@@ -34,7 +34,7 @@
 struct uart_backend;
 
 struct uart_backend *uart_backend_alloc(void);
-int uart_backend_open(struct uart_backend *b, const char *opts,
+int uart_backend_open(struct uart_backend *b, const char *device,
     void (*func)(int, enum ev_type, void *), void *arg);
 
 void uart_rxfifo_reset(struct uart_backend *b, int size);

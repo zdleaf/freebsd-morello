@@ -468,11 +468,11 @@ uart_init(uart_intr_func_t intr_assert, uart_intr_func_t intr_deassert,
 }
 
 int
-uart_set_backend(struct uart_softc *sc, const char *opts)
+uart_set_backend(struct uart_softc *sc, const char *device)
 {
 	int retval;
 
-	retval = uart_backend_open(sc->backend, opts, uart_drain, sc);
+	retval = uart_backend_open(sc->backend, device, uart_drain, sc);
 	return (retval);
 }
 
