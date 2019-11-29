@@ -1236,6 +1236,7 @@ initarm(struct arm64_bootparams *abp)
 	valid = bus_probe();
 
 	cninit();
+	set_ttbr0(abp->kern_ttbr0);
 
 	if (!valid)
 		panic("Invalid bus configuration: %s",
