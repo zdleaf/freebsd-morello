@@ -2,6 +2,7 @@
  * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2019 Andrew Turner
+ * Copyright (c) 2019 Ruslan Bukin <br@bsdpad.com>
  *
  * This software was developed by SRI International and the University of
  * Cambridge Computer Laboratory (Department of Computer Science and
@@ -35,6 +36,7 @@ __FBSDID("$FreeBSD$");
 
 #include <sys/param.h>
 #include <sys/systm.h>
+#include <sys/malloc.h>
 #include <sys/bus.h>
 #include <sys/endian.h>
 #include <sys/kernel.h>
@@ -70,6 +72,100 @@ __FBSDID("$FreeBSD$");
 	(((func) & PCIE_FUNC_MASK) << PCIE_FUNC_SHIFT)	|	\
 	((reg) & PCIE_REG_MASK))
 
+#define	PCIE_BDF(bus, slot, func)				\
+	((((bus) & PCIE_BUS_MASK) << PCIE_BUS_SHIFT)	|	\
+	(((slot) & PCIE_SLOT_MASK) << PCIE_SLOT_SHIFT)	|	\
+	(((func) & PCIE_FUNC_MASK) << PCIE_FUNC_SHIFT))
+
+#define	AP_NS_SHARED_MEM_BASE	0x06000000
+#define	MAX_SEGMENTS		2 /* Two PCIe root complex devices. */
+#define	BDF_TABLE_SIZE		(16 * 1024)
+#define	PCI_CFG_SPACE		0x1000
+
+extern struct bus_space memmap_bus;
+bus_space_handle_t rc_remapped_addr[MAX_SEGMENTS];
+
+int nsegments = 0;
+
+struct pcie_discovery_data {
+	uint32_t rc_base_addr;
+	uint32_t nr_bdfs;
+	uint32_t valid_bdfs[0];
+} *pcie_discovery_data[MAX_SEGMENTS];
+
+static void
+n1sdp_init(struct generic_pcie_core_softc *sc)
+{
+	bus_addr_t paddr;
+	bus_addr_t paddr_rc;
+	bus_size_t psize;
+	bus_size_t psize_rc;
+	bus_space_handle_t vaddr;
+	bus_space_handle_t vaddr_rc;
+	int segment;
+	int err;
+	int bdfs_size;
+	struct pcie_discovery_data *shared_data;
+
+	segment = sc->unit;
+
+	paddr = AP_NS_SHARED_MEM_BASE + segment * BDF_TABLE_SIZE;
+	psize = BDF_TABLE_SIZE;
+	err = bus_space_map(&memmap_bus, paddr, psize, 0, &vaddr);
+
+	printf("vaddr %lx\n", vaddr);
+
+	shared_data = (struct pcie_discovery_data *)vaddr;
+	bdfs_size = sizeof(struct pcie_discovery_data) +
+		sizeof(uint32_t) * shared_data->nr_bdfs;
+	pcie_discovery_data[segment] =
+	    malloc(bdfs_size, M_DEVBUF, M_WAITOK | M_ZERO);
+	memcpy(pcie_discovery_data[segment], shared_data, bdfs_size);
+
+	paddr_rc = shared_data->rc_base_addr;
+	psize_rc = PCI_CFG_SPACE;
+	err = bus_space_map(&memmap_bus, paddr_rc, psize_rc, 0, &vaddr_rc);
+
+	rc_remapped_addr[segment] = vaddr_rc;
+
+	printf("shared_data->rc_base_addr %x\n", shared_data->rc_base_addr);
+	printf("bdfs_size %d\n", bdfs_size);
+
+	int table_count;
+	int i;
+
+	table_count = pcie_discovery_data[segment]->nr_bdfs;
+	for (i = 0; i < table_count; i++)
+		printf("%s%d: valid bdf %x\n", __func__, sc->unit,
+		    pcie_discovery_data[segment]->valid_bdfs[i]);
+
+	bus_space_unmap(&memmap_bus, vaddr, psize);
+}
+
+static int
+n1sdp_check_bdf(struct generic_pcie_core_softc *sc,
+    u_int bus, u_int slot, u_int func)
+{
+	int table_count;
+	int segment;
+	int bdf;
+	int i;
+
+	bdf = PCIE_BDF(bus, slot, func);
+	if (bdf == 0)
+		return (1);
+
+	segment = sc->unit;
+
+	table_count = pcie_discovery_data[segment]->nr_bdfs;
+
+	for (i = 0; i < table_count; i++)
+		if (bdf == pcie_discovery_data[segment]->valid_bdfs[i])
+			return (1);
+
+	return (0);
+}
+
 static int
 n1sdp_pcie_acpi_probe(device_t dev)
 {
@@ -101,6 +197,26 @@ n1sdp_pcie_acpi_probe(device_t dev)
 	return (BUS_PROBE_DEFAULT);
 }
 
+static int
+n1sdp_pcie_acpi_attach(device_t dev)
+{
+	struct generic_pcie_core_softc *sc;
+	int err;
+
+	sc = device_get_softc(dev);
+
+	/* TODO: where to get pci bus id (segment id) ? */
+	sc->unit = nsegments++;
+	if (sc->unit > MAX_SEGMENTS)
+		return (ENXIO);
+
+	n1sdp_init(sc);
+
+	err = pci_host_generic_acpi_attach(dev);
+
+	return (err);
+}
+
 static uint32_t
 n1sdp_pcie_read_config(device_t dev, u_int bus, u_int slot,
     u_int func, u_int reg, int bytes)
@@ -118,18 +234,31 @@ n1sdp_pcie_read_config(device_t dev, u_int bus, u_int slot,
 	    (reg > PCIE_REGMAX))
 		return (~0U);
 
+	if (n1sdp_check_bdf(sc, bus, slot, func) == 0)
+		return (~0U);
+
+	//printf("%s: bdf %x\n", __func__, PCIE_BDF(bus, slot, func));
+
 	offset = PCIE_ADDR_OFFSET(bus - sc->bus_start, slot, func, reg);
 	t = sc->bst;
 	h = sc->bsh;
 
+	if (bus == 0 && slot == 0 && func == 0) {
+		t = &memmap_bus;
+		h = rc_remapped_addr[sc->unit];
+	}
+
 	data = bus_space_read_4(t, h, offset & ~3);
+
 	switch (bytes) {
 	case 1:
-		data >>= offset & 3;
+		data >>= (offset & 3) * 8;
+		data &= 0xff;
 		break;
 	case 2:
-		data >>= (offset & 3) >> 1;
+		data >>= (offset & 3) * 8;
 		data = le16toh(data);
+		data &= 0xffff;
 		break;
 	case 4:
 		data = le32toh(data);
@@ -158,10 +287,18 @@ n1sdp_pcie_write_config(device_t dev, u_int bus, u_int slot,
 	    (reg > PCIE_REGMAX))
 		return;
 
+	if (n1sdp_check_bdf(sc, bus, slot, func) == 0)
+		return;
+
 	offset = PCIE_ADDR_OFFSET(bus - sc->bus_start, slot, func, reg);
 
 	t = sc->bst;
 	h = sc->bsh;
+
+	if (bus == 0 && slot == 0 && func == 0) {
+		t = &memmap_bus;
+		h = rc_remapped_addr[sc->unit];
+	}
 
 	/*
 	 * TODO: This is probably wrong on big-endian, however as arm64 is
@@ -170,15 +307,15 @@ n1sdp_pcie_write_config(device_t dev, u_int bus, u_int slot,
 	switch (bytes) {
 	case 1:
 		data = bus_space_read_4(t, h, offset & ~3);
-		data &= ~(0xff << (offset & 3));
-		data |= (val & 0xff) << (offset & 3);
-		bus_space_write_4(t, h, offset, htole32(data));
+		data &= ~(0xff << ((offset & 3) * 8));
+		data |= (val & 0xff) << ((offset & 3) * 8);
+		bus_space_write_4(t, h, offset & ~3, htole32(data));
 		break;
 	case 2:
 		data = bus_space_read_4(t, h, offset & ~3);
-		data &= ~(0xffff << ((offset & 3) >> 1));
-		data |= (val & 0xffff) << ((offset & 3) >> 1);
-		bus_space_write_4(t, h, offset, htole32(data));
+		data &= ~(0xffff << ((offset & 3) * 8));
+		data |= (val & 0xffff) << ((offset & 3) * 8);
+		bus_space_write_4(t, h, offset & ~3, htole32(data));
 		break;
 	case 4:
 		bus_space_write_4(t, h, offset, htole32(val));
@@ -190,6 +327,7 @@ n1sdp_pcie_write_config(device_t dev, u_int bus, u_int slot,
 
 static device_method_t n1sdp_pcie_acpi_methods[] = {
 	DEVMETHOD(device_probe,		n1sdp_pcie_acpi_probe),
+	DEVMETHOD(device_attach,	n1sdp_pcie_acpi_attach),
 
 	/* pcib interface */
 	DEVMETHOD(pcib_read_config,	n1sdp_pcie_read_config),

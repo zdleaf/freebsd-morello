@@ -229,7 +229,7 @@ pci_host_acpi_get_ecam_resource(device_t dev)
 	return (0);
 }
 
-static int
+int
 pci_host_generic_acpi_attach(device_t dev)
 {
 	struct generic_pcie_acpi_softc *sc;

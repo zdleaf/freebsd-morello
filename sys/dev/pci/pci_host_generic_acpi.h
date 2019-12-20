@@ -39,4 +39,6 @@ struct generic_pcie_acpi_softc {
 
 DECLARE_CLASS(generic_pcie_acpi_driver);
 
+int pci_host_generic_acpi_attach(device_t dev);
+
 #endif /* __PCI_HOST_GENERIC_ACPI_H_ */
