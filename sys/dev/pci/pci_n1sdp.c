@@ -85,8 +85,6 @@ __FBSDID("$FreeBSD$");
 extern struct bus_space memmap_bus;
 bus_space_handle_t rc_remapped_addr[MAX_SEGMENTS];
 
-int nsegments = 0;
-
 struct pcie_discovery_data {
 	uint32_t rc_base_addr;
 	uint32_t nr_bdfs;
@@ -102,42 +100,36 @@ n1sdp_init(struct generic_pcie_core_softc *sc)
 	bus_size_t psize_rc;
 	bus_space_handle_t vaddr;
 	bus_space_handle_t vaddr_rc;
-	int segment;
 	int err;
 	int bdfs_size;
 	struct pcie_discovery_data *shared_data;
 
-	segment = sc->unit;
-
-	paddr = AP_NS_SHARED_MEM_BASE + segment * BDF_TABLE_SIZE;
+	paddr = AP_NS_SHARED_MEM_BASE + sc->segment * BDF_TABLE_SIZE;
 	psize = BDF_TABLE_SIZE;
 	err = bus_space_map(&memmap_bus, paddr, psize, 0, &vaddr);
-
-	printf("vaddr %lx\n", vaddr);
 
 	shared_data = (struct pcie_discovery_data *)vaddr;
 	bdfs_size = sizeof(struct pcie_discovery_data) +
 		sizeof(uint32_t) * shared_data->nr_bdfs;
-	pcie_discovery_data[segment] =
+	pcie_discovery_data[sc->segment] =
 	    malloc(bdfs_size, M_DEVBUF, M_WAITOK | M_ZERO);
-	memcpy(pcie_discovery_data[segment], shared_data, bdfs_size);
+	memcpy(pcie_discovery_data[sc->segment], shared_data, bdfs_size);
 
 	paddr_rc = shared_data->rc_base_addr;
 	psize_rc = PCI_CFG_SPACE;
 	err = bus_space_map(&memmap_bus, paddr_rc, psize_rc, 0, &vaddr_rc);
 
-	rc_remapped_addr[segment] = vaddr_rc;
-
-	printf("shared_data->rc_base_addr %x\n", shared_data->rc_base_addr);
-	printf("bdfs_size %d\n", bdfs_size);
+	rc_remapped_addr[sc->segment] = vaddr_rc;
 
 	int table_count;
 	int i;
 
-	table_count = pcie_discovery_data[segment]->nr_bdfs;
-	for (i = 0; i < table_count; i++)
-		printf("%s%d: valid bdf %x\n", __func__, sc->unit,
-		    pcie_discovery_data[segment]->valid_bdfs[i]);
+	if (bootverbose) {
+		table_count = pcie_discovery_data[sc->segment]->nr_bdfs;
+		for (i = 0; i < table_count; i++)
+			device_printf(sc->dev, "valid bdf %x\n",
+			    pcie_discovery_data[sc->segment]->valid_bdfs[i]);
+	}
 
 	bus_space_unmap(&memmap_bus, vaddr, psize);
 }
@@ -147,7 +139,6 @@ n1sdp_check_bdf(struct generic_pcie_core_softc *sc,
     u_int bus, u_int slot, u_int func)
 {
 	int table_count;
-	int segment;
 	int bdf;
 	int i;
 
@@ -155,12 +146,10 @@ n1sdp_check_bdf(struct generic_pcie_core_softc *sc,
 	if (bdf == 0)
 		return (1);
 
-	segment = sc->unit;
-
-	table_count = pcie_discovery_data[segment]->nr_bdfs;
+	table_count = pcie_discovery_data[sc->segment]->nr_bdfs;
 
 	for (i = 0; i < table_count; i++)
-		if (bdf == pcie_discovery_data[segment]->valid_bdfs[i])
+		if (bdf == pcie_discovery_data[sc->segment]->valid_bdfs[i])
 			return (1);
 
 	return (0);
@@ -201,14 +190,25 @@ static int
 n1sdp_pcie_acpi_attach(device_t dev)
 {
 	struct generic_pcie_core_softc *sc;
+	ACPI_HANDLE handle;
+	ACPI_STATUS status;
 	int err;
 
 	sc = device_get_softc(dev);
 
-	/* TODO: where to get pci bus id (segment id) ? */
-	sc->unit = nsegments++;
-	if (sc->unit > MAX_SEGMENTS)
+	handle = acpi_get_handle(dev);
+
+	/* Get PCI Segment (domain) needed for IOMMU space remap. */
+	status = acpi_GetInteger(handle, "_SEG", &sc->segment);
+	if (ACPI_FAILURE(status)) {
+		device_printf(dev, "No _SEG for PCI Bus\n");
 		return (ENXIO);
+	}
+
+	if (sc->segment == MAX_SEGMENTS) {
+		device_printf(dev, "Unknown PCI Bus segment (domain)\n");
+		return (ENXIO);
+	}
 
 	n1sdp_init(sc);
 
@@ -237,15 +237,13 @@ n1sdp_pcie_read_config(device_t dev, u_int bus, u_int slot,
 	if (n1sdp_check_bdf(sc, bus, slot, func) == 0)
 		return (~0U);
 
-	//printf("%s: bdf %x\n", __func__, PCIE_BDF(bus, slot, func));
-
 	offset = PCIE_ADDR_OFFSET(bus - sc->bus_start, slot, func, reg);
 	t = sc->bst;
 	h = sc->bsh;
 
 	if (bus == 0 && slot == 0 && func == 0) {
 		t = &memmap_bus;
-		h = rc_remapped_addr[sc->unit];
+		h = rc_remapped_addr[sc->segment];
 	}
 
 	data = bus_space_read_4(t, h, offset & ~3);
@@ -297,7 +295,7 @@ n1sdp_pcie_write_config(device_t dev, u_int bus, u_int slot,
 
 	if (bus == 0 && slot == 0 && func == 0) {
 		t = &memmap_bus;
-		h = rc_remapped_addr[sc->unit];
+		h = rc_remapped_addr[sc->segment];
 	}
 
 	/*
