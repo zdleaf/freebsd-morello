@@ -64,7 +64,6 @@ struct generic_pcie_core_softc {
 	device_t		dev;
 	bus_space_handle_t	ioh;
 	bus_dma_tag_t		dmat;
-	int			segment;
 };
 
 DECLARE_CLASS(generic_pcie_core_driver);
