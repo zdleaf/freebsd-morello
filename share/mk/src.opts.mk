@@ -304,9 +304,8 @@ __DEFAULT_NO_OPTIONS+=LLVM_TARGET_BPF
 # This means that architectures that have GCC 4.2 as default can not
 # build Clang without using an external compiler.
 
-.if ${COMPILER_FEATURES:Mc++11} && (${__T} == "aarch64" || \
-    ${__T} == "amd64" || ${__TT} == "arm" || ${__T} == "i386" || \
-    ${__TT} == "powerpc")
+.if ${COMPILER_FEATURES:Mc++11} && (${__TT} != "mips" && \
+    ${__TT} != "riscv" && ${__TT} != "sparc64")
 # Clang is enabled, and will be installed as the default /usr/bin/cc.
 __DEFAULT_YES_OPTIONS+=CLANG CLANG_BOOTSTRAP CLANG_IS_CC LLD
 __DEFAULT_NO_OPTIONS+=GCC GCC_BOOTSTRAP GNUCXX GPL_DTC
@@ -328,8 +327,8 @@ BROKEN_OPTIONS+=BINUTILS BINUTILS_BOOTSTRAP GCC GCC_BOOTSTRAP GDB
 .if ${__T:Mriscv*} != ""
 BROKEN_OPTIONS+=OFED
 .endif
-.if ${__T} == "aarch64" || ${__T} == "amd64" || ${__T} == "i386" || \
-    ${__TT} == "powerpc" || ${__T:Mriscv*} != "" || ${__TT} == "mips"
+.if ${__T} != "arm" && ${__T} != "armv6" && ${__T} != "armv7" && \
+    ${__T} != "sparc64"
 __DEFAULT_YES_OPTIONS+=LLVM_LIBUNWIND
 .else
 __DEFAULT_NO_OPTIONS+=LLVM_LIBUNWIND
