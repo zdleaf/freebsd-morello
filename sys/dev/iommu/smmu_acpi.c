@@ -62,7 +62,6 @@ struct smmu_acpi_devinfo {
 static device_identify_t smmu_acpi_identify;
 static device_probe_t smmu_acpi_probe;
 static device_attach_t smmu_acpi_attach;
-static bus_alloc_resource_t smmu_acpi_bus_alloc_res;
 
 static void smmu_acpi_bus_attach(device_t);
 
@@ -71,10 +70,6 @@ static device_method_t smmu_acpi_methods[] = {
 	DEVMETHOD(device_identify,		smmu_acpi_identify),
 	DEVMETHOD(device_probe,			smmu_acpi_probe),
 	DEVMETHOD(device_attach,		smmu_acpi_attach),
-
-	/* Bus interface */
-	DEVMETHOD(bus_alloc_resource,		smmu_acpi_bus_alloc_res),
-	DEVMETHOD(bus_activate_resource,	bus_generic_activate_resource),
 
 	/* End */
 	DEVMETHOD_END
@@ -123,31 +118,6 @@ iort_handler(ACPI_SUBTABLE_HEADER *entry, void *arg)
 		break;
 	}
 }
-
-#if 0
-static void
-rdist_map(ACPI_SUBTABLE_HEADER *entry, void *arg)
-{
-	ACPI_MADT_GENERIC_REDISTRIBUTOR *redist;
-	struct iort_table_data *iort_data;
-
-	iort_data = (struct iort_table_data *)arg;
-
-	switch(entry->Type) {
-	case ACPI_MADT_TYPE_GENERIC_REDISTRIBUTOR:
-		redist = (ACPI_MADT_GENERIC_REDISTRIBUTOR *)entry;
-
-		iort_data->count++;
-		BUS_SET_RESOURCE(iort_data->parent, iort_data->dev,
-		    SYS_RES_MEMORY, iort_data->count, redist->BaseAddress,
-		    redist->Length);
-		break;
-
-	default:
-		break;
-	}
-}
-#endif
 
 static void
 smmu_acpi_identify(driver_t *driver, device_t parent)
@@ -217,11 +187,6 @@ smmu_acpi_identify(driver_t *driver, device_t parent)
 
 	iort_data.dev = dev;
 
-#if 0
-	acpi_walk_subtables(iort + 1, (char *)iort + iort->Header.Length,
-	    rdist_map, &iort_data);
-#endif
-
 out:
 	acpi_unmap_table(iort);
 }
@@ -243,46 +208,6 @@ smmu_acpi_probe(device_t dev)
 	return (BUS_PROBE_NOWILDCARD);
 }
 
-static void
-iort_count_redistrib(ACPI_SUBTABLE_HEADER *entry, void *arg)
-{
-#if 0
-	struct smmu_softc *sc = arg;
-
-	if (entry->Type == ACPI_MADT_TYPE_GENERIC_REDISTRIBUTOR)
-		sc->smmu_redists.nregions++;
-#endif
-}
-
-static int
-smmu_acpi_count_regions(device_t dev)
-{
-#if 0
-	struct smmu_softc *sc;
-	ACPI_TABLE_MADT *iort;
-	vm_paddr_t physaddr;
-
-	sc = device_get_softc(dev);
-
-	physaddr = acpi_find_table(ACPI_SIG_MADT);
-	if (physaddr == 0)
-		return (ENXIO);
-
-	iort = acpi_map_table(physaddr, ACPI_SIG_MADT);
-	if (iort == NULL) {
-		device_printf(dev, "Unable to map the MADT\n");
-		return (ENXIO);
-	}
-
-	acpi_walk_subtables(iort + 1, (char *)iort + iort->Header.Length,
-	    iort_count_redistrib, sc);
-	acpi_unmap_table(iort);
-
-	return (sc->smmu_redists.nregions > 0 ? 0 : ENXIO);
-#endif
-	return (0);
-}
-
 static int
 smmu_acpi_attach(device_t dev)
 {
@@ -291,37 +216,10 @@ smmu_acpi_attach(device_t dev)
 
 	sc = device_get_softc(dev);
 	sc->dev = dev;
-	//sc->smmu_bus = GIC_BUS_ACPI;
-
-	err = smmu_acpi_count_regions(dev);
-	if (err != 0)
-		goto error;
 
 	err = smmu_attach(dev);
 	if (err != 0)
 		goto error;
-
-#if 0
-	sc->smmu_pic = intr_pic_register(dev, ACPI_INTR_XREF);
-	if (sc->smmu_pic == NULL) {
-		device_printf(dev, "could not register PIC\n");
-		err = ENXIO;
-		goto error;
-	}
-
-	if (intr_pic_claim_root(dev, ACPI_INTR_XREF, arm_smmu_intr, sc,
-	    GIC_LAST_SGI - GIC_FIRST_SGI + 1) != 0) {
-		err = ENXIO;
-		goto error;
-	}
-#endif
-
-	if (1 == 0)
-		smmu_acpi_bus_attach(dev);
-
-	//if (device_get_children(dev, &sc->smmu_children,
-	//    &sc->smmu_nchildren) !=0)
-	//	sc->smmu_nchildren = 0;
 
 	return (0);
 
@@ -334,97 +232,4 @@ error:
 	smmu_detach(dev);
 
 	return (err);
-}
-
-static void
-smmu_add_children(ACPI_SUBTABLE_HEADER *entry, void *arg)
-{
-#if 0
-	ACPI_MADT_GENERIC_TRANSLATOR *smmut;
-	struct smmu_acpi_devinfo *di;
-	struct smmu_softc *sc;
-	device_t child, dev;
-	u_int xref;
-	int err, pxm;
-
-	if (entry->Type == ACPI_MADT_TYPE_GENERIC_TRANSLATOR) {
-		/* We have an ITS, add it as a child */
-		smmut = (ACPI_MADT_GENERIC_TRANSLATOR *)entry;
-		dev = arg;
-		sc = device_get_softc(dev);
-
-		child = device_add_child(dev, "its", -1);
-		if (child == NULL)
-			return;
-
-		di = malloc(sizeof(*di), M_GIC_V3, M_WAITOK | M_ZERO);
-		resource_list_init(&di->di_rl);
-		resource_list_add(&di->di_rl, SYS_RES_MEMORY, 0,
-		    smmut->BaseAddress, smmut->BaseAddress + 256 * 1024 - 1,
-		    256 * 1024);
-		err = acpi_iort_its_lookup(smmut->TranslationId, &xref, &pxm);
-		if (err == 0) {
-			di->di_smmu_dinfo.smmu_domain = pxm;
-			di->di_smmu_dinfo.msi_xref = xref;
-		} else {
-			di->di_smmu_dinfo.smmu_domain = -1;
-			di->di_smmu_dinfo.msi_xref = ACPI_MSI_XREF;
-		}
-		sc->smmu_nchildren++;
-		device_set_ivars(child, di);
-	}
-#endif
-}
-
-static void
-smmu_acpi_bus_attach(device_t dev)
-{
-	ACPI_TABLE_MADT *iort;
-	vm_paddr_t physaddr;
-
-	physaddr = acpi_find_table(ACPI_SIG_MADT);
-	if (physaddr == 0)
-		return;
-
-	iort = acpi_map_table(physaddr, ACPI_SIG_MADT);
-	if (iort == NULL) {
-		device_printf(dev, "Unable to map the MADT to add children\n");
-		return;
-	}
-
-	acpi_walk_subtables(iort + 1, (char *)iort + iort->Header.Length,
-	    smmu_add_children, dev);
-
-	acpi_unmap_table(iort);
-
-	bus_generic_attach(dev);
-}
-
-static struct resource *
-smmu_acpi_bus_alloc_res(device_t bus, device_t child, int type, int *rid,
-    rman_res_t start, rman_res_t end, rman_res_t count, u_int flags)
-{
-	struct smmu_acpi_devinfo *di;
-	struct resource_list_entry *rle;
-
-	/* We only allocate memory */
-	if (type != SYS_RES_MEMORY)
-		return (NULL);
-
-	if (RMAN_IS_DEFAULT_RANGE(start, end)) {
-		if ((di = device_get_ivars(child)) == NULL)
-			return (NULL);
-
-		/* Find defaults for this rid */
-		rle = resource_list_find(&di->di_rl, type, *rid);
-		if (rle == NULL)
-			return (NULL);
-
-		start = rle->start;
-		end = rle->end;
-		count = rle->count;
-	}
-
-	return (bus_generic_alloc_resource(bus, child, type, rid, start, end,
-	    count, flags));
 }
