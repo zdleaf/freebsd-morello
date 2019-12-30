@@ -88,6 +88,14 @@ static device_method_t smmu_methods[] = {
 	DEVMETHOD_END
 };
 
+static struct resource_spec smmu_spec[] = {
+	{ SYS_RES_MEMORY, 0, RF_ACTIVE },
+	{ SYS_RES_IRQ, 0, RF_ACTIVE },
+	{ SYS_RES_IRQ, 1, RF_ACTIVE },
+	{ SYS_RES_IRQ, 2, RF_ACTIVE },
+	RESOURCE_SPEC_END
+};
+
 DEFINE_CLASS_0(gic, smmu_driver, smmu_methods,
     sizeof(struct smmu_softc));
 
@@ -96,6 +104,33 @@ DEFINE_CLASS_0(gic, smmu_driver, smmu_methods,
  */
 MALLOC_DEFINE(M_SMMU, "SMMU", SMMU_DEVSTR);
 
+static int
+smmu_event_intr(void *arg)
+{
+
+	printf("%s\n", __func__);
+
+	return (FILTER_HANDLED);
+}
+
+static int
+smmu_sync_intr(void *arg)
+{
+
+	printf("%s\n", __func__);
+
+	return (FILTER_HANDLED);
+}
+
+static int
+smmu_gerr_intr(void *arg)
+{
+
+	printf("%s\n", __func__);
+
+	return (FILTER_HANDLED);
+}
+
 /*
  * Device interface.
  */
@@ -103,19 +138,43 @@ int
 smmu_attach(device_t dev)
 {
 	struct smmu_softc *sc;
-	int rid;
+	int error;
 
 	sc = device_get_softc(dev);
 
 	sc->dev = dev;
 
-	rid = 0;
-	sc->res[rid] = bus_alloc_resource_any(dev, SYS_RES_MEMORY,
-	    &rid, RF_ACTIVE);
-	if (sc->res[rid] == NULL) {
-		device_printf(dev, "Failed to map memory\n");
+	error = bus_alloc_resources(dev, smmu_spec, sc->res);
+	if (error) {
+		device_printf(dev, "Couldn't allocate resources\n");
 		return (ENXIO);
 	}
+
+	error = bus_setup_intr(dev, sc->res[1], INTR_TYPE_MISC,
+	    smmu_event_intr, NULL, sc, &sc->intr_cookie[0]);
+	if (error) {
+		device_printf(dev, "Couldn't setup Event interrupt handler\n");
+		goto fail;
+	}
+
+	error = bus_setup_intr(dev, sc->res[2], INTR_TYPE_MISC,
+	    smmu_sync_intr, NULL, sc, &sc->intr_cookie[1]);
+	if (error) {
+		device_printf(dev, "Couldn't setup Sync interrupt handler\n");
+		goto fail;
+	}
+
+	error = bus_setup_intr(dev, sc->res[3], INTR_TYPE_MISC,
+	    smmu_gerr_intr, NULL, sc, &sc->intr_cookie[2]);
+	if (error) {
+		device_printf(dev, "Couldn't setup Gerr interrupt handler\n");
+		goto fail;
+	}
+
+	return (0);
+
+fail:
+	bus_release_resources(dev, smmu_spec, sc->res);
 
 	return (0);
 }
@@ -124,16 +183,13 @@ int
 smmu_detach(device_t dev)
 {
 	struct smmu_softc *sc;
-	int rid;
 
 	sc = device_get_softc(dev);
 
 	//if (device_is_attached(dev)) {
 	//}
 
-	rid = 0;
-
-	bus_release_resource(dev, SYS_RES_MEMORY, rid, sc->res[rid]);
+	bus_release_resources(dev, smmu_spec, sc->res);
 
 	return (0);
 }

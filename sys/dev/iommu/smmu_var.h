@@ -41,7 +41,8 @@ DECLARE_CLASS(smmu_driver);
 
 struct smmu_softc {
 	device_t		dev;
-	struct resource		*res[1];
+	struct resource		*res[4];
+	void			*intr_cookie[3];
 };
 
 struct smmu_devinfo {

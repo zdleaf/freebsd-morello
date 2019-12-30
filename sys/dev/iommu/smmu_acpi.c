@@ -195,7 +195,19 @@ smmu_acpi_identify(driver_t *driver, device_t parent)
 			goto out;
 		}
 
+		printf("intr ids %d %d %d, prio %d\n",
+			iort_data.smmu[i]->EventGsiv,
+			iort_data.smmu[i]->SyncGsiv,
+			iort_data.smmu[i]->GerrGsiv,
+			iort_data.smmu[i]->PriGsiv);
+
 		/* Add the IORT data */
+		BUS_SET_RESOURCE(parent, dev, SYS_RES_IRQ, 0,
+		    iort_data.smmu[i]->EventGsiv, 1);
+		BUS_SET_RESOURCE(parent, dev, SYS_RES_IRQ, 1,
+		    iort_data.smmu[i]->SyncGsiv, 1);
+		BUS_SET_RESOURCE(parent, dev, SYS_RES_IRQ, 2,
+		    iort_data.smmu[i]->GerrGsiv, 1);
 		BUS_SET_RESOURCE(parent, dev, SYS_RES_MEMORY, 0,
 		    iort_data.smmu[i]->BaseAddress, MEMORY_RESOURCE_SIZE);
 
