@@ -23,6 +23,7 @@ ident		GENERIC
 
 makeoptions	DEBUG=-g		# Build kernel with gdb(1) debug symbols
 makeoptions	WITH_CTF=1		# Run ctfconvert(1) for DTrace support
+makeoptions	NO_MODULES
 
 options 	SCHED_ULE		# ULE scheduler
 options 	NUMA			# Non-Uniform Memory Architecture support
@@ -77,6 +78,10 @@ options 	RACCT_DEFAULT_TO_DISABLED # Set kern.racct.enable=0 by default
 options 	RCTL			# Resource limits
 options 	SMP
 options 	INTRNG
+
+#options 	MD_ROOT_SIZE=65536
+#options 	ROOTDEVNAME=\"ufs:md0\"
+#makeoptions	MFS_IMAGE=/home/br/dev/freebsd-head/aa64.img
 
 # Debugging support.  Always need this:
 options 	KDB			# Enable kernel debugger support.
