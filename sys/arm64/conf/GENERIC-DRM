@@ -1,0 +1,14 @@
+#
+# GENERIC-DRM
+#
+# Custom kernel for arm64 plus DRM
+#
+# $FreeBSD$
+
+#NO_UNIVERSE
+
+include		GENERIC
+ident		GENERIC-DRM
+
+# DRM Support
+options		COMPAT_DRMKPI
