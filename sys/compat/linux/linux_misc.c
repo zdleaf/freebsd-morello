@@ -396,7 +396,7 @@ linux_uselib(struct thread *td, struct linux_uselib_args *args)
 	 * Lock no longer needed
 	 */
 	locked = false;
-	VOP_UNLOCK(vp, 0);
+	VOP_UNLOCK(vp);
 
 	/*
 	 * Check if file_offset page aligned. Currently we cannot handle
@@ -469,7 +469,7 @@ linux_uselib(struct thread *td, struct linux_uselib_args *args)
 cleanup:
 	if (opened) {
 		if (locked)
-			VOP_UNLOCK(vp, 0);
+			VOP_UNLOCK(vp);
 		locked = false;
 		VOP_CLOSE(vp, FREAD, td->td_ucred, td);
 	}
@@ -481,7 +481,7 @@ cleanup:
 		VOP_UNSET_TEXT_CHECKED(vp);
 	}
 	if (locked)
-		VOP_UNLOCK(vp, 0);
+		VOP_UNLOCK(vp);
 
 	/* Release the temporary mapping. */
 	if (a_out)
@@ -1207,12 +1207,8 @@ linux_getitimer(struct thread *td, struct linux_getitimer_args *uap)
 int
 linux_nice(struct thread *td, struct linux_nice_args *args)
 {
-	struct setpriority_args bsd_args;
 
-	bsd_args.which = PRIO_PROCESS;
-	bsd_args.who = 0;		/* current process */
-	bsd_args.prio = args->inc;
-	return (sys_setpriority(td, &bsd_args));
+	return (kern_setpriority(td, PRIO_PROCESS, 0, args->inc));
 }
 #endif /* __i386__ || (__amd64__ && COMPAT_LINUX32) */
 
@@ -1617,12 +1613,9 @@ linux_nosys(struct thread *td, struct nosys_args *ignore)
 int
 linux_getpriority(struct thread *td, struct linux_getpriority_args *args)
 {
-	struct getpriority_args bsd_args;
 	int error;
 
-	bsd_args.which = args->which;
-	bsd_args.who = args->who;
-	error = sys_getpriority(td, &bsd_args);
+	error = kern_getpriority(td, args->which, args->who);
 	td->td_retval[0] = 20 - td->td_retval[0];
 	return (error);
 }
@@ -2351,5 +2344,21 @@ linux_syslog(struct thread *td, struct linux_syslog_args *args)
 	}
 out:
 	td->td_retval[0] = dst - args->buf;
+	return (error);
+}
+
+int
+linux_getcpu(struct thread *td, struct linux_getcpu_args *args)
+{
+	int cpu, error, node;
+
+	cpu = td->td_oncpu; /* Make sure it doesn't change during copyout(9) */
+	error = 0;
+	node = cpuid_to_pcpu[cpu]->pc_domain;
+
+	if (args->cpu != NULL)
+		error = copyout(&cpu, args->cpu, sizeof(l_int));
+	if (args->node != NULL)
+		error = copyout(&node, args->node, sizeof(l_int));
 	return (error);
 }

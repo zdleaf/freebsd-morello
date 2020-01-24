@@ -915,7 +915,7 @@ mdstart_vnode(struct md_s *sc, struct bio *bp)
 		(void) vn_start_write(vp, &mp, V_WAIT);
 		vn_lock(vp, LK_EXCLUSIVE | LK_RETRY);
 		error = VOP_FSYNC(vp, MNT_WAIT, td);
-		VOP_UNLOCK(vp, 0);
+		VOP_UNLOCK(vp);
 		vn_finished_write(mp);
 		return (error);
 	}
@@ -986,13 +986,13 @@ unmapped_step:
 	if (auio.uio_rw == UIO_READ) {
 		vn_lock(vp, LK_EXCLUSIVE | LK_RETRY);
 		error = VOP_READ(vp, &auio, 0, sc->cred);
-		VOP_UNLOCK(vp, 0);
+		VOP_UNLOCK(vp);
 	} else {
 		(void) vn_start_write(vp, &mp, V_WAIT);
 		vn_lock(vp, LK_EXCLUSIVE | LK_RETRY);
 		error = VOP_WRITE(vp, &auio, sc->flags & MD_ASYNC ? 0 : IO_SYNC,
 		    sc->cred);
-		VOP_UNLOCK(vp, 0);
+		VOP_UNLOCK(vp);
 		vn_finished_write(mp);
 		if (error == 0)
 			sc->flags &= ~MD_VERIFY;
@@ -1057,11 +1057,12 @@ mdstart_swap(struct md_s *sc, struct bio *bp)
 	lastend = (bp->bio_offset + bp->bio_length - 1) % PAGE_SIZE + 1;
 
 	rv = VM_PAGER_OK;
-	VM_OBJECT_WLOCK(sc->object);
 	vm_object_pip_add(sc->object, 1);
 	for (i = bp->bio_offset / PAGE_SIZE; i <= lastp; i++) {
 		len = ((i == lastp) ? lastend : PAGE_SIZE) - offs;
+		VM_OBJECT_WLOCK(sc->object);
 		m = vm_page_grab(sc->object, i, VM_ALLOC_SYSTEM);
+		VM_OBJECT_WUNLOCK(sc->object);
 		if (bp->bio_cmd == BIO_READ) {
 			if (vm_page_all_valid(m))
 				rv = VM_PAGER_OK;
@@ -1069,7 +1070,9 @@ mdstart_swap(struct md_s *sc, struct bio *bp)
 				rv = vm_pager_get_pages(sc->object, &m, 1,
 				    NULL, NULL);
 			if (rv == VM_PAGER_ERROR) {
+				VM_OBJECT_WLOCK(sc->object);
 				vm_page_free(m);
+				VM_OBJECT_WUNLOCK(sc->object);
 				break;
 			} else if (rv == VM_PAGER_FAIL) {
 				/*
@@ -1099,7 +1102,9 @@ mdstart_swap(struct md_s *sc, struct bio *bp)
 				rv = vm_pager_get_pages(sc->object, &m, 1,
 				    NULL, NULL);
 			if (rv == VM_PAGER_ERROR) {
+				VM_OBJECT_WLOCK(sc->object);
 				vm_page_free(m);
+				VM_OBJECT_WUNLOCK(sc->object);
 				break;
 			} else if (rv == VM_PAGER_FAIL)
 				pmap_zero_page(m);
@@ -1122,8 +1127,10 @@ mdstart_swap(struct md_s *sc, struct bio *bp)
 			else
 				rv = vm_pager_get_pages(sc->object, &m, 1,
 				    NULL, NULL);
+			VM_OBJECT_WLOCK(sc->object);
 			if (rv == VM_PAGER_ERROR) {
 				vm_page_free(m);
+				VM_OBJECT_WUNLOCK(sc->object);
 				break;
 			} else if (rv == VM_PAGER_FAIL) {
 				vm_page_free(m);
@@ -1139,10 +1146,20 @@ mdstart_swap(struct md_s *sc, struct bio *bp)
 					m = NULL;
 				}
 			}
+			VM_OBJECT_WUNLOCK(sc->object);
 		}
 		if (m != NULL) {
 			vm_page_xunbusy(m);
-			vm_page_reference(m);
+
+			/*
+			 * The page may be deactivated prior to setting
+			 * PGA_REFERENCED, but in this case it will be
+			 * reactivated by the page daemon.
+			 */
+			if (vm_page_active(m))
+				vm_page_reference(m);
+			else
+				vm_page_activate(m);
 		}
 
 		/* Actions on further pages start at offset 0 */
@@ -1151,7 +1168,6 @@ mdstart_swap(struct md_s *sc, struct bio *bp)
 		ma_offs += len;
 	}
 	vm_object_pip_wakeup(sc->object);
-	VM_OBJECT_WUNLOCK(sc->object);
 	return (rv != VM_PAGER_ERROR ? 0 : ENOSPC);
 }
 
@@ -1295,6 +1311,8 @@ mdinit(struct md_s *sc)
 	gp = g_new_geomf(&g_md_class, "md%d", sc->unit);
 	gp->softc = sc;
 	pp = g_new_providerf(gp, "md%d", sc->unit);
+	devstat_remove_entry(pp->stat);
+	pp->stat = NULL;
 	pp->flags |= G_PF_DIRECT_SEND | G_PF_DIRECT_RECEIVE;
 	pp->mediasize = sc->mediasize;
 	pp->sectorsize = sc->sectorsize;
@@ -1310,10 +1328,11 @@ mdinit(struct md_s *sc)
 	}
 	sc->gp = gp;
 	sc->pp = pp;
-	g_error_provider(pp, 0);
-	g_topology_unlock();
 	sc->devstat = devstat_new_entry("md", sc->unit, sc->sectorsize,
 	    DEVSTAT_ALL_SUPPORTED, DEVSTAT_TYPE_DIRECT, DEVSTAT_PRIORITY_MAX);
+	sc->devstat->id = pp;
+	g_error_provider(pp, 0);
+	g_topology_unlock();
 }
 
 static int
@@ -1393,7 +1412,7 @@ mdsetcred(struct md_s *sc, struct ucred *cred)
 		auio.uio_resid = aiov.iov_len;
 		vn_lock(sc->vnode, LK_EXCLUSIVE | LK_RETRY);
 		error = VOP_READ(sc->vnode, &auio, 0, sc->cred);
-		VOP_UNLOCK(sc->vnode, 0);
+		VOP_UNLOCK(sc->vnode);
 		free(tmpbuf, M_TEMP);
 	}
 	return (error);
@@ -1444,7 +1463,7 @@ mdcreate_vnode(struct md_s *sc, struct md_req *mdr, struct thread *td)
 		}
 	}
 	nd.ni_vp->v_vflag |= VV_MD;
-	VOP_UNLOCK(nd.ni_vp, 0);
+	VOP_UNLOCK(nd.ni_vp);
 
 	if (mdr->md_fwsectors != 0)
 		sc->fwsectors = mdr->md_fwsectors;
@@ -1467,7 +1486,7 @@ mdcreate_vnode(struct md_s *sc, struct md_req *mdr, struct thread *td)
 	}
 	return (0);
 bad:
-	VOP_UNLOCK(nd.ni_vp, 0);
+	VOP_UNLOCK(nd.ni_vp);
 	(void)vn_close(nd.ni_vp, flags, td->td_ucred, td);
 	return (error);
 }
@@ -1511,7 +1530,7 @@ mddestroy(struct md_s *sc, struct thread *td)
 	if (sc->vnode != NULL) {
 		vn_lock(sc->vnode, LK_EXCLUSIVE | LK_RETRY);
 		sc->vnode->v_vflag &= ~VV_MD;
-		VOP_UNLOCK(sc->vnode, 0);
+		VOP_UNLOCK(sc->vnode);
 		(void)vn_close(sc->vnode, sc->flags & MD_READONLY ?
 		    FREAD : (FREAD|FWRITE), sc->cred, td);
 	}

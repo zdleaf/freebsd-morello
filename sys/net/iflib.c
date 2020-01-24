@@ -2263,8 +2263,11 @@ iflib_timer(void *arg)
 		     (sctx->isc_pause_frames == 0)))
 			goto hung;
 
-		if (ifmp_ring_is_stalled(txq->ift_br))
+		if (txq->ift_qstatus != IFLIB_QUEUE_IDLE &&
+		    ifmp_ring_is_stalled(txq->ift_br)) {
+			KASSERT(ctx->ifc_link_state == LINK_STATE_UP, ("queue can't be marked as hung if interface is down"));
 			txq->ift_qstatus = IFLIB_QUEUE_HUNG;
+		}
 		txq->ift_cleaned_prev = txq->ift_cleaned;
 	}
 #ifdef DEV_NETMAP
@@ -2755,6 +2758,8 @@ iflib_rxeof(iflib_rxq_t rxq, qidx_t budget)
 	 * acks in interrupt context
 	 */
 	struct mbuf *m, *mh, *mt, *mf;
+
+	NET_EPOCH_ASSERT();
 
 	lro_possible = v4_forwarding = v6_forwarding = false;
 	ifp = ctx->ifc_ifp;
@@ -3776,6 +3781,7 @@ _task_fn_tx(void *context)
 static void
 _task_fn_rx(void *context)
 {
+	struct epoch_tracker et;
 	iflib_rxq_t rxq = context;
 	if_ctx_t ctx = rxq->ifr_ctx;
 	bool more;
@@ -3799,6 +3805,7 @@ _task_fn_rx(void *context)
 	budget = ctx->ifc_sysctl_rx_budget;
 	if (budget == 0)
 		budget = 16;	/* XXX */
+	NET_EPOCH_ENTER(et);
 	if (more == false || (more = iflib_rxeof(rxq, budget)) == false) {
 		if (ctx->ifc_flags & IFC_LEGACY)
 			IFDI_INTR_ENABLE(ctx);
@@ -3806,6 +3813,7 @@ _task_fn_rx(void *context)
 			IFDI_RX_QUEUE_INTR_ENABLE(ctx, rxq->ifr_id);
 		DBG_COUNTER_INC(rx_intr_enables);
 	}
+	NET_EPOCH_EXIT(et);
 	if (__predict_false(!(if_getdrvflags(ctx->ifc_ifp) & IFF_DRV_RUNNING)))
 		return;
 	if (more)
@@ -6808,6 +6816,7 @@ iflib_debugnet_transmit(if_t ifp, struct mbuf *m)
 static int
 iflib_debugnet_poll(if_t ifp, int count)
 {
+	struct epoch_tracker et;
 	if_ctx_t ctx;
 	if_softc_ctx_t scctx;
 	iflib_txq_t txq;
@@ -6823,8 +6832,10 @@ iflib_debugnet_poll(if_t ifp, int count)
 	txq = &ctx->ifc_txqs[0];
 	(void)iflib_completed_tx_reclaim(txq, RECLAIM_THRESH(ctx));
 
+	NET_EPOCH_ENTER(et);
 	for (i = 0; i < scctx->isc_nrxqsets; i++)
 		(void)iflib_rxeof(&ctx->ifc_rxqs[i], 16 /* XXX */);
+	NET_EPOCH_EXIT(et);
 	return (0);
 }
 #endif /* DEBUGNET */

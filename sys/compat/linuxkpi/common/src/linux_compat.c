@@ -1498,6 +1498,9 @@ linux_file_close(struct file *file, struct thread *td)
 	KASSERT(file_count(filp) == 0,
 	    ("File refcount(%d) is not zero", file_count(filp)));
 
+	if (td == NULL)
+		td = curthread;
+
 	error = 0;
 	filp->f_flags = file->f_flag;
 	linux_set_current(td);
@@ -1663,7 +1666,7 @@ linux_file_stat(struct file *fp, struct stat *sb, struct ucred *active_cred,
 
 	vn_lock(vp, LK_SHARED | LK_RETRY);
 	error = vn_stat(vp, sb, td->td_ucred, NOCRED, td);
-	VOP_UNLOCK(vp, 0);
+	VOP_UNLOCK(vp);
 
 	return (error);
 }

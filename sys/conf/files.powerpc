@@ -76,6 +76,7 @@ dev/uart/uart_cpu_powerpc.c	optional	uart
 dev/usb/controller/ehci_fsl.c	optional	ehci mpc85xx
 dev/vt/hw/ofwfb/ofwfb.c		optional	vt aim
 kern/kern_clocksource.c		standard
+kern/subr_atomic64.c		optional	powerpc | powerpcspe
 kern/subr_dummy_vdso_tc.c	standard
 kern/syscalls.c			optional	ktr
 kern/subr_sfbuf.c		standard
@@ -106,6 +107,7 @@ powerpc/aim/moea64_native.c	optional	aim
 powerpc/aim/mp_cpudep.c		optional	aim
 powerpc/aim/slb.c		optional	aim powerpc64
 powerpc/amigaone/platform_amigaone.c	optional	amigaone
+powerpc/amigaone/cpld_x5000.c		optional	powerpc amigaone | powerpc64 amigaone
 powerpc/booke/locore.S		optional	booke no-obj
 powerpc/booke/booke_machdep.c	optional	booke
 powerpc/booke/machdep_e500.c	optional	booke_e500

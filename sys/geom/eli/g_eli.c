@@ -429,6 +429,7 @@ g_eli_start(struct bio *bp)
 	case BIO_GETATTR:
 	case BIO_FLUSH:
 	case BIO_ZONE:
+	case BIO_SPEEDUP:
 		break;
 	case BIO_DELETE:
 		/*
@@ -468,6 +469,7 @@ g_eli_start(struct bio *bp)
 	case BIO_GETATTR:
 	case BIO_FLUSH:
 	case BIO_DELETE:
+	case BIO_SPEEDUP:
 	case BIO_ZONE:
 		if (bp->bio_cmd == BIO_GETATTR)
 			cbp->bio_done = g_eli_getattr_done;
@@ -1048,8 +1050,7 @@ g_eli_destroy(struct g_eli_softc *sc, boolean_t force)
 	bzero(sc, sizeof(*sc));
 	free(sc, M_ELI);
 
-	if (pp == NULL || (pp->acr == 0 && pp->acw == 0 && pp->ace == 0))
-		G_ELI_DEBUG(0, "Device %s destroyed.", gp->name);
+	G_ELI_DEBUG(0, "Device %s destroyed.", gp->name);
 	g_wither_geom_close(gp, ENXIO);
 
 	return (0);

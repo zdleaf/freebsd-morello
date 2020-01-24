@@ -116,9 +116,9 @@ VNET_DEFINE(int, udp_cksum) = 1;
 SYSCTL_INT(_net_inet_udp, UDPCTL_CHECKSUM, checksum, CTLFLAG_VNET | CTLFLAG_RW,
     &VNET_NAME(udp_cksum), 0, "compute udp checksum");
 
-int	udp_log_in_vain = 0;
-SYSCTL_INT(_net_inet_udp, OID_AUTO, log_in_vain, CTLFLAG_RW,
-    &udp_log_in_vain, 0, "Log all incoming UDP packets");
+VNET_DEFINE(int, udp_log_in_vain) = 0;
+SYSCTL_INT(_net_inet_udp, OID_AUTO, log_in_vain, CTLFLAG_VNET | CTLFLAG_RW,
+    &VNET_NAME(udp_log_in_vain), 0, "Log all incoming UDP packets");
 
 VNET_DEFINE(int, udp_blackhole) = 0;
 SYSCTL_INT(_net_inet_udp, OID_AUTO, blackhole, CTLFLAG_VNET | CTLFLAG_RW,
@@ -686,7 +686,7 @@ udp_input(struct mbuf **mp, int *offp, int proto)
 		    ip->ip_dst, uh->uh_dport, INPLOOKUP_WILDCARD |
 		    INPLOOKUP_RLOCKPCB, ifp, m);
 	if (inp == NULL) {
-		if (udp_log_in_vain) {
+		if (V_udp_log_in_vain) {
 			char src[INET_ADDRSTRLEN];
 			char dst[INET_ADDRSTRLEN];
 
@@ -1606,6 +1606,7 @@ udp_close(struct socket *so)
 static int
 udp_connect(struct socket *so, struct sockaddr *nam, struct thread *td)
 {
+	struct epoch_tracker et;
 	struct inpcb *inp;
 	struct inpcbinfo *pcbinfo;
 	struct sockaddr_in *sin;
@@ -1625,9 +1626,11 @@ udp_connect(struct socket *so, struct sockaddr *nam, struct thread *td)
 		INP_WUNLOCK(inp);
 		return (error);
 	}
+	NET_EPOCH_ENTER(et);
 	INP_HASH_WLOCK(pcbinfo);
 	error = in_pcbconnect(inp, nam, td->td_ucred);
 	INP_HASH_WUNLOCK(pcbinfo);
+	NET_EPOCH_EXIT(et);
 	if (error == 0)
 		soisconnected(so);
 	INP_WUNLOCK(inp);
