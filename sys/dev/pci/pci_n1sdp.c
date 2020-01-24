@@ -72,24 +72,19 @@ __FBSDID("$FreeBSD$");
 	(((func) & PCIE_FUNC_MASK) << PCIE_FUNC_SHIFT)	|	\
 	((reg) & PCIE_REG_MASK))
 
-#define	PCIE_BDF(bus, slot, func)				\
-	((((bus) & PCIE_BUS_MASK) << PCIE_BUS_SHIFT)	|	\
-	(((slot) & PCIE_SLOT_MASK) << PCIE_SLOT_SHIFT)	|	\
-	(((func) & PCIE_FUNC_MASK) << PCIE_FUNC_SHIFT))
-
 #define	AP_NS_SHARED_MEM_BASE	0x06000000
-#define	MAX_SEGMENTS		2 /* Two PCIe root complex devices. */
+#define	N1SDP_MAX_SEGMENTS	2 /* Two PCIe root complex devices. */
 #define	BDF_TABLE_SIZE		(16 * 1024)
-#define	PCI_CFG_SPACE		0x1000
+#define	PCI_CFG_SPACE_SIZE	0x1000
 
 extern struct bus_space memmap_bus;
-bus_space_handle_t rc_remapped_addr[MAX_SEGMENTS];
+bus_space_handle_t rc_remapped_addr[N1SDP_MAX_SEGMENTS];
 
 struct pcie_discovery_data {
 	uint32_t rc_base_addr;
 	uint32_t nr_bdfs;
 	uint32_t valid_bdfs[0];
-} *pcie_discovery_data[MAX_SEGMENTS];
+} *pcie_discovery_data[N1SDP_MAX_SEGMENTS];
 
 static void
 n1sdp_init(struct generic_pcie_acpi_softc *sc)
@@ -114,7 +109,7 @@ n1sdp_init(struct generic_pcie_acpi_softc *sc)
 	memcpy(pcie_discovery_data[sc->segment], shared_data, bdfs_size);
 
 	paddr_rc = shared_data->rc_base_addr;
-	err = bus_space_map(&memmap_bus, paddr_rc, PCI_CFG_SPACE,
+	err = bus_space_map(&memmap_bus, paddr_rc, PCI_CFG_SPACE_SIZE,
 	    0, &vaddr_rc);
 
 	rc_remapped_addr[sc->segment] = vaddr_rc;
@@ -137,7 +132,7 @@ n1sdp_check_bdf(struct generic_pcie_acpi_softc *sc,
 	int bdf;
 	int i;
 
-	bdf = PCIE_BDF(bus, slot, func);
+	bdf = PCIE_ADDR_OFFSET(bus, slot, func, 0);
 	if (bdf == 0)
 		return (1);
 
@@ -201,7 +196,7 @@ n1sdp_pcie_acpi_attach(device_t dev)
 		return (ENXIO);
 	}
 
-	if (sc->segment == MAX_SEGMENTS) {
+	if (sc->segment == N1SDP_MAX_SEGMENTS) {
 		device_printf(dev, "Unknown PCI Bus segment (domain)\n");
 		return (ENXIO);
 	}
