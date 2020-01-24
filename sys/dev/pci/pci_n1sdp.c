@@ -196,8 +196,9 @@ n1sdp_pcie_acpi_attach(device_t dev)
 		return (ENXIO);
 	}
 
-	if (sc->segment == N1SDP_MAX_SEGMENTS) {
-		device_printf(dev, "Unknown PCI Bus segment (domain)\n");
+	if (sc->segment >= N1SDP_MAX_SEGMENTS) {
+		device_printf(dev, "Unknown PCI Bus segment (domain) %d\n",
+		    sc->segment);
 		return (ENXIO);
 	}
 
