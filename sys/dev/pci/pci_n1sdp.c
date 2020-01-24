@@ -94,35 +94,30 @@ struct pcie_discovery_data {
 static void
 n1sdp_init(struct generic_pcie_acpi_softc *sc)
 {
-	bus_addr_t paddr;
-	bus_addr_t paddr_rc;
-	bus_size_t psize;
-	bus_size_t psize_rc;
-	bus_space_handle_t vaddr;
-	bus_space_handle_t vaddr_rc;
-	int err;
-	int bdfs_size;
 	struct pcie_discovery_data *shared_data;
+	bus_space_handle_t vaddr_rc;
+	bus_space_handle_t vaddr;
+	bus_addr_t paddr_rc;
+	bus_addr_t paddr;
+	int table_count;
+	int bdfs_size;
+	int err, i;
 
 	paddr = AP_NS_SHARED_MEM_BASE + sc->segment * BDF_TABLE_SIZE;
-	psize = BDF_TABLE_SIZE;
-	err = bus_space_map(&memmap_bus, paddr, psize, 0, &vaddr);
+	err = bus_space_map(&memmap_bus, paddr, BDF_TABLE_SIZE, 0, &vaddr);
 
 	shared_data = (struct pcie_discovery_data *)vaddr;
 	bdfs_size = sizeof(struct pcie_discovery_data) +
-		sizeof(uint32_t) * shared_data->nr_bdfs;
+	    sizeof(uint32_t) * shared_data->nr_bdfs;
 	pcie_discovery_data[sc->segment] =
 	    malloc(bdfs_size, M_DEVBUF, M_WAITOK | M_ZERO);
 	memcpy(pcie_discovery_data[sc->segment], shared_data, bdfs_size);
 
 	paddr_rc = shared_data->rc_base_addr;
-	psize_rc = PCI_CFG_SPACE;
-	err = bus_space_map(&memmap_bus, paddr_rc, psize_rc, 0, &vaddr_rc);
+	err = bus_space_map(&memmap_bus, paddr_rc, PCI_CFG_SPACE,
+	    0, &vaddr_rc);
 
 	rc_remapped_addr[sc->segment] = vaddr_rc;
-
-	int table_count;
-	int i;
 
 	if (bootverbose) {
 		table_count = pcie_discovery_data[sc->segment]->nr_bdfs;
@@ -131,7 +126,7 @@ n1sdp_init(struct generic_pcie_acpi_softc *sc)
 			    pcie_discovery_data[sc->segment]->valid_bdfs[i]);
 	}
 
-	bus_space_unmap(&memmap_bus, vaddr, psize);
+	bus_space_unmap(&memmap_bus, vaddr, BDF_TABLE_SIZE);
 }
 
 static int
@@ -167,6 +162,7 @@ n1sdp_pcie_acpi_probe(device_t dev)
 	if (acpi_disabled("pcib") || (h = acpi_get_handle(dev)) == NULL ||
 	    ACPI_FAILURE(AcpiGetObjectInfo(h, &devinfo)))
 		return (ENXIO);
+
 	root = (devinfo->Flags & ACPI_PCI_ROOT_BRIDGE) != 0;
 	AcpiOsFree(devinfo);
 	if (!root)
@@ -259,7 +255,6 @@ n1sdp_pcie_read_config(device_t dev, u_int bus, u_int slot,
 	case 2:
 		data >>= (offset & 3) * 8;
 		data = le16toh(data);
-		data &= 0xffff;
 		break;
 	case 4:
 		data = le32toh(data);

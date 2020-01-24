@@ -29,8 +29,8 @@
  * SUCH DAMAGE.
  */
 
-#ifndef __PCI_HOST_GENERIC_ACPI_H_
-#define	__PCI_HOST_GENERIC_ACPI_H_
+#ifndef	_DEV_PCI_PCI_HOST_GENERIC_ACPI_H_
+#define	_DEV_PCI_PCI_HOST_GENERIC_ACPI_H_
 
 struct generic_pcie_acpi_softc {
 	struct generic_pcie_core_softc base;
@@ -42,4 +42,4 @@ DECLARE_CLASS(generic_pcie_acpi_driver);
 
 int pci_host_generic_acpi_attach(device_t dev);
 
-#endif /* __PCI_HOST_GENERIC_ACPI_H_ */
+#endif /* _DEV_PCI_PCI_HOST_GENERIC_ACPI_H_ */
