@@ -43,6 +43,10 @@ __FBSDID("$FreeBSD$");
 #include <sys/module.h>
 #include <sys/rman.h>
 
+#include <vm/vm.h>
+#include <vm/vm_extern.h>
+#include <vm/vm_page.h>
+
 #include <contrib/dev/acpica/include/acpi.h>
 #include <contrib/dev/acpica/include/accommon.h>
 
@@ -71,20 +75,25 @@ struct pcie_discovery_data {
 	uint32_t valid_bdfs[0];
 } *pcie_discovery_data[N1SDP_MAX_SEGMENTS];
 
-static void
+static int
 n1sdp_init(struct generic_pcie_acpi_softc *sc)
 {
 	struct pcie_discovery_data *shared_data;
-	bus_space_handle_t vaddr_rc;
-	bus_space_handle_t vaddr;
-	bus_addr_t paddr_rc;
-	bus_addr_t paddr;
+	vm_offset_t vaddr_rc;
+	vm_offset_t vaddr;
+	vm_paddr_t paddr_rc;
+	vm_paddr_t paddr;
 	int table_count;
 	int bdfs_size;
-	int err, i;
+	int i;
 
 	paddr = AP_NS_SHARED_MEM_BASE + sc->segment * BDF_TABLE_SIZE;
-	err = bus_space_map(&memmap_bus, paddr, BDF_TABLE_SIZE, 0, &vaddr);
+	vaddr = kva_alloc((vm_size_t)BDF_TABLE_SIZE);
+	if (vaddr == 0) {
+		printf("%s: Can't allocate KVA memory.", __func__);
+		return (ENXIO);
+	}
+	pmap_kenter_device(vaddr, (vm_size_t)BDF_TABLE_SIZE, paddr);
 
 	shared_data = (struct pcie_discovery_data *)vaddr;
 	bdfs_size = sizeof(struct pcie_discovery_data) +
@@ -93,9 +102,13 @@ n1sdp_init(struct generic_pcie_acpi_softc *sc)
 	    malloc(bdfs_size, M_DEVBUF, M_WAITOK | M_ZERO);
 	memcpy(pcie_discovery_data[sc->segment], shared_data, bdfs_size);
 
-	paddr_rc = shared_data->rc_base_addr;
-	err = bus_space_map(&memmap_bus, paddr_rc, PCI_CFG_SPACE_SIZE,
-	    0, &vaddr_rc);
+	paddr_rc = (vm_offset_t)shared_data->rc_base_addr;
+	vaddr_rc = kva_alloc((vm_size_t)PCI_CFG_SPACE_SIZE);
+	if (vaddr == 0) {
+		printf("%s: Can't allocate KVA memory.", __func__);
+		return (ENXIO);
+	}
+	pmap_kenter_device(vaddr_rc, (vm_size_t)PCI_CFG_SPACE_SIZE, paddr_rc);
 
 	rc_remapped_addr[sc->segment] = vaddr_rc;
 
@@ -106,7 +119,10 @@ n1sdp_init(struct generic_pcie_acpi_softc *sc)
 			    pcie_discovery_data[sc->segment]->valid_bdfs[i]);
 	}
 
-	bus_space_unmap(&memmap_bus, vaddr, BDF_TABLE_SIZE);
+	pmap_kremove_device(vaddr, (vm_size_t)BDF_TABLE_SIZE);
+	kva_free(vaddr, (vm_size_t)BDF_TABLE_SIZE);
+
+	return (0);
 }
 
 static int
@@ -187,7 +203,9 @@ n1sdp_pcie_acpi_attach(device_t dev)
 		return (ENXIO);
 	}
 
-	n1sdp_init(sc);
+	err = n1sdp_init(sc);
+	if (err)
+		return (err);
 
 	err = pci_host_generic_acpi_attach(dev);
 
