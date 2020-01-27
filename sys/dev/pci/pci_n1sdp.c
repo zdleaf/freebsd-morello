@@ -66,10 +66,8 @@ __FBSDID("$FreeBSD$");
 #define	BDF_TABLE_SIZE		(16 * 1024)
 #define	PCI_CFG_SPACE_SIZE	0x1000
 
-extern struct bus_space memmap_bus;
-bus_space_handle_t rc_remapped_addr[N1SDP_MAX_SEGMENTS];
-
-struct pcie_discovery_data {
+static vm_offset_t rc_remapped_addr[N1SDP_MAX_SEGMENTS];
+static struct pcie_discovery_data {
 	uint32_t rc_base_addr;
 	uint32_t nr_bdfs;
 	uint32_t valid_bdfs[0];
@@ -218,8 +216,6 @@ n1sdp_pcie_read_config(device_t dev, u_int bus, u_int slot,
 {
 	struct generic_pcie_acpi_softc *sc_acpi;
 	struct generic_pcie_core_softc *sc;
-	bus_space_handle_t h;
-	bus_space_tag_t	t;
 	uint64_t offset;
 	uint32_t data;
 
@@ -236,15 +232,12 @@ n1sdp_pcie_read_config(device_t dev, u_int bus, u_int slot,
 		return (~0U);
 
 	offset = PCIE_ADDR_OFFSET(bus - sc->bus_start, slot, func, reg);
-	t = sc->bst;
-	h = sc->bsh;
 
-	if (bus == 0 && slot == 0 && func == 0) {
-		t = &memmap_bus;
-		h = rc_remapped_addr[sc_acpi->segment];
-	}
-
-	data = bus_space_read_4(t, h, offset & ~3);
+	if (bus == 0 && slot == 0 && func == 0)
+		data = *(uint32_t *)(rc_remapped_addr[sc_acpi->segment] +
+		    (offset & ~3));
+	else
+		data = bus_space_read_4(sc->bst, sc->bsh, offset & ~3);
 
 	switch (bytes) {
 	case 1:
@@ -293,10 +286,11 @@ n1sdp_pcie_write_config(device_t dev, u_int bus, u_int slot,
 	t = sc->bst;
 	h = sc->bsh;
 
-	if (bus == 0 && slot == 0 && func == 0) {
-		t = &memmap_bus;
-		h = rc_remapped_addr[sc_acpi->segment];
-	}
+	if (bus == 0 && slot == 0 && func == 0)
+		data = *(uint32_t *)(rc_remapped_addr[sc_acpi->segment] +
+		    (offset & ~3));
+	else
+		data = bus_space_read_4(t, h, offset & ~3);
 
 	/*
 	 * TODO: This is probably wrong on big-endian, however as arm64 is
@@ -304,23 +298,25 @@ n1sdp_pcie_write_config(device_t dev, u_int bus, u_int slot,
 	 */
 	switch (bytes) {
 	case 1:
-		data = bus_space_read_4(t, h, offset & ~3);
 		data &= ~(0xff << ((offset & 3) * 8));
 		data |= (val & 0xff) << ((offset & 3) * 8);
-		bus_space_write_4(t, h, offset & ~3, htole32(data));
 		break;
 	case 2:
-		data = bus_space_read_4(t, h, offset & ~3);
 		data &= ~(0xffff << ((offset & 3) * 8));
 		data |= (val & 0xffff) << ((offset & 3) * 8);
-		bus_space_write_4(t, h, offset & ~3, htole32(data));
 		break;
 	case 4:
-		bus_space_write_4(t, h, offset, htole32(val));
+		data = val;
 		break;
 	default:
 		return;
 	}
+
+	if (bus == 0 && slot == 0 && func == 0)
+		*(uint32_t *)(rc_remapped_addr[sc_acpi->segment] +
+		    (offset & ~3)) = data;
+	else
+		bus_space_write_4(t, h, offset & ~3, htole32(data));
 }
 
 static device_method_t n1sdp_pcie_acpi_methods[] = {
