@@ -91,7 +91,8 @@ n1sdp_init(struct generic_pcie_acpi_softc *sc)
 		printf("%s: Can't allocate KVA memory.", __func__);
 		return (ENXIO);
 	}
-	pmap_kenter_device(vaddr, (vm_size_t)BDF_TABLE_SIZE, paddr);
+	pmap_kenter(vaddr, (vm_size_t)BDF_TABLE_SIZE, paddr,
+	    VM_MEMATTR_UNCACHEABLE);
 
 	shared_data = (struct pcie_discovery_data *)vaddr;
 	bdfs_size = sizeof(struct pcie_discovery_data) +
@@ -117,7 +118,7 @@ n1sdp_init(struct generic_pcie_acpi_softc *sc)
 			    pcie_discovery_data[sc->segment]->valid_bdfs[i]);
 	}
 
-	pmap_kremove_device(vaddr, (vm_size_t)BDF_TABLE_SIZE);
+	pmap_kremove(vaddr);
 	kva_free(vaddr, (vm_size_t)BDF_TABLE_SIZE);
 
 	return (0);
