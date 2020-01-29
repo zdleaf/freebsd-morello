@@ -320,6 +320,25 @@ n1sdp_pcie_write_config(device_t dev, u_int bus, u_int slot,
 		bus_space_write_4(t, h, offset & ~3, htole32(data));
 }
 
+static int
+n1sdp_pcie_alloc_msi(device_t pci, device_t child, int count, int maxcount,
+    int *irqs)
+{
+
+	/* No MSI/MSI-X support. */
+
+	return (ENXIO);
+}
+
+static int
+n1sdp_pcie_alloc_msix(device_t pci, device_t child, int *irq)
+{
+
+	/* No MSI/MSI-X support. */
+
+	return (ENXIO);
+}
+
 static device_method_t n1sdp_pcie_acpi_methods[] = {
 	DEVMETHOD(device_probe,		n1sdp_pcie_acpi_probe),
 	DEVMETHOD(device_attach,	n1sdp_pcie_acpi_attach),
@@ -327,6 +346,8 @@ static device_method_t n1sdp_pcie_acpi_methods[] = {
 	/* pcib interface */
 	DEVMETHOD(pcib_read_config,	n1sdp_pcie_read_config),
 	DEVMETHOD(pcib_write_config,	n1sdp_pcie_write_config),
+	DEVMETHOD(pcib_alloc_msi,	n1sdp_pcie_alloc_msi),
+	DEVMETHOD(pcib_alloc_msix,	n1sdp_pcie_alloc_msix),
 
 	DEVMETHOD_END
 };
