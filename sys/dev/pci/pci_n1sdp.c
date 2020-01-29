@@ -325,7 +325,11 @@ n1sdp_pcie_alloc_msi(device_t pci, device_t child, int count, int maxcount,
     int *irqs)
 {
 
-	/* No MSI/MSI-X support. */
+	/*
+	 * No MSI/MSI-X support for n1sdp due to an unknown bug:
+	 * ARM ITS driver setups MSI/MSIx but interrupts are not coming.
+	 * Further investigation is required.
+	 */
 
 	return (ENXIO);
 }
