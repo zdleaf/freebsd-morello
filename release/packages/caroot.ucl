@@ -15,3 +15,11 @@ licenses = [ BSD2CLAUSE ]
 desc = <<EOD
 %DESC%
 EOD
+scripts: {
+	# XXX If pkg picks up a mechanism to detect in the post-install script
+	# files being added or removed, we should use it instead to gate the
+	# rehash.
+	post-install = <<EOD
+	[ -x /usr/sbin/certctl ] && /usr/sbin/certctl rehash
+EOD
+}
