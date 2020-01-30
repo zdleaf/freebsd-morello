@@ -234,10 +234,12 @@ n1sdp_pcie_read_config(device_t dev, u_int bus, u_int slot,
 
 	offset = PCIE_ADDR_OFFSET(bus - sc->bus_start, slot, func, reg);
 
-	if (bus == 0 && slot == 0 && func == 0)
+	if (bus == sc->bus_start) {
+		if (slot != 0 || func != 0)
+			return (~0U);
 		data = *(uint32_t *)(rc_remapped_addr[sc_acpi->segment] +
 		    (offset & ~3));
-	else
+	} else
 		data = bus_space_read_4(sc->bst, sc->bsh, offset & ~3);
 
 	switch (bytes) {
@@ -287,10 +289,12 @@ n1sdp_pcie_write_config(device_t dev, u_int bus, u_int slot,
 	t = sc->bst;
 	h = sc->bsh;
 
-	if (bus == 0 && slot == 0 && func == 0)
+	if (bus == sc->bus_start) {
+		if (slot != 0 || func != 0)
+			return;
 		data = *(uint32_t *)(rc_remapped_addr[sc_acpi->segment] +
 		    (offset & ~3));
-	else
+	} else
 		data = bus_space_read_4(t, h, offset & ~3);
 
 	/*
