@@ -1743,9 +1743,6 @@ gicv3_its_acpi_attach(device_t dev)
 	struct gic_v3_devinfo *di;
 	int err;
 
-	if (device_get_unit(dev) > 0)
-		return (ENXIO);
-
 	sc = device_get_softc(dev);
 	err = gicv3_its_attach(dev);
 	if (err != 0)
