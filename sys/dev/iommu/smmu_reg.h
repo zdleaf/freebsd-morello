@@ -50,7 +50,10 @@
 #define	 IDR0_TTENDIAN_MIXED	(0x0 << IDR0_TTENDIAN_S)
 #define	 IDR0_TTENDIAN_LITTLE	(0x2 << IDR0_TTENDIAN_S)
 #define	 IDR0_TTENDIAN_BIG	(0x3 << IDR0_TTENDIAN_S)
+#define	 IDR0_VATOS		(1 << 20) / * Virtual ATOS page interface */
 #define	 IDR0_CD2L		(1 << 19) /* 2-level Context descriptor table*/
+#define	 IDR0_VMID16		(1 << 18) /* 16-bit VMID supported */
+#define	 IDR0_VMW		(1 << 17) /* VMID wildcard-matching */
 #define	 IDR0_PRI		(1 << 16) /* Page Request Interface supported*/
 #define	 IDR0_ATOS		(1 << 15) /* Address Translation Operations */
 #define	 IDR0_SEV		(1 << 14) /* WFE wake-up events */
@@ -74,6 +77,21 @@
 #define	 IDR0_S1P		(1 << 1) / * Stage1 translation supported. */
 #define	 IDR0_S2P		(1 << 0) / * Stage2 translation supported. */
 #define	SMMU_IDR1		0x004
+#define	 IDR1_TABLES_PRESET	(1 << 30) /* Table base addresses fixed. */
+#define	 IDR1_QUEUES_PRESET	(1 << 29) /* Queue base addresses fixed. */
+#define	 IDR1_REL		(1 << 28) /* Relative base pointers */
+#define	 IDR1_ATTR_TYPES_OVR	(1 << 27) /* Incoming attrs can be overridden*/
+#define	 IDR1_ATTR_PERMS_OVR	(1 << 26) /* Incoming attrs can be overridden*/
+#define	 IDR1_CMDQS_S		21 /* Maximum number of Command queue entries*/
+#define	 IDR1_CMDQS_M		(0x1f << IDR1_CMDQS_S)
+#define	 IDR1_EVENTQS_S		16 /* Maximum number of Event queue entries */
+#define	 IDR1_EVENTQS_M		(0x1f << IDR1_EVENTQS_S)
+#define	 IDR1_PRIQS_S		11 /* Maximum number of PRI queue entries */
+#define	 IDR1_PRIQS_M		(0x1f << IDR1_PRIQS_S)
+#define	 IDR1_SSIDSIZE_S	6 /* Max bits of SubstreamID */
+#define	 IDR1_SSIDSIZE_M	(0x1f << IDR1_SSIDSIZE_S)
+#define	 IDR1_SIDSIZE_S		0 /* Max bits of StreamID */
+#define	 IDR1_SIDSIZE_M		(0x3f << IDR1_SIDSIZE_S)
 #define	SMMU_IDR2		0x008
 #define	SMMU_IDR3		0x00C
 #define	SMMU_IDR4		0x010
