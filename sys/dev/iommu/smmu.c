@@ -138,6 +138,7 @@ int
 smmu_attach(device_t dev)
 {
 	struct smmu_softc *sc;
+	uint32_t reg;
 	int error;
 
 	sc = device_get_softc(dev);
@@ -169,6 +170,30 @@ smmu_attach(device_t dev)
 	if (error) {
 		device_printf(dev, "Couldn't setup Gerr interrupt handler\n");
 		goto fail;
+	}
+
+	reg = bus_read_4(sc->res[0], SMMU_IDR0);
+	printf("IDR0 %x\n", reg);
+
+	if (reg & IDR0_ST_LVL_2)
+		device_printf(sc->dev, "2-level stream table supported\n");
+
+	if (reg & IDR0_CD2L)
+		device_printf(sc->dev, "2-level CD table supported.\n");
+
+	switch (reg & IDR0_TTENDIAN_M) {
+	case IDR0_TTENDIAN_MIXED:
+		device_printf(sc->dev, "Mixed endianess supported.\n");
+		break;
+	case IDR0_TTENDIAN_LITTLE:
+		device_printf(sc->dev, "Little endian supported only.\n");
+		break;
+	case IDR0_TTENDIAN_BIG:
+		device_printf(sc->dev, "Big endian supported only.\n");
+		break;
+	default:
+		device_printf(sc->dev, "Unsupported endianness.\n");
+		return (ENXIO);
 	}
 
 	return (0);

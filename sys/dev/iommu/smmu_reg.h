@@ -45,6 +45,34 @@
 #define	 IDR0_STALL_MODEL_M	(0x3 << IDR0_STALL_MODEL_S)
 #define	 IDR0_STALL_MODEL_STALL	(0x0 << IDR0_STALL_MODEL_S) /* Stall and Term*/
 #define	 IDR0_STALL_MODEL_FORCE	(0x2 << IDR0_STALL_MODEL_S) /* Stall is forced*/
+#define	 IDR0_TTENDIAN_S	21 /* Endianness for translation table walks.*/
+#define	 IDR0_TTENDIAN_M	(0x3 << IDR0_TTENDIAN_S)
+#define	 IDR0_TTENDIAN_MIXED	(0x0 << IDR0_TTENDIAN_S)
+#define	 IDR0_TTENDIAN_LITTLE	(0x2 << IDR0_TTENDIAN_S)
+#define	 IDR0_TTENDIAN_BIG	(0x3 << IDR0_TTENDIAN_S)
+#define	 IDR0_CD2L		(1 << 19) /* 2-level Context descriptor table*/
+#define	 IDR0_PRI		(1 << 16) /* Page Request Interface supported*/
+#define	 IDR0_ATOS		(1 << 15) /* Address Translation Operations */
+#define	 IDR0_SEV		(1 << 14) /* WFE wake-up events */
+#define	 IDR0_MSI		(1 << 13) /* Message Signalled Interrupts */
+#define	 IDR0_ASID16		(1 << 12) /* 16-bit ASID supported */
+#define	 IDR0_NS1ATS		(1 << 11) /* Split-stage ATS not supported */
+#define	 IDR0_ATS		(1 << 10) /* PCIe ATS supported by SMMU */
+#define	 IDR0_HYP		(1 << 9) /* Hypervisor stage 1 contexts */
+#define	 IDR0_DORMHINT		(1 << 8) /* Dormant hint supported */
+#define	 IDR0_HTTU_S		6 /* H/W transl. table A-flag and Dirty state */
+#define	 IDR0_HTTU_M		(0x3 << IDR0_HTTU_S)
+#define	 IDR0_HTTU_A		(0x1 << IDR0_HTTU_S) /* Access flag (A-flag) */
+#define	 IDR0_HTTU_AD		(0x2 << IDR0_HTTU_S) /* A-flag and Dirty State*/
+#define	 IDR0_BTM		(1 << 5) /* Broadcast TLB Maintenance */
+#define	 IDR0_COHACC		(1 << 4) /* Coherent access to translations*/
+#define	 IDR0_TTF_S		2 /* Translation Table Formats supported */
+#define	 IDR0_TTF_M		(0x3 << IDR0_TTF_S)
+#define	 IDR0_TTF_AA32		(0x1 << IDR0_TTF_S) /* AArch32 (LPAE) */
+#define	 IDR0_TTF_AA64		(0x2 << IDR0_TTF_S) /* AArch64 */
+#define	 IDR0_TTF_ALL		(0x3 << IDR0_TTF_S) /* AArch32 and AArch64 */
+#define	 IDR0_S1P		(1 << 1) / * Stage1 translation supported. */
+#define	 IDR0_S2P		(1 << 0) / * Stage2 translation supported. */
 #define	SMMU_IDR1		0x004
 #define	SMMU_IDR2		0x008
 #define	SMMU_IDR3		0x00C
