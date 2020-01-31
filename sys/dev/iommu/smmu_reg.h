@@ -36,6 +36,15 @@
 #define	_DEV_IOMMU_SMMU_REG_H_
 
 #define	SMMU_IDR0		0x000
+#define	 IDR0_ST_LVL_S		27
+#define	 IDR0_ST_LVL_M		(0x3 << IDR0_ST_LVL_S)
+#define	 IDR0_ST_LVL_LINEAR	(0x0 << IDR0_ST_LVL_S) /* Linear Stream table*/
+#define	 IDR0_ST_LVL_2		(0x1 << IDR0_ST_LVL_S) /* 2-level Stream Table*/
+#define	 IDR0_ST_TERM_MODEL	(1 << 26) /* Terminate model behavior */
+#define	 IDR0_STALL_MODEL_S	24 /*  Stall model support */
+#define	 IDR0_STALL_MODEL_M	(0x3 << IDR0_STALL_MODEL_S)
+#define	 IDR0_STALL_MODEL_STALL	(0x0 << IDR0_STALL_MODEL_S) /* Stall and Term*/
+#define	 IDR0_STALL_MODEL_FORCE	(0x2 << IDR0_STALL_MODEL_S) /* Stall is forced*/
 #define	SMMU_IDR1		0x004
 #define	SMMU_IDR2		0x008
 #define	SMMU_IDR3		0x00C
