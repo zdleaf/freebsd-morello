@@ -699,7 +699,6 @@ vntblinit(void *dummy __unused)
 }
 SYSINIT(vfs, SI_SUB_VFS, SI_ORDER_FIRST, vntblinit, NULL);
 
-
 /*
  * Mark a mount point as busy. Used to synchronize access and to delay
  * unmounting. Eventually, mountlist_mtx is not released on failure.
@@ -3863,7 +3862,6 @@ vgonel(struct vnode *vp)
 		vinactivef(vp);
 		VI_UNLOCK(vp);
 	}
-	VNPASS(!vn_need_pageq_flush(vp), vp);
 	if (vp->v_type == VSOCK)
 		vfs_unp_reclaim(vp);
 
@@ -4995,7 +4993,7 @@ vn_need_pageq_flush(struct vnode *vp)
 	struct vm_object *obj;
 	int need;
 
-	VNPASS(VN_IS_DOOMED(vp) || mtx_owned(VI_MTX(vp)), vp);
+	MPASS(mtx_owned(VI_MTX(vp)));
 	need = 0;
 	if ((obj = vp->v_object) != NULL && (vp->v_vflag & VV_NOSYNC) == 0 &&
 	    vm_object_mightbedirty(obj))
@@ -6129,7 +6127,6 @@ vfs_cache_root_set(struct mount *mp, struct vnode *vp)
  *
  * This interface replaces MNT_VNODE_FOREACH.
  */
-
 
 struct vnode *
 __mnt_vnode_next_all(struct vnode **mvp, struct mount *mp)
