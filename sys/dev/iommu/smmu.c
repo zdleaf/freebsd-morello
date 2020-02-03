@@ -277,6 +277,36 @@ smmu_attach(device_t dev)
 	sc->ssid_bits = (reg & IDR1_SSIDSIZE_M) >> IDR1_SSIDSIZE_S;
 	sc->sid_bits = (reg & IDR1_SIDSIZE_M) >> IDR1_SIDSIZE_S;
 
+	/* IDR5 */
+	reg = bus_read_4(sc->res[0], SMMU_IDR5);
+	printf("IDR1 %x\n", reg);
+
+	switch (reg & IDR5_OAS_M) {
+	case IDR5_OAS_32:
+		sc->oas = 32;
+		break;
+	case IDR5_OAS_36:
+		sc->oas = 36;
+		break;
+	case IDR5_OAS_40:
+		sc->oas = 40;
+		break;
+	case IDR5_OAS_42:
+		sc->oas = 42;
+		break;
+	case IDR5_OAS_44:
+		sc->oas = 44;
+		break;
+	case IDR5_OAS_48:
+		sc->oas = 48;
+		break;
+	case IDR5_OAS_52:
+		sc->oas = 52;
+		break;
+	}
+
+	printf("oas %d\n", sc->oas);
+
 	return (0);
 
 fail:
