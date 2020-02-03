@@ -43,6 +43,13 @@ struct smmu_softc {
 	device_t		dev;
 	struct resource		*res[4];
 	void			*intr_cookie[3];
+
+	uint32_t		features;
+#define	SMMU_FEATURE_2_LVL_STREAM_TABLE		(1 << 0)
+#define	SMMU_FEATURE_2_LVL_CD			(1 << 1)
+#define	SMMU_FEATURE_TT_LE			(1 << 2)
+#define	SMMU_FEATURE_TT_BE			(1 << 3)
+#define	SMMU_FEATURE_SEV			(1 << 4)
 };
 
 struct smmu_devinfo {

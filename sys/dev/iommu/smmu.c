@@ -175,26 +175,38 @@ smmu_attach(device_t dev)
 	reg = bus_read_4(sc->res[0], SMMU_IDR0);
 	printf("IDR0 %x\n", reg);
 
-	if (reg & IDR0_ST_LVL_2)
+	sc->features = 0;
+	if (reg & IDR0_ST_LVL_2) {
 		device_printf(sc->dev, "2-level stream table supported\n");
+		sc->features |= SMMU_FEATURE_2_LVL_STREAM_TABLE;
+	}
 
-	if (reg & IDR0_CD2L)
+	if (reg & IDR0_CD2L) {
 		device_printf(sc->dev, "2-level CD table supported.\n");
+		sc->features |= SMMU_FEATURE_2_LVL_CD;
+	}
 
 	switch (reg & IDR0_TTENDIAN_M) {
 	case IDR0_TTENDIAN_MIXED:
 		device_printf(sc->dev, "Mixed endianess supported.\n");
+		sc->features |= SMMU_FEATURE_TT_LE;
+		sc->features |= SMMU_FEATURE_TT_BE;
 		break;
 	case IDR0_TTENDIAN_LITTLE:
 		device_printf(sc->dev, "Little endian supported only.\n");
+		sc->features |= SMMU_FEATURE_TT_LE;
 		break;
 	case IDR0_TTENDIAN_BIG:
 		device_printf(sc->dev, "Big endian supported only.\n");
+		sc->features |= SMMU_FEATURE_TT_BE;
 		break;
 	default:
 		device_printf(sc->dev, "Unsupported endianness.\n");
 		return (ENXIO);
 	}
+
+	reg = bus_read_4(sc->res[0], SMMU_IDR1);
+	printf("IDR1 %x\n", reg);
 
 	return (0);
 
