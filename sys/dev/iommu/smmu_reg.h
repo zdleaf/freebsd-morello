@@ -96,6 +96,24 @@
 #define	SMMU_IDR3		0x00C
 #define	SMMU_IDR4		0x010
 #define	SMMU_IDR5		0x014
+#define	 IDR5_STALL_MAX_S	16 /* Max outstanding stalled transactions */
+#define	 IDR5_STALL_MAX_M	(0xffff << IDR5_STALL_MAX_S)
+#define	 IDR5_VAX_S		10 /* Virtual Address eXtend */
+#define	 IDR5_VAX_M		(0x3 << IDR5_VAX_S)
+#define	 IDR5_VAX_48		(0 << IDR5_VAX_S)
+#define	 IDR5_VAX_52		(1 << IDR5_VAX_S)
+#define	 IDR5_GRAN64K		(1 << 6) /* 64KB translation granule */
+#define	 IDR5_GRAN16K		(1 << 5) /* 16KB translation granule */
+#define	 IDR5_GRAN4K		(1 << 4) /* 4KB translation granule */
+#define	 IDR5_OAS_S		0 /* Output Address Size */
+#define	 IDR5_OAS_M		(0x7 << IDR5_OAS_S)
+#define	 IDR5_OAS_32		(0x0 << IDR5_OAS_S)
+#define	 IDR5_OAS_36		(0x1 << IDR5_OAS_S)
+#define	 IDR5_OAS_40		(0x2 << IDR5_OAS_S)
+#define	 IDR5_OAS_42		(0x3 << IDR5_OAS_S)
+#define	 IDR5_OAS_44		(0x4 << IDR5_OAS_S)
+#define	 IDR5_OAS_48		(0x5 << IDR5_OAS_S)
+#define	 IDR5_OAS_52		(0x6 << IDR5_OAS_S) /* Reserved in SMMU v3.0 */
 #define	SMMU_IIDR		0x018
 #define	SMMU_AIDR		0x01C
 #define	SMMU_CR0		0x020
