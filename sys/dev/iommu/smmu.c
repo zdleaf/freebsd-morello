@@ -307,6 +307,19 @@ smmu_attach(device_t dev)
 
 	printf("oas %d\n", sc->oas);
 
+	sc->pgsizes = 0;
+	if (reg & IDR5_GRAN64K)
+		sc->pgsizes |= 64 * 1024;
+	if (reg & IDR5_GRAN16K)
+		sc->pgsizes |= 16 * 1024;
+	if (reg & IDR5_GRAN4K)
+		sc->pgsizes |= 4 * 1024;
+
+	printf("pgsizes %x\n", sc->pgsizes);
+
+	if ((reg & IDR5_VAX_M) == IDR5_VAX_52)
+		sc->features |= SMMU_FEATURE_VAX;
+
 	return (0);
 
 fail:
