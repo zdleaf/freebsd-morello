@@ -74,8 +74,8 @@
 #define	 IDR0_TTF_AA32		(0x1 << IDR0_TTF_S) /* AArch32 (LPAE) */
 #define	 IDR0_TTF_AA64		(0x2 << IDR0_TTF_S) /* AArch64 */
 #define	 IDR0_TTF_ALL		(0x3 << IDR0_TTF_S) /* AArch32 and AArch64 */
-#define	 IDR0_S1P		(1 << 1) / * Stage1 translation supported. */
-#define	 IDR0_S2P		(1 << 0) / * Stage2 translation supported. */
+#define	 IDR0_S1P		(1 << 1) /* Stage1 translation supported. */
+#define	 IDR0_S2P		(1 << 0) /* Stage2 translation supported. */
 #define	SMMU_IDR1		0x004
 #define	 IDR1_TABLES_PRESET	(1 << 30) /* Table base addresses fixed. */
 #define	 IDR1_QUEUES_PRESET	(1 << 29) /* Queue base addresses fixed. */
