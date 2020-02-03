@@ -169,4 +169,29 @@
 #define	SMMU_S_GATOS_ADDR	0x8110
 #define	SMMU_S_GATOS_PAR	0x8118
 
+#define	CMD_PREFETCH_CONFIG	0x01
+#define	CMD_PREFETCH_ADDR	0x02
+#define	CMD_CFGI_STE		0x03
+#define	CMD_CFGI_STE_RANGE	0x04
+#define	CMD_CFGI_CD		0x05
+#define	CMD_CFGI_CD_ALL		0x06
+#define	CMD_TLBI_NH_ALL		0x10
+#define	CMD_TLBI_NH_ASID	0x11
+#define	CMD_TLBI_NH_VA		0x12
+#define	CMD_TLBI_NH_VAA		0x13
+#define	CMD_TLBI_EL3_ALL	0x18
+#define	CMD_TLBI_EL3_VA		0x1A
+#define	CMD_TLBI_EL2_ALL	0x20
+#define	CMD_TLBI_EL2_ASID	0x21
+#define	CMD_TLBI_EL2_VA		0x22
+#define	CMD_TLBI_EL2_VAA	0x23
+#define	CMD_TLBI_S12_VMALL	0x28
+#define	CMD_TLBI_S2_IPA		0x2A
+#define	CMD_TLBI_NSNH_ALL	0x30
+#define	CMD_ATC_INV		0x40
+#define	CMD_PRI_RESP		0x41
+#define	CMD_RESUME		0x44
+#define	CMD_STALL_TERM		0x45
+#define	CMD_SYNC		0x46
+
 #endif /* _DEV_IOMMU_SMMU_REG_H_ */
