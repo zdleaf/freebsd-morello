@@ -264,6 +264,19 @@ smmu_attach(device_t dev)
 		return (ENXIO);
 	}
 
+	uint32_t val;
+	val = (reg & IDR1_CMDQS_M) >> IDR1_CMDQS_S;
+	printf("CMD queue size %d\n", val);
+
+	val = (reg & IDR1_EVENTQS_M) >> IDR1_EVENTQS_S;
+	printf("EVENT queue size %d\n", val);
+
+	val = (reg & IDR1_PRIQS_M) >> IDR1_PRIQS_S;
+	printf("PRI queue size %d\n", val);
+
+	sc->ssid_bits = (reg & IDR1_SSIDSIZE_M) >> IDR1_SSIDSIZE_S;
+	sc->sid_bits = (reg & IDR1_SIDSIZE_M) >> IDR1_SIDSIZE_S;
+
 	return (0);
 
 fail:

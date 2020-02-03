@@ -47,6 +47,8 @@ struct smmu_softc {
 	uint32_t		oas; /* Physical Address */
 	uint32_t		asid_bits;
 	uint32_t		vmid_bits;
+	uint32_t		sid_bits;
+	uint32_t		ssid_bits;
 	uint32_t		features;
 #define	SMMU_FEATURE_2_LVL_STREAM_TABLE		(1 << 0)
 #define	SMMU_FEATURE_2_LVL_CD			(1 << 1)
