@@ -205,8 +205,64 @@ smmu_attach(device_t dev)
 		return (ENXIO);
 	}
 
+	if (reg & IDR0_SEV)
+		sc->features |= SMMU_FEATURE_SEV;
+
+	if (reg & IDR0_MSI)
+		sc->features |= SMMU_FEATURE_MSI;
+
+	if (reg & IDR0_HYP)
+		sc->features |= SMMU_FEATURE_HYP;
+
+	if (reg & IDR0_ATS)
+		sc->features |= SMMU_FEATURE_ATS;
+
+	if (reg & IDR0_PRI)
+		sc->features |= SMMU_FEATURE_PRI;
+
+	switch (reg & IDR0_STALL_MODEL_M) {
+	case IDR0_STALL_MODEL_FORCE:
+		/* Stall is forced. */
+		sc->features |= SMMU_FEATURE_STALL_FORCE;
+		/* FALLTHROUGH */
+	case IDR0_STALL_MODEL_STALL:
+		sc->features |= SMMU_FEATURE_STALL;
+		break;
+	}
+
+	/* Grab translation stages supported. */
+	if (reg & IDR0_S1P)
+		sc->features |= SMMU_FEATURE_S1P;
+	if (reg & IDR0_S2P)
+		sc->features |= SMMU_FEATURE_S2P;
+
+	switch (reg & IDR0_TTF_M) {
+	case IDR0_TTF_ALL:
+	case IDR0_TTF_AA64:
+		sc->ias = 40;
+		break;
+	default:
+		device_printf(dev, "No AArch64 table format support\n");
+		return (ENXIO);
+	}
+
+	if (reg & IDR0_ASID16)
+		sc->asid_bits = 16;
+	else
+		sc->asid_bits = 8;
+
+	if (reg & IDR0_VMID16)
+		sc->vmid_bits = 16;
+	else
+		sc->vmid_bits = 8;
+
 	reg = bus_read_4(sc->res[0], SMMU_IDR1);
 	printf("IDR1 %x\n", reg);
+
+	if (reg & (IDR1_TABLES_PRESET | IDR1_QUEUES_PRESET | IDR1_REL)) {
+		device_printf(dev, "Embedded implementations not supported\n");
+		return (ENXIO);
+	}
 
 	return (0);
 

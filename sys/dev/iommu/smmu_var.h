@@ -43,13 +43,24 @@ struct smmu_softc {
 	device_t		dev;
 	struct resource		*res[4];
 	void			*intr_cookie[3];
-
+	uint32_t		ias; /* Intermediate Physical Address */
+	uint32_t		oas; /* Physical Address */
+	uint32_t		asid_bits;
+	uint32_t		vmid_bits;
 	uint32_t		features;
 #define	SMMU_FEATURE_2_LVL_STREAM_TABLE		(1 << 0)
 #define	SMMU_FEATURE_2_LVL_CD			(1 << 1)
 #define	SMMU_FEATURE_TT_LE			(1 << 2)
 #define	SMMU_FEATURE_TT_BE			(1 << 3)
 #define	SMMU_FEATURE_SEV			(1 << 4)
+#define	SMMU_FEATURE_MSI			(1 << 5)
+#define	SMMU_FEATURE_HYP			(1 << 6)
+#define	SMMU_FEATURE_ATS			(1 << 7)
+#define	SMMU_FEATURE_PRI			(1 << 8)
+#define	SMMU_FEATURE_STALL_FORCE		(1 << 9)
+#define	SMMU_FEATURE_STALL			(1 << 10)
+#define	SMMU_FEATURE_S1P			(1 << 11)
+#define	SMMU_FEATURE_S2P			(1 << 12)
 };
 
 struct smmu_devinfo {
