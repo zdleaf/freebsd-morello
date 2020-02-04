@@ -117,6 +117,13 @@
 #define	SMMU_IIDR		0x018
 #define	SMMU_AIDR		0x01C
 #define	SMMU_CR0		0x020
+#define	 CR0_VMW_S		6 /* VMID Wildcard */
+#define	 CR0_VMW_M		(0x7 << CR0_VMW_S)
+#define	 CR0_ATSCHK		(1 << 4) /* ATS behavior: Safe mode */
+#define	 CR0_CMDQEN		(1 << 3) /* Enable Command queue processing */
+#define	 CR0_EVENTQEN		(1 << 2) /* Enable Event queue writes */
+#define	 CR0_PRIQEN		(1 << 1) /* Enable PRI queue writes */
+#define	 CR0_SMMUEN		(1 << 0) /* Non-secure SMMU enable */
 #define	SMMU_CR0ACK		0x024
 #define	SMMU_CR1		0x028
 #define	SMMU_CR2		0x02C
