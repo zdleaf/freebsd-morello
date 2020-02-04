@@ -131,6 +131,36 @@ smmu_gerr_intr(void *arg)
 	return (FILTER_HANDLED);
 }
 
+struct smmu_queue {
+	vm_paddr_t paddr;
+	void *addr;
+};
+
+#define	SMMU_CMDQ_ALIGN	(64 * 1024)
+static int
+smmu_init_queue(struct smmu_softc *sc, struct smmu_queue *q)
+{
+	int sz;
+
+	sz = (1 << sc->cmdqs_shift) * 16;
+
+	printf("allocating %d bytes\n", sz);
+
+	/* Set up the command circular buffer */
+	q->addr = contigmalloc(sz, M_SMMU,
+	    M_WAITOK | M_ZERO, 0, (1ul << 48) - 1, SMMU_CMDQ_ALIGN, 0);
+	if (q->addr == NULL) {
+		printf("failed to allocate %d bytes\n", sz);
+		return (-1);
+	}
+
+	q->paddr = vtophys(q->addr);
+
+	printf("addr %p paddr %lx\n", q->addr, q->paddr);
+
+	return (0);
+}
+
 /*
  * Device interface.
  */
@@ -266,6 +296,8 @@ smmu_attach(device_t dev)
 
 	uint32_t val;
 	val = (reg & IDR1_CMDQS_M) >> IDR1_CMDQS_S;
+	sc->cmdqs_shift = val;
+
 	printf("CMD queue size %d\n", val);
 
 	val = (reg & IDR1_EVENTQS_M) >> IDR1_EVENTQS_S;
@@ -319,6 +351,13 @@ smmu_attach(device_t dev)
 
 	if ((reg & IDR5_VAX_M) == IDR5_VAX_52)
 		sc->features |= SMMU_FEATURE_VAX;
+
+	struct smmu_queue q;
+	int err;
+
+	err = smmu_init_queue(sc, &q);
+	if (err)
+		return (ENXIO);
 
 	return (0);
 
