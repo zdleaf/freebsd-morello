@@ -193,6 +193,7 @@ arm64/coresight/coresight-tmc.c			standard
 arm64/intel/firmware.c				optional soc_intel_stratix10
 arm64/intel/stratix10-soc-fpga-mgr.c		optional soc_intel_stratix10
 arm64/intel/stratix10-svc.c			optional soc_intel_stratix10
+arm64/n1sdp/pci_n1sdp.c				optional pci_n1sdp acpi
 arm64/qualcomm/qcom_gcc.c			optional qcom_gcc fdt
 contrib/vchiq/interface/compat/vchi_bsd.c	optional vchiq soc_brcm_bcm2837 \
 	compile-with "${NORMAL_C} -DUSE_VCHIQ_ARM -D__VCCOREVER__=0x04000000 -I$S/contrib/vchiq"
@@ -256,7 +257,6 @@ dev/pci/pci_host_generic_fdt.c	optional	pci fdt
 dev/pci/pci_dw_mv.c		optional	pci fdt
 dev/pci/pci_dw.c		optional	pci fdt
 dev/pci/pci_dw_if.m		optional	pci fdt
-dev/pci/pci_n1sdp.c		optional	pci_n1sdp acpi
 dev/psci/psci.c			standard
 dev/psci/smccc_arm64.S		standard
 dev/psci/smccc.c		standard
