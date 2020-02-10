@@ -66,26 +66,30 @@ __FBSDID("$FreeBSD$");
 #define	BDF_TABLE_SIZE		(16 * 1024)
 #define	PCI_CFG_SPACE_SIZE	0x1000
 
-static vm_offset_t rc_remapped_addr[N1SDP_MAX_SEGMENTS];
-static struct pcie_discovery_data {
+struct pcie_discovery_data {
 	uint32_t rc_base_addr;
 	uint32_t nr_bdfs;
 	uint32_t valid_bdfs[0];
-} *pcie_discovery_data[N1SDP_MAX_SEGMENTS];
+};
+
+struct generic_pcie_n1sdp_softc {
+	struct generic_pcie_acpi_softc acpi;
+	struct pcie_discovery_data *n1_discovery_data;
+	bus_space_handle_t n1_bsh;
+};
 
 static int
-n1sdp_init(struct generic_pcie_acpi_softc *sc)
+n1sdp_init(struct generic_pcie_n1sdp_softc *sc)
 {
 	struct pcie_discovery_data *shared_data;
-	vm_offset_t vaddr_rc;
 	vm_offset_t vaddr;
 	vm_paddr_t paddr_rc;
 	vm_paddr_t paddr;
 	int table_count;
 	int bdfs_size;
-	int i;
+	int error, i;
 
-	paddr = AP_NS_SHARED_MEM_BASE + sc->segment * BDF_TABLE_SIZE;
+	paddr = AP_NS_SHARED_MEM_BASE + sc->acpi.segment * BDF_TABLE_SIZE;
 	vaddr = kva_alloc((vm_size_t)BDF_TABLE_SIZE);
 	if (vaddr == 0) {
 		printf("%s: Can't allocate KVA memory.", __func__);
@@ -97,25 +101,20 @@ n1sdp_init(struct generic_pcie_acpi_softc *sc)
 	shared_data = (struct pcie_discovery_data *)vaddr;
 	bdfs_size = sizeof(struct pcie_discovery_data) +
 	    sizeof(uint32_t) * shared_data->nr_bdfs;
-	pcie_discovery_data[sc->segment] =
-	    malloc(bdfs_size, M_DEVBUF, M_WAITOK | M_ZERO);
-	memcpy(pcie_discovery_data[sc->segment], shared_data, bdfs_size);
+	sc->n1_discovery_data = malloc(bdfs_size, M_DEVBUF, M_WAITOK | M_ZERO);
+	memcpy(sc->n1_discovery_data, shared_data, bdfs_size);
 
 	paddr_rc = (vm_offset_t)shared_data->rc_base_addr;
-	vaddr_rc = kva_alloc((vm_size_t)PCI_CFG_SPACE_SIZE);
-	if (vaddr == 0) {
-		printf("%s: Can't allocate KVA memory.", __func__);
-		return (ENXIO);
-	}
-	pmap_kenter_device(vaddr_rc, (vm_size_t)PCI_CFG_SPACE_SIZE, paddr_rc);
-
-	rc_remapped_addr[sc->segment] = vaddr_rc;
+	error = bus_space_map(sc->acpi.base.bst, paddr_rc, PCI_CFG_SPACE_SIZE,
+	    0, &sc->n1_bsh);
+	if (error != 0)
+		return (error);
 
 	if (bootverbose) {
-		table_count = pcie_discovery_data[sc->segment]->nr_bdfs;
+		table_count = sc->n1_discovery_data->nr_bdfs;
 		for (i = 0; i < table_count; i++)
 			printf("valid bdf %x\n",
-			    pcie_discovery_data[sc->segment]->valid_bdfs[i]);
+			    sc->n1_discovery_data->valid_bdfs[i]);
 	}
 
 	pmap_kremove(vaddr);
@@ -125,7 +124,7 @@ n1sdp_init(struct generic_pcie_acpi_softc *sc)
 }
 
 static int
-n1sdp_check_bdf(struct generic_pcie_acpi_softc *sc,
+n1sdp_check_bdf(struct generic_pcie_n1sdp_softc *sc,
     u_int bus, u_int slot, u_int func)
 {
 	int table_count;
@@ -136,10 +135,10 @@ n1sdp_check_bdf(struct generic_pcie_acpi_softc *sc,
 	if (bdf == 0)
 		return (1);
 
-	table_count = pcie_discovery_data[sc->segment]->nr_bdfs;
+	table_count = sc->n1_discovery_data->nr_bdfs;
 
 	for (i = 0; i < table_count; i++)
-		if (bdf == pcie_discovery_data[sc->segment]->valid_bdfs[i])
+		if (bdf == sc->n1_discovery_data->valid_bdfs[i])
 			return (1);
 
 	return (0);
@@ -180,25 +179,28 @@ n1sdp_pcie_acpi_probe(device_t dev)
 static int
 n1sdp_pcie_acpi_attach(device_t dev)
 {
-	struct generic_pcie_acpi_softc *sc;
+	struct generic_pcie_n1sdp_softc *sc;
 	ACPI_HANDLE handle;
 	ACPI_STATUS status;
 	int err;
 
-	sc = device_get_softc(dev);
+	err = pci_host_generic_acpi_init(dev);
+	if (err != 0)
+		return (err);
 
+	sc = device_get_softc(dev);
 	handle = acpi_get_handle(dev);
 
 	/* Get PCI Segment (domain) needed for IOMMU space remap. */
-	status = acpi_GetInteger(handle, "_SEG", &sc->segment);
+	status = acpi_GetInteger(handle, "_SEG", &sc->acpi.segment);
 	if (ACPI_FAILURE(status)) {
 		device_printf(dev, "No _SEG for PCI Bus\n");
 		return (ENXIO);
 	}
 
-	if (sc->segment >= N1SDP_MAX_SEGMENTS) {
+	if (sc->acpi.segment >= N1SDP_MAX_SEGMENTS) {
 		device_printf(dev, "Unknown PCI Bus segment (domain) %d\n",
-		    sc->segment);
+		    sc->acpi.segment);
 		return (ENXIO);
 	}
 
@@ -206,21 +208,50 @@ n1sdp_pcie_acpi_attach(device_t dev)
 	if (err)
 		return (err);
 
-	err = pci_host_generic_acpi_attach(dev);
+	device_add_child(dev, "pci", -1);
+	return (bus_generic_attach(dev));
+}
 
-	return (err);
+static int
+n1sdp_get_bus_space(device_t dev, u_int bus, u_int slot, u_int func, u_int reg,
+    bus_space_tag_t *bst, bus_space_handle_t *bsh, bus_size_t *offset)
+{
+	struct generic_pcie_n1sdp_softc *sc;
+
+	sc = device_get_softc(dev);
+
+	if (n1sdp_check_bdf(sc, bus, slot, func) == 0)
+		return (EINVAL);
+
+	if (bus == sc->acpi.base.bus_start) {
+		if (slot != 0 || func != 0)
+			return (EINVAL);
+		*bsh = sc->n1_bsh;
+	} else {
+		*bsh = sc->acpi.base.bsh;
+	}
+
+	*bst = sc->acpi.base.bst;
+	*offset = PCIE_ADDR_OFFSET(bus - sc->acpi.base.bus_start, slot, func,
+	    reg);
+
+	return (0);
 }
 
 static uint32_t
 n1sdp_pcie_read_config(device_t dev, u_int bus, u_int slot,
     u_int func, u_int reg, int bytes)
 {
+	struct generic_pcie_n1sdp_softc *sc_n1sdp;
 	struct generic_pcie_acpi_softc *sc_acpi;
 	struct generic_pcie_core_softc *sc;
-	uint64_t offset;
+	bus_space_handle_t h;
+	bus_space_tag_t t;
+	bus_size_t offset;
 	uint32_t data;
 
-	sc_acpi = device_get_softc(dev);
+	sc_n1sdp = device_get_softc(dev);
+	sc_acpi = &sc_n1sdp->acpi;
 	sc = &sc_acpi->base;
 
 	if ((bus < sc->bus_start) || (bus > sc->bus_end))
@@ -229,18 +260,10 @@ n1sdp_pcie_read_config(device_t dev, u_int bus, u_int slot,
 	    (reg > PCIE_REGMAX))
 		return (~0U);
 
-	if (n1sdp_check_bdf(sc_acpi, bus, slot, func) == 0)
+	if (n1sdp_get_bus_space(dev, bus, slot, func, reg, &t, &h, &offset) !=0)
 		return (~0U);
 
-	offset = PCIE_ADDR_OFFSET(bus - sc->bus_start, slot, func, reg);
-
-	if (bus == sc->bus_start) {
-		if (slot != 0 || func != 0)
-			return (~0U);
-		data = *(uint32_t *)(rc_remapped_addr[sc_acpi->segment] +
-		    (offset & ~3));
-	} else
-		data = bus_space_read_4(sc->bst, sc->bsh, offset & ~3);
+	data = bus_space_read_4(t, h, offset & ~3);
 
 	switch (bytes) {
 	case 1:
@@ -265,14 +288,16 @@ static void
 n1sdp_pcie_write_config(device_t dev, u_int bus, u_int slot,
     u_int func, u_int reg, uint32_t val, int bytes)
 {
+	struct generic_pcie_n1sdp_softc *sc_n1sdp;
 	struct generic_pcie_acpi_softc *sc_acpi;
 	struct generic_pcie_core_softc *sc;
 	bus_space_handle_t h;
 	bus_space_tag_t t;
-	uint64_t offset;
+	bus_size_t offset;
 	uint32_t data;
 
-	sc_acpi = device_get_softc(dev);
+	sc_n1sdp = device_get_softc(dev);
+	sc_acpi = &sc_n1sdp->acpi;
 	sc = &sc_acpi->base;
 
 	if ((bus < sc->bus_start) || (bus > sc->bus_end))
@@ -281,26 +306,11 @@ n1sdp_pcie_write_config(device_t dev, u_int bus, u_int slot,
 	    (reg > PCIE_REGMAX))
 		return;
 
-	if (n1sdp_check_bdf(sc_acpi, bus, slot, func) == 0)
+	if (n1sdp_get_bus_space(dev, bus, slot, func, reg, &t, &h, &offset) !=0)
 		return;
 
-	offset = PCIE_ADDR_OFFSET(bus - sc->bus_start, slot, func, reg);
+	data = bus_space_read_4(t, h, offset & ~3);
 
-	t = sc->bst;
-	h = sc->bsh;
-
-	if (bus == sc->bus_start) {
-		if (slot != 0 || func != 0)
-			return;
-		data = *(uint32_t *)(rc_remapped_addr[sc_acpi->segment] +
-		    (offset & ~3));
-	} else
-		data = bus_space_read_4(t, h, offset & ~3);
-
-	/*
-	 * TODO: This is probably wrong on big-endian, however as arm64 is
-	 * little endian it should be fine.
-	 */
 	switch (bytes) {
 	case 1:
 		data &= ~(0xff << ((offset & 3) * 8));
@@ -317,11 +327,7 @@ n1sdp_pcie_write_config(device_t dev, u_int bus, u_int slot,
 		return;
 	}
 
-	if (bus == 0 && slot == 0 && func == 0)
-		*(uint32_t *)(rc_remapped_addr[sc_acpi->segment] +
-		    (offset & ~3)) = data;
-	else
-		bus_space_write_4(t, h, offset & ~3, htole32(data));
+	bus_space_write_4(t, h, offset & ~3, data);
 }
 
 static device_method_t n1sdp_pcie_acpi_methods[] = {
@@ -336,7 +342,7 @@ static device_method_t n1sdp_pcie_acpi_methods[] = {
 };
 
 DEFINE_CLASS_1(pcib, n1sdp_pcie_acpi_driver, n1sdp_pcie_acpi_methods,
-    sizeof(struct generic_pcie_acpi_softc), generic_pcie_acpi_driver);
+    sizeof(struct generic_pcie_n1sdp_softc), generic_pcie_acpi_driver);
 
 static devclass_t n1sdp_pcie_acpi_devclass;
 
