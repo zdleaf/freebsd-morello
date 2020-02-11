@@ -138,7 +138,7 @@
 #define	SMMU_GERROR_IRQ_CFG1	0x070
 #define	SMMU_GERROR_IRQ_CFG2	0x074
 #define	SMMU_STRTAB_BASE	0x080
-#define	 STRTAB_BASE_RA		(1 << 62) /* Read-Allocate. */
+#define	 STRTAB_BASE_RA		(1ULL << 62) /* Read-Allocate. */
 #define	 STRTAB_BASE_ADDR_S	6 /* Physical address of Stream table base */
 #define	 STRTAB_BASE_ADDR_M	(0x3fffffffffff << STRTAB_BASE_ADDR_S)
 #define	SMMU_STRTAB_BASE_CFG	0x088
