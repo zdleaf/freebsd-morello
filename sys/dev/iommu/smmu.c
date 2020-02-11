@@ -104,6 +104,8 @@ DEFINE_CLASS_0(gic, smmu_driver, smmu_methods,
  */
 MALLOC_DEFINE(M_SMMU, "SMMU", SMMU_DEVSTR);
 
+#define	STRTAB_SPLIT	8
+
 static int
 smmu_event_intr(void *arg)
 {
@@ -308,6 +310,12 @@ smmu_attach(device_t dev)
 
 	sc->ssid_bits = (reg & IDR1_SSIDSIZE_M) >> IDR1_SSIDSIZE_S;
 	sc->sid_bits = (reg & IDR1_SIDSIZE_M) >> IDR1_SIDSIZE_S;
+
+	if (sc->sid_bits <= STRTAB_SPLIT)
+		sc->features &= ~SMMU_FEATURE_2_LVL_STREAM_TABLE;
+
+	device_printf(dev, "ssid_bits %d\n", sc->ssid_bits);
+	device_printf(dev, "sid_bits %d\n", sc->sid_bits);
 
 	/* IDR5 */
 	reg = bus_read_4(sc->res[0], SMMU_IDR5);

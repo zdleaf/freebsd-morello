@@ -138,7 +138,21 @@
 #define	SMMU_GERROR_IRQ_CFG1	0x070
 #define	SMMU_GERROR_IRQ_CFG2	0x074
 #define	SMMU_STRTAB_BASE	0x080
+#define	 STRTAB_BASE_RA		(1 << 62) /* Read-Allocate. */
+#define	 STRTAB_BASE_ADDR_S	6 /* Physical address of Stream table base */
+#define	 STRTAB_BASE_ADDR_M	(0x3fffffffffff << STRTAB_BASE_ADDR_S)
 #define	SMMU_STRTAB_BASE_CFG	0x088
+#define	 STRTAB_BASE_CFG_FMT_S		16 /* Format of Stream table. */
+#define	 STRTAB_BASE_CFG_FMT_M		(0x3 << STRTAB_BASE_CFG_FMT_S)
+#define	 STRTAB_BASE_CFG_FMT_LINEAR	(0x0 << STRTAB_BASE_CFG_FMT_S)
+#define	 STRTAB_BASE_CFG_FMT_2LVL	(0x1 << STRTAB_BASE_CFG_FMT_S)
+#define	 STRTAB_BASE_CFG_SPLIT_S	6 /* SID split point for 2lvl table. */
+#define	 STRTAB_BASE_CFG_SPLIT_M	(0x1f << STRTAB_BASE_CFG_SPLIT_S)
+#define	 STRTAB_BASE_CFG_SPLIT_4KB	(6 << STRTAB_BASE_CFG_SPLIT_S)
+#define	 STRTAB_BASE_CFG_SPLIT_16KB	(8 << STRTAB_BASE_CFG_SPLIT_S)
+#define	 STRTAB_BASE_CFG_SPLIT_64KB	(10 << STRTAB_BASE_CFG_SPLIT_S)
+#define	 STRTAB_BASE_CFG_LOG2SIZE_S	0 /* Table size as log2(entries) */
+#define	 STRTAB_BASE_CFG_LOG2SIZE_M	(0x3f << STRTAB_BASE_CFG_LOG2SIZE_S)
 #define	SMMU_CMDQ_BASE		0x090
 #define	SMMU_CMDQ_PROD		0x098
 #define	SMMU_CMDQ_CONS		0x09C
