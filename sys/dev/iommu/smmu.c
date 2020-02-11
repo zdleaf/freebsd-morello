@@ -213,6 +213,10 @@ smmu_init_strtab_2lvl(struct smmu_softc *sc)
 	reg |= STRTAB_SPLIT << STRTAB_BASE_CFG_SPLIT_S;
 	bus_write_4(sc->res[0], SMMU_STRTAB_BASE_CFG, reg);
 
+	reg = vtophys(strtab) & STRTAB_BASE_ADDR_M;
+	reg |= STRTAB_BASE_RA;
+	bus_write_4(sc->res[0], SMMU_STRTAB_BASE, reg);
+
 	return (0);
 }
 
