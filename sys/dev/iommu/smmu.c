@@ -104,7 +104,9 @@ DEFINE_CLASS_0(gic, smmu_driver, smmu_methods,
  */
 MALLOC_DEFINE(M_SMMU, "SMMU", SMMU_DEVSTR);
 
-#define	STRTAB_SPLIT	8
+#define	STRTAB_L1_SZ_SHIFT	20
+#define	STRTAB_SPLIT		8
+#define	STRTAB_L1_DESC_DWORDS	1
 
 static int
 smmu_event_intr(void *arg)
@@ -138,6 +140,16 @@ struct smmu_queue {
 	void *addr;
 };
 
+static inline int
+ilog2(long x)
+{
+
+	KASSERT(x > 0 && powerof2(x),
+	    ("%s: invalid arg %ld", __func__, x));
+
+	return (flsl(x) - 1);
+}
+
 #define	SMMU_CMDQ_ALIGN	(64 * 1024)
 static int
 smmu_init_queue(struct smmu_softc *sc, struct smmu_queue *q)
@@ -159,6 +171,47 @@ smmu_init_queue(struct smmu_softc *sc, struct smmu_queue *q)
 	q->paddr = vtophys(q->addr);
 
 	printf("addr %p paddr %lx\n", q->addr, q->paddr);
+
+	return (0);
+}
+
+static int
+smmu_init_strtab_2lvl(struct smmu_softc *sc)
+{
+	uint32_t size;
+	uint32_t num_l1_entries;
+	uint32_t l1size;
+
+	size = STRTAB_L1_SZ_SHIFT - (ilog2(STRTAB_L1_DESC_DWORDS) + 3);
+	size = min(size, sc->sid_bits - STRTAB_SPLIT);
+	num_l1_entries = (1 << size);
+	size += STRTAB_SPLIT;
+
+	l1size = num_l1_entries * (STRTAB_L1_DESC_DWORDS << 3);
+
+	printf("%s: size %d, l1 entries %d, l1size %d\n",
+	    __func__, size, num_l1_entries, l1size);
+
+	void *strtab;
+
+	strtab = contigmalloc(l1size, M_SMMU,
+	    M_WAITOK | M_ZERO,	/* flags */
+	    0,			/* low */
+	    (1ul << 48) - 1,	/* high */
+	    SMMU_CMDQ_ALIGN,	/* alignment */
+	    0);			/* boundary */
+	if (strtab == NULL) {
+		printf("failed to allocate strtab\n");
+		return (ENXIO);
+	}
+
+	printf("%s: strtab %p\n", __func__, strtab);
+
+	uint32_t reg;
+	reg = STRTAB_BASE_CFG_FMT_2LVL;
+	reg |= size << STRTAB_BASE_CFG_LOG2SIZE_S;
+	reg |= STRTAB_SPLIT << STRTAB_BASE_CFG_SPLIT_S;
+	bus_write_4(sc->res[0], SMMU_STRTAB_BASE_CFG, reg);
 
 	return (0);
 }
@@ -364,6 +417,14 @@ smmu_attach(device_t dev)
 	int err;
 
 	err = smmu_init_queue(sc, &q);
+	if (err)
+		return (ENXIO);
+
+	if (sc->features & SMMU_FEATURE_2_LVL_STREAM_TABLE)
+		err = smmu_init_strtab_2lvl(sc);
+	else
+		panic("unsupported configuration");
+
 	if (err)
 		return (ENXIO);
 
