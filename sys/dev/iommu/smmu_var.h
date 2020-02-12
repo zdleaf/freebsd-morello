@@ -39,6 +39,14 @@
 
 DECLARE_CLASS(smmu_driver);
 
+struct smmu_queue {
+	vm_paddr_t paddr;
+	void *addr;
+	uint32_t prod_reg;
+	uint32_t cons_reg;
+	int size_log2;
+};
+
 struct smmu_softc {
 	device_t		dev;
 	struct resource		*res[4];
@@ -50,7 +58,6 @@ struct smmu_softc {
 	uint32_t		sid_bits;
 	uint32_t		ssid_bits;
 	uint32_t		pgsizes;
-	uint32_t		cmdqs_shift;
 	uint32_t		features;
 #define	SMMU_FEATURE_2_LVL_STREAM_TABLE		(1 << 0)
 #define	SMMU_FEATURE_2_LVL_CD			(1 << 1)
@@ -66,6 +73,9 @@ struct smmu_softc {
 #define	SMMU_FEATURE_S1P			(1 << 11)
 #define	SMMU_FEATURE_S2P			(1 << 12)
 #define	SMMU_FEATURE_VAX			(1 << 13)
+	struct smmu_queue cmd_q;
+	struct smmu_queue evt_q;
+	struct smmu_queue pri_q;
 };
 
 struct smmu_devinfo {

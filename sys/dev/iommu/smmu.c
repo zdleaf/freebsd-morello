@@ -137,11 +137,6 @@ smmu_gerr_intr(void *arg)
 	return (FILTER_HANDLED);
 }
 
-struct smmu_queue {
-	vm_paddr_t paddr;
-	void *addr;
-};
-
 static inline int
 ilog2(long x)
 {
@@ -153,14 +148,16 @@ ilog2(long x)
 }
 
 #define	SMMU_CMDQ_ALIGN	(64 * 1024)
+
 static int
-smmu_init_queue(struct smmu_softc *sc, struct smmu_queue *q)
+smmu_init_queue(struct smmu_softc *sc, struct smmu_queue *q,
+    uint32_t prod_off, uint32_t cons_off)
 {
 	int sz;
 
-	sz = (1 << sc->cmdqs_shift) * 16;
+	sz = (1 << q->size_log2) * 16;
 
-	printf("allocating %d bytes\n", sz);
+	printf("%s: allocating %d bytes\n", __func__, sz);
 
 	/* Set up the command circular buffer */
 	q->addr = contigmalloc(sz, M_SMMU,
@@ -170,9 +167,44 @@ smmu_init_queue(struct smmu_softc *sc, struct smmu_queue *q)
 		return (-1);
 	}
 
+	q->prod_reg = prod_off;
+	q->cons_reg = cons_off;
 	q->paddr = vtophys(q->addr);
 
-	printf("addr %p paddr %lx\n", q->addr, q->paddr);
+	q->base =
+
+	printf("%s: queue addr %p paddr %lx\n", __func__, q->addr, q->paddr);
+
+	return (0);
+}
+
+static int
+smmu_init_queues(struct smmu_softc *sc)
+{
+	int err;
+
+	/* Command queue */
+	err = smmu_init_queue(sc, &sc->cmd_q,
+	    SMMU_CMDQ_PROD, SMMU_CMDQ_CONS);
+	if (err)
+		return (ENXIO);
+
+	/* Event queue */
+	err = smmu_init_queue(sc, &sc->evt_q,
+	    SMMU_EVENTQ_PROD, SMMU_EVENTQ_CONS);
+	if (err)
+		return (ENXIO);
+
+	if (!(sc->features & SMMU_FEATURE_PRI)) {
+		printf("no PRI queue is available\n");
+		return (0);
+	}
+
+	/* PRI queue */
+	err = smmu_init_queue(sc, &sc->pri_q,
+	    SMMU_PRIQ_PROD, SMMU_PRIQ_CONS);
+	if (err)
+		return (ENXIO);
 
 	return (0);
 }
@@ -421,14 +453,15 @@ smmu_attach(device_t dev)
 
 	uint32_t val;
 	val = (reg & IDR1_CMDQS_M) >> IDR1_CMDQS_S;
-	sc->cmdqs_shift = val;
-
+	sc->cmd_q.size_log2 = val;
 	printf("CMD queue size %d\n", val);
 
 	val = (reg & IDR1_EVENTQS_M) >> IDR1_EVENTQS_S;
+	sc->evt_q.size_log2 = val;
 	printf("EVENT queue size %d\n", val);
 
 	val = (reg & IDR1_PRIQS_M) >> IDR1_PRIQS_S;
+	sc->pri_q.size_log2 = val;
 	printf("PRI queue size %d\n", val);
 
 	sc->ssid_bits = (reg & IDR1_SSIDSIZE_M) >> IDR1_SSIDSIZE_S;
@@ -483,22 +516,17 @@ smmu_attach(device_t dev)
 	if ((reg & IDR5_VAX_M) == IDR5_VAX_52)
 		sc->features |= SMMU_FEATURE_VAX;
 
-	struct smmu_queue q;
-	int err;
-
-	err = smmu_init_queue(sc, &q);
-	if (err)
-		return (ENXIO);
+	smmu_init_queues(sc);
 
 	/* Try linear for now. */
 	sc->features &= ~SMMU_FEATURE_2_LVL_STREAM_TABLE;
 
 	if (sc->features & SMMU_FEATURE_2_LVL_STREAM_TABLE)
-		err = smmu_init_strtab_2lvl(sc);
+		error = smmu_init_strtab_2lvl(sc);
 	else
-		err = smmu_init_strtab_linear(sc);
+		error = smmu_init_strtab_linear(sc);
 
-	if (err)
+	if (error)
 		return (ENXIO);
 
 	return (0);
