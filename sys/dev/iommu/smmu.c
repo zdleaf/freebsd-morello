@@ -108,6 +108,8 @@ MALLOC_DEFINE(M_SMMU, "SMMU", SMMU_DEVSTR);
 #define	STRTAB_SPLIT		8
 #define	STRTAB_L1_DESC_DWORDS	1
 
+#define	STRTAB_STE_DWORDS	8
+
 static int
 smmu_event_intr(void *arg)
 {
@@ -171,6 +173,70 @@ smmu_init_queue(struct smmu_softc *sc, struct smmu_queue *q)
 	q->paddr = vtophys(q->addr);
 
 	printf("addr %p paddr %lx\n", q->addr, q->paddr);
+
+	return (0);
+}
+
+static int
+smmu_init_ste(struct smmu_softc *sc, uint64_t *ste)
+{
+
+	ste[0] = STE0_VALID | STE0_CONFIG_ABORT;
+	ste[1] = STE1_SHCFG_INCOMING;
+	ste[2] = 0;
+
+	return (0);
+}
+
+static int
+smmu_init_bypass(struct smmu_softc *sc,
+    uint64_t *strtab, int num_l1_entries)
+{
+	int i;
+
+	for (i = 0; i < num_l1_entries; i++) {
+		smmu_init_ste(sc, strtab);
+		strtab += STRTAB_STE_DWORDS;
+	}
+
+	return (0);
+}
+
+static int
+smmu_init_strtab_linear(struct smmu_softc *sc)
+{
+	uint32_t size;
+	uint32_t num_l1_entries;
+
+	num_l1_entries = (1 << sc->sid_bits);
+
+	size = num_l1_entries * (STRTAB_STE_DWORDS << 3);
+	printf("%s: linear strtab size %d, num_l1_entries %d\n",
+	    __func__, size, num_l1_entries);
+
+	void *strtab;
+
+	strtab = contigmalloc(size, M_SMMU,
+	    M_WAITOK | M_ZERO,	/* flags */
+	    0,			/* low */
+	    (1ul << 48) - 1,	/* high */
+	    SMMU_CMDQ_ALIGN,	/* alignment */
+	    0);			/* boundary */
+	if (strtab == NULL) {
+		printf("failed to allocate strtab\n");
+		return (ENXIO);
+	}
+
+	uint32_t reg;
+	reg = STRTAB_BASE_CFG_FMT_LINEAR;
+	reg |= sc->sid_bits << STRTAB_BASE_CFG_LOG2SIZE_S;
+	bus_write_4(sc->res[0], SMMU_STRTAB_BASE_CFG, reg);
+
+	reg = vtophys(strtab) & STRTAB_BASE_ADDR_M;
+	reg |= STRTAB_BASE_RA;
+	bus_write_4(sc->res[0], SMMU_STRTAB_BASE, reg);
+
+	smmu_init_bypass(sc, strtab, num_l1_entries);
 
 	return (0);
 }
@@ -424,10 +490,13 @@ smmu_attach(device_t dev)
 	if (err)
 		return (ENXIO);
 
+	/* Try linear for now. */
+	sc->features &= ~SMMU_FEATURE_2_LVL_STREAM_TABLE;
+
 	if (sc->features & SMMU_FEATURE_2_LVL_STREAM_TABLE)
 		err = smmu_init_strtab_2lvl(sc);
 	else
-		panic("unsupported configuration");
+		err = smmu_init_strtab_linear(sc);
 
 	if (err)
 		return (ENXIO);
