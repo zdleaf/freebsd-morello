@@ -233,4 +233,105 @@
 #define	CMD_STALL_TERM		0x45
 #define	CMD_SYNC		0x46
 
+#define	STE0_VALID		(1 << 0) /* Structure contents are valid. */
+#define	STE0_CONFIG_S		1
+#define	STE0_CONFIG_M		(0x7 << STE_CONFIG_S)
+#define	STE0_CONFIG_ABORT	(0x0 << STE_CONFIG_S)
+#define	STE0_CONFIG_BYPASS	(0x4 << STE_CONFIG_S)
+#define	STE0_CONFIG_S1_TRANS	(0x5 << STE_CONFIG_S)
+#define	STE0_CONFIG_S2_TRANS	(0x6 << STE_CONFIG_S)
+#define	STE0_CONFIG_ALL_TRANS	(0x7 << STE_CONFIG_S)
+#define	STE0_S1FMT_S		4
+#define	STE0_S1FMT_M		(0x3 << STE_S1FMT_S)
+#define STE0_S1FMT_LINEAR	(0x0 << STE_S1FMT_S)
+#define	STE0_S1FMT_4KB_L2	(0x1 << STE_S1FMT_S)
+#define	STE0_S1FMT_64KB_L2	(0x2 << STE_S1FMT_S)
+#define	STE0_S1CONTEXTPTR_S	6
+#define	STE0_S1CONTEXTPTR_M	(0x3fffffffffff << STE_S1CONTEXTPTR_S)
+#define	STE0_S1CDMAX_S		59
+#define	STE0_S1CDMAX_M		(0x1f << STE_S1CDMAX_S)
+
+#define	STE1_S1DSS_S		0
+#define	STE1_S1DSS_M		(0x3 << STE1_S1DSS_S)
+#define	STE1_S1DSS_TERMINATE	(0x0 << STE1_S1DSS_S)
+#define	STE1_S1DSS_BYPASS	(0x1 << STE1_S1DSS_S)
+#define	STE1_S1DSS_SUBSTREAM0	(0x2 << STE1_S1DSS_S)
+#define	STE1_S1CIR_S		2
+#define	STE1_S1CIR_M		(0x3 << STE1_S1CIR_S)
+#define	STE1_S1CIR_NC		(0x0 << STE1_S1CIR_S)
+#define	STE1_S1CIR_WBRA		(0x1 << STE1_S1CIR_S)
+#define	STE1_S1CIR_WT		(0x2 << STE1_S1CIR_S)
+#define	STE1_S1CIR_WB		(0x3 << STE1_S1CIR_S)
+#define	STE1_S1COR_S		4
+#define	STE1_S1COR_M		(0x3 << STE1_S1COR_S)
+#define	STE1_S1COR_NC		(0x0 << STE1_S1COR_S)
+#define	STE1_S1COR_WBRA		(0x1 << STE1_S1COR_S)
+#define	STE1_S1COR_WT		(0x2 << STE1_S1COR_S)
+#define	STE1_S1COR_WB		(0x3 << STE1_S1COR_S)
+#define	STE1_S1CSH_S		6
+#define	STE1_S1CSH_NS		(0x0 << STE1_S1CSH_S)
+#define	STE1_S1CSH_OS		(0x2 << STE1_S1CSH_S)
+#define	STE1_S1CSH_IS		(0x3 << STE1_S1CSH_S)
+#define	STE1_S2HWU59		(1 << 8)
+#define	STE1_S2HWU60		(1 << 9)
+#define	STE1_S2HWU61		(1 << 10)
+#define	STE1_S2HWU62		(1 << 11)
+#define	STE1_DRE		(1 << 12) /* Destructive Read Enable. */
+#define	STE1_CONT_S		13 /* Contiguous Hint */
+#define	STE1_CONT_M		(0xf << STE1_CONT_S)
+#define	STE1_DCP		(1 << 17) /* Directed Cache Prefetch. */
+#define	STE1_PPAR		(1 << 18) /* PRI Page request Auto Responses */
+#define	STE1_MEV		(1 << 19) /* Merge Events */
+#define	STE1_S1STALLD		(1 << 27) /* Stage 1 Stall Disable */
+#define	STE1_EATS_S		28 /* Enable PCIe ATS translation and traffic */
+#define	STE1_EATS_M		(0x3 << STE1_EATS_S)
+#define	STE1_EATS_ABORT		(0x0 << STE1_EATS_S)
+#define	STE1_EATS_FULLATS	(0x1 << STE1_EATS_S) /* Full ATS */
+#define	STE1_EATS_S1		(0x2 << STE1_EATS_S) /* Split-stage ATS */
+#define	STE1_STRW_S		30 /* StreamWorld control */
+#define	STE1_STRW_M		(0x3 << STE1_STRW_S)
+#define	STE1_STRW_NS_EL1	(0x0 << STE1_STRW_S)
+#define	STE1_STRW_EL2		(0x2 << STE1_STRW_S)
+#define	STE1_MEMATTR_S		32
+#define	STE1_MTCFG		(1 << 36)
+#define	STE1_ALLOCCFG_S		37
+#define	STE1_SHCFG_S		44
+#define	STE1_SHCFG_M		(0x3 << STE1_SHCFG_S)
+#define	STE1_SHCFG_NS		(0x0 << STE1_SHCFG_S)
+#define	STE1_SHCFG_INCOMING	(0x1 << STE1_SHCFG_S)
+#define	STE1_SHCFG_OS		(0x2 << STE1_SHCFG_S)
+#define	STE1_SHCFG_IS		(0x3 << STE1_SHCFG_S)
+#define	STE1_NSCFG_S		46
+#define	STE1_NSCFG_M		(0x3 << STE1_NSCFG_S)
+#define	STE1_NSCFG_SECURE	(0x2 << STE1_NSCFG_S)
+#define	STE1_NSCFG_NONSECURE	(0x3 << STE1_NSCFG_S)
+#define	STE1_PRIVCFG_S		48
+#define	STE1_INSTCFG_S		50
+
+#define	STE2_S2VMID_S		0
+#define	STE2_S2VMID_M		(0xffff << STE2_S2VMID_S)
+#define	STE2_S2T0SZ_S		32 /* Size of IPA input region */
+#define	STE2_S2T0SZ_M		(0x3f << STE2_S2T0SZ_S)
+#define	STE2_S2SL0_S		38 /* Starting level of stage 2 tt walk */
+#define	STE2_S2SL0_M		(0x3 << STE2_S2SL0_S)
+#define	STE2_S2IR0_S		40
+#define	STE2_S2IR0_M		(0x3 << STE2_S2IR0_S)
+#define	STE2_S2OR0_S		42
+#define	STE2_S2OR0_M		(0x3 << STE2_S2OR0_S)
+#define	STE2_S2SH0_S		44
+#define	STE2_S2SH0_M		(0x3 << STE2_S2SH0_S)
+#define	STE2_S2TG_S		46
+#define	STE2_S2TG_M		(0x3 << STE2_S2TG_S)
+#define	STE2_S2PS_S		48 /* Physical address Size */
+#define	STE2_S2PS_M		(0x7 << STE2_S2PS_S)
+#define	STE2_S2AA64		(1 << 51) /* Stage 2 tt is AArch64 */
+#define	STE2_S2ENDI		(1 << 52) /* Stage 2 tt endianness */
+#define	STE2_S2AFFD		(1 << 53) /* Stage 2 Access Flag Fault Disable*/
+#define	STE2_S2PTW		(1 << 54) /* Protected Table Walk */
+#define	STE2_S2S		(1 << 57)
+#define	STE2_S2R		(1 << 58)
+
+#define	STE3_S2TTB_S		4 /* Address of Translation Table base */
+#define	STE3_S2TTB_M		(0xffffffffffff << STE3_S2TTB_S)
+
 #endif /* _DEV_IOMMU_SMMU_REG_H_ */
