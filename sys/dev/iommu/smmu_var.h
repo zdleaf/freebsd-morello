@@ -39,6 +39,10 @@
 
 DECLARE_CLASS(smmu_driver);
 
+struct smmu_cmdq_entry {
+	uint8_t opcode;
+};
+
 struct smmu_strtab {
 	void *addr;
 	uint64_t base;

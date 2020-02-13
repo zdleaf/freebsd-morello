@@ -1,7 +1,7 @@
 /*-
  * SPDX-License-Identifier: BSD-2-Clause
  *
- * Copyright (c) 2019 Ruslan Bukin <br@bsdpad.com>
+ * Copyright (c) 2019-2020 Ruslan Bukin <br@bsdpad.com>
  *
  * This software was developed by SRI International and the University of
  * Cambridge Computer Laboratory (Department of Computer Science and
@@ -372,6 +372,20 @@ smmu_disable(struct smmu_softc *sc)
 }
 
 static int
+smmu_cmdq_issue_cmd(struct smmu_softc *sc, struct smmu_cmdq_entry *cmd)
+{
+
+	return (0);
+}
+
+static int
+smmu_cmdq_issue_sync(struct smmu_softc *sc)
+{
+
+	return (0);
+}
+
+static int
 smmu_reset(struct smmu_softc *sc)
 {
 	struct smmu_strtab *strtab;
@@ -415,6 +429,11 @@ smmu_reset(struct smmu_softc *sc)
 		device_printf(sc->dev, "Could not enable command queue\n");
 		return (ENXIO);
 	}
+
+	struct smmu_cmdq_entry cmd;
+	cmd.opcode = CMD_CFGI_STE_RANGE;
+	smmu_cmdq_issue_cmd(sc, &cmd);
+	smmu_cmdq_issue_sync(sc);
 
 	return (0);
 }
