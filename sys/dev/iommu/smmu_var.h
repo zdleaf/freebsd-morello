@@ -39,11 +39,17 @@
 
 DECLARE_CLASS(smmu_driver);
 
+struct smmu_strtab {
+	void *addr;
+	uint64_t base;
+	uint64_t base_cfg;
+};
+
 struct smmu_queue {
 	vm_paddr_t paddr;
 	void *addr;
-	uint32_t prod_reg;
-	uint32_t cons_reg;
+	uint32_t prod_off;
+	uint32_t cons_off;
 	int size_log2;
 	uint64_t base;
 };
@@ -77,6 +83,7 @@ struct smmu_softc {
 	struct smmu_queue cmd_q;
 	struct smmu_queue evt_q;
 	struct smmu_queue pri_q;
+	struct smmu_strtab strtab;
 };
 
 struct smmu_devinfo {

@@ -167,8 +167,8 @@ smmu_init_queue(struct smmu_softc *sc, struct smmu_queue *q,
 		return (-1);
 	}
 
-	q->prod_reg = prod_off;
-	q->cons_reg = cons_off;
+	q->prod_off = prod_off;
+	q->cons_off = cons_off;
 	q->paddr = vtophys(q->addr);
 
 	q->base = CMDQ_BASE_RA | EVENTQ_BASE_WA | PRIQ_BASE_WA;
@@ -239,38 +239,38 @@ smmu_init_bypass(struct smmu_softc *sc,
 static int
 smmu_init_strtab_linear(struct smmu_softc *sc)
 {
-	uint32_t size;
+	struct smmu_strtab *strtab;
 	uint32_t num_l1_entries;
+	uint32_t size;
+	uint32_t reg;
 
+	strtab = &sc->strtab;
 	num_l1_entries = (1 << sc->sid_bits);
 
 	size = num_l1_entries * (STRTAB_STE_DWORDS << 3);
 	printf("%s: linear strtab size %d, num_l1_entries %d\n",
 	    __func__, size, num_l1_entries);
 
-	void *strtab;
-
-	strtab = contigmalloc(size, M_SMMU,
+	strtab->addr = contigmalloc(size, M_SMMU,
 	    M_WAITOK | M_ZERO,	/* flags */
 	    0,			/* low */
 	    (1ul << 48) - 1,	/* high */
 	    SMMU_CMDQ_ALIGN,	/* alignment */
 	    0);			/* boundary */
-	if (strtab == NULL) {
+	if (strtab->addr == NULL) {
 		printf("failed to allocate strtab\n");
 		return (ENXIO);
 	}
 
-	uint32_t reg;
 	reg = STRTAB_BASE_CFG_FMT_LINEAR;
 	reg |= sc->sid_bits << STRTAB_BASE_CFG_LOG2SIZE_S;
-	bus_write_4(sc->res[0], SMMU_STRTAB_BASE_CFG, reg);
+	strtab->base_cfg = reg;
 
-	reg = vtophys(strtab) & STRTAB_BASE_ADDR_M;
+	reg = vtophys(strtab->addr) & STRTAB_BASE_ADDR_M;
 	reg |= STRTAB_BASE_RA;
-	bus_write_4(sc->res[0], SMMU_STRTAB_BASE, reg);
+	strtab->base = reg;
 
-	smmu_init_bypass(sc, strtab, num_l1_entries);
+	smmu_init_bypass(sc, strtab->addr, num_l1_entries);
 
 	return (0);
 }
@@ -374,6 +374,7 @@ smmu_disable(struct smmu_softc *sc)
 static int
 smmu_reset(struct smmu_softc *sc)
 {
+	struct smmu_strtab *strtab;
 	int error;
 	int reg;
 
@@ -398,6 +399,16 @@ smmu_reset(struct smmu_softc *sc)
 
 	reg = CR2_PTM | CR2_RECINVSID | CR2_E2H;
 	bus_write_4(sc->res[0], SMMU_CR2, reg);
+
+	/* Stream table. */
+	strtab = &sc->strtab;
+	bus_write_4(sc->res[0], SMMU_STRTAB_BASE_CFG, strtab->base);
+	bus_write_4(sc->res[0], SMMU_STRTAB_BASE, strtab->base_cfg);
+
+	/* Command queue. */
+	bus_write_4(sc->res[0], SMMU_CMDQ_BASE, sc->cmd_q.base);
+	bus_write_4(sc->res[0], SMMU_CMDQ_PROD, sc->cmd_q.prod_off);
+	bus_write_4(sc->res[0], SMMU_CMDQ_CONS, sc->cmd_q.cons_off);
 
 	return (0);
 }
