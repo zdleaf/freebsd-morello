@@ -171,7 +171,9 @@ smmu_init_queue(struct smmu_softc *sc, struct smmu_queue *q,
 	q->cons_reg = cons_off;
 	q->paddr = vtophys(q->addr);
 
-	q->base =
+	q->base = CMDQ_BASE_RA | EVENTQ_BASE_WA | PRIQ_BASE_WA;
+	q->base |= q->paddr & Q_BASE_ADDR_M;
+	q->base |= q->size_log2 << Q_LOG2SIZE_S;
 
 	printf("%s: queue addr %p paddr %lx\n", __func__, q->addr, q->paddr);
 
@@ -316,6 +318,22 @@ smmu_init_strtab_2lvl(struct smmu_softc *sc)
 	bus_write_4(sc->res[0], SMMU_STRTAB_BASE, reg);
 
 	return (0);
+}
+
+static int
+smmu_init_strtab(struct smmu_softc *sc)
+{
+	int error;
+
+	/* XXX: Try linear for now. */
+	sc->features &= ~SMMU_FEATURE_2_LVL_STREAM_TABLE;
+
+	if (sc->features & SMMU_FEATURE_2_LVL_STREAM_TABLE)
+		error = smmu_init_strtab_2lvl(sc);
+	else
+		error = smmu_init_strtab_linear(sc);
+
+	return (error);
 }
 
 /*
@@ -516,18 +534,17 @@ smmu_attach(device_t dev)
 	if ((reg & IDR5_VAX_M) == IDR5_VAX_52)
 		sc->features |= SMMU_FEATURE_VAX;
 
-	smmu_init_queues(sc);
-
-	/* Try linear for now. */
-	sc->features &= ~SMMU_FEATURE_2_LVL_STREAM_TABLE;
-
-	if (sc->features & SMMU_FEATURE_2_LVL_STREAM_TABLE)
-		error = smmu_init_strtab_2lvl(sc);
-	else
-		error = smmu_init_strtab_linear(sc);
-
-	if (error)
+	error = smmu_init_queues(sc);
+	if (error) {
+		device_printf(dev, "Couldn't allocate queues\n");
 		return (ENXIO);
+	}
+
+	error = smmu_init_strtab(sc);
+	if (error) {
+		device_printf(dev, "Couldn't allocate strtab\n");
+		return (ENXIO);
+	}
 
 	return (0);
 

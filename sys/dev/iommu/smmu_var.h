@@ -45,6 +45,7 @@ struct smmu_queue {
 	uint32_t prod_reg;
 	uint32_t cons_reg;
 	int size_log2;
+	uint64_t base;
 };
 
 struct smmu_softc {

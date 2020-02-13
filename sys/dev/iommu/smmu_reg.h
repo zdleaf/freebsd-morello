@@ -154,15 +154,22 @@
 #define	 STRTAB_BASE_CFG_LOG2SIZE_S	0 /* Table size as log2(entries) */
 #define	 STRTAB_BASE_CFG_LOG2SIZE_M	(0x3f << STRTAB_BASE_CFG_LOG2SIZE_S)
 #define	SMMU_CMDQ_BASE		0x090
+#define	 CMDQ_BASE_RA		(1ULL << 62) /* Read-Allocate. */
+#define	 Q_BASE_ADDR_S		5 /* PA of queue base */
+#define	 Q_BASE_ADDR_M		(0x7fffffffffff << Q_BASE_ADDR_S)
+#define	 Q_LOG2SIZE_S		0 /* Queue size as log2(entries) */
+#define	 Q_LOG2SIZE_M		(0x1f << Q_LOG2SIZE_S)
 #define	SMMU_CMDQ_PROD		0x098
 #define	SMMU_CMDQ_CONS		0x09C
 #define	SMMU_EVENTQ_BASE	0x0A0
+#define	 EVENTQ_BASE_WA		(1ULL << 62) /* Write-Allocate. */
 #define	SMMU_EVENTQ_PROD	0x100A8
 #define	SMMU_EVENTQ_CONS	0x100AC
 #define	SMMU_EVENTQ_IRQ_CFG0	0x0B0
 #define	SMMU_EVENTQ_IRQ_CFG1	0x0B8
 #define	SMMU_EVENTQ_IRQ_CFG2	0x0BC
 #define	SMMU_PRIQ_BASE		0x0C0
+#define	 PRIQ_BASE_WA		(1ULL < 62) /* Write-Allocate. */
 #define	SMMU_PRIQ_PROD		0x100C8
 #define	SMMU_PRIQ_CONS		0x100CC
 #define	SMMU_PRIQ_IRQ_CFG0	0x0D0
