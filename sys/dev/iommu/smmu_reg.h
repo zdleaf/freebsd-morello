@@ -157,6 +157,9 @@
 #define	 CR1_QUEUE_IC_WBC	(0x1 << CR1_QUEUE_IC_S)
 #define	 CR1_QUEUE_IC_WTC	(0x2 << CR1_QUEUE_IC_S)
 #define	SMMU_CR2		0x02C
+#define	 CR2_PTM		(1 << 2) /* Private TLB Maintenance. */
+#define	 CR2_RECINVSID		(1 << 1) /* Record invalid SID. */
+#define	 CR2_E2H		(1 << 0) /* Enable EL2-E2H translation regime */
 #define	SMMU_STATUSR		0x040
 #define	SMMU_GBPA		0x044
 #define	SMMU_AGBPA		0x048

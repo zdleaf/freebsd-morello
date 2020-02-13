@@ -396,6 +396,9 @@ smmu_reset(struct smmu_softc *sc)
 	    | CR1_QUEUE_IC_WBC;
 	bus_write_4(sc->res[0], SMMU_CR1, reg);
 
+	reg = CR2_PTM | CR2_RECINVSID | CR2_E2H;
+	bus_write_4(sc->res[0], SMMU_CR2, reg);
+
 	return (0);
 }
 
