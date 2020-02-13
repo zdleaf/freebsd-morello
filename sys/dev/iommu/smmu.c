@@ -336,6 +336,69 @@ smmu_init_strtab(struct smmu_softc *sc)
 	return (error);
 }
 
+static int
+smmu_write_ack(struct smmu_softc *sc, uint32_t reg,
+    uint32_t reg_ack, uint32_t val)
+{
+	uint32_t v;
+	int timeout;
+
+	timeout = 100000;
+
+	bus_write_4(sc->res[0], reg, val);
+
+	do {
+		v = bus_read_4(sc->res[0], reg_ack);
+		if (v == val)
+			break;
+	} while (timeout--);
+
+	if (timeout <= 0) {
+		device_printf(sc->dev, "Failed to write reg.\n");
+		return (-1);
+	}
+
+	return (0);
+}
+
+static int
+smmu_disable(struct smmu_softc *sc)
+{
+	int ret;
+
+	ret = smmu_write_ack(sc, SMMU_CR0, SMMU_CR0ACK, 0);
+
+	return (ret);
+}
+
+static int
+smmu_reset(struct smmu_softc *sc)
+{
+	int error;
+	int reg;
+
+	reg = bus_read_4(sc->res[0], SMMU_CR0);
+
+	if (reg & CR0_SMMUEN)
+		device_printf(sc->dev,
+		    "%s: Warning: SMMU is enabled\n", __func__);
+
+	error = smmu_disable(sc);
+	if (error)
+		device_printf(sc->dev,
+		    "%s: Could not disable SMMU.\n", __func__);
+
+	reg = CR1_TABLE_SH_IS
+	    | CR1_TABLE_OC_WBC
+	    | CR1_TABLE_IC_WBC
+	    | CR1_QUEUE_SH_IS
+	    | CR1_QUEUE_OC_WBC
+	    | CR1_QUEUE_IC_WBC;
+	bus_write_4(sc->res[0], SMMU_CR1, reg);
+
+	return (0);
+}
+
 /*
  * Device interface.
  */
@@ -536,13 +599,19 @@ smmu_attach(device_t dev)
 
 	error = smmu_init_queues(sc);
 	if (error) {
-		device_printf(dev, "Couldn't allocate queues\n");
+		device_printf(dev, "Couldn't allocate queues.\n");
 		return (ENXIO);
 	}
 
 	error = smmu_init_strtab(sc);
 	if (error) {
-		device_printf(dev, "Couldn't allocate strtab\n");
+		device_printf(dev, "Couldn't allocate strtab.\n");
+		return (ENXIO);
+	}
+
+	error = smmu_reset(sc);
+	if (error) {
+		device_printf(dev, "Couldn't reset SMMU.\n");
 		return (ENXIO);
 	}
 

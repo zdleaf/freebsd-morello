@@ -126,6 +126,36 @@
 #define	 CR0_SMMUEN		(1 << 0) /* Non-secure SMMU enable */
 #define	SMMU_CR0ACK		0x024
 #define	SMMU_CR1		0x028
+#define	 CR1_TABLE_SH_S		10 /* Table access Shareability. */
+#define	 CR1_TABLE_SH_M		(0x3 << CR1_TABLE_SH_S)
+#define	 CR1_TABLE_SH_NS	(0x0 << CR1_TABLE_SH_S)
+#define	 CR1_TABLE_SH_OS	(0x2 << CR1_TABLE_SH_S)
+#define	 CR1_TABLE_SH_IS	(0x3 << CR1_TABLE_SH_S)
+#define	 CR1_TABLE_OC_S		8 /* Table access Outer Cacheability. */
+#define	 CR1_TABLE_OC_M		(0x3 << CR1_TABLE_OC_S)
+#define	 CR1_TABLE_OC_NC	(0x0 << CR1_TABLE_OC_S)
+#define	 CR1_TABLE_OC_WBC	(0x1 << CR1_TABLE_OC_S)
+#define	 CR1_TABLE_OC_WTC	(0x2 << CR1_TABLE_OC_S)
+#define	 CR1_TABLE_IC_S		6 /* Table access Inner Cacheability. */
+#define	 CR1_TABLE_IC_M		(0x3 << CR1_TABLE_IC_S)
+#define	 CR1_TABLE_IC_NC	(0x0 << CR1_TABLE_IC_S)
+#define	 CR1_TABLE_IC_WBC	(0x1 << CR1_TABLE_IC_S)
+#define	 CR1_TABLE_IC_WTC	(0x2 << CR1_TABLE_IC_S)
+#define	 CR1_QUEUE_SH_S		4 /* Queue access Shareability. */
+#define	 CR1_QUEUE_SH_M		(0x3 << CR1_QUEUE_SH_S)
+#define	 CR1_QUEUE_SH_NS	(0x0 << CR1_QUEUE_SH_S)
+#define	 CR1_QUEUE_SH_OS	(0x2 << CR1_QUEUE_SH_S)
+#define	 CR1_QUEUE_SH_IS	(0x3 << CR1_QUEUE_SH_S)
+#define	 CR1_QUEUE_OC_S		2 /* Queue access Outer Cacheability. */
+#define	 CR1_QUEUE_OC_M		(0x3 << CR1_QUEUE_OC_S)
+#define	 CR1_QUEUE_OC_NC	(0x0 << CR1_QUEUE_OC_S)
+#define	 CR1_QUEUE_OC_WBC	(0x1 << CR1_QUEUE_OC_S)
+#define	 CR1_QUEUE_OC_WTC	(0x2 << CR1_QUEUE_OC_S)
+#define	 CR1_QUEUE_IC_S		0 /* Queue access Inner Cacheability. */
+#define	 CR1_QUEUE_IC_M		(0x3 << CR1_QUEUE_IC_S)
+#define	 CR1_QUEUE_IC_NC	(0x0 << CR1_QUEUE_IC_S)
+#define	 CR1_QUEUE_IC_WBC	(0x1 << CR1_QUEUE_IC_S)
+#define	 CR1_QUEUE_IC_WTC	(0x2 << CR1_QUEUE_IC_S)
 #define	SMMU_CR2		0x02C
 #define	SMMU_STATUSR		0x040
 #define	SMMU_GBPA		0x044
