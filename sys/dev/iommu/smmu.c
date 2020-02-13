@@ -110,6 +110,10 @@ MALLOC_DEFINE(M_SMMU, "SMMU", SMMU_DEVSTR);
 
 #define	STRTAB_STE_DWORDS	8
 
+#define	CMDQ_ENTRY_DWORDS	2
+#define	EVENTQ_ENTRY_DWORDS	3
+#define	PRIQ_ENTRY_DWORDS	2
+
 static int
 smmu_event_intr(void *arg)
 {
@@ -151,11 +155,11 @@ ilog2(long x)
 
 static int
 smmu_init_queue(struct smmu_softc *sc, struct smmu_queue *q,
-    uint32_t prod_off, uint32_t cons_off)
+    uint32_t prod_off, uint32_t cons_off, uint32_t dwords)
 {
 	int sz;
 
-	sz = (1 << q->size_log2) * 16;
+	sz = (1 << q->size_log2) * dwords * 8;
 
 	printf("%s: allocating %d bytes\n", __func__, sz);
 
@@ -187,13 +191,13 @@ smmu_init_queues(struct smmu_softc *sc)
 
 	/* Command queue */
 	err = smmu_init_queue(sc, &sc->cmd_q,
-	    SMMU_CMDQ_PROD, SMMU_CMDQ_CONS);
+	    SMMU_CMDQ_PROD, SMMU_CMDQ_CONS, CMDQ_ENTRY_DWORDS);
 	if (err)
 		return (ENXIO);
 
 	/* Event queue */
 	err = smmu_init_queue(sc, &sc->evt_q,
-	    SMMU_EVENTQ_PROD, SMMU_EVENTQ_CONS);
+	    SMMU_EVENTQ_PROD, SMMU_EVENTQ_CONS, EVENTQ_ENTRY_DWORDS);
 	if (err)
 		return (ENXIO);
 
@@ -204,7 +208,7 @@ smmu_init_queues(struct smmu_softc *sc)
 
 	/* PRI queue */
 	err = smmu_init_queue(sc, &sc->pri_q,
-	    SMMU_PRIQ_PROD, SMMU_PRIQ_CONS);
+	    SMMU_PRIQ_PROD, SMMU_PRIQ_CONS, PRIQ_ENTRY_DWORDS);
 	if (err)
 		return (ENXIO);
 
@@ -371,9 +375,27 @@ smmu_disable(struct smmu_softc *sc)
 	return (ret);
 }
 
-static int
-smmu_cmdq_issue_cmd(struct smmu_softc *sc, struct smmu_cmdq_entry *cmd)
+static void
+make_cmd(struct smmu_softc *sc, uint64_t *cmd,
+    struct smmu_cmdq_entry *entry)
 {
+
+	memset(cmd, 0, CMDQ_ENTRY_DWORDS * 8);
+	cmd[0] = entry->opcode << CMD_QUEUE_OPCODE_S;
+
+	switch (entry->opcode) {
+	case CMD_CFGI_STE_RANGE:
+		cmd[1] = 31;
+		break;
+	};
+}
+
+static int
+smmu_cmdq_issue_cmd(struct smmu_softc *sc, struct smmu_cmdq_entry *entry)
+{
+	uint64_t cmd[CMDQ_ENTRY_DWORDS];
+
+	make_cmd(sc, cmd, entry);
 
 	return (0);
 }
