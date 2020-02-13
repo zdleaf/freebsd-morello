@@ -410,6 +410,12 @@ smmu_reset(struct smmu_softc *sc)
 	bus_write_4(sc->res[0], SMMU_CMDQ_PROD, sc->cmd_q.prod_off);
 	bus_write_4(sc->res[0], SMMU_CMDQ_CONS, sc->cmd_q.cons_off);
 
+	error = smmu_write_ack(sc, SMMU_CR0, SMMU_CR0ACK, CR0_CMDQEN);
+	if (error) {
+		device_printf(sc->dev, "Could not enable command queue\n");
+		return (ENXIO);
+	}
+
 	return (0);
 }
 
