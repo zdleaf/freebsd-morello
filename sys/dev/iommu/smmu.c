@@ -190,13 +190,13 @@ smmu_init_queues(struct smmu_softc *sc)
 	int err;
 
 	/* Command queue */
-	err = smmu_init_queue(sc, &sc->cmd_q,
+	err = smmu_init_queue(sc, &sc->cmdq,
 	    SMMU_CMDQ_PROD, SMMU_CMDQ_CONS, CMDQ_ENTRY_DWORDS);
 	if (err)
 		return (ENXIO);
 
 	/* Event queue */
-	err = smmu_init_queue(sc, &sc->evt_q,
+	err = smmu_init_queue(sc, &sc->evtq,
 	    SMMU_EVENTQ_PROD, SMMU_EVENTQ_CONS, EVENTQ_ENTRY_DWORDS);
 	if (err)
 		return (ENXIO);
@@ -207,7 +207,7 @@ smmu_init_queues(struct smmu_softc *sc)
 	}
 
 	/* PRI queue */
-	err = smmu_init_queue(sc, &sc->pri_q,
+	err = smmu_init_queue(sc, &sc->priq,
 	    SMMU_PRIQ_PROD, SMMU_PRIQ_CONS, PRIQ_ENTRY_DWORDS);
 	if (err)
 		return (ENXIO);
@@ -391,17 +391,45 @@ make_cmd(struct smmu_softc *sc, uint64_t *cmd,
 }
 
 static int
-smmu_cmdq_issue_cmd(struct smmu_softc *sc, struct smmu_cmdq_entry *entry)
+smmu_cmdq_enqueue_cmd(struct smmu_softc *sc, struct smmu_cmdq_entry *entry)
 {
 	uint64_t cmd[CMDQ_ENTRY_DWORDS];
+	struct smmu_queue *cmdq;
+	uint64_t val;
 
 	make_cmd(sc, cmd, entry);
+
+	cmdq = &sc->cmdq;
+
+	val = bus_read_8(sc->res[0], SMMU_EVENTQ_PROD);
+	printf("%s: eventq prod cons %lx\n", __func__, val);
+
+	printf("%s: lc.val %lx\n", __func__, cmdq->lc.val);
+	cmdq->lc.val = bus_read_8(sc->res[0], cmdq->prod_off);
+	printf("%s: lc.val new %lx\n", __func__, cmdq->lc.val);
+
+	void *entry_addr;
+
+	entry_addr = (void *)((uint64_t)cmdq->addr +
+	    cmdq->lc.prod * CMDQ_ENTRY_DWORDS);
+	memcpy(entry_addr, cmd, CMDQ_ENTRY_DWORDS);
+
+	cmdq->lc.prod += 1;
+	bus_write_8(sc->res[0], cmdq->prod_off, cmdq->lc.val);
+
+	printf("%s: complete\n", __func__);
+
+	cmdq->lc.val = bus_read_8(sc->res[0], cmdq->prod_off);
+	printf("%s: lc.val completed %lx\n", __func__, cmdq->lc.val);
+
+	val = bus_read_8(sc->res[0], SMMU_EVENTQ_PROD);
+	printf("%s: eventq prod cons %lx\n", __func__, val);
 
 	return (0);
 }
 
 static int
-smmu_cmdq_issue_sync(struct smmu_softc *sc)
+smmu_cmdq_enqueue_sync(struct smmu_softc *sc)
 {
 
 	return (0);
@@ -442,9 +470,9 @@ smmu_reset(struct smmu_softc *sc)
 	bus_write_4(sc->res[0], SMMU_STRTAB_BASE, strtab->base_cfg);
 
 	/* Command queue. */
-	bus_write_4(sc->res[0], SMMU_CMDQ_BASE, sc->cmd_q.base);
-	bus_write_4(sc->res[0], SMMU_CMDQ_PROD, sc->cmd_q.prod_off);
-	bus_write_4(sc->res[0], SMMU_CMDQ_CONS, sc->cmd_q.cons_off);
+	bus_write_4(sc->res[0], SMMU_CMDQ_BASE, sc->cmdq.base);
+	bus_write_4(sc->res[0], SMMU_CMDQ_PROD, sc->cmdq.lc.prod);
+	bus_write_4(sc->res[0], SMMU_CMDQ_CONS, sc->cmdq.lc.cons);
 
 	error = smmu_write_ack(sc, SMMU_CR0, SMMU_CR0ACK, CR0_CMDQEN);
 	if (error) {
@@ -454,8 +482,8 @@ smmu_reset(struct smmu_softc *sc)
 
 	struct smmu_cmdq_entry cmd;
 	cmd.opcode = CMD_CFGI_STE_RANGE;
-	smmu_cmdq_issue_cmd(sc, &cmd);
-	smmu_cmdq_issue_sync(sc);
+	smmu_cmdq_enqueue_cmd(sc, &cmd);
+	smmu_cmdq_enqueue_sync(sc);
 
 	return (0);
 }
@@ -595,15 +623,15 @@ smmu_attach(device_t dev)
 
 	uint32_t val;
 	val = (reg & IDR1_CMDQS_M) >> IDR1_CMDQS_S;
-	sc->cmd_q.size_log2 = val;
+	sc->cmdq.size_log2 = val;
 	printf("CMD queue size %d\n", val);
 
 	val = (reg & IDR1_EVENTQS_M) >> IDR1_EVENTQS_S;
-	sc->evt_q.size_log2 = val;
+	sc->evtq.size_log2 = val;
 	printf("EVENT queue size %d\n", val);
 
 	val = (reg & IDR1_PRIQS_M) >> IDR1_PRIQS_S;
-	sc->pri_q.size_log2 = val;
+	sc->priq.size_log2 = val;
 	printf("PRI queue size %d\n", val);
 
 	sc->ssid_bits = (reg & IDR1_SSIDSIZE_M) >> IDR1_SSIDSIZE_S;

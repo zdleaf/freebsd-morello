@@ -1,7 +1,7 @@
 /*-
  * SPDX-License-Identifier: BSD-2-Clause
  *
- * Copyright (c) 2019 Ruslan Bukin <br@bsdpad.com>
+ * Copyright (c) 2019-2020 Ruslan Bukin <br@bsdpad.com>
  *
  * This software was developed by SRI International and the University of
  * Cambridge Computer Laboratory (Department of Computer Science and
@@ -39,6 +39,26 @@
 
 DECLARE_CLASS(smmu_driver);
 
+struct smmu_queue_local_copy {
+	union {
+		uint64_t val;
+		struct {
+			uint32_t prod;
+			uint32_t cons;
+		};
+	};
+};
+
+struct smmu_queue {
+	struct smmu_queue_local_copy lc;
+	vm_paddr_t paddr;
+	void *addr;
+	uint32_t prod_off;
+	uint32_t cons_off;
+	int size_log2;
+	uint64_t base;
+};
+
 struct smmu_cmdq_entry {
 	uint8_t opcode;
 };
@@ -47,15 +67,6 @@ struct smmu_strtab {
 	void *addr;
 	uint64_t base;
 	uint64_t base_cfg;
-};
-
-struct smmu_queue {
-	vm_paddr_t paddr;
-	void *addr;
-	uint32_t prod_off;
-	uint32_t cons_off;
-	int size_log2;
-	uint64_t base;
 };
 
 struct smmu_softc {
@@ -84,9 +95,9 @@ struct smmu_softc {
 #define	SMMU_FEATURE_S1P			(1 << 11)
 #define	SMMU_FEATURE_S2P			(1 << 12)
 #define	SMMU_FEATURE_VAX			(1 << 13)
-	struct smmu_queue cmd_q;
-	struct smmu_queue evt_q;
-	struct smmu_queue pri_q;
+	struct smmu_queue cmdq;
+	struct smmu_queue evtq;
+	struct smmu_queue priq;
 	struct smmu_strtab strtab;
 };
 
