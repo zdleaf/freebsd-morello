@@ -194,6 +194,8 @@
 #define	 Q_LOG2SIZE_M		(0x1f << Q_LOG2SIZE_S)
 #define	SMMU_CMDQ_PROD		0x098
 #define	SMMU_CMDQ_CONS		0x09C
+#define	 CMDQ_CONS_ERR_S	24
+#define	 CMDQ_CONS_ERR_M	(0x7f << CMDQ_CONS_ERR_S)
 #define	SMMU_EVENTQ_BASE	0x0A0
 #define	 EVENTQ_BASE_WA		(1ULL << 62) /* Write-Allocate. */
 #define	SMMU_EVENTQ_PROD	0x100A8
@@ -287,6 +289,8 @@
 #define	 SYNC_MSH_OS		(0x2 << SYNC_MSH_S) /* Outer Shareable */
 #define	 SYNC_MSH_IS		(0x3 << SYNC_MSH_S) /* Inner Shareable */
 #define	 SYNC_MSIATTR_S		24 /* Write attribute for MSI */
+#define	 SYNC_MSIATTR_M		(0xf << SYNC_MSIATTR_S)
+#define	 SYNC_MSIATTR_OIWB	(0xf << SYNC_MSIATTR_S)
 #define	 SYNC_MSIDATA_S		32
 #define	 SYNC_MSIADDRESS_S	2
 #define	 SYNC_MSIADDRESS_M	(0x3ffffffffffff << SYNC_MSIADDRESS_S)

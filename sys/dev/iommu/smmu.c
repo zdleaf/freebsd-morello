@@ -385,7 +385,11 @@ make_cmd(struct smmu_softc *sc, uint64_t *cmd,
 
 	switch (entry->opcode) {
 	case CMD_CFGI_STE_RANGE:
-		cmd[1] = 31;
+		cmd[1] = (31 << CFGI_STE_RANGE_S);
+		break;
+	case CMD_SYNC:
+		cmd[0] |= SYNC_CS_SIG_SEV;
+		cmd[0] |= SYNC_MSH_IS | SYNC_MSIATTR_OIWB;
 		break;
 	};
 }
@@ -395,35 +399,33 @@ smmu_cmdq_enqueue_cmd(struct smmu_softc *sc, struct smmu_cmdq_entry *entry)
 {
 	uint64_t cmd[CMDQ_ENTRY_DWORDS];
 	struct smmu_queue *cmdq;
-	uint64_t val;
-
-	make_cmd(sc, cmd, entry);
+	void *entry_addr;
 
 	cmdq = &sc->cmdq;
 
-	val = bus_read_8(sc->res[0], SMMU_EVENTQ_PROD);
-	printf("%s: eventq prod cons %lx\n", __func__, val);
+	make_cmd(sc, cmd, entry);
 
 	printf("%s: lc.val %lx\n", __func__, cmdq->lc.val);
 	cmdq->lc.val = bus_read_8(sc->res[0], cmdq->prod_off);
 	printf("%s: lc.val new %lx\n", __func__, cmdq->lc.val);
 
-	void *entry_addr;
-
 	entry_addr = (void *)((uint64_t)cmdq->addr +
-	    cmdq->lc.prod * CMDQ_ENTRY_DWORDS);
-	memcpy(entry_addr, cmd, CMDQ_ENTRY_DWORDS);
+	    cmdq->lc.prod * CMDQ_ENTRY_DWORDS * 8);
+	memcpy(entry_addr, cmd, CMDQ_ENTRY_DWORDS * 8);
 
 	cmdq->lc.prod += 1;
-	bus_write_8(sc->res[0], cmdq->prod_off, cmdq->lc.val);
+	bus_write_4(sc->res[0], cmdq->prod_off, cmdq->lc.prod);
 
 	printf("%s: complete\n", __func__);
 
 	cmdq->lc.val = bus_read_8(sc->res[0], cmdq->prod_off);
 	printf("%s: lc.val completed %lx\n", __func__, cmdq->lc.val);
 
-	val = bus_read_8(sc->res[0], SMMU_EVENTQ_PROD);
-	printf("%s: eventq prod cons %lx\n", __func__, val);
+	if (cmdq->lc.cons & CMDQ_CONS_ERR_M) {
+		uint32_t reg;
+		reg = bus_read_4(sc->res[0], SMMU_GERROR);
+		printf("Gerror %x\n", reg);
+	}
 
 	return (0);
 }
@@ -431,6 +433,11 @@ smmu_cmdq_enqueue_cmd(struct smmu_softc *sc, struct smmu_cmdq_entry *entry)
 static int
 smmu_cmdq_enqueue_sync(struct smmu_softc *sc)
 {
+	struct smmu_cmdq_entry cmd;
+
+	cmd.opcode = CMD_SYNC;
+
+	smmu_cmdq_enqueue_cmd(sc, &cmd);
 
 	return (0);
 }
