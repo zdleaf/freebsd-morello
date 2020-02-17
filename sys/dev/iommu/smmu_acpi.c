@@ -125,6 +125,7 @@ smmu_acpi_identify(driver_t *driver, device_t parent)
 	struct iort_table_data iort_data;
 	ACPI_TABLE_IORT *iort;
 	vm_paddr_t physaddr;
+	uintptr_t priv;
 	device_t dev;
 	int i;
 
@@ -181,8 +182,11 @@ smmu_acpi_identify(driver_t *driver, device_t parent)
 		BUS_SET_RESOURCE(parent, dev, SYS_RES_MEMORY, 0,
 		    iort_data.smmu[i]->BaseAddress, MEMORY_RESOURCE_SIZE);
 
-		acpi_set_private(dev,
-		    (void *)(uintptr_t)iort_data.smmu[i]->Model);
+		priv = iort_data.smmu[i]->Flags;
+		priv <<= 32;
+		priv |= iort_data.smmu[i]->Model;
+
+		acpi_set_private(dev, (void *)priv);
 	}
 
 	iort_data.dev = dev;
@@ -195,7 +199,7 @@ static int
 smmu_acpi_probe(device_t dev)
 {
 
-	switch((uintptr_t)acpi_get_private(dev)) {
+	switch((uintptr_t)acpi_get_private(dev) & 0xffffffff) {
 	case ACPI_IORT_SMMU_V3_GENERIC:
 		/* Generic SMMUv3 */
 		break;
@@ -211,11 +215,19 @@ smmu_acpi_probe(device_t dev)
 static int
 smmu_acpi_attach(device_t dev)
 {
+	uintptr_t priv;
 	struct smmu_softc *sc;
 	int err;
 
+	priv = (uintptr_t)acpi_get_private(dev);
+
 	sc = device_get_softc(dev);
 	sc->dev = dev;
+
+	if ((priv >> 32) & ACPI_IORT_SMMU_V3_COHACC_OVERRIDE)
+		sc->features |= SMMU_FEATURE_COHERENCY;
+
+	printf("%s: features %x\n", __func__, sc->features);
 
 	err = smmu_attach(dev);
 	if (err != 0)

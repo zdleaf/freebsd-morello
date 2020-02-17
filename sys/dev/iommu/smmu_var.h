@@ -95,6 +95,7 @@ struct smmu_softc {
 #define	SMMU_FEATURE_S1P			(1 << 11)
 #define	SMMU_FEATURE_S2P			(1 << 12)
 #define	SMMU_FEATURE_VAX			(1 << 13)
+#define	SMMU_FEATURE_COHERENCY			(1 << 14)
 	struct smmu_queue cmdq;
 	struct smmu_queue evtq;
 	struct smmu_queue priq;
