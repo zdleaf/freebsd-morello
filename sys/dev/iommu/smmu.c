@@ -481,6 +481,8 @@ smmu_reset(struct smmu_softc *sc)
 	}
 
 	struct smmu_cmdq_entry cmd;
+
+	/* Invalidate cached config */
 	cmd.opcode = CMD_CFGI_STE_RANGE;
 	smmu_cmdq_enqueue_cmd(sc, &cmd);
 	smmu_cmdq_enqueue_sync(sc);
@@ -565,8 +567,11 @@ smmu_attach(device_t dev)
 	if (reg & IDR0_SEV)
 		sc->features |= SMMU_FEATURE_SEV;
 
-	if (reg & IDR0_MSI)
+	if (reg & IDR0_MSI) {
+		device_printf(sc->dev, "MSI feature present\n");
 		sc->features |= SMMU_FEATURE_MSI;
+	} else
+		device_printf(sc->dev, "MSI feature not present\n");
 
 	if (reg & IDR0_HYP)
 		sc->features |= SMMU_FEATURE_HYP;
