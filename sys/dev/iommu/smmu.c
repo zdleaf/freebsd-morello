@@ -384,6 +384,9 @@ make_cmd(struct smmu_softc *sc, uint64_t *cmd,
 	cmd[0] = entry->opcode << CMD_QUEUE_OPCODE_S;
 
 	switch (entry->opcode) {
+	case CMD_TLBI_EL2_ALL:
+	case CMD_TLBI_NSNH_ALL:
+		break;
 	case CMD_CFGI_STE_RANGE:
 		cmd[1] = (31 << CFGI_STE_RANGE_S);
 		break;
@@ -494,6 +497,14 @@ smmu_reset(struct smmu_softc *sc)
 	smmu_cmdq_enqueue_cmd(sc, &cmd);
 	smmu_cmdq_enqueue_sync(sc);
 
+	if (sc->features & SMMU_FEATURE_HYP) {
+		cmd.opcode = CMD_TLBI_EL2_ALL;
+		smmu_cmdq_enqueue_cmd(sc, &cmd);
+	};
+
+	cmd.opcode = CMD_TLBI_NSNH_ALL;
+	smmu_cmdq_enqueue_cmd(sc, &cmd);
+
 	return (0);
 }
 
@@ -580,8 +591,10 @@ smmu_attach(device_t dev)
 	} else
 		device_printf(sc->dev, "MSI feature not present\n");
 
-	if (reg & IDR0_HYP)
+	if (reg & IDR0_HYP) {
+		device_printf(sc->dev, "HYP feature present\n");
 		sc->features |= SMMU_FEATURE_HYP;
+	}
 
 	if (reg & IDR0_ATS)
 		sc->features |= SMMU_FEATURE_ATS;
