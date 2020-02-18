@@ -484,7 +484,8 @@ smmu_reset(struct smmu_softc *sc)
 	bus_write_4(sc->res[0], SMMU_CMDQ_PROD, sc->cmdq.lc.prod);
 	bus_write_4(sc->res[0], SMMU_CMDQ_CONS, sc->cmdq.lc.cons);
 
-	error = smmu_write_ack(sc, SMMU_CR0, SMMU_CR0ACK, CR0_CMDQEN);
+	reg = CR0_CMDQEN;
+	error = smmu_write_ack(sc, SMMU_CR0, SMMU_CR0ACK, reg);
 	if (error) {
 		device_printf(sc->dev, "Could not enable command queue\n");
 		return (ENXIO);
@@ -504,6 +505,48 @@ smmu_reset(struct smmu_softc *sc)
 
 	cmd.opcode = CMD_TLBI_NSNH_ALL;
 	smmu_cmdq_enqueue_cmd(sc, &cmd);
+
+	/* Event queue */
+	bus_write_4(sc->res[0], SMMU_EVENTQ_BASE, sc->evtq.base);
+	bus_write_4(sc->res[0], SMMU_EVENTQ_PROD, sc->evtq.lc.prod);
+	bus_write_4(sc->res[0], SMMU_EVENTQ_CONS, sc->evtq.lc.cons);
+
+	reg |= CR0_EVENTQEN;
+	error = smmu_write_ack(sc, SMMU_CR0, SMMU_CR0ACK, reg);
+	if (error) {
+		device_printf(sc->dev, "Could not enable event queue\n");
+		return (ENXIO);
+	}
+
+	if (sc->features & SMMU_FEATURE_PRI) {
+		/* PRI queue */
+		bus_write_4(sc->res[0], SMMU_PRIQ_BASE, sc->priq.base);
+		bus_write_4(sc->res[0], SMMU_PRIQ_PROD, sc->priq.lc.prod);
+		bus_write_4(sc->res[0], SMMU_PRIQ_CONS, sc->priq.lc.cons);
+
+		reg |= CR0_PRIQEN;
+		error = smmu_write_ack(sc, SMMU_CR0, SMMU_CR0ACK, reg);
+		if (error) {
+			device_printf(sc->dev, "Could not enable PRI queue\n");
+			return (ENXIO);
+		}
+	}
+
+	if (sc->features & SMMU_FEATURE_ATS) {
+		reg |= CR0_ATSCHK;
+		error = smmu_write_ack(sc, SMMU_CR0, SMMU_CR0ACK, reg);
+		if (error) {
+			device_printf(sc->dev, "Could not enable ATS check\n");
+			return (ENXIO);
+		}
+	}
+
+	//reg |= CR0_SMMUEN;
+	error = smmu_write_ack(sc, SMMU_CR0, SMMU_CR0ACK, reg);
+	if (error) {
+		device_printf(sc->dev, "Could not enable SMMU.\n");
+		return (ENXIO);
+	}
 
 	return (0);
 }
