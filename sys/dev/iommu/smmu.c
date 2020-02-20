@@ -215,13 +215,100 @@ smmu_init_queues(struct smmu_softc *sc)
 	return (0);
 }
 
+static void
+make_cmd(struct smmu_softc *sc, uint64_t *cmd,
+    struct smmu_cmdq_entry *entry)
+{
+
+	memset(cmd, 0, CMDQ_ENTRY_DWORDS * 8);
+	cmd[0] = entry->opcode << CMD_QUEUE_OPCODE_S;
+
+	switch (entry->opcode) {
+	case CMD_TLBI_EL2_ALL:
+	case CMD_TLBI_NSNH_ALL:
+		break;
+	case CMD_CFGI_STE_RANGE:
+		cmd[1] = (31 << CFGI_STE_RANGE_S);
+		break;
+	case CMD_SYNC:
+		cmd[0] |= SYNC_CS_SIG_SEV;
+		cmd[0] |= SYNC_MSH_IS | SYNC_MSIATTR_OIWB;
+		break;
+	};
+}
+
+static int
+smmu_cmdq_enqueue_cmd(struct smmu_softc *sc, struct smmu_cmdq_entry *entry)
+{
+	uint64_t cmd[CMDQ_ENTRY_DWORDS];
+	struct smmu_queue *cmdq;
+	void *entry_addr;
+
+	cmdq = &sc->cmdq;
+
+	make_cmd(sc, cmd, entry);
+
+	printf("%s: lc.val %lx\n", __func__, cmdq->lc.val);
+	cmdq->lc.val = bus_read_8(sc->res[0], cmdq->prod_off);
+	printf("%s: lc.val new %lx\n", __func__, cmdq->lc.val);
+
+	entry_addr = (void *)((uint64_t)cmdq->addr +
+	    cmdq->lc.prod * CMDQ_ENTRY_DWORDS * 8);
+	memcpy(entry_addr, cmd, CMDQ_ENTRY_DWORDS * 8);
+
+	cmdq->lc.prod += 1;
+	bus_write_4(sc->res[0], cmdq->prod_off, cmdq->lc.prod);
+
+	printf("%s: complete\n", __func__);
+
+	cmdq->lc.val = bus_read_8(sc->res[0], cmdq->prod_off);
+	printf("%s: lc.val completed %lx\n", __func__, cmdq->lc.val);
+
+	if (cmdq->lc.cons & CMDQ_CONS_ERR_M) {
+		uint32_t reg;
+		reg = bus_read_4(sc->res[0], SMMU_GERROR);
+		printf("Gerror %x\n", reg);
+	}
+
+	return (0);
+}
+
+static int
+smmu_cmdq_enqueue_sync(struct smmu_softc *sc)
+{
+	struct smmu_cmdq_entry cmd;
+
+	cmd.opcode = CMD_SYNC;
+
+	smmu_cmdq_enqueue_cmd(sc, &cmd);
+
+	return (0);
+}
+
+static void
+smmu_invalidate_all_sid(struct smmu_softc *sc)
+{
+	struct smmu_cmdq_entry cmd;
+	
+	/* Invalidate cached config */
+	cmd.opcode = CMD_CFGI_STE_RANGE;
+	smmu_cmdq_enqueue_cmd(sc, &cmd);
+	smmu_cmdq_enqueue_sync(sc);
+}
+
 static int
 smmu_init_ste(struct smmu_softc *sc, uint64_t *ste)
 {
+	uint64_t val;
 
-	ste[0] = STE0_VALID | STE0_CONFIG_ABORT;
+	val = STE0_VALID | STE0_CONFIG_BYPASS;
+
+	ste[0] = val;
 	ste[1] = STE1_SHCFG_INCOMING;
 	ste[2] = 0;
+
+	/* The STE[0] has to be written in a single blast. */
+	*(volatile uint64_t *)ste = val;
 
 	return (0);
 }
@@ -232,10 +319,15 @@ smmu_init_bypass(struct smmu_softc *sc,
 {
 	int i;
 
+	printf("%s: num_l1_entries %d, base addr %lx\n",
+	    __func__, num_l1_entries, (uint64_t)strtab);
+
 	for (i = 0; i < num_l1_entries; i++) {
 		smmu_init_ste(sc, strtab);
 		strtab += STRTAB_STE_DWORDS;
 	}
+
+	smmu_invalidate_all_sid(sc);
 
 	return (0);
 }
@@ -246,7 +338,7 @@ smmu_init_strtab_linear(struct smmu_softc *sc)
 	struct smmu_strtab *strtab;
 	uint32_t num_l1_entries;
 	uint32_t size;
-	uint32_t reg;
+	uint64_t reg;
 
 	strtab = &sc->strtab;
 	num_l1_entries = (1 << sc->sid_bits);
@@ -266,13 +358,18 @@ smmu_init_strtab_linear(struct smmu_softc *sc)
 		return (ENXIO);
 	}
 
+	printf("%s: strtab VA %lx\n", __func__, (uint64_t)strtab->addr);
+	printf("%s: strtab PA %lx\n", __func__, vtophys(strtab->addr));
+
 	reg = STRTAB_BASE_CFG_FMT_LINEAR;
 	reg |= sc->sid_bits << STRTAB_BASE_CFG_LOG2SIZE_S;
-	strtab->base_cfg = reg;
+	strtab->base_cfg = (uint32_t)reg;
 
 	reg = vtophys(strtab->addr) & STRTAB_BASE_ADDR_M;
-	reg |= STRTAB_BASE_RA;
+	//reg |= STRTAB_BASE_RA;
 	strtab->base = reg;
+
+	printf("strtab base %lx\n", (uint64_t)strtab->base);
 
 	smmu_init_bypass(sc, strtab->addr, num_l1_entries);
 
@@ -375,76 +472,6 @@ smmu_disable(struct smmu_softc *sc)
 	return (ret);
 }
 
-static void
-make_cmd(struct smmu_softc *sc, uint64_t *cmd,
-    struct smmu_cmdq_entry *entry)
-{
-
-	memset(cmd, 0, CMDQ_ENTRY_DWORDS * 8);
-	cmd[0] = entry->opcode << CMD_QUEUE_OPCODE_S;
-
-	switch (entry->opcode) {
-	case CMD_TLBI_EL2_ALL:
-	case CMD_TLBI_NSNH_ALL:
-		break;
-	case CMD_CFGI_STE_RANGE:
-		cmd[1] = (31 << CFGI_STE_RANGE_S);
-		break;
-	case CMD_SYNC:
-		cmd[0] |= SYNC_CS_SIG_SEV;
-		cmd[0] |= SYNC_MSH_IS | SYNC_MSIATTR_OIWB;
-		break;
-	};
-}
-
-static int
-smmu_cmdq_enqueue_cmd(struct smmu_softc *sc, struct smmu_cmdq_entry *entry)
-{
-	uint64_t cmd[CMDQ_ENTRY_DWORDS];
-	struct smmu_queue *cmdq;
-	void *entry_addr;
-
-	cmdq = &sc->cmdq;
-
-	make_cmd(sc, cmd, entry);
-
-	printf("%s: lc.val %lx\n", __func__, cmdq->lc.val);
-	cmdq->lc.val = bus_read_8(sc->res[0], cmdq->prod_off);
-	printf("%s: lc.val new %lx\n", __func__, cmdq->lc.val);
-
-	entry_addr = (void *)((uint64_t)cmdq->addr +
-	    cmdq->lc.prod * CMDQ_ENTRY_DWORDS * 8);
-	memcpy(entry_addr, cmd, CMDQ_ENTRY_DWORDS * 8);
-
-	cmdq->lc.prod += 1;
-	bus_write_4(sc->res[0], cmdq->prod_off, cmdq->lc.prod);
-
-	printf("%s: complete\n", __func__);
-
-	cmdq->lc.val = bus_read_8(sc->res[0], cmdq->prod_off);
-	printf("%s: lc.val completed %lx\n", __func__, cmdq->lc.val);
-
-	if (cmdq->lc.cons & CMDQ_CONS_ERR_M) {
-		uint32_t reg;
-		reg = bus_read_4(sc->res[0], SMMU_GERROR);
-		printf("Gerror %x\n", reg);
-	}
-
-	return (0);
-}
-
-static int
-smmu_cmdq_enqueue_sync(struct smmu_softc *sc)
-{
-	struct smmu_cmdq_entry cmd;
-
-	cmd.opcode = CMD_SYNC;
-
-	smmu_cmdq_enqueue_cmd(sc, &cmd);
-
-	return (0);
-}
-
 static int
 smmu_reset(struct smmu_softc *sc)
 {
@@ -476,11 +503,11 @@ smmu_reset(struct smmu_softc *sc)
 
 	/* Stream table. */
 	strtab = &sc->strtab;
-	bus_write_4(sc->res[0], SMMU_STRTAB_BASE_CFG, strtab->base);
-	bus_write_4(sc->res[0], SMMU_STRTAB_BASE, strtab->base_cfg);
+	bus_write_4(sc->res[0], SMMU_STRTAB_BASE_CFG, strtab->base_cfg);
+	bus_write_8(sc->res[0], SMMU_STRTAB_BASE, strtab->base);
 
 	/* Command queue. */
-	bus_write_4(sc->res[0], SMMU_CMDQ_BASE, sc->cmdq.base);
+	bus_write_8(sc->res[0], SMMU_CMDQ_BASE, sc->cmdq.base);
 	bus_write_4(sc->res[0], SMMU_CMDQ_PROD, sc->cmdq.lc.prod);
 	bus_write_4(sc->res[0], SMMU_CMDQ_CONS, sc->cmdq.lc.cons);
 
@@ -507,7 +534,7 @@ smmu_reset(struct smmu_softc *sc)
 	smmu_cmdq_enqueue_cmd(sc, &cmd);
 
 	/* Event queue */
-	bus_write_4(sc->res[0], SMMU_EVENTQ_BASE, sc->evtq.base);
+	bus_write_8(sc->res[0], SMMU_EVENTQ_BASE, sc->evtq.base);
 	bus_write_4(sc->res[0], SMMU_EVENTQ_PROD, sc->evtq.lc.prod);
 	bus_write_4(sc->res[0], SMMU_EVENTQ_CONS, sc->evtq.lc.cons);
 
@@ -520,7 +547,7 @@ smmu_reset(struct smmu_softc *sc)
 
 	if (sc->features & SMMU_FEATURE_PRI) {
 		/* PRI queue */
-		bus_write_4(sc->res[0], SMMU_PRIQ_BASE, sc->priq.base);
+		bus_write_8(sc->res[0], SMMU_PRIQ_BASE, sc->priq.base);
 		bus_write_4(sc->res[0], SMMU_PRIQ_PROD, sc->priq.lc.prod);
 		bus_write_4(sc->res[0], SMMU_PRIQ_CONS, sc->priq.lc.cons);
 
@@ -656,10 +683,14 @@ smmu_attach(device_t dev)
 	}
 
 	/* Grab translation stages supported. */
-	if (reg & IDR0_S1P)
+	if (reg & IDR0_S1P) {
+		printf("stage 1 translation supported\n");
 		sc->features |= SMMU_FEATURE_S1P;
-	if (reg & IDR0_S2P)
+	}
+	if (reg & IDR0_S2P) {
+		printf("stage 2 translation supported\n");
 		sc->features |= SMMU_FEATURE_S2P;
+	}
 
 	switch (reg & IDR0_TTF_M) {
 	case IDR0_TTF_ALL:

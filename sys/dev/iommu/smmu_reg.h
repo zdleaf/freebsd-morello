@@ -173,7 +173,7 @@
 #define	SMMU_STRTAB_BASE	0x080
 #define	 STRTAB_BASE_RA		(1ULL << 62) /* Read-Allocate. */
 #define	 STRTAB_BASE_ADDR_S	6 /* Physical address of Stream table base */
-#define	 STRTAB_BASE_ADDR_M	(0x3fffffffffff << STRTAB_BASE_ADDR_S)
+#define	 STRTAB_BASE_ADDR_M	(0x3fffffffffffULL << STRTAB_BASE_ADDR_S)
 #define	SMMU_STRTAB_BASE_CFG	0x088
 #define	 STRTAB_BASE_CFG_FMT_S		16 /* Format of Stream table. */
 #define	 STRTAB_BASE_CFG_FMT_M		(0x3 << STRTAB_BASE_CFG_FMT_S)

@@ -66,7 +66,7 @@ struct smmu_cmdq_entry {
 struct smmu_strtab {
 	void *addr;
 	uint64_t base;
-	uint64_t base_cfg;
+	uint32_t base_cfg;
 };
 
 struct smmu_softc {
