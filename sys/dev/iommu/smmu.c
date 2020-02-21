@@ -308,7 +308,10 @@ smmu_init_ste(struct smmu_softc *sc, uint64_t *ste)
 	ste[2] = 0;
 
 	/* The STE[0] has to be written in a single blast. */
-	*(volatile uint64_t *)ste = val;
+	//*(volatile uint64_t *)ste = val;
+
+	cpu_dcache_wb_range((vm_offset_t)ste, 64);
+	dsb(ishst);
 
 	return (0);
 }
@@ -366,10 +369,11 @@ smmu_init_strtab_linear(struct smmu_softc *sc)
 	strtab->base_cfg = (uint32_t)reg;
 
 	reg = vtophys(strtab->addr) & STRTAB_BASE_ADDR_M;
-	//reg |= STRTAB_BASE_RA;
+	reg |= STRTAB_BASE_RA;
 	strtab->base = reg;
 
-	printf("strtab base %lx\n", (uint64_t)strtab->base);
+	printf("strtab base cfg %x\n", strtab->base_cfg);
+	printf("strtab base %lx\n", strtab->base);
 
 	smmu_init_bypass(sc, strtab->addr, num_l1_entries);
 
@@ -473,8 +477,70 @@ smmu_disable(struct smmu_softc *sc)
 }
 
 static int
+smmu_enable_interrupts(struct smmu_softc *sc)
+{
+	uint32_t reg;
+	int error;
+
+	printf("%s\n", __func__);
+
+	/* Disable interrupts first. */
+	error = smmu_write_ack(sc, SMMU_IRQ_CTRL, SMMU_IRQ_CTRLACK, 0);
+	if (error) {
+		device_printf(sc->dev, "Could not disable interrupts.\n");
+		return (ENXIO);
+	}
+
+	reg = IRQ_CTRL_EVENTQ_IRQEN | IRQ_CTRL_GERROR_IRQEN;
+	if (sc->features & SMMU_FEATURE_PRI)
+		reg |= IRQ_CTRL_PRIQ_IRQEN;
+
+	/* Enable interrupts */
+	error = smmu_write_ack(sc, SMMU_IRQ_CTRL, SMMU_IRQ_CTRLACK, reg);
+	if (error) {
+		device_printf(sc->dev, "Could not enable interrupts.\n");
+		return (ENXIO);
+	}
+
+	return (0);
+}
+
+static int
+smmu_setup_interrupts(struct smmu_softc *sc)
+{
+	device_t dev;
+	int error;
+
+	dev = sc->dev;
+
+	error = bus_setup_intr(dev, sc->res[1], INTR_TYPE_MISC,
+	    smmu_event_intr, NULL, sc, &sc->intr_cookie[0]);
+	if (error) {
+		device_printf(dev, "Couldn't setup Event interrupt handler\n");
+		return (ENXIO);
+	}
+
+	error = bus_setup_intr(dev, sc->res[2], INTR_TYPE_MISC,
+	    smmu_sync_intr, NULL, sc, &sc->intr_cookie[1]);
+	if (error) {
+		device_printf(dev, "Couldn't setup Sync interrupt handler\n");
+		return (ENXIO);
+	}
+
+	error = bus_setup_intr(dev, sc->res[3], INTR_TYPE_MISC,
+	    smmu_gerr_intr, NULL, sc, &sc->intr_cookie[2]);
+	if (error) {
+		device_printf(dev, "Couldn't setup Gerr interrupt handler\n");
+		return (ENXIO);
+	}
+
+	return (0);
+}
+
+static int
 smmu_reset(struct smmu_softc *sc)
 {
+	struct smmu_cmdq_entry cmd;
 	struct smmu_strtab *strtab;
 	int error;
 	int reg;
@@ -503,8 +569,8 @@ smmu_reset(struct smmu_softc *sc)
 
 	/* Stream table. */
 	strtab = &sc->strtab;
-	bus_write_4(sc->res[0], SMMU_STRTAB_BASE_CFG, strtab->base_cfg);
 	bus_write_8(sc->res[0], SMMU_STRTAB_BASE, strtab->base);
+	bus_write_4(sc->res[0], SMMU_STRTAB_BASE_CFG, strtab->base_cfg);
 
 	/* Command queue. */
 	bus_write_8(sc->res[0], SMMU_CMDQ_BASE, sc->cmdq.base);
@@ -517,8 +583,6 @@ smmu_reset(struct smmu_softc *sc)
 		device_printf(sc->dev, "Could not enable command queue\n");
 		return (ENXIO);
 	}
-
-	struct smmu_cmdq_entry cmd;
 
 	/* Invalidate cached config */
 	cmd.opcode = CMD_CFGI_STE_RANGE;
@@ -568,7 +632,12 @@ smmu_reset(struct smmu_softc *sc)
 		}
 	}
 
-	//reg |= CR0_SMMUEN;
+	if (smmu_enable_interrupts(sc) != 0) {
+		device_printf(sc->dev, "Could not enable interrupts.\n");
+		return (ENXIO);
+	}
+
+	reg |= CR0_SMMUEN;
 	error = smmu_write_ack(sc, SMMU_CR0, SMMU_CR0ACK, reg);
 	if (error) {
 		device_printf(sc->dev, "Could not enable SMMU.\n");
@@ -589,7 +658,6 @@ smmu_attach(device_t dev)
 	int error;
 
 	sc = device_get_softc(dev);
-
 	sc->dev = dev;
 
 	error = bus_alloc_resources(dev, smmu_spec, sc->res);
@@ -598,25 +666,9 @@ smmu_attach(device_t dev)
 		return (ENXIO);
 	}
 
-	error = bus_setup_intr(dev, sc->res[1], INTR_TYPE_MISC,
-	    smmu_event_intr, NULL, sc, &sc->intr_cookie[0]);
-	if (error) {
-		device_printf(dev, "Couldn't setup Event interrupt handler\n");
-		goto fail;
-	}
-
-	error = bus_setup_intr(dev, sc->res[2], INTR_TYPE_MISC,
-	    smmu_sync_intr, NULL, sc, &sc->intr_cookie[1]);
-	if (error) {
-		device_printf(dev, "Couldn't setup Sync interrupt handler\n");
-		goto fail;
-	}
-
-	error = bus_setup_intr(dev, sc->res[3], INTR_TYPE_MISC,
-	    smmu_gerr_intr, NULL, sc, &sc->intr_cookie[2]);
-	if (error) {
-		device_printf(dev, "Couldn't setup Gerr interrupt handler\n");
-		goto fail;
+	if (smmu_setup_interrupts(sc) != 0) {
+		bus_release_resources(dev, smmu_spec, sc->res);
+		return (ENXIO);
 	}
 
 	reg = bus_read_4(sc->res[0], SMMU_IDR0);
@@ -744,7 +796,7 @@ smmu_attach(device_t dev)
 
 	/* IDR5 */
 	reg = bus_read_4(sc->res[0], SMMU_IDR5);
-	printf("IDR1 %x\n", reg);
+	printf("IDR5 %x\n", reg);
 
 	switch (reg & IDR5_OAS_M) {
 	case IDR5_OAS_32:
@@ -802,11 +854,6 @@ smmu_attach(device_t dev)
 		device_printf(dev, "Couldn't reset SMMU.\n");
 		return (ENXIO);
 	}
-
-	return (0);
-
-fail:
-	bus_release_resources(dev, smmu_spec, sc->res);
 
 	return (0);
 }

@@ -164,6 +164,9 @@
 #define	SMMU_GBPA		0x044
 #define	SMMU_AGBPA		0x048
 #define	SMMU_IRQ_CTRL		0x050
+#define	 IRQ_CTRL_EVENTQ_IRQEN	(1 << 2) /* NS Event queue interrupts enabled.*/
+#define	 IRQ_CTRL_PRIQ_IRQEN	(1 << 1) /* PRI queue interrupts are enabled.*/
+#define	 IRQ_CTRL_GERROR_IRQEN	(1 << 0) /* Global errors int are enabled. */
 #define	SMMU_IRQ_CTRLACK	0x054
 #define	SMMU_GERROR		0x060
 #define	SMMU_GERRORN		0x064
