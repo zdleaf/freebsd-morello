@@ -181,7 +181,7 @@ out:
 #elif defined(__arm__)
 #define	EFI_STAGING_SIZE	32
 #else
-#define	EFI_STAGING_SIZE	64
+#define	EFI_STAGING_SIZE	512
 #endif
 #endif
 
