@@ -111,37 +111,66 @@ MALLOC_DEFINE(M_SMMU, "SMMU", SMMU_DEVSTR);
 #define	STRTAB_STE_DWORDS	8
 
 #define	CMDQ_ENTRY_DWORDS	2
-#define	EVENTQ_ENTRY_DWORDS	3
+#define	EVTQ_ENTRY_DWORDS	4
 #define	PRIQ_ENTRY_DWORDS	2
 
+static int smmu_evtq_dequeue(struct smmu_softc *sc);
+
 static int
-smmu_event_intr(void *arg)
+smmu_write_ack(struct smmu_softc *sc, uint32_t reg,
+    uint32_t reg_ack, uint32_t val)
 {
+	uint32_t v;
+	int timeout;
 
-	printf("%s\n", __func__);
-	panic("%s\n", __func__);
+	timeout = 100000;
 
-	return (FILTER_HANDLED);
+	bus_write_4(sc->res[0], reg, val);
+
+	do {
+		v = bus_read_4(sc->res[0], reg_ack);
+		if (v == val)
+			break;
+	} while (timeout--);
+
+	if (timeout <= 0) {
+		device_printf(sc->dev, "Failed to write reg.\n");
+		return (-1);
+	}
+
+	return (0);
 }
 
-static int
+static void
+smmu_event_intr(void *arg)
+{
+	struct smmu_softc *sc;
+
+	sc = arg;
+
+	printf("!!!!!!!!! %s\n", __func__);
+
+	smmu_evtq_dequeue(sc);
+
+	//return (FILTER_HANDLED);
+}
+
+static void
 smmu_sync_intr(void *arg)
 {
 
-	printf("%s\n", __func__);
-	panic("%s\n", __func__);
+	printf("!!!!!!!!! %s\n", __func__);
 
-	return (FILTER_HANDLED);
+	//return (FILTER_HANDLED);
 }
 
-static int
+static void
 smmu_gerr_intr(void *arg)
 {
 
-	printf("%s\n", __func__);
-	panic("%s\n", __func__);
+	printf("!!!!!!!!! %s\n", __func__);
 
-	return (FILTER_HANDLED);
+	//return (FILTER_HANDLED);
 }
 
 static inline int
@@ -200,7 +229,7 @@ smmu_init_queues(struct smmu_softc *sc)
 
 	/* Event queue */
 	err = smmu_init_queue(sc, &sc->evtq,
-	    SMMU_EVENTQ_PROD, SMMU_EVENTQ_CONS, EVENTQ_ENTRY_DWORDS);
+	    SMMU_EVENTQ_PROD, SMMU_EVENTQ_CONS, EVTQ_ENTRY_DWORDS);
 	if (err)
 		return (ENXIO);
 
@@ -214,6 +243,52 @@ smmu_init_queues(struct smmu_softc *sc)
 	    SMMU_PRIQ_PROD, SMMU_PRIQ_CONS, PRIQ_ENTRY_DWORDS);
 	if (err)
 		return (ENXIO);
+
+	return (0);
+}
+
+static int
+smmu_evtq_dequeue(struct smmu_softc *sc)
+{
+	uint32_t evt[EVTQ_ENTRY_DWORDS * 2];
+	struct smmu_queue *evtq;
+	void *entry_addr;
+	uint8_t event_id;
+
+	evtq = &sc->evtq;
+
+	evtq->lc.val = bus_read_8(sc->res[0], evtq->prod_off);
+	printf("evtq->lc.cons %d evtq->lc.prod %d\n",
+	    evtq->lc.cons, evtq->lc.prod);
+
+	entry_addr = (void *)((uint64_t)evtq->addr +
+	    evtq->lc.cons * EVTQ_ENTRY_DWORDS * 8);
+	memcpy(evt, entry_addr, EVTQ_ENTRY_DWORDS * 8);
+
+	evtq->lc.cons += 1;
+	bus_write_4(sc->res[0], evtq->cons_off, evtq->lc.cons);
+
+	event_id = evt[0] & 0xff;
+
+	printf("%s: event %d received\n", __func__, event_id);
+
+	printf("evt[0] %x\n", evt[0]);
+	printf("evt[1] %x\n", evt[1]);
+	printf("evt[2] %x\n", evt[2]);
+	printf("evt[3] %x\n", evt[3]);
+	printf("evt[4] %x\n", evt[4]);
+	printf("evt[5] %x\n", evt[5]);
+	printf("evt[6] %x\n", evt[6]);
+	printf("evt[7] %x\n", evt[7]);
+
+	/* Disable SMMU */
+	uint32_t reg;
+	int error;
+	reg = bus_read_4(sc->res[0], SMMU_CR0);
+	reg &= ~CR0_SMMUEN;
+	error = smmu_write_ack(sc, SMMU_CR0, SMMU_CR0ACK, reg);
+	if (error)
+		device_printf(sc->dev, "Could not disable SMMU.\n");
 
 	return (0);
 }
@@ -236,6 +311,7 @@ make_cmd(struct smmu_softc *sc, uint64_t *cmd,
 	case CMD_SYNC:
 		cmd[0] |= SYNC_CS_SIG_SEV;
 		cmd[0] |= SYNC_MSH_IS | SYNC_MSIATTR_OIWB;
+		//cmd[0] = 0xfffff;
 		break;
 	};
 }
@@ -282,7 +358,6 @@ smmu_cmdq_enqueue_sync(struct smmu_softc *sc)
 	struct smmu_cmdq_entry cmd;
 
 	cmd.opcode = CMD_SYNC;
-
 	smmu_cmdq_enqueue_cmd(sc, &cmd);
 
 	return (0);
@@ -307,14 +382,19 @@ smmu_init_ste(struct smmu_softc *sc, uint64_t *ste)
 	val = STE0_VALID | STE0_CONFIG_BYPASS;
 
 	ste[0] = val;
-	ste[1] = STE1_SHCFG_INCOMING;
+	ste[1] = STE1_SHCFG_INCOMING; //| STE1_EATS_FULLATS;
 	ste[2] = 0;
+	ste[3] = 0;
+	ste[4] = 0;
+	ste[5] = 0;
+	ste[6] = 0;
+	ste[7] = 0;
 
 	/* The STE[0] has to be written in a single blast. */
 	//*(volatile uint64_t *)ste = val;
 
-	cpu_dcache_wb_range((vm_offset_t)ste, 64);
-	dsb(ishst);
+	//cpu_dcache_wb_range((vm_offset_t)ste, 64);
+	//dsb(ishst);
 
 	return (0);
 }
@@ -375,8 +455,8 @@ smmu_init_strtab_linear(struct smmu_softc *sc)
 	reg |= STRTAB_BASE_RA;
 	strtab->base = reg;
 
-	printf("strtab base cfg %x\n", strtab->base_cfg);
-	printf("strtab base %lx\n", strtab->base);
+	printf("strtab base cfg 0x%x\n", strtab->base_cfg);
+	printf("strtab base 0x%lx\n", strtab->base);
 
 	smmu_init_bypass(sc, strtab->addr, num_l1_entries);
 
@@ -445,31 +525,6 @@ smmu_init_strtab(struct smmu_softc *sc)
 }
 
 static int
-smmu_write_ack(struct smmu_softc *sc, uint32_t reg,
-    uint32_t reg_ack, uint32_t val)
-{
-	uint32_t v;
-	int timeout;
-
-	timeout = 100000;
-
-	bus_write_4(sc->res[0], reg, val);
-
-	do {
-		v = bus_read_4(sc->res[0], reg_ack);
-		if (v == val)
-			break;
-	} while (timeout--);
-
-	if (timeout <= 0) {
-		device_printf(sc->dev, "Failed to write reg.\n");
-		return (-1);
-	}
-
-	return (0);
-}
-
-static int
 smmu_disable(struct smmu_softc *sc)
 {
 	int ret;
@@ -487,10 +542,27 @@ smmu_enable_interrupts(struct smmu_softc *sc)
 
 	printf("%s\n", __func__);
 
+#if 0
 	/* Disable MSI */
 	bus_write_8(sc->res[0], SMMU_GERROR_IRQ_CFG0, 0);
+	bus_write_4(sc->res[0], SMMU_GERROR_IRQ_CFG1, 0);
+	bus_write_4(sc->res[0], SMMU_GERROR_IRQ_CFG2, 0);
+
 	bus_write_8(sc->res[0], SMMU_EVENTQ_IRQ_CFG0, 0);
+	bus_write_4(sc->res[0], SMMU_EVENTQ_IRQ_CFG1, 0);
+	bus_write_4(sc->res[0], SMMU_EVENTQ_IRQ_CFG2, 0);
+
 	bus_write_8(sc->res[0], SMMU_PRIQ_IRQ_CFG0, 0);
+	bus_write_4(sc->res[0], SMMU_PRIQ_IRQ_CFG1, 0);
+	bus_write_4(sc->res[0], SMMU_PRIQ_IRQ_CFG2, 0);
+#else
+	bus_write_8(sc->res[0], SMMU_GERROR_IRQ_CFG0, 0x30050040);
+	bus_write_4(sc->res[0], SMMU_GERROR_IRQ_CFG1, 0);
+	bus_write_4(sc->res[0], SMMU_GERROR_IRQ_CFG2, 1);
+	bus_write_8(sc->res[0], SMMU_EVENTQ_IRQ_CFG0, 0x30050040);
+	bus_write_4(sc->res[0], SMMU_EVENTQ_IRQ_CFG1, 0);
+	bus_write_4(sc->res[0], SMMU_EVENTQ_IRQ_CFG2, 1);
+#endif
 
 	/* Disable interrupts first. */
 	error = smmu_write_ack(sc, SMMU_IRQ_CTRL, SMMU_IRQ_CTRLACK, 0);
@@ -510,6 +582,8 @@ smmu_enable_interrupts(struct smmu_softc *sc)
 		return (ENXIO);
 	}
 
+	printf("SMMU_IRQ_CTRL %x\n", bus_read_4(sc->res[0], SMMU_IRQ_CTRL));
+
 	return (0);
 }
 
@@ -521,22 +595,24 @@ smmu_setup_interrupts(struct smmu_softc *sc)
 
 	dev = sc->dev;
 
+	printf("%s\n", __func__);
+
 	error = bus_setup_intr(dev, sc->res[1], INTR_TYPE_MISC,
-	    smmu_event_intr, NULL, sc, &sc->intr_cookie[0]);
+	    NULL, smmu_event_intr, sc, &sc->intr_cookie[0]);
 	if (error) {
 		device_printf(dev, "Couldn't setup Event interrupt handler\n");
 		return (ENXIO);
 	}
 
 	error = bus_setup_intr(dev, sc->res[2], INTR_TYPE_MISC,
-	    smmu_sync_intr, NULL, sc, &sc->intr_cookie[1]);
+	    NULL, smmu_sync_intr, sc, &sc->intr_cookie[1]);
 	if (error) {
 		device_printf(dev, "Couldn't setup Sync interrupt handler\n");
 		return (ENXIO);
 	}
 
 	error = bus_setup_intr(dev, sc->res[3], INTR_TYPE_MISC,
-	    smmu_gerr_intr, NULL, sc, &sc->intr_cookie[2]);
+	    NULL, smmu_gerr_intr, sc, &sc->intr_cookie[2]);
 	if (error) {
 		device_printf(dev, "Couldn't setup Gerr interrupt handler\n");
 		return (ENXIO);
@@ -564,6 +640,11 @@ smmu_reset(struct smmu_softc *sc)
 		device_printf(sc->dev,
 		    "%s: Could not disable SMMU.\n", __func__);
 
+	if (smmu_enable_interrupts(sc) != 0) {
+		device_printf(sc->dev, "Could not enable interrupts.\n");
+		return (ENXIO);
+	}
+
 	reg = CR1_TABLE_SH_IS
 	    | CR1_TABLE_OC_WBC
 	    | CR1_TABLE_IC_WBC
@@ -579,6 +660,12 @@ smmu_reset(struct smmu_softc *sc)
 	strtab = &sc->strtab;
 	bus_write_8(sc->res[0], SMMU_STRTAB_BASE, strtab->base);
 	bus_write_4(sc->res[0], SMMU_STRTAB_BASE_CFG, strtab->base_cfg);
+
+	printf("%s: SMMU_STRTAB_BASE %lx\n", __func__,
+	    bus_read_8(sc->res[0], SMMU_STRTAB_BASE));
+
+	printf("%s: SMMU_STRTAB_BASE_CFG %x\n", __func__,
+	    bus_read_4(sc->res[0], SMMU_STRTAB_BASE_CFG));
 
 	/* Command queue. */
 	bus_write_8(sc->res[0], SMMU_CMDQ_BASE, sc->cmdq.base);
@@ -640,10 +727,6 @@ smmu_reset(struct smmu_softc *sc)
 		}
 	}
 
-	if (smmu_enable_interrupts(sc) != 0) {
-		device_printf(sc->dev, "Could not enable interrupts.\n");
-		return (ENXIO);
-	}
 
 	reg |= CR0_SMMUEN;
 	error = smmu_write_ack(sc, SMMU_CR0, SMMU_CR0ACK, reg);
