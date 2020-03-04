@@ -398,4 +398,72 @@
 #define	STE3_S2TTB_S		4 /* Address of Translation Table base */
 #define	STE3_S2TTB_M		(0xffffffffffff << STE3_S2TTB_S)
 
+#define	CD0_T0SZ_S		0 /* VA region size covered by TT0. */
+#define	CD0_T0SZ_M		(0x3f << CD0_T0SZ_S)
+#define	CD0_TG0_S		6 /* TT0 Translation Granule size */
+#define	CD0_TG0_M		(0x3 << CD0_TG0_S)
+#define	CD0_TG0_4KB		(0x0 << CD0_TG0_S)
+#define	CD0_TG0_64KB		(0x1 << CD0_TG0_S)
+#define	CD0_TG0_16KB		(0x2 << CD0_TG0_S)
+#define	CD0_IR0_S		8 /* Inner region Cacheability for TT0 access*/
+#define	CD0_IR0_M		(0x3 << CD0_IR0_S)
+#define	CD0_IR0_NC		(0x0 << CD0_IR0_S)
+#define	CD0_IR0_WBC_RWA		(0x1 << CD0_IR0_S)
+#define	CD0_IR0_WTC_RA		(0x2 << CD0_IR0_S)
+#define	CD0_IR0_WBC_RA		(0x3 << CD0_IR0_S)
+#define	CD0_OR0_S		10 /* Outer region Cacheability for TT0 access*/
+#define	CD0_OR0_M		(0x3 << CD0_OR0_S)
+#define	CD0_OR0_NC		(0x0 << CD0_OR0_S)
+#define	CD0_OR0_WBC_RWA		(0x1 << CD0_OR0_S)
+#define	CD0_OR0_WTC_RA		(0x2 << CD0_OR0_S)
+#define	CD0_OR0_WBC_RA		(0x3 << CD0_OR0_S)
+#define	CD0_SH0_S		12 /* Shareability for TT0 access */
+#define	CD0_SH0_M		(0x3 << CD0_SH0_S)
+#define	CD0_SH0_NS		(0x0 << CD0_SH0_S)
+#define	CD0_SH0_OS		(0x2 << CD0_SH0_S) /* Outer Shareable */
+#define	CD0_SH0_IS		(0x3 << CD0_SH0_S) /* Inner Shareable */
+#define	CD0_EPD0		(1 << 14) /* TT0 walk disable */
+#define	CD0_ENDI		(1 << 15) /* Big Endian */
+#define	CD0_T1SZ_S		16 /* VA region size covered by TT1 */
+#define	CD0_T1SZ_M		(0x3f << CD0_T1SZ_S)
+#define	CD0_TG1_S		22 /* TT1 Translation Granule size */
+#define	CD0_TG1_M		(0x3 << CD0_TG1_S)
+#define	CD0_TG1_4KB		(0x2 << CD0_TG1_S)
+#define	CD0_TG1_64KB		(0x3 << CD0_TG1_S)
+#define	CD0_TG1_16KB		(0x1 << CD0_TG1_S)
+#define	CD0_IR1_S		24 /* Inner region Cacheability for TT1 access*/
+#define	CD0_IR1_M		(0x3 << CD0_IR1_S)
+#define	CD0_OR1_S		26
+#define	CD0_OR1_M		(0x3 << CD0_OR1_S)
+#define	CD0_SH1_S		28
+#define	CD0_SH1_M		(0x3 << CD0_SH1_S)
+#define	CD0_EPD1		(1 << 30)
+#define	CD0_VALID		(1 << 31) /* CD Valid. */
+#define	CD0_IPS_S		32 /* Intermediate Physical Size */
+#define	CD0_IPS_M		(0x7 << CD0_IPS_S)
+#define	CD0_IPS_32BITS		(0x0 << CD0_IPS_S)
+#define	CD0_IPS_36BITS		(0x1 << CD0_IPS_S)
+#define	CD0_IPS_40BITS		(0x2 << CD0_IPS_S)
+#define	CD0_IPS_42BITS		(0x3 << CD0_IPS_S)
+#define	CD0_IPS_44BITS		(0x4 << CD0_IPS_S)
+#define	CD0_IPS_48BITS		(0x5 << CD0_IPS_S)
+#define	CD0_IPS_52BITS		(0x6 << CD0_IPS_S) /* SMMUv3.1 only */
+#define	CD0_AFFD		(1 << 35) /* Access Flag Fault Disable */
+#define	CD0_WXN			(1 << 36) /* Write eXecute Never */
+#define	CD0_UWXN		(1 << 37) /* Unprivileged Write eXecute Never*/
+#define	CD0_TBI0		(1 << 38) /* Top Byte Ignore for TTB0 */
+#define	CD0_TBI1		(1 << 39) /* Top Byte Ignore for TTB1 */
+#define	CD0_PAN			(1 << 40) /* Privileged Access Never */
+#define	CD0_AA64		(1 << 41) /* TTB{0,1} is AArch64-format TT */
+#define	CD0_HD			(1 << 42)
+#define	CD0_HA			(1 << 43)
+#define	CD0_S			(1 << 44)
+#define	CD0_R			(1 << 45)
+#define	CD0_A			(1 << 46)
+#define	CD0_ASET		(1 << 47) /* ASID Set. */
+#define	CD0_ASID_S		48 /* Address Space Identifier */
+#define	CD0_ASID_M		(0xffff << CD0_ASID_S)
+#define	CD1_TTB0_S		4 /* Address of TT0 base. */
+#define	CD1_TTB0_M		(0xffffffffffff << CD1_TTB0_S)
+
 #endif /* _DEV_IOMMU_SMMU_REG_H_ */
