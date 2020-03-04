@@ -921,6 +921,7 @@ pmap_bootstrap(vm_offset_t l0pt, vm_offset_t l1pt, vm_paddr_t kernstart,
 	kernel_pmap->pm_l0_paddr = l0pt - kern_delta;
 	kernel_pmap->pm_cookie = COOKIE_FROM(-1, INT_MIN);
 	kernel_pmap->pm_stage = PM_STAGE1;
+	kernel_pmap->pm_levels = 4;
 	kernel_pmap->pm_asid_set = &asids;
 
 	/* Assume the address we were loaded to is a valid physical address */
@@ -1645,13 +1646,14 @@ pmap_pinit0(pmap_t pmap)
 	pmap->pm_root.rt_root = 0;
 	pmap->pm_cookie = COOKIE_FROM(ASID_RESERVED_FOR_PID_0, INT_MIN);
 	pmap->pm_stage = PM_STAGE1;
+	pmap->pm_levels = 4;
 	pmap->pm_asid_set = &asids;
 
 	PCPU_SET(curpmap, pmap);
 }
 
 int
-pmap_pinit_stage(pmap_t pmap, enum pmap_stage stage)
+pmap_pinit_stage(pmap_t pmap, enum pmap_stage stage, int levels)
 {
 	vm_page_t l0pt;
 
@@ -1672,6 +1674,7 @@ pmap_pinit_stage(pmap_t pmap, enum pmap_stage stage)
 	bzero(&pmap->pm_stats, sizeof(pmap->pm_stats));
 	pmap->pm_cookie = COOKIE_FROM(-1, INT_MAX);
 
+	pmap->pm_levels = levels;
 	pmap->pm_stage = stage;
 	switch (stage) {
 	case PM_STAGE1:
@@ -1695,7 +1698,7 @@ int
 pmap_pinit(pmap_t pmap)
 {
 
-	return (pmap_pinit_stage(pmap, PM_STAGE1));
+	return (pmap_pinit_stage(pmap, PM_STAGE1, 4));
 }
 
 /*
@@ -6093,9 +6096,22 @@ out:
 uint64_t
 pmap_to_ttbr0(pmap_t pmap)
 {
+	uint64_t paddr;
 
-	return (ASID_TO_OPERAND(COOKIE_TO_ASID(pmap->pm_cookie)) |
-	    pmap->pm_l0_paddr);
+	switch (pmap->pm_levels) {
+	case 4:
+		paddr = pmap->pm_l0_paddr;
+		break;
+	case 3:
+		KASSERT((pmap->pm_l0[0] & ATTR_DESCR_VALID) == ATTR_DESCR_VALID,
+		    ("pmap_to_ttbr0: Invalid l0 entry: %lx", pmap->pm_l0[0]));
+		paddr = pmap->pm_l0[0] & ~ATTR_MASK;
+		break;
+	default:
+		panic("pmap_to_ttbr0: Invalid level %d", pmap->pm_levels);
+	}
+
+	return (ASID_TO_OPERAND(COOKIE_TO_ASID(pmap->pm_cookie)) | paddr);
 }
 
 static bool
