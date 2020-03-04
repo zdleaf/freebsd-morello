@@ -477,7 +477,9 @@ find_currdev(bool do_bootmgr, bool is_last,
 	int unit;
 	uint64_t extra;
 	int rv;
-	char *rootdev;
+	char *rootdev = "net0:";
+	set_currdev(rootdev);
+	return (0);
 
 	/*
 	 * First choice: if rootdev is already set, use that, even if
