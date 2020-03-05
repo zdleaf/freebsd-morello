@@ -49,6 +49,11 @@ struct smmu_queue_local_copy {
 	};
 };
 
+struct smmu_cd {
+	vm_paddr_t paddr;
+	void *addr;
+};
+
 struct smmu_queue {
 	struct smmu_queue_local_copy lc;
 	vm_paddr_t paddr;
@@ -100,6 +105,7 @@ struct smmu_softc {
 	struct smmu_queue evtq;
 	struct smmu_queue priq;
 	struct smmu_strtab strtab;
+	struct smmu_cd cd;
 };
 
 struct smmu_devinfo {

@@ -114,6 +114,8 @@ MALLOC_DEFINE(M_SMMU, "SMMU", SMMU_DEVSTR);
 #define	EVTQ_ENTRY_DWORDS	4
 #define	PRIQ_ENTRY_DWORDS	2
 
+#define	CD_DWORDS		8
+
 static int smmu_evtq_dequeue(struct smmu_softc *sc);
 
 static int
@@ -148,7 +150,7 @@ smmu_event_intr(void *arg)
 
 	sc = arg;
 
-	printf("!!!!!!!!! %s\n", __func__);
+	device_printf(sc->dev, "!!!!!!!!! %s\n", __func__);
 
 	smmu_evtq_dequeue(sc);
 
@@ -158,8 +160,11 @@ smmu_event_intr(void *arg)
 static void
 smmu_sync_intr(void *arg)
 {
+	struct smmu_softc *sc;
 
-	printf("!!!!!!!!! %s\n", __func__);
+	sc = arg;
+
+	device_printf(sc->dev, "!!!!!!!!! %s\n", __func__);
 
 	//return (FILTER_HANDLED);
 }
@@ -167,8 +172,11 @@ smmu_sync_intr(void *arg)
 static void
 smmu_gerr_intr(void *arg)
 {
+	struct smmu_softc *sc;
 
-	printf("!!!!!!!!! %s\n", __func__);
+	sc = arg;
+
+	device_printf(sc->dev, "!!!!!!!!! %s\n", __func__);
 
 	//return (FILTER_HANDLED);
 }
@@ -193,13 +201,13 @@ smmu_init_queue(struct smmu_softc *sc, struct smmu_queue *q,
 
 	sz = (1 << q->size_log2) * dwords * 8;
 
-	printf("%s: allocating %d bytes\n", __func__, sz);
+	device_printf(sc->dev, "%s: allocating %d bytes\n", __func__, sz);
 
 	/* Set up the command circular buffer */
 	q->addr = contigmalloc(sz, M_SMMU,
 	    M_WAITOK | M_ZERO, 0, (1ul << 48) - 1, SMMU_CMDQ_ALIGN, 0);
 	if (q->addr == NULL) {
-		printf("failed to allocate %d bytes\n", sz);
+		device_printf(sc->dev, "failed to allocate %d bytes\n", sz);
 		return (-1);
 	}
 
@@ -211,7 +219,8 @@ smmu_init_queue(struct smmu_softc *sc, struct smmu_queue *q,
 	q->base |= q->paddr & Q_BASE_ADDR_M;
 	q->base |= q->size_log2 << Q_LOG2SIZE_S;
 
-	printf("%s: queue addr %p paddr %lx\n", __func__, q->addr, q->paddr);
+	device_printf(sc->dev, "%s: queue addr %p paddr %lx\n",
+	    __func__, q->addr, q->paddr);
 
 	return (0);
 }
@@ -234,7 +243,7 @@ smmu_init_queues(struct smmu_softc *sc)
 		return (ENXIO);
 
 	if (!(sc->features & SMMU_FEATURE_PRI)) {
-		printf("no PRI queue is available\n");
+		device_printf(sc->dev, "no PRI queue is available\n");
 		return (0);
 	}
 
@@ -258,7 +267,7 @@ smmu_evtq_dequeue(struct smmu_softc *sc)
 	evtq = &sc->evtq;
 
 	evtq->lc.val = bus_read_8(sc->res[0], evtq->prod_off);
-	printf("evtq->lc.cons %d evtq->lc.prod %d\n",
+	device_printf(sc->dev, "evtq->lc.cons %d evtq->lc.prod %d\n",
 	    evtq->lc.cons, evtq->lc.prod);
 
 	entry_addr = (void *)((uint64_t)evtq->addr +
@@ -270,16 +279,16 @@ smmu_evtq_dequeue(struct smmu_softc *sc)
 
 	event_id = evt[0] & 0xff;
 
-	printf("%s: event %d received\n", __func__, event_id);
+	device_printf(sc->dev, "%s: event %d received\n", __func__, event_id);
 
-	printf("evt[0] %x\n", evt[0]);
-	printf("evt[1] %x\n", evt[1]);
-	printf("evt[2] %x\n", evt[2]);
-	printf("evt[3] %x\n", evt[3]);
-	printf("evt[4] %x\n", evt[4]);
-	printf("evt[5] %x\n", evt[5]);
-	printf("evt[6] %x\n", evt[6]);
-	printf("evt[7] %x\n", evt[7]);
+	device_printf(sc->dev, "evt[0] %x\n", evt[0]);
+	device_printf(sc->dev, "evt[1] %x\n", evt[1]);
+	device_printf(sc->dev, "evt[2] %x\n", evt[2]);
+	device_printf(sc->dev, "evt[3] %x\n", evt[3]);
+	device_printf(sc->dev, "evt[4] %x\n", evt[4]);
+	device_printf(sc->dev, "evt[5] %x\n", evt[5]);
+	device_printf(sc->dev, "evt[6] %x\n", evt[6]);
+	device_printf(sc->dev, "evt[7] %x\n", evt[7]);
 
 	/* Disable SMMU */
 	uint32_t reg;
@@ -327,9 +336,11 @@ smmu_cmdq_enqueue_cmd(struct smmu_softc *sc, struct smmu_cmdq_entry *entry)
 
 	make_cmd(sc, cmd, entry);
 
-	printf("%s: lc.val %lx\n", __func__, cmdq->lc.val);
+	device_printf(sc->dev, "%s: lc.val %lx\n",
+	    __func__, cmdq->lc.val);
 	cmdq->lc.val = bus_read_8(sc->res[0], cmdq->prod_off);
-	printf("%s: lc.val new %lx\n", __func__, cmdq->lc.val);
+	device_printf(sc->dev, "%s: lc.val new %lx\n",
+	    __func__, cmdq->lc.val);
 
 	entry_addr = (void *)((uint64_t)cmdq->addr +
 	    cmdq->lc.prod * CMDQ_ENTRY_DWORDS * 8);
@@ -338,15 +349,16 @@ smmu_cmdq_enqueue_cmd(struct smmu_softc *sc, struct smmu_cmdq_entry *entry)
 	cmdq->lc.prod += 1;
 	bus_write_4(sc->res[0], cmdq->prod_off, cmdq->lc.prod);
 
-	printf("%s: complete\n", __func__);
+	device_printf(sc->dev, "%s: complete\n", __func__);
 
 	cmdq->lc.val = bus_read_8(sc->res[0], cmdq->prod_off);
-	printf("%s: lc.val completed %lx\n", __func__, cmdq->lc.val);
+	device_printf(sc->dev, "%s: lc.val completed %lx\n",
+	    __func__, cmdq->lc.val);
 
 	if (cmdq->lc.cons & CMDQ_CONS_ERR_M) {
 		uint32_t reg;
 		reg = bus_read_4(sc->res[0], SMMU_GERROR);
-		printf("Gerror %x\n", reg);
+		device_printf(sc->dev, "Gerror %x\n", reg);
 	}
 
 	return (0);
@@ -379,10 +391,14 @@ smmu_init_ste(struct smmu_softc *sc, uint64_t *ste)
 {
 	uint64_t val;
 
-	val = STE0_VALID | STE0_CONFIG_BYPASS;
+	val = STE0_VALID;
 
-	ste[0] = val;
+#if 0
+	val |= STE0_CONFIG_BYPASS;
 	ste[1] = STE1_SHCFG_INCOMING; //| STE1_EATS_FULLATS;
+#endif
+
+	ste[1] = 0;
 	ste[2] = 0;
 	ste[3] = 0;
 	ste[4] = 0;
@@ -390,11 +406,40 @@ smmu_init_ste(struct smmu_softc *sc, uint64_t *ste)
 	ste[6] = 0;
 	ste[7] = 0;
 
-	/* The STE[0] has to be written in a single blast. */
-	//*(volatile uint64_t *)ste = val;
+	/* S1 */
+	ste[1] |= STE1_S1DSS_SUBSTREAM0
+		| STE1_S1CIR_WBRA
+		| STE1_S1COR_WBRA
+		| STE1_S1CSH_IS
+		| STE1_STRW_NS_EL1;
 
-	//cpu_dcache_wb_range((vm_offset_t)ste, 64);
-	//dsb(ishst);
+	if (sc->features & SMMU_FEATURE_STALL &&
+	    ((sc->features & SMMU_FEATURE_STALL) == 0))
+		ste[1] |= STE1_S1STALLD;
+
+	struct smmu_cd *cd;
+
+	cd = &sc->cd;
+
+	/* Configure CD */
+	val |= (cd->paddr & STE0_S1CONTEXTPTR_M);
+	val |= STE0_CONFIG_S1_TRANS;
+
+	/* One Context descriptor (S1Fmt is IGNORED). */
+
+	/*
+	 * val |= STE0_S1FMT_LINEAR;
+	 * val |= 1 << STE0_S1CDMAX_S;
+	 */
+
+	cpu_dcache_wb_range((vm_offset_t)ste, 64);
+	dsb(ishst);
+
+	/* The STE[0] has to be written in a single blast. */
+	ste[0] = val;
+
+	cpu_dcache_wb_range((vm_offset_t)ste, 64);
+	dsb(ishst);
 
 	return (0);
 }
@@ -405,7 +450,7 @@ smmu_init_bypass(struct smmu_softc *sc,
 {
 	int i;
 
-	printf("%s: num_l1_entries %d, base addr %lx\n",
+	device_printf(sc->dev, "%s: num_l1_entries %d, base addr %lx\n",
 	    __func__, num_l1_entries, (uint64_t)strtab);
 
 	for (i = 0; i < num_l1_entries; i++) {
@@ -419,18 +464,44 @@ smmu_init_bypass(struct smmu_softc *sc,
 }
 
 static int
+smmu_init_cd(struct smmu_softc *sc)
+{
+	struct smmu_cd *cd;
+	int size;
+
+	size = 1 * (CD_DWORDS << 3);
+
+	cd = &sc->cd;
+	cd->addr = contigmalloc(size, M_SMMU,
+	    M_WAITOK | M_ZERO,	/* flags */
+	    0,			/* low */
+	    (1ul << 48) - 1,	/* high */
+	    SMMU_CMDQ_ALIGN,	/* alignment */
+	    0);			/* boundary */
+	if (cd->addr == NULL) {
+		device_printf(sc->dev, "failed to allocate CD\n");
+		return (ENXIO);
+	}
+
+	cd->paddr = vtophys(cd->addr);
+
+	return (0);
+}
+
+static int
 smmu_init_strtab_linear(struct smmu_softc *sc)
 {
 	struct smmu_strtab *strtab;
 	uint32_t num_l1_entries;
 	uint32_t size;
 	uint64_t reg;
+	int err;
 
 	strtab = &sc->strtab;
 	num_l1_entries = (1 << sc->sid_bits);
 
 	size = num_l1_entries * (STRTAB_STE_DWORDS << 3);
-	printf("%s: linear strtab size %d, num_l1_entries %d\n",
+	device_printf(sc->dev, "%s: linear strtab size %d, num_l1_entries %d\n",
 	    __func__, size, num_l1_entries);
 
 	strtab->addr = contigmalloc(size, M_SMMU,
@@ -440,12 +511,14 @@ smmu_init_strtab_linear(struct smmu_softc *sc)
 	    SMMU_CMDQ_ALIGN,	/* alignment */
 	    0);			/* boundary */
 	if (strtab->addr == NULL) {
-		printf("failed to allocate strtab\n");
+		device_printf(sc->dev, "failed to allocate strtab\n");
 		return (ENXIO);
 	}
 
-	printf("%s: strtab VA %lx\n", __func__, (uint64_t)strtab->addr);
-	printf("%s: strtab PA %lx\n", __func__, vtophys(strtab->addr));
+	device_printf(sc->dev, "%s: strtab VA %lx\n",
+	    __func__, (uint64_t)strtab->addr);
+	device_printf(sc->dev, "%s: strtab PA %lx\n",
+	    __func__, vtophys(strtab->addr));
 
 	reg = STRTAB_BASE_CFG_FMT_LINEAR;
 	reg |= sc->sid_bits << STRTAB_BASE_CFG_LOG2SIZE_S;
@@ -455,9 +528,14 @@ smmu_init_strtab_linear(struct smmu_softc *sc)
 	reg |= STRTAB_BASE_RA;
 	strtab->base = reg;
 
-	printf("strtab base cfg 0x%x\n", strtab->base_cfg);
-	printf("strtab base 0x%lx\n", strtab->base);
+	device_printf(sc->dev, "strtab base cfg 0x%x\n", strtab->base_cfg);
+	device_printf(sc->dev, "strtab base 0x%lx\n", strtab->base);
 
+	err = smmu_init_cd(sc);
+	if (err) {
+		device_printf(sc->dev, "Could not initialize CD\n");
+		return (ENXIO);
+	}
 	smmu_init_bypass(sc, strtab->addr, num_l1_entries);
 
 	return (0);
@@ -477,7 +555,7 @@ smmu_init_strtab_2lvl(struct smmu_softc *sc)
 
 	l1size = num_l1_entries * (STRTAB_L1_DESC_DWORDS << 3);
 
-	printf("%s: size %d, l1 entries %d, l1size %d\n",
+	device_printf(sc->dev, "%s: size %d, l1 entries %d, l1size %d\n",
 	    __func__, size, num_l1_entries, l1size);
 
 	void *strtab;
@@ -489,11 +567,11 @@ smmu_init_strtab_2lvl(struct smmu_softc *sc)
 	    SMMU_CMDQ_ALIGN,	/* alignment */
 	    0);			/* boundary */
 	if (strtab == NULL) {
-		printf("failed to allocate strtab\n");
+		device_printf(sc->dev, "failed to allocate strtab\n");
 		return (ENXIO);
 	}
 
-	printf("%s: strtab %p\n", __func__, strtab);
+	device_printf(sc->dev, "%s: strtab %p\n", __func__, strtab);
 
 	uint32_t reg;
 	reg = STRTAB_BASE_CFG_FMT_2LVL;
@@ -540,7 +618,7 @@ smmu_enable_interrupts(struct smmu_softc *sc)
 	uint32_t reg;
 	int error;
 
-	printf("%s\n", __func__);
+	device_printf(sc->dev, "%s\n", __func__);
 
 #if 0
 	/* Disable MSI */
@@ -582,7 +660,8 @@ smmu_enable_interrupts(struct smmu_softc *sc)
 		return (ENXIO);
 	}
 
-	printf("SMMU_IRQ_CTRL %x\n", bus_read_4(sc->res[0], SMMU_IRQ_CTRL));
+	device_printf(sc->dev, "SMMU_IRQ_CTRL %x\n",
+	    bus_read_4(sc->res[0], SMMU_IRQ_CTRL));
 
 	return (0);
 }
@@ -595,7 +674,7 @@ smmu_setup_interrupts(struct smmu_softc *sc)
 
 	dev = sc->dev;
 
-	printf("%s\n", __func__);
+	device_printf(sc->dev, "%s\n", __func__);
 
 	error = bus_setup_intr(dev, sc->res[1], INTR_TYPE_MISC,
 	    NULL, smmu_event_intr, sc, &sc->intr_cookie[0]);
@@ -661,10 +740,10 @@ smmu_reset(struct smmu_softc *sc)
 	bus_write_8(sc->res[0], SMMU_STRTAB_BASE, strtab->base);
 	bus_write_4(sc->res[0], SMMU_STRTAB_BASE_CFG, strtab->base_cfg);
 
-	printf("%s: SMMU_STRTAB_BASE %lx\n", __func__,
+	device_printf(sc->dev, "%s: SMMU_STRTAB_BASE %lx\n", __func__,
 	    bus_read_8(sc->res[0], SMMU_STRTAB_BASE));
 
-	printf("%s: SMMU_STRTAB_BASE_CFG %x\n", __func__,
+	device_printf(sc->dev, "%s: SMMU_STRTAB_BASE_CFG %x\n", __func__,
 	    bus_read_4(sc->res[0], SMMU_STRTAB_BASE_CFG));
 
 	/* Command queue. */
@@ -763,7 +842,7 @@ smmu_attach(device_t dev)
 	}
 
 	reg = bus_read_4(sc->res[0], SMMU_IDR0);
-	printf("IDR0 %x\n", reg);
+	device_printf(sc->dev, "IDR0 %x\n", reg);
 
 	sc->features = 0;
 	if (reg & IDR0_ST_LVL_2) {
@@ -827,11 +906,11 @@ smmu_attach(device_t dev)
 
 	/* Grab translation stages supported. */
 	if (reg & IDR0_S1P) {
-		printf("stage 1 translation supported\n");
+		device_printf(sc->dev, "stage 1 translation supported\n");
 		sc->features |= SMMU_FEATURE_S1P;
 	}
 	if (reg & IDR0_S2P) {
-		printf("stage 2 translation supported\n");
+		device_printf(sc->dev, "stage 2 translation supported\n");
 		sc->features |= SMMU_FEATURE_S2P;
 	}
 
@@ -856,7 +935,7 @@ smmu_attach(device_t dev)
 		sc->vmid_bits = 8;
 
 	reg = bus_read_4(sc->res[0], SMMU_IDR1);
-	printf("IDR1 %x\n", reg);
+	device_printf(sc->dev, "IDR1 %x\n", reg);
 
 	if (reg & (IDR1_TABLES_PRESET | IDR1_QUEUES_PRESET | IDR1_REL)) {
 		device_printf(dev, "Embedded implementations not supported\n");
@@ -866,15 +945,15 @@ smmu_attach(device_t dev)
 	uint32_t val;
 	val = (reg & IDR1_CMDQS_M) >> IDR1_CMDQS_S;
 	sc->cmdq.size_log2 = val;
-	printf("CMD queue size %d\n", val);
+	device_printf(sc->dev, "CMD queue size %d\n", val);
 
 	val = (reg & IDR1_EVENTQS_M) >> IDR1_EVENTQS_S;
 	sc->evtq.size_log2 = val;
-	printf("EVENT queue size %d\n", val);
+	device_printf(sc->dev, "EVENT queue size %d\n", val);
 
 	val = (reg & IDR1_PRIQS_M) >> IDR1_PRIQS_S;
 	sc->priq.size_log2 = val;
-	printf("PRI queue size %d\n", val);
+	device_printf(sc->dev, "PRI queue size %d\n", val);
 
 	sc->ssid_bits = (reg & IDR1_SSIDSIZE_M) >> IDR1_SSIDSIZE_S;
 	sc->sid_bits = (reg & IDR1_SIDSIZE_M) >> IDR1_SIDSIZE_S;
@@ -887,7 +966,7 @@ smmu_attach(device_t dev)
 
 	/* IDR5 */
 	reg = bus_read_4(sc->res[0], SMMU_IDR5);
-	printf("IDR5 %x\n", reg);
+	device_printf(sc->dev, "IDR5 %x\n", reg);
 
 	switch (reg & IDR5_OAS_M) {
 	case IDR5_OAS_32:
@@ -913,7 +992,7 @@ smmu_attach(device_t dev)
 		break;
 	}
 
-	printf("oas %d\n", sc->oas);
+	device_printf(sc->dev, "oas %d\n", sc->oas);
 
 	sc->pgsizes = 0;
 	if (reg & IDR5_GRAN64K)
@@ -923,7 +1002,7 @@ smmu_attach(device_t dev)
 	if (reg & IDR5_GRAN4K)
 		sc->pgsizes |= 4 * 1024;
 
-	printf("pgsizes %x\n", sc->pgsizes);
+	device_printf(sc->dev, "pgsizes %x\n", sc->pgsizes);
 
 	if ((reg & IDR5_VAX_M) == IDR5_VAX_52)
 		sc->features |= SMMU_FEATURE_VAX;
@@ -967,7 +1046,10 @@ smmu_detach(device_t dev)
 static int
 smmu_get_domain(device_t dev, device_t child, int *domain)
 {
+	struct smmu_softc *sc;
 	//struct smmu_devinfo *di;
+
+	sc = device_get_softc(dev);
 
 	//di = device_get_ivars(child);
 	//if (di->smmu_domain < 0)
@@ -975,7 +1057,7 @@ smmu_get_domain(device_t dev, device_t child, int *domain)
 
 	//*domain = di->smmu_domain;
 
-	printf("%s\n", __func__);
+	device_printf(sc->dev, "%s\n", __func__);
 
 	return (0);
 }
@@ -983,11 +1065,11 @@ smmu_get_domain(device_t dev, device_t child, int *domain)
 static int
 smmu_read_ivar(device_t dev, device_t child, int which, uintptr_t *result)
 {
-	//struct smmu_softc *sc;
+	struct smmu_softc *sc;
 
-	//sc = device_get_softc(dev);
+	sc = device_get_softc(dev);
 
-	printf("%s\n", __func__);
+	device_printf(sc->dev, "%s\n", __func__);
 
 	return (ENOENT);
 }
