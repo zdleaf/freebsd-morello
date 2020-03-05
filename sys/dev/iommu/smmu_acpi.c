@@ -51,6 +51,7 @@ __FBSDID("$FreeBSD$");
 
 #include "smmu_reg.h"
 #include "smmu_var.h"
+#include "pic_if.h"
 
 #define	MEMORY_RESOURCE_SIZE	0x40000
 
@@ -228,6 +229,55 @@ smmu_acpi_attach(device_t dev)
 		sc->features |= SMMU_FEATURE_COHERENCY;
 
 	printf("%s: features %x\n", __func__, sc->features);
+
+#if 0
+	u_int xref;
+	int pxm;
+	rman_res_t start;
+	start = bus_get_resource_start(dev, SYS_RES_MEMORY, 0);
+	err = acpi_smmu_to_its(start, &xref, &pxm);
+	if (err != 0) {
+		printf("%s: acpi_smmu_to_its returned %d\n", __func__, err);
+		return (ENXIO);
+	}
+
+	int irq;
+	err = intr_alloc_msi(NULL, dev, xref, 1, 1, &irq);
+	if (err != 0) {
+		printf("%s: intr_alloc_msi returned %d\n", __func__, err);
+		return (ENXIO);
+	}
+
+	printf("%s: irq %d\n", __func__, irq);
+
+	struct intr_irqsrc *isrc;
+	device_t map_dev;
+	intptr_t map_xref;
+	struct intr_map_data *map_data;
+
+	intr_map_copy_map_data(irq, &map_dev, &map_xref, &map_data);
+
+	err = intr_resolve_irq(map_dev, map_xref, map_data, &isrc);
+	if (err != 0) {
+		printf("intr_resolve_irq returned %d\n", err);
+		return (ENXIO);
+	}
+
+	intr_map_set_isrc(irq, isrc);
+
+	PIC_BIND_INTR(isrc->isrc_dev, isrc);
+
+	uint64_t addr;
+	uint32_t data;
+	err = intr_map_msi(NULL, dev, xref, irq, &addr, &data);
+	err = 0;
+	if (err != 0) {
+		printf("%s: intr_map_msi returned %d\n", __func__, err);
+		return (ENXIO);
+	}
+
+	printf("%s: addr %lx data %x\n", __func__, addr, data);
+#endif
 
 	err = smmu_attach(dev);
 	if (err != 0)
