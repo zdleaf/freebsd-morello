@@ -256,6 +256,17 @@ smmu_init_queues(struct smmu_softc *sc)
 	return (0);
 }
 
+static void
+smmu_dump_ste(struct smmu_softc *sc, uint64_t *ste)
+{
+	int i;
+
+	device_printf(sc->dev, "%s\n", __func__);
+
+	for (i = 0; i < STRTAB_STE_DWORDS; i++)
+		device_printf(sc->dev, "ste[%d] == %lx\n", i, ste[i]);
+}
+
 static int
 smmu_evtq_dequeue(struct smmu_softc *sc)
 {
@@ -289,6 +300,17 @@ smmu_evtq_dequeue(struct smmu_softc *sc)
 	device_printf(sc->dev, "evt[5] %x\n", evt[5]);
 	device_printf(sc->dev, "evt[6] %x\n", evt[6]);
 	device_printf(sc->dev, "evt[7] %x\n", evt[7]);
+
+	int sid;
+	uint64_t *ste;
+	struct smmu_strtab *strtab;
+
+	sid = evt[1];
+	strtab = &sc->strtab;
+	ste = (void *)((uint64_t)strtab->addr + sid * (STRTAB_STE_DWORDS << 3));
+
+	device_printf(sc->dev, "ste addr %p\n", ste);
+	smmu_dump_ste(sc, ste);
 
 	/* Disable SMMU */
 	uint32_t reg;
@@ -484,6 +506,9 @@ smmu_init_cd(struct smmu_softc *sc)
 	}
 
 	cd->paddr = vtophys(cd->addr);
+
+	device_printf(sc->dev, "%s: CD vaddr %p\n", __func__, cd->addr);
+	device_printf(sc->dev, "%s: CD paddr %lx\n", __func__, cd->paddr);
 
 	return (0);
 }
