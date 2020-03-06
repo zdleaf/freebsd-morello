@@ -234,8 +234,22 @@ drop_to_el1:
 	b.eq	1f
 	ret
 1:
-	/* Configure the Hypervisor */
-	mov	x2, #(HCR_RW)
+	/*
+	 * If the MMU is active, then it is using a page table where VA == PA.
+	 * But the page table won't have entries for the hypervisor EL2
+	 * initialization code which is loaded into memory with the vmm module.
+	 *
+	 * So we disable the MMU in EL2 to make the vmm hypervisor code run
+	 * successfully.
+	 */
+	dsb	sy
+	mrs	x2, sctlr_el2
+	bic	x2, x2, SCTLR_M
+	msr	sctlr_el2, x2
+	isb
+
+	/* Enable the HVC Instruction and Make EL1 aarch64 */
+	ldr	x2, hcr
 	msr	hcr_el2, x2
 
 	/* Load the Virtualization Process ID Register */
@@ -265,9 +279,18 @@ drop_to_el1:
 	/* Set the counter offset to a known value */
 	msr	cntvoff_el2, xzr
 
-	/* Hypervisor trap functions */
-	adr	x2, hyp_vectors
+	/* Install hypervisor trap functions */
+	adrp	x2, hyp_stub_vectors
 	msr	vbar_el2, x2
+
+	/* Use the host VTTBR_EL2 to tell the host and the guests apart */
+	mov	x2, #VTTBR_HOST
+	msr	vttbr_el2, x2
+
+	/* Mark hypervisor mode as enabled */
+	mov 	x1, #1
+	adr	x2, hypmode_enabled
+	str 	x1, [x2]
 
 	mov	x2, #(PSR_F | PSR_I | PSR_A | PSR_D | PSR_M_EL1h)
 	msr	spsr_el2, x2
@@ -296,31 +319,9 @@ drop_to_el1:
 .Lsctlr_res1:
 	.quad SCTLR_RES1
 
-#define	VECT_EMPTY	\
-	.align 7;	\
-	1:	b	1b
-
-	.align 11
-hyp_vectors:
-	VECT_EMPTY	/* Synchronous EL2t */
-	VECT_EMPTY	/* IRQ EL2t */
-	VECT_EMPTY	/* FIQ EL2t */
-	VECT_EMPTY	/* Error EL2t */
-
-	VECT_EMPTY	/* Synchronous EL2h */
-	VECT_EMPTY	/* IRQ EL2h */
-	VECT_EMPTY	/* FIQ EL2h */
-	VECT_EMPTY	/* Error EL2h */
-
-	VECT_EMPTY	/* Synchronous 64-bit EL1 */
-	VECT_EMPTY	/* IRQ 64-bit EL1 */
-	VECT_EMPTY	/* FIQ 64-bit EL1 */
-	VECT_EMPTY	/* Error 64-bit EL1 */
-
-	VECT_EMPTY	/* Synchronous 32-bit EL1 */
-	VECT_EMPTY	/* IRQ 32-bit EL1 */
-	VECT_EMPTY	/* FIQ 32-bit EL1 */
-	VECT_EMPTY	/* Error 32-bit EL1 */
+hcr:
+	/* Make sure the HVC instruction is not disabled */
+	.quad (HCR_RW & ~HCR_HCD)
 
 /*
  * Get the delta between the physical address we were loaded to and the

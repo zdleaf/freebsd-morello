@@ -63,6 +63,10 @@ __FBSDID("$FreeBSD$");
 #include <machine/machdep.h> /* For arm_set_delay */
 #endif
 
+#if defined(__aarch64__)
+#include <machine/vmm.h>	/* For virt_enabled() */
+#endif
+
 #ifdef FDT
 #include <dev/ofw/openfirm.h>
 #include <dev/ofw/ofw_bus.h>
@@ -73,6 +77,11 @@ __FBSDID("$FreeBSD$");
 #include <contrib/dev/acpica/include/acpi.h>
 #include <dev/acpica/acpivar.h>
 #endif
+
+/* TODO: delete me */
+#include <arm64/vmm/arm64.h>
+
+#include "generic_timer.h"
 
 #define	GT_CTRL_ENABLE		(1 << 0)
 #define	GT_CTRL_INT_MASK	(1 << 1)
@@ -87,6 +96,10 @@ __FBSDID("$FreeBSD$");
 #define	GT_CNTKCTL_EVNTEN	(1 << 2) /* Enables virtual counter events */
 #define	GT_CNTKCTL_PL0VCTEN	(1 << 1) /* PL0 CNTVCT and CNTFRQ access */
 #define	GT_CNTKCTL_PL0PCTEN	(1 << 0) /* PL0 CNTPCT and CNTFRQ access */
+
+#ifdef __arm__
+extern char hypmode_enabled[];
+#endif
 
 struct arm_tmr_softc {
 	struct resource		*res[4];
@@ -113,7 +126,7 @@ static void arm_tmr_do_delay(int usec, void *);
 
 static timecounter_get_t arm_tmr_get_timecount;
 
-static struct timecounter arm_tmr_timecount = {
+struct timecounter arm_tmr_timecount = {
 	.tc_name           = "ARM MPCore Timecounter",
 	.tc_get_timecount  = arm_tmr_get_timecount,
 	.tc_poll_pps       = NULL,
@@ -122,6 +135,8 @@ static struct timecounter arm_tmr_timecount = {
 	.tc_quality        = 1000,
 	.tc_fill_vdso_timehands = arm_tmr_fill_vdso_timehands,
 };
+
+static device_t arm_tmr_dev;
 
 #ifdef __arm__
 #define	get_el0(x)	cp15_## x ##_get()
@@ -258,6 +273,13 @@ arm_tmr_start(struct eventtimer *et, sbintime_t first,
 	struct arm_tmr_softc *sc;
 	int counts, ctrl;
 
+#if DEBUG_ME == 1
+	if (!virt_enabled()) {
+		ctrl = READ_SPECIALREG(cntv_ctl_el0);
+		eprintf("Old cntv_ctl_el0 = 0x%08x\n", ctrl);
+	}
+#endif
+
 	sc = (struct arm_tmr_softc *)et->et_priv;
 
 	if (first != 0) {
@@ -266,6 +288,10 @@ arm_tmr_start(struct eventtimer *et, sbintime_t first,
 		ctrl &= ~GT_CTRL_INT_MASK;
 		ctrl |= GT_CTRL_ENABLE;
 		set_tval(counts, sc->physical);
+#if DEBUG_ME == 1
+		if (!virt_enabled())
+			eprintf("New cntv_ctl_el0 = 0x%08x\n", ctrl);
+#endif
 		set_ctrl(ctrl, sc->physical);
 		return (0);
 	}
@@ -289,8 +315,24 @@ arm_tmr_stop(struct eventtimer *et)
 {
 	struct arm_tmr_softc *sc;
 
+	/* TODO: delete me */
+#if DEBUG_ME == 1
+	int ctrl;
+	if (!virt_enabled()) {
+		ctrl = READ_SPECIALREG(cntv_ctl_el0);
+		eprintf("Old cntv_ctl_el0 = 0x%08x\n", ctrl);
+	}
+#endif
+
 	sc = (struct arm_tmr_softc *)et->et_priv;
 	arm_tmr_disable(sc->physical);
+
+#if DEBUG_ME == 1
+	if (!virt_enabled()) {
+		ctrl = READ_SPECIALREG(cntv_ctl_el0);
+		eprintf("New cntv_ctl_el0 = 0x%08x\n", ctrl);
+	}
+#endif
 
 	return (0);
 }
@@ -301,17 +343,63 @@ arm_tmr_intr(void *arg)
 	struct arm_tmr_softc *sc;
 	int ctrl;
 
+#if DEBUG_ME == 1
+	if (!virt_enabled()) {
+		ctrl = READ_SPECIALREG(cntv_ctl_el0);
+		eprintf("Old cntv_ctl_el0 = 0x%08x\n", ctrl);
+	}
+#endif
+
 	sc = (struct arm_tmr_softc *)arg;
 	ctrl = get_ctrl(sc->physical);
 	if (ctrl & GT_CTRL_INT_STAT) {
 		ctrl |= GT_CTRL_INT_MASK;
 		set_ctrl(ctrl, sc->physical);
+#if DEBUG_ME == 1
+		if (!virt_enabled()) {
+			ctrl = READ_SPECIALREG(cntv_ctl_el0);
+			eprintf("New cntv_ctl_el0 = 0x%08x\n", ctrl);
+		}
+#endif
 	}
 
 	if (sc->et.et_active)
 		sc->et.et_event_cb(&sc->et, sc->et.et_arg);
 
 	return (FILTER_HANDLED);
+}
+
+int
+arm_tmr_setup_intr(int gt_type, driver_filter_t filter, driver_intr_t handler,
+    void *arg)
+{
+	if (gt_type != GT_PHYS_SECURE &&
+	    gt_type != GT_PHYS_NONSECURE &&
+	    gt_type != GT_VIRT &&
+	    gt_type != GT_HYP)
+		return (ENXIO);
+
+	if (arm_tmr_sc->res[gt_type] == NULL)
+		return (ENXIO);
+
+	return (bus_setup_intr(arm_tmr_dev, arm_tmr_sc->res[gt_type],
+	    INTR_TYPE_CLK, filter, handler, arg, &arm_tmr_sc->ihl[gt_type]));
+}
+
+int
+arm_tmr_teardown_intr(int gt_type)
+{
+	if (gt_type != GT_PHYS_SECURE &&
+	    gt_type != GT_PHYS_NONSECURE &&
+	    gt_type != GT_VIRT &&
+	    gt_type != GT_HYP)
+		return (ENXIO);
+
+	if (arm_tmr_sc->res[gt_type] == NULL)
+		return (ENXIO);
+
+	return (bus_teardown_intr(arm_tmr_dev, arm_tmr_sc->res[gt_type],
+	    arm_tmr_sc->ihl[gt_type]));
 }
 
 #ifdef FDT
@@ -393,7 +481,7 @@ arm_tmr_attach(device_t dev)
 	pcell_t clock;
 #endif
 	int error;
-	int i, first_timer, last_timer;
+	int i;
 
 	sc = device_get_softc(dev);
 	if (arm_tmr_sc)
@@ -433,28 +521,28 @@ arm_tmr_attach(device_t dev)
 		return (ENXIO);
 	}
 
-#ifdef __aarch64__
-	/* Use the virtual timer if we have one. */
-	if (sc->res[2] != NULL) {
-		sc->physical = false;
-		first_timer = 2;
-		last_timer = 2;
-	} else
+	sc->physical = (sc->res[GT_VIRT] == NULL);
+#ifdef __arm__
+	sc->physical |= (hypmode_enabled[0] == 0);
+#elif defined(__aarch64__)
+	sc->physical |= virt_enabled();
 #endif
-	/* Otherwise set up the secure and non-secure physical timers. */
-	{
-		sc->physical = true;
-		first_timer = 0;
-		last_timer = 1;
-	}
-
 	arm_tmr_sc = sc;
 
 	/* Setup secure, non-secure and virtual IRQs handler */
-	for (i = first_timer; i <= last_timer; i++) {
+	for (i = 0; i < 3; i++) {
 		/* If we do not have the interrupt, skip it. */
 		if (sc->res[i] == NULL)
 			continue;
+#if defined(__aarch64__)
+		if (i == 2 && virt_enabled()) {
+			/*
+			 * Do not install an interrupt handler for the virtual
+			 * timer. This will be used by the VM.
+			 */
+			continue;
+		}
+#endif
 		error = bus_setup_intr(dev, sc->res[i], INTR_TYPE_CLK,
 		    arm_tmr_intr, NULL, sc, &sc->ihl[i]);
 		if (error) {
@@ -488,6 +576,8 @@ arm_tmr_attach(device_t dev)
 #if defined(__arm__)
 	arm_set_delay(arm_tmr_do_delay, sc);
 #endif
+
+	arm_tmr_dev = dev;
 
 	return (0);
 }
