@@ -663,13 +663,18 @@ static inline int
 pmap_pte_dirty(pmap_t pmap, pt_entry_t pte)
 {
 
-	PMAP_ASSERT_STAGE1(pmap);
 	KASSERT((pte & ATTR_SW_MANAGED) != 0, ("pte %#lx is unmanaged", pte));
-	KASSERT((pte & (ATTR_S1_AP_RW_BIT | ATTR_SW_DBM)) != 0,
-	    ("pte %#lx is writeable and missing ATTR_SW_DBM", pte));
 
-	return ((pte & (ATTR_S1_AP_RW_BIT | ATTR_SW_DBM)) ==
-	    (ATTR_S1_AP(ATTR_S1_AP_RW) | ATTR_SW_DBM));
+	if (pmap->pm_stage == PM_STAGE1) {
+		KASSERT((pte & (ATTR_S1_AP_RW_BIT | ATTR_SW_DBM)) != 0,
+		    ("pte %#lx is writeable and missing ATTR_SW_DBM", pte));
+
+		return ((pte & (ATTR_S1_AP_RW_BIT | ATTR_SW_DBM)) ==
+		    (ATTR_S1_AP(ATTR_S1_AP_RW) | ATTR_SW_DBM));
+	}
+
+	return ((pte & ATTR_S2_S2AP(ATTR_S2_S2AP_WRITE)) ==
+	    ATTR_S2_S2AP(ATTR_S2_S2AP_WRITE));
 }
 
 static __inline void
@@ -1586,7 +1591,8 @@ _pmap_unwire_l3(pmap_t pmap, vm_offset_t va, vm_page_t m, struct spglist *free)
 		l1pg = PHYS_TO_VM_PAGE(tl0 & ~ATTR_MASK);
 		pmap_unwire_l3(pmap, va, l1pg, free);
 	}
-	pmap_invalidate_page(pmap, va);
+	if (pmap->pm_stage == PM_STAGE1)
+		pmap_invalidate_page(pmap, va);
 
 	/*
 	 * Put page on a list so that it is released after
@@ -1960,20 +1966,27 @@ pmap_release(pmap_t pmap)
 	    pmap->pm_stats.resident_count));
 	KASSERT(vm_radix_is_empty(&pmap->pm_root),
 	    ("pmap_release: pmap has reserved page table page(s)"));
-	PMAP_ASSERT_STAGE1(pmap);
 
 	set = pmap->pm_asid_set;
 	KASSERT(set != NULL, ("%s: NULL asid set", __func__));
 
-	mtx_lock_spin(&set->asid_set_mutex);
-	if (COOKIE_TO_EPOCH(pmap->pm_cookie) == set->asid_epoch) {
-		asid = COOKIE_TO_ASID(pmap->pm_cookie);
-		KASSERT(asid >= ASID_FIRST_AVAILABLE &&
-		    asid < set->asid_set_size,
-		    ("pmap_release: pmap cookie has out-of-range asid"));
-		bit_clear(set->asid_set, asid);
+	/*
+	 * Allow the ASID to be reused. In stage 2 VMIDs we don't invalidate
+	 * the entries when removing them so rely on a later tlb invalidation.
+	 * this will happen when updating the VMID generation. Because of this
+	 * we don't reuse VMIDs within a generation.
+	 */
+	if (pmap->pm_stage == PM_STAGE1) {
+		mtx_lock_spin(&set->asid_set_mutex);
+		if (COOKIE_TO_EPOCH(pmap->pm_cookie) == set->asid_epoch) {
+			asid = COOKIE_TO_ASID(pmap->pm_cookie);
+			KASSERT(asid >= ASID_FIRST_AVAILABLE &&
+			    asid < set->asid_set_size,
+			    ("pmap_release: pmap cookie has out-of-range asid"));
+			bit_clear(set->asid_set, asid);
+		}
+		mtx_unlock_spin(&set->asid_set_mutex);
 	}
-	mtx_unlock_spin(&set->asid_set_mutex);
 
 	m = PHYS_TO_VM_PAGE(pmap->pm_l0_paddr);
 	vm_page_unwire_noq(m);
@@ -2809,7 +2822,8 @@ pmap_remove_l3_range(pmap_t pmap, pd_entry_t l2e, vm_offset_t sva,
 	for (l3 = pmap_l2_to_l3(&l2e, sva); sva != eva; l3++, sva += L3_SIZE) {
 		if (!pmap_l3_valid(pmap_load(l3))) {
 			if (va != eva) {
-				pmap_invalidate_range(pmap, va, sva);
+				if (pmap->pm_stage == PM_STAGE1)
+					pmap_invalidate_range(pmap, va, sva);
 				va = eva;
 			}
 			continue;
@@ -2836,8 +2850,9 @@ pmap_remove_l3_range(pmap_t pmap, pd_entry_t l2e, vm_offset_t sva,
 					 * still provides access to that page. 
 					 */
 					if (va != eva) {
-						pmap_invalidate_range(pmap, va,
-						    sva);
+						if (pmap->pm_stage == PM_STAGE1)
+							pmap_invalidate_range(
+							    pmap, va, sva);
 						va = eva;
 					}
 					rw_wunlock(*lockp);
@@ -2860,7 +2875,7 @@ pmap_remove_l3_range(pmap_t pmap, pd_entry_t l2e, vm_offset_t sva,
 			break;
 		}
 	}
-	if (va != eva)
+	if (va != eva && pmap->pm_stage == PM_STAGE1)
 		pmap_invalidate_range(pmap, va, sva);
 }
 
