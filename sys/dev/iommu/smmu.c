@@ -116,7 +116,45 @@ MALLOC_DEFINE(M_SMMU, "SMMU", SMMU_DEVSTR);
 
 #define	CD_DWORDS		8
 
+#define	Q_WRP(q, p)		((p) & (1 << (q)->size_log2))
+#define	Q_IDX(q, p)		((p) & ((1 << (q)->size_log2) - 1))
+#define	Q_OVF(p)		((p) & (1 << 31)) /* Event queue overflowed */
+
 static int smmu_evtq_dequeue(struct smmu_softc *sc);
+
+static int
+smmu_q_has_space(struct smmu_queue *q)
+{
+
+	/*
+	 * See 6.3.27 SMMU_CMDQ_PROD
+	 *
+	 * There is space in the queue for additional commands if:
+	 *  SMMU_CMDQ_CONS.RD != SMMU_CMDQ_PROD.WR ||
+	 *  SMMU_CMDQ_CONS.RD_WRAP == SMMU_CMDQ_PROD.WR_WRAP
+	 */
+
+	if (Q_IDX(q, q->lc.cons) != Q_IDX(q, q->lc.prod) ||
+	    Q_WRP(q, q->lc.cons) == Q_WRP(q, q->lc.prod))
+		return (1);
+
+	//printf("no space: cons %x prod %x\n", q->lc.cons, q->lc.prod);
+
+	return (0);
+}
+
+static uint32_t
+smmu_q_inc_prod(struct smmu_queue *q)
+{
+	uint32_t prod;
+	uint32_t val;
+
+	prod = (Q_WRP(q, q->lc.prod) | Q_IDX(q, q->lc.prod)) + 1;
+
+	val = (Q_OVF(q->lc.prod) | Q_WRP(q, prod) | Q_IDX(q, prod));
+
+	return (val);
+}
 
 static int
 smmu_write_ack(struct smmu_softc *sc, uint32_t reg,
@@ -312,6 +350,7 @@ smmu_evtq_dequeue(struct smmu_softc *sc)
 	device_printf(sc->dev, "ste addr %p\n", ste);
 	smmu_dump_ste(sc, ste);
 
+#if 0
 	/* Disable SMMU */
 	uint32_t reg;
 	int error;
@@ -320,6 +359,7 @@ smmu_evtq_dequeue(struct smmu_softc *sc)
 	error = smmu_write_ack(sc, SMMU_CR0, SMMU_CR0ACK, reg);
 	if (error)
 		device_printf(sc->dev, "Could not disable SMMU.\n");
+#endif
 
 	return (0);
 }
@@ -358,9 +398,14 @@ smmu_cmdq_enqueue_cmd(struct smmu_softc *sc, struct smmu_cmdq_entry *entry)
 
 	make_cmd(sc, cmd, entry);
 
-	device_printf(sc->dev, "%s: lc.val %lx\n",
-	    __func__, cmdq->lc.val);
-	cmdq->lc.val = bus_read_8(sc->res[0], cmdq->prod_off);
+	device_printf(sc->dev, "Enqueueing command %d\n", entry->opcode);
+
+	device_printf(sc->dev, "%s: lc.val %lx\n", __func__, cmdq->lc.val);
+
+	do {
+		cmdq->lc.val = bus_read_8(sc->res[0], cmdq->prod_off);
+	} while (smmu_q_has_space(cmdq) == 0);
+
 	device_printf(sc->dev, "%s: lc.val new %lx\n",
 	    __func__, cmdq->lc.val);
 
@@ -368,13 +413,15 @@ smmu_cmdq_enqueue_cmd(struct smmu_softc *sc, struct smmu_cmdq_entry *entry)
 	    cmdq->lc.prod * CMDQ_ENTRY_DWORDS * 8);
 	memcpy(entry_addr, cmd, CMDQ_ENTRY_DWORDS * 8);
 
-	cmdq->lc.prod += 1;
+	cmdq->lc.prod = smmu_q_inc_prod(cmdq);
+
 	bus_write_4(sc->res[0], cmdq->prod_off, cmdq->lc.prod);
 
 	device_printf(sc->dev, "%s: complete\n", __func__);
 
 	cmdq->lc.val = bus_read_8(sc->res[0], cmdq->prod_off);
-	device_printf(sc->dev, "%s: lc.val completed %lx\n",
+
+	device_printf(sc->dev, "%s: lc.val compl %lx\n",
 	    __func__, cmdq->lc.val);
 
 	if (cmdq->lc.cons & CMDQ_CONS_ERR_M) {
@@ -420,7 +467,7 @@ smmu_init_ste(struct smmu_softc *sc, uint64_t *ste)
 	ste[1] = STE1_SHCFG_INCOMING; //| STE1_EATS_FULLATS;
 #endif
 
-	ste[1] = 0;
+	ste[1] = STE1_EATS_FULLATS;
 	ste[2] = 0;
 	ste[3] = 0;
 	ste[4] = 0;
@@ -454,14 +501,16 @@ smmu_init_ste(struct smmu_softc *sc, uint64_t *ste)
 	 * val |= 1 << STE0_S1CDMAX_S;
 	 */
 
-	cpu_dcache_wb_range((vm_offset_t)ste, 64);
-	dsb(ishst);
+	//cpu_dcache_wb_range((vm_offset_t)ste, 64);
+	//dsb(ishst);
+	smmu_invalidate_all_sid(sc);
 
 	/* The STE[0] has to be written in a single blast. */
 	ste[0] = val;
 
-	cpu_dcache_wb_range((vm_offset_t)ste, 64);
-	dsb(ishst);
+	//cpu_dcache_wb_range((vm_offset_t)ste, 64);
+	//dsb(ishst);
+	smmu_invalidate_all_sid(sc);
 
 	return (0);
 }
@@ -476,11 +525,13 @@ smmu_init_bypass(struct smmu_softc *sc,
 	    __func__, num_l1_entries, (uint64_t)strtab);
 
 	for (i = 0; i < num_l1_entries; i++) {
+		if ((i % 10000) == 0)
+			device_printf(sc->dev, "%s: i %d\n", __func__, i);
 		smmu_init_ste(sc, strtab);
 		strtab += STRTAB_STE_DWORDS;
 	}
 
-	smmu_invalidate_all_sid(sc);
+	//smmu_invalidate_all_sid(sc);
 
 	return (0);
 }
@@ -572,6 +623,8 @@ smmu_init_strtab_2lvl(struct smmu_softc *sc)
 	uint32_t size;
 	uint32_t num_l1_entries;
 	uint32_t l1size;
+
+	panic("Not in use for now");
 
 	size = STRTAB_L1_SZ_SHIFT - (ilog2(STRTAB_L1_DESC_DWORDS) + 3);
 	size = min(size, sc->sid_bits - STRTAB_SPLIT);
@@ -830,7 +883,6 @@ smmu_reset(struct smmu_softc *sc)
 			return (ENXIO);
 		}
 	}
-
 
 	reg |= CR0_SMMUEN;
 	error = smmu_write_ack(sc, SMMU_CR0, SMMU_CR0ACK, reg);
