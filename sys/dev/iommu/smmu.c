@@ -398,31 +398,33 @@ smmu_cmdq_enqueue_cmd(struct smmu_softc *sc, struct smmu_cmdq_entry *entry)
 
 	make_cmd(sc, cmd, entry);
 
-	device_printf(sc->dev, "Enqueueing command %d\n", entry->opcode);
-
-	device_printf(sc->dev, "%s: lc.val %lx\n", __func__, cmdq->lc.val);
+	//device_printf(sc->dev, "Enqueueing command %d\n", entry->opcode);
+	//device_printf(sc->dev, "%s: lc.val %lx\n", __func__, cmdq->lc.val);
 
 	do {
 		cmdq->lc.val = bus_read_8(sc->res[0], cmdq->prod_off);
 	} while (smmu_q_has_space(cmdq) == 0);
 
-	device_printf(sc->dev, "%s: lc.val new %lx\n",
-	    __func__, cmdq->lc.val);
+#if 0
+	if (cmdq->lc.prod == 0x80000)
+		device_printf(sc->dev, "%s: lc.val %lx\n",
+		    __func__, cmdq->lc.val);
+#endif
 
 	entry_addr = (void *)((uint64_t)cmdq->addr +
-	    cmdq->lc.prod * CMDQ_ENTRY_DWORDS * 8);
+	    Q_IDX(cmdq, cmdq->lc.prod) * CMDQ_ENTRY_DWORDS * 8);
 	memcpy(entry_addr, cmd, CMDQ_ENTRY_DWORDS * 8);
 
 	cmdq->lc.prod = smmu_q_inc_prod(cmdq);
 
 	bus_write_4(sc->res[0], cmdq->prod_off, cmdq->lc.prod);
 
-	device_printf(sc->dev, "%s: complete\n", __func__);
+	//device_printf(sc->dev, "%s: complete\n", __func__);
 
 	cmdq->lc.val = bus_read_8(sc->res[0], cmdq->prod_off);
 
-	device_printf(sc->dev, "%s: lc.val compl %lx\n",
-	    __func__, cmdq->lc.val);
+	//device_printf(sc->dev, "%s: lc.val compl %lx\n",
+	//    __func__, cmdq->lc.val);
 
 	if (cmdq->lc.cons & CMDQ_CONS_ERR_M) {
 		uint32_t reg;
@@ -517,18 +519,21 @@ smmu_init_ste(struct smmu_softc *sc, uint64_t *ste)
 
 static int
 smmu_init_bypass(struct smmu_softc *sc,
-    uint64_t *strtab, int num_l1_entries)
+    struct smmu_strtab *strtab)
 {
 	int i;
+	uint64_t *addr;
+
+	addr = strtab->addr;
 
 	device_printf(sc->dev, "%s: num_l1_entries %d, base addr %lx\n",
-	    __func__, num_l1_entries, (uint64_t)strtab);
+	    __func__, strtab->num_l1_entries, (uint64_t)addr);
 
-	for (i = 0; i < num_l1_entries; i++) {
+	for (i = 0; i < strtab->num_l1_entries; i++) {
 		if ((i % 10000) == 0)
 			device_printf(sc->dev, "%s: i %d\n", __func__, i);
-		smmu_init_ste(sc, strtab);
-		strtab += STRTAB_STE_DWORDS;
+		smmu_init_ste(sc, addr);
+		addr += STRTAB_STE_DWORDS;
 	}
 
 	//smmu_invalidate_all_sid(sc);
@@ -575,6 +580,7 @@ smmu_init_strtab_linear(struct smmu_softc *sc)
 
 	strtab = &sc->strtab;
 	num_l1_entries = (1 << sc->sid_bits);
+	strtab->num_l1_entries = num_l1_entries;
 
 	size = num_l1_entries * (STRTAB_STE_DWORDS << 3);
 	device_printf(sc->dev, "%s: linear strtab size %d, num_l1_entries %d\n",
@@ -612,7 +618,6 @@ smmu_init_strtab_linear(struct smmu_softc *sc)
 		device_printf(sc->dev, "Could not initialize CD\n");
 		return (ENXIO);
 	}
-	smmu_init_bypass(sc, strtab->addr, num_l1_entries);
 
 	return (0);
 }
@@ -1101,6 +1106,8 @@ smmu_attach(device_t dev)
 		device_printf(dev, "Couldn't reset SMMU.\n");
 		return (ENXIO);
 	}
+
+	smmu_init_bypass(sc, &sc->strtab);
 
 	return (0);
 }
