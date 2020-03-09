@@ -198,11 +198,11 @@ cpuset_t vm_active_cpus(struct vm *vm);
 cpuset_t vm_suspended_cpus(struct vm *vm);
 #endif	/* _SYS__CPUSET_H_ */
 
-extern uint64_t hypmode_enabled;
 static __inline bool
 virt_enabled()
 {
-	return (hypmode_enabled != 0);
+
+	return (has_hyp());
 }
 
 static __inline int

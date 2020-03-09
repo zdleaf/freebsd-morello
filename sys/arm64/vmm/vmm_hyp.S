@@ -32,7 +32,6 @@
 #include <machine/armreg.h>
 #include <machine/asm.h>
 #include <machine/hypervisor.h>
-#include <arm/arm/gic_common.h>
 
 #include "hyp_macros.h"
 #include "hyp.h"

@@ -287,11 +287,6 @@ drop_to_el1:
 	mov	x2, #VTTBR_HOST
 	msr	vttbr_el2, x2
 
-	/* Mark hypervisor mode as enabled */
-	mov 	x1, #1
-	adr	x2, hypmode_enabled
-	str 	x1, [x2]
-
 	mov	x2, #(PSR_F | PSR_I | PSR_A | PSR_D | PSR_M_EL1h)
 	msr	spsr_el2, x2
 

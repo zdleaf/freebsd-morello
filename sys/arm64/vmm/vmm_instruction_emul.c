@@ -32,6 +32,7 @@
 
 #include <vm/vm.h>
 
+#include <machine/machdep.h>
 #include <machine/vmm.h>
 
 #else

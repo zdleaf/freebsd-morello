@@ -116,6 +116,7 @@
 #define	CPU_IMPL_TO_MIDR(val)	(((val) & 0xff) << 24)
 #define	CPU_PART_TO_MIDR(val)	(((val) & 0xfff) << 4)
 #define	CPU_VAR_TO_MIDR(val)	(((val) & 0xf) << 20)
+#define	CPU_ARCH_TO_MIDR(val)	(((val) & 0xf) << 16)
 #define	CPU_REV_TO_MIDR(val)	(((val) & 0xf) << 0)
 
 #define	CPU_IMPL_MASK	(0xff << 24)

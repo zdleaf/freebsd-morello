@@ -31,6 +31,7 @@
 #include <sys/assym.h>
 #include <vm/vm.h>
 #include <vm/pmap.h>
+#include <machine/machdep.h>
 #include <machine/vmm.h>
 
 #include "arm64.h"

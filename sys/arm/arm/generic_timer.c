@@ -58,10 +58,7 @@ __FBSDID("$FreeBSD$");
 #include <machine/cpu.h>
 #include <machine/intr.h>
 #include <machine/md_var.h>
-
-#if defined(__arm__)
 #include <machine/machdep.h> /* For arm_set_delay */
-#endif
 
 #if defined(__aarch64__)
 #include <machine/vmm.h>	/* For virt_enabled() */

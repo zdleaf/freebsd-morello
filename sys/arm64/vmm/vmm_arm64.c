@@ -45,6 +45,7 @@
 #include <machine/vm.h>
 #include <machine/cpufunc.h>
 #include <machine/cpu.h>
+#include <machine/machdep.h>
 #include <machine/vmm.h>
 #include <machine/vmm_dev.h>
 #include <machine/atomic.h>
@@ -116,8 +117,10 @@ arm_init(int ipinum)
 {
 	char *stack_top;
 	size_t hyp_code_len;
+#ifdef notyet
 	uint64_t ich_vtr_el2;
 	uint64_t cnthctl_el2;
+#endif
 	uint64_t tcr_el1, tcr_el2;
 	uint64_t id_aa64mmfr0_el1;
 	uint64_t pa_range_bits;
@@ -145,7 +148,7 @@ arm_init(int ipinum)
 
 	/* Create the mappings for the hypervisor translation table. */
 	hyp_pmap = malloc(sizeof(*hyp_pmap), M_HYP, M_WAITOK | M_ZERO);
-	hypmap_init(hyp_pmap, PT_STAGE1);
+	hypmap_init(hyp_pmap, PM_STAGE1);
 	hyp_code_len = (size_t)hyp_code_end - (size_t)hyp_code_start;
 	hypmap_map(hyp_pmap, (vm_offset_t)hyp_code_start, hyp_code_len, VM_PROT_EXECUTE);
 
@@ -164,7 +167,7 @@ arm_init(int ipinum)
 
 	/* Set physical address size */
 	id_aa64mmfr0_el1 = READ_SPECIALREG(id_aa64mmfr0_el1);
-	pa_range_bits = ID_AA64MMFR0_PA_RANGE(id_aa64mmfr0_el1);
+	pa_range_bits = ID_AA64MMFR0_PARange_VAL(id_aa64mmfr0_el1);
 	tcr_el2	|= (pa_range_bits & 0x7) << TCR_EL2_PS_SHIFT;
 
 	/* Use the same address translation attributes as the host */
@@ -205,7 +208,7 @@ arm_init(int ipinum)
 	vtcr_el2 |= VTCR_EL2_IRGN0_WBWA | VTCR_EL2_ORGN0_WBWA;
 	vtcr_el2 |= VTCR_EL2_TG0_4K;
 	vtcr_el2 |= VTCR_EL2_SH0_IS;
-	if (pa_range_bits == ID_AA64MMFR0_PA_RANGE_1T) {
+	if (pa_range_bits == ID_AA64MMFR0_PARange_1T) {
 		/*
 		 * 40 bits of physical addresses, use concatenated level 1
 		 * tables
@@ -218,11 +221,13 @@ arm_init(int ipinum)
 	vmm_call_hyp((void *)vtophys(hyp_vectors), vtophys(hyp_pmap->pm_l0),
 	    ktohyp(stack_top), tcr_el2, sctlr_el2, vtcr_el2);
 
+#ifdef notyet
 	ich_vtr_el2 = vmm_call_hyp((void *)ktohyp(vmm_read_ich_vtr_el2));
 	vgic_v3_init(ich_vtr_el2);
 
 	cnthctl_el2 = vmm_call_hyp((void *)ktohyp(vmm_read_cnthctl_el2));
 	vtimer_init(cnthctl_el2);
+#endif
 
 	intr_restore(daif);
 
@@ -254,7 +259,9 @@ arm_cleanup(void)
 
 	arm64_set_active_vcpu(NULL);
 
+#ifdef notyet
 	vtimer_cleanup();
+#endif
 
 	hypmap_cleanup(hyp_pmap);
 	free(hyp_pmap, M_HYP);
@@ -270,7 +277,9 @@ arm_vminit(struct vm *vm)
 {
 	struct hyp *hyp;
 	struct hypctx *hypctx;
+#ifdef notyet
 	bool last_vcpu;
+#endif
 	int i;
 
 	hyp = malloc(sizeof(struct hyp), M_HYP, M_WAITOK | M_ZERO);
@@ -279,7 +288,7 @@ arm_vminit(struct vm *vm)
 
 	hyp->stage2_map = malloc(sizeof(*hyp->stage2_map),
 	    M_HYP, M_WAITOK | M_ZERO);
-	hypmap_init(hyp->stage2_map, PT_STAGE2);
+	hypmap_init(hyp->stage2_map, PM_STAGE2);
 	arm64_set_vttbr(hyp);
 
 	for (i = 0; i < VM_MAXCPU; i++) {
@@ -291,6 +300,7 @@ arm_vminit(struct vm *vm)
 		reset_vm_el2_regs(hypctx);
 	}
 
+#ifdef notyet
 	vtimer_vminit(hyp);
 	vgic_v3_vminit(hyp);
 	for (i = 0; i < VM_MAXCPU; i++) {
@@ -299,6 +309,7 @@ arm_vminit(struct vm *vm)
 		last_vcpu = (i == VM_MAXCPU - 1);
 		vgic_v3_cpuinit(hypctx, last_vcpu);
 	}
+#endif
 
 	hypmap_map(hyp_pmap, (vm_offset_t)hyp, sizeof(struct hyp),
 	    VM_PROT_READ | VM_PROT_WRITE);
@@ -566,7 +577,9 @@ arm_vmrun(void *arg, int vcpu, register_t pc, pmap_t pmap,
 		 * here, but for the previous VM?
 		 */
 		arm64_set_active_vcpu(hypctx);
+#ifdef noyet
 		vgic_v3_sync_hwstate(hypctx);
+#endif
 		excp_type = vmm_call_hyp((void *)ktohyp(vmm_enter_guest),
 		    ktohyp(hypctx));
 		intr_restore(daif);
@@ -603,8 +616,10 @@ arm_vmcleanup(void *arg)
 	if (arm64_get_active_vcpu() == hypctx)
 		arm64_set_active_vcpu(NULL);
 
+#ifdef notyet
 	vtimer_vmcleanup(arg);
 	vgic_v3_detach_from_vm(arg);
+#endif
 
 	/* Unmap the VM hyp struct from the hyp mode translation table */
 	hypmap_map(hyp_pmap, (vm_offset_t)hyp, sizeof(struct hyp),

@@ -42,6 +42,7 @@
 #include <vm/pmap.h>
 #include <vm/vm_map.h>
 
+#include <machine/machdep.h>
 #include <machine/vmparam.h>
 #include <machine/vmm.h>
 #include <machine/vmm_dev.h>

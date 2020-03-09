@@ -49,6 +49,7 @@
 #include <vm/vm_param.h>
 
 #include <machine/cpu.h>
+#include <machine/machdep.h>
 #include <machine/vm.h>
 #include <machine/pcb.h>
 #include <machine/param.h>
@@ -347,6 +348,7 @@ vm_handle_reg_emul(struct vm *vm, int vcpuid, bool *retu)
 
 	iss_reg = vre->inst_syndrome & ISS_MSR_REG_MASK;
 	switch (iss_reg) {
+#ifdef notyet
 	case ISS_CNTP_CTL_EL0:
 		rread = vtimer_phys_ctl_read;
 		rwrite = vtimer_phys_ctl_write;
@@ -359,6 +361,7 @@ vm_handle_reg_emul(struct vm *vm, int vcpuid, bool *retu)
 		rread = vtimer_phys_tval_read;
 		rwrite = vtimer_phys_tval_write;
 		break;
+#endif
 	default:
 		goto out_user;
 	}
@@ -837,8 +840,12 @@ vm_attach_vgic(struct vm *vm, uint64_t dist_start, size_t dist_size,
 {
 	int error;
 
+#ifdef notyet
 	error = vgic_v3_attach_to_vm(vm->cookie, dist_start, dist_size,
 	    redist_start, redist_size);
+#else
+	error = EINVAL;
+#endif
 
 	return (error);
 }
@@ -846,11 +853,17 @@ vm_attach_vgic(struct vm *vm, uint64_t dist_start, size_t dist_size,
 int
 vm_assert_irq(struct vm *vm, uint32_t irq)
 {
+#ifdef notyet
 	struct hyp *hyp = (struct hyp *)vm->cookie;
+#endif
 	int error;
 
+#ifdef notyet
 	/* TODO: this is crap, send the vcpuid as an argument to vm_assert_irq */
 	error = vgic_v3_inject_irq(&hyp->ctx[0], irq, VGIC_IRQ_VIRTIO);
+#else
+	error = EINVAL;
+#endif
 
 	return (error);
 }
@@ -860,7 +873,11 @@ vm_deassert_irq(struct vm *vm, uint32_t irq)
 {
 	int error;
 
+#ifdef notyet
 	error = vgic_v3_remove_irq(vm->cookie, irq, false);
+#else
+	error = EINVAL;
+#endif
 
 	return (error);
 }
@@ -878,8 +895,10 @@ vm_handle_wfi(struct vm *vm, int vcpuid, struct vm_exit *vme, bool *retu)
 
 	vcpu_lock(vcpu);
 	while (1) {
+#ifdef notyet
 		if (!intr_disabled && vgic_v3_vcpu_pending_irq(hypctx))
 			break;
+#endif
 
 		if (vcpu_should_yield(vm, vcpuid))
 			break;

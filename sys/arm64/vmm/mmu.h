@@ -30,6 +30,7 @@
 #ifndef _VMM_MMU_H_
 #define	_VMM_MMU_H_
 
+#include <machine/machdep.h>
 #include <machine/vmparam.h>
 #include <machine/vmm.h>
 
@@ -42,7 +43,7 @@
 
 #define page_aligned(x)		(((vm_offset_t)(x) & PAGE_MASK) == 0)
 
-void 		hypmap_init(pmap_t map, enum pmap_type pm_type);
+void 		hypmap_init(pmap_t map, enum pmap_stage pm_stage);
 void 		hypmap_map(pmap_t map, vm_offset_t va, size_t len,
 			vm_prot_t prot);
 void 		hypmap_map_identity(pmap_t map, vm_offset_t va, size_t len,

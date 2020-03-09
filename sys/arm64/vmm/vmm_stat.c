@@ -31,6 +31,7 @@
 #include <sys/systm.h>
 #include <sys/malloc.h>
 
+#include <machine/machdep.h>
 #include <machine/vmm.h>
 #include "vmm_stat.h"
 
