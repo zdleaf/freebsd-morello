@@ -25,6 +25,8 @@
  */
 
 #include <sys/cdefs.h>
+__FBSDID("$FreeBSD$");
+
 #include <sys/param.h>
 #include <sys/kernel.h>
 #include <sys/jail.h>
@@ -138,6 +140,17 @@ vcpu_lock_all(struct vmmdev_softc *sc)
 	return (error);
 }
 
+static void
+vcpu_unlock_all(struct vmmdev_softc *sc)
+{
+	int vcpu;
+	uint16_t maxcpus;
+
+	maxcpus = vm_get_maxcpus(sc->vm);
+	for (vcpu = 0; vcpu < maxcpus; vcpu++)
+		vcpu_unlock_one(sc, vcpu);
+}
+
 static struct vmmdev_softc *
 vmmdev_lookup(const char *name)
 {
@@ -165,12 +178,57 @@ vmmdev_lookup2(struct cdev *cdev)
 static int
 vmmdev_rw(struct cdev *cdev, struct uio *uio, int flags)
 {
-	int error;
+	int error, off, c, prot;
+	vm_paddr_t gpa, maxaddr;
+	void *hpa, *cookie;
+	struct vmmdev_softc *sc;
+	uint16_t lastcpu;
 
 	error = vmm_priv_check(curthread->td_ucred);
 	if (error)
 		return (error);
 
+	sc = vmmdev_lookup2(cdev);
+	if (sc == NULL)
+		return (ENXIO);
+
+	/*
+	 * Get a read lock on the guest memory map by freezing any vcpu.
+	 */
+	lastcpu = vm_get_maxcpus(sc->vm) - 1;
+	error = vcpu_lock_one(sc, lastcpu);
+	if (error)
+		return (error);
+
+	prot = (uio->uio_rw == UIO_WRITE ? VM_PROT_WRITE : VM_PROT_READ);
+	maxaddr = vmm_sysmem_maxaddr(sc->vm);
+	while (uio->uio_resid > 0 && error == 0) {
+		gpa = uio->uio_offset;
+		off = gpa & PAGE_MASK;
+		c = min(uio->uio_resid, PAGE_SIZE - off);
+
+		/*
+		 * The VM has a hole in its physical memory map. If we want to
+		 * use 'dd' to inspect memory beyond the hole we need to
+		 * provide bogus data for memory that lies in the hole.
+		 *
+		 * Since this device does not support lseek(2), dd(1) will
+		 * read(2) blocks of data to simulate the lseek(2).
+		 */
+		hpa = vm_gpa_hold(sc->vm, lastcpu, gpa, c,
+		    prot, &cookie);
+		if (hpa == NULL) {
+			if (uio->uio_rw == UIO_READ && gpa < maxaddr)
+				error = uiomove(__DECONST(void *, zero_region),
+				    c, uio);
+			else
+				error = EFAULT;
+		} else {
+			error = uiomove(hpa, c, uio);
+			vm_gpa_release(cookie);
+		}
+	}
+	vcpu_unlock_one(sc, lastcpu);
 	return (error);
 }
 
@@ -237,6 +295,36 @@ alloc_memseg(struct vmmdev_softc *sc, struct vm_memseg *mseg)
 	}
 done:
 	free(name, M_VMMDEV);
+	return (error);
+}
+
+static int
+vm_get_register_set(struct vm *vm, int vcpu, unsigned int count, int *regnum,
+    uint64_t *regval)
+{
+	int error, i;
+
+	error = 0;
+	for (i = 0; i < count; i++) {
+		error = vm_get_register(vm, vcpu, regnum[i], &regval[i]);
+		if (error)
+			break;
+	}
+	return (error);
+}
+
+static int
+vm_set_register_set(struct vm *vm, int vcpu, unsigned int count, int *regnum,
+    uint64_t *regval)
+{
+	int error, i;
+
+	error = 0;
+	for (i = 0; i < count; i++) {
+		error = vm_set_register(vm, vcpu, regnum[i], regval[i]);
+		if (error)
+			break;
+	}
 	return (error);
 }
 
@@ -387,16 +475,18 @@ vmmdev_ioctl(struct cdev *cdev, u_long cmd, caddr_t data, int fflag,
 		break;
 	}
 
-	if (state_changed == 1) {
-		vcpu_set_state(sc->vm, vcpu, VCPU_IDLE, false);
-	} else if (state_changed == 2) {
-		for (vcpu = 0; vcpu < VM_MAXCPU; vcpu++)
-			vcpu_set_state(sc->vm, vcpu, VCPU_IDLE, false);
-	}
+	if (state_changed == 1)
+		vcpu_unlock_one(sc, vcpu);
+	else if (state_changed == 2)
+		vcpu_unlock_all(sc);
 
 done:
-	/* Make sure that no handler returns a bogus value like ERESTART */
-	KASSERT(error >= 0, ("vmmdev_ioctl: invalid error return %d", error));
+	/*
+	 * Make sure that no handler returns a kernel-internal
+	 * error value to userspace.
+	 */
+	KASSERT(error == ERESTART || error >= 0,
+	    ("vmmdev_ioctl: invalid error return %d", error));
 	return (error);
 }
 
@@ -500,55 +590,67 @@ static int
 sysctl_vmm_destroy(SYSCTL_HANDLER_ARGS)
 {
 	struct devmem_softc *dsc;
-	int error;
-	char buf[VM_MAX_NAMELEN];
 	struct vmmdev_softc *sc;
 	struct cdev *cdev;
+	char *buf;
+	int error, buflen;
 
 	error = vmm_priv_check(req->td->td_ucred);
 	if (error)
 		return (error);
 
-	strlcpy(buf, "beavis", sizeof(buf));
-	error = sysctl_handle_string(oidp, buf, sizeof(buf), req);
+	buflen = VM_MAX_NAMELEN + 1;
+	buf = malloc(buflen, M_VMMDEV, M_WAITOK | M_ZERO);
+	strlcpy(buf, "beavis", buflen);
+	error = sysctl_handle_string(oidp, buf, buflen, req);
 	if (error != 0 || req->newptr == NULL)
-		return (error);
+		goto out;
 
 	mtx_lock(&vmmdev_mtx);
 	sc = vmmdev_lookup(buf);
 	if (sc == NULL || sc->cdev == NULL) {
 		mtx_unlock(&vmmdev_mtx);
-		return (EINVAL);
+		error = EINVAL;
+		goto out;
 	}
 
 	/*
 	 * The 'cdev' will be destroyed asynchronously when 'si_threadcount'
 	 * goes down to 0 so we should not do it again in the callback.
+	 *
+	 * Setting 'sc->cdev' to NULL is also used to indicate that the VM
+	 * is scheduled for destruction.
 	 */
 	cdev = sc->cdev;
 	sc->cdev = NULL;
 	mtx_unlock(&vmmdev_mtx);
 
 	/*
-	 * Schedule the 'cdev' to be destroyed:
+	 * Schedule all cdevs to be destroyed:
 	 *
-	 * - any new operations on this 'cdev' will return an error (ENXIO).
+	 * - any new operations on the 'cdev' will return an error (ENXIO).
 	 *
 	 * - when the 'si_threadcount' dwindles down to zero the 'cdev' will
 	 *   be destroyed and the callback will be invoked in a taskqueue
 	 *   context.
+	 *
+	 * - the 'devmem' cdevs are destroyed before the virtual machine 'cdev'
 	 */
 	SLIST_FOREACH(dsc, &sc->devmem, link) {
 		KASSERT(dsc->cdev != NULL, ("devmem cdev already destroyed"));
 		destroy_dev_sched_cb(dsc->cdev, devmem_destroy, dsc);
 	}
 	destroy_dev_sched_cb(cdev, vmmdev_destroy, sc);
+	error = 0;
 
-	return (0);
+out:
+	free(buf, M_VMMDEV);
+	return (error);
 }
 SYSCTL_PROC(_hw_vmm, OID_AUTO, destroy,
-	    CTLTYPE_STRING | CTLFLAG_RW | CTLFLAG_PRISON,
-	    NULL, 0, sysctl_vmm_destroy, "A", NULL);
+    CTLTYPE_STRING | CTLFLAG_RW | CTLFLAG_PRISON | CTLFLAG_MPSAFE,
+    NULL, 0, sysctl_vmm_destroy, "A",
+    NULL);
 
 static struct cdevsw vmmdevsw = {
 	.d_name		= "vmmdev",
@@ -562,30 +664,34 @@ static struct cdevsw vmmdevsw = {
 static int
 sysctl_vmm_create(SYSCTL_HANDLER_ARGS)
 {
-	int error;
 	struct vm *vm;
 	struct cdev *cdev;
 	struct vmmdev_softc *sc, *sc2;
-	char buf[VM_MAX_NAMELEN];
+	char *buf;
+	int error, buflen;
 
 	error = vmm_priv_check(req->td->td_ucred);
 	if (error)
 		return (error);
 
-	strlcpy(buf, "beavis", sizeof(buf));
-	error = sysctl_handle_string(oidp, buf, sizeof(buf), req);
+	buflen = VM_MAX_NAMELEN + 1;
+	buf = malloc(buflen, M_VMMDEV, M_WAITOK | M_ZERO);
+	strlcpy(buf, "beavis", buflen);
+	error = sysctl_handle_string(oidp, buf, buflen, req);
 	if (error != 0 || req->newptr == NULL)
-		return (error);
+		goto out;
 
 	mtx_lock(&vmmdev_mtx);
 	sc = vmmdev_lookup(buf);
 	mtx_unlock(&vmmdev_mtx);
-	if (sc != NULL)
-		return (EEXIST);
+	if (sc != NULL) {
+		error = EEXIST;
+		goto out;
+	}
 
 	error = vm_create(buf, &vm);
 	if (error != 0)
-		return (error);
+		goto out;
 
 	sc = malloc(sizeof(struct vmmdev_softc), M_VMMDEV, M_WAITOK | M_ZERO);
 	sc->vm = vm;
@@ -605,14 +711,15 @@ sysctl_vmm_create(SYSCTL_HANDLER_ARGS)
 
 	if (sc2 != NULL) {
 		vmmdev_destroy(sc);
-		return (EEXIST);
+		error = EEXIST;
+		goto out;
 	}
 
 	error = make_dev_p(MAKEDEV_CHECKNAME, &cdev, &vmmdevsw, NULL,
 			   UID_ROOT, GID_WHEEL, 0600, "vmm/%s", buf);
 	if (error != 0) {
 		vmmdev_destroy(sc);
-		return (error);
+		goto out;
 	}
 
 	mtx_lock(&vmmdev_mtx);
@@ -620,11 +727,14 @@ sysctl_vmm_create(SYSCTL_HANDLER_ARGS)
 	sc->cdev->si_drv1 = sc;
 	mtx_unlock(&vmmdev_mtx);
 
-	return (0);
+out:
+	free(buf, M_VMMDEV);
+	return (error);
 }
 SYSCTL_PROC(_hw_vmm, OID_AUTO, create,
-	    CTLTYPE_STRING | CTLFLAG_RW | CTLFLAG_PRISON,
-	    NULL, 0, sysctl_vmm_create, "A", NULL);
+    CTLTYPE_STRING | CTLFLAG_RW | CTLFLAG_PRISON | CTLFLAG_MPSAFE,
+    NULL, 0, sysctl_vmm_create, "A",
+    NULL);
 
 void
 vmmdev_init(void)

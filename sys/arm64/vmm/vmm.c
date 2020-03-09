@@ -975,6 +975,62 @@ vcpu_get_state(struct vm *vm, int vcpuid, int *hostcpu)
 	return (state);
 }
 
+void *
+vm_gpa_hold(struct vm *vm, int vcpuid, vm_paddr_t gpa, size_t len, int reqprot,
+	    void **cookie)
+{
+	int i, count, pageoff;
+	struct mem_map *mm;
+	vm_page_t m;
+#ifdef INVARIANTS
+	/*
+	 * All vcpus are frozen by ioctls that modify the memory map
+	 * (e.g. VM_MMAP_MEMSEG). Therefore 'vm->memmap[]' stability is
+	 * guaranteed if at least one vcpu is in the VCPU_FROZEN state.
+	 */
+	int state;
+	KASSERT(vcpuid >= -1 && vcpuid < vm->maxcpus, ("%s: invalid vcpuid %d",
+	    __func__, vcpuid));
+	for (i = 0; i < vm->maxcpus; i++) {
+		if (vcpuid != -1 && vcpuid != i)
+			continue;
+		state = vcpu_get_state(vm, i, NULL);
+		KASSERT(state == VCPU_FROZEN, ("%s: invalid vcpu state %d",
+		    __func__, state));
+	}
+#endif
+	pageoff = gpa & PAGE_MASK;
+	if (len > PAGE_SIZE - pageoff)
+		panic("vm_gpa_hold: invalid gpa/len: 0x%016lx/%lu", gpa, len);
+
+	count = 0;
+	for (i = 0; i < VM_MAX_MEMMAPS; i++) {
+		mm = &vm->mem_maps[i];
+		if (sysmem_mapping(vm, mm) && gpa >= mm->gpa &&
+		    gpa < mm->gpa + mm->len) {
+			count = vm_fault_quick_hold_pages(&vm->vmspace->vm_map,
+			    trunc_page(gpa), PAGE_SIZE, reqprot, &m, 1);
+			break;
+		}
+	}
+
+	if (count == 1) {
+		*cookie = m;
+		return ((void *)(PHYS_TO_DMAP(VM_PAGE_TO_PHYS(m)) + pageoff));
+	} else {
+		*cookie = NULL;
+		return (NULL);
+	}
+}
+
+void
+vm_gpa_release(void *cookie)
+{
+	vm_page_t m = cookie;
+
+	vm_page_unwire(m, PQ_ACTIVE);
+}
+
 int
 vm_get_register(struct vm *vm, int vcpu, int reg, uint64_t *retval)
 {

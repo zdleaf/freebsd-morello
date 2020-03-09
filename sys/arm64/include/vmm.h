@@ -175,6 +175,9 @@ int vm_mmap_getnext(struct vm *vm, vm_paddr_t *gpa, int *segid,
 int vm_get_memseg(struct vm *vm, int ident, size_t *len, bool *sysmem,
     struct vm_object **objptr);
 vm_paddr_t vmm_sysmem_maxaddr(struct vm *vm);
+void *vm_gpa_hold(struct vm *, int vcpuid, vm_paddr_t gpa, size_t len,
+    int prot, void **cookie);
+void vm_gpa_release(void *cookie);
 bool vm_mem_allocated(struct vm *vm, int vcpuid, vm_paddr_t gpa);
 
 uint16_t vm_get_maxcpus(struct vm *vm);
