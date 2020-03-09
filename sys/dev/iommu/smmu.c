@@ -347,7 +347,10 @@ smmu_evtq_dequeue(struct smmu_softc *sc)
 	strtab = &sc->strtab;
 	ste = (void *)((uint64_t)strtab->addr + sid * (STRTAB_STE_DWORDS << 3));
 
-	device_printf(sc->dev, "ste addr %p\n", ste);
+	device_printf(sc->dev, "strtab addr %p ste addr %p\n",
+	    strtab->addr, ste);
+	device_printf(sc->dev, "strtab phys %lx ste phys %lx\n",
+	    vtophys(strtab->addr), vtophys(ste));
 	smmu_dump_ste(sc, ste);
 
 #if 0
