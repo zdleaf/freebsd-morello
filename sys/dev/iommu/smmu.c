@@ -143,6 +143,17 @@ smmu_q_has_space(struct smmu_queue *q)
 	return (0);
 }
 
+static int
+smmu_q_empty(struct smmu_queue *q)
+{
+
+	if (Q_IDX(q, q->lc.cons) == Q_IDX(q, q->lc.prod) &&
+	    Q_WRP(q, q->lc.cons) == Q_WRP(q, q->lc.prod))
+		return (1);
+
+	return (0);
+}
+
 static uint32_t
 smmu_q_inc_prod(struct smmu_queue *q)
 {
@@ -190,7 +201,9 @@ smmu_event_intr(void *arg)
 
 	device_printf(sc->dev, "!!!!!!!!! %s\n", __func__);
 
-	smmu_evtq_dequeue(sc);
+	do {
+		smmu_evtq_dequeue(sc);
+	} while (!smmu_q_empty(&sc->evtq));
 
 	//return (FILTER_HANDLED);
 }
@@ -229,7 +242,8 @@ ilog2(long x)
 	return (flsl(x) - 1);
 }
 
-#define	SMMU_CMDQ_ALIGN	(64 * 1024)
+#define	SMMU_CMDQ_ALIGN		(64 * 1024)
+#define	SMMU_STRTAB_ALIGN	(0x40000000)
 
 static int
 smmu_init_queue(struct smmu_softc *sc, struct smmu_queue *q,
@@ -328,7 +342,7 @@ smmu_evtq_dequeue(struct smmu_softc *sc)
 
 	event_id = evt[0] & 0xff;
 
-	device_printf(sc->dev, "%s: event %d received\n", __func__, event_id);
+	device_printf(sc->dev, "%s: event 0x%x received\n", __func__, event_id);
 
 	device_printf(sc->dev, "evt[0] %x\n", evt[0]);
 	device_printf(sc->dev, "evt[1] %x\n", evt[1]);
@@ -489,6 +503,27 @@ smmu_prefetch_sid(struct smmu_softc *sc, uint32_t sid)
 	smmu_cmdq_enqueue_sync(sc);
 }
 
+static void
+smmu_init_ste_bypass(struct smmu_softc *sc, uint32_t sid, uint64_t *ste)
+{
+	uint64_t val;
+
+	val = STE0_VALID | STE0_CONFIG_BYPASS;
+
+	ste[1] = STE1_SHCFG_INCOMING | STE1_EATS_FULLATS;
+	ste[2] = 0;
+	ste[3] = 0;
+	ste[4] = 0;
+	ste[5] = 0;
+	ste[6] = 0;
+	ste[7] = 0;
+
+	smmu_invalidate_sid(sc, sid);
+	ste[0] = val;
+	smmu_invalidate_sid(sc, sid);
+	smmu_prefetch_sid(sc, sid);
+}
+
 static int
 smmu_init_ste(struct smmu_softc *sc, uint32_t sid, uint64_t *ste)
 {
@@ -567,9 +602,9 @@ smmu_init_bypass(struct smmu_softc *sc,
 	    __func__, strtab->num_l1_entries, (uint64_t)addr);
 
 	for (i = 0; i < strtab->num_l1_entries; i++) {
-		if ((i % 10000) == 0)
+		if ((i % 100000) == 0)
 			device_printf(sc->dev, "%s: i %d\n", __func__, i);
-		smmu_init_ste(sc, i, addr);
+		smmu_init_ste_bypass(sc, i, addr);
 		addr += STRTAB_STE_DWORDS;
 	}
 
@@ -627,7 +662,7 @@ smmu_init_strtab_linear(struct smmu_softc *sc)
 	    M_WAITOK | M_ZERO,	/* flags */
 	    0,			/* low */
 	    (1ul << 48) - 1,	/* high */
-	    SMMU_CMDQ_ALIGN,	/* alignment */
+	    SMMU_STRTAB_ALIGN,	/* alignment */
 	    0);			/* boundary */
 	if (strtab->addr == NULL) {
 		device_printf(sc->dev, "failed to allocate strtab\n");
@@ -643,7 +678,12 @@ smmu_init_strtab_linear(struct smmu_softc *sc)
 	reg |= sc->sid_bits << STRTAB_BASE_CFG_LOG2SIZE_S;
 	strtab->base_cfg = (uint32_t)reg;
 
-	reg = vtophys(strtab->addr) & STRTAB_BASE_ADDR_M;
+	vm_paddr_t base;
+	base = vtophys(strtab->addr);
+
+	reg = base & STRTAB_BASE_ADDR_M;
+	if (reg != base)
+		panic("wrong allocation");
 	reg |= STRTAB_BASE_RA;
 	strtab->base = reg;
 
