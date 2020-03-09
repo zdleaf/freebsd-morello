@@ -376,6 +376,9 @@ make_cmd(struct smmu_softc *sc, uint64_t *cmd,
 	case CMD_TLBI_EL2_ALL:
 	case CMD_TLBI_NSNH_ALL:
 		break;
+	case CMD_CFGI_STE:
+		cmd[0] |= ((uint64_t)entry->cfgi.sid << CFGI_STE_SID_S);
+		break;
 	case CMD_CFGI_STE_RANGE:
 		cmd[1] = (31 << CFGI_STE_RANGE_S);
 		break;
@@ -450,15 +453,27 @@ static void
 smmu_invalidate_all_sid(struct smmu_softc *sc)
 {
 	struct smmu_cmdq_entry cmd;
-	
+
 	/* Invalidate cached config */
 	cmd.opcode = CMD_CFGI_STE_RANGE;
 	smmu_cmdq_enqueue_cmd(sc, &cmd);
 	smmu_cmdq_enqueue_sync(sc);
 }
 
+static void
+smmu_invalidate_sid(struct smmu_softc *sc, uint32_t sid)
+{
+	struct smmu_cmdq_entry cmd;
+
+	/* Invalidate cached config */
+	cmd.opcode = CMD_CFGI_STE;
+	cmd.cfgi.sid = sid;
+	smmu_cmdq_enqueue_cmd(sc, &cmd);
+	smmu_cmdq_enqueue_sync(sc);
+}
+
 static int
-smmu_init_ste(struct smmu_softc *sc, uint64_t *ste)
+smmu_init_ste(struct smmu_softc *sc, uint32_t sid, uint64_t *ste)
 {
 	uint64_t val;
 
@@ -505,14 +520,18 @@ smmu_init_ste(struct smmu_softc *sc, uint64_t *ste)
 
 	//cpu_dcache_wb_range((vm_offset_t)ste, 64);
 	//dsb(ishst);
-	smmu_invalidate_all_sid(sc);
+	//smmu_invalidate_all_sid(sc);
+
+	smmu_invalidate_sid(sc, sid);
 
 	/* The STE[0] has to be written in a single blast. */
 	ste[0] = val;
 
 	//cpu_dcache_wb_range((vm_offset_t)ste, 64);
 	//dsb(ishst);
-	smmu_invalidate_all_sid(sc);
+	//smmu_invalidate_all_sid(sc);
+
+	smmu_invalidate_sid(sc, sid);
 
 	return (0);
 }
@@ -532,7 +551,7 @@ smmu_init_bypass(struct smmu_softc *sc,
 	for (i = 0; i < strtab->num_l1_entries; i++) {
 		if ((i % 10000) == 0)
 			device_printf(sc->dev, "%s: i %d\n", __func__, i);
-		smmu_init_ste(sc, addr);
+		smmu_init_ste(sc, i, addr);
 		addr += STRTAB_STE_DWORDS;
 	}
 

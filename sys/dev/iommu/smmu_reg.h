@@ -259,6 +259,7 @@
 #define	CMD_PREFETCH_CONFIG	0x01
 #define	CMD_PREFETCH_ADDR	0x02
 #define	CMD_CFGI_STE		0x03
+#define	 CFGI_STE_SID_S		32
 #define	CMD_CFGI_STE_RANGE	0x04
 #define	 CFGI_STE_RANGE_S	0
 #define	CMD_CFGI_CD		0x05

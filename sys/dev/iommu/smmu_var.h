@@ -66,12 +66,18 @@ struct smmu_queue {
 
 struct smmu_cmdq_entry {
 	uint8_t opcode;
+	union {
+		struct {
+			uint32_t sid;
+		};
+	} cfgi;
 };
 
 struct smmu_strtab {
 	void *addr;
 	uint64_t base;
 	uint32_t base_cfg;
+	uint32_t num_l1_entries;
 };
 
 struct smmu_softc {
