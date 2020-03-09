@@ -69,8 +69,11 @@ struct smmu_cmdq_entry {
 	union {
 		struct {
 			uint32_t sid;
-		};
-	} cfgi;
+		} cfgi;
+		struct {
+			uint32_t sid;
+		} prefetch;
+	};
 };
 
 struct smmu_strtab {

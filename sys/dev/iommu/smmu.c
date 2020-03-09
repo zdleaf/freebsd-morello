@@ -387,6 +387,9 @@ make_cmd(struct smmu_softc *sc, uint64_t *cmd,
 		cmd[0] |= SYNC_MSH_IS | SYNC_MSIATTR_OIWB;
 		//cmd[0] = 0xfffff;
 		break;
+	case CMD_PREFETCH_CONFIG:
+		cmd[0] |= ((uint64_t)entry->prefetch.sid << PREFETCH_SID_S);
+		break;
 	};
 }
 
@@ -472,6 +475,17 @@ smmu_invalidate_sid(struct smmu_softc *sc, uint32_t sid)
 	smmu_cmdq_enqueue_sync(sc);
 }
 
+static void
+smmu_prefetch_sid(struct smmu_softc *sc, uint32_t sid)
+{
+	struct smmu_cmdq_entry cmd;
+
+	cmd.opcode = CMD_PREFETCH_CONFIG;
+	cmd.prefetch.sid = sid;
+	smmu_cmdq_enqueue_cmd(sc, &cmd);
+	smmu_cmdq_enqueue_sync(sc);
+}
+
 static int
 smmu_init_ste(struct smmu_softc *sc, uint32_t sid, uint64_t *ste)
 {
@@ -532,6 +546,7 @@ smmu_init_ste(struct smmu_softc *sc, uint32_t sid, uint64_t *ste)
 	//smmu_invalidate_all_sid(sc);
 
 	smmu_invalidate_sid(sc, sid);
+	smmu_prefetch_sid(sc, sid);
 
 	return (0);
 }
