@@ -280,7 +280,7 @@ arm_vminit(struct vm *vm)
 #ifdef notyet
 	bool last_vcpu;
 #endif
-	int i;
+	int i, maxcpus;
 
 	hyp = malloc(sizeof(struct hyp), M_HYP, M_WAITOK | M_ZERO);
 	hyp->vm = vm;
@@ -291,7 +291,8 @@ arm_vminit(struct vm *vm)
 	hypmap_init(hyp->stage2_map, PM_STAGE2);
 	arm64_set_vttbr(hyp);
 
-	for (i = 0; i < VM_MAXCPU; i++) {
+	maxcpus = vm_get_maxcpus(vm);
+	for (i = 0; i < maxcpus; i++) {
 		hypctx = &hyp->ctx[i];
 		hypctx->vcpu = i;
 		hypctx->hyp = hyp;

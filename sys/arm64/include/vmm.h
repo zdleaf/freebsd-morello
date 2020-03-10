@@ -160,6 +160,7 @@ uint64_t vm_gpa2hpa(struct vm *vm, uint64_t gpa, size_t size);
 int vm_gpabase2memseg(struct vm *vm, uint64_t gpabase,
 		      struct vm_memory_segment *seg);
 boolean_t vm_mem_allocated(struct vm *vm, uint64_t gpa);
+uint16_t vm_get_maxcpus(struct vm *vm);
 int vm_get_register(struct vm *vm, int vcpu, int reg, uint64_t *retval);
 int vm_set_register(struct vm *vm, int vcpu, int reg, uint64_t val);
 int vm_run(struct vm *vm, struct vm_run *vmrun);
