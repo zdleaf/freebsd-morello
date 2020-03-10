@@ -27,6 +27,7 @@
 #include <sys/cdefs.h>
 #include <sys/param.h>
 #include <sys/kernel.h>
+#include <sys/jail.h>
 #include <sys/queue.h>
 #include <sys/lock.h>
 #include <sys/mutex.h>
@@ -37,6 +38,7 @@
 #include <sys/ioccom.h>
 #include <sys/mman.h>
 #include <sys/uio.h>
+#include <sys/proc.h>
 
 #include <vm/vm.h>
 #include <vm/pmap.h>
@@ -57,11 +59,25 @@ struct vmmdev_softc {
 
 static SLIST_HEAD(, vmmdev_softc) head;
 
+static unsigned pr_allow_flag;
 static struct mtx vmmdev_mtx;
 
 static MALLOC_DEFINE(M_VMMDEV, "vmmdev", "vmmdev");
 
 SYSCTL_DECL(_hw_vmm);
+
+static int vmm_priv_check(struct ucred *ucred);
+
+static int
+vmm_priv_check(struct ucred *ucred)
+{
+
+	if (jailed(ucred) &&
+	    !(ucred->cr_prison->pr_allow & pr_allow_flag))
+		return (EPERM);
+
+	return (0);
+}
 
 static int
 vcpu_lock_one(struct vmmdev_softc *sc, int vcpu)
@@ -137,7 +153,11 @@ vmmdev_lookup2(struct cdev *cdev)
 static int
 vmmdev_rw(struct cdev *cdev, struct uio *uio, int flags)
 {
-	int error = 0;
+	int error;
+
+	error = vmm_priv_check(curthread->td_ucred);
+	if (error)
+		return (error);
 
 	return (error);
 }
@@ -154,6 +174,10 @@ vmmdev_ioctl(struct cdev *cdev, u_long cmd, caddr_t data, int fflag,
 	struct vm_activate_cpu *vac;
 	struct vm_attach_vgic *vav;
 	struct vm_irq *vi;
+
+	error = vmm_priv_check(curthread->td_ucred);
+	if (error)
+		return (error);
 
 	sc = vmmdev_lookup2(cdev);
 	if (sc == NULL)
@@ -308,6 +332,10 @@ sysctl_vmm_destroy(SYSCTL_HANDLER_ARGS)
 	struct vmmdev_softc *sc;
 	struct cdev *cdev;
 
+	error = vmm_priv_check(req->td->td_ucred);
+	if (error)
+		return (error);
+
 	strlcpy(buf, "beavis", sizeof(buf));
 	error = sysctl_handle_string(oidp, buf, sizeof(buf), req);
 	if (error != 0 || req->newptr == NULL)
@@ -341,7 +369,8 @@ sysctl_vmm_destroy(SYSCTL_HANDLER_ARGS)
 
 	return (0);
 }
-SYSCTL_PROC(_hw_vmm, OID_AUTO, destroy, CTLTYPE_STRING | CTLFLAG_RW,
+SYSCTL_PROC(_hw_vmm, OID_AUTO, destroy,
+	    CTLTYPE_STRING | CTLFLAG_RW | CTLFLAG_PRISON,
 	    NULL, 0, sysctl_vmm_destroy, "A", NULL);
 
 static struct cdevsw vmmdevsw = {
@@ -361,6 +390,10 @@ sysctl_vmm_create(SYSCTL_HANDLER_ARGS)
 	struct cdev *cdev;
 	struct vmmdev_softc *sc, *sc2;
 	char buf[VM_MAX_NAMELEN];
+
+	error = vmm_priv_check(req->td->td_ucred);
+	if (error)
+		return (error);
 
 	strlcpy(buf, "beavis", sizeof(buf));
 	error = sysctl_handle_string(oidp, buf, sizeof(buf), req);
@@ -411,13 +444,16 @@ sysctl_vmm_create(SYSCTL_HANDLER_ARGS)
 
 	return (0);
 }
-SYSCTL_PROC(_hw_vmm, OID_AUTO, create, CTLTYPE_STRING | CTLFLAG_RW,
+SYSCTL_PROC(_hw_vmm, OID_AUTO, create,
+	    CTLTYPE_STRING | CTLFLAG_RW | CTLFLAG_PRISON,
 	    NULL, 0, sysctl_vmm_create, "A", NULL);
 
 void
 vmmdev_init(void)
 {
 	mtx_init(&vmmdev_mtx, "vmm device mutex", NULL, MTX_DEF);
+	pr_allow_flag = prison_add_allow(NULL, "vmm", NULL,
+	    "Allow use of vmm in a jail.");
 }
 
 int
