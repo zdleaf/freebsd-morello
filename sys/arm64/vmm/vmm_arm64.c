@@ -38,6 +38,7 @@
 
 #include <vm/vm.h>
 #include <vm/pmap.h>
+#include <vm/vm_extern.h>
 #include <vm/vm_page.h>
 #include <vm/vm_param.h>
 
@@ -75,41 +76,10 @@ extern char hyp_stub_vectors[];
 char *stack;
 pmap_t hyp_pmap;
 
-static uint64_t vmid_generation = 0;
-static struct mtx vmid_generation_mtx;
-
 static inline void
 arm64_set_active_vcpu(struct hypctx *hypctx)
 {
 	PCPU_SET(vcpu, hypctx);
-}
-
-static void arm64_set_vttbr(struct hyp *hyp)
-{
-	if (hyp->vmid_generation != 0 &&
-			((hyp->vmid_generation & ~VMID_GENERATION_MASK) !=
-			(atomic_load_acq_64(&vmid_generation) & ~VMID_GENERATION_MASK)))
-		goto out;
-
-	mtx_lock(&vmid_generation_mtx);
-
-	/* Another VCPU has change the VMID already */
-	if (hyp->vmid_generation &&
-	    ((hyp->vmid_generation & ~VMID_GENERATION_MASK) !=
-	    (vmid_generation & ~VMID_GENERATION_MASK))) {
-		mtx_unlock(&vmid_generation_mtx);
-		goto out;
-	}
-
-	vmid_generation++;
-	if (!(vmid_generation & VMID_GENERATION_MASK))
-		vmid_generation++;
-
-	hyp->vmid_generation = vmid_generation;
-	mtx_unlock(&vmid_generation_mtx);
-out:
-	hyp->vttbr_el2 = build_vttbr(hyp->vmid_generation,
-			vtophys(hyp->stage2_map->pm_l0));
 }
 
 static int
@@ -132,8 +102,6 @@ arm_init(int ipinum)
 		printf("arm_init: Processor doesn't have support for virtualization.\n");
 		return (ENXIO);
 	}
-
-	mtx_init(&vmid_generation_mtx, "vmid_generation_mtx", NULL, MTX_DEF);
 
 	daif = intr_disable();
 	arm64_set_active_vcpu(NULL);
@@ -267,13 +235,11 @@ arm_cleanup(void)
 	free(hyp_pmap, M_HYP);
 	free(stack, M_HYP);
 
-	mtx_destroy(&vmid_generation_mtx);
-
 	return (0);
 }
 
 static void *
-arm_vminit(struct vm *vm)
+arm_vminit(struct vm *vm, pmap_t pmap)
 {
 	struct hyp *hyp;
 	struct hypctx *hypctx;
@@ -285,11 +251,6 @@ arm_vminit(struct vm *vm)
 	hyp = malloc(sizeof(struct hyp), M_HYP, M_WAITOK | M_ZERO);
 	hyp->vm = vm;
 	hyp->vgic_attached = false;
-
-	hyp->stage2_map = malloc(sizeof(*hyp->stage2_map),
-	    M_HYP, M_WAITOK | M_ZERO);
-	hypmap_init(hyp->stage2_map, PM_STAGE2);
-	arm64_set_vttbr(hyp);
 
 	maxcpus = vm_get_maxcpus(vm);
 	for (i = 0; i < maxcpus; i++) {
@@ -316,6 +277,27 @@ arm_vminit(struct vm *vm)
 	    VM_PROT_READ | VM_PROT_WRITE);
 
 	return (hyp);
+}
+
+static int
+arm_vmm_pinit(pmap_t pmap)
+{
+
+	pmap_pinit_stage(pmap, PM_STAGE2, 3);
+	return (1);
+}
+
+static struct vmspace *
+arm_vmspace_alloc(vm_offset_t min, vm_offset_t max)
+{
+	return (vmspace_alloc(min, max, arm_vmm_pinit));
+}
+
+static void
+arm_vmspace_free(struct vmspace *vmspace)
+{
+
+	vmspace_free(vmspace);
 }
 
 static enum vm_reg_name
@@ -455,7 +437,8 @@ arm64_gen_reg_emul_data(uint32_t esr_iss, struct vm_exit *vme_ret)
 //static bool print_stuff = false;
 
 static int
-handle_el1_sync_excp(struct hyp *hyp, int vcpu, struct vm_exit *vme_ret)
+handle_el1_sync_excp(struct hyp *hyp, int vcpu, struct vm_exit *vme_ret,
+    pmap_t pmap)
 {
 	uint32_t esr_ec, esr_iss;
 
@@ -476,7 +459,14 @@ handle_el1_sync_excp(struct hyp *hyp, int vcpu, struct vm_exit *vme_ret)
 		vme_ret->exitcode = VM_EXITCODE_REG_EMUL;
 		break;
 
+	case EXCP_INSN_ABORT_L:
 	case EXCP_DATA_ABORT_L:
+		if (pmap_fault(pmap, vme_ret->u.hyp.esr_el2,
+		    vme_ret->u.hyp.far_el2) == KERN_SUCCESS) {
+			vme_ret->inst_length = 0;
+			return (HANDLED);
+		}
+
 		/* Check if instruction syndrome is valid */
 		if (!(esr_iss & ISS_DATA_ISV)) {
 			eprintf("Data abort with invalid instruction syndrome\n");
@@ -496,8 +486,14 @@ handle_el1_sync_excp(struct hyp *hyp, int vcpu, struct vm_exit *vme_ret)
 			break;
 		}
 
-		arm64_gen_inst_emul_data(esr_iss, vme_ret);
-		vme_ret->exitcode = VM_EXITCODE_INST_EMUL;
+		if (esr_ec == EXCP_DATA_ABORT_L) {
+			arm64_gen_inst_emul_data(esr_iss, vme_ret);
+			vme_ret->exitcode = VM_EXITCODE_INST_EMUL;
+		} else {
+			eprintf("Unsupported instruction fault from guest\n");
+			arm64_print_hyp_regs(vme_ret);
+			vme_ret->exitcode = VM_EXITCODE_HYP;
+		}
 		break;
 
 	default:
@@ -513,7 +509,8 @@ handle_el1_sync_excp(struct hyp *hyp, int vcpu, struct vm_exit *vme_ret)
 }
 
 static int
-arm64_handle_world_switch(struct hyp *hyp, int vcpu, struct vm_exit *vme)
+arm64_handle_world_switch(struct hyp *hyp, int vcpu, struct vm_exit *vme,
+    pmap_t pmap)
 {
 	int excp_type;
 	int handled;
@@ -522,7 +519,7 @@ arm64_handle_world_switch(struct hyp *hyp, int vcpu, struct vm_exit *vme)
 	switch (excp_type) {
 	case EXCP_TYPE_EL1_SYNC:
 		/* The exit code will be set by handle_el1_sync_excp(). */
-		handled = handle_el1_sync_excp(hyp, vcpu, vme);
+		handled = handle_el1_sync_excp(hyp, vcpu, vme, pmap);
 		break;
 
 	case EXCP_TYPE_EL1_IRQ:
@@ -573,6 +570,11 @@ arm_vmrun(void *arg, int vcpu, register_t pc, pmap_t pmap,
 
 	for (;;) {
 		daif = intr_disable();
+
+		/* Activate the stage2 pmap so the vmid is valid */
+		pmap_activate_vm(pmap);
+		hyp->vttbr_el2 = pmap_to_ttbr0(pmap);
+
 		/*
 		 * TODO: What happens if a timer interrupt is asserted exactly
 		 * here, but for the previous VM?
@@ -583,6 +585,9 @@ arm_vmrun(void *arg, int vcpu, register_t pc, pmap_t pmap,
 #endif
 		excp_type = vmm_call_hyp((void *)ktohyp(vmm_enter_guest),
 		    ktohyp(hypctx));
+
+		/* Deactivate the stage2 pmap */
+		PCPU_SET(curvmpmap, NULL);
 		intr_restore(daif);
 
 		if (excp_type == EXCP_TYPE_MAINT_IRQ)
@@ -595,7 +600,7 @@ arm_vmrun(void *arg, int vcpu, register_t pc, pmap_t pmap,
 		vme->u.hyp.far_el2 = hypctx->exit_info.far_el2;
 		vme->u.hyp.hpfar_el2 = hypctx->exit_info.hpfar_el2;
 
-		handled = arm64_handle_world_switch(hyp, vcpu, vme);
+		handled = arm64_handle_world_switch(hyp, vcpu, vme, pmap);
 		if (handled == UNHANDLED)
 			/* Exit loop to emulate instruction. */
 			break;
@@ -625,8 +630,6 @@ arm_vmcleanup(void *arg)
 	/* Unmap the VM hyp struct from the hyp mode translation table */
 	hypmap_map(hyp_pmap, (vm_offset_t)hyp, sizeof(struct hyp),
 	    VM_PROT_NONE);
-	hypmap_cleanup(hyp->stage2_map);
-	free(hyp->stage2_map, M_HYP);
 	free(hyp, M_HYP);
 }
 
@@ -771,10 +774,10 @@ struct vmm_ops vmm_ops_arm = {
 	arm_vminit,
 	arm_vmrun,
 	arm_vmcleanup,
-	hypmap_set,
-	hypmap_get,
 	arm_getreg,
 	arm_setreg,
 	NULL, 		/* vmi_get_cap_t */
-	NULL 		/* vmi_set_cap_t */
+	NULL, 		/* vmi_set_cap_t */
+	arm_vmspace_alloc,
+	arm_vmspace_free,
 };

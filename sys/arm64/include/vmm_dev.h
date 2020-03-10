@@ -32,10 +32,21 @@ void	vmmdev_init(void);
 int	vmmdev_cleanup(void);
 #endif
 
-struct vm_memory_segment {
-	uint64_t	gpa;	/* in */
+struct vm_memmap {
+	vm_paddr_t	gpa;
+	int		segid;		/* memory segment */
+	vm_ooffset_t	segoff;		/* offset into memory segment */
+	size_t		len;		/* mmap length */
+	int		prot;		/* RWX */
+	int		flags;
+};
+#define	VM_MEMMAP_F_WIRED	0x01
+
+#define	VM_MEMSEG_NAME(m)	((m)->name[0] != '\0' ? (m)->name : NULL)
+struct vm_memseg {
+	int		segid;
 	size_t		len;
-	int		wired;
+	char		name[VM_MAX_SUFFIXLEN + 1];
 };
 
 struct vm_register {
@@ -119,10 +130,12 @@ enum {
 	IOCNUM_REINIT = 5,
 
 	/* memory apis */
-	IOCNUM_MAP_MEMORY = 10,
-	IOCNUM_GET_MEMORY_SEG = 11,
 	IOCNUM_GET_GPA_PMAP = 12,
 	IOCNUM_GLA2GPA = 13,
+	IOCNUM_ALLOC_MEMSEG = 14,
+	IOCNUM_GET_MEMSEG = 15,
+	IOCNUM_MMAP_MEMSEG = 16,
+	IOCNUM_MMAP_GETNEXT = 17,
 
 	/* register/state accessors */
 	IOCNUM_SET_REGISTER = 20,
@@ -150,10 +163,14 @@ enum {
 	_IOW('v', IOCNUM_SUSPEND, struct vm_suspend)
 #define	VM_REINIT	\
 	_IO('v', IOCNUM_REINIT)
-#define	VM_MAP_MEMORY	\
-	_IOWR('v', IOCNUM_MAP_MEMORY, struct vm_memory_segment)
-#define	VM_GET_MEMORY_SEG \
-	_IOWR('v', IOCNUM_GET_MEMORY_SEG, struct vm_memory_segment)
+#define	VM_ALLOC_MEMSEG	\
+	_IOW('v', IOCNUM_ALLOC_MEMSEG, struct vm_memseg)
+#define	VM_GET_MEMSEG	\
+	_IOWR('v', IOCNUM_GET_MEMSEG, struct vm_memseg)
+#define	VM_MMAP_MEMSEG	\
+	_IOW('v', IOCNUM_MMAP_MEMSEG, struct vm_memmap)
+#define	VM_MMAP_GETNEXT	\
+	_IOWR('v', IOCNUM_MMAP_GETNEXT, struct vm_memmap)
 #define	VM_SET_REGISTER \
 	_IOW('v', IOCNUM_SET_REGISTER, struct vm_register)
 #define	VM_GET_REGISTER \

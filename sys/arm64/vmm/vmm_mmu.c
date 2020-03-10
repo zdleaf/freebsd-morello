@@ -109,54 +109,6 @@ hypmap_map_identity(pmap_t map, vm_offset_t va, size_t len,
 }
 
 /*
- * Map 'len' bytes starting at virtual address 'va' to 'len' bytes
- * starting at physical address 'pa'
- */
-void
-hypmap_set(void *arg, vm_offset_t va, vm_offset_t pa, size_t len,
-		vm_prot_t prot)
-{
-	vm_offset_t va_end, hypva;
-	vm_page_t dummy_page;
-	struct hyp *hyp;
-	pmap_t map;
-
-	hyp = (struct hyp *)arg;
-	map = hyp->stage2_map;
-
-	dummy_page = malloc(sizeof(*dummy_page), M_HYP, M_WAITOK | M_ZERO);
-	dummy_page->oflags = VPO_UNMANAGED;
-	dummy_page->md.pv_memattr = VM_MEMATTR_DEFAULT;
-
-	va_end = va + len - 1;
-	va = trunc_page(va);
-	dummy_page->phys_addr = trunc_page(pa);
-	while (va < va_end) {
-		hypva = (va >= VM_MIN_KERNEL_ADDRESS) ? ktohyp(va) : va;
-		pmap_enter(map, hypva, dummy_page, prot, PMAP_ENTER_WIRED, 0);
-		va += PAGE_SIZE;
-		dummy_page->phys_addr += PAGE_SIZE;
-	}
-
-	free(dummy_page, M_HYP);
-}
-
-/*
- * Return the physical address associated with virtual address 'va'
- */
-vm_paddr_t
-hypmap_get(void *arg, vm_offset_t va)
-{
-	struct hyp *hyp;
-	pmap_t map;
-
-	hyp = (struct hyp *)arg;
-	map = hyp->stage2_map;
-
-	return pmap_extract(map, va);
-}
-
-/*
  * Remove all the mappings from the hyp translation tables
  */
 void

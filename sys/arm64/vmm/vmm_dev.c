@@ -43,16 +43,26 @@
 #include <vm/vm.h>
 #include <vm/pmap.h>
 #include <vm/vm_map.h>
+#include <vm/vm_object.h>
 
 #include <machine/machdep.h>
 #include <machine/vmparam.h>
 #include <machine/vmm.h>
 #include <machine/vmm_dev.h>
 
+struct devmem_softc {
+	int	segid;
+	char	*name;
+	struct cdev *cdev;
+	struct vmmdev_softc *sc;
+	SLIST_ENTRY(devmem_softc) link;
+};
+
 struct vmmdev_softc {
 	struct vm	*vm;		/* vm instance cookie */
 	struct cdev	*cdev;
 	SLIST_ENTRY(vmmdev_softc) link;
+	SLIST_HEAD(, devmem_softc) devmem;
 	int		flags;
 };
 #define	VSC_LINKED		0x01
@@ -67,6 +77,8 @@ static MALLOC_DEFINE(M_VMMDEV, "vmmdev", "vmmdev");
 SYSCTL_DECL(_hw_vmm);
 
 static int vmm_priv_check(struct ucred *ucred);
+static int devmem_create_cdev(const char *vmname, int id, char *devmem);
+static void devmem_destroy(void *arg);
 
 static int
 vmm_priv_check(struct ucred *ucred)
@@ -163,17 +175,83 @@ vmmdev_rw(struct cdev *cdev, struct uio *uio, int flags)
 }
 
 static int
+get_memseg(struct vmmdev_softc *sc, struct vm_memseg *mseg)
+{
+	struct devmem_softc *dsc;
+	int error;
+	bool sysmem;
+
+	error = vm_get_memseg(sc->vm, mseg->segid, &mseg->len, &sysmem, NULL);
+	if (error || mseg->len == 0)
+		return (error);
+
+	if (!sysmem) {
+		SLIST_FOREACH(dsc, &sc->devmem, link) {
+			if (dsc->segid == mseg->segid)
+				break;
+		}
+		KASSERT(dsc != NULL, ("%s: devmem segment %d not found",
+		    __func__, mseg->segid));
+		error = copystr(dsc->name, mseg->name, sizeof(mseg->name),
+		    NULL);
+	} else {
+		bzero(mseg->name, sizeof(mseg->name));
+	}
+
+	return (error);
+}
+
+static int
+alloc_memseg(struct vmmdev_softc *sc, struct vm_memseg *mseg)
+{
+	char *name;
+	int error;
+	bool sysmem;
+
+	error = 0;
+	name = NULL;
+	sysmem = true;
+
+	/*
+	 * The allocation is lengthened by 1 to hold a terminating NUL.  It'll
+	 * by stripped off when devfs processes the full string.
+	 */
+	if (VM_MEMSEG_NAME(mseg)) {
+		sysmem = false;
+		name = malloc(sizeof(mseg->name), M_VMMDEV, M_WAITOK);
+		error = copystr(mseg->name, name, sizeof(mseg->name), NULL);
+		if (error)
+			goto done;
+	}
+
+	error = vm_alloc_memseg(sc->vm, mseg->segid, mseg->len, sysmem);
+	if (error)
+		goto done;
+
+	if (VM_MEMSEG_NAME(mseg)) {
+		error = devmem_create_cdev(vm_name(sc->vm), mseg->segid, name);
+		if (error)
+			vm_free_memseg(sc->vm, mseg->segid);
+		else
+			name = NULL;	/* freed when 'cdev' is destroyed */
+	}
+done:
+	free(name, M_VMMDEV);
+	return (error);
+}
+
+static int
 vmmdev_ioctl(struct cdev *cdev, u_long cmd, caddr_t data, int fflag,
 	     struct thread *td)
 {
 	int error, vcpu, state_changed;
 	struct vmmdev_softc *sc;
 	struct vm_run *vmrun;
-	struct vm_memory_segment *seg;
 	struct vm_register *vmreg;
 	struct vm_activate_cpu *vac;
 	struct vm_attach_vgic *vav;
 	struct vm_irq *vi;
+	struct vm_memmap *mm;
 
 	error = vmm_priv_check(curthread->td_ucred);
 	if (error)
@@ -202,11 +280,11 @@ vmmdev_ioctl(struct cdev *cdev, u_long cmd, caddr_t data, int fflag,
 		error = vcpu_lock_one(sc, vcpu);
 		if (error)
 			goto done;
-
 		state_changed = 1;
 		break;
 
-	case VM_MAP_MEMORY:
+	case VM_ALLOC_MEMSEG:
+	case VM_MMAP_MEMSEG:
 	case VM_ATTACH_VGIC:
 		/*
 		 * ioctls that operate on the entire virtual machine must
@@ -216,6 +294,18 @@ vmmdev_ioctl(struct cdev *cdev, u_long cmd, caddr_t data, int fflag,
 		if (error)
 			goto done;
 		state_changed = 2;
+		break;
+	case VM_GET_MEMSEG:
+	case VM_MMAP_GETNEXT:
+		/*
+		 * Lock a vcpu to make sure that the memory map cannot be
+		 * modified while it is being inspected.
+		 */
+		vcpu = vm_get_maxcpus(sc->vm) - 1;
+		error = vcpu_lock_one(sc, vcpu);
+		if (error)
+			goto done;
+		state_changed = 1;
 		break;
 	case VM_ASSERT_IRQ:
 		vi =(struct vm_irq *)data;
@@ -234,15 +324,21 @@ vmmdev_ioctl(struct cdev *cdev, u_long cmd, caddr_t data, int fflag,
 		vmrun = (struct vm_run *)data;
 		error = vm_run(sc->vm, vmrun);
 		break;
-	case VM_MAP_MEMORY:
-		seg = (struct vm_memory_segment *)data;
-		error = vm_malloc(sc->vm, seg->gpa, seg->len);
+	case VM_MMAP_GETNEXT:
+		mm = (struct vm_memmap *)data;
+		error = vm_mmap_getnext(sc->vm, &mm->gpa, &mm->segid,
+		    &mm->segoff, &mm->len, &mm->prot, &mm->flags);
 		break;
-	case VM_GET_MEMORY_SEG:
-		seg = (struct vm_memory_segment *)data;
-		seg->len = 0;
-		(void)vm_gpabase2memseg(sc->vm, seg->gpa, seg);
-		error = 0;
+	case VM_MMAP_MEMSEG:
+		mm = (struct vm_memmap *)data;
+		error = vm_mmap_memseg(sc->vm, mm->gpa, mm->segid, mm->segoff,
+		    mm->len, mm->prot, mm->flags);
+		break;
+	case VM_ALLOC_MEMSEG:
+		error = alloc_memseg(sc, (struct vm_memseg *)data);
+		break;
+	case VM_GET_MEMSEG:
+		error = get_memseg(sc, (struct vm_memseg *)data);
 		break;
 	case VM_GET_REGISTER:
 		vmreg = (struct vm_register *)data;
@@ -282,32 +378,85 @@ done:
 }
 
 static int
-vmmdev_mmap(struct cdev *cdev, vm_ooffset_t offset, vm_paddr_t *paddr,
-    int nprot, vm_memattr_t *memattr)
+vmmdev_mmap_single(struct cdev *cdev, vm_ooffset_t *offset, vm_size_t mapsize,
+    struct vm_object **objp, int nprot)
 {
-	int error;
 	struct vmmdev_softc *sc;
+	vm_paddr_t gpa;
+	size_t len;
+	vm_ooffset_t segoff, first, last;
+	int error, found, segid;
+	uint16_t lastcpu;
+	bool sysmem;
 
-	error = -1;
-	mtx_lock(&vmmdev_mtx);
+	error = vmm_priv_check(curthread->td_ucred);
+	if (error)
+		return (error);
+
+	first = *offset;
+	last = first + mapsize;
+	if ((nprot & PROT_EXEC) || first < 0 || first >= last)
+		return (EINVAL);
 
 	sc = vmmdev_lookup2(cdev);
-	if (sc != NULL && !(nprot & PROT_EXEC)) {
-		*paddr = (vm_paddr_t)vm_gpa2hpa(sc->vm, (vm_paddr_t)offset, PAGE_SIZE);
-		if (*paddr != (vm_paddr_t)-1)
-			error = 0;
+	if (sc == NULL) {
+		/* virtual machine is in the process of being created */
+		return (EINVAL);
 	}
 
-	mtx_unlock(&vmmdev_mtx);
+	/*
+	 * Get a read lock on the guest memory map by freezing any vcpu.
+	 */
+	lastcpu = vm_get_maxcpus(sc->vm) - 1;
+	error = vcpu_lock_one(sc, lastcpu);
+	if (error)
+		return (error);
 
+	gpa = 0;
+	found = 0;
+	while (!found) {
+		error = vm_mmap_getnext(sc->vm, &gpa, &segid, &segoff, &len,
+		    NULL, NULL);
+		if (error)
+			break;
+
+		if (first >= gpa && last <= gpa + len)
+			found = 1;
+		else
+			gpa += len;
+	}
+
+	if (found) {
+		error = vm_get_memseg(sc->vm, segid, &len, &sysmem, objp);
+		KASSERT(error == 0 && *objp != NULL,
+		    ("%s: invalid memory segment %d", __func__, segid));
+		if (sysmem) {
+			vm_object_reference(*objp);
+			*offset = segoff + (first - gpa);
+		} else {
+			error = EINVAL;
+		}
+	}
+	vcpu_unlock_one(sc, lastcpu);
 	return (error);
 }
 
 static void
 vmmdev_destroy(void *arg)
 {
-
 	struct vmmdev_softc *sc = arg;
+	struct devmem_softc *dsc;
+	int error;
+
+	error = vcpu_lock_all(sc);
+	KASSERT(error == 0, ("%s: error %d freezing vcpus", __func__, error));
+
+	while ((dsc = SLIST_FIRST(&sc->devmem)) != NULL) {
+		KASSERT(dsc->cdev == NULL, ("%s: devmem not free", __func__));
+		SLIST_REMOVE_HEAD(&sc->devmem, link);
+		free(dsc->name, M_VMMDEV);
+		free(dsc, M_VMMDEV);
+	}
 
 	if (sc->cdev != NULL)
 		destroy_dev(sc->cdev);
@@ -327,6 +476,7 @@ vmmdev_destroy(void *arg)
 static int
 sysctl_vmm_destroy(SYSCTL_HANDLER_ARGS)
 {
+	struct devmem_softc *dsc;
 	int error;
 	char buf[VM_MAX_NAMELEN];
 	struct vmmdev_softc *sc;
@@ -365,6 +515,10 @@ sysctl_vmm_destroy(SYSCTL_HANDLER_ARGS)
 	 *   be destroyed and the callback will be invoked in a taskqueue
 	 *   context.
 	 */
+	SLIST_FOREACH(dsc, &sc->devmem, link) {
+		KASSERT(dsc->cdev != NULL, ("devmem cdev already destroyed"));
+		destroy_dev_sched_cb(dsc->cdev, devmem_destroy, dsc);
+	}
 	destroy_dev_sched_cb(cdev, vmmdev_destroy, sc);
 
 	return (0);
@@ -377,7 +531,7 @@ static struct cdevsw vmmdevsw = {
 	.d_name		= "vmmdev",
 	.d_version	= D_VERSION,
 	.d_ioctl	= vmmdev_ioctl,
-	.d_mmap		= vmmdev_mmap,
+	.d_mmap_single	= vmmdev_mmap_single,
 	.d_read		= vmmdev_rw,
 	.d_write	= vmmdev_rw,
 };
@@ -412,6 +566,7 @@ sysctl_vmm_create(SYSCTL_HANDLER_ARGS)
 
 	sc = malloc(sizeof(struct vmmdev_softc), M_VMMDEV, M_WAITOK | M_ZERO);
 	sc->vm = vm;
+	SLIST_INIT(&sc->devmem);
 
 	/*
 	 * Lookup the name again just in case somebody sneaked in when we
@@ -467,4 +622,99 @@ vmmdev_cleanup(void)
 		error = EBUSY;
 
 	return (error);
+}
+
+static int
+devmem_mmap_single(struct cdev *cdev, vm_ooffset_t *offset, vm_size_t len,
+    struct vm_object **objp, int nprot)
+{
+	struct devmem_softc *dsc;
+	vm_ooffset_t first, last;
+	size_t seglen;
+	int error;
+	uint16_t lastcpu;
+	bool sysmem;
+
+	dsc = cdev->si_drv1;
+	if (dsc == NULL) {
+		/* 'cdev' has been created but is not ready for use */
+		return (ENXIO);
+	}
+
+	first = *offset;
+	last = *offset + len;
+	if ((nprot & PROT_EXEC) || first < 0 || first >= last)
+		return (EINVAL);
+
+	lastcpu = vm_get_maxcpus(dsc->sc->vm) - 1;
+	error = vcpu_lock_one(dsc->sc, lastcpu);
+	if (error)
+		return (error);
+
+	error = vm_get_memseg(dsc->sc->vm, dsc->segid, &seglen, &sysmem, objp);
+	KASSERT(error == 0 && !sysmem && *objp != NULL,
+	    ("%s: invalid devmem segment %d", __func__, dsc->segid));
+
+	vcpu_unlock_one(dsc->sc, lastcpu);
+
+	if (seglen >= last) {
+		vm_object_reference(*objp);
+		return (0);
+	} else {
+		return (EINVAL);
+	}
+}
+
+static struct cdevsw devmemsw = {
+	.d_name		= "devmem",
+	.d_version	= D_VERSION,
+	.d_mmap_single	= devmem_mmap_single,
+};
+
+static int
+devmem_create_cdev(const char *vmname, int segid, char *devname)
+{
+	struct devmem_softc *dsc;
+	struct vmmdev_softc *sc;
+	struct cdev *cdev;
+	int error;
+
+	error = make_dev_p(MAKEDEV_CHECKNAME, &cdev, &devmemsw, NULL,
+	    UID_ROOT, GID_WHEEL, 0600, "vmm.io/%s.%s", vmname, devname);
+	if (error)
+		return (error);
+
+	dsc = malloc(sizeof(struct devmem_softc), M_VMMDEV, M_WAITOK | M_ZERO);
+
+	mtx_lock(&vmmdev_mtx);
+	sc = vmmdev_lookup(vmname);
+	KASSERT(sc != NULL, ("%s: vm %s softc not found", __func__, vmname));
+	if (sc->cdev == NULL) {
+		/* virtual machine is being created or destroyed */
+		mtx_unlock(&vmmdev_mtx);
+		free(dsc, M_VMMDEV);
+		destroy_dev_sched_cb(cdev, NULL, 0);
+		return (ENODEV);
+	}
+
+	dsc->segid = segid;
+	dsc->name = devname;
+	dsc->cdev = cdev;
+	dsc->sc = sc;
+	SLIST_INSERT_HEAD(&sc->devmem, dsc, link);
+	mtx_unlock(&vmmdev_mtx);
+
+	/* The 'cdev' is ready for use after 'si_drv1' is initialized */
+	cdev->si_drv1 = dsc;
+	return (0);
+}
+
+static void
+devmem_destroy(void *arg)
+{
+	struct devmem_softc *dsc = arg;
+
+	KASSERT(dsc->cdev, ("%s: devmem cdev already destroyed", __func__));
+	dsc->cdev = NULL;
+	dsc->sc = NULL;
 }

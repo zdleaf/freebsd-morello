@@ -95,6 +95,8 @@ enum vm_reg_name {
 #define	VM_INTINFO_HWEXCEPTION	(3 << 8)
 #define	VM_INTINFO_SWINTR	(4 << 8)
 
+#define VM_MAX_SUFFIXLEN 15
+
 #define VM_GUEST_BASE_IPA	0x80000000UL	/* Guest kernel start ipa */
 
 #ifdef _KERNEL
@@ -103,7 +105,6 @@ enum vm_reg_name {
 
 struct vm;
 struct vm_exception;
-struct vm_memory_segment;
 struct vm_exit;
 struct vm_run;
 struct vm_object;
@@ -113,7 +114,7 @@ struct hypctx;
 typedef int	(*vmm_init_func_t)(int ipinum);
 typedef int	(*vmm_cleanup_func_t)(void);
 typedef void	(*vmm_resume_func_t)(void);
-typedef void *	(*vmi_init_func_t)(struct vm *vm);
+typedef void *	(*vmi_init_func_t)(struct vm *vm, struct pmap *pmap);
 typedef int	(*vmi_run_func_t)(void *vmi, int vcpu, register_t rip,
 				  struct pmap *pmap, void *rendezvous_cookie,
 				  void *suspend_cookie);
@@ -142,12 +143,12 @@ struct vmm_ops {
 	vmi_init_func_t		vminit;
 	vmi_run_func_t		vmrun;
 	vmi_cleanup_func_t	vmcleanup;
-	vmi_mmap_set_func_t	vmmapset;
-	vmi_mmap_get_func_t	vmmapget;
 	vmi_get_register_t	vmgetreg;
 	vmi_set_register_t	vmsetreg;
 	vmi_get_cap_t		vmgetcap;
 	vmi_set_cap_t		vmsetcap;
+	vmi_vmspace_alloc	vmspace_alloc;
+	vmi_vmspace_free	vmspace_free;
 };
 
 extern struct vmm_ops vmm_ops_arm;
@@ -155,11 +156,27 @@ extern struct vmm_ops vmm_ops_arm;
 int vm_create(const char *name, struct vm **retvm);
 void vm_destroy(struct vm *vm);
 const char *vm_name(struct vm *vm);
-int vm_malloc(struct vm *vm, uint64_t gpa, size_t len);
-uint64_t vm_gpa2hpa(struct vm *vm, uint64_t gpa, size_t size);
-int vm_gpabase2memseg(struct vm *vm, uint64_t gpabase,
-		      struct vm_memory_segment *seg);
-boolean_t vm_mem_allocated(struct vm *vm, uint64_t gpa);
+
+/*
+ * APIs that modify the guest memory map require all vcpus to be frozen.
+ */
+int vm_mmap_memseg(struct vm *vm, vm_paddr_t gpa, int segid, vm_ooffset_t off,
+    size_t len, int prot, int flags);
+int vm_alloc_memseg(struct vm *vm, int ident, size_t len, bool sysmem);
+void vm_free_memseg(struct vm *vm, int ident);
+
+/*
+ * APIs that inspect the guest memory map require only a *single* vcpu to
+ * be frozen. This acts like a read lock on the guest memory map since any
+ * modification requires *all* vcpus to be frozen.
+ */
+int vm_mmap_getnext(struct vm *vm, vm_paddr_t *gpa, int *segid,
+    vm_ooffset_t *segoff, size_t *len, int *prot, int *flags);
+int vm_get_memseg(struct vm *vm, int ident, size_t *len, bool *sysmem,
+    struct vm_object **objptr);
+vm_paddr_t vmm_sysmem_maxaddr(struct vm *vm);
+bool vm_mem_allocated(struct vm *vm, int vcpuid, vm_paddr_t gpa);
+
 uint16_t vm_get_maxcpus(struct vm *vm);
 int vm_get_register(struct vm *vm, int vcpu, int reg, uint64_t *retval);
 int vm_set_register(struct vm *vm, int vcpu, int reg, uint64_t val);

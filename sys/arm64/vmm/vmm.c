@@ -91,15 +91,27 @@ struct mem_seg {
 	uint64_t	gpa;
 	size_t		len;
 	bool		wired;
+	bool		sysmem;
 	vm_object_t	object;
 };
-#define	VM_MAX_MEMORY_SEGMENTS	2
+#define	VM_MAX_MEMSEGS	3
+
+struct mem_map {
+	vm_paddr_t	gpa;
+	size_t		len;
+	vm_ooffset_t	segoff;
+	int		segid;
+	int		prot;
+	int		flags;
+};
+#define	VM_MAX_MEMMAPS	4
 
 struct vm {
 	void		*cookie;
 	struct vcpu	vcpu[VM_MAXCPU];
-	int		num_mem_segs;
-	struct vm_memory_segment mem_segs[VM_MAX_MEMORY_SEGMENTS];
+	struct mem_map	mem_maps[VM_MAX_MEMMAPS];
+	struct mem_seg	mem_segs[VM_MAX_MEMSEGS];
+	struct vmspace	*vmspace;
 	char		name[VM_MAX_NAMELEN];
 	/*
 	 * Set of active vcpus.
@@ -117,15 +129,14 @@ static struct vmm_ops *ops = NULL;
 #define	VMM_INIT(num)	(ops != NULL ? (*ops->init)(num) : 0)
 #define	VMM_CLEANUP()	(ops != NULL ? (*ops->cleanup)() : 0)
 
-#define	VMINIT(vm) (ops != NULL ? (*ops->vminit)(vm): NULL)
+#define	VMINIT(vm, pmap) (ops != NULL ? (*ops->vminit)(vm, pmap): NULL)
 #define	VMRUN(vmi, vcpu, pc, pmap, rvc, sc) \
 	(ops != NULL ? (*ops->vmrun)(vmi, vcpu, pc, pmap, rvc, sc) : ENXIO)
 #define	VMCLEANUP(vmi)	(ops != NULL ? (*ops->vmcleanup)(vmi) : NULL)
-#define	VMMMAP_SET(vmi, ipa, pa, len, prot)				\
-    	(ops != NULL ? 							\
-    	(*ops->vmmapset)(vmi, ipa, pa, len, prot) : ENXIO)
-#define	VMMMAP_GET(vmi, gpa) \
-	(ops != NULL ? (*ops->vmmapget)(vmi, gpa) : ENXIO)
+#define	VMSPACE_ALLOC(min, max) \
+	(ops != NULL ? (*ops->vmspace_alloc)(min, max) : NULL)
+#define	VMSPACE_FREE(vmspace) \
+	(ops != NULL ? (*ops->vmspace_free)(vmspace) : ENXIO)
 #define	VMGETREG(vmi, vcpu, num, retval)		\
 	(ops != NULL ? (*ops->vmgetreg)(vmi, vcpu, num, retval) : ENXIO)
 #define	VMSETREG(vmi, vcpu, num, val)		\
@@ -165,6 +176,9 @@ static int trace_guest_exceptions;
 SYSCTL_INT(_hw_vmm, OID_AUTO, trace_guest_exceptions, CTLFLAG_RDTUN,
     &trace_guest_exceptions, 0,
     "Trap into hypervisor on all guest exceptions and reflect them back");
+
+static void vm_free_memmap(struct vm *vm, int ident);
+static bool sysmem_mapping(struct vm *vm, struct mem_map *mm);
 
 static void
 vcpu_cleanup(struct vm *vm, int i, bool destroy)
@@ -251,6 +265,7 @@ int
 vm_create(const char *name, struct vm **retvm)
 {
 	struct vm *vm;
+	struct vmspace *vmspace;
 	int i;
 
 	/*
@@ -263,9 +278,14 @@ vm_create(const char *name, struct vm **retvm)
 	if (name == NULL || strlen(name) >= VM_MAX_NAMELEN)
 		return (EINVAL);
 
+	vmspace = VMSPACE_ALLOC(0, 1ul << 39);
+	if (vmspace == NULL)
+		return (ENOMEM);
+
 	vm = malloc(sizeof(struct vm), M_VMM, M_WAITOK | M_ZERO);
 	strcpy(vm->name, name);
-	vm->cookie = VMINIT(vm);
+	vm->vmspace = vmspace;
+	vm->cookie = VMINIT(vm, vmspace_pmap(vm->vmspace));
 
 	vm->maxcpus = VM_MAXCPU;	/* XXX temp to keep code working */
 	for (i = 0; i < vm->maxcpus; i++)
@@ -287,7 +307,32 @@ vm_get_maxcpus(struct vm *vm)
 static void
 vm_cleanup(struct vm *vm, bool destroy)
 {
+	struct mem_map *mm;
+	int i;
+
 	VMCLEANUP(vm->cookie);
+
+	/*
+	 * System memory is removed from the guest address space only when
+	 * the VM is destroyed. This is because the mapping remains the same
+	 * across VM reset.
+	 *
+	 * Device memory can be relocated by the guest (e.g. using PCI BARs)
+	 * so those mappings are removed on a VM reset.
+	 */
+	for (i = 0; i < VM_MAX_MEMMAPS; i++) {
+		mm = &vm->mem_maps[i];
+		if (destroy || !sysmem_mapping(vm, mm))
+			vm_free_memmap(vm, i);
+	}
+
+	if (destroy) {
+		for (i = 0; i < VM_MAX_MEMSEGS; i++)
+			vm_free_memseg(vm, i);
+
+		VMSPACE_FREE(vm->vmspace);
+		vm->vmspace = NULL;
+	}
 }
 
 void
@@ -302,6 +347,249 @@ vm_name(struct vm *vm)
 {
 	return (vm->name);
 }
+
+/*
+ * Return 'true' if 'gpa' is allocated in the guest address space.
+ *
+ * This function is called in the context of a running vcpu which acts as
+ * an implicit lock on 'vm->mem_maps[]'.
+ */
+bool
+vm_mem_allocated(struct vm *vm, int vcpuid, vm_paddr_t gpa)
+{
+	struct mem_map *mm;
+	int i;
+
+#ifdef INVARIANTS
+	int hostcpu, state;
+	state = vcpu_get_state(vm, vcpuid, &hostcpu);
+	KASSERT(state == VCPU_RUNNING && hostcpu == curcpu,
+	    ("%s: invalid vcpu state %d/%d", __func__, state, hostcpu));
+#endif
+
+	for (i = 0; i < VM_MAX_MEMMAPS; i++) {
+		mm = &vm->mem_maps[i];
+		if (mm->len != 0 && gpa >= mm->gpa && gpa < mm->gpa + mm->len)
+			return (true);		/* 'gpa' is sysmem or devmem */
+	}
+
+#if 0
+	if (ppt_is_mmio(vm, gpa))
+		return (true);			/* 'gpa' is pci passthru mmio */
+#endif
+
+	return (false);
+}
+
+int
+vm_alloc_memseg(struct vm *vm, int ident, size_t len, bool sysmem)
+{
+	struct mem_seg *seg;
+	vm_object_t obj;
+
+	if (ident < 0 || ident >= VM_MAX_MEMSEGS)
+		return (EINVAL);
+
+	if (len == 0 || (len & PAGE_MASK))
+		return (EINVAL);
+
+	seg = &vm->mem_segs[ident];
+	if (seg->object != NULL) {
+		if (seg->len == len && seg->sysmem == sysmem)
+			return (EEXIST);
+		else
+			return (EINVAL);
+	}
+
+	obj = vm_object_allocate(OBJT_DEFAULT, len >> PAGE_SHIFT);
+	if (obj == NULL)
+		return (ENOMEM);
+
+	seg->len = len;
+	seg->object = obj;
+	seg->sysmem = sysmem;
+	return (0);
+}
+
+int
+vm_get_memseg(struct vm *vm, int ident, size_t *len, bool *sysmem,
+    vm_object_t *objptr)
+{
+	struct mem_seg *seg;
+
+	if (ident < 0 || ident >= VM_MAX_MEMSEGS)
+		return (EINVAL);
+
+	seg = &vm->mem_segs[ident];
+	if (len)
+		*len = seg->len;
+	if (sysmem)
+		*sysmem = seg->sysmem;
+	if (objptr)
+		*objptr = seg->object;
+	return (0);
+}
+
+void
+vm_free_memseg(struct vm *vm, int ident)
+{
+	struct mem_seg *seg;
+
+	KASSERT(ident >= 0 && ident < VM_MAX_MEMSEGS,
+	    ("%s: invalid memseg ident %d", __func__, ident));
+
+	seg = &vm->mem_segs[ident];
+	if (seg->object != NULL) {
+		vm_object_deallocate(seg->object);
+		bzero(seg, sizeof(struct mem_seg));
+	}
+}
+
+int
+vm_mmap_memseg(struct vm *vm, vm_paddr_t gpa, int segid, vm_ooffset_t first,
+    size_t len, int prot, int flags)
+{
+	struct mem_seg *seg;
+	struct mem_map *m, *map;
+	vm_ooffset_t last;
+	int i, error;
+
+	if (prot == 0 || (prot & ~(VM_PROT_ALL)) != 0)
+		return (EINVAL);
+
+	if (flags & ~VM_MEMMAP_F_WIRED)
+		return (EINVAL);
+
+	if (segid < 0 || segid >= VM_MAX_MEMSEGS)
+		return (EINVAL);
+
+	seg = &vm->mem_segs[segid];
+	if (seg->object == NULL)
+		return (EINVAL);
+
+	last = first + len;
+	if (first < 0 || first >= last || last > seg->len)
+		return (EINVAL);
+
+	if ((gpa | first | last) & PAGE_MASK)
+		return (EINVAL);
+
+	map = NULL;
+	for (i = 0; i < VM_MAX_MEMMAPS; i++) {
+		m = &vm->mem_maps[i];
+		if (m->len == 0) {
+			map = m;
+			break;
+		}
+	}
+
+	if (map == NULL)
+		return (ENOSPC);
+
+	error = vm_map_find(&vm->vmspace->vm_map, seg->object, first, &gpa,
+	    len, 0, VMFS_NO_SPACE, prot, prot, 0);
+	if (error != KERN_SUCCESS)
+		return (EFAULT);
+
+	vm_object_reference(seg->object);
+
+	if (flags & VM_MEMMAP_F_WIRED) {
+		error = vm_map_wire(&vm->vmspace->vm_map, gpa, gpa + len,
+		    VM_MAP_WIRE_USER | VM_MAP_WIRE_NOHOLES);
+		if (error != KERN_SUCCESS) {
+			vm_map_remove(&vm->vmspace->vm_map, gpa, gpa + len);
+			return (error == KERN_RESOURCE_SHORTAGE ? ENOMEM :
+			    EFAULT);
+		}
+	}
+
+	map->gpa = gpa;
+	map->len = len;
+	map->segoff = first;
+	map->segid = segid;
+	map->prot = prot;
+	map->flags = flags;
+	return (0);
+}
+
+int
+vm_mmap_getnext(struct vm *vm, vm_paddr_t *gpa, int *segid,
+    vm_ooffset_t *segoff, size_t *len, int *prot, int *flags)
+{
+	struct mem_map *mm, *mmnext;
+	int i;
+
+	mmnext = NULL;
+	for (i = 0; i < VM_MAX_MEMMAPS; i++) {
+		mm = &vm->mem_maps[i];
+		if (mm->len == 0 || mm->gpa < *gpa)
+			continue;
+		if (mmnext == NULL || mm->gpa < mmnext->gpa)
+			mmnext = mm;
+	}
+
+	if (mmnext != NULL) {
+		*gpa = mmnext->gpa;
+		if (segid)
+			*segid = mmnext->segid;
+		if (segoff)
+			*segoff = mmnext->segoff;
+		if (len)
+			*len = mmnext->len;
+		if (prot)
+			*prot = mmnext->prot;
+		if (flags)
+			*flags = mmnext->flags;
+		return (0);
+	} else {
+		return (ENOENT);
+	}
+}
+
+static void
+vm_free_memmap(struct vm *vm, int ident)
+{
+	struct mem_map *mm;
+	int error;
+
+	mm = &vm->mem_maps[ident];
+	if (mm->len) {
+		error = vm_map_remove(&vm->vmspace->vm_map, mm->gpa,
+		    mm->gpa + mm->len);
+		KASSERT(error == KERN_SUCCESS, ("%s: vm_map_remove error %d",
+		    __func__, error));
+		bzero(mm, sizeof(struct mem_map));
+	}
+}
+
+static __inline bool
+sysmem_mapping(struct vm *vm, struct mem_map *mm)
+{
+
+	if (mm->len != 0 && vm->mem_segs[mm->segid].sysmem)
+		return (true);
+	else
+		return (false);
+}
+
+vm_paddr_t
+vmm_sysmem_maxaddr(struct vm *vm)
+{
+	struct mem_map *mm;
+	vm_paddr_t maxaddr;
+	int i;
+
+	maxaddr = 0;
+	for (i = 0; i < VM_MAX_MEMMAPS; i++) {
+		mm = &vm->mem_maps[i];
+		if (sysmem_mapping(vm, mm)) {
+			if (maxaddr < mm->gpa + mm->len)
+				maxaddr = mm->gpa + mm->len;
+		}
+	}
+	return (maxaddr);
+}
+
 
 #include <sys/queue.h>
 #include <sys/linker.h>
@@ -487,9 +775,7 @@ vm_run(struct vm *vm, struct vm_run *vmrun)
 
 	rvc = sc = NULL;
 restart:
-	critical_enter();
 	error = VMRUN(vm->cookie, vcpuid, pc, NULL, rvc, sc);
-	critical_exit();
 
 	vme = vm_exitinfo(vm, vcpuid);
 	if (error == 0) {
@@ -671,33 +957,6 @@ vcpu_get_state(struct vm *vm, int vcpuid, int *hostcpu)
 	return (state);
 }
 
-uint64_t
-vm_gpa2hpa(struct vm *vm, uint64_t gpa, size_t len)
-{
-	uint64_t nextpage;
-
-	nextpage = trunc_page(gpa + PAGE_SIZE);
-	if (len > nextpage - gpa)
-		panic("vm_gpa2hpa: invalid gpa/len: 0x%016lx/%zu", gpa, len);
-
-	return (VMMMAP_GET(vm->cookie, gpa));
-}
-
-int
-vm_gpabase2memseg(struct vm *vm, uint64_t gpabase,
-		  struct vm_memory_segment *seg)
-{
-	int i;
-
-	for (i = 0; i < vm->num_mem_segs; i++) {
-		if (gpabase == vm->mem_segs[i].gpa) {
-			*seg = vm->mem_segs[i];
-			return (0);
-		}
-	}
-	return (-1);
-}
-
 int
 vm_get_register(struct vm *vm, int vcpu, int reg, uint64_t *retval)
 {
@@ -736,111 +995,6 @@ void *
 vm_get_cookie(struct vm *vm)
 {
 	return vm->cookie;
-}
-
-static void
-vm_free_mem_seg(struct vm *vm, struct vm_memory_segment *seg)
-{
-	size_t len;
-	uint64_t hpa;
-
-	len = 0;
-	while (len < seg->len) {
-		hpa = vm_gpa2hpa(vm, seg->gpa + len, PAGE_SIZE);
-		if (hpa == (uint64_t)-1) {
-			panic("vm_free_mem_segs: cannot free hpa "
-			      "associated with gpa 0x%016lx", seg->gpa + len);
-		}
-
-		vmm_mem_free(hpa, PAGE_SIZE);
-
-		len += PAGE_SIZE;
-	}
-
-	bzero(seg, sizeof(struct vm_memory_segment));
-}
-
-/*
- * Return true if 'gpa' is available for allocation, false otherwise
- */
-static bool
-vm_ipa_available(struct vm *vm, uint64_t ipa)
-{
-	uint64_t ipabase, ipalimit;
-	int i;
-
-	if (!page_aligned(ipa))
-		panic("vm_ipa_available: ipa (0x%016lx) not page aligned", ipa);
-
-	for (i = 0; i < vm->num_mem_segs; i++) {
-		ipabase = vm->mem_segs[i].gpa;
-		ipalimit = ipabase + vm->mem_segs[i].len;
-		if (ipa >= ipabase && ipa < ipalimit)
-			return (false);
-	}
-
-	return (true);
-}
-
-/*
- * Allocate 'len' bytes for the virtual machine starting at address 'ipa'
- */
-int
-vm_malloc(struct vm *vm, uint64_t ipa, size_t len)
-{
-	struct vm_memory_segment *seg;
-	int error, available, allocated;
-	uint64_t ipa2;
-	vm_paddr_t pa;
-
-	if (!page_aligned(ipa) != 0 || !page_aligned(len) || len == 0)
-		return (EINVAL);
-
-	available = allocated = 0;
-	ipa2 = ipa;
-	while (ipa2 < ipa + len) {
-		if (vm_ipa_available(vm, ipa2))
-			available++;
-		else
-			allocated++;
-		ipa2 += PAGE_SIZE;
-	}
-
-	/*
-	 * If there are some allocated and some available pages in the address
-	 * range then it is an error.
-	 */
-	if (allocated != 0  && available != 0)
-		return (EINVAL);
-
-	/*
-	 * If the entire address range being requested has already been
-	 * allocated then there isn't anything more to do.
-	 */
-	if (allocated != 0 && available == 0)
-		return (0);
-
-	if (vm->num_mem_segs == VM_MAX_MEMORY_SEGMENTS)
-		return (E2BIG);
-
-	seg = &vm->mem_segs[vm->num_mem_segs];
-	error = 0;
-	seg->gpa = ipa;
-	seg->len = 0;
-	while (seg->len < len) {
-		pa = vmm_mem_alloc(PAGE_SIZE);
-		if (pa == 0) {
-			error = ENOMEM;
-			break;
-		}
-		VMMMAP_SET(vm->cookie, ipa, pa, PAGE_SIZE, VM_PROT_ALL);
-
-		seg->len += PAGE_SIZE;
-		ipa += PAGE_SIZE;
-	}
-	vm->num_mem_segs++;
-
-	return (0);
 }
 
 int
