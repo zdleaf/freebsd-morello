@@ -35,6 +35,9 @@
 #ifndef _DEV_IOMMU_SMMU_VAR_H_
 #define _DEV_IOMMU_SMMU_VAR_H_
 
+#include <vm/vm.h>
+#include <vm/pmap.h>
+
 #define	SMMU_DEVSTR	"ARM System Memory Management Unit"
 
 DECLARE_CLASS(smmu_driver);
@@ -115,6 +118,7 @@ struct smmu_softc {
 	struct smmu_queue priq;
 	struct smmu_strtab strtab;
 	struct smmu_cd cd;
+	struct pmap p;
 };
 
 struct smmu_devinfo {

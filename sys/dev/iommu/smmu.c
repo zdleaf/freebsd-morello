@@ -531,11 +531,6 @@ smmu_init_ste(struct smmu_softc *sc, uint32_t sid, uint64_t *ste)
 
 	val = STE0_VALID;
 
-#if 0
-	val |= STE0_CONFIG_BYPASS;
-	ste[1] = STE1_SHCFG_INCOMING; //| STE1_EATS_FULLATS;
-#endif
-
 	ste[1] = STE1_EATS_FULLATS;
 	ste[2] = 0;
 	ste[3] = 0;
@@ -604,7 +599,8 @@ smmu_init_bypass(struct smmu_softc *sc,
 	for (i = 0; i < strtab->num_l1_entries; i++) {
 		if ((i % 100000) == 0)
 			device_printf(sc->dev, "%s: i %d\n", __func__, i);
-		smmu_init_ste_bypass(sc, i, addr);
+		//smmu_init_ste_bypass(sc, i, addr);
+		smmu_init_ste(sc, i, addr);
 		addr += STRTAB_STE_DWORDS;
 	}
 
@@ -637,6 +633,17 @@ smmu_init_cd(struct smmu_softc *sc)
 
 	device_printf(sc->dev, "%s: CD vaddr %p\n", __func__, cd->addr);
 	device_printf(sc->dev, "%s: CD paddr %lx\n", __func__, cd->paddr);
+
+	uint64_t *ptr;
+	uint64_t val;
+
+	pmap_pinit(&sc->p);
+	ptr = (uint64_t *)&cd->addr;
+
+	memset(ptr, 0, CD_DWORDS * 8);
+	val = CD0_VALID | CD0_AA64 | CD0_ASET | CD0_R | CD0_A;
+	ptr[1] = (sc->p.pm_l0_paddr & CD1_TTB0_M);
+	ptr[0] = val;
 
 	return (0);
 }

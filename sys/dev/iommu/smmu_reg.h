@@ -174,9 +174,9 @@
 #define	SMMU_GERROR_IRQ_CFG1	0x070
 #define	SMMU_GERROR_IRQ_CFG2	0x074
 #define	SMMU_STRTAB_BASE	0x080
-#define	 STRTAB_BASE_RA		(1ULL << 62) /* Read-Allocate. */
+#define	 STRTAB_BASE_RA		(1UL << 62) /* Read-Allocate. */
 #define	 STRTAB_BASE_ADDR_S	6 /* Physical address of Stream table base */
-#define	 STRTAB_BASE_ADDR_M	(0x3fffffffffffULL << STRTAB_BASE_ADDR_S)
+#define	 STRTAB_BASE_ADDR_M	(0x3fffffffffffUL << STRTAB_BASE_ADDR_S)
 #define	SMMU_STRTAB_BASE_CFG	0x088
 #define	 STRTAB_BASE_CFG_FMT_S		16 /* Format of Stream table. */
 #define	 STRTAB_BASE_CFG_FMT_M		(0x3 << STRTAB_BASE_CFG_FMT_S)
@@ -190,7 +190,7 @@
 #define	 STRTAB_BASE_CFG_LOG2SIZE_S	0 /* Table size as log2(entries) */
 #define	 STRTAB_BASE_CFG_LOG2SIZE_M	(0x3f << STRTAB_BASE_CFG_LOG2SIZE_S)
 #define	SMMU_CMDQ_BASE		0x090
-#define	 CMDQ_BASE_RA		(1ULL << 62) /* Read-Allocate. */
+#define	 CMDQ_BASE_RA		(1UL << 62) /* Read-Allocate. */
 #define	 Q_BASE_ADDR_S		5 /* PA of queue base */
 #define	 Q_BASE_ADDR_M		(0x7fffffffffff << Q_BASE_ADDR_S)
 #define	 Q_LOG2SIZE_S		0 /* Queue size as log2(entries) */
@@ -200,14 +200,14 @@
 #define	 CMDQ_CONS_ERR_S	24
 #define	 CMDQ_CONS_ERR_M	(0x7f << CMDQ_CONS_ERR_S)
 #define	SMMU_EVENTQ_BASE	0x0A0
-#define	 EVENTQ_BASE_WA		(1ULL << 62) /* Write-Allocate. */
+#define	 EVENTQ_BASE_WA		(1UL << 62) /* Write-Allocate. */
 #define	SMMU_EVENTQ_PROD	0x100A8
 #define	SMMU_EVENTQ_CONS	0x100AC
 #define	SMMU_EVENTQ_IRQ_CFG0	0x0B0
 #define	SMMU_EVENTQ_IRQ_CFG1	0x0B8
 #define	SMMU_EVENTQ_IRQ_CFG2	0x0BC
 #define	SMMU_PRIQ_BASE		0x0C0
-#define	 PRIQ_BASE_WA		(1ULL < 62) /* Write-Allocate. */
+#define	 PRIQ_BASE_WA		(1UL < 62) /* Write-Allocate. */
 #define	SMMU_PRIQ_PROD		0x100C8
 #define	SMMU_PRIQ_CONS		0x100CC
 #define	SMMU_PRIQ_IRQ_CFG0	0x0D0
@@ -362,15 +362,15 @@
 #define	STE1_MTCFG		(1 << 36)
 #define	STE1_ALLOCCFG_S		37
 #define	STE1_SHCFG_S		44
-#define	STE1_SHCFG_M		(0x3ULL << STE1_SHCFG_S)
-#define	STE1_SHCFG_NS		(0x0ULL << STE1_SHCFG_S)
-#define	STE1_SHCFG_INCOMING	(0x1ULL << STE1_SHCFG_S)
-#define	STE1_SHCFG_OS		(0x2ULL << STE1_SHCFG_S)
-#define	STE1_SHCFG_IS		(0x3ULL << STE1_SHCFG_S)
+#define	STE1_SHCFG_M		(0x3UL << STE1_SHCFG_S)
+#define	STE1_SHCFG_NS		(0x0UL << STE1_SHCFG_S)
+#define	STE1_SHCFG_INCOMING	(0x1UL << STE1_SHCFG_S)
+#define	STE1_SHCFG_OS		(0x2UL << STE1_SHCFG_S)
+#define	STE1_SHCFG_IS		(0x3UL << STE1_SHCFG_S)
 #define	STE1_NSCFG_S		46
-#define	STE1_NSCFG_M		(0x3ULL << STE1_NSCFG_S)
-#define	STE1_NSCFG_SECURE	(0x2ULL << STE1_NSCFG_S)
-#define	STE1_NSCFG_NONSECURE	(0x3ULL << STE1_NSCFG_S)
+#define	STE1_NSCFG_M		(0x3UL << STE1_NSCFG_S)
+#define	STE1_NSCFG_SECURE	(0x2UL << STE1_NSCFG_S)
+#define	STE1_NSCFG_NONSECURE	(0x3UL << STE1_NSCFG_S)
 #define	STE1_PRIVCFG_S		48
 #define	STE1_INSTCFG_S		50
 
@@ -450,19 +450,19 @@
 #define	CD0_IPS_44BITS		(0x4 << CD0_IPS_S)
 #define	CD0_IPS_48BITS		(0x5 << CD0_IPS_S)
 #define	CD0_IPS_52BITS		(0x6 << CD0_IPS_S) /* SMMUv3.1 only */
-#define	CD0_AFFD		(1 << 35) /* Access Flag Fault Disable */
-#define	CD0_WXN			(1 << 36) /* Write eXecute Never */
-#define	CD0_UWXN		(1 << 37) /* Unprivileged Write eXecute Never*/
-#define	CD0_TBI0		(1 << 38) /* Top Byte Ignore for TTB0 */
-#define	CD0_TBI1		(1 << 39) /* Top Byte Ignore for TTB1 */
-#define	CD0_PAN			(1 << 40) /* Privileged Access Never */
-#define	CD0_AA64		(1 << 41) /* TTB{0,1} is AArch64-format TT */
-#define	CD0_HD			(1 << 42)
-#define	CD0_HA			(1 << 43)
-#define	CD0_S			(1 << 44)
-#define	CD0_R			(1 << 45)
-#define	CD0_A			(1 << 46)
-#define	CD0_ASET		(1 << 47) /* ASID Set. */
+#define	CD0_AFFD		(1UL << 35) /* Access Flag Fault Disable */
+#define	CD0_WXN			(1UL << 36) /* Write eXecute Never */
+#define	CD0_UWXN		(1UL << 37) /* Unprivileged Write eXecut Never*/
+#define	CD0_TBI0		(1UL << 38) /* Top Byte Ignore for TTB0 */
+#define	CD0_TBI1		(1UL << 39) /* Top Byte Ignore for TTB1 */
+#define	CD0_PAN			(1UL << 40) /* Privileged Access Never */
+#define	CD0_AA64		(1UL << 41) /* TTB{0,1} is AArch64-format TT */
+#define	CD0_HD			(1UL << 42)
+#define	CD0_HA			(1UL << 43)
+#define	CD0_S			(1UL << 44)
+#define	CD0_R			(1UL << 45)
+#define	CD0_A			(1UL << 46)
+#define	CD0_ASET		(1UL << 47) /* ASID Set. */
 #define	CD0_ASID_S		48 /* Address Space Identifier */
 #define	CD0_ASID_M		(0xffff << CD0_ASID_S)
 #define	CD1_TTB0_S		4 /* Address of TT0 base. */
