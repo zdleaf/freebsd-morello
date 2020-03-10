@@ -936,7 +936,7 @@ sysctl_vmm_destroy(SYSCTL_HANDLER_ARGS)
 	 * is scheduled for destruction.
 	 */
 	cdev = sc->cdev;
-	sc->cdev = NULL;		
+	sc->cdev = NULL;
 	mtx_unlock(&vmmdev_mtx);
 
 	/*

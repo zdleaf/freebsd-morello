@@ -106,6 +106,15 @@ struct vm_activate_cpu {
 	int		vcpuid;
 };
 
+struct vm_cpuset {
+	int		which;
+	int		cpusetsize;
+	cpuset_t	*cpus;
+};
+#define	VM_ACTIVE_CPUS		0
+#define	VM_SUSPENDED_CPUS	1
+#define	VM_DEBUG_CPUS		2
+
 struct vm_attach_vgic {
 	uint64_t	dist_start;
 	size_t		dist_size;
@@ -116,9 +125,6 @@ struct vm_attach_vgic {
 struct vm_irq {
 	uint32_t irq;
 };
-
-#define	VM_ACTIVE_CPUS		0
-#define	VM_SUSPENDED_CPUS	1
 
 enum {
 	/* general routines */

@@ -119,6 +119,9 @@ struct vm {
 	 * explicitly (AP) by sending it a startup ipi.
 	 */
 	cpuset_t	active_cpus;
+	cpuset_t	debug_cpus;
+	int		suspend;
+	cpuset_t	suspended_cpus;
 	uint16_t	maxcpus;
 };
 
@@ -846,6 +849,21 @@ vm_active_cpus(struct vm *vm)
 
 	return (vm->active_cpus);
 }
+
+cpuset_t
+vm_debug_cpus(struct vm *vm)
+{
+
+	return (vm->debug_cpus);
+}
+
+cpuset_t
+vm_suspended_cpus(struct vm *vm)
+{
+
+	return (vm->suspended_cpus);
+}
+
 
 void *
 vcpu_stats(struct vm *vm, int vcpuid)

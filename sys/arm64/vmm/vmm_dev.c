@@ -244,12 +244,14 @@ static int
 vmmdev_ioctl(struct cdev *cdev, u_long cmd, caddr_t data, int fflag,
 	     struct thread *td)
 {
-	int error, vcpu, state_changed;
+	int error, vcpu, state_changed, size;
+	cpuset_t *cpuset;
 	struct vmmdev_softc *sc;
 	struct vm_run *vmrun;
 	struct vm_register *vmreg;
 	struct vm_activate_cpu *vac;
 	struct vm_attach_vgic *vav;
+	struct vm_cpuset *vm_cpuset;
 	struct vm_irq *vi;
 	struct vm_memmap *mm;
 
@@ -353,6 +355,27 @@ vmmdev_ioctl(struct cdev *cdev, u_long cmd, caddr_t data, int fflag,
 	case VM_ACTIVATE_CPU:
 		vac = (struct vm_activate_cpu *)data;
 		error = vm_activate_cpu(sc->vm, vac->vcpuid);
+		break;
+	case VM_GET_CPUS:
+		error = 0;
+		vm_cpuset = (struct vm_cpuset *)data;
+		size = vm_cpuset->cpusetsize;
+		if (size < sizeof(cpuset_t) || size > CPU_MAXSIZE / NBBY) {
+			error = ERANGE;
+			break;
+		}
+		cpuset = malloc(size, M_TEMP, M_WAITOK | M_ZERO);
+		if (vm_cpuset->which == VM_ACTIVE_CPUS)
+			*cpuset = vm_active_cpus(sc->vm);
+		else if (vm_cpuset->which == VM_SUSPENDED_CPUS)
+			*cpuset = vm_suspended_cpus(sc->vm);
+		else if (vm_cpuset->which == VM_DEBUG_CPUS)
+			*cpuset = vm_debug_cpus(sc->vm);
+		else
+			error = EINVAL;
+		if (error == 0)
+			error = copyout(cpuset, vm_cpuset->cpus, size);
+		free(cpuset, M_TEMP);
 		break;
 	case VM_ATTACH_VGIC:
 		vav = (struct vm_attach_vgic *)data;

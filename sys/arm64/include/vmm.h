@@ -213,6 +213,7 @@ typedef void (*vm_rendezvous_func_t)(struct vm *vm, int vcpuid, void *arg);
 void vm_smp_rendezvous(struct vm *vm, int vcpuid, cpuset_t dest,
     vm_rendezvous_func_t func, void *arg);
 cpuset_t vm_active_cpus(struct vm *vm);
+cpuset_t vm_debug_cpus(struct vm *vm);
 cpuset_t vm_suspended_cpus(struct vm *vm);
 #endif	/* _SYS__CPUSET_H_ */
 
