@@ -63,6 +63,53 @@ static MALLOC_DEFINE(M_VMMDEV, "vmmdev", "vmmdev");
 
 SYSCTL_DECL(_hw_vmm);
 
+static int
+vcpu_lock_one(struct vmmdev_softc *sc, int vcpu)
+{
+	int error;
+
+	if (vcpu < 0 || vcpu >= vm_get_maxcpus(sc->vm))
+		return (EINVAL);
+
+	error = vcpu_set_state(sc->vm, vcpu, VCPU_FROZEN, true);
+	return (error);
+}
+
+static void
+vcpu_unlock_one(struct vmmdev_softc *sc, int vcpu)
+{
+	enum vcpu_state state;
+
+	state = vcpu_get_state(sc->vm, vcpu, NULL);
+	if (state != VCPU_FROZEN) {
+		panic("vcpu %s(%d) has invalid state %d", vm_name(sc->vm),
+		    vcpu, state);
+	}
+
+	vcpu_set_state(sc->vm, vcpu, VCPU_IDLE, false);
+}
+
+static int
+vcpu_lock_all(struct vmmdev_softc *sc)
+{
+	int error, vcpu;
+	uint16_t maxcpus;
+
+	maxcpus = vm_get_maxcpus(sc->vm);
+	for (vcpu = 0; vcpu < maxcpus; vcpu++) {
+		error = vcpu_lock_one(sc, vcpu);
+		if (error)
+			break;
+	}
+
+	if (error) {
+		while (--vcpu >= 0)
+			vcpu_unlock_one(sc, vcpu);
+	}
+
+	return (error);
+}
+
 static struct vmmdev_softc *
 vmmdev_lookup(const char *name)
 {
@@ -128,12 +175,7 @@ vmmdev_ioctl(struct cdev *cdev, u_long cmd, caddr_t data, int fflag,
 		 * Assumes that the first field of the ioctl data is the vcpu.
 		 */
 		vcpu = *(int *)data;
-		if (vcpu < 0 || vcpu >= VM_MAXCPU) {
-			error = EINVAL;
-			goto done;
-		}
-
-		error = vcpu_set_state(sc->vm, vcpu, VCPU_FROZEN, true);
+		error = vcpu_lock_one(sc, vcpu);
 		if (error)
 			goto done;
 
@@ -146,22 +188,9 @@ vmmdev_ioctl(struct cdev *cdev, u_long cmd, caddr_t data, int fflag,
 		 * ioctls that operate on the entire virtual machine must
 		 * prevent all vcpus from running.
 		 */
-		error = 0;
-		for (vcpu = 0; vcpu < VM_MAXCPU; vcpu++) {
-			error = vcpu_set_state(sc->vm, vcpu, VCPU_FROZEN, true);
-			if (error)
-				break;
-		}
-
-		if (error) {
-			vcpu--;
-			while (vcpu >= 0) {
-				vcpu_set_state(sc->vm, vcpu, VCPU_IDLE, false);
-				vcpu--;
-			}
+		error = vcpu_lock_all(sc);
+		if (error)
 			goto done;
-		}
-
 		state_changed = 2;
 		break;
 	case VM_ASSERT_IRQ:
