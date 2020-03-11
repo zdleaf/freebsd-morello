@@ -281,6 +281,7 @@ drop_to_el1:
 
 	/* Install hypervisor trap functions */
 	adrp	x2, hyp_stub_vectors
+	add	x2, x2, :lo12:hyp_stub_vectors
 	msr	vbar_el2, x2
 
 	/* Use the host VTTBR_EL2 to tell the host and the guests apart */
