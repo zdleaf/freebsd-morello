@@ -474,11 +474,12 @@ smmu_cmdq_enqueue_sync(struct smmu_softc *sc)
 }
 
 static int
-smmu_sync_cd(struct smmu_softc *sc, int ssid, bool leaf)
+smmu_sync_cd(struct smmu_softc *sc, int sid, int ssid, bool leaf)
 {
 	struct smmu_cmdq_entry cmd;
 
 	cmd.opcode = CMD_CFGI_CD;
+	cmd.cfgi.sid = sid;
 	cmd.cfgi.ssid = ssid;
 	cmd.cfgi.leaf = leaf;
 	smmu_cmdq_enqueue_cmd(sc, &cmd);
@@ -538,6 +539,7 @@ smmu_init_ste_bypass(struct smmu_softc *sc, uint32_t sid, uint64_t *ste)
 	smmu_invalidate_sid(sc, sid);
 	ste[0] = val;
 	smmu_invalidate_sid(sc, sid);
+
 	smmu_prefetch_sid(sc, sid);
 }
 
@@ -596,6 +598,7 @@ smmu_init_ste(struct smmu_softc *sc, uint32_t sid, uint64_t *ste)
 	//smmu_invalidate_all_sid(sc);
 
 	smmu_invalidate_sid(sc, sid);
+	smmu_sync_cd(sc, sid, 0, true);
 	smmu_prefetch_sid(sc, sid);
 
 	return (0);
@@ -639,7 +642,7 @@ smmu_init_cd(struct smmu_softc *sc)
 	    M_WAITOK | M_ZERO,	/* flags */
 	    0,			/* low */
 	    (1ul << 48) - 1,	/* high */
-	    SMMU_CMDQ_ALIGN,	/* alignment */
+	    SMMU_STRTAB_ALIGN,	/* alignment */
 	    0);			/* boundary */
 	if (cd->addr == NULL) {
 		device_printf(sc->dev, "failed to allocate CD\n");
@@ -655,11 +658,26 @@ smmu_init_cd(struct smmu_softc *sc)
 	uint64_t val;
 
 	pmap_pinit(&sc->p);
-	ptr = (uint64_t *)cd->addr;
+	ptr = cd->addr;
 
 	memset(ptr, 0, CD_DWORDS * 8);
 	val = CD0_VALID | CD0_AA64 | CD0_ASET | CD0_R | CD0_A;
-	ptr[1] = (sc->p.pm_l0_paddr & CD1_TTB0_M);
+	val |= CD0_EPD1;
+
+	val |= 64ULL - sc->ias; /* T0SZ */
+	val |= CD0_IPS_48BITS;
+
+	vm_paddr_t paddr;
+	paddr = sc->p.pm_l0_paddr & CD1_TTB0_M;
+	if (paddr != sc->p.pm_l0_paddr)
+		panic("here");
+
+	printf("%s: ttbr paddr %lx\n", __func__, paddr);
+
+	ptr[1] = paddr;
+	ptr[2] = 0;
+	ptr[3] = 0; /* MAIR */
+
 	ptr[0] = val;
 
 	return (0);

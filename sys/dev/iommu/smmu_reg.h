@@ -441,17 +441,17 @@
 #define	CD0_OR1_M		(0x3 << CD0_OR1_S)
 #define	CD0_SH1_S		28
 #define	CD0_SH1_M		(0x3 << CD0_SH1_S)
-#define	CD0_EPD1		(1 << 30)
+#define	CD0_EPD1		(1 << 30) /* TT1 tt walk disable*/
 #define	CD0_VALID		(1 << 31) /* CD Valid. */
 #define	CD0_IPS_S		32 /* Intermediate Physical Size */
-#define	CD0_IPS_M		(0x7 << CD0_IPS_S)
-#define	CD0_IPS_32BITS		(0x0 << CD0_IPS_S)
-#define	CD0_IPS_36BITS		(0x1 << CD0_IPS_S)
-#define	CD0_IPS_40BITS		(0x2 << CD0_IPS_S)
-#define	CD0_IPS_42BITS		(0x3 << CD0_IPS_S)
-#define	CD0_IPS_44BITS		(0x4 << CD0_IPS_S)
-#define	CD0_IPS_48BITS		(0x5 << CD0_IPS_S)
-#define	CD0_IPS_52BITS		(0x6 << CD0_IPS_S) /* SMMUv3.1 only */
+#define	CD0_IPS_M		(0x7UL << CD0_IPS_S)
+#define	CD0_IPS_32BITS		(0x0UL << CD0_IPS_S)
+#define	CD0_IPS_36BITS		(0x1UL << CD0_IPS_S)
+#define	CD0_IPS_40BITS		(0x2UL << CD0_IPS_S)
+#define	CD0_IPS_42BITS		(0x3UL << CD0_IPS_S)
+#define	CD0_IPS_44BITS		(0x4UL << CD0_IPS_S)
+#define	CD0_IPS_48BITS		(0x5UL << CD0_IPS_S)
+#define	CD0_IPS_52BITS		(0x6UL << CD0_IPS_S) /* SMMUv3.1 only */
 #define	CD0_AFFD		(1UL << 35) /* Access Flag Fault Disable */
 #define	CD0_WXN			(1UL << 36) /* Write eXecute Never */
 #define	CD0_UWXN		(1UL << 37) /* Unprivileged Write eXecut Never*/
