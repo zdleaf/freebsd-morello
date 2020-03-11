@@ -257,13 +257,15 @@
 #define	CMD_QUEUE_OPCODE_M	(0xff << CMD_QUEUE_OPCODE_S)
 
 #define	CMD_PREFETCH_CONFIG	0x01
-#define	 PREFETCH_SID_S		32
+#define	 PREFETCH_0_SID_S	32
 #define	CMD_PREFETCH_ADDR	0x02
 #define	CMD_CFGI_STE		0x03
-#define	 CFGI_STE_SID_S		32
+#define	 CFGI_0_STE_SID_S	32
 #define	CMD_CFGI_STE_RANGE	0x04
-#define	 CFGI_STE_RANGE_S	0
+#define	 CFGI_1_STE_RANGE_S	0
 #define	CMD_CFGI_CD		0x05
+#define	 CFGI_0_SSID_S		12
+#define	 CFGI_1_LEAF_S		0
 #define	CMD_CFGI_CD_ALL		0x06
 #define	CMD_TLBI_NH_ALL		0x10
 #define	CMD_TLBI_NH_ASID	0x11

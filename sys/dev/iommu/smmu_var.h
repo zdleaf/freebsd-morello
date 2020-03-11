@@ -72,6 +72,8 @@ struct smmu_cmdq_entry {
 	union {
 		struct {
 			uint32_t sid;
+			uint32_t ssid;
+			bool leaf;
 		} cfgi;
 		struct {
 			uint32_t sid;

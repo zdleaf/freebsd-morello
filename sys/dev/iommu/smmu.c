@@ -393,11 +393,15 @@ make_cmd(struct smmu_softc *sc, uint64_t *cmd,
 	case CMD_TLBI_EL2_ALL:
 	case CMD_TLBI_NSNH_ALL:
 		break;
+	case CMD_CFGI_CD:
+		cmd[0] |= ((uint64_t)entry->cfgi.ssid << CFGI_0_SSID_S);
+		/* FALLTROUGH */
 	case CMD_CFGI_STE:
-		cmd[0] |= ((uint64_t)entry->cfgi.sid << CFGI_STE_SID_S);
+		cmd[0] |= ((uint64_t)entry->cfgi.sid << CFGI_0_STE_SID_S);
+		cmd[1] |= ((uint64_t)entry->cfgi.leaf << CFGI_1_LEAF_S);
 		break;
 	case CMD_CFGI_STE_RANGE:
-		cmd[1] = (31 << CFGI_STE_RANGE_S);
+		cmd[1] = (31 << CFGI_1_STE_RANGE_S);
 		break;
 	case CMD_SYNC:
 		cmd[0] |= SYNC_CS_SIG_SEV;
@@ -405,7 +409,7 @@ make_cmd(struct smmu_softc *sc, uint64_t *cmd,
 		//cmd[0] = 0xfffff;
 		break;
 	case CMD_PREFETCH_CONFIG:
-		cmd[0] |= ((uint64_t)entry->prefetch.sid << PREFETCH_SID_S);
+		cmd[0] |= ((uint64_t)entry->prefetch.sid << PREFETCH_0_SID_S);
 		break;
 	};
 }
@@ -464,6 +468,19 @@ smmu_cmdq_enqueue_sync(struct smmu_softc *sc)
 	struct smmu_cmdq_entry cmd;
 
 	cmd.opcode = CMD_SYNC;
+	smmu_cmdq_enqueue_cmd(sc, &cmd);
+
+	return (0);
+}
+
+static int
+smmu_sync_cd(struct smmu_softc *sc, int ssid, bool leaf)
+{
+	struct smmu_cmdq_entry cmd;
+
+	cmd.opcode = CMD_CFGI_CD;
+	cmd.cfgi.ssid = ssid;
+	cmd.cfgi.leaf = leaf;
 	smmu_cmdq_enqueue_cmd(sc, &cmd);
 
 	return (0);
@@ -638,7 +655,7 @@ smmu_init_cd(struct smmu_softc *sc)
 	uint64_t val;
 
 	pmap_pinit(&sc->p);
-	ptr = (uint64_t *)&cd->addr;
+	ptr = (uint64_t *)cd->addr;
 
 	memset(ptr, 0, CD_DWORDS * 8);
 	val = CD0_VALID | CD0_AA64 | CD0_ASET | CD0_R | CD0_A;
