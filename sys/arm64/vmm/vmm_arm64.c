@@ -96,6 +96,8 @@ arm_init(int ipinum)
 	uint64_t pa_range_bits;
 	uint32_t sctlr_el2;
 	uint32_t vtcr_el2;
+	uint32_t t0sz;
+
 	register_t daif;
 
 	if (!virt_enabled()) {
@@ -172,18 +174,30 @@ arm_init(int ipinum)
 	 * shareable
 	 */
 	vtcr_el2 = VTCR_EL2_RES1;
-	vtcr_el2 = (pa_range_bits & 0x7) << VTCR_EL2_PS_SHIFT;
+	vtcr_el2 |= (pa_range_bits & 0x7) << VTCR_EL2_PS_SHIFT;
 	vtcr_el2 |= VTCR_EL2_IRGN0_WBWA | VTCR_EL2_ORGN0_WBWA;
 	vtcr_el2 |= VTCR_EL2_TG0_4K;
 	vtcr_el2 |= VTCR_EL2_SH0_IS;
-	if (pa_range_bits == ID_AA64MMFR0_PARange_1T) {
-		/*
-		 * 40 bits of physical addresses, use concatenated level 1
-		 * tables
-		 */
-		vtcr_el2 |= 24 & VTCR_EL2_T0SZ_MASK;
+
+	/* TODO: Set this based on pa_range_bits */
+	t0sz = (64 - 39);
+	vtcr_el2 |= t0sz & VTCR_EL2_T0SZ_MASK;
+
+	/*
+	 * Set which table to use for the top level translation table.
+	 */
+	if (16 <= t0sz && t0sz <= 24)
+		vtcr_el2 |= VTCR_EL2_SL0_4K_LVL0;
+	else if (25 <= t0sz && t0sz <= 33)
 		vtcr_el2 |= VTCR_EL2_SL0_4K_LVL1;
-	}
+#ifdef notyet
+	else if (34 <= t0sz && t0sz <= 42)
+		vtcr_el2 |= VTCR_EL2_SL0_4K_LVL2;
+	else if (43 <= t0sz && t0sz <= 48)
+		vtcr_el2 |= VTCR_EL2_SL0_4K_LVL3;
+#endif
+	else
+		panic("Invalid t0sz: %u", t0sz);
 
 	/* Special call to initialize EL2 */
 	vmm_call_hyp((void *)vtophys(hyp_vectors), vtophys(hyp_pmap->pm_l0),
