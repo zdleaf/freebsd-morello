@@ -817,6 +817,9 @@ vm_run(struct vm *vm, struct vm_run *vmrun)
 	if (!CPU_ISSET(vcpuid, &vm->active_cpus))
 		return (EINVAL);
 
+	if (CPU_ISSET(vcpuid, &vm->suspended_cpus))
+		return (EINVAL);
+
 	pmap = vmspace_pmap(vm->vmspace);
 	vcpu = &vm->vcpu[vcpuid];
 	rvc = sc = NULL;
