@@ -106,23 +106,25 @@ struct mem_map {
 };
 #define	VM_MAX_MEMMAPS	4
 
+/*
+ * Initialization:
+ * (o) initialized the first time the VM is created
+ * (i) initialized when VM is created and when it is reinitialized
+ * (x) initialized before use
+ */
 struct vm {
-	void		*cookie;
-	struct vcpu	vcpu[VM_MAXCPU];
-	struct mem_map	mem_maps[VM_MAX_MEMMAPS];
-	struct mem_seg	mem_segs[VM_MAX_MEMSEGS];
-	struct vmspace	*vmspace;
-	char		name[VM_MAX_NAMELEN];
-	/*
-	 * Set of active vcpus.
-	 * An active vcpu is one that has been started implicitly (BSP) or
-	 * explicitly (AP) by sending it a startup ipi.
-	 */
-	cpuset_t	active_cpus;
-	cpuset_t	debug_cpus;
-	int		suspend;
-	cpuset_t	suspended_cpus;
-	uint16_t	maxcpus;
+	void		*cookie;		/* (i) cpu-specific data */
+	volatile cpuset_t active_cpus;		/* (i) active vcpus */
+	volatile cpuset_t debug_cpus;		/* (i) vcpus stopped for debug */
+	int		suspend;		/* (i) stop VM execution */
+	volatile cpuset_t suspended_cpus; 	/* (i) suspended vcpus */
+	volatile cpuset_t halted_cpus;		/* (x) cpus in a hard halt */
+	struct mem_map	mem_maps[VM_MAX_MEMMAPS]; /* (i) guest address space */
+	struct mem_seg	mem_segs[VM_MAX_MEMSEGS]; /* (o) guest memory regions */
+	struct vmspace	*vmspace;		/* (o) guest's address space */
+	char		name[VM_MAX_NAMELEN];	/* (o) virtual machine name */
+	struct vcpu	vcpu[VM_MAXCPU];	/* (i) guest vcpus */
+	uint16_t	maxcpus;		/* (o) max pluggable cpus */
 };
 
 static bool vmm_initialized = false;
