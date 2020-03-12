@@ -155,6 +155,7 @@ extern struct vmm_ops vmm_ops_arm;
 
 int vm_create(const char *name, struct vm **retvm);
 void vm_destroy(struct vm *vm);
+int vm_reinit(struct vm *vm);
 const char *vm_name(struct vm *vm);
 
 /*

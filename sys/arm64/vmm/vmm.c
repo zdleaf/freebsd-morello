@@ -192,15 +192,19 @@ vcpu_cleanup(struct vm *vm, int i, bool destroy)
 }
 
 static void
-vcpu_init(struct vm *vm, uint32_t vcpu_id)
+vcpu_init(struct vm *vm, uint32_t vcpu_id, bool create)
 {
 	struct vcpu *vcpu;
 
 	vcpu = &vm->vcpu[vcpu_id];
 
-	vcpu_lock_init(vcpu);
-	vcpu->hostcpu = NOCPU;
-	vcpu->vcpuid = vcpu_id;
+	if (create) {
+		KASSERT(!vcpu_lock_initialized(vcpu), ("vcpu %d already "
+		    "initialized", vcpu_id));
+		vcpu_lock_init(vcpu);
+		vcpu->hostcpu = NOCPU;
+		vcpu->vcpuid = vcpu_id;
+	}
 }
 
 struct vm_exit *
@@ -266,12 +270,28 @@ static moduledata_t vmm_kmod = {
 DECLARE_MODULE(vmm, vmm_kmod, SI_SUB_SMP + 1, SI_ORDER_ANY);
 MODULE_VERSION(vmm, 1);
 
+static void
+vm_init(struct vm *vm, bool create)
+{
+	int i;
+
+	vm->cookie = VMINIT(vm, vmspace_pmap(vm->vmspace));
+
+	CPU_ZERO(&vm->active_cpus);
+	CPU_ZERO(&vm->debug_cpus);
+
+	vm->suspend = 0;
+	CPU_ZERO(&vm->suspended_cpus);
+
+	for (i = 0; i < vm->maxcpus; i++)
+		vcpu_init(vm, i, create);
+}
+
 int
 vm_create(const char *name, struct vm **retvm)
 {
 	struct vm *vm;
 	struct vmspace *vmspace;
-	int i;
 
 	/*
 	 * If vmm.ko could not be successfully initialized then don't attempt
@@ -290,13 +310,10 @@ vm_create(const char *name, struct vm **retvm)
 	vm = malloc(sizeof(struct vm), M_VMM, M_WAITOK | M_ZERO);
 	strcpy(vm->name, name);
 	vm->vmspace = vmspace;
-	vm->cookie = VMINIT(vm, vmspace_pmap(vm->vmspace));
 
 	vm->maxcpus = VM_MAXCPU;	/* XXX temp to keep code working */
-	for (i = 0; i < vm->maxcpus; i++)
-		vcpu_init(vm, i);
 
-	vm_activate_cpu(vm, BSP);
+	vm_init(vm, true);
 
 	*retvm = vm;
 	return (0);
@@ -314,6 +331,9 @@ vm_cleanup(struct vm *vm, bool destroy)
 {
 	struct mem_map *mm;
 	int i;
+
+	for (i = 0; i < vm->maxcpus; i++)
+		vcpu_cleanup(vm, i, destroy);
 
 	VMCLEANUP(vm->cookie);
 
@@ -345,6 +365,25 @@ vm_destroy(struct vm *vm)
 {
 	vm_cleanup(vm, true);
 	free(vm, M_VMM);
+}
+
+int
+vm_reinit(struct vm *vm)
+{
+	int error;
+
+	/*
+	 * A virtual machine can be reset only if all vcpus are suspended.
+	 */
+	if (CPU_CMP(&vm->suspended_cpus, &vm->active_cpus) == 0) {
+		vm_cleanup(vm, false);
+		vm_init(vm, false);
+		error = 0;
+	} else {
+		error = EBUSY;
+	}
+
+	return (error);
 }
 
 const char *
