@@ -893,9 +893,15 @@ static bus_dma_segment_t *
 bounce_bus_dmamap_complete(bus_dma_tag_t dmat, bus_dmamap_t map,
     bus_dma_segment_t *segs, int nsegs, int error)
 {
+	int i;
 
 	if (segs == NULL)
 		segs = dmat->segments;
+
+	for (i = 0; i < nsegs; i++)
+		printf("complete seg %d addr %lx len %lx\n",
+		    i, segs[i].ds_addr, segs[i].ds_len);
+
 	return (segs);
 }
 
