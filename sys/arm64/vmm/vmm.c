@@ -807,6 +807,7 @@ vm_run(struct vm *vm, struct vm_run *vmrun)
 	struct vm_exit *vme;
 	bool retu;
 	void *rvc, *sc;
+	pmap_t pmap;
 
 	vcpuid = vmrun->cpuid;
 	pc = vmrun->pc;
@@ -817,9 +818,10 @@ vm_run(struct vm *vm, struct vm_run *vmrun)
 	if (!CPU_ISSET(vcpuid, &vm->active_cpus))
 		return (EINVAL);
 
+	pmap = vmspace_pmap(vm->vmspace);
 	rvc = sc = NULL;
 restart:
-	error = VMRUN(vm->cookie, vcpuid, pc, NULL, rvc, sc);
+	error = VMRUN(vm->cookie, vcpuid, pc, pmap, rvc, sc);
 
 	vme = vm_exitinfo(vm, vcpuid);
 	if (error == 0) {
