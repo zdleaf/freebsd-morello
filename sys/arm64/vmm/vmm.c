@@ -803,14 +803,13 @@ int
 vm_run(struct vm *vm, struct vm_run *vmrun)
 {
 	int error, vcpuid;
-	register_t pc;
+	struct vcpu *vcpu;
 	struct vm_exit *vme;
 	bool retu;
 	void *rvc, *sc;
 	pmap_t pmap;
 
 	vcpuid = vmrun->cpuid;
-	pc = vmrun->pc;
 
 	if (vcpuid < 0 || vcpuid >= vm->maxcpus)
 		return (EINVAL);
@@ -819,21 +818,22 @@ vm_run(struct vm *vm, struct vm_run *vmrun)
 		return (EINVAL);
 
 	pmap = vmspace_pmap(vm->vmspace);
+	vcpu = &vm->vcpu[vcpuid];
 	rvc = sc = NULL;
 restart:
-	error = VMRUN(vm->cookie, vcpuid, pc, pmap, rvc, sc);
+	error = VMRUN(vm->cookie, vcpuid, vcpu->nextpc, pmap, rvc, sc);
 
 	vme = vm_exitinfo(vm, vcpuid);
 	if (error == 0) {
 		retu = false;
 		switch (vme->exitcode) {
 		case VM_EXITCODE_INST_EMUL:
-			pc = vme->pc + vme->inst_length;
+			vcpu->nextpc = vme->pc + vme->inst_length;
 			error = vm_handle_inst_emul(vm, vcpuid, &retu);
 			break;
 
 		case VM_EXITCODE_REG_EMUL:
-			pc = vme->pc + vme->inst_length;
+			vcpu->nextpc = vme->pc + vme->inst_length;
 			error = vm_handle_reg_emul(vm, vcpuid, &retu);
 			break;
 
@@ -842,7 +842,7 @@ restart:
 			 * The HVC instruction saves the address for the
 			 * next instruction as the return address.
 			 */
-			pc = vme->pc;
+			vcpu->nextpc = vme->pc;
 			/*
 			 * The PSCI call can change the exit information in the
 			 * case of suspend/reset/poweroff/cpu off/cpu on.
@@ -851,12 +851,13 @@ restart:
 			break;
 
 		case VM_EXITCODE_WFI:
-			pc = vme->pc + vme->inst_length;
+			vcpu->nextpc = vme->pc + vme->inst_length;
 			error = vm_handle_wfi(vm, vcpuid, vme, &retu);
 			break;
 
 		default:
 			/* Handle in userland */
+			vcpu->nextpc = vme->pc;
 			retu = true;
 			break;
 		}
@@ -1099,7 +1100,7 @@ vm_set_register(struct vm *vm, int vcpuid, int reg, uint64_t val)
 	if (reg >= VM_REG_LAST)
 		return (EINVAL);
 	error = VMSETREG(vm->cookie, vcpuid, reg, val);
-	if (error)
+	if (error || reg != VM_REG_ELR_EL2)
 		return (error);
 
 	vcpu = &vm->vcpu[vcpuid];
