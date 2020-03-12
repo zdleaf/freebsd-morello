@@ -359,7 +359,7 @@
 #define	STE1_STRW_S		30 /* StreamWorld control */
 #define	STE1_STRW_M		(0x3 << STE1_STRW_S)
 #define	STE1_STRW_NS_EL1	(0x0 << STE1_STRW_S)
-#define	STE1_STRW_EL2		(0x2 << STE1_STRW_S)
+#define	STE1_STRW_NS_EL2	(0x2 << STE1_STRW_S)
 #define	STE1_MEMATTR_S		32
 #define	STE1_MTCFG		(1 << 36)
 #define	STE1_ALLOCCFG_S		37
@@ -441,8 +441,8 @@
 #define	CD0_OR1_M		(0x3 << CD0_OR1_S)
 #define	CD0_SH1_S		28
 #define	CD0_SH1_M		(0x3 << CD0_SH1_S)
-#define	CD0_EPD1		(1 << 30) /* TT1 tt walk disable*/
-#define	CD0_VALID		(1 << 31) /* CD Valid. */
+#define	CD0_EPD1		(1UL << 30) /* TT1 tt walk disable*/
+#define	CD0_VALID		(1UL << 31) /* CD Valid. */
 #define	CD0_IPS_S		32 /* Intermediate Physical Size */
 #define	CD0_IPS_M		(0x7UL << CD0_IPS_S)
 #define	CD0_IPS_32BITS		(0x0UL << CD0_IPS_S)

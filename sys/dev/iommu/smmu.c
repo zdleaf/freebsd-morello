@@ -319,6 +319,22 @@ smmu_dump_ste(struct smmu_softc *sc, uint64_t *ste)
 		device_printf(sc->dev, "ste[%d] == %lx\n", i, ste[i]);
 }
 
+static void
+smmu_dump_cd(struct smmu_softc *sc)
+{
+	uint64_t *addr;
+	int i;
+
+	device_printf(sc->dev, "%s\n", __func__);
+
+	struct smmu_cd *cd;
+	cd = &sc->cd;
+	addr = cd->addr;
+
+	for (i = 0; i < CD_DWORDS; i++)
+		device_printf(sc->dev, "cd[%d] == %lx\n", i, addr[i]);
+}
+
 static int
 smmu_evtq_dequeue(struct smmu_softc *sc)
 {
@@ -366,6 +382,7 @@ smmu_evtq_dequeue(struct smmu_softc *sc)
 	device_printf(sc->dev, "strtab phys %lx ste phys %lx\n",
 	    vtophys(strtab->addr), vtophys(ste));
 	smmu_dump_ste(sc, ste);
+	smmu_dump_cd(sc);
 
 #if 0
 	/* Disable SMMU */
@@ -559,15 +576,17 @@ smmu_init_ste(struct smmu_softc *sc, uint32_t sid, uint64_t *ste)
 	ste[7] = 0;
 
 	/* S1 */
-	ste[1] |= STE1_S1DSS_SUBSTREAM0
-		| STE1_S1CIR_WBRA
+	ste[1] |= STE1_S1CIR_WBRA
 		| STE1_S1COR_WBRA
 		| STE1_S1CSH_IS
 		| STE1_STRW_NS_EL1;
+		//| STE1_S1DSS_SUBSTREAM0
 
 	if (sc->features & SMMU_FEATURE_STALL &&
-	    ((sc->features & SMMU_FEATURE_STALL) == 0))
+	    ((sc->features & SMMU_FEATURE_STALL) == 0)) {
+		device_printf(sc->dev, "ste1 s1stalld enabled\n");
 		ste[1] |= STE1_S1STALLD;
+	}
 
 	struct smmu_cd *cd;
 
@@ -599,13 +618,14 @@ smmu_init_ste(struct smmu_softc *sc, uint32_t sid, uint64_t *ste)
 
 	smmu_invalidate_sid(sc, sid);
 	smmu_sync_cd(sc, sid, 0, true);
+	smmu_invalidate_sid(sc, sid);
 	smmu_prefetch_sid(sc, sid);
 
 	return (0);
 }
 
 static int
-smmu_init_bypass(struct smmu_softc *sc,
+smmu_init_stes(struct smmu_softc *sc,
     struct smmu_strtab *strtab)
 {
 	int i;
@@ -616,12 +636,15 @@ smmu_init_bypass(struct smmu_softc *sc,
 	device_printf(sc->dev, "%s: num_l1_entries %d, base addr %lx\n",
 	    __func__, strtab->num_l1_entries, (uint64_t)addr);
 
-	for (i = 0; i < strtab->num_l1_entries; i++) {
+	//for (i = 0; i < strtab->num_l1_entries; i++) {
+	for (i = 0x800; i < 0x801; i++) {
+		addr = (void *)((uint64_t)strtab->addr +
+		    STRTAB_STE_DWORDS * 8 * i);
 		if ((i % 100000) == 0)
 			device_printf(sc->dev, "%s: i %d\n", __func__, i);
 		//smmu_init_ste_bypass(sc, i, addr);
 		smmu_init_ste(sc, i, addr);
-		addr += STRTAB_STE_DWORDS;
+		//addr += STRTAB_STE_DWORDS;
 	}
 
 	//smmu_invalidate_all_sid(sc);
@@ -641,7 +664,7 @@ smmu_init_cd(struct smmu_softc *sc)
 	cd->addr = contigmalloc(size, M_SMMU,
 	    M_WAITOK | M_ZERO,	/* flags */
 	    0,			/* low */
-	    (1ul << 48) - 1,	/* high */
+	    (1ul << 40) - 1,	/* high */
 	    SMMU_STRTAB_ALIGN,	/* alignment */
 	    0);			/* boundary */
 	if (cd->addr == NULL) {
@@ -654,6 +677,7 @@ smmu_init_cd(struct smmu_softc *sc)
 	device_printf(sc->dev, "%s: CD vaddr %p\n", __func__, cd->addr);
 	device_printf(sc->dev, "%s: CD paddr %lx\n", __func__, cd->paddr);
 
+	vm_paddr_t paddr;
 	uint64_t *ptr;
 	uint64_t val;
 
@@ -661,13 +685,25 @@ smmu_init_cd(struct smmu_softc *sc)
 	ptr = cd->addr;
 
 	memset(ptr, 0, CD_DWORDS * 8);
-	val = CD0_VALID | CD0_AA64 | CD0_ASET | CD0_R | CD0_A;
-	val |= CD0_EPD1;
-
-	val |= 64ULL - sc->ias; /* T0SZ */
+	val = CD0_VALID;
+	printf("%s: val %lx\n", __func__, val);
+	val |= CD0_AA64;
+	printf("%s: val %lx\n", __func__, val);
+	val |= CD0_ASET;
+	printf("%s: val %lx\n", __func__, val);
+	val |= CD0_R;
+	printf("%s: val %lx\n", __func__, val);
+	val |= CD0_A;
+	printf("%s: val %lx\n", __func__, val);
+	val |= CD0_TG0_4KB;
+	printf("%s: val %lx\n", __func__, val);
+	val |= CD0_EPD1; /* Disable TT1 */
+	printf("%s: val %lx\n", __func__, val);
+	val |= ((64 - sc->ias) << CD0_T0SZ_S);
+	printf("%s: val %lx\n", __func__, val);
 	val |= CD0_IPS_48BITS;
+	printf("%s: val %lx\n", __func__, val);
 
-	vm_paddr_t paddr;
 	paddr = sc->p.pm_l0_paddr & CD1_TTB0_M;
 	if (paddr != sc->p.pm_l0_paddr)
 		panic("here");
@@ -678,7 +714,10 @@ smmu_init_cd(struct smmu_softc *sc)
 	ptr[2] = 0;
 	ptr[3] = 0; /* MAIR */
 
+	printf("%s: val %lx\n", __func__, val);
 	ptr[0] = val;
+
+	printf("%s: ptr[0] %lx\n", __func__, ptr[0]);
 
 	return (0);
 }
@@ -1031,6 +1070,9 @@ smmu_attach(device_t dev)
 	sc = device_get_softc(dev);
 	sc->dev = dev;
 
+	if (device_get_unit(dev) != 0)
+		return (ENXIO);
+
 	error = bus_alloc_resources(dev, smmu_spec, sc->res);
 	if (error) {
 		device_printf(dev, "Couldn't allocate resources\n");
@@ -1041,6 +1083,9 @@ smmu_attach(device_t dev)
 		bus_release_resources(dev, smmu_spec, sc->res);
 		return (ENXIO);
 	}
+
+	reg = bus_read_4(sc->res[0], SMMU_IDR3);
+	device_printf(sc->dev, "IDR3 %x\n", reg);
 
 	reg = bus_read_4(sc->res[0], SMMU_IDR0);
 	device_printf(sc->dev, "IDR0 %x\n", reg);
@@ -1135,6 +1180,9 @@ smmu_attach(device_t dev)
 	else
 		sc->vmid_bits = 8;
 
+	reg = bus_read_4(sc->res[0], SMMU_S_CR0);
+	device_printf(sc->dev, "SMMU_S_CR0 %x\n", reg);
+
 	reg = bus_read_4(sc->res[0], SMMU_IDR1);
 	device_printf(sc->dev, "IDR1 %x\n", reg);
 
@@ -1226,7 +1274,7 @@ smmu_attach(device_t dev)
 		return (ENXIO);
 	}
 
-	smmu_init_bypass(sc, &sc->strtab);
+	smmu_init_stes(sc, &sc->strtab);
 
 	return (0);
 }
