@@ -768,16 +768,16 @@ void arm_restore(void)
 }
 
 struct vmm_ops vmm_ops_arm = {
-	arm_init,
-	arm_cleanup,
-	arm_restore,
-	arm_vminit,
-	arm_vmrun,
-	arm_vmcleanup,
-	arm_getreg,
-	arm_setreg,
-	NULL, 		/* vmi_get_cap_t */
-	NULL, 		/* vmi_set_cap_t */
-	arm_vmspace_alloc,
-	arm_vmspace_free,
+	.init = arm_init,
+	.cleanup = arm_cleanup,
+	.resume = arm_restore,
+	.vminit = arm_vminit,
+	.vmrun = arm_vmrun,
+	.vmcleanup = arm_vmcleanup,
+	.vmgetreg = arm_getreg,
+	.vmsetreg = arm_setreg,
+	.vmgetcap = NULL, 		/* vmi_get_cap_t */
+	.vmsetcap = NULL, 		/* vmi_set_cap_t */
+	.vmspace_alloc	= arm_vmspace_alloc,
+	.vmspace_free	= arm_vmspace_free,
 };
