@@ -35,8 +35,12 @@
 #ifndef _DEV_IOMMU_SMMU_VAR_H_
 #define _DEV_IOMMU_SMMU_VAR_H_
 
+#include <sys/vmem.h>
+
 #include <vm/vm.h>
 #include <vm/pmap.h>
+#include <vm/vm_extern.h>
+#include <vm/vm_page.h>
 
 #define	SMMU_DEVSTR	"ARM System Memory Management Unit"
 
@@ -121,6 +125,7 @@ struct smmu_softc {
 	struct smmu_strtab strtab;
 	struct smmu_cd cd;
 	struct pmap p;
+	vmem_t *vmem;
 };
 
 struct smmu_devinfo {
@@ -132,5 +137,9 @@ MALLOC_DECLARE(M_SMMU);
 /* Device methods */
 int smmu_attach(device_t dev);
 int smmu_detach(device_t dev);
+
+void smmu_insert(vm_paddr_t addr, vm_offset_t va, vm_size_t size);
+void smmu_map(bus_dma_segment_t *segs, int nsegs);
+void smmu_unmap(bus_dma_segment_t *segs, int nsegs);
 
 #endif /* _DEV_IOMMU_SMMU_VAR_H_ */

@@ -120,6 +120,8 @@ MALLOC_DEFINE(M_SMMU, "SMMU", SMMU_DEVSTR);
 #define	Q_IDX(q, p)		((p) & ((1 << (q)->size_log2) - 1))
 #define	Q_OVF(p)		((p) & (1 << 31)) /* Event queue overflowed */
 
+static struct smmu_softc *smmu_sc = NULL;
+
 static int smmu_evtq_dequeue(struct smmu_softc *sc);
 
 static int
@@ -561,7 +563,7 @@ smmu_init_ste_bypass(struct smmu_softc *sc, uint32_t sid, uint64_t *ste)
 }
 
 static int
-smmu_init_ste(struct smmu_softc *sc, uint32_t sid, uint64_t *ste)
+smmu_init_ste_s1(struct smmu_softc *sc, uint32_t sid, uint64_t *ste)
 {
 	uint64_t val;
 
@@ -576,11 +578,13 @@ smmu_init_ste(struct smmu_softc *sc, uint32_t sid, uint64_t *ste)
 	ste[7] = 0;
 
 	/* S1 */
-	ste[1] |= STE1_S1CIR_WBRA
-		| STE1_S1COR_WBRA
-		| STE1_S1CSH_IS
-		| STE1_STRW_NS_EL1;
+	ste[1] |= STE1_S1CSH_IS
+		//| STE1_S1CIR_WBRA
+		//| STE1_S1COR_WBRA
+		| STE1_S1CIR_NC
+		| STE1_S1COR_NC
 		//| STE1_S1DSS_SUBSTREAM0
+		| STE1_STRW_NS_EL1;
 
 	if (sc->features & SMMU_FEATURE_STALL &&
 	    ((sc->features & SMMU_FEATURE_STALL) == 0)) {
@@ -625,10 +629,26 @@ smmu_init_ste(struct smmu_softc *sc, uint32_t sid, uint64_t *ste)
 }
 
 static int
+smmu_init_ste(struct smmu_softc *sc,
+    struct smmu_strtab *strtab, int i, bool bypass)
+{
+	uint64_t *addr;
+
+	addr = (void *)((uint64_t)strtab->addr +
+	    STRTAB_STE_DWORDS * 8 * i);
+
+	if (bypass)
+		smmu_init_ste_bypass(sc, i, addr);
+	else
+		smmu_init_ste_s1(sc, i, addr);
+
+	return (0);
+}
+
+static int
 smmu_init_stes(struct smmu_softc *sc,
     struct smmu_strtab *strtab)
 {
-	int i;
 	uint64_t *addr;
 
 	addr = strtab->addr;
@@ -636,18 +656,28 @@ smmu_init_stes(struct smmu_softc *sc,
 	device_printf(sc->dev, "%s: num_l1_entries %d, base addr %lx\n",
 	    __func__, strtab->num_l1_entries, (uint64_t)addr);
 
-	//for (i = 0; i < strtab->num_l1_entries; i++) {
-	for (i = 0x800; i < 0x801; i++) {
+	smmu_init_ste(sc, strtab, 0x800, true); //xhci
+	smmu_init_ste(sc, strtab, 0x700, false); //realtek
+
+#if 0
+	int i;
+	for (i = 0; i < strtab->num_l1_entries; i++) {
 		addr = (void *)((uint64_t)strtab->addr +
 		    STRTAB_STE_DWORDS * 8 * i);
 		if ((i % 100000) == 0)
 			device_printf(sc->dev, "%s: i %d\n", __func__, i);
-		//smmu_init_ste_bypass(sc, i, addr);
-		smmu_init_ste(sc, i, addr);
+		//if (i == 0x800) /* xhci */
+		//if (i == 0x700) /* realtek */
+		if (1 == 1)
+			smmu_init_ste_s1(sc, i, addr);
+		else
+			smmu_init_ste_bypass(sc, i, addr);
+
 		//addr += STRTAB_STE_DWORDS;
 	}
 
 	//smmu_invalidate_all_sid(sc);
+#endif
 
 	return (0);
 }
@@ -682,27 +712,32 @@ smmu_init_cd(struct smmu_softc *sc)
 	uint64_t val;
 
 	pmap_pinit(&sc->p);
+	PMAP_LOCK_INIT(&sc->p);
+	sc->vmem = vmem_create("SMMU vmem", 0, 0, PAGE_SIZE,
+	    PAGE_SIZE, M_FIRSTFIT | M_WAITOK);
+	if (sc->vmem == NULL)
+		return (ENXIO);
+	vmem_add(sc->vmem, 0x0, 1024 * 1024 * 1024, 0);
+
+	pmap_debug(1);
+	//smmu_insert(0x300b0000, 0x300b0000, 0x1000 * 4);
+	pmap_enter_device(&sc->p, 0x300b0000, 0x1000 * 4,
+	    0x300b0000, VM_MEMATTR_DEVICE);
+	pmap_debug(0);
+
+	device_printf(sc->dev, "%s: pmap initialized\n", __func__);
 	ptr = cd->addr;
 
 	memset(ptr, 0, CD_DWORDS * 8);
 	val = CD0_VALID;
-	printf("%s: val %lx\n", __func__, val);
 	val |= CD0_AA64;
-	printf("%s: val %lx\n", __func__, val);
 	val |= CD0_ASET;
-	printf("%s: val %lx\n", __func__, val);
 	val |= CD0_R;
-	printf("%s: val %lx\n", __func__, val);
 	val |= CD0_A;
-	printf("%s: val %lx\n", __func__, val);
 	val |= CD0_TG0_4KB;
-	printf("%s: val %lx\n", __func__, val);
 	val |= CD0_EPD1; /* Disable TT1 */
-	printf("%s: val %lx\n", __func__, val);
 	val |= ((64 - sc->ias) << CD0_T0SZ_S);
-	printf("%s: val %lx\n", __func__, val);
 	val |= CD0_IPS_48BITS;
-	printf("%s: val %lx\n", __func__, val);
 
 	paddr = sc->p.pm_l0_paddr & CD1_TTB0_M;
 	if (paddr != sc->p.pm_l0_paddr)
@@ -712,7 +747,10 @@ smmu_init_cd(struct smmu_softc *sc)
 
 	ptr[1] = paddr;
 	ptr[2] = 0;
-	ptr[3] = 0; /* MAIR */
+	ptr[3] = MAIR_ATTR(MAIR_DEVICE_nGnRnE, VM_MEMATTR_DEVICE)	|\
+		MAIR_ATTR(MAIR_NORMAL_NC, VM_MEMATTR_UNCACHEABLE)	|\
+		MAIR_ATTR(MAIR_NORMAL_WB, VM_MEMATTR_WRITE_BACK)	|\
+		MAIR_ATTR(MAIR_NORMAL_WT, VM_MEMATTR_WRITE_THROUGH);
 
 	printf("%s: val %lx\n", __func__, val);
 	ptr[0] = val;
@@ -966,11 +1004,15 @@ smmu_reset(struct smmu_softc *sc)
 	}
 
 	reg = CR1_TABLE_SH_IS
-	    | CR1_TABLE_OC_WBC
-	    | CR1_TABLE_IC_WBC
+	//    | CR1_TABLE_OC_WBC
+	//    | CR1_TABLE_IC_WBC
+	    | CR1_TABLE_OC_NC
+	    | CR1_TABLE_IC_NC
 	    | CR1_QUEUE_SH_IS
-	    | CR1_QUEUE_OC_WBC
-	    | CR1_QUEUE_IC_WBC;
+	//    | CR1_QUEUE_OC_WBC
+	//    | CR1_QUEUE_IC_WBC;
+	    | CR1_QUEUE_OC_NC
+	    | CR1_QUEUE_IC_NC;
 	bus_write_4(sc->res[0], SMMU_CR1, reg);
 
 	reg = CR2_PTM | CR2_RECINVSID | CR2_E2H;
@@ -1072,6 +1114,8 @@ smmu_attach(device_t dev)
 
 	if (device_get_unit(dev) != 0)
 		return (ENXIO);
+
+	smmu_sc = sc;
 
 	error = bus_alloc_resources(dev, smmu_spec, sc->res);
 	if (error) {
@@ -1323,4 +1367,85 @@ smmu_read_ivar(device_t dev, device_t child, int which, uintptr_t *result)
 	device_printf(sc->dev, "%s\n", __func__);
 
 	return (ENOENT);
+}
+
+void
+smmu_insert(vm_paddr_t pa, vm_offset_t va, vm_size_t size)
+{
+	struct smmu_softc *sc;
+	vm_prot_t prot;
+	vm_page_t m;
+	pmap_t p;
+
+	sc = smmu_sc;
+	if (sc == NULL)
+		panic("here");
+
+	p = &sc->p;
+
+	size = roundup2(size, PAGE_SIZE);
+
+	device_printf(sc->dev, "%s: pa %lx va %lx size %lx\n",
+	    __func__, pa, va, size);
+
+	prot = VM_PROT_ALL;
+
+	for (; size > 0; size -= PAGE_SIZE) {
+		m = PHYS_TO_VM_PAGE(pa);
+		if (m == NULL)
+			panic("page not found for pa %lx\n", pa);
+		pmap_enter(p, va, m, prot, prot | PMAP_ENTER_WIRED, 0);
+		pa += PAGE_SIZE;
+	}
+}
+
+void
+smmu_unmap(bus_dma_segment_t *segs, int nsegs)
+{
+	struct smmu_softc *sc;
+	vm_offset_t sva;
+	vm_offset_t eva;
+	int i;
+
+	sc = smmu_sc;
+	if (sc == NULL)
+		panic("here");
+
+	for (i = 0; i < nsegs; i++) {
+		sva = segs[i].ds_addr;
+		eva = sva + segs[i].ds_len;
+		//device_printf(sc->dev, "%s: sva %lx eva %lx\n",
+		//    __func__, sva, eva);
+		pmap_remove(&sc->p, sva, eva);
+	}
+}
+
+void
+smmu_map(bus_dma_segment_t *segs, int nsegs)
+{
+	struct smmu_softc *sc;
+	vm_offset_t va;
+	vm_size_t size;
+	int i;
+
+	sc = smmu_sc;
+	if (sc == NULL)
+		panic("here");
+
+	for (i = 0; i < nsegs; i++) {
+		size = segs[i].ds_len;
+		size = roundup2(size, PAGE_SIZE);
+
+		if (vmem_alloc(sc->vmem, size,
+		    M_FIRSTFIT | M_NOWAIT, &va))
+			panic("Could not allocate virtual address.\n");
+
+		if (1 == 0)
+			smmu_insert(segs[i].ds_addr, segs[i].ds_addr, size);
+		else {
+			smmu_insert(segs[i].ds_addr, va, size);
+			segs[i].ds_addr = va;
+			segs[i].ds_len = size;
+		}
+	}
 }

@@ -184,6 +184,9 @@ bool	pmap_get_tables(pmap_t, vm_offset_t, pd_entry_t **, pd_entry_t **,
     pd_entry_t **, pt_entry_t **);
 
 int	pmap_fault(pmap_t, uint64_t, uint64_t);
+int pmap_debug(int enable);
+void pmap_enter_device(pmap_t pmap, vm_offset_t sva, vm_size_t size,
+    vm_paddr_t pa, int mode);
 
 struct pcb *pmap_switch(struct thread *, struct thread *);
 

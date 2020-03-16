@@ -426,9 +426,46 @@ static bus_dma_tag_t
 generic_pcie_get_dma_tag(device_t dev, device_t child)
 {
 	struct generic_pcie_core_softc *sc;
+	int pci_bus, pci_slot, pci_func;
+	bus_dma_tag_t t;
+	int error;
 
 	sc = device_get_softc(dev);
-	return (sc->dmat);
+
+	devclass_t pci_class;
+	pci_class = devclass_find("pci");
+
+	if (device_get_devclass(device_get_parent(child)) != pci_class) {
+		printf("%s: not a pci bus device\n", __func__);
+		return (sc->dmat);
+	}
+
+	printf("%s: allocating bus dma tag\n", __func__);
+
+	/* Create the parent DMA tag to pass down the coherent flag */
+	error = bus_dma_tag_create(bus_get_dma_tag(dev), /* parent */
+	    1, 0,				/* alignment, bounds */
+	    BUS_SPACE_MAXADDR,			/* lowaddr */
+	    BUS_SPACE_MAXADDR,			/* highaddr */
+	    NULL, NULL,				/* filter, filterarg */
+	    BUS_SPACE_MAXSIZE,			/* maxsize */
+	    BUS_SPACE_UNRESTRICTED,		/* nsegments */
+	    BUS_SPACE_MAXSIZE,			/* maxsegsize */
+	    sc->coherent ? BUS_DMA_COHERENT : 0, /* flags */
+	    NULL, NULL,				/* lockfunc, lockarg */
+	    &t);
+	if (error != 0)
+		panic("could not alloc tag\n");
+
+	pci_bus = pci_get_bus(child);
+	pci_slot = pci_get_slot(child);
+	pci_func = pci_get_function(child);
+
+	printf("pci bus is %d\n", pci_bus);
+	if (pci_bus == 7) // realtek
+		bus_dma_tag_set_iommu(t);
+
+	return (t);
 }
 
 static device_method_t generic_pcie_methods[] = {

@@ -76,12 +76,13 @@ options 	VFP			# Floating-point support
 options 	RACCT			# Resource accounting framework
 options 	RACCT_DEFAULT_TO_DISABLED # Set kern.racct.enable=0 by default
 options 	RCTL			# Resource limits
-options 	SMP
+# options 	SMP
 options 	INTRNG
 
 #options 	MD_ROOT_SIZE=47104
 #options 	ROOTDEVNAME=\"ufs:md0\"
 #makeoptions	MFS_IMAGE=/home/br/dev/freebsd-head/arm64.img
+options 	ROOTDEVNAME=\"ufs:da0p2\"
 
 # Debugging support.  Always need this:
 options 	KDB			# Enable kernel debugger support.

@@ -148,6 +148,13 @@ __FBSDID("$FreeBSD$");
 #include <machine/md_var.h>
 #include <machine/pcb.h>
 
+#ifdef _KERNEL
+#include <machine/stdarg.h>
+#else
+#include <stdarg.h>
+#endif
+
+
 #include <arm/include/physmem.h>
 
 #define	PMAP_ASSERT_STAGE1(pmap)	MPASS((pmap)->pm_stage == PM_STAGE1)
@@ -361,6 +368,8 @@ static boolean_t pmap_try_insert_pv_entry(pmap_t pmap, vm_offset_t va,
     vm_page_t m, struct rwlock **lockp);
 
 static vm_page_t _pmap_alloc_l3(pmap_t pmap, vm_pindex_t ptepindex,
+		struct rwlock **lockp);
+static vm_page_t pmap_alloc_l3(pmap_t pmap, vm_offset_t va,
 		struct rwlock **lockp);
 
 static void _pmap_unwire_l3(pmap_t pmap, vm_offset_t va, vm_page_t m,
@@ -1255,6 +1264,61 @@ pmap_kextract(vm_offset_t va)
 /***************************************************
  * Low level mapping routines.....
  ***************************************************/
+
+void
+pmap_enter_device(pmap_t pmap, vm_offset_t sva, vm_size_t size,
+    vm_paddr_t pa, int mode)
+{
+	pd_entry_t *pde;
+	pt_entry_t *pte, attr;
+	vm_page_t mpte;
+	vm_offset_t va;
+	int lvl;
+
+	KASSERT((pa & L3_OFFSET) == 0,
+	   ("pmap_enter_device: Invalid physical address"));
+	KASSERT((sva & L3_OFFSET) == 0,
+	   ("pmap_enter_device: Invalid virtual address"));
+	KASSERT((size & PAGE_MASK) == 0,
+	    ("pmap_enter_device: Mapping is not page-sized"));
+
+	attr = ATTR_AF | ATTR_S1_AP(ATTR_S1_AP_RW) |
+	    ATTR_SH(ATTR_SH_IS) | ATTR_S1_IDX(mode) | L3_PAGE;
+	attr |= ATTR_S1_AP(ATTR_S1_AP_USER);
+
+	//attr |= ATTR_S1_NS;
+	//attr |= ATTR_S1_XN; // priv and unpriv eXecute never
+	//test
+	attr |= ATTR_SW_WIRED;
+	attr |= ATTR_S1_nG;
+
+	va = sva;
+	while (size != 0) {
+retry:
+		pde = pmap_pde(pmap, va, &lvl);
+		if (pde == NULL) {
+			PMAP_LOCK(pmap);
+			//mpte = _pmap_alloc_l3(pmap, pmap_l2_pindex(va), NULL);
+			mpte = pmap_alloc_l3(pmap, va, NULL);
+			PMAP_UNLOCK(pmap);
+			if (mpte == NULL)
+				panic("mpte is NULL");
+			goto retry;
+		}
+
+		KASSERT(pde != NULL,
+		    ("pmap_kenter: Invalid page entry, va: 0x%lx", va));
+		KASSERT(lvl == 2, ("pmap_enter_device: Invalid level %d", lvl));
+
+		pte = pmap_l2_to_l3(pde, va);
+		pmap_load_store(pte, (pa & ~L3_OFFSET) | attr);
+
+		va += PAGE_SIZE;
+		pa += PAGE_SIZE;
+		size -= PAGE_SIZE;
+	}
+	pmap_invalidate_range(pmap, sva, va);
+}
 
 void
 pmap_kenter(vm_offset_t sva, vm_size_t size, vm_paddr_t pa, int mode)
@@ -3324,6 +3388,36 @@ setl3:
 }
 #endif /* VM_NRESERVLEVEL > 0 */
 
+static int flag = 0;
+
+int
+pmap_debug(int enable)
+{
+
+	if (enable)
+		flag = 1;
+	else
+		flag = 0;
+
+	return (0);
+}
+
+static int
+dprintf(const char *fmt, ...)
+{
+	va_list ap;
+	int retval;
+
+	if (flag == 0)
+		return (0);
+
+	va_start(ap, fmt);
+	retval = vprintf(fmt, ap);
+	va_end(ap);
+
+	return (retval);
+}
+
 /*
  *	Insert the given physical page (p) at
  *	the specified virtual address (v) in the
@@ -3356,8 +3450,8 @@ pmap_enter(pmap_t pmap, vm_offset_t va, vm_page_t m, vm_prot_t prot,
 	if ((m->oflags & VPO_UNMANAGED) == 0)
 		VM_PAGE_OBJECT_BUSY_ASSERT(m);
 	pa = VM_PAGE_TO_PHYS(m);
-	new_l3 = (pt_entry_t)(pa | ATTR_DEFAULT | ATTR_S1_IDX(m->md.pv_memattr) |
-	    L3_PAGE);
+	new_l3 = (pt_entry_t)(pa | ATTR_DEFAULT |
+	    ATTR_S1_IDX(m->md.pv_memattr) | L3_PAGE);
 	if ((prot & VM_PROT_WRITE) == 0)
 		new_l3 |= ATTR_S1_AP(ATTR_S1_AP_RO);
 	if ((prot & VM_PROT_EXECUTE) == 0 ||
@@ -3394,11 +3488,13 @@ pmap_enter(pmap_t pmap, vm_offset_t va, vm_page_t m, vm_prot_t prot,
 	}
 	mpte = NULL;
 
+dprintf("%s\n", __func__);
 	/*
 	 * In the case that a page table page is not
 	 * resident, we are creating it here.
 	 */
 retry:
+	dprintf("%s 1\n", __func__);
 	pde = pmap_pde(pmap, va, &lvl);
 	if (pde != NULL && lvl == 2) {
 		l3 = pmap_l2_to_l3(pde, va);
@@ -3441,6 +3537,7 @@ retry:
 		panic("pmap_enter: missing L3 table for kernel va %#lx", va);
 
 havel3:
+	dprintf("%s 2\n", __func__);
 	orig_l3 = pmap_load(l3);
 	opa = orig_l3 & ~ATTR_MASK;
 	pv = NULL;
@@ -3484,6 +3581,8 @@ havel3:
 				vm_page_aflag_set(m, PGA_WRITEABLE);
 			goto validate;
 		}
+
+dprintf("%s 3\n", __func__);
 
 		/*
 		 * The physical page has changed.  Temporarily invalidate
@@ -3544,6 +3643,7 @@ havel3:
 			vm_page_aflag_set(m, PGA_WRITEABLE);
 	}
 
+dprintf("%s 4\n", __func__);
 validate:
 	/*
 	 * Sync icache if exec permission and attribute VM_MEMATTR_WRITE_BACK
@@ -3594,6 +3694,8 @@ validate:
 		pmap_store(l3, new_l3);
 		dsb(ishst);
 	}
+
+dprintf("%s 5\n", __func__);
 
 #if VM_NRESERVLEVEL > 0
 	if ((mpte == NULL || mpte->ref_count == NL3PG) &&

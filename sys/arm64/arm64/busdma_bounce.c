@@ -59,6 +59,8 @@ __FBSDID("$FreeBSD$");
 #include <machine/md_var.h>
 #include <arm64/include/bus_dma_impl.h>
 
+#include <dev/iommu/smmu_var.h>
+
 #define MAX_BPAGES 4096
 
 enum {
@@ -76,6 +78,7 @@ struct bus_dma_tag {
 	int			bounce_flags;
 	bus_dma_segment_t	*segments;
 	struct bounce_zone	*bounce_zone;
+	int			iommu;
 };
 
 struct bounce_page {
@@ -138,6 +141,7 @@ struct bus_dmamap {
 #define	DMAMAP_COULD_BOUNCE	(1 << 0)
 #define	DMAMAP_FROM_DMAMEM	(1 << 1)
 	int			sync_count;
+	int			nsegs;
 	struct sync_list	slist[];
 };
 
@@ -197,6 +201,7 @@ bounce_bus_dma_tag_create(bus_dma_tag_t parent, bus_size_t alignment,
 
 		/* Copy some flags from the parent */
 		newtag->bounce_flags |= parent->bounce_flags & BF_COHERENT;
+		newtag->iommu = parent->iommu;
 	}
 
 	if (newtag->common.lowaddr < ptoa((vm_paddr_t)Maxmem) ||
@@ -893,14 +898,19 @@ static bus_dma_segment_t *
 bounce_bus_dmamap_complete(bus_dma_tag_t dmat, bus_dmamap_t map,
     bus_dma_segment_t *segs, int nsegs, int error)
 {
-	int i;
 
-	if (segs == NULL)
+	map->nsegs = nsegs;
+
+	if (segs != NULL)
+		memcpy(dmat->segments, segs, map->nsegs * sizeof(segs[0]));
+
+	if (dmat->iommu == 1)
+		smmu_map(dmat->segments, nsegs);
+
+	if (segs != NULL)
+		memcpy(segs, dmat->segments, map->nsegs * sizeof(segs[0]));
+	else
 		segs = dmat->segments;
-
-	for (i = 0; i < nsegs; i++)
-		printf("complete seg %d addr %lx len %lx\n",
-		    i, segs[i].ds_addr, segs[i].ds_len);
 
 	return (segs);
 }
@@ -912,6 +922,11 @@ static void
 bounce_bus_dmamap_unload(bus_dma_tag_t dmat, bus_dmamap_t map)
 {
 	struct bounce_page *bpage;
+
+	if (dmat->iommu == 1) {
+		smmu_unmap(dmat->segments, map->nsegs);
+		map->nsegs = 0;
+	}
 
 	while ((bpage = STAILQ_FIRST(&map->bpages)) != NULL) {
 		STAILQ_REMOVE_HEAD(&map->bpages, links);
@@ -1345,6 +1360,16 @@ busdma_swi(void)
 		mtx_lock(&bounce_lock);
 	}
 	mtx_unlock(&bounce_lock);
+}
+
+int
+bus_dma_tag_set_iommu(bus_dma_tag_t tag)
+{
+
+	printf("%s\n", __func__);
+	tag->iommu = 1;
+
+	return (0);
 }
 
 struct bus_dma_impl bus_dma_bounce_impl = {
