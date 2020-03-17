@@ -42,7 +42,9 @@
 
 struct iovec;
 struct vmctx;
+#ifdef __amd64__
 enum x2apic_state;
+#endif
 
 /*
  * Different styles of mapping the memory assigned to a VM into the address
@@ -111,11 +113,13 @@ int	vm_parse_memsize(const char *optarg, size_t *memsize);
 int	vm_setup_memory(struct vmctx *ctx, size_t len, enum vm_mmap_style s);
 void	*vm_map_gpa(struct vmctx *ctx, vm_paddr_t gaddr, size_t len);
 int	vm_get_gpa_pmap(struct vmctx *, uint64_t gpa, uint64_t *pte, int *num);
+#ifdef __amd64__
 int	vm_gla2gpa(struct vmctx *, int vcpuid, struct vm_guest_paging *paging,
 		   uint64_t gla, int prot, uint64_t *gpa, int *fault);
 int	vm_gla2gpa_nofault(struct vmctx *, int vcpuid,
 		   struct vm_guest_paging *paging, uint64_t gla, int prot,
 		   uint64_t *gpa, int *fault);
+#endif
 uint32_t vm_get_lowmem_limit(struct vmctx *ctx);
 void	vm_set_lowmem_limit(struct vmctx *ctx, uint32_t limit);
 void	vm_set_memflags(struct vmctx *ctx, int flags);
@@ -126,8 +130,10 @@ int	vm_set_desc(struct vmctx *ctx, int vcpu, int reg,
 		    uint64_t base, uint32_t limit, uint32_t access);
 int	vm_get_desc(struct vmctx *ctx, int vcpu, int reg,
 		    uint64_t *base, uint32_t *limit, uint32_t *access);
+#ifdef __amd64__
 int	vm_get_seg_desc(struct vmctx *ctx, int vcpu, int reg,
 			struct seg_desc *seg_desc);
+#endif
 int	vm_set_register(struct vmctx *ctx, int vcpu, int reg, uint64_t val);
 int	vm_get_register(struct vmctx *ctx, int vcpu, int reg, uint64_t *retval);
 int	vm_set_register_set(struct vmctx *ctx, int vcpu, unsigned int count,
@@ -150,8 +156,10 @@ int	vm_ioapic_pincount(struct vmctx *ctx, int *pincount);
 int	vm_isa_assert_irq(struct vmctx *ctx, int atpic_irq, int ioapic_irq);
 int	vm_isa_deassert_irq(struct vmctx *ctx, int atpic_irq, int ioapic_irq);
 int	vm_isa_pulse_irq(struct vmctx *ctx, int atpic_irq, int ioapic_irq);
+#ifdef __amd64__
 int	vm_isa_set_irq_trigger(struct vmctx *ctx, int atpic_irq,
 	    enum vm_intr_trigger trigger);
+#endif
 int	vm_inject_nmi(struct vmctx *ctx, int vcpu);
 int	vm_capability_name2type(const char *capname);
 const char *vm_capability_type2name(int type);
@@ -181,8 +189,10 @@ uint64_t *vm_get_stats(struct vmctx *ctx, int vcpu, struct timeval *ret_tv,
 		       int *ret_entries);
 const char *vm_get_stat_desc(struct vmctx *ctx, int index);
 
+#ifdef __amd64__
 int	vm_get_x2apic_state(struct vmctx *ctx, int vcpu, enum x2apic_state *s);
 int	vm_set_x2apic_state(struct vmctx *ctx, int vcpu, enum x2apic_state s);
+#endif
 
 int	vm_get_hpet_capabilities(struct vmctx *ctx, uint32_t *capabilities);
 
@@ -195,9 +205,11 @@ int	vm_get_hpet_capabilities(struct vmctx *ctx, uint32_t *capabilities);
  *   0		  1		An exception was injected into the guest
  * EFAULT	 N/A		Error
  */
+#ifdef __amd64__
 int	vm_copy_setup(struct vmctx *ctx, int vcpu, struct vm_guest_paging *pg,
 	    uint64_t gla, size_t len, int prot, struct iovec *iov, int iovcnt,
 	    int *fault);
+#endif
 void	vm_copyin(struct vmctx *ctx, int vcpu, struct iovec *guest_iov,
 	    void *host_dst, size_t len);
 void	vm_copyout(struct vmctx *ctx, int vcpu, const void *host_src,

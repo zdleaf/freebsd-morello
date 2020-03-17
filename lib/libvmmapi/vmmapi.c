@@ -40,8 +40,10 @@ __FBSDID("$FreeBSD$");
 #include <sys/_iovec.h>
 #include <sys/cpuset.h>
 
+#ifdef __amd64__
 #include <x86/segments.h>
 #include <machine/specialreg.h>
+#endif
 
 #include <errno.h>
 #include <stdio.h>
@@ -512,6 +514,7 @@ done:
 	return (ptr);
 }
 
+#ifdef __amd64__
 int
 vm_set_desc(struct vmctx *ctx, int vcpu, int reg,
 	    uint64_t base, uint32_t limit, uint32_t access)
@@ -559,6 +562,7 @@ vm_get_seg_desc(struct vmctx *ctx, int vcpu, int reg, struct seg_desc *seg_desc)
 	    &seg_desc->access);
 	return (error);
 }
+#endif
 
 int
 vm_set_register(struct vmctx *ctx, int vcpu, int reg, uint64_t val)
@@ -590,6 +594,7 @@ vm_get_register(struct vmctx *ctx, int vcpu, int reg, uint64_t *ret_val)
 	return (error);
 }
 
+#ifdef __amd64__
 int
 vm_set_register_set(struct vmctx *ctx, int vcpu, unsigned int count,
     const int *regnums, uint64_t *regvals)
@@ -623,6 +628,7 @@ vm_get_register_set(struct vmctx *ctx, int vcpu, unsigned int count,
 	error = ioctl(ctx->fd, VM_GET_REGISTER_SET, &vmregset);
 	return (error);
 }
+#endif
 
 int
 vm_run(struct vmctx *ctx, int vcpu, struct vm_exit *vmexit)
@@ -655,6 +661,7 @@ vm_reinit(struct vmctx *ctx)
 	return (ioctl(ctx->fd, VM_REINIT, 0));
 }
 
+#ifdef __amd64__
 int
 vm_inject_exception(struct vmctx *ctx, int vcpu, int vector, int errcode_valid,
     uint32_t errcode, int restart_instruction)
@@ -815,6 +822,7 @@ vm_inject_nmi(struct vmctx *ctx, int vcpu)
 
 	return (ioctl(ctx->fd, VM_INJECT_NMI, &vmnmi));
 }
+#endif
 
 static struct {
 	const char	*name;
@@ -824,7 +832,9 @@ static struct {
 	{ "mtrap_exit",		VM_CAP_MTRAP_EXIT },
 	{ "pause_exit",		VM_CAP_PAUSE_EXIT },
 	{ "unrestricted_guest",	VM_CAP_UNRESTRICTED_GUEST },
+#ifdef __amd64__
 	{ "enable_invpcid",	VM_CAP_ENABLE_INVPCID },
+#endif
 	{ 0 }
 };
 
@@ -883,6 +893,7 @@ vm_set_capability(struct vmctx *ctx, int vcpu, enum vm_cap_type cap, int val)
 	return (ioctl(ctx->fd, VM_SET_CAPABILITY, &vmcap));
 }
 
+#ifdef __amd64__
 int
 vm_assign_pptdev(struct vmctx *ctx, int bus, int slot, int func)
 {
@@ -962,6 +973,7 @@ vm_setup_pptdev_msix(struct vmctx *ctx, int vcpu, int bus, int slot, int func,
 
 	return ioctl(ctx->fd, VM_PPTDEV_MSIX, &pptmsix);
 }
+#endif
 
 uint64_t *
 vm_get_stats(struct vmctx *ctx, int vcpu, struct timeval *ret_tv,
@@ -996,6 +1008,7 @@ vm_get_stat_desc(struct vmctx *ctx, int index)
 		return (NULL);
 }
 
+#ifdef __amd64__
 int
 vm_get_x2apic_state(struct vmctx *ctx, int vcpu, enum x2apic_state *state)
 {
@@ -1256,11 +1269,13 @@ vm_gla2gpa_nofault(struct vmctx *ctx, int vcpu, struct vm_guest_paging *paging,
 	}
 	return (error);
 }
+#endif
 
 #ifndef min
 #define	min(a,b)	(((a) < (b)) ? (a) : (b))
 #endif
 
+#ifdef __amd64__
 int
 vm_copy_setup(struct vmctx *ctx, int vcpu, struct vm_guest_paging *paging,
     uint64_t gla, size_t len, int prot, struct iovec *iov, int iovcnt,
@@ -1298,6 +1313,7 @@ vm_copy_setup(struct vmctx *ctx, int vcpu, struct vm_guest_paging *paging,
 	}
 	return (0);
 }
+#endif
 
 void
 vm_copy_teardown(struct vmctx *ctx, int vcpu, struct iovec *iov, int iovcnt)
@@ -1419,6 +1435,7 @@ vm_resume_cpu(struct vmctx *ctx, int vcpu)
 	return (error);
 }
 
+#ifdef __amd64__
 int
 vm_get_intinfo(struct vmctx *ctx, int vcpu, uint64_t *info1, uint64_t *info2)
 {
@@ -1539,6 +1556,7 @@ vm_get_topology(struct vmctx *ctx,
 	}
 	return (error);
 }
+#endif
 
 int
 vm_get_device_fd(struct vmctx *ctx)
@@ -1547,6 +1565,7 @@ vm_get_device_fd(struct vmctx *ctx)
 	return (ctx->fd);
 }
 
+#ifdef __amd64__
 const cap_ioctl_t *
 vm_get_ioctls(size_t *len)
 {
@@ -1583,3 +1602,4 @@ vm_get_ioctls(size_t *len)
 	*len = nitems(vm_ioctl_cmds);
 	return (NULL);
 }
+#endif
