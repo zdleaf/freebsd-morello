@@ -1383,18 +1383,18 @@ smmu_insert(vm_paddr_t pa, vm_offset_t va, vm_size_t size)
 
 	p = &sc->p;
 
-	size = roundup2(size, PAGE_SIZE);
+	//size = roundup2(size, PAGE_SIZE);
 
 	device_printf(sc->dev, "%s: pa %lx va %lx size %lx\n",
 	    __func__, pa, va, size);
 
-	prot = VM_PROT_ALL;
+	prot = VM_PROT_READ | VM_PROT_WRITE;
 
 	for (; size > 0; size -= PAGE_SIZE) {
 		m = PHYS_TO_VM_PAGE(pa);
 		if (m == NULL)
 			panic("page not found for pa %lx\n", pa);
-		pmap_enter(p, va, m, prot, prot | PMAP_ENTER_WIRED, 0);
+		pmap_enter_smmu(p, va, m, prot, prot | PMAP_ENTER_WIRED, 0);
 		pa += PAGE_SIZE;
 	}
 }
@@ -1405,6 +1405,7 @@ smmu_unmap(bus_dma_segment_t *segs, int nsegs)
 	struct smmu_softc *sc;
 	vm_offset_t sva;
 	vm_offset_t eva;
+	vm_size_t size;
 	int i;
 
 	sc = smmu_sc;
@@ -1412,10 +1413,12 @@ smmu_unmap(bus_dma_segment_t *segs, int nsegs)
 		panic("here");
 
 	for (i = 0; i < nsegs; i++) {
-		sva = segs[i].ds_addr;
-		eva = sva + segs[i].ds_len;
-		//device_printf(sc->dev, "%s: sva %lx eva %lx\n",
-		//    __func__, sva, eva);
+		sva = segs[i].ds_addr & ~0xfff;
+		size = roundup2(segs[i].ds_len, PAGE_SIZE);
+		//eva = sva + segs[i].ds_len;
+		eva = sva + size;
+		device_printf(sc->dev, "%s: sva %lx eva %lx\n",
+		    __func__, sva, eva);
 		pmap_remove(&sc->p, sva, eva);
 	}
 }
@@ -1433,19 +1436,20 @@ smmu_map(bus_dma_segment_t *segs, int nsegs)
 		panic("here");
 
 	for (i = 0; i < nsegs; i++) {
-		size = segs[i].ds_len;
-		size = roundup2(size, PAGE_SIZE);
+		printf("%s: len %lx\n", __func__, segs[i].ds_len);
+		size = roundup2(segs[i].ds_len, PAGE_SIZE);
 
 		if (vmem_alloc(sc->vmem, size,
 		    M_FIRSTFIT | M_NOWAIT, &va))
 			panic("Could not allocate virtual address.\n");
 
-		if (1 == 0)
-			smmu_insert(segs[i].ds_addr, segs[i].ds_addr, size);
-		else {
+		if (1 == 0) {
+			pmap_enter_device(&sc->p, va, size,
+			    segs[i].ds_addr, VM_MEMATTR_DEVICE);
+		} else {
 			smmu_insert(segs[i].ds_addr, va, size);
-			segs[i].ds_addr = va;
-			segs[i].ds_len = size;
+			segs[i].ds_addr = va | (segs[i].ds_addr & 0xfff);
+			//segs[i].ds_len = size;
 		}
 	}
 }

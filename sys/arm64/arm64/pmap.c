@@ -3418,6 +3418,283 @@ dprintf(const char *fmt, ...)
 	return (retval);
 }
 
+int
+pmap_enter_smmu(pmap_t pmap, vm_offset_t va, vm_page_t m, vm_prot_t prot,
+    u_int flags, int8_t psind)
+{
+	struct rwlock *lock;
+	pd_entry_t *pde;
+	pt_entry_t new_l3, orig_l3;
+	pt_entry_t *l2, *l3;
+	pv_entry_t pv;
+	vm_paddr_t opa, pa;
+	vm_page_t mpte, om;
+	boolean_t nosleep;
+	int lvl, rv;
+
+	PMAP_ASSERT_STAGE1(pmap);
+
+	va = trunc_page(va);
+	if ((m->oflags & VPO_UNMANAGED) == 0)
+		VM_PAGE_OBJECT_BUSY_ASSERT(m);
+	pa = VM_PAGE_TO_PHYS(m);
+	printf("%s: va %lx pa %lx\n", __func__, va, pa);
+	//new_l3 = (pt_entry_t)(pa | ATTR_DEFAULT |
+	//    ATTR_S1_IDX(m->md.pv_memattr) | L3_PAGE);
+	new_l3 = (pt_entry_t)(pa | ATTR_DEFAULT |
+	    ATTR_S1_IDX(VM_MEMATTR_UNCACHEABLE) | L3_PAGE);
+	if ((prot & VM_PROT_WRITE) == 0)
+		new_l3 |= ATTR_S1_AP(ATTR_S1_AP_RO);
+	new_l3 |= ATTR_S1_XN;
+	if ((flags & PMAP_ENTER_WIRED) != 0)
+		new_l3 |= ATTR_SW_WIRED;
+	if (va < VM_MAXUSER_ADDRESS)
+		new_l3 |= ATTR_S1_AP(ATTR_S1_AP_USER) | ATTR_S1_PXN;
+	else
+		new_l3 |= ATTR_S1_UXN;
+	if (pmap != kernel_pmap)
+		new_l3 |= ATTR_S1_nG;
+	if ((m->oflags & VPO_UNMANAGED) == 0) {
+		new_l3 |= ATTR_SW_MANAGED;
+		if ((prot & VM_PROT_WRITE) != 0) {
+			new_l3 |= ATTR_SW_DBM;
+			if ((flags & VM_PROT_WRITE) == 0)
+				new_l3 |= ATTR_S1_AP(ATTR_S1_AP_RO);
+		}
+	}
+
+	CTR2(KTR_PMAP, "pmap_enter: %.16lx -> %.16lx", va, pa);
+
+	lock = NULL;
+	PMAP_LOCK(pmap);
+	if (psind == 1) {
+		/* Assert the required virtual and physical alignment. */
+		KASSERT((va & L2_OFFSET) == 0, ("pmap_enter: va unaligned"));
+		KASSERT(m->psind > 0, ("pmap_enter: m->psind < psind"));
+		rv = pmap_enter_l2(pmap, va, (new_l3 & ~L3_PAGE) | L2_BLOCK,
+		    flags, m, &lock);
+		goto out;
+	}
+	mpte = NULL;
+
+	/*
+	 * In the case that a page table page is not
+	 * resident, we are creating it here.
+	 */
+retry:
+	pde = pmap_pde(pmap, va, &lvl);
+	if (pde != NULL && lvl == 2) {
+		l3 = pmap_l2_to_l3(pde, va);
+		if (va < VM_MAXUSER_ADDRESS && mpte == NULL) {
+			mpte = PHYS_TO_VM_PAGE(pmap_load(pde) & ~ATTR_MASK);
+			mpte->ref_count++;
+		}
+		goto havel3;
+	} else if (pde != NULL && lvl == 1) {
+		l2 = pmap_l1_to_l2(pde, va);
+		if ((pmap_load(l2) & ATTR_DESCR_MASK) == L2_BLOCK &&
+		    (l3 = pmap_demote_l2_locked(pmap, l2, va, &lock)) != NULL) {
+			l3 = &l3[pmap_l3_index(va)];
+			if (va < VM_MAXUSER_ADDRESS) {
+				mpte = PHYS_TO_VM_PAGE(
+				    pmap_load(l2) & ~ATTR_MASK);
+				mpte->ref_count++;
+			}
+			goto havel3;
+		}
+		/* We need to allocate an L3 table. */
+	}
+	if (va < VM_MAXUSER_ADDRESS) {
+		nosleep = (flags & PMAP_ENTER_NOSLEEP) != 0;
+
+		/*
+		 * We use _pmap_alloc_l3() instead of pmap_alloc_l3() in order
+		 * to handle the possibility that a superpage mapping for "va"
+		 * was created while we slept.
+		 */
+		mpte = _pmap_alloc_l3(pmap, pmap_l2_pindex(va),
+		    nosleep ? NULL : &lock);
+		if (mpte == NULL && nosleep) {
+			CTR0(KTR_PMAP, "pmap_enter: mpte == NULL");
+			rv = KERN_RESOURCE_SHORTAGE;
+			goto out;
+		}
+		goto retry;
+	} else
+		panic("pmap_enter: missing L3 table for kernel va %#lx", va);
+
+havel3:
+	orig_l3 = pmap_load(l3);
+	opa = orig_l3 & ~ATTR_MASK;
+	pv = NULL;
+
+	/*
+	 * Is the specified virtual address already mapped?
+	 */
+	if (pmap_l3_valid(orig_l3)) {
+		/*
+		 * Wiring change, just update stats. We don't worry about
+		 * wiring PT pages as they remain resident as long as there
+		 * are valid mappings in them. Hence, if a user page is wired,
+		 * the PT page will be also.
+		 */
+		if ((flags & PMAP_ENTER_WIRED) != 0 &&
+		    (orig_l3 & ATTR_SW_WIRED) == 0)
+			pmap->pm_stats.wired_count++;
+		else if ((flags & PMAP_ENTER_WIRED) == 0 &&
+		    (orig_l3 & ATTR_SW_WIRED) != 0)
+			pmap->pm_stats.wired_count--;
+
+		/*
+		 * Remove the extra PT page reference.
+		 */
+		if (mpte != NULL) {
+			mpte->ref_count--;
+			KASSERT(mpte->ref_count > 0,
+			    ("pmap_enter: missing reference to page table page,"
+			     " va: 0x%lx", va));
+		}
+
+		/*
+		 * Has the physical page changed?
+		 */
+		if (opa == pa) {
+			/*
+			 * No, might be a protection or wiring change.
+			 */
+			if ((orig_l3 & ATTR_SW_MANAGED) != 0 &&
+			    (new_l3 & ATTR_SW_DBM) != 0)
+				vm_page_aflag_set(m, PGA_WRITEABLE);
+			goto validate;
+		}
+
+		/*
+		 * The physical page has changed.  Temporarily invalidate
+		 * the mapping.
+		 */
+		orig_l3 = pmap_load_clear(l3);
+		KASSERT((orig_l3 & ~ATTR_MASK) == opa,
+		    ("pmap_enter: unexpected pa update for %#lx", va));
+		if ((orig_l3 & ATTR_SW_MANAGED) != 0) {
+			om = PHYS_TO_VM_PAGE(opa);
+
+			/*
+			 * The pmap lock is sufficient to synchronize with
+			 * concurrent calls to pmap_page_test_mappings() and
+			 * pmap_ts_referenced().
+			 */
+			if (pmap_pte_dirty(pmap, orig_l3))
+				vm_page_dirty(om);
+			if ((orig_l3 & ATTR_AF) != 0) {
+				pmap_invalidate_page(pmap, va);
+				vm_page_aflag_set(om, PGA_REFERENCED);
+			}
+			CHANGE_PV_LIST_LOCK_TO_PHYS(&lock, opa);
+			pv = pmap_pvh_remove(&om->md, pmap, va);
+			if ((m->oflags & VPO_UNMANAGED) != 0)
+				free_pv_entry(pmap, pv);
+			if ((om->a.flags & PGA_WRITEABLE) != 0 &&
+			    TAILQ_EMPTY(&om->md.pv_list) &&
+			    ((om->flags & PG_FICTITIOUS) != 0 ||
+			    TAILQ_EMPTY(&pa_to_pvh(opa)->pv_list)))
+				vm_page_aflag_clear(om, PGA_WRITEABLE);
+		} else {
+			KASSERT((orig_l3 & ATTR_AF) != 0,
+			    ("pmap_enter: unmanaged mapping lacks ATTR_AF"));
+			pmap_invalidate_page(pmap, va);
+		}
+		orig_l3 = 0;
+	} else {
+		/*
+		 * Increment the counters.
+		 */
+		if ((new_l3 & ATTR_SW_WIRED) != 0)
+			pmap->pm_stats.wired_count++;
+		pmap_resident_count_inc(pmap, 1);
+	}
+	/*
+	 * Enter on the PV list if part of our managed memory.
+	 */
+	if ((m->oflags & VPO_UNMANAGED) == 0) {
+		if (pv == NULL) {
+			pv = get_pv_entry(pmap, &lock);
+			pv->pv_va = va;
+		}
+		CHANGE_PV_LIST_LOCK_TO_PHYS(&lock, pa);
+		TAILQ_INSERT_TAIL(&m->md.pv_list, pv, pv_next);
+		m->md.pv_gen++;
+		if ((new_l3 & ATTR_SW_DBM) != 0)
+			vm_page_aflag_set(m, PGA_WRITEABLE);
+	}
+
+validate:
+	/*
+	 * Sync icache if exec permission and attribute VM_MEMATTR_WRITE_BACK
+	 * is set. Do it now, before the mapping is stored and made
+	 * valid for hardware table walk. If done later, then other can
+	 * access this page before caches are properly synced.
+	 * Don't do it for kernel memory which is mapped with exec
+	 * permission even if the memory isn't going to hold executable
+	 * code. The only time when icache sync is needed is after
+	 * kernel module is loaded and the relocation info is processed.
+	 * And it's done in elf_cpu_load_file().
+	*/
+	if ((prot & VM_PROT_EXECUTE) &&  pmap != kernel_pmap &&
+	    m->md.pv_memattr == VM_MEMATTR_WRITE_BACK &&
+	    (opa != pa || (orig_l3 & ATTR_S1_XN)))
+		cpu_icache_sync_range(PHYS_TO_DMAP(pa), PAGE_SIZE);
+
+	/*
+	 * Update the L3 entry
+	 */
+	if (pmap_l3_valid(orig_l3)) {
+		KASSERT(opa == pa, ("pmap_enter: invalid update"));
+		if ((orig_l3 & ~ATTR_AF) != (new_l3 & ~ATTR_AF)) {
+			/* same PA, different attributes */
+			orig_l3 = pmap_load_store(l3, new_l3);
+			pmap_invalidate_page(pmap, va);
+			if ((orig_l3 & ATTR_SW_MANAGED) != 0 &&
+			    pmap_pte_dirty(pmap, orig_l3))
+				vm_page_dirty(m);
+		} else {
+			/*
+			 * orig_l3 == new_l3
+			 * This can happens if multiple threads simultaneously
+			 * access not yet mapped page. This bad for performance
+			 * since this can cause full demotion-NOP-promotion
+			 * cycle.
+			 * Another possible reasons are:
+			 * - VM and pmap memory layout are diverged
+			 * - tlb flush is missing somewhere and CPU doesn't see
+			 *   actual mapping.
+			 */
+			CTR4(KTR_PMAP, "%s: already mapped page - "
+			    "pmap %p va 0x%#lx pte 0x%lx",
+			    __func__, pmap, va, new_l3);
+		}
+	} else {
+		/* New mapping */
+		pmap_store(l3, new_l3);
+		dsb(ishst);
+	}
+
+#if VM_NRESERVLEVEL > 0
+	if ((mpte == NULL || mpte->ref_count == NL3PG) &&
+	    pmap_ps_enabled(pmap) &&
+	    (m->flags & PG_FICTITIOUS) == 0 &&
+	    vm_reserv_level_iffullpop(m) == 0) {
+		pmap_promote_l2(pmap, pde, va, &lock);
+	}
+#endif
+
+	rv = KERN_SUCCESS;
+out:
+	if (lock != NULL)
+		rw_wunlock(lock);
+	PMAP_UNLOCK(pmap);
+	return (rv);
+}
+
 /*
  *	Insert the given physical page (p) at
  *	the specified virtual address (v) in the
@@ -3488,13 +3765,11 @@ pmap_enter(pmap_t pmap, vm_offset_t va, vm_page_t m, vm_prot_t prot,
 	}
 	mpte = NULL;
 
-dprintf("%s\n", __func__);
 	/*
 	 * In the case that a page table page is not
 	 * resident, we are creating it here.
 	 */
 retry:
-	dprintf("%s 1\n", __func__);
 	pde = pmap_pde(pmap, va, &lvl);
 	if (pde != NULL && lvl == 2) {
 		l3 = pmap_l2_to_l3(pde, va);
@@ -3537,7 +3812,6 @@ retry:
 		panic("pmap_enter: missing L3 table for kernel va %#lx", va);
 
 havel3:
-	dprintf("%s 2\n", __func__);
 	orig_l3 = pmap_load(l3);
 	opa = orig_l3 & ~ATTR_MASK;
 	pv = NULL;
@@ -3581,8 +3855,6 @@ havel3:
 				vm_page_aflag_set(m, PGA_WRITEABLE);
 			goto validate;
 		}
-
-dprintf("%s 3\n", __func__);
 
 		/*
 		 * The physical page has changed.  Temporarily invalidate
@@ -3643,7 +3915,6 @@ dprintf("%s 3\n", __func__);
 			vm_page_aflag_set(m, PGA_WRITEABLE);
 	}
 
-dprintf("%s 4\n", __func__);
 validate:
 	/*
 	 * Sync icache if exec permission and attribute VM_MEMATTR_WRITE_BACK
@@ -3694,8 +3965,6 @@ validate:
 		pmap_store(l3, new_l3);
 		dsb(ishst);
 	}
-
-dprintf("%s 5\n", __func__);
 
 #if VM_NRESERVLEVEL > 0
 	if ((mpte == NULL || mpte->ref_count == NL3PG) &&
