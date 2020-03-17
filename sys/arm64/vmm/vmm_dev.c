@@ -52,6 +52,8 @@ __FBSDID("$FreeBSD$");
 #include <machine/vmm.h>
 #include <machine/vmm_dev.h>
 
+#include "vmm_stat.h"
+
 struct devmem_softc {
 	int	segid;
 	char	*name;
@@ -335,13 +337,20 @@ vmmdev_ioctl(struct cdev *cdev, u_long cmd, caddr_t data, int fflag,
 	int error, vcpu, state_changed, size;
 	cpuset_t *cpuset;
 	struct vmmdev_softc *sc;
-	struct vm_run *vmrun;
 	struct vm_register *vmreg;
+	struct vm_register_set *vmregset;
+	struct vm_run *vmrun;
 	struct vm_activate_cpu *vac;
 	struct vm_attach_vgic *vav;
 	struct vm_cpuset *vm_cpuset;
 	struct vm_irq *vi;
+	struct vm_capability *vmcap;
+	struct vm_stats *vmstats;
+	struct vm_stat_desc *statdesc;
+	struct vm_suspend *vmsuspend;
 	struct vm_memmap *mm;
+	uint64_t *regvals;
+	int *regnums;
 
 	error = vmm_priv_check(curthread->td_ucred);
 	if (error)
@@ -362,6 +371,11 @@ vmmdev_ioctl(struct cdev *cdev, u_long cmd, caddr_t data, int fflag,
 	case VM_RUN:
 	case VM_GET_REGISTER:
 	case VM_SET_REGISTER:
+	case VM_GET_REGISTER_SET:
+	case VM_SET_REGISTER_SET:
+	case VM_GET_CAPABILITY:
+	case VM_SET_CAPABILITY:
+	case VM_ACTIVATE_CPU:
 		/*
 		 * XXX fragile, handle with care
 		 * Assumes that the first field of the ioctl data is the vcpu.
@@ -375,6 +389,7 @@ vmmdev_ioctl(struct cdev *cdev, u_long cmd, caddr_t data, int fflag,
 
 	case VM_ALLOC_MEMSEG:
 	case VM_MMAP_MEMSEG:
+	case VM_REINIT:
 	case VM_ATTACH_VGIC:
 		/*
 		 * ioctls that operate on the entire virtual machine must
@@ -414,6 +429,27 @@ vmmdev_ioctl(struct cdev *cdev, u_long cmd, caddr_t data, int fflag,
 		vmrun = (struct vm_run *)data;
 		error = vm_run(sc->vm, vmrun);
 		break;
+	case VM_SUSPEND:
+		vmsuspend = (struct vm_suspend *)data;
+		error = vm_suspend(sc->vm, vmsuspend->how);
+		break;
+	case VM_REINIT:
+		error = vm_reinit(sc->vm);
+		break;
+	case VM_STAT_DESC: {
+		statdesc = (struct vm_stat_desc *)data;
+		error = vmm_stat_desc_copy(statdesc->index,
+					statdesc->desc, sizeof(statdesc->desc));
+		break;
+	}
+	case VM_STATS: {
+		CTASSERT(MAX_VM_STATS >= MAX_VMM_STAT_ELEMS);
+		vmstats = (struct vm_stats *)data;
+		getmicrotime(&vmstats->tv);
+		error = vmm_stat_copy(sc->vm, vmstats->cpuid,
+				      &vmstats->num_entries, vmstats->statbuf);
+		break;
+	}
 	case VM_MMAP_GETNEXT:
 		mm = (struct vm_memmap *)data;
 		error = vm_mmap_getnext(sc->vm, &mm->gpa, &mm->segid,
@@ -440,6 +476,60 @@ vmmdev_ioctl(struct cdev *cdev, u_long cmd, caddr_t data, int fflag,
 		error = vm_set_register(sc->vm, vmreg->cpuid, vmreg->regnum,
 					vmreg->regval);
 		break;
+	case VM_GET_REGISTER_SET:
+		vmregset = (struct vm_register_set *)data;
+		if (vmregset->count > VM_REG_LAST) {
+			error = EINVAL;
+			break;
+		}
+		regvals = malloc(sizeof(regvals[0]) * vmregset->count, M_VMMDEV,
+		    M_WAITOK);
+		regnums = malloc(sizeof(regnums[0]) * vmregset->count, M_VMMDEV,
+		    M_WAITOK);
+		error = copyin(vmregset->regnums, regnums, sizeof(regnums[0]) *
+		    vmregset->count);
+		if (error == 0)
+			error = vm_get_register_set(sc->vm, vmregset->cpuid,
+			    vmregset->count, regnums, regvals);
+		if (error == 0)
+			error = copyout(regvals, vmregset->regvals,
+			    sizeof(regvals[0]) * vmregset->count);
+		free(regvals, M_VMMDEV);
+		free(regnums, M_VMMDEV);
+		break;
+	case VM_SET_REGISTER_SET:
+		vmregset = (struct vm_register_set *)data;
+		if (vmregset->count > VM_REG_LAST) {
+			error = EINVAL;
+			break;
+		}
+		regvals = malloc(sizeof(regvals[0]) * vmregset->count, M_VMMDEV,
+		    M_WAITOK);
+		regnums = malloc(sizeof(regnums[0]) * vmregset->count, M_VMMDEV,
+		    M_WAITOK);
+		error = copyin(vmregset->regnums, regnums, sizeof(regnums[0]) *
+		    vmregset->count);
+		if (error == 0)
+			error = copyin(vmregset->regvals, regvals,
+			    sizeof(regvals[0]) * vmregset->count);
+		if (error == 0)
+			error = vm_set_register_set(sc->vm, vmregset->cpuid,
+			    vmregset->count, regnums, regvals);
+		free(regvals, M_VMMDEV);
+		free(regnums, M_VMMDEV);
+		break;
+	case VM_GET_CAPABILITY:
+		vmcap = (struct vm_capability *)data;
+		error = vm_get_capability(sc->vm, vmcap->cpuid,
+					  vmcap->captype,
+					  &vmcap->capval);
+		break;
+	case VM_SET_CAPABILITY:
+		vmcap = (struct vm_capability *)data;
+		error = vm_set_capability(sc->vm, vmcap->cpuid,
+					  vmcap->captype,
+					  vmcap->capval);
+		break;
 	case VM_ACTIVATE_CPU:
 		vac = (struct vm_activate_cpu *)data;
 		error = vm_activate_cpu(sc->vm, vac->vcpuid);
@@ -464,6 +554,14 @@ vmmdev_ioctl(struct cdev *cdev, u_long cmd, caddr_t data, int fflag,
 		if (error == 0)
 			error = copyout(cpuset, vm_cpuset->cpus, size);
 		free(cpuset, M_TEMP);
+		break;
+	case VM_SUSPEND_CPU:
+		vac = (struct vm_activate_cpu *)data;
+		error = vm_suspend_cpu(sc->vm, vac->vcpuid);
+		break;
+	case VM_RESUME_CPU:
+		vac = (struct vm_activate_cpu *)data;
+		error = vm_resume_cpu(sc->vm, vac->vcpuid);
 		break;
 	case VM_ATTACH_VGIC:
 		vav = (struct vm_attach_vgic *)data;

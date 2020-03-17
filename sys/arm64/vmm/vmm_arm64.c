@@ -775,6 +775,20 @@ arm_setreg(void *arg, int vcpu, int reg, uint64_t val)
 	}
 }
 
+static int
+arm_setcap(void *arg, int vcpu, int type, int val)
+{
+
+	return (ENOENT);
+}
+
+static int
+arm_getcap(void *arg, int vcpu, int type, int *retval)
+{
+
+	return (ENOENT);
+}
+
 static
 void arm_restore(void)
 {
@@ -790,8 +804,8 @@ struct vmm_ops vmm_ops_arm = {
 	.vmcleanup = arm_vmcleanup,
 	.vmgetreg = arm_getreg,
 	.vmsetreg = arm_setreg,
-	.vmgetcap = NULL, 		/* vmi_get_cap_t */
-	.vmsetcap = NULL, 		/* vmi_set_cap_t */
+	.vmgetcap = arm_getcap,
+	.vmsetcap = arm_setcap,
 	.vmspace_alloc	= arm_vmspace_alloc,
 	.vmspace_free	= arm_vmspace_free,
 };

@@ -185,10 +185,13 @@ uint16_t vm_get_maxcpus(struct vm *vm);
 int vm_get_register(struct vm *vm, int vcpu, int reg, uint64_t *retval);
 int vm_set_register(struct vm *vm, int vcpu, int reg, uint64_t val);
 int vm_run(struct vm *vm, struct vm_run *vmrun);
+int vm_suspend(struct vm *vm, enum vm_suspend_how how);
 void* vm_get_cookie(struct vm *vm);
 int vm_get_capability(struct vm *vm, int vcpu, int type, int *val);
 int vm_set_capability(struct vm *vm, int vcpu, int type, int val);
 int vm_activate_cpu(struct vm *vm, int vcpu);
+int vm_suspend_cpu(struct vm *vm, int vcpu);
+int vm_resume_cpu(struct vm *vm, int vcpu);
 int vm_attach_vgic(struct vm *vm, uint64_t dist_start, size_t dist_size,
 		   uint64_t redist_start, size_t redist_size);
 int vm_assert_irq(struct vm *vm, uint32_t irq);

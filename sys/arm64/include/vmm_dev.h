@@ -55,6 +55,13 @@ struct vm_register {
 	uint64_t	regval;
 };
 
+struct vm_register_set {
+	int		cpuid;
+	unsigned int	count;
+	const int	*regnums;	/* enum vm_reg_name */
+	uint64_t	*regvals;
+};
+
 struct vm_run {
 	int		cpuid;
 	uint64_t	pc;
@@ -88,7 +95,6 @@ struct vm_stat_desc {
 	int		index;				/* in */
 	char		desc[128];			/* out */
 };
-
 
 struct vm_suspend {
 	enum vm_suspend_how how;
@@ -146,6 +152,8 @@ enum {
 	/* register/state accessors */
 	IOCNUM_SET_REGISTER = 20,
 	IOCNUM_GET_REGISTER = 21,
+	IOCNUM_SET_REGISTER_SET = 24,
+	IOCNUM_GET_REGISTER_SET = 25,
 
 	/* statistics */
 	IOCNUM_VM_STATS = 50, 
@@ -158,6 +166,8 @@ enum {
 	/* vm_cpuset */
 	IOCNUM_ACTIVATE_CPU = 90,
 	IOCNUM_GET_CPUSET = 91,
+	IOCNUM_SUSPEND_CPU = 92,
+	IOCNUM_RESUME_CPU = 93,
 
 	/* vm_attach_vgic */
 	IOCNUM_ATTACH_VGIC = 110,
@@ -181,6 +191,10 @@ enum {
 	_IOW('v', IOCNUM_SET_REGISTER, struct vm_register)
 #define	VM_GET_REGISTER \
 	_IOWR('v', IOCNUM_GET_REGISTER, struct vm_register)
+#define	VM_SET_REGISTER_SET \
+	_IOW('v', IOCNUM_SET_REGISTER_SET, struct vm_register_set)
+#define	VM_GET_REGISTER_SET \
+	_IOWR('v', IOCNUM_GET_REGISTER_SET, struct vm_register_set)
 #define	VM_SET_CAPABILITY \
 	_IOW('v', IOCNUM_SET_CAPABILITY, struct vm_capability)
 #define	VM_GET_CAPABILITY \
@@ -199,6 +213,10 @@ enum {
 	_IOW('v', IOCNUM_ACTIVATE_CPU, struct vm_activate_cpu)
 #define	VM_GET_CPUS	\
 	_IOW('v', IOCNUM_GET_CPUSET, struct vm_cpuset)
+#define	VM_SUSPEND_CPU \
+	_IOW('v', IOCNUM_SUSPEND_CPU, struct vm_activate_cpu)
+#define	VM_RESUME_CPU \
+	_IOW('v', IOCNUM_RESUME_CPU, struct vm_activate_cpu)
 #define	VM_ATTACH_VGIC	\
 	_IOW('v', IOCNUM_ATTACH_VGIC, struct vm_attach_vgic)
 #endif

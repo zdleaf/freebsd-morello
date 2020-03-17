@@ -184,6 +184,7 @@ SYSCTL_INT(_hw_vmm, OID_AUTO, trace_guest_exceptions, CTLFLAG_RDTUN,
 
 static void vm_free_memmap(struct vm *vm, int ident);
 static bool sysmem_mapping(struct vm *vm, struct mem_map *mm);
+static void vcpu_notify_event_locked(struct vcpu *vcpu, bool lapic_intr);
 
 static void
 vcpu_cleanup(struct vm *vm, int i, bool destroy)
@@ -800,6 +801,37 @@ out:
 }
 
 int
+vm_suspend(struct vm *vm, enum vm_suspend_how how)
+{
+	int i;
+
+	if (how <= VM_SUSPEND_NONE || how >= VM_SUSPEND_LAST)
+		return (EINVAL);
+
+	if (atomic_cmpset_int(&vm->suspend, 0, how) == 0) {
+#if 0
+		VM_CTR2(vm, "virtual machine already suspended %d/%d",
+		    vm->suspend, how);
+#endif
+		return (EALREADY);
+	}
+
+#if 0
+	VM_CTR1(vm, "virtual machine successfully suspended %d", how);
+#endif
+
+	/*
+	 * Notify all active vcpus that they are now suspended.
+	 */
+	for (i = 0; i < vm->maxcpus; i++) {
+		if (CPU_ISSET(i, &vm->active_cpus))
+			vcpu_notify_event(vm, i, false);
+	}
+
+	return (0);
+}
+
+int
 vm_run(struct vm *vm, struct vm_run *vmrun)
 {
 	int error, vcpuid;
@@ -890,6 +922,49 @@ vm_activate_cpu(struct vm *vm, int vcpuid)
 
 }
 
+int
+vm_suspend_cpu(struct vm *vm, int vcpuid)
+{
+	int i;
+
+	if (vcpuid < -1 || vcpuid >= vm->maxcpus)
+		return (EINVAL);
+
+	if (vcpuid == -1) {
+		vm->debug_cpus = vm->active_cpus;
+		for (i = 0; i < vm->maxcpus; i++) {
+			if (CPU_ISSET(i, &vm->active_cpus))
+				vcpu_notify_event(vm, i, false);
+		}
+	} else {
+		if (!CPU_ISSET(vcpuid, &vm->active_cpus))
+			return (EINVAL);
+
+		CPU_SET_ATOMIC(vcpuid, &vm->debug_cpus);
+		vcpu_notify_event(vm, vcpuid, false);
+	}
+	return (0);
+}
+
+int
+vm_resume_cpu(struct vm *vm, int vcpuid)
+{
+
+	if (vcpuid < -1 || vcpuid >= vm->maxcpus)
+		return (EINVAL);
+
+	if (vcpuid == -1) {
+		CPU_ZERO(&vm->debug_cpus);
+	} else {
+		if (!CPU_ISSET(vcpuid, &vm->debug_cpus))
+			return (EINVAL);
+
+		CPU_CLR_ATOMIC(vcpuid, &vm->debug_cpus);
+	}
+	return (0);
+}
+
+
 cpuset_t
 vm_active_cpus(struct vm *vm)
 {
@@ -917,6 +992,58 @@ vcpu_stats(struct vm *vm, int vcpuid)
 {
 
 	return (vm->vcpu[vcpuid].stats);
+}
+
+/*
+ * This function is called to ensure that a vcpu "sees" a pending event
+ * as soon as possible:
+ * - If the vcpu thread is sleeping then it is woken up.
+ * - If the vcpu is running on a different host_cpu then an IPI will be directed
+ *   to the host_cpu to cause the vcpu to trap into the hypervisor.
+ */
+static void
+vcpu_notify_event_locked(struct vcpu *vcpu, bool lapic_intr)
+{
+	int hostcpu;
+
+	KASSERT(lapic_intr == false, ("%s: lapic_intr != false", __func__));
+	hostcpu = vcpu->hostcpu;
+	if (vcpu->state == VCPU_RUNNING) {
+		KASSERT(hostcpu != NOCPU, ("vcpu running on invalid hostcpu"));
+		if (hostcpu != curcpu) {
+#if 0
+			if (lapic_intr) {
+				vlapic_post_intr(vcpu->vlapic, hostcpu,
+				    vmm_ipinum);
+			} else
+#endif
+			{
+				ipi_cpu(hostcpu, vmm_ipinum);
+			}
+		} else {
+			/*
+			 * If the 'vcpu' is running on 'curcpu' then it must
+			 * be sending a notification to itself (e.g. SELF_IPI).
+			 * The pending event will be picked up when the vcpu
+			 * transitions back to guest context.
+			 */
+		}
+	} else {
+		KASSERT(hostcpu == NOCPU, ("vcpu state %d not consistent "
+		    "with hostcpu %d", vcpu->state, hostcpu));
+		if (vcpu->state == VCPU_SLEEPING)
+			wakeup_one(vcpu);
+	}
+}
+
+void
+vcpu_notify_event(struct vm *vm, int vcpuid, bool lapic_intr)
+{
+	struct vcpu *vcpu = &vm->vcpu[vcpuid];
+
+	vcpu_lock(vcpu);
+	vcpu_notify_event_locked(vcpu, lapic_intr);
+	vcpu_unlock(vcpu);
 }
 
 static int
@@ -981,6 +1108,30 @@ vcpu_set_state_locked(struct vcpu *vcpu, enum vcpu_state newstate,
 		wakeup(&vcpu->state);
 
 	return (0);
+}
+
+int
+vm_get_capability(struct vm *vm, int vcpu, int type, int *retval)
+{
+	if (vcpu < 0 || vcpu >= vm->maxcpus)
+		return (EINVAL);
+
+	if (type < 0 || type >= VM_CAP_MAX)
+		return (EINVAL);
+
+	return (VMGETCAP(vm->cookie, vcpu, type, retval));
+}
+
+int
+vm_set_capability(struct vm *vm, int vcpu, int type, int val)
+{
+	if (vcpu < 0 || vcpu >= vm->maxcpus)
+		return (EINVAL);
+
+	if (type < 0 || type >= VM_CAP_MAX)
+		return (EINVAL);
+
+	return (VMSETCAP(vm->cookie, vcpu, type, val));
 }
 
 int
