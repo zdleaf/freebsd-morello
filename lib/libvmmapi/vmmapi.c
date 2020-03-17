@@ -71,12 +71,16 @@ __FBSDID("$FreeBSD$");
 #define	PROT_RW		(PROT_READ | PROT_WRITE)
 #define	PROT_ALL	(PROT_READ | PROT_WRITE | PROT_EXEC)
 
+struct mem_region {
+	size_t base;	/* The base address */
+	size_t limit;	/* The limit of the size in this region */
+	size_t size;	/* The allocated size in this region */
+};
+
 struct vmctx {
 	int	fd;
-	uint32_t lowmem_limit;
+	struct mem_region regions[2];
 	int	memflags;
-	size_t	lowmem;
-	size_t	highmem;
 	char	*baseaddr;
 	char	*name;
 };
@@ -121,7 +125,14 @@ vm_open(const char *name)
 
 	vm->fd = -1;
 	vm->memflags = 0;
-	vm->lowmem_limit = 3 * GB;
+
+	vm->regions[0].base = 0;
+	vm->regions[0].limit = 3 * GB;
+	vm->regions[0].size = 0;
+
+	vm->regions[1].base = 4 * GB;
+	vm->regions[1].limit = SIZE_T_MAX;
+	vm->regions[1].size = 0;
 	vm->name = (char *)(vm + 1);
 	strcpy(vm->name, name);
 
@@ -174,14 +185,14 @@ uint32_t
 vm_get_lowmem_limit(struct vmctx *ctx)
 {
 
-	return (ctx->lowmem_limit);
+	return (ctx->regions[0].limit);
 }
 
 void
 vm_set_lowmem_limit(struct vmctx *ctx, uint32_t limit)
 {
 
-	ctx->lowmem_limit = limit;
+	ctx->regions[0].limit = limit;
 }
 
 void
@@ -366,7 +377,7 @@ vm_setup_memory(struct vmctx *ctx, size_t memsize, enum vm_mmap_style vms)
 	size_t objsize, len;
 	vm_paddr_t gpa;
 	char *baseaddr, *ptr;
-	int error;
+	int i, error;
 
 	assert(vms == VM_MMAP_ALL);
 
@@ -374,15 +385,19 @@ vm_setup_memory(struct vmctx *ctx, size_t memsize, enum vm_mmap_style vms)
 	 * If 'memsize' cannot fit entirely in the 'lowmem' segment then
 	 * create another 'highmem' segment above 4GB for the remainder.
 	 */
-	if (memsize > ctx->lowmem_limit) {
-		ctx->lowmem = ctx->lowmem_limit;
-		ctx->highmem = memsize - ctx->lowmem_limit;
-		objsize = 4*GB + ctx->highmem;
-	} else {
-		ctx->lowmem = memsize;
-		ctx->highmem = 0;
-		objsize = ctx->lowmem;
+	for (i = 0; i < nitems(ctx->regions); i++) {
+		size_t len;
+
+		len = ctx->regions[i].limit - ctx->regions[i].base;
+		if (len > memsize)
+			len = memsize;
+		ctx->regions[i].size = len;
+		memsize -= len;
+
+		if (len > 0)
+			objsize = ctx->regions[i].base + ctx->regions[i].size;
 	}
+	assert(memsize == 0);
 
 	error = vm_alloc_memseg(ctx, VM_SYSMEM, objsize, NULL);
 	if (error)
@@ -398,17 +413,9 @@ vm_setup_memory(struct vmctx *ctx, size_t memsize, enum vm_mmap_style vms)
 		return (-1);
 
 	baseaddr = ptr + VM_MMAP_GUARD_SIZE;
-	if (ctx->highmem > 0) {
+	for (i = 0; i < nitems(ctx->regions); i++) {
 		gpa = 4*GB;
-		len = ctx->highmem;
-		error = setup_memory_segment(ctx, gpa, len, baseaddr);
-		if (error)
-			return (error);
-	}
-
-	if (ctx->lowmem > 0) {
-		gpa = 0;
-		len = ctx->lowmem;
+		len = ctx->regions[i].size;
 		error = setup_memory_segment(ctx, gpa, len, baseaddr);
 		if (error)
 			return (error);
@@ -429,20 +436,13 @@ vm_setup_memory(struct vmctx *ctx, size_t memsize, enum vm_mmap_style vms)
 void *
 vm_map_gpa(struct vmctx *ctx, vm_paddr_t gaddr, size_t len)
 {
+	int i;
 
-	if (ctx->lowmem > 0) {
-		if (gaddr < ctx->lowmem && len <= ctx->lowmem &&
-		    gaddr + len <= ctx->lowmem)
+	for (i = 0; i < nitems(ctx->regions); i++) {
+		if (gaddr >= ctx->regions[i].base &&
+		    len <= ctx->regions[i].size &&
+		    gaddr + len <= ctx->regions[i].base + ctx->regions[i].size)
 			return (ctx->baseaddr + gaddr);
-	}
-
-	if (ctx->highmem > 0) {
-                if (gaddr >= 4*GB) {
-			if (gaddr < 4*GB + ctx->highmem &&
-			    len <= ctx->highmem &&
-			    gaddr + len <= 4*GB + ctx->highmem)
-				return (ctx->baseaddr + gaddr);
-		}
 	}
 
 	return (NULL);
@@ -452,14 +452,14 @@ size_t
 vm_get_lowmem_size(struct vmctx *ctx)
 {
 
-	return (ctx->lowmem);
+	return (ctx->regions[0].size);
 }
 
 size_t
 vm_get_highmem_size(struct vmctx *ctx)
 {
 
-	return (ctx->highmem);
+	return (ctx->regions[1].size);
 }
 
 void *
