@@ -129,7 +129,11 @@ vm_open(const char *name)
 	vm->memflags = 0;
 
 	vm->regions[0].base = 0;
+#if 0
 	vm->regions[0].limit = 3 * GB;
+#else
+	vm->regions[0].limit = 0;
+#endif
 	vm->regions[0].size = 0;
 
 	vm->regions[1].base = 4 * GB;
