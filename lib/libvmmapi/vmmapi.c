@@ -416,8 +416,10 @@ vm_setup_memory(struct vmctx *ctx, size_t memsize, enum vm_mmap_style vms)
 
 	baseaddr = ptr + VM_MMAP_GUARD_SIZE;
 	for (i = 0; i < nitems(ctx->regions); i++) {
-		gpa = 4*GB;
+		gpa = ctx->regions[i].base;
 		len = ctx->regions[i].size;
+		if (len == 0)
+			continue;
 		error = setup_memory_segment(ctx, gpa, len, baseaddr);
 		if (error)
 			return (error);
