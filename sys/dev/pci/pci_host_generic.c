@@ -462,8 +462,12 @@ generic_pcie_get_dma_tag(device_t dev, device_t child)
 	pci_func = pci_get_function(child);
 
 	printf("pci bus is %d\n", pci_bus);
+
 	if (pci_bus == 7) // realtek
 		bus_dma_tag_set_iommu(t);
+
+	//if (pci_bus == 8) // xhci
+	//	bus_dma_tag_set_iommu(t);
 
 	return (t);
 }

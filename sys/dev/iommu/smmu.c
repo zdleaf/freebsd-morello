@@ -630,17 +630,17 @@ smmu_init_ste_s1(struct smmu_softc *sc, uint32_t sid, uint64_t *ste)
 
 static int
 smmu_init_ste(struct smmu_softc *sc,
-    struct smmu_strtab *strtab, int i, bool bypass)
+    struct smmu_strtab *strtab, int i, bool s1)
 {
 	uint64_t *addr;
 
 	addr = (void *)((uint64_t)strtab->addr +
 	    STRTAB_STE_DWORDS * 8 * i);
 
-	if (bypass)
-		smmu_init_ste_bypass(sc, i, addr);
-	else
+	if (s1)
 		smmu_init_ste_s1(sc, i, addr);
+	else
+		smmu_init_ste_bypass(sc, i, addr);
 
 	return (0);
 }
@@ -656,8 +656,8 @@ smmu_init_stes(struct smmu_softc *sc,
 	device_printf(sc->dev, "%s: num_l1_entries %d, base addr %lx\n",
 	    __func__, strtab->num_l1_entries, (uint64_t)addr);
 
-	smmu_init_ste(sc, strtab, 0x800, true); //xhci
-	smmu_init_ste(sc, strtab, 0x700, false); //realtek
+	smmu_init_ste(sc, strtab, 0x800, false); //xhci
+	smmu_init_ste(sc, strtab, 0x700, true); //realtek
 
 #if 0
 	int i;
@@ -1385,8 +1385,8 @@ smmu_insert(vm_paddr_t pa, vm_offset_t va, vm_size_t size)
 
 	//size = roundup2(size, PAGE_SIZE);
 
-	device_printf(sc->dev, "%s: pa %lx va %lx size %lx\n",
-	    __func__, pa, va, size);
+	//device_printf(sc->dev, "%s: pa %lx va %lx size %lx\n",
+	//    __func__, pa, va, size);
 
 	prot = VM_PROT_READ | VM_PROT_WRITE;
 
@@ -1395,6 +1395,7 @@ smmu_insert(vm_paddr_t pa, vm_offset_t va, vm_size_t size)
 		if (m == NULL)
 			panic("page not found for pa %lx\n", pa);
 		pmap_enter_smmu(p, va, m, prot, prot | PMAP_ENTER_WIRED, 0);
+		//pmap_enter(p, va, m, prot, prot | PMAP_ENTER_WIRED, 0);
 		pa += PAGE_SIZE;
 	}
 }
@@ -1420,6 +1421,7 @@ smmu_unmap(bus_dma_segment_t *segs, int nsegs)
 		device_printf(sc->dev, "%s: sva %lx eva %lx\n",
 		    __func__, sva, eva);
 		pmap_remove(&sc->p, sva, eva);
+		//vmem_free(sc->vmem, sva, size);
 	}
 }
 
@@ -1428,7 +1430,9 @@ smmu_map(bus_dma_segment_t *segs, int nsegs)
 {
 	struct smmu_softc *sc;
 	vm_offset_t va;
+	vm_paddr_t pa;
 	vm_size_t size;
+	vm_offset_t offset;
 	int i;
 
 	sc = smmu_sc;
@@ -1436,20 +1440,30 @@ smmu_map(bus_dma_segment_t *segs, int nsegs)
 		panic("here");
 
 	for (i = 0; i < nsegs; i++) {
-		printf("%s: len %lx\n", __func__, segs[i].ds_len);
+		offset = segs[i].ds_addr & 0xfff;
+		pa = segs[i].ds_addr & ~0xfff;
 		size = roundup2(segs[i].ds_len, PAGE_SIZE);
 
 		if (vmem_alloc(sc->vmem, size,
 		    M_FIRSTFIT | M_NOWAIT, &va))
 			panic("Could not allocate virtual address.\n");
 
+		device_printf(sc->dev,
+		    "%s: pa %lx va %lx offset %lx len %lx size %lx\n",
+			__func__,
+			pa, va,
+			offset,
+			segs[i].ds_len,
+			size);
+
 		if (1 == 0) {
 			pmap_enter_device(&sc->p, va, size,
 			    segs[i].ds_addr, VM_MEMATTR_DEVICE);
 		} else {
 			smmu_insert(segs[i].ds_addr, va, size);
-			segs[i].ds_addr = va | (segs[i].ds_addr & 0xfff);
-			//segs[i].ds_len = size;
+			segs[i].ds_addr = va | offset;
 		}
 	}
+
+	device_printf(sc->dev, "map done\n");
 }

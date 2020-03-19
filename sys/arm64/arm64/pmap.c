@@ -3438,7 +3438,7 @@ pmap_enter_smmu(pmap_t pmap, vm_offset_t va, vm_page_t m, vm_prot_t prot,
 	if ((m->oflags & VPO_UNMANAGED) == 0)
 		VM_PAGE_OBJECT_BUSY_ASSERT(m);
 	pa = VM_PAGE_TO_PHYS(m);
-	printf("%s: va %lx pa %lx\n", __func__, va, pa);
+	//printf("%s: va %lx pa %lx\n", __func__, va, pa);
 	//new_l3 = (pt_entry_t)(pa | ATTR_DEFAULT |
 	//    ATTR_S1_IDX(m->md.pv_memattr) | L3_PAGE);
 	new_l3 = (pt_entry_t)(pa | ATTR_DEFAULT |
