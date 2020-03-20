@@ -39,5 +39,10 @@ make -j6 TARGET=arm64 KERN${A}=GENERIC buildkernel
 #ssh 10.5.0.3 "su -m root -c /root/upd.sh"
 
 # Uncomment for tftpboot
-sudo cp /xhome/obj/usr/home/br/dev/freebsd-head/arm64.aarch64/sys/GENERIC/kernel /tftpboot/root
+if [ $(hostname) = "pie" ]; then
+	sudo cp /xhome/obj/usr/home/br/dev/freebsd-head/arm64.aarch64/sys/GENERIC/kernel /tftpboot/root
+fi
 
+if [ $(hostname) = "pooh" ]; then
+	sudo cp /usr/obj/usr/home/br/dev/freebsd-head/arm64.aarch64/sys/GENERIC/kernel /tftpboot/root
+fi
