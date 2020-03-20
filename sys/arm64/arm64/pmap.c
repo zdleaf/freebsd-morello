@@ -1488,6 +1488,31 @@ pmap_qremove(vm_offset_t sva, int count)
 	pmap_invalidate_range(kernel_pmap, sva, va);
 }
 
+/*
+ * This routine tears out page mappings from the
+ * kernel -- it is meant only for temporary mappings.
+ */
+void
+pmap_qremove_smmu(pmap_t pmap, vm_offset_t sva, int count)
+{
+	pt_entry_t *pte;
+	vm_offset_t va;
+	int lvl;
+
+	va = sva;
+	while (count-- > 0) {
+		pte = pmap_pte(pmap, va, &lvl);
+		KASSERT(lvl == 3,
+		    ("Invalid device pagetable level: %d != 3", lvl));
+		if (pte != NULL)
+			pmap_clear(pte);
+
+		va += PAGE_SIZE;
+	}
+	pmap_invalidate_range(pmap, sva, va);
+}
+
+
 /***************************************************
  * Page table page management routines.....
  ***************************************************/
@@ -1753,7 +1778,8 @@ _pmap_alloc_l3(pmap_t pmap, vm_pindex_t ptepindex, struct rwlock **lockp)
 
 		l1 = (pd_entry_t *)PHYS_TO_DMAP(pmap_load(l0) & ~ATTR_MASK);
 		l1 = &l1[ptepindex & Ln_ADDR_MASK];
-		pmap_store(l1, VM_PAGE_TO_PHYS(m) | L1_TABLE);
+		/* here ATTR_AF */
+		pmap_store(l1, VM_PAGE_TO_PHYS(m) | ATTR_AF | L1_TABLE);
 	} else {
 		vm_pindex_t l0index, l1index;
 		pd_entry_t *l0, *l1, *l2;
@@ -2837,6 +2863,101 @@ pmap_remove_l3_range(pmap_t pmap, pd_entry_t l2e, vm_offset_t sva,
  *	rounded to the page size.
  */
 void
+pmap_remove_smmu(pmap_t pmap, vm_offset_t sva, vm_offset_t eva)
+{
+	struct rwlock *lock;
+	vm_offset_t va_next;
+	pd_entry_t *l0, *l1, *l2;
+	pt_entry_t l3_paddr;
+	struct spglist free;
+
+	/*
+	 * Perform an unsynchronized read.  This is, however, safe.
+	 */
+	if (pmap->pm_stats.resident_count == 0)
+		return;
+
+	SLIST_INIT(&free);
+
+	PMAP_LOCK(pmap);
+
+	lock = NULL;
+	for (; sva < eva; sva = va_next) {
+
+		if (pmap->pm_stats.resident_count == 0)
+			break;
+
+		l0 = pmap_l0(pmap, sva);
+		if (pmap_load(l0) == 0) {
+			va_next = (sva + L0_SIZE) & ~L0_OFFSET;
+			if (va_next < sva)
+				va_next = eva;
+			continue;
+		}
+
+		l1 = pmap_l0_to_l1(l0, sva);
+		if (pmap_load(l1) == 0) {
+			va_next = (sva + L1_SIZE) & ~L1_OFFSET;
+			if (va_next < sva)
+				va_next = eva;
+			continue;
+		}
+
+		/*
+		 * Calculate index for next page table.
+		 */
+		va_next = (sva + L2_SIZE) & ~L2_OFFSET;
+		if (va_next < sva)
+			va_next = eva;
+
+		l2 = pmap_l1_to_l2(l1, sva);
+		if (l2 == NULL)
+			continue;
+
+		l3_paddr = pmap_load(l2);
+
+		if ((l3_paddr & ATTR_DESCR_MASK) == L2_BLOCK) {
+			if (sva + L2_SIZE == va_next && eva >= va_next) {
+				pmap_remove_l2(pmap, l2, sva, pmap_load(l1),
+				    &free, &lock);
+				continue;
+			} else if (pmap_demote_l2_locked(pmap, l2, sva,
+			    &lock) == NULL)
+				continue;
+			l3_paddr = pmap_load(l2);
+		}
+
+		/*
+		 * Weed out invalid mappings.
+		 */
+		if ((l3_paddr & ATTR_DESCR_MASK) != L2_TABLE)
+			continue;
+
+		/*
+		 * Limit our scan to either the end of the va represented
+		 * by the current page table page, or to the end of the
+		 * range being removed.
+		 */
+		if (va_next > eva)
+			va_next = eva;
+
+		pmap_remove_l3_range(pmap, l3_paddr, sva, va_next, &free,
+		    &lock);
+		pmap_invalidate_page(pmap, sva);
+	}
+	if (lock != NULL)
+		rw_wunlock(lock);
+	PMAP_UNLOCK(pmap);
+	//vm_page_free_pages_toq(&free, true);
+}
+
+/*
+ *	Remove the given range of addresses from the specified map.
+ *
+ *	It is assumed that the start and end are properly
+ *	rounded to the page size.
+ */
+void
 pmap_remove(pmap_t pmap, vm_offset_t sva, vm_offset_t eva)
 {
 	struct rwlock *lock;
@@ -3435,8 +3556,8 @@ pmap_enter_smmu(pmap_t pmap, vm_offset_t va, vm_page_t m, vm_prot_t prot,
 	PMAP_ASSERT_STAGE1(pmap);
 
 	va = trunc_page(va);
-	if ((m->oflags & VPO_UNMANAGED) == 0)
-		VM_PAGE_OBJECT_BUSY_ASSERT(m);
+	//if ((m->oflags & VPO_UNMANAGED) == 0)
+	//	VM_PAGE_OBJECT_BUSY_ASSERT(m);
 	pa = VM_PAGE_TO_PHYS(m);
 	//printf("%s: va %lx pa %lx\n", __func__, va, pa);
 	//new_l3 = (pt_entry_t)(pa | ATTR_DEFAULT |
@@ -3454,19 +3575,22 @@ pmap_enter_smmu(pmap_t pmap, vm_offset_t va, vm_page_t m, vm_prot_t prot,
 		new_l3 |= ATTR_S1_UXN;
 	if (pmap != kernel_pmap)
 		new_l3 |= ATTR_S1_nG;
+#if 0
 	if ((m->oflags & VPO_UNMANAGED) == 0) {
-		new_l3 |= ATTR_SW_MANAGED;
+		//new_l3 |= ATTR_SW_MANAGED;
 		if ((prot & VM_PROT_WRITE) != 0) {
-			new_l3 |= ATTR_SW_DBM;
+			//new_l3 |= ATTR_SW_DBM;
 			if ((flags & VM_PROT_WRITE) == 0)
 				new_l3 |= ATTR_S1_AP(ATTR_S1_AP_RO);
 		}
 	}
+#endif
 
 	CTR2(KTR_PMAP, "pmap_enter: %.16lx -> %.16lx", va, pa);
 
 	lock = NULL;
 	PMAP_LOCK(pmap);
+#if 0
 	if (psind == 1) {
 		/* Assert the required virtual and physical alignment. */
 		KASSERT((va & L2_OFFSET) == 0, ("pmap_enter: va unaligned"));
@@ -3475,6 +3599,7 @@ pmap_enter_smmu(pmap_t pmap, vm_offset_t va, vm_page_t m, vm_prot_t prot,
 		    flags, m, &lock);
 		goto out;
 	}
+#endif
 	mpte = NULL;
 
 	/*
@@ -3528,6 +3653,7 @@ havel3:
 	opa = orig_l3 & ~ATTR_MASK;
 	pv = NULL;
 
+#if 1
 	/*
 	 * Is the specified virtual address already mapped?
 	 */
@@ -3559,15 +3685,18 @@ havel3:
 		 * Has the physical page changed?
 		 */
 		if (opa == pa) {
+#if 1
 			/*
 			 * No, might be a protection or wiring change.
 			 */
 			if ((orig_l3 & ATTR_SW_MANAGED) != 0 &&
 			    (new_l3 & ATTR_SW_DBM) != 0)
 				vm_page_aflag_set(m, PGA_WRITEABLE);
+#endif
 			goto validate;
 		}
 
+		panic("physical page changed");
 		/*
 		 * The physical page has changed.  Temporarily invalidate
 		 * the mapping.
@@ -3577,6 +3706,7 @@ havel3:
 		    ("pmap_enter: unexpected pa update for %#lx", va));
 		if ((orig_l3 & ATTR_SW_MANAGED) != 0) {
 			om = PHYS_TO_VM_PAGE(opa);
+			panic("here");
 
 			/*
 			 * The pmap lock is sufficient to synchronize with
@@ -3612,6 +3742,10 @@ havel3:
 			pmap->pm_stats.wired_count++;
 		pmap_resident_count_inc(pmap, 1);
 	}
+
+#endif
+
+#if 0
 	/*
 	 * Enter on the PV list if part of our managed memory.
 	 */
@@ -3626,8 +3760,10 @@ havel3:
 		if ((new_l3 & ATTR_SW_DBM) != 0)
 			vm_page_aflag_set(m, PGA_WRITEABLE);
 	}
+#endif
 
 validate:
+#if 0
 	/*
 	 * Sync icache if exec permission and attribute VM_MEMATTR_WRITE_BACK
 	 * is set. Do it now, before the mapping is stored and made
@@ -3643,6 +3779,7 @@ validate:
 	    m->md.pv_memattr == VM_MEMATTR_WRITE_BACK &&
 	    (opa != pa || (orig_l3 & ATTR_S1_XN)))
 		cpu_icache_sync_range(PHYS_TO_DMAP(pa), PAGE_SIZE);
+#endif
 
 	/*
 	 * Update the L3 entry
@@ -3653,9 +3790,11 @@ validate:
 			/* same PA, different attributes */
 			orig_l3 = pmap_load_store(l3, new_l3);
 			pmap_invalidate_page(pmap, va);
+#if 0
 			if ((orig_l3 & ATTR_SW_MANAGED) != 0 &&
 			    pmap_pte_dirty(pmap, orig_l3))
 				vm_page_dirty(m);
+#endif
 		} else {
 			/*
 			 * orig_l3 == new_l3
@@ -3678,6 +3817,7 @@ validate:
 		dsb(ishst);
 	}
 
+#if 0
 #if VM_NRESERVLEVEL > 0
 	if ((mpte == NULL || mpte->ref_count == NL3PG) &&
 	    pmap_ps_enabled(pmap) &&
@@ -3686,12 +3826,15 @@ validate:
 		pmap_promote_l2(pmap, pde, va, &lock);
 	}
 #endif
+#endif
 
 	rv = KERN_SUCCESS;
 out:
 	if (lock != NULL)
 		rw_wunlock(lock);
 	PMAP_UNLOCK(pmap);
+
+	pmap_invalidate_page(pmap, va);
 	return (rv);
 }
 

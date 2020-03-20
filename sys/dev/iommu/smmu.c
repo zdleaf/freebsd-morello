@@ -409,6 +409,8 @@ make_cmd(struct smmu_softc *sc, uint64_t *cmd,
 	cmd[0] = entry->opcode << CMD_QUEUE_OPCODE_S;
 
 	switch (entry->opcode) {
+	case CMD_TLBI_NH_ALL:
+		break;
 	case CMD_TLBI_EL2_ALL:
 	case CMD_TLBI_NSNH_ALL:
 		break;
@@ -513,6 +515,18 @@ smmu_invalidate_all_sid(struct smmu_softc *sc)
 
 	/* Invalidate cached config */
 	cmd.opcode = CMD_CFGI_STE_RANGE;
+	smmu_cmdq_enqueue_cmd(sc, &cmd);
+	smmu_cmdq_enqueue_sync(sc);
+}
+
+static void
+smmu_tlbi_all(struct smmu_softc *sc)
+{
+	struct smmu_cmdq_entry cmd;
+
+	/* Invalidate entire TLB */
+	cmd.opcode = CMD_TLBI_NH_ALL;
+	cmd.opcode = CMD_TLBI_NSNH_ALL;
 	smmu_cmdq_enqueue_cmd(sc, &cmd);
 	smmu_cmdq_enqueue_sync(sc);
 }
@@ -656,7 +670,7 @@ smmu_init_stes(struct smmu_softc *sc,
 	device_printf(sc->dev, "%s: num_l1_entries %d, base addr %lx\n",
 	    __func__, strtab->num_l1_entries, (uint64_t)addr);
 
-	smmu_init_ste(sc, strtab, 0x800, false); //xhci
+	smmu_init_ste(sc, strtab, 0x800, true); //xhci
 	smmu_init_ste(sc, strtab, 0x700, true); //realtek
 
 #if 0
@@ -720,8 +734,8 @@ smmu_init_cd(struct smmu_softc *sc)
 	vmem_add(sc->vmem, 0x0, 1024 * 1024 * 1024, 0);
 
 	pmap_debug(1);
-	//smmu_insert(0x300b0000, 0x300b0000, 0x1000 * 4);
-	pmap_enter_device(&sc->p, 0x300b0000, 0x1000 * 4,
+	//smmu_insert(0x300b0000, 0x300b0000, 0x1000 * 1);
+	pmap_enter_device(&sc->p, 0x300b0000, 0x1000 * 1,
 	    0x300b0000, VM_MEMATTR_DEVICE);
 	pmap_debug(0);
 
@@ -1388,7 +1402,7 @@ smmu_insert(vm_paddr_t pa, vm_offset_t va, vm_size_t size)
 	//device_printf(sc->dev, "%s: pa %lx va %lx size %lx\n",
 	//    __func__, pa, va, size);
 
-	prot = VM_PROT_READ | VM_PROT_WRITE;
+	prot = VM_PROT_ALL;
 
 	for (; size > 0; size -= PAGE_SIZE) {
 		m = PHYS_TO_VM_PAGE(pa);
@@ -1420,9 +1434,12 @@ smmu_unmap(bus_dma_segment_t *segs, int nsegs)
 		eva = sva + size;
 		device_printf(sc->dev, "%s: sva %lx eva %lx\n",
 		    __func__, sva, eva);
-		pmap_remove(&sc->p, sva, eva);
+		pmap_qremove_smmu(&sc->p, sva, size / 0x1000);
+		//pmap_remove_smmu(&sc->p, sva, eva);
 		//vmem_free(sc->vmem, sva, size);
 	}
+
+	smmu_tlbi_all(sc);
 }
 
 void
@@ -1456,14 +1473,17 @@ smmu_map(bus_dma_segment_t *segs, int nsegs)
 			segs[i].ds_len,
 			size);
 
-		if (1 == 0) {
+		if (1 == 0)
 			pmap_enter_device(&sc->p, va, size,
 			    segs[i].ds_addr, VM_MEMATTR_DEVICE);
-		} else {
+		else
 			smmu_insert(segs[i].ds_addr, va, size);
-			segs[i].ds_addr = va | offset;
-		}
+		segs[i].ds_addr = va | offset;
 	}
+
+	smmu_tlbi_all(sc);
+	smmu_tlbi_all(sc);
+	smmu_tlbi_all(sc);
 
 	device_printf(sc->dev, "map done\n");
 }

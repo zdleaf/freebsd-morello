@@ -43,6 +43,6 @@ if [ $(hostname) = "pie" ]; then
 	sudo cp /xhome/obj/usr/home/br/dev/freebsd-head/arm64.aarch64/sys/GENERIC/kernel /tftpboot/root
 fi
 
-if [ $(hostname) = "pooh" ]; then
+if [ $(hostname) = "pooh.bsdpad.com" ]; then
 	sudo cp /usr/obj/usr/home/br/dev/freebsd-head/arm64.aarch64/sys/GENERIC/kernel /tftpboot/root
 fi

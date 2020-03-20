@@ -75,6 +75,12 @@ struct smmu_cmdq_entry {
 	uint8_t opcode;
 	union {
 		struct {
+			uint16_t asid;
+			uint16_t vmid;
+			bool leaf;
+			uint64_t va;
+		} tlbi;
+		struct {
 			uint32_t sid;
 			uint32_t ssid;
 			bool leaf;

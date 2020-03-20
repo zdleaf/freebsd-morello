@@ -466,8 +466,8 @@ generic_pcie_get_dma_tag(device_t dev, device_t child)
 	if (pci_bus == 7) // realtek
 		bus_dma_tag_set_iommu(t);
 
-	//if (pci_bus == 8) // xhci
-	//	bus_dma_tag_set_iommu(t);
+	if (pci_bus == 8) // xhci
+		bus_dma_tag_set_iommu(t);
 
 	return (t);
 }
