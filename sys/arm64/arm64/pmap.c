@@ -3696,7 +3696,9 @@ havel3:
 			goto validate;
 		}
 
-		panic("physical page changed");
+		panic("physical page changed, va %lx opa %lx pa %lx",
+		    va, opa, pa);
+
 		/*
 		 * The physical page has changed.  Temporarily invalidate
 		 * the mapping.

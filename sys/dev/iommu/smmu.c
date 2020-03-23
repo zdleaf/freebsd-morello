@@ -156,6 +156,21 @@ smmu_q_empty(struct smmu_queue *q)
 	return (0);
 }
 
+static int
+smmu_q_consumed(struct smmu_queue *q, uint32_t prod)
+{
+
+	if ((Q_WRP(q, q->lc.cons) == Q_WRP(q, prod)) &&
+	    (Q_IDX(q, q->lc.cons) >= Q_IDX(q, prod)))
+		return (1);
+
+	if ((Q_WRP(q, q->lc.cons) != Q_WRP(q, prod)) &&
+	    (Q_IDX(q, q->lc.cons) <= Q_IDX(q, prod)))
+		return (1);
+
+	return (0);
+}
+
 static uint32_t
 smmu_q_inc_prod(struct smmu_queue *q)
 {
@@ -481,6 +496,18 @@ smmu_cmdq_enqueue_cmd(struct smmu_softc *sc, struct smmu_cmdq_entry *entry)
 	}
 
 	return (0);
+}
+
+static void
+smmu_poll_until_consumed(struct smmu_softc *sc, struct smmu_queue *q)
+{
+
+	while (1) {
+		q->lc.val = bus_read_8(sc->res[0], q->prod_off);
+		if (smmu_q_empty(q))
+			break;
+		printf(".");
+	}
 }
 
 static int
@@ -1333,6 +1360,7 @@ smmu_attach(device_t dev)
 	}
 
 	smmu_init_stes(sc, &sc->strtab);
+	smmu_poll_until_consumed(sc, &sc->cmdq);
 
 	return (0);
 }
@@ -1414,6 +1442,9 @@ smmu_insert(vm_paddr_t pa, vm_offset_t va, vm_size_t size)
 	}
 }
 
+int map_cnt = 0;
+int unmap_cnt = 0;
+
 void
 smmu_unmap(bus_dma_segment_t *segs, int nsegs)
 {
@@ -1432,14 +1463,17 @@ smmu_unmap(bus_dma_segment_t *segs, int nsegs)
 		size = roundup2(segs[i].ds_len, PAGE_SIZE);
 		//eva = sva + segs[i].ds_len;
 		eva = sva + size;
-		device_printf(sc->dev, "%s: sva %lx eva %lx\n",
-		    __func__, sva, eva);
+#if 0
+		device_printf(sc->dev, "%s: cnt %d sva %lx eva %lx\n",
+		    __func__, unmap_cnt++, sva, eva);
+#endif
 		pmap_qremove_smmu(&sc->p, sva, size / 0x1000);
 		//pmap_remove_smmu(&sc->p, sva, eva);
 		//vmem_free(sc->vmem, sva, size);
 	}
 
 	smmu_tlbi_all(sc);
+	smmu_poll_until_consumed(sc, &sc->cmdq);
 }
 
 void
@@ -1465,13 +1499,16 @@ smmu_map(bus_dma_segment_t *segs, int nsegs)
 		    M_FIRSTFIT | M_NOWAIT, &va))
 			panic("Could not allocate virtual address.\n");
 
+#if 0
 		device_printf(sc->dev,
-		    "%s: pa %lx va %lx offset %lx len %lx size %lx\n",
+		    "%s: cnt %d pa %lx va %lx offset %lx len %lx size %lx\n",
 			__func__,
+			map_cnt++,
 			pa, va,
 			offset,
 			segs[i].ds_len,
 			size);
+#endif
 
 		if (1 == 0)
 			pmap_enter_device(&sc->p, va, size,
@@ -1482,8 +1519,5 @@ smmu_map(bus_dma_segment_t *segs, int nsegs)
 	}
 
 	smmu_tlbi_all(sc);
-	smmu_tlbi_all(sc);
-	smmu_tlbi_all(sc);
-
-	device_printf(sc->dev, "map done\n");
+	smmu_poll_until_consumed(sc, &sc->cmdq);
 }
