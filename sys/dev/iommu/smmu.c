@@ -1472,9 +1472,8 @@ smmu_unmap(bus_dma_segment_t *segs, int nsegs)
 		device_printf(sc->dev, "%s: cnt %d sva %lx eva %lx\n",
 		    __func__, unmap_cnt++, sva, eva);
 #endif
-		pmap_qremove_smmu(&sc->p, sva, size / 0x1000);
-		//pmap_remove_smmu(&sc->p, sva, eva);
-		//vmem_free(sc->vmem, sva, size);
+		if (pmap_qremove_smmu(&sc->p, sva, size / 0x1000))
+			vmem_free(sc->vmem, sva, size);
 	}
 
 	smmu_tlbi_all(sc);
