@@ -222,6 +222,8 @@ smmu_event_intr(void *arg)
 		smmu_evtq_dequeue(sc);
 	} while (!smmu_q_empty(&sc->evtq));
 
+	//panic("%s\n", __func__);
+
 	//return (FILTER_HANDLED);
 }
 
@@ -506,7 +508,6 @@ smmu_poll_until_consumed(struct smmu_softc *sc, struct smmu_queue *q)
 		q->lc.val = bus_read_8(sc->res[0], q->prod_off);
 		if (smmu_q_empty(q))
 			break;
-		printf(".");
 	}
 }
 
@@ -1439,6 +1440,7 @@ smmu_insert(vm_paddr_t pa, vm_offset_t va, vm_size_t size)
 		pmap_enter_smmu(p, va, m, prot, prot | PMAP_ENTER_WIRED, 0);
 		//pmap_enter(p, va, m, prot, prot | PMAP_ENTER_WIRED, 0);
 		pa += PAGE_SIZE;
+		va += PAGE_SIZE;
 	}
 }
 
@@ -1452,6 +1454,7 @@ smmu_unmap(bus_dma_segment_t *segs, int nsegs)
 	vm_offset_t sva;
 	vm_offset_t eva;
 	vm_size_t size;
+	vm_offset_t offset;
 	int i;
 
 	sc = smmu_sc;
@@ -1460,7 +1463,9 @@ smmu_unmap(bus_dma_segment_t *segs, int nsegs)
 
 	for (i = 0; i < nsegs; i++) {
 		sva = segs[i].ds_addr & ~0xfff;
-		size = roundup2(segs[i].ds_len, PAGE_SIZE);
+		offset = segs[i].ds_addr & 0xfff;
+		//size = roundup2(segs[i].ds_len, PAGE_SIZE);
+		size = roundup2(offset + segs[i].ds_len, PAGE_SIZE);
 		//eva = sva + segs[i].ds_len;
 		eva = sva + size;
 #if 0
@@ -1493,7 +1498,12 @@ smmu_map(bus_dma_segment_t *segs, int nsegs)
 	for (i = 0; i < nsegs; i++) {
 		offset = segs[i].ds_addr & 0xfff;
 		pa = segs[i].ds_addr & ~0xfff;
-		size = roundup2(segs[i].ds_len, PAGE_SIZE);
+		//size = roundup2(segs[i].ds_len, PAGE_SIZE);
+		size = roundup2(offset + segs[i].ds_len, PAGE_SIZE);
+
+		if ((offset + segs[i].ds_len) > PAGE_SIZE)
+			printf("offset %lx len %lx size %lx\n",
+			    offset, segs[i].ds_len, size);
 
 		if (vmem_alloc(sc->vmem, size,
 		    M_FIRSTFIT | M_NOWAIT, &va))
@@ -1520,4 +1530,6 @@ smmu_map(bus_dma_segment_t *segs, int nsegs)
 
 	smmu_tlbi_all(sc);
 	smmu_poll_until_consumed(sc, &sc->cmdq);
+
+	//device_printf(sc->dev, "map done\n");
 }
