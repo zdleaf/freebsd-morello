@@ -2171,8 +2171,6 @@ re_rxeof(struct rl_softc *sc, int *rx_npktsp)
 
 	RL_LOCK_ASSERT(sc);
 
-	printf("%s\n", __func__);
-
 	ifp = sc->rl_ifp;
 #ifdef DEV_NETMAP
 	if (netmap_rx_irq(ifp, 0, &rx_npkts))
