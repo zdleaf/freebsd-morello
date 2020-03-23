@@ -1492,7 +1492,7 @@ pmap_qremove(vm_offset_t sva, int count)
  * This routine tears out page mappings from the
  * kernel -- it is meant only for temporary mappings.
  */
-void
+int
 pmap_qremove_smmu(pmap_t pmap, vm_offset_t sva, int count)
 {
 	pt_entry_t *pte;
@@ -1504,12 +1504,19 @@ pmap_qremove_smmu(pmap_t pmap, vm_offset_t sva, int count)
 		pte = pmap_pte(pmap, va, &lvl);
 		KASSERT(lvl == 3,
 		    ("Invalid device pagetable level: %d != 3", lvl));
+
 		if (pte != NULL)
 			pmap_clear(pte);
+		else {
+			printf("pte is NULL\n");
+			return (0);
+		}
 
 		va += PAGE_SIZE;
 	}
 	pmap_invalidate_range(pmap, sva, va);
+
+	return (1);
 }
 
 

@@ -190,7 +190,7 @@ void pmap_enter_device(pmap_t pmap, vm_offset_t sva, vm_size_t size,
 int pmap_enter_smmu(pmap_t pmap, vm_offset_t va, vm_page_t m, vm_prot_t prot,
     u_int flags, int8_t psind);
 void pmap_remove_smmu(pmap_t pmap, vm_offset_t sva, vm_offset_t eva);
-void pmap_qremove_smmu(pmap_t pmap, vm_offset_t sva, int count);
+int pmap_qremove_smmu(pmap_t pmap, vm_offset_t sva, int count);
 
 struct pcb *pmap_switch(struct thread *, struct thread *);
 
