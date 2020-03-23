@@ -3635,10 +3635,8 @@ havel3:
 	opa = orig_l3 & ~ATTR_MASK;
 	pv = NULL;
 
-	//if (pmap_l3_valid(orig_l3))
-	//	panic("pmap is valid");
-
-	pmap_invalidate_page(pmap, va);
+	if (pmap_l3_valid(orig_l3))
+		panic("pmap is valid");
 
 	/* New mapping */
 	pmap_store(l3, new_l3);
