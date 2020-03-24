@@ -1785,8 +1785,7 @@ _pmap_alloc_l3(pmap_t pmap, vm_pindex_t ptepindex, struct rwlock **lockp)
 
 		l1 = (pd_entry_t *)PHYS_TO_DMAP(pmap_load(l0) & ~ATTR_MASK);
 		l1 = &l1[ptepindex & Ln_ADDR_MASK];
-		/* here ATTR_AF */
-		pmap_store(l1, VM_PAGE_TO_PHYS(m) | ATTR_AF | L1_TABLE);
+		pmap_store(l1, VM_PAGE_TO_PHYS(m) | L1_TABLE);
 	} else {
 		vm_pindex_t l0index, l1index;
 		pd_entry_t *l0, *l1, *l2;
@@ -3556,7 +3555,7 @@ pmap_enter_smmu(pmap_t pmap, vm_offset_t va, vm_page_t m, vm_prot_t prot,
 	pt_entry_t *l2, *l3;
 	pv_entry_t pv;
 	vm_paddr_t opa, pa;
-	vm_page_t mpte;// om;
+	vm_page_t mpte;
 	boolean_t nosleep;
 	int lvl, rv;
 
@@ -3690,8 +3689,8 @@ pmap_enter(pmap_t pmap, vm_offset_t va, vm_page_t m, vm_prot_t prot,
 	if ((m->oflags & VPO_UNMANAGED) == 0)
 		VM_PAGE_OBJECT_BUSY_ASSERT(m);
 	pa = VM_PAGE_TO_PHYS(m);
-	new_l3 = (pt_entry_t)(pa | ATTR_DEFAULT |
-	    ATTR_S1_IDX(m->md.pv_memattr) | L3_PAGE);
+	new_l3 = (pt_entry_t)(pa | ATTR_DEFAULT | ATTR_S1_IDX(m->md.pv_memattr) |
+	    L3_PAGE);
 	if ((prot & VM_PROT_WRITE) == 0)
 		new_l3 |= ATTR_S1_AP(ATTR_S1_AP_RO);
 	if ((prot & VM_PROT_EXECUTE) == 0 ||
