@@ -3440,10 +3440,8 @@ pmap_remove_smmu(pmap_t pmap, vm_offset_t va)
 	KASSERT(lvl == 3,
 	    ("Invalid device pagetable level: %d != 3", lvl));
 
-	if (pte == NULL) {
-		printf("pte is NULL\n");
+	if (pte == NULL)
 		return (0);
-	}
 
 	pmap_clear(pte);
 

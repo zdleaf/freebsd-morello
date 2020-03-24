@@ -1463,6 +1463,8 @@ smmu_unmap(bus_dma_segment_t *segs, int nsegs)
 		for (j = 0; j < size; j += 0x1000) {
 			if (pmap_remove_smmu(&sc->p, va))
 				vmem_free(sc->vmem, va, 0x1000);
+			else
+				printf("pte is NULL, va %lx\n", va);
 			va += 0x1000;
 		}
 	}
