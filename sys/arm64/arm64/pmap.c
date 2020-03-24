@@ -148,13 +148,6 @@ __FBSDID("$FreeBSD$");
 #include <machine/md_var.h>
 #include <machine/pcb.h>
 
-#ifdef _KERNEL
-#include <machine/stdarg.h>
-#else
-#include <stdarg.h>
-#endif
-
-
 #include <arm/include/physmem.h>
 
 #define	PMAP_ASSERT_STAGE1(pmap)	MPASS((pmap)->pm_stage == PM_STAGE1)
@@ -3362,36 +3355,6 @@ setl3:
 		    pmap);
 }
 #endif /* VM_NRESERVLEVEL > 0 */
-
-static int flag = 0;
-
-int
-pmap_debug(int enable)
-{
-
-	if (enable)
-		flag = 1;
-	else
-		flag = 0;
-
-	return (0);
-}
-
-static int
-dprintf(const char *fmt, ...)
-{
-	va_list ap;
-	int retval;
-
-	if (flag == 0)
-		return (0);
-
-	va_start(ap, fmt);
-	retval = vprintf(fmt, ap);
-	va_end(ap);
-
-	return (retval);
-}
 
 int
 pmap_enter_smmu(pmap_t pmap, vm_offset_t va, vm_paddr_t pa,

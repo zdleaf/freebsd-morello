@@ -761,19 +761,10 @@ smmu_init_cd(struct smmu_softc *sc)
 		return (ENXIO);
 	vmem_add(sc->vmem, 0x0, 1024 * 1024 * 1024, 0);
 
-	pmap_debug(1);
-
-#if 0
-	pmap_enter_device(&sc->p, 0x300b0000, 0x1000 * 1,
-	    0x300b0000, VM_MEMATTR_DEVICE);
-#else
 	vm_prot_t prot;
 	prot = VM_PROT_ALL;
 	pmap_enter_smmu(&sc->p, 0x300b0000, 0x300b0000,
 	    prot, prot | PMAP_ENTER_WIRED);
-#endif
-
-	pmap_debug(0);
 
 	device_printf(sc->dev, "%s: pmap initialized\n", __func__);
 	ptr = cd->addr;
@@ -1523,11 +1514,7 @@ smmu_map(bus_dma_segment_t *segs, int nsegs)
 			size);
 #endif
 
-		if (1 == 0)
-			pmap_enter_device(&sc->p, va, size,
-			    segs[i].ds_addr, VM_MEMATTR_DEVICE);
-		else
-			smmu_insert(segs[i].ds_addr, va, size);
+		smmu_insert(segs[i].ds_addr, va, size);
 		segs[i].ds_addr = va | offset;
 	}
 
