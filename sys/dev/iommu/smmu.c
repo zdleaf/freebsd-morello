@@ -755,10 +755,12 @@ smmu_init_cd(struct smmu_softc *sc)
 	    PAGE_SIZE, M_FIRSTFIT | M_WAITOK);
 	if (sc->vmem == NULL)
 		return (ENXIO);
-	vmem_add(sc->vmem, 0x0, 1024 * 1024 * 1024, 0);
+
+	/* 1GB of VA space starting from 0x40000000. */
+	vmem_add(sc->vmem, 0x40000000, 0x40000000, 0);
 
 	vm_prot_t prot;
-	prot = VM_PROT_ALL;
+	prot = VM_PROT_WRITE;
 	pmap_enter_smmu(&sc->p, 0x300b0000, 0x300b0000,
 	    prot, prot | PMAP_ENTER_WIRED);
 
@@ -1420,13 +1422,7 @@ smmu_insert(vm_paddr_t pa, vm_offset_t va, vm_size_t size)
 
 	p = &sc->p;
 
-	//size = roundup2(size, PAGE_SIZE);
-	//device_printf(sc->dev, "%s: pa %lx va %lx size %lx\n",
-	//    __func__, pa, va, size);
-
 	prot = VM_PROT_ALL;
-
-	pa &= ~0xfff;
 
 	for (; size > 0; size -= PAGE_SIZE) {
 		pmap_enter_smmu(p, va, pa, prot, prot | PMAP_ENTER_WIRED);
@@ -1490,7 +1486,6 @@ smmu_map(bus_dma_segment_t *segs, int nsegs)
 	for (i = 0; i < nsegs; i++) {
 		offset = segs[i].ds_addr & 0xfff;
 		pa = segs[i].ds_addr & ~0xfff;
-		//size = roundup2(segs[i].ds_len, PAGE_SIZE);
 		size = roundup2(offset + segs[i].ds_len, PAGE_SIZE);
 
 		if ((offset + segs[i].ds_len) > PAGE_SIZE)
@@ -1512,7 +1507,7 @@ smmu_map(bus_dma_segment_t *segs, int nsegs)
 			size);
 #endif
 
-		smmu_insert(segs[i].ds_addr, va, size);
+		smmu_insert(pa, va, size);
 		segs[i].ds_addr = va | offset;
 	}
 
