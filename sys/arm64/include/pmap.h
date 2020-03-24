@@ -187,8 +187,9 @@ int	pmap_fault(pmap_t, uint64_t, uint64_t);
 int pmap_debug(int enable);
 void pmap_enter_device(pmap_t pmap, vm_offset_t sva, vm_size_t size,
     vm_paddr_t pa, int mode);
-int pmap_enter_smmu(pmap_t pmap, vm_offset_t va, vm_page_t m, vm_prot_t prot,
-    u_int flags, int8_t psind);
+
+int pmap_enter_smmu(pmap_t pmap, vm_offset_t va, vm_paddr_t pa,
+    vm_prot_t prot, u_int flags);
 void pmap_remove_smmu(pmap_t pmap, vm_offset_t sva, vm_offset_t eva);
 int pmap_qremove_smmu(pmap_t pmap, vm_offset_t sva, int count);
 

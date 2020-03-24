@@ -3546,15 +3546,15 @@ dprintf(const char *fmt, ...)
 }
 
 int
-pmap_enter_smmu(pmap_t pmap, vm_offset_t va, vm_page_t m, vm_prot_t prot,
-    u_int flags, int8_t psind)
+pmap_enter_smmu(pmap_t pmap, vm_offset_t va, vm_paddr_t pa,
+    vm_prot_t prot, u_int flags)
 {
 	struct rwlock *lock;
 	pd_entry_t *pde;
 	pt_entry_t new_l3, orig_l3;
 	pt_entry_t *l2, *l3;
 	pv_entry_t pv;
-	vm_paddr_t opa, pa;
+	vm_paddr_t opa;
 	vm_page_t mpte;
 	boolean_t nosleep;
 	int lvl, rv;
@@ -3562,7 +3562,6 @@ pmap_enter_smmu(pmap_t pmap, vm_offset_t va, vm_page_t m, vm_prot_t prot,
 	PMAP_ASSERT_STAGE1(pmap);
 
 	va = trunc_page(va);
-	pa = VM_PAGE_TO_PHYS(m);
 	new_l3 = (pt_entry_t)(pa | ATTR_DEFAULT |
 	    ATTR_S1_IDX(VM_MEMATTR_DEVICE) | L3_PAGE);
 	if ((prot & VM_PROT_WRITE) == 0)
@@ -3590,7 +3589,6 @@ pmap_enter_smmu(pmap_t pmap, vm_offset_t va, vm_page_t m, vm_prot_t prot,
 	 */
 retry:
 	pde = pmap_pde(pmap, va, &lvl);
-	//printf("va %lx lvl %d, pde %p\n", va, lvl, pde);
 	if (pde != NULL)
 		cpu_dcache_wbinv_range((uint64_t)pde, PAGE_SIZE);
 	if (pde != NULL && lvl == 2) {

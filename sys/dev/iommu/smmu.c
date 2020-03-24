@@ -762,9 +762,17 @@ smmu_init_cd(struct smmu_softc *sc)
 	vmem_add(sc->vmem, 0x0, 1024 * 1024 * 1024, 0);
 
 	pmap_debug(1);
-	//smmu_insert(0x300b0000, 0x300b0000, 0x1000 * 1);
+
+#if 0
 	pmap_enter_device(&sc->p, 0x300b0000, 0x1000 * 1,
 	    0x300b0000, VM_MEMATTR_DEVICE);
+#else
+	vm_prot_t prot;
+	prot = VM_PROT_ALL;
+	pmap_enter_smmu(&sc->p, 0x300b0000, 0x300b0000,
+	    prot, prot | PMAP_ENTER_WIRED);
+#endif
+
 	pmap_debug(0);
 
 	device_printf(sc->dev, "%s: pmap initialized\n", __func__);
@@ -1417,7 +1425,6 @@ smmu_insert(vm_paddr_t pa, vm_offset_t va, vm_size_t size)
 {
 	struct smmu_softc *sc;
 	vm_prot_t prot;
-	vm_page_t m;
 	pmap_t p;
 
 	sc = smmu_sc;
@@ -1427,18 +1434,15 @@ smmu_insert(vm_paddr_t pa, vm_offset_t va, vm_size_t size)
 	p = &sc->p;
 
 	//size = roundup2(size, PAGE_SIZE);
-
 	//device_printf(sc->dev, "%s: pa %lx va %lx size %lx\n",
 	//    __func__, pa, va, size);
 
 	prot = VM_PROT_ALL;
 
+	pa &= ~0xfff;
+
 	for (; size > 0; size -= PAGE_SIZE) {
-		m = PHYS_TO_VM_PAGE(pa);
-		if (m == NULL)
-			panic("page not found for pa %lx\n", pa);
-		pmap_enter_smmu(p, va, m, prot, prot | PMAP_ENTER_WIRED, 0);
-		//pmap_enter(p, va, m, prot, prot | PMAP_ENTER_WIRED, 0);
+		pmap_enter_smmu(p, va, pa, prot, prot | PMAP_ENTER_WIRED);
 		pa += PAGE_SIZE;
 		va += PAGE_SIZE;
 	}
