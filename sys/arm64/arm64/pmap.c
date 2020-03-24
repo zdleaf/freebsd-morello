@@ -369,8 +369,6 @@ static boolean_t pmap_try_insert_pv_entry(pmap_t pmap, vm_offset_t va,
 
 static vm_page_t _pmap_alloc_l3(pmap_t pmap, vm_pindex_t ptepindex,
 		struct rwlock **lockp);
-static vm_page_t pmap_alloc_l3(pmap_t pmap, vm_offset_t va,
-		struct rwlock **lockp);
 
 static void _pmap_unwire_l3(pmap_t pmap, vm_offset_t va, vm_page_t m,
     struct spglist *free);
@@ -1264,61 +1262,6 @@ pmap_kextract(vm_offset_t va)
 /***************************************************
  * Low level mapping routines.....
  ***************************************************/
-
-void
-pmap_enter_device(pmap_t pmap, vm_offset_t sva, vm_size_t size,
-    vm_paddr_t pa, int mode)
-{
-	pd_entry_t *pde;
-	pt_entry_t *pte, attr;
-	vm_page_t mpte;
-	vm_offset_t va;
-	int lvl;
-
-	KASSERT((pa & L3_OFFSET) == 0,
-	   ("pmap_enter_device: Invalid physical address"));
-	KASSERT((sva & L3_OFFSET) == 0,
-	   ("pmap_enter_device: Invalid virtual address"));
-	KASSERT((size & PAGE_MASK) == 0,
-	    ("pmap_enter_device: Mapping is not page-sized"));
-
-	attr = ATTR_AF | ATTR_S1_AP(ATTR_S1_AP_RW) |
-	    ATTR_SH(ATTR_SH_IS) | ATTR_S1_IDX(mode) | L3_PAGE;
-	attr |= ATTR_S1_AP(ATTR_S1_AP_USER);
-
-	//attr |= ATTR_S1_NS;
-	//attr |= ATTR_S1_XN; // priv and unpriv eXecute never
-	//test
-	attr |= ATTR_SW_WIRED;
-	attr |= ATTR_S1_nG;
-
-	va = sva;
-	while (size != 0) {
-retry:
-		pde = pmap_pde(pmap, va, &lvl);
-		if (pde == NULL) {
-			PMAP_LOCK(pmap);
-			//mpte = _pmap_alloc_l3(pmap, pmap_l2_pindex(va), NULL);
-			mpte = pmap_alloc_l3(pmap, va, NULL);
-			PMAP_UNLOCK(pmap);
-			if (mpte == NULL)
-				panic("mpte is NULL");
-			goto retry;
-		}
-
-		KASSERT(pde != NULL,
-		    ("pmap_kenter: Invalid page entry, va: 0x%lx", va));
-		KASSERT(lvl == 2, ("pmap_enter_device: Invalid level %d", lvl));
-
-		pte = pmap_l2_to_l3(pde, va);
-		pmap_load_store(pte, (pa & ~L3_OFFSET) | attr);
-
-		va += PAGE_SIZE;
-		pa += PAGE_SIZE;
-		size -= PAGE_SIZE;
-	}
-	pmap_invalidate_range(pmap, sva, va);
-}
 
 void
 pmap_kenter(vm_offset_t sva, vm_size_t size, vm_paddr_t pa, int mode)
@@ -2860,101 +2803,6 @@ pmap_remove_l3_range(pmap_t pmap, pd_entry_t l2e, vm_offset_t sva,
 	}
 	if (va != eva)
 		pmap_invalidate_range(pmap, va, sva);
-}
-
-/*
- *	Remove the given range of addresses from the specified map.
- *
- *	It is assumed that the start and end are properly
- *	rounded to the page size.
- */
-void
-pmap_remove_smmu(pmap_t pmap, vm_offset_t sva, vm_offset_t eva)
-{
-	struct rwlock *lock;
-	vm_offset_t va_next;
-	pd_entry_t *l0, *l1, *l2;
-	pt_entry_t l3_paddr;
-	struct spglist free;
-
-	/*
-	 * Perform an unsynchronized read.  This is, however, safe.
-	 */
-	if (pmap->pm_stats.resident_count == 0)
-		return;
-
-	SLIST_INIT(&free);
-
-	PMAP_LOCK(pmap);
-
-	lock = NULL;
-	for (; sva < eva; sva = va_next) {
-
-		if (pmap->pm_stats.resident_count == 0)
-			break;
-
-		l0 = pmap_l0(pmap, sva);
-		if (pmap_load(l0) == 0) {
-			va_next = (sva + L0_SIZE) & ~L0_OFFSET;
-			if (va_next < sva)
-				va_next = eva;
-			continue;
-		}
-
-		l1 = pmap_l0_to_l1(l0, sva);
-		if (pmap_load(l1) == 0) {
-			va_next = (sva + L1_SIZE) & ~L1_OFFSET;
-			if (va_next < sva)
-				va_next = eva;
-			continue;
-		}
-
-		/*
-		 * Calculate index for next page table.
-		 */
-		va_next = (sva + L2_SIZE) & ~L2_OFFSET;
-		if (va_next < sva)
-			va_next = eva;
-
-		l2 = pmap_l1_to_l2(l1, sva);
-		if (l2 == NULL)
-			continue;
-
-		l3_paddr = pmap_load(l2);
-
-		if ((l3_paddr & ATTR_DESCR_MASK) == L2_BLOCK) {
-			if (sva + L2_SIZE == va_next && eva >= va_next) {
-				pmap_remove_l2(pmap, l2, sva, pmap_load(l1),
-				    &free, &lock);
-				continue;
-			} else if (pmap_demote_l2_locked(pmap, l2, sva,
-			    &lock) == NULL)
-				continue;
-			l3_paddr = pmap_load(l2);
-		}
-
-		/*
-		 * Weed out invalid mappings.
-		 */
-		if ((l3_paddr & ATTR_DESCR_MASK) != L2_TABLE)
-			continue;
-
-		/*
-		 * Limit our scan to either the end of the va represented
-		 * by the current page table page, or to the end of the
-		 * range being removed.
-		 */
-		if (va_next > eva)
-			va_next = eva;
-
-		pmap_remove_l3_range(pmap, l3_paddr, sva, va_next, &free,
-		    &lock);
-		pmap_invalidate_page(pmap, sva);
-	}
-	if (lock != NULL)
-		rw_wunlock(lock);
-	PMAP_UNLOCK(pmap);
-	//vm_page_free_pages_toq(&free, true);
 }
 
 /*
