@@ -3435,28 +3435,21 @@ out:
 }
 
 int
-pmap_remove_smmu(pmap_t pmap, vm_offset_t sva, int count)
+pmap_remove_smmu(pmap_t pmap, vm_offset_t va)
 {
 	pt_entry_t *pte;
-	vm_offset_t va;
 	int lvl;
 
-	va = sva;
-	while (count-- > 0) {
-		pte = pmap_pte(pmap, va, &lvl);
-		KASSERT(lvl == 3,
-		    ("Invalid device pagetable level: %d != 3", lvl));
+	pte = pmap_pte(pmap, va, &lvl);
+	KASSERT(lvl == 3,
+	    ("Invalid device pagetable level: %d != 3", lvl));
 
-		if (pte != NULL)
-			pmap_clear(pte);
-		else {
-			printf("pte is NULL\n");
-			return (0);
-		}
-
-		va += PAGE_SIZE;
+	if (pte == NULL) {
+		printf("pte is NULL\n");
+		return (0);
 	}
-	pmap_invalidate_range(pmap, sva, va);
+
+	pmap_clear(pte);
 
 	return (1);
 }

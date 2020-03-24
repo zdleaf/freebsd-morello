@@ -1446,29 +1446,29 @@ void
 smmu_unmap(bus_dma_segment_t *segs, int nsegs)
 {
 	struct smmu_softc *sc;
-	vm_offset_t sva;
-	vm_offset_t eva;
+	vm_offset_t va;
 	vm_size_t size;
 	vm_offset_t offset;
 	int i;
+	int j;
 
 	sc = smmu_sc;
 	if (sc == NULL)
 		panic("here");
 
 	for (i = 0; i < nsegs; i++) {
-		sva = segs[i].ds_addr & ~0xfff;
+		va = segs[i].ds_addr & ~0xfff;
 		offset = segs[i].ds_addr & 0xfff;
-		//size = roundup2(segs[i].ds_len, PAGE_SIZE);
 		size = roundup2(offset + segs[i].ds_len, PAGE_SIZE);
-		//eva = sva + segs[i].ds_len;
-		eva = sva + size;
 #if 0
-		device_printf(sc->dev, "%s: cnt %d sva %lx eva %lx\n",
-		    __func__, unmap_cnt++, sva, eva);
+		device_printf(sc->dev, "%s: cnt %d va %lx size %lx\n",
+		    __func__, unmap_cnt++, va, size);
 #endif
-		if (pmap_remove_smmu(&sc->p, sva, size / 0x1000))
-			vmem_free(sc->vmem, sva, size);
+		for (j = 0; j < size; j += 0x1000) {
+			if (pmap_remove_smmu(&sc->p, va))
+				vmem_free(sc->vmem, va, 0x1000);
+			va += 0x1000;
+		}
 	}
 
 	smmu_tlbi_all(sc);
