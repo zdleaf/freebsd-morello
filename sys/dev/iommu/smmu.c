@@ -761,8 +761,7 @@ smmu_init_cd(struct smmu_softc *sc)
 
 	vm_prot_t prot;
 	prot = VM_PROT_WRITE;
-	pmap_enter_smmu(&sc->p, 0x300b0000, 0x300b0000,
-	    prot, prot | PMAP_ENTER_WIRED);
+	pmap_enter_smmu(&sc->p, 0x300b0000, 0x300b0000, prot, 0);
 
 	device_printf(sc->dev, "%s: pmap initialized\n", __func__);
 	ptr = cd->addr;
@@ -1422,10 +1421,10 @@ smmu_insert(vm_paddr_t pa, vm_offset_t va, vm_size_t size)
 
 	p = &sc->p;
 
-	prot = VM_PROT_ALL;
+	prot = VM_PROT_READ | VM_PROT_WRITE;
 
 	for (; size > 0; size -= PAGE_SIZE) {
-		pmap_enter_smmu(p, va, pa, prot, prot | PMAP_ENTER_WIRED);
+		pmap_enter_smmu(p, va, pa, prot, 0);
 		pa += PAGE_SIZE;
 		va += PAGE_SIZE;
 	}

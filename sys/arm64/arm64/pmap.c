@@ -3345,9 +3345,10 @@ pmap_enter_smmu(pmap_t pmap, vm_offset_t va, vm_paddr_t pa,
 	    ATTR_S1_IDX(VM_MEMATTR_DEVICE) | L3_PAGE);
 	if ((prot & VM_PROT_WRITE) == 0)
 		new_l3 |= ATTR_S1_AP(ATTR_S1_AP_RO);
+
+	/* Execute never. */
 	new_l3 |= ATTR_S1_XN;
-	if ((flags & PMAP_ENTER_WIRED) != 0)
-		new_l3 |= ATTR_SW_WIRED;
+
 	if (va < VM_MAXUSER_ADDRESS)
 		new_l3 |= ATTR_S1_AP(ATTR_S1_AP_USER) | ATTR_S1_PXN;
 	else
@@ -3438,7 +3439,7 @@ pmap_remove_smmu(pmap_t pmap, vm_offset_t va)
 
 	pte = pmap_pte(pmap, va, &lvl);
 	KASSERT(lvl == 3,
-	    ("Invalid device pagetable level: %d != 3", lvl));
+	    ("Invalid SMMU pagetable level: %d != 3", lvl));
 
 	if (pte == NULL)
 		return (0);
