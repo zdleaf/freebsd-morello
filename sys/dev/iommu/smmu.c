@@ -617,10 +617,8 @@ smmu_init_ste_s1(struct smmu_softc *sc, uint32_t sid, uint64_t *ste)
 
 	/* S1 */
 	ste[1] |= STE1_S1CSH_IS
-		//| STE1_S1CIR_WBRA
-		//| STE1_S1COR_WBRA
-		| STE1_S1CIR_NC
-		| STE1_S1COR_NC
+		| STE1_S1CIR_WBRA
+		| STE1_S1COR_WBRA
 		//| STE1_S1DSS_SUBSTREAM0
 		| STE1_STRW_NS_EL1;
 
@@ -696,26 +694,6 @@ smmu_init_stes(struct smmu_softc *sc,
 
 	smmu_init_ste(sc, strtab, 0x800, true); //xhci
 	smmu_init_ste(sc, strtab, 0x700, true); //realtek
-
-#if 0
-	int i;
-	for (i = 0; i < strtab->num_l1_entries; i++) {
-		addr = (void *)((uint64_t)strtab->addr +
-		    STRTAB_STE_DWORDS * 8 * i);
-		if ((i % 100000) == 0)
-			device_printf(sc->dev, "%s: i %d\n", __func__, i);
-		//if (i == 0x800) /* xhci */
-		//if (i == 0x700) /* realtek */
-		if (1 == 1)
-			smmu_init_ste_s1(sc, i, addr);
-		else
-			smmu_init_ste_bypass(sc, i, addr);
-
-		//addr += STRTAB_STE_DWORDS;
-	}
-
-	//smmu_invalidate_all_sid(sc);
-#endif
 
 	return (0);
 }
@@ -1042,15 +1020,11 @@ smmu_reset(struct smmu_softc *sc)
 	}
 
 	reg = CR1_TABLE_SH_IS
-	//    | CR1_TABLE_OC_WBC
-	//    | CR1_TABLE_IC_WBC
-	    | CR1_TABLE_OC_NC
-	    | CR1_TABLE_IC_NC
+	    | CR1_TABLE_OC_WBC
+	    | CR1_TABLE_IC_WBC
 	    | CR1_QUEUE_SH_IS
-	//    | CR1_QUEUE_OC_WBC
-	//    | CR1_QUEUE_IC_WBC;
-	    | CR1_QUEUE_OC_NC
-	    | CR1_QUEUE_IC_NC;
+	    | CR1_QUEUE_OC_WBC
+	    | CR1_QUEUE_IC_WBC;
 	bus_write_4(sc->res[0], SMMU_CR1, reg);
 
 	reg = CR2_PTM | CR2_RECINVSID | CR2_E2H;
