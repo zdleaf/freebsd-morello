@@ -761,7 +761,7 @@ smmu_init_cd(struct smmu_softc *sc)
 
 	vm_prot_t prot;
 	prot = VM_PROT_WRITE;
-	pmap_enter_smmu(&sc->p, 0x300b0000, 0x300b0000, prot, 0);
+	pmap_senter(&sc->p, 0x300b0000, 0x300b0000, prot, 0);
 
 	device_printf(sc->dev, "%s: pmap initialized\n", __func__);
 	ptr = cd->addr;
@@ -1424,7 +1424,7 @@ smmu_insert(vm_paddr_t pa, vm_offset_t va, vm_size_t size)
 	prot = VM_PROT_READ | VM_PROT_WRITE;
 
 	for (; size > 0; size -= PAGE_SIZE) {
-		pmap_enter_smmu(p, va, pa, prot, 0);
+		pmap_senter(p, va, pa, prot, 0);
 		pa += PAGE_SIZE;
 		va += PAGE_SIZE;
 	}
@@ -1456,7 +1456,7 @@ smmu_unmap(bus_dma_segment_t *segs, int nsegs)
 		    __func__, unmap_cnt++, va, size);
 #endif
 		for (j = 0; j < size; j += 0x1000) {
-			if (pmap_remove_smmu(&sc->p, va))
+			if (pmap_sremove(&sc->p, va))
 				vmem_free(sc->vmem, va, 0x1000);
 			else
 				printf("pte is NULL, va %lx\n", va);

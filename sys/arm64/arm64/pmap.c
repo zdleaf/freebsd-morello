@@ -3325,7 +3325,7 @@ setl3:
 #endif /* VM_NRESERVLEVEL > 0 */
 
 int
-pmap_enter_smmu(pmap_t pmap, vm_offset_t va, vm_paddr_t pa,
+pmap_senter(pmap_t pmap, vm_offset_t va, vm_paddr_t pa,
     vm_prot_t prot, u_int flags)
 {
 	struct rwlock *lock;
@@ -3432,7 +3432,7 @@ out:
 }
 
 int
-pmap_remove_smmu(pmap_t pmap, vm_offset_t va)
+pmap_sremove(pmap_t pmap, vm_offset_t va)
 {
 	pt_entry_t *pte;
 	int lvl;
