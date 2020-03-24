@@ -3324,6 +3324,9 @@ setl3:
 }
 #endif /* VM_NRESERVLEVEL > 0 */
 
+/*
+ * Add a single SMMU entry.
+ */
 int
 pmap_senter(pmap_t pmap, vm_offset_t va, vm_paddr_t pa,
     vm_prot_t prot, u_int flags)
@@ -3345,16 +3348,11 @@ pmap_senter(pmap_t pmap, vm_offset_t va, vm_paddr_t pa,
 	    ATTR_S1_IDX(VM_MEMATTR_DEVICE) | L3_PAGE);
 	if ((prot & VM_PROT_WRITE) == 0)
 		new_l3 |= ATTR_S1_AP(ATTR_S1_AP_RO);
-
-	/* Execute never. */
-	new_l3 |= ATTR_S1_XN;
-
+	new_l3 |= ATTR_S1_XN; /* Execute never. */
 	if (va < VM_MAXUSER_ADDRESS)
-		new_l3 |= ATTR_S1_AP(ATTR_S1_AP_USER) | ATTR_S1_PXN;
-	else
-		new_l3 |= ATTR_S1_UXN;
-	if (pmap != kernel_pmap)
-		new_l3 |= ATTR_S1_nG;
+		new_l3 |= ATTR_S1_AP(ATTR_S1_AP_USER);
+	/* TODO: check this. */
+	new_l3 |= ATTR_S1_nG;
 
 	CTR2(KTR_PMAP, "pmap_enter_smmu: %.16lx -> %.16lx", va, pa);
 
@@ -3431,6 +3429,9 @@ out:
 	return (rv);
 }
 
+/*
+ * Remove a single SMMU entry.
+ */
 int
 pmap_sremove(pmap_t pmap, vm_offset_t va)
 {
