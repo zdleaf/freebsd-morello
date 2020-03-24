@@ -1512,6 +1512,4 @@ smmu_map(bus_dma_segment_t *segs, int nsegs)
 
 	smmu_tlbi_all(sc);
 	smmu_poll_until_consumed(sc, &sc->cmdq);
-
-	//device_printf(sc->dev, "map done\n");
 }
