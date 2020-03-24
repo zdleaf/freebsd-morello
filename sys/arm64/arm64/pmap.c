@@ -3355,7 +3355,7 @@ pmap_enter_smmu(pmap_t pmap, vm_offset_t va, vm_paddr_t pa,
 	if (pmap != kernel_pmap)
 		new_l3 |= ATTR_S1_nG;
 
-	CTR2(KTR_PMAP, "pmap_enter: %.16lx -> %.16lx", va, pa);
+	CTR2(KTR_PMAP, "pmap_enter_smmu: %.16lx -> %.16lx", va, pa);
 
 	lock = NULL;
 	PMAP_LOCK(pmap);
@@ -3368,19 +3368,15 @@ pmap_enter_smmu(pmap_t pmap, vm_offset_t va, vm_paddr_t pa,
 	 */
 retry:
 	pde = pmap_pde(pmap, va, &lvl);
-	if (pde != NULL)
-		cpu_dcache_wbinv_range((uint64_t)pde, PAGE_SIZE);
 	if (pde != NULL && lvl == 2) {
 		l3 = pmap_l2_to_l3(pde, va);
 		if (va < VM_MAXUSER_ADDRESS && mpte == NULL) {
 			mpte = PHYS_TO_VM_PAGE(pmap_load(pde) & ~ATTR_MASK);
 			mpte->ref_count++;
 		}
-		cpu_dcache_wbinv_range((uint64_t)l3, PAGE_SIZE);
 		goto havel3;
 	} else if (pde != NULL && lvl == 1) {
 		l2 = pmap_l1_to_l2(pde, va);
-		cpu_dcache_wbinv_range((uint64_t)l2, PAGE_SIZE);
 		if ((pmap_load(l2) & ATTR_DESCR_MASK) == L2_BLOCK &&
 		    (l3 = pmap_demote_l2_locked(pmap, l2, va, &lock)) != NULL) {
 			l3 = &l3[pmap_l3_index(va)];
@@ -3389,7 +3385,6 @@ retry:
 				    pmap_load(l2) & ~ATTR_MASK);
 				mpte->ref_count++;
 			}
-			cpu_dcache_wbinv_range((uint64_t)l3, PAGE_SIZE);
 			goto havel3;
 		}
 		/* We need to allocate an L3 table. */
@@ -3414,6 +3409,7 @@ retry:
 		panic("pmap_enter: missing L3 table for kernel va %#lx", va);
 
 havel3:
+
 	orig_l3 = pmap_load(l3);
 	opa = orig_l3 & ~ATTR_MASK;
 	pv = NULL;
