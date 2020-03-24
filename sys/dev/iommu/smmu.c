@@ -216,15 +216,11 @@ smmu_event_intr(void *arg)
 
 	sc = arg;
 
-	device_printf(sc->dev, "!!!!!!!!! %s\n", __func__);
+	device_printf(sc->dev, "%s\n", __func__);
 
 	do {
 		smmu_evtq_dequeue(sc);
 	} while (!smmu_q_empty(&sc->evtq));
-
-	//panic("%s\n", __func__);
-
-	//return (FILTER_HANDLED);
 }
 
 static void
