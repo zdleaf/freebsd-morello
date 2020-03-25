@@ -422,10 +422,14 @@ make_cmd(struct smmu_softc *sc, uint64_t *cmd,
 	cmd[0] = entry->opcode << CMD_QUEUE_OPCODE_S;
 
 	switch (entry->opcode) {
-	case CMD_TLBI_NH_ALL:
+	case CMD_TLBI_NH_VA:
+		cmd[1] = entry->tlbi.addr & TLBI_1_ADDR_M;
+		if (entry->tlbi.leaf)
+			cmd[1] |= TLBI_1_LEAF;
 		break;
-	case CMD_TLBI_EL2_ALL:
 	case CMD_TLBI_NSNH_ALL:
+	case CMD_TLBI_NH_ALL:
+	case CMD_TLBI_EL2_ALL:
 		break;
 	case CMD_CFGI_CD:
 		cmd[0] |= ((uint64_t)entry->cfgi.ssid << CFGI_0_SSID_S);
@@ -553,6 +557,20 @@ smmu_tlbi_all(struct smmu_softc *sc)
 	cmd.opcode = CMD_TLBI_NSNH_ALL;
 	smmu_cmdq_enqueue_cmd(sc, &cmd);
 	smmu_cmdq_enqueue_sync(sc);
+}
+
+static void
+smmu_tlbi_va(struct smmu_softc *sc, vm_offset_t va)
+{
+	struct smmu_cmdq_entry cmd;
+
+	/* Invalidate specific range */
+	cmd.opcode = CMD_TLBI_NH_VA;
+	cmd.tlbi.asid = 0;
+	cmd.tlbi.vmid = 0;
+	cmd.tlbi.leaf = false;
+	cmd.tlbi.addr = va;
+	smmu_cmdq_enqueue_cmd(sc, &cmd);
 }
 
 static void
@@ -1399,6 +1417,7 @@ smmu_insert(vm_paddr_t pa, vm_offset_t va, vm_size_t size)
 
 	for (; size > 0; size -= PAGE_SIZE) {
 		pmap_senter(p, va, pa, prot, 0);
+		smmu_tlbi_va(sc, va);
 		pa += PAGE_SIZE;
 		va += PAGE_SIZE;
 	}
@@ -1430,15 +1449,16 @@ smmu_unmap(bus_dma_segment_t *segs, int nsegs)
 		    __func__, unmap_cnt++, va, size);
 #endif
 		for (j = 0; j < size; j += 0x1000) {
-			if (pmap_sremove(&sc->p, va))
+			if (pmap_sremove(&sc->p, va)) {
 				vmem_free(sc->vmem, va, 0x1000);
-			else
+				smmu_tlbi_va(sc, va);
+			} else
 				printf("pte is NULL, va %lx\n", va);
 			va += 0x1000;
 		}
 	}
 
-	smmu_tlbi_all(sc);
+	smmu_cmdq_enqueue_sync(sc);
 	smmu_poll_until_consumed(sc, &sc->cmdq);
 }
 
@@ -1484,6 +1504,6 @@ smmu_map(bus_dma_segment_t *segs, int nsegs)
 		segs[i].ds_addr = va | offset;
 	}
 
-	smmu_tlbi_all(sc);
+	smmu_cmdq_enqueue_sync(sc);
 	smmu_poll_until_consumed(sc, &sc->cmdq);
 }

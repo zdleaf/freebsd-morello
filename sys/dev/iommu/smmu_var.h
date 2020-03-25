@@ -77,8 +77,8 @@ struct smmu_cmdq_entry {
 		struct {
 			uint16_t asid;
 			uint16_t vmid;
+			uint64_t addr;
 			bool leaf;
-			uint64_t va;
 		} tlbi;
 		struct {
 			uint32_t sid;

@@ -270,6 +270,9 @@
 #define	CMD_TLBI_NH_ALL		0x10
 #define	CMD_TLBI_NH_ASID	0x11
 #define	CMD_TLBI_NH_VA		0x12
+#define	 TLBI_1_LEAF		(1 << 0)
+#define	 TLBI_1_ADDR_S		12
+#define	 TLBI_1_ADDR_M		(0xfffffffffffff << TLBI_1_ADDR_S)
 #define	CMD_TLBI_NH_VAA		0x13
 #define	CMD_TLBI_EL3_ALL	0x18
 #define	CMD_TLBI_EL3_VA		0x1A
