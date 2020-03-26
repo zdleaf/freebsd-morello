@@ -399,17 +399,6 @@ smmu_evtq_dequeue(struct smmu_softc *sc)
 	smmu_dump_ste(sc, ste);
 	smmu_dump_cd(sc);
 
-#if 0
-	/* Disable SMMU */
-	uint32_t reg;
-	int error;
-	reg = bus_read_4(sc->res[0], SMMU_CR0);
-	reg &= ~CR0_SMMUEN;
-	error = smmu_write_ack(sc, SMMU_CR0, SMMU_CR0ACK, reg);
-	if (error)
-		device_printf(sc->dev, "Could not disable SMMU.\n");
-#endif
-
 	return (0);
 }
 
@@ -918,11 +907,17 @@ smmu_init_strtab(struct smmu_softc *sc)
 static int
 smmu_disable(struct smmu_softc *sc)
 {
-	int ret;
+	uint32_t reg;
+	int error;
 
-	ret = smmu_write_ack(sc, SMMU_CR0, SMMU_CR0ACK, 0);
+	/* Disable SMMU */
+	reg = bus_read_4(sc->res[0], SMMU_CR0);
+	reg &= ~CR0_SMMUEN;
+	error = smmu_write_ack(sc, SMMU_CR0, SMMU_CR0ACK, reg);
+	if (error)
+		device_printf(sc->dev, "Could not disable SMMU.\n");
 
-	return (ret);
+	return (0);
 }
 
 static int
