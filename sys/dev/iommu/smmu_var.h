@@ -145,7 +145,7 @@ int smmu_attach(device_t dev);
 int smmu_detach(device_t dev);
 
 void smmu_insert(vm_paddr_t addr, vm_offset_t va, vm_size_t size);
-void smmu_map(bus_dma_segment_t *segs, int nsegs);
-void smmu_unmap(bus_dma_segment_t *segs, int nsegs);
+int smmu_map(device_t dev, bus_dma_segment_t *segs, int nsegs);
+int smmu_unmap(device_t dev, bus_dma_segment_t *segs, int nsegs);
 
 #endif /* _DEV_IOMMU_SMMU_VAR_H_ */

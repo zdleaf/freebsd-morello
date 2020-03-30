@@ -44,5 +44,6 @@ int iommu_create_domain(void);
 
 void iommu_map(bus_dma_segment_t *segs, int nsegs);
 void iommu_unmap(bus_dma_segment_t *segs, int nsegs);
+int iommu_register(device_t dev);
 
 #endif /* _DEV_IOMMU_IOMMU_H_ */

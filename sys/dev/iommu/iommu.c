@@ -62,6 +62,9 @@ __FBSDID("$FreeBSD$");
 #include <dev/iommu/smmu_var.h>
 
 #include "iommu.h"
+#include "iommu_if.h"
+
+static device_t iommu_dev = NULL;
 
 int
 iommu_create_domain(void)
@@ -80,12 +83,21 @@ void
 iommu_map(bus_dma_segment_t *segs, int nsegs)
 {
 
-	smmu_map(segs, nsegs);
+	IOMMU_MAP(iommu_dev, segs, nsegs);
 }
 
 void
 iommu_unmap(bus_dma_segment_t *segs, int nsegs)
 {
 
-	smmu_unmap(segs, nsegs);
+	IOMMU_UNMAP(iommu_dev, segs, nsegs);
+}
+
+int
+iommu_register(device_t dev)
+{
+
+	iommu_dev = dev;
+
+	return (0);
 }

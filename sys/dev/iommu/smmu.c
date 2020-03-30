@@ -73,6 +73,9 @@ __FBSDID("$FreeBSD$");
 #include "smmu_reg.h"
 #include "smmu_var.h"
 
+#include "iommu.h"
+#include "iommu_if.h"
+
 static bus_get_domain_t smmu_get_domain;
 static bus_read_ivar_t smmu_read_ivar;
 
@@ -1346,6 +1349,12 @@ smmu_attach(device_t dev)
 	smmu_init_stes(sc, &sc->strtab);
 	smmu_poll_until_consumed(sc, &sc->cmdq);
 
+	error = iommu_register(dev);
+	if (error) {
+		device_printf(dev, "Failed to register SMMU.\n");
+		return (ENXIO);
+	}
+
 	return (0);
 }
 
@@ -1421,8 +1430,8 @@ smmu_insert(vm_paddr_t pa, vm_offset_t va, vm_size_t size)
 int map_cnt = 0;
 int unmap_cnt = 0;
 
-void
-smmu_unmap(bus_dma_segment_t *segs, int nsegs)
+int
+smmu_unmap(device_t dev, bus_dma_segment_t *segs, int nsegs)
 {
 	struct smmu_softc *sc;
 	vm_offset_t va;
@@ -1455,10 +1464,12 @@ smmu_unmap(bus_dma_segment_t *segs, int nsegs)
 
 	smmu_cmdq_enqueue_sync(sc);
 	smmu_poll_until_consumed(sc, &sc->cmdq);
+
+	return (0);
 }
 
-void
-smmu_map(bus_dma_segment_t *segs, int nsegs)
+int
+smmu_map(device_t dev, bus_dma_segment_t *segs, int nsegs)
 {
 	struct smmu_softc *sc;
 	vm_offset_t va;
@@ -1501,4 +1512,6 @@ smmu_map(bus_dma_segment_t *segs, int nsegs)
 
 	smmu_cmdq_enqueue_sync(sc);
 	smmu_poll_until_consumed(sc, &sc->cmdq);
+
+	return (0);
 }
