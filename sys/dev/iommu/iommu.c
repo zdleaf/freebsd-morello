@@ -59,6 +59,8 @@ __FBSDID("$FreeBSD$");
 #include <machine/cpu.h>
 #include <machine/intr.h>
 
+#include <dev/iommu/smmu_var.h>
+
 #include "iommu.h"
 
 int
@@ -72,4 +74,18 @@ void
 iommu_init(void)
 {
 
+}
+
+void
+iommu_map(bus_dma_segment_t *segs, int nsegs)
+{
+
+	smmu_map(segs, nsegs);
+}
+
+void
+iommu_unmap(bus_dma_segment_t *segs, int nsegs)
+{
+
+	smmu_unmap(segs, nsegs);
 }
