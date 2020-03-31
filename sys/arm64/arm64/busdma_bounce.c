@@ -71,7 +71,6 @@ enum {
 };
 
 struct bounce_zone;
-struct smmu_domain;
 
 struct bus_dma_tag {
 	struct bus_dma_tag_common common;
@@ -80,7 +79,7 @@ struct bus_dma_tag {
 	bus_dma_segment_t	*segments;
 	struct bounce_zone	*bounce_zone;
 	int			iommu;
-	struct smmu_domain	*domain;
+	struct iommu_domain	*domain;
 };
 
 struct bounce_page {
@@ -91,10 +90,6 @@ struct bounce_page {
 	vm_offset_t	dataoffs;	/* page offset of client data */
 	bus_size_t	datacount;	/* client data count */
 	STAILQ_ENTRY(bounce_page) links;
-};
-
-struct smmu_domain {
-	struct bus_dma_tag dmat;
 };
 
 int busdma_swi_pending;
@@ -116,6 +111,8 @@ struct bounce_zone {
 	struct sysctl_ctx_list sysctl_tree;
 	struct sysctl_oid *sysctl_tree_top;
 };
+
+static MALLOC_DEFINE(M_BUSDMA, "busdma", "ARM64 busdma");
 
 static struct mtx bounce_lock;
 static int total_bpages;
@@ -1389,40 +1386,36 @@ struct bus_dma_impl bus_dma_bounce_impl = {
 
 #include <dev/pci/pcivar.h>
 
-static MALLOC_DEFINE(M_SMMU_DOMAIN, "smmu_dom", "ARM SMMU Domain");
-
 static void
-smmu_tag_init(struct smmu_domain *d)
+smmu_tag_init(struct bus_dma_tag *t)
 {
 	bus_addr_t maxaddr;
 
 	maxaddr = BUS_SPACE_MAXADDR;
 
-	d->dmat.common.ref_count = 1; /* Prevent free */
-	d->dmat.common.impl = &bus_dma_bounce_impl;
-	d->dmat.common.boundary = 0;
-	d->dmat.common.lowaddr = maxaddr;
-	d->dmat.common.highaddr = maxaddr;
-	d->dmat.common.maxsize = maxaddr;
-	d->dmat.common.nsegments = BUS_SPACE_UNRESTRICTED;
-	d->dmat.common.maxsegsz = maxaddr;
+	t->common.ref_count = 1; /* Prevent free */
+	t->common.impl = &bus_dma_bounce_impl;
+	t->common.boundary = 0;
+	t->common.lowaddr = maxaddr;
+	t->common.highaddr = maxaddr;
+	t->common.maxsize = maxaddr;
+	t->common.nsegments = BUS_SPACE_UNRESTRICTED;
+	t->common.maxsegsz = maxaddr;
 }
 
 static void
-bus_dma_tag_set_iommu(bus_dma_tag_t tag, struct smmu_domain *domain)
+bus_dma_tag_set_iommu(bus_dma_tag_t tag, struct iommu_domain *domain)
 {
 
 	tag->iommu = 1;
-	tag->domain = domain;
 }
 
 bus_dma_tag_t
 smmu_get_dma_tag(device_t dev, device_t child)
 {
-	int pci_bus, pci_slot, pci_func;
-	bus_dma_tag_t res;
-
 	devclass_t pci_class;
+	int pci_bus, pci_slot, pci_func;
+	bus_dma_tag_t tag;
 
 	printf("%s\n", __func__);
 
@@ -1433,10 +1426,10 @@ smmu_get_dma_tag(device_t dev, device_t child)
 		return (NULL);
 	}
 
-	struct smmu_domain *domain;
+	tag = malloc(sizeof(*tag), M_BUSDMA, M_WAITOK | M_ZERO);
+	tag->domain = iommu_domain_alloc();
 
-	domain = malloc(sizeof(*domain), M_SMMU_DOMAIN, M_WAITOK | M_ZERO);
-	smmu_tag_init(domain);
+	smmu_tag_init(tag);
 
 #if 0
 	struct dmar_unit *dmar;
@@ -1456,8 +1449,6 @@ smmu_get_dma_tag(device_t dev, device_t child)
 	res = ctx == NULL ? NULL : (bus_dma_tag_t)&ctx->ctx_tag;
 #endif
 
-	res = &domain->dmat;
-
 	pci_bus = pci_get_bus(child);
 	pci_slot = pci_get_slot(child);
 	pci_func = pci_get_function(child);
@@ -1465,10 +1456,10 @@ smmu_get_dma_tag(device_t dev, device_t child)
 	printf("pci bus is %d\n", pci_bus);
 
 	if (pci_bus == 7) // realtek
-		bus_dma_tag_set_iommu(res, domain);
+		bus_dma_tag_set_iommu(tag, tag->domain);
 
 	if (pci_bus == 8) // xhci
-		bus_dma_tag_set_iommu(res, domain);
+		bus_dma_tag_set_iommu(tag, tag->domain);
 
-	return (res);
+	return (tag);
 }

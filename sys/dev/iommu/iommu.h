@@ -40,7 +40,7 @@ struct iommu_domain {
 };
 
 void iommu_init(void);
-int iommu_create_domain(void);
+struct iommu_domain * iommu_domain_alloc(void);
 
 void iommu_map(bus_dma_segment_t *segs, int nsegs);
 void iommu_unmap(bus_dma_segment_t *segs, int nsegs);

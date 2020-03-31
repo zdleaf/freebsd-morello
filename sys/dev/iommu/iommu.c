@@ -64,13 +64,18 @@ __FBSDID("$FreeBSD$");
 #include "iommu.h"
 #include "iommu_if.h"
 
+static MALLOC_DEFINE(M_IOMMU_DOMAIN, "iommu_d", "IOMMU Domain");
+
 static device_t iommu_dev = NULL;
 
-int
-iommu_create_domain(void)
+struct iommu_domain *
+iommu_domain_alloc(void)
 {
+	struct iommu_domain *d;
 
-	return (0);
+	d = malloc(sizeof(*d), M_IOMMU_DOMAIN, M_WAITOK | M_ZERO);
+
+	return (d);
 }
 
 void
