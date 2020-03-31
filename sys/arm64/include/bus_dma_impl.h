@@ -92,6 +92,7 @@ int common_bus_dma_tag_create(struct bus_dma_tag_common *parent,
     int nsegments, bus_size_t maxsegsz, int flags, bus_dma_lock_t *lockfunc,
     void *lockfuncarg, size_t sz, void **dmat);
 int bus_dma_tag_set_iommu(bus_dma_tag_t tag);
+bus_dma_tag_t smmu_get_dma_tag(device_t dev, device_t child);
 
 extern struct bus_dma_impl bus_dma_bounce_impl;
 

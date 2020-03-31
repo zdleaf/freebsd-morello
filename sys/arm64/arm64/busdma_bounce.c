@@ -1388,3 +1388,89 @@ struct bus_dma_impl bus_dma_bounce_impl = {
 	.map_unload = bounce_bus_dmamap_unload,
 	.map_sync = bounce_bus_dmamap_sync
 };
+
+/* SMMU */
+
+#include <dev/pci/pcivar.h>
+
+struct smmu_domain {
+	struct bus_dma_tag dmat;
+};
+
+static MALLOC_DEFINE(M_SMMU_DOMAIN, "smmu_dom", "ARM SMMU Domain");
+
+static void
+smmu_tag_init(struct smmu_domain *d)
+{
+	bus_addr_t maxaddr;
+
+	maxaddr = BUS_SPACE_MAXADDR;
+
+	d->dmat.common.ref_count = 1; /* Prevent free */
+	d->dmat.common.impl = &bus_dma_bounce_impl;
+	d->dmat.common.boundary = 0;
+	d->dmat.common.lowaddr = maxaddr;
+	d->dmat.common.highaddr = maxaddr;
+	d->dmat.common.maxsize = maxaddr;
+	d->dmat.common.nsegments = BUS_SPACE_UNRESTRICTED;
+	d->dmat.common.maxsegsz = maxaddr;
+}
+
+bus_dma_tag_t
+smmu_get_dma_tag(device_t dev, device_t child)
+{
+	int pci_bus, pci_slot, pci_func;
+	bus_dma_tag_t res;
+
+	devclass_t pci_class;
+
+	printf("%s\n", __func__);
+
+	pci_class = devclass_find("pci");
+
+	if (device_get_devclass(device_get_parent(child)) != pci_class) {
+		printf("%s: not a pci bus device\n", __func__);
+		return (NULL);
+	}
+
+	struct smmu_domain *domain;
+
+	domain = malloc(sizeof(*domain), M_SMMU_DOMAIN, M_WAITOK | M_ZERO);
+	smmu_tag_init(domain);
+
+#if 0
+	struct dmar_unit *dmar;
+	struct dmar_ctx *ctx;
+	bus_dma_tag_t res;
+
+	dmar = dmar_find(child, bootverbose);
+	/* Not in scope of any DMAR ? */
+	if (dmar == NULL)
+		return (NULL);
+	if (!dmar->dma_enabled)
+		return (NULL);
+	dmar_quirks_pre_use(dmar);
+	dmar_instantiate_rmrr_ctxs(dmar);
+
+	ctx = dmar_instantiate_ctx(dmar, child, false);
+	res = ctx == NULL ? NULL : (bus_dma_tag_t)&ctx->ctx_tag;
+#endif
+
+	res = &domain->dmat;
+
+	bus_dma_tag_set_iommu(res);
+
+	pci_bus = pci_get_bus(child);
+	pci_slot = pci_get_slot(child);
+	pci_func = pci_get_function(child);
+
+	printf("pci bus is %d\n", pci_bus);
+
+	if (pci_bus == 7) // realtek
+		bus_dma_tag_set_iommu(res);
+
+	if (pci_bus == 8) // xhci
+		bus_dma_tag_set_iommu(res);
+
+	return (res);
+}

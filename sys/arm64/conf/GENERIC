@@ -78,6 +78,7 @@ options 	RACCT_DEFAULT_TO_DISABLED # Set kern.racct.enable=0 by default
 options 	RCTL			# Resource limits
 # options 	SMP
 options 	INTRNG
+options		ACPI_SMMU
 
 #options 	MD_ROOT_SIZE=47104
 #options 	ROOTDEVNAME=\"ufs:md0\"

@@ -5700,6 +5700,25 @@ pci_get_dma_tag(device_t bus, device_t dev)
 	}
 	return (tag);
 }
+#elif defined(ACPI_SMMU)
+bus_dma_tag_t smmu_get_dma_tag(device_t dev, device_t child);
+bus_dma_tag_t
+pci_get_dma_tag(device_t bus, device_t dev)
+{
+	bus_dma_tag_t tag;
+	struct pci_softc *sc;
+
+	if (device_get_parent(dev) == bus) {
+		/* try smmu and return if it works */
+		tag = smmu_get_dma_tag(bus, dev);
+	} else
+		tag = NULL;
+	if (tag == NULL) {
+		sc = device_get_softc(bus);
+		tag = sc->sc_dma_tag;
+	}
+	return (tag);
+}
 #else
 bus_dma_tag_t
 pci_get_dma_tag(device_t bus, device_t dev)
