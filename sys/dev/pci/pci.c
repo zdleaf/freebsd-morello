@@ -5723,11 +5723,9 @@ pci_get_dma_tag(device_t bus, device_t dev)
 bus_dma_tag_t
 pci_get_dma_tag(device_t bus, device_t dev)
 {
-	bus_dma_tag_t tag;
+	struct pci_softc *sc = device_get_softc(bus);
 
-	tag = BUS_GET_DMA_TAG(device_get_parent(bus), dev);
-
-	return (tag);
+	return (sc->sc_dma_tag);
 }
 #endif
 
