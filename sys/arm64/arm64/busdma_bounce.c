@@ -1416,6 +1416,7 @@ smmu_get_dma_tag(device_t dev, device_t child)
 	devclass_t pci_class;
 	int pci_bus, pci_slot, pci_func;
 	bus_dma_tag_t tag;
+	uint16_t rid;
 
 	printf("%s\n", __func__);
 
@@ -1428,6 +1429,9 @@ smmu_get_dma_tag(device_t dev, device_t child)
 
 	tag = malloc(sizeof(*tag), M_BUSDMA, M_WAITOK | M_ZERO);
 	tag->domain = iommu_domain_alloc();
+
+	rid = pci_get_rid(child);
+	iommu_add_device(tag->domain, child, rid);
 
 	smmu_tag_init(tag);
 

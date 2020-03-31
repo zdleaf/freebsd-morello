@@ -78,6 +78,13 @@ iommu_domain_alloc(void)
 	return (d);
 }
 
+int
+iommu_add_device(struct iommu_domain *domain, device_t dev, uint16_t rid)
+{
+
+	return (0);
+}
+
 void
 iommu_init(void)
 {
