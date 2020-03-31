@@ -42,8 +42,8 @@ struct iommu_domain {
 void iommu_init(void);
 struct iommu_domain * iommu_domain_alloc(void);
 
-void iommu_map(bus_dma_segment_t *segs, int nsegs);
-void iommu_unmap(bus_dma_segment_t *segs, int nsegs);
+void iommu_map(struct iommu_domain *, bus_dma_segment_t *segs, int nsegs);
+void iommu_unmap(struct iommu_domain *, bus_dma_segment_t *segs, int nsegs);
 int iommu_register(device_t dev);
 
 #endif /* _DEV_IOMMU_IOMMU_H_ */

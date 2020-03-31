@@ -85,14 +85,14 @@ iommu_init(void)
 }
 
 void
-iommu_map(bus_dma_segment_t *segs, int nsegs)
+iommu_map(struct iommu_domain *domain, bus_dma_segment_t *segs, int nsegs)
 {
 
 	IOMMU_MAP(iommu_dev, segs, nsegs);
 }
 
 void
-iommu_unmap(bus_dma_segment_t *segs, int nsegs)
+iommu_unmap(struct iommu_domain *domain, bus_dma_segment_t *segs, int nsegs)
 {
 
 	IOMMU_UNMAP(iommu_dev, segs, nsegs);

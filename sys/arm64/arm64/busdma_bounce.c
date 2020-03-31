@@ -908,7 +908,7 @@ bounce_bus_dmamap_complete(bus_dma_tag_t dmat, bus_dmamap_t map,
 		memcpy(dmat->segments, segs, map->nsegs * sizeof(segs[0]));
 
 	if (dmat->iommu == 1)
-		iommu_map(dmat->segments, nsegs);
+		iommu_map(dmat->domain, dmat->segments, nsegs);
 
 	if (segs != NULL)
 		memcpy(segs, dmat->segments, map->nsegs * sizeof(segs[0]));
@@ -927,7 +927,7 @@ bounce_bus_dmamap_unload(bus_dma_tag_t dmat, bus_dmamap_t map)
 	struct bounce_page *bpage;
 
 	if (dmat->iommu == 1) {
-		iommu_unmap(dmat->segments, map->nsegs);
+		iommu_unmap(dmat->domain, dmat->segments, map->nsegs);
 		map->nsegs = 0;
 	}
 
