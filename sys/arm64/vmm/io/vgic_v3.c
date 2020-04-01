@@ -42,9 +42,9 @@
 #include <dev/ofw/openfirm.h>
 
 #include <machine/bus.h>
-#include <machine/bitops.h>
 #include <machine/cpufunc.h>
 #include <machine/cpu.h>
+#include <machine/machdep.h>
 #include <machine/param.h>
 #include <machine/pmap.h>
 #include <machine/vmparam.h>
@@ -223,7 +223,7 @@ vgic_v3_vminit(void *arg)
 	 * supports one security state (ARM GIC Architecture Specification for
 	 * GICv3 and GICv4, p. 4-464)
 	 */
-	dist->gicd_ctlr = GICD_CTLR_DS;
+	dist->gicd_ctlr = 0; //GICD_CTLR_DS;
 
 	dist->gicd_typer = ro_regs.gicd_typer;
 	dist->nirqs = GICD_TYPER_I_NUM(dist->gicd_typer);
@@ -232,11 +232,532 @@ vgic_v3_vminit(void *arg)
 	mtx_init(&dist->dist_mtx, "VGICv3 Distributor lock", NULL, MTX_SPIN);
 }
 
+static uint64_t
+dist_read_gicd_ixenabler(struct vgic_v3_dist *dist, int n)
+{
+	uint64_t ret;
+
+	/*
+	 * GIC Architecture specification, p 8-471: "When ARE is 1 for the
+	 * Security state of an interrupt, the field for that interrupt is RES0
+	 * and an implementation is permitted to* make the field RAZ/WI in this
+	 * case".
+	 */
+	if (n == 0 && aff_routing_en(dist)) {
+		return (0);
+	}
+
+	mtx_lock_spin(&dist->dist_mtx);
+	ret = dist->gicd_ixenabler[n];
+	mtx_unlock_spin(&dist->dist_mtx);
+
+	return (ret);
+}
+
+static void
+vgic_update_interrupts(struct hyp *hyp, int vcpuid, int irq,
+    uint64_t old_ixenabler, uint64_t new_ixenabler, bool set)
+{
+	uint32_t updates;
+	int i;
+
+	i = 0;
+	updates = old_ixenabler ^ new_ixenabler;
+	for (; updates != 0; updates >>= 1) {
+		if ((updates & 1) == 1) {
+			vgic_v3_irq_toggle_enabled(irq + i, set, hyp, vcpuid);
+		}
+		i++;
+	}
+}
+
+static void
+dist_write_gicd_ixenabler(struct hyp *hyp, int vcpuid,
+    struct vgic_v3_dist *dist, int idx, uint64_t val, bool set)
+{
+	uint32_t old_ixenabler;
+
+	/*
+	 * GIC Architecture specification, p 8-471: "When ARE is 1 for the
+	 * Security state of an interrupt, the field for that interrupt is RES0
+	 * and an implementation is permitted to* make the field RAZ/WI in this
+	 * case".
+	 */
+	if (idx == 0 && aff_routing_en(dist)) {
+		return;
+	}
+
+	mtx_lock_spin(&dist->dist_mtx);
+	old_ixenabler = dist->gicd_ixenabler[idx];
+	if (set)
+		dist->gicd_ixenabler[idx] |= val;
+	else
+		dist->gicd_ixenabler[idx] &= ~val;
+	vgic_update_interrupts(hyp, vcpuid, idx * 32, old_ixenabler,
+	    dist->gicd_ixenabler[idx], set);
+	mtx_unlock_spin(&dist->dist_mtx);
+}
+
+static int
+dist_read(void *vm, int vcpuid, uint64_t fault_ipa, uint64_t *rval,
+    int size, void *arg)
+{
+	struct hyp *hyp = vm_get_cookie(vm);
+	struct vgic_v3_dist *dist = &hyp->vgic_dist;
+	bool *retu = arg;
+	uint64_t reg;
+	int n;
+
+	/* Check the register is one of ours and is the correct size */
+	if (fault_ipa < dist->start || fault_ipa + size > dist->end ||
+	    size != 4) {
+		return (EINVAL);
+	}
+
+	reg = fault_ipa - dist->start;
+	/* Check the register is correctly aligned */
+	if ((reg & (size - 1)) != 0)
+		return (EINVAL);
+
+	switch(reg) {
+	default:
+		break;
+	case GICD_CTLR:
+		mtx_lock_spin(&dist->dist_mtx);
+		*rval = dist->gicd_ctlr;
+		mtx_unlock_spin(&dist->dist_mtx);
+
+		/* Writes are never pending */
+		*rval &= ~GICD_CTLR_RWP;
+
+		*retu = false;
+		return (0);
+	case GICD_TYPER:
+		*rval = dist->gicd_typer;
+		*retu = false;
+		return (0);
+	case GICD_PIDR2:
+		*rval = dist->gicd_pidr2;
+		*retu = false;
+		return (0);
+	}
+
+	if (reg >= GICD_IGROUPR(0) && /* 0x0080 */
+	    reg < (GICD_IGROUPR(0) + dist->gicd_igroup_size)) {
+
+		/*
+		 * GIC Architecture specification, p 8-477: "For SGIs and PPIs:
+		 * When ARE is 1 for the Security state of an interrupt, the
+		 * field for that interrupt is RES0 and an implementation is
+		 * permitted to make the field RAZ/WI in this case".
+		 */
+		if (reg == GICD_IGROUPR(0) && aff_routing_en(dist))
+			*rval = 0;
+		else
+			*rval = 0xffffffff;
+		*retu = false;
+		return (0);
+	}
+
+	if (reg >= GICD_ISENABLER(0) && /* 0x0100 */
+	    reg < GICD_ISENABLER(0) + dist->gicd_ixenable_size) {
+		n = (reg - GICD_ISENABLER(0)) / 4;
+		*rval = dist_read_gicd_ixenabler(dist, n);
+		*retu = false;
+		return (0);
+	}
+
+	if (reg >= GICD_ICENABLER(0) && /* 0x0180 */
+	    reg < GICD_ICENABLER(0) + dist->gicd_ixenable_size) {
+		n = (reg - GICD_ICENABLER(0)) / 4;
+		*rval = dist_read_gicd_ixenabler(dist, n);
+		*retu = false;
+		return (0);
+	}
+
+	/* TODO: GICD_ISPENDR 0x0200 */
+	/* TODO: GICD_ICPENDR 0x0280 */
+	/* TODO: GICD_ICACTIVER 0x0380 */
+
+	if (reg >= GICD_IPRIORITYR(0) && /* 0x0400 */
+	    reg < GICD_IPRIORITYR(0) + dist->gicd_ipriority_size) {
+		n = (reg - GICD_IPRIORITYR(0)) / 4;
+		/*
+		 * GIC Architecture specification, p 8-483: when affinity
+		 * routing is enabled, GICD_IPRIORITYR<n> is RAZ/WI for
+		 * n = 0 to 7.
+		 */
+		if (aff_routing_en(dist) && n <= 7) {
+			*rval = 0;
+		} else {
+			mtx_lock_spin(&dist->dist_mtx);
+			*rval = dist->gicd_ipriorityr[n];
+			mtx_unlock_spin(&dist->dist_mtx);
+		}
+
+		*retu = false;
+		return (0);
+	}
+
+	/* TODO: GICD_ITARGETSR 0x0800 */
+
+	if (reg >= GICD_ICFGR(0) && /* 0x0C00 */
+	    reg < (GICD_ICFGR(0) + dist->gicd_icfg_size)) {
+		if (reg == GICD_ICFGR(0)) {
+			*rval = 0;
+		} else {
+			mtx_lock_spin(&dist->dist_mtx);
+			*rval = dist->gicd_icfgr[(reg - GICD_ICFGR(0)) / 4];
+			mtx_unlock_spin(&dist->dist_mtx);
+		}
+		*retu = false;
+		return (0);
+	}
+
+	if (reg >= GICD_IROUTER(0) && /* 0x6000 */
+	    reg < GICD_IROUTER(0) + dist->gicd_iroute_size) {
+		n = (reg - GICD_IROUTER(0)) / 8;
+		if (n <= 31 || !aff_routing_en(dist)) {
+			*rval = 0;
+		} else {
+			mtx_lock_spin(&dist->dist_mtx);
+			*rval = dist->gicd_irouter[n];
+			mtx_unlock_spin(&dist->dist_mtx);
+		}
+		*retu = false;
+		return (0);
+	}
+
+	return (0);
+}
+
+static int
+dist_write(void *vm, int vcpuid, uint64_t fault_ipa, uint64_t wval,
+    int size, void *arg)
+{
+	struct hyp *hyp = vm_get_cookie(vm);
+	struct vgic_v3_dist *dist = &hyp->vgic_dist;
+	bool *retu = arg;
+	uint64_t reg;
+	int n;
+
+	/* Check the register is one of ours and is the correct size */
+	if (fault_ipa < dist->start || fault_ipa + size > dist->end ||
+	    size != 4) {
+		/* TODO: GICD_IROUTER is an 8 byte register */
+		return (EINVAL);
+	}
+
+	reg = fault_ipa - dist->start;
+	/* Check the register is correctly aligned */
+	if ((reg & (size - 1)) != 0)
+		return (EINVAL);
+
+	switch(reg) {
+	default:
+		break;
+	case GICD_CTLR:
+		/*
+		 * GICD_CTLR.DS is RAO/WI when only one security
+		 * state is supported.
+		 */
+		//wval |= GICD_CTLR_DS;
+		mtx_lock_spin(&dist->dist_mtx);
+#define	reg_changed(new, old, mask)	(((new) & (mask)) != ((old) & (mask)))
+		if (reg_changed(wval, dist->gicd_ctlr, GICD_CTLR_G1A)) {
+			if (!(wval & GICD_CTLR_G1A))
+				vgic_v3_group_toggle_enabled(false, hyp);
+			else
+				vgic_v3_group_toggle_enabled(true, hyp);
+		}
+		dist->gicd_ctlr = wval;
+		mtx_unlock_spin(&dist->dist_mtx);
+
+		*retu = false;
+		return (0);
+	case GICD_TYPER:
+		*retu = false;
+		return (0);
+	case GICD_PIDR2:
+		*retu = false;
+		return (0);
+	}
+
+	/* Only group 1 interrupts are supported. Treat IGROUPR as RA0/WI. */
+	if (reg >= GICD_IGROUPR(0) && /* 0x0080 */
+	    reg < (GICD_IGROUPR(0) + dist->gicd_igroup_size)) {
+		*retu = false;
+		return (0);
+	}
+
+	if (reg >= GICD_ISENABLER(0) && /* 0x0100 */
+	    reg < GICD_ISENABLER(0) + dist->gicd_ixenable_size) {
+		n = (reg - GICD_ISENABLER(0)) / 4;
+		dist_write_gicd_ixenabler(hyp, vcpuid, dist, n, wval, true);
+		*retu = false;
+		return (0);
+	}
+
+	if (reg >= GICD_ICENABLER(0) && /* 0x0180 */
+	    reg < GICD_ICENABLER(0) + dist->gicd_ixenable_size) {
+		n = (reg - GICD_ICENABLER(0)) / 4;
+		dist_write_gicd_ixenabler(hyp, vcpuid, dist, n, wval, false);
+		*retu = false;
+		return (0);
+	}
+
+	/* TODO: GICD_ISPENDR 0x0200 */
+	/* TODO: GICD_ICPENDR 0x0280 */
+	/* TODO: GICD_ICACTIVER 0x0380 */
+
+	if (reg >= GICD_IPRIORITYR(0) && /* 0x0400 */
+	    reg < GICD_IPRIORITYR(0) + dist->gicd_ipriority_size) {
+		n = (reg - GICD_IPRIORITYR(0)) / 4;
+		/*
+		 * GIC Architecture specification, p 8-483: when affinity
+		 * routing is enabled, GICD_IPRIORITYR<n> is RAZ/WI for
+		 * n = 0 to 7.
+		 */
+		if (!(aff_routing_en(dist) && n <= 7)) {
+			mtx_lock_spin(&dist->dist_mtx);
+			dist->gicd_ipriorityr[n] = wval;
+			mtx_unlock_spin(&dist->dist_mtx);
+		}
+
+		*retu = false;
+		return (0);
+	}
+
+	if (reg >= GICD_ICFGR(0) &&
+	    reg < (GICD_ICFGR(0) + dist->gicd_icfg_size)) {
+		if (reg != GICD_ICFGR(0)) {
+			mtx_lock_spin(&dist->dist_mtx);
+			dist->gicd_icfgr[(reg - GICD_ICFGR(0)) / 4] = wval;
+			mtx_unlock_spin(&dist->dist_mtx);
+		}
+		*retu = false;
+		return (0);
+	}
+
+	if (reg >= GICD_IROUTER(0) && /* 0x6000 */
+	    reg < GICD_IROUTER(0) + dist->gicd_iroute_size) {
+		n = (reg - GICD_IROUTER(0)) / 8;
+		if (n > 31 && aff_routing_en(dist)) {
+			mtx_lock_spin(&dist->dist_mtx);
+			dist->gicd_irouter[n] = wval;
+			mtx_unlock_spin(&dist->dist_mtx);
+		}
+		*retu = false;
+		return (0);
+	}
+
+	return (0);
+}
+
+static int
+redist_read(void *vm, int vcpuid, uint64_t fault_ipa, uint64_t *rval,
+    int size, void *arg)
+{
+	struct hyp *hyp = vm_get_cookie(vm);
+	struct vgic_v3_redist *redist = &hyp->ctx[vcpuid].vgic_redist;
+	bool *retu = arg;
+	uint64_t reg;
+	int n;
+
+	/* Check the register is one of ours and is the correct size */
+	if (fault_ipa < redist->start || fault_ipa + size > redist->end) {
+		return (EINVAL);
+	}
+
+	reg = fault_ipa - redist->start;
+	/* Check the register is correctly aligned */
+	if ((reg & (size - 1)) != 0)
+		return (EINVAL);
+
+	switch (reg) {
+	case GICR_CTLR:
+		*rval = redist->gicr_ctlr;
+		*retu = false;
+		return (0);
+	case GICR_TYPER:
+		*rval = redist->gicr_typer;
+		*retu = false;
+		return (0);
+	case GICR_WAKER:
+		*rval = 0; // & ~GICR_WAKER_PS & ~GICR_WAKER_CA;
+		*retu = false;
+		return (0);
+	case GICR_PIDR2:
+		*rval = hyp->vgic_dist.gicd_pidr2;
+		*retu = false;
+		return (0);
+	case GICR_SGI_BASE_SIZE + GICR_IGROUPR0:
+		*rval = ~0ul;
+		*retu = false;
+		return (0);
+	case GICR_SGI_BASE_SIZE + GICR_ISENABLER0:
+	case GICR_SGI_BASE_SIZE + GICR_ICENABLER0:
+		*rval = redist->gicr_ixenabler0;
+		*retu = false;
+		return (0);
+	case GICR_SGI_BASE_SIZE + GICR_ICFGR0_BASE:
+		*rval = redist->gicr_icfgr0;
+		*retu = false;
+		return (0);
+	case GICR_SGI_BASE_SIZE + GICR_ICFGR1_BASE:
+		*rval = redist->gicr_icfgr1;
+		*retu = false;
+		return (0);
+	default:
+		break;
+	}
+
+	if (reg >= (GICR_SGI_BASE_SIZE + GICR_IPRIORITYR_BASE) &&
+	    reg < (GICR_SGI_BASE_SIZE + GICR_IPRIORITYR_BASE +
+	    sizeof(redist->gicr_ipriorityr))) {
+		n = (reg - GICR_SGI_BASE_SIZE + GICR_IPRIORITYR_BASE) / 4;
+		*rval = redist->gicr_ipriorityr[n];
+		*retu = false;
+		return (0);
+	}
+
+	panic("%s: %lx", __func__, reg);
+}
+
+static void
+redist_write_gicr_ixenabler0(struct hyp *hyp, int vcpuid,
+    struct vgic_v3_redist *redist, uint64_t wval, bool set)
+{
+	uint32_t old_ixenabler0, new_ixenabler0;
+
+	old_ixenabler0 = redist->gicr_ixenabler0;
+	if (set)
+		new_ixenabler0 = old_ixenabler0 | wval;
+	else
+		new_ixenabler0 = old_ixenabler0 & ~wval;
+	vgic_update_interrupts(hyp, vcpuid, 0, old_ixenabler0, new_ixenabler0,
+	    set);
+	redist->gicr_ixenabler0 = new_ixenabler0;
+}
+
+static int
+redist_write(void *vm, int vcpuid, uint64_t fault_ipa, uint64_t wval,
+    int size, void *arg)
+{
+	struct hyp *hyp = vm_get_cookie(vm);
+	struct vgic_v3_redist *redist = &hyp->ctx[vcpuid].vgic_redist;
+	bool *retu = arg;
+	uint64_t reg;
+	int n;
+
+
+	/* Check the register is one of ours and is the correct size */
+	if (fault_ipa < redist->start || fault_ipa + size > redist->end) {
+		return (EINVAL);
+	}
+
+	reg = fault_ipa - redist->start;
+	/* Check the register is correctly aligned */
+	if ((reg & (size - 1)) != 0)
+		return (EINVAL);
+
+	switch (reg) {
+	case GICR_CTLR:
+		redist->gicr_ctlr = wval;
+		*retu = false;
+		return (0);
+	case GICR_TYPER:
+	case GICR_WAKER:
+	case GICR_PIDR2:
+	case GICR_SGI_BASE_SIZE + GICR_IGROUPR0:
+		/* Ignore writes */
+		*retu = false;
+		return (0);
+	case GICR_SGI_BASE_SIZE + GICR_ISENABLER0:
+	case GICR_SGI_BASE_SIZE + GICR_ICENABLER0:
+		redist_write_gicr_ixenabler0(hyp, vcpuid, redist, wval,
+		    reg == (GICR_SGI_BASE_SIZE + GICR_ISENABLER0));
+		*retu = false;
+		return (0);
+	case GICR_SGI_BASE_SIZE + GICR_IPRIORITYR_BASE:
+		break;
+	case GICR_SGI_BASE_SIZE + GICR_ICFGR0_BASE:
+		redist->gicr_icfgr0 = wval;
+		*retu = false;
+		return (0);
+	case GICR_SGI_BASE_SIZE + GICR_ICFGR1_BASE:
+		redist->gicr_icfgr1 = wval;
+		*retu = false;
+		return (0);
+	default:
+		break;
+	}
+
+	if (reg >= (GICR_SGI_BASE_SIZE + GICR_IPRIORITYR_BASE) &&
+	    reg < (GICR_SGI_BASE_SIZE + GICR_IPRIORITYR_BASE +
+	    sizeof(redist->gicr_ipriorityr))) {
+		n = (reg - GICR_SGI_BASE_SIZE + GICR_IPRIORITYR_BASE) / 4;
+		redist->gicr_ipriorityr[n] = wval;
+		*retu = false;
+		return (0);
+	}
+
+	panic("%s: %lx", __func__, reg);
+}
+
+static void
+vgic_v3_mmio_init(struct hyp *hyp)
+{
+	struct vgic_v3_dist *dist = &hyp->vgic_dist;
+
+	/* GICD_IGROUPR */
+	dist->gicd_igroup_size = howmany(dist->nirqs, 32) *
+	    sizeof(uint32_t);
+
+	/* GICD_ISENABLER & GICD_ICENABLER */
+	dist->gicd_ixenable_size =
+	    ((dist->gicd_typer & GICD_TYPER_ITLINESNUM_MASK) + 1) *
+	    sizeof(*dist->gicd_ixenabler);
+	dist->gicd_ixenabler = malloc(dist->gicd_ixenable_size, M_VGIC_V3,
+	    M_WAITOK | M_ZERO);
+
+	/* GICD_IPRIORITYR */
+	dist->gicd_ipriority_size =
+	    (8 * ((dist->gicd_typer & GICD_TYPER_ITLINESNUM_MASK) + 1)) *
+	    sizeof(*dist->gicd_ipriorityr);
+	dist->gicd_ipriorityr = malloc(dist->gicd_ipriority_size,
+	    M_VGIC_V3, M_WAITOK | M_ZERO);
+
+	/* GICD_ICFGR */
+	dist->gicd_icfg_size = howmany(dist->nirqs, 16) *
+	    sizeof(*dist->gicd_icfgr);
+	dist->gicd_icfgr = malloc(dist->gicd_icfg_size,
+	    M_VGIC_V3, M_WAITOK | M_ZERO);
+
+	/* GICD_IROUTER */
+	dist->gicd_iroute_size =
+	    (32 * ((dist->gicd_typer & GICD_TYPER_ITLINESNUM_MASK) + 1)) *
+	    sizeof(*dist->gicd_irouter);
+	dist->gicd_irouter = malloc(dist->gicd_iroute_size, M_VGIC_V3,
+	    M_WAITOK | M_ZERO);
+}
+
+static void
+vgic_v3_mmio_destroy(struct hyp *hyp)
+{
+	struct vgic_v3_dist *dist = &hyp->vgic_dist;
+
+	free(dist->gicd_ixenabler, M_VGIC_V3);
+	free(dist->gicd_ipriorityr, M_VGIC_V3);
+	free(dist->gicd_icfgr, M_VGIC_V3);
+	free(dist->gicd_irouter, M_VGIC_V3);
+}
+
 int
-vgic_v3_attach_to_vm(void *arg, uint64_t dist_start, size_t dist_size,
+vgic_v3_attach_to_vm(struct vm *vm, uint64_t dist_start, size_t dist_size,
     uint64_t redist_start, size_t redist_size)
 {
-	struct hyp *hyp = arg;
+	struct hyp *hyp = vm_get_cookie(vm);
 	struct vgic_v3_dist *dist = &hyp->vgic_dist;
 	struct vgic_v3_redist *redist;
 	int i;
@@ -251,6 +772,12 @@ vgic_v3_attach_to_vm(void *arg, uint64_t dist_start, size_t dist_size,
 		redist->start = redist_start;
 		redist->end = redist_start + redist_size;
 	}
+
+	vm_register_inst_handler(vm, dist_start, dist_size, dist_read,
+	    dist_write);
+	vm_register_inst_handler(vm, redist_start, redist_size, redist_read,
+	    redist_write);
+
 	vgic_v3_mmio_init(hyp);
 
 	hyp->vgic_attached = true;
@@ -396,10 +923,7 @@ vgic_v3_int_target(uint32_t irq, struct hypctx *hypctx)
 
 	aff = redist->gicr_typer >> GICR_TYPER_AFF_SHIFT;
 	/* Affinity in format for comparison with irouter */
-	aff = GICR_TYPER_AFF0(redist->gicr_typer) | \
-	    (GICR_TYPER_AFF1(redist->gicr_typer) << 8) | \
-	    (GICR_TYPER_AFF2(redist->gicr_typer) << 16) | \
-	    (GICR_TYPER_AFF3(redist->gicr_typer) << 32);
+	aff = GICR_TYPER_AFF(redist->gicr_typer);
 	if ((irouter & aff) == aff)
 		return (true);
 	else
@@ -946,11 +1470,13 @@ arm_vgic_probe(device_t dev)
 static int
 arm_vgic_attach(device_t dev)
 {
+#if 0
 	int error;
 
 	error = gic_v3_setup_maint_intr(vgic_v3_maint_intr, NULL, NULL);
 	if (error)
 		device_printf(dev, "Could not setup maintenance interrupt\n");
+#endif
 
 	return (0);
 }
@@ -958,11 +1484,13 @@ arm_vgic_attach(device_t dev)
 static int
 arm_vgic_detach(device_t dev)
 {
+#if 0
 	int error;
 
 	error = gic_v3_teardown_maint_intr();
 	if (error)
 		device_printf(dev, "Could not teardown maintenance interrupt\n");
+#endif
 
 	gic_sc = NULL;
 

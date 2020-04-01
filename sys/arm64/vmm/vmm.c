@@ -106,6 +106,14 @@ struct mem_map {
 };
 #define	VM_MAX_MEMMAPS	4
 
+struct vmm_mmio_region {
+	uint64_t start;
+	uint64_t end;
+	mem_region_read_t read;
+	mem_region_write_t write;
+};
+#define	VM_MAX_MMIO_REGIONS	4
+
 /*
  * Initialization:
  * (o) initialized the first time the VM is created
@@ -125,6 +133,8 @@ struct vm {
 	char		name[VM_MAX_NAMELEN];	/* (o) virtual machine name */
 	struct vcpu	vcpu[VM_MAXCPU];	/* (i) guest vcpus */
 	uint16_t	maxcpus;		/* (o) max pluggable cpus */
+	struct vmm_mmio_region mmio_region[VM_MAX_MMIO_REGIONS];
+						/* (o) guest MMIO regions */
 };
 
 static bool vmm_initialized = false;
@@ -283,6 +293,8 @@ vm_init(struct vm *vm, bool create)
 
 	vm->suspend = 0;
 	CPU_ZERO(&vm->suspended_cpus);
+
+	memset(vm->mmio_region, 0, sizeof(vm->mmio_region));
 
 	for (i = 0; i < vm->maxcpus; i++)
 		vcpu_init(vm, i, create);
@@ -717,6 +729,26 @@ out_user:
 	return (0);
 }
 
+void
+vm_register_inst_handler(struct vm *vm, uint64_t start, uint64_t size,
+    mem_region_read_t mmio_read, mem_region_write_t mmio_write)
+{
+	int i;
+
+	for (i = 0; i < nitems(vm->mmio_region); i++) {
+		if (vm->mmio_region[i].start == 0 &&
+		    vm->mmio_region[i].end == 0) {
+			vm->mmio_region[i].start = start;
+			vm->mmio_region[i].end = start + size;
+			vm->mmio_region[i].read = mmio_read;
+			vm->mmio_region[i].write = mmio_write;
+			return;
+		}
+	}
+
+	panic("%s: No free MMIO region", __func__);
+}
+
 static int
 vm_mmio_region_match(const void *key, const void *memb)
 {
@@ -738,8 +770,8 @@ vm_handle_inst_emul(struct vm *vm, int vcpuid, bool *retu)
 	struct vie *vie;
 	struct hyp *hyp = vm->cookie;
 	uint64_t fault_ipa;
-	struct vgic_mmio_region *vmr;
-	int error;
+	struct vmm_mmio_region *vmr;
+	int error, i;
 
 	if (!hyp->vgic_attached)
 		goto out_user;
@@ -749,15 +781,19 @@ vm_handle_inst_emul(struct vm *vm, int vcpuid, bool *retu)
 
 	fault_ipa = vme->u.inst_emul.gpa;
 
-	vmr = bsearch(&fault_ipa, hyp->vgic_mmio_regions,
-	    hyp->vgic_mmio_regions_num, sizeof(struct vgic_mmio_region),
-	    vm_mmio_region_match);
-	if (!vmr)
+	vmr = NULL;
+	for (i = 0; i < nitems(vm->mmio_region); i++) {
+		if (vm->mmio_region[i].start <= fault_ipa &&
+		    vm->mmio_region[i].end > fault_ipa) {
+			vmr = &vm->mmio_region[i];
+			break;
+		}
+	}
+	if (vmr == NULL)
 		goto out_user;
 
 	error = vmm_emulate_instruction(vm, vcpuid, fault_ipa, vie,
 	    vmr->read, vmr->write, retu);
-
 	return (error);
 
 out_user:
@@ -1275,12 +1311,8 @@ vm_attach_vgic(struct vm *vm, uint64_t dist_start, size_t dist_size,
 {
 	int error;
 
-#ifdef notyet
-	error = vgic_v3_attach_to_vm(vm->cookie, dist_start, dist_size,
-	    redist_start, redist_size);
-#else
-	error = EINVAL;
-#endif
+	error = vgic_v3_attach_to_vm(vm, dist_start, dist_size, redist_start,
+	    redist_size);
 
 	return (error);
 }
@@ -1288,17 +1320,11 @@ vm_attach_vgic(struct vm *vm, uint64_t dist_start, size_t dist_size,
 int
 vm_assert_irq(struct vm *vm, uint32_t irq)
 {
-#ifdef notyet
 	struct hyp *hyp = (struct hyp *)vm->cookie;
-#endif
 	int error;
 
-#ifdef notyet
 	/* TODO: this is crap, send the vcpuid as an argument to vm_assert_irq */
 	error = vgic_v3_inject_irq(&hyp->ctx[0], irq, VGIC_IRQ_VIRTIO);
-#else
-	error = EINVAL;
-#endif
 
 	return (error);
 }
@@ -1308,11 +1334,7 @@ vm_deassert_irq(struct vm *vm, uint32_t irq)
 {
 	int error;
 
-#ifdef notyet
 	error = vgic_v3_remove_irq(vm->cookie, irq, false);
-#else
-	error = EINVAL;
-#endif
 
 	return (error);
 }
@@ -1330,10 +1352,8 @@ vm_handle_wfi(struct vm *vm, int vcpuid, struct vm_exit *vme, bool *retu)
 
 	vcpu_lock(vcpu);
 	while (1) {
-#ifdef notyet
 		if (!intr_disabled && vgic_v3_vcpu_pending_irq(hypctx))
 			break;
-#endif
 
 		if (vcpu_should_yield(vm, vcpuid))
 			break;

@@ -57,13 +57,18 @@
 #define	 GICD_CTLR_G1A		(1 << 1)
 #define	 GICD_CTLR_ARE_NS	(1 << 4)
 #define	 GICD_CTLR_RWP		(1 << 31)
+
 /* GICD_TYPER */
+#define	 GICD_TYPER_SECURITYEXTN (1 << 10)
+#define	 GICD_TYPER_LPIS	(1 << 17)
+#define	 GICD_TYPER_DVIS	(1 << 18)
 #define	 GICD_TYPER_IDBITS(n)	((((n) >> 19) & 0x1F) + 1)
 
 /*
  * Registers (v3)
  */
 #define	GICD_IROUTER(n)		(0x6000 + ((n) * 8))
+#define	 GICD_IROUTER_IRM	(1u << 31)
 
 #define	GICD_PIDR4		0xFFD0
 #define	GICD_PIDR5		0xFFD4
@@ -84,19 +89,26 @@
 
 /* Redistributor registers */
 #define	GICR_CTLR		GICD_CTLR
-#define		GICR_CTLR_LPI_ENABLE	(1 << 0)
+#define	 GICR_CTLR_LPI_ENABLE	(1 << 0)
+#define	 GICR_CTLR_RWP		(1 << 3)
+#define	 GICR_CTLR_DPG0		(1 << 24)
+#define	 GICR_CTLR_DPG1NS	(1 << 25)
+#define	 GICR_CTLR_UWP		(1 << 31)
 
 #define	GICR_PIDR2		GICD_PIDR2
 
 #define	GICR_TYPER		(0x0008)
-#define	GICR_TYPER_PLPIS	(1 << 0)
-#define	GICR_TYPER_VLPIS	(1 << 1)
-#define	GICR_TYPER_LAST		(1 << 4)
-#define	GICR_TYPER_CPUNUM_SHIFT	(8)
-#define	GICR_TYPER_CPUNUM_MASK	(0xFFFUL << GICR_TYPER_CPUNUM_SHIFT)
-#define	GICR_TYPER_CPUNUM(x)	\
+#define	 GICR_TYPER_PLPIS	(1 << 0)
+#define	 GICR_TYPER_VLPIS	(1 << 1)
+#define	 GICR_TYPER_LAST	(1 << 4)
+#define	 GICR_TYPER_CPUNUM_SHIFT (8)
+#define	 GICR_TYPER_CPUNUM_MASK	(0xFFFUL << GICR_TYPER_CPUNUM_SHIFT)
+#define	 GICR_TYPER_CPUNUM(x)	\
 	    (((x) & GICR_TYPER_CPUNUM_MASK) >> GICR_TYPER_CPUNUM_SHIFT)
-#define	GICR_TYPER_AFF_SHIFT	(32)
+#define	 GICR_TYPER_AFF_SHIFT	32
+#define	 GICR_TYPER_AFF_MASK	(0xfffffffful << GICR_TYPER_AFF_SHIFT)
+#define	GICR_TYPER_AFF(x)					\
+    (((x) & GICR_TYPER_AFF_MASK) >> GICR_TYPER_AFF_SHIFT)
 
 #define	GICR_WAKER		(0x0014)
 #define	GICR_WAKER_PS		(1 << 1) /* Processor sleep */
@@ -194,6 +206,10 @@
 #define		GICR_I_ENABLER_PPI_MASK		(0xFFFF0000)
 
 #define		GICR_I_PER_IPRIORITYn		(GICD_I_PER_IPRIORITYn)
+
+#define	GICR_IPRIORITYR_BASE			0x0400
+#define	GICR_ICFGR0_BASE			0x0c00
+#define	GICR_ICFGR1_BASE			0x0c04
 
 /* ITS registers */
 #define	GITS_PIDR2		GICR_PIDR2

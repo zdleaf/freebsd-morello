@@ -88,8 +88,6 @@ struct hypctx {
 
 struct hyp {
 	struct hypctx	ctx[VM_MAXCPU];
-	struct vgic_mmio_region	*vgic_mmio_regions;
-	size_t		vgic_mmio_regions_num;
 	struct vgic_v3_dist vgic_dist;
 	struct vm	*vm;
 	struct vtimer	vtimer;

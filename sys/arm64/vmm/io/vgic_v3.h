@@ -79,13 +79,20 @@ struct vgic_v3_dist {
 	uint32_t 	gicd_ctlr;	/* Distributor Control Register */
 	uint32_t 	gicd_typer;	/* Interrupt Controller Type Register */
 	uint32_t 	gicd_pidr2;	/* Distributor Peripheral ID2 Register */
+
+	size_t		gicd_igroup_size;
+
 	/* Interrupt Configuration Registers. */
+	size_t		gicd_icfg_size;
 	uint32_t	*gicd_icfgr;
 	/* Interrupt Priority Registers. */
+	size_t		gicd_ipriority_size;
 	uint32_t	*gicd_ipriorityr;
 	/* Interrupt Routing Registers. */
+	size_t		gicd_iroute_size;
 	uint64_t	*gicd_irouter;
 	/* Interrupt Clear-Enable and Set-Enable Registers. */
+	size_t		gicd_ixenable_size;
 	uint32_t	*gicd_ixenabler;
 };
 
@@ -141,16 +148,13 @@ struct vgic_v3_cpu_if {
 	size_t		irqbuf_num;
 };
 
-int 	vgic_v3_attach_to_vm(void *arg, uint64_t dist_start, size_t dist_size,
-			     uint64_t redist_start, size_t redist_size);
+int 	vgic_v3_attach_to_vm(struct vm *vm, uint64_t dist_start,
+    size_t dist_size, uint64_t redist_start, size_t redist_size);
 void	vgic_v3_detach_from_vm(void *arg);
 void	vgic_v3_init(uint64_t ich_vtr_el2);
 void	vgic_v3_vminit(void *arg);
 void	vgic_v3_cpuinit(void *arg, bool last_vcpu);
 void 	vgic_v3_sync_hwstate(void *arg);
-
-void	vgic_v3_mmio_init(struct hyp *hyp);
-void	vgic_v3_mmio_destroy(struct hyp *hyp);
 
 int 	vgic_v3_vcpu_pending_irq(void *arg);
 int 	vgic_v3_inject_irq(void *arg, uint32_t irq,
