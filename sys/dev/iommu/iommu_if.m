@@ -49,3 +49,7 @@ METHOD int unmap {
 	bus_dma_segment_t	*segs;
 	int			nsegs;
 };
+
+METHOD struct iommu_domain * domain_alloc {
+	device_t		dev;
+};

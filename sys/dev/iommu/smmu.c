@@ -835,6 +835,7 @@ smmu_init_strtab_linear(struct smmu_softc *sc)
 	device_printf(sc->dev, "strtab base cfg 0x%x\n", strtab->base_cfg);
 	device_printf(sc->dev, "strtab base 0x%lx\n", strtab->base);
 
+	/* TODO: CD is per iommu device */
 	err = smmu_init_cd(sc);
 	if (err) {
 		device_printf(sc->dev, "Could not initialize CD\n");
@@ -1514,4 +1515,18 @@ smmu_map(device_t dev, bus_dma_segment_t *segs, int nsegs)
 	smmu_poll_until_consumed(sc, &sc->cmdq);
 
 	return (0);
+}
+
+struct iommu_domain *
+smmu_domain_alloc(device_t dev)
+{
+	struct smmu_domain *d;
+
+	d = malloc(sizeof(*d), M_SMMU, M_WAITOK | M_ZERO);
+
+	mtx_init(&d->mtx_lock, "SMMU domain", NULL, MTX_DEF);
+
+	TAILQ_INIT(&d->devices);
+
+	return (&d->domain);
 }

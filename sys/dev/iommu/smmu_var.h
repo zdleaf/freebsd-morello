@@ -37,6 +37,8 @@
 
 #include <sys/vmem.h>
 
+#include <dev/iommu/iommu.h>
+
 #include <vm/vm.h>
 #include <vm/pmap.h>
 #include <vm/vm_extern.h>
@@ -134,6 +136,15 @@ struct smmu_softc {
 	vmem_t *vmem;
 };
 
+struct smmu_domain {
+	struct iommu_domain domain;
+	struct pmap p;
+	vmem_t *vmem;
+	struct mtx			mtx_lock;
+	TAILQ_ENTRY(smmu_domain)	next;
+	TAILQ_HEAD(, iommu_device)	devices;
+};
+
 struct smmu_devinfo {
 	int smmu_domain;
 };
@@ -147,5 +158,6 @@ int smmu_detach(device_t dev);
 void smmu_insert(vm_paddr_t addr, vm_offset_t va, vm_size_t size);
 int smmu_map(device_t dev, bus_dma_segment_t *segs, int nsegs);
 int smmu_unmap(device_t dev, bus_dma_segment_t *segs, int nsegs);
+struct iommu_domain * smmu_domain_alloc(device_t dev);
 
 #endif /* _DEV_IOMMU_SMMU_VAR_H_ */

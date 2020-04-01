@@ -76,6 +76,7 @@ static device_method_t smmu_acpi_methods[] = {
 	/* IOMMU interface */
 	DEVMETHOD(iommu_map,			smmu_map),
 	DEVMETHOD(iommu_unmap,			smmu_unmap),
+	DEVMETHOD(iommu_domain_alloc,		smmu_domain_alloc),
 
 	/* End */
 	DEVMETHOD_END

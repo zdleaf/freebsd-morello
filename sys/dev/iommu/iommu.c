@@ -82,10 +82,9 @@ iommu_domain_alloc(void)
 {
 	struct iommu_domain *d;
 
-	d = malloc(sizeof(*d), M_IOMMU, M_WAITOK | M_ZERO);
-
-	mtx_init(&d->mtx_lock, "IOMMU domain", NULL, MTX_DEF);
-	TAILQ_INIT(&d->devs);
+	d = IOMMU_DOMAIN_ALLOC(iommu_dev);
+	if (d == NULL)
+		return (NULL);
 
 	IOMMU_LOCK();
 	TAILQ_INSERT_TAIL(&domains, d, next);
