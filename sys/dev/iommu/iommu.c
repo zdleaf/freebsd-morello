@@ -65,7 +65,7 @@ __FBSDID("$FreeBSD$");
 #include "iommu.h"
 #include "iommu_if.h"
 
-static MALLOC_DEFINE(M_IOMMU_DOMAIN, "iommu_d", "IOMMU Domain");
+static MALLOC_DEFINE(M_IOMMU, "iommu", "IOMMU");
 
 static device_t iommu_dev = NULL;
 
@@ -82,7 +82,10 @@ iommu_domain_alloc(void)
 {
 	struct iommu_domain *d;
 
-	d = malloc(sizeof(*d), M_IOMMU_DOMAIN, M_WAITOK | M_ZERO);
+	d = malloc(sizeof(*d), M_IOMMU, M_WAITOK | M_ZERO);
+
+	mtx_init(&d->mtx_lock, "IOMMU domain", NULL, MTX_DEF);
+	TAILQ_INIT(&d->devs);
 
 	IOMMU_LOCK();
 	TAILQ_INSERT_TAIL(&domains, d, next);
@@ -91,9 +94,22 @@ iommu_domain_alloc(void)
 	return (d);
 }
 
+/*
+ * Adds a consumer device to a domain.
+ */
 int
-iommu_add_device(struct iommu_domain *domain, device_t dev, uint16_t rid)
+iommu_add_device(struct iommu_domain *domain,
+    device_t dev, uint16_t rid)
 {
+	struct iommu_device *iod;
+
+	iod = malloc(sizeof(*iod), M_IOMMU, M_WAITOK | M_ZERO);
+	iod->dev = dev;
+	iod->rid = rid;
+
+	DOMAIN_LOCK(domain);
+	TAILQ_INSERT_TAIL(&domain->devs, iod, next);
+	DOMAIN_UNLOCK(domain);
 
 	return (0);
 }

@@ -35,10 +35,25 @@
 #ifndef _DEV_IOMMU_IOMMU_H_
 #define _DEV_IOMMU_IOMMU_H_
 
+#include <sys/mutex.h>
+
+struct iommu_device {
+	uint16_t rid;
+	device_t dev;
+	TAILQ_ENTRY(iommu_device)	next;
+};
+
 struct iommu_domain {
 	int test;
+	struct mtx			mtx_lock;
 	TAILQ_ENTRY(iommu_domain)	next;
+	TAILQ_HEAD(, iommu_device)	devs;
 };
+
+#define	DOMAIN_LOCK(domain)		mtx_lock(&(domain)->mtx_lock)
+#define	DOMAIN_UNLOCK(domain)		mtx_unlock(&(domain)->mtx_lock)
+#define	DOMAIN_ASSERT_LOCKED(domain)	\
+    mtx_assert(&(domain)->mtx_lock, MA_OWNED)
 
 struct iommu_domain * iommu_domain_alloc(void);
 int iommu_register(device_t dev);
