@@ -44,6 +44,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/ktr.h>
 #include <sys/malloc.h>
 #include <sys/module.h>
+#include <sys/queue.h>
 #include <sys/rman.h>
 #include <sys/pcpu.h>
 #include <sys/proc.h>
@@ -68,12 +69,24 @@ static MALLOC_DEFINE(M_IOMMU_DOMAIN, "iommu_d", "IOMMU Domain");
 
 static device_t iommu_dev = NULL;
 
+static struct mtx iommu_mtx;
+
+#define	IOMMU_LOCK()			mtx_lock(&iommu_mtx)
+#define	IOMMU_UNLOCK()			mtx_unlock(&iommu_mtx)
+#define	IOMMU_ASSERT_LOCKED()		mtx_assert(&iommu_mtx, MA_OWNED)
+
+static TAILQ_HEAD(, iommu_domain) domains = TAILQ_HEAD_INITIALIZER(domains);
+
 struct iommu_domain *
 iommu_domain_alloc(void)
 {
 	struct iommu_domain *d;
 
 	d = malloc(sizeof(*d), M_IOMMU_DOMAIN, M_WAITOK | M_ZERO);
+
+	IOMMU_LOCK();
+	TAILQ_INSERT_TAIL(&domains, d, next);
+	IOMMU_UNLOCK();
 
 	return (d);
 }
@@ -83,12 +96,6 @@ iommu_add_device(struct iommu_domain *domain, device_t dev, uint16_t rid)
 {
 
 	return (0);
-}
-
-void
-iommu_init(void)
-{
-
 }
 
 void
@@ -113,3 +120,12 @@ iommu_register(device_t dev)
 
 	return (0);
 }
+
+static void
+iommu_init(void)
+{
+
+	mtx_init(&iommu_mtx, "IOMMU", NULL, MTX_DEF);
+}
+
+SYSINIT(iommu, SI_SUB_DRIVERS, SI_ORDER_FIRST, iommu_init, NULL);

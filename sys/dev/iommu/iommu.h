@@ -37,9 +37,9 @@
 
 struct iommu_domain {
 	int test;
+	TAILQ_ENTRY(iommu_domain)	next;
 };
 
-void iommu_init(void);
 struct iommu_domain * iommu_domain_alloc(void);
 int iommu_register(device_t dev);
 int iommu_add_device(struct iommu_domain *domain, device_t dev, uint16_t rid);
