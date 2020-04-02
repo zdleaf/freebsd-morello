@@ -53,3 +53,9 @@ METHOD int unmap {
 METHOD struct iommu_domain * domain_alloc {
 	device_t		dev;
 };
+
+METHOD int add_device {
+	device_t		smmu_dev;
+	struct iommu_domain	*domain;
+	device_t		dev;
+};

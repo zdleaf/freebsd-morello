@@ -159,5 +159,7 @@ void smmu_insert(vm_paddr_t addr, vm_offset_t va, vm_size_t size);
 int smmu_map(device_t dev, bus_dma_segment_t *segs, int nsegs);
 int smmu_unmap(device_t dev, bus_dma_segment_t *segs, int nsegs);
 struct iommu_domain * smmu_domain_alloc(device_t dev);
+int smmu_add_device(device_t smmu_dev,
+    struct iommu_domain *domain, device_t dev);
 
 #endif /* _DEV_IOMMU_SMMU_VAR_H_ */

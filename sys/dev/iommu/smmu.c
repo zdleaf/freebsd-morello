@@ -1530,3 +1530,25 @@ smmu_domain_alloc(device_t dev)
 
 	return (&d->domain);
 }
+
+#include <dev/pci/pcivar.h>
+
+int
+smmu_add_device(device_t smmu_dev,
+    struct iommu_domain *domain, device_t dev)
+{
+	struct smmu_domain *smmu_dom;
+	struct iommu_device *iod;
+
+	smmu_dom = (struct smmu_domain *)domain;
+
+	iod = malloc(sizeof(*iod), M_SMMU, M_WAITOK | M_ZERO);
+	iod->dev = dev;
+	iod->rid = pci_get_rid(dev);
+
+	DOMAIN_LOCK(smmu_dom);
+	TAILQ_INSERT_TAIL(&smmu_dom->devices, iod, next);
+	DOMAIN_UNLOCK(smmu_dom);
+
+	return (0);
+}

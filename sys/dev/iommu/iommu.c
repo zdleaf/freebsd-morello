@@ -97,20 +97,13 @@ iommu_domain_alloc(void)
  * Adds a consumer device to a domain.
  */
 int
-iommu_add_device(struct iommu_domain *domain,
-    device_t dev, uint16_t rid)
+iommu_add_device(struct iommu_domain *domain, device_t dev)
 {
-	struct iommu_device *iod;
+	int err;
 
-	iod = malloc(sizeof(*iod), M_IOMMU, M_WAITOK | M_ZERO);
-	iod->dev = dev;
-	iod->rid = rid;
+	err = IOMMU_ADD_DEVICE(iommu_dev, domain, dev);
 
-	DOMAIN_LOCK(domain);
-	TAILQ_INSERT_TAIL(&domain->devs, iod, next);
-	DOMAIN_UNLOCK(domain);
-
-	return (0);
+	return (err);
 }
 
 void

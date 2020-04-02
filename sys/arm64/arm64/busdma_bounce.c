@@ -1384,8 +1384,6 @@ struct bus_dma_impl bus_dma_bounce_impl = {
 
 /* SMMU */
 
-#include <dev/pci/pcivar.h>
-
 static void
 smmu_tag_init(struct bus_dma_tag *t)
 {
@@ -1414,9 +1412,7 @@ bus_dma_tag_t
 smmu_get_dma_tag(device_t dev, device_t child)
 {
 	devclass_t pci_class;
-	int pci_bus, pci_slot, pci_func;
 	bus_dma_tag_t tag;
-	uint16_t rid;
 
 	printf("%s\n", __func__);
 
@@ -1429,13 +1425,15 @@ smmu_get_dma_tag(device_t dev, device_t child)
 
 	tag = malloc(sizeof(*tag), M_BUSDMA, M_WAITOK | M_ZERO);
 	tag->domain = iommu_domain_alloc();
+	tag->iommu = 1;
 
-	rid = pci_get_rid(child);
-	iommu_add_device(tag->domain, child, rid);
+	iommu_add_device(tag->domain, child);
 
 	smmu_tag_init(tag);
 
 #if 0
+	int pci_bus, pci_slot, pci_func;
+	uint16_t rid;
 	struct dmar_unit *dmar;
 	struct dmar_ctx *ctx;
 	bus_dma_tag_t res;
@@ -1451,7 +1449,6 @@ smmu_get_dma_tag(device_t dev, device_t child)
 
 	ctx = dmar_instantiate_ctx(dmar, child, false);
 	res = ctx == NULL ? NULL : (bus_dma_tag_t)&ctx->ctx_tag;
-#endif
 
 	pci_bus = pci_get_bus(child);
 	pci_slot = pci_get_slot(child);
@@ -1464,6 +1461,7 @@ smmu_get_dma_tag(device_t dev, device_t child)
 
 	if (pci_bus == 8) // xhci
 		bus_dma_tag_set_iommu(tag, tag->domain);
+#endif
 
 	return (tag);
 }
