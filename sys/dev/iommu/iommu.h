@@ -37,17 +37,8 @@
 
 #include <sys/mutex.h>
 
-struct iommu_device {
-	uint16_t rid;
-	device_t dev;
-	TAILQ_ENTRY(iommu_device)	next;
-};
-
 struct iommu_domain {
-	int test;
-	struct mtx			mtx_lock;
 	TAILQ_ENTRY(iommu_domain)	next;
-	TAILQ_HEAD(, iommu_device)	devs;
 };
 
 #define	DOMAIN_LOCK(domain)		mtx_lock(&(domain)->mtx_lock)

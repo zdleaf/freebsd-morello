@@ -1523,26 +1523,26 @@ smmu_add_device(device_t smmu_dev,
 {
 	struct smmu_softc *sc;
 	struct smmu_domain *smmu_dom;
-	struct iommu_device *iod;
+	struct smmu_device *slave;
 
 	sc = device_get_softc(smmu_dev);
 	smmu_dom = (struct smmu_domain *)domain;
 
-	iod = malloc(sizeof(*iod), M_SMMU, M_WAITOK | M_ZERO);
-	iod->dev = dev;
-	iod->rid = pci_get_rid(dev);
+	slave = malloc(sizeof(*slave), M_SMMU, M_WAITOK | M_ZERO);
+	slave->dev = dev;
+	slave->rid = pci_get_rid(dev);
 
-	printf("%s: rid %x\n", __func__, iod->rid);
+	printf("%s: rid %x\n", __func__, slave->rid);
 
 	/* 0x800 xhci */
 	/* 0x700 realtek */
 	/* 0x600 sata */
 
 	DOMAIN_LOCK(smmu_dom);
-	TAILQ_INSERT_TAIL(&smmu_dom->devices, iod, next);
+	TAILQ_INSERT_TAIL(&smmu_dom->devices, slave, next);
 	DOMAIN_UNLOCK(smmu_dom);
 
-	smmu_init_ste(sc, iod->rid, true);
+	smmu_init_ste(sc, slave->rid, true);
 
 	return (0);
 }

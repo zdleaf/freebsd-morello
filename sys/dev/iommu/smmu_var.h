@@ -136,17 +136,20 @@ struct smmu_softc {
 	vmem_t *vmem;
 };
 
+struct smmu_device {
+	uint16_t			rid;
+	device_t			dev;
+	TAILQ_ENTRY(smmu_device)	next;
+	struct smmu_cd			cd;
+};
+
 struct smmu_domain {
 	struct iommu_domain domain;
 	struct pmap p;
 	vmem_t *vmem;
 	struct mtx			mtx_lock;
 	TAILQ_ENTRY(smmu_domain)	next;
-	TAILQ_HEAD(, iommu_device)	devices;
-};
-
-struct smmu_devinfo {
-	int smmu_domain;
+	TAILQ_HEAD(, smmu_device)	devices;
 };
 
 MALLOC_DECLARE(M_SMMU);
