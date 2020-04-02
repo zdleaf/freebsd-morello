@@ -110,14 +110,14 @@ void
 iommu_map(struct iommu_domain *domain, bus_dma_segment_t *segs, int nsegs)
 {
 
-	IOMMU_MAP(iommu_dev, segs, nsegs);
+	IOMMU_MAP(iommu_dev, domain, segs, nsegs);
 }
 
 void
 iommu_unmap(struct iommu_domain *domain, bus_dma_segment_t *segs, int nsegs)
 {
 
-	IOMMU_UNMAP(iommu_dev, segs, nsegs);
+	IOMMU_UNMAP(iommu_dev, domain, segs, nsegs);
 }
 
 int

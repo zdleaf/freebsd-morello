@@ -78,8 +78,7 @@ struct bus_dma_tag {
 	int			bounce_flags;
 	bus_dma_segment_t	*segments;
 	struct bounce_zone	*bounce_zone;
-	int			iommu;
-	struct iommu_domain	*domain;
+	struct iommu_domain	*iommu_domain;
 };
 
 struct bounce_page {
@@ -204,7 +203,7 @@ bounce_bus_dma_tag_create(bus_dma_tag_t parent, bus_size_t alignment,
 
 		/* Copy some flags from the parent */
 		newtag->bounce_flags |= parent->bounce_flags & BF_COHERENT;
-		newtag->iommu = parent->iommu;
+		newtag->iommu_domain = parent->iommu_domain;
 	}
 
 	if (newtag->common.lowaddr < ptoa((vm_paddr_t)Maxmem) ||
@@ -907,8 +906,8 @@ bounce_bus_dmamap_complete(bus_dma_tag_t dmat, bus_dmamap_t map,
 	if (segs != NULL)
 		memcpy(dmat->segments, segs, map->nsegs * sizeof(segs[0]));
 
-	if (dmat->iommu == 1)
-		iommu_map(dmat->domain, dmat->segments, nsegs);
+	if (dmat->iommu_domain)
+		iommu_map(dmat->iommu_domain, dmat->segments, nsegs);
 
 	if (segs != NULL)
 		memcpy(segs, dmat->segments, map->nsegs * sizeof(segs[0]));
@@ -926,8 +925,8 @@ bounce_bus_dmamap_unload(bus_dma_tag_t dmat, bus_dmamap_t map)
 {
 	struct bounce_page *bpage;
 
-	if (dmat->iommu == 1) {
-		iommu_unmap(dmat->domain, dmat->segments, map->nsegs);
+	if (dmat->iommu_domain) {
+		iommu_unmap(dmat->iommu_domain, dmat->segments, map->nsegs);
 		map->nsegs = 0;
 	}
 
@@ -1401,12 +1400,14 @@ smmu_tag_init(struct bus_dma_tag *t)
 	t->common.maxsegsz = maxaddr;
 }
 
+#if 0
 static void
 bus_dma_tag_set_iommu(bus_dma_tag_t tag, struct iommu_domain *domain)
 {
 
 	tag->iommu = 1;
 }
+#endif
 
 bus_dma_tag_t
 smmu_get_dma_tag(device_t dev, device_t child)
@@ -1424,10 +1425,9 @@ smmu_get_dma_tag(device_t dev, device_t child)
 	}
 
 	tag = malloc(sizeof(*tag), M_BUSDMA, M_WAITOK | M_ZERO);
-	tag->domain = iommu_domain_alloc();
-	tag->iommu = 1;
+	tag->iommu_domain = iommu_domain_alloc();
 
-	iommu_add_device(tag->domain, child);
+	iommu_add_device(tag->iommu_domain, child);
 
 	smmu_tag_init(tag);
 

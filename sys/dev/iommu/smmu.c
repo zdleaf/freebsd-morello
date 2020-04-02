@@ -63,6 +63,7 @@ __FBSDID("$FreeBSD$");
 #include <dev/fdt/fdt_intr.h>
 #include <dev/ofw/ofw_bus_subr.h>
 #endif
+#include <dev/pci/pcivar.h>
 
 #ifdef DEV_ACPI
 #include <contrib/dev/acpica/include/acpi.h>
@@ -122,8 +123,6 @@ MALLOC_DEFINE(M_SMMU, "SMMU", SMMU_DEVSTR);
 #define	Q_WRP(q, p)		((p) & (1 << (q)->size_log2))
 #define	Q_IDX(q, p)		((p) & ((1 << (q)->size_log2) - 1))
 #define	Q_OVF(p)		((p) & (1 << 31)) /* Event queue overflowed */
-
-static struct smmu_softc *smmu_sc = NULL;
 
 static int smmu_evtq_dequeue(struct smmu_softc *sc);
 
@@ -337,6 +336,7 @@ smmu_dump_ste(struct smmu_softc *sc, uint64_t *ste)
 		device_printf(sc->dev, "ste[%d] == %lx\n", i, ste[i]);
 }
 
+#if 0
 static void
 smmu_dump_cd(struct smmu_softc *sc)
 {
@@ -352,6 +352,7 @@ smmu_dump_cd(struct smmu_softc *sc)
 	for (i = 0; i < CD_DWORDS; i++)
 		device_printf(sc->dev, "cd[%d] == %lx\n", i, addr[i]);
 }
+#endif
 
 static int
 smmu_evtq_dequeue(struct smmu_softc *sc)
@@ -400,7 +401,7 @@ smmu_evtq_dequeue(struct smmu_softc *sc)
 	device_printf(sc->dev, "strtab phys %lx ste phys %lx\n",
 	    vtophys(strtab->addr), vtophys(ste));
 	smmu_dump_ste(sc, ste);
-	smmu_dump_cd(sc);
+	//smmu_dump_cd(sc);
 
 	return (0);
 }
@@ -611,7 +612,8 @@ smmu_init_ste_bypass(struct smmu_softc *sc, uint32_t sid, uint64_t *ste)
 }
 
 static int
-smmu_init_ste_s1(struct smmu_softc *sc, uint32_t sid, uint64_t *ste)
+smmu_init_ste_s1(struct smmu_softc *sc, struct smmu_cd *cd,
+    uint32_t sid, uint64_t *ste)
 {
 	uint64_t val;
 
@@ -638,11 +640,7 @@ smmu_init_ste_s1(struct smmu_softc *sc, uint32_t sid, uint64_t *ste)
 		ste[1] |= STE1_S1STALLD;
 	}
 
-	struct smmu_cd *cd;
-
-	cd = &sc->cd;
-
-	/* Configure CD */
+	/* Configure STE */
 	val |= (cd->paddr & STE0_S1CONTEXTPTR_M);
 	val |= STE0_CONFIG_S1_TRANS;
 
@@ -675,7 +673,7 @@ smmu_init_ste_s1(struct smmu_softc *sc, uint32_t sid, uint64_t *ste)
 }
 
 static int
-smmu_init_ste(struct smmu_softc *sc, int i, bool s1)
+smmu_init_ste(struct smmu_softc *sc, struct smmu_cd *cd, int i, bool s1)
 {
 	struct smmu_strtab *strtab;
 	uint64_t *addr;
@@ -686,7 +684,7 @@ smmu_init_ste(struct smmu_softc *sc, int i, bool s1)
 	    STRTAB_STE_DWORDS * 8 * i);
 
 	if (s1)
-		smmu_init_ste_s1(sc, i, addr);
+		smmu_init_ste_s1(sc, cd, i, addr);
 	else
 		smmu_init_ste_bypass(sc, i, addr);
 
@@ -696,14 +694,15 @@ smmu_init_ste(struct smmu_softc *sc, int i, bool s1)
 }
 
 static int
-smmu_init_cd(struct smmu_softc *sc)
+smmu_init_cd(struct smmu_softc *sc, struct smmu_cd *cd, pmap_t p)
 {
-	struct smmu_cd *cd;
+	vm_paddr_t paddr;
+	uint64_t *ptr;
+	uint64_t val;
 	int size;
 
 	size = 1 * (CD_DWORDS << 3);
 
-	cd = &sc->cd;
 	cd->addr = contigmalloc(size, M_SMMU,
 	    M_WAITOK | M_ZERO,	/* flags */
 	    0,			/* low */
@@ -720,25 +719,6 @@ smmu_init_cd(struct smmu_softc *sc)
 	device_printf(sc->dev, "%s: CD vaddr %p\n", __func__, cd->addr);
 	device_printf(sc->dev, "%s: CD paddr %lx\n", __func__, cd->paddr);
 
-	vm_paddr_t paddr;
-	uint64_t *ptr;
-	uint64_t val;
-
-	pmap_pinit(&sc->p);
-	PMAP_LOCK_INIT(&sc->p);
-	sc->vmem = vmem_create("SMMU vmem", 0, 0, PAGE_SIZE,
-	    PAGE_SIZE, M_FIRSTFIT | M_WAITOK);
-	if (sc->vmem == NULL)
-		return (ENXIO);
-
-	/* 1GB of VA space starting from 0x40000000. */
-	vmem_add(sc->vmem, 0x40000000, 0x40000000, 0);
-
-	vm_prot_t prot;
-	prot = VM_PROT_WRITE;
-	pmap_senter(&sc->p, 0x300b0000, 0x300b0000, prot, 0);
-
-	device_printf(sc->dev, "%s: pmap initialized\n", __func__);
 	ptr = cd->addr;
 
 	memset(ptr, 0, CD_DWORDS * 8);
@@ -752,8 +732,8 @@ smmu_init_cd(struct smmu_softc *sc)
 	val |= ((64 - sc->ias) << CD0_T0SZ_S);
 	val |= CD0_IPS_48BITS;
 
-	paddr = sc->p.pm_l0_paddr & CD1_TTB0_M;
-	if (paddr != sc->p.pm_l0_paddr)
+	paddr = p->pm_l0_paddr & CD1_TTB0_M;
+	if (paddr != p->pm_l0_paddr)
 		panic("here");
 
 	printf("%s: ttbr paddr %lx\n", __func__, paddr);
@@ -774,13 +754,46 @@ smmu_init_cd(struct smmu_softc *sc)
 }
 
 static int
+smmu_init_vmem(struct smmu_softc *sc, struct smmu_domain *domain)
+{
+
+	domain->vmem = vmem_create("SMMU vmem", 0, 0, PAGE_SIZE,
+	    PAGE_SIZE, M_FIRSTFIT | M_WAITOK);
+	if (domain->vmem == NULL)
+		return (ENXIO);
+
+	/* 1GB of VA space starting from 0x40000000. */
+	vmem_add(domain->vmem, 0x40000000, 0x40000000, 0);
+
+	printf("%s: vmem initialized at addr %p\n", __func__, domain->vmem);
+
+	return (0);
+}
+
+static int
+smmu_init_pmap(struct smmu_softc *sc, pmap_t p)
+{
+	vm_prot_t prot;
+
+	pmap_pinit(p);
+	PMAP_LOCK_INIT(p);
+
+	/* Add MSI static mapping. */
+	prot = VM_PROT_WRITE;
+	pmap_senter(p, 0x300b0000, 0x300b0000, prot, 0);
+
+	device_printf(sc->dev, "%s: pmap initialized\n", __func__);
+
+	return (0);
+}
+
+static int
 smmu_init_strtab_linear(struct smmu_softc *sc)
 {
 	struct smmu_strtab *strtab;
 	uint32_t num_l1_entries;
 	uint32_t size;
 	uint64_t reg;
-	int err;
 
 	strtab = &sc->strtab;
 	num_l1_entries = (1 << sc->sid_bits);
@@ -821,13 +834,6 @@ smmu_init_strtab_linear(struct smmu_softc *sc)
 
 	device_printf(sc->dev, "strtab base cfg 0x%x\n", strtab->base_cfg);
 	device_printf(sc->dev, "strtab base 0x%lx\n", strtab->base);
-
-	/* TODO: CD is per iommu device */
-	err = smmu_init_cd(sc);
-	if (err) {
-		device_printf(sc->dev, "Could not initialize CD\n");
-		return (ENXIO);
-	}
 
 	return (0);
 }
@@ -1131,8 +1137,6 @@ smmu_attach(device_t dev)
 	if (device_get_unit(dev) != 0)
 		return (ENXIO);
 
-	smmu_sc = sc;
-
 	error = bus_alloc_resources(dev, smmu_spec, sc->res);
 	if (error) {
 		device_printf(dev, "Couldn't allocate resources\n");
@@ -1389,18 +1393,14 @@ smmu_read_ivar(device_t dev, device_t child, int which, uintptr_t *result)
 	return (ENOENT);
 }
 
-void
-smmu_insert(vm_paddr_t pa, vm_offset_t va, vm_size_t size)
+static void
+smmu_insert(struct smmu_softc *sc, struct smmu_domain *domain,
+    vm_paddr_t pa, vm_offset_t va, vm_size_t size)
 {
-	struct smmu_softc *sc;
 	vm_prot_t prot;
 	pmap_t p;
 
-	sc = smmu_sc;
-	if (sc == NULL)
-		panic("here");
-
-	p = &sc->p;
+	p = &domain->p;
 
 	prot = VM_PROT_READ | VM_PROT_WRITE;
 
@@ -1416,8 +1416,10 @@ int map_cnt = 0;
 int unmap_cnt = 0;
 
 int
-smmu_unmap(device_t dev, bus_dma_segment_t *segs, int nsegs)
+smmu_unmap(device_t dev, struct iommu_domain *dom0,
+    bus_dma_segment_t *segs, int nsegs)
 {
+	struct smmu_domain *domain;
 	struct smmu_softc *sc;
 	vm_offset_t va;
 	vm_size_t size;
@@ -1425,9 +1427,8 @@ smmu_unmap(device_t dev, bus_dma_segment_t *segs, int nsegs)
 	int i;
 	int j;
 
-	sc = smmu_sc;
-	if (sc == NULL)
-		panic("here");
+	sc = device_get_softc(dev);
+	domain = (struct smmu_domain *)dom0;
 
 	for (i = 0; i < nsegs; i++) {
 		va = segs[i].ds_addr & ~0xfff;
@@ -1438,8 +1439,8 @@ smmu_unmap(device_t dev, bus_dma_segment_t *segs, int nsegs)
 		    __func__, unmap_cnt++, va, size);
 #endif
 		for (j = 0; j < size; j += 0x1000) {
-			if (pmap_sremove(&sc->p, va)) {
-				vmem_free(sc->vmem, va, 0x1000);
+			if (pmap_sremove(&domain->p, va)) {
+				vmem_free(domain->vmem, va, 0x1000);
 				smmu_tlbi_va(sc, va);
 			} else
 				printf("pte is NULL, va %lx\n", va);
@@ -1454,8 +1455,10 @@ smmu_unmap(device_t dev, bus_dma_segment_t *segs, int nsegs)
 }
 
 int
-smmu_map(device_t dev, bus_dma_segment_t *segs, int nsegs)
+smmu_map(device_t dev, struct iommu_domain *dom0,
+    bus_dma_segment_t *segs, int nsegs)
 {
+	struct smmu_domain *domain;
 	struct smmu_softc *sc;
 	vm_offset_t va;
 	vm_paddr_t pa;
@@ -1463,9 +1466,8 @@ smmu_map(device_t dev, bus_dma_segment_t *segs, int nsegs)
 	vm_offset_t offset;
 	int i;
 
-	sc = smmu_sc;
-	if (sc == NULL)
-		panic("here");
+	sc = device_get_softc(dev);
+	domain = (struct smmu_domain *)dom0;
 
 	for (i = 0; i < nsegs; i++) {
 		offset = segs[i].ds_addr & 0xfff;
@@ -1476,7 +1478,7 @@ smmu_map(device_t dev, bus_dma_segment_t *segs, int nsegs)
 			printf("offset %lx len %lx size %lx\n",
 			    offset, segs[i].ds_len, size);
 
-		if (vmem_alloc(sc->vmem, size,
+		if (vmem_alloc(domain->vmem, size,
 		    M_FIRSTFIT | M_NOWAIT, &va))
 			panic("Could not allocate virtual address.\n");
 
@@ -1491,7 +1493,7 @@ smmu_map(device_t dev, bus_dma_segment_t *segs, int nsegs)
 			size);
 #endif
 
-		smmu_insert(pa, va, size);
+		smmu_insert(sc, domain, pa, va, size);
 		segs[i].ds_addr = va | offset;
 	}
 
@@ -1504,26 +1506,48 @@ smmu_map(device_t dev, bus_dma_segment_t *segs, int nsegs)
 struct iommu_domain *
 smmu_domain_alloc(device_t dev)
 {
-	struct smmu_domain *d;
+	struct smmu_domain *domain;
+	struct smmu_softc *sc;
+	int err;
 
-	d = malloc(sizeof(*d), M_SMMU, M_WAITOK | M_ZERO);
+	sc = device_get_softc(dev);
 
-	mtx_init(&d->mtx_lock, "SMMU domain", NULL, MTX_DEF);
+	domain = malloc(sizeof(*domain), M_SMMU, M_WAITOK | M_ZERO);
 
-	TAILQ_INIT(&d->devices);
+	mtx_init(&domain->mtx_lock, "SMMU domain", NULL, MTX_DEF);
 
-	return (&d->domain);
+	TAILQ_INIT(&domain->devices);
+
+	err = smmu_init_vmem(sc, domain);
+	if (err) {
+		device_printf(sc->dev, "Could not initialize vmem\n");
+		return (NULL);
+	}
+
+	err = smmu_init_pmap(sc, &domain->p);
+	if (err) {
+		device_printf(sc->dev, "Could not initialize pmap\n");
+		return (NULL);
+	}
+
+	err = smmu_init_cd(sc, &domain->cd, &domain->p);
+	if (err) {
+		device_printf(sc->dev, "Could not initialize CD\n");
+		return (NULL);
+	}
+
+	printf("%s: domain is at %p\n", __func__, domain);
+
+	return (&domain->domain);
 }
-
-#include <dev/pci/pcivar.h>
 
 int
 smmu_add_device(device_t smmu_dev,
     struct iommu_domain *domain, device_t dev)
 {
-	struct smmu_softc *sc;
 	struct smmu_domain *smmu_dom;
 	struct smmu_device *slave;
+	struct smmu_softc *sc;
 
 	sc = device_get_softc(smmu_dev);
 	smmu_dom = (struct smmu_domain *)domain;
@@ -1534,15 +1558,17 @@ smmu_add_device(device_t smmu_dev,
 
 	printf("%s: rid %x\n", __func__, slave->rid);
 
-	/* 0x800 xhci */
-	/* 0x700 realtek */
-	/* 0x600 sata */
+	/*
+	 * 0x800 xhci
+	 * 0x700 realtek
+	 * 0x600 sata
+	 */
 
 	DOMAIN_LOCK(smmu_dom);
 	TAILQ_INSERT_TAIL(&smmu_dom->devices, slave, next);
 	DOMAIN_UNLOCK(smmu_dom);
 
-	smmu_init_ste(sc, slave->rid, true);
+	smmu_init_ste(sc, &smmu_dom->cd, slave->rid, true);
 
 	return (0);
 }

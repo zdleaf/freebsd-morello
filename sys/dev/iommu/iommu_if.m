@@ -40,12 +40,14 @@ INTERFACE iommu;
 
 METHOD int map {
 	device_t		dev;
+	struct iommu_domain	*domain;
 	bus_dma_segment_t	*segs;
 	int			nsegs;
 };
 
 METHOD int unmap {
 	device_t		dev;
+	struct iommu_domain	*domain;
 	bus_dma_segment_t	*segs;
 	int			nsegs;
 };

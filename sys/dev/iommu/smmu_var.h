@@ -131,25 +131,22 @@ struct smmu_softc {
 	struct smmu_queue evtq;
 	struct smmu_queue priq;
 	struct smmu_strtab strtab;
-	struct smmu_cd cd;
-	struct pmap p;
-	vmem_t *vmem;
 };
 
 struct smmu_device {
 	uint16_t			rid;
 	device_t			dev;
 	TAILQ_ENTRY(smmu_device)	next;
-	struct smmu_cd			cd;
 };
 
 struct smmu_domain {
-	struct iommu_domain domain;
-	struct pmap p;
-	vmem_t *vmem;
+	struct iommu_domain		domain;
 	struct mtx			mtx_lock;
 	TAILQ_ENTRY(smmu_domain)	next;
 	TAILQ_HEAD(, smmu_device)	devices;
+	struct smmu_cd			cd;
+	struct pmap			p;
+	vmem_t				*vmem;
 };
 
 MALLOC_DECLARE(M_SMMU);
@@ -158,9 +155,10 @@ MALLOC_DECLARE(M_SMMU);
 int smmu_attach(device_t dev);
 int smmu_detach(device_t dev);
 
-void smmu_insert(vm_paddr_t addr, vm_offset_t va, vm_size_t size);
-int smmu_map(device_t dev, bus_dma_segment_t *segs, int nsegs);
-int smmu_unmap(device_t dev, bus_dma_segment_t *segs, int nsegs);
+int smmu_map(device_t dev, struct iommu_domain *domain,
+    bus_dma_segment_t *segs, int nsegs);
+int smmu_unmap(device_t dev, struct iommu_domain *domain,
+    bus_dma_segment_t *segs, int nsegs);
 struct iommu_domain * smmu_domain_alloc(device_t dev);
 int smmu_add_device(device_t smmu_dev,
     struct iommu_domain *domain, device_t dev);
