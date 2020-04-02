@@ -675,10 +675,12 @@ smmu_init_ste_s1(struct smmu_softc *sc, uint32_t sid, uint64_t *ste)
 }
 
 static int
-smmu_init_ste(struct smmu_softc *sc,
-    struct smmu_strtab *strtab, int i, bool s1)
+smmu_init_ste(struct smmu_softc *sc, int i, bool s1)
 {
+	struct smmu_strtab *strtab;
 	uint64_t *addr;
+
+	strtab = &sc->strtab;
 
 	addr = (void *)((uint64_t)strtab->addr +
 	    STRTAB_STE_DWORDS * 8 * i);
@@ -688,22 +690,7 @@ smmu_init_ste(struct smmu_softc *sc,
 	else
 		smmu_init_ste_bypass(sc, i, addr);
 
-	return (0);
-}
-
-static int
-smmu_init_stes(struct smmu_softc *sc,
-    struct smmu_strtab *strtab)
-{
-	uint64_t *addr;
-
-	addr = strtab->addr;
-
-	device_printf(sc->dev, "%s: num_l1_entries %d, base addr %lx\n",
-	    __func__, strtab->num_l1_entries, (uint64_t)addr);
-
-	smmu_init_ste(sc, strtab, 0x800, true); //xhci
-	smmu_init_ste(sc, strtab, 0x700, true); //realtek
+	smmu_poll_until_consumed(sc, &sc->cmdq);
 
 	return (0);
 }
@@ -1347,9 +1334,6 @@ smmu_attach(device_t dev)
 		return (ENXIO);
 	}
 
-	smmu_init_stes(sc, &sc->strtab);
-	smmu_poll_until_consumed(sc, &sc->cmdq);
-
 	error = iommu_register(dev);
 	if (error) {
 		device_printf(dev, "Failed to register SMMU.\n");
@@ -1537,18 +1521,28 @@ int
 smmu_add_device(device_t smmu_dev,
     struct iommu_domain *domain, device_t dev)
 {
+	struct smmu_softc *sc;
 	struct smmu_domain *smmu_dom;
 	struct iommu_device *iod;
 
+	sc = device_get_softc(smmu_dev);
 	smmu_dom = (struct smmu_domain *)domain;
 
 	iod = malloc(sizeof(*iod), M_SMMU, M_WAITOK | M_ZERO);
 	iod->dev = dev;
 	iod->rid = pci_get_rid(dev);
 
+	printf("%s: rid %x\n", __func__, iod->rid);
+
+	/* 0x800 xhci */
+	/* 0x700 realtek */
+	/* 0x600 sata */
+
 	DOMAIN_LOCK(smmu_dom);
 	TAILQ_INSERT_TAIL(&smmu_dom->devices, iod, next);
 	DOMAIN_UNLOCK(smmu_dom);
+
+	smmu_init_ste(sc, iod->rid, true);
 
 	return (0);
 }
