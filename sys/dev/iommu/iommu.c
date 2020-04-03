@@ -61,6 +61,7 @@ __FBSDID("$FreeBSD$");
 #include <machine/intr.h>
 
 #include <dev/iommu/smmu_var.h>
+#include <dev/pci/pcivar.h>
 
 #include "iommu.h"
 #include "iommu_if.h"
@@ -75,33 +76,67 @@ static struct mtx iommu_mtx;
 #define	IOMMU_UNLOCK()			mtx_unlock(&iommu_mtx)
 #define	IOMMU_ASSERT_LOCKED()		mtx_assert(&iommu_mtx, MA_OWNED)
 
-static TAILQ_HEAD(, iommu_domain) domains = TAILQ_HEAD_INITIALIZER(domains);
+static LIST_HEAD(, iommu_domain) domain_list =
+    LIST_HEAD_INITIALIZER(domain_list);
 
 struct iommu_domain *
 iommu_domain_alloc(void)
 {
-	struct iommu_domain *d;
+	struct iommu_domain *domain;
 
-	d = IOMMU_DOMAIN_ALLOC(iommu_dev);
-	if (d == NULL)
+	domain = IOMMU_DOMAIN_ALLOC(iommu_dev);
+	if (domain == NULL)
 		return (NULL);
 
+	LIST_INIT(&domain->device_list);
+	mtx_init(&domain->mtx_lock, "IOMMU domain", NULL, MTX_DEF);
+
 	IOMMU_LOCK();
-	TAILQ_INSERT_TAIL(&domains, d, next);
+	LIST_INSERT_HEAD(&domain_list, domain, next);
 	IOMMU_UNLOCK();
 
-	return (d);
+	return (domain);
+}
+
+struct iommu_domain *
+iommu_get_domain_for_dev(device_t dev)
+{
+	struct iommu_domain *domain;
+	struct iommu_device *device;
+
+	LIST_FOREACH(domain, &domain_list, next) {
+		LIST_FOREACH(device, &domain->device_list, next) {
+			if (device->dev == dev)
+				return (domain);
+		}
+	}
+
+	return (NULL);
 }
 
 /*
- * Adds a consumer device to a domain.
+ * Add a consumer device to a domain.
  */
 int
 iommu_add_device(struct iommu_domain *domain, device_t dev)
 {
+	struct iommu_device *device;
 	int err;
 
-	err = IOMMU_ADD_DEVICE(iommu_dev, domain, dev);
+	device = malloc(sizeof(*device), M_IOMMU, M_WAITOK | M_ZERO);
+	device->rid = pci_get_rid(dev);
+	device->dev = dev;
+
+	err = IOMMU_ADD_DEVICE(iommu_dev, domain, device);
+	if (err) {
+		printf("Failed to add device\n");
+		free(device, M_IOMMU);
+		return (err);
+	}
+
+	DOMAIN_LOCK(domain);
+	LIST_INSERT_HEAD(&domain->device_list, device, next);
+	DOMAIN_UNLOCK(domain);
 
 	return (err);
 }

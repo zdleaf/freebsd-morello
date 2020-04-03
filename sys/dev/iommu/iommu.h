@@ -37,8 +37,17 @@
 
 #include <sys/mutex.h>
 
+/* Consumer device */
+struct iommu_device {
+	LIST_ENTRY(iommu_device)	next;
+	device_t dev;
+	uint16_t rid;
+};
+
 struct iommu_domain {
-	TAILQ_ENTRY(iommu_domain)	next;
+	LIST_HEAD(, iommu_device)	device_list;
+	LIST_ENTRY(iommu_domain)	next;
+	struct mtx			mtx_lock;
 };
 
 #define	DOMAIN_LOCK(domain)		mtx_lock(&(domain)->mtx_lock)
@@ -51,5 +60,6 @@ int iommu_register(device_t dev);
 int iommu_add_device(struct iommu_domain *domain, device_t dev);
 void iommu_map(struct iommu_domain *, bus_dma_segment_t *segs, int nsegs);
 void iommu_unmap(struct iommu_domain *, bus_dma_segment_t *segs, int nsegs);
+struct iommu_domain * iommu_get_domain_for_dev(device_t dev);
 
 #endif /* _DEV_IOMMU_IOMMU_H_ */

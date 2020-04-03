@@ -1412,23 +1412,27 @@ bus_dma_tag_set_iommu(bus_dma_tag_t tag, struct iommu_domain *domain)
 bus_dma_tag_t
 smmu_get_dma_tag(device_t dev, device_t child)
 {
+	struct iommu_domain *domain;
 	devclass_t pci_class;
 	bus_dma_tag_t tag;
 
 	printf("%s\n", __func__);
 
 	pci_class = devclass_find("pci");
-
 	if (device_get_devclass(device_get_parent(child)) != pci_class) {
 		printf("%s: not a pci bus device\n", __func__);
 		return (NULL);
 	}
 
 	tag = malloc(sizeof(*tag), M_BUSDMA, M_WAITOK | M_ZERO);
-	tag->iommu_domain = iommu_domain_alloc();
 
-	iommu_add_device(tag->iommu_domain, child);
+	domain = iommu_get_domain_for_dev(dev);
+	if (!domain) {
+		domain = iommu_domain_alloc();
+		iommu_add_device(domain, child);
+	}
 
+	tag->iommu_domain = domain;
 	smmu_tag_init(tag);
 
 #if 0

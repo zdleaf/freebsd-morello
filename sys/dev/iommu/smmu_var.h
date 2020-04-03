@@ -133,17 +133,16 @@ struct smmu_softc {
 	struct smmu_strtab strtab;
 };
 
-struct smmu_device {
-	uint16_t			rid;
-	device_t			dev;
-	TAILQ_ENTRY(smmu_device)	next;
+struct smmu_master {
+	TAILQ_ENTRY(smmu_master)	next;
+	struct iommu_device		*device;
 };
 
 struct smmu_domain {
 	struct iommu_domain		domain;
 	struct mtx			mtx_lock;
 	TAILQ_ENTRY(smmu_domain)	next;
-	TAILQ_HEAD(, smmu_device)	devices;
+	TAILQ_HEAD(, smmu_master)	master_list;
 	struct smmu_cd			cd;
 	struct pmap			p;
 	vmem_t				*vmem;
@@ -161,6 +160,6 @@ int smmu_unmap(device_t dev, struct iommu_domain *domain,
     bus_dma_segment_t *segs, int nsegs);
 struct iommu_domain * smmu_domain_alloc(device_t dev);
 int smmu_add_device(device_t smmu_dev,
-    struct iommu_domain *domain, device_t dev);
+    struct iommu_domain *domain, struct iommu_device *dev);
 
 #endif /* _DEV_IOMMU_SMMU_VAR_H_ */

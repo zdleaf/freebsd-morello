@@ -1516,7 +1516,7 @@ smmu_domain_alloc(device_t dev)
 
 	mtx_init(&domain->mtx_lock, "SMMU domain", NULL, MTX_DEF);
 
-	TAILQ_INIT(&domain->devices);
+	TAILQ_INIT(&domain->master_list);
 
 	err = smmu_init_vmem(sc, domain);
 	if (err) {
@@ -1542,21 +1542,20 @@ smmu_domain_alloc(device_t dev)
 }
 
 int
-smmu_add_device(device_t smmu_dev,
-    struct iommu_domain *domain, device_t dev)
+smmu_add_device(device_t smmu_dev, struct iommu_domain *domain,
+    struct iommu_device *device)
 {
 	struct smmu_domain *smmu_dom;
-	struct smmu_device *slave;
+	struct smmu_master *master;
 	struct smmu_softc *sc;
 
 	sc = device_get_softc(smmu_dev);
 	smmu_dom = (struct smmu_domain *)domain;
 
-	slave = malloc(sizeof(*slave), M_SMMU, M_WAITOK | M_ZERO);
-	slave->dev = dev;
-	slave->rid = pci_get_rid(dev);
+	master = malloc(sizeof(*master), M_SMMU, M_WAITOK | M_ZERO);
+	master->device = device;
 
-	printf("%s: rid %x\n", __func__, slave->rid);
+	printf("%s: rid %x\n", __func__, device->rid);
 
 	/*
 	 * 0x800 xhci
@@ -1565,10 +1564,10 @@ smmu_add_device(device_t smmu_dev,
 	 */
 
 	DOMAIN_LOCK(smmu_dom);
-	TAILQ_INSERT_TAIL(&smmu_dom->devices, slave, next);
+	TAILQ_INSERT_TAIL(&smmu_dom->master_list, master, next);
 	DOMAIN_UNLOCK(smmu_dom);
 
-	smmu_init_ste(sc, &smmu_dom->cd, slave->rid, true);
+	smmu_init_ste(sc, &smmu_dom->cd, device->rid, true);
 
 	return (0);
 }
