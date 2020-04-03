@@ -61,5 +61,6 @@ int iommu_add_device(struct iommu_domain *domain, device_t dev);
 void iommu_map(struct iommu_domain *, bus_dma_segment_t *segs, int nsegs);
 void iommu_unmap(struct iommu_domain *, bus_dma_segment_t *segs, int nsegs);
 struct iommu_domain * iommu_get_domain_for_dev(device_t dev);
+int iommu_capable(device_t dev);
 
 #endif /* _DEV_IOMMU_IOMMU_H_ */

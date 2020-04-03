@@ -61,3 +61,8 @@ METHOD int add_device {
 	struct iommu_domain	*domain;
 	struct iommu_device	*device;
 };
+
+METHOD int capable {
+	device_t		smmu_dev;
+	device_t		dev;
+};

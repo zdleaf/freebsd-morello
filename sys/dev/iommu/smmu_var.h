@@ -161,5 +161,6 @@ int smmu_unmap(device_t dev, struct iommu_domain *domain,
 struct iommu_domain * smmu_domain_alloc(device_t dev);
 int smmu_add_device(device_t smmu_dev,
     struct iommu_domain *domain, struct iommu_device *dev);
+int smmu_capable(device_t smmu_dev, device_t dev);
 
 #endif /* _DEV_IOMMU_SMMU_VAR_H_ */

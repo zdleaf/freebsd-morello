@@ -156,6 +156,16 @@ iommu_unmap(struct iommu_domain *domain, bus_dma_segment_t *segs, int nsegs)
 }
 
 int
+iommu_capable(device_t dev)
+{
+	int err;
+
+	err = IOMMU_CAPABLE(iommu_dev, dev);
+
+	return (err);
+}
+
+int
 iommu_register(device_t dev)
 {
 

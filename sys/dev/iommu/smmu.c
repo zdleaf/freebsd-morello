@@ -1571,3 +1571,10 @@ smmu_add_device(device_t smmu_dev, struct iommu_domain *domain,
 
 	return (0);
 }
+
+int
+smmu_capable(device_t smmu_dev, device_t dev)
+{
+
+	return (0);
+}
