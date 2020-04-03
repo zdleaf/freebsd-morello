@@ -1381,8 +1381,6 @@ struct bus_dma_impl bus_dma_bounce_impl = {
 	.map_sync = bounce_bus_dmamap_sync
 };
 
-/* SMMU */
-
 static void
 smmu_tag_init(struct bus_dma_tag *t)
 {
@@ -1400,15 +1398,6 @@ smmu_tag_init(struct bus_dma_tag *t)
 	t->common.maxsegsz = maxaddr;
 }
 
-#if 0
-static void
-bus_dma_tag_set_iommu(bus_dma_tag_t tag, struct iommu_domain *domain)
-{
-
-	tag->iommu = 1;
-}
-#endif
-
 bus_dma_tag_t
 smmu_get_dma_tag(device_t dev, device_t child)
 {
@@ -1424,48 +1413,26 @@ smmu_get_dma_tag(device_t dev, device_t child)
 		return (NULL);
 	}
 
-	tag = malloc(sizeof(*tag), M_BUSDMA, M_WAITOK | M_ZERO);
-
 	domain = iommu_get_domain_for_dev(dev);
-	if (!domain) {
-		domain = iommu_domain_alloc();
-		iommu_add_device(domain, child);
+	if (domain)
+		return (domain->tag);
+
+	domain = iommu_domain_alloc();
+	if (!domain)
+		return (NULL);
+
+	tag = malloc(sizeof(*tag), M_BUSDMA, M_WAITOK | M_ZERO);
+	if (!tag) {
+		/* iommu_domain_free(domain) */
+		return (NULL);
 	}
 
 	tag->iommu_domain = domain;
+	domain->tag = tag;
+
+	iommu_add_device(domain, child);
+
 	smmu_tag_init(tag);
-
-#if 0
-	int pci_bus, pci_slot, pci_func;
-	uint16_t rid;
-	struct dmar_unit *dmar;
-	struct dmar_ctx *ctx;
-	bus_dma_tag_t res;
-
-	dmar = dmar_find(child, bootverbose);
-	/* Not in scope of any DMAR ? */
-	if (dmar == NULL)
-		return (NULL);
-	if (!dmar->dma_enabled)
-		return (NULL);
-	dmar_quirks_pre_use(dmar);
-	dmar_instantiate_rmrr_ctxs(dmar);
-
-	ctx = dmar_instantiate_ctx(dmar, child, false);
-	res = ctx == NULL ? NULL : (bus_dma_tag_t)&ctx->ctx_tag;
-
-	pci_bus = pci_get_bus(child);
-	pci_slot = pci_get_slot(child);
-	pci_func = pci_get_function(child);
-
-	printf("pci bus is %d\n", pci_bus);
-
-	if (pci_bus == 7) // realtek
-		bus_dma_tag_set_iommu(tag, tag->domain);
-
-	if (pci_bus == 8) // xhci
-		bus_dma_tag_set_iommu(tag, tag->domain);
-#endif
 
 	return (tag);
 }
