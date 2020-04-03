@@ -702,10 +702,13 @@ vm_handle_reg_emul(struct vm *vm, int vcpuid, bool *retu)
 
 	iss_reg = vre->inst_syndrome & ISS_MSR_REG_MASK;
 	switch (iss_reg) {
-#ifdef notyet
 	case ISS_CNTP_CTL_EL0:
 		rread = vtimer_phys_ctl_read;
 		rwrite = vtimer_phys_ctl_write;
+		break;
+	case ISS_CNTP_CT_EL0:
+		rread = vtimer_phys_cnt_read;
+		rwrite = vtimer_phys_cnt_write;
 		break;
 	case ISS_CNTP_CVAL_EL0:
 		rread = vtimer_phys_cval_read;
@@ -715,7 +718,6 @@ vm_handle_reg_emul(struct vm *vm, int vcpuid, bool *retu)
 		rread = vtimer_phys_tval_read;
 		rwrite = vtimer_phys_tval_write;
 		break;
-#endif
 	default:
 		goto out_user;
 	}

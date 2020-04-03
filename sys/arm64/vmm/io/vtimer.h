@@ -44,6 +44,18 @@
      CNTP_CTL_EL0_CRn << ISS_MSR_CRn_SHIFT |	\
      CNTP_CTL_EL0_CRm << ISS_MSR_CRm_SHIFT)
 
+#define	CNTP_CT_EL0_OP0		0b11
+#define	CNTP_CT_EL0_OP1		0b011
+#define	CNTP_CT_EL0_OP2		0b001
+#define	CNTP_CT_EL0_CRn		0b1110
+#define	CNTP_CT_EL0_CRm		0b0000
+#define	ISS_CNTP_CT_EL0	\
+    (CNTP_CT_EL0_OP0 << ISS_MSR_OP0_SHIFT | 	\
+     CNTP_CT_EL0_OP2 << ISS_MSR_OP2_SHIFT |	\
+     CNTP_CT_EL0_OP1 << ISS_MSR_OP1_SHIFT | 	\
+     CNTP_CT_EL0_CRn << ISS_MSR_CRn_SHIFT |	\
+     CNTP_CT_EL0_CRm << ISS_MSR_CRm_SHIFT)
+
 #define	CNTP_CVAL_EL0_OP0	0b11
 #define	CNTP_CVAL_EL0_OP1	0b011
 #define	CNTP_CVAL_EL0_OP2	0b010
@@ -77,6 +89,7 @@ struct vtimer
 struct vtimer_cpu
 {
 	struct callout	callout;
+	struct mtx	mtx;
 	uint32_t	cntkctl_el1;
 	/*
 	 * Emulated registers:
@@ -105,6 +118,8 @@ void	vtimer_cleanup(void);
 
 int 	vtimer_phys_ctl_read(void *vm, int vcpuid, uint64_t *rval, void *arg);
 int 	vtimer_phys_ctl_write(void *vm, int vcpuid, uint64_t wval, void *arg);
+int 	vtimer_phys_cnt_read(void *vm, int vcpuid, uint64_t *rval, void *arg);
+int 	vtimer_phys_cnt_write(void *vm, int vcpuid, uint64_t wval, void *arg);
 int 	vtimer_phys_cval_read(void *vm, int vcpuid, uint64_t *rval, void *arg);
 int 	vtimer_phys_cval_write(void *vm, int vcpuid, uint64_t wval, void *arg);
 int 	vtimer_phys_tval_read(void *vm, int vcpuid, uint64_t *rval, void *arg);

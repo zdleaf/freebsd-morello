@@ -218,7 +218,7 @@ arm64/vmm/vmm_reset.c				optional vmm
 arm64/vmm/vmm_hyp.S				optional vmm
 arm64/vmm/vmm_mmu.c				optional vmm
 arm64/vmm/io/vgic_v3.c				optional vmm
-#arm64/vmm/io/vtimer.c				optional vmm
+arm64/vmm/io/vtimer.c				optional vmm
 contrib/vchiq/interface/compat/vchi_bsd.c	optional vchiq soc_brcm_bcm2837 \
 	compile-with "${NORMAL_C} -DUSE_VCHIQ_ARM -D__VCCOREVER__=0x04000000 -I$S/contrib/vchiq"
 contrib/vchiq/interface/vchiq_arm/vchiq_2835_arm.c	optional vchiq soc_brcm_bcm2837 \

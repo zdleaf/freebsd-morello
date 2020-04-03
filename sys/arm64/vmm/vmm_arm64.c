@@ -88,9 +88,7 @@ arm_init(int ipinum)
 	char *stack_top;
 	size_t hyp_code_len;
 	uint64_t ich_vtr_el2;
-#ifdef notyet
 	uint64_t cnthctl_el2;
-#endif
 	uint64_t tcr_el1, tcr_el2;
 	uint64_t id_aa64mmfr0_el1;
 	uint64_t pa_range_bits;
@@ -206,10 +204,8 @@ arm_init(int ipinum)
 	ich_vtr_el2 = vmm_call_hyp((void *)ktohyp(vmm_read_ich_vtr_el2));
 	vgic_v3_init(ich_vtr_el2);
 
-#ifdef notyet
 	cnthctl_el2 = vmm_call_hyp((void *)ktohyp(vmm_read_cnthctl_el2));
 	vtimer_init(cnthctl_el2);
-#endif
 
 	intr_restore(daif);
 
@@ -241,9 +237,7 @@ arm_cleanup(void)
 
 	arm64_set_active_vcpu(NULL);
 
-#ifdef notyet
 	vtimer_cleanup();
-#endif
 
 	hypmap_cleanup(hyp_pmap);
 	free(hyp_pmap, M_HYP);
@@ -274,15 +268,11 @@ arm_vminit(struct vm *vm, pmap_t pmap)
 		reset_vm_el2_regs(hypctx);
 	}
 
-#ifdef notyet
 	vtimer_vminit(hyp);
-#endif
 	vgic_v3_vminit(hyp);
 	for (i = 0; i < VM_MAXCPU; i++) {
-#ifdef notyet
 		hypctx = &hyp->ctx[i];
 		vtimer_cpuinit(hypctx);
-#endif
 		last_vcpu = (i == VM_MAXCPU - 1);
 		vgic_v3_cpuinit(hypctx, last_vcpu);
 	}
@@ -636,9 +626,7 @@ arm_vmcleanup(void *arg)
 	if (arm64_get_active_vcpu() == hypctx)
 		arm64_set_active_vcpu(NULL);
 
-#ifdef notyet
 	vtimer_vmcleanup(arg);
-#endif
 	vgic_v3_detach_from_vm(arg);
 
 	/* Unmap the VM hyp struct from the hyp mode translation table */

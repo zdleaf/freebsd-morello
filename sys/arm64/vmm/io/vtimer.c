@@ -36,6 +36,7 @@
 #include <sys/timetc.h>
 
 #include <machine/bus.h>
+#include <machine/machdep.h>
 #include <machine/vmm.h>
 #include <machine/armreg.h>
 
@@ -163,11 +164,9 @@ vtimer_cpuinit(void *arg)
 	 * ~CNTP_CTL_ENABLE: disable the timer
 	 */
 	vtimer_cpu->cntp_ctl_el0 = CNTP_CTL_IMASK & ~CNTP_CTL_ENABLE;
-	/*
-	 * Callout function is MP_SAFE because the VGIC uses a spin
-	 * mutex when modifying the list registers.
-	 */
-	callout_init(&vtimer_cpu->callout, 1);
+
+	mtx_init(&vtimer_cpu->mtx, "vtimer callout mutex", NULL, MTX_DEF);
+	callout_init_mtx(&vtimer_cpu->callout, &vtimer_cpu->mtx, 0);
 }
 
 void
@@ -309,6 +308,25 @@ vtimer_phys_ctl_write(void *vm, int vcpuid, uint64_t wval, void *arg)
 
 	if (timer_toggled_on)
 		vtimer_schedule_irq(vtimer_cpu, hypctx);
+
+	*retu = false;
+	return (0);
+}
+
+int
+vtimer_phys_cnt_read(void *vm, int vcpuid, uint64_t *rval, void *arg)
+{
+	bool *retu = arg;
+
+	*rval = READ_SPECIALREG(cntpct_el0);
+	*retu = false;
+	return (0);
+}
+
+int
+vtimer_phys_cnt_write(void *vm, int vcpuid, uint64_t wval, void *arg)
+{
+	bool *retu = arg;
 
 	*retu = false;
 	return (0);
