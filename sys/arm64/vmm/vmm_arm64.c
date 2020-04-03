@@ -466,7 +466,7 @@ handle_el1_sync_excp(struct hyp *hyp, int vcpu, struct vm_exit *vme_ret,
 	case EXCP_INSN_ABORT_L:
 	case EXCP_DATA_ABORT_L:
 		if (pmap_fault(pmap, vme_ret->u.hyp.esr_el2,
-		    vme_ret->u.hyp.far_el2) == KERN_SUCCESS) {
+		    vme_ret->u.hyp.hpfar_el2 << 8) == KERN_SUCCESS) {
 			vme_ret->inst_length = 0;
 			return (HANDLED);
 		}
