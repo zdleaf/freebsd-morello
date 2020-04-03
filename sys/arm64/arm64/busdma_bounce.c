@@ -1404,6 +1404,7 @@ smmu_get_dma_tag(device_t dev, device_t child)
 	struct iommu_domain *domain;
 	devclass_t pci_class;
 	bus_dma_tag_t tag;
+	int error;
 
 	printf("%s\n", __func__);
 
@@ -1423,14 +1424,19 @@ smmu_get_dma_tag(device_t dev, device_t child)
 
 	tag = malloc(sizeof(*tag), M_BUSDMA, M_WAITOK | M_ZERO);
 	if (!tag) {
-		/* iommu_domain_free(domain) */
+		iommu_domain_free(domain);
 		return (NULL);
 	}
 
 	tag->iommu_domain = domain;
 	domain->tag = tag;
 
-	iommu_add_device(domain, child);
+	error = iommu_add_device(domain, child);
+	if (error) {
+		free(tag, M_BUSDMA);
+		iommu_domain_free(domain);
+		return (NULL);
+	}
 
 	smmu_tag_init(tag);
 
