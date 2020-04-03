@@ -57,6 +57,7 @@ struct iommu_domain {
 #define	DOMAIN_ASSERT_LOCKED(domain)	\
     mtx_assert(&(domain)->mtx_lock, MA_OWNED)
 
+void iommu_domain_free(struct iommu_domain *domain);
 struct iommu_domain * iommu_domain_alloc(void);
 struct iommu_domain * iommu_get_domain_for_dev(device_t dev);
 void iommu_map(struct iommu_domain *, bus_dma_segment_t *segs, int nsegs);

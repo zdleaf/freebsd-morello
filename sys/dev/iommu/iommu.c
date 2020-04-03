@@ -98,6 +98,13 @@ iommu_domain_alloc(void)
 	return (domain);
 }
 
+void
+iommu_domain_free(struct iommu_domain *domain)
+{
+
+	/* TODO */
+}
+
 struct iommu_domain *
 iommu_get_domain_for_dev(device_t dev)
 {
