@@ -288,22 +288,22 @@
 #define	CMD_RESUME		0x44
 #define	CMD_STALL_TERM		0x45
 #define	CMD_SYNC		0x46
-#define	 SYNC_CS_S		12 /* The ComplSignal */
-#define	 SYNC_CS_M		(0x3 << SYNC_CS_S)
-#define	 SYNC_CS_SIG_NONE	(0x0 << SYNC_CS_S)
-#define	 SYNC_CS_SIG_IRQ	(0x1 << SYNC_CS_S)
-#define	 SYNC_CS_SIG_SEV	(0x2 << SYNC_CS_S)
-#define	 SYNC_MSH_S		22 /* Shareability attribute for MSI write */
-#define	 SYNC_MSH_M		(0x3 << SYNC_MSH_S)
-#define	 SYNC_MSH_NS		(0x0 << SYNC_MSH_S) /* Non-shareable */
-#define	 SYNC_MSH_OS		(0x2 << SYNC_MSH_S) /* Outer Shareable */
-#define	 SYNC_MSH_IS		(0x3 << SYNC_MSH_S) /* Inner Shareable */
-#define	 SYNC_MSIATTR_S		24 /* Write attribute for MSI */
-#define	 SYNC_MSIATTR_M		(0xf << SYNC_MSIATTR_S)
-#define	 SYNC_MSIATTR_OIWB	(0xf << SYNC_MSIATTR_S)
-#define	 SYNC_MSIDATA_S		32
-#define	 SYNC_MSIADDRESS_S	2
-#define	 SYNC_MSIADDRESS_M	(0x3ffffffffffff << SYNC_MSIADDRESS_S)
+#define	 SYNC_0_CS_S		12 /* The ComplSignal */
+#define	 SYNC_0_CS_M		(0x3 << SYNC_0_CS_S)
+#define	 SYNC_0_CS_SIG_NONE	(0x0 << SYNC_0_CS_S)
+#define	 SYNC_0_CS_SIG_IRQ	(0x1 << SYNC_0_CS_S)
+#define	 SYNC_0_CS_SIG_SEV	(0x2 << SYNC_0_CS_S)
+#define	 SYNC_0_MSH_S		22 /* Shareability attribute for MSI write */
+#define	 SYNC_0_MSH_M		(0x3 << SYNC_0_MSH_S)
+#define	 SYNC_0_MSH_NS		(0x0 << SYNC_0_MSH_S) /* Non-shareable */
+#define	 SYNC_0_MSH_OS		(0x2 << SYNC_0_MSH_S) /* Outer Shareable */
+#define	 SYNC_0_MSH_IS		(0x3 << SYNC_0_MSH_S) /* Inner Shareable */
+#define	 SYNC_0_MSIATTR_S	24 /* Write attribute for MSI */
+#define	 SYNC_0_MSIATTR_M	(0xf << SYNC_0_MSIATTR_S)
+#define	 SYNC_0_MSIATTR_OIWB	(0xf << SYNC_0_MSIATTR_S)
+#define	 SYNC_0_MSIDATA_S	32
+#define	 SYNC_1_MSIADDRESS_S	2
+#define	 SYNC_1_MSIADDRESS_M	(0x3ffffffffffff << SYNC_1_MSIADDRESS_S)
 #define	STE0_VALID		(1 << 0) /* Structure contents are valid. */
 #define	STE0_CONFIG_S		1
 #define	STE0_CONFIG_M		(0x7 << STE0_CONFIG_S)

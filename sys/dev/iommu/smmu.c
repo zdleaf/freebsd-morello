@@ -437,9 +437,9 @@ make_cmd(struct smmu_softc *sc, uint64_t *cmd,
 		cmd[1] = (31 << CFGI_1_STE_RANGE_S);
 		break;
 	case CMD_SYNC:
-		cmd[0] |= SYNC_CS_SIG_SEV;
-		cmd[0] |= SYNC_MSH_IS | SYNC_MSIATTR_OIWB;
-		//cmd[0] = 0xfffff;
+		//cmd[0] |= SYNC_CS_SIG_SEV;
+		cmd[0] |= SYNC_0_CS_SIG_IRQ;
+		cmd[0] |= SYNC_0_MSH_IS | SYNC_0_MSIATTR_OIWB;
 		break;
 	case CMD_PREFETCH_CONFIG:
 		cmd[0] |= ((uint64_t)entry->prefetch.sid << PREFETCH_0_SID_S);
@@ -503,6 +503,7 @@ smmu_poll_until_consumed(struct smmu_softc *sc, struct smmu_queue *q)
 		q->lc.val = bus_read_8(sc->res[0], q->prod_off);
 		if (smmu_q_empty(q))
 			break;
+		cpu_spinwait();
 	}
 }
 
@@ -1138,6 +1139,8 @@ smmu_attach(device_t dev)
 
 	if (device_get_unit(dev) != 0)
 		return (ENXIO);
+
+	mtx_init(&sc->sc_mtx, device_get_nameunit(sc->dev), "smmu", MTX_DEF);
 
 	error = bus_alloc_resources(dev, smmu_spec, sc->res);
 	if (error) {

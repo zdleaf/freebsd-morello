@@ -44,7 +44,9 @@
 #include <vm/vm_extern.h>
 #include <vm/vm_page.h>
 
-#define	SMMU_DEVSTR	"ARM System Memory Management Unit"
+#define	SMMU_DEVSTR		"ARM System Memory Management Unit"
+#define	SMMU_LOCK(_sc)		mtx_lock_spin(&(_sc)->sc_mtx)
+#define	SMMU_UNLOCK(_sc)	mtx_unlock_spin(&(_sc)->sc_mtx)
 
 DECLARE_CLASS(smmu_driver);
 
@@ -131,6 +133,8 @@ struct smmu_softc {
 	struct smmu_queue evtq;
 	struct smmu_queue priq;
 	struct smmu_strtab strtab;
+	int				sync;
+	struct mtx			sc_mtx;
 };
 
 struct smmu_master {
