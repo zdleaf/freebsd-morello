@@ -227,6 +227,7 @@ smmu_event_intr(void *arg)
 	return (FILTER_HANDLED);
 }
 
+#if 0
 static int
 smmu_sync_intr(void *arg)
 {
@@ -238,6 +239,7 @@ smmu_sync_intr(void *arg)
 
 	return (FILTER_HANDLED);
 }
+#endif
 
 static int
 smmu_gerr_intr(void *arg)
@@ -437,9 +439,12 @@ make_cmd(struct smmu_softc *sc, uint64_t *cmd,
 		cmd[1] = (31 << CFGI_1_STE_RANGE_S);
 		break;
 	case CMD_SYNC:
-		//cmd[0] |= SYNC_CS_SIG_SEV;
-		cmd[0] |= SYNC_0_CS_SIG_IRQ;
 		cmd[0] |= SYNC_0_MSH_IS | SYNC_0_MSIATTR_OIWB;
+		if (entry->sync.msiaddr) {
+			cmd[0] |= SYNC_0_CS_SIG_IRQ;
+			cmd[1] |= (entry->sync.msiaddr & SYNC_1_MSIADDRESS_M);
+		} else
+			cmd[0] |= SYNC_0_CS_SIG_SEV;
 		break;
 	case CMD_PREFETCH_CONFIG:
 		cmd[0] |= ((uint64_t)entry->prefetch.sid << PREFETCH_0_SID_S);
@@ -475,8 +480,8 @@ smmu_cmdq_enqueue_cmd(struct smmu_softc *sc, struct smmu_cmdq_entry *entry)
 	    Q_IDX(cmdq, cmdq->lc.prod) * CMDQ_ENTRY_DWORDS * 8);
 	memcpy(entry_addr, cmd, CMDQ_ENTRY_DWORDS * 8);
 
+	/* Increment prod index */
 	cmdq->lc.prod = smmu_q_inc_prod(cmdq);
-
 	bus_write_4(sc->res[0], cmdq->prod_off, cmdq->lc.prod);
 
 	//device_printf(sc->dev, "%s: complete\n", __func__);
@@ -511,9 +516,27 @@ static int
 smmu_cmdq_enqueue_sync(struct smmu_softc *sc)
 {
 	struct smmu_cmdq_entry cmd;
+	struct smmu_queue *q;
+	int prod;
+
+	q = &sc->cmdq;
+	prod = q->lc.prod;
 
 	cmd.opcode = CMD_SYNC;
+	cmd.sync.msiaddr = q->paddr + Q_IDX(q, prod) * CMDQ_ENTRY_DWORDS * 8;
 	smmu_cmdq_enqueue_cmd(sc, &cmd);
+
+	/* Wait completion */
+
+	uint32_t *base;
+	base = (void *)((uint64_t)q->addr +
+	    Q_IDX(q, prod) * CMDQ_ENTRY_DWORDS * 8);
+
+	for (;;) {
+		if (*base == 0)
+			break;
+		cpu_spinwait();
+	}
 
 	return (0);
 }
@@ -691,7 +714,7 @@ smmu_init_ste(struct smmu_softc *sc, struct smmu_cd *cd, int i, bool s1)
 	else
 		smmu_init_ste_bypass(sc, i, addr);
 
-	smmu_poll_until_consumed(sc, &sc->cmdq);
+	smmu_cmdq_enqueue_sync(sc);
 
 	return (0);
 }
@@ -991,12 +1014,16 @@ smmu_setup_interrupts(struct smmu_softc *sc)
 		return (ENXIO);
 	}
 
+#if 0
+	/* Since we are using msiaddr feature, don't setup wired interrupt */
+
 	error = bus_setup_intr(dev, sc->res[2], INTR_TYPE_MISC,
 	    smmu_sync_intr, NULL, sc, &sc->intr_cookie[1]);
 	if (error) {
 		device_printf(dev, "Couldn't setup Sync interrupt handler\n");
 		return (ENXIO);
 	}
+#endif
 
 	error = bus_setup_intr(dev, sc->res[3], INTR_TYPE_MISC,
 	    smmu_gerr_intr, NULL, sc, &sc->intr_cookie[2]);
@@ -1454,7 +1481,6 @@ smmu_unmap(device_t dev, struct iommu_domain *dom0,
 	}
 
 	smmu_cmdq_enqueue_sync(sc);
-	smmu_poll_until_consumed(sc, &sc->cmdq);
 
 	return (0);
 }
@@ -1503,7 +1529,6 @@ smmu_map(device_t dev, struct iommu_domain *dom0,
 	}
 
 	smmu_cmdq_enqueue_sync(sc);
-	smmu_poll_until_consumed(sc, &sc->cmdq);
 
 	return (0);
 }

@@ -92,6 +92,9 @@ struct smmu_cmdq_entry {
 		struct {
 			uint32_t sid;
 		} prefetch;
+		struct {
+			uint64_t msiaddr;
+		} sync;
 	};
 };
 
