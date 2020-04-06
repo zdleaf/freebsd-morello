@@ -211,7 +211,7 @@ smmu_write_ack(struct smmu_softc *sc, uint32_t reg,
 	return (0);
 }
 
-static void
+static int
 smmu_event_intr(void *arg)
 {
 	struct smmu_softc *sc;
@@ -223,9 +223,11 @@ smmu_event_intr(void *arg)
 	do {
 		smmu_evtq_dequeue(sc);
 	} while (!smmu_q_empty(&sc->evtq));
+
+	return (FILTER_HANDLED);
 }
 
-static void
+static int
 smmu_sync_intr(void *arg)
 {
 	struct smmu_softc *sc;
@@ -234,10 +236,10 @@ smmu_sync_intr(void *arg)
 
 	device_printf(sc->dev, "!!!!!!!!! %s\n", __func__);
 
-	//return (FILTER_HANDLED);
+	return (FILTER_HANDLED);
 }
 
-static void
+static int
 smmu_gerr_intr(void *arg)
 {
 	struct smmu_softc *sc;
@@ -246,7 +248,7 @@ smmu_gerr_intr(void *arg)
 
 	device_printf(sc->dev, "!!!!!!!!! %s\n", __func__);
 
-	//return (FILTER_HANDLED);
+	return (FILTER_HANDLED);
 }
 
 static inline int
@@ -982,21 +984,21 @@ smmu_setup_interrupts(struct smmu_softc *sc)
 	device_printf(sc->dev, "%s\n", __func__);
 
 	error = bus_setup_intr(dev, sc->res[1], INTR_TYPE_MISC,
-	    NULL, smmu_event_intr, sc, &sc->intr_cookie[0]);
+	    smmu_event_intr, NULL, sc, &sc->intr_cookie[0]);
 	if (error) {
 		device_printf(dev, "Couldn't setup Event interrupt handler\n");
 		return (ENXIO);
 	}
 
 	error = bus_setup_intr(dev, sc->res[2], INTR_TYPE_MISC,
-	    NULL, smmu_sync_intr, sc, &sc->intr_cookie[1]);
+	    smmu_sync_intr, NULL, sc, &sc->intr_cookie[1]);
 	if (error) {
 		device_printf(dev, "Couldn't setup Sync interrupt handler\n");
 		return (ENXIO);
 	}
 
 	error = bus_setup_intr(dev, sc->res[3], INTR_TYPE_MISC,
-	    NULL, smmu_gerr_intr, sc, &sc->intr_cookie[2]);
+	    smmu_gerr_intr, NULL, sc, &sc->intr_cookie[2]);
 	if (error) {
 		device_printf(dev, "Couldn't setup Gerr interrupt handler\n");
 		return (ENXIO);
