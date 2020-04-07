@@ -30,7 +30,6 @@
  * SUCH DAMAGE.
  */
 
-#include "opt_acpi.h"
 #include "opt_platform.h"
 
 #include <sys/cdefs.h>
@@ -38,19 +37,12 @@ __FBSDID("$FreeBSD$");
 
 #include <sys/param.h>
 #include <sys/systm.h>
-#include <sys/bitstring.h>
 #include <sys/bus.h>
 #include <sys/kernel.h>
-#include <sys/ktr.h>
 #include <sys/malloc.h>
-#include <sys/module.h>
 #include <sys/rman.h>
-#include <sys/pcpu.h>
-#include <sys/proc.h>
-#include <sys/cpuset.h>
-#include <sys/lock.h>
 #include <sys/mutex.h>
-#include <sys/smp.h>
+#include <sys/lock.h>
 
 #include <vm/vm.h>
 #include <vm/pmap.h>
@@ -59,25 +51,13 @@ __FBSDID("$FreeBSD$");
 #include <machine/cpu.h>
 #include <machine/intr.h>
 
-#ifdef FDT
-#include <dev/fdt/fdt_intr.h>
-#include <dev/ofw/ofw_bus_subr.h>
-#endif
 #include <dev/pci/pcivar.h>
-
-#ifdef DEV_ACPI
-#include <contrib/dev/acpica/include/acpi.h>
-#include <dev/acpica/acpivar.h>
-#endif
-
-#include "smmu_reg.h"
-#include "smmu_var.h"
 
 #include "iommu.h"
 #include "iommu_if.h"
 
-static bus_get_domain_t smmu_get_domain;
-static bus_read_ivar_t smmu_read_ivar;
+#include "smmu_reg.h"
+#include "smmu_var.h"
 
 static struct resource_spec smmu_spec[] = {
 	{ SYS_RES_MEMORY, 0, RF_ACTIVE },
@@ -87,15 +67,11 @@ static struct resource_spec smmu_spec[] = {
 	RESOURCE_SPEC_END
 };
 
-/*
- * Driver-specific definitions.
- */
 MALLOC_DEFINE(M_SMMU, "SMMU", SMMU_DEVSTR);
 
 #define	STRTAB_L1_SZ_SHIFT	20
 #define	STRTAB_SPLIT		8
 #define	STRTAB_L1_DESC_DWORDS	1
-
 #define	STRTAB_STE_DWORDS	8
 
 #define	CMDQ_ENTRY_DWORDS	2
