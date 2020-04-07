@@ -1433,6 +1433,7 @@ smmu_read_ivar(device_t dev, device_t child, int which, uintptr_t *result)
 	return (ENOENT);
 }
 
+#if 0
 static void
 smmu_insert(struct smmu_softc *sc, struct smmu_domain *domain,
     vm_paddr_t pa, vm_offset_t va, vm_size_t size)
@@ -1451,89 +1452,58 @@ smmu_insert(struct smmu_softc *sc, struct smmu_domain *domain,
 		va += PAGE_SIZE;
 	}
 }
-
-int map_cnt = 0;
-int unmap_cnt = 0;
+#endif
 
 int
 smmu_unmap(device_t dev, struct iommu_domain *dom0,
-    bus_dma_segment_t *segs, int nsegs)
+    vm_offset_t va, vm_size_t size)
 {
 	struct smmu_domain *domain;
 	struct smmu_softc *sc;
-	vm_offset_t va;
-	vm_size_t size;
-	vm_offset_t offset;
+	int err;
 	int i;
-	int j;
 
 	sc = device_get_softc(dev);
 	domain = (struct smmu_domain *)dom0;
 
-	for (i = 0; i < nsegs; i++) {
-		va = segs[i].ds_addr & ~0xfff;
-		offset = segs[i].ds_addr & 0xfff;
-		size = roundup2(offset + segs[i].ds_len, PAGE_SIZE);
-#if 0
-		device_printf(sc->dev, "%s: cnt %d va %lx size %lx\n",
-		    __func__, unmap_cnt++, va, size);
-#endif
-		for (j = 0; j < size; j += 0x1000) {
-			if (pmap_sremove(&domain->p, va)) {
-				vmem_free(domain->vmem, va, 0x1000);
-				smmu_tlbi_va(sc, va);
-			} else
-				printf("pte is NULL, va %lx\n", va);
-			va += 0x1000;
+	err = 0;
+
+	for (i = 0; i < size; i += PAGE_SIZE) {
+		if (pmap_sremove(&domain->p, va)) {
+			smmu_tlbi_va(sc, va);
+		} else {
+			printf("pte is NULL, va %lx\n", va);
+			err = ENOENT;
 		}
+		va += PAGE_SIZE;
 	}
 
 	smmu_sync(sc);
 
-	return (0);
+	return (err);
 }
 
 int
 smmu_map(device_t dev, struct iommu_domain *dom0,
-    bus_dma_segment_t *segs, int nsegs)
+    vm_paddr_t pa, vm_offset_t va, vm_size_t size)
 {
 	struct smmu_domain *domain;
 	struct smmu_softc *sc;
-	vm_offset_t va;
-	vm_paddr_t pa;
-	vm_size_t size;
-	vm_offset_t offset;
-	int i;
+	vm_prot_t prot;
+	pmap_t p;
 
 	sc = device_get_softc(dev);
 	domain = (struct smmu_domain *)dom0;
 
-	for (i = 0; i < nsegs; i++) {
-		offset = segs[i].ds_addr & 0xfff;
-		pa = segs[i].ds_addr & ~0xfff;
-		size = roundup2(offset + segs[i].ds_len, PAGE_SIZE);
+	p = &domain->p;
 
-		if ((offset + segs[i].ds_len) > PAGE_SIZE)
-			printf("offset %lx len %lx size %lx\n",
-			    offset, segs[i].ds_len, size);
+	prot = VM_PROT_READ | VM_PROT_WRITE;
 
-		if (vmem_alloc(domain->vmem, size,
-		    M_FIRSTFIT | M_NOWAIT, &va))
-			panic("Could not allocate virtual address.\n");
-
-#if 0
-		device_printf(sc->dev,
-		    "%s: cnt %d pa %lx va %lx offset %lx len %lx size %lx\n",
-			__func__,
-			map_cnt++,
-			pa, va,
-			offset,
-			segs[i].ds_len,
-			size);
-#endif
-
-		smmu_insert(sc, domain, pa, va, size);
-		segs[i].ds_addr = va | offset;
+	for (; size > 0; size -= PAGE_SIZE) {
+		pmap_senter(p, va, pa, prot, 0);
+		smmu_tlbi_va(sc, va);
+		pa += PAGE_SIZE;
+		va += PAGE_SIZE;
 	}
 
 	smmu_sync(sc);

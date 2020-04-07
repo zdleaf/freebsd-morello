@@ -35,8 +35,11 @@
 #ifndef _DEV_IOMMU_IOMMU_H_
 #define _DEV_IOMMU_IOMMU_H_
 
+#include <machine/bus.h>
+
 #include <sys/mutex.h>
 #include <sys/bus_dma.h>
+#include <sys/vmem.h>
 
 /* Consumer device */
 struct iommu_device {
@@ -50,6 +53,7 @@ struct iommu_domain {
 	LIST_ENTRY(iommu_domain)	next;
 	struct mtx			mtx_lock;
 	bus_dma_tag_t			tag;
+	vmem_t				*vmem;
 };
 
 #define	DOMAIN_LOCK(domain)		mtx_lock(&(domain)->mtx_lock)

@@ -32,8 +32,6 @@
 # $FreeBSD$
 #
 
-#include <machine/bus.h>
-
 #include <dev/iommu/iommu.h>
 
 INTERFACE iommu;
@@ -41,15 +39,16 @@ INTERFACE iommu;
 METHOD int map {
 	device_t		dev;
 	struct iommu_domain	*domain;
-	bus_dma_segment_t	*segs;
-	int			nsegs;
+	vm_paddr_t		pa;
+	vm_offset_t		va;
+	vm_size_t		size;
 };
 
 METHOD int unmap {
 	device_t		dev;
 	struct iommu_domain	*domain;
-	bus_dma_segment_t	*segs;
-	int			nsegs;
+	vm_offset_t		va;
+	vm_size_t		size;
 };
 
 METHOD struct iommu_domain * domain_alloc {

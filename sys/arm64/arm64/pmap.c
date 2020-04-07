@@ -3414,7 +3414,7 @@ havel3:
 	pv = NULL;
 
 	if (pmap_l3_valid(orig_l3))
-		panic("pmap is valid");
+		panic("l3 is valid");
 
 	/* New mapping */
 	pmap_store(l3, new_l3);

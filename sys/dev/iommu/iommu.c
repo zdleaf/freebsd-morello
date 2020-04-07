@@ -95,6 +95,16 @@ iommu_domain_alloc(void)
 	LIST_INSERT_HEAD(&domain_list, domain, next);
 	IOMMU_UNLOCK();
 
+	domain->vmem = vmem_create("IOMMU vmem", 0, 0, PAGE_SIZE,
+	    PAGE_SIZE, M_FIRSTFIT | M_WAITOK);
+	if (domain->vmem == NULL)
+		return (NULL);
+
+	/* 1GB of VA space starting from 0x40000000. */
+	vmem_add(domain->vmem, 0x40000000, 0x40000000, 0);
+
+	printf("%s: vmem initialized at addr %p\n", __func__, domain->vmem);
+
 	return (domain);
 }
 
@@ -149,17 +159,51 @@ iommu_add_device(struct iommu_domain *domain, device_t dev)
 }
 
 void
-iommu_map(struct iommu_domain *domain, bus_dma_segment_t *segs, int nsegs)
+iommu_unmap(struct iommu_domain *domain, bus_dma_segment_t *segs, int nsegs)
 {
+	vm_offset_t offset;
+	vm_offset_t va;
+	vm_size_t size;
+	int err;
+	int i;
 
-	IOMMU_MAP(iommu_dev, domain, segs, nsegs);
+	for (i = 0; i < nsegs; i++) {
+		va = segs[i].ds_addr & ~0xfff;
+		offset = segs[i].ds_addr & 0xfff;
+		size = roundup2(offset + segs[i].ds_len, PAGE_SIZE);
+
+		err = IOMMU_UNMAP(iommu_dev, domain, va, size);
+		if (err == 0)
+			vmem_free(domain->vmem, va, size);
+	}
 }
 
 void
-iommu_unmap(struct iommu_domain *domain, bus_dma_segment_t *segs, int nsegs)
+iommu_map(struct iommu_domain *domain, bus_dma_segment_t *segs, int nsegs)
 {
+	vm_offset_t offset;
+	vm_offset_t va;
+	vm_paddr_t pa;
+	vm_size_t size;
+	int i;
 
-	IOMMU_UNMAP(iommu_dev, domain, segs, nsegs);
+	for (i = 0; i < nsegs; i++) {
+		pa = segs[i].ds_addr & ~(PAGE_SIZE - 1);
+		offset = segs[i].ds_addr & (PAGE_SIZE - 1);
+		size = roundup2(offset + segs[i].ds_len, PAGE_SIZE);
+
+		if ((offset + segs[i].ds_len) > PAGE_SIZE)
+			printf("offset %lx len %lx size %lx\n",
+			    offset, segs[i].ds_len, size);
+
+		if (vmem_alloc(domain->vmem, size,
+		    M_FIRSTFIT | M_NOWAIT, &va))
+			panic("Could not allocate virtual address.\n");
+
+		IOMMU_MAP(iommu_dev, domain, pa, va, size);
+
+		segs[i].ds_addr = va | offset;
+	}
 }
 
 int
