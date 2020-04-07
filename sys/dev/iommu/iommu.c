@@ -168,13 +168,20 @@ iommu_unmap(struct iommu_domain *domain, bus_dma_segment_t *segs, int nsegs)
 	int i;
 
 	for (i = 0; i < nsegs; i++) {
-		va = segs[i].ds_addr & ~0xfff;
-		offset = segs[i].ds_addr & 0xfff;
+		va = segs[i].ds_addr & ~(PAGE_SIZE - 1);
+		offset = segs[i].ds_addr & (PAGE_SIZE - 1);
 		size = roundup2(offset + segs[i].ds_len, PAGE_SIZE);
 
 		err = IOMMU_UNMAP(iommu_dev, domain, va, size);
-		if (err == 0)
-			vmem_free(domain->vmem, va, size);
+		if (err) {
+			/*
+			 * It could be that busdma backend tries to unload
+			 * the same address twice due to a bug in a device
+			 * driver.
+			 */
+			continue;
+		}
+		vmem_free(domain->vmem, va, size);
 	}
 }
 
@@ -201,7 +208,6 @@ iommu_map(struct iommu_domain *domain, bus_dma_segment_t *segs, int nsegs)
 			panic("Could not allocate virtual address.\n");
 
 		IOMMU_MAP(iommu_dev, domain, pa, va, size);
-
 		segs[i].ds_addr = va | offset;
 	}
 }
