@@ -235,7 +235,7 @@ smmu_sync_intr(void *arg)
 
 	sc = arg;
 
-	device_printf(sc->dev, "!!!!!!!!! %s\n", __func__);
+	device_printf(sc->dev, "%s\n", __func__);
 
 	return (FILTER_HANDLED);
 }
@@ -248,7 +248,7 @@ smmu_gerr_intr(void *arg)
 
 	sc = arg;
 
-	device_printf(sc->dev, "!!!!!!!!! %s\n", __func__);
+	device_printf(sc->dev, "SMMU Global Error\n");
 
 	return (FILTER_HANDLED);
 }
