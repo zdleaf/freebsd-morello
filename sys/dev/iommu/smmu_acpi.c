@@ -61,37 +61,6 @@ struct smmu_acpi_devinfo {
 	struct resource_list	di_rl;
 };
 
-static device_identify_t smmu_acpi_identify;
-static device_probe_t smmu_acpi_probe;
-static device_attach_t smmu_acpi_attach;
-
-static void smmu_acpi_bus_attach(device_t);
-
-static device_method_t smmu_acpi_methods[] = {
-	/* Device interface */
-	DEVMETHOD(device_identify,		smmu_acpi_identify),
-	DEVMETHOD(device_probe,			smmu_acpi_probe),
-	DEVMETHOD(device_attach,		smmu_acpi_attach),
-
-	/* IOMMU interface */
-	DEVMETHOD(iommu_map,			smmu_map),
-	DEVMETHOD(iommu_unmap,			smmu_unmap),
-	DEVMETHOD(iommu_domain_alloc,		smmu_domain_alloc),
-	DEVMETHOD(iommu_add_device,		smmu_add_device),
-	DEVMETHOD(iommu_capable,		smmu_capable),
-
-	/* End */
-	DEVMETHOD_END
-};
-
-DEFINE_CLASS_1(smmu, smmu_acpi_driver, smmu_acpi_methods,
-    sizeof(struct smmu_softc), smmu_driver);
-
-static devclass_t smmu_acpi_devclass;
-
-EARLY_DRIVER_MODULE(smmu, acpi, smmu_acpi_driver, smmu_acpi_devclass,
-    0, 0, BUS_PASS_INTERRUPT + BUS_PASS_ORDER_MIDDLE);
-
 #define	MAX_SMMU	8
 
 struct iort_table_data {
@@ -303,3 +272,28 @@ error:
 
 	return (err);
 }
+
+static device_method_t smmu_acpi_methods[] = {
+	/* Device interface */
+	DEVMETHOD(device_identify,		smmu_acpi_identify),
+	DEVMETHOD(device_probe,			smmu_acpi_probe),
+	DEVMETHOD(device_attach,		smmu_acpi_attach),
+
+	/* IOMMU interface */
+	DEVMETHOD(iommu_map,			smmu_map),
+	DEVMETHOD(iommu_unmap,			smmu_unmap),
+	DEVMETHOD(iommu_domain_alloc,		smmu_domain_alloc),
+	DEVMETHOD(iommu_add_device,		smmu_add_device),
+	DEVMETHOD(iommu_capable,		smmu_capable),
+
+	/* End */
+	DEVMETHOD_END
+};
+
+DEFINE_CLASS_1(smmu, smmu_acpi_driver, smmu_acpi_methods,
+    sizeof(struct smmu_softc), smmu_driver);
+
+static devclass_t smmu_acpi_devclass;
+
+EARLY_DRIVER_MODULE(smmu, acpi, smmu_acpi_driver, smmu_acpi_devclass,
+    0, 0, BUS_PASS_INTERRUPT + BUS_PASS_ORDER_MIDDLE);

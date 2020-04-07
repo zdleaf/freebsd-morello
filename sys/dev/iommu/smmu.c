@@ -70,7 +70,6 @@ __FBSDID("$FreeBSD$");
 #include <dev/acpica/acpivar.h>
 #endif
 
-#include <arm/arm/gic_common.h>
 #include "smmu_reg.h"
 #include "smmu_var.h"
 
@@ -80,18 +79,6 @@ __FBSDID("$FreeBSD$");
 static bus_get_domain_t smmu_get_domain;
 static bus_read_ivar_t smmu_read_ivar;
 
-static device_method_t smmu_methods[] = {
-	/* Device interface */
-	DEVMETHOD(device_detach,	smmu_detach),
-
-	/* Bus interface */
-	DEVMETHOD(bus_get_domain,	smmu_get_domain),
-	DEVMETHOD(bus_read_ivar,	smmu_read_ivar),
-
-	/* End */
-	DEVMETHOD_END
-};
-
 static struct resource_spec smmu_spec[] = {
 	{ SYS_RES_MEMORY, 0, RF_ACTIVE },
 	{ SYS_RES_IRQ, 0, RF_ACTIVE },
@@ -99,9 +86,6 @@ static struct resource_spec smmu_spec[] = {
 	{ SYS_RES_IRQ, 2, RF_ACTIVE },
 	RESOURCE_SPEC_END
 };
-
-DEFINE_CLASS_0(gic, smmu_driver, smmu_methods,
-    sizeof(struct smmu_softc));
 
 /*
  * Driver-specific definitions.
@@ -1560,3 +1544,18 @@ smmu_capable(device_t smmu_dev, device_t dev)
 
 	return (0);
 }
+
+static device_method_t smmu_methods[] = {
+	/* Device interface */
+	DEVMETHOD(device_detach,	smmu_detach),
+
+	/* Bus interface */
+	DEVMETHOD(bus_get_domain,	smmu_get_domain),
+	DEVMETHOD(bus_read_ivar,	smmu_read_ivar),
+
+	/* End */
+	DEVMETHOD_END
+};
+
+DEFINE_CLASS_0(smmu, smmu_driver, smmu_methods,
+    sizeof(struct smmu_softc));
