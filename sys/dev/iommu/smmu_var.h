@@ -158,14 +158,4 @@ MALLOC_DECLARE(M_SMMU);
 int smmu_attach(device_t dev);
 int smmu_detach(device_t dev);
 
-struct iommu_domain * smmu_domain_alloc(device_t dev);
-int smmu_add_device(device_t smmu_dev,
-    struct iommu_domain *domain, struct iommu_device *dev);
-int smmu_capable(device_t smmu_dev, device_t dev);
-
-int smmu_map(device_t dev, struct iommu_domain *dom0,
-    vm_paddr_t pa, vm_offset_t va, vm_size_t size, vm_prot_t prot);
-int smmu_unmap(device_t dev, struct iommu_domain *dom0,
-    vm_offset_t va, vm_size_t size);
-
 #endif /* _DEV_IOMMU_SMMU_VAR_H_ */

@@ -1419,7 +1419,7 @@ smmu_insert(struct smmu_softc *sc, struct smmu_domain *domain,
 }
 #endif
 
-int
+static int
 smmu_unmap(device_t dev, struct iommu_domain *dom0,
     vm_offset_t va, vm_size_t size)
 {
@@ -1449,7 +1449,7 @@ smmu_unmap(device_t dev, struct iommu_domain *dom0,
 	return (err);
 }
 
-int
+static int
 smmu_map(device_t dev, struct iommu_domain *dom0,
     vm_offset_t va, vm_paddr_t pa, vm_size_t size,
     vm_prot_t prot)
@@ -1475,7 +1475,7 @@ smmu_map(device_t dev, struct iommu_domain *dom0,
 	return (0);
 }
 
-struct iommu_domain *
+static struct iommu_domain *
 smmu_domain_alloc(device_t dev)
 {
 	struct smmu_domain *domain;
@@ -1507,7 +1507,7 @@ smmu_domain_alloc(device_t dev)
 	return (&domain->domain);
 }
 
-int
+static int
 smmu_add_device(device_t smmu_dev, struct iommu_domain *domain,
     struct iommu_device *device)
 {
@@ -1538,7 +1538,7 @@ smmu_add_device(device_t smmu_dev, struct iommu_domain *domain,
 	return (0);
 }
 
-int
+static int
 smmu_capable(device_t smmu_dev, device_t dev)
 {
 
@@ -1548,6 +1548,13 @@ smmu_capable(device_t smmu_dev, device_t dev)
 static device_method_t smmu_methods[] = {
 	/* Device interface */
 	DEVMETHOD(device_detach,	smmu_detach),
+
+	/* IOMMU interface */
+	DEVMETHOD(iommu_map,		smmu_map),
+	DEVMETHOD(iommu_unmap,		smmu_unmap),
+	DEVMETHOD(iommu_domain_alloc,	smmu_domain_alloc),
+	DEVMETHOD(iommu_add_device,	smmu_add_device),
+	DEVMETHOD(iommu_capable,	smmu_capable),
 
 	/* Bus interface */
 	DEVMETHOD(bus_get_domain,	smmu_get_domain),

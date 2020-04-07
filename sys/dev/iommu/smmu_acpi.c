@@ -52,7 +52,6 @@ __FBSDID("$FreeBSD$");
 #include "smmu_reg.h"
 #include "smmu_var.h"
 #include "pic_if.h"
-#include "iommu_if.h"
 
 #define	MEMORY_RESOURCE_SIZE	0x40000
 
@@ -278,13 +277,6 @@ static device_method_t smmu_acpi_methods[] = {
 	DEVMETHOD(device_identify,		smmu_acpi_identify),
 	DEVMETHOD(device_probe,			smmu_acpi_probe),
 	DEVMETHOD(device_attach,		smmu_acpi_attach),
-
-	/* IOMMU interface */
-	DEVMETHOD(iommu_map,			smmu_map),
-	DEVMETHOD(iommu_unmap,			smmu_unmap),
-	DEVMETHOD(iommu_domain_alloc,		smmu_domain_alloc),
-	DEVMETHOD(iommu_add_device,		smmu_add_device),
-	DEVMETHOD(iommu_capable,		smmu_capable),
 
 	/* End */
 	DEVMETHOD_END
