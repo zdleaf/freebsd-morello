@@ -790,14 +790,12 @@ smmu_init_cd(struct smmu_softc *sc, struct smmu_cd *cd, pmap_t p)
 static int
 smmu_init_pmap(struct smmu_softc *sc, pmap_t p)
 {
-	vm_prot_t prot;
 
 	pmap_pinit(p);
 	PMAP_LOCK_INIT(p);
 
 	/* Add MSI static mapping. */
-	prot = VM_PROT_WRITE;
-	pmap_senter(p, 0x300b0000, 0x300b0000, prot, 0);
+	pmap_senter(p, 0x300b0000, 0x300b0000, VM_PROT_WRITE, 0);
 
 	device_printf(sc->dev, "%s: pmap initialized\n", __func__);
 
@@ -1453,6 +1451,7 @@ smmu_unmap(device_t dev, struct iommu_domain *dom0,
 
 	for (i = 0; i < size; i += PAGE_SIZE) {
 		if (pmap_sremove(&domain->p, va)) {
+			/* pmap entry removed, invalidate TLB */
 			smmu_tlbi_va(sc, va);
 		} else {
 			printf("pte is NULL, va %lx\n", va);
@@ -1468,19 +1467,17 @@ smmu_unmap(device_t dev, struct iommu_domain *dom0,
 
 int
 smmu_map(device_t dev, struct iommu_domain *dom0,
-    vm_paddr_t pa, vm_offset_t va, vm_size_t size)
+    vm_offset_t va, vm_paddr_t pa, vm_size_t size,
+    vm_prot_t prot)
 {
 	struct smmu_domain *domain;
 	struct smmu_softc *sc;
-	vm_prot_t prot;
 	pmap_t p;
 
 	sc = device_get_softc(dev);
 	domain = (struct smmu_domain *)dom0;
 
 	p = &domain->p;
-
-	prot = VM_PROT_READ | VM_PROT_WRITE;
 
 	for (; size > 0; size -= PAGE_SIZE) {
 		pmap_senter(p, va, pa, prot, 0);

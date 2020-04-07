@@ -164,7 +164,7 @@ int smmu_add_device(device_t smmu_dev,
 int smmu_capable(device_t smmu_dev, device_t dev);
 
 int smmu_map(device_t dev, struct iommu_domain *dom0,
-    vm_paddr_t pa, vm_offset_t va, vm_size_t size);
+    vm_paddr_t pa, vm_offset_t va, vm_size_t size, vm_prot_t prot);
 int smmu_unmap(device_t dev, struct iommu_domain *dom0,
     vm_offset_t va, vm_size_t size);
 
