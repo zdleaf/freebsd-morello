@@ -463,11 +463,14 @@ smmu_cmdq_enqueue_cmd(struct smmu_softc *sc, struct smmu_cmdq_entry *entry)
 
 	make_cmd(sc, cmd, entry);
 
-	//device_printf(sc->dev, "Enqueueing command %d\n", entry->opcode);
-	//device_printf(sc->dev, "%s: lc.val %lx\n", __func__, cmdq->lc.val);
+#if 0
+	device_printf(sc->dev, "Enqueueing command %d\n", entry->opcode);
+	device_printf(sc->dev, "%s: lc.val %lx\n", __func__, cmdq->lc.val);
+#endif
 
+	/* Ensure that a space is available. */
 	do {
-		cmdq->lc.val = bus_read_8(sc->res[0], cmdq->prod_off);
+		cmdq->lc.cons = bus_read_4(sc->res[0], cmdq->cons_off);
 	} while (smmu_q_has_space(cmdq) == 0);
 
 #if 0
@@ -476,17 +479,19 @@ smmu_cmdq_enqueue_cmd(struct smmu_softc *sc, struct smmu_cmdq_entry *entry)
 		    __func__, cmdq->lc.val);
 #endif
 
+	/* Write the command to the current prod entry. */
 	entry_addr = (void *)((uint64_t)cmdq->addr +
 	    Q_IDX(cmdq, cmdq->lc.prod) * CMDQ_ENTRY_DWORDS * 8);
 	memcpy(entry_addr, cmd, CMDQ_ENTRY_DWORDS * 8);
 
-	/* Increment prod index */
+	/* Increment prod index. */
 	cmdq->lc.prod = smmu_q_inc_prod(cmdq);
 	bus_write_4(sc->res[0], cmdq->prod_off, cmdq->lc.prod);
 
+#if 0
 	//device_printf(sc->dev, "%s: complete\n", __func__);
 
-	cmdq->lc.val = bus_read_8(sc->res[0], cmdq->prod_off);
+	cmdq->lc.cons = bus_read_4(sc->res[0], cmdq->cons_off);
 
 	//device_printf(sc->dev, "%s: lc.val compl %lx\n",
 	//    __func__, cmdq->lc.val);
@@ -496,6 +501,7 @@ smmu_cmdq_enqueue_cmd(struct smmu_softc *sc, struct smmu_cmdq_entry *entry)
 		reg = bus_read_4(sc->res[0], SMMU_GERROR);
 		device_printf(sc->dev, "Gerror %x\n", reg);
 	}
+#endif
 
 	return (0);
 }
@@ -513,28 +519,30 @@ smmu_poll_until_consumed(struct smmu_softc *sc, struct smmu_queue *q)
 }
 
 static int
-smmu_cmdq_enqueue_sync(struct smmu_softc *sc)
+smmu_sync(struct smmu_softc *sc)
 {
 	struct smmu_cmdq_entry cmd;
 	struct smmu_queue *q;
+	uint32_t *base;
 	int prod;
 
 	q = &sc->cmdq;
 	prod = q->lc.prod;
 
+	/* Enqueue sync command. */
 	cmd.opcode = CMD_SYNC;
 	cmd.sync.msiaddr = q->paddr + Q_IDX(q, prod) * CMDQ_ENTRY_DWORDS * 8;
 	smmu_cmdq_enqueue_cmd(sc, &cmd);
 
-	/* Wait completion */
-
-	uint32_t *base;
+	/* Wait for the sync completion. */
 	base = (void *)((uint64_t)q->addr +
 	    Q_IDX(q, prod) * CMDQ_ENTRY_DWORDS * 8);
 
 	for (;;) {
-		if (*base == 0)
+		if (*base == 0) {
+			/* MSI write completed. */
 			break;
+		}
 		cpu_spinwait();
 	}
 
@@ -563,7 +571,7 @@ smmu_invalidate_all_sid(struct smmu_softc *sc)
 	/* Invalidate cached config */
 	cmd.opcode = CMD_CFGI_STE_RANGE;
 	smmu_cmdq_enqueue_cmd(sc, &cmd);
-	smmu_cmdq_enqueue_sync(sc);
+	smmu_sync(sc);
 }
 
 static void
@@ -575,7 +583,7 @@ smmu_tlbi_all(struct smmu_softc *sc)
 	cmd.opcode = CMD_TLBI_NH_ALL;
 	cmd.opcode = CMD_TLBI_NSNH_ALL;
 	smmu_cmdq_enqueue_cmd(sc, &cmd);
-	smmu_cmdq_enqueue_sync(sc);
+	smmu_sync(sc);
 }
 
 static void
@@ -601,7 +609,7 @@ smmu_invalidate_sid(struct smmu_softc *sc, uint32_t sid)
 	cmd.opcode = CMD_CFGI_STE;
 	cmd.cfgi.sid = sid;
 	smmu_cmdq_enqueue_cmd(sc, &cmd);
-	smmu_cmdq_enqueue_sync(sc);
+	smmu_sync(sc);
 }
 
 static void
@@ -612,7 +620,7 @@ smmu_prefetch_sid(struct smmu_softc *sc, uint32_t sid)
 	cmd.opcode = CMD_PREFETCH_CONFIG;
 	cmd.prefetch.sid = sid;
 	smmu_cmdq_enqueue_cmd(sc, &cmd);
-	smmu_cmdq_enqueue_sync(sc);
+	smmu_sync(sc);
 }
 
 static void
@@ -714,7 +722,7 @@ smmu_init_ste(struct smmu_softc *sc, struct smmu_cd *cd, int i, bool s1)
 	else
 		smmu_init_ste_bypass(sc, i, addr);
 
-	smmu_cmdq_enqueue_sync(sc);
+	smmu_sync(sc);
 
 	return (0);
 }
@@ -1096,7 +1104,7 @@ smmu_reset(struct smmu_softc *sc)
 	/* Invalidate cached config */
 	cmd.opcode = CMD_CFGI_STE_RANGE;
 	smmu_cmdq_enqueue_cmd(sc, &cmd);
-	smmu_cmdq_enqueue_sync(sc);
+	smmu_sync(sc);
 
 	if (sc->features & SMMU_FEATURE_HYP) {
 		cmd.opcode = CMD_TLBI_EL2_ALL;
@@ -1480,7 +1488,7 @@ smmu_unmap(device_t dev, struct iommu_domain *dom0,
 		}
 	}
 
-	smmu_cmdq_enqueue_sync(sc);
+	smmu_sync(sc);
 
 	return (0);
 }
@@ -1528,7 +1536,7 @@ smmu_map(device_t dev, struct iommu_domain *dom0,
 		segs[i].ds_addr = va | offset;
 	}
 
-	smmu_cmdq_enqueue_sync(sc);
+	smmu_sync(sc);
 
 	return (0);
 }
