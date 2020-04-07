@@ -788,23 +788,6 @@ smmu_init_cd(struct smmu_softc *sc, struct smmu_cd *cd, pmap_t p)
 }
 
 static int
-smmu_init_vmem(struct smmu_softc *sc, struct smmu_domain *domain)
-{
-
-	domain->vmem = vmem_create("SMMU vmem", 0, 0, PAGE_SIZE,
-	    PAGE_SIZE, M_FIRSTFIT | M_WAITOK);
-	if (domain->vmem == NULL)
-		return (ENXIO);
-
-	/* 1GB of VA space starting from 0x40000000. */
-	vmem_add(domain->vmem, 0x40000000, 0x40000000, 0);
-
-	printf("%s: vmem initialized at addr %p\n", __func__, domain->vmem);
-
-	return (0);
-}
-
-static int
 smmu_init_pmap(struct smmu_softc *sc, pmap_t p)
 {
 	vm_prot_t prot;
@@ -1525,12 +1508,6 @@ smmu_domain_alloc(device_t dev)
 	mtx_init(&domain->mtx_lock, "SMMU domain", NULL, MTX_DEF);
 
 	TAILQ_INIT(&domain->master_list);
-
-	err = smmu_init_vmem(sc, domain);
-	if (err) {
-		device_printf(sc->dev, "Could not initialize vmem\n");
-		return (NULL);
-	}
 
 	err = smmu_init_pmap(sc, &domain->p);
 	if (err) {

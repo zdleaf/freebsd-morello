@@ -35,8 +35,6 @@
 #ifndef _DEV_IOMMU_SMMU_VAR_H_
 #define _DEV_IOMMU_SMMU_VAR_H_
 
-#include <sys/vmem.h>
-
 #include <dev/iommu/iommu.h>
 
 #include <vm/vm.h>
@@ -152,7 +150,6 @@ struct smmu_domain {
 	TAILQ_HEAD(, smmu_master)	master_list;
 	struct smmu_cd			cd;
 	struct pmap			p;
-	vmem_t				*vmem;
 };
 
 MALLOC_DECLARE(M_SMMU);
