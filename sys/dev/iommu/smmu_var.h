@@ -43,8 +43,8 @@
 #include <vm/vm_page.h>
 
 #define	SMMU_DEVSTR		"ARM System Memory Management Unit"
-#define	SMMU_LOCK(_sc)		mtx_lock_spin(&(_sc)->sc_mtx)
-#define	SMMU_UNLOCK(_sc)	mtx_unlock_spin(&(_sc)->sc_mtx)
+#define	SMMU_LOCK(_sc)		mtx_lock(&(_sc)->sc_mtx)
+#define	SMMU_UNLOCK(_sc)	mtx_unlock(&(_sc)->sc_mtx)
 
 DECLARE_CLASS(smmu_driver);
 

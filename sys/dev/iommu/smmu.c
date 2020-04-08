@@ -134,13 +134,24 @@ smmu_q_consumed(struct smmu_queue *q, uint32_t prod)
 }
 
 static uint32_t
+smmu_q_inc_cons(struct smmu_queue *q)
+{
+	uint32_t cons;
+	uint32_t val;
+
+	cons = (Q_WRP(q, q->lc.cons) | Q_IDX(q, q->lc.cons)) + 1;
+	val = (Q_OVF(q->lc.cons) | Q_WRP(q, cons) | Q_IDX(q, cons));
+
+	return (val);
+}
+
+static uint32_t
 smmu_q_inc_prod(struct smmu_queue *q)
 {
 	uint32_t prod;
 	uint32_t val;
 
 	prod = (Q_WRP(q, q->lc.prod) | Q_IDX(q, q->lc.prod)) + 1;
-
 	val = (Q_OVF(q->lc.prod) | Q_WRP(q, prod) | Q_IDX(q, prod));
 
 	return (val);
@@ -336,7 +347,7 @@ smmu_evtq_dequeue(struct smmu_softc *sc)
 	    evtq->lc.cons * EVTQ_ENTRY_DWORDS * 8);
 	memcpy(evt, entry_addr, EVTQ_ENTRY_DWORDS * 8);
 
-	evtq->lc.cons += 1;
+	evtq->lc.cons = smmu_q_inc_cons(evtq);
 	bus_write_4(sc->res[0], evtq->cons_off, evtq->lc.cons);
 
 	event_id = evt[0] & 0xff;
@@ -424,9 +435,11 @@ smmu_cmdq_enqueue_cmd(struct smmu_softc *sc, struct smmu_cmdq_entry *entry)
 	make_cmd(sc, cmd, entry);
 
 #if 0
-	device_printf(sc->dev, "Enqueueing command %d\n", entry->opcode);
-	device_printf(sc->dev, "%s: lc.val %lx\n", __func__, cmdq->lc.val);
+	device_printf(sc->dev, "Enqueueing command %d, lc.val %lx\n",
+	    entry->opcode, cmdq->lc.val);
 #endif
+
+	SMMU_LOCK(sc);
 
 	/* Ensure that a space is available. */
 	do {
@@ -448,13 +461,15 @@ smmu_cmdq_enqueue_cmd(struct smmu_softc *sc, struct smmu_cmdq_entry *entry)
 	cmdq->lc.prod = smmu_q_inc_prod(cmdq);
 	bus_write_4(sc->res[0], cmdq->prod_off, cmdq->lc.prod);
 
+	SMMU_UNLOCK(sc);
+
 #if 0
-	//device_printf(sc->dev, "%s: complete\n", __func__);
+	device_printf(sc->dev, "%s: complete\n", __func__);
 
 	cmdq->lc.cons = bus_read_4(sc->res[0], cmdq->cons_off);
 
-	//device_printf(sc->dev, "%s: lc.val compl %lx\n",
-	//    __func__, cmdq->lc.val);
+	device_printf(sc->dev, "%s: lc.val compl %lx\n",
+	    __func__, cmdq->lc.val);
 
 	if (cmdq->lc.cons & CMDQ_CONS_ERR_M) {
 		uint32_t reg;
