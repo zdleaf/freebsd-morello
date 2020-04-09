@@ -41,19 +41,30 @@
 #include <sys/bus_dma.h>
 #include <sys/vmem.h>
 
-/* Consumer device */
-struct iommu_device {
-	LIST_ENTRY(iommu_device)	next;
-	device_t dev;
-	uint16_t rid;
+/* MMU unit */
+struct iommu {
+	LIST_HEAD(, iommu_domain)	domain_list;
+	LIST_ENTRY(iommu)		next;
+	device_t			dev;
+	intptr_t			xref;
 };
 
+/* Minimal translation domain. */
 struct iommu_domain {
 	LIST_HEAD(, iommu_device)	device_list;
 	LIST_ENTRY(iommu_domain)	next;
 	struct mtx			mtx_lock;
 	bus_dma_tag_t			tag;
 	vmem_t				*vmem;
+	struct iommu			*iommu;
+};
+
+/* Consumer device. */
+struct iommu_device {
+	LIST_ENTRY(iommu_device)	next;
+	struct iommu_domain		*domain;
+	device_t dev;
+	uint16_t rid;
 };
 
 #define	DOMAIN_LOCK(domain)		mtx_lock(&(domain)->mtx_lock)
@@ -62,12 +73,13 @@ struct iommu_domain {
     mtx_assert(&(domain)->mtx_lock, MA_OWNED)
 
 void iommu_domain_free(struct iommu_domain *domain);
-struct iommu_domain * iommu_domain_alloc(void);
+struct iommu_domain * iommu_domain_alloc(struct iommu *iommu);
 struct iommu_domain * iommu_get_domain_for_dev(device_t dev);
 void iommu_map(struct iommu_domain *, bus_dma_segment_t *segs, int nsegs);
 void iommu_unmap(struct iommu_domain *, bus_dma_segment_t *segs, int nsegs);
 int iommu_add_device(struct iommu_domain *domain, device_t dev);
-int iommu_register(device_t dev);
 int iommu_capable(device_t dev);
+struct iommu * iommu_lookup(intptr_t xref, int flags);
+int iommu_register(device_t dev, intptr_t xref);
 
 #endif /* _DEV_IOMMU_IOMMU_H_ */

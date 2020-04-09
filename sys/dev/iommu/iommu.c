@@ -68,31 +68,29 @@ __FBSDID("$FreeBSD$");
 
 static MALLOC_DEFINE(M_IOMMU, "iommu", "IOMMU");
 
-static device_t iommu_dev = NULL;
-
 static struct mtx iommu_mtx;
 
 #define	IOMMU_LOCK()			mtx_lock(&iommu_mtx)
 #define	IOMMU_UNLOCK()			mtx_unlock(&iommu_mtx)
 #define	IOMMU_ASSERT_LOCKED()		mtx_assert(&iommu_mtx, MA_OWNED)
 
-static LIST_HEAD(, iommu_domain) domain_list =
-    LIST_HEAD_INITIALIZER(domain_list);
+static LIST_HEAD(, iommu) iommu_list = LIST_HEAD_INITIALIZER(iommu_list);
 
 struct iommu_domain *
-iommu_domain_alloc(void)
+iommu_domain_alloc(struct iommu *iommu)
 {
 	struct iommu_domain *domain;
 
-	domain = IOMMU_DOMAIN_ALLOC(iommu_dev);
+	domain = IOMMU_DOMAIN_ALLOC(iommu->dev);
 	if (domain == NULL)
 		return (NULL);
 
 	LIST_INIT(&domain->device_list);
 	mtx_init(&domain->mtx_lock, "IOMMU domain", NULL, MTX_DEF);
+	domain->iommu = iommu;
 
 	IOMMU_LOCK();
-	LIST_INSERT_HEAD(&domain_list, domain, next);
+	LIST_INSERT_HEAD(&iommu->domain_list, domain, next);
 	IOMMU_UNLOCK();
 
 	domain->vmem = vmem_create("IOMMU vmem", 0, 0, PAGE_SIZE,
@@ -120,11 +118,14 @@ iommu_get_domain_for_dev(device_t dev)
 {
 	struct iommu_domain *domain;
 	struct iommu_device *device;
+	struct iommu *iommu;
 
-	LIST_FOREACH(domain, &domain_list, next) {
-		LIST_FOREACH(device, &domain->device_list, next) {
-			if (device->dev == dev)
-				return (domain);
+	LIST_FOREACH(iommu, &iommu_list, next) {
+		LIST_FOREACH(domain, &iommu->domain_list, next) {
+			LIST_FOREACH(device, &domain->device_list, next) {
+				if (device->dev == dev)
+					return (domain);
+			}
 		}
 	}
 
@@ -138,13 +139,16 @@ int
 iommu_add_device(struct iommu_domain *domain, device_t dev)
 {
 	struct iommu_device *device;
+	struct iommu *iommu;
 	int err;
+
+	iommu = domain->iommu;
 
 	device = malloc(sizeof(*device), M_IOMMU, M_WAITOK | M_ZERO);
 	device->rid = pci_get_rid(dev);
 	device->dev = dev;
 
-	err = IOMMU_ADD_DEVICE(iommu_dev, domain, device);
+	err = IOMMU_ADD_DEVICE(iommu->dev, domain, device);
 	if (err) {
 		printf("Failed to add device\n");
 		free(device, M_IOMMU);
@@ -161,18 +165,21 @@ iommu_add_device(struct iommu_domain *domain, device_t dev)
 void
 iommu_unmap(struct iommu_domain *domain, bus_dma_segment_t *segs, int nsegs)
 {
+	struct iommu *iommu;
 	vm_offset_t offset;
 	vm_offset_t va;
 	vm_size_t size;
 	int err;
 	int i;
 
+	iommu = domain->iommu;
+
 	for (i = 0; i < nsegs; i++) {
 		va = segs[i].ds_addr & ~(PAGE_SIZE - 1);
 		offset = segs[i].ds_addr & (PAGE_SIZE - 1);
 		size = roundup2(offset + segs[i].ds_len, PAGE_SIZE);
 
-		err = IOMMU_UNMAP(iommu_dev, domain, va, size);
+		err = IOMMU_UNMAP(iommu->dev, domain, va, size);
 		if (err) {
 			/*
 			 * It could be that busdma backend tries to unload
@@ -188,12 +195,15 @@ iommu_unmap(struct iommu_domain *domain, bus_dma_segment_t *segs, int nsegs)
 void
 iommu_map(struct iommu_domain *domain, bus_dma_segment_t *segs, int nsegs)
 {
+	struct iommu *iommu;
 	vm_offset_t offset;
 	vm_offset_t va;
 	vm_paddr_t pa;
 	vm_size_t size;
 	vm_prot_t prot;
 	int i;
+
+	iommu = domain->iommu;
 
 	for (i = 0; i < nsegs; i++) {
 		pa = segs[i].ds_addr & ~(PAGE_SIZE - 1);
@@ -209,7 +219,7 @@ iommu_map(struct iommu_domain *domain, bus_dma_segment_t *segs, int nsegs)
 			panic("Could not allocate virtual address.\n");
 
 		prot = VM_PROT_READ | VM_PROT_WRITE;
-		IOMMU_MAP(iommu_dev, domain, va, pa, size, prot);
+		IOMMU_MAP(iommu->dev, domain, va, pa, size, prot);
 		segs[i].ds_addr = va | offset;
 	}
 }
@@ -219,19 +229,49 @@ iommu_capable(device_t dev)
 {
 	int err;
 
-	err = IOMMU_CAPABLE(iommu_dev, dev);
+	err = 0;
 
 	return (err);
 }
 
 int
-iommu_register(device_t dev)
+iommu_register(device_t dev, intptr_t xref)
 {
+	struct iommu *iommu;
 
-	iommu_dev = dev;
+	iommu = malloc(sizeof(*iommu), M_IOMMU, M_WAITOK | M_ZERO);
+	iommu->dev = dev;
+	iommu->xref = xref;
+
+	LIST_INIT(&iommu->domain_list);
+
+	IOMMU_LOCK();
+	LIST_INSERT_HEAD(&iommu_list, iommu, next);
+	IOMMU_UNLOCK();
 
 	return (0);
 }
+
+struct iommu *
+iommu_lookup(intptr_t xref, int flags)
+{
+	struct iommu *iommu;
+
+	LIST_FOREACH(iommu, &iommu_list, next) {
+		if (iommu->xref == xref)
+			return (iommu);
+	}
+
+	return (NULL);
+}
+
+#if 0
+int
+iommu_unregister(device_t dev)
+{
+
+}
+#endif
 
 static void
 iommu_init(void)

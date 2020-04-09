@@ -61,6 +61,14 @@ __FBSDID("$FreeBSD$");
 
 #include <dev/iommu/iommu.h>
 
+#include <contrib/dev/acpica/include/acpi.h>
+#include <contrib/dev/acpica/include/accommon.h>
+
+#include <dev/acpica/acpivar.h>
+#include <dev/acpica/acpi_pcibvar.h>
+
+#include <dev/pci/pcivar.h>
+
 #define MAX_BPAGES 4096
 
 enum {
@@ -1414,11 +1422,27 @@ smmu_get_dma_tag(device_t dev, device_t child)
 		return (NULL);
 	}
 
+	uint16_t rid;
+	rid = pci_get_rid(child);
+	u_int xref, devid;
+	int err;
+
+	err = acpi_iort_map_pci_smmuv3(0, rid, &xref, &devid);
+
+	printf("%s: smmuv3 err %d rid %x xref %d devid %d\n",
+	    __func__, err, rid, xref, devid);
+
 	domain = iommu_get_domain_for_dev(dev);
 	if (domain)
 		return (domain->tag);
 
-	domain = iommu_domain_alloc();
+	struct iommu *iommu;
+
+	iommu = iommu_lookup(xref, 0);
+	if (iommu == NULL)
+		return (NULL);
+
+	domain = iommu_domain_alloc(iommu);
 	if (!domain)
 		return (NULL);
 

@@ -1128,9 +1128,6 @@ smmu_attach(device_t dev)
 	sc = device_get_softc(dev);
 	sc->dev = dev;
 
-	if (device_get_unit(dev) != 0)
-		return (ENXIO);
-
 	mtx_init(&sc->sc_mtx, device_get_nameunit(sc->dev), "smmu", MTX_DEF);
 
 	error = bus_alloc_resources(dev, smmu_spec, sc->res);
@@ -1331,12 +1328,6 @@ smmu_attach(device_t dev)
 	error = smmu_reset(sc);
 	if (error) {
 		device_printf(dev, "Couldn't reset SMMU.\n");
-		return (ENXIO);
-	}
-
-	error = iommu_register(dev);
-	if (error) {
-		device_printf(dev, "Failed to register SMMU.\n");
 		return (ENXIO);
 	}
 

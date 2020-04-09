@@ -206,6 +206,8 @@ smmu_acpi_attach(device_t dev)
 
 	printf("%s: features %x\n", __func__, sc->features);
 
+	uint32_t start;
+	start = bus_get_resource_start(dev, SYS_RES_MEMORY, 0);
 #if 0
 	u_int xref;
 	int pxm;
@@ -258,6 +260,12 @@ smmu_acpi_attach(device_t dev)
 	err = smmu_attach(dev);
 	if (err != 0)
 		goto error;
+
+	err = iommu_register(dev, start);
+	if (err) {
+		device_printf(dev, "Failed to register SMMU.\n");
+		return (ENXIO);
+	}
 
 	return (0);
 
