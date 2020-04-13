@@ -84,6 +84,8 @@ MALLOC_DEFINE(M_SMMU, "SMMU", SMMU_DEVSTR);
 #define	Q_IDX(q, p)		((p) & ((1 << (q)->size_log2) - 1))
 #define	Q_OVF(p)		((p) & (1 << 31)) /* Event queue overflowed */
 
+#define	SMMU_Q_ALIGN		(64 * 1024)
+
 static int smmu_evtq_dequeue(struct smmu_softc *sc);
 
 static int
@@ -234,9 +236,6 @@ ilog2(long x)
 	return (flsl(x) - 1);
 }
 
-#define	SMMU_CMDQ_ALIGN		(64 * 1024)
-#define	SMMU_STRTAB_ALIGN	(0x40000000)
-
 static int
 smmu_init_queue(struct smmu_softc *sc, struct smmu_queue *q,
     uint32_t prod_off, uint32_t cons_off, uint32_t dwords)
@@ -249,7 +248,7 @@ smmu_init_queue(struct smmu_softc *sc, struct smmu_queue *q,
 
 	/* Set up the command circular buffer */
 	q->addr = contigmalloc(sz, M_SMMU,
-	    M_WAITOK | M_ZERO, 0, (1ul << 48) - 1, SMMU_CMDQ_ALIGN, 0);
+	    M_WAITOK | M_ZERO, 0, (1ul << 48) - 1, SMMU_Q_ALIGN, 0);
 	if (q->addr == NULL) {
 		device_printf(sc->dev, "failed to allocate %d bytes\n", sz);
 		return (-1);
@@ -725,7 +724,7 @@ smmu_init_cd(struct smmu_softc *sc, struct smmu_cd *cd, pmap_t p)
 	    M_WAITOK | M_ZERO,	/* flags */
 	    0,			/* low */
 	    (1ul << 40) - 1,	/* high */
-	    SMMU_STRTAB_ALIGN,	/* alignment */
+	    size,		/* alignment */
 	    0);			/* boundary */
 	if (cd->addr == NULL) {
 		device_printf(sc->dev, "failed to allocate CD\n");
@@ -806,7 +805,7 @@ smmu_init_strtab_linear(struct smmu_softc *sc)
 	    M_WAITOK | M_ZERO,	/* flags */
 	    0,			/* low */
 	    (1ul << 48) - 1,	/* high */
-	    SMMU_STRTAB_ALIGN,	/* alignment */
+	    size,		/* alignment */
 	    0);			/* boundary */
 	if (strtab->addr == NULL) {
 		device_printf(sc->dev, "failed to allocate strtab\n");
@@ -862,7 +861,7 @@ smmu_init_strtab_2lvl(struct smmu_softc *sc)
 	    M_WAITOK | M_ZERO,	/* flags */
 	    0,			/* low */
 	    (1ul << 48) - 1,	/* high */
-	    SMMU_CMDQ_ALIGN,	/* alignment */
+	    l1size,		/* alignment */
 	    0);			/* boundary */
 	if (strtab == NULL) {
 		device_printf(sc->dev, "failed to allocate strtab\n");
