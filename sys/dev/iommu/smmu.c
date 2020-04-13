@@ -118,7 +118,7 @@ smmu_q_empty(struct smmu_queue *q)
 	return (0);
 }
 
-static int
+static int __unused
 smmu_q_consumed(struct smmu_queue *q, uint32_t prod)
 {
 
@@ -481,7 +481,7 @@ smmu_cmdq_enqueue_cmd(struct smmu_softc *sc, struct smmu_cmdq_entry *entry)
 	return (0);
 }
 
-static void
+static void __unused
 smmu_poll_until_consumed(struct smmu_softc *sc, struct smmu_queue *q)
 {
 
@@ -559,13 +559,12 @@ smmu_invalidate_all_sid(struct smmu_softc *sc)
 	smmu_sync(sc);
 }
 
-static void
+static void __unused
 smmu_tlbi_all(struct smmu_softc *sc)
 {
 	struct smmu_cmdq_entry cmd;
 
 	/* Invalidate entire TLB */
-	cmd.opcode = CMD_TLBI_NH_ALL;
 	cmd.opcode = CMD_TLBI_NSNH_ALL;
 	smmu_cmdq_enqueue_cmd(sc, &cmd);
 	smmu_sync(sc);
@@ -672,7 +671,6 @@ smmu_init_ste_s1(struct smmu_softc *sc, struct smmu_cd *cd,
 
 	//cpu_dcache_wb_range((vm_offset_t)ste, 64);
 	//dsb(ishst);
-	//smmu_invalidate_all_sid(sc);
 
 	smmu_invalidate_sid(sc, sid);
 
@@ -681,11 +679,12 @@ smmu_init_ste_s1(struct smmu_softc *sc, struct smmu_cd *cd,
 
 	//cpu_dcache_wb_range((vm_offset_t)ste, 64);
 	//dsb(ishst);
-	//smmu_invalidate_all_sid(sc);
 
 	smmu_invalidate_sid(sc, sid);
 	smmu_sync_cd(sc, sid, 0, true);
 	smmu_invalidate_sid(sc, sid);
+
+	/* The sid will be used soon. */
 	smmu_prefetch_sid(sc, sid);
 
 	return (0);
@@ -1067,10 +1066,8 @@ smmu_reset(struct smmu_softc *sc)
 		return (ENXIO);
 	}
 
-	/* Invalidate cached config */
-	cmd.opcode = CMD_CFGI_STE_RANGE;
-	smmu_cmdq_enqueue_cmd(sc, &cmd);
-	smmu_sync(sc);
+	/* Invalidate cached configuration. */
+	smmu_invalidate_all_sid(sc);
 
 	if (sc->features & SMMU_FEATURE_HYP) {
 		cmd.opcode = CMD_TLBI_EL2_ALL;
