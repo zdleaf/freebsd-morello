@@ -843,7 +843,7 @@ smmu_init_strtab_2lvl(struct smmu_softc *sc)
 	uint32_t num_l1_entries;
 	uint32_t l1size;
 
-	panic("Not in use for now");
+	panic("Not implemented");
 
 	size = STRTAB_L1_SZ_SHIFT - (ilog2(STRTAB_L1_DESC_DWORDS) + 3);
 	size = min(size, sc->sid_bits - STRTAB_SPLIT);
