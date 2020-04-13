@@ -636,7 +636,7 @@ smmu_init_ste_s1(struct smmu_softc *sc, struct smmu_cd *cd,
 
 	val = STE0_VALID;
 
-	ste[1] = STE1_EATS_FULLATS;
+	ste[1] = 0;
 	ste[2] = 0;
 	ste[3] = 0;
 	ste[4] = 0;
@@ -645,7 +645,8 @@ smmu_init_ste_s1(struct smmu_softc *sc, struct smmu_cd *cd,
 	ste[7] = 0;
 
 	/* S1 */
-	ste[1] |= STE1_S1CSH_IS
+	ste[1] |= STE1_EATS_FULLATS
+		| STE1_S1CSH_IS
 		| STE1_S1CIR_WBRA
 		| STE1_S1COR_WBRA
 		//| STE1_S1DSS_SUBSTREAM0
@@ -664,26 +665,22 @@ smmu_init_ste_s1(struct smmu_softc *sc, struct smmu_cd *cd,
 	/* One Context descriptor (S1Fmt is IGNORED). */
 
 	/*
+	 * Set for a linear table of CDs.
+	 *
 	 * val |= STE0_S1FMT_LINEAR;
 	 * val |= 1 << STE0_S1CDMAX_S;
 	 */
 
-	//cpu_dcache_wb_range((vm_offset_t)ste, 64);
-	//dsb(ishst);
-
 	smmu_invalidate_sid(sc, sid);
 
-	/* The STE[0] has to be written in a single blast. */
+	/* The STE[0] has to be written in a single blast, last of all. */
 	ste[0] = val;
-
-	//cpu_dcache_wb_range((vm_offset_t)ste, 64);
-	//dsb(ishst);
 
 	smmu_invalidate_sid(sc, sid);
 	smmu_sync_cd(sc, sid, 0, true);
 	smmu_invalidate_sid(sc, sid);
 
-	/* The sid will be used soon. */
+	/* The sid will be used soon most likely. */
 	smmu_prefetch_sid(sc, sid);
 
 	return (0);
