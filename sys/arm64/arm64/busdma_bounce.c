@@ -1424,13 +1424,17 @@ smmu_get_dma_tag(device_t dev, device_t child)
 
 	uint16_t rid;
 	rid = pci_get_rid(child);
-	u_int xref, devid;
+	u_int xref, sid;
+	int seg;
 	int err;
 
-	err = acpi_iort_map_pci_smmuv3(0, rid, &xref, &devid);
+	seg = pci_get_domain(child);
+	printf("%s: seg %d\n", __func__, seg);
 
-	printf("%s: smmuv3 err %d rid %x xref %d devid %d\n",
-	    __func__, err, rid, xref, devid);
+	err = acpi_iort_map_pci_smmuv3(seg, rid, &xref, &sid);
+
+	printf("%s: smmuv3 err %d rid %x xref %d sid %x\n",
+	    __func__, err, rid, xref, sid);
 
 	domain = iommu_get_domain_for_dev(dev);
 	if (domain)
