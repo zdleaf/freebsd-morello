@@ -499,6 +499,7 @@ smmu_sync(struct smmu_softc *sc)
 	struct smmu_cmdq_entry cmd;
 	struct smmu_queue *q;
 	uint32_t *base;
+	int timeout;
 	int prod;
 
 	q = &sc->cmdq;
@@ -513,13 +514,22 @@ smmu_sync(struct smmu_softc *sc)
 	base = (void *)((uint64_t)q->addr +
 	    Q_IDX(q, prod) * CMDQ_ENTRY_DWORDS * 8);
 
-	for (;;) {
+	/*
+	 * It takes around 200 loops (6 instructions each)
+	 * on Neoverse N1 to complete the sync.
+	 */
+	timeout = 10000;
+
+	do {
 		if (*base == 0) {
 			/* MSI write completed. */
 			break;
 		}
 		cpu_spinwait();
-	}
+	} while (timeout--);
+
+	if (timeout < 0)
+		device_printf(sc->dev, "Failed to sync\n");
 
 	return (0);
 }
