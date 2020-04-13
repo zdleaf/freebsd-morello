@@ -558,7 +558,7 @@ smmu_invalidate_all_sid(struct smmu_softc *sc)
 	smmu_sync(sc);
 }
 
-static void __unused
+static void
 smmu_tlbi_all(struct smmu_softc *sc)
 {
 	struct smmu_cmdq_entry cmd;
@@ -1071,8 +1071,8 @@ smmu_reset(struct smmu_softc *sc)
 		smmu_cmdq_enqueue_cmd(sc, &cmd);
 	};
 
-	cmd.opcode = CMD_TLBI_NSNH_ALL;
-	smmu_cmdq_enqueue_cmd(sc, &cmd);
+	/* Invalidate TLB. */
+	smmu_tlbi_all(sc);
 
 	/* Event queue */
 	bus_write_8(sc->res[0], SMMU_EVENTQ_BASE, sc->evtq.base);
