@@ -51,6 +51,11 @@ __FBSDID("$FreeBSD$");
 #include <machine/cpu.h>
 #include <machine/intr.h>
 
+#include <contrib/dev/acpica/include/acpi.h>
+#include <contrib/dev/acpica/include/accommon.h>
+
+#include <dev/acpica/acpivar.h>
+#include <dev/acpica/acpi_pcibvar.h>
 #include <dev/pci/pcivar.h>
 
 #include "iommu.h"
@@ -1500,6 +1505,10 @@ smmu_add_device(device_t smmu_dev, struct iommu_domain *domain,
 	struct smmu_domain *smmu_dom;
 	struct smmu_master *master;
 	struct smmu_softc *sc;
+	uint16_t rid;
+	u_int xref, sid;
+	int seg;
+	int err;
 
 	sc = device_get_softc(smmu_dev);
 	smmu_dom = (struct smmu_domain *)domain;
@@ -1507,7 +1516,15 @@ smmu_add_device(device_t smmu_dev, struct iommu_domain *domain,
 	master = malloc(sizeof(*master), M_SMMU, M_WAITOK | M_ZERO);
 	master->device = device;
 
-	printf("%s: rid %x\n", __func__, device->rid);
+	seg = pci_get_domain(device->dev);
+	rid = pci_get_rid(device->dev);
+	err = acpi_iort_map_pci_smmuv3(seg, rid, &xref, &sid);
+	if (err) {
+		free(master, M_SMMU);
+		return (ENOENT);
+	}
+
+	master->sid = sid;
 
 	/*
 	 * 0x800 xhci
@@ -1519,7 +1536,7 @@ smmu_add_device(device_t smmu_dev, struct iommu_domain *domain,
 	TAILQ_INSERT_TAIL(&smmu_dom->master_list, master, next);
 	DOMAIN_UNLOCK(smmu_dom);
 
-	smmu_init_ste(sc, &smmu_dom->cd, device->rid, true);
+	smmu_init_ste(sc, &smmu_dom->cd, master->sid, true);
 
 	return (0);
 }

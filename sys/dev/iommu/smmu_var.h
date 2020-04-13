@@ -141,6 +141,7 @@ struct smmu_softc {
 struct smmu_master {
 	TAILQ_ENTRY(smmu_master)	next;
 	struct iommu_device		*device;
+	int				sid;
 };
 
 struct smmu_domain {

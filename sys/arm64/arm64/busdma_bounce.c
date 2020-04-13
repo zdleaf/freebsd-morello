@@ -1432,6 +1432,8 @@ smmu_get_dma_tag(device_t dev, device_t child)
 	printf("%s: seg %d\n", __func__, seg);
 
 	err = acpi_iort_map_pci_smmuv3(seg, rid, &xref, &sid);
+	if (err)
+		return (NULL);
 
 	printf("%s: smmuv3 err %d rid %x xref %d sid %x\n",
 	    __func__, err, rid, xref, sid);
