@@ -70,9 +70,13 @@ static MALLOC_DEFINE(M_IOMMU, "iommu", "IOMMU");
 
 static struct mtx iommu_mtx;
 
-#define	IOMMU_LOCK()			mtx_lock(&iommu_mtx)
-#define	IOMMU_UNLOCK()			mtx_unlock(&iommu_mtx)
-#define	IOMMU_ASSERT_LOCKED()		mtx_assert(&iommu_mtx, MA_OWNED)
+#define	IOMMU_LOCK(iommu)		mtx_lock(&(iommu)->mtx_lock)
+#define	IOMMU_UNLOCK(iommu)		mtx_unlock(&(iommu)->mtx_lock)
+#define	IOMMU_ASSERT_LOCKED(iommu)	mtx_assert(&(iommu)->mtx_lock, MA_OWNED)
+
+#define	IOMMU_LIST_LOCK()		mtx_lock(&iommu_mtx)
+#define	IOMMU_LIST_UNLOCK()		mtx_unlock(&iommu_mtx)
+#define	IOMMU_LIST_ASSERT_LOCKED()	mtx_assert(&iommu_mtx, MA_OWNED)
 
 static LIST_HEAD(, iommu) iommu_list = LIST_HEAD_INITIALIZER(iommu_list);
 
@@ -89,9 +93,9 @@ iommu_domain_alloc(struct iommu *iommu)
 	mtx_init(&domain->mtx_lock, "IOMMU domain", NULL, MTX_DEF);
 	domain->iommu = iommu;
 
-	IOMMU_LOCK();
+	IOMMU_LOCK(iommu);
 	LIST_INSERT_HEAD(&iommu->domain_list, domain, next);
-	IOMMU_UNLOCK();
+	IOMMU_UNLOCK(iommu);
 
 	domain->vmem = vmem_create("IOMMU vmem", 0, 0, PAGE_SIZE,
 	    PAGE_SIZE, M_FIRSTFIT | M_WAITOK);
@@ -244,10 +248,11 @@ iommu_register(device_t dev, intptr_t xref)
 	iommu->xref = xref;
 
 	LIST_INIT(&iommu->domain_list);
+	mtx_init(&iommu->mtx_lock, "IOMMU", NULL, MTX_DEF);
 
-	IOMMU_LOCK();
+	IOMMU_LIST_LOCK();
 	LIST_INSERT_HEAD(&iommu_list, iommu, next);
-	IOMMU_UNLOCK();
+	IOMMU_LIST_UNLOCK();
 
 	return (0);
 }

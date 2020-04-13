@@ -45,6 +45,7 @@
 struct iommu {
 	LIST_HEAD(, iommu_domain)	domain_list;
 	LIST_ENTRY(iommu)		next;
+	struct mtx			mtx_lock;
 	device_t			dev;
 	intptr_t			xref;
 };
