@@ -836,9 +836,11 @@ smmu_init_strtab_linear(struct smmu_softc *sc)
 static int
 smmu_init_strtab_2lvl(struct smmu_softc *sc)
 {
-	uint32_t size;
 	uint32_t num_l1_entries;
 	uint32_t l1size;
+	uint32_t size;
+	uint32_t reg;
+	void *strtab;
 
 	panic("Not implemented");
 
@@ -851,8 +853,6 @@ smmu_init_strtab_2lvl(struct smmu_softc *sc)
 
 	device_printf(sc->dev, "%s: size %d, l1 entries %d, l1size %d\n",
 	    __func__, size, num_l1_entries, l1size);
-
-	void *strtab;
 
 	strtab = contigmalloc(l1size, M_SMMU,
 	    M_WAITOK | M_ZERO,	/* flags */
@@ -867,7 +867,6 @@ smmu_init_strtab_2lvl(struct smmu_softc *sc)
 
 	device_printf(sc->dev, "%s: strtab %p\n", __func__, strtab);
 
-	uint32_t reg;
 	reg = STRTAB_BASE_CFG_FMT_2LVL;
 	reg |= size << STRTAB_BASE_CFG_LOG2SIZE_S;
 	reg |= STRTAB_SPLIT << STRTAB_BASE_CFG_SPLIT_S;
@@ -920,7 +919,6 @@ smmu_enable_interrupts(struct smmu_softc *sc)
 
 	device_printf(sc->dev, "%s\n", __func__);
 
-#if 0
 	/* Disable MSI */
 	bus_write_8(sc->res[0], SMMU_GERROR_IRQ_CFG0, 0);
 	bus_write_4(sc->res[0], SMMU_GERROR_IRQ_CFG1, 0);
@@ -930,10 +928,13 @@ smmu_enable_interrupts(struct smmu_softc *sc)
 	bus_write_4(sc->res[0], SMMU_EVENTQ_IRQ_CFG1, 0);
 	bus_write_4(sc->res[0], SMMU_EVENTQ_IRQ_CFG2, 0);
 
-	bus_write_8(sc->res[0], SMMU_PRIQ_IRQ_CFG0, 0);
-	bus_write_4(sc->res[0], SMMU_PRIQ_IRQ_CFG1, 0);
-	bus_write_4(sc->res[0], SMMU_PRIQ_IRQ_CFG2, 0);
-#else
+	if (sc->features & CR0_PRIQEN) {
+		bus_write_8(sc->res[0], SMMU_PRIQ_IRQ_CFG0, 0);
+		bus_write_4(sc->res[0], SMMU_PRIQ_IRQ_CFG1, 0);
+		bus_write_4(sc->res[0], SMMU_PRIQ_IRQ_CFG2, 0);
+	}
+
+#if 0
 	bus_write_8(sc->res[0], SMMU_GERROR_IRQ_CFG0, 0x30050040);
 	bus_write_4(sc->res[0], SMMU_GERROR_IRQ_CFG1, 0);
 	bus_write_4(sc->res[0], SMMU_GERROR_IRQ_CFG2, 1);
