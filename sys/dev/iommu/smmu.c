@@ -792,17 +792,16 @@ static int
 smmu_init_strtab_linear(struct smmu_softc *sc)
 {
 	struct smmu_strtab *strtab;
-	uint32_t num_l1_entries;
+	vm_paddr_t base;
 	uint32_t size;
 	uint64_t reg;
 
 	strtab = &sc->strtab;
-	num_l1_entries = (1 << sc->sid_bits);
-	strtab->num_l1_entries = num_l1_entries;
+	strtab->num_l1_entries = (1 << sc->sid_bits);
 
-	size = num_l1_entries * (STRTAB_STE_DWORDS << 3);
+	size = strtab->num_l1_entries * (STRTAB_STE_DWORDS << 3);
 	device_printf(sc->dev, "%s: linear strtab size %d, num_l1_entries %d\n",
-	    __func__, size, num_l1_entries);
+	    __func__, size, strtab->num_l1_entries);
 
 	strtab->addr = contigmalloc(size, M_SMMU,
 	    M_WAITOK | M_ZERO,	/* flags */
@@ -824,12 +823,10 @@ smmu_init_strtab_linear(struct smmu_softc *sc)
 	reg |= sc->sid_bits << STRTAB_BASE_CFG_LOG2SIZE_S;
 	strtab->base_cfg = (uint32_t)reg;
 
-	vm_paddr_t base;
 	base = vtophys(strtab->addr);
 
 	reg = base & STRTAB_BASE_ADDR_M;
-	if (reg != base)
-		panic("wrong allocation");
+	KASSERT(reg == base, ("bad allocation"));
 	reg |= STRTAB_BASE_RA;
 	strtab->base = reg;
 
@@ -842,45 +839,48 @@ smmu_init_strtab_linear(struct smmu_softc *sc)
 static int
 smmu_init_strtab_2lvl(struct smmu_softc *sc)
 {
-	uint32_t num_l1_entries;
+	struct smmu_strtab *strtab;
+	vm_paddr_t base;
 	uint32_t l1size;
 	uint32_t size;
 	uint32_t reg;
-	void *strtab;
 
-	panic("Not implemented");
+	strtab = &sc->strtab;
 
 	size = STRTAB_L1_SZ_SHIFT - (ilog2(STRTAB_L1_DESC_DWORDS) + 3);
 	size = min(size, sc->sid_bits - STRTAB_SPLIT);
-	num_l1_entries = (1 << size);
+	strtab->num_l1_entries = (1 << size);
 	size += STRTAB_SPLIT;
 
-	l1size = num_l1_entries * (STRTAB_L1_DESC_DWORDS << 3);
+	l1size = strtab->num_l1_entries * (STRTAB_L1_DESC_DWORDS << 3);
 
 	device_printf(sc->dev, "%s: size %d, l1 entries %d, l1size %d\n",
-	    __func__, size, num_l1_entries, l1size);
+	    __func__, size, strtab->num_l1_entries, l1size);
 
-	strtab = contigmalloc(l1size, M_SMMU,
+	strtab->addr = contigmalloc(l1size, M_SMMU,
 	    M_WAITOK | M_ZERO,	/* flags */
 	    0,			/* low */
 	    (1ul << 48) - 1,	/* high */
 	    l1size,		/* alignment */
 	    0);			/* boundary */
-	if (strtab == NULL) {
+	if (strtab->addr == NULL) {
 		device_printf(sc->dev, "failed to allocate strtab\n");
 		return (ENXIO);
 	}
 
-	device_printf(sc->dev, "%s: strtab %p\n", __func__, strtab);
+	device_printf(sc->dev, "%s: 2lvl strtab %p\n", __func__, strtab);
 
 	reg = STRTAB_BASE_CFG_FMT_2LVL;
 	reg |= size << STRTAB_BASE_CFG_LOG2SIZE_S;
 	reg |= STRTAB_SPLIT << STRTAB_BASE_CFG_SPLIT_S;
-	bus_write_4(sc->res[0], SMMU_STRTAB_BASE_CFG, reg);
+	strtab->base_cfg = (uint32_t)reg;
 
-	reg = vtophys(strtab) & STRTAB_BASE_ADDR_M;
+	base = vtophys(strtab->addr);
+
+	reg = base & STRTAB_BASE_ADDR_M;
+	KASSERT(reg == base, ("bad allocation"));
 	reg |= STRTAB_BASE_RA;
-	bus_write_4(sc->res[0], SMMU_STRTAB_BASE, reg);
+	strtab->base = reg;
 
 	return (0);
 }
