@@ -76,6 +76,7 @@ MALLOC_DEFINE(M_SMMU, "SMMU", SMMU_DEVSTR);
 
 #define	STRTAB_L1_SZ_SHIFT	20
 #define	STRTAB_SPLIT		8
+
 #define	STRTAB_L1_DESC_DWORDS	1
 #define	STRTAB_STE_DWORDS	8
 
@@ -1426,11 +1427,11 @@ smmu_unmap(device_t dev, struct iommu_domain *dom0,
 
 	for (i = 0; i < size; i += PAGE_SIZE) {
 		if (pmap_sremove(&domain->p, va)) {
-			/* pmap entry removed, invalidate TLB */
+			/* pmap entry removed, invalidate TLB. */
 			smmu_tlbi_va(sc, va);
 		} else {
-			printf("pte is NULL, va %lx\n", va);
 			err = ENOENT;
+			break;
 		}
 		va += PAGE_SIZE;
 	}

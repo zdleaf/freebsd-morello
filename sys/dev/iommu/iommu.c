@@ -188,8 +188,10 @@ iommu_unmap(struct iommu_domain *domain, bus_dma_segment_t *segs, int nsegs)
 			/*
 			 * It could be that busdma backend tries to unload
 			 * the same address twice due to a bug in a device
-			 * driver.
+			 * driver. We can't add this VA back to vmem twice.
 			 */
+			device_printf(iommu->dev,
+			    "Could not unmap VA %jx\n", va);
 			continue;
 		}
 		vmem_free(domain->vmem, va, size);
