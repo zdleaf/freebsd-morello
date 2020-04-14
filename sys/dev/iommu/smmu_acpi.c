@@ -1,7 +1,7 @@
 /*-
  * SPDX-License-Identifier: BSD-2-Clause
  *
- * Copyright (c) 2019 Ruslan Bukin <br@bsdpad.com>
+ * Copyright (c) 2019-2020 Ruslan Bukin <br@bsdpad.com>
  *
  * This software was developed by SRI International and the University of
  * Cambridge Computer Laboratory (Department of Computer Science and
@@ -54,13 +54,12 @@ __FBSDID("$FreeBSD$");
 #include "pic_if.h"
 
 #define	MEMORY_RESOURCE_SIZE	0x40000
+#define	MAX_SMMU		8
 
 struct smmu_acpi_devinfo {
 	//struct smmu_devinfo	di_smmu_dinfo;
 	struct resource_list	di_rl;
 };
-
-#define	MAX_SMMU	8
 
 struct iort_table_data {
 	device_t parent;
@@ -81,6 +80,11 @@ iort_handler(ACPI_SUBTABLE_HEADER *entry, void *arg)
 
 	switch(entry->Type) {
 	case ACPI_IORT_NODE_SMMU_V3:
+		if (i == MAX_SMMU) {
+			printf("SMMUv3 found, but no space available.\n");
+			break;
+		}
+
 		if (iort_data->smmu[i] != NULL) {
 			if (bootverbose)
 				device_printf(iort_data->parent,
@@ -101,18 +105,18 @@ smmu_acpi_identify(driver_t *driver, device_t parent)
 {
 	struct iort_table_data iort_data;
 	ACPI_TABLE_IORT *iort;
-	vm_paddr_t physaddr;
+	vm_paddr_t iort_pa;
 	uintptr_t priv;
 	device_t dev;
 	int i;
 
 	printf("%s\n", __func__);
 
-	physaddr = acpi_find_table(ACPI_SIG_IORT);
-	if (physaddr == 0)
+	iort_pa = acpi_find_table(ACPI_SIG_IORT);
+	if (iort_pa == 0)
 		return;
 
-	iort = acpi_map_table(physaddr, ACPI_SIG_IORT);
+	iort = acpi_map_table(iort_pa, ACPI_SIG_IORT);
 	if (iort == NULL) {
 		device_printf(parent, "smmu: Unable to map the IORT\n");
 		return;
@@ -129,6 +133,7 @@ smmu_acpi_identify(driver_t *driver, device_t parent)
 		device_printf(parent, "No SMMU found.\n");
 		goto out;
 	}
+
 #if 0
 	/* This is for the wrong GIC version */
 	if (iort_data.smmu->Version != ACPI_MADT_GIC_VERSION_V3)
