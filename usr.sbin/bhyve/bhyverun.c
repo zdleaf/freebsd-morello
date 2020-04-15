@@ -71,6 +71,7 @@ __FBSDID("$FreeBSD$");
 #include "bhyverun.h"
 #include "acpi.h"
 #include "atkbdc.h"
+#include "bootrom.h"
 #include "inout.h"
 #include "dbgport.h"
 #include "fwctl.h"
@@ -1255,6 +1256,7 @@ main(int argc, char *argv[])
 	    0x2f300000UL, 0x10000UL);
 #ifdef __amd64__
 	init_inout();
+	init_bootrom(ctx);
 	atkbdc_init(ctx);
 	pci_irq_init(ctx);
 	ioapic_init(ctx);
