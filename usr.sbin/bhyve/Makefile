@@ -49,6 +49,7 @@ SRCS=	\
 	usb_emul.c		\
 	usb_mouse.c		\
 	virtio.c		\
+	vmgenc.c		\
 	iov.c
 
 .if ${MACHINE_CPUARCH} == "aarch64"
