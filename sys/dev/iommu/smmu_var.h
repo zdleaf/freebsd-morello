@@ -96,11 +96,18 @@ struct smmu_cmdq_entry {
 	};
 };
 
+struct l1_desc {
+	uint8_t		span;
+	void		*va;
+	vm_paddr_t	pa;
+};
+
 struct smmu_strtab {
-	void *addr;
-	uint64_t base;
-	uint32_t base_cfg;
-	uint32_t num_l1_entries;
+	void		*addr;
+	uint64_t	base;
+	uint32_t	base_cfg;
+	uint32_t	num_l1_entries;
+	struct l1_desc	*l1;
 };
 
 struct smmu_softc {

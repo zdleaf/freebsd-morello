@@ -77,7 +77,9 @@ MALLOC_DEFINE(M_SMMU, "SMMU", SMMU_DEVSTR);
 #define	STRTAB_L1_SZ_SHIFT	20
 #define	STRTAB_SPLIT		8
 
+#define	STRTAB_L1_DESC_L2PTR_M	(0x3fffffffffff << 6)
 #define	STRTAB_L1_DESC_DWORDS	1
+
 #define	STRTAB_STE_DWORDS	8
 
 #define	CMDQ_ENTRY_DWORDS	2
@@ -693,20 +695,28 @@ smmu_init_ste_s1(struct smmu_softc *sc, struct smmu_cd *cd,
 }
 
 static int
-smmu_init_ste(struct smmu_softc *sc, struct smmu_cd *cd, int i, bool s1)
+smmu_init_ste(struct smmu_softc *sc, struct smmu_cd *cd, int sid, bool s1)
 {
 	struct smmu_strtab *strtab;
+	struct l1_desc *l1_desc;
 	uint64_t *addr;
 
 	strtab = &sc->strtab;
+	l1_desc = &strtab->l1[sid >> STRTAB_SPLIT];
 
-	addr = (void *)((uint64_t)strtab->addr +
-	    STRTAB_STE_DWORDS * 8 * i);
+	if (sc->features & SMMU_FEATURE_2_LVL_STREAM_TABLE) {
+		addr = l1_desc->va;
+	} else {
+		addr = (void *)((uint64_t)strtab->addr +
+		    STRTAB_STE_DWORDS * 8 * sid);
+	};
+
+	printf("%s: ste base for sid %d is %p\n", __func__, sid, addr);
 
 	if (s1)
-		smmu_init_ste_s1(sc, cd, i, addr);
+		smmu_init_ste_s1(sc, cd, sid, addr);
 	else
-		smmu_init_ste_bypass(sc, i, addr);
+		smmu_init_ste_bypass(sc, sid, addr);
 
 	smmu_sync(sc);
 
@@ -844,6 +854,7 @@ smmu_init_strtab_2lvl(struct smmu_softc *sc)
 	uint32_t l1size;
 	uint32_t size;
 	uint32_t reg;
+	int sz;
 
 	strtab = &sc->strtab;
 
@@ -868,6 +879,9 @@ smmu_init_strtab_2lvl(struct smmu_softc *sc)
 		return (ENXIO);
 	}
 
+	sz = strtab->num_l1_entries * sizeof(struct l1_desc);
+	strtab->l1 = malloc(sz, M_SMMU, M_WAITOK | M_ZERO);
+
 	device_printf(sc->dev, "%s: 2lvl strtab %p\n", __func__, strtab);
 
 	reg = STRTAB_BASE_CFG_FMT_2LVL;
@@ -890,15 +904,60 @@ smmu_init_strtab(struct smmu_softc *sc)
 {
 	int error;
 
-	/* XXX: Try linear for now. */
-	sc->features &= ~SMMU_FEATURE_2_LVL_STREAM_TABLE;
-
 	if (sc->features & SMMU_FEATURE_2_LVL_STREAM_TABLE)
 		error = smmu_init_strtab_2lvl(sc);
 	else
 		error = smmu_init_strtab_linear(sc);
 
 	return (error);
+}
+
+static int
+smmu_init_l2_strtab(struct smmu_softc *sc, int sid)
+{
+	struct smmu_strtab *strtab;
+	struct l1_desc *l1_desc;
+	uint64_t *addr;
+	uint64_t val;
+	size_t size;
+	int i;
+
+	strtab = &sc->strtab;
+	l1_desc = &strtab->l1[sid >> STRTAB_SPLIT];
+
+	size = 1 << (STRTAB_SPLIT + ilog2(STRTAB_STE_DWORDS) + 3);
+
+	printf("%s: size %zu\n", __func__, size);
+
+	l1_desc->span = STRTAB_SPLIT + 1;
+	l1_desc->va = contigmalloc(size, M_SMMU,
+	    M_WAITOK | M_ZERO,	/* flags */
+	    0,			/* low */
+	    (1ul << 48) - 1,	/* high */
+	    size,		/* alignment */
+	    0);			/* boundary */
+	if (l1_desc->va == NULL) {
+		device_printf(sc->dev, "failed to allocate l2 entry\n");
+		return (ENXIO);
+	}
+
+	l1_desc->pa = vtophys(l1_desc->va);
+
+	printf("%s: l2 va for sid %d is %p\n", __func__, sid, l1_desc->va);
+
+	i = sid >> STRTAB_SPLIT;
+	addr = (void *)((uint64_t)strtab->addr + STRTAB_L1_DESC_DWORDS * 8 * i);
+
+	printf("%s: l1 addr for sid %d is %p\n", __func__, sid, addr);
+
+	/* Install L1 entry. */
+	val = l1_desc->pa & STRTAB_L1_DESC_L2PTR_M;
+	if (val != l1_desc->pa)
+		panic("wrong allocation");
+	val |= l1_desc->span;
+	*addr = val;
+
+	return (0);
 }
 
 static int
@@ -1526,6 +1585,12 @@ smmu_add_device(device_t smmu_dev, struct iommu_domain *domain,
 	}
 
 	master->sid = sid;
+
+	if (sc->features & SMMU_FEATURE_2_LVL_STREAM_TABLE) {
+		err = smmu_init_l2_strtab(sc, sid);
+		if (err)
+			return (ENXIO);
+	}
 
 	/*
 	 * 0x800 xhci
