@@ -1,7 +1,7 @@
 /*-
  * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
  *
- * Copyright (c) 2012 NetApp, Inc.
+ * Copyright (c) 2001 Doug Rabson
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -13,10 +13,10 @@
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
  *
- * THIS SOFTWARE IS PROVIDED BY NETAPP, INC ``AS IS'' AND
+ * THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS'' AND
  * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
- * ARE DISCLAIMED.  IN NO EVENT SHALL NETAPP, INC OR CONTRIBUTORS BE LIABLE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE
  * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
  * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
  * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
@@ -28,39 +28,50 @@
  * $FreeBSD$
  */
 
-#ifndef _ACPI_H_
-#define _ACPI_H_
+#ifndef _COMPAT_H_
+#define	_COMPAT_H_
 
-#define	SCI_INT			9
+/*
+ * Helper macros for translating objects between different ABIs.
+ */
 
-#define	SMI_CMD			0xb2
-#define	BHYVE_ACPI_ENABLE	0xa0
-#define	BHYVE_ACPI_DISABLE	0xa1
+#define	PTRIN(v)	(void *)(uintptr_t)(v)
+#define	PTROUT(v)	(uintptr_t)(v)
 
-#define	PM1A_EVT_ADDR		0x400
-#define	PM1A_CNT_ADDR		0x404
+#define	CP(src, dst, fld) do {			\
+	(dst).fld = (src).fld;			\
+} while (0)
 
-#define	IO_PMTMR		0x408	/* 4-byte i/o port for the timer */
+#define	CP2(src, dst, sfld, dfld) do {		\
+	(dst).dfld = (src).sfld;		\
+} while (0)
 
-#define	IO_GPE0_BLK		0x40c	/* 2x 1-byte IO port for GPE0_STS/EN */
-#define	IO_GPE0_LEN		0x2
+#define	PTRIN_CP(src, dst, fld) do {		\
+	(dst).fld = PTRIN((src).fld);		\
+} while (0)
 
-#define	IO_GPE0_STS		IO_GPE0_BLK
-#define	IO_GPE0_EN		(IO_GPE0_BLK + (IO_GPE0_LEN / 2))
+#define	PTROUT_CP(src, dst, fld) do {		\
+	(dst).fld = PTROUT((src).fld);		\
+} while (0)
 
-/* Allocated GPE bits. */
-#define	GPE_VMGENC		0
+#define	TV_CP(src, dst, fld) do {		\
+	CP((src).fld, (dst).fld, tv_sec);	\
+	CP((src).fld, (dst).fld, tv_usec);	\
+} while (0)
 
-struct vmctx;
+#define	TS_CP(src, dst, fld) do {		\
+	CP((src).fld, (dst).fld, tv_sec);	\
+	CP((src).fld, (dst).fld, tv_nsec);	\
+} while (0)
 
-int	acpi_build(struct vmctx *ctx, int ncpu);
-void	acpi_raise_gpe(struct vmctx *ctx, unsigned bit);
-void	dsdt_line(const char *fmt, ...);
-void	dsdt_fixed_ioport(uint16_t iobase, uint16_t length);
-void	dsdt_fixed_irq(uint8_t irq);
-void	dsdt_fixed_mem32(uint32_t base, uint32_t length);
-void	dsdt_indent(int levels);
-void	dsdt_unindent(int levels);
-void	sci_init(struct vmctx *ctx);
+#define	ITS_CP(src, dst) do {			\
+	TS_CP((src), (dst), it_interval);	\
+	TS_CP((src), (dst), it_value);		\
+} while (0)
 
-#endif /* _ACPI_H_ */
+#define	BT_CP(src, dst, fld) do {				\
+	CP((src).fld, (dst).fld, sec);				\
+	*(uint64_t *)&(dst).fld.frac[0] = (src).fld.frac;	\
+} while (0)
+
+#endif /* !_COMPAT_H_ */
