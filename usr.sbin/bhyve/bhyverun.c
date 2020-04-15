@@ -74,6 +74,7 @@ __FBSDID("$FreeBSD$");
 #include "bootrom.h"
 #include "inout.h"
 #include "dbgport.h"
+#include "debug.h"
 #include "fwctl.h"
 #include "gdb.h"
 #include "ioapic.h"
@@ -762,20 +763,18 @@ vmexit_inst_emul(struct vmctx *ctx, struct vm_exit *vmexit, int *pvcpu)
 
 	if (err) {
 		if (err == ESRCH) {
-			fprintf(stderr, "Unhandled memory access to 0x%lx\n",
+			EPRINTLN("Unhandled memory access to 0x%lx\n",
 			    vmexit->u.inst_emul.gpa);
 		}
 
 		fprintf(stderr, "Failed to emulate instruction ");
 #ifdef __amd64__
-		fprintf(stderr, "[");
-		for (i = 0; i < vie->num_valid; i++) {
-			fprintf(stderr, "0x%02x%s", vie->inst[i],
-			    i != (vie->num_valid - 1) ? " " : "");
-		}
+		fprintf(stderr, "sequence [ ");
+		for (i = 0; i < vie->num_valid; i++)
+			fprintf(stderr, "%02x", vie->inst[i]);
 		fprintf(stderr, "] ");
 #endif
-		fprintf(stderr, "at 0x%lx\n", VM_EXIT_PC(*vmexit));
+		FPRINTLN(stderr, "at 0x%lx", VM_EXIT_PC(*vmexit));
 		return (VMEXIT_ABORT);
 	}
 
