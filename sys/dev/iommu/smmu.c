@@ -763,9 +763,7 @@ smmu_init_cd(struct smmu_softc *sc, struct smmu_cd *cd, pmap_t p)
 	val |= CD0_IPS_48BITS;
 
 	paddr = p->pm_l0_paddr & CD1_TTB0_M;
-	if (paddr != p->pm_l0_paddr)
-		panic("here");
-
+	KASSERT(paddr == p->pm_l0_paddr, ("bad allocation"));
 	printf("%s: ttbr paddr %lx\n", __func__, paddr);
 
 	ptr[1] = paddr;
@@ -776,9 +774,9 @@ smmu_init_cd(struct smmu_softc *sc, struct smmu_cd *cd, pmap_t p)
 		MAIR_ATTR(MAIR_NORMAL_WT, VM_MEMATTR_WRITE_THROUGH);
 
 	printf("%s: val %lx\n", __func__, val);
-	ptr[0] = val;
 
-	printf("%s: ptr[0] %lx\n", __func__, ptr[0]);
+	/* Install the CD. */
+	ptr[0] = val;
 
 	return (0);
 }
