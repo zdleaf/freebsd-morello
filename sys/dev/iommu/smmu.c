@@ -875,12 +875,17 @@ smmu_init_strtab_2lvl(struct smmu_softc *sc)
 	    l1size,		/* alignment */
 	    0);			/* boundary */
 	if (strtab->addr == NULL) {
-		device_printf(sc->dev, "failed to allocate strtab\n");
-		return (ENXIO);
+		device_printf(sc->dev, "Failed to allocate 2lvl strtab.\n");
+		return (ENOMEM);
 	}
 
 	sz = strtab->num_l1_entries * sizeof(struct l1_desc);
+
 	strtab->l1 = malloc(sz, M_SMMU, M_WAITOK | M_ZERO);
+	if (strtab->l1 == NULL) {
+		contigfree(strtab->addr, l1size, M_SMMU);
+		return (ENOMEM);
+	}
 
 	device_printf(sc->dev, "%s: 2lvl strtab %p\n", __func__, strtab);
 
@@ -950,10 +955,9 @@ smmu_init_l2_strtab(struct smmu_softc *sc, int sid)
 
 	printf("%s: l1 addr for sid %d is %p\n", __func__, sid, addr);
 
-	/* Install L1 entry. */
+	/* Install the L1 entry. */
 	val = l1_desc->pa & STRTAB_L1_DESC_L2PTR_M;
-	if (val != l1_desc->pa)
-		panic("wrong allocation");
+	KASSERT(val == l1_desc->pa, ("bad allocation"));
 	val |= l1_desc->span;
 	*addr = val;
 
