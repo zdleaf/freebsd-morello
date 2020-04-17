@@ -31,6 +31,7 @@
  */
 
 #include "opt_platform.h"
+#include "opt_acpi.h"
 
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
@@ -51,11 +52,14 @@ __FBSDID("$FreeBSD$");
 #include <machine/cpu.h>
 #include <machine/intr.h>
 
+#if DEV_ACPI
 #include <contrib/dev/acpica/include/acpi.h>
 #include <contrib/dev/acpica/include/accommon.h>
 
 #include <dev/acpica/acpivar.h>
 #include <dev/acpica/acpi_pcibvar.h>
+#endif
+
 #include <dev/pci/pcivar.h>
 
 #include "iommu.h"
@@ -1034,6 +1038,24 @@ smmu_enable_interrupts(struct smmu_softc *sc)
 	return (0);
 }
 
+#if DEV_ACPI
+static void
+smmu_configure_intr(struct smmu_softc *sc, struct resource *res)
+{
+	struct intr_map_data_acpi *ad;
+	struct intr_map_data *data;
+
+	data = rman_get_virtual(res);
+	KASSERT(data != NULL, ("data is NULL"));
+
+	if (data->type == INTR_MAP_DATA_ACPI) {
+		ad = (struct intr_map_data_acpi *)data;
+		ad->trig = INTR_TRIGGER_EDGE;
+		ad->pol = INTR_POLARITY_HIGH;
+	}
+}
+#endif
+
 static int
 smmu_setup_interrupts(struct smmu_softc *sc)
 {
@@ -1044,6 +1066,12 @@ smmu_setup_interrupts(struct smmu_softc *sc)
 
 	device_printf(sc->dev, "%s\n", __func__);
 
+#if DEV_ACPI
+	smmu_configure_intr(sc, sc->res[1]);
+	smmu_configure_intr(sc, sc->res[2]);
+	smmu_configure_intr(sc, sc->res[3]);
+#endif
+
 	error = bus_setup_intr(dev, sc->res[1], INTR_TYPE_MISC,
 	    smmu_event_intr, NULL, sc, &sc->intr_cookie[0]);
 	if (error) {
@@ -1051,9 +1079,9 @@ smmu_setup_interrupts(struct smmu_softc *sc)
 		return (ENXIO);
 	}
 
-#if 0
-	/* Since we are using msiaddr feature, don't setup wired interrupt */
+	/* Since we are using msiaddr feature, don't setup wired interrupt. */
 
+#if 0
 	error = bus_setup_intr(dev, sc->res[2], INTR_TYPE_MISC,
 	    smmu_sync_intr, NULL, sc, &sc->intr_cookie[1]);
 	if (error) {

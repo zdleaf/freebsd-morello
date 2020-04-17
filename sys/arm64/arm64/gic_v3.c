@@ -588,8 +588,6 @@ do_gic_v3_map_intr(device_t dev, struct intr_map_data *data, u_int *irqp,
 #endif
 	u_int irq;
 
-	printf("%s\n", __func__);
-
 	sc = device_get_softc(dev);
 
 	switch (data->type) {
@@ -607,14 +605,6 @@ do_gic_v3_map_intr(device_t dev, struct intr_map_data *data, u_int *irqp,
 		irq = daa->irq;
 		pol = daa->pol;
 		trig = daa->trig;
-		if (irq == 0x10b ||
-		    irq == 0x10c ||
-		    irq == 0x10d ||
-		    irq == 0x104 ||
-		    irq == 0x105 ||
-		    irq == 0x106)
-			trig = 1;
-		printf("%s: DAA daa %x %x %x\n", __func__, irq, pol, trig);
 		break;
 #endif
 	case INTR_MAP_DATA_MSI:
@@ -682,8 +672,6 @@ gic_v3_setup_intr(device_t dev, struct intr_irqsrc *isrc,
 	u_int irq;
 	int error;
 
-	printf("%s\n", __func__);
-
 	if (data == NULL)
 		return (ENOTSUP);
 
@@ -694,8 +682,6 @@ gic_v3_setup_intr(device_t dev, struct intr_irqsrc *isrc,
 	if (gi->gi_irq != irq || pol == INTR_POLARITY_CONFORM ||
 	    trig == INTR_TRIGGER_CONFORM)
 		return (EINVAL);
-
-	printf("%s: pol %d trig %d\n", __func__, pol, trig);
 
 	/* Compare config if this is not first setup. */
 	if (isrc->isrc_handlers != 0) {
@@ -797,8 +783,6 @@ gic_v3_enable_intr(device_t dev, struct intr_irqsrc *isrc)
 	sc = device_get_softc(dev);
 	gi = (struct gic_v3_irqsrc *)isrc;
 	irq = gi->gi_irq;
-
-	printf("%s: irq %d\n", __func__, irq);
 
 	if (irq <= GIC_LAST_PPI) {
 		/* SGIs and PPIs in corresponding Re-Distributor */
