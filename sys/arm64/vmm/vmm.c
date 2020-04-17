@@ -405,6 +405,60 @@ vm_name(struct vm *vm)
 	return (vm->name);
 }
 
+int
+vm_map_mmio(struct vm *vm, vm_paddr_t gpa, size_t len, vm_paddr_t hpa)
+{
+	vm_object_t obj;
+
+	if ((obj = vmm_mmio_alloc(vm->vmspace, gpa, len, hpa)) == NULL)
+		return (ENOMEM);
+	else
+		return (0);
+}
+
+int
+vm_unmap_mmio(struct vm *vm, vm_paddr_t gpa, size_t len)
+{
+
+	vmm_mmio_free(vm->vmspace, gpa, len);
+	return (0);
+}
+
+int
+vmm_map_gpa(struct vm *vm, vm_offset_t va, vm_paddr_t gpa, int pages,
+    vm_page_t *ma)
+{
+	size_t len;
+	int cnt;
+
+	KASSERT((gpa & PAGE_MASK) == 0, ("%s: Misaligned guest address %lx",
+	    __func__, gpa));
+	KASSERT((va & PAGE_MASK) == 0, ("%s: Misaligned address %lx", __func__,
+	    va));
+
+	len = pages * PAGE_SIZE;
+	cnt = vm_fault_quick_hold_pages(&vm->vmspace->vm_map, gpa, len,
+	    VM_PROT_READ, ma, pages);
+	if (cnt == -1)
+		return (-1);
+
+	KASSERT(cnt == pages, ("%s: Invalid page count %d != %d", __func__,
+	   cnt, pages));
+	pmap_qenter(va, ma, pages);
+	return (cnt);
+}
+
+void
+vmm_unmap_gpa(struct vm *vm, vm_offset_t va, size_t pages, vm_page_t *ma)
+{
+
+	KASSERT((va & PAGE_MASK) == 0, ("%s: Misaligned address %lx", __func__,
+	    va));
+	pmap_qremove(va, pages);
+	vm_page_unhold_pages(ma, pages);
+}
+
+
 /*
  * Return 'true' if 'gpa' is allocated in the guest address space.
  *
