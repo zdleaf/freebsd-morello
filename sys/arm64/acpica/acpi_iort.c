@@ -575,34 +575,10 @@ acpi_iort_map_pci_smmuv3(u_int seg, u_int rid, u_int *xref, u_int *sid)
 	if (node == NULL)
 		return (ENOENT);
 
-	smmu = (ACPI_IORT_SMMU_V3 *)&node->data.smmu_v3;
-
-#if 0
-	printf("%s: baseaddr %lx\n", __func__, smmu->BaseAddress);
-	printf("%s: nentries %d\n", __func__, node->nentries);
-
-	struct iort_map_entry *mapping;
-	int i;
-	mapping = node->entries.mappings;
-	for (i = 0; i < node->nentries; i++, mapping++) {
-		printf("%s: base %x end %x outbase %x out_node_offset %x"
-		    " flags %d\n", __func__,
-				mapping->base,
-				mapping->end,
-				mapping->outbase,
-				mapping->out_node_offset,
-				mapping->flags);
-	}
-
-	devclass_t smmu_class;
-	device_t dev;
-	smmu_class = devclass_find("smmu");
-	dev = devclass_get_device(smmu_class, 0);
-#endif
-
-	/* This should be an SMMU node */
+	/* This should be an SMMU node. */
 	KASSERT(node->type == ACPI_IORT_NODE_SMMU_V3, ("bad node"));
 
+	smmu = (ACPI_IORT_SMMU_V3 *)&node->data.smmu_v3;
 	*xref = smmu->BaseAddress;
 
 	return (0);
