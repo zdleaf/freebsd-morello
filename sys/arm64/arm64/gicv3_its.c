@@ -61,6 +61,7 @@ __FBSDID("$FreeBSD$");
 #include <arm/arm/gic_common.h>
 #include <arm64/arm64/gic_v3_reg.h>
 #include <arm64/arm64/gic_v3_var.h>
+#include <arm64/arm64/gicv3_its.h>
 
 #ifdef FDT
 #include <dev/ofw/openfirm.h>
@@ -94,38 +95,6 @@ MALLOC_DEFINE(M_GICV3_ITS, "GICv3 ITS",
 
 #define	LPI_INT_TRANS_TAB_ALIGN	256
 #define	LPI_INT_TRANS_TAB_MAX_ADDR ((1ul << 48) - 1)
-
-/* ITS commands encoding */
-#define	ITS_CMD_MOVI		(0x01)
-#define	ITS_CMD_SYNC		(0x05)
-#define	ITS_CMD_MAPD		(0x08)
-#define	ITS_CMD_MAPC		(0x09)
-#define	ITS_CMD_MAPTI		(0x0a)
-#define	ITS_CMD_MAPI		(0x0b)
-#define	ITS_CMD_INV		(0x0c)
-#define	ITS_CMD_INVALL		(0x0d)
-/* Command */
-#define	CMD_COMMAND_MASK	(0xFFUL)
-/* PCI device ID */
-#define	CMD_DEVID_SHIFT		(32)
-#define	CMD_DEVID_MASK		(0xFFFFFFFFUL << CMD_DEVID_SHIFT)
-/* Size of IRQ ID bitfield */
-#define	CMD_SIZE_MASK		(0xFFUL)
-/* Virtual LPI ID */
-#define	CMD_ID_MASK		(0xFFFFFFFFUL)
-/* Physical LPI ID */
-#define	CMD_PID_SHIFT		(32)
-#define	CMD_PID_MASK		(0xFFFFFFFFUL << CMD_PID_SHIFT)
-/* Collection */
-#define	CMD_COL_MASK		(0xFFFFUL)
-/* Target (CPU or Re-Distributor) */
-#define	CMD_TARGET_SHIFT	(16)
-#define	CMD_TARGET_MASK		(0xFFFFFFFFUL << CMD_TARGET_SHIFT)
-/* Interrupt Translation Table address */
-#define	CMD_ITT_MASK		(0xFFFFFFFFFF00UL)
-/* Valid command bit */
-#define	CMD_VALID_SHIFT		(63)
-#define	CMD_VALID_MASK		(1UL << CMD_VALID_SHIFT)
 
 #define	ITS_TARGET_NONE		0xFBADBEEF
 
@@ -202,11 +171,6 @@ struct its_cmd_desc {
 			struct its_col *col;
 		} cmd_desc_invall;
 	};
-};
-
-/* ITS command. Each command is 32 bytes long */
-struct its_cmd {
-	uint64_t	cmd_dword[4];	/* ITS command double word */
 };
 
 /* An ITS private table */
