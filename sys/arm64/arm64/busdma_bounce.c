@@ -1410,52 +1410,39 @@ smmu_tag_init(struct bus_dma_tag *t)
 	t->common.maxsegsz = maxaddr;
 }
 
-bus_dma_tag_t
-smmu_get_dma_tag(device_t dev, device_t child)
+static bus_dma_tag_t
+smmu_alloc_domain(device_t dev)
 {
 	struct iommu_domain *domain;
 	struct iommu *iommu;
-	devclass_t pci_class;
 	bus_dma_tag_t tag;
-	int error;
 	u_int xref, sid;
 	uint16_t rid;
+	int error;
 	int seg;
-	int err;
 
-	printf("%s\n", __func__);
-
-	pci_class = devclass_find("pci");
-	if (device_get_devclass(device_get_parent(child)) != pci_class) {
-		printf("%s: not a pci bus device\n", __func__);
-		return (NULL);
-	}
-
-	rid = pci_get_rid(child);
-	seg = pci_get_domain(child);
-
-	printf("%s: seg %d\n", __func__, seg);
+	rid = pci_get_rid(dev);
+	seg = pci_get_domain(dev);
 
 #ifdef DEV_ACPI
-	err = acpi_iort_map_pci_smmuv3(seg, rid, &xref, &sid);
-	if (err)
+	error = acpi_iort_map_pci_smmuv3(seg, rid, &xref, &sid);
+	if (error) {
+		/* Could not find reference to an SMMU device. */
 		return (NULL);
+	}
 #else
 	/* TODO: add FDT support. */
-
 	return (NULL);
 #endif
 
-	printf("%s: smmuv3 err %d rid %x xref %d sid %x\n",
-	    __func__, err, rid, xref, sid);
-
-	domain = iommu_get_domain_for_dev(dev);
-	if (domain)
-		return (domain->tag);
+	printf("%s: smmuv3 error %d rid %x xref %d sid %x\n",
+	    __func__, error, rid, xref, sid);
 
 	iommu = iommu_lookup(xref, 0);
-	if (iommu == NULL)
+	if (iommu == NULL) {
+		/* SMMU device is not registered in the IOMMU framework. */
 		return (NULL);
+	}
 
 	domain = iommu_domain_alloc(iommu);
 	if (!domain)
@@ -1470,7 +1457,7 @@ smmu_get_dma_tag(device_t dev, device_t child)
 	tag->iommu_domain = domain;
 	domain->tag = tag;
 
-	error = iommu_add_device(domain, child);
+	error = iommu_add_device(domain, dev);
 	if (error) {
 		free(tag, M_BUSDMA);
 		iommu_domain_free(domain);
@@ -1481,3 +1468,20 @@ smmu_get_dma_tag(device_t dev, device_t child)
 
 	return (tag);
 }
+
+bus_dma_tag_t
+smmu_get_dma_tag(device_t dev, device_t child)
+{
+	struct iommu_domain *domain;
+	devclass_t pci_class;
+
+	pci_class = devclass_find("pci");
+	if (device_get_devclass(device_get_parent(child)) != pci_class)
+		return (NULL);
+
+	domain = iommu_get_domain_for_dev(child);
+	if (domain)
+		return (domain->tag);
+
+	return (smmu_alloc_domain(child));
+};
