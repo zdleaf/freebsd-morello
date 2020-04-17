@@ -31,6 +31,8 @@
  * SUCH DAMAGE.
  */
 
+#include "opt_acpi.h"
+
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
@@ -61,11 +63,13 @@ __FBSDID("$FreeBSD$");
 
 #include <dev/iommu/iommu.h>
 
+#ifdef DEV_ACPI
 #include <contrib/dev/acpica/include/acpi.h>
 #include <contrib/dev/acpica/include/accommon.h>
 
 #include <dev/acpica/acpivar.h>
 #include <dev/acpica/acpi_pcibvar.h>
+#endif
 
 #include <dev/pci/pcivar.h>
 
@@ -1410,9 +1414,14 @@ bus_dma_tag_t
 smmu_get_dma_tag(device_t dev, device_t child)
 {
 	struct iommu_domain *domain;
+	struct iommu *iommu;
 	devclass_t pci_class;
 	bus_dma_tag_t tag;
 	int error;
+	u_int xref, sid;
+	uint16_t rid;
+	int seg;
+	int err;
 
 	printf("%s\n", __func__);
 
@@ -1422,18 +1431,20 @@ smmu_get_dma_tag(device_t dev, device_t child)
 		return (NULL);
 	}
 
-	uint16_t rid;
 	rid = pci_get_rid(child);
-	u_int xref, sid;
-	int seg;
-	int err;
-
 	seg = pci_get_domain(child);
+
 	printf("%s: seg %d\n", __func__, seg);
 
+#ifdef DEV_ACPI
 	err = acpi_iort_map_pci_smmuv3(seg, rid, &xref, &sid);
 	if (err)
 		return (NULL);
+#else
+	/* TODO: add FDT support. */
+
+	return (NULL);
+#endif
 
 	printf("%s: smmuv3 err %d rid %x xref %d sid %x\n",
 	    __func__, err, rid, xref, sid);
@@ -1441,8 +1452,6 @@ smmu_get_dma_tag(device_t dev, device_t child)
 	domain = iommu_get_domain_for_dev(dev);
 	if (domain)
 		return (domain->tag);
-
-	struct iommu *iommu;
 
 	iommu = iommu_lookup(xref, 0);
 	if (iommu == NULL)
