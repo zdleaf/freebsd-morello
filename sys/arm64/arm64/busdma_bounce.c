@@ -1410,12 +1410,10 @@ smmu_tag_init(struct bus_dma_tag *t)
 	t->common.maxsegsz = maxaddr;
 }
 
-static bus_dma_tag_t
+static struct iommu_domain *
 smmu_alloc_domain(device_t dev)
 {
-	struct iommu_domain *domain;
 	struct iommu *iommu;
-	bus_dma_tag_t tag;
 	u_int xref, sid;
 	uint16_t rid;
 	int error;
@@ -1444,7 +1442,26 @@ smmu_alloc_domain(device_t dev)
 		return (NULL);
 	}
 
-	domain = iommu_domain_alloc(iommu);
+	return (iommu_domain_alloc(iommu));
+}
+
+bus_dma_tag_t
+smmu_get_dma_tag(device_t dev, device_t child)
+{
+	struct iommu_domain *domain;
+	devclass_t pci_class;
+	bus_dma_tag_t tag;
+	int error;
+
+	pci_class = devclass_find("pci");
+	if (device_get_devclass(device_get_parent(child)) != pci_class)
+		return (NULL);
+
+	domain = iommu_get_domain_for_dev(child);
+	if (domain)
+		return (domain->tag);
+
+	domain = smmu_alloc_domain(child);
 	if (!domain)
 		return (NULL);
 
@@ -1468,20 +1485,3 @@ smmu_alloc_domain(device_t dev)
 
 	return (tag);
 }
-
-bus_dma_tag_t
-smmu_get_dma_tag(device_t dev, device_t child)
-{
-	struct iommu_domain *domain;
-	devclass_t pci_class;
-
-	pci_class = devclass_find("pci");
-	if (device_get_devclass(device_get_parent(child)) != pci_class)
-		return (NULL);
-
-	domain = iommu_get_domain_for_dev(child);
-	if (domain)
-		return (domain->tag);
-
-	return (smmu_alloc_domain(child));
-};
