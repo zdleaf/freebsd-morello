@@ -150,9 +150,11 @@ vgic_v3_cpuinit(void *arg, bool last_vcpu)
 
 	/* Set up GICR_TYPER. */
 	redist->gicr_typer = aff << GICR_TYPER_AFF_SHIFT;
-	/* Redistributor doesn't support virtual or physical LPIS. */
+	/* Set the vcpu as the processsor ID */
+	redist->gicr_typer |= hypctx->vcpu << GICR_TYPER_CPUNUM_SHIFT;
+	/* Redistributor doesn't support virtual LPIS. */
 	redist->gicr_typer &= ~GICR_TYPER_VLPIS;
-	redist->gicr_typer &= ~GICR_TYPER_PLPIS;
+	redist->gicr_typer |= GICR_TYPER_PLPIS;
 
 	if (last_vcpu)
 		/* Mark the last Redistributor */
@@ -164,6 +166,14 @@ vgic_v3_cpuinit(void *arg, bool last_vcpu)
 	 * ~GICR_CTLR_LPI_ENABLE: LPIs are disabled
 	 */
 	redist->gicr_ctlr = 0 & ~GICR_CTLR_LPI_ENABLE;
+
+
+	redist->gicr_propbaser =
+	    (GICR_PROPBASER_SHARE_OS << GICR_PROPBASER_SHARE_SHIFT) |
+	    (GICR_PROPBASER_CACHE_NIWAWB << GICR_PROPBASER_CACHE_SHIFT);
+	redist->gicr_pendbaser =
+	    (GICR_PENDBASER_SHARE_OS << GICR_PENDBASER_SHARE_SHIFT) |
+	    (GICR_PENDBASER_CACHE_NIWAWB << GICR_PENDBASER_CACHE_SHIFT);
 
 	mtx_init(&cpu_if->lr_mtx, "VGICv3 ICH_LR_EL2 lock", NULL, MTX_SPIN);
 
@@ -247,6 +257,10 @@ dist_read_gicd_ixenabler(struct vgic_v3_dist *dist, int n)
 		return (0);
 	}
 
+	/* Ensure the register is valid */
+	if ((n * sizeof(*dist->gicd_ixenabler)) > dist->gicd_ixenable_size)
+		return (0);
+
 	mtx_lock_spin(&dist->dist_mtx);
 	ret = dist->gicd_ixenabler[n];
 	mtx_unlock_spin(&dist->dist_mtx);
@@ -276,6 +290,10 @@ dist_write_gicd_ixenabler(struct hyp *hyp, int vcpuid,
     struct vgic_v3_dist *dist, int idx, uint64_t val, bool set)
 {
 	uint32_t old_ixenabler;
+
+	/* TODO: Handle LPIs */
+	if ((idx * sizeof(*dist->gicd_ixenabler)) > dist->gicd_ixenable_size)
+		panic("Invalid reg: %x %zx\n", idx, dist->gicd_ixenable_size);
 
 	/*
 	 * GIC Architecture specification, p 8-471: "When ARE is 1 for the
@@ -428,6 +446,7 @@ dist_read(void *vm, int vcpuid, uint64_t fault_ipa, uint64_t *rval,
 		return (0);
 	}
 
+	panic("%s: %lx\n", __func__, fault_ipa - dist->start);
 	return (0);
 }
 
@@ -551,6 +570,7 @@ dist_write(void *vm, int vcpuid, uint64_t fault_ipa, uint64_t wval,
 		return (0);
 	}
 
+	panic("%s: %lx\n", __func__, fault_ipa - dist->start);
 	return (0);
 }
 
@@ -585,6 +605,14 @@ redist_read(void *vm, int vcpuid, uint64_t fault_ipa, uint64_t *rval,
 		return (0);
 	case GICR_WAKER:
 		*rval = 0; // & ~GICR_WAKER_PS & ~GICR_WAKER_CA;
+		*retu = false;
+		return (0);
+	case GICR_PROPBASER:
+		*rval = redist->gicr_propbaser;
+		*retu = false;
+		return (0);
+	case GICR_PENDBASER:
+		*rval = redist->gicr_pendbaser;
 		*retu = false;
 		return (0);
 	case GICR_PIDR2:
@@ -664,6 +692,24 @@ redist_write(void *vm, int vcpuid, uint64_t fault_ipa, uint64_t wval,
 	switch (reg) {
 	case GICR_CTLR:
 		redist->gicr_ctlr = wval;
+		*retu = false;
+		return (0);
+	case GICR_PROPBASER:
+		wval &= ~(GICR_PROPBASER_OUTER_CACHE_MASK |
+		    GICR_PROPBASER_SHARE_MASK | GICR_PROPBASER_CACHE_MASK);
+		wval |=
+		    (GICR_PROPBASER_SHARE_OS << GICR_PROPBASER_SHARE_SHIFT) |
+		    (GICR_PROPBASER_CACHE_NIWAWB << GICR_PROPBASER_CACHE_SHIFT);
+		redist->gicr_propbaser = wval;
+		*retu = false;
+		return (0);
+	case GICR_PENDBASER:
+		wval &= ~(GICR_PENDBASER_OUTER_CACHE_MASK |
+		    GICR_PENDBASER_SHARE_MASK | GICR_PENDBASER_CACHE_MASK);
+		wval |=
+		    (GICR_PENDBASER_SHARE_OS << GICR_PENDBASER_SHARE_SHIFT) |
+		    (GICR_PENDBASER_CACHE_NIWAWB << GICR_PENDBASER_CACHE_SHIFT);
+		redist->gicr_pendbaser = wval;
 		*retu = false;
 		return (0);
 	case GICR_TYPER:
@@ -1052,6 +1098,39 @@ out:
 	return (error);
 }
 
+int
+vgic_v3_inject_lpi(void *arg, uint32_t lpi)
+{
+        struct hypctx *hypctx = arg;
+	struct vgic_v3_dist *dist = &hypctx->hyp->vgic_dist;
+	struct vgic_v3_cpu_if *cpu_if = &hypctx->vgic_cpu_if;
+	struct vgic_v3_irq *vip;
+	int error;
+
+	KASSERT(lpi >= GIC_FIRST_LPI, ("%s: Invalid LPI %u", __func__, lpi));
+
+	error = 0;
+
+	mtx_lock_spin(&dist->dist_mtx);
+	mtx_lock_spin(&cpu_if->lr_mtx);
+	vip = vgic_v3_irqbuf_add_nolock(cpu_if);
+	if (!vip) {
+		eprintf("Error adding LPI %u to the IRQ buffer.\n", lpi);
+		error = ENXIO;
+		goto out;
+	}
+	vip->irq = lpi;
+	vip->irqtype = VGIC_IRQ_MISC;
+	vip->enabled = 1;
+	vip->priority = 1;
+
+out:
+	mtx_unlock_spin(&cpu_if->lr_mtx);
+	mtx_unlock_spin(&dist->dist_mtx);
+
+	return (error);
+}
+
 void
 vgic_v3_group_toggle_enabled(bool enabled, struct hyp *hyp)
 {
@@ -1156,7 +1235,7 @@ irqbuf_highest_priority(struct vgic_v3_cpu_if *cpu_if, int start, int end,
 
 		if (!dist_group_enabled(&hypctx->hyp->vgic_dist))
 			continue;
-		if (!vgic_v3_int_target(irq, hypctx))
+		if (irq < GIC_FIRST_LPI && !vgic_v3_int_target(irq, hypctx))
 			continue;
 
 		priority = cpu_if->irqbuf[i].priority;
@@ -1311,7 +1390,7 @@ vgic_v3_sync_hwstate(void *arg)
 	bool en_underflow_intr;
 
 	hypctx = arg;
-	cpu_if =  &hypctx->vgic_cpu_if;
+	cpu_if = &hypctx->vgic_cpu_if;
 
 	/*
 	 * All Distributor writes have been executed at this point, do not
@@ -1367,15 +1446,11 @@ vgic_v3_get_ro_regs()
 
 	/*
 	 * Configure the GIC type register for the guest.
-	 *
-	 * ~GICD_TYPER_SECURITYEXTN: disable security extensions.
-	 * ~GICD_TYPER_DVIS: direct injection for virtual LPIs not supported.
-	 * ~GICD_TYPER_LPIS: LPIs not supported.
+	 * All SPIs and max LPI of 64k - 1.
 	 */
-	ro_regs.gicd_typer = gic_d_read(gic_sc, 4, GICD_TYPER);
-	ro_regs.gicd_typer &= ~GICD_TYPER_SECURITYEXTN;
-	ro_regs.gicd_typer &= ~GICD_TYPER_DVIS;
-	ro_regs.gicd_typer &= ~GICD_TYPER_LPIS;
+	ro_regs.gicd_typer = 31;
+	ro_regs.gicd_typer |= 16ul << 19;
+	ro_regs.gicd_typer |= GICD_TYPER_LPIS;
 
 	/*
 	 * XXX. Guest reads of GICD_PIDR2 should return the same ArchRev as

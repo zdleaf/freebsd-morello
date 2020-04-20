@@ -59,6 +59,8 @@
 #include <machine/vmm_dev.h>
 #include <machine/armreg.h>
 
+#include <dev/pci/pcireg.h>
+
 #include "vmm_stat.h"
 #include "vmm_mem.h"
 #include "arm64.h"
@@ -1369,6 +1371,8 @@ vm_attach_vgic(struct vm *vm, uint64_t dist_start, size_t dist_size,
 
 	error = vgic_v3_attach_to_vm(vm, dist_start, dist_size, redist_start,
 	    redist_size);
+	if (error == 0)
+		error = vgic_its_attach_to_vm(vm, 0x2f300000, 0x10000);
 
 	return (error);
 }
@@ -1392,6 +1396,16 @@ vm_deassert_irq(struct vm *vm, uint32_t irq)
 
 	error = vgic_v3_remove_irq(vm->cookie, irq, false);
 
+	return (error);
+}
+
+int
+vm_raise_msi(struct vm *vm, uint64_t msg, uint64_t addr, int bus, int slot,
+    int func)
+{
+	int error;
+
+	error = vgic_its_raise_msi(vm, msg, addr, PCI_RID(bus, slot, func));
 	return (error);
 }
 

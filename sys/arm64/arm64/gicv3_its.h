@@ -54,7 +54,7 @@ struct its_cmd {
 #define	CMD_COMMAND_SHIFT	0
 #define	CMD_COMMAND_MASK	(0xFFUL << CMD_COMMAND_SHIFT)
 #define	CMD_COMMAND_GET(x)	\
-    (((x)->cmd_dword[0] & CMD_COMMAAND_MASK) >> CMD_COMMAND_SHIFT)
+    (((x)->cmd_dword[0] & CMD_COMMAND_MASK) >> CMD_COMMAND_SHIFT)
 
 /* PCI device ID */
 #define	CMD_DEVID_SHIFT		32

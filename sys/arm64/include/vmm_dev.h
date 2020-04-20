@@ -77,6 +77,14 @@ struct vm_exception {
 	int		restart_instruction;
 };
 
+struct vm_msi {
+	uint64_t	msg;
+	uint64_t	addr;
+	int		bus;
+	int		slot;
+	int		func;
+};
+
 struct vm_capability {
 	int		cpuid;
 	enum vm_cap_type captype;
@@ -162,6 +170,7 @@ enum {
 	/* interrupt injection */
 	IOCNUM_ASSERT_IRQ = 80,
 	IOCNUM_DEASSERT_IRQ = 81,
+	IOCNUM_RAISE_MSI = 82,
 
 	/* vm_cpuset */
 	IOCNUM_ACTIVATE_CPU = 90,
@@ -207,6 +216,8 @@ enum {
 	_IOW('v', IOCNUM_ASSERT_IRQ, struct vm_irq)
 #define VM_DEASSERT_IRQ \
 	_IOW('v', IOCNUM_DEASSERT_IRQ, struct vm_irq)
+#define VM_RAISE_MSI \
+	_IOW('v', IOCNUM_RAISE_MSI, struct vm_msi)
 #define	VM_GLA2GPA	\
 	_IOWR('v', IOCNUM_GLA2GPA, struct vm_gla2gpa)
 #define	VM_ACTIVATE_CPU	\

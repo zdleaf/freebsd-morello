@@ -584,9 +584,7 @@ arm_vmrun(void *arg, int vcpu, register_t pc, pmap_t pmap,
 		 * here, but for the previous VM?
 		 */
 		arm64_set_active_vcpu(hypctx);
-#ifdef noyet
 		vgic_v3_sync_hwstate(hypctx);
-#endif
 		excp_type = vmm_call_hyp((void *)ktohyp(vmm_enter_guest),
 		    ktohyp(hypctx));
 

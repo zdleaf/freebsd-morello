@@ -349,6 +349,7 @@ vmmdev_ioctl(struct cdev *cdev, u_long cmd, caddr_t data, int fflag,
 	struct vm_stat_desc *statdesc;
 	struct vm_suspend *vmsuspend;
 	struct vm_memmap *mm;
+	struct vm_msi *vmsi;
 	uint64_t *regvals;
 	int *regnums;
 
@@ -567,6 +568,11 @@ vmmdev_ioctl(struct cdev *cdev, u_long cmd, caddr_t data, int fflag,
 		vav = (struct vm_attach_vgic *)data;
 		error = vm_attach_vgic(sc->vm, vav->dist_start, vav->dist_size,
 				vav->redist_start, vav->redist_size);
+		break;
+	case VM_RAISE_MSI:
+		vmsi = (struct vm_msi *)data;
+		error = vm_raise_msi(sc->vm, vmsi->msg, vmsi->addr, vmsi->bus,
+		    vmsi->slot, vmsi->func);
 		break;
 	default:
 		error = ENOTTY;

@@ -1359,6 +1359,11 @@ its_cmd_wait_completion(device_t dev, struct its_cmd *cmd_first,
 
 	for (;;) {
 		read = gic_its_read_8(sc, GITS_CREADR);
+		if ((read & GITS_CREADR_STALL) == GITS_CREADR_STALL) {
+			device_printf(dev, "Command processing stalled: %lx\n",
+			    read);
+			return;
+		}
 		if (first < last) {
 			if (read < first || read >= last)
 				break;
