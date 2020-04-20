@@ -793,7 +793,10 @@ smmu_init_pmap(struct smmu_softc *sc, pmap_t p)
 	pmap_pinit(p);
 	PMAP_LOCK_INIT(p);
 
+	pmap_bootstrap_smmu(p, 0x40000000, 0x40000000 / PAGE_SIZE);
+
 	/* Add a static mapping for MSI interrupts delivery. */
+	pmap_bootstrap_smmu(p, 0x300b0000, 1);
 	error = pmap_senter(p, 0x300b0000, 0x300b0000, VM_PROT_WRITE, 0);
 	if (error) {
 		device_printf(sc->dev,

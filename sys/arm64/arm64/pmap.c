@@ -3324,21 +3324,51 @@ setl3:
 #endif /* VM_NRESERVLEVEL > 0 */
 
 /*
+ * Preallocate l1, l2 page directories for an SMMU domain.
+ */
+int
+pmap_bootstrap_smmu(pmap_t pmap, vm_offset_t sva, int count)
+{
+	struct rwlock *lock;
+	pd_entry_t *pde;
+	vm_page_t mpte;
+	vm_offset_t va;
+	int lvl;
+	int i;
+
+	lock = NULL;
+	PMAP_LOCK(pmap);
+
+	va = sva;
+	for (i = 0; i < count; i++) {
+		pde = pmap_pde(pmap, va, &lvl);
+		if (pde != NULL && lvl == 2)
+			continue;
+		mpte = _pmap_alloc_l3(pmap, pmap_l2_pindex(va), &lock);
+		if (mpte == NULL)
+			panic("could not bootstrap");
+		va += PAGE_SIZE;
+	}
+
+	if (lock != NULL)
+		rw_wunlock(lock);
+	PMAP_UNLOCK(pmap);
+
+	return (0);
+}
+
+/*
  * Add a single SMMU entry.
  */
 int
 pmap_senter(pmap_t pmap, vm_offset_t va, vm_paddr_t pa,
     vm_prot_t prot, u_int flags)
 {
-	struct rwlock *lock;
 	pd_entry_t *pde;
 	pt_entry_t new_l3, orig_l3;
 	pt_entry_t *l3;
-	pv_entry_t pv;
-	vm_paddr_t opa;
 	vm_page_t mpte;
-	boolean_t nosleep;
-	int lvl, rv;
+	int lvl;
 
 	PMAP_ASSERT_STAGE1(pmap);
 	KASSERT(va < VM_MAXUSER_ADDRESS, ("wrong address space"));
@@ -3355,41 +3385,15 @@ pmap_senter(pmap_t pmap, vm_offset_t va, vm_paddr_t pa,
 
 	CTR2(KTR_PMAP, "pmap_senter: %.16lx -> %.16lx", va, pa);
 
-	lock = NULL;
 	PMAP_LOCK(pmap);
 
-	/*
-	 * In the case that a page table page is not
-	 * resident, we are creating it here.
-	 */
-retry:
 	pde = pmap_pde(pmap, va, &lvl);
-	if (pde != NULL && lvl == 2) {
-		l3 = pmap_l2_to_l3(pde, va);
-		mpte = PHYS_TO_VM_PAGE(pmap_load(pde) & ~ATTR_MASK);
-		mpte->ref_count++;
-	} else {
-		nosleep = (flags & PMAP_ENTER_NOSLEEP) != 0;
-
-		/*
-		 * We use _pmap_alloc_l3() instead of pmap_alloc_l3() in order
-		 * to handle the possibility that a superpage mapping for "va"
-		 * was created while we slept.
-		 */
-		mpte = _pmap_alloc_l3(pmap, pmap_l2_pindex(va),
-		    nosleep ? NULL : &lock);
-		if (mpte == NULL && nosleep) {
-			CTR0(KTR_PMAP, "pmap_enter: mpte == NULL");
-			rv = KERN_RESOURCE_SHORTAGE;
-			goto out;
-		}
-		goto retry;
-	}
+	KASSERT(pde != NULL && lvl == 2, ("pmap is not bootstrapped"));
+	l3 = pmap_l2_to_l3(pde, va);
+	mpte = PHYS_TO_VM_PAGE(pmap_load(pde) & ~ATTR_MASK);
+	mpte->ref_count++;
 
 	orig_l3 = pmap_load(l3);
-	opa = orig_l3 & ~ATTR_MASK;
-	pv = NULL;
-
 	if (pmap_l3_valid(orig_l3))
 		panic("l3 is valid");
 
@@ -3397,13 +3401,9 @@ retry:
 	pmap_store(l3, new_l3);
 	dsb(ishst);
 
-	rv = KERN_SUCCESS;
-out:
-	if (lock != NULL)
-		rw_wunlock(lock);
 	PMAP_UNLOCK(pmap);
 
-	return (rv);
+	return (KERN_SUCCESS);
 }
 
 /*
