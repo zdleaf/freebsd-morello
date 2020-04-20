@@ -3333,7 +3333,7 @@ pmap_senter(pmap_t pmap, vm_offset_t va, vm_paddr_t pa,
 	struct rwlock *lock;
 	pd_entry_t *pde;
 	pt_entry_t new_l3, orig_l3;
-	pt_entry_t *l2, *l3;
+	pt_entry_t *l3;
 	pv_entry_t pv;
 	vm_paddr_t opa;
 	vm_page_t mpte;
@@ -3341,6 +3341,7 @@ pmap_senter(pmap_t pmap, vm_offset_t va, vm_paddr_t pa,
 	int lvl, rv;
 
 	PMAP_ASSERT_STAGE1(pmap);
+	KASSERT(va < VM_MAXUSER_ADDRESS, ("wrong address space"));
 
 	va = trunc_page(va);
 	new_l3 = (pt_entry_t)(pa | ATTR_DEFAULT |
@@ -3348,17 +3349,14 @@ pmap_senter(pmap_t pmap, vm_offset_t va, vm_paddr_t pa,
 	if ((prot & VM_PROT_WRITE) == 0)
 		new_l3 |= ATTR_S1_AP(ATTR_S1_AP_RO);
 	new_l3 |= ATTR_S1_XN; /* Execute never. */
-	if (va < VM_MAXUSER_ADDRESS)
-		new_l3 |= ATTR_S1_AP(ATTR_S1_AP_USER);
+	new_l3 |= ATTR_S1_AP(ATTR_S1_AP_USER);
 	/* TODO: check this. */
 	new_l3 |= ATTR_S1_nG;
 
-	CTR2(KTR_PMAP, "pmap_enter_smmu: %.16lx -> %.16lx", va, pa);
+	CTR2(KTR_PMAP, "pmap_senter: %.16lx -> %.16lx", va, pa);
 
 	lock = NULL;
 	PMAP_LOCK(pmap);
-
-	mpte = NULL;
 
 	/*
 	 * In the case that a page table page is not
@@ -3368,26 +3366,9 @@ retry:
 	pde = pmap_pde(pmap, va, &lvl);
 	if (pde != NULL && lvl == 2) {
 		l3 = pmap_l2_to_l3(pde, va);
-		if (va < VM_MAXUSER_ADDRESS && mpte == NULL) {
-			mpte = PHYS_TO_VM_PAGE(pmap_load(pde) & ~ATTR_MASK);
-			mpte->ref_count++;
-		}
-		goto havel3;
-	} else if (pde != NULL && lvl == 1) {
-		l2 = pmap_l1_to_l2(pde, va);
-		if ((pmap_load(l2) & ATTR_DESCR_MASK) == L2_BLOCK &&
-		    (l3 = pmap_demote_l2_locked(pmap, l2, va, &lock)) != NULL) {
-			l3 = &l3[pmap_l3_index(va)];
-			if (va < VM_MAXUSER_ADDRESS) {
-				mpte = PHYS_TO_VM_PAGE(
-				    pmap_load(l2) & ~ATTR_MASK);
-				mpte->ref_count++;
-			}
-			goto havel3;
-		}
-		/* We need to allocate an L3 table. */
-	}
-	if (va < VM_MAXUSER_ADDRESS) {
+		mpte = PHYS_TO_VM_PAGE(pmap_load(pde) & ~ATTR_MASK);
+		mpte->ref_count++;
+	} else {
 		nosleep = (flags & PMAP_ENTER_NOSLEEP) != 0;
 
 		/*
@@ -3397,16 +3378,14 @@ retry:
 		 */
 		mpte = _pmap_alloc_l3(pmap, pmap_l2_pindex(va),
 		    nosleep ? NULL : &lock);
+		printf("mpte %p\n", mpte);
 		if (mpte == NULL && nosleep) {
 			CTR0(KTR_PMAP, "pmap_enter: mpte == NULL");
 			rv = KERN_RESOURCE_SHORTAGE;
 			goto out;
 		}
 		goto retry;
-	} else
-		panic("pmap_enter: missing L3 table for kernel va %#lx", va);
-
-havel3:
+	}
 
 	orig_l3 = pmap_load(l3);
 	opa = orig_l3 & ~ATTR_MASK;
@@ -3434,7 +3413,8 @@ out:
 int
 pmap_sremove(pmap_t pmap, vm_offset_t va)
 {
-	pt_entry_t *pte;
+	pt_entry_t *pte, *l2;
+	vm_page_t mpte;
 	int lvl;
 
 	pte = pmap_pte(pmap, va, &lvl);
@@ -3445,6 +3425,10 @@ pmap_sremove(pmap_t pmap, vm_offset_t va)
 		return (0);
 
 	pmap_clear(pte);
+
+	l2 = pmap_l2(pmap, va);
+	mpte = PHYS_TO_VM_PAGE(pmap_load(l2) & ~ATTR_MASK);
+	mpte->ref_count--;
 
 	return (1);
 }
