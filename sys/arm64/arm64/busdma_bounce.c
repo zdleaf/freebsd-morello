@@ -123,7 +123,7 @@ struct bounce_zone {
 	struct sysctl_oid *sysctl_tree_top;
 };
 
-static MALLOC_DEFINE(M_BUSDMA, "busdma", "ARM64 busdma");
+static MALLOC_DEFINE(M_BUSDMA, "busdma tag", "ARM64 busdma");
 
 static struct mtx bounce_lock;
 static int total_bpages;
