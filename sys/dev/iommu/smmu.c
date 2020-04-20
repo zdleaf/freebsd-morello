@@ -990,7 +990,7 @@ smmu_enable_interrupts(struct smmu_softc *sc)
 
 	device_printf(sc->dev, "%s\n", __func__);
 
-	/* Disable MSI */
+	/* Disable MSI. */
 	bus_write_8(sc->res[0], SMMU_GERROR_IRQ_CFG0, 0);
 	bus_write_4(sc->res[0], SMMU_GERROR_IRQ_CFG1, 0);
 	bus_write_4(sc->res[0], SMMU_GERROR_IRQ_CFG2, 0);
@@ -1014,18 +1014,18 @@ smmu_enable_interrupts(struct smmu_softc *sc)
 	bus_write_4(sc->res[0], SMMU_EVENTQ_IRQ_CFG2, 1);
 #endif
 
-	/* Disable interrupts first. */
+	/* Disable any interrupts. */
 	error = smmu_write_ack(sc, SMMU_IRQ_CTRL, SMMU_IRQ_CTRLACK, 0);
 	if (error) {
 		device_printf(sc->dev, "Could not disable interrupts.\n");
 		return (ENXIO);
 	}
 
+	/* Enable interrupts. */
 	reg = IRQ_CTRL_EVENTQ_IRQEN | IRQ_CTRL_GERROR_IRQEN;
 	if (sc->features & SMMU_FEATURE_PRI)
 		reg |= IRQ_CTRL_PRIQ_IRQEN;
 
-	/* Enable interrupts */
 	error = smmu_write_ack(sc, SMMU_IRQ_CTRL, SMMU_IRQ_CTRLACK, reg);
 	if (error) {
 		device_printf(sc->dev, "Could not enable interrupts.\n");
