@@ -3378,7 +3378,6 @@ retry:
 		 */
 		mpte = _pmap_alloc_l3(pmap, pmap_l2_pindex(va),
 		    nosleep ? NULL : &lock);
-		printf("mpte %p\n", mpte);
 		if (mpte == NULL && nosleep) {
 			CTR0(KTR_PMAP, "pmap_enter: mpte == NULL");
 			rv = KERN_RESOURCE_SHORTAGE;
