@@ -207,6 +207,7 @@ iommu_map(struct iommu_domain *domain, bus_dma_segment_t *segs, int nsegs)
 	vm_paddr_t pa;
 	vm_size_t size;
 	vm_prot_t prot;
+	int error;
 	int i;
 
 	iommu = domain->iommu;
@@ -225,7 +226,9 @@ iommu_map(struct iommu_domain *domain, bus_dma_segment_t *segs, int nsegs)
 			panic("Could not allocate virtual address.\n");
 
 		prot = VM_PROT_READ | VM_PROT_WRITE;
-		IOMMU_MAP(iommu->dev, domain, va, pa, size, prot);
+		error = IOMMU_MAP(iommu->dev, domain, va, pa, size, prot);
+		if (error)
+			panic("Could not map VA %jx", va);
 		segs[i].ds_addr = va | offset;
 	}
 }

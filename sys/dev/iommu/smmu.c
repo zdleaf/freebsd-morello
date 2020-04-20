@@ -788,12 +788,18 @@ smmu_init_cd(struct smmu_softc *sc, struct smmu_cd *cd, pmap_t p)
 static int
 smmu_init_pmap(struct smmu_softc *sc, pmap_t p)
 {
+	int error;
 
 	pmap_pinit(p);
 	PMAP_LOCK_INIT(p);
 
-	/* Add MSI static mapping. */
-	pmap_senter(p, 0x300b0000, 0x300b0000, VM_PROT_WRITE, 0);
+	/* Add a static mapping for MSI interrupts delivery. */
+	error = pmap_senter(p, 0x300b0000, 0x300b0000, VM_PROT_WRITE, 0);
+	if (error) {
+		device_printf(sc->dev,
+		    "Could not add a static mapping for MSI page\n");
+		return (ENXIO);
+	}
 
 	device_printf(sc->dev, "%s: pmap initialized\n", __func__);
 
@@ -1479,27 +1485,6 @@ smmu_read_ivar(device_t dev, device_t child, int which, uintptr_t *result)
 	return (ENOENT);
 }
 
-#if 0
-static void
-smmu_insert(struct smmu_softc *sc, struct smmu_domain *domain,
-    vm_paddr_t pa, vm_offset_t va, vm_size_t size)
-{
-	vm_prot_t prot;
-	pmap_t p;
-
-	p = &domain->p;
-
-	prot = VM_PROT_READ | VM_PROT_WRITE;
-
-	for (; size > 0; size -= PAGE_SIZE) {
-		pmap_senter(p, va, pa, prot, 0);
-		smmu_tlbi_va(sc, va);
-		pa += PAGE_SIZE;
-		va += PAGE_SIZE;
-	}
-}
-#endif
-
 static int
 smmu_unmap(device_t dev, struct iommu_domain *dom0,
     vm_offset_t va, vm_size_t size)
@@ -1537,6 +1522,7 @@ smmu_map(device_t dev, struct iommu_domain *dom0,
 {
 	struct smmu_domain *domain;
 	struct smmu_softc *sc;
+	int error;
 	pmap_t p;
 
 	sc = device_get_softc(dev);
@@ -1545,7 +1531,11 @@ smmu_map(device_t dev, struct iommu_domain *dom0,
 	p = &domain->p;
 
 	for (; size > 0; size -= PAGE_SIZE) {
-		pmap_senter(p, va, pa, prot, 0);
+		error = pmap_senter(p, va, pa, prot, 0);
+		if (error) {
+			device_printf(dev, "Could not map address\n");
+			return (ENXIO);
+		}
 		smmu_tlbi_va(sc, va);
 		pa += PAGE_SIZE;
 		va += PAGE_SIZE;
