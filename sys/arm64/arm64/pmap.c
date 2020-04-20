@@ -3416,20 +3416,27 @@ pmap_sremove(pmap_t pmap, vm_offset_t va)
 	vm_page_t mpte;
 	int lvl;
 
+	PMAP_LOCK(pmap);
+
 	pte = pmap_pte(pmap, va, &lvl);
 	KASSERT(lvl == 3,
 	    ("Invalid SMMU pagetable level: %d != 3", lvl));
 
-	if (pte == NULL)
-		return (0);
+	if (pte != NULL) {
+		pmap_clear(pte);
+		l2 = pmap_l2(pmap, va);
+		mpte = PHYS_TO_VM_PAGE(pmap_load(l2) & ~ATTR_MASK);
+		mpte->ref_count--;
 
-	pmap_clear(pte);
+		printf("rc %d\n", mpte->ref_count);
 
-	l2 = pmap_l2(pmap, va);
-	mpte = PHYS_TO_VM_PAGE(pmap_load(l2) & ~ATTR_MASK);
-	mpte->ref_count--;
+		PMAP_UNLOCK(pmap);
+		return (1);
+	}
 
-	return (1);
+	PMAP_UNLOCK(pmap);
+
+	return (0);
 }
 
 /*
