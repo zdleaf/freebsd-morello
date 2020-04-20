@@ -3343,11 +3343,11 @@ pmap_bootstrap_smmu(pmap_t pmap, vm_offset_t sva, int count)
 	for (i = 0; i < count; i++) {
 		pde = pmap_pde(pmap, va, &lvl);
 		if (pde != NULL && lvl == 2)
-			continue;
+			panic("l2 entry exists");
 		mpte = _pmap_alloc_l3(pmap, pmap_l2_pindex(va), &lock);
 		if (mpte == NULL)
 			panic("could not bootstrap");
-		va += PAGE_SIZE;
+		va += L2_SIZE;
 	}
 
 	if (lock != NULL)
