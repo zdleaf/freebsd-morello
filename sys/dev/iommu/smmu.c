@@ -799,6 +799,14 @@ smmu_init_pmap(struct smmu_softc *sc, pmap_t p)
 		return (ENXIO);
 	}
 
+	pmap_remove_smmu(p);
+
+	error = pmap_bootstrap_smmu(p, 0x40000000, 0x40000000 / PAGE_SIZE);
+	if (error) {
+		device_printf(sc->dev, "Could not add SMMU range 1.\n");
+		return (ENXIO);
+	}
+
 	/* Add a static mapping for MSI interrupts delivery. */
 	error = pmap_bootstrap_smmu(p, 0x300b0000, 1);
 	if (error) {
