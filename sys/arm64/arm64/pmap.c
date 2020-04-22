@@ -3324,7 +3324,7 @@ setl3:
 #endif /* VM_NRESERVLEVEL > 0 */
 
 /*
- * Preallocate l1, l2 page directories for an SMMU domain.
+ * Preallocate l1, l2 page directories for a specific VA range.
  */
 int
 pmap_bootstrap_smmu(pmap_t pmap, vm_offset_t sva, int count)
@@ -3343,10 +3343,10 @@ pmap_bootstrap_smmu(pmap_t pmap, vm_offset_t sva, int count)
 	for (i = 0; i < count; i++) {
 		pde = pmap_pde(pmap, va, &lvl);
 		if (pde != NULL && lvl == 2)
-			panic("l2 entry exists");
+			return (EEXIST);
 		mpte = _pmap_alloc_l3(pmap, pmap_l2_pindex(va), &lock);
 		if (mpte == NULL)
-			panic("could not bootstrap");
+			return (ENOMEM);
 		va += L2_SIZE;
 	}
 
@@ -3360,14 +3360,13 @@ pmap_bootstrap_smmu(pmap_t pmap, vm_offset_t sva, int count)
 /*
  * Add a single SMMU entry.
  */
-int
+void
 pmap_senter(pmap_t pmap, vm_offset_t va, vm_paddr_t pa,
     vm_prot_t prot, u_int flags)
 {
 	pd_entry_t *pde;
 	pt_entry_t new_l3, orig_l3;
 	pt_entry_t *l3;
-	vm_page_t mpte;
 	int lvl;
 
 	PMAP_ASSERT_STAGE1(pmap);
@@ -3390,8 +3389,6 @@ pmap_senter(pmap_t pmap, vm_offset_t va, vm_paddr_t pa,
 	pde = pmap_pde(pmap, va, &lvl);
 	KASSERT(pde != NULL && lvl == 2, ("pmap is not bootstrapped"));
 	l3 = pmap_l2_to_l3(pde, va);
-	mpte = PHYS_TO_VM_PAGE(pmap_load(pde) & ~ATTR_MASK);
-	mpte->ref_count++;
 
 	orig_l3 = pmap_load(l3);
 	if (pmap_l3_valid(orig_l3))
@@ -3402,8 +3399,6 @@ pmap_senter(pmap_t pmap, vm_offset_t va, vm_paddr_t pa,
 	dsb(ishst);
 
 	PMAP_UNLOCK(pmap);
-
-	return (KERN_SUCCESS);
 }
 
 /*
@@ -3413,8 +3408,8 @@ int
 pmap_sremove(pmap_t pmap, vm_offset_t va)
 {
 	pt_entry_t *pte, *l2;
-	vm_page_t mpte;
 	int lvl;
+	int rc;
 
 	PMAP_LOCK(pmap);
 
@@ -3425,18 +3420,13 @@ pmap_sremove(pmap_t pmap, vm_offset_t va)
 	if (pte != NULL) {
 		pmap_clear(pte);
 		l2 = pmap_l2(pmap, va);
-		mpte = PHYS_TO_VM_PAGE(pmap_load(l2) & ~ATTR_MASK);
-		mpte->ref_count--;
-
-		printf("rc %d\n", mpte->ref_count);
-
-		PMAP_UNLOCK(pmap);
-		return (1);
-	}
+		rc = 1;
+	} else
+		rc = 0;
 
 	PMAP_UNLOCK(pmap);
 
-	return (0);
+	return (rc);
 }
 
 /*

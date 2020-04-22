@@ -267,6 +267,8 @@ bounce_bus_dma_tag_destroy(bus_dma_tag_t dmat)
 	dmat_copy = dmat;
 
 	if (dmat != NULL) {
+		printf("%s: map_count %d\n", __func__, dmat->map_count);
+
 		if (dmat->map_count != 0) {
 			error = EBUSY;
 			goto out;

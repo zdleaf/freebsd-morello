@@ -793,16 +793,20 @@ smmu_init_pmap(struct smmu_softc *sc, pmap_t p)
 	pmap_pinit(p);
 	PMAP_LOCK_INIT(p);
 
-	pmap_bootstrap_smmu(p, 0x40000000, 0x40000000 / PAGE_SIZE);
-
-	/* Add a static mapping for MSI interrupts delivery. */
-	pmap_bootstrap_smmu(p, 0x300b0000, 1);
-	error = pmap_senter(p, 0x300b0000, 0x300b0000, VM_PROT_WRITE, 0);
+	error = pmap_bootstrap_smmu(p, 0x40000000, 0x40000000 / PAGE_SIZE);
 	if (error) {
-		device_printf(sc->dev,
-		    "Could not add a static mapping for MSI page\n");
+		device_printf(sc->dev, "Could not add SMMU range.\n");
 		return (ENXIO);
 	}
+
+	/* Add a static mapping for MSI interrupts delivery. */
+	error = pmap_bootstrap_smmu(p, 0x300b0000, 1);
+	if (error) {
+		device_printf(sc->dev, "Could not add an MSI page.\n");
+		return (ENXIO);
+	}
+
+	(void)pmap_senter(p, 0x300b0000, 0x300b0000, VM_PROT_WRITE, 0);
 
 	device_printf(sc->dev, "%s: pmap initialized\n", __func__);
 
@@ -1525,7 +1529,6 @@ smmu_map(device_t dev, struct iommu_domain *dom0,
 {
 	struct smmu_domain *domain;
 	struct smmu_softc *sc;
-	int error;
 	pmap_t p;
 
 	sc = device_get_softc(dev);
@@ -1534,11 +1537,7 @@ smmu_map(device_t dev, struct iommu_domain *dom0,
 	p = &domain->p;
 
 	for (; size > 0; size -= PAGE_SIZE) {
-		error = pmap_senter(p, va, pa, prot, 0);
-		if (error) {
-			device_printf(dev, "Could not map address\n");
-			return (ENXIO);
-		}
+		(void)pmap_senter(p, va, pa, prot, 0);
 		smmu_tlbi_va(sc, va);
 		pa += PAGE_SIZE;
 		va += PAGE_SIZE;
