@@ -1588,11 +1588,21 @@ smmu_domain_alloc(device_t dev)
 	return (&domain->domain);
 }
 
+static void
+smmu_domain_free(device_t dev, struct iommu_domain *domain)
+{
+	struct smmu_domain *smmu_domain;
+
+	smmu_domain = (struct smmu_domain *)domain;
+
+	pmap_remove_smmu(&smmu_domain->p);
+}
+
 static int
 smmu_add_device(device_t smmu_dev, struct iommu_domain *domain,
     struct iommu_device *device)
 {
-	struct smmu_domain *smmu_dom;
+	struct smmu_domain *smmu_domain;
 	struct smmu_master *master;
 	struct smmu_softc *sc;
 	uint16_t rid;
@@ -1601,7 +1611,7 @@ smmu_add_device(device_t smmu_dev, struct iommu_domain *domain,
 	int err;
 
 	sc = device_get_softc(smmu_dev);
-	smmu_dom = (struct smmu_domain *)domain;
+	smmu_domain = (struct smmu_domain *)domain;
 
 	master = malloc(sizeof(*master), M_SMMU, M_WAITOK | M_ZERO);
 	master->device = device;
@@ -1628,11 +1638,11 @@ smmu_add_device(device_t smmu_dev, struct iommu_domain *domain,
 	 * 0x600 sata
 	 */
 
-	DOMAIN_LOCK(smmu_dom);
-	TAILQ_INSERT_TAIL(&smmu_dom->master_list, master, next);
-	DOMAIN_UNLOCK(smmu_dom);
+	DOMAIN_LOCK(smmu_domain);
+	TAILQ_INSERT_TAIL(&smmu_domain->master_list, master, next);
+	DOMAIN_UNLOCK(smmu_domain);
 
-	smmu_init_ste(sc, &smmu_dom->cd, master->sid, true);
+	smmu_init_ste(sc, &smmu_domain->cd, master->sid, true);
 
 	return (0);
 }
@@ -1652,6 +1662,7 @@ static device_method_t smmu_methods[] = {
 	DEVMETHOD(iommu_map,		smmu_map),
 	DEVMETHOD(iommu_unmap,		smmu_unmap),
 	DEVMETHOD(iommu_domain_alloc,	smmu_domain_alloc),
+	DEVMETHOD(iommu_domain_free,	smmu_domain_free),
 	DEVMETHOD(iommu_add_device,	smmu_add_device),
 	DEVMETHOD(iommu_capable,	smmu_capable),
 

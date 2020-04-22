@@ -58,6 +58,11 @@ METHOD struct iommu_domain * domain_alloc {
 	device_t		dev;
 };
 
+METHOD void domain_free {
+	device_t		dev;
+	struct iommu_domain	*domain;
+};
+
 METHOD int add_device {
 	device_t		smmu_dev;
 	struct iommu_domain	*domain;

@@ -113,8 +113,11 @@ iommu_domain_alloc(struct iommu *iommu)
 void
 iommu_domain_free(struct iommu_domain *domain)
 {
+	struct iommu *iommu;
 
-	/* TODO */
+	iommu = domain->iommu;
+
+	IOMMU_DOMAIN_FREE(iommu->dev, domain);
 }
 
 struct iommu_domain *
