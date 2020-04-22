@@ -3391,8 +3391,7 @@ pmap_senter(pmap_t pmap, vm_offset_t va, vm_paddr_t pa,
 	l3 = pmap_l2_to_l3(pde, va);
 
 	orig_l3 = pmap_load(l3);
-	if (pmap_l3_valid(orig_l3))
-		panic("l3 is valid");
+	KASSERT(!pmap_l3_valid(orig_l3), ("l3 is valid"));
 
 	/* New mapping */
 	pmap_store(l3, new_l3);
