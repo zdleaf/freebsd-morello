@@ -3406,7 +3406,7 @@ pmap_senter(pmap_t pmap, vm_offset_t va, vm_paddr_t pa,
 int
 pmap_sremove(pmap_t pmap, vm_offset_t va)
 {
-	pt_entry_t *pte, *l2;
+	pt_entry_t *pte;
 	int lvl;
 	int rc;
 
@@ -3418,7 +3418,6 @@ pmap_sremove(pmap_t pmap, vm_offset_t va)
 
 	if (pte != NULL) {
 		pmap_clear(pte);
-		l2 = pmap_l2(pmap, va);
 		rc = 1;
 	} else
 		rc = 0;
@@ -6485,6 +6484,109 @@ sysctl_kmaps_check(struct sbuf *sb, struct pmap_kernel_map_range *range,
 		sysctl_kmaps_dump(sb, range, va);
 		sysctl_kmaps_reinit(range, va, attrs);
 	}
+}
+
+void
+pmap_remove_smmu(pmap_t pmap)
+{
+	pd_entry_t l0e, *l1, l1e, *l2, l2e;
+	pt_entry_t *l3, l3e;
+	vm_offset_t sva;
+	vm_paddr_t pa;
+	vm_paddr_t pa0;
+	vm_paddr_t pa1;
+	int i, j, k, l;
+	vm_page_t m;
+	vm_page_t m0;
+	vm_page_t m1;
+
+	PMAP_LOCK(pmap);
+
+	printf("%s: pm_stats.resident_count %ld\n", __func__,
+	    pmap->pm_stats.resident_count);
+
+	for (sva = VM_MINUSER_ADDRESS, i = pmap_l0_index(sva); i < Ln_ENTRIES;
+	    i++) {
+		l0e = pmap->pm_l0[i];
+		if ((l0e & ATTR_DESCR_VALID) == 0) {
+			sva += L0_SIZE;
+			continue;
+		}
+		//printf("%s: l0e found\n", __func__);
+		pa0 = l0e & ~ATTR_MASK;
+		m0 = PHYS_TO_VM_PAGE(pa0);
+		l1 = (pd_entry_t *)PHYS_TO_DMAP(pa0);
+
+		for (j = pmap_l1_index(sva); j < Ln_ENTRIES; j++) {
+			l1e = l1[j];
+			if ((l1e & ATTR_DESCR_VALID) == 0) {
+				sva += L1_SIZE;
+				continue;
+			}
+			//printf("%s: l1e found\n", __func__);
+			if ((l1e & ATTR_DESCR_MASK) == L1_BLOCK) {
+				sva += L1_SIZE;
+				continue;
+			}
+			pa1 = l1e & ~ATTR_MASK;
+			m1 = PHYS_TO_VM_PAGE(pa1);
+			l2 = (pd_entry_t *)PHYS_TO_DMAP(pa1);
+
+			for (k = pmap_l2_index(sva); k < Ln_ENTRIES; k++) {
+				l2e = l2[k];
+				if ((l2e & ATTR_DESCR_VALID) == 0) {
+					sva += L2_SIZE;
+					continue;
+				}
+				//printf("%s: l2e found\n", __func__);
+				if ((l2e & ATTR_DESCR_MASK) == L2_BLOCK) {
+					sva += L2_SIZE;
+					continue;
+				}
+				pa = l2e & ~ATTR_MASK;
+				m = PHYS_TO_VM_PAGE(pa);
+				l3 = (pt_entry_t *)PHYS_TO_DMAP(pa);
+				//printf("%s: l3 %p\n", __func__, l3);
+
+				for (l = pmap_l3_index(sva); l < Ln_ENTRIES;
+				    l++, sva += L3_SIZE) {
+					l3e = l3[l];
+					if ((l3e & ATTR_DESCR_VALID) == 0)
+						continue;
+					panic("%s: l3e found\n", __func__);
+				}
+
+				m1->ref_count--;
+				vm_page_unwire_noq(m);
+				pmap_resident_count_dec(pmap, 1);
+				if (m->ref_count != 0)
+					printf("pa rc %d\n", m->ref_count);
+				vm_page_free(m);
+				pmap_clear(&l2[k]);
+			}
+
+			vm_page_unwire_noq(m0);
+			pmap_resident_count_dec(pmap, 1);
+			if (m1->ref_count != 0)
+				printf("pa1 rc %d\n", m1->ref_count);
+			vm_page_free(m1);
+			pmap_clear(&l1[j]);
+		}
+
+		if (m0->ref_count != 0)
+			printf("pa0 rc %d\n", m0->ref_count);
+		pmap_resident_count_dec(pmap, 1);
+		vm_page_free(m0);
+		pmap_clear(&pmap->pm_l0[i]);
+	}
+
+	printf("%s: new pm_stats.resident_count %ld\n", __func__,
+	    pmap->pm_stats.resident_count);
+
+	KASSERT(pmap->pm_stats.resident_count == 0,
+	    ("invalid resident count"));
+
+	PMAP_UNLOCK(pmap);
 }
 
 static int
