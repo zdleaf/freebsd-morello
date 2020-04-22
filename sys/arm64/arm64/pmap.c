@@ -3493,7 +3493,7 @@ pmap_remove_smmu(pmap_t pmap)
 					panic("%s: l3e found\n", __func__);
 				}
 
-				m1->ref_count--;
+				vm_page_unwire_noq(m1);
 				vm_page_unwire_noq(m);
 				pmap_resident_count_dec(pmap, 1);
 				vm_page_free(m);
