@@ -1415,6 +1415,7 @@ smmu_tag_init(struct bus_dma_tag *t)
 static struct iommu_domain *
 smmu_alloc_domain(device_t dev)
 {
+	struct iommu_domain *domain;
 	struct iommu *iommu;
 	u_int xref, sid;
 	uint16_t rid;
@@ -1444,7 +1445,13 @@ smmu_alloc_domain(device_t dev)
 		return (NULL);
 	}
 
-	return (iommu_domain_alloc(iommu));
+	domain = iommu_domain_alloc(iommu);
+	if (domain == NULL)
+		return (NULL);
+
+	iommu_domain_add_va_range(domain, 0x40000000, 0x40000000);
+
+	return (domain);
 }
 
 bus_dma_tag_t

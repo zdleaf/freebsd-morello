@@ -102,12 +102,17 @@ iommu_domain_alloc(struct iommu *iommu)
 	if (domain->vmem == NULL)
 		return (NULL);
 
-	/* 1GB of VA space starting from 0x40000000. */
-	vmem_add(domain->vmem, 0x40000000, 0x40000000, 0);
-
-	printf("%s: vmem initialized at addr %p\n", __func__, domain->vmem);
-
 	return (domain);
+}
+
+void
+iommu_domain_add_va_range(struct iommu_domain *domain,
+    vm_offset_t va, vm_size_t size)
+{
+
+	KASSERT(size > 0, ("wrong size"));
+
+	vmem_add(domain->vmem, va, size, M_WAITOK);
 }
 
 void
