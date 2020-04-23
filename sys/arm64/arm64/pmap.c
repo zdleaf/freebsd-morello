@@ -3397,8 +3397,6 @@ retry:
 	pde = pmap_pde(pmap, va, &lvl);
 	if (pde != NULL && lvl == 2) {
 		l3 = pmap_l2_to_l3(pde, va);
-		mpte = PHYS_TO_VM_PAGE(pmap_load(pde) & ~ATTR_MASK);
-		mpte->ref_count++;
 	} else {
 		mpte = _pmap_alloc_l3(pmap, pmap_l2_pindex(va), NULL);
 		if (mpte == NULL) {
