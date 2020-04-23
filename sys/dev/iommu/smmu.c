@@ -1479,21 +1479,21 @@ smmu_read_ivar(device_t dev, device_t child, int which, uintptr_t *result)
 }
 
 static int
-smmu_unmap(device_t dev, struct iommu_domain *dom0,
+smmu_unmap(device_t dev, struct iommu_domain *domain,
     vm_offset_t va, vm_size_t size)
 {
-	struct smmu_domain *domain;
+	struct smmu_domain *smmu_domain;
 	struct smmu_softc *sc;
 	int err;
 	int i;
 
 	sc = device_get_softc(dev);
-	domain = (struct smmu_domain *)dom0;
+	smmu_domain = (struct smmu_domain *)domain;
 
 	err = 0;
 
 	for (i = 0; i < size; i += PAGE_SIZE) {
-		if (pmap_sremove(&domain->p, va)) {
+		if (pmap_sremove(&smmu_domain->p, va)) {
 			/* pmap entry removed, invalidate TLB. */
 			smmu_tlbi_va(sc, va);
 		} else {
@@ -1509,22 +1509,19 @@ smmu_unmap(device_t dev, struct iommu_domain *dom0,
 }
 
 static int
-smmu_map(device_t dev, struct iommu_domain *dom0,
+smmu_map(device_t dev, struct iommu_domain *domain,
     vm_offset_t va, vm_paddr_t pa, vm_size_t size,
     vm_prot_t prot)
 {
-	struct smmu_domain *domain;
+	struct smmu_domain *smmu_domain;
 	struct smmu_softc *sc;
 	int error;
-	pmap_t p;
 
 	sc = device_get_softc(dev);
-	domain = (struct smmu_domain *)dom0;
-
-	p = &domain->p;
+	smmu_domain = (struct smmu_domain *)domain;
 
 	for (; size > 0; size -= PAGE_SIZE) {
-		error = pmap_senter(p, va, pa, prot, 0);
+		error = pmap_senter(&smmu_domain->p, va, pa, prot, 0);
 		if (error)
 			return (error);
 		smmu_tlbi_va(sc, va);
