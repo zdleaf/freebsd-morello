@@ -914,14 +914,18 @@ static bus_dma_segment_t *
 bounce_bus_dmamap_complete(bus_dma_tag_t dmat, bus_dmamap_t map,
     bus_dma_segment_t *segs, int nsegs, int error)
 {
+	int rv;
 
 	map->nsegs = nsegs;
 
 	if (segs != NULL)
 		memcpy(dmat->segments, segs, map->nsegs * sizeof(segs[0]));
 
-	if (dmat->iommu_domain)
-		iommu_map(dmat->iommu_domain, dmat->segments, nsegs);
+	if (dmat->iommu_domain) {
+		rv = iommu_map(dmat->iommu_domain, dmat->segments, nsegs);
+		if (rv)
+			panic("TODO: not sure what to do in this case\n");
+	}
 
 	if (segs != NULL)
 		memcpy(segs, dmat->segments, map->nsegs * sizeof(segs[0]));
