@@ -105,14 +105,20 @@ iommu_domain_alloc(struct iommu *iommu)
 	return (domain);
 }
 
-void
+int
 iommu_domain_add_va_range(struct iommu_domain *domain,
     vm_offset_t va, vm_size_t size)
 {
+	struct iommu *iommu;
+	int error;
 
 	KASSERT(size > 0, ("wrong size"));
 
-	vmem_add(domain->vmem, va, size, M_WAITOK);
+	iommu = domain->iommu;
+
+	error = vmem_add(domain->vmem, va, size, M_WAITOK);
+
+	return (error);
 }
 
 void

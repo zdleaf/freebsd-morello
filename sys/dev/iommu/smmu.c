@@ -786,35 +786,35 @@ smmu_init_cd(struct smmu_softc *sc, struct smmu_cd *cd, pmap_t p)
 }
 
 static int
+smmu_bootstrap(device_t dev, struct iommu_domain *domain,
+    vm_offset_t va, vm_size_t size)
+{
+	struct smmu_domain *smmu_domain;
+	struct smmu_softc *sc;
+	int error;
+	pmap_t p;
+
+	KASSERT((va & (PAGE_SIZE - 1)) == 0, ("va is not properly aligned\n"));
+	KASSERT((size & (PAGE_SIZE - 1)) == 0, ("size is not aligned"));
+
+	sc = device_get_softc(dev);
+	smmu_domain = (struct smmu_domain *)domain;
+
+	p = &smmu_domain->p;
+
+	error = pmap_bootstrap_smmu(p, va, size / PAGE_SIZE);
+
+	return (error);
+}
+
+static int
 smmu_init_pmap(struct smmu_softc *sc, pmap_t p)
 {
 	int error;
 
-	pmap_pinit(p);
-	PMAP_LOCK_INIT(p);
-
-	error = pmap_bootstrap_smmu(p, 0x40000000, 0x40000000 / PAGE_SIZE);
-	if (error) {
-		device_printf(sc->dev, "Could not add SMMU range.\n");
-		return (ENXIO);
-	}
-
-	pmap_remove_smmu(p);
-
-	error = pmap_bootstrap_smmu(p, 0x40000000, 0x40000000 / PAGE_SIZE);
-	if (error) {
-		device_printf(sc->dev, "Could not add SMMU range 1.\n");
-		return (ENXIO);
-	}
-
-	/* Add a static mapping for MSI interrupts delivery. */
-	error = pmap_bootstrap_smmu(p, 0x300b0000, 1);
-	if (error) {
-		device_printf(sc->dev, "Could not add an MSI page.\n");
-		return (ENXIO);
-	}
-
-	(void)pmap_senter(p, 0x300b0000, 0x300b0000, VM_PROT_WRITE, 0);
+	error = pmap_senter(p, 0x300b0000, 0x300b0000, VM_PROT_WRITE, 0);
+	if (error)
+		return (error);
 
 	device_printf(sc->dev, "%s: pmap initialized\n", __func__);
 
@@ -1537,6 +1537,7 @@ smmu_map(device_t dev, struct iommu_domain *dom0,
 {
 	struct smmu_domain *domain;
 	struct smmu_softc *sc;
+	int error;
 	pmap_t p;
 
 	sc = device_get_softc(dev);
@@ -1545,7 +1546,9 @@ smmu_map(device_t dev, struct iommu_domain *dom0,
 	p = &domain->p;
 
 	for (; size > 0; size -= PAGE_SIZE) {
-		(void)pmap_senter(p, va, pa, prot, 0);
+		error = pmap_senter(p, va, pa, prot, 0);
+		if (error)
+			return (error);
 		smmu_tlbi_va(sc, va);
 		pa += PAGE_SIZE;
 		va += PAGE_SIZE;
@@ -1571,11 +1574,10 @@ smmu_domain_alloc(device_t dev)
 
 	TAILQ_INIT(&domain->master_list);
 
-	err = smmu_init_pmap(sc, &domain->p);
-	if (err) {
-		device_printf(sc->dev, "Could not initialize pmap\n");
-		return (NULL);
-	}
+	pmap_pinit(&domain->p);
+	PMAP_LOCK_INIT(&domain->p);
+
+	smmu_init_pmap(sc, &domain->p);
 
 	err = smmu_init_cd(sc, &domain->cd, &domain->p);
 	if (err) {
@@ -1648,7 +1650,7 @@ smmu_add_device(device_t smmu_dev, struct iommu_domain *domain,
 }
 
 static int
-smmu_capable(device_t smmu_dev, device_t dev)
+smmu_capable(device_t dev)
 {
 
 	return (0);
@@ -1659,6 +1661,7 @@ static device_method_t smmu_methods[] = {
 	DEVMETHOD(device_detach,	smmu_detach),
 
 	/* IOMMU interface */
+	DEVMETHOD(iommu_bootstrap,	smmu_bootstrap),
 	DEVMETHOD(iommu_map,		smmu_map),
 	DEVMETHOD(iommu_unmap,		smmu_unmap),
 	DEVMETHOD(iommu_domain_alloc,	smmu_domain_alloc),

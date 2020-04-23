@@ -38,6 +38,9 @@
 
 INTERFACE iommu;
 
+#
+# Map a virtual address VA to a physical address PA.
+#
 METHOD int map {
 	device_t		dev;
 	struct iommu_domain	*domain;
@@ -47,6 +50,9 @@ METHOD int map {
 	vm_prot_t		prot;
 };
 
+#
+# Unmap a virtual address VA.
+#
 METHOD int unmap {
 	device_t		dev;
 	struct iommu_domain	*domain;
@@ -54,22 +60,43 @@ METHOD int unmap {
 	vm_size_t		size;
 };
 
+#
+# Allocate an IOMMU domain.
+#
 METHOD struct iommu_domain * domain_alloc {
 	device_t		dev;
 };
 
+#
+# Release all the resources held by IOMMU domain.
+#
 METHOD void domain_free {
 	device_t		dev;
 	struct iommu_domain	*domain;
 };
 
+#
+# A VA range is going to be added to a IOMMU domain.
+#
+METHOD int bootstrap {
+	device_t		dev;
+	struct iommu_domain	*domain;
+	vm_offset_t		va;
+	vm_size_t		size;
+};
+
+#
+# Add a consumer device to a IOMMU domain.
+#
 METHOD int add_device {
-	device_t		smmu_dev;
+	device_t		dev;
 	struct iommu_domain	*domain;
 	struct iommu_device	*device;
 };
 
+#
+# Unused.
+#
 METHOD int capable {
-	device_t		smmu_dev;
 	device_t		dev;
 };

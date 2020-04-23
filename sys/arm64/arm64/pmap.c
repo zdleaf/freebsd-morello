@@ -3325,6 +3325,7 @@ setl3:
 
 /*
  * Preallocate l1, l2 page directories for a specific VA range.
+ * This is optional.
  */
 int
 pmap_bootstrap_smmu(pmap_t pmap, vm_offset_t sva, int count)
@@ -3358,16 +3359,18 @@ pmap_bootstrap_smmu(pmap_t pmap, vm_offset_t sva, int count)
 }
 
 /*
- * Add a single SMMU entry.
+ * Add a single SMMU entry. This function does not sleep.
  */
-void
+int
 pmap_senter(pmap_t pmap, vm_offset_t va, vm_paddr_t pa,
     vm_prot_t prot, u_int flags)
 {
 	pd_entry_t *pde;
 	pt_entry_t new_l3, orig_l3;
 	pt_entry_t *l3;
+	vm_page_t mpte;
 	int lvl;
+	int rv;
 
 	PMAP_ASSERT_STAGE1(pmap);
 	KASSERT(va < VM_MAXUSER_ADDRESS, ("wrong address space"));
@@ -3386,9 +3389,25 @@ pmap_senter(pmap_t pmap, vm_offset_t va, vm_paddr_t pa,
 
 	PMAP_LOCK(pmap);
 
+	/*
+	 * In the case that a page table page is not
+	 * resident, we are creating it here.
+	 */
+retry:
 	pde = pmap_pde(pmap, va, &lvl);
-	KASSERT(pde != NULL && lvl == 2, ("pmap is not bootstrapped"));
-	l3 = pmap_l2_to_l3(pde, va);
+	if (pde != NULL && lvl == 2) {
+		l3 = pmap_l2_to_l3(pde, va);
+		mpte = PHYS_TO_VM_PAGE(pmap_load(pde) & ~ATTR_MASK);
+		mpte->ref_count++;
+	} else {
+		mpte = _pmap_alloc_l3(pmap, pmap_l2_pindex(va), NULL);
+		if (mpte == NULL) {
+			CTR0(KTR_PMAP, "pmap_enter: mpte == NULL");
+			rv = KERN_RESOURCE_SHORTAGE;
+			goto out;
+		}
+		goto retry;
+	}
 
 	orig_l3 = pmap_load(l3);
 	KASSERT(!pmap_l3_valid(orig_l3), ("l3 is valid"));
@@ -3397,7 +3416,11 @@ pmap_senter(pmap_t pmap, vm_offset_t va, vm_paddr_t pa,
 	pmap_store(l3, new_l3);
 	dsb(ishst);
 
+	rv = KERN_SUCCESS;
+out:
 	PMAP_UNLOCK(pmap);
+
+	return (rv);
 }
 
 /*

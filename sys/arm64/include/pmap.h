@@ -187,7 +187,7 @@ int	pmap_fault(pmap_t, uint64_t, uint64_t);
 int pmap_debug(int enable);
 
 void pmap_remove_smmu(pmap_t pmap);
-void pmap_senter(pmap_t pmap, vm_offset_t va, vm_paddr_t pa,
+int pmap_senter(pmap_t pmap, vm_offset_t va, vm_paddr_t pa,
     vm_prot_t prot, u_int flags);
 int pmap_sremove(pmap_t pmap, vm_offset_t va);
 int pmap_bootstrap_smmu(pmap_t pmap, vm_offset_t sva, int count);
