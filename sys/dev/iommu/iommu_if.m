@@ -76,16 +76,6 @@ METHOD void domain_free {
 };
 
 #
-# A VA range is going to be added to a IOMMU domain.
-#
-METHOD int bootstrap {
-	device_t		dev;
-	struct iommu_domain	*domain;
-	vm_offset_t		va;
-	vm_size_t		size;
-};
-
-#
 # Add a consumer device to a IOMMU domain.
 #
 METHOD int add_device {

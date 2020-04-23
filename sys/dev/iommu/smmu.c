@@ -786,28 +786,6 @@ smmu_init_cd(struct smmu_softc *sc, struct smmu_cd *cd, pmap_t p)
 }
 
 static int
-smmu_bootstrap(device_t dev, struct iommu_domain *domain,
-    vm_offset_t va, vm_size_t size)
-{
-	struct smmu_domain *smmu_domain;
-	struct smmu_softc *sc;
-	int error;
-	pmap_t p;
-
-	KASSERT((va & (PAGE_SIZE - 1)) == 0, ("va is not properly aligned\n"));
-	KASSERT((size & (PAGE_SIZE - 1)) == 0, ("size is not aligned"));
-
-	sc = device_get_softc(dev);
-	smmu_domain = (struct smmu_domain *)domain;
-
-	p = &smmu_domain->p;
-
-	error = pmap_bootstrap_smmu(p, va, size / PAGE_SIZE);
-
-	return (error);
-}
-
-static int
 smmu_init_pmap(struct smmu_softc *sc, pmap_t p)
 {
 	int error;
@@ -1661,7 +1639,6 @@ static device_method_t smmu_methods[] = {
 	DEVMETHOD(device_detach,	smmu_detach),
 
 	/* IOMMU interface */
-	DEVMETHOD(iommu_bootstrap,	smmu_bootstrap),
 	DEVMETHOD(iommu_map,		smmu_map),
 	DEVMETHOD(iommu_unmap,		smmu_unmap),
 	DEVMETHOD(iommu_domain_alloc,	smmu_domain_alloc),

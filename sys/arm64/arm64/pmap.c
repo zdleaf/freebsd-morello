@@ -3325,7 +3325,7 @@ setl3:
 
 /*
  * Preallocate l1, l2 page directories for a specific VA range.
- * This is optional.
+ * This is not used.
  */
 int
 pmap_bootstrap_smmu(pmap_t pmap, vm_offset_t sva, int count)
