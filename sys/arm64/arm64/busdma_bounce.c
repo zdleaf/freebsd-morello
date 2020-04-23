@@ -1449,7 +1449,11 @@ smmu_alloc_domain(device_t dev)
 	if (domain == NULL)
 		return (NULL);
 
+	/* Add some virtual address range. */
 	iommu_domain_add_va_range(domain, 0x40000000, 0x40000000);
+
+	/* Map MSI page so device dev could send MSI interrupts. */
+	iommu_map_page(domain, 0x300b0000, 0x300b0000, VM_PROT_WRITE);
 
 	return (domain);
 }

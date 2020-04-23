@@ -180,6 +180,52 @@ iommu_add_device(struct iommu_domain *domain, device_t dev)
 	return (err);
 }
 
+/*
+ * Busdma map/unmap interface.
+ */
+int
+iommu_map(struct iommu_domain *domain, bus_dma_segment_t *segs, int nsegs)
+{
+	struct iommu *iommu;
+	vm_offset_t offset;
+	vm_offset_t va;
+	vm_paddr_t pa;
+	vm_size_t size;
+	vm_prot_t prot;
+	int error;
+	int i;
+
+	iommu = domain->iommu;
+
+	for (i = 0; i < nsegs; i++) {
+		pa = segs[i].ds_addr & ~(PAGE_SIZE - 1);
+		offset = segs[i].ds_addr & (PAGE_SIZE - 1);
+		size = roundup2(offset + segs[i].ds_len, PAGE_SIZE);
+
+#if 0
+		if ((offset + segs[i].ds_len) > PAGE_SIZE)
+			printf("offset %lx len %lx size %lx\n",
+			    offset, segs[i].ds_len, size);
+#endif
+
+		error = vmem_alloc(domain->vmem, size,
+		    M_FIRSTFIT | M_NOWAIT, &va);
+		if (error) {
+			device_printf(iommu->dev, "Could not allocate VA.\n");
+			return (error);
+		}
+
+		prot = VM_PROT_READ | VM_PROT_WRITE;
+
+		error = IOMMU_MAP(iommu->dev, domain, va, pa, size, prot);
+		if (error)
+			return (error);
+		segs[i].ds_addr = va | offset;
+	}
+
+	return (0);
+}
+
 void
 iommu_unmap(struct iommu_domain *domain, bus_dma_segment_t *segs, int nsegs)
 {
@@ -212,39 +258,20 @@ iommu_unmap(struct iommu_domain *domain, bus_dma_segment_t *segs, int nsegs)
 	}
 }
 
-void
-iommu_map(struct iommu_domain *domain, bus_dma_segment_t *segs, int nsegs)
+int
+iommu_map_page(struct iommu_domain *domain,
+    vm_offset_t va, vm_paddr_t pa, vm_prot_t prot)
 {
 	struct iommu *iommu;
-	vm_offset_t offset;
-	vm_offset_t va;
-	vm_paddr_t pa;
-	vm_size_t size;
-	vm_prot_t prot;
 	int error;
-	int i;
 
 	iommu = domain->iommu;
 
-	for (i = 0; i < nsegs; i++) {
-		pa = segs[i].ds_addr & ~(PAGE_SIZE - 1);
-		offset = segs[i].ds_addr & (PAGE_SIZE - 1);
-		size = roundup2(offset + segs[i].ds_len, PAGE_SIZE);
+	error = IOMMU_MAP(iommu->dev, domain, va, pa, PAGE_SIZE, prot);
+	if (error)
+		return (error);
 
-		if ((offset + segs[i].ds_len) > PAGE_SIZE)
-			printf("offset %lx len %lx size %lx\n",
-			    offset, segs[i].ds_len, size);
-
-		if (vmem_alloc(domain->vmem, size,
-		    M_FIRSTFIT | M_NOWAIT, &va))
-			panic("Could not allocate virtual address.\n");
-
-		prot = VM_PROT_READ | VM_PROT_WRITE;
-		error = IOMMU_MAP(iommu->dev, domain, va, pa, size, prot);
-		if (error)
-			panic("Could not map VA %jx", va);
-		segs[i].ds_addr = va | offset;
-	}
+	return (0);
 }
 
 int

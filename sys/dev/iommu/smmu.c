@@ -786,20 +786,6 @@ smmu_init_cd(struct smmu_softc *sc, struct smmu_cd *cd, pmap_t p)
 }
 
 static int
-smmu_init_pmap(struct smmu_softc *sc, pmap_t p)
-{
-	int error;
-
-	error = pmap_senter(p, 0x300b0000, 0x300b0000, VM_PROT_WRITE, 0);
-	if (error)
-		return (error);
-
-	device_printf(sc->dev, "%s: pmap initialized\n", __func__);
-
-	return (0);
-}
-
-static int
 smmu_init_strtab_linear(struct smmu_softc *sc)
 {
 	struct smmu_strtab *strtab;
@@ -1551,8 +1537,6 @@ smmu_domain_alloc(device_t dev)
 
 	pmap_pinit(&domain->p);
 	PMAP_LOCK_INIT(&domain->p);
-
-	smmu_init_pmap(sc, &domain->p);
 
 	err = smmu_init_cd(sc, &domain->cd, &domain->p);
 	if (err) {
