@@ -957,8 +957,14 @@ smmu_deinit_l1_entry(struct smmu_softc *sc, int sid)
 {
 	struct smmu_strtab *strtab;
 	struct l1_desc *l1_desc;
+	uint64_t *addr;
+	int i;
 
 	strtab = &sc->strtab;
+
+	i = sid >> STRTAB_SPLIT;
+	addr = (void *)((uint64_t)strtab->addr + STRTAB_L1_DESC_DWORDS * 8 * i);
+	*addr = 0;
 
 	if (sc->features & SMMU_FEATURE_2_LVL_STREAM_TABLE) {
 		l1_desc = &strtab->l1[sid >> STRTAB_SPLIT];
@@ -1571,7 +1577,11 @@ smmu_domain_free(device_t dev, struct iommu_domain *domain)
 
 	smmu_domain = (struct smmu_domain *)domain;
 
+	/* TODO: remove CD */
+
 	pmap_remove_smmu(&smmu_domain->p);
+
+	free(domain, M_SMMU);
 }
 
 static int

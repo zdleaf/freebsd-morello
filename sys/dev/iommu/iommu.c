@@ -80,31 +80,6 @@ static struct mtx iommu_mtx;
 
 static LIST_HEAD(, iommu) iommu_list = LIST_HEAD_INITIALIZER(iommu_list);
 
-struct iommu_domain *
-iommu_domain_alloc(struct iommu *iommu)
-{
-	struct iommu_domain *domain;
-
-	domain = IOMMU_DOMAIN_ALLOC(iommu->dev);
-	if (domain == NULL)
-		return (NULL);
-
-	LIST_INIT(&domain->device_list);
-	mtx_init(&domain->mtx_lock, "IOMMU domain", NULL, MTX_DEF);
-	domain->iommu = iommu;
-
-	IOMMU_LOCK(iommu);
-	LIST_INSERT_HEAD(&iommu->domain_list, domain, next);
-	IOMMU_UNLOCK(iommu);
-
-	domain->vmem = vmem_create("IOMMU vmem", 0, 0, PAGE_SIZE,
-	    PAGE_SIZE, M_FIRSTFIT | M_WAITOK);
-	if (domain->vmem == NULL)
-		return (NULL);
-
-	return (domain);
-}
-
 int
 iommu_domain_add_va_range(struct iommu_domain *domain,
     vm_offset_t va, vm_size_t size)
@@ -121,6 +96,31 @@ iommu_domain_add_va_range(struct iommu_domain *domain,
 	return (error);
 }
 
+struct iommu_domain *
+iommu_domain_alloc(struct iommu *iommu)
+{
+	struct iommu_domain *domain;
+
+	domain = IOMMU_DOMAIN_ALLOC(iommu->dev);
+	if (domain == NULL)
+		return (NULL);
+
+	LIST_INIT(&domain->device_list);
+	mtx_init(&domain->mtx_lock, "IOMMU domain", NULL, MTX_DEF);
+	domain->iommu = iommu;
+
+	domain->vmem = vmem_create("IOMMU vmem", 0, 0, PAGE_SIZE,
+	    PAGE_SIZE, M_FIRSTFIT | M_WAITOK);
+	if (domain->vmem == NULL)
+		return (NULL);
+
+	IOMMU_LOCK(iommu);
+	LIST_INSERT_HEAD(&iommu->domain_list, domain, next);
+	IOMMU_UNLOCK(iommu);
+
+	return (domain);
+}
+
 void
 iommu_domain_free(struct iommu_domain *domain)
 {
@@ -128,7 +128,11 @@ iommu_domain_free(struct iommu_domain *domain)
 
 	iommu = domain->iommu;
 
+	IOMMU_LOCK(iommu);
+	LIST_REMOVE(domain, next);
+	vmem_destroy(domain->vmem);
 	IOMMU_DOMAIN_FREE(iommu->dev, domain);
+	IOMMU_UNLOCK(iommu);
 }
 
 struct iommu_domain *
