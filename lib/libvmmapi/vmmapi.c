@@ -600,7 +600,6 @@ vm_get_register(struct vmctx *ctx, int vcpu, int reg, uint64_t *ret_val)
 	return (error);
 }
 
-#ifdef __amd64__
 int
 vm_set_register_set(struct vmctx *ctx, int vcpu, unsigned int count,
     const int *regnums, uint64_t *regvals)
@@ -634,7 +633,6 @@ vm_get_register_set(struct vmctx *ctx, int vcpu, unsigned int count,
 	error = ioctl(ctx->fd, VM_GET_REGISTER_SET, &vmregset);
 	return (error);
 }
-#endif
 
 int
 vm_run(struct vmctx *ctx, int vcpu, struct vm_exit *vmexit)
@@ -667,7 +665,64 @@ vm_reinit(struct vmctx *ctx)
 	return (ioctl(ctx->fd, VM_REINIT, 0));
 }
 
-#ifdef __amd64__
+#if defined(__aarch64__)
+int
+vm_attach_vgic(struct vmctx *ctx, uint64_t dist_start, size_t dist_size,
+    uint64_t redist_start, size_t redist_size, uint64_t its_start,
+    size_t its_size)
+{
+	struct vm_attach_vgic vav;
+
+	bzero(&vav, sizeof(vav));
+	vav.dist_start = dist_start;
+	vav.dist_size = dist_size;
+	vav.redist_start = redist_start;
+	vav.redist_size = redist_size;
+	vav.its_start = its_start;
+	vav.its_size = its_size;
+
+	return (ioctl(ctx->fd, VM_ATTACH_VGIC, &vav));
+}
+
+int
+vm_assert_irq(struct vmctx *ctx, uint32_t irq)
+{
+	struct vm_irq vi;
+
+	bzero(&vi, sizeof(vi));
+	vi.irq = irq;
+
+	return (ioctl(ctx->fd, VM_ASSERT_IRQ, &vi));
+}
+
+int
+vm_deassert_irq(struct vmctx *ctx, uint32_t irq)
+{
+	struct vm_irq vi;
+
+	bzero(&vi, sizeof(vi));
+	vi.irq = irq;
+
+	return (ioctl(ctx->fd, VM_DEASSERT_IRQ, &vi));
+}
+
+int
+vm_raise_msi(struct vmctx *ctx, uint64_t addr, uint64_t msg, int bus, int slot,
+    int func)
+{
+	struct vm_msi vmsi;
+
+	bzero(&vmsi, sizeof(vmsi));
+	vmsi.addr = addr;
+	vmsi.msg = msg;
+	vmsi.bus = bus;
+	vmsi.slot = slot;
+	vmsi.func = func;
+
+	return (ioctl(ctx->fd, VM_RAISE_MSI, &vmsi));
+}
+
+#elif defined(__amd64__)
 int
 vm_inject_exception(struct vmctx *ctx, int vcpu, int vector, int errcode_valid,
     uint32_t errcode, int restart_instruction)

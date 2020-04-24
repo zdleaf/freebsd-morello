@@ -143,6 +143,16 @@ int	vm_get_register_set(struct vmctx *ctx, int vcpu, unsigned int count,
 int	vm_run(struct vmctx *ctx, int vcpu, struct vm_exit *ret_vmexit);
 int	vm_suspend(struct vmctx *ctx, enum vm_suspend_how how);
 int	vm_reinit(struct vmctx *ctx);
+#ifdef __aarch64__
+int	vm_attach_vgic(struct vmctx *ctx, uint64_t dist_start, size_t dist_size,
+    uint64_t redist_start, size_t redist_size, uint64_t its_start,
+    size_t its_size);
+int	vm_assert_irq(struct vmctx *ctx, uint32_t irq);
+int	vm_deassert_irq(struct vmctx *ctx, uint32_t irq);
+int	vm_raise_msi(struct vmctx *ctx, uint64_t addr, uint64_t msg, int bus,
+    int slot, int func);
+#endif
+#ifdef __amd64__
 int	vm_apicid2vcpu(struct vmctx *ctx, int apicid);
 int	vm_inject_exception(struct vmctx *ctx, int vcpu, int vector,
     int errcode_valid, uint32_t errcode, int restart_instruction);
@@ -156,11 +166,10 @@ int	vm_ioapic_pincount(struct vmctx *ctx, int *pincount);
 int	vm_isa_assert_irq(struct vmctx *ctx, int atpic_irq, int ioapic_irq);
 int	vm_isa_deassert_irq(struct vmctx *ctx, int atpic_irq, int ioapic_irq);
 int	vm_isa_pulse_irq(struct vmctx *ctx, int atpic_irq, int ioapic_irq);
-#ifdef __amd64__
 int	vm_isa_set_irq_trigger(struct vmctx *ctx, int atpic_irq,
 	    enum vm_intr_trigger trigger);
-#endif
 int	vm_inject_nmi(struct vmctx *ctx, int vcpu);
+#endif
 int	vm_capability_name2type(const char *capname);
 const char *vm_capability_type2name(int type);
 int	vm_get_capability(struct vmctx *ctx, int vcpu, enum vm_cap_type cap,
