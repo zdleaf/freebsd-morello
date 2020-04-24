@@ -728,15 +728,19 @@ smmu_init_ste(struct smmu_softc *sc, struct smmu_cd *cd, int sid, bool s1)
 }
 
 static int
-smmu_init_cd(struct smmu_softc *sc, struct smmu_cd *cd, pmap_t p)
+smmu_init_cd(struct smmu_softc *sc, struct smmu_domain *domain)
 {
 	vm_paddr_t paddr;
 	uint64_t *ptr;
 	uint64_t val;
 	int size;
+	struct smmu_cd *cd;
+	pmap_t p;
 
 	size = 1 * (CD_DWORDS << 3);
 
+	p = &domain->p;
+	cd = &domain->cd;
 	cd->addr = contigmalloc(size, M_SMMU,
 	    M_WAITOK | M_ZERO,	/* flags */
 	    0,			/* low */
@@ -1559,7 +1563,7 @@ smmu_domain_alloc(device_t dev)
 	pmap_pinit(&domain->p);
 	PMAP_LOCK_INIT(&domain->p);
 
-	err = smmu_init_cd(sc, &domain->cd, &domain->p);
+	err = smmu_init_cd(sc, domain);
 	if (err) {
 		device_printf(sc->dev, "Could not initialize CD\n");
 		return (NULL);
