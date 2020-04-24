@@ -279,6 +279,7 @@ bounce_bus_dma_tag_destroy(bus_dma_tag_t dmat)
 			if (dmat->common.ref_count == 0) {
 				if (dmat->segments != NULL)
 					free(dmat->segments, M_DEVBUF);
+				//smmu_
 				free(dmat, M_DEVBUF);
 				/*
 				 * Last reference count, so
@@ -1429,6 +1430,9 @@ smmu_alloc_domain(device_t dev)
 	rid = pci_get_rid(dev);
 	seg = pci_get_domain(dev);
 
+	/*
+	 * Find an xref of an IOMMU controller that serves traffic for dev.
+	 */
 #ifdef DEV_ACPI
 	error = acpi_iort_map_pci_smmuv3(seg, rid, &xref, &sid);
 	if (error) {
@@ -1440,9 +1444,9 @@ smmu_alloc_domain(device_t dev)
 	return (NULL);
 #endif
 
-	printf("%s: smmuv3 error %d rid %x xref %d sid %x\n",
-	    __func__, error, rid, xref, sid);
-
+	/*
+	 * Find the registered IOMMU controller by xref.
+	 */
 	iommu = iommu_lookup(xref, 0);
 	if (iommu == NULL) {
 		/* SMMU device is not registered in the IOMMU framework. */
@@ -1456,7 +1460,7 @@ smmu_alloc_domain(device_t dev)
 	/* Add some virtual address range. */
 	iommu_domain_add_va_range(domain, 0x40000000, 0x40000000);
 
-	/* Map MSI page so device dev could send MSI interrupts. */
+	/* Map the GICv3 ITS page so the device could send MSI interrupts. */
 	iommu_map_page(domain, 0x300b0000, 0x300b0000, VM_PROT_WRITE);
 
 	return (domain);

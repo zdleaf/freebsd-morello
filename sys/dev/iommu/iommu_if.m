@@ -85,6 +85,14 @@ METHOD int add_device {
 };
 
 #
+# Remove a consumer device from IOMMU domain.
+#
+METHOD int remove_device {
+	device_t		dev;
+	struct iommu_device	*device;
+};
+
+#
 # Unused.
 #
 METHOD int capable {

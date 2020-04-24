@@ -89,5 +89,6 @@ int iommu_domain_add_va_range(struct iommu_domain *domain,
     vm_offset_t va, vm_size_t size);
 int iommu_map_page(struct iommu_domain *domain,
     vm_offset_t va, vm_paddr_t pa, vm_prot_t prot);
+int iommu_remove_device(struct iommu_domain *domain, device_t dev);
 
 #endif /* _DEV_IOMMU_IOMMU_H_ */

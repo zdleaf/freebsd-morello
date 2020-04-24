@@ -98,6 +98,7 @@ struct smmu_cmdq_entry {
 
 struct l1_desc {
 	uint8_t		span;
+	size_t		size;
 	void		*va;
 	vm_paddr_t	pa;
 };
@@ -146,7 +147,7 @@ struct smmu_softc {
 };
 
 struct smmu_master {
-	TAILQ_ENTRY(smmu_master)	next;
+	LIST_ENTRY(smmu_master)	next;
 	struct iommu_device		*device;
 	int				sid;
 };
@@ -154,8 +155,8 @@ struct smmu_master {
 struct smmu_domain {
 	struct iommu_domain		domain;
 	struct mtx			mtx_lock;
-	TAILQ_ENTRY(smmu_domain)	next;
-	TAILQ_HEAD(, smmu_master)	master_list;
+	LIST_ENTRY(smmu_domain)	next;
+	LIST_HEAD(, smmu_master)	master_list;
 	struct smmu_cd			cd;
 	struct pmap			p;
 };

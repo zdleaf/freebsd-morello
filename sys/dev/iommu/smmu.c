@@ -706,9 +706,9 @@ smmu_init_ste(struct smmu_softc *sc, struct smmu_cd *cd, int sid, bool s1)
 	uint64_t *addr;
 
 	strtab = &sc->strtab;
-	l1_desc = &strtab->l1[sid >> STRTAB_SPLIT];
 
 	if (sc->features & SMMU_FEATURE_2_LVL_STREAM_TABLE) {
+		l1_desc = &strtab->l1[sid >> STRTAB_SPLIT];
 		addr = l1_desc->va;
 	} else {
 		addr = (void *)((uint64_t)strtab->addr +
@@ -905,7 +905,7 @@ smmu_init_strtab(struct smmu_softc *sc)
 }
 
 static int
-smmu_init_l2_strtab(struct smmu_softc *sc, int sid)
+smmu_init_l1_entry(struct smmu_softc *sc, int sid)
 {
 	struct smmu_strtab *strtab;
 	struct l1_desc *l1_desc;
@@ -922,6 +922,7 @@ smmu_init_l2_strtab(struct smmu_softc *sc, int sid)
 	printf("%s: size %zu\n", __func__, size);
 
 	l1_desc->span = STRTAB_SPLIT + 1;
+	l1_desc->size = size;
 	l1_desc->va = contigmalloc(size, M_SMMU,
 	    M_WAITOK | M_ZERO,	/* flags */
 	    0,			/* low */
@@ -949,6 +950,20 @@ smmu_init_l2_strtab(struct smmu_softc *sc, int sid)
 	*addr = val;
 
 	return (0);
+}
+
+static void
+smmu_deinit_l1_entry(struct smmu_softc *sc, int sid)
+{
+	struct smmu_strtab *strtab;
+	struct l1_desc *l1_desc;
+
+	strtab = &sc->strtab;
+
+	if (sc->features & SMMU_FEATURE_2_LVL_STREAM_TABLE) {
+		l1_desc = &strtab->l1[sid >> STRTAB_SPLIT];
+		contigfree(l1_desc->va, l1_desc->size, M_SMMU);
+	}
 }
 
 static int
@@ -1533,7 +1548,7 @@ smmu_domain_alloc(device_t dev)
 
 	mtx_init(&domain->mtx_lock, "SMMU domain", NULL, MTX_DEF);
 
-	TAILQ_INIT(&domain->master_list);
+	LIST_INIT(&domain->master_list);
 
 	pmap_pinit(&domain->p);
 	PMAP_LOCK_INIT(&domain->p);
@@ -1560,7 +1575,7 @@ smmu_domain_free(device_t dev, struct iommu_domain *domain)
 }
 
 static int
-smmu_add_device(device_t smmu_dev, struct iommu_domain *domain,
+smmu_add_device(device_t dev, struct iommu_domain *domain,
     struct iommu_device *device)
 {
 	struct smmu_domain *smmu_domain;
@@ -1571,7 +1586,7 @@ smmu_add_device(device_t smmu_dev, struct iommu_domain *domain,
 	int seg;
 	int err;
 
-	sc = device_get_softc(smmu_dev);
+	sc = device_get_softc(dev);
 	smmu_domain = (struct smmu_domain *)domain;
 
 	master = malloc(sizeof(*master), M_SMMU, M_WAITOK | M_ZERO);
@@ -1588,7 +1603,7 @@ smmu_add_device(device_t smmu_dev, struct iommu_domain *domain,
 	master->sid = sid;
 
 	if (sc->features & SMMU_FEATURE_2_LVL_STREAM_TABLE) {
-		err = smmu_init_l2_strtab(sc, sid);
+		err = smmu_init_l1_entry(sc, sid);
 		if (err)
 			return (ENXIO);
 	}
@@ -1600,10 +1615,45 @@ smmu_add_device(device_t smmu_dev, struct iommu_domain *domain,
 	 */
 
 	DOMAIN_LOCK(smmu_domain);
-	TAILQ_INSERT_TAIL(&smmu_domain->master_list, master, next);
+	LIST_INSERT_HEAD(&smmu_domain->master_list, master, next);
 	DOMAIN_UNLOCK(smmu_domain);
 
 	smmu_init_ste(sc, &smmu_domain->cd, master->sid, true);
+
+	return (0);
+}
+
+static int
+smmu_remove_device(device_t dev, struct iommu_device *device)
+{
+	struct smmu_domain *smmu_domain;
+	struct smmu_master *master, *master1;
+	struct iommu_domain *domain;
+	struct smmu_softc *sc;
+	bool found;
+
+	sc = device_get_softc(dev);
+	domain = device->domain;
+	smmu_domain = (struct smmu_domain *)domain;
+
+	found = false;
+
+	DOMAIN_LOCK(smmu_domain);
+	LIST_FOREACH_SAFE(master, &smmu_domain->master_list, next, master1) {
+		if (master->device == device) {
+			found = true;
+			LIST_REMOVE(master, next);
+			break;
+		}
+	}
+	DOMAIN_UNLOCK(smmu_domain);
+
+	if (!found)
+		return (ENODEV);
+
+	smmu_deinit_l1_entry(sc, master->sid);
+
+	free(master, M_SMMU);
 
 	return (0);
 }
@@ -1625,6 +1675,7 @@ static device_method_t smmu_methods[] = {
 	DEVMETHOD(iommu_domain_alloc,	smmu_domain_alloc),
 	DEVMETHOD(iommu_domain_free,	smmu_domain_free),
 	DEVMETHOD(iommu_add_device,	smmu_add_device),
+	DEVMETHOD(iommu_remove_device,	smmu_remove_device),
 	DEVMETHOD(iommu_capable,	smmu_capable),
 
 	/* Bus interface */
