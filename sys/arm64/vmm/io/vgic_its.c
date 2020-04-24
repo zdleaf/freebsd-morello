@@ -51,29 +51,6 @@
 #define	ITS_UNLOCK(its)		sx_xunlock(&its->its_mtx)
 #define	ITS_ASSERT_LOCKED(its)	sx_assert(&its->its_mtx, SA_XLOCKED)
 
-static int
-arm_vits_probe(device_t dev)
-{
-
-	printf("arm_vits_probe\n");
-
-	return (BUS_PROBE_DEFAULT);
-}
-
-static int
-arm_vits_attach(device_t dev)
-{
-
-	return (0);
-}
-
-static int
-arm_vits_detach(device_t dev)
-{
-
-	return (0);
-}
-
 static void
 its_table_map(void *vm, struct vgic_its_table *tab, bool valid, uint64_t paddr,
     size_t size)
@@ -507,17 +484,3 @@ vgic_its_attach_to_vm(struct vm *vm, uint64_t start, size_t size)
 
 	return (0);
 }
-
-static device_method_t arm_vits_methods[] = {
-	//DEVMETHOD(device_identify,	arm_vits_identify),
-	DEVMETHOD(device_probe,		arm_vits_probe),
-	DEVMETHOD(device_attach,	arm_vits_attach),
-	DEVMETHOD(device_detach,	arm_vits_detach),
-
-	DEVMETHOD_END
-};
-
-DEFINE_CLASS_0(vits, arm_vits_driver, arm_vits_methods, 0);
-
-static devclass_t arm_vits_devclass;
-DRIVER_MODULE(vits, vgic, arm_vits_driver, arm_vits_devclass, 0, 0);
