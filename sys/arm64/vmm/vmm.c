@@ -707,40 +707,6 @@ vmm_sysmem_maxaddr(struct vm *vm)
 #include <sys/queue.h>
 #include <sys/linker.h>
 
-static caddr_t
-search_by_type(const char *type, caddr_t preload_metadata)
-{
-    caddr_t	curp, lname;
-    uint32_t	*hdr;
-    int		next;
-
-    if (preload_metadata != NULL) {
-
-	curp = preload_metadata;
-	lname = NULL;
-	for (;;) {
-	    hdr = (uint32_t *)curp;
-	    if (hdr[0] == 0 && hdr[1] == 0)
-		break;
-
-	    /* remember the start of each record */
-	    if (hdr[0] == MODINFO_NAME)
-		lname = curp;
-
-	    /* Search for a MODINFO_TYPE field */
-	    if ((hdr[0] == MODINFO_TYPE) &&
-		!strcmp(type, curp + sizeof(uint32_t) * 2))
-		return(lname);
-
-	    /* skip to next field */
-	    next = sizeof(uint32_t) * 2 + hdr[1];
-	    next = roundup(next, sizeof(u_long));
-	    curp += next;
-	}
-    }
-    return(NULL);
-}
-
 static int
 vm_handle_reg_emul(struct vm *vm, int vcpuid, bool *retu)
 {
