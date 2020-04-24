@@ -1331,14 +1331,15 @@ vm_get_cookie(struct vm *vm)
 
 int
 vm_attach_vgic(struct vm *vm, uint64_t dist_start, size_t dist_size,
-		uint64_t redist_start, size_t redist_size)
+    uint64_t redist_start, size_t redist_size, uint64_t its_start,
+    size_t its_size)
 {
 	int error;
 
 	error = vgic_v3_attach_to_vm(vm, dist_start, dist_size, redist_start,
 	    redist_size);
-	if (error == 0)
-		error = vgic_its_attach_to_vm(vm, 0x2f300000, 0x10000);
+	if (error == 0 && its_size > 0)
+		error = vgic_its_attach_to_vm(vm, its_start, its_size);
 
 	return (error);
 }
