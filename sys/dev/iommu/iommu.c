@@ -151,10 +151,10 @@ iommu_get_domain_for_dev(device_t dev)
 }
 
 /*
- * Add a consumer device to a domain.
+ * Attach a consumer device to a domain.
  */
 int
-iommu_add_device(struct iommu_domain *domain, device_t dev)
+iommu_device_attach(struct iommu_domain *domain, device_t dev)
 {
 	struct iommu_device *device;
 	struct iommu *iommu;
@@ -166,7 +166,7 @@ iommu_add_device(struct iommu_domain *domain, device_t dev)
 	device->rid = pci_get_rid(dev);
 	device->dev = dev;
 
-	err = IOMMU_ADD_DEVICE(iommu->dev, domain, device);
+	err = IOMMU_DEVICE_ATTACH(iommu->dev, domain, device);
 	if (err) {
 		device_printf(iommu->dev, "Failed to add device\n");
 		free(device, M_IOMMU);
@@ -181,10 +181,10 @@ iommu_add_device(struct iommu_domain *domain, device_t dev)
 }
 
 /*
- * Remove a consumer device from IOMMU domain.
+ * Detach a consumer device from IOMMU domain.
  */
 int
-iommu_remove_device(struct iommu_domain *domain, device_t dev)
+iommu_device_detach(struct iommu_domain *domain, device_t dev)
 {
 	struct iommu_device *device;
 	struct iommu *iommu;
@@ -208,7 +208,7 @@ iommu_remove_device(struct iommu_domain *domain, device_t dev)
 		return (ENODEV);
 	}
 
-	err = IOMMU_REMOVE_DEVICE(iommu->dev, device);
+	err = IOMMU_DEVICE_DETACH(iommu->dev, device);
 	if (err) {
 		device_printf(iommu->dev, "Failed to remove device\n");
 		DOMAIN_UNLOCK(domain);

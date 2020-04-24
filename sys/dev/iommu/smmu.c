@@ -1575,7 +1575,7 @@ smmu_domain_free(device_t dev, struct iommu_domain *domain)
 }
 
 static int
-smmu_add_device(device_t dev, struct iommu_domain *domain,
+smmu_device_attach(device_t dev, struct iommu_domain *domain,
     struct iommu_device *device)
 {
 	struct smmu_domain *smmu_domain;
@@ -1624,7 +1624,7 @@ smmu_add_device(device_t dev, struct iommu_domain *domain,
 }
 
 static int
-smmu_remove_device(device_t dev, struct iommu_device *device)
+smmu_device_detach(device_t dev, struct iommu_device *device)
 {
 	struct smmu_domain *smmu_domain;
 	struct smmu_master *master, *master1;
@@ -1674,8 +1674,8 @@ static device_method_t smmu_methods[] = {
 	DEVMETHOD(iommu_unmap,		smmu_unmap),
 	DEVMETHOD(iommu_domain_alloc,	smmu_domain_alloc),
 	DEVMETHOD(iommu_domain_free,	smmu_domain_free),
-	DEVMETHOD(iommu_add_device,	smmu_add_device),
-	DEVMETHOD(iommu_remove_device,	smmu_remove_device),
+	DEVMETHOD(iommu_device_attach,	smmu_device_attach),
+	DEVMETHOD(iommu_device_detach,	smmu_device_detach),
 	DEVMETHOD(iommu_capable,	smmu_capable),
 
 	/* Bus interface */

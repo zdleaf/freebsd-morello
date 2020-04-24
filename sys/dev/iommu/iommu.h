@@ -81,7 +81,8 @@ struct iommu_domain * iommu_domain_alloc(struct iommu *iommu);
 struct iommu_domain * iommu_get_domain_for_dev(device_t dev);
 int iommu_map(struct iommu_domain *, bus_dma_segment_t *segs, int nsegs);
 void iommu_unmap(struct iommu_domain *, bus_dma_segment_t *segs, int nsegs);
-int iommu_add_device(struct iommu_domain *domain, device_t dev);
+int iommu_device_attach(struct iommu_domain *domain, device_t dev);
+int iommu_device_detach(struct iommu_domain *domain, device_t dev);
 int iommu_capable(device_t dev);
 struct iommu * iommu_lookup(intptr_t xref, int flags);
 int iommu_register(device_t dev, intptr_t xref);
@@ -89,6 +90,5 @@ int iommu_domain_add_va_range(struct iommu_domain *domain,
     vm_offset_t va, vm_size_t size);
 int iommu_map_page(struct iommu_domain *domain,
     vm_offset_t va, vm_paddr_t pa, vm_prot_t prot);
-int iommu_remove_device(struct iommu_domain *domain, device_t dev);
 
 #endif /* _DEV_IOMMU_IOMMU_H_ */

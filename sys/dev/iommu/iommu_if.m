@@ -76,18 +76,18 @@ METHOD void domain_free {
 };
 
 #
-# Add a consumer device to a IOMMU domain.
+# Attach a consumer device to a IOMMU domain.
 #
-METHOD int add_device {
+METHOD int device_attach {
 	device_t		dev;
 	struct iommu_domain	*domain;
 	struct iommu_device	*device;
 };
 
 #
-# Remove a consumer device from IOMMU domain.
+# Detach a consumer device from IOMMU domain.
 #
-METHOD int remove_device {
+METHOD int device_detach {
 	device_t		dev;
 	struct iommu_device	*device;
 };

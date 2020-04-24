@@ -1482,6 +1482,8 @@ smmu_get_dma_tag(device_t dev, device_t child)
 	if (domain)
 		return (domain->tag);
 
+	/* A single device per domain. */
+
 	domain = smmu_alloc_domain(child);
 	if (!domain)
 		return (NULL);
@@ -1495,7 +1497,7 @@ smmu_get_dma_tag(device_t dev, device_t child)
 	tag->iommu_domain = domain;
 	domain->tag = tag;
 
-	error = iommu_add_device(domain, child);
+	error = iommu_device_attach(domain, child);
 	if (error) {
 		free(tag, M_BUSDMA);
 		iommu_domain_free(domain);
