@@ -264,6 +264,7 @@ bounce_bus_dma_tag_create(bus_dma_tag_t parent, bus_size_t alignment,
 static int
 bounce_bus_dma_tag_destroy(bus_dma_tag_t dmat)
 {
+	struct iommu_domain *domain;
 	bus_dma_tag_t dmat_copy, parent;
 	int error;
 
@@ -281,7 +282,8 @@ bounce_bus_dma_tag_destroy(bus_dma_tag_t dmat)
 			if (dmat->common.ref_count == 0) {
 				if (dmat->segments != NULL)
 					free(dmat->segments, M_DEVBUF);
-				if (dmat == dmat->iommu_domain->tag)
+				domain = dmat->iommu_domain;
+				if (domain && dmat == domain->tag)
 					smmu_domain_free(dmat);
 				free(dmat, M_DEVBUF);
 				/*
