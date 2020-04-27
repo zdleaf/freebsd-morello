@@ -1028,9 +1028,11 @@ smmu_setup_interrupts(struct smmu_softc *sc)
 
 	dev = sc->dev;
 
-	device_printf(sc->dev, "%s\n", __func__);
-
 #if DEV_ACPI
+	/*
+	 * Configure SMMU interrupts as EDGE triggered manually
+	 * as ACPI tables carries no information for that.
+	 */
 	smmu_configure_intr(sc, sc->res[1]);
 	smmu_configure_intr(sc, sc->res[2]);
 	smmu_configure_intr(sc, sc->res[3]);
@@ -1042,16 +1044,6 @@ smmu_setup_interrupts(struct smmu_softc *sc)
 		device_printf(dev, "Couldn't setup Event interrupt handler\n");
 		return (ENXIO);
 	}
-
-	/* Since we are using msiaddr feature, don't setup wired interrupt. */
-#if 0
-	error = bus_setup_intr(dev, sc->res[2], INTR_TYPE_MISC,
-	    smmu_sync_intr, NULL, sc, &sc->intr_cookie[1]);
-	if (error) {
-		device_printf(dev, "Couldn't setup Sync interrupt handler\n");
-		return (ENXIO);
-	}
-#endif
 
 	error = bus_setup_intr(dev, sc->res[3], INTR_TYPE_MISC,
 	    smmu_gerr_intr, NULL, sc, &sc->intr_cookie[2]);
