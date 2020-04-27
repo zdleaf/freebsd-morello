@@ -110,8 +110,6 @@ smmu_acpi_identify(driver_t *driver, device_t parent)
 	device_t dev;
 	int i;
 
-	printf("%s\n", __func__);
-
 	iort_pa = acpi_find_table(ACPI_SIG_IORT);
 	if (iort_pa == 0)
 		return;
@@ -133,12 +131,6 @@ smmu_acpi_identify(driver_t *driver, device_t parent)
 		device_printf(parent, "No SMMU found.\n");
 		goto out;
 	}
-
-#if 0
-	/* This is for the wrong GIC version */
-	if (iort_data.smmu->Version != ACPI_MADT_GIC_VERSION_V3)
-		goto out;
-#endif
 
 	for (i = 0; i < iort_data.count; i++) {
 		dev = BUS_ADD_CHILD(parent,
@@ -197,75 +189,26 @@ smmu_acpi_probe(device_t dev)
 static int
 smmu_acpi_attach(device_t dev)
 {
-	uintptr_t priv;
 	struct smmu_softc *sc;
+	uintptr_t start;
+	uintptr_t priv;
 	int err;
-
-	priv = (uintptr_t)acpi_get_private(dev);
 
 	sc = device_get_softc(dev);
 	sc->dev = dev;
 
+	priv = (uintptr_t)acpi_get_private(dev);
 	if ((priv >> 32) & ACPI_IORT_SMMU_V3_COHACC_OVERRIDE)
 		sc->features |= SMMU_FEATURE_COHERENCY;
 
 	printf("%s: features %x\n", __func__, sc->features);
 
-	uint32_t start;
-	start = bus_get_resource_start(dev, SYS_RES_MEMORY, 0);
-#if 0
-	u_int xref;
-	int pxm;
-	rman_res_t start;
-	start = bus_get_resource_start(dev, SYS_RES_MEMORY, 0);
-	err = acpi_smmu_to_its(start, &xref, &pxm);
-	if (err != 0) {
-		printf("%s: acpi_smmu_to_its returned %d\n", __func__, err);
-		return (ENXIO);
-	}
-
-	int irq;
-	err = intr_alloc_msi(NULL, dev, xref, 1, 1, &irq);
-	if (err != 0) {
-		printf("%s: intr_alloc_msi returned %d\n", __func__, err);
-		return (ENXIO);
-	}
-
-	printf("%s: irq %d\n", __func__, irq);
-
-	struct intr_irqsrc *isrc;
-	device_t map_dev;
-	intptr_t map_xref;
-	struct intr_map_data *map_data;
-
-	intr_map_copy_map_data(irq, &map_dev, &map_xref, &map_data);
-
-	err = intr_resolve_irq(map_dev, map_xref, map_data, &isrc);
-	if (err != 0) {
-		printf("intr_resolve_irq returned %d\n", err);
-		return (ENXIO);
-	}
-
-	intr_map_set_isrc(irq, isrc);
-
-	PIC_BIND_INTR(isrc->isrc_dev, isrc);
-
-	uint64_t addr;
-	uint32_t data;
-	err = intr_map_msi(NULL, dev, xref, irq, &addr, &data);
-	err = 0;
-	if (err != 0) {
-		printf("%s: intr_map_msi returned %d\n", __func__, err);
-		return (ENXIO);
-	}
-
-	printf("%s: addr %lx data %x\n", __func__, addr, data);
-#endif
-
 	err = smmu_attach(dev);
 	if (err != 0)
 		goto error;
 
+	/* Use memory start address as an xref. */
+	start = bus_get_resource_start(dev, SYS_RES_MEMORY, 0);
 	err = iommu_register(dev, start);
 	if (err) {
 		device_printf(dev, "Failed to register SMMU.\n");
