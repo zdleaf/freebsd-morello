@@ -212,8 +212,7 @@ smmu_event_intr(void *arg)
 	return (FILTER_HANDLED);
 }
 
-#if 0
-static int
+static int __unused
 smmu_sync_intr(void *arg)
 {
 	struct smmu_softc *sc;
@@ -224,7 +223,6 @@ smmu_sync_intr(void *arg)
 
 	return (FILTER_HANDLED);
 }
-#endif
 
 static int
 smmu_gerr_intr(void *arg)
@@ -1084,7 +1082,6 @@ smmu_setup_interrupts(struct smmu_softc *sc)
 	}
 
 	/* Since we are using msiaddr feature, don't setup wired interrupt. */
-
 #if 0
 	error = bus_setup_intr(dev, sc->res[2], INTR_TYPE_MISC,
 	    smmu_sync_intr, NULL, sc, &sc->intr_cookie[1]);
