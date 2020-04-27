@@ -435,23 +435,12 @@ smmu_cmdq_enqueue_cmd(struct smmu_softc *sc, struct smmu_cmdq_entry *entry)
 
 	make_cmd(sc, cmd, entry);
 
-#if 0
-	device_printf(sc->dev, "Enqueueing command %d, lc.val %lx\n",
-	    entry->opcode, cmdq->lc.val);
-#endif
-
 	SMMU_LOCK(sc);
 
 	/* Ensure that a space is available. */
 	do {
 		cmdq->lc.cons = bus_read_4(sc->res[0], cmdq->cons_off);
 	} while (smmu_q_has_space(cmdq) == 0);
-
-#if 0
-	if (cmdq->lc.prod == 0x80000)
-		device_printf(sc->dev, "%s: lc.val %lx\n",
-		    __func__, cmdq->lc.val);
-#endif
 
 	/* Write the command to the current prod entry. */
 	entry_addr = (void *)((uint64_t)cmdq->addr +
@@ -463,21 +452,6 @@ smmu_cmdq_enqueue_cmd(struct smmu_softc *sc, struct smmu_cmdq_entry *entry)
 	bus_write_4(sc->res[0], cmdq->prod_off, cmdq->lc.prod);
 
 	SMMU_UNLOCK(sc);
-
-#if 0
-	device_printf(sc->dev, "%s: complete\n", __func__);
-
-	cmdq->lc.cons = bus_read_4(sc->res[0], cmdq->cons_off);
-
-	device_printf(sc->dev, "%s: lc.val compl %lx\n",
-	    __func__, cmdq->lc.val);
-
-	if (cmdq->lc.cons & CMDQ_CONS_ERR_M) {
-		uint32_t reg;
-		reg = bus_read_4(sc->res[0], SMMU_GERROR);
-		device_printf(sc->dev, "Gerror %x\n", reg);
-	}
-#endif
 
 	return (0);
 }
