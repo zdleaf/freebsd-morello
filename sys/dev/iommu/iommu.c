@@ -78,6 +78,15 @@ static struct mtx iommu_mtx;
 #define	IOMMU_LIST_UNLOCK()		mtx_unlock(&iommu_mtx)
 #define	IOMMU_LIST_ASSERT_LOCKED()	mtx_assert(&iommu_mtx, MA_OWNED)
 
+#define IOMMU_DEBUG
+#undef IOMMU_DEBUG
+
+#ifdef IOMMU_DEBUG
+#define DPRINTF(fmt, ...)  printf(fmt, ##__VA_ARGS__)
+#else
+#define DPRINTF(fmt, ...)
+#endif
+
 static LIST_HEAD(, iommu) iommu_list = LIST_HEAD_INITIALIZER(iommu_list);
 
 int
@@ -266,6 +275,9 @@ iommu_map(struct iommu_domain *domain, bus_dma_segment_t *segs, int nsegs)
 			return (error);
 		}
 
+		DPRINTF("%s: %jx -> %jx (%jd pages)\n",
+		    __func__, va, pa, size / PAGE_SIZE);
+
 		prot = VM_PROT_READ | VM_PROT_WRITE;
 
 		error = IOMMU_MAP(iommu->dev, domain, va, pa, size, prot);
@@ -293,6 +305,9 @@ iommu_unmap(struct iommu_domain *domain, bus_dma_segment_t *segs, int nsegs)
 		va = segs[i].ds_addr & ~(PAGE_SIZE - 1);
 		offset = segs[i].ds_addr & (PAGE_SIZE - 1);
 		size = roundup2(offset + segs[i].ds_len, PAGE_SIZE);
+
+		DPRINTF("%s: %jx (%jd pages)\n",
+		    __func__, va, size / PAGE_SIZE);
 
 		err = IOMMU_UNMAP(iommu->dev, domain, va, size);
 		if (err) {
