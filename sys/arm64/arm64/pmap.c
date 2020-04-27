@@ -3325,7 +3325,7 @@ setl3:
 
 /*
  * Preallocate l1, l2 page directories for a specific VA range.
- * This is not used.
+ * This is optional and not in use currently.
  */
 int
 pmap_bootstrap_smmu(pmap_t pmap, vm_offset_t sva, int count)
@@ -3439,9 +3439,9 @@ pmap_sremove(pmap_t pmap, vm_offset_t va)
 
 	if (pte != NULL) {
 		pmap_clear(pte);
-		rc = 1;
+		rc = KERN_FAILURE;
 	} else
-		rc = 0;
+		rc = KERN_SUCCESS;
 
 	PMAP_UNLOCK(pmap);
 
@@ -3451,8 +3451,8 @@ pmap_sremove(pmap_t pmap, vm_offset_t va)
 /*
  * Remove all the allocated pages from SMMU pmap.
  */
-void
-pmap_remove_smmu(pmap_t pmap)
+int
+pmap_sremove_all(pmap_t pmap)
 {
 	pd_entry_t l0e, *l1, l1e, *l2, l2e;
 	pt_entry_t *l3, l3e;
@@ -3464,6 +3464,7 @@ pmap_remove_smmu(pmap_t pmap)
 	vm_page_t m;
 	vm_page_t m0;
 	vm_page_t m1;
+	int rc;
 
 	PMAP_LOCK(pmap);
 
@@ -3511,7 +3512,10 @@ pmap_remove_smmu(pmap_t pmap)
 					l3e = l3[l];
 					if ((l3e & ATTR_DESCR_VALID) == 0)
 						continue;
-					panic("%s: l3e found\n", __func__);
+					printf("%s: l3e found for va %jx\n",
+					    __func__, sva);
+					rc = KERN_FAILURE;
+					goto out;
 				}
 
 				vm_page_unwire_noq(m1);
@@ -3535,7 +3539,12 @@ pmap_remove_smmu(pmap_t pmap)
 	KASSERT(pmap->pm_stats.resident_count == 0,
 	    ("Invalid resident count %jd", pmap->pm_stats.resident_count));
 
+
+	rc = KERN_SUCCESS;
+out:
 	PMAP_UNLOCK(pmap);
+
+	return (rc);
 }
 
 /*

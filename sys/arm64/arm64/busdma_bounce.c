@@ -75,6 +75,8 @@ __FBSDID("$FreeBSD$");
 
 #define MAX_BPAGES 4096
 
+static int smmu_domain_free(bus_dma_tag_t dmat);
+
 enum {
 	BF_COULD_BOUNCE		= 0x01,
 	BF_MIN_ALLOC_COMP	= 0x02,
@@ -91,6 +93,7 @@ struct bus_dma_tag {
 	bus_dma_segment_t	*segments;
 	struct bounce_zone	*bounce_zone;
 	struct iommu_domain	*iommu_domain;
+	device_t		owner;
 };
 
 struct bounce_page {
@@ -216,6 +219,7 @@ bounce_bus_dma_tag_create(bus_dma_tag_t parent, bus_size_t alignment,
 		/* Copy some flags from the parent */
 		newtag->bounce_flags |= parent->bounce_flags & BF_COHERENT;
 		newtag->iommu_domain = parent->iommu_domain;
+		newtag->owner = parent->owner;
 	}
 
 	if (newtag->common.lowaddr < ptoa((vm_paddr_t)Maxmem) ||
@@ -267,8 +271,6 @@ bounce_bus_dma_tag_destroy(bus_dma_tag_t dmat)
 	dmat_copy = dmat;
 
 	if (dmat != NULL) {
-		printf("%s: map_count %d\n", __func__, dmat->map_count);
-
 		if (dmat->map_count != 0) {
 			error = EBUSY;
 			goto out;
@@ -279,7 +281,8 @@ bounce_bus_dma_tag_destroy(bus_dma_tag_t dmat)
 			if (dmat->common.ref_count == 0) {
 				if (dmat->segments != NULL)
 					free(dmat->segments, M_DEVBUF);
-				//smmu_
+				if (dmat == dmat->iommu_domain->tag)
+					smmu_domain_free(dmat);
 				free(dmat, M_DEVBUF);
 				/*
 				 * Last reference count, so
@@ -1407,7 +1410,7 @@ smmu_tag_init(struct bus_dma_tag *t)
 
 	maxaddr = BUS_SPACE_MAXADDR;
 
-	t->common.ref_count = 1; /* Prevent free */
+	t->common.ref_count = 0;
 	t->common.impl = &bus_dma_bounce_impl;
 	t->common.boundary = 0;
 	t->common.lowaddr = maxaddr;
@@ -1417,8 +1420,37 @@ smmu_tag_init(struct bus_dma_tag *t)
 	t->common.maxsegsz = maxaddr;
 }
 
+static int
+smmu_domain_free(bus_dma_tag_t dmat)
+{
+	struct iommu_domain *domain;
+	int error;
+
+	domain = iommu_get_domain_for_dev(dmat->owner);
+	if (domain == NULL)
+		return (0);
+
+	error = iommu_device_detach(domain, dmat->owner);
+	if (error) {
+		device_printf(dmat->owner,
+		    "Could not detach a device from IOMMU domain.\n");
+		return (error);
+	}
+
+	/* TODO: unmap the GICv3 ITS page here. */
+
+	error = iommu_domain_free(domain);
+	if (error) {
+		device_printf(dmat->owner,
+		    "Could not deallocate IOMMU domain.\n");
+		return (error);
+	}
+
+	return (0);
+}
+
 static struct iommu_domain *
-smmu_alloc_domain(device_t dev)
+smmu_domain_alloc(device_t dev)
 {
 	struct iommu_domain *domain;
 	struct iommu *iommu;
@@ -1478,13 +1510,15 @@ smmu_get_dma_tag(device_t dev, device_t child)
 	if (device_get_devclass(device_get_parent(child)) != pci_class)
 		return (NULL);
 
+	printf("%s\n", __func__);
+
 	domain = iommu_get_domain_for_dev(child);
 	if (domain)
 		return (domain->tag);
 
 	/* A single device per domain. */
 
-	domain = smmu_alloc_domain(child);
+	domain = smmu_domain_alloc(child);
 	if (!domain)
 		return (NULL);
 
@@ -1494,6 +1528,7 @@ smmu_get_dma_tag(device_t dev, device_t child)
 		return (NULL);
 	}
 
+	tag->owner = child;
 	tag->iommu_domain = domain;
 	domain->tag = tag;
 

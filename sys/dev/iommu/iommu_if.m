@@ -70,7 +70,7 @@ METHOD struct iommu_domain * domain_alloc {
 #
 # Release all the resources held by IOMMU domain.
 #
-METHOD void domain_free {
+METHOD int domain_free {
 	device_t		dev;
 	struct iommu_domain	*domain;
 };

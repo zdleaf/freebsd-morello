@@ -121,18 +121,29 @@ iommu_domain_alloc(struct iommu *iommu)
 	return (domain);
 }
 
-void
+int
 iommu_domain_free(struct iommu_domain *domain)
 {
 	struct iommu *iommu;
+	vmem_t *vmem;
+	int error;
 
 	iommu = domain->iommu;
+	vmem = domain->vmem;
 
 	IOMMU_LOCK(iommu);
+	error = IOMMU_DOMAIN_FREE(iommu->dev, domain);
+	if (error) {
+		IOMMU_UNLOCK(iommu);
+		return (error);
+	}
+
 	LIST_REMOVE(domain, next);
-	vmem_destroy(domain->vmem);
-	IOMMU_DOMAIN_FREE(iommu->dev, domain);
 	IOMMU_UNLOCK(iommu);
+
+	vmem_destroy(vmem);
+
+	return (0);
 }
 
 struct iommu_domain *
@@ -169,6 +180,7 @@ iommu_device_attach(struct iommu_domain *domain, device_t dev)
 	device = malloc(sizeof(*device), M_IOMMU, M_WAITOK | M_ZERO);
 	device->rid = pci_get_rid(dev);
 	device->dev = dev;
+	device->domain = domain;
 
 	err = IOMMU_DEVICE_ATTACH(iommu->dev, domain, device);
 	if (err) {

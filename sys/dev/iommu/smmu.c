@@ -1574,18 +1574,23 @@ smmu_domain_alloc(device_t dev)
 	return (&domain->domain);
 }
 
-static void
+static int
 smmu_domain_free(device_t dev, struct iommu_domain *domain)
 {
 	struct smmu_domain *smmu_domain;
+	int error;
 
 	smmu_domain = (struct smmu_domain *)domain;
 
-	/* TODO: remove CD */
+	/* TODO: remove CD. */
 
-	pmap_remove_smmu(&smmu_domain->p);
+	error = pmap_sremove_all(&smmu_domain->p);
+	if (error != 0)
+		return (error);
 
 	free(domain, M_SMMU);
+
+	return (0);
 }
 
 static int
