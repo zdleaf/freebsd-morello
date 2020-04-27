@@ -1004,15 +1004,6 @@ smmu_enable_interrupts(struct smmu_softc *sc)
 		bus_write_4(sc->res[0], SMMU_PRIQ_IRQ_CFG2, 0);
 	}
 
-#if 0
-	bus_write_8(sc->res[0], SMMU_GERROR_IRQ_CFG0, 0x30050040);
-	bus_write_4(sc->res[0], SMMU_GERROR_IRQ_CFG1, 0);
-	bus_write_4(sc->res[0], SMMU_GERROR_IRQ_CFG2, 1);
-	bus_write_8(sc->res[0], SMMU_EVENTQ_IRQ_CFG0, 0x30050040);
-	bus_write_4(sc->res[0], SMMU_EVENTQ_IRQ_CFG1, 0);
-	bus_write_4(sc->res[0], SMMU_EVENTQ_IRQ_CFG2, 1);
-#endif
-
 	/* Disable any interrupts. */
 	error = smmu_write_ack(sc, SMMU_IRQ_CTRL, SMMU_IRQ_CTRLACK, 0);
 	if (error) {
