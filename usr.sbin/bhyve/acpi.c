@@ -110,7 +110,9 @@ static int basl_keep_temps;
 static int basl_verbose_iasl;
 static int basl_ncpu;
 static uint32_t basl_acpi_base = BHYVE_ACPI_BASE;
+#if defined(__amd64__)
 static uint32_t hpet_capabilities;
+#endif
 
 /*
  * Contains the full pathname of the template to be passed
@@ -164,6 +166,7 @@ err_exit:
 	return (errno);
 }
 
+#if defined(__amd64__)
 static int
 basl_fwrite_rsdt(FILE *fp)
 {
@@ -199,6 +202,7 @@ basl_fwrite_rsdt(FILE *fp)
 err_exit:
 	return (errno);
 }
+#endif
 
 static int
 basl_fwrite_xsdt(FILE *fp)
@@ -541,6 +545,7 @@ err_exit:
 	return (errno);
 }
 
+#if defined(__amd64__)
 static int
 basl_fwrite_hpet(FILE *fp)
 {
@@ -585,6 +590,7 @@ basl_fwrite_hpet(FILE *fp)
 err_exit:
 	return (errno);
 }
+#endif
 
 static int
 basl_fwrite_mcfg(FILE *fp)
@@ -945,11 +951,15 @@ static struct {
 } basl_ftables[] =
 {
 	{ basl_fwrite_rsdp, 0},
+#if defined(__amd64__)
 	{ basl_fwrite_rsdt, RSDT_OFFSET },
+#endif
 	{ basl_fwrite_xsdt, XSDT_OFFSET },
 	{ basl_fwrite_madt, MADT_OFFSET },
 	{ basl_fwrite_fadt, FADT_OFFSET },
+#if defined(__amd64__)
 	{ basl_fwrite_hpet, HPET_OFFSET },
+#endif
 	{ basl_fwrite_mcfg, MCFG_OFFSET },
 	{ basl_fwrite_facs, FACS_OFFSET },
 	{ basl_fwrite_dsdt, DSDT_OFFSET },
@@ -964,9 +974,11 @@ acpi_build(struct vmctx *ctx, int ncpu)
 
 	basl_ncpu = ncpu;
 
+#if defined(__amd64__)
 	err = vm_get_hpet_capabilities(ctx, &hpet_capabilities);
 	if (err != 0)
 		return (err);
+#endif
 
 	/*
 	 * For debug, allow the user to have iasl compiler output sent
