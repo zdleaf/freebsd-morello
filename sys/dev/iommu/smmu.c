@@ -116,8 +116,6 @@ smmu_q_has_space(struct smmu_queue *q)
 	    Q_WRP(q, q->lc.cons) == Q_WRP(q, q->lc.prod))
 		return (1);
 
-	//printf("no space: cons %x prod %x\n", q->lc.cons, q->lc.prod);
-
 	return (0);
 }
 
@@ -653,7 +651,6 @@ smmu_init_ste_s1(struct smmu_softc *sc, struct smmu_cd *cd,
 		| STE1_S1CSH_IS
 		| STE1_S1CIR_WBRA
 		| STE1_S1COR_WBRA
-		//| STE1_S1DSS_SUBSTREAM0
 		| STE1_STRW_NS_EL1;
 
 	if (sc->features & SMMU_FEATURE_STALL &&
@@ -1441,29 +1438,7 @@ smmu_detach(device_t dev)
 
 	sc = device_get_softc(dev);
 
-	//if (device_is_attached(dev)) {
-	//}
-
 	bus_release_resources(dev, smmu_spec, sc->res);
-
-	return (0);
-}
-
-static int
-smmu_get_domain(device_t dev, device_t child, int *domain)
-{
-	struct smmu_softc *sc;
-	//struct smmu_devinfo *di;
-
-	sc = device_get_softc(dev);
-
-	//di = device_get_ivars(child);
-	//if (di->smmu_domain < 0)
-	//	return (ENOENT);
-
-	//*domain = di->smmu_domain;
-
-	device_printf(sc->dev, "%s\n", __func__);
 
 	return (0);
 }
@@ -1689,7 +1664,6 @@ static device_method_t smmu_methods[] = {
 	DEVMETHOD(iommu_capable,	smmu_capable),
 
 	/* Bus interface */
-	DEVMETHOD(bus_get_domain,	smmu_get_domain),
 	DEVMETHOD(bus_read_ivar,	smmu_read_ivar),
 
 	/* End */
