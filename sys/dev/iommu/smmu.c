@@ -322,23 +322,18 @@ smmu_dump_ste(struct smmu_softc *sc, uint64_t *ste)
 		device_printf(sc->dev, "ste[%d] == %lx\n", i, ste[i]);
 }
 
-#if 0
-static void
-smmu_dump_cd(struct smmu_softc *sc)
+static void __unused
+smmu_dump_cd(struct smmu_softc *sc, struct smmu_cd *cd)
 {
 	uint64_t *addr;
 	int i;
 
 	device_printf(sc->dev, "%s\n", __func__);
 
-	struct smmu_cd *cd;
-	cd = &sc->cd;
 	addr = cd->addr;
-
 	for (i = 0; i < CD_DWORDS; i++)
 		device_printf(sc->dev, "cd[%d] == %lx\n", i, addr[i]);
 }
-#endif
 
 static int
 smmu_evtq_dequeue(struct smmu_softc *sc)
@@ -387,7 +382,6 @@ smmu_evtq_dequeue(struct smmu_softc *sc)
 	device_printf(sc->dev, "strtab phys %lx ste phys %lx\n",
 	    vtophys(strtab->addr), vtophys(ste));
 	smmu_dump_ste(sc, ste);
-	//smmu_dump_cd(sc);
 
 	return (0);
 }
