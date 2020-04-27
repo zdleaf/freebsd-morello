@@ -91,10 +91,3 @@ METHOD int device_detach {
 	device_t		dev;
 	struct iommu_device	*device;
 };
-
-#
-# Unused.
-#
-METHOD int capable {
-	device_t		dev;
-};

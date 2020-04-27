@@ -86,6 +86,7 @@ int iommu_device_detach(struct iommu_domain *domain, device_t dev);
 int iommu_capable(device_t dev);
 struct iommu * iommu_lookup(intptr_t xref, int flags);
 int iommu_register(device_t dev, intptr_t xref);
+int iommu_unregister(device_t dev);
 int iommu_domain_add_va_range(struct iommu_domain *domain,
     vm_offset_t va, vm_size_t size);
 int iommu_map_page(struct iommu_domain *domain,

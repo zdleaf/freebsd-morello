@@ -259,12 +259,6 @@ iommu_map(struct iommu_domain *domain, bus_dma_segment_t *segs, int nsegs)
 		offset = segs[i].ds_addr & (PAGE_SIZE - 1);
 		size = roundup2(offset + segs[i].ds_len, PAGE_SIZE);
 
-#if 0
-		if ((offset + segs[i].ds_len) > PAGE_SIZE)
-			printf("offset %lx len %lx size %lx\n",
-			    offset, segs[i].ds_len, size);
-#endif
-
 		error = vmem_alloc(domain->vmem, size,
 		    M_FIRSTFIT | M_NOWAIT, &va);
 		if (error) {
@@ -332,16 +326,6 @@ iommu_map_page(struct iommu_domain *domain,
 }
 
 int
-iommu_capable(device_t dev)
-{
-	int err;
-
-	err = 0;
-
-	return (err);
-}
-
-int
 iommu_register(device_t dev, intptr_t xref)
 {
 	struct iommu *iommu;
@@ -360,6 +344,15 @@ iommu_register(device_t dev, intptr_t xref)
 	return (0);
 }
 
+int
+iommu_unregister(device_t dev)
+{
+
+	/* TODO */
+
+	return (0);
+}
+
 struct iommu *
 iommu_lookup(intptr_t xref, int flags)
 {
@@ -372,14 +365,6 @@ iommu_lookup(intptr_t xref, int flags)
 
 	return (NULL);
 }
-
-#if 0
-int
-iommu_unregister(device_t dev)
-{
-
-}
-#endif
 
 static void
 iommu_init(void)

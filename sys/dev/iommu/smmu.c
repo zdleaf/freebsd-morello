@@ -1600,13 +1600,6 @@ smmu_device_detach(device_t dev, struct iommu_device *device)
 	return (0);
 }
 
-static int
-smmu_capable(device_t dev)
-{
-
-	return (0);
-}
-
 static device_method_t smmu_methods[] = {
 	/* Device interface */
 	DEVMETHOD(device_detach,	smmu_detach),
@@ -1618,7 +1611,6 @@ static device_method_t smmu_methods[] = {
 	DEVMETHOD(iommu_domain_free,	smmu_domain_free),
 	DEVMETHOD(iommu_device_attach,	smmu_device_attach),
 	DEVMETHOD(iommu_device_detach,	smmu_device_detach),
-	DEVMETHOD(iommu_capable,	smmu_capable),
 
 	/* Bus interface */
 	DEVMETHOD(bus_read_ivar,	smmu_read_ivar),
