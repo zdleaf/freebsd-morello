@@ -314,6 +314,10 @@ smmu_dump_ste(struct smmu_softc *sc, uint64_t *ste)
 
 	device_printf(sc->dev, "%s\n", __func__);
 
+	if (sc->features & SMMU_FEATURE_2_LVL_STREAM_TABLE) {
+		/* TODO: add support. */
+	}
+
 	for (i = 0; i < STRTAB_STE_DWORDS; i++)
 		device_printf(sc->dev, "ste[%d] == %lx\n", i, ste[i]);
 }
@@ -734,7 +738,7 @@ smmu_init_cd(struct smmu_softc *sc, struct smmu_domain *domain)
 	val |= CD0_IPS_48BITS;
 
 	paddr = p->pm_l0_paddr & CD1_TTB0_M;
-	KASSERT(paddr == p->pm_l0_paddr, ("bad allocation"));
+	KASSERT(paddr == p->pm_l0_paddr, ("bad allocation 1"));
 	printf("%s: ttbr paddr %lx\n", __func__, paddr);
 
 	ptr[1] = paddr;
@@ -790,7 +794,7 @@ smmu_init_strtab_linear(struct smmu_softc *sc)
 	base = vtophys(strtab->addr);
 
 	reg = base & STRTAB_BASE_ADDR_M;
-	KASSERT(reg == base, ("bad allocation"));
+	KASSERT(reg == base, ("bad allocation 2"));
 	reg |= STRTAB_BASE_RA;
 	strtab->base = reg;
 
@@ -805,6 +809,7 @@ smmu_init_strtab_2lvl(struct smmu_softc *sc)
 {
 	struct smmu_strtab *strtab;
 	vm_paddr_t base;
+	uint64_t reg_base;
 	uint32_t l1size;
 	uint32_t size;
 	uint32_t reg;
@@ -850,10 +855,10 @@ smmu_init_strtab_2lvl(struct smmu_softc *sc)
 
 	base = vtophys(strtab->addr);
 
-	reg = base & STRTAB_BASE_ADDR_M;
-	KASSERT(reg == base, ("bad allocation"));
-	reg |= STRTAB_BASE_RA;
-	strtab->base = reg;
+	reg_base = base & STRTAB_BASE_ADDR_M;
+	KASSERT(reg_base == base, ("bad allocation 3"));
+	reg_base |= STRTAB_BASE_RA;
+	strtab->base = reg_base;
 
 	return (0);
 }
@@ -912,7 +917,7 @@ smmu_init_l1_entry(struct smmu_softc *sc, int sid)
 
 	/* Install the L1 entry. */
 	val = l1_desc->pa & STRTAB_L1_DESC_L2PTR_M;
-	KASSERT(val == l1_desc->pa, ("bad allocation"));
+	KASSERT(val == l1_desc->pa, ("bad allocation 4"));
 	val |= l1_desc->span;
 	*addr = val;
 
