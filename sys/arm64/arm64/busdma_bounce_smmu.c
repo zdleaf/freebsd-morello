@@ -151,7 +151,7 @@ bounce_smmu_domain_alloc(device_t dev)
 	if (domain == NULL)
 		return (NULL);
 
-	/* Add some virtual address range. */
+	/* Add some virtual address range for this domain. */
 	iommu_domain_add_va_range(domain, 0x40000000, 0x40000000);
 
 	/* Map the GICv3 ITS page so the device could send MSI interrupts. */
@@ -188,6 +188,7 @@ bounce_smmu_get_dma_tag(device_t dev, device_t child)
 		return (NULL);
 	}
 
+	bounce_smmu_tag_init(tag);
 	tag->owner = child;
 	tag->iommu_domain = domain;
 	domain->tag = tag;
@@ -198,8 +199,6 @@ bounce_smmu_get_dma_tag(device_t dev, device_t child)
 		iommu_domain_free(domain);
 		return (NULL);
 	}
-
-	bounce_smmu_tag_init(tag);
 
 	return (tag);
 }

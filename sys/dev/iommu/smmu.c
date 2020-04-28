@@ -292,13 +292,13 @@ smmu_init_queues(struct smmu_softc *sc)
 {
 	int err;
 
-	/* Command queue */
+	/* Command queue. */
 	err = smmu_init_queue(sc, &sc->cmdq,
 	    SMMU_CMDQ_PROD, SMMU_CMDQ_CONS, CMDQ_ENTRY_DWORDS);
 	if (err)
 		return (ENXIO);
 
-	/* Event queue */
+	/* Event queue. */
 	err = smmu_init_queue(sc, &sc->evtq,
 	    SMMU_EVENTQ_PROD, SMMU_EVENTQ_CONS, EVTQ_ENTRY_DWORDS);
 	if (err)
@@ -309,7 +309,7 @@ smmu_init_queues(struct smmu_softc *sc)
 		return (0);
 	}
 
-	/* PRI queue */
+	/* PRI queue. */
 	err = smmu_init_queue(sc, &sc->priq,
 	    SMMU_PRIQ_PROD, SMMU_PRIQ_CONS, PRIQ_ENTRY_DWORDS);
 	if (err)
@@ -628,6 +628,9 @@ smmu_prefetch_sid(struct smmu_softc *sc, uint32_t sid)
 	smmu_sync(sc);
 }
 
+/*
+ * Init STE in bypass mode. Traffic is not translated for the sid.
+ */
 static void
 smmu_init_ste_bypass(struct smmu_softc *sc, uint32_t sid, uint64_t *ste)
 {
@@ -650,6 +653,9 @@ smmu_init_ste_bypass(struct smmu_softc *sc, uint32_t sid, uint64_t *ste)
 	smmu_prefetch_sid(sc, sid);
 }
 
+/*
+ * Enable Stage1 (S1) translation for the sid.
+ */
 static int
 smmu_init_ste_s1(struct smmu_softc *sc, struct smmu_cd *cd,
     uint32_t sid, uint64_t *ste)
@@ -724,7 +730,9 @@ smmu_init_ste(struct smmu_softc *sc, struct smmu_cd *cd, int sid, bool s1)
 		    STRTAB_STE_DWORDS * 8 * sid);
 	};
 
+#if 0
 	printf("%s: ste base for sid %d is %p\n", __func__, sid, addr);
+#endif
 
 	if (s1)
 		smmu_init_ste_s1(sc, cd, sid, addr);
@@ -758,7 +766,7 @@ smmu_init_cd(struct smmu_softc *sc, struct smmu_domain *domain)
 	    size,		/* alignment */
 	    0);			/* boundary */
 	if (cd->addr == NULL) {
-		device_printf(sc->dev, "failed to allocate CD\n");
+		device_printf(sc->dev, "Failed to allocate CD\n");
 		return (ENXIO);
 	}
 
@@ -1270,6 +1278,7 @@ smmu_attach(device_t dev)
 {
 	struct smmu_softc *sc;
 	uint32_t reg;
+	uint32_t val;
 	int error;
 
 	sc = device_get_softc(dev);
@@ -1395,7 +1404,6 @@ smmu_attach(device_t dev)
 		return (ENXIO);
 	}
 
-	uint32_t val;
 	val = (reg & IDR1_CMDQS_M) >> IDR1_CMDQS_S;
 	sc->cmdq.size_log2 = val;
 	device_printf(sc->dev, "CMD queue size %d\n", val);
@@ -1650,7 +1658,7 @@ smmu_device_attach(device_t dev, struct iommu_domain *domain,
 	/*
 	 * Neoverse N1 SDP:
 	 * 0x800 xhci
-	 * 0x700 realtek
+	 * 0x700 re
 	 * 0x600 sata
 	 */
 

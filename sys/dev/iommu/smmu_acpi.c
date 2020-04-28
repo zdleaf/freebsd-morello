@@ -53,11 +53,11 @@ __FBSDID("$FreeBSD$");
 #include "smmu_var.h"
 #include "pic_if.h"
 
+/* TODO: check this */
 #define	MEMORY_RESOURCE_SIZE	0x40000
 #define	MAX_SMMU		8
 
 struct smmu_acpi_devinfo {
-	//struct smmu_devinfo	di_smmu_dinfo;
 	struct resource_list	di_rl;
 };
 
@@ -222,7 +222,7 @@ error:
 		device_printf(dev,
 		    "Failed to attach. Error %d\n", err);
 	}
-	/* Failure so free resources */
+	/* Failure so free resources. */
 	smmu_detach(dev);
 
 	return (err);
