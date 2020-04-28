@@ -39,28 +39,13 @@ __FBSDID("$FreeBSD$");
 #include <sys/systm.h>
 #include <sys/malloc.h>
 #include <sys/bus.h>
-#include <sys/interrupt.h>
 #include <sys/kernel.h>
-#include <sys/ktr.h>
-#include <sys/lock.h>
-#include <sys/proc.h>
-#include <sys/memdesc.h>
-#include <sys/mutex.h>
-#include <sys/sysctl.h>
-#include <sys/uio.h>
 
-#include <vm/vm.h>
-#include <vm/vm_extern.h>
-#include <vm/vm_kern.h>
-#include <vm/vm_page.h>
-#include <vm/vm_map.h>
-
-#include <machine/atomic.h>
 #include <machine/bus.h>
-#include <machine/md_var.h>
 #include <arm64/include/bus_dma_impl.h>
 
 #include <dev/iommu/iommu.h>
+#include <dev/pci/pcivar.h>
 
 #ifdef DEV_ACPI
 #include <contrib/dev/acpica/include/acpi.h>
@@ -69,8 +54,6 @@ __FBSDID("$FreeBSD$");
 #include <dev/acpica/acpivar.h>
 #include <dev/acpica/acpi_pcibvar.h>
 #endif
-
-#include <dev/pci/pcivar.h>
 
 #define	GICV3_ITS_PAGE	0x300b0000
 
@@ -188,8 +171,6 @@ smmu_get_dma_tag(device_t dev, device_t child)
 	pci_class = devclass_find("pci");
 	if (device_get_devclass(device_get_parent(child)) != pci_class)
 		return (NULL);
-
-	printf("%s\n", __func__);
 
 	domain = iommu_get_domain_for_dev(child);
 	if (domain)
