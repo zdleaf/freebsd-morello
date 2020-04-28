@@ -3449,7 +3449,9 @@ pmap_sremove(pmap_t pmap, vm_offset_t va)
 }
 
 /*
- * Remove all the allocated pages from SMMU pmap.
+ * Remove all the allocated L1, L2 pages from SMMU pmap.
+ * All the L3 entires must be cleared in advance, otherwise
+ * this function returns error.
  */
 int
 pmap_sremove_all(pmap_t pmap)
@@ -3538,7 +3540,6 @@ pmap_sremove_all(pmap_t pmap)
 
 	KASSERT(pmap->pm_stats.resident_count == 0,
 	    ("Invalid resident count %jd", pmap->pm_stats.resident_count));
-
 
 	rc = KERN_SUCCESS;
 out:
