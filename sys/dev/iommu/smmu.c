@@ -318,19 +318,42 @@ smmu_init_queues(struct smmu_softc *sc)
 	return (0);
 }
 
+/*
+ * Dump 2LVL or linear STE.
+ */
 static void
-smmu_dump_ste(struct smmu_softc *sc, uint64_t *ste)
+smmu_dump_ste(struct smmu_softc *sc, int sid)
 {
+	struct smmu_strtab *strtab;
+	struct l1_desc *l1_desc;
+	uint64_t *ste, *l1;
 	int i;
 
-	device_printf(sc->dev, "%s\n", __func__);
+	strtab = &sc->strtab;
 
 	if (sc->features & SMMU_FEATURE_2_LVL_STREAM_TABLE) {
-		/* TODO: add support. */
+		i = sid >> STRTAB_SPLIT;
+		l1 = (void *)((uint64_t)strtab->addr +
+		    STRTAB_L1_DESC_DWORDS * 8 * i);
+		device_printf(sc->dev, "L1 ste == %lx\n", l1[0]);
+
+		l1_desc = &strtab->l1[i];
+		ste = l1_desc->va;
+	} else {
+		ste = (void *)((uint64_t)strtab->addr +
+		    sid * (STRTAB_STE_DWORDS << 3));
 	}
 
+	/* Dump L2 or linear STE. */
 	for (i = 0; i < STRTAB_STE_DWORDS; i++)
 		device_printf(sc->dev, "ste[%d] == %lx\n", i, ste[i]);
+
+#if 0
+	device_printf(sc->dev, "strtab addr %p ste addr %p\n",
+	    strtab->addr, ste);
+	device_printf(sc->dev, "strtab phys %jx ste phys %jx\n",
+	    vtophys(strtab->addr), vtophys(ste));
+#endif
 }
 
 static void __unused
@@ -373,6 +396,7 @@ smmu_print_event(struct smmu_softc *sc, uint32_t *evt)
 	struct smmu_event *ev;
 	uint64_t input_addr;
 	uint8_t event_id;
+	int sid;
 	int i;
 
 	ev = NULL;
@@ -390,34 +414,18 @@ smmu_print_event(struct smmu_softc *sc, uint32_t *evt)
 	} else
 		device_printf(sc->dev, "Event 0x%x received\n", event_id);
 
+	sid = evt[1];
 	input_addr = evt[4];
 	input_addr <<= 32;
 	input_addr |= evt[5];
 
-	device_printf(sc->dev, "Input Address: %jx\n", input_addr);
+	device_printf(sc->dev, "SID %x, Input Address: %jx\n",
+	    sid, input_addr);
 
-	device_printf(sc->dev, "evt[0] %x\n", evt[0]);
-	device_printf(sc->dev, "evt[1] %x\n", evt[1]);
-	device_printf(sc->dev, "evt[2] %x\n", evt[2]);
-	device_printf(sc->dev, "evt[3] %x\n", evt[3]);
-	device_printf(sc->dev, "evt[4] %x\n", evt[4]);
-	device_printf(sc->dev, "evt[5] %x\n", evt[5]);
-	device_printf(sc->dev, "evt[6] %x\n", evt[6]);
-	device_printf(sc->dev, "evt[7] %x\n", evt[7]);
+	for (i = 0; i < 8; i++)
+		device_printf(sc->dev, "evt[%d] %x\n", i, evt[i]);
 
-	int sid;
-	uint64_t *ste;
-	struct smmu_strtab *strtab;
-
-	sid = evt[1];
-	strtab = &sc->strtab;
-	ste = (void *)((uint64_t)strtab->addr + sid * (STRTAB_STE_DWORDS << 3));
-
-	device_printf(sc->dev, "strtab addr %p ste addr %p\n",
-	    strtab->addr, ste);
-	device_printf(sc->dev, "strtab phys %jx ste phys %jx\n",
-	    vtophys(strtab->addr), vtophys(ste));
-	smmu_dump_ste(sc, ste);
+	smmu_dump_ste(sc, sid);
 }
 
 static void
