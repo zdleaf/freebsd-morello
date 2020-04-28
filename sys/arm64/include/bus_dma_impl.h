@@ -50,6 +50,8 @@ struct bus_dma_tag_common {
 	int		  ref_count;
 };
 
+struct bounce_zone;
+
 struct bus_dma_tag {
 	struct bus_dma_tag_common common;
 	int			map_count;

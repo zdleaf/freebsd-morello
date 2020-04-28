@@ -70,8 +70,6 @@ enum {
 	BF_COHERENT		= 0x10,
 };
 
-struct bounce_zone;
-
 struct bounce_page {
 	vm_offset_t	vaddr;		/* kva of bounce buffer */
 	bus_addr_t	busaddr;	/* Physical address */
