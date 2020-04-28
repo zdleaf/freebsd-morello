@@ -66,7 +66,7 @@ __FBSDID("$FreeBSD$");
 #include "iommu.h"
 #include "iommu_if.h"
 
-static MALLOC_DEFINE(M_IOMMU, "iommu", "IOMMU");
+static MALLOC_DEFINE(M_IOMMU, "IOMMU", "IOMMU framework");
 
 static struct mtx iommu_mtx;
 
