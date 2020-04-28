@@ -72,6 +72,8 @@ __FBSDID("$FreeBSD$");
 
 #include <dev/pci/pcivar.h>
 
+#define	GICV3_ITS_PAGE	0x300b0000
+
 static MALLOC_DEFINE(M_BUSDMA, "busdma tag", "ARM64 busdma");
 
 static void
@@ -109,7 +111,7 @@ bounce_smmu_domain_free(bus_dma_tag_t dmat)
 	}
 
 	/* Unmap the GICv3 ITS page. */
-	error = iommu_unmap_page(dmat->iommu_domain, 0x300b0000);
+	error = iommu_unmap_page(dmat->iommu_domain, GICV3_ITS_PAGE);
 	if (error) {
 		device_printf(dmat->owner,
 		    "Could not unmap GICv3 ITS page.\n");
@@ -170,7 +172,7 @@ bounce_smmu_domain_alloc(device_t dev)
 	iommu_domain_add_va_range(domain, 0x40000000, 0x40000000);
 
 	/* Map the GICv3 ITS page so the device could send MSI interrupts. */
-	iommu_map_page(domain, 0x300b0000, 0x300b0000, VM_PROT_WRITE);
+	iommu_map_page(domain, GICV3_ITS_PAGE, GICV3_ITS_PAGE, VM_PROT_WRITE);
 
 	return (domain);
 }
