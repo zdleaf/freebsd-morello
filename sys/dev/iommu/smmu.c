@@ -98,7 +98,58 @@ MALLOC_DEFINE(M_SMMU, "SMMU", SMMU_DEVSTR);
 
 #define	SMMU_Q_ALIGN		(64 * 1024)
 
-static int smmu_evtq_dequeue(struct smmu_softc *sc);
+struct smmu_event {
+	int ident;
+	char *str;
+	char *msg;
+};
+
+static struct smmu_event events[] = {
+	{ 0x01, "F_UUT",
+		"Unsupported Upstream Transaction."},
+	{ 0x02, "C_BAD_STREAMID",
+		"Transaction StreamID out of range."},
+	{ 0x03, "F_STE_FETCH",
+		"Fetch of STE caused external abort."},
+	{ 0x04, "C_BAD_STE",
+		"Used STE invalid."},
+	{ 0x05, "F_BAD_ATS_TREQ",
+		"Address Translation Request disallowed for a StreamID "
+		"and a PCIe ATS Translation Request received."},
+	{ 0x06, "F_STREAM_DISABLED",
+		"The STE of a transaction marks non-substream transactions "
+		"disabled."},
+	{ 0x07, "F_TRANSL_FORBIDDEN",
+		"An incoming PCIe transaction is marked Translated but "
+		"SMMU bypass is disallowed for this StreamID."},
+	{ 0x08, "C_BAD_SUBSTREAMID",
+		"Incoming SubstreamID present, but configuration is invalid."},
+	{ 0x09, "F_CD_FETCH",
+		"Fetch of CD caused external abort."},
+	{ 0x0a, "C_BAD_CD",
+		"Fetched CD invalid."},
+	{ 0x0b, "F_WALK_EABT",
+		"An external abort occurred fetching (or updating) "
+		"a translation table descriptor."},
+	{ 0x10, "F_TRANSLATION",
+		"Translation fault."},
+	{ 0x11, "F_ADDR_SIZE",
+		"Address Size fault."},
+	{ 0x12, "F_ACCESS",
+		"Access flag fault due to AF == 0 in a page or block TTD."},
+	{ 0x13, "F_PERMISSION",
+		"Permission fault occurred on page access."},
+	{ 0x20, "F_TLB_CONFLICT",
+		"A TLB conflict occurred because of the transaction."},
+	{ 0x21, "F_CFG_CONFLICT",
+		"A configuration cache conflict occurred due to "
+		"the transaction."},
+	{ 0x24, "E_PAGE_REQUEST",
+		"Speculative page request hint."},
+	{ 0x25, "F_VMS_FETCH",
+		"Fetch of VMS caused external abort."},
+	{ 0, NULL, NULL },
+};
 
 static int
 smmu_q_has_space(struct smmu_queue *q)
@@ -192,46 +243,6 @@ smmu_write_ack(struct smmu_softc *sc, uint32_t reg,
 	}
 
 	return (0);
-}
-
-static int
-smmu_event_intr(void *arg)
-{
-	struct smmu_softc *sc;
-
-	sc = arg;
-
-	device_printf(sc->dev, "%s\n", __func__);
-
-	do {
-		smmu_evtq_dequeue(sc);
-	} while (!smmu_q_empty(&sc->evtq));
-
-	return (FILTER_HANDLED);
-}
-
-static int __unused
-smmu_sync_intr(void *arg)
-{
-	struct smmu_softc *sc;
-
-	sc = arg;
-
-	device_printf(sc->dev, "%s\n", __func__);
-
-	return (FILTER_HANDLED);
-}
-
-static int
-smmu_gerr_intr(void *arg)
-{
-	struct smmu_softc *sc;
-
-	sc = arg;
-
-	device_printf(sc->dev, "SMMU Global Error\n");
-
-	return (FILTER_HANDLED);
 }
 
 static inline int
@@ -335,30 +346,55 @@ smmu_dump_cd(struct smmu_softc *sc, struct smmu_cd *cd)
 		device_printf(sc->dev, "cd[%d] == %lx\n", i, addr[i]);
 }
 
-static int
-smmu_evtq_dequeue(struct smmu_softc *sc)
+static void
+smmu_evtq_dequeue(struct smmu_softc *sc, uint32_t *evt)
 {
-	uint32_t evt[EVTQ_ENTRY_DWORDS * 2];
 	struct smmu_queue *evtq;
 	void *entry_addr;
-	uint8_t event_id;
 
 	evtq = &sc->evtq;
 
-	evtq->lc.val = bus_read_8(sc->res[0], evtq->prod_off);
+#if 0
 	device_printf(sc->dev, "evtq->lc.cons %d evtq->lc.prod %d\n",
 	    evtq->lc.cons, evtq->lc.prod);
+#endif
 
+	evtq->lc.val = bus_read_8(sc->res[0], evtq->prod_off);
 	entry_addr = (void *)((uint64_t)evtq->addr +
 	    evtq->lc.cons * EVTQ_ENTRY_DWORDS * 8);
 	memcpy(evt, entry_addr, EVTQ_ENTRY_DWORDS * 8);
-
 	evtq->lc.cons = smmu_q_inc_cons(evtq);
 	bus_write_4(sc->res[0], evtq->cons_off, evtq->lc.cons);
+}
 
+static void
+smmu_print_event(struct smmu_softc *sc, uint32_t *evt)
+{
+	struct smmu_event *ev;
+	uint64_t input_addr;
+	uint8_t event_id;
+	int i;
+
+	ev = NULL;
 	event_id = evt[0] & 0xff;
+	for (i = 0; events[i].ident != 0; i++) {
+		if (events[i].ident == event_id) {
+			ev = &events[i];
+			break;
+		}
+	}
 
-	device_printf(sc->dev, "%s: event 0x%x received\n", __func__, event_id);
+	if (ev) {
+		device_printf(sc->dev,
+		    "Event %s (%s) received.\n", ev->str, ev->msg);
+	} else
+		device_printf(sc->dev, "Event 0x%x received\n", event_id);
+
+	input_addr = evt[4];
+	input_addr <<= 32;
+	input_addr |= evt[5];
+
+	device_printf(sc->dev, "Input Address: %jx\n", input_addr);
 
 	device_printf(sc->dev, "evt[0] %x\n", evt[0]);
 	device_printf(sc->dev, "evt[1] %x\n", evt[1]);
@@ -379,11 +415,9 @@ smmu_evtq_dequeue(struct smmu_softc *sc)
 
 	device_printf(sc->dev, "strtab addr %p ste addr %p\n",
 	    strtab->addr, ste);
-	device_printf(sc->dev, "strtab phys %lx ste phys %lx\n",
+	device_printf(sc->dev, "strtab phys %jx ste phys %jx\n",
 	    vtophys(strtab->addr), vtophys(ste));
 	smmu_dump_ste(sc, ste);
-
-	return (0);
 }
 
 static void
@@ -958,6 +992,50 @@ smmu_disable(struct smmu_softc *sc)
 		device_printf(sc->dev, "Could not disable SMMU.\n");
 
 	return (0);
+}
+
+static int
+smmu_event_intr(void *arg)
+{
+	uint32_t evt[EVTQ_ENTRY_DWORDS * 2];
+	struct smmu_softc *sc;
+
+	sc = arg;
+
+#if 0
+	device_printf(sc->dev, "%s\n", __func__);
+#endif
+
+	do {
+		smmu_evtq_dequeue(sc, evt);
+		smmu_print_event(sc, evt);
+	} while (!smmu_q_empty(&sc->evtq));
+
+	return (FILTER_HANDLED);
+}
+
+static int __unused
+smmu_sync_intr(void *arg)
+{
+	struct smmu_softc *sc;
+
+	sc = arg;
+
+	device_printf(sc->dev, "%s\n", __func__);
+
+	return (FILTER_HANDLED);
+}
+
+static int
+smmu_gerr_intr(void *arg)
+{
+	struct smmu_softc *sc;
+
+	sc = arg;
+
+	device_printf(sc->dev, "SMMU Global Error\n");
+
+	return (FILTER_HANDLED);
 }
 
 static int
