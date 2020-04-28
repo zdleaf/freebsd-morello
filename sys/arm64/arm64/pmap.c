@@ -3382,8 +3382,7 @@ pmap_senter(pmap_t pmap, vm_offset_t va, vm_paddr_t pa,
 		new_l3 |= ATTR_S1_AP(ATTR_S1_AP_RO);
 	new_l3 |= ATTR_S1_XN; /* Execute never. */
 	new_l3 |= ATTR_S1_AP(ATTR_S1_AP_USER);
-	/* TODO: check this. */
-	new_l3 |= ATTR_S1_nG;
+	new_l3 |= ATTR_S1_nG; /* Non global. */
 
 	CTR2(KTR_PMAP, "pmap_senter: %.16lx -> %.16lx", va, pa);
 
