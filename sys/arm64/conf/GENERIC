@@ -145,6 +145,8 @@ options 	SOC_XILINX_ZYNQ
 # Alternatively include all the DTrace modules
 #device		dtraceall
 
+device		smmu
+
 # Timer drivers
 device		a10_timer
 
