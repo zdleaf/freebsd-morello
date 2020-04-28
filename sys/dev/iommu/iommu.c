@@ -378,8 +378,33 @@ iommu_register(device_t dev, intptr_t xref)
 int
 iommu_unregister(device_t dev)
 {
+	struct iommu *iommu;
+	bool found;
 
-	/* TODO */
+	found = false;
+
+	IOMMU_LIST_LOCK();
+	LIST_FOREACH(iommu, &iommu_list, next) {
+		if (iommu->dev == dev) {
+			found = true;
+			break;
+		}
+	}
+
+	if (!found) {
+		IOMMU_LIST_UNLOCK();
+		return (ENOENT);
+	}
+
+	if (!LIST_EMPTY(&iommu->domain_list)) {
+		IOMMU_LIST_UNLOCK();
+		return (EBUSY);
+	}
+
+	LIST_REMOVE(iommu, next);
+	IOMMU_LIST_UNLOCK();
+
+	free(iommu, M_IOMMU);
 
 	return (0);
 }
