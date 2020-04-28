@@ -75,7 +75,7 @@ __FBSDID("$FreeBSD$");
 
 #define MAX_BPAGES 4096
 
-static int smmu_domain_free(bus_dma_tag_t dmat);
+static int bounce_smmu_domain_free(bus_dma_tag_t dmat);
 
 enum {
 	BF_COULD_BOUNCE		= 0x01,
@@ -281,7 +281,7 @@ bounce_bus_dma_tag_destroy(bus_dma_tag_t dmat)
 			if (dmat->common.ref_count == 0) {
 				domain = dmat->iommu_domain;
 				if (domain && dmat == domain->tag)
-					smmu_domain_free(dmat);
+					bounce_smmu_domain_free(dmat);
 				free(dmat, M_DEVBUF);
 				/*
 				 * Last reference count, so
@@ -1398,7 +1398,7 @@ struct bus_dma_impl bus_dma_bounce_impl = {
 };
 
 static void
-smmu_tag_init(struct bus_dma_tag *t)
+bounce_smmu_tag_init(struct bus_dma_tag *t)
 {
 	bus_addr_t maxaddr;
 
@@ -1415,7 +1415,7 @@ smmu_tag_init(struct bus_dma_tag *t)
 }
 
 static int
-smmu_domain_free(bus_dma_tag_t dmat)
+bounce_smmu_domain_free(bus_dma_tag_t dmat)
 {
 	struct iommu_domain *domain;
 	int error;
@@ -1450,7 +1450,7 @@ smmu_domain_free(bus_dma_tag_t dmat)
 }
 
 static struct iommu_domain *
-smmu_domain_alloc(device_t dev)
+bounce_smmu_domain_alloc(device_t dev)
 {
 	struct iommu_domain *domain;
 	struct iommu *iommu;
@@ -1518,7 +1518,7 @@ smmu_get_dma_tag(device_t dev, device_t child)
 
 	/* A single device per domain. */
 
-	domain = smmu_domain_alloc(child);
+	domain = bounce_smmu_domain_alloc(child);
 	if (!domain)
 		return (NULL);
 
@@ -1539,7 +1539,7 @@ smmu_get_dma_tag(device_t dev, device_t child)
 		return (NULL);
 	}
 
-	smmu_tag_init(tag);
+	bounce_smmu_tag_init(tag);
 
 	return (tag);
 }
