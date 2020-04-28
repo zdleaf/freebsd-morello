@@ -470,7 +470,7 @@ make_cmd(struct smmu_softc *sc, uint64_t *cmd,
 	};
 }
 
-static int
+static void
 smmu_cmdq_enqueue_cmd(struct smmu_softc *sc, struct smmu_cmdq_entry *entry)
 {
 	uint64_t cmd[CMDQ_ENTRY_DWORDS];
@@ -498,8 +498,6 @@ smmu_cmdq_enqueue_cmd(struct smmu_softc *sc, struct smmu_cmdq_entry *entry)
 	bus_write_4(sc->res[0], cmdq->prod_off, cmdq->lc.prod);
 
 	SMMU_UNLOCK(sc);
-
-	return (0);
 }
 
 static void __unused
@@ -1642,6 +1640,7 @@ smmu_device_attach(device_t dev, struct iommu_domain *domain,
 	}
 
 	/*
+	 * Neoverse N1 SDP:
 	 * 0x800 xhci
 	 * 0x700 realtek
 	 * 0x600 sata
