@@ -339,6 +339,8 @@ smmu_dump_ste(struct smmu_softc *sc, int sid)
 
 		l1_desc = &strtab->l1[i];
 		ste = l1_desc->va;
+		if (ste == NULL)
+			return;
 	} else {
 		ste = (void *)((uint64_t)strtab->addr +
 		    sid * (STRTAB_STE_DWORDS << 3));
