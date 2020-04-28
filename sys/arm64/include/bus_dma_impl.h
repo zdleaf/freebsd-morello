@@ -103,7 +103,7 @@ int common_bus_dma_tag_create(struct bus_dma_tag_common *parent,
     int nsegments, bus_size_t maxsegsz, int flags, bus_dma_lock_t *lockfunc,
     void *lockfuncarg, size_t sz, void **dmat);
 
-bus_dma_tag_t smmu_get_dma_tag(device_t dev, device_t child);
+bus_dma_tag_t bounce_smmu_get_dma_tag(device_t dev, device_t child);
 int bounce_smmu_domain_free(bus_dma_tag_t dmat);
 
 extern struct bus_dma_impl bus_dma_bounce_impl;

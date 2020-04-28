@@ -5701,7 +5701,7 @@ pci_get_dma_tag(device_t bus, device_t dev)
 	return (tag);
 }
 #elif defined(ACPI_SMMU)
-bus_dma_tag_t smmu_get_dma_tag(device_t dev, device_t child);
+bus_dma_tag_t bounce_smmu_get_dma_tag(device_t dev, device_t child);
 bus_dma_tag_t
 pci_get_dma_tag(device_t bus, device_t dev)
 {
@@ -5710,7 +5710,7 @@ pci_get_dma_tag(device_t bus, device_t dev)
 
 	if (device_get_parent(dev) == bus) {
 		/* try smmu and return if it works */
-		tag = smmu_get_dma_tag(bus, dev);
+		tag = bounce_smmu_get_dma_tag(bus, dev);
 	} else
 		tag = NULL;
 	if (tag == NULL) {

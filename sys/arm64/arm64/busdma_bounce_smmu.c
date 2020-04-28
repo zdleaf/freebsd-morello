@@ -161,7 +161,7 @@ bounce_smmu_domain_alloc(device_t dev)
 }
 
 bus_dma_tag_t
-smmu_get_dma_tag(device_t dev, device_t child)
+bounce_smmu_get_dma_tag(device_t dev, device_t child)
 {
 	struct iommu_domain *domain;
 	devclass_t pci_class;
