@@ -60,6 +60,7 @@ struct smmu_queue_local_copy {
 
 struct smmu_cd {
 	vm_paddr_t paddr;
+	vm_size_t size;
 	void *addr;
 };
 

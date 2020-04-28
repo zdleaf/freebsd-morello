@@ -740,7 +740,7 @@ smmu_init_cd(struct smmu_softc *sc, struct smmu_domain *domain)
 	vm_paddr_t paddr;
 	uint64_t *ptr;
 	uint64_t val;
-	int size;
+	vm_size_t size;
 	struct smmu_cd *cd;
 	pmap_t p;
 
@@ -748,6 +748,7 @@ smmu_init_cd(struct smmu_softc *sc, struct smmu_domain *domain)
 
 	p = &domain->p;
 	cd = &domain->cd;
+
 	cd->addr = contigmalloc(size, M_SMMU,
 	    M_WAITOK | M_ZERO,	/* flags */
 	    0,			/* low */
@@ -759,6 +760,7 @@ smmu_init_cd(struct smmu_softc *sc, struct smmu_domain *domain)
 		return (ENXIO);
 	}
 
+	cd->size = size;
 	cd->paddr = vtophys(cd->addr);
 
 	device_printf(sc->dev, "%s: CD vaddr %p\n", __func__, cd->addr);
@@ -1590,15 +1592,19 @@ static int
 smmu_domain_free(device_t dev, struct iommu_domain *domain)
 {
 	struct smmu_domain *smmu_domain;
+	struct smmu_cd *cd;
 	int error;
 
 	smmu_domain = (struct smmu_domain *)domain;
-
-	/* TODO: remove CD. */
+	cd = &smmu_domain->cd;
 
 	error = pmap_sremove_all(&smmu_domain->p);
 	if (error != 0)
 		return (error);
+
+	pmap_release(&smmu_domain->p);
+
+	contigfree(cd->addr, cd->size, M_SMMU);
 
 	free(domain, M_SMMU);
 
