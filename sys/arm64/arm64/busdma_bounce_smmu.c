@@ -57,7 +57,7 @@ __FBSDID("$FreeBSD$");
 
 #define	GICV3_ITS_PAGE	0x300b0000
 
-static MALLOC_DEFINE(M_BUSDMA, "busdma tag", "ARM64 busdma");
+static MALLOC_DEFINE(M_BUSDMA, "bounce SMMU", "ARM64 busdma bounce SMMU");
 
 static void
 bounce_smmu_tag_init(struct bus_dma_tag *t)
