@@ -885,7 +885,7 @@ static bus_dma_segment_t *
 bounce_bus_dmamap_complete(bus_dma_tag_t dmat, bus_dmamap_t map,
     bus_dma_segment_t *segs, int nsegs, int error)
 {
-	int rv;
+	int ret;
 
 	map->nsegs = nsegs;
 
@@ -893,9 +893,11 @@ bounce_bus_dmamap_complete(bus_dma_tag_t dmat, bus_dmamap_t map,
 		memcpy(map->segments, segs, map->nsegs * sizeof(segs[0]));
 
 	if (dmat->iommu_domain) {
-		rv = iommu_map(dmat->iommu_domain, map->segments, nsegs);
-		if (rv)
-			panic("TODO: not sure what to do in this case\n");
+		ret = iommu_map(dmat->iommu_domain, map->segments, nsegs);
+		if (ret) {
+			printf("iommu failed to map page: error %d\n", ret);
+			/* TODO: handle this case. */
+		}
 	}
 
 	if (segs != NULL)
