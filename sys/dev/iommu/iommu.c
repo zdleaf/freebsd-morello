@@ -141,13 +141,14 @@ iommu_domain_free(struct iommu_domain *domain)
 	vmem = domain->vmem;
 
 	IOMMU_LOCK(iommu);
+	LIST_REMOVE(domain, next);
 	error = IOMMU_DOMAIN_FREE(iommu->dev, domain);
 	if (error) {
+		LIST_INSERT_HEAD(&iommu->domain_list, domain, next);
 		IOMMU_UNLOCK(iommu);
 		return (error);
 	}
 
-	LIST_REMOVE(domain, next);
 	IOMMU_UNLOCK(iommu);
 
 	vmem_destroy(vmem);
@@ -246,6 +247,37 @@ iommu_device_detach(struct iommu_domain *domain, device_t dev)
 	return (0);
 }
 
+int
+iommu_map_page(struct iommu_domain *domain,
+    vm_offset_t va, vm_paddr_t pa, vm_prot_t prot)
+{
+	struct iommu *iommu;
+	int error;
+
+	iommu = domain->iommu;
+
+	error = IOMMU_MAP(iommu->dev, domain, va, pa, PAGE_SIZE, prot);
+	if (error)
+		return (error);
+
+	return (0);
+}
+
+int
+iommu_unmap_page(struct iommu_domain *domain, vm_offset_t va)
+{
+	struct iommu *iommu;
+	int error;
+
+	iommu = domain->iommu;
+
+	error = IOMMU_UNMAP(iommu->dev, domain, va, PAGE_SIZE);
+	if (error)
+		return (error);
+
+	return (0);
+}
+
 /*
  * Busdma map/unmap interface.
  */
@@ -322,22 +354,6 @@ iommu_unmap(struct iommu_domain *domain, bus_dma_segment_t *segs, int nsegs)
 		}
 		vmem_free(domain->vmem, va, size);
 	}
-}
-
-int
-iommu_map_page(struct iommu_domain *domain,
-    vm_offset_t va, vm_paddr_t pa, vm_prot_t prot)
-{
-	struct iommu *iommu;
-	int error;
-
-	iommu = domain->iommu;
-
-	error = IOMMU_MAP(iommu->dev, domain, va, pa, PAGE_SIZE, prot);
-	if (error)
-		return (error);
-
-	return (0);
 }
 
 int

@@ -415,9 +415,9 @@ smmu_print_event(struct smmu_softc *sc, uint32_t *evt)
 		device_printf(sc->dev, "Event 0x%x received\n", event_id);
 
 	sid = evt[1];
-	input_addr = evt[4];
+	input_addr = evt[5];
 	input_addr <<= 32;
-	input_addr |= evt[5];
+	input_addr |= evt[4];
 
 	device_printf(sc->dev, "SID %x, Input Address: %jx\n",
 	    sid, input_addr);
@@ -1606,7 +1606,7 @@ smmu_domain_free(device_t dev, struct iommu_domain *domain)
 
 	contigfree(cd->addr, cd->size, M_SMMU);
 
-	free(domain, M_SMMU);
+	free(smmu_domain, M_SMMU);
 
 	return (0);
 }

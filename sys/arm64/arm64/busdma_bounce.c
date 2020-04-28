@@ -1431,7 +1431,13 @@ smmu_domain_free(bus_dma_tag_t dmat)
 		return (error);
 	}
 
-	/* TODO: unmap the GICv3 ITS page here. */
+	/* Unmap the GICv3 ITS page. */
+	error = iommu_unmap_page(dmat->iommu_domain, 0x300b0000);
+	if (error) {
+		device_printf(dmat->owner,
+		    "Could not unmap GICv3 ITS page.\n");
+		return (error);
+	}
 
 	error = iommu_domain_free(domain);
 	if (error) {
