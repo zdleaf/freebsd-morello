@@ -31,8 +31,6 @@
  * SUCH DAMAGE.
  */
 
-#include "opt_acpi.h"
-
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
@@ -63,19 +61,7 @@ __FBSDID("$FreeBSD$");
 
 #include <dev/iommu/iommu.h>
 
-#ifdef DEV_ACPI
-#include <contrib/dev/acpica/include/acpi.h>
-#include <contrib/dev/acpica/include/accommon.h>
-
-#include <dev/acpica/acpivar.h>
-#include <dev/acpica/acpi_pcibvar.h>
-#endif
-
-#include <dev/pci/pcivar.h>
-
 #define MAX_BPAGES 4096
-
-static int bounce_smmu_domain_free(bus_dma_tag_t dmat);
 
 enum {
 	BF_COULD_BOUNCE		= 0x01,
@@ -85,15 +71,6 @@ enum {
 };
 
 struct bounce_zone;
-
-struct bus_dma_tag {
-	struct bus_dma_tag_common common;
-	int			map_count;
-	int			bounce_flags;
-	struct bounce_zone	*bounce_zone;
-	struct iommu_domain	*iommu_domain;
-	device_t		owner;
-};
 
 struct bounce_page {
 	vm_offset_t	vaddr;		/* kva of bounce buffer */
@@ -124,8 +101,6 @@ struct bounce_zone {
 	struct sysctl_ctx_list sysctl_tree;
 	struct sysctl_oid *sysctl_tree_top;
 };
-
-static MALLOC_DEFINE(M_BUSDMA, "busdma tag", "ARM64 busdma");
 
 static struct mtx bounce_lock;
 static int total_bpages;
@@ -1396,150 +1371,3 @@ struct bus_dma_impl bus_dma_bounce_impl = {
 	.map_unload = bounce_bus_dmamap_unload,
 	.map_sync = bounce_bus_dmamap_sync
 };
-
-static void
-bounce_smmu_tag_init(struct bus_dma_tag *t)
-{
-	bus_addr_t maxaddr;
-
-	maxaddr = BUS_SPACE_MAXADDR;
-
-	t->common.ref_count = 0;
-	t->common.impl = &bus_dma_bounce_impl;
-	t->common.boundary = 0;
-	t->common.lowaddr = maxaddr;
-	t->common.highaddr = maxaddr;
-	t->common.maxsize = maxaddr;
-	t->common.nsegments = BUS_SPACE_UNRESTRICTED;
-	t->common.maxsegsz = maxaddr;
-}
-
-static int
-bounce_smmu_domain_free(bus_dma_tag_t dmat)
-{
-	struct iommu_domain *domain;
-	int error;
-
-	domain = iommu_get_domain_for_dev(dmat->owner);
-	if (domain == NULL)
-		return (0);
-
-	error = iommu_device_detach(domain, dmat->owner);
-	if (error) {
-		device_printf(dmat->owner,
-		    "Could not detach a device from IOMMU domain.\n");
-		return (error);
-	}
-
-	/* Unmap the GICv3 ITS page. */
-	error = iommu_unmap_page(dmat->iommu_domain, 0x300b0000);
-	if (error) {
-		device_printf(dmat->owner,
-		    "Could not unmap GICv3 ITS page.\n");
-		return (error);
-	}
-
-	error = iommu_domain_free(domain);
-	if (error) {
-		device_printf(dmat->owner,
-		    "Could not deallocate IOMMU domain.\n");
-		return (error);
-	}
-
-	return (0);
-}
-
-static struct iommu_domain *
-bounce_smmu_domain_alloc(device_t dev)
-{
-	struct iommu_domain *domain;
-	struct iommu *iommu;
-	u_int xref, sid;
-	uint16_t rid;
-	int error;
-	int seg;
-
-	rid = pci_get_rid(dev);
-	seg = pci_get_domain(dev);
-
-	/*
-	 * Find an xref of an IOMMU controller that serves traffic for dev.
-	 */
-#ifdef DEV_ACPI
-	error = acpi_iort_map_pci_smmuv3(seg, rid, &xref, &sid);
-	if (error) {
-		/* Could not find reference to an SMMU device. */
-		return (NULL);
-	}
-#else
-	/* TODO: add FDT support. */
-	return (NULL);
-#endif
-
-	/*
-	 * Find the registered IOMMU controller by xref.
-	 */
-	iommu = iommu_lookup(xref, 0);
-	if (iommu == NULL) {
-		/* SMMU device is not registered in the IOMMU framework. */
-		return (NULL);
-	}
-
-	domain = iommu_domain_alloc(iommu);
-	if (domain == NULL)
-		return (NULL);
-
-	/* Add some virtual address range. */
-	iommu_domain_add_va_range(domain, 0x40000000, 0x40000000);
-
-	/* Map the GICv3 ITS page so the device could send MSI interrupts. */
-	iommu_map_page(domain, 0x300b0000, 0x300b0000, VM_PROT_WRITE);
-
-	return (domain);
-}
-
-bus_dma_tag_t
-smmu_get_dma_tag(device_t dev, device_t child)
-{
-	struct iommu_domain *domain;
-	devclass_t pci_class;
-	bus_dma_tag_t tag;
-	int error;
-
-	pci_class = devclass_find("pci");
-	if (device_get_devclass(device_get_parent(child)) != pci_class)
-		return (NULL);
-
-	printf("%s\n", __func__);
-
-	domain = iommu_get_domain_for_dev(child);
-	if (domain)
-		return (domain->tag);
-
-	/* A single device per domain. */
-
-	domain = bounce_smmu_domain_alloc(child);
-	if (!domain)
-		return (NULL);
-
-	tag = malloc(sizeof(*tag), M_BUSDMA, M_WAITOK | M_ZERO);
-	if (!tag) {
-		iommu_domain_free(domain);
-		return (NULL);
-	}
-
-	tag->owner = child;
-	tag->iommu_domain = domain;
-	domain->tag = tag;
-
-	error = iommu_device_attach(domain, child);
-	if (error) {
-		free(tag, M_BUSDMA);
-		iommu_domain_free(domain);
-		return (NULL);
-	}
-
-	bounce_smmu_tag_init(tag);
-
-	return (tag);
-}
