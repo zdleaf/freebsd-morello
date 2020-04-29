@@ -1205,7 +1205,7 @@ smmu_reset(struct smmu_softc *sc)
 		reg |= CR0_ATSCHK;
 		error = smmu_write_ack(sc, SMMU_CR0, SMMU_CR0ACK, reg);
 		if (error) {
-			device_printf(sc->dev, "Could not enable ATS check\n");
+			device_printf(sc->dev, "Could not enable ATS check.\n");
 			return (ENXIO);
 		}
 	}
@@ -1220,42 +1220,18 @@ smmu_reset(struct smmu_softc *sc)
 	return (0);
 }
 
-/*
- * Device interface.
- */
-int
-smmu_attach(device_t dev)
+static int
+smmu_check_features(struct smmu_softc *sc)
 {
-	struct smmu_softc *sc;
 	uint32_t reg;
 	uint32_t val;
-	int error;
-
-	sc = device_get_softc(dev);
-	sc->dev = dev;
-
-	mtx_init(&sc->sc_mtx, device_get_nameunit(sc->dev), "smmu", MTX_DEF);
-
-	error = bus_alloc_resources(dev, smmu_spec, sc->res);
-	if (error) {
-		device_printf(dev, "Couldn't allocate resources\n");
-		return (ENXIO);
-	}
-
-	if (smmu_setup_interrupts(sc) != 0) {
-		bus_release_resources(dev, smmu_spec, sc->res);
-		return (ENXIO);
-	}
-
-	reg = bus_read_4(sc->res[0], SMMU_IDR3);
-	device_printf(sc->dev, "IDR3 %x\n", reg);
-
-	reg = bus_read_4(sc->res[0], SMMU_IDR0);
-	device_printf(sc->dev, "IDR0 %x\n", reg);
 
 	sc->features = 0;
+
+	reg = bus_read_4(sc->res[0], SMMU_IDR0);
+
 	if (reg & IDR0_ST_LVL_2) {
-		device_printf(sc->dev, "2-level stream table supported\n");
+		device_printf(sc->dev, "2-level stream table supported.\n");
 		sc->features |= SMMU_FEATURE_2_LVL_STREAM_TABLE;
 	}
 
@@ -1287,13 +1263,13 @@ smmu_attach(device_t dev)
 		sc->features |= SMMU_FEATURE_SEV;
 
 	if (reg & IDR0_MSI) {
-		device_printf(sc->dev, "MSI feature present\n");
+		device_printf(sc->dev, "MSI feature present.\n");
 		sc->features |= SMMU_FEATURE_MSI;
 	} else
-		device_printf(sc->dev, "MSI feature not present\n");
+		device_printf(sc->dev, "MSI feature not present.\n");
 
 	if (reg & IDR0_HYP) {
-		device_printf(sc->dev, "HYP feature present\n");
+		device_printf(sc->dev, "HYP feature present.\n");
 		sc->features |= SMMU_FEATURE_HYP;
 	}
 
@@ -1315,11 +1291,11 @@ smmu_attach(device_t dev)
 
 	/* Grab translation stages supported. */
 	if (reg & IDR0_S1P) {
-		device_printf(sc->dev, "stage 1 translation supported\n");
+		device_printf(sc->dev, "Stage 1 translation supported.\n");
 		sc->features |= SMMU_FEATURE_S1P;
 	}
 	if (reg & IDR0_S2P) {
-		device_printf(sc->dev, "stage 2 translation supported\n");
+		device_printf(sc->dev, "Stage 2 translation supported.\n");
 		sc->features |= SMMU_FEATURE_S2P;
 	}
 
@@ -1329,7 +1305,7 @@ smmu_attach(device_t dev)
 		sc->ias = 40;
 		break;
 	default:
-		device_printf(dev, "No AArch64 table format support\n");
+		device_printf(sc->dev, "No AArch64 table format support.\n");
 		return (ENXIO);
 	}
 
@@ -1343,28 +1319,27 @@ smmu_attach(device_t dev)
 	else
 		sc->vmid_bits = 8;
 
-	reg = bus_read_4(sc->res[0], SMMU_S_CR0);
-	device_printf(sc->dev, "SMMU_S_CR0 %x\n", reg);
-
 	reg = bus_read_4(sc->res[0], SMMU_IDR1);
-	device_printf(sc->dev, "IDR1 %x\n", reg);
 
 	if (reg & (IDR1_TABLES_PRESET | IDR1_QUEUES_PRESET | IDR1_REL)) {
-		device_printf(dev, "Embedded implementations not supported\n");
+		device_printf(sc->dev,
+		    "Embedded implementations not supported by this driver.\n");
 		return (ENXIO);
 	}
 
 	val = (reg & IDR1_CMDQS_M) >> IDR1_CMDQS_S;
 	sc->cmdq.size_log2 = val;
-	device_printf(sc->dev, "CMD queue size %d\n", val);
+	device_printf(sc->dev, "CMD queue bits %d\n", val);
 
 	val = (reg & IDR1_EVENTQS_M) >> IDR1_EVENTQS_S;
 	sc->evtq.size_log2 = val;
-	device_printf(sc->dev, "EVENT queue size %d\n", val);
+	device_printf(sc->dev, "EVENT queue bits %d\n", val);
 
-	val = (reg & IDR1_PRIQS_M) >> IDR1_PRIQS_S;
-	sc->priq.size_log2 = val;
-	device_printf(sc->dev, "PRI queue size %d\n", val);
+	if (sc->features & SMMU_FEATURE_PRI) {
+		val = (reg & IDR1_PRIQS_M) >> IDR1_PRIQS_S;
+		sc->priq.size_log2 = val;
+		device_printf(sc->dev, "PRI queue bits %d\n", val);
+	}
 
 	sc->ssid_bits = (reg & IDR1_SSIDSIZE_M) >> IDR1_SSIDSIZE_S;
 	sc->sid_bits = (reg & IDR1_SIDSIZE_M) >> IDR1_SIDSIZE_S;
@@ -1372,12 +1347,11 @@ smmu_attach(device_t dev)
 	if (sc->sid_bits <= STRTAB_SPLIT)
 		sc->features &= ~SMMU_FEATURE_2_LVL_STREAM_TABLE;
 
-	device_printf(dev, "ssid_bits %d\n", sc->ssid_bits);
-	device_printf(dev, "sid_bits %d\n", sc->sid_bits);
+	device_printf(sc->dev, "SSID bits %d\n", sc->ssid_bits);
+	device_printf(sc->dev, "SID bits %d\n", sc->sid_bits);
 
 	/* IDR5 */
 	reg = bus_read_4(sc->res[0], SMMU_IDR5);
-	device_printf(sc->dev, "IDR5 %x\n", reg);
 
 	switch (reg & IDR5_OAS_M) {
 	case IDR5_OAS_32:
@@ -1403,8 +1377,6 @@ smmu_attach(device_t dev)
 		break;
 	}
 
-	device_printf(sc->dev, "oas %d\n", sc->oas);
-
 	sc->pgsizes = 0;
 	if (reg & IDR5_GRAN64K)
 		sc->pgsizes |= 64 * 1024;
@@ -1413,10 +1385,44 @@ smmu_attach(device_t dev)
 	if (reg & IDR5_GRAN4K)
 		sc->pgsizes |= 4 * 1024;
 
-	device_printf(sc->dev, "pgsizes %x\n", sc->pgsizes);
-
 	if ((reg & IDR5_VAX_M) == IDR5_VAX_52)
 		sc->features |= SMMU_FEATURE_VAX;
+
+	return (0);
+}
+
+/*
+ * Device interface.
+ */
+int
+smmu_attach(device_t dev)
+{
+	struct smmu_softc *sc;
+	int error;
+
+	sc = device_get_softc(dev);
+	sc->dev = dev;
+
+	mtx_init(&sc->sc_mtx, device_get_nameunit(sc->dev), "smmu", MTX_DEF);
+
+	error = bus_alloc_resources(dev, smmu_spec, sc->res);
+	if (error) {
+		device_printf(dev, "Couldn't allocate resources.\n");
+		return (ENXIO);
+	}
+
+	error = smmu_setup_interrupts(sc);
+	if (error) {
+		bus_release_resources(dev, smmu_spec, sc->res);
+		return (ENXIO);
+	}
+
+	error = smmu_check_features(sc);
+	if (error) {
+		device_printf(dev, "Some features are required "
+		    "but not supported by hardware.\n");
+		return (ENXIO);
+	}
 
 	error = smmu_init_queues(sc);
 	if (error) {
