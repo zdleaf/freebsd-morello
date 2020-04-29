@@ -14,7 +14,6 @@ MAN=	bhyve.8
 BHYVE_SYSDIR?=${SRCTOP}
 
 SRCS=	\
-	atkbdc.c		\
 	acpi.c			\
 	audio.c			\
 	bhyvegc.c		\
@@ -22,30 +21,20 @@ SRCS=	\
 	block_if.c		\
 	bootrom.c		\
 	console.c		\
-	consport.c		\
 	ctl_util.c		\
 	ctl_scsi_all.c		\
-	dbgport.c		\
 	fwctl.c			\
-	gdb.c			\
 	hda_codec.c		\
-	inout.c			\
-	ioapic.c		\
 	mem.c			\
 	mevent.c		\
-	mptbl.c			\
 	net_backends.c		\
 	net_utils.c		\
 	pci_ahci.c		\
 	pci_e82545.c		\
 	pci_emul.c		\
 	pci_hda.c		\
-	pci_fbuf.c		\
 	pci_hostbridge.c	\
-	pci_irq.c		\
-	pci_lpc.c		\
 	pci_nvme.c		\
-	pci_passthru.c		\
 	pci_virtio_block.c	\
 	pci_virtio_console.c	\
 	pci_virtio_net.c	\
@@ -53,25 +42,46 @@ SRCS=	\
 	pci_virtio_scsi.c	\
 	pci_uart.c		\
 	pci_xhci.c		\
-	pm.c			\
 	post.c			\
-	ps2kbd.c		\
-	ps2mouse.c		\
-	rfb.c			\
-	rtc.c			\
 	smbiostbl.c		\
 	sockstream.c		\
-	task_switch.c		\
 	uart_emul.c		\
 	usb_emul.c		\
 	usb_mouse.c		\
 	virtio.c		\
-	vga.c			\
-	xmsr.c			\
-	spinup_ap.c		\
 	iov.c
 
-.PATH:  ${BHYVE_SYSDIR}/sys/amd64/vmm
+.if ${MACHINE_CPUARCH} == "aarch64"
+# Missing vm_get_ioctls
+CFLAGS+=	-DWITHOUT_CAPSICUM
+.endif
+
+.if ${MACHINE_CPUARCH} == "amd64"
+SRCS+=	\
+	atkbdc.c		\
+	consport.c		\
+	dbgport.c		\
+	gdb.c			\
+	inout.c			\
+	ioapic.c		\
+	mptbl.c			\
+	pci_fbuf.c		\
+	pci_irq.c		\
+	pci_lpc.c		\
+	pci_passthru.c		\
+	pm.c			\
+	ps2kbd.c		\
+	ps2mouse.c		\
+	rfb.c			\
+	rtc.c			\
+	task_switch.c		\
+	xmsr.c			\
+	spinup_ap.c		\
+	vga.c			\
+
+.endif
+
+.PATH:  ${BHYVE_SYSDIR}/sys/${MACHINE}/vmm
 SRCS+=	vmm_instruction_emul.c
 
 LIBADD=	vmmapi md pthread z util sbuf cam
