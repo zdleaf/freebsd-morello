@@ -61,13 +61,13 @@ struct smmu_queue_local_copy {
 struct smmu_cd {
 	vm_paddr_t paddr;
 	vm_size_t size;
-	void *addr;
+	void *vaddr;
 };
 
 struct smmu_queue {
 	struct smmu_queue_local_copy lc;
 	vm_paddr_t paddr;
-	void *addr;
+	void *vaddr;
 	uint32_t prod_off;
 	uint32_t cons_off;
 	int size_log2;
@@ -105,7 +105,7 @@ struct l1_desc {
 };
 
 struct smmu_strtab {
-	void		*addr;
+	void		*vaddr;
 	uint64_t	base;
 	uint32_t	base_cfg;
 	uint32_t	num_l1_entries;
