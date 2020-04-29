@@ -819,9 +819,6 @@ smmu_init_strtab_linear(struct smmu_softc *sc)
 	reg |= STRTAB_BASE_RA;
 	strtab->base = reg;
 
-	device_printf(sc->dev, "strtab base cfg 0x%x\n", strtab->base_cfg);
-	device_printf(sc->dev, "strtab base 0x%lx\n", strtab->base);
-
 	return (0);
 }
 
