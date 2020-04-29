@@ -486,6 +486,8 @@ _ATOMIC_STORE_REL_IMPL(16, w, h)
 _ATOMIC_STORE_REL_IMPL(32, w,  )
 _ATOMIC_STORE_REL_IMPL(64,  ,  )
 
+#define	atomic_load_acq_short		atomic_load_acq_16
+
 #define	atomic_add_int			atomic_add_32
 #define	atomic_fcmpset_int		atomic_fcmpset_32
 #define	atomic_clear_int		atomic_clear_32
