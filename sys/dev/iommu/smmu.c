@@ -752,7 +752,6 @@ smmu_init_cd(struct smmu_softc *sc, struct smmu_domain *domain)
 
 	ptr = cd->vaddr;
 
-	memset(ptr, 0, CD_DWORDS * 8);
 	val = CD0_VALID;
 	val |= CD0_AA64;
 	val |= CD0_ASET;
