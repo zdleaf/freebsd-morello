@@ -331,6 +331,17 @@ int vcpu_trace_exceptions(struct vm *vm, int vcpuid);
 #define	VM_DIR_READ	0
 #define	VM_DIR_WRITE	1
 
+#define	VM_GP_M_MASK		0x1f
+#define	VM_GP_MMU_ENABLED	(1 << 5)
+
+struct vm_guest_paging {
+	uint64_t	far;
+	uint64_t	ttbr0_el1;
+	uint64_t	ttbr1_el1;
+	int		flags;
+	int		padding;
+};
+
 struct vie {
 	uint8_t access_size:4, sign_extend:1, dir:1, unused:2;
 	enum vm_reg_name reg;
@@ -352,6 +363,7 @@ enum vm_cap_type {
 	VM_CAP_UNRESTRICTED_GUEST,
 	VM_CAP_MAX
 };
+
 enum vm_exitcode {
 	VM_EXITCODE_BOGUS,
 	VM_EXITCODE_INST_EMUL,
@@ -401,6 +413,7 @@ struct vm_exit {
 		} paging;
 		struct {
 			uint64_t	gpa;
+			struct vm_guest_paging paging;
 			struct vie	vie;
 		} inst_emul;
 

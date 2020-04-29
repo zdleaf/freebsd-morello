@@ -53,7 +53,8 @@ typedef int (*reg_write_t)(void *vm, int cpuid, uint64_t wval, void *arg);
  *
  */
 int vmm_emulate_instruction(void *vm, int cpuid, uint64_t gpa, struct vie *vie,
-    mem_region_read_t mrr, mem_region_write_t mrw, void *mrarg);
+    struct vm_guest_paging *paging, mem_region_read_t mrr,
+    mem_region_write_t mrw, void *mrarg);
 
 /*
  * Emulate the decoded 'vre' instruction when it contains a register access.

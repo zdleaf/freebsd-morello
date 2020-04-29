@@ -394,8 +394,10 @@ arm64_print_hyp_regs(struct vm_exit *vme)
 }
 
 static void
-arm64_gen_inst_emul_data(uint32_t esr_iss, struct vm_exit *vme_ret)
+arm64_gen_inst_emul_data(struct hypctx *hypctx, uint32_t esr_iss,
+    struct vm_exit *vme_ret)
 {
+	struct vm_guest_paging *paging;
 	struct vie *vie;
 	uint32_t esr_sas, reg_num;
 	uint64_t page_off;
@@ -404,8 +406,8 @@ arm64_gen_inst_emul_data(uint32_t esr_iss, struct vm_exit *vme_ret)
 	 * Get bits [47:12] of the IPA from HPFAR_EL2.
 	 * At this point the 'u.hyp' member will be replaced by 'u.inst_emul'.
 	 */
-	vme_ret->u.inst_emul.gpa = \
-	    (vme_ret->u.hyp.hpfar_el2) >> HPFAR_EL2_FIPA_SHIFT;
+	vme_ret->u.inst_emul.gpa =
+	    hypctx->exit_info.hpfar_el2 >> HPFAR_EL2_FIPA_SHIFT;
 	/* The IPA is the base address of a 4KB page, make bits [11:0] zero. */
 	vme_ret->u.inst_emul.gpa = (vme_ret->u.inst_emul.gpa) << PAGE_SHIFT;
 	/* Bits [11:0] are the same as bits [11:0] from the virtual address. */
@@ -420,6 +422,14 @@ arm64_gen_inst_emul_data(uint32_t esr_iss, struct vm_exit *vme_ret)
 	vie->sign_extend = (esr_iss & ISS_DATA_SSE) ? 1 : 0;
 	vie->dir = (esr_iss & ISS_DATA_WnR) ? VM_DIR_WRITE : VM_DIR_READ;
 	vie->reg = get_vm_reg_name(reg_num, UNUSED);
+
+	paging = &vme_ret->u.inst_emul.paging;
+	paging->far = hypctx->exit_info.far_el2;
+	paging->ttbr0_el1 = hypctx->ttbr0_el1;
+	paging->ttbr1_el1 = hypctx->ttbr1_el1;
+	paging->flags = hypctx->spsr_el2 & (PSR_M_MASK | PSR_M_32);
+	if ((hypctx->sctlr_el1 & SCTLR_M) != 0)
+		paging->flags |= VM_GP_MMU_ENABLED;
 }
 
 static void
@@ -491,7 +501,8 @@ handle_el1_sync_excp(struct hyp *hyp, int vcpu, struct vm_exit *vme_ret,
 		}
 
 		if (esr_ec == EXCP_DATA_ABORT_L) {
-			arm64_gen_inst_emul_data(esr_iss, vme_ret);
+			arm64_gen_inst_emul_data(&hyp->ctx[vcpu], esr_iss,
+			    vme_ret);
 			vme_ret->exitcode = VM_EXITCODE_INST_EMUL;
 		} else {
 			eprintf("Unsupported instruction fault from guest\n");

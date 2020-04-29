@@ -52,7 +52,8 @@
 
 int
 vmm_emulate_instruction(void *vm, int vcpuid, uint64_t gpa, struct vie *vie,
-    mem_region_read_t memread, mem_region_write_t memwrite, void *memarg)
+    struct vm_guest_paging *paging, mem_region_read_t memread,
+    mem_region_write_t memwrite, void *memarg)
 {
 	uint64_t val;
 	int error;

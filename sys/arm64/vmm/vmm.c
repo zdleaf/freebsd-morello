@@ -794,6 +794,7 @@ vm_handle_inst_emul(struct vm *vm, int vcpuid, bool *retu)
 	struct vie *vie;
 	struct hyp *hyp = vm->cookie;
 	uint64_t fault_ipa;
+	struct vm_guest_paging *paging;
 	struct vmm_mmio_region *vmr;
 	int error, i;
 
@@ -802,6 +803,7 @@ vm_handle_inst_emul(struct vm *vm, int vcpuid, bool *retu)
 
 	vme = vm_exitinfo(vm, vcpuid);
 	vie = &vme->u.inst_emul.vie;
+	paging = &vme->u.inst_emul.paging;
 
 	fault_ipa = vme->u.inst_emul.gpa;
 
@@ -817,7 +819,7 @@ vm_handle_inst_emul(struct vm *vm, int vcpuid, bool *retu)
 		goto out_user;
 
 	error = vmm_emulate_instruction(vm, vcpuid, fault_ipa, vie,
-	    vmr->read, vmr->write, retu);
+	    paging, vmr->read, vmr->write, retu);
 	return (error);
 
 out_user:
