@@ -422,8 +422,14 @@ make_cmd(struct smmu_softc *sc, uint64_t *cmd,
 	switch (entry->opcode) {
 	case CMD_TLBI_NH_VA:
 		cmd[1] = entry->tlbi.addr & TLBI_1_ADDR_M;
-		if (entry->tlbi.leaf)
+		if (entry->tlbi.leaf) {
+			/*
+			 * Leaf flag means that only cached entries
+			 * for the last level of translation table walk
+			 * are required to be invalidated.
+			 */
 			cmd[1] |= TLBI_1_LEAF;
+		}
 		break;
 	case CMD_TLBI_NSNH_ALL:
 	case CMD_TLBI_NH_ALL:
@@ -629,6 +635,7 @@ smmu_init_ste_bypass(struct smmu_softc *sc, uint32_t sid, uint64_t *ste)
 
 	smmu_invalidate_sid(sc, sid);
 	ste[0] = val;
+	dsb(sy);
 	smmu_invalidate_sid(sc, sid);
 
 	smmu_prefetch_sid(sc, sid);
@@ -681,6 +688,7 @@ smmu_init_ste_s1(struct smmu_softc *sc, struct smmu_cd *cd,
 
 	/* The STE[0] has to be written in a single blast, last of all. */
 	ste[0] = val;
+	dsb(sy);
 
 	smmu_invalidate_sid(sc, sid);
 	smmu_sync_cd(sc, sid, 0, true);
