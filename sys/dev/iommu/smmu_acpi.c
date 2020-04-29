@@ -201,7 +201,9 @@ smmu_acpi_attach(device_t dev)
 	if ((priv >> 32) & ACPI_IORT_SMMU_V3_COHACC_OVERRIDE)
 		sc->features |= SMMU_FEATURE_COHERENCY;
 
-	printf("%s: features %x\n", __func__, sc->features);
+	if (bootverbose)
+		device_printf(sc->dev, "%s: features %x\n",
+		    __func__, sc->features);
 
 	err = smmu_attach(dev);
 	if (err != 0)

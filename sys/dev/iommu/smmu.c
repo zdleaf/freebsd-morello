@@ -263,8 +263,6 @@ smmu_init_queue(struct smmu_softc *sc, struct smmu_queue *q,
 
 	sz = (1 << q->size_log2) * dwords * 8;
 
-	device_printf(sc->dev, "%s: allocating %d bytes\n", __func__, sz);
-
 	/* Set up the command circular buffer */
 	q->vaddr = contigmalloc(sz, M_SMMU,
 	    M_WAITOK | M_ZERO, 0, (1ul << 48) - 1, SMMU_Q_ALIGN, 0);
@@ -280,9 +278,6 @@ smmu_init_queue(struct smmu_softc *sc, struct smmu_queue *q,
 	q->base = CMDQ_BASE_RA | EVENTQ_BASE_WA | PRIQ_BASE_WA;
 	q->base |= q->paddr & Q_BASE_ADDR_M;
 	q->base |= q->size_log2 << Q_LOG2SIZE_S;
-
-	device_printf(sc->dev, "%s: queue addr %p paddr %lx\n",
-	    __func__, q->vaddr, q->paddr);
 
 	return (0);
 }
@@ -304,10 +299,8 @@ smmu_init_queues(struct smmu_softc *sc)
 	if (err)
 		return (ENXIO);
 
-	if (!(sc->features & SMMU_FEATURE_PRI)) {
-		device_printf(sc->dev, "no PRI queue is available\n");
+	if (!(sc->features & SMMU_FEATURE_PRI))
 		return (0);
-	}
 
 	/* PRI queue. */
 	err = smmu_init_queue(sc, &sc->priq,
@@ -1030,8 +1023,6 @@ smmu_enable_interrupts(struct smmu_softc *sc)
 	uint32_t reg;
 	int error;
 
-	device_printf(sc->dev, "%s\n", __func__);
-
 	/* Disable MSI. */
 	bus_write_8(sc->res[0], SMMU_GERROR_IRQ_CFG0, 0);
 	bus_write_4(sc->res[0], SMMU_GERROR_IRQ_CFG1, 0);
@@ -1064,9 +1055,6 @@ smmu_enable_interrupts(struct smmu_softc *sc)
 		device_printf(sc->dev, "Could not enable interrupts.\n");
 		return (ENXIO);
 	}
-
-	device_printf(sc->dev, "SMMU_IRQ_CTRL %x\n",
-	    bus_read_4(sc->res[0], SMMU_IRQ_CTRL));
 
 	return (0);
 }
@@ -1163,12 +1151,6 @@ smmu_reset(struct smmu_softc *sc)
 	strtab = &sc->strtab;
 	bus_write_8(sc->res[0], SMMU_STRTAB_BASE, strtab->base);
 	bus_write_4(sc->res[0], SMMU_STRTAB_BASE_CFG, strtab->base_cfg);
-
-	device_printf(sc->dev, "%s: SMMU_STRTAB_BASE %lx\n", __func__,
-	    bus_read_8(sc->res[0], SMMU_STRTAB_BASE));
-
-	device_printf(sc->dev, "%s: SMMU_STRTAB_BASE_CFG %x\n", __func__,
-	    bus_read_4(sc->res[0], SMMU_STRTAB_BASE_CFG));
 
 	/* Command queue. */
 	bus_write_8(sc->res[0], SMMU_CMDQ_BASE, sc->cmdq.base);
