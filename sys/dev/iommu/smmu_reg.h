@@ -94,6 +94,7 @@
 #define	 IDR1_SIDSIZE_M		(0x3f << IDR1_SIDSIZE_S)
 #define	SMMU_IDR2		0x008
 #define	SMMU_IDR3		0x00C
+#define	 IDR3_RIL		(1 << 10) /* Range-based Invalidations. */
 #define	SMMU_IDR4		0x010
 #define	SMMU_IDR5		0x014
 #define	 IDR5_STALL_MAX_S	16 /* Max outstanding stalled transactions */

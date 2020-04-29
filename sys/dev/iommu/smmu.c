@@ -1352,6 +1352,11 @@ smmu_check_features(struct smmu_softc *sc)
 	device_printf(sc->dev, "SSID bits %d\n", sc->ssid_bits);
 	device_printf(sc->dev, "SID bits %d\n", sc->sid_bits);
 
+	/* IDR3 */
+	reg = bus_read_4(sc->res[0], SMMU_IDR3);
+	if (reg & IDR3_RIL)
+		sc->features |= SMMU_FEATURE_RANGE_INV;
+
 	/* IDR5 */
 	reg = bus_read_4(sc->res[0], SMMU_IDR5);
 
