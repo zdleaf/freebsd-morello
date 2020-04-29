@@ -661,10 +661,8 @@ smmu_init_ste_s1(struct smmu_softc *sc, struct smmu_cd *cd,
 		| STE1_STRW_NS_EL1;
 
 	if (sc->features & SMMU_FEATURE_STALL &&
-	    ((sc->features & SMMU_FEATURE_STALL) == 0)) {
-		device_printf(sc->dev, "ste1 s1stalld enabled\n");
+	    ((sc->features & SMMU_FEATURE_STALL_FORCE) == 0))
 		ste[1] |= STE1_S1STALLD;
-	}
 
 	/* Configure STE */
 	val |= (cd->paddr & STE0_S1CONTEXTPTR_M);
