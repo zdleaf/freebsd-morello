@@ -161,6 +161,7 @@ struct smmu_domain {
 	LIST_HEAD(, smmu_master)	master_list;
 	struct smmu_cd			cd;
 	struct pmap			p;
+	uint16_t			asid;
 };
 
 MALLOC_DECLARE(M_SMMU);

@@ -421,6 +421,7 @@ make_cmd(struct smmu_softc *sc, uint64_t *cmd,
 
 	switch (entry->opcode) {
 	case CMD_TLBI_NH_VA:
+		cmd[0] |= (uint64_t)entry->tlbi.asid << TLBI_0_ASID_S;
 		cmd[1] = entry->tlbi.addr & TLBI_1_ADDR_M;
 		if (entry->tlbi.leaf) {
 			/*
@@ -579,15 +580,15 @@ smmu_tlbi_all(struct smmu_softc *sc)
 }
 
 static void
-smmu_tlbi_va(struct smmu_softc *sc, vm_offset_t va)
+smmu_tlbi_va(struct smmu_softc *sc, vm_offset_t va, uint16_t asid)
 {
 	struct smmu_cmdq_entry cmd;
 
 	/* Invalidate specific range */
 	cmd.opcode = CMD_TLBI_NH_VA;
-	cmd.tlbi.asid = 0;
+	cmd.tlbi.asid = (uint16_t)asid;
 	cmd.tlbi.vmid = 0;
-	cmd.tlbi.leaf = false;
+	cmd.tlbi.leaf = true; /* We change only L3. */
 	cmd.tlbi.addr = va;
 	smmu_cmdq_enqueue_cmd(sc, &cmd);
 }
@@ -760,9 +761,10 @@ smmu_init_cd(struct smmu_softc *sc, struct smmu_domain *domain)
 
 	val = CD0_VALID;
 	val |= CD0_AA64;
-	val |= CD0_ASET;
 	val |= CD0_R;
 	val |= CD0_A;
+	val |= CD0_ASET;
+	val |= (uint64_t)domain->asid << CD0_ASID_S;
 	val |= CD0_TG0_4KB;
 	val |= CD0_EPD1; /* Disable TT1 */
 	val |= ((64 - sc->ias) << CD0_T0SZ_S);
@@ -1316,6 +1318,8 @@ smmu_check_features(struct smmu_softc *sc)
 	else
 		sc->asid_bits = 8;
 
+	device_printf(sc->dev, "ASID bits %d\n", sc->asid_bits);
+
 	if (reg & IDR0_VMID16)
 		sc->vmid_bits = 16;
 	else
@@ -1493,7 +1497,7 @@ smmu_unmap(device_t dev, struct iommu_domain *domain,
 	for (i = 0; i < size; i += PAGE_SIZE) {
 		if (pmap_sremove(&smmu_domain->p, va)) {
 			/* pmap entry removed, invalidate TLB. */
-			smmu_tlbi_va(sc, va);
+			smmu_tlbi_va(sc, va, smmu_domain->asid);
 		} else {
 			err = ENOENT;
 			break;
@@ -1522,7 +1526,7 @@ smmu_map(device_t dev, struct iommu_domain *domain,
 		error = pmap_senter(&smmu_domain->p, va, pa, prot, 0);
 		if (error)
 			return (error);
-		smmu_tlbi_va(sc, va);
+		smmu_tlbi_va(sc, va, smmu_domain->asid);
 		pa += PAGE_SIZE;
 		va += PAGE_SIZE;
 	}
@@ -1537,7 +1541,7 @@ smmu_domain_alloc(device_t dev)
 {
 	struct smmu_domain *domain;
 	struct smmu_softc *sc;
-	int err;
+	int error;
 
 	sc = device_get_softc(dev);
 
@@ -1548,10 +1552,16 @@ smmu_domain_alloc(device_t dev)
 	LIST_INIT(&domain->master_list);
 
 	pmap_pinit(&domain->p);
+	/*
+	 * TODO: ensure that pmap asid_bits == smmu asid_bits.
+	 */
+	domain->asid = (uint16_t)domain->p.pm_cookie;
+
 	PMAP_LOCK_INIT(&domain->p);
 
-	err = smmu_init_cd(sc, domain);
-	if (err) {
+	error = smmu_init_cd(sc, domain);
+	if (error) {
+		free(domain, M_SMMU);
 		device_printf(sc->dev, "Could not initialize CD\n");
 		return (NULL);
 	}
