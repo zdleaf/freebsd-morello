@@ -68,16 +68,6 @@ __FBSDID("$FreeBSD$");
 #include "smmu_reg.h"
 #include "smmu_var.h"
 
-static struct resource_spec smmu_spec[] = {
-	{ SYS_RES_MEMORY, 0, RF_ACTIVE },
-	{ SYS_RES_IRQ, 0, RF_ACTIVE },
-	{ SYS_RES_IRQ, 1, RF_ACTIVE },
-	{ SYS_RES_IRQ, 2, RF_ACTIVE },
-	RESOURCE_SPEC_END
-};
-
-MALLOC_DEFINE(M_SMMU, "SMMU", SMMU_DEVSTR);
-
 #define	STRTAB_L1_SZ_SHIFT	20
 #define	STRTAB_SPLIT		8
 
@@ -97,6 +87,16 @@ MALLOC_DEFINE(M_SMMU, "SMMU", SMMU_DEVSTR);
 #define	Q_OVF(p)		((p) & (1 << 31)) /* Event queue overflowed */
 
 #define	SMMU_Q_ALIGN		(64 * 1024)
+
+static struct resource_spec smmu_spec[] = {
+	{ SYS_RES_MEMORY, 0, RF_ACTIVE },
+	{ SYS_RES_IRQ, 0, RF_ACTIVE },
+	{ SYS_RES_IRQ, 1, RF_ACTIVE },
+	{ SYS_RES_IRQ, 2, RF_ACTIVE },
+	RESOURCE_SPEC_END
+};
+
+MALLOC_DEFINE(M_SMMU, "SMMU", SMMU_DEVSTR);
 
 struct smmu_event {
 	int ident;
@@ -339,7 +339,7 @@ smmu_dump_ste(struct smmu_softc *sc, int sid)
 
 		l1_desc = &strtab->l1[i];
 		ste = l1_desc->va;
-		if (ste == NULL)
+		if (ste == NULL) /* L2 is not initialized */
 			return;
 	} else {
 		ste = (void *)((uint64_t)strtab->vaddr +
@@ -349,13 +349,6 @@ smmu_dump_ste(struct smmu_softc *sc, int sid)
 	/* Dump L2 or linear STE. */
 	for (i = 0; i < STRTAB_STE_DWORDS; i++)
 		device_printf(sc->dev, "ste[%d] == %lx\n", i, ste[i]);
-
-#if 0
-	device_printf(sc->dev, "strtab addr %p ste addr %p\n",
-	    strtab->addr, ste);
-	device_printf(sc->dev, "strtab phys %jx ste phys %jx\n",
-	    vtophys(strtab->addr), vtophys(ste));
-#endif
 }
 
 static void __unused
@@ -378,11 +371,6 @@ smmu_evtq_dequeue(struct smmu_softc *sc, uint32_t *evt)
 	void *entry_addr;
 
 	evtq = &sc->evtq;
-
-#if 0
-	device_printf(sc->dev, "evtq->lc.cons %d evtq->lc.prod %d\n",
-	    evtq->lc.cons, evtq->lc.prod);
-#endif
 
 	evtq->lc.val = bus_read_8(sc->res[0], evtq->prod_off);
 	entry_addr = (void *)((uint64_t)evtq->vaddr +
@@ -730,10 +718,6 @@ smmu_init_ste(struct smmu_softc *sc, struct smmu_cd *cd, int sid, bool s1)
 		    STRTAB_STE_DWORDS * 8 * sid);
 	};
 
-#if 0
-	printf("%s: ste base for sid %d is %p\n", __func__, sid, addr);
-#endif
-
 	if (s1)
 		smmu_init_ste_s1(sc, cd, sid, addr);
 	else
@@ -773,9 +757,6 @@ smmu_init_cd(struct smmu_softc *sc, struct smmu_domain *domain)
 	cd->size = size;
 	cd->paddr = vtophys(cd->vaddr);
 
-	device_printf(sc->dev, "%s: CD vaddr %p\n", __func__, cd->vaddr);
-	device_printf(sc->dev, "%s: CD paddr %lx\n", __func__, cd->paddr);
-
 	ptr = cd->vaddr;
 
 	memset(ptr, 0, CD_DWORDS * 8);
@@ -791,7 +772,6 @@ smmu_init_cd(struct smmu_softc *sc, struct smmu_domain *domain)
 
 	paddr = p->pm_l0_paddr & CD1_TTB0_M;
 	KASSERT(paddr == p->pm_l0_paddr, ("bad allocation 1"));
-	printf("%s: ttbr paddr %lx\n", __func__, paddr);
 
 	ptr[1] = paddr;
 	ptr[2] = 0;
@@ -799,8 +779,6 @@ smmu_init_cd(struct smmu_softc *sc, struct smmu_domain *domain)
 		MAIR_ATTR(MAIR_NORMAL_NC, VM_MEMATTR_UNCACHEABLE)	|\
 		MAIR_ATTR(MAIR_NORMAL_WB, VM_MEMATTR_WRITE_BACK)	|\
 		MAIR_ATTR(MAIR_NORMAL_WT, VM_MEMATTR_WRITE_THROUGH);
-
-	printf("%s: val %lx\n", __func__, val);
 
 	/* Install the CD. */
 	ptr[0] = val;
@@ -820,8 +798,11 @@ smmu_init_strtab_linear(struct smmu_softc *sc)
 	strtab->num_l1_entries = (1 << sc->sid_bits);
 
 	size = strtab->num_l1_entries * (STRTAB_STE_DWORDS << 3);
-	device_printf(sc->dev, "%s: linear strtab size %d, num_l1_entries %d\n",
-	    __func__, size, strtab->num_l1_entries);
+
+	if (bootverbose)
+		device_printf(sc->dev,
+		    "%s: linear strtab size %d, num_l1_entries %d\n",
+		    __func__, size, strtab->num_l1_entries);
 
 	strtab->vaddr = contigmalloc(size, M_SMMU,
 	    M_WAITOK | M_ZERO,	/* flags */
@@ -833,11 +814,6 @@ smmu_init_strtab_linear(struct smmu_softc *sc)
 		device_printf(sc->dev, "failed to allocate strtab\n");
 		return (ENXIO);
 	}
-
-	device_printf(sc->dev, "%s: strtab VA %lx\n",
-	    __func__, (uint64_t)strtab->vaddr);
-	device_printf(sc->dev, "%s: strtab PA %lx\n",
-	    __func__, vtophys(strtab->vaddr));
 
 	reg = STRTAB_BASE_CFG_FMT_LINEAR;
 	reg |= sc->sid_bits << STRTAB_BASE_CFG_LOG2SIZE_S;
@@ -876,8 +852,10 @@ smmu_init_strtab_2lvl(struct smmu_softc *sc)
 
 	l1size = strtab->num_l1_entries * (STRTAB_L1_DESC_DWORDS << 3);
 
-	device_printf(sc->dev, "%s: size %d, l1 entries %d, l1size %d\n",
-	    __func__, size, strtab->num_l1_entries, l1size);
+	if (bootverbose)
+		device_printf(sc->dev,
+		    "%s: size %d, l1 entries %d, l1size %d\n",
+		    __func__, size, strtab->num_l1_entries, l1size);
 
 	strtab->vaddr = contigmalloc(l1size, M_SMMU,
 	    M_WAITOK | M_ZERO,	/* flags */
@@ -897,8 +875,6 @@ smmu_init_strtab_2lvl(struct smmu_softc *sc)
 		contigfree(strtab->vaddr, l1size, M_SMMU);
 		return (ENOMEM);
 	}
-
-	device_printf(sc->dev, "%s: 2lvl strtab %p\n", __func__, strtab);
 
 	reg = STRTAB_BASE_CFG_FMT_2LVL;
 	reg |= size << STRTAB_BASE_CFG_LOG2SIZE_S;
@@ -943,8 +919,6 @@ smmu_init_l1_entry(struct smmu_softc *sc, int sid)
 
 	size = 1 << (STRTAB_SPLIT + ilog2(STRTAB_STE_DWORDS) + 3);
 
-	printf("%s: size %zu\n", __func__, size);
-
 	l1_desc->span = STRTAB_SPLIT + 1;
 	l1_desc->size = size;
 	l1_desc->va = contigmalloc(size, M_SMMU,
@@ -960,13 +934,9 @@ smmu_init_l1_entry(struct smmu_softc *sc, int sid)
 
 	l1_desc->pa = vtophys(l1_desc->va);
 
-	printf("%s: l2 va for sid %d is %p\n", __func__, sid, l1_desc->va);
-
 	i = sid >> STRTAB_SPLIT;
 	addr = (void *)((uint64_t)strtab->vaddr +
 	    STRTAB_L1_DESC_DWORDS * 8 * i);
-
-	printf("%s: l1 addr for sid %d is %p\n", __func__, sid, addr);
 
 	/* Install the L1 entry. */
 	val = l1_desc->pa & STRTAB_L1_DESC_L2PTR_M;
@@ -1021,10 +991,6 @@ smmu_event_intr(void *arg)
 	struct smmu_softc *sc;
 
 	sc = arg;
-
-#if 0
-	device_printf(sc->dev, "%s\n", __func__);
-#endif
 
 	do {
 		smmu_evtq_dequeue(sc, evt);
@@ -1594,8 +1560,6 @@ smmu_domain_alloc(device_t dev)
 		device_printf(sc->dev, "Could not initialize CD\n");
 		return (NULL);
 	}
-
-	printf("%s: domain is at %p\n", __func__, domain);
 
 	return (&domain->domain);
 }
