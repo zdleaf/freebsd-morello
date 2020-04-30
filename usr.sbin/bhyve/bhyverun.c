@@ -683,7 +683,9 @@ static int
 vmexit_bogus(struct vmctx *ctx, struct vm_exit *vmexit, int *pvcpu)
 {
 
+#ifdef __amd64__
 	assert(vmexit->inst_length == 0);
+#endif
 
 	stats.vmexit_bogus++;
 
