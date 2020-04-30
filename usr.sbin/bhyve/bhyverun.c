@@ -71,6 +71,7 @@ __FBSDID("$FreeBSD$");
 #include "bhyverun.h"
 #include "acpi.h"
 #include "atkbdc.h"
+#include "bootrom.h"
 #include "inout.h"
 #include "dbgport.h"
 #include "fwctl.h"
@@ -1245,6 +1246,8 @@ main(int argc, char *argv[])
 #endif
 
 	init_mem();
+	error = bootrom_init(ctx, "/root/u-boot.bin");
+	assert(error == 0);
 	init_uart();
 #ifdef __amd64__
 	init_inout();
