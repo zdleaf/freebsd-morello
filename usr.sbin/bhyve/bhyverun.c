@@ -998,6 +998,9 @@ do_open(const char *vmname)
 
 	reinit = romboot = false;
 
+#ifdef __aarch64__
+	romboot = true;
+#endif
 #ifdef __amd64__
 	if (lpc_bootrom())
 		romboot = true;
