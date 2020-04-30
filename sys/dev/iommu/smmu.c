@@ -30,6 +30,63 @@
  * SUCH DAMAGE.
  */
 
+/*
+ * Hardware overview.
+ *
+ * An incoming transaction from a peripheral device has an address, size,
+ * attributes and StreamID.
+ *
+ * In case of PCI-based devices, StreamID is a PCI rid.
+ *
+ * The StreamID is used to select a Stream Table Entry (STE) in a Stream table,
+ * which contains per-device configuration.
+ *
+ * Stream table is a linear or 2-level walk table (this driver supports both).
+ * Note that a linear table could occupy 1GB or more of memory depending on
+ * sid_bits value.
+ *
+ * STE is used to locate a Context Descriptor, which is a struct in memory
+ * that describes stages of translation, translation table type, pointer to
+ * level 0 of page tables, ASID, etc.
+ *
+ * Hardware supports two stages of translation: Stage1 (S1) and Stage2 (S2):
+ *  o S1 is used for the host machine traffic translation
+ *  o S2 is for a hypervisor
+ *
+ * This driver enables S1 stage with standard AArch64 page tables.
+ *
+ * Note that SMMU does not share TLB with a main CPU.
+ * Command queue is used by this driver to Invalidate SMMU TLB, STE cache.
+ *
+ * An arm64 SoC could have more than one SMMU instance.
+ * ACPI IORT table describes which SMMU unit is assigned for a particular
+ * peripheral device.
+ *
+ * Queues.
+ *
+ * Register interface and Memory-based circular buffer queues are used
+ * to inferface SMMU.
+ *
+ * These are a Command queue for commands to send to the SMMU and an Event
+ * queue for event/fault reports from the SMMU. Optionally PRI queue is for
+ * receipt of PCIe page requests.
+ *
+ * Note that not every hardware supports PRI services. For instance they were
+ * not found in Neoverse N1 SDP machine.
+ * (This drivers does not implement PRI queue.)
+ *
+ * All SMMU queues are arranged as circular buffers in memory. They are used
+ * in a producer-consumer fashion so that an output queue contains data
+ * produced by the SMMU and consumed by software.
+ * An input queue contains data produced by software, consumed by the SMMU.
+ *
+ * Interrupts.
+ *
+ * Interrupts are not required by this driver for normal operation.
+ * The standard wired interrupt is only triggered when an event comes from
+ * the SMMU, which is only in a case of a translation fault.
+ */
+
 #include "opt_platform.h"
 #include "opt_acpi.h"
 
