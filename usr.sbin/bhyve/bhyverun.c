@@ -976,12 +976,12 @@ fbsdrun_set_capabilities(struct vmctx *ctx, int cpu)
 		err = vm_set_x2apic_state(ctx, cpu, X2APIC_DISABLED);
 
 	vm_set_capability(ctx, cpu, VM_CAP_ENABLE_INVPCID, 1);
-#endif
 
 	if (err) {
 		fprintf(stderr, "Unable to set x2apic state (%d)\n", err);
 		exit(4);
 	}
+#endif
 }
 
 static struct vmctx *
