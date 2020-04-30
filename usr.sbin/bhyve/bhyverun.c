@@ -1093,7 +1093,7 @@ main(int argc, char *argv[])
 #endif
 	memflags = 0;
 
-	optstr = "abehuwxACHIPSWYp:g:G:c:s:m:l:U:";
+	optstr = "abehuwxABCHIPSWYp:g:G:c:s:m:l:U:";
 	while ((c = getopt(argc, argv, optstr)) != -1) {
 		switch (c) {
 #ifdef __amd64__
@@ -1107,6 +1107,10 @@ main(int argc, char *argv[])
 		case 'b':
 			bvmcons = 1;
 			break;
+#ifdef __aarch64__
+		case 'B':
+			break;
+#endif
 		case 'p':
                         if (pincpu_parse(optarg) != 0) {
                             errx(EX_USAGE, "invalid vcpu pinning "
@@ -1257,7 +1261,9 @@ main(int argc, char *argv[])
 		exit(4);
 	}
 
-#ifdef __amd64__
+#if defined(__aarch64__)
+	rip = vm_get_highmem_base(ctx);
+#elif defined(__amd64__)
 	if (dbg_port != 0)
 		init_dbgport(dbg_port);
 
@@ -1276,12 +1282,10 @@ main(int argc, char *argv[])
 		error = vcpu_reset(ctx, BSP);
 		assert(error == 0);
 	}
-#endif
 
 	error = vm_get_register(ctx, BSP, VM_REG_GUEST_PC, &rip);
 	assert(error == 0);
 
-#ifdef __amd64__
 	/*
 	 * build the guest tables, MP etc.
 	 */

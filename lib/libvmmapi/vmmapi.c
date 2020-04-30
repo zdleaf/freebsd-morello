@@ -464,6 +464,13 @@ vm_get_lowmem_size(struct vmctx *ctx)
 }
 
 size_t
+vm_get_highmem_base(struct vmctx *ctx)
+{
+
+	return (ctx->regions[1].base);
+}
+
+size_t
 vm_get_highmem_size(struct vmctx *ctx)
 {
 
