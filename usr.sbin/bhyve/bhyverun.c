@@ -169,6 +169,8 @@ static const char * const vmx_exit_reason_desc[] = {
 	[EXIT_REASON_XRSTORS] = "XRSTORS"
 };
 
+void init_uart(void);
+
 typedef int (*vmexit_handler_t)(struct vmctx *, struct vm_exit *, int *vcpu);
 extern int vmexit_task_switch(struct vmctx *, struct vm_exit *, int *vcpu);
 
@@ -1243,6 +1245,7 @@ main(int argc, char *argv[])
 #endif
 
 	init_mem();
+	init_uart();
 #ifdef __amd64__
 	init_inout();
 	atkbdc_init(ctx);

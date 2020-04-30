@@ -54,6 +54,8 @@ SRCS=	\
 .if ${MACHINE_CPUARCH} == "aarch64"
 # Missing vm_get_ioctls
 CFLAGS+=	-DWITHOUT_CAPSICUM
+SRCS+=	\
+	mmio_uart.c
 .endif
 
 .if ${MACHINE_CPUARCH} == "amd64"
