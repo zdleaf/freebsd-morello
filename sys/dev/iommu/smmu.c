@@ -1479,7 +1479,7 @@ static void
 smmu_init_asids(struct smmu_softc *sc)
 {
 
-	sc->asid_set_size = (1 << sc->sid_bits);
+	sc->asid_set_size = (1 << sc->asid_bits);
 	sc->asid_set = bit_alloc(sc->asid_set_size, M_SMMU, M_WAITOK);
 	mtx_init(&sc->asid_set_mutex, "asid set", NULL, MTX_SPIN);
 }
