@@ -35,6 +35,8 @@
 #ifndef _DEV_IOMMU_SMMU_VAR_H_
 #define _DEV_IOMMU_SMMU_VAR_H_
 
+#include <sys/bitstring.h>
+
 #include <dev/iommu/iommu.h>
 
 #include <vm/vm.h>
@@ -146,6 +148,10 @@ struct smmu_softc {
 	struct smmu_strtab strtab;
 	int				sync;
 	struct mtx			sc_mtx;
+
+	bitstr_t			*asid_set;
+	int				asid_set_size;
+	struct mtx			asid_set_mutex;
 };
 
 struct smmu_master {

@@ -94,6 +94,7 @@
 __FBSDID("$FreeBSD$");
 
 #include <sys/param.h>
+#include <sys/bitstring.h>
 #include <sys/systm.h>
 #include <sys/bus.h>
 #include <sys/kernel.h>
@@ -489,6 +490,9 @@ make_cmd(struct smmu_softc *sc, uint64_t *cmd,
 			cmd[1] |= TLBI_1_LEAF;
 		}
 		break;
+	case CMD_TLBI_NH_ASID:
+		cmd[0] |= (uint64_t)entry->tlbi.asid << TLBI_0_ASID_S;
+		break;
 	case CMD_TLBI_NSNH_ALL:
 	case CMD_TLBI_NH_ALL:
 	case CMD_TLBI_EL2_ALL:
@@ -637,13 +641,25 @@ smmu_tlbi_all(struct smmu_softc *sc)
 }
 
 static void
+smmu_tlbi_asid(struct smmu_softc *sc, uint16_t asid)
+{
+	struct smmu_cmdq_entry cmd;
+
+	/* Invalidate TLB for an ASID. */
+	cmd.opcode = CMD_TLBI_NH_ASID;
+	cmd.tlbi.asid = asid;
+	smmu_cmdq_enqueue_cmd(sc, &cmd);
+	smmu_sync(sc);
+}
+
+static void
 smmu_tlbi_va(struct smmu_softc *sc, vm_offset_t va, uint16_t asid)
 {
 	struct smmu_cmdq_entry cmd;
 
 	/* Invalidate specific range */
 	cmd.opcode = CMD_TLBI_NH_VA;
-	cmd.tlbi.asid = (uint16_t)asid;
+	cmd.tlbi.asid = asid;
 	cmd.tlbi.vmid = 0;
 	cmd.tlbi.leaf = true; /* We change only L3. */
 	cmd.tlbi.addr = va;
@@ -1459,6 +1475,40 @@ smmu_check_features(struct smmu_softc *sc)
 	return (0);
 }
 
+static void
+smmu_init_asids(struct smmu_softc *sc)
+{
+
+	sc->asid_set_size = (1 << sc->sid_bits);
+	sc->asid_set = bit_alloc(sc->asid_set_size, M_SMMU, M_WAITOK);
+	mtx_init(&sc->asid_set_mutex, "asid set", NULL, MTX_SPIN);
+}
+
+static int
+smmu_asid_alloc(struct smmu_softc *sc, int *new_asid)
+{
+
+	mtx_lock_spin(&sc->asid_set_mutex);
+	bit_ffc(sc->asid_set, sc->asid_set_size, new_asid);
+	if (*new_asid == -1) {
+		mtx_unlock_spin(&sc->asid_set_mutex);
+		return (ENOMEM);
+	}
+	bit_set(sc->asid_set, *new_asid);
+	mtx_unlock_spin(&sc->asid_set_mutex);
+
+	return (0);
+}
+
+static void
+smmu_asid_free(struct smmu_softc *sc, int asid)
+{
+
+	mtx_lock_spin(&sc->asid_set_mutex);
+	bit_clear(sc->asid_set, asid);
+	mtx_unlock_spin(&sc->asid_set_mutex);
+}
+
 /*
  * Device interface.
  */
@@ -1491,6 +1541,8 @@ smmu_attach(device_t dev)
 		    "but not supported by hardware.\n");
 		return (ENXIO);
 	}
+
+	smmu_init_asids(sc);
 
 	error = smmu_init_queues(sc);
 	if (error) {
@@ -1599,21 +1651,26 @@ smmu_domain_alloc(device_t dev)
 	struct smmu_domain *domain;
 	struct smmu_softc *sc;
 	int error;
+	int new_asid;
 
 	sc = device_get_softc(dev);
 
 	domain = malloc(sizeof(*domain), M_SMMU, M_WAITOK | M_ZERO);
 
-	mtx_init(&domain->mtx_lock, "SMMU domain", NULL, MTX_DEF);
+	error = smmu_asid_alloc(sc, &new_asid);
+	if (error) {
+		free(domain, M_SMMU);
+		device_printf(sc->dev,
+		    "Could not allocate ASID for a new domain.\n");
+		return (NULL);
+	}
 
+	domain->asid = (uint16_t)new_asid;
+
+	mtx_init(&domain->mtx_lock, "SMMU domain", NULL, MTX_DEF);
 	LIST_INIT(&domain->master_list);
 
 	pmap_pinit(&domain->p);
-	/*
-	 * TODO: ensure that pmap asid_bits == smmu asid_bits.
-	 */
-	domain->asid = (uint16_t)domain->p.pm_cookie;
-
 	PMAP_LOCK_INIT(&domain->p);
 
 	error = smmu_init_cd(sc, domain);
@@ -1623,6 +1680,8 @@ smmu_domain_alloc(device_t dev)
 		return (NULL);
 	}
 
+	smmu_tlbi_asid(sc, domain->asid);
+
 	return (&domain->domain);
 }
 
@@ -1630,8 +1689,11 @@ static int
 smmu_domain_free(device_t dev, struct iommu_domain *domain)
 {
 	struct smmu_domain *smmu_domain;
+	struct smmu_softc *sc;
 	struct smmu_cd *cd;
 	int error;
+
+	sc = device_get_softc(dev);
 
 	smmu_domain = (struct smmu_domain *)domain;
 	cd = &smmu_domain->cd;
@@ -1641,6 +1703,9 @@ smmu_domain_free(device_t dev, struct iommu_domain *domain)
 		return (error);
 
 	pmap_release(&smmu_domain->p);
+
+	smmu_tlbi_asid(sc, smmu_domain->asid);
+	smmu_asid_free(sc, smmu_domain->asid);
 
 	contigfree(cd->vaddr, cd->size, M_SMMU);
 
