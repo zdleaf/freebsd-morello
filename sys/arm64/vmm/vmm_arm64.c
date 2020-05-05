@@ -202,6 +202,11 @@ arm_init(int ipinum)
 		return (ENXIO);
 	}
 
+	if (!vgic_attach()) {
+		printf("arm_init: No GICv3 found\n");
+		return (ENODEV);
+	}
+
 	/* Create the mappings for the hypervisor translation table. */
 	hyp_pmap = malloc(sizeof(*hyp_pmap), M_HYP, M_WAITOK | M_ZERO);
 	hypmap_init(hyp_pmap, PM_STAGE1);

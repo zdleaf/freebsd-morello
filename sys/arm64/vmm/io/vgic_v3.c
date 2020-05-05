@@ -1459,8 +1459,31 @@ vgic_v3_get_ro_regs()
 	ro_regs.gicd_pidr2 = gic_d_read(gic_sc, 4, GICD_PIDR2);
 }
 
+bool
+vgic_attach(void)
+{
+	device_t gic_dev;
+	uintptr_t ver;
+
+	KASSERT(gic_sc == NULL, ("%s: GIC softc is not NULL", __func__));
+
+	gic_dev = device_lookup_by_name("gic0");
+	if (gic_dev == NULL)
+		return (false);
+
+	if (BUS_READ_IVAR(gic_dev, NULL, GIC_IVAR_HW_REV, &ver) != 0)
+		return (false);
+	if (ver < 3)
+		return (false);
+
+	gic_sc = device_get_softc(gic_dev);
+
+	return (true);
+}
+
 void
-vgic_v3_init(uint64_t ich_vtr_el2) {
+vgic_v3_init(uint64_t ich_vtr_el2)
+{
 	uint32_t pribits, prebits;
 
 	KASSERT(gic_sc != NULL, ("GIC softc is NULL"));
@@ -1494,93 +1517,3 @@ vgic_v3_init(uint64_t ich_vtr_el2) {
 
 	virt_features.ich_lr_num = ICH_VTR_EL2_LISTREGS(ich_vtr_el2);
 }
-
-static int
-vgic_v3_maint_intr(void *arg)
-{
-	printf("MAINTENANCE INTERRUPT\n");
-
-	return (FILTER_HANDLED);
-}
-
-/*
- * TODO: Look at how gic_v3_fdt.c adds the gic driver.
- *
- * 1. In probe they set the device description.
- * 2. In attach they create children devices for the GIC (in
- * gic_v3_ofw_bus_attach).
- * 3. There is no identify function being called.
- *
- * On the other hand, in man 9 DEVICE_IDENTIFY it is stated that a new device
- * instance is created by the identify function.
- */
-
-static void
-arm_vgic_identify(driver_t *driver, device_t parent)
-{
-	device_t dev;
-
-	if (strcmp(device_get_name(parent), "gic") == 0) {
-		dev = device_find_child(parent, VGIC_V3_DEVNAME, -1);
-		if (!dev)
-			dev = device_add_child(parent, VGIC_V3_DEVNAME, -1);
-		gic_sc = device_get_softc(parent);
-	}
-}
-
-static int
-arm_vgic_probe(device_t dev)
-{
-	device_t parent;
-
-	parent = device_get_parent(dev);
-	if (strcmp(device_get_name(parent), "gic") == 0) {
-		device_set_desc(dev, VGIC_V3_DEVSTR);
-		return (BUS_PROBE_DEFAULT);
-	}
-
-	return (ENXIO);
-}
-
-static int
-arm_vgic_attach(device_t dev)
-{
-#if 0
-	int error;
-
-	error = gic_v3_setup_maint_intr(vgic_v3_maint_intr, NULL, NULL);
-	if (error)
-		device_printf(dev, "Could not setup maintenance interrupt\n");
-#endif
-
-	return (0);
-}
-
-static int
-arm_vgic_detach(device_t dev)
-{
-#if 0
-	int error;
-
-	error = gic_v3_teardown_maint_intr();
-	if (error)
-		device_printf(dev, "Could not teardown maintenance interrupt\n");
-#endif
-
-	gic_sc = NULL;
-
-	return (0);
-}
-
-static device_method_t arm_vgic_methods[] = {
-	DEVMETHOD(device_identify,	arm_vgic_identify),
-	DEVMETHOD(device_probe,		arm_vgic_probe),
-	DEVMETHOD(device_attach,	arm_vgic_attach),
-	DEVMETHOD(device_detach,	arm_vgic_detach),
-	DEVMETHOD_END
-};
-
-DEFINE_CLASS_1(vgic, arm_vgic_driver, arm_vgic_methods, 0, gic_v3_driver);
-
-static devclass_t arm_vgic_devclass;
-DRIVER_MODULE(vgic, gic, arm_vgic_driver, arm_vgic_devclass, 0, 0);
