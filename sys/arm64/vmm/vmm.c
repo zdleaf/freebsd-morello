@@ -1378,7 +1378,9 @@ vm_run(struct vm *vm, struct vm_run *vmrun)
 	vcpu = &vm->vcpu[vcpuid];
 	rvc = sc = NULL;
 restart:
+	critical_enter();
 	error = VMRUN(vm->cookie, vcpuid, vcpu->nextpc, pmap, rvc, sc);
+	critical_exit();
 
 	vme = vm_exitinfo(vm, vcpuid);
 	if (error == 0) {
