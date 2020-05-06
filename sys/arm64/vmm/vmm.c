@@ -473,13 +473,11 @@ vm_mem_allocated(struct vm *vm, int vcpuid, vm_paddr_t gpa)
 	struct mem_map *mm;
 	int i;
 
-#if 0
 #ifdef INVARIANTS
 	int hostcpu, state;
 	state = vcpu_get_state(vm, vcpuid, &hostcpu);
 	KASSERT(state == VCPU_RUNNING && hostcpu == curcpu,
 	    ("%s: invalid vcpu state %d/%d", __func__, state, hostcpu));
-#endif
 #endif
 
 	for (i = 0; i < VM_MAX_MEMMAPS; i++) {
@@ -1035,11 +1033,13 @@ vcpu_notify_event(struct vm *vm, int vcpuid, bool lapic_intr)
 }
 
 static int
-vcpu_set_state_locked(struct vcpu *vcpu, enum vcpu_state newstate,
+vcpu_set_state_locked(struct vm *vm, int vcpuid, enum vcpu_state newstate,
     bool from_idle)
 {
+	struct vcpu *vcpu;
 	int error;
 
+	vcpu = &vm->vcpu[vcpuid];
 	vcpu_assert_locked(vcpu);
 
 	/*
@@ -1048,8 +1048,10 @@ vcpu_set_state_locked(struct vcpu *vcpu, enum vcpu_state newstate,
 	 * ioctl() operating on a vcpu at any point.
 	 */
 	if (from_idle) {
-		while (vcpu->state != VCPU_IDLE)
+		while (vcpu->state != VCPU_IDLE) {
+			vcpu_notify_event_locked(vcpu, false);
 			msleep_spin(&vcpu->state, &vcpu->mtx, "vmstat", hz);
+		}
 	} else {
 		KASSERT(vcpu->state != VCPU_IDLE, ("invalid transition from "
 		    "vcpu idle state"));
@@ -1098,6 +1100,24 @@ vcpu_set_state_locked(struct vcpu *vcpu, enum vcpu_state newstate,
 	return (0);
 }
 
+static void
+vcpu_require_state(struct vm *vm, int vcpuid, enum vcpu_state newstate)
+{
+	int error;
+
+	if ((error = vcpu_set_state(vm, vcpuid, newstate, false)) != 0)
+		panic("Error %d setting state to %d\n", error, newstate);
+}
+
+static void
+vcpu_require_state_locked(struct vm *vm, int vcpuid, enum vcpu_state newstate)
+{
+	int error;
+
+	if ((error = vcpu_set_state_locked(vm, vcpuid, newstate, false)) != 0)
+		panic("Error %d setting state to %d", error, newstate);
+}
+
 int
 vm_get_capability(struct vm *vm, int vcpu, int type, int *retval)
 {
@@ -1135,7 +1155,7 @@ vcpu_set_state(struct vm *vm, int vcpuid, enum vcpu_state newstate,
 	vcpu = &vm->vcpu[vcpuid];
 
 	vcpu_lock(vcpu);
-	error = vcpu_set_state_locked(vcpu, newstate, from_idle);
+	error = vcpu_set_state_locked(vm, vcpuid, newstate, from_idle);
 	vcpu_unlock(vcpu);
 
 	return (error);
@@ -1323,9 +1343,9 @@ vm_handle_wfi(struct vm *vm, int vcpuid, struct vm_exit *vme, bool *retu)
 		if (vcpu_should_yield(vm, vcpuid))
 			break;
 
-		vcpu_set_state_locked(vcpu, VCPU_SLEEPING, false);
+		vcpu_require_state_locked(vm, vcpuid, VCPU_SLEEPING);
 		msleep_spin(vcpu, &vcpu->mtx, "vmidle", hz);
-		vcpu_set_state_locked(vcpu, VCPU_FROZEN, false);
+		vcpu_require_state_locked(vm, vcpuid, VCPU_FROZEN);
 	}
 	vcpu_unlock(vcpu);
 
@@ -1379,7 +1399,9 @@ vm_run(struct vm *vm, struct vm_run *vmrun)
 	rvc = sc = NULL;
 restart:
 	critical_enter();
+	vcpu_require_state(vm, vcpuid, VCPU_RUNNING);
 	error = VMRUN(vm->cookie, vcpuid, vcpu->nextpc, pmap, rvc, sc);
+	vcpu_require_state(vm, vcpuid, VCPU_FROZEN);
 	critical_exit();
 
 	vme = vm_exitinfo(vm, vcpuid);
