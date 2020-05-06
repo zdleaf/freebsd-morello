@@ -431,16 +431,13 @@ arm64_gen_inst_emul_data(struct hypctx *hypctx, uint32_t esr_iss,
 	uint64_t page_off;
 
 	/*
-	 * Get bits [47:12] of the IPA from HPFAR_EL2.
-	 * At this point the 'u.hyp' member will be replaced by 'u.inst_emul'.
+	 * Get the page address from HPFAR_EL2.
 	 */
 	vme_ret->u.inst_emul.gpa =
-	    hypctx->exit_info.hpfar_el2 >> HPFAR_EL2_FIPA_SHIFT;
-	/* The IPA is the base address of a 4KB page, make bits [11:0] zero. */
-	vme_ret->u.inst_emul.gpa = (vme_ret->u.inst_emul.gpa) << PAGE_SHIFT;
+	    HPFAR_EL2_FIPA_ADDR(hypctx->exit_info.hpfar_el2);
 	/* Bits [11:0] are the same as bits [11:0] from the virtual address. */
-	page_off = FAR_EL2_PAGE_OFFSET(vme_ret->u.hyp.far_el2);
-	vme_ret->u.inst_emul.gpa = vme_ret->u.inst_emul.gpa + page_off;
+	page_off = FAR_EL2_PAGE_OFFSET(hypctx->exit_info.far_el2);
+	vme_ret->u.inst_emul.gpa += page_off;
 
 	esr_sas = (esr_iss & ISS_DATA_SAS_MASK) >> ISS_DATA_SAS_SHIFT;
 	reg_num = (esr_iss & ISS_DATA_SRT_MASK) >> ISS_DATA_SRT_SHIFT;
@@ -486,8 +483,9 @@ handle_el1_sync_excp(struct hyp *hyp, int vcpu, struct vm_exit *vme_ret,
 	uint64_t gpa;
 	uint32_t esr_ec, esr_iss;
 
-	esr_ec = ESR_ELx_EXCEPTION(vme_ret->u.hyp.esr_el2);
-	esr_iss = vme_ret->u.hyp.esr_el2 & ESR_ELx_ISS_MASK;
+	hypctx = &hyp->ctx[vcpu];
+	esr_ec = ESR_ELx_EXCEPTION(hypctx->exit_info.esr_el2);
+	esr_iss = hypctx->exit_info.esr_el2 & ESR_ELx_ISS_MASK;
 
 	switch(esr_ec) {
 	case EXCP_UNKNOWN:
@@ -506,7 +504,7 @@ handle_el1_sync_excp(struct hyp *hyp, int vcpu, struct vm_exit *vme_ret,
 	case EXCP_INSN_ABORT_L:
 	case EXCP_DATA_ABORT_L:
 		hypctx = &hyp->ctx[vcpu];
-		gpa = vme_ret->u.hyp.hpfar_el2 << 8;
+		gpa = HPFAR_EL2_FIPA_ADDR(hypctx->exit_info.hpfar_el2);
 		if (vm_mem_allocated(hyp->vm, vcpu, gpa)) {
 			vme_ret->exitcode = VM_EXITCODE_PAGING;
 			vme_ret->inst_length = 0;
@@ -558,13 +556,11 @@ handle_el1_sync_excp(struct hyp *hyp, int vcpu, struct vm_exit *vme_ret,
 }
 
 static int
-arm64_handle_world_switch(struct hyp *hyp, int vcpu, struct vm_exit *vme,
-    pmap_t pmap)
+arm64_handle_world_switch(struct hyp *hyp, int vcpu, int excp_type,
+    struct vm_exit *vme, pmap_t pmap)
 {
-	int excp_type;
 	int handled;
 
-	excp_type = vme->u.hyp.exception_nr;
 	switch (excp_type) {
 	case EXCP_TYPE_EL1_SYNC:
 		/* The exit code will be set by handle_el1_sync_excp(). */
@@ -647,7 +643,8 @@ arm_vmrun(void *arg, int vcpu, register_t pc, pmap_t pmap,
 		vme->u.hyp.far_el2 = hypctx->exit_info.far_el2;
 		vme->u.hyp.hpfar_el2 = hypctx->exit_info.hpfar_el2;
 
-		handled = arm64_handle_world_switch(hyp, vcpu, vme, pmap);
+		handled = arm64_handle_world_switch(hyp, vcpu, excp_type, vme,
+		    pmap);
 		if (handled == UNHANDLED)
 			/* Exit loop to emulate instruction. */
 			break;

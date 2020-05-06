@@ -100,6 +100,11 @@
 /* HPFAR_EL2 - Hypervisor IPA Fault Address Register */
 #define	HPFAR_EL2_FIPA_SHIFT	4
 #define	HPFAR_EL2_FIPA_MASK	0xfffffffff0
+#define	HPFAR_EL2_FIPA_GET(x)	\
+    (((x) & HPFAR_EL2_FIPA_MASK) >> HPFAR_EL2_FIPA_SHIFT)
+/* HPFAR_EL2_FIPA holds the 4k page address */
+#define	HPFAR_EL2_FIPA_ADDR(x)	\
+    (HPFAR_EL2_FIPA_GET(x) << 12)
 
 /* ICC_SRE_EL2 */
 #define	ICC_SRE_EL2_SRE		(1U << 0)
