@@ -896,89 +896,6 @@ vm_suspend(struct vm *vm, enum vm_suspend_how how)
 }
 
 int
-vm_run(struct vm *vm, struct vm_run *vmrun)
-{
-	int error, vcpuid;
-	struct vcpu *vcpu;
-	struct vm_exit *vme;
-	bool retu;
-	void *rvc, *sc;
-	pmap_t pmap;
-
-	vcpuid = vmrun->cpuid;
-
-	if (vcpuid < 0 || vcpuid >= vm->maxcpus)
-		return (EINVAL);
-
-	if (!CPU_ISSET(vcpuid, &vm->active_cpus))
-		return (EINVAL);
-
-	if (CPU_ISSET(vcpuid, &vm->suspended_cpus))
-		return (EINVAL);
-
-	pmap = vmspace_pmap(vm->vmspace);
-	vcpu = &vm->vcpu[vcpuid];
-	rvc = sc = NULL;
-restart:
-	error = VMRUN(vm->cookie, vcpuid, vcpu->nextpc, pmap, rvc, sc);
-
-	vme = vm_exitinfo(vm, vcpuid);
-	if (error == 0) {
-		retu = false;
-		switch (vme->exitcode) {
-		case VM_EXITCODE_INST_EMUL:
-			vcpu->nextpc = vme->pc + vme->inst_length;
-			error = vm_handle_inst_emul(vm, vcpuid, &retu);
-			break;
-
-		case VM_EXITCODE_REG_EMUL:
-			vcpu->nextpc = vme->pc + vme->inst_length;
-			error = vm_handle_reg_emul(vm, vcpuid, &retu);
-			break;
-
-		case VM_EXITCODE_HVC:
-			/*
-			 * The HVC instruction saves the address for the
-			 * next instruction as the return address.
-			 */
-			vcpu->nextpc = vme->pc;
-			/*
-			 * The PSCI call can change the exit information in the
-			 * case of suspend/reset/poweroff/cpu off/cpu on.
-			 */
-			error = psci_handle_call(vm, vcpuid, vme, &retu);
-			break;
-
-		case VM_EXITCODE_WFI:
-			vcpu->nextpc = vme->pc + vme->inst_length;
-			error = vm_handle_wfi(vm, vcpuid, vme, &retu);
-			break;
-
-		case VM_EXITCODE_PAGING:
-			vcpu->nextpc = vme->pc;
-			error = 0;
-			if (pmap_fault(pmap, vme->u.paging.esr, vme->u.paging.gpa) == KERN_SUCCESS) {
-			}
-			break;
-
-		default:
-			/* Handle in userland */
-			vcpu->nextpc = vme->pc;
-			retu = true;
-			break;
-		}
-	}
-
-	if (error == 0 && retu == false)
-		goto restart;
-
-	/* Copy the exit information */
-	bcopy(vme, &vmrun->vm_exit, sizeof(struct vm_exit));
-
-	return (error);
-}
-
-int
 vm_activate_cpu(struct vm *vm, int vcpuid)
 {
 
@@ -1414,4 +1331,87 @@ vm_handle_wfi(struct vm *vm, int vcpuid, struct vm_exit *vme, bool *retu)
 
 	*retu = false;
 	return (0);
+}
+
+int
+vm_run(struct vm *vm, struct vm_run *vmrun)
+{
+	int error, vcpuid;
+	struct vcpu *vcpu;
+	struct vm_exit *vme;
+	bool retu;
+	void *rvc, *sc;
+	pmap_t pmap;
+
+	vcpuid = vmrun->cpuid;
+
+	if (vcpuid < 0 || vcpuid >= vm->maxcpus)
+		return (EINVAL);
+
+	if (!CPU_ISSET(vcpuid, &vm->active_cpus))
+		return (EINVAL);
+
+	if (CPU_ISSET(vcpuid, &vm->suspended_cpus))
+		return (EINVAL);
+
+	pmap = vmspace_pmap(vm->vmspace);
+	vcpu = &vm->vcpu[vcpuid];
+	rvc = sc = NULL;
+restart:
+	error = VMRUN(vm->cookie, vcpuid, vcpu->nextpc, pmap, rvc, sc);
+
+	vme = vm_exitinfo(vm, vcpuid);
+	if (error == 0) {
+		retu = false;
+		switch (vme->exitcode) {
+		case VM_EXITCODE_INST_EMUL:
+			vcpu->nextpc = vme->pc + vme->inst_length;
+			error = vm_handle_inst_emul(vm, vcpuid, &retu);
+			break;
+
+		case VM_EXITCODE_REG_EMUL:
+			vcpu->nextpc = vme->pc + vme->inst_length;
+			error = vm_handle_reg_emul(vm, vcpuid, &retu);
+			break;
+
+		case VM_EXITCODE_HVC:
+			/*
+			 * The HVC instruction saves the address for the
+			 * next instruction as the return address.
+			 */
+			vcpu->nextpc = vme->pc;
+			/*
+			 * The PSCI call can change the exit information in the
+			 * case of suspend/reset/poweroff/cpu off/cpu on.
+			 */
+			error = psci_handle_call(vm, vcpuid, vme, &retu);
+			break;
+
+		case VM_EXITCODE_WFI:
+			vcpu->nextpc = vme->pc + vme->inst_length;
+			error = vm_handle_wfi(vm, vcpuid, vme, &retu);
+			break;
+
+		case VM_EXITCODE_PAGING:
+			vcpu->nextpc = vme->pc;
+			error = 0;
+			if (pmap_fault(pmap, vme->u.paging.esr, vme->u.paging.gpa) == KERN_SUCCESS) {
+			}
+			break;
+
+		default:
+			/* Handle in userland */
+			vcpu->nextpc = vme->pc;
+			retu = true;
+			break;
+		}
+	}
+
+	if (error == 0 && retu == false)
+		goto restart;
+
+	/* Copy the exit information */
+	bcopy(vme, &vmrun->vm_exit, sizeof(struct vm_exit));
+
+	return (error);
 }
