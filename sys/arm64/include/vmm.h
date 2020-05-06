@@ -372,6 +372,7 @@ enum vm_exitcode {
 	VM_EXITCODE_SUSPENDED,
 	VM_EXITCODE_HYP,
 	VM_EXITCODE_WFI,
+	VM_EXITCODE_PAGING,
 	VM_EXITCODE_MAX
 };
 
@@ -409,7 +410,7 @@ struct vm_exit {
 		} reg_emul;
 		struct {
 			uint64_t	gpa;
-			int		fault_type;
+			uint64_t	esr;
 		} paging;
 		struct {
 			uint64_t	gpa;

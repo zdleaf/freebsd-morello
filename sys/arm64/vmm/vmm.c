@@ -473,11 +473,13 @@ vm_mem_allocated(struct vm *vm, int vcpuid, vm_paddr_t gpa)
 	struct mem_map *mm;
 	int i;
 
+#if 0
 #ifdef INVARIANTS
 	int hostcpu, state;
 	state = vcpu_get_state(vm, vcpuid, &hostcpu);
 	KASSERT(state == VCPU_RUNNING && hostcpu == curcpu,
 	    ("%s: invalid vcpu state %d/%d", __func__, state, hostcpu));
+#endif
 #endif
 
 	for (i = 0; i < VM_MAX_MEMMAPS; i++) {
@@ -950,6 +952,13 @@ restart:
 		case VM_EXITCODE_WFI:
 			vcpu->nextpc = vme->pc + vme->inst_length;
 			error = vm_handle_wfi(vm, vcpuid, vme, &retu);
+			break;
+
+		case VM_EXITCODE_PAGING:
+			vcpu->nextpc = vme->pc;
+			error = 0;
+			if (pmap_fault(pmap, vme->u.paging.esr, vme->u.paging.gpa) == KERN_SUCCESS) {
+			}
 			break;
 
 		default:

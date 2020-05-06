@@ -482,6 +482,8 @@ static int
 handle_el1_sync_excp(struct hyp *hyp, int vcpu, struct vm_exit *vme_ret,
     pmap_t pmap)
 {
+	struct hypctx *hypctx;
+	uint64_t gpa;
 	uint32_t esr_ec, esr_iss;
 
 	esr_ec = ESR_ELx_EXCEPTION(vme_ret->u.hyp.esr_el2);
@@ -503,10 +505,14 @@ handle_el1_sync_excp(struct hyp *hyp, int vcpu, struct vm_exit *vme_ret,
 
 	case EXCP_INSN_ABORT_L:
 	case EXCP_DATA_ABORT_L:
-		if (pmap_fault(pmap, vme_ret->u.hyp.esr_el2,
-		    vme_ret->u.hyp.hpfar_el2 << 8) == KERN_SUCCESS) {
+		hypctx = &hyp->ctx[vcpu];
+		gpa = vme_ret->u.hyp.hpfar_el2 << 8;
+		if (vm_mem_allocated(hyp->vm, vcpu, gpa)) {
+			vme_ret->exitcode = VM_EXITCODE_PAGING;
 			vme_ret->inst_length = 0;
-			return (HANDLED);
+			vme_ret->u.paging.esr = hypctx->exit_info.esr_el2;
+			vme_ret->u.paging.gpa = gpa;
+			break;
 		}
 
 		/* Check if instruction syndrome is valid */
