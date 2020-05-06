@@ -1333,6 +1333,26 @@ vm_handle_wfi(struct vm *vm, int vcpuid, struct vm_exit *vme, bool *retu)
 	return (0);
 }
 
+static int
+vm_handle_paging(struct vm *vm, int vcpuid, bool *retu)
+{
+	struct vm_exit *vme;
+	struct vcpu *vcpu;
+	uint64_t addr;
+	pmap_t pmap;
+
+	vme = vm_exitinfo(vm, vcpuid);
+	pmap = vmspace_pmap(vm->vmspace);
+	vcpu = &vm->vcpu[vcpuid];
+	addr = vme->u.paging.gpa;
+
+	/* The page exists, but the page table needs to be upddated */
+	if (pmap_fault(pmap, vme->u.paging.esr, addr) == KERN_SUCCESS)
+		return (0);
+
+	panic("vm_handle_paging");
+}
+
 int
 vm_run(struct vm *vm, struct vm_run *vmrun)
 {
@@ -1394,9 +1414,7 @@ restart:
 
 		case VM_EXITCODE_PAGING:
 			vcpu->nextpc = vme->pc;
-			error = 0;
-			if (pmap_fault(pmap, vme->u.paging.esr, vme->u.paging.gpa) == KERN_SUCCESS) {
-			}
+			error = vm_handle_paging(vm, vcpuid, &retu);
 			break;
 
 		default:
