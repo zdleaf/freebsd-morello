@@ -1604,11 +1604,13 @@ _pmap_unwire_l3(pmap_t pmap, vm_offset_t va, vm_page_t m, struct spglist *free)
 	if (pmap->pm_stage == PM_STAGE1)
 		pmap_invalidate_page(pmap, va);
 
-	/*
-	 * Put page on a list so that it is released after
-	 * *ALL* TLB shootdown is done
-	 */
-	pmap_add_delayed_free_list(m, free, TRUE);
+	if (free != NULL) {
+		/*
+		 * Put page on a list so that it is released after
+		 * *ALL* TLB shootdown is done
+		 */
+		pmap_add_delayed_free_list(m, free, TRUE);
+	}
 }
 
 /*
@@ -1690,6 +1692,7 @@ pmap_pinit_stage(pmap_t pmap, enum pmap_stage stage, int levels)
 	bzero(&pmap->pm_stats, sizeof(pmap->pm_stats));
 	pmap->pm_cookie = COOKIE_FROM(-1, INT_MAX);
 
+	MPASS(levels == 3 || levels == 4);
 	pmap->pm_levels = levels;
 	pmap->pm_stage = stage;
 	switch (stage) {
@@ -1706,6 +1709,17 @@ pmap_pinit_stage(pmap_t pmap, enum pmap_stage stage, int levels)
 
 	/* XXX Temporarily disable deferred ASID allocation. */
 	pmap_alloc_asid(pmap);
+
+	/*
+	 * Allocate the level 1 entry to use as the root. This will increase
+	 * the refcount on the level 1 page so it won't be removed until we
+	 * are releasing it.
+	 */
+	if (pmap->pm_levels == 3) {
+		PMAP_LOCK(pmap);
+		_pmap_alloc_l3(pmap, NUL2E + NUL1E, NULL);
+		PMAP_UNLOCK(pmap);
+	}
 
 	return (1);
 }
@@ -1967,9 +1981,23 @@ retry:
 void
 pmap_release(pmap_t pmap)
 {
+	boolean_t rv;
 	struct asid_set *set;
 	vm_page_t m;
 	int asid;
+
+	if (pmap->pm_levels == 3) {
+		KASSERT(pmap->pm_stats.resident_count == 1,
+		    ("pmap_release: pmap resident count %ld != 0",
+		    pmap->pm_stats.resident_count));
+		KASSERT((pmap->pm_l0[0] & ATTR_DESCR_VALID) == ATTR_DESCR_VALID,
+		    ("pmap_release: Invalid l0 entry: %lx", pmap->pm_l0[0]));
+		m = PHYS_TO_VM_PAGE(pmap->pm_l0[0] & ~ATTR_MASK);
+		PMAP_LOCK(pmap);
+		rv = pmap_unwire_l3(pmap, 0, m, NULL);
+		PMAP_UNLOCK(pmap);
+		MPASS(rv == TRUE);
+	}
 
 	KASSERT(pmap->pm_stats.resident_count == 0,
 	    ("pmap_release: pmap resident count %ld != 0",
