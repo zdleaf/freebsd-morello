@@ -3537,8 +3537,11 @@ pmap_enter(pmap_t pmap, vm_offset_t va, vm_page_t m, vm_prot_t prot,
 		if ((prot & VM_PROT_WRITE) != 0) {
 			new_l3 |= ATTR_SW_DBM;
 			if ((flags & VM_PROT_WRITE) == 0) {
-				PMAP_ASSERT_STAGE1(pmap);
-				new_l3 |= ATTR_S1_AP(ATTR_S1_AP_RO);
+				if (pmap->pm_stage == PM_STAGE1)
+					new_l3 |= ATTR_S1_AP(ATTR_S1_AP_RO);
+				else
+					new_l3 &=
+					    ~ATTR_S2_S2AP(ATTR_S2_S2AP_WRITE);
 			}
 		}
 	}
