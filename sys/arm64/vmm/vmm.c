@@ -1357,20 +1357,41 @@ static int
 vm_handle_paging(struct vm *vm, int vcpuid, bool *retu)
 {
 	struct vm_exit *vme;
+	struct vm_map *map;
 	struct vcpu *vcpu;
-	uint64_t addr;
+	uint64_t addr, esr;
 	pmap_t pmap;
+	int ftype, rv;
 
 	vme = vm_exitinfo(vm, vcpuid);
 	pmap = vmspace_pmap(vm->vmspace);
 	vcpu = &vm->vcpu[vcpuid];
 	addr = vme->u.paging.gpa;
+	esr = vme->u.paging.esr;
 
 	/* The page exists, but the page table needs to be upddated */
 	if (pmap_fault(pmap, vme->u.paging.esr, addr) == KERN_SUCCESS)
 		return (0);
 
-	panic("vm_handle_paging");
+	switch (ESR_ELx_EXCEPTION(vme->u.paging.esr)) {
+	case EXCP_INSN_ABORT_L:
+		ftype = VM_PROT_EXECUTE;
+		break;
+	case EXCP_DATA_ABORT_L:
+		ftype = (esr & ISS_DATA_WnR) == 0 ? VM_PROT_READ :
+		    VM_PROT_READ | VM_PROT_WRITE;
+		break;
+	default:
+		panic("%s: Invalid exception (esr = %lx)", __func__,
+		    vme->u.paging.esr);
+	}
+
+	map = &vm->vmspace->vm_map;
+	rv = vm_fault(map, vme->u.paging.gpa, ftype, VM_FAULT_NORMAL, NULL);
+	if (rv != KERN_SUCCESS)
+		return (EFAULT);
+
+	return (0);
 }
 
 int
