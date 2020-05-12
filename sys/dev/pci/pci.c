@@ -5681,8 +5681,8 @@ pci_get_resource_list (device_t dev, device_t child)
 	return (&dinfo->resources);
 }
 
-#ifdef ACPI_DMAR
-bus_dma_tag_t dmar_get_dma_tag(device_t dev, device_t child);
+#if defined(ACPI_DMAR) || defined(ACPI_SMMU)
+bus_dma_tag_t acpi_iommu_get_dma_tag(device_t dev, device_t child);
 bus_dma_tag_t
 pci_get_dma_tag(device_t bus, device_t dev)
 {
@@ -5690,27 +5690,8 @@ pci_get_dma_tag(device_t bus, device_t dev)
 	struct pci_softc *sc;
 
 	if (device_get_parent(dev) == bus) {
-		/* try dmar and return if it works */
-		tag = dmar_get_dma_tag(bus, dev);
-	} else
-		tag = NULL;
-	if (tag == NULL) {
-		sc = device_get_softc(bus);
-		tag = sc->sc_dma_tag;
-	}
-	return (tag);
-}
-#elif defined(ACPI_SMMU)
-bus_dma_tag_t bounce_smmu_get_dma_tag(device_t dev, device_t child);
-bus_dma_tag_t
-pci_get_dma_tag(device_t bus, device_t dev)
-{
-	bus_dma_tag_t tag;
-	struct pci_softc *sc;
-
-	if (device_get_parent(dev) == bus) {
-		/* try smmu and return if it works */
-		tag = bounce_smmu_get_dma_tag(bus, dev);
+		/* try iommu and return if it works */
+		tag = acpi_iommu_get_dma_tag(bus, dev);
 	} else
 		tag = NULL;
 	if (tag == NULL) {

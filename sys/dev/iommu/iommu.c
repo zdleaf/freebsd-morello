@@ -54,6 +54,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/smp.h>
 
 #include <vm/vm.h>
+#include <vm/uma.h>
 #include <vm/pmap.h>
 
 #include <machine/bus.h>
@@ -87,13 +88,13 @@ static struct mtx iommu_mtx;
 #define DPRINTF(fmt, ...)
 #endif
 
-static LIST_HEAD(, iommu) iommu_list = LIST_HEAD_INITIALIZER(iommu_list);
+static LIST_HEAD(, iommu_unit) iommu_list = LIST_HEAD_INITIALIZER(iommu_list);
 
 int
 iommu_domain_add_va_range(struct iommu_domain *domain,
     vm_offset_t va, vm_size_t size)
 {
-	struct iommu *iommu;
+	struct iommu_unit *iommu;
 	int error;
 
 	KASSERT(size > 0, ("wrong size"));
@@ -106,7 +107,7 @@ iommu_domain_add_va_range(struct iommu_domain *domain,
 }
 
 struct iommu_domain *
-iommu_domain_alloc(struct iommu *iommu)
+iommu_domain_alloc(struct iommu_unit *iommu)
 {
 	struct iommu_domain *domain;
 
@@ -133,7 +134,7 @@ iommu_domain_alloc(struct iommu *iommu)
 int
 iommu_domain_free(struct iommu_domain *domain)
 {
-	struct iommu *iommu;
+	struct iommu_unit *iommu;
 	vmem_t *vmem;
 	int error;
 
@@ -161,13 +162,32 @@ iommu_get_domain_for_dev(device_t dev)
 {
 	struct iommu_domain *domain;
 	struct iommu_device *device;
-	struct iommu *iommu;
+	struct iommu_unit *iommu;
 
 	LIST_FOREACH(iommu, &iommu_list, next) {
 		LIST_FOREACH(domain, &iommu->domain_list, next) {
 			LIST_FOREACH(device, &domain->device_list, next) {
 				if (device->dev == dev)
 					return (domain);
+			}
+		}
+	}
+
+	return (NULL);
+}
+
+struct iommu_device *
+iommu_get_device_for_dev(device_t dev)
+{
+	struct iommu_domain *domain;
+	struct iommu_device *device;
+	struct iommu_unit *iommu;
+
+	LIST_FOREACH(iommu, &iommu_list, next) {
+		LIST_FOREACH(domain, &iommu->domain_list, next) {
+			LIST_FOREACH(device, &domain->device_list, next) {
+				if (device->dev == dev)
+					return (device);
 			}
 		}
 	}
@@ -182,7 +202,7 @@ int
 iommu_device_attach(struct iommu_domain *domain, device_t dev)
 {
 	struct iommu_device *device;
-	struct iommu *iommu;
+	struct iommu_unit *iommu;
 	int err;
 
 	iommu = domain->iommu;
@@ -213,7 +233,7 @@ int
 iommu_device_detach(struct iommu_domain *domain, device_t dev)
 {
 	struct iommu_device *device;
-	struct iommu *iommu;
+	struct iommu_unit *iommu;
 	bool found;
 	int err;
 
@@ -251,7 +271,7 @@ int
 iommu_map_page(struct iommu_domain *domain,
     vm_offset_t va, vm_paddr_t pa, vm_prot_t prot)
 {
-	struct iommu *iommu;
+	struct iommu_unit *iommu;
 	int error;
 
 	iommu = domain->iommu;
@@ -266,7 +286,7 @@ iommu_map_page(struct iommu_domain *domain,
 int
 iommu_unmap_page(struct iommu_domain *domain, vm_offset_t va)
 {
-	struct iommu *iommu;
+	struct iommu_unit *iommu;
 	int error;
 
 	iommu = domain->iommu;
@@ -278,13 +298,86 @@ iommu_unmap_page(struct iommu_domain *domain, vm_offset_t va)
 	return (0);
 }
 
+static uma_zone_t iommu_map_entry_zone;
+
+static void
+intel_gas_init(void)
+{
+
+	iommu_map_entry_zone = uma_zcreate("DMAR_MAP_ENTRY",
+	    sizeof(struct iommu_map_entry), NULL, NULL,
+	    NULL, NULL, UMA_ALIGN_PTR, UMA_ZONE_NODUMP);
+}
+SYSINIT(intel_gas, SI_SUB_DRIVERS, SI_ORDER_FIRST, intel_gas_init, NULL);
+
+static struct iommu_map_entry *
+iommu_gas_alloc_entry(struct iommu_domain *domain, u_int flags)
+{
+	struct iommu_map_entry *res;
+
+	KASSERT((flags & ~(DMAR_PGF_WAITOK)) == 0,
+	    ("unsupported flags %x", flags));
+
+	res = uma_zalloc(iommu_map_entry_zone, ((flags & DMAR_PGF_WAITOK) !=
+	    0 ? M_WAITOK : M_NOWAIT) | M_ZERO);
+	if (res != NULL) {
+		res->domain = domain;
+		atomic_add_int(&domain->entries_cnt, 1);
+	}
+	return (res);
+}
+
+#if 0
+static void
+iommu_gas_free_entry(struct iommu_domain *domain, struct iommu_map_entry *entry)
+{
+
+	KASSERT(domain == entry->domain,
+	    ("mismatched free domain %p entry %p entry->domain %p", domain,
+	    entry, entry->domain));
+	atomic_subtract_int(&domain->entries_cnt, 1);
+	uma_zfree(iommu_map_entry_zone, entry);
+}
+#endif
+
+int
+iommu_map1(struct iommu_domain *domain, vm_size_t size, vm_offset_t offset,
+    vm_prot_t prot, vm_page_t *ma, struct iommu_map_entry **res)
+{
+	struct iommu_map_entry *entry;
+	struct iommu_unit *iommu;
+	vm_offset_t va;
+	vm_paddr_t pa;
+	int error;
+
+	iommu = domain->iommu;
+
+	entry = iommu_gas_alloc_entry(domain, 0);
+
+	error = vmem_alloc(domain->vmem, size,
+	    M_FIRSTFIT | M_NOWAIT, &va);
+
+	pa = VM_PAGE_TO_PHYS(ma[0]);
+
+	entry->start = va;
+	entry->end = va + size;
+
+	error = IOMMU_MAP(iommu->dev, domain, va, pa, size, prot);
+
+	//printf("%s: size %lx, offset %lx\n", __func__, size, offset);
+
+	*res = entry;
+
+	return (0);
+}
+
 /*
  * Busdma map/unmap interface.
  */
 int
 iommu_map(struct iommu_domain *domain, bus_dma_segment_t *segs, int nsegs)
 {
-	struct iommu *iommu;
+	struct iommu_unit *iommu;
 	vm_offset_t offset;
 	vm_offset_t va;
 	vm_paddr_t pa;
@@ -324,7 +417,7 @@ iommu_map(struct iommu_domain *domain, bus_dma_segment_t *segs, int nsegs)
 void
 iommu_unmap(struct iommu_domain *domain, bus_dma_segment_t *segs, int nsegs)
 {
-	struct iommu *iommu;
+	struct iommu_unit *iommu;
 	vm_offset_t offset;
 	vm_offset_t va;
 	vm_size_t size;
@@ -359,7 +452,7 @@ iommu_unmap(struct iommu_domain *domain, bus_dma_segment_t *segs, int nsegs)
 int
 iommu_register(device_t dev, intptr_t xref)
 {
-	struct iommu *iommu;
+	struct iommu_unit *iommu;
 
 	iommu = malloc(sizeof(*iommu), M_IOMMU, M_WAITOK | M_ZERO);
 	iommu->dev = dev;
@@ -378,7 +471,7 @@ iommu_register(device_t dev, intptr_t xref)
 int
 iommu_unregister(device_t dev)
 {
-	struct iommu *iommu;
+	struct iommu_unit *iommu;
 	bool found;
 
 	found = false;
@@ -409,10 +502,10 @@ iommu_unregister(device_t dev)
 	return (0);
 }
 
-struct iommu *
+struct iommu_unit *
 iommu_lookup(intptr_t xref, int flags)
 {
-	struct iommu *iommu;
+	struct iommu_unit *iommu;
 
 	LIST_FOREACH(iommu, &iommu_list, next) {
 		if (iommu->xref == xref)

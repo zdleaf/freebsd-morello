@@ -48,17 +48,7 @@ struct bus_dma_tag_common {
 	bus_dma_lock_t	 *lockfunc;
 	void		 *lockfuncarg;
 	int		  ref_count;
-};
-
-struct bounce_zone;
-
-struct bus_dma_tag {
-	struct bus_dma_tag_common common;
-	int			map_count;
-	int			bounce_flags;
-	struct bounce_zone	*bounce_zone;
-	struct iommu_domain	*iommu_domain;
-	device_t		owner;
+	int		domain;
 };
 
 struct bus_dma_impl {
@@ -70,6 +60,7 @@ struct bus_dma_impl {
 	    void *lockfuncarg, bus_dma_tag_t *dmat);
 	int (*tag_destroy)(bus_dma_tag_t dmat);
 	bool (*id_mapped)(bus_dma_tag_t, vm_paddr_t, bus_size_t);
+	int (*tag_set_domain)(bus_dma_tag_t);
 	int (*map_create)(bus_dma_tag_t dmat, int flags, bus_dmamap_t *mapp);
 	int (*map_destroy)(bus_dma_tag_t dmat, bus_dmamap_t map);
 	int (*mem_alloc)(bus_dma_tag_t dmat, void** vaddr, int flags,
@@ -102,9 +93,6 @@ int common_bus_dma_tag_create(struct bus_dma_tag_common *parent,
     bus_dma_filter_t *filter, void *filterarg, bus_size_t maxsize,
     int nsegments, bus_size_t maxsegsz, int flags, bus_dma_lock_t *lockfunc,
     void *lockfuncarg, size_t sz, void **dmat);
-
-bus_dma_tag_t bounce_smmu_get_dma_tag(device_t dev, device_t child);
-int bounce_smmu_domain_free(bus_dma_tag_t dmat);
 
 extern struct bus_dma_impl bus_dma_bounce_impl;
 

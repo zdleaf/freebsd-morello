@@ -48,6 +48,7 @@ __FBSDID("$FreeBSD$");
 
 #include <contrib/dev/acpica/include/acpi.h>
 #include <dev/acpica/acpivar.h>
+#include <dev/iommu/busdma_iommu.h>
 
 #include "smmu_reg.h"
 #include "smmu_var.h"
@@ -190,6 +191,8 @@ smmu_acpi_attach(device_t dev)
 
 	sc = device_get_softc(dev);
 	sc->dev = dev;
+
+	iommu_init_busdma(&sc->unit);
 
 	priv = (uintptr_t)acpi_get_private(dev);
 	if ((priv >> 32) & ACPI_IORT_SMMU_V3_COHACC_OVERRIDE)

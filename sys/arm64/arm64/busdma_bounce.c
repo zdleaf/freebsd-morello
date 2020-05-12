@@ -59,8 +59,6 @@ __FBSDID("$FreeBSD$");
 #include <machine/md_var.h>
 #include <arm64/include/bus_dma_impl.h>
 
-#include <dev/iommu/iommu.h>
-
 #define MAX_BPAGES 4096
 
 enum {
@@ -68,6 +66,16 @@ enum {
 	BF_MIN_ALLOC_COMP	= 0x02,
 	BF_KMEM_ALLOC		= 0x04,
 	BF_COHERENT		= 0x10,
+};
+
+struct bounce_zone;
+
+struct bus_dma_tag {
+	struct bus_dma_tag_common common;
+	int			map_count;
+	int			bounce_flags;
+	bus_dma_segment_t	*segments;
+	struct bounce_zone	*bounce_zone;
 };
 
 struct bounce_page {
@@ -130,8 +138,6 @@ struct bus_dmamap {
 #define	DMAMAP_COULD_BOUNCE	(1 << 0)
 #define	DMAMAP_FROM_DMAMEM	(1 << 1)
 	int			sync_count;
-	int			nsegs;
-	bus_dma_segment_t	*segments;
 	struct sync_list	slist[];
 };
 
@@ -179,6 +185,7 @@ bounce_bus_dma_tag_create(bus_dma_tag_t parent, bus_size_t alignment,
 
 	newtag->common.impl = &bus_dma_bounce_impl;
 	newtag->map_count = 0;
+	newtag->segments = NULL;
 
 	if ((flags & BUS_DMA_COHERENT) != 0)
 		newtag->bounce_flags |= BF_COHERENT;
@@ -190,8 +197,6 @@ bounce_bus_dma_tag_create(bus_dma_tag_t parent, bus_size_t alignment,
 
 		/* Copy some flags from the parent */
 		newtag->bounce_flags |= parent->bounce_flags & BF_COHERENT;
-		newtag->iommu_domain = parent->iommu_domain;
-		newtag->owner = parent->owner;
 	}
 
 	if (newtag->common.lowaddr < ptoa((vm_paddr_t)Maxmem) ||
@@ -236,7 +241,6 @@ bounce_bus_dma_tag_create(bus_dma_tag_t parent, bus_size_t alignment,
 static int
 bounce_bus_dma_tag_destroy(bus_dma_tag_t dmat)
 {
-	struct iommu_domain *domain;
 	bus_dma_tag_t dmat_copy, parent;
 	int error;
 
@@ -252,9 +256,8 @@ bounce_bus_dma_tag_destroy(bus_dma_tag_t dmat)
 			parent = (bus_dma_tag_t)dmat->common.parent;
 			atomic_subtract_int(&dmat->common.ref_count, 1);
 			if (dmat->common.ref_count == 0) {
-				domain = dmat->iommu_domain;
-				if (domain && dmat == domain->tag)
-					bounce_smmu_domain_free(dmat);
+				if (dmat->segments != NULL)
+					free(dmat->segments, M_DEVBUF);
 				free(dmat, M_DEVBUF);
 				/*
 				 * Last reference count, so
@@ -292,17 +295,6 @@ alloc_dmamap(bus_dma_tag_t dmat, int flags)
 	if (map == NULL)
 		return (NULL);
 
-	map->segments = (bus_dma_segment_t *)malloc(
-	    sizeof(bus_dma_segment_t) * dmat->common.nsegments,
-	    M_DEVBUF, M_NOWAIT);
-	if (map->segments == NULL) {
-		CTR3(KTR_BUSDMA, "%s: tag %p error %d",
-		    __func__, dmat, ENOMEM);
-		free(map, M_DEVBUF);
-		return (NULL);
-	}
-	map->nsegs = 0;
-
 	/* Initialize the new map */
 	STAILQ_INIT(&map->bpages);
 
@@ -321,6 +313,17 @@ bounce_bus_dmamap_create(bus_dma_tag_t dmat, int flags, bus_dmamap_t *mapp)
 
 	error = 0;
 
+	if (dmat->segments == NULL) {
+		dmat->segments = (bus_dma_segment_t *)malloc(
+		    sizeof(bus_dma_segment_t) * dmat->common.nsegments,
+		    M_DEVBUF, M_NOWAIT);
+		if (dmat->segments == NULL) {
+			CTR3(KTR_BUSDMA, "%s: tag %p error %d",
+			    __func__, dmat, ENOMEM);
+			return (ENOMEM);
+		}
+	}
+
 	*mapp = alloc_dmamap(dmat, M_NOWAIT);
 	if (*mapp == NULL) {
 		CTR3(KTR_BUSDMA, "%s: tag %p error %d",
@@ -337,7 +340,6 @@ bounce_bus_dmamap_create(bus_dma_tag_t dmat, int flags, bus_dmamap_t *mapp)
 		/* Must bounce */
 		if (dmat->bounce_zone == NULL) {
 			if ((error = alloc_bounce_zone(dmat)) != 0) {
-				free((*mapp)->segments, M_DEVBUF);
 				free(*mapp, M_DEVBUF);
 				return (error);
 			}
@@ -375,10 +377,8 @@ bounce_bus_dmamap_create(bus_dma_tag_t dmat, int flags, bus_dmamap_t *mapp)
 	}
 	if (error == 0)
 		dmat->map_count++;
-	else {
-		free((*mapp)->segments, M_DEVBUF);
+	else
 		free(*mapp, M_DEVBUF);
-	}
 	CTR4(KTR_BUSDMA, "%s: tag %p tag flags 0x%x error %d",
 	    __func__, dmat, dmat->common.flags, error);
 	return (error);
@@ -405,7 +405,6 @@ bounce_bus_dmamap_destroy(bus_dma_tag_t dmat, bus_dmamap_t map)
 		    ("%s: Bounce zone when cannot bounce", __func__));
 		dmat->bounce_zone->map_count--;
 	}
-	free(map->segments, M_DEVBUF);
 	free(map, M_DEVBUF);
 	dmat->map_count--;
 	CTR2(KTR_BUSDMA, "%s: tag %p error 0", __func__, dmat);
@@ -437,6 +436,16 @@ bounce_bus_dmamem_alloc(bus_dma_tag_t dmat, void** vaddr, int flags,
 	else
 		mflags = M_WAITOK;
 
+	if (dmat->segments == NULL) {
+		dmat->segments = (bus_dma_segment_t *)malloc(
+		    sizeof(bus_dma_segment_t) * dmat->common.nsegments,
+		    M_DEVBUF, mflags);
+		if (dmat->segments == NULL) {
+			CTR4(KTR_BUSDMA, "%s: tag %p tag flags 0x%x error %d",
+			    __func__, dmat, dmat->common.flags, ENOMEM);
+			return (ENOMEM);
+		}
+	}
 	if (flags & BUS_DMA_ZERO)
 		mflags |= M_ZERO;
 	if (flags & BUS_DMA_NOCACHE)
@@ -506,7 +515,6 @@ bounce_bus_dmamem_alloc(bus_dma_tag_t dmat, void** vaddr, int flags,
 	if (*vaddr == NULL) {
 		CTR4(KTR_BUSDMA, "%s: tag %p tag flags 0x%x error %d",
 		    __func__, dmat, dmat->common.flags, ENOMEM);
-		free((*mapp)->segments, M_DEVBUF);
 		free(*mapp, M_DEVBUF);
 		return (ENOMEM);
 	} else if (vtophys(*vaddr) & (dmat->common.alignment - 1)) {
@@ -711,7 +719,7 @@ bounce_bus_dmamap_load_phys(bus_dma_tag_t dmat, bus_dmamap_t map,
 	int error;
 
 	if (segs == NULL)
-		segs = map->segments;
+		segs = dmat->segments;
 
 	if ((dmat->bounce_flags & BF_COULD_BOUNCE) != 0) {
 		_bus_dmamap_count_phys(dmat, map, buf, buflen, flags);
@@ -782,7 +790,7 @@ bounce_bus_dmamap_load_buffer(bus_dma_tag_t dmat, bus_dmamap_t map, void *buf,
 	int error;
 
 	if (segs == NULL)
-		segs = map->segments;
+		segs = dmat->segments;
 
 	if ((dmat->bounce_flags & BF_COULD_BOUNCE) != 0) {
 		_bus_dmamap_count_pages(dmat, map, pmap, buf, buflen, flags);
@@ -885,26 +893,9 @@ static bus_dma_segment_t *
 bounce_bus_dmamap_complete(bus_dma_tag_t dmat, bus_dmamap_t map,
     bus_dma_segment_t *segs, int nsegs, int error)
 {
-	int ret;
 
-	map->nsegs = nsegs;
-
-	if (segs != NULL)
-		memcpy(map->segments, segs, map->nsegs * sizeof(segs[0]));
-
-	if (dmat->iommu_domain) {
-		ret = iommu_map(dmat->iommu_domain, map->segments, nsegs);
-		if (ret) {
-			printf("iommu failed to map page: error %d\n", ret);
-			/* TODO: handle this case. */
-		}
-	}
-
-	if (segs != NULL)
-		memcpy(segs, map->segments, map->nsegs * sizeof(segs[0]));
-	else
-		segs = map->segments;
-
+	if (segs == NULL)
+		segs = dmat->segments;
 	return (segs);
 }
 
@@ -915,11 +906,6 @@ static void
 bounce_bus_dmamap_unload(bus_dma_tag_t dmat, bus_dmamap_t map)
 {
 	struct bounce_page *bpage;
-
-	if (dmat->iommu_domain) {
-		iommu_unmap(dmat->iommu_domain, map->segments, map->nsegs);
-		map->nsegs = 0;
-	}
 
 	while ((bpage = STAILQ_FIRST(&map->bpages)) != NULL) {
 		STAILQ_REMOVE_HEAD(&map->bpages, links);

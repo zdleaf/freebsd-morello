@@ -38,6 +38,7 @@
 #include <sys/bitstring.h>
 
 #include <dev/iommu/iommu.h>
+#include <dev/iommu/busdma_iommu.h>
 
 #include <vm/vm.h>
 #include <vm/pmap.h>
@@ -152,6 +153,7 @@ struct smmu_softc {
 	bitstr_t			*asid_set;
 	int				asid_set_size;
 	struct mtx			asid_set_mutex;
+	struct iommu_unit		unit;
 };
 
 struct smmu_master {

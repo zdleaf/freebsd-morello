@@ -41,16 +41,50 @@
 #include <sys/bus_dma.h>
 #include <sys/vmem.h>
 
+#include <sys/systm.h>
+#include <sys/domainset.h>
+#include <sys/malloc.h>
+#include <sys/bus.h>
+#include <sys/conf.h>
+#include <sys/interrupt.h>
+#include <sys/kernel.h>
+#include <sys/ktr.h>
+#include <sys/lock.h>
+#include <sys/proc.h>
+#include <sys/memdesc.h>
+#include <sys/mutex.h>
+#include <sys/sysctl.h>
+#include <sys/rman.h>
+#include <sys/taskqueue.h>
+#include <sys/tree.h>
+#include <sys/uio.h>
+#include <sys/vmem.h>
+
 #include <vm/vm.h>
 #include <vm/pmap.h>
 
-/* MMU unit */
-struct iommu {
+struct iommu_map_entry;
+TAILQ_HEAD(iommu_map_entries_tailq, iommu_map_entry);
+
+struct iommu_unit {
 	LIST_HEAD(, iommu_domain)	domain_list;
-	LIST_ENTRY(iommu)		next;
+	LIST_ENTRY(iommu_unit)		next;
 	struct mtx			mtx_lock;
 	device_t			dev;
 	intptr_t			xref;
+
+	int unit;
+	int dma_enabled;
+
+	/* Delayed freeing of map entries queue processing */
+	struct iommu_map_entries_tailq tlb_flush_entries;
+	struct task qi_task;
+	struct taskqueue *qi_taskqueue;
+
+	/* Busdma delayed map load */
+	struct task dmamap_load_task;
+	TAILQ_HEAD(, bus_dmamap_iommu) delayed_maps;
+	struct taskqueue *delayed_taskqueue;
 };
 
 /* Minimal translation domain. */
@@ -60,7 +94,39 @@ struct iommu_domain {
 	struct mtx			mtx_lock;
 	bus_dma_tag_t			tag;
 	vmem_t				*vmem;
-	struct iommu			*iommu;
+	struct iommu_unit		*iommu;
+
+#if 0
+	int domain;			/* (c) DID, written in context entry */
+	int mgaw;			/* (c) Real max address width */
+	int agaw;			/* (c) Adjusted guest address width */
+	int pglvl;			/* (c) The pagelevel */
+	int awlvl;			/* (c) The pagelevel as the bitmask,
+					   to set in context entry */
+	iommu_gaddr_t end;		/* (c) Highest address + 1 in
+					   the guest AS */
+	u_int ctx_cnt;			/* (u) Number of contexts owned */
+	u_int refs;			/* (u) Refs, including ctx */
+	struct iommu_unit *iommu;		/* (c) */
+	struct mtx lock;		/* (c) */
+	LIST_ENTRY(iommu_domain) link;	/* (u) Member in the iommu list */
+	LIST_HEAD(, iommu_ctx) contexts;	/* (u) */
+	vm_object_t pgtbl_obj;		/* (c) Page table pages */
+	u_int flags;			/* (u) */
+	u_int entries_cnt;		/* (d) */
+	struct iommu_gas_entries_tree rb_root; /* (d) */
+	struct iommu_map_entries_tailq unload_entries; /* (d) Entries to
+							 unload */
+	struct iommu_map_entry *first_place, *last_place; /* (d) */
+	struct task unload_task;	/* (c) */
+	u_int batch_no;
+#endif
+
+	struct task unload_task;	/* (c) */
+	struct iommu_map_entries_tailq unload_entries; /* (d) Entries to
+							 unload */
+	u_int flags;			/* (u) */
+	u_int entries_cnt;		/* (d) */
 };
 
 /* Consumer device. */
@@ -69,6 +135,8 @@ struct iommu_device {
 	struct iommu_domain		*domain;
 	device_t dev;
 	uint16_t rid;
+	u_long loads;
+	u_long unloads;
 };
 
 #define	DOMAIN_LOCK(domain)		mtx_lock(&(domain)->mtx_lock)
@@ -77,12 +145,13 @@ struct iommu_device {
     mtx_assert(&(domain)->mtx_lock, MA_OWNED)
 
 int iommu_domain_free(struct iommu_domain *domain);
-struct iommu_domain * iommu_domain_alloc(struct iommu *iommu);
+struct iommu_domain * iommu_domain_alloc(struct iommu_unit *iommu);
 struct iommu_domain * iommu_get_domain_for_dev(device_t dev);
+struct iommu_device * iommu_get_device_for_dev(device_t dev);
 int iommu_device_attach(struct iommu_domain *domain, device_t dev);
 int iommu_device_detach(struct iommu_domain *domain, device_t dev);
 int iommu_capable(device_t dev);
-struct iommu * iommu_lookup(intptr_t xref, int flags);
+struct iommu_unit * iommu_lookup(intptr_t xref, int flags);
 int iommu_register(device_t dev, intptr_t xref);
 int iommu_unregister(device_t dev);
 int iommu_domain_add_va_range(struct iommu_domain *domain,
@@ -93,5 +162,14 @@ void iommu_unmap(struct iommu_domain *, bus_dma_segment_t *segs, int nsegs);
 int iommu_map_page(struct iommu_domain *domain,
     vm_offset_t va, vm_paddr_t pa, vm_prot_t prot);
 int iommu_unmap_page(struct iommu_domain *domain, vm_offset_t va);
+
+int iommu_map1(struct iommu_domain *domain, vm_size_t size, vm_offset_t offset,
+    vm_prot_t prot, vm_page_t *ma, struct iommu_map_entry **entry);
+
+#define	DMAR_PGF_WAITOK	0x0001
+#define	DMAR_PGF_ZERO	0x0002
+#define	DMAR_PGF_ALLOC	0x0004
+#define	DMAR_PGF_NOALLOC 0x0008
+#define	DMAR_PGF_OBJL	0x0010
 
 #endif /* _DEV_IOMMU_IOMMU_H_ */
