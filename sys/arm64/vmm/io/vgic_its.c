@@ -51,6 +51,8 @@
 #define	ITS_UNLOCK(its)		sx_xunlock(&its->its_mtx)
 #define	ITS_ASSERT_LOCKED(its)	sx_assert(&its->its_mtx, SA_XLOCKED)
 
+MALLOC_DEFINE(M_VITS, "ARM VMM VITS", "ARM VMM VITS");
+
 static void
 its_table_map(void *vm, struct vgic_its_table *tab, bool valid, uint64_t paddr,
     size_t size)
@@ -71,14 +73,14 @@ its_table_map(void *vm, struct vgic_its_table *tab, bool valid, uint64_t paddr,
 			/* Unmap the old table before remapping it */
 			vmm_unmap_gpa(vm, tab->vaddr, tab->size / PAGE_SIZE,
 			    tab->ma);
-			free(tab->ma, M_DEVBUF);
+			free(tab->ma, M_VITS);
 			kva_free(tab->vaddr, tab->size);
 		}
 		tab->pbase = paddr;
 		tab->size = size;
 		tab->vaddr = kva_alloc(tab->size);
 		tab->ma = malloc((tab->size / PAGE_SIZE) * sizeof(*tab->ma),
-		    M_DEVBUF, M_ZERO | M_WAITOK);
+		    M_VITS, M_ZERO | M_WAITOK);
 
 		vmm_map_gpa(vm, tab->vaddr, tab->pbase, tab->size / PAGE_SIZE,
 		    tab->ma);
@@ -86,7 +88,7 @@ its_table_map(void *vm, struct vgic_its_table *tab, bool valid, uint64_t paddr,
 	} else if (tab->valid) {
 		/* Move from valid -> invalid */
 		vmm_unmap_gpa(vm, tab->vaddr, tab->size / PAGE_SIZE, tab->ma);
-		free(tab->ma, M_DEVBUF);
+		free(tab->ma, M_VITS);
 		kva_free(tab->vaddr, tab->size);
 		tab->size = 0;
 		tab->pbase = 0;
@@ -173,7 +175,7 @@ its_cmd_mapi(struct vgic_its *its, struct its_cmd *cmd)
 {
 	struct vgic_its_msi *msi;
 
-	msi = malloc(sizeof(*msi), M_DEVBUF, M_WAITOK | M_ZERO);
+	msi = malloc(sizeof(*msi), M_VITS, M_WAITOK | M_ZERO);
 	msi->devid = CMD_DEVID_GET(cmd);
 	msi->eventid = CMD_ID_GET(cmd);
 	if (CMD_COMMAND_GET(cmd) == ITS_CMD_MAPTI)
@@ -475,7 +477,7 @@ vgic_its_attach_to_vm(struct vm *vm, uint64_t start, size_t size)
 
 	its->col_entries = vm_get_maxcpus(vm);
 	its->collection = mallocarray(its->col_entries,
-	    sizeof(*its->collection), M_DEVBUF, M_WAITOK);
+	    sizeof(*its->collection), M_VITS, M_WAITOK);
 
 	for (i = 0; i < its->col_entries; i++)
 		its->collection[i] = -1;
