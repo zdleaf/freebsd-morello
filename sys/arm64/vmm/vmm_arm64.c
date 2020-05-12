@@ -188,6 +188,32 @@ arm_setup_vectors(void *arg)
 	intr_restore(daif);
 }
 
+static void
+arm_teardown_vectors(void *arg)
+{
+	register_t daif;
+
+	/*
+	 * vmm_cleanup() will disable the MMU. For the next few instructions,
+	 * before the hardware disables the MMU, one of the following is
+	 * possible:
+	 *
+	 * a. The instruction addresses are fetched with the MMU disabled,
+	 * and they must represent the actual physical addresses. This will work
+	 * because we call the vmm_cleanup() function by its physical address.
+	 *
+	 * b. The instruction addresses are fetched using the old translation
+	 * tables. This will work because we have an identity mapping in place
+	 * in the translation tables and vmm_cleanup() is called by its physical
+	 * address.
+	 */
+	daif = intr_disable();
+	vmm_call_hyp((void *)vtophys(vmm_cleanup), vtophys(hyp_stub_vectors));
+	intr_restore(daif);
+
+	arm64_set_active_vcpu(NULL);
+}
+
 static int
 arm_init(int ipinum)
 {
@@ -241,35 +267,16 @@ arm_init(int ipinum)
 static int
 arm_cleanup(void)
 {
-	register_t daif;
 	int cpu;
 
-	/*
-	 * vmm_cleanup() will disable the MMU. For the next few instructions,
-	 * before the hardware disables the MMU, one of the following is
-	 * possible:
-	 *
-	 * a. The instruction addresses are fetched with the MMU disabled,
-	 * and they must represent the actual physical addresses. This will work
-	 * because we call the vmm_cleanup() function by its physical address.
-	 *
-	 * b. The instruction addresses are fetched using the old translation
-	 * tables. This will work because we have an identity mapping in place
-	 * in the translation tables and vmm_cleanup() is called by its physical
-	 * address.
-	 */
-	daif = intr_disable();
-	vmm_call_hyp((void *)vtophys(vmm_cleanup), vtophys(hyp_stub_vectors));
-	intr_restore(daif);
-
-	arm64_set_active_vcpu(NULL);
+	smp_rendezvous(NULL, arm_teardown_vectors, NULL, NULL);
 
 	vtimer_cleanup();
 
 	hypmap_cleanup(hyp_pmap);
 	free(hyp_pmap, M_HYP);
 	for (cpu = 0; cpu < nitems(stack); cpu++)
-		free(stack, M_HYP);
+		free(stack[cpu], M_HYP);
 
 	return (0);
 }
