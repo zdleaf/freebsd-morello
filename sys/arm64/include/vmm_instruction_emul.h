@@ -73,6 +73,7 @@ int vmm_emulate_register(void *vm, int vcpuid, struct vre *vre, reg_read_t regre
 #ifdef _KERNEL
 void vm_register_inst_handler(struct vm *vm, uint64_t start, uint64_t size,
     mem_region_read_t mmio_read, mem_region_write_t mmio_write);
+void vm_deregister_inst_handler(struct vm *vm, uint64_t start, uint64_t size);
 #endif
 
 #endif	/* _VMM_INSTRUCTION_EMUL_H_ */

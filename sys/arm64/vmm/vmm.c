@@ -776,6 +776,24 @@ vm_register_inst_handler(struct vm *vm, uint64_t start, uint64_t size,
 	panic("%s: No free MMIO region", __func__);
 }
 
+void
+vm_deregister_inst_handler(struct vm *vm, uint64_t start, uint64_t size)
+{
+	int i;
+
+	for (i = 0; i < nitems(vm->mmio_region); i++) {
+		if (vm->mmio_region[i].start == start &&
+		    vm->mmio_region[i].end == start + size) {
+			memset(&vm->mmio_region[i], 0,
+			    sizeof(vm->mmio_region[i]));
+			return;
+		}
+	}
+
+	panic("%s: Invalid MMIO region: %lx - %lx", __func__, start,
+	    start + size);
+}
+
 static int
 vm_mmio_region_match(const void *key, const void *memb)
 {
