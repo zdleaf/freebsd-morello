@@ -148,35 +148,6 @@ iommu_test_boundary(iommu_gaddr_t start, iommu_gaddr_t size,
 	return (start + size <= ((start + boundary) & ~(boundary - 1)));
 }
 
-extern struct timespec iommu_hw_timeout;
-
-#define	DMAR_WAIT_UNTIL(cond)					\
-{								\
-	struct timespec last, curr;				\
-	bool forever;						\
-								\
-	if (iommu_hw_timeout.tv_sec == 0 &&			\
-	    iommu_hw_timeout.tv_nsec == 0) {			\
-		forever = true;					\
-	} else {						\
-		forever = false;				\
-		nanouptime(&curr);				\
-		timespecadd(&curr, &iommu_hw_timeout, &last);	\
-	}							\
-	for (;;) {						\
-		if (cond) {					\
-			error = 0;				\
-			break;					\
-		}						\
-		nanouptime(&curr);				\
-		if (!forever && timespeccmp(&last, &curr, <)) {	\
-			error = ETIMEDOUT;			\
-			break;					\
-		}						\
-		cpu_spinwait();					\
-	}							\
-}
-
 #if 0
 struct iommu_domain {
 	int domain;			/* (c) DID, written in context entry */
