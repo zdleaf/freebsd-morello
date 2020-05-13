@@ -65,7 +65,7 @@ __FBSDID("$FreeBSD$");
 #include <machine/md_var.h>
 #include <machine/bus_dma_impl.h>
 
-#include <dev/iommu/busdma_iommu.h>
+#include <arm64/iommu/busdma_iommu.h>
 
 /*
  * busdma_iommu.c, the implementation of the busdma(9) interface using

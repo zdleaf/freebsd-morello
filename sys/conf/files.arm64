@@ -239,11 +239,6 @@ dev/iicbus/sy8106a.c		optional	sy8106a fdt
 dev/iicbus/twsi/mv_twsi.c	optional	twsi fdt
 dev/iicbus/twsi/a10_twsi.c	optional	twsi fdt
 dev/iicbus/twsi/twsi.c		optional	twsi fdt
-dev/iommu/busdma_iommu.c	standard
-dev/iommu/iommu.c		standard
-dev/iommu/iommu_if.m		standard
-dev/iommu/smmu.c		optional	smmu
-dev/iommu/smmu_acpi.c		optional	smmu acpi
 dev/hwpmc/hwpmc_arm64.c		optional	hwpmc
 dev/hwpmc/hwpmc_arm64_md.c	optional	hwpmc
 dev/mbox/mbox_if.m		optional	soc_brcm_bcm2837
@@ -305,6 +300,12 @@ libkern/arm64/crc32c_armv8.S	standard
 cddl/dev/dtrace/aarch64/dtrace_asm.S			optional dtrace compile-with "${DTRACE_S}"
 cddl/dev/dtrace/aarch64/dtrace_subr.c			optional dtrace compile-with "${DTRACE_C}"
 cddl/dev/fbt/aarch64/fbt_isa.c				optional dtrace_fbt | dtraceall compile-with "${FBT_C}"
+
+arm64/iommu/busdma_iommu.c	optional	smmu
+arm64/iommu/iommu.c		optional	smmu
+arm64/iommu/iommu_if.m		optional	smmu
+arm64/iommu/smmu.c		optional	smmu
+arm64/iommu/smmu_acpi.c		optional	smmu acpi
 
 # RockChip Drivers
 arm64/rockchip/rk3399_emmcphy.c		optional fdt rk_emmcphy soc_rockchip_rk3399

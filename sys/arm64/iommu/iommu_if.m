@@ -34,7 +34,7 @@
 
 #include <vm/vm.h>
 
-#include <dev/iommu/iommu.h>
+#include <arm64/iommu/iommu.h>
 
 INTERFACE iommu;
 

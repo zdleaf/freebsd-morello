@@ -53,7 +53,7 @@
 #include <sys/uio.h>
 #include <sys/vmem.h>
 
-#include <dev/iommu/iommu.h>
+#include <arm64/iommu/iommu.h>
 
 struct bus_dmamap_iommu {
 	struct bus_dma_tag_iommu *tag;
