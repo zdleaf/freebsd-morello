@@ -280,10 +280,6 @@ acpi_iommu_get_dma_tag(device_t dev, device_t child)
 		return (NULL);
 	if (!iommu->dma_enabled)
 		return (NULL);
-#if 0
-	iommu_quirks_pre_use(iommu);
-	iommu_instantiate_rmrr_ctxs(iommu);
-#endif
 
 	ctx = iommu_instantiate_ctx(iommu, child, false);
 	res = ctx == NULL ? NULL : (bus_dma_tag_t)&ctx->ctx_tag;
@@ -316,7 +312,6 @@ iommu_bus_dma_tag_create(bus_dma_tag_t parent, bus_size_t alignment,
 
 	oldtag = (struct bus_dma_tag_iommu *)parent;
 	newtag->common.impl = &bus_dma_iommu_impl;
-	//newtag->ctx = oldtag->ctx;
 	newtag->device = oldtag->device;
 	newtag->owner = oldtag->owner;
 

@@ -234,8 +234,6 @@ iommu_get_ctx_for_dev(struct iommu_unit *iommu, device_t requester,
 	struct bus_dma_tag_iommu *tag;
 	int error;
 
-	printf("%s\n", __func__);
-
 	device = iommu_get_device_for_dev(requester);
 	if (device)
 		return (device);
