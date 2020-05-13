@@ -193,7 +193,6 @@ _bus_dmamap_load_mbuf_sg(bus_dma_tag_t dmat, bus_dmamap_t map,
 				    flags | BUS_DMA_LOAD_MBUF, segs, nsegs);
 		}
 	}
-	printf("%s: nsegs %d\n", __func__, *nsegs);
 	CTR5(KTR_BUSDMA, "%s: tag %p tag flags 0x%x error %d nsegs %d",
 	    __func__, dmat, flags, error, *nsegs);
 	return (error);
