@@ -61,23 +61,6 @@ __FBSDID("$FreeBSD$");
 
 static MALLOC_DEFINE(M_BUSDMA, "SMMU", "ARM64 busdma SMMU");
 
-static void
-smmu_tag_init(struct bus_dma_tag_iommu *t)
-{
-	bus_addr_t maxaddr;
-
-	maxaddr = BUS_SPACE_MAXADDR;
-
-	t->common.ref_count = 0;
-	t->common.impl = &bus_dma_iommu_impl;
-	t->common.boundary = 0;
-	t->common.lowaddr = maxaddr;
-	t->common.highaddr = maxaddr;
-	t->common.maxsize = maxaddr;
-	t->common.nsegments = BUS_SPACE_UNRESTRICTED;
-	t->common.maxsegsz = maxaddr;
-}
-
 int
 busdma_smmu_domain_free(struct bus_dma_tag_iommu *dmat)
 {
@@ -114,109 +97,6 @@ busdma_smmu_domain_free(struct bus_dma_tag_iommu *dmat)
 
 	return (0);
 }
-
-static struct iommu_domain *
-smmu_domain_alloc(device_t dev)
-{
-	struct iommu_domain *domain;
-	struct iommu_unit *iommu;
-	u_int xref, sid;
-	uint16_t rid;
-	int error;
-	int seg;
-
-	rid = pci_get_rid(dev);
-	seg = pci_get_domain(dev);
-
-	/*
-	 * Find an xref of an IOMMU controller that serves traffic for dev.
-	 */
-#ifdef DEV_ACPI
-	error = acpi_iort_map_pci_smmuv3(seg, rid, &xref, &sid);
-	if (error) {
-		/* Could not find reference to an SMMU device. */
-		return (NULL);
-	}
-#else
-	/* TODO: add FDT support. */
-	return (NULL);
-#endif
-
-	/*
-	 * Find the registered IOMMU controller by xref.
-	 */
-	iommu = iommu_lookup(xref, 0);
-	if (iommu == NULL) {
-		/* SMMU device is not registered in the IOMMU framework. */
-		return (NULL);
-	}
-
-	domain = iommu_domain_alloc(iommu);
-	if (domain == NULL)
-		return (NULL);
-
-	/* Add some virtual address range for this domain. */
-	iommu_domain_add_va_range(domain, 0x40000000, 0x40000000);
-
-	/* Map the GICv3 ITS page so the device could send MSI interrupts. */
-	iommu_map_page(domain, GICV3_ITS_PAGE, GICV3_ITS_PAGE, VM_PROT_WRITE);
-
-	return (domain);
-}
-
-#if 0
-bus_dma_tag_t
-smmu_get_dma_tag(device_t dev, device_t child)
-{
-	struct iommu_domain *domain;
-	devclass_t pci_class;
-	struct bus_dma_tag_iommu *tag;
-	int error;
-
-	pci_class = devclass_find("pci");
-	if (device_get_devclass(device_get_parent(child)) != pci_class)
-		return (NULL);
-
-	struct iommu_device *device;
-	device = iommu_get_device_for_dev(child);
-	if (device)
-		return (device->ctx_tag);
-
-#if 0
-	domain = iommu_get_domain_for_dev(child);
-	if (domain)
-		return (domain->tag);
-#endif
-
-	/* A single device per domain. */
-
-	domain = smmu_domain_alloc(child);
-	if (!domain)
-		return (NULL);
-
-	tag = malloc(sizeof(*tag), M_BUSDMA, M_WAITOK | M_ZERO);
-	if (!tag) {
-		iommu_domain_free(domain);
-		return (NULL);
-	}
-
-	smmu_tag_init(tag);
-	tag->owner = child;
-	device->ctx_tag = (bus_dma_tag_t)tag;
-
-	error = iommu_device_attach(domain, child);
-	if (error) {
-		free(tag, M_BUSDMA);
-		iommu_domain_free(domain);
-		return (NULL);
-	}
-
-	tag->device = iommu_get_device_for_dev(child);
-	tag->device->domain = domain;
-
-	return ((bus_dma_tag_t)(tag));
-}
-#endif
 
 struct iommu_unit *
 iommu_find(device_t dev, bool verbose)

@@ -241,11 +241,10 @@ iommu_get_ctx_for_dev(struct iommu_unit *iommu, device_t requester,
 		return (NULL);
 
 	tag = &device->ctx_tag;
-
-	iommu_tag_init(tag);
-
 	tag->owner = requester;
 	tag->device = device;
+
+	iommu_tag_init(tag);
 
 	device->domain = domain;
 
@@ -439,8 +438,6 @@ iommu_map1(struct iommu_domain *domain, vm_size_t size, vm_offset_t offset,
 	entry->end = va + size;
 
 	error = IOMMU_MAP(iommu->dev, domain, va, pa, size, prot);
-
-	//printf("%s: size %lx, offset %lx\n", __func__, size, offset);
 
 	*res = entry;
 
