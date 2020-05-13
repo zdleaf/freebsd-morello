@@ -209,6 +209,7 @@ int	vgic_v3_irq_toggle_enabled(uint32_t irq, bool enabled,
 				   struct hyp *hyp, int vcpuid);
 
 int	vgic_its_attach_to_vm(struct vm *vm, uint64_t start, uint64_t size);
+void	vgic_its_detach_from_vm(struct vm *vm);
 int	vgic_its_raise_msi(struct vm *vm, uint64_t msg, uint64_t addr,
     uint32_t eventid);
 

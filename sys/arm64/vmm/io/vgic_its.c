@@ -54,6 +54,20 @@
 MALLOC_DEFINE(M_VITS, "ARM VMM VITS", "ARM VMM VITS");
 
 static void
+its_table_unmap(void *vm, struct vgic_its_table *tab)
+{
+
+	if (tab->valid) {
+		vmm_unmap_gpa(vm, tab->vaddr, tab->size / PAGE_SIZE, tab->ma);
+		free(tab->ma, M_VITS);
+		kva_free(tab->vaddr, tab->size);
+		tab->size = 0;
+		tab->pbase = 0;
+		tab->valid = 0;
+	}
+}
+
+static void
 its_table_map(void *vm, struct vgic_its_table *tab, bool valid, uint64_t paddr,
     size_t size)
 {
@@ -485,4 +499,27 @@ vgic_its_attach_to_vm(struct vm *vm, uint64_t start, size_t size)
 	vm_register_inst_handler(vm, start, size, its_read, its_write);
 
 	return (0);
+}
+
+void
+vgic_its_detach_from_vm(struct vm *vm)
+{
+	struct hyp *hyp = vm_get_cookie(vm);
+	struct vgic_its *its = &hyp->vgic_its;
+	struct vgic_its_msi *msi, *msi_tmp;
+
+	/* TODO: Check if the VITS is attached */
+
+	vm_deregister_inst_handler(vm, its->start, its->end - its->start);
+
+	its_table_unmap(vm, &its->cmd_tab);
+	its_table_unmap(vm, &its->dev_tab);
+
+	free(its->collection, M_VITS);
+	SLIST_FOREACH_SAFE(msi, &its->its_msi, next, msi_tmp) {
+		SLIST_REMOVE(&its->its_msi, msi, vgic_its_msi, next);
+		free(msi, M_VITS);
+	}
+	sx_destroy(&its->its_mtx);
+	memset(its, 0, sizeof(*its));
 }

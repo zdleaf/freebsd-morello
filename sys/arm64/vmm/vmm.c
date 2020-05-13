@@ -349,6 +349,7 @@ vm_cleanup(struct vm *vm, bool destroy)
 
 	vtimer_vmcleanup(vm);
 	vgic_v3_detach_from_vm(vm);
+	vgic_its_detach_from_vm(vm);
 
 	for (i = 0; i < vm->maxcpus; i++)
 		vcpu_cleanup(vm, i, destroy);
