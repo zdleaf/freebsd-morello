@@ -192,8 +192,6 @@ smmu_acpi_attach(device_t dev)
 	sc = device_get_softc(dev);
 	sc->dev = dev;
 
-	iommu_init_busdma(&sc->unit);
-
 	priv = (uintptr_t)acpi_get_private(dev);
 	if ((priv >> 32) & ACPI_IORT_SMMU_V3_COHACC_OVERRIDE)
 		sc->features |= SMMU_FEATURE_COHERENCY;
@@ -208,7 +206,7 @@ smmu_acpi_attach(device_t dev)
 
 	/* Use memory start address as an xref. */
 	start = bus_get_resource_start(dev, SYS_RES_MEMORY, 0);
-	err = iommu_register(dev, start);
+	err = iommu_register(dev, &sc->unit, start);
 	if (err) {
 		device_printf(dev, "Failed to register SMMU.\n");
 		return (ENXIO);

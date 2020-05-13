@@ -55,14 +55,6 @@
 
 #include <dev/iommu/iommu.h>
 
-struct bus_dma_tag_iommu {
-	struct bus_dma_tag_common common;
-	struct iommu_device *device;
-	device_t owner;
-	int map_count;
-	bus_dma_segment_t *segments;
-};
-
 struct bus_dmamap_iommu {
 	struct bus_dma_tag_iommu *tag;
 	struct memdesc mem;
@@ -143,5 +135,6 @@ void iommu_fini_busdma(struct iommu_unit *unit);
 
 bus_dma_tag_t smmu_get_dma_tag(device_t dev, device_t child);
 int busdma_smmu_domain_free(struct bus_dma_tag_iommu *dmat);
+struct iommu_unit * iommu_find(device_t dev, bool verbose);
 
 #endif /* !_DEV_IOMMU_BUSDMA_IOMMU_H_*/

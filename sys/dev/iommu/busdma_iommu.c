@@ -227,12 +227,11 @@ iommu_get_requester(device_t dev, uint16_t *rid)
 	return (requester);
 }
 
-#if 0
-struct iommu_ctx *
+static struct iommu_device *
 iommu_instantiate_ctx(struct iommu_unit *iommu, device_t dev, bool rmrr)
 {
 	device_t requester;
-	struct iommu_ctx *ctx;
+	struct iommu_device *ctx;
 	bool disabled;
 	uint16_t rid;
 
@@ -261,20 +260,18 @@ iommu_instantiate_ctx(struct iommu_unit *iommu, device_t dev, bool rmrr)
 			ctx->flags |= DMAR_CTX_DISABLED;
 			DMAR_UNLOCK(iommu);
 		} else {
-			iommu_free_ctx_locked(iommu, ctx);
+			//iommu_free_ctx_locked(iommu, ctx);
 		}
 		ctx = NULL;
 	}
 	return (ctx);
 }
-#endif
 
 bus_dma_tag_t
 acpi_iommu_get_dma_tag(device_t dev, device_t child)
 {
-#if 0
 	struct iommu_unit *iommu;
-	struct iommu_ctx *ctx;
+	struct iommu_device *ctx;
 	bus_dma_tag_t res;
 
 	iommu = iommu_find(child, bootverbose);
@@ -283,24 +280,13 @@ acpi_iommu_get_dma_tag(device_t dev, device_t child)
 		return (NULL);
 	if (!iommu->dma_enabled)
 		return (NULL);
+#if 0
 	iommu_quirks_pre_use(iommu);
 	iommu_instantiate_rmrr_ctxs(iommu);
+#endif
 
 	ctx = iommu_instantiate_ctx(iommu, child, false);
 	res = ctx == NULL ? NULL : (bus_dma_tag_t)&ctx->ctx_tag;
-#endif
-
-	bus_dma_tag_t res;
-	device_t requester;
-
-#if defined(__aarch64__)
-	uint16_t rid;
-	requester = iommu_get_requester(child, &rid);
-	printf("child rid %x, requester rid %x\n", pci_get_rid(child), rid);
-	res = smmu_get_dma_tag(dev, child);
-#else
-	res = NULL;
-#endif
 
 	return (res);
 }
@@ -318,8 +304,6 @@ iommu_bus_dma_tag_create(bus_dma_tag_t parent, bus_size_t alignment,
 {
 	struct bus_dma_tag_iommu *newtag, *oldtag;
 	int error;
-
-	printf("%s\n", __func__);
 
 	*dmat = NULL;
 	error = common_bus_dma_tag_create(parent != NULL ?
@@ -705,8 +689,6 @@ iommu_bus_dmamap_load_phys(bus_dma_tag_t dmat, bus_dmamap_t map1,
 	vm_paddr_t pstart, pend, paddr;
 	int error, i, ma_cnt, mflags, offset;
 
-	printf("%s: segp %p\n", __func__, segp);
-
 	tag = (struct bus_dma_tag_iommu *)dmat;
 	map = (struct bus_dmamap_iommu *)map1;
 	pstart = trunc_page(buf);
@@ -720,9 +702,7 @@ iommu_bus_dmamap_load_phys(bus_dma_tag_t dmat, bus_dmamap_t map1,
 	fma = NULL;
 	for (i = 0; i < ma_cnt; i++) {
 		paddr = pstart + ptoa(i);
-		printf("paddr %lx\n", paddr);
 		ma[i] = PHYS_TO_VM_PAGE(paddr);
-		printf("paddr_ %lx\n", paddr);
 		if (ma[i] == NULL || VM_PAGE_TO_PHYS(ma[i]) != paddr) {
 			/*
 			 * If PHYS_TO_VM_PAGE() returned NULL or the
@@ -778,7 +758,6 @@ iommu_bus_dmamap_load_buffer(bus_dma_tag_t dmat, bus_dmamap_t map1, void *buf,
 			paddr = pmap_extract(pmap, pstart);
 		ma[i] = PHYS_TO_VM_PAGE(paddr);
 		if (ma[i] == NULL || VM_PAGE_TO_PHYS(ma[i]) != paddr) {
-			printf("%s: here\n", __func__);
 			/*
 			 * If PHYS_TO_VM_PAGE() returned NULL or the
 			 * vm_page was not initialized we'll use a

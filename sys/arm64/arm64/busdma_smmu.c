@@ -164,6 +164,7 @@ smmu_domain_alloc(device_t dev)
 	return (domain);
 }
 
+#if 0
 bus_dma_tag_t
 smmu_get_dma_tag(device_t dev, device_t child)
 {
@@ -176,9 +177,16 @@ smmu_get_dma_tag(device_t dev, device_t child)
 	if (device_get_devclass(device_get_parent(child)) != pci_class)
 		return (NULL);
 
+	struct iommu_device *device;
+	device = iommu_get_device_for_dev(child);
+	if (device)
+		return (device->ctx_tag);
+
+#if 0
 	domain = iommu_get_domain_for_dev(child);
 	if (domain)
 		return (domain->tag);
+#endif
 
 	/* A single device per domain. */
 
@@ -194,7 +202,7 @@ smmu_get_dma_tag(device_t dev, device_t child)
 
 	smmu_tag_init(tag);
 	tag->owner = child;
-	domain->tag = (bus_dma_tag_t)tag;
+	device->ctx_tag = (bus_dma_tag_t)tag;
 
 	error = iommu_device_attach(domain, child);
 	if (error) {
@@ -207,4 +215,43 @@ smmu_get_dma_tag(device_t dev, device_t child)
 	tag->device->domain = domain;
 
 	return ((bus_dma_tag_t)(tag));
+}
+#endif
+
+struct iommu_unit *
+iommu_find(device_t dev, bool verbose)
+{
+	struct iommu_unit *iommu;
+	u_int xref, sid;
+	uint16_t rid;
+	int error;
+	int seg;
+
+	rid = pci_get_rid(dev);
+	seg = pci_get_domain(dev);
+
+	/*
+	 * Find an xref of an IOMMU controller that serves traffic for dev.
+	 */
+#ifdef DEV_ACPI
+	error = acpi_iort_map_pci_smmuv3(seg, rid, &xref, &sid);
+	if (error) {
+		/* Could not find reference to an SMMU device. */
+		return (NULL);
+	}
+#else
+	/* TODO: add FDT support. */
+	return (NULL);
+#endif
+
+	/*
+	 * Find the registered IOMMU controller by xref.
+	 */
+	iommu = iommu_lookup(xref, 0);
+	if (iommu == NULL) {
+		/* SMMU device is not registered in the IOMMU framework. */
+		return (NULL);
+	}
+
+	return (iommu);
 }

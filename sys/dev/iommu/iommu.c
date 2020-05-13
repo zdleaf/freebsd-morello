@@ -68,6 +68,7 @@ __FBSDID("$FreeBSD$");
 #include "iommu_if.h"
 
 static MALLOC_DEFINE(M_IOMMU, "IOMMU", "IOMMU framework");
+static MALLOC_DEFINE(M_BUSDMA, "SMMU", "ARM64 busdma SMMU");
 
 static struct mtx iommu_mtx;
 
@@ -87,6 +88,8 @@ static struct mtx iommu_mtx;
 #else
 #define DPRINTF(fmt, ...)
 #endif
+
+#define GICV3_ITS_PAGE  0x300b0000
 
 static LIST_HEAD(, iommu_unit) iommu_list = LIST_HEAD_INITIALIZER(iommu_list);
 
@@ -195,22 +198,93 @@ iommu_get_device_for_dev(device_t dev)
 	return (NULL);
 }
 
-/*
- * Attach a consumer device to a domain.
- */
-int
-iommu_device_attach(struct iommu_domain *domain, device_t dev)
+static void
+iommu_tag_init(struct bus_dma_tag_iommu *t)
+{
+	bus_addr_t maxaddr;
+
+	maxaddr = BUS_SPACE_MAXADDR;
+
+	t->common.ref_count = 0;
+	t->common.impl = &bus_dma_iommu_impl;
+	t->common.boundary = 0;
+	t->common.lowaddr = maxaddr;
+	t->common.highaddr = maxaddr;
+	t->common.maxsize = maxaddr;
+	t->common.nsegments = BUS_SPACE_UNRESTRICTED;
+	t->common.maxsegsz = maxaddr;
+}
+
+struct iommu_device *
+iommu_get_ctx_for_dev(struct iommu_unit *iommu, device_t requester,
+    uint16_t rid, bool disabled, bool rmrr)
 {
 	struct iommu_device *device;
-	struct iommu_unit *iommu;
-	int err;
+	struct iommu_domain *domain;
+	struct bus_dma_tag_iommu *tag;
+	int error;
 
-	iommu = domain->iommu;
+	printf("%s\n", __func__);
+
+	device = iommu_get_device_for_dev(requester);
+	if (device)
+		return (device);
+
+	device = iommu_device_alloc(requester);
+	if (device == NULL)
+		return (NULL);
+
+	domain = iommu_domain_alloc(iommu);
+	if (domain == NULL)
+		return (NULL);
+
+	tag = &device->ctx_tag;
+
+	iommu_tag_init(tag);
+
+	tag->owner = requester;
+	tag->device = device;
+
+	device->domain = domain;
+
+	error = iommu_device_attach(domain, device);
+	if (error) {
+		free(tag, M_BUSDMA);
+		iommu_domain_free(domain);
+		return (NULL);
+	}
+
+	/* Add some virtual address range for this domain. */
+	iommu_domain_add_va_range(domain, 0x40000000, 0x40000000);
+
+	/* Map the GICv3 ITS page so the device could send MSI interrupts. */
+	iommu_map_page(domain, GICV3_ITS_PAGE, GICV3_ITS_PAGE, VM_PROT_WRITE);
+
+	return (device);
+}
+
+struct iommu_device *
+iommu_device_alloc(device_t dev)
+{
+	struct iommu_device *device;
 
 	device = malloc(sizeof(*device), M_IOMMU, M_WAITOK | M_ZERO);
 	device->rid = pci_get_rid(dev);
 	device->dev = dev;
-	device->domain = domain;
+
+	return (device);
+}
+
+/*
+ * Attach a consumer device to a domain.
+ */
+int
+iommu_device_attach(struct iommu_domain *domain, struct iommu_device *device)
+{
+	struct iommu_unit *iommu;
+	int err;
+
+	iommu = domain->iommu;
 
 	err = IOMMU_DEVICE_ATTACH(iommu->dev, domain, device);
 	if (err) {
@@ -218,6 +292,8 @@ iommu_device_attach(struct iommu_domain *domain, device_t dev)
 		free(device, M_IOMMU);
 		return (err);
 	}
+
+	device->domain = domain;
 
 	DOMAIN_LOCK(domain);
 	LIST_INSERT_HEAD(&domain->device_list, device, next);
@@ -462,11 +538,9 @@ iommu_unmap(struct iommu_domain *domain, bus_dma_segment_t *segs, int nsegs)
 }
 
 int
-iommu_register(device_t dev, intptr_t xref)
+iommu_register(device_t dev, struct iommu_unit *iommu, intptr_t xref)
 {
-	struct iommu_unit *iommu;
 
-	iommu = malloc(sizeof(*iommu), M_IOMMU, M_WAITOK | M_ZERO);
 	iommu->dev = dev;
 	iommu->xref = xref;
 
@@ -476,6 +550,8 @@ iommu_register(device_t dev, intptr_t xref)
 	IOMMU_LIST_LOCK();
 	LIST_INSERT_HEAD(&iommu_list, iommu, next);
 	IOMMU_LIST_UNLOCK();
+
+	iommu_init_busdma(iommu);
 
 	return (0);
 }
