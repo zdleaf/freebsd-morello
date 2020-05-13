@@ -69,7 +69,7 @@ __FBSDID("$FreeBSD$");
 
 /*
  * busdma_iommu.c, the implementation of the busdma(9) interface using
- * DMAR units from Intel VT-d.
+ * IOMMU units.
  */
 
 static bool
@@ -106,7 +106,6 @@ iommu_bus_dma_is_dev_disabled(int domain, int bus, int slot, int func)
 	return (ret);
 }
 
-#if 0
 /*
  * Given original device, find the requester ID that will be seen by
  * the DMAR unit and used for page table lookup.  PCI bridges may take
@@ -116,7 +115,7 @@ iommu_bus_dma_is_dev_disabled(int domain, int bus, int slot, int func)
  * domain, and must collectively be assigned to use either DMAR or
  * bounce mapping.
  */
-device_t
+static device_t
 iommu_get_requester(device_t dev, uint16_t *rid)
 {
 	devclass_t pci_class;
@@ -228,6 +227,7 @@ iommu_get_requester(device_t dev, uint16_t *rid)
 	return (requester);
 }
 
+#if 0
 struct iommu_ctx *
 iommu_instantiate_ctx(struct iommu_unit *iommu, device_t dev, bool rmrr)
 {
@@ -288,48 +288,24 @@ acpi_iommu_get_dma_tag(device_t dev, device_t child)
 
 	ctx = iommu_instantiate_ctx(iommu, child, false);
 	res = ctx == NULL ? NULL : (bus_dma_tag_t)&ctx->ctx_tag;
-#else
-	bus_dma_tag_t res;
-
-	printf("%s\n", __func__);
-
-	res = smmu_get_dma_tag(dev, child);
 #endif
+
+	bus_dma_tag_t res;
+	device_t requester;
+
+#if defined(__aarch64__)
+	uint16_t rid;
+	requester = iommu_get_requester(child, &rid);
+	printf("child rid %x, requester rid %x\n", pci_get_rid(child), rid);
+	res = smmu_get_dma_tag(dev, child);
+#else
+	res = NULL;
+#endif
+
 	return (res);
 }
 
-#if 0
-bool
-bus_dma_iommu_set_buswide(device_t dev)
-{
-	struct iommu_unit *iommu;
-	device_t parent;
-	u_int busno, slot, func;
-
-	parent = device_get_parent(dev);
-	if (device_get_devclass(parent) != devclass_find("pci"))
-		return (false);
-	iommu = iommu_find(dev, bootverbose);
-	if (iommu == NULL)
-		return (false);
-	busno = pci_get_bus(dev);
-	slot = pci_get_slot(dev);
-	func = pci_get_function(dev);
-	if (slot != 0 || func != 0) {
-		if (bootverbose) {
-			device_printf(dev,
-			    "iommu%d pci%d:%d:%d requested buswide busdma\n",
-			    iommu->unit, busno, slot, func);
-		}
-		return (false);
-	}
-	iommu_set_buswide_ctx(iommu, busno);
-	return (true);
-}
-#endif
-
 static MALLOC_DEFINE(M_DMAR_DMAMAP, "iommu_dmamap", "Intel DMAR DMA Map");
-
 static void iommu_bus_schedule_dmamap(struct iommu_unit *unit,
     struct bus_dmamap_iommu *map);
 

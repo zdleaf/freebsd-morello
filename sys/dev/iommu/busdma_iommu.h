@@ -61,7 +61,6 @@ struct bus_dma_tag_iommu {
 	device_t owner;
 	int map_count;
 	bus_dma_segment_t *segments;
-	//struct iommu_domain *iommu_domain;
 };
 
 struct bus_dmamap_iommu {
@@ -75,15 +74,6 @@ struct bus_dmamap_iommu {
 	bool cansleep;
 	int flags;
 };
-
-#if 0
-struct iommu_ctx {
-	struct iommu_domain *domain;
-	struct bus_dma_tag_iommu ctx_tag;
-	u_long loads;
-	u_long unloads;
-};
-#endif
 
 #define	DMAR_LOCK(n)
 #define	DMAR_UNLOCK(n)
@@ -119,7 +109,7 @@ struct iommu_map_entry {
 	TAILQ_ENTRY(iommu_map_entry) unroll_link; /* Link for unroll after
 						    dmamap_load failure */
 	struct iommu_domain *domain;
-	struct iommu_qi_genseq gseq;
+	//struct iommu_qi_genseq gseq;
 };
 
 RB_HEAD(iommu_gas_entries_tree, iommu_map_entry);
@@ -147,34 +137,6 @@ iommu_test_boundary(iommu_gaddr_t start, iommu_gaddr_t size,
 		return (true);
 	return (start + size <= ((start + boundary) & ~(boundary - 1)));
 }
-
-#if 0
-struct iommu_domain {
-	int domain;			/* (c) DID, written in context entry */
-	int mgaw;			/* (c) Real max address width */
-	int agaw;			/* (c) Adjusted guest address width */
-	int pglvl;			/* (c) The pagelevel */
-	int awlvl;			/* (c) The pagelevel as the bitmask,
-					   to set in context entry */
-	iommu_gaddr_t end;		/* (c) Highest address + 1 in
-					   the guest AS */
-	u_int ctx_cnt;			/* (u) Number of contexts owned */
-	u_int refs;			/* (u) Refs, including ctx */
-	struct iommu_unit *iommu;		/* (c) */
-	struct mtx lock;		/* (c) */
-	LIST_ENTRY(iommu_domain) link;	/* (u) Member in the iommu list */
-	LIST_HEAD(, iommu_ctx) contexts;	/* (u) */
-	vm_object_t pgtbl_obj;		/* (c) Page table pages */
-	u_int flags;			/* (u) */
-	u_int entries_cnt;		/* (d) */
-	struct iommu_gas_entries_tree rb_root; /* (d) */
-	struct iommu_map_entries_tailq unload_entries; /* (d) Entries to
-							 unload */
-	struct iommu_map_entry *first_place, *last_place; /* (d) */
-	struct task unload_task;	/* (c) */
-	u_int batch_no;
-};
-#endif
 
 int iommu_init_busdma(struct iommu_unit *unit);
 void iommu_fini_busdma(struct iommu_unit *unit);
