@@ -66,6 +66,14 @@ __FBSDID("$FreeBSD$");
 #include <dev/pci/pcivar.h>
 #include <dev/iommu/busdma_iommu.h>
 
+#ifdef DEV_ACPI
+#include <contrib/dev/acpica/include/acpi.h>
+#include <contrib/dev/acpica/include/accommon.h>
+
+#include <dev/acpica/acpivar.h>
+#include <dev/acpica/acpi_pcibvar.h>
+#endif
+
 #include "iommu.h"
 #include "iommu_if.h"
 
@@ -600,6 +608,44 @@ iommu_lookup(intptr_t xref, int flags)
 	}
 
 	return (NULL);
+}
+
+struct iommu_unit *
+iommu_find(device_t dev, bool verbose)
+{
+	struct iommu_unit *iommu;
+	u_int xref, sid;
+	uint16_t rid;
+	int error;
+	int seg;
+
+	rid = pci_get_rid(dev);
+	seg = pci_get_domain(dev);
+
+	/*
+	 * Find an xref of an IOMMU controller that serves traffic for dev.
+	 */
+#ifdef DEV_ACPI
+	error = acpi_iort_map_pci_smmuv3(seg, rid, &xref, &sid);
+	if (error) {
+		/* Could not find reference to an SMMU device. */
+		return (NULL);
+	}
+#else
+	/* TODO: add FDT support. */
+	return (NULL);
+#endif
+
+	/*
+	 * Find the registered IOMMU controller by xref.
+	 */
+	iommu = iommu_lookup(xref, 0);
+	if (iommu == NULL) {
+		/* SMMU device is not registered in the IOMMU framework. */
+		return (NULL);
+	}
+
+	return (iommu);
 }
 
 static void
