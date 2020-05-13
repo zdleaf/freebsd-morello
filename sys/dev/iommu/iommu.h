@@ -165,6 +165,8 @@ int iommu_unmap_page(struct iommu_domain *domain, vm_offset_t va);
 
 int iommu_map1(struct iommu_domain *domain, vm_size_t size, vm_offset_t offset,
     vm_prot_t prot, vm_page_t *ma, struct iommu_map_entry **entry);
+int iommu_unmap1(struct iommu_domain *domain,
+    struct iommu_map_entries_tailq *entries, bool free);
 
 #define	DMAR_PGF_WAITOK	0x0001
 #define	DMAR_PGF_ZERO	0x0002

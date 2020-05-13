@@ -908,11 +908,9 @@ iommu_bus_dmamap_unload(bus_dma_tag_t dmat, bus_dmamap_t map1)
 	TAILQ_CONCAT(&entries, &map->map_entries, dmamap_link);
 	DMAR_DOMAIN_UNLOCK(domain);
 	THREAD_NO_SLEEPING();
-#if 0
-	iommu_domain_unload(domain, &entries, false);
-#endif
+	iommu_unmap1(domain, &entries, false);
 	THREAD_SLEEPING_OK();
-	//KASSERT(TAILQ_EMPTY(&entries), ("lazy iommu_device_unload %p", device));
+	KASSERT(TAILQ_EMPTY(&entries), ("lazy iommu_device_unload %p", device));
 #endif
 }
 

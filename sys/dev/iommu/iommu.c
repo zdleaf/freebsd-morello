@@ -327,7 +327,6 @@ iommu_gas_alloc_entry(struct iommu_domain *domain, u_int flags)
 	return (res);
 }
 
-#if 0
 static void
 iommu_gas_free_entry(struct iommu_domain *domain, struct iommu_map_entry *entry)
 {
@@ -338,7 +337,6 @@ iommu_gas_free_entry(struct iommu_domain *domain, struct iommu_map_entry *entry)
 	atomic_subtract_int(&domain->entries_cnt, 1);
 	uma_zfree(iommu_map_entry_zone, entry);
 }
-#endif
 
 int
 iommu_map1(struct iommu_domain *domain, vm_size_t size, vm_offset_t offset,
@@ -367,6 +365,20 @@ iommu_map1(struct iommu_domain *domain, vm_size_t size, vm_offset_t offset,
 	//printf("%s: size %lx, offset %lx\n", __func__, size, offset);
 
 	*res = entry;
+
+	return (0);
+}
+
+int
+iommu_unmap1(struct iommu_domain *domain,
+    struct iommu_map_entries_tailq *entries, bool free)
+{
+	struct iommu_map_entry *entry, *entry1;
+
+	TAILQ_FOREACH_SAFE(entry, entries, dmamap_link, entry1) {
+		TAILQ_REMOVE(entries, entry, dmamap_link);
+		iommu_gas_free_entry(domain, entry);
+	};
 
 	return (0);
 }
