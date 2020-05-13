@@ -56,13 +56,15 @@ __FBSDID("$FreeBSD$");
 #include <vm/vm.h>
 #include <vm/uma.h>
 #include <vm/pmap.h>
+#include <vm/vm_extern.h>
+#include <vm/vm_page.h>
 
 #include <machine/bus.h>
 #include <machine/cpu.h>
 #include <machine/intr.h>
 
-#include <dev/iommu/smmu_var.h>
 #include <dev/pci/pcivar.h>
+#include <dev/iommu/busdma_iommu.h>
 
 #include "iommu.h"
 #include "iommu_if.h"

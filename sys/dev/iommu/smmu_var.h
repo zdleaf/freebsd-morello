@@ -37,14 +37,6 @@
 
 #include <sys/bitstring.h>
 
-#include <dev/iommu/iommu.h>
-#include <dev/iommu/busdma_iommu.h>
-
-#include <vm/vm.h>
-#include <vm/pmap.h>
-#include <vm/vm_extern.h>
-#include <vm/vm_page.h>
-
 #define	SMMU_DEVSTR		"ARM System Memory Management Unit"
 #define	SMMU_LOCK(_sc)		mtx_lock(&(_sc)->sc_mtx)
 #define	SMMU_UNLOCK(_sc)	mtx_unlock(&(_sc)->sc_mtx)
