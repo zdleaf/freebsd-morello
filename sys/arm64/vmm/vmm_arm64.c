@@ -673,9 +673,6 @@ arm_vmcleanup(void *arg)
 	if (arm64_get_active_vcpu() == hypctx)
 		arm64_set_active_vcpu(NULL);
 
-	vtimer_vmcleanup(arg);
-	vgic_v3_detach_from_vm(arg);
-
 	/* Unmap the VM hyp struct from the hyp mode translation table */
 	hypmap_map(hyp_pmap, (vm_offset_t)hyp, sizeof(struct hyp),
 	    VM_PROT_NONE);

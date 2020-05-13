@@ -190,7 +190,7 @@ struct vgic_v3_cpu_if {
 
 int 	vgic_v3_attach_to_vm(struct vm *vm, uint64_t dist_start,
     size_t dist_size, uint64_t redist_start, size_t redist_size);
-void	vgic_v3_detach_from_vm(void *arg);
+void	vgic_v3_detach_from_vm(struct vm *vm);
 
 bool	vgic_attach(void);
 void	vgic_v3_init(uint64_t ich_vtr_el2);

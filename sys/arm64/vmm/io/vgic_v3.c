@@ -832,14 +832,12 @@ vgic_v3_attach_to_vm(struct vm *vm, uint64_t dist_start, size_t dist_size,
 }
 
 void
-vgic_v3_detach_from_vm(void *arg)
+vgic_v3_detach_from_vm(struct vm *vm)
 {
-	struct hyp *hyp;
+	struct hyp *hyp = vm_get_cookie(vm);
 	struct hypctx *hypctx;
 	struct vgic_v3_cpu_if *cpu_if;
 	int i;
-
-	hyp = arg;
 
 	for (i = 0; i < VM_MAXCPU; i++) {
 		hypctx = & hyp->ctx[i];

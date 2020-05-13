@@ -170,16 +170,15 @@ vtimer_cpuinit(void *arg)
 }
 
 void
-vtimer_vmcleanup(void *arg)
+vtimer_vmcleanup(struct vm *vm)
 {
-	struct hyp *hyp;
+	struct hyp *hyp = vm_get_cookie(vm);
 	struct hypctx *hypctx;
 	struct vtimer *vtimer;
 	struct vtimer_cpu *vtimer_cpu;
 	uint32_t cntv_ctl;
 	int i;
 
-	hyp = arg;
 	vtimer = &hyp->vtimer;
 
 	hypctx = arm64_get_active_vcpu();

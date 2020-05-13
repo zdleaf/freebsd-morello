@@ -113,7 +113,7 @@ struct vtimer_cpu
 int 	vtimer_init(uint64_t cnthctl_el2);
 void 	vtimer_vminit(void *arg);
 void 	vtimer_cpuinit(void *arg);
-void	vtimer_vmcleanup(void *arg);
+void	vtimer_vmcleanup(struct vm *vm);
 void	vtimer_cleanup(void);
 
 int 	vtimer_phys_ctl_read(void *vm, int vcpuid, uint64_t *rval, void *arg);
