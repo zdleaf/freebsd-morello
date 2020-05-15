@@ -506,7 +506,7 @@ iommu_bus_dmamap_load_something1(struct bus_dma_tag_iommu *tag,
 	int error, idx, seg;
 #endif
 
-	KASSERT(offset < DMAR_PAGE_SIZE, ("offset %d", offset));
+	KASSERT(offset < IOMMU_PAGE_SIZE, ("offset %d", offset));
 	if (segs == NULL)
 		segs = tag->segments;
 	device = tag->device;
@@ -598,7 +598,7 @@ iommu_bus_dmamap_load_something1(struct bus_dma_tag_iommu *tag,
 
 		idx += OFF_TO_IDX(trunc_page(offset + buflen1));
 		offset += buflen1;
-		offset &= DMAR_PAGE_MASK;
+		offset &= IOMMU_PAGE_MASK;
 		buflen -= buflen1;
 	}
 	if (error == 0)

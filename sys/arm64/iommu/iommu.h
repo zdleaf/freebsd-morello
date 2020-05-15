@@ -63,6 +63,25 @@
 #include <vm/vm.h>
 #include <vm/pmap.h>
 
+#define	IOMMU_PAGE_SIZE		4096
+#define	IOMMU_PAGE_MASK		(IOMMU_PAGE_SIZE - 1)
+
+#define	IOMMU_PGF_WAITOK	0x0001
+#define	IOMMU_PGF_ZERO		0x0002
+#define	IOMMU_PGF_ALLOC		0x0004
+#define	IOMMU_PGF_NOALLOC	0x0008
+#define	IOMMU_PGF_OBJL		0x0010
+
+#define	IOMMU_LOCK(iommu)		mtx_lock(&(iommu)->mtx_lock)
+#define	IOMMU_UNLOCK(iommu)		mtx_unlock(&(iommu)->mtx_lock)
+#define	IOMMU_ASSERT_LOCKED(iommu)	\
+    mtx_assert(&(iommu)->mtx_lock, MA_OWNED)
+
+#define	IOMMU_DOMAIN_LOCK(domain)		mtx_lock(&(domain)->mtx_lock)
+#define	IOMMU_DOMAIN_UNLOCK(domain)		mtx_unlock(&(domain)->mtx_lock)
+#define	IOMMU_DOMAIN_ASSERT_LOCKED(domain)	\
+    mtx_assert(&(domain)->mtx_lock, MA_OWNED)
+
 struct iommu_map_entry;
 TAILQ_HEAD(iommu_map_entries_tailq, iommu_map_entry);
 
@@ -95,7 +114,6 @@ struct iommu_unit {
 	struct taskqueue *delayed_taskqueue;
 };
 
-/* Minimal translation domain. */
 struct iommu_domain {
 	LIST_HEAD(, iommu_device)	device_list;
 	LIST_ENTRY(iommu_domain)	next;
@@ -153,16 +171,6 @@ struct iommu_device {
 					   to prevent context destruction */
 };
 
-#define	IOMMU_LOCK(iommu)		mtx_lock(&(iommu)->mtx_lock)
-#define	IOMMU_UNLOCK(iommu)		mtx_unlock(&(iommu)->mtx_lock)
-#define	IOMMU_ASSERT_LOCKED(iommu)	\
-    mtx_assert(&(iommu)->mtx_lock, MA_OWNED)
-
-#define	IOMMU_DOMAIN_LOCK(domain)		mtx_lock(&(domain)->mtx_lock)
-#define	IOMMU_DOMAIN_UNLOCK(domain)		mtx_unlock(&(domain)->mtx_lock)
-#define	IOMMU_DOMAIN_ASSERT_LOCKED(domain)	\
-    mtx_assert(&(domain)->mtx_lock, MA_OWNED)
-
 struct iommu_unit * iommu_lookup(intptr_t xref, int flags);
 int iommu_register(device_t dev, struct iommu_unit *unit, intptr_t xref);
 int iommu_unregister(device_t dev);
@@ -184,11 +192,5 @@ int iommu_unmap1(struct iommu_domain *domain,
 struct iommu_unit * iommu_find(device_t dev, bool verbose);
 int iommu_init_busdma(struct iommu_unit *unit);
 void iommu_fini_busdma(struct iommu_unit *unit);
-
-#define	DMAR_PGF_WAITOK	0x0001
-#define	DMAR_PGF_ZERO	0x0002
-#define	DMAR_PGF_ALLOC	0x0004
-#define	DMAR_PGF_NOALLOC 0x0008
-#define	DMAR_PGF_OBJL	0x0010
 
 #endif /* _DEV_IOMMU_IOMMU_H_ */

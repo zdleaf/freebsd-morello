@@ -359,7 +359,7 @@ static void
 intel_gas_init(void)
 {
 
-	iommu_map_entry_zone = uma_zcreate("DMAR_MAP_ENTRY",
+	iommu_map_entry_zone = uma_zcreate("IOMMU_MAP_ENTRY",
 	    sizeof(struct iommu_map_entry), NULL, NULL,
 	    NULL, NULL, UMA_ALIGN_PTR, UMA_ZONE_NODUMP);
 }
@@ -370,10 +370,10 @@ iommu_gas_alloc_entry(struct iommu_domain *domain, u_int flags)
 {
 	struct iommu_map_entry *res;
 
-	KASSERT((flags & ~(DMAR_PGF_WAITOK)) == 0,
+	KASSERT((flags & ~(IOMMU_PGF_WAITOK)) == 0,
 	    ("unsupported flags %x", flags));
 
-	res = uma_zalloc(iommu_map_entry_zone, ((flags & DMAR_PGF_WAITOK) !=
+	res = uma_zalloc(iommu_map_entry_zone, ((flags & IOMMU_PGF_WAITOK) !=
 	    0 ? M_WAITOK : M_NOWAIT) | M_ZERO);
 	if (res != NULL) {
 		res->domain = domain;
