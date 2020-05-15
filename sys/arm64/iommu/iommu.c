@@ -103,7 +103,7 @@ static struct mtx iommu_mtx;
 
 static LIST_HEAD(, iommu_unit) iommu_list = LIST_HEAD_INITIALIZER(iommu_list);
 
-int
+static int
 iommu_domain_add_va_range(struct iommu_domain *domain,
     vm_offset_t va, vm_size_t size)
 {
@@ -119,7 +119,7 @@ iommu_domain_add_va_range(struct iommu_domain *domain,
 	return (error);
 }
 
-struct iommu_domain *
+static struct iommu_domain *
 iommu_domain_alloc(struct iommu_unit *iommu)
 {
 	struct iommu_domain *domain;
@@ -144,7 +144,7 @@ iommu_domain_alloc(struct iommu_unit *iommu)
 	return (domain);
 }
 
-int
+static int
 iommu_domain_free(struct iommu_domain *domain)
 {
 	struct iommu_unit *iommu;
@@ -170,7 +170,7 @@ iommu_domain_free(struct iommu_domain *domain)
 	return (0);
 }
 
-struct iommu_device *
+static struct iommu_device *
 iommu_get_device_for_dev(device_t dev)
 {
 	struct iommu_domain *domain;
@@ -205,6 +205,45 @@ iommu_tag_init(struct bus_dma_tag_iommu *t)
 	t->common.nsegments = BUS_SPACE_UNRESTRICTED;
 	t->common.maxsegsz = maxaddr;
 }
+
+static struct iommu_device *
+iommu_device_alloc(device_t dev)
+{
+	struct iommu_device *device;
+
+	device = malloc(sizeof(*device), M_IOMMU, M_WAITOK | M_ZERO);
+	device->rid = pci_get_rid(dev);
+	device->dev = dev;
+
+	return (device);
+}
+/*
+ * Attach a consumer device to a domain.
+ */
+static int
+iommu_device_attach(struct iommu_domain *domain, struct iommu_device *device)
+{
+	struct iommu_unit *iommu;
+	int err;
+
+	iommu = domain->iommu;
+
+	err = IOMMU_DEVICE_ATTACH(iommu->dev, domain, device);
+	if (err) {
+		device_printf(iommu->dev, "Failed to add device\n");
+		free(device, M_IOMMU);
+		return (err);
+	}
+
+	device->domain = domain;
+
+	DOMAIN_LOCK(domain);
+	LIST_INSERT_HEAD(&domain->device_list, device, next);
+	DOMAIN_UNLOCK(domain);
+
+	return (err);
+}
+
 
 struct iommu_device *
 iommu_get_ctx_for_dev(struct iommu_unit *iommu, device_t requester,
@@ -249,45 +288,6 @@ iommu_get_ctx_for_dev(struct iommu_unit *iommu, device_t requester,
 	iommu_map_page(domain, GICV3_ITS_PAGE, GICV3_ITS_PAGE, VM_PROT_WRITE);
 
 	return (device);
-}
-
-struct iommu_device *
-iommu_device_alloc(device_t dev)
-{
-	struct iommu_device *device;
-
-	device = malloc(sizeof(*device), M_IOMMU, M_WAITOK | M_ZERO);
-	device->rid = pci_get_rid(dev);
-	device->dev = dev;
-
-	return (device);
-}
-
-/*
- * Attach a consumer device to a domain.
- */
-int
-iommu_device_attach(struct iommu_domain *domain, struct iommu_device *device)
-{
-	struct iommu_unit *iommu;
-	int err;
-
-	iommu = domain->iommu;
-
-	err = IOMMU_DEVICE_ATTACH(iommu->dev, domain, device);
-	if (err) {
-		device_printf(iommu->dev, "Failed to add device\n");
-		free(device, M_IOMMU);
-		return (err);
-	}
-
-	device->domain = domain;
-
-	DOMAIN_LOCK(domain);
-	LIST_INSERT_HEAD(&domain->device_list, device, next);
-	DOMAIN_UNLOCK(domain);
-
-	return (err);
 }
 
 int

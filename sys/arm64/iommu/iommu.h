@@ -141,7 +141,6 @@ struct iommu_device {
 	LIST_ENTRY(iommu_device)	next;
 	struct iommu_domain		*domain;
 	struct bus_dma_tag_iommu	ctx_tag;
-	//bus_dma_tag_t			ctx_tag;
 	device_t dev;
 	uint16_t rid;
 	u_long loads;
@@ -159,21 +158,15 @@ struct iommu_device {
 #define	DOMAIN_ASSERT_LOCKED(domain)	\
     mtx_assert(&(domain)->mtx_lock, MA_OWNED)
 
-int iommu_domain_free(struct iommu_domain *domain);
-struct iommu_domain * iommu_domain_alloc(struct iommu_unit *iommu);
-struct iommu_device * iommu_get_device_for_dev(device_t dev);
-int iommu_device_attach(struct iommu_domain *domain, struct iommu_device *);
-int iommu_device_detach(struct iommu_domain *domain, device_t dev);
-int iommu_capable(device_t dev);
 struct iommu_unit * iommu_lookup(intptr_t xref, int flags);
 int iommu_register(device_t dev, struct iommu_unit *unit, intptr_t xref);
 int iommu_unregister(device_t dev);
-int iommu_domain_add_va_range(struct iommu_domain *domain,
-    vm_offset_t va, vm_size_t size);
-struct iommu_device * iommu_device_alloc(device_t dev);
+struct iommu_device * iommu_get_ctx_for_dev(struct iommu_unit *iommu,
+    device_t requester, uint16_t rid, bool disabled, bool rmrr);
+int iommu_free_ctx(struct iommu_device *device);
+int iommu_free_ctx_locked(struct iommu_unit *iommu,
+    struct iommu_device *device);
 
-int iommu_map(struct iommu_domain *, bus_dma_segment_t *segs, int nsegs);
-void iommu_unmap(struct iommu_domain *, bus_dma_segment_t *segs, int nsegs);
 int iommu_map_page(struct iommu_domain *domain,
     vm_offset_t va, vm_paddr_t pa, vm_prot_t prot);
 int iommu_unmap_page(struct iommu_domain *domain, vm_offset_t va);
@@ -182,13 +175,6 @@ int iommu_map1(struct iommu_domain *domain, vm_size_t size, vm_offset_t offset,
     vm_prot_t prot, vm_page_t *ma, struct iommu_map_entry **entry);
 int iommu_unmap1(struct iommu_domain *domain,
     struct iommu_map_entries_tailq *entries, bool free);
-struct iommu_device *
-iommu_get_ctx_for_dev(struct iommu_unit *iommu, device_t requester,
-    uint16_t rid, bool disabled, bool rmrr);
-
-int iommu_free_ctx(struct iommu_device *device);
-int iommu_free_ctx_locked(struct iommu_unit *iommu,
-    struct iommu_device *device);
 
 #define	DMAR_PGF_WAITOK	0x0001
 #define	DMAR_PGF_ZERO	0x0002
