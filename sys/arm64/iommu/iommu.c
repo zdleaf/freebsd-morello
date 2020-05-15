@@ -170,25 +170,6 @@ iommu_domain_free(struct iommu_domain *domain)
 	return (0);
 }
 
-struct iommu_domain *
-iommu_get_domain_for_dev(device_t dev)
-{
-	struct iommu_domain *domain;
-	struct iommu_device *device;
-	struct iommu_unit *iommu;
-
-	LIST_FOREACH(iommu, &iommu_list, next) {
-		LIST_FOREACH(domain, &iommu->domain_list, next) {
-			LIST_FOREACH(device, &domain->device_list, next) {
-				if (device->dev == dev)
-					return (domain);
-			}
-		}
-	}
-
-	return (NULL);
-}
-
 struct iommu_device *
 iommu_get_device_for_dev(device_t dev)
 {

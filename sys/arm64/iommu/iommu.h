@@ -161,7 +161,6 @@ struct iommu_device {
 
 int iommu_domain_free(struct iommu_domain *domain);
 struct iommu_domain * iommu_domain_alloc(struct iommu_unit *iommu);
-struct iommu_domain * iommu_get_domain_for_dev(device_t dev);
 struct iommu_device * iommu_get_device_for_dev(device_t dev);
 int iommu_device_attach(struct iommu_domain *domain, struct iommu_device *);
 int iommu_device_detach(struct iommu_domain *domain, device_t dev);
