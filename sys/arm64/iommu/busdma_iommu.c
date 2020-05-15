@@ -108,11 +108,11 @@ iommu_bus_dma_is_dev_disabled(int domain, int bus, int slot, int func)
 
 /*
  * Given original device, find the requester ID that will be seen by
- * the DMAR unit and used for page table lookup.  PCI bridges may take
+ * the IOMMU unit and used for page table lookup.  PCI bridges may take
  * ownership of transactions from downstream devices, so it may not be
  * the same as the BSF of the target device.  In those cases, all
  * devices downstream of the bridge must share a single mapping
- * domain, and must collectively be assigned to use either DMAR or
+ * domain, and must collectively be assigned to use either IOMMU or
  * bounce mapping.
  */
 static device_t
@@ -131,7 +131,7 @@ iommu_get_requester(device_t dev, uint16_t *rid)
 
 	/*
 	 * Walk the bridge hierarchy from the target device to the
-	 * host port to find the translating bridge nearest the DMAR
+	 * host port to find the translating bridge nearest the IOMMU
 	 * unit.
 	 */
 	for (;;) {
@@ -169,7 +169,7 @@ iommu_get_requester(device_t dev, uint16_t *rid)
 		} else {
 			/*
 			 * Device is not PCIe, it cannot be seen as a
-			 * requester by DMAR unit.  Check whether the
+			 * requester by IOMMU unit.  Check whether the
 			 * bridge is PCIe.
 			 */
 			bridge_is_pcie = pci_find_cap(pcib, PCIY_EXPRESS,
@@ -239,8 +239,8 @@ iommu_instantiate_ctx(struct iommu_unit *iommu, device_t dev, bool rmrr)
 
 	/*
 	 * If the user requested the IOMMU disabled for the device, we
-	 * cannot disable the DMAR, due to possibility of other
-	 * devices on the same DMAR still requiring translation.
+	 * cannot disable the IOMMU, due to possibility of other
+	 * devices on the same IOMMU still requiring translation.
 	 * Instead provide the identity mapping for the device
 	 * context.
 	 */
@@ -256,8 +256,8 @@ iommu_instantiate_ctx(struct iommu_unit *iommu, device_t dev, bool rmrr)
 		 * later refs.
 		 */
 		IOMMU_LOCK(iommu);
-		if ((ctx->flags & DMAR_CTX_DISABLED) == 0) {
-			ctx->flags |= DMAR_CTX_DISABLED;
+		if ((ctx->flags & IOMMU_CTX_DISABLED) == 0) {
+			ctx->flags |= IOMMU_CTX_DISABLED;
 			IOMMU_UNLOCK(iommu);
 		} else {
 			iommu_free_ctx_locked(iommu, ctx);
@@ -275,7 +275,7 @@ acpi_iommu_get_dma_tag(device_t dev, device_t child)
 	bus_dma_tag_t res;
 
 	iommu = iommu_find(child, bootverbose);
-	/* Not in scope of any DMAR ? */
+	/* Not in scope of any IOMMU ? */
 	if (iommu == NULL)
 		return (NULL);
 	if (!iommu->dma_enabled)
@@ -287,7 +287,7 @@ acpi_iommu_get_dma_tag(device_t dev, device_t child)
 	return (res);
 }
 
-static MALLOC_DEFINE(M_DMAR_DMAMAP, "iommu_dmamap", "Intel DMAR DMA Map");
+static MALLOC_DEFINE(M_IOMMU_DMAMAP, "iommu_dmamap", "IOMMU DMA Map");
 static void iommu_bus_schedule_dmamap(struct iommu_unit *unit,
     struct bus_dmamap_iommu *map);
 
@@ -350,7 +350,7 @@ iommu_bus_dma_tag_destroy(bus_dma_tag_t dmat1)
 			    1) {
 				if (dmat == &dmat->device->ctx_tag)
 					iommu_free_ctx(dmat->device);
-				free_domain(dmat->segments, M_DMAR_DMAMAP);
+				free_domain(dmat->segments, M_IOMMU_DMAMAP);
 				free(dmat, M_DEVBUF);
 				dmat = parent;
 			} else
@@ -376,7 +376,7 @@ iommu_bus_dmamap_create(bus_dma_tag_t dmat, int flags, bus_dmamap_t *mapp)
 	struct bus_dmamap_iommu *map;
 
 	tag = (struct bus_dma_tag_iommu *)dmat;
-	map = malloc_domainset(sizeof(*map), M_DMAR_DMAMAP,
+	map = malloc_domainset(sizeof(*map), M_IOMMU_DMAMAP,
 	    DOMAINSET_PREF(tag->common.domain), M_NOWAIT | M_ZERO);
 	if (map == NULL) {
 		*mapp = NULL;
@@ -384,10 +384,10 @@ iommu_bus_dmamap_create(bus_dma_tag_t dmat, int flags, bus_dmamap_t *mapp)
 	}
 	if (tag->segments == NULL) {
 		tag->segments = malloc_domainset(sizeof(bus_dma_segment_t) *
-		    tag->common.nsegments, M_DMAR_DMAMAP,
+		    tag->common.nsegments, M_IOMMU_DMAMAP,
 		    DOMAINSET_PREF(tag->common.domain), M_NOWAIT);
 		if (tag->segments == NULL) {
-			free_domain(map, M_DMAR_DMAMAP);
+			free_domain(map, M_IOMMU_DMAMAP);
 			*mapp = NULL;
 			return (ENOMEM);
 		}
@@ -419,7 +419,7 @@ iommu_bus_dmamap_destroy(bus_dma_tag_t dmat, bus_dmamap_t map1)
 			return (EBUSY);
 		}
 		IOMMU_DOMAIN_UNLOCK(domain);
-		free_domain(map, M_DMAR_DMAMAP);
+		free_domain(map, M_IOMMU_DMAMAP);
 	}
 	tag->map_count--;
 	return (0);
@@ -452,12 +452,12 @@ iommu_bus_dmamem_alloc(bus_dma_tag_t dmat, void** vaddr, int flags,
 	    attr == VM_MEMATTR_DEFAULT) {
 		*vaddr = malloc_domainset(tag->common.maxsize, M_DEVBUF,
 		    DOMAINSET_PREF(tag->common.domain), mflags);
-		map->flags |= BUS_DMAMAP_DMAR_MALLOC;
+		map->flags |= BUS_DMAMAP_IOMMU_MALLOC;
 	} else {
 		*vaddr = (void *)kmem_alloc_attr_domainset(
 		    DOMAINSET_PREF(tag->common.domain), tag->common.maxsize,
 		    mflags, 0ul, BUS_SPACE_MAXADDR, attr);
-		map->flags |= BUS_DMAMAP_DMAR_KMEM_ALLOC;
+		map->flags |= BUS_DMAMAP_IOMMU_KMEM_ALLOC;
 	}
 	if (*vaddr == NULL) {
 		iommu_bus_dmamap_destroy(dmat, *mapp);
@@ -476,14 +476,14 @@ iommu_bus_dmamem_free(bus_dma_tag_t dmat, void *vaddr, bus_dmamap_t map1)
 	tag = (struct bus_dma_tag_iommu *)dmat;
 	map = (struct bus_dmamap_iommu *)map1;
 
-	if ((map->flags & BUS_DMAMAP_DMAR_MALLOC) != 0) {
+	if ((map->flags & BUS_DMAMAP_IOMMU_MALLOC) != 0) {
 		free_domain(vaddr, M_DEVBUF);
-		map->flags &= ~BUS_DMAMAP_DMAR_MALLOC;
+		map->flags &= ~BUS_DMAMAP_IOMMU_MALLOC;
 	} else {
-		KASSERT((map->flags & BUS_DMAMAP_DMAR_KMEM_ALLOC) != 0,
+		KASSERT((map->flags & BUS_DMAMAP_IOMMU_KMEM_ALLOC) != 0,
 		    ("iommu_bus_dmamem_free for non alloced map %p", map));
 		kmem_free((vm_offset_t)vaddr, tag->common.maxsize);
-		map->flags &= ~BUS_DMAMAP_DMAR_KMEM_ALLOC;
+		map->flags &= ~BUS_DMAMAP_IOMMU_KMEM_ALLOC;
 	}
 
 	iommu_bus_dmamap_destroy(dmat, map1);

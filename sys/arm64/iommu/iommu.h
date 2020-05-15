@@ -167,9 +167,9 @@ struct iommu_device {
 	u_long loads;
 	u_long unloads;
 	u_int flags;
-#define	DMAR_CTX_FAULTED	0x0001	/* Fault was reported,
+#define	IOMMU_CTX_FAULTED	0x0001	/* Fault was reported,
 					   last_fault_rec is valid */
-#define	DMAR_CTX_DISABLED	0x0002	/* Device is disabled, the
+#define	IOMMU_CTX_DISABLED	0x0002	/* Device is disabled, the
 					   ephemeral reference is kept
 					   to prevent context destruction */
 };

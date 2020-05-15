@@ -67,8 +67,8 @@ struct bus_dmamap_iommu {
 	int flags;
 };
 
-#define	BUS_DMAMAP_DMAR_MALLOC		0x0001
-#define	BUS_DMAMAP_DMAR_KMEM_ALLOC	0x0002
+#define	BUS_DMAMAP_IOMMU_MALLOC		0x0001
+#define	BUS_DMAMAP_IOMMU_KMEM_ALLOC	0x0002
 
 extern struct bus_dma_impl bus_dma_iommu_impl;
 
