@@ -66,6 +66,9 @@
 #define	IOMMU_PAGE_SIZE		4096
 #define	IOMMU_PAGE_MASK		(IOMMU_PAGE_SIZE - 1)
 
+#define	IOMMU_MF_CANWAIT	0x0001
+#define	IOMMU_MF_CANSPLIT	0x0002
+
 #define	IOMMU_PGF_WAITOK	0x0001
 #define	IOMMU_PGF_ZERO		0x0002
 #define	IOMMU_PGF_ALLOC		0x0004
@@ -184,8 +187,11 @@ int iommu_map_page(struct iommu_domain *domain,
     vm_offset_t va, vm_paddr_t pa, vm_prot_t prot);
 int iommu_unmap_page(struct iommu_domain *domain, vm_offset_t va);
 
-int iommu_map1(struct iommu_domain *domain, vm_size_t size, vm_offset_t offset,
-    vm_prot_t prot, vm_page_t *ma, struct iommu_map_entry **entry);
+int iommu_map1(struct iommu_domain *domain,
+    const struct bus_dma_tag_common *common,
+    vm_size_t size, vm_offset_t offset,
+    vm_prot_t prot, int iommu_flags,
+    vm_page_t *ma, struct iommu_map_entry **entry);
 int iommu_unmap1(struct iommu_domain *domain,
     struct iommu_map_entries_tailq *entries, bool free);
 

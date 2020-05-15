@@ -500,11 +500,7 @@ iommu_bus_dmamap_load_something1(struct bus_dma_tag_iommu *tag,
 	struct iommu_map_entry *entry;
 	iommu_gaddr_t size;
 	bus_size_t buflen1;
-#if 0
-	int error, idx, gas_flags, seg;
-#else
-	int error, idx, seg;
-#endif
+	int error, idx, iommu_flags, seg;
 
 	KASSERT(offset < IOMMU_PAGE_SIZE, ("offset %d", offset));
 	if (segs == NULL)
@@ -528,18 +524,18 @@ iommu_bus_dmamap_load_something1(struct bus_dma_tag_iommu *tag,
 		 * (Too) optimistically allow split if there are more
 		 * then one segments left.
 		 */
-#if 0
-		gas_flags = map->cansleep ? DMAR_GM_CANWAIT : 0;
+		iommu_flags = map->cansleep ? IOMMU_MF_CANWAIT : 0;
 		if (seg + 1 < tag->common.nsegments)
-			gas_flags |= DMAR_GM_CANSPLIT;
+			iommu_flags |= IOMMU_MF_CANSPLIT;
 
-		error = iommu_gas_map(domain, &tag->common, size, offset,
+		error = iommu_map1(domain, &tag->common, size, offset,
 		    DMAR_MAP_ENTRY_READ |
 		    ((flags & BUS_DMA_NOWRITE) == 0 ? DMAR_MAP_ENTRY_WRITE : 0),
-		    gas_flags, ma + idx, &entry);
+		    iommu_flags, ma + idx, &entry);
 		if (error != 0)
 			break;
-		if ((gas_flags & DMAR_GM_CANSPLIT) != 0) {
+
+		if ((iommu_flags & IOMMU_MF_CANSPLIT) != 0) {
 			KASSERT(size >= entry->end - entry->start,
 			    ("split increased entry size %jx %jx %jx",
 			    (uintmax_t)size, (uintmax_t)entry->start,
@@ -553,12 +549,6 @@ iommu_bus_dmamap_load_something1(struct bus_dma_tag_iommu *tag,
 			    (uintmax_t)size, (uintmax_t)entry->start,
 			    (uintmax_t)entry->end));
 		}
-#else
-		error = iommu_map1(domain, size, offset,
-		    VM_PROT_READ | VM_PROT_WRITE, ma + idx, &entry);
-		if (error != 0)
-			break;
-#endif
 		if (offset + buflen1 > size)
 			buflen1 = size - offset;
 		if (buflen1 > tag->common.maxsegsz)
