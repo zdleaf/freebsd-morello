@@ -76,42 +76,15 @@ typedef uint64_t iommu_gaddr_t;
 
 bus_dma_tag_t acpi_iommu_get_dma_tag(device_t dev, device_t child);
 
-struct iommu_qi_genseq {
-	u_int gen;
-	uint32_t seq;
-};
-
 struct iommu_map_entry {
 	iommu_gaddr_t start;
 	iommu_gaddr_t end;
-	iommu_gaddr_t first;		/* Least start in subtree */
-	iommu_gaddr_t last;		/* Greatest end in subtree */
-	iommu_gaddr_t free_down;		/* Max free space below the
-					   current R/B tree node */
 	u_int flags;
 	TAILQ_ENTRY(iommu_map_entry) dmamap_link; /* Link for dmamap entries */
-	RB_ENTRY(iommu_map_entry) rb_entry;	 /* Links for domain entries */
 	TAILQ_ENTRY(iommu_map_entry) unroll_link; /* Link for unroll after
 						    dmamap_load failure */
 	struct iommu_domain *domain;
-	//struct iommu_qi_genseq gseq;
 };
-
-RB_HEAD(iommu_gas_entries_tree, iommu_map_entry);
-RB_PROTOTYPE(iommu_gas_entries_tree, iommu_map_entry, rb_entry,
-    iommu_gas_cmp_entries);
-
-#define	IOMMU_MAP_ENTRY_PLACE	0x0001	/* Fake entry */
-#define	IOMMU_MAP_ENTRY_RMRR	0x0002	/* Permanent, not linked by
-					   dmamap_link */
-#define	IOMMU_MAP_ENTRY_MAP	0x0004	/* Busdma created, linked by
-					   dmamap_link */
-#define	IOMMU_MAP_ENTRY_UNMAPPED 0x0010	/* No backing pages */
-#define	IOMMU_MAP_ENTRY_QI_NF	0x0020	/* qi task, do not free entry */
-#define	IOMMU_MAP_ENTRY_READ	0x1000	/* Read permitted */
-#define	IOMMU_MAP_ENTRY_WRITE	0x2000	/* Write permitted */
-#define	IOMMU_MAP_ENTRY_SNOOP	0x4000	/* Snoop */
-#define	IOMMU_MAP_ENTRY_TM	0x8000	/* Transient */
 
 static inline bool
 iommu_test_boundary(iommu_gaddr_t start, iommu_gaddr_t size,

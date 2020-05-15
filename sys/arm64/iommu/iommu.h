@@ -75,6 +75,18 @@
 #define	IOMMU_PGF_NOALLOC	0x0008
 #define	IOMMU_PGF_OBJL		0x0010
 
+#define	IOMMU_MAP_ENTRY_PLACE	0x0001	/* Fake entry */
+#define	IOMMU_MAP_ENTRY_RMRR	0x0002	/* Permanent, not linked by
+					   dmamap_link */
+#define	IOMMU_MAP_ENTRY_MAP	0x0004	/* Busdma created, linked by
+					   dmamap_link */
+#define	IOMMU_MAP_ENTRY_UNMAPPED 0x0010	/* No backing pages */
+#define	IOMMU_MAP_ENTRY_QI_NF	0x0020	/* qi task, do not free entry */
+#define	IOMMU_MAP_ENTRY_READ	0x1000	/* Read permitted */
+#define	IOMMU_MAP_ENTRY_WRITE	0x2000	/* Write permitted */
+#define	IOMMU_MAP_ENTRY_SNOOP	0x4000	/* Snoop */
+#define	IOMMU_MAP_ENTRY_TM	0x8000	/* Transient */
+
 #define	IOMMU_LOCK(iommu)		mtx_lock(&(iommu)->mtx_lock)
 #define	IOMMU_UNLOCK(iommu)		mtx_unlock(&(iommu)->mtx_lock)
 #define	IOMMU_ASSERT_LOCKED(iommu)	\
