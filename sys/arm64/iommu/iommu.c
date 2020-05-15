@@ -309,45 +309,40 @@ iommu_device_attach(struct iommu_domain *domain, struct iommu_device *device)
 	return (err);
 }
 
-/*
- * Detach a consumer device from IOMMU domain.
- */
 int
-iommu_device_detach(struct iommu_domain *domain, device_t dev)
+iommu_free_ctx_locked(struct iommu_unit *iommu, struct iommu_device *device)
 {
-	struct iommu_device *device;
-	struct iommu_unit *iommu;
-	bool found;
+	struct iommu_domain *domain;
 	int err;
 
-	iommu = domain->iommu;
-
-	found = false;
-
-	DOMAIN_LOCK(domain);
-	LIST_FOREACH(device, &domain->device_list, next) {
-		if (device->dev == dev) {
-			found = true;
-			break;
-		}
-	}
-
-	if (!found) {
-		DOMAIN_UNLOCK(domain);
-		return (ENODEV);
-	}
+	domain = device->domain;
 
 	err = IOMMU_DEVICE_DETACH(iommu->dev, device);
 	if (err) {
 		device_printf(iommu->dev, "Failed to remove device\n");
-		DOMAIN_UNLOCK(domain);
 		return (err);
 	}
 
 	LIST_REMOVE(device, next);
-	DOMAIN_UNLOCK(domain);
 
 	return (0);
+}
+
+int
+iommu_free_ctx(struct iommu_device *device)
+{
+	struct iommu_domain *domain;
+	int error;
+
+	printf("%s\n", __func__);
+
+	domain = device->domain;
+
+	DOMAIN_LOCK(domain);
+	error = iommu_free_ctx_locked(domain->iommu, device);
+	DOMAIN_UNLOCK(domain);
+
+	return (error);
 }
 
 int

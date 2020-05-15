@@ -260,7 +260,7 @@ iommu_instantiate_ctx(struct iommu_unit *iommu, device_t dev, bool rmrr)
 			ctx->flags |= DMAR_CTX_DISABLED;
 			DMAR_UNLOCK(iommu);
 		} else {
-			//iommu_free_ctx_locked(iommu, ctx);
+			iommu_free_ctx_locked(iommu, ctx);
 		}
 		ctx = NULL;
 	}
@@ -348,10 +348,8 @@ iommu_bus_dma_tag_destroy(bus_dma_tag_t dmat1)
 			parent = (struct bus_dma_tag_iommu *)dmat->common.parent;
 			if (atomic_fetchadd_int(&dmat->common.ref_count, -1) ==
 			    1) {
-#if 0
-				if (dmat == &dmat->ctx->ctx_tag)
-					iommu_free_ctx(dmat->ctx);
-#endif
+				if (dmat == &dmat->device->ctx_tag)
+					iommu_free_ctx(dmat->device);
 				free_domain(dmat->segments, M_DMAR_DMAMAP);
 				free(dmat, M_DEVBUF);
 				dmat = parent;

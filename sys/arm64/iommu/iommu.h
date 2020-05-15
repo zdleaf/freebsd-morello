@@ -187,6 +187,10 @@ struct iommu_device *
 iommu_get_ctx_for_dev(struct iommu_unit *iommu, device_t requester,
     uint16_t rid, bool disabled, bool rmrr);
 
+int iommu_free_ctx(struct iommu_device *device);
+int iommu_free_ctx_locked(struct iommu_unit *iommu,
+    struct iommu_device *device);
+
 #define	DMAR_PGF_WAITOK	0x0001
 #define	DMAR_PGF_ZERO	0x0002
 #define	DMAR_PGF_ALLOC	0x0004
