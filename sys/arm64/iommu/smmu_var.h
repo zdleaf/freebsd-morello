@@ -41,6 +41,11 @@
 #define	SMMU_LOCK(_sc)		mtx_lock(&(_sc)->sc_mtx)
 #define	SMMU_UNLOCK(_sc)	mtx_unlock(&(_sc)->sc_mtx)
 
+#define	SMMU_DOMAIN_LOCK(domain)		mtx_lock(&(domain)->mtx_lock)
+#define	SMMU_DOMAIN_UNLOCK(domain)		mtx_unlock(&(domain)->mtx_lock)
+#define	SMMU_DOMAIN_ASSERT_LOCKED(domain)	\
+    mtx_assert(&(domain)->mtx_lock, MA_OWNED)
+
 DECLARE_CLASS(smmu_driver);
 
 struct smmu_queue_local_copy {

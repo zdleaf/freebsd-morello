@@ -67,10 +67,6 @@ struct bus_dmamap_iommu {
 	int flags;
 };
 
-#define	DMAR_LOCK(n)
-#define	DMAR_UNLOCK(n)
-#define	DMAR_DOMAIN_LOCK(n)
-#define	DMAR_DOMAIN_UNLOCK(n)
 #define	DMAR_PAGE_SIZE	4096
 #define	DMAR_PAGE_MASK	(DMAR_PAGE_SIZE - 1)
 
@@ -129,12 +125,5 @@ iommu_test_boundary(iommu_gaddr_t start, iommu_gaddr_t size,
 		return (true);
 	return (start + size <= ((start + boundary) & ~(boundary - 1)));
 }
-
-int iommu_init_busdma(struct iommu_unit *unit);
-void iommu_fini_busdma(struct iommu_unit *unit);
-
-bus_dma_tag_t smmu_get_dma_tag(device_t dev, device_t child);
-int busdma_smmu_domain_free(struct bus_dma_tag_iommu *dmat);
-struct iommu_unit * iommu_find(device_t dev, bool verbose);
 
 #endif /* !_DEV_IOMMU_BUSDMA_IOMMU_H_*/

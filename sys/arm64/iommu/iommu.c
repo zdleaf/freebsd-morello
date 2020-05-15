@@ -82,10 +82,6 @@ static MALLOC_DEFINE(M_BUSDMA, "SMMU", "ARM64 busdma SMMU");
 
 static struct mtx iommu_mtx;
 
-#define	IOMMU_LOCK(iommu)		mtx_lock(&(iommu)->mtx_lock)
-#define	IOMMU_UNLOCK(iommu)		mtx_unlock(&(iommu)->mtx_lock)
-#define	IOMMU_ASSERT_LOCKED(iommu)	mtx_assert(&(iommu)->mtx_lock, MA_OWNED)
-
 #define	IOMMU_LIST_LOCK()		mtx_lock(&iommu_mtx)
 #define	IOMMU_LIST_UNLOCK()		mtx_unlock(&iommu_mtx)
 #define	IOMMU_LIST_ASSERT_LOCKED()	mtx_assert(&iommu_mtx, MA_OWNED)
@@ -237,9 +233,9 @@ iommu_device_attach(struct iommu_domain *domain, struct iommu_device *device)
 
 	device->domain = domain;
 
-	DOMAIN_LOCK(domain);
+	IOMMU_DOMAIN_LOCK(domain);
 	LIST_INSERT_HEAD(&domain->device_list, device, next);
-	DOMAIN_UNLOCK(domain);
+	IOMMU_DOMAIN_UNLOCK(domain);
 
 	return (err);
 }
@@ -319,9 +315,9 @@ iommu_free_ctx(struct iommu_device *device)
 
 	domain = device->domain;
 
-	DOMAIN_LOCK(domain);
+	IOMMU_DOMAIN_LOCK(domain);
 	error = iommu_free_ctx_locked(domain->iommu, device);
-	DOMAIN_UNLOCK(domain);
+	IOMMU_DOMAIN_UNLOCK(domain);
 
 	return (error);
 }

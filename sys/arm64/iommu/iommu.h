@@ -153,9 +153,14 @@ struct iommu_device {
 					   to prevent context destruction */
 };
 
-#define	DOMAIN_LOCK(domain)		mtx_lock(&(domain)->mtx_lock)
-#define	DOMAIN_UNLOCK(domain)		mtx_unlock(&(domain)->mtx_lock)
-#define	DOMAIN_ASSERT_LOCKED(domain)	\
+#define	IOMMU_LOCK(iommu)		mtx_lock(&(iommu)->mtx_lock)
+#define	IOMMU_UNLOCK(iommu)		mtx_unlock(&(iommu)->mtx_lock)
+#define	IOMMU_ASSERT_LOCKED(iommu)	\
+    mtx_assert(&(iommu)->mtx_lock, MA_OWNED)
+
+#define	IOMMU_DOMAIN_LOCK(domain)		mtx_lock(&(domain)->mtx_lock)
+#define	IOMMU_DOMAIN_UNLOCK(domain)		mtx_unlock(&(domain)->mtx_lock)
+#define	IOMMU_DOMAIN_ASSERT_LOCKED(domain)	\
     mtx_assert(&(domain)->mtx_lock, MA_OWNED)
 
 struct iommu_unit * iommu_lookup(intptr_t xref, int flags);
@@ -175,6 +180,10 @@ int iommu_map1(struct iommu_domain *domain, vm_size_t size, vm_offset_t offset,
     vm_prot_t prot, vm_page_t *ma, struct iommu_map_entry **entry);
 int iommu_unmap1(struct iommu_domain *domain,
     struct iommu_map_entries_tailq *entries, bool free);
+
+struct iommu_unit * iommu_find(device_t dev, bool verbose);
+int iommu_init_busdma(struct iommu_unit *unit);
+void iommu_fini_busdma(struct iommu_unit *unit);
 
 #define	DMAR_PGF_WAITOK	0x0001
 #define	DMAR_PGF_ZERO	0x0002

@@ -255,10 +255,10 @@ iommu_instantiate_ctx(struct iommu_unit *iommu, device_t dev, bool rmrr)
 		 * Keep the first reference on context, release the
 		 * later refs.
 		 */
-		DMAR_LOCK(iommu);
+		IOMMU_LOCK(iommu);
 		if ((ctx->flags & DMAR_CTX_DISABLED) == 0) {
 			ctx->flags |= DMAR_CTX_DISABLED;
-			DMAR_UNLOCK(iommu);
+			IOMMU_UNLOCK(iommu);
 		} else {
 			iommu_free_ctx_locked(iommu, ctx);
 		}
@@ -413,12 +413,12 @@ iommu_bus_dmamap_destroy(bus_dma_tag_t dmat, bus_dmamap_t map1)
 	map = (struct bus_dmamap_iommu *)map1;
 	if (map != NULL) {
 		domain = tag->device->domain;
-		DMAR_DOMAIN_LOCK(domain);
+		IOMMU_DOMAIN_LOCK(domain);
 		if (!TAILQ_EMPTY(&map->map_entries)) {
-			DMAR_DOMAIN_UNLOCK(domain);
+			IOMMU_DOMAIN_UNLOCK(domain);
 			return (EBUSY);
 		}
-		DMAR_DOMAIN_UNLOCK(domain);
+		IOMMU_DOMAIN_UNLOCK(domain);
 		free_domain(map, M_DMAR_DMAMAP);
 	}
 	tag->map_count--;
@@ -587,10 +587,10 @@ iommu_bus_dmamap_load_something1(struct bus_dma_tag_iommu *tag,
 		    (uintmax_t)entry->start, (uintmax_t)entry->end,
 		    (uintmax_t)buflen1, (uintmax_t)tag->common.maxsegsz));
 
-		DMAR_DOMAIN_LOCK(domain);
+		IOMMU_DOMAIN_LOCK(domain);
 		TAILQ_INSERT_TAIL(&map->map_entries, entry, dmamap_link);
 		entry->flags |= DMAR_MAP_ENTRY_MAP;
-		DMAR_DOMAIN_UNLOCK(domain);
+		IOMMU_DOMAIN_UNLOCK(domain);
 		TAILQ_INSERT_TAIL(unroll_list, entry, unroll_link);
 
 		segs[seg].ds_addr = entry->start + offset;
@@ -630,7 +630,7 @@ iommu_bus_dmamap_load_something(struct bus_dma_tag_iommu *tag,
 		 * partial buffer load, so unfortunately we have to
 		 * revert all work done.
 		 */
-		DMAR_DOMAIN_LOCK(domain);
+		IOMMU_DOMAIN_LOCK(domain);
 		TAILQ_FOREACH_SAFE(entry, &unroll_list, unroll_link,
 		    entry1) {
 			/*
@@ -644,7 +644,7 @@ iommu_bus_dmamap_load_something(struct bus_dma_tag_iommu *tag,
 			TAILQ_INSERT_TAIL(&domain->unload_entries, entry,
 			    dmamap_link);
 		}
-		DMAR_DOMAIN_UNLOCK(domain);
+		IOMMU_DOMAIN_UNLOCK(domain);
 		taskqueue_enqueue(domain->iommu->delayed_taskqueue,
 		    &domain->unload_task);
 	}
@@ -845,16 +845,16 @@ iommu_bus_dmamap_unload(bus_dma_tag_t dmat, bus_dmamap_t map1)
 	atomic_add_long(&device->unloads, 1);
 
 #if defined(__i386__)
-	DMAR_DOMAIN_LOCK(domain);
+	IOMMU_DOMAIN_LOCK(domain);
 	TAILQ_CONCAT(&domain->unload_entries, &map->map_entries, dmamap_link);
-	DMAR_DOMAIN_UNLOCK(domain);
+	IOMMU_DOMAIN_UNLOCK(domain);
 	taskqueue_enqueue(domain->iommu->delayed_taskqueue,
 	    &domain->unload_task);
 #else /* defined(__amd64__) || defined(__aarch64__) */
 	TAILQ_INIT(&entries);
-	DMAR_DOMAIN_LOCK(domain);
+	IOMMU_DOMAIN_LOCK(domain);
 	TAILQ_CONCAT(&entries, &map->map_entries, dmamap_link);
-	DMAR_DOMAIN_UNLOCK(domain);
+	IOMMU_DOMAIN_UNLOCK(domain);
 	THREAD_NO_SLEEPING();
 	iommu_unmap1(domain, &entries, false);
 	THREAD_SLEEPING_OK();
@@ -894,10 +894,10 @@ iommu_bus_task_dmamap(void *arg, int pending)
 	struct iommu_unit *unit;
 
 	unit = arg;
-	DMAR_LOCK(unit);
+	IOMMU_LOCK(unit);
 	while ((map = TAILQ_FIRST(&unit->delayed_maps)) != NULL) {
 		TAILQ_REMOVE(&unit->delayed_maps, map, delay_link);
-		DMAR_UNLOCK(unit);
+		IOMMU_UNLOCK(unit);
 		tag = map->tag;
 		map->cansleep = true;
 		map->locked = false;
@@ -911,9 +911,9 @@ iommu_bus_task_dmamap(void *arg, int pending)
 		} else
 			map->locked = true;
 		map->cansleep = false;
-		DMAR_LOCK(unit);
+		IOMMU_LOCK(unit);
 	}
-	DMAR_UNLOCK(unit);
+	IOMMU_UNLOCK(unit);
 }
 
 static void
@@ -921,9 +921,9 @@ iommu_bus_schedule_dmamap(struct iommu_unit *unit, struct bus_dmamap_iommu *map)
 {
 
 	map->locked = false;
-	DMAR_LOCK(unit);
+	IOMMU_LOCK(unit);
 	TAILQ_INSERT_TAIL(&unit->delayed_maps, map, delay_link);
-	DMAR_UNLOCK(unit);
+	IOMMU_UNLOCK(unit);
 	taskqueue_enqueue(unit->delayed_taskqueue, &unit->dmamap_load_task);
 }
 

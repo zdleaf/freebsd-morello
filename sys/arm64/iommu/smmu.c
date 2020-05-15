@@ -1755,9 +1755,9 @@ smmu_device_attach(device_t dev, struct iommu_domain *domain,
 	 * 0x600 sata
 	 */
 
-	DOMAIN_LOCK(smmu_domain);
+	SMMU_DOMAIN_LOCK(smmu_domain);
 	LIST_INSERT_HEAD(&smmu_domain->master_list, master, next);
-	DOMAIN_UNLOCK(smmu_domain);
+	SMMU_DOMAIN_UNLOCK(smmu_domain);
 
 	smmu_init_ste(sc, &smmu_domain->cd, master->sid, true);
 
@@ -1779,7 +1779,7 @@ smmu_device_detach(device_t dev, struct iommu_device *device)
 
 	found = false;
 
-	DOMAIN_LOCK(smmu_domain);
+	SMMU_DOMAIN_LOCK(smmu_domain);
 	LIST_FOREACH_SAFE(master, &smmu_domain->master_list, next, master1) {
 		if (master->device == device) {
 			found = true;
@@ -1787,7 +1787,7 @@ smmu_device_detach(device_t dev, struct iommu_device *device)
 			break;
 		}
 	}
-	DOMAIN_UNLOCK(smmu_domain);
+	SMMU_DOMAIN_UNLOCK(smmu_domain);
 
 	if (!found)
 		return (ENODEV);
