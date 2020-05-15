@@ -95,6 +95,7 @@ __FBSDID("$FreeBSD$");
 #include "fwctl.h"
 #include "gdb.h"
 #include "ioapic.h"
+#include "kernemu_dev.h"
 #include "mem.h"
 #include "mevent.h"
 #include "mptbl.h"
@@ -1371,6 +1372,7 @@ main(int argc, char *argv[])
 #endif
 #ifdef __amd64__
 	init_inout();
+	kernemu_dev_init();
 	init_bootrom(ctx);
 	atkbdc_init(ctx);
 	pci_irq_init(ctx);

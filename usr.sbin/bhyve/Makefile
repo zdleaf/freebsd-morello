@@ -68,6 +68,7 @@ SRCS+=	\
 	gdb.c			\
 	inout.c			\
 	ioapic.c		\
+	kernemu_dev.c		\
 	mptbl.c			\
 	pci_fbuf.c		\
 	pci_irq.c		\
@@ -88,6 +89,8 @@ SRCS+=	\
 .if ${MK_BHYVE_SNAPSHOT} != "no"
 SRCS+=	snapshot.c
 .endif
+
+CFLAGS.kernemu_dev.c+=	-I${SRCTOP}/sys/amd64
 
 .PATH:  ${BHYVE_SYSDIR}/sys/${MACHINE}/vmm
 SRCS+=	vmm_instruction_emul.c
