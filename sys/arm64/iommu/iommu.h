@@ -199,28 +199,30 @@ struct iommu_device {
 					   to prevent context destruction */
 };
 
+struct iommu_unit * iommu_find(device_t dev, bool verbose);
 struct iommu_unit * iommu_lookup(intptr_t xref, int flags);
+
 int iommu_register(device_t dev, struct iommu_unit *unit, intptr_t xref);
 int iommu_unregister(device_t dev);
+
 struct iommu_device * iommu_get_ctx_for_dev(struct iommu_unit *iommu,
     device_t requester, uint16_t rid, bool disabled, bool rmrr);
 int iommu_free_ctx(struct iommu_device *device);
 int iommu_free_ctx_locked(struct iommu_unit *iommu,
     struct iommu_device *device);
 
-int iommu_map_page(struct iommu_domain *domain,
-    vm_offset_t va, vm_paddr_t pa, vm_prot_t prot);
-int iommu_unmap_page(struct iommu_domain *domain, vm_offset_t va);
-
-int iommu_map1(struct iommu_domain *domain,
+int iommu_map(struct iommu_domain *domain,
     const struct bus_dma_tag_common *common,
     vm_size_t size, vm_offset_t offset,
     int eflags, int iommu_flags,
     vm_page_t *ma, struct iommu_map_entry **entry);
-int iommu_unmap1(struct iommu_domain *domain,
+int iommu_unmap(struct iommu_domain *domain,
     struct iommu_map_entries_tailq *entries, bool free);
 
-struct iommu_unit * iommu_find(device_t dev, bool verbose);
+int iommu_map_page(struct iommu_domain *domain,
+    vm_offset_t va, vm_paddr_t pa, vm_prot_t prot);
+int iommu_unmap_page(struct iommu_domain *domain, vm_offset_t va);
+
 int iommu_init_busdma(struct iommu_unit *unit);
 void iommu_fini_busdma(struct iommu_unit *unit);
 

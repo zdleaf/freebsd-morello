@@ -528,7 +528,7 @@ iommu_bus_dmamap_load_something1(struct bus_dma_tag_iommu *tag,
 		if (seg + 1 < tag->common.nsegments)
 			iommu_flags |= IOMMU_MF_CANSPLIT;
 
-		error = iommu_map1(domain, &tag->common, size, offset,
+		error = iommu_map(domain, &tag->common, size, offset,
 		    IOMMU_MAP_ENTRY_READ |
 		    ((flags & BUS_DMA_NOWRITE) == 0 ? IOMMU_MAP_ENTRY_WRITE: 0),
 		    iommu_flags, ma + idx, &entry);
@@ -846,7 +846,7 @@ iommu_bus_dmamap_unload(bus_dma_tag_t dmat, bus_dmamap_t map1)
 	TAILQ_CONCAT(&entries, &map->map_entries, dmamap_link);
 	IOMMU_DOMAIN_UNLOCK(domain);
 	THREAD_NO_SLEEPING();
-	iommu_unmap1(domain, &entries, false);
+	iommu_unmap(domain, &entries, false);
 	THREAD_SLEEPING_OK();
 	KASSERT(TAILQ_EMPTY(&entries), ("lazy iommu_device_unload %p", device));
 #endif

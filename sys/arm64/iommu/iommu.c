@@ -393,7 +393,7 @@ iommu_gas_free_entry(struct iommu_domain *domain, struct iommu_map_entry *entry)
 }
 
 int
-iommu_map1(struct iommu_domain *domain,
+iommu_map(struct iommu_domain *domain,
     const struct bus_dma_tag_common *common,
     vm_size_t size, vm_offset_t offset,
     int eflags, int iommu_flags,
@@ -432,7 +432,7 @@ iommu_map1(struct iommu_domain *domain,
 }
 
 int
-iommu_unmap1(struct iommu_domain *domain,
+iommu_unmap(struct iommu_domain *domain,
     struct iommu_map_entries_tailq *entries, bool free)
 {
 	struct iommu_map_entry *entry, *entry1;
