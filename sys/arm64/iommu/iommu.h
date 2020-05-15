@@ -148,38 +148,9 @@ struct iommu_domain {
 	struct mtx			mtx_lock;
 	vmem_t				*vmem;
 	struct iommu_unit		*iommu;
-
-#if 0
-	int domain;			/* (c) DID, written in context entry */
-	int mgaw;			/* (c) Real max address width */
-	int agaw;			/* (c) Adjusted guest address width */
-	int pglvl;			/* (c) The pagelevel */
-	int awlvl;			/* (c) The pagelevel as the bitmask,
-					   to set in context entry */
-	iommu_gaddr_t end;		/* (c) Highest address + 1 in
-					   the guest AS */
-	u_int ctx_cnt;			/* (u) Number of contexts owned */
-	u_int refs;			/* (u) Refs, including ctx */
-	struct iommu_unit *iommu;		/* (c) */
-	struct mtx lock;		/* (c) */
-	LIST_ENTRY(iommu_domain) link;	/* (u) Member in the iommu list */
-	LIST_HEAD(, iommu_ctx) contexts;	/* (u) */
-	vm_object_t pgtbl_obj;		/* (c) Page table pages */
-	u_int flags;			/* (u) */
-	u_int entries_cnt;		/* (d) */
-	struct iommu_gas_entries_tree rb_root; /* (d) */
-	struct iommu_map_entries_tailq unload_entries; /* (d) Entries to
-							 unload */
-	struct iommu_map_entry *first_place, *last_place; /* (d) */
-	struct task unload_task;	/* (c) */
-	u_int batch_no;
-#endif
-
-	struct task unload_task;	/* (c) */
-	struct iommu_map_entries_tailq unload_entries; /* (d) Entries to
-							 unload */
-	u_int flags;			/* (u) */
-	u_int entries_cnt;		/* (d) */
+	struct task unload_task;
+	struct iommu_map_entries_tailq unload_entries; /* Entries to unload */
+	u_int entries_cnt;
 };
 
 /* Consumer device. */
