@@ -397,11 +397,12 @@ int
 iommu_map1(struct iommu_domain *domain,
     const struct bus_dma_tag_common *common,
     vm_size_t size, vm_offset_t offset,
-    vm_prot_t prot, int iommu_flags,
+    int eflags, int iommu_flags,
     vm_page_t *ma, struct iommu_map_entry **res)
 {
 	struct iommu_map_entry *entry;
 	struct iommu_unit *iommu;
+	vm_prot_t prot;
 	vm_offset_t va;
 	vm_paddr_t pa;
 	int error;
@@ -417,6 +418,12 @@ iommu_map1(struct iommu_domain *domain,
 
 	entry->start = va;
 	entry->end = va + size;
+
+	prot = 0;
+	if (eflags & IOMMU_MAP_ENTRY_READ)
+		prot |= VM_PROT_READ;
+	if (eflags & IOMMU_MAP_ENTRY_WRITE)
+		prot |= VM_PROT_WRITE;
 
 	error = IOMMU_MAP(iommu->dev, domain, va, pa, size, prot);
 

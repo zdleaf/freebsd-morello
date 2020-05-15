@@ -190,7 +190,7 @@ int iommu_unmap_page(struct iommu_domain *domain, vm_offset_t va);
 int iommu_map1(struct iommu_domain *domain,
     const struct bus_dma_tag_common *common,
     vm_size_t size, vm_offset_t offset,
-    vm_prot_t prot, int iommu_flags,
+    int eflags, int iommu_flags,
     vm_page_t *ma, struct iommu_map_entry **entry);
 int iommu_unmap1(struct iommu_domain *domain,
     struct iommu_map_entries_tailq *entries, bool free);

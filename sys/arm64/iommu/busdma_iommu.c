@@ -529,8 +529,8 @@ iommu_bus_dmamap_load_something1(struct bus_dma_tag_iommu *tag,
 			iommu_flags |= IOMMU_MF_CANSPLIT;
 
 		error = iommu_map1(domain, &tag->common, size, offset,
-		    DMAR_MAP_ENTRY_READ |
-		    ((flags & BUS_DMA_NOWRITE) == 0 ? DMAR_MAP_ENTRY_WRITE : 0),
+		    IOMMU_MAP_ENTRY_READ |
+		    ((flags & BUS_DMA_NOWRITE) == 0 ? IOMMU_MAP_ENTRY_WRITE: 0),
 		    iommu_flags, ma + idx, &entry);
 		if (error != 0)
 			break;
@@ -579,7 +579,7 @@ iommu_bus_dmamap_load_something1(struct bus_dma_tag_iommu *tag,
 
 		IOMMU_DOMAIN_LOCK(domain);
 		TAILQ_INSERT_TAIL(&map->map_entries, entry, dmamap_link);
-		entry->flags |= DMAR_MAP_ENTRY_MAP;
+		entry->flags |= IOMMU_MAP_ENTRY_MAP;
 		IOMMU_DOMAIN_UNLOCK(domain);
 		TAILQ_INSERT_TAIL(unroll_list, entry, unroll_link);
 

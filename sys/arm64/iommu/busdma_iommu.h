@@ -101,17 +101,17 @@ RB_HEAD(iommu_gas_entries_tree, iommu_map_entry);
 RB_PROTOTYPE(iommu_gas_entries_tree, iommu_map_entry, rb_entry,
     iommu_gas_cmp_entries);
 
-#define	DMAR_MAP_ENTRY_PLACE	0x0001	/* Fake entry */
-#define	DMAR_MAP_ENTRY_RMRR	0x0002	/* Permanent, not linked by
+#define	IOMMU_MAP_ENTRY_PLACE	0x0001	/* Fake entry */
+#define	IOMMU_MAP_ENTRY_RMRR	0x0002	/* Permanent, not linked by
 					   dmamap_link */
-#define	DMAR_MAP_ENTRY_MAP	0x0004	/* Busdma created, linked by
+#define	IOMMU_MAP_ENTRY_MAP	0x0004	/* Busdma created, linked by
 					   dmamap_link */
-#define	DMAR_MAP_ENTRY_UNMAPPED	0x0010	/* No backing pages */
-#define	DMAR_MAP_ENTRY_QI_NF	0x0020	/* qi task, do not free entry */
-#define	DMAR_MAP_ENTRY_READ	0x1000	/* Read permitted */
-#define	DMAR_MAP_ENTRY_WRITE	0x2000	/* Write permitted */
-#define	DMAR_MAP_ENTRY_SNOOP	0x4000	/* Snoop */
-#define	DMAR_MAP_ENTRY_TM	0x8000	/* Transient */
+#define	IOMMU_MAP_ENTRY_UNMAPPED 0x0010	/* No backing pages */
+#define	IOMMU_MAP_ENTRY_QI_NF	0x0020	/* qi task, do not free entry */
+#define	IOMMU_MAP_ENTRY_READ	0x1000	/* Read permitted */
+#define	IOMMU_MAP_ENTRY_WRITE	0x2000	/* Write permitted */
+#define	IOMMU_MAP_ENTRY_SNOOP	0x4000	/* Snoop */
+#define	IOMMU_MAP_ENTRY_TM	0x8000	/* Transient */
 
 static inline bool
 iommu_test_boundary(iommu_gaddr_t start, iommu_gaddr_t size,
