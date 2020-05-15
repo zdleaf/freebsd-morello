@@ -97,7 +97,20 @@
 #define	IOMMU_DOMAIN_ASSERT_LOCKED(domain)	\
     mtx_assert(&(domain)->mtx_lock, MA_OWNED)
 
-struct iommu_map_entry;
+typedef uint64_t iommu_gaddr_t;
+
+extern struct bus_dma_impl bus_dma_iommu_impl;
+
+struct iommu_map_entry {
+	iommu_gaddr_t start;
+	iommu_gaddr_t end;
+	u_int flags;
+	TAILQ_ENTRY(iommu_map_entry) dmamap_link; /* Link for dmamap entries */
+	TAILQ_ENTRY(iommu_map_entry) unroll_link; /* Link for unroll after
+						    dmamap_load failure */
+	struct iommu_domain *domain;
+};
+
 TAILQ_HEAD(iommu_map_entries_tailq, iommu_map_entry);
 
 struct bus_dma_tag_iommu {

@@ -64,7 +64,6 @@ __FBSDID("$FreeBSD$");
 #include <machine/intr.h>
 
 #include <dev/pci/pcivar.h>
-#include <arm64/iommu/busdma_iommu.h>
 
 #ifdef DEV_ACPI
 #include <contrib/dev/acpica/include/acpi.h>
