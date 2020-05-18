@@ -171,7 +171,6 @@ struct iommu_device {
 };
 
 struct iommu_unit * iommu_find(device_t dev, bool verbose);
-struct iommu_unit * iommu_lookup(intptr_t xref, int flags);
 
 int iommu_register(device_t dev, struct iommu_unit *unit, intptr_t xref);
 int iommu_unregister(device_t dev);

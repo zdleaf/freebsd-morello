@@ -354,7 +354,7 @@ iommu_unmap_page(struct iommu_domain *domain, vm_offset_t va)
 }
 
 static struct iommu_map_entry *
-iommu_gas_alloc_entry(struct iommu_domain *domain, u_int flags)
+iommu_map_alloc_entry(struct iommu_domain *domain, u_int flags)
 {
 	struct iommu_map_entry *res;
 
@@ -371,7 +371,7 @@ iommu_gas_alloc_entry(struct iommu_domain *domain, u_int flags)
 }
 
 static void
-iommu_gas_free_entry(struct iommu_domain *domain, struct iommu_map_entry *entry)
+iommu_map_free_entry(struct iommu_domain *domain, struct iommu_map_entry *entry)
 {
 
 	KASSERT(domain == entry->domain,
@@ -397,7 +397,9 @@ iommu_map(struct iommu_domain *domain,
 
 	iommu = domain->iommu;
 
-	entry = iommu_gas_alloc_entry(domain, 0);
+	entry = iommu_map_alloc_entry(domain, 0);
+	if (entry == NULL)
+		return (ENOMEM);
 
 	error = vmem_alloc(domain->vmem, size,
 	    M_FIRSTFIT | M_NOWAIT, &va);
@@ -428,7 +430,7 @@ iommu_unmap(struct iommu_domain *domain,
 
 	TAILQ_FOREACH_SAFE(entry, entries, dmamap_link, entry1) {
 		TAILQ_REMOVE(entries, entry, dmamap_link);
-		iommu_gas_free_entry(domain, entry);
+		iommu_map_free_entry(domain, entry);
 	};
 
 	return (0);
@@ -487,8 +489,8 @@ iommu_unregister(device_t dev)
 	return (0);
 }
 
-struct iommu_unit *
-iommu_lookup(intptr_t xref, int flags)
+static struct iommu_unit *
+iommu_lookup(intptr_t xref)
 {
 	struct iommu_unit *iommu;
 
@@ -527,9 +529,9 @@ iommu_find(device_t dev, bool verbose)
 #endif
 
 	/*
-	 * Find the registered IOMMU controller by xref.
+	 * Find a registered IOMMU controller by xref.
 	 */
-	iommu = iommu_lookup(xref, 0);
+	iommu = iommu_lookup(xref);
 	if (iommu == NULL) {
 		/* SMMU device is not registered in the IOMMU framework. */
 		return (NULL);
