@@ -220,15 +220,15 @@ static int
 iommu_device_attach(struct iommu_domain *domain, struct iommu_device *device)
 {
 	struct iommu_unit *iommu;
-	int err;
+	int error;
 
 	iommu = domain->iommu;
 
-	err = IOMMU_DEVICE_ATTACH(iommu->dev, domain, device);
-	if (err) {
+	error = IOMMU_DEVICE_ATTACH(iommu->dev, domain, device);
+	if (error) {
 		device_printf(iommu->dev, "Failed to add device\n");
 		free(device, M_IOMMU);
-		return (err);
+		return (error);
 	}
 
 	device->domain = domain;
@@ -237,7 +237,7 @@ iommu_device_attach(struct iommu_domain *domain, struct iommu_device *device)
 	LIST_INSERT_HEAD(&domain->device_list, device, next);
 	IOMMU_DOMAIN_UNLOCK(domain);
 
-	return (err);
+	return (error);
 }
 
 
@@ -272,7 +272,6 @@ iommu_get_ctx_for_dev(struct iommu_unit *iommu, device_t requester,
 
 	error = iommu_device_attach(domain, device);
 	if (error) {
-		free(tag, M_BUSDMA);
 		iommu_domain_free(domain);
 		return (NULL);
 	}
@@ -290,17 +289,27 @@ int
 iommu_free_ctx_locked(struct iommu_unit *iommu, struct iommu_device *device)
 {
 	struct iommu_domain *domain;
-	int err;
+	int error;
+
+	IOMMU_ASSERT_LOCKED(iommu);
 
 	domain = device->domain;
 
-	err = IOMMU_DEVICE_DETACH(iommu->dev, device);
-	if (err) {
+	error = IOMMU_DEVICE_DETACH(iommu->dev, device);
+	if (error) {
 		device_printf(iommu->dev, "Failed to remove device\n");
-		return (err);
+		return (error);
 	}
 
 	LIST_REMOVE(device, next);
+
+	IOMMU_UNLOCK(iommu);
+
+	/* Since we have a domain per each device, remove the domain too. */
+	iommu_unmap_page(domain, GICV3_ITS_PAGE);
+	error = iommu_domain_free(domain);
+	if (error)
+		device_printf(iommu->dev, "Could not free a domain\n");
 
 	return (0);
 }
@@ -308,16 +317,15 @@ iommu_free_ctx_locked(struct iommu_unit *iommu, struct iommu_device *device)
 int
 iommu_free_ctx(struct iommu_device *device)
 {
+	struct iommu_unit *iommu;
 	struct iommu_domain *domain;
 	int error;
 
-	printf("%s\n", __func__);
-
 	domain = device->domain;
+	iommu = domain->iommu;
 
-	IOMMU_DOMAIN_LOCK(domain);
-	error = iommu_free_ctx_locked(domain->iommu, device);
-	IOMMU_DOMAIN_UNLOCK(domain);
+	IOMMU_LOCK(iommu);
+	error = iommu_free_ctx_locked(iommu, device);
 
 	return (error);
 }
