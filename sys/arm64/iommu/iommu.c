@@ -97,6 +97,7 @@ static struct mtx iommu_mtx;
 #define GICV3_ITS_PAGE  0x300b0000
 
 static LIST_HEAD(, iommu_unit) iommu_list = LIST_HEAD_INITIALIZER(iommu_list);
+static uma_zone_t iommu_map_entry_zone;
 
 static int
 iommu_domain_add_va_range(struct iommu_domain *domain,
@@ -352,18 +353,6 @@ iommu_unmap_page(struct iommu_domain *domain, vm_offset_t va)
 	return (0);
 }
 
-static uma_zone_t iommu_map_entry_zone;
-
-static void
-intel_gas_init(void)
-{
-
-	iommu_map_entry_zone = uma_zcreate("IOMMU_MAP_ENTRY",
-	    sizeof(struct iommu_map_entry), NULL, NULL,
-	    NULL, NULL, UMA_ALIGN_PTR, UMA_ZONE_NODUMP);
-}
-SYSINIT(intel_gas, SI_SUB_DRIVERS, SI_ORDER_FIRST, intel_gas_init, NULL);
-
 static struct iommu_map_entry *
 iommu_gas_alloc_entry(struct iommu_domain *domain, u_int flags)
 {
@@ -554,6 +543,10 @@ iommu_init(void)
 {
 
 	mtx_init(&iommu_mtx, "IOMMU", NULL, MTX_DEF);
+
+	iommu_map_entry_zone = uma_zcreate("IOMMU_MAP_ENTRY",
+	    sizeof(struct iommu_map_entry), NULL, NULL,
+	    NULL, NULL, UMA_ALIGN_PTR, UMA_ZONE_NODUMP);
 }
 
 SYSINIT(iommu, SI_SUB_DRIVERS, SI_ORDER_FIRST, iommu_init, NULL);
