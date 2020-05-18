@@ -403,11 +403,16 @@ iommu_map(struct iommu_domain *domain,
 
 	error = vmem_alloc(domain->vmem, size,
 	    M_FIRSTFIT | M_NOWAIT, &va);
+	if (error) {
+		iommu_map_free_entry(domain, entry);
+		return (error);
+	}
 
 	pa = VM_PAGE_TO_PHYS(ma[0]);
 
 	entry->start = va;
 	entry->end = va + size;
+	entry->size = size;
 
 	prot = 0;
 	if (eflags & IOMMU_MAP_ENTRY_READ)
@@ -416,6 +421,10 @@ iommu_map(struct iommu_domain *domain,
 		prot |= VM_PROT_WRITE;
 
 	error = IOMMU_MAP(iommu->dev, domain, va, pa, size, prot);
+	if (error) {
+		iommu_map_free_entry(domain, entry);
+		return (error);
+	}
 
 	*res = entry;
 
@@ -426,10 +435,18 @@ int
 iommu_unmap(struct iommu_domain *domain,
     struct iommu_map_entries_tailq *entries, bool free)
 {
+	struct iommu_unit *iommu;
 	struct iommu_map_entry *entry, *entry1;
+	int error;
+
+	iommu = domain->iommu;
 
 	TAILQ_FOREACH_SAFE(entry, entries, dmamap_link, entry1) {
 		TAILQ_REMOVE(entries, entry, dmamap_link);
+		error = IOMMU_UNMAP(iommu->dev, domain,
+		    entry->start, entry->size);
+		if (error == 0)
+			vmem_free(domain->vmem, entry->start, entry->size);
 		iommu_map_free_entry(domain, entry);
 	};
 

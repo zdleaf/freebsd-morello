@@ -104,6 +104,7 @@ extern struct bus_dma_impl bus_dma_iommu_impl;
 struct iommu_map_entry {
 	iommu_gaddr_t start;
 	iommu_gaddr_t end;
+	iommu_gaddr_t size;
 	u_int flags;
 	TAILQ_ENTRY(iommu_map_entry) dmamap_link; /* Link for dmamap entries */
 	TAILQ_ENTRY(iommu_map_entry) unroll_link; /* Link for unroll after
