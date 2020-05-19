@@ -48,7 +48,7 @@ struct bus_dma_tag_common {
 	bus_dma_lock_t	 *lockfunc;
 	void		 *lockfuncarg;
 	int		  ref_count;
-	int		domain;
+	int		  domain;
 };
 
 struct bus_dma_impl {

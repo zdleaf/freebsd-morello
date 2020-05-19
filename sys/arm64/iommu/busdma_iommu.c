@@ -244,8 +244,8 @@ iommu_instantiate_device(struct iommu_unit *iommu, device_t dev, bool rmrr)
 	 * Instead provide the identity mapping for the device
 	 * context.
 	 */
-	disabled = iommu_bus_dma_is_dev_disabled(pci_get_domain(requester), 
-	    pci_get_bus(requester), pci_get_slot(requester), 
+	disabled = iommu_bus_dma_is_dev_disabled(pci_get_domain(requester),
+	    pci_get_bus(requester), pci_get_slot(requester),
 	    pci_get_function(requester));
 	device = iommu_get_device(iommu, requester, rid, disabled, rmrr);
 	if (device == NULL)
