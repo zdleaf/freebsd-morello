@@ -228,10 +228,10 @@ iommu_get_requester(device_t dev, uint16_t *rid)
 }
 
 static struct iommu_device *
-iommu_instantiate_ctx(struct iommu_unit *iommu, device_t dev, bool rmrr)
+iommu_instantiate_device(struct iommu_unit *iommu, device_t dev, bool rmrr)
 {
 	device_t requester;
-	struct iommu_device *ctx;
+	struct iommu_device *device;
 	bool disabled;
 	uint16_t rid;
 
@@ -247,8 +247,8 @@ iommu_instantiate_ctx(struct iommu_unit *iommu, device_t dev, bool rmrr)
 	disabled = iommu_bus_dma_is_dev_disabled(pci_get_domain(requester), 
 	    pci_get_bus(requester), pci_get_slot(requester), 
 	    pci_get_function(requester));
-	ctx = iommu_get_ctx_for_dev(iommu, requester, rid, disabled, rmrr);
-	if (ctx == NULL)
+	device = iommu_get_device(iommu, requester, rid, disabled, rmrr);
+	if (device == NULL)
 		return (NULL);
 	if (disabled) {
 		/*
@@ -256,22 +256,22 @@ iommu_instantiate_ctx(struct iommu_unit *iommu, device_t dev, bool rmrr)
 		 * later refs.
 		 */
 		IOMMU_LOCK(iommu);
-		if ((ctx->flags & IOMMU_CTX_DISABLED) == 0) {
-			ctx->flags |= IOMMU_CTX_DISABLED;
+		if ((device->flags & IOMMU_DEVICE_DISABLED) == 0) {
+			device->flags |= IOMMU_DEVICE_DISABLED;
 			IOMMU_UNLOCK(iommu);
 		} else {
-			iommu_free_ctx_locked(iommu, ctx);
+			iommu_free_device_locked(iommu, device);
 		}
-		ctx = NULL;
+		device = NULL;
 	}
-	return (ctx);
+	return (device);
 }
 
 bus_dma_tag_t
 acpi_iommu_get_dma_tag(device_t dev, device_t child)
 {
 	struct iommu_unit *iommu;
-	struct iommu_device *ctx;
+	struct iommu_device *device;
 	bus_dma_tag_t res;
 
 	iommu = iommu_find(child, bootverbose);
@@ -281,8 +281,8 @@ acpi_iommu_get_dma_tag(device_t dev, device_t child)
 	if (!iommu->dma_enabled)
 		return (NULL);
 
-	ctx = iommu_instantiate_ctx(iommu, child, false);
-	res = ctx == NULL ? NULL : (bus_dma_tag_t)&ctx->ctx_tag;
+	device = iommu_instantiate_device(iommu, child, false);
+	res = device == NULL ? NULL : (bus_dma_tag_t)&device->device_tag;
 
 	return (res);
 }
@@ -348,8 +348,8 @@ iommu_bus_dma_tag_destroy(bus_dma_tag_t dmat1)
 			parent = (struct bus_dma_tag_iommu *)dmat->common.parent;
 			if (atomic_fetchadd_int(&dmat->common.ref_count, -1) ==
 			    1) {
-				if (dmat == &dmat->device->ctx_tag)
-					iommu_free_ctx(dmat->device);
+				if (dmat == &dmat->device->device_tag)
+					iommu_free_device(dmat->device);
 				free_domain(dmat->segments, M_IOMMU_DMAMAP);
 				free(dmat, M_DEVBUF);
 				dmat = parent;

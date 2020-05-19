@@ -158,15 +158,15 @@ struct iommu_domain {
 struct iommu_device {
 	LIST_ENTRY(iommu_device)	next;
 	struct iommu_domain		*domain;
-	struct bus_dma_tag_iommu	ctx_tag;
+	struct bus_dma_tag_iommu	device_tag;
 	device_t dev;
 	uint16_t rid;
 	u_long loads;
 	u_long unloads;
 	u_int flags;
-#define	IOMMU_CTX_FAULTED	0x0001	/* Fault was reported,
+#define	IOMMU_DEVICE_FAULTED	0x0001	/* Fault was reported,
 					   last_fault_rec is valid */
-#define	IOMMU_CTX_DISABLED	0x0002	/* Device is disabled, the
+#define	IOMMU_DEVICE_DISABLED	0x0002	/* Device is disabled, the
 					   ephemeral reference is kept
 					   to prevent context destruction */
 };
@@ -176,10 +176,10 @@ struct iommu_unit * iommu_find(device_t dev, bool verbose);
 int iommu_register(device_t dev, struct iommu_unit *unit, intptr_t xref);
 int iommu_unregister(device_t dev);
 
-struct iommu_device * iommu_get_ctx_for_dev(struct iommu_unit *iommu,
+struct iommu_device * iommu_get_device_for_dev(struct iommu_unit *iommu,
     device_t requester, uint16_t rid, bool disabled, bool rmrr);
-int iommu_free_ctx(struct iommu_device *device);
-int iommu_free_ctx_locked(struct iommu_unit *iommu,
+int iommu_free_device(struct iommu_device *device);
+int iommu_free_device_locked(struct iommu_unit *iommu,
     struct iommu_device *device);
 
 int iommu_map(struct iommu_domain *domain,

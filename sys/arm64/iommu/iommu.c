@@ -167,7 +167,7 @@ iommu_domain_free(struct iommu_domain *domain)
 }
 
 static struct iommu_device *
-iommu_get_device_for_dev(device_t dev)
+iommu_device_lookup(device_t dev)
 {
 	struct iommu_domain *domain;
 	struct iommu_device *device;
@@ -242,7 +242,7 @@ iommu_device_attach(struct iommu_domain *domain, struct iommu_device *device)
 
 
 struct iommu_device *
-iommu_get_ctx_for_dev(struct iommu_unit *iommu, device_t requester,
+iommu_get_device(struct iommu_unit *iommu, device_t requester,
     uint16_t rid, bool disabled, bool rmrr)
 {
 	struct iommu_device *device;
@@ -250,7 +250,7 @@ iommu_get_ctx_for_dev(struct iommu_unit *iommu, device_t requester,
 	struct bus_dma_tag_iommu *tag;
 	int error;
 
-	device = iommu_get_device_for_dev(requester);
+	device = iommu_device_lookup(requester);
 	if (device)
 		return (device);
 
@@ -258,11 +258,12 @@ iommu_get_ctx_for_dev(struct iommu_unit *iommu, device_t requester,
 	if (device == NULL)
 		return (NULL);
 
+	/* In our current configuration we have a domain per each device. */
 	domain = iommu_domain_alloc(iommu);
 	if (domain == NULL)
 		return (NULL);
 
-	tag = &device->ctx_tag;
+	tag = &device->device_tag;
 	tag->owner = requester;
 	tag->device = device;
 
@@ -286,7 +287,7 @@ iommu_get_ctx_for_dev(struct iommu_unit *iommu, device_t requester,
 }
 
 int
-iommu_free_ctx_locked(struct iommu_unit *iommu, struct iommu_device *device)
+iommu_free_device_locked(struct iommu_unit *iommu, struct iommu_device *device)
 {
 	struct iommu_domain *domain;
 	int error;
@@ -315,7 +316,7 @@ iommu_free_ctx_locked(struct iommu_unit *iommu, struct iommu_device *device)
 }
 
 int
-iommu_free_ctx(struct iommu_device *device)
+iommu_free_device(struct iommu_device *device)
 {
 	struct iommu_unit *iommu;
 	struct iommu_domain *domain;
@@ -325,7 +326,7 @@ iommu_free_ctx(struct iommu_device *device)
 	iommu = domain->iommu;
 
 	IOMMU_LOCK(iommu);
-	error = iommu_free_ctx_locked(iommu, device);
+	error = iommu_free_device_locked(iommu, device);
 
 	return (error);
 }
