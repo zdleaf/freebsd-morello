@@ -163,6 +163,7 @@ struct iommu_device {
 	uint16_t rid;
 	u_long loads;
 	u_long unloads;
+	bool bypass;
 	u_int flags;
 #define	IOMMU_DEVICE_FAULTED	0x0001	/* Fault was reported,
 					   last_fault_rec is valid */

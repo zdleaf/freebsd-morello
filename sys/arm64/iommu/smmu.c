@@ -775,7 +775,7 @@ smmu_init_ste_s1(struct smmu_softc *sc, struct smmu_cd *cd,
 }
 
 static int
-smmu_init_ste(struct smmu_softc *sc, struct smmu_cd *cd, int sid, bool s1)
+smmu_init_ste(struct smmu_softc *sc, struct smmu_cd *cd, int sid, bool bypass)
 {
 	struct smmu_strtab *strtab;
 	struct l1_desc *l1_desc;
@@ -791,10 +791,10 @@ smmu_init_ste(struct smmu_softc *sc, struct smmu_cd *cd, int sid, bool s1)
 		    STRTAB_STE_DWORDS * 8 * sid);
 	};
 
-	if (s1)
-		smmu_init_ste_s1(sc, cd, sid, addr);
-	else
+	if (bypass)
 		smmu_init_ste_bypass(sc, sid, addr);
+	else
+		smmu_init_ste_s1(sc, cd, sid, addr);
 
 	smmu_sync(sc);
 
@@ -1759,7 +1759,7 @@ smmu_device_attach(device_t dev, struct iommu_domain *domain,
 	LIST_INSERT_HEAD(&smmu_domain->master_list, master, next);
 	SMMU_DOMAIN_UNLOCK(smmu_domain);
 
-	smmu_init_ste(sc, &smmu_domain->cd, master->sid, true);
+	smmu_init_ste(sc, &smmu_domain->cd, master->sid, device->bypass);
 
 	return (0);
 }

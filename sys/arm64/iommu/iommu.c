@@ -258,6 +258,9 @@ iommu_get_device(struct iommu_unit *iommu, device_t requester,
 	if (device == NULL)
 		return (NULL);
 
+	if (disabled)
+		device->bypass = true;
+
 	/* In our current configuration we have a domain per each device. */
 	domain = iommu_domain_alloc(iommu);
 	if (domain == NULL)
