@@ -281,6 +281,11 @@ acpi_iommu_get_dma_tag(device_t dev, device_t child)
 	if (!iommu->dma_enabled)
 		return (NULL);
 
+#if defined(__amd64__)
+	iommu_quirks_pre_use(iommu);
+	iommu_instantiate_rmrr_ctxs(iommu);
+#endif
+
 	device = iommu_instantiate_device(iommu, child, false);
 	res = device == NULL ? NULL : (bus_dma_tag_t)&device->device_tag;
 
