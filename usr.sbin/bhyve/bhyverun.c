@@ -71,7 +71,6 @@ __FBSDID("$FreeBSD$");
 #include "bhyverun.h"
 #include "acpi.h"
 #include "atkbdc.h"
-#include "bootrom.h"
 #include "inout.h"
 #include "dbgport.h"
 #include "fwctl.h"
@@ -1251,8 +1250,6 @@ main(int argc, char *argv[])
 #endif
 
 	init_mem();
-	error = bootrom_init(ctx, "/root/u-boot.bin");
-	assert(error == 0);
 	init_uart();
 	vm_attach_vgic(ctx, 0x2f000000UL, 0x10000UL, 0x2f100000UL, 0x200000UL,
 	    0x2f300000UL, 0x10000UL);

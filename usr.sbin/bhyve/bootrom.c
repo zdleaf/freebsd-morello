@@ -56,10 +56,7 @@ bootrom_init(struct vmctx *ctx, const char *romfile)
 	vm_paddr_t gpa;
 	ssize_t rlen;
 	char *ptr;
-	int fd, i, rv;
-#if defined(__amd64__)
-	int prot;
-#endif
+	int fd, i, rv, prot;
 
 	rv = -1;
 	fd = open(romfile, O_RDONLY);
@@ -84,10 +81,6 @@ bootrom_init(struct vmctx *ctx, const char *romfile)
 		goto done;
 	}
 
-#if defined(__aarch64__)
-	gpa = (1ULL << 32);
-	ptr = vm_map_gpa(ctx, gpa, sbuf.st_size);
-#elif defined(__amd64__)
 	if (sbuf.st_size & PAGE_MASK) {
 		EPRINTLN("Bootrom size %ld is not a multiple of the "
 		    "page size", sbuf.st_size);
@@ -103,20 +96,11 @@ bootrom_init(struct vmctx *ctx, const char *romfile)
 	gpa = (1ULL << 32) - sbuf.st_size;
 	if (vm_mmap_memseg(ctx, gpa, VM_BOOTROM, 0, sbuf.st_size, prot) != 0)
 		goto done;
-#endif
 
 	/* Read 'romfile' into the guest address space */
 	for (i = 0; i < sbuf.st_size / PAGE_SIZE; i++) {
 		rlen = read(fd, ptr + i * PAGE_SIZE, PAGE_SIZE);
 		if (rlen != PAGE_SIZE) {
-			EPRINTLN("Incomplete read of page %d of bootrom "
-			    "file %s: %ld bytes", i, romfile, rlen);
-			goto done;
-		}
-	}
-	if ((sbuf.st_size % PAGE_SIZE) != 0) {
-		rlen = read(fd, ptr + i * PAGE_SIZE, sbuf.st_size % PAGE_SIZE);
-		if (rlen != sbuf.st_size % PAGE_SIZE) {
 			EPRINTLN("Incomplete read of page %d of bootrom "
 			    "file %s: %ld bytes", i, romfile, rlen);
 			goto done;
