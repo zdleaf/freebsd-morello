@@ -63,7 +63,13 @@ __FBSDID("$FreeBSD$");
 #include <machine/atomic.h>
 #include <machine/bus.h>
 #include <machine/md_var.h>
+
+#if defined(__amd64__)
+#include <x86/busdma_impl.h>
+#include <x86/iommu/intel_dmar.h>
+#else
 #include <machine/bus_dma_impl.h>
+#endif
 
 #include <dev/iommu/busdma_iommu.h>
 
@@ -282,8 +288,8 @@ acpi_iommu_get_dma_tag(device_t dev, device_t child)
 		return (NULL);
 
 #if defined(__amd64__)
-	iommu_quirks_pre_use(iommu);
-	iommu_instantiate_rmrr_ctxs(iommu);
+	dmar_quirks_pre_use(iommu);
+	dmar_instantiate_rmrr_ctxs(iommu);
 #endif
 
 	device = iommu_instantiate_device(iommu, child, false);

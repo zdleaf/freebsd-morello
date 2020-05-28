@@ -165,6 +165,7 @@ dev/imcsmb/imcsmb.c		optional	imcsmb
 dev/imcsmb/imcsmb_pci.c		optional	imcsmb pci
 dev/intel/spi.c			optional	intelspi
 dev/io/iodev.c			optional	io
+dev/iommu/busdma_iommu.c	optional	acpi acpi_dmar pci
 dev/ipmi/ipmi.c			optional	ipmi
 dev/ipmi/ipmi_acpi.c		optional	ipmi acpi
 dev/ipmi/ipmi_isa.c		optional	ipmi isa
