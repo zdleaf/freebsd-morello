@@ -71,6 +71,7 @@ __FBSDID("$FreeBSD$");
 #include "bhyverun.h"
 #include "acpi.h"
 #include "atkbdc.h"
+#include "bootcode.h"
 #include "bootrom.h"
 #include "inout.h"
 #include "dbgport.h"
@@ -1252,8 +1253,12 @@ main(int argc, char *argv[])
 
 	init_mem();
 	init_uart();
+#ifdef __aarch64__
+	error = bootcode_load(ctx, "/root/u-boot.bin", &rip);
+	assert(error == 0);
 	vm_attach_vgic(ctx, 0x2f000000UL, 0x10000UL, 0x2f100000UL, 0x200000UL,
 	    0x2f300000UL, 0x10000UL);
+#endif
 #ifdef __amd64__
 	init_inout();
 	init_bootrom(ctx);
@@ -1280,9 +1285,7 @@ main(int argc, char *argv[])
 	if (acpi)
 		vmgenc_init(ctx);
 
-#if defined(__aarch64__)
-	rip = vm_get_highmem_base(ctx);
-#elif defined(__amd64__)
+#if defined(__amd64__)
 	if (dbg_port != 0)
 		init_dbgport(dbg_port);
 

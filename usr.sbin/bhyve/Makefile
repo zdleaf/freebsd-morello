@@ -56,6 +56,7 @@ SRCS=	\
 # Missing vm_get_ioctls
 CFLAGS+=	-DWITHOUT_CAPSICUM
 SRCS+=	\
+	bootcode.c		\
 	mmio_uart.c
 .endif
 
