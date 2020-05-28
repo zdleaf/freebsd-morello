@@ -353,10 +353,10 @@ cddl/dev/dtrace/aarch64/dtrace_asm.S			optional dtrace compile-with "${DTRACE_S}
 cddl/dev/dtrace/aarch64/dtrace_subr.c			optional dtrace compile-with "${DTRACE_C}"
 cddl/dev/fbt/aarch64/fbt_isa.c				optional dtrace_fbt | dtraceall compile-with "${FBT_C}"
 
-arm64/iommu/iommu.c		optional	smmu
-arm64/iommu/iommu_if.m		optional	smmu
-arm64/iommu/smmu.c		optional	smmu
-arm64/iommu/smmu_acpi.c		optional	smmu acpi
+arm64/iommu/iommu.c		optional	acpi acpi_smmu pci
+arm64/iommu/iommu_if.m		optional	acpi acpi_smmu pci
+arm64/iommu/smmu.c		optional	acpi acpi_smmu pci
+arm64/iommu/smmu_acpi.c		optional	acpi acpi_smmu pci
 
 # RockChip Drivers
 arm64/rockchip/rk3399_emmcphy.c		optional fdt rk_emmcphy soc_rockchip_rk3399
