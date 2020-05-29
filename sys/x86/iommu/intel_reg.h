@@ -34,12 +34,12 @@
 #ifndef __X86_IOMMU_INTEL_REG_H
 #define	__X86_IOMMU_INTEL_REG_H
 
-#define	DMAR_PAGE_SIZE	PAGE_SIZE
-#define	DMAR_PAGE_MASK	(DMAR_PAGE_SIZE - 1)
-#define	DMAR_PAGE_SHIFT	PAGE_SHIFT
-#define	DMAR_NPTEPG	(DMAR_PAGE_SIZE / sizeof(dmar_pte_t))
-#define	DMAR_NPTEPGSHIFT 9
-#define	DMAR_PTEMASK	(DMAR_NPTEPG - 1)
+#define	IOMMU_PAGE_SIZE		PAGE_SIZE
+#define	IOMMU_PAGE_MASK		(IOMMU_PAGE_SIZE - 1)
+#define	IOMMU_PAGE_SHIFT	PAGE_SHIFT
+#define	DMAR_NPTEPG		(IOMMU_PAGE_SIZE / sizeof(dmar_pte_t))
+#define	DMAR_NPTEPGSHIFT	9
+#define	DMAR_PTEMASK		(DMAR_NPTEPG - 1)
 
 typedef struct dmar_root_entry {
 	uint64_t r1;
@@ -49,12 +49,12 @@ typedef struct dmar_root_entry {
 #define	DMAR_ROOT_R1_CTP_MASK	0xfffffffffffff000 /* Mask for Context-Entry
 						      Table Pointer */
 
-#define	DMAR_CTX_CNT		(DMAR_PAGE_SIZE / sizeof(dmar_root_entry_t))
+#define	DMAR_CTX_CNT		(IOMMU_PAGE_SIZE / sizeof(dmar_root_entry_t))
 
-typedef	struct dmar_ctx_entry {
+typedef	struct iommu_device_entry {
 	uint64_t ctx1;
 	uint64_t ctx2;
-} dmar_ctx_entry_t;
+} iommu_device_entry_t;
 #define	DMAR_CTX1_P		1		/* Present */
 #define	DMAR_CTX1_FPD		2		/* Fault Processing Disable */
 						/* Translation Type: */

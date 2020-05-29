@@ -69,8 +69,8 @@ __FBSDID("$FreeBSD$");
 #include <dev/pci/pcireg.h>
 #include <x86/iommu/intel_dmar.h>
 
-static int domain_unmap_buf_locked(struct dmar_domain *domain,
-    dmar_gaddr_t base, dmar_gaddr_t size, int flags);
+static int domain_unmap_buf_locked(struct iommu_domain *domain,
+    iommu_gaddr_t base, iommu_gaddr_t size, int flags);
 
 /*
  * The cache of the identity mapping page tables for the DMARs.  Using
@@ -82,7 +82,7 @@ static int domain_unmap_buf_locked(struct dmar_domain *domain,
  */
 
 struct idpgtbl {
-	dmar_gaddr_t maxaddr;	/* Page table covers the guest address
+	iommu_gaddr_t maxaddr;	/* Page table covers the guest address
 				   range [0..maxaddr) */
 	int pglvl;		/* Total page table levels ignoring
 				   superpages */
@@ -109,12 +109,12 @@ static MALLOC_DEFINE(M_DMAR_IDPGTBL, "dmar_idpgtbl",
  */
 static void
 domain_idmap_nextlvl(struct idpgtbl *tbl, int lvl, vm_pindex_t idx,
-    dmar_gaddr_t addr)
+    iommu_gaddr_t addr)
 {
 	vm_page_t m1;
 	dmar_pte_t *pte;
 	struct sf_buf *sf;
-	dmar_gaddr_t f, pg_sz;
+	iommu_gaddr_t f, pg_sz;
 	vm_pindex_t base;
 	int i;
 
@@ -163,9 +163,9 @@ domain_idmap_nextlvl(struct idpgtbl *tbl, int lvl, vm_pindex_t idx,
  * maxaddr is typically mapped.
  */
 vm_object_t
-domain_get_idmap_pgtbl(struct dmar_domain *domain, dmar_gaddr_t maxaddr)
+domain_get_idmap_pgtbl(struct iommu_domain *domain, iommu_gaddr_t maxaddr)
 {
-	struct dmar_unit *unit;
+	struct iommu_unit *unit;
 	struct idpgtbl *tbl;
 	vm_object_t res;
 	vm_page_t m;
@@ -194,7 +194,7 @@ domain_get_idmap_pgtbl(struct dmar_domain *domain, dmar_gaddr_t maxaddr)
 	sx_slock(&idpgtbl_lock);
 	LIST_FOREACH(tbl, &idpgtbls, link) {
 		if (tbl->maxaddr >= maxaddr &&
-		    dmar_pglvl_supported(domain->dmar, tbl->pglvl) &&
+		    dmar_pglvl_supported(domain->iommu, tbl->pglvl) &&
 		    tbl->leaf == leaf) {
 			res = tbl->pgtbl_obj;
 			vm_object_reference(res);
@@ -213,7 +213,7 @@ domain_get_idmap_pgtbl(struct dmar_domain *domain, dmar_gaddr_t maxaddr)
 	sx_xlock(&idpgtbl_lock);
 	LIST_FOREACH(tbl, &idpgtbls, link) {
 		if (tbl->maxaddr >= maxaddr &&
-		    dmar_pglvl_supported(domain->dmar, tbl->pglvl) &&
+		    dmar_pglvl_supported(domain->iommu, tbl->pglvl) &&
 		    tbl->leaf == leaf) {
 			res = tbl->pgtbl_obj;
 			vm_object_reference(res);
@@ -254,7 +254,7 @@ end:
 	 * If DMAR cannot look into the chipset write buffer, flush it
 	 * as well.
 	 */
-	unit = domain->dmar;
+	unit = domain->iommu;
 	if (!DMAR_IS_COHERENT(unit)) {
 		VM_OBJECT_WLOCK(res);
 		for (m = vm_page_lookup(res, 0); m != NULL;
@@ -263,9 +263,9 @@ end:
 		VM_OBJECT_WUNLOCK(res);
 	}
 	if ((unit->hw_cap & DMAR_CAP_RWBF) != 0) {
-		DMAR_LOCK(unit);
+		IOMMU_LOCK(unit);
 		dmar_flush_write_bufs(unit);
-		DMAR_UNLOCK(unit);
+		IOMMU_UNLOCK(unit);
 	}
 	
 	return (res);
@@ -323,10 +323,10 @@ put_idmap_pgtbl(vm_object_t obj)
  * the level lvl.
  */
 static int
-domain_pgtbl_pte_off(struct dmar_domain *domain, dmar_gaddr_t base, int lvl)
+domain_pgtbl_pte_off(struct iommu_domain *domain, iommu_gaddr_t base, int lvl)
 {
 
-	base >>= DMAR_PAGE_SHIFT + (domain->pglvl - lvl - 1) *
+	base >>= IOMMU_PAGE_SHIFT + (domain->pglvl - lvl - 1) *
 	    DMAR_NPTEPGSHIFT;
 	return (base & DMAR_PTEMASK);
 }
@@ -337,7 +337,7 @@ domain_pgtbl_pte_off(struct dmar_domain *domain, dmar_gaddr_t base, int lvl)
  * lvl.
  */
 static vm_pindex_t
-domain_pgtbl_get_pindex(struct dmar_domain *domain, dmar_gaddr_t base, int lvl)
+domain_pgtbl_get_pindex(struct iommu_domain *domain, iommu_gaddr_t base, int lvl)
 {
 	vm_pindex_t idx, pidx;
 	int i;
@@ -353,7 +353,7 @@ domain_pgtbl_get_pindex(struct dmar_domain *domain, dmar_gaddr_t base, int lvl)
 }
 
 static dmar_pte_t *
-domain_pgtbl_map_pte(struct dmar_domain *domain, dmar_gaddr_t base, int lvl,
+domain_pgtbl_map_pte(struct iommu_domain *domain, iommu_gaddr_t base, int lvl,
     int flags, vm_pindex_t *idxp, struct sf_buf **sf)
 {
 	vm_page_t m;
@@ -408,7 +408,7 @@ retry:
 			}
 			dmar_pte_store(&ptep->pte, DMAR_PTE_R | DMAR_PTE_W |
 			    VM_PAGE_TO_PHYS(m));
-			dmar_flush_pte_to_ram(domain->dmar, ptep);
+			dmar_flush_pte_to_ram(domain->iommu, ptep);
 			sf_buf_page(sfp)->ref_count += 1;
 			m->ref_count--;
 			dmar_unmap_pgtbl(sfp);
@@ -421,12 +421,12 @@ retry:
 }
 
 static int
-domain_map_buf_locked(struct dmar_domain *domain, dmar_gaddr_t base,
-    dmar_gaddr_t size, vm_page_t *ma, uint64_t pflags, int flags)
+domain_map_buf_locked(struct iommu_domain *domain, iommu_gaddr_t base,
+    iommu_gaddr_t size, vm_page_t *ma, uint64_t pflags, int flags)
 {
 	dmar_pte_t *pte;
 	struct sf_buf *sf;
-	dmar_gaddr_t pg_sz, base1, size1;
+	iommu_gaddr_t pg_sz, base1, size1;
 	vm_pindex_t pi, c, idx, run_sz;
 	int lvl;
 	bool superpage;
@@ -442,7 +442,7 @@ domain_map_buf_locked(struct dmar_domain *domain, dmar_gaddr_t base,
 	    pi += run_sz) {
 		for (lvl = 0, c = 0, superpage = false;; lvl++) {
 			pg_sz = domain_page_size(domain, lvl);
-			run_sz = pg_sz >> DMAR_PAGE_SHIFT;
+			run_sz = pg_sz >> IOMMU_PAGE_SHIFT;
 			if (lvl == domain->pglvl - 1)
 				break;
 			/*
@@ -489,7 +489,7 @@ domain_map_buf_locked(struct dmar_domain *domain, dmar_gaddr_t base,
 		}
 		dmar_pte_store(&pte->pte, VM_PAGE_TO_PHYS(ma[pi]) | pflags |
 		    (superpage ? DMAR_PTE_SP : 0));
-		dmar_flush_pte_to_ram(domain->dmar, pte);
+		dmar_flush_pte_to_ram(domain->iommu, pte);
 		sf_buf_page(sf)->ref_count += 1;
 	}
 	if (sf != NULL)
@@ -499,20 +499,20 @@ domain_map_buf_locked(struct dmar_domain *domain, dmar_gaddr_t base,
 }
 
 int
-domain_map_buf(struct dmar_domain *domain, dmar_gaddr_t base, dmar_gaddr_t size,
+domain_map_buf(struct iommu_domain *domain, iommu_gaddr_t base, iommu_gaddr_t size,
     vm_page_t *ma, uint64_t pflags, int flags)
 {
-	struct dmar_unit *unit;
+	struct iommu_unit *unit;
 	int error;
 
-	unit = domain->dmar;
+	unit = domain->iommu;
 
 	KASSERT((domain->flags & DMAR_DOMAIN_IDMAP) == 0,
 	    ("modifying idmap pagetable domain %p", domain));
-	KASSERT((base & DMAR_PAGE_MASK) == 0,
+	KASSERT((base & IOMMU_PAGE_MASK) == 0,
 	    ("non-aligned base %p %jx %jx", domain, (uintmax_t)base,
 	    (uintmax_t)size));
-	KASSERT((size & DMAR_PAGE_MASK) == 0,
+	KASSERT((size & IOMMU_PAGE_MASK) == 0,
 	    ("non-aligned size %p %jx %jx", domain, (uintmax_t)base,
 	    (uintmax_t)size));
 	KASSERT(size > 0, ("zero size %p %jx %jx", domain, (uintmax_t)base,
@@ -551,19 +551,19 @@ domain_map_buf(struct dmar_domain *domain, dmar_gaddr_t base, dmar_gaddr_t size,
 		domain_flush_iotlb_sync(domain, base, size);
 	else if ((unit->hw_cap & DMAR_CAP_RWBF) != 0) {
 		/* See 11.1 Write Buffer Flushing. */
-		DMAR_LOCK(unit);
+		IOMMU_LOCK(unit);
 		dmar_flush_write_bufs(unit);
-		DMAR_UNLOCK(unit);
+		IOMMU_UNLOCK(unit);
 	}
 	return (0);
 }
 
-static void domain_unmap_clear_pte(struct dmar_domain *domain,
-    dmar_gaddr_t base, int lvl, int flags, dmar_pte_t *pte,
+static void domain_unmap_clear_pte(struct iommu_domain *domain,
+    iommu_gaddr_t base, int lvl, int flags, dmar_pte_t *pte,
     struct sf_buf **sf, bool free_fs);
 
 static void
-domain_free_pgtbl_pde(struct dmar_domain *domain, dmar_gaddr_t base,
+domain_free_pgtbl_pde(struct iommu_domain *domain, iommu_gaddr_t base,
     int lvl, int flags)
 {
 	struct sf_buf *sf;
@@ -576,13 +576,13 @@ domain_free_pgtbl_pde(struct dmar_domain *domain, dmar_gaddr_t base,
 }
 
 static void
-domain_unmap_clear_pte(struct dmar_domain *domain, dmar_gaddr_t base, int lvl,
+domain_unmap_clear_pte(struct iommu_domain *domain, iommu_gaddr_t base, int lvl,
     int flags, dmar_pte_t *pte, struct sf_buf **sf, bool free_sf)
 {
 	vm_page_t m;
 
 	dmar_pte_clear(&pte->pte);
-	dmar_flush_pte_to_ram(domain->dmar, pte);
+	dmar_flush_pte_to_ram(domain->iommu, pte);
 	m = sf_buf_page(*sf);
 	if (free_sf) {
 		dmar_unmap_pgtbl(*sf);
@@ -605,13 +605,13 @@ domain_unmap_clear_pte(struct dmar_domain *domain, dmar_gaddr_t base, int lvl,
  * Assumes that the unmap is never partial.
  */
 static int
-domain_unmap_buf_locked(struct dmar_domain *domain, dmar_gaddr_t base,
-    dmar_gaddr_t size, int flags)
+domain_unmap_buf_locked(struct iommu_domain *domain, iommu_gaddr_t base,
+    iommu_gaddr_t size, int flags)
 {
 	dmar_pte_t *pte;
 	struct sf_buf *sf;
 	vm_pindex_t idx;
-	dmar_gaddr_t pg_sz;
+	iommu_gaddr_t pg_sz;
 	int lvl;
 
 	DMAR_DOMAIN_ASSERT_PGLOCKED(domain);
@@ -620,10 +620,10 @@ domain_unmap_buf_locked(struct dmar_domain *domain, dmar_gaddr_t base,
 
 	KASSERT((domain->flags & DMAR_DOMAIN_IDMAP) == 0,
 	    ("modifying idmap pagetable domain %p", domain));
-	KASSERT((base & DMAR_PAGE_MASK) == 0,
+	KASSERT((base & IOMMU_PAGE_MASK) == 0,
 	    ("non-aligned base %p %jx %jx", domain, (uintmax_t)base,
 	    (uintmax_t)size));
-	KASSERT((size & DMAR_PAGE_MASK) == 0,
+	KASSERT((size & IOMMU_PAGE_MASK) == 0,
 	    ("non-aligned size %p %jx %jx", domain, (uintmax_t)base,
 	    (uintmax_t)size));
 	KASSERT(base < (1ULL << domain->agaw),
@@ -677,8 +677,8 @@ domain_unmap_buf_locked(struct dmar_domain *domain, dmar_gaddr_t base,
 }
 
 int
-domain_unmap_buf(struct dmar_domain *domain, dmar_gaddr_t base,
-    dmar_gaddr_t size, int flags)
+domain_unmap_buf(struct iommu_domain *domain, iommu_gaddr_t base,
+    iommu_gaddr_t size, int flags)
 {
 	int error;
 
@@ -689,7 +689,7 @@ domain_unmap_buf(struct dmar_domain *domain, dmar_gaddr_t base,
 }
 
 int
-domain_alloc_pgtbl(struct dmar_domain *domain)
+domain_alloc_pgtbl(struct iommu_domain *domain)
 {
 	vm_page_t m;
 
@@ -704,21 +704,21 @@ domain_alloc_pgtbl(struct dmar_domain *domain)
 	/* No implicit free of the top level page table page. */
 	m->ref_count = 1;
 	DMAR_DOMAIN_PGUNLOCK(domain);
-	DMAR_LOCK(domain->dmar);
+	IOMMU_LOCK(domain->iommu);
 	domain->flags |= DMAR_DOMAIN_PGTBL_INITED;
-	DMAR_UNLOCK(domain->dmar);
+	IOMMU_UNLOCK(domain->iommu);
 	return (0);
 }
 
 void
-domain_free_pgtbl(struct dmar_domain *domain)
+domain_free_pgtbl(struct iommu_domain *domain)
 {
 	vm_object_t obj;
 	vm_page_t m;
 
 	obj = domain->pgtbl_obj;
 	if (obj == NULL) {
-		KASSERT((domain->dmar->hw_ecap & DMAR_ECAP_PT) != 0 &&
+		KASSERT((domain->iommu->hw_ecap & DMAR_ECAP_PT) != 0 &&
 		    (domain->flags & DMAR_DOMAIN_IDMAP) != 0,
 		    ("lost pagetable object domain %p", domain));
 		return;
@@ -741,7 +741,7 @@ domain_free_pgtbl(struct dmar_domain *domain)
 }
 
 static inline uint64_t
-domain_wait_iotlb_flush(struct dmar_unit *unit, uint64_t wt, int iro)
+domain_wait_iotlb_flush(struct iommu_unit *unit, uint64_t wt, int iro)
 {
 	uint64_t iotlbr;
 
@@ -757,19 +757,19 @@ domain_wait_iotlb_flush(struct dmar_unit *unit, uint64_t wt, int iro)
 }
 
 void
-domain_flush_iotlb_sync(struct dmar_domain *domain, dmar_gaddr_t base,
-    dmar_gaddr_t size)
+domain_flush_iotlb_sync(struct iommu_domain *domain, iommu_gaddr_t base,
+    iommu_gaddr_t size)
 {
-	struct dmar_unit *unit;
-	dmar_gaddr_t isize;
+	struct iommu_unit *unit;
+	iommu_gaddr_t isize;
 	uint64_t iotlbr;
 	int am, iro;
 
-	unit = domain->dmar;
+	unit = domain->iommu;
 	KASSERT(!unit->qi_enabled, ("dmar%d: sync iotlb flush call",
 	    unit->unit));
 	iro = DMAR_ECAP_IRO(unit->hw_ecap) * 16;
-	DMAR_LOCK(unit);
+	IOMMU_LOCK(unit);
 	if ((unit->hw_cap & DMAR_CAP_PSI) == 0 || size > 2 * 1024 * 1024) {
 		iotlbr = domain_wait_iotlb_flush(unit, DMAR_IOTLB_IIRG_DOM |
 		    DMAR_IOTLB_DID(domain->domain), iro);
@@ -799,5 +799,5 @@ domain_flush_iotlb_sync(struct dmar_domain *domain, dmar_gaddr_t base,
 				break;
 		}
 	}
-	DMAR_UNLOCK(unit);
+	IOMMU_UNLOCK(unit);
 }

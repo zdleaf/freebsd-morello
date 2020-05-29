@@ -34,34 +34,6 @@
 #ifndef __X86_IOMMU_BUSDMA_DMAR_H
 #define __X86_IOMMU_BUSDMA_DMAR_H
 
-struct dmar_map_entry;
-TAILQ_HEAD(dmar_map_entries_tailq, dmar_map_entry);
-
-struct bus_dma_tag_dmar {
-	struct bus_dma_tag_common common;
-	struct dmar_ctx *ctx;
-	device_t owner;
-	int map_count;
-	bus_dma_segment_t *segments;
-};
-
-struct bus_dmamap_dmar {
-	struct bus_dma_tag_dmar *tag;
-	struct memdesc mem;
-	bus_dmamap_callback_t *callback;
-	void *callback_arg;
-	struct dmar_map_entries_tailq map_entries;
-	TAILQ_ENTRY(bus_dmamap_dmar) delay_link;
-	bool locked;
-	bool cansleep;
-	int flags;
-};
-
-#define	BUS_DMAMAP_DMAR_MALLOC	0x0001
-#define	BUS_DMAMAP_DMAR_KMEM_ALLOC 0x0002
-
-extern struct bus_dma_impl bus_dma_dmar_impl;
-
-bus_dma_tag_t acpi_iommu_get_dma_tag(device_t dev, device_t child);
+#include <dev/iommu/busdma_iommu.h>
 
 #endif

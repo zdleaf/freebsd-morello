@@ -80,7 +80,7 @@ __FBSDID("$FreeBSD$");
  */
 
 static int
-dmar_fault_next(struct dmar_unit *unit, int faultp)
+dmar_fault_next(struct iommu_unit *unit, int faultp)
 {
 
 	faultp += 2;
@@ -90,7 +90,7 @@ dmar_fault_next(struct dmar_unit *unit, int faultp)
 }
 
 static void
-dmar_fault_intr_clear(struct dmar_unit *unit, uint32_t fsts)
+dmar_fault_intr_clear(struct iommu_unit *unit, uint32_t fsts)
 {
 	uint32_t clear;
 
@@ -124,7 +124,7 @@ dmar_fault_intr_clear(struct dmar_unit *unit, uint32_t fsts)
 int
 dmar_fault_intr(void *arg)
 {
-	struct dmar_unit *unit;
+	struct iommu_unit *unit;
 	uint64_t fault_rec[2];
 	uint32_t fsts;
 	int fri, frir, faultp;
@@ -190,8 +190,8 @@ done:
 static void
 dmar_fault_task(void *arg, int pending __unused)
 {
-	struct dmar_unit *unit;
-	struct dmar_ctx *ctx;
+	struct iommu_unit *unit;
+	struct iommu_device *ctx;
 	uint64_t fault_rec[2];
 	int sid, bus, slot, func, faultp;
 
@@ -209,7 +209,7 @@ dmar_fault_task(void *arg, int pending __unused)
 
 		sid = DMAR_FRCD2_SID(fault_rec[1]);
 		printf("DMAR%d: ", unit->unit);
-		DMAR_LOCK(unit);
+		IOMMU_LOCK(unit);
 		ctx = dmar_find_ctx_locked(unit, sid);
 		if (ctx == NULL) {
 			printf("<unknown dev>:");
@@ -223,15 +223,15 @@ dmar_fault_task(void *arg, int pending __unused)
 			slot = PCI_RID2SLOT(sid);
 			func = PCI_RID2FUNC(sid);
 		} else {
-			ctx->flags |= DMAR_CTX_FAULTED;
+			ctx->flags |= IOMMU_DEVICE_FAULTED;
 			ctx->last_fault_rec[0] = fault_rec[0];
 			ctx->last_fault_rec[1] = fault_rec[1];
-			device_print_prettyname(ctx->ctx_tag.owner);
-			bus = pci_get_bus(ctx->ctx_tag.owner);
-			slot = pci_get_slot(ctx->ctx_tag.owner);
-			func = pci_get_function(ctx->ctx_tag.owner);
+			device_print_prettyname(ctx->device_tag.owner);
+			bus = pci_get_bus(ctx->device_tag.owner);
+			slot = pci_get_slot(ctx->device_tag.owner);
+			func = pci_get_function(ctx->device_tag.owner);
 		}
-		DMAR_UNLOCK(unit);
+		IOMMU_UNLOCK(unit);
 		printf(
 		    "pci%d:%d:%d sid %x fault acc %x adt 0x%x reason 0x%x "
 		    "addr %jx\n",
@@ -244,7 +244,7 @@ dmar_fault_task(void *arg, int pending __unused)
 }
 
 static void
-dmar_clear_faults(struct dmar_unit *unit)
+dmar_clear_faults(struct iommu_unit *unit)
 {
 	uint32_t frec, frir, fsts;
 	int i;
@@ -261,7 +261,7 @@ dmar_clear_faults(struct dmar_unit *unit)
 }
 
 int
-dmar_init_fault_log(struct dmar_unit *unit)
+dmar_init_fault_log(struct iommu_unit *unit)
 {
 
 	mtx_init(&unit->fault_lock, "dmarflt", NULL, MTX_SPIN);
@@ -278,25 +278,25 @@ dmar_init_fault_log(struct dmar_unit *unit)
 	taskqueue_start_threads(&unit->fault_taskqueue, 1, PI_AV,
 	    "dmar%d fault taskq", unit->unit);
 
-	DMAR_LOCK(unit);
+	IOMMU_LOCK(unit);
 	dmar_disable_fault_intr(unit);
 	dmar_clear_faults(unit);
 	dmar_enable_fault_intr(unit);
-	DMAR_UNLOCK(unit);
+	IOMMU_UNLOCK(unit);
 
 	return (0);
 }
 
 void
-dmar_fini_fault_log(struct dmar_unit *unit)
+dmar_fini_fault_log(struct iommu_unit *unit)
 {
 
 	if (unit->fault_taskqueue == NULL)
 		return;
 
-	DMAR_LOCK(unit);
+	IOMMU_LOCK(unit);
 	dmar_disable_fault_intr(unit);
-	DMAR_UNLOCK(unit);
+	IOMMU_UNLOCK(unit);
 
 	taskqueue_drain(unit->fault_taskqueue, &unit->fault_task);
 	taskqueue_free(unit->fault_taskqueue);
@@ -309,22 +309,22 @@ dmar_fini_fault_log(struct dmar_unit *unit)
 }
 
 void
-dmar_enable_fault_intr(struct dmar_unit *unit)
+dmar_enable_fault_intr(struct iommu_unit *unit)
 {
 	uint32_t fectl;
 
-	DMAR_ASSERT_LOCKED(unit);
+	IOMMU_ASSERT_LOCKED(unit);
 	fectl = dmar_read4(unit, DMAR_FECTL_REG);
 	fectl &= ~DMAR_FECTL_IM;
 	dmar_write4(unit, DMAR_FECTL_REG, fectl);
 }
 
 void
-dmar_disable_fault_intr(struct dmar_unit *unit)
+dmar_disable_fault_intr(struct iommu_unit *unit)
 {
 	uint32_t fectl;
 
-	DMAR_ASSERT_LOCKED(unit);
+	IOMMU_ASSERT_LOCKED(unit);
 	fectl = dmar_read4(unit, DMAR_FECTL_REG);
 	dmar_write4(unit, DMAR_FECTL_REG, fectl | DMAR_FECTL_IM);
 }
