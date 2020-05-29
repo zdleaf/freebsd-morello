@@ -199,5 +199,7 @@ int iommu_unmap_page(struct iommu_domain *domain, vm_offset_t va);
 
 int iommu_init_busdma(struct iommu_unit *unit);
 void iommu_fini_busdma(struct iommu_unit *unit);
+struct iommu_device * iommu_instantiate_device(struct iommu_unit *iommu,
+    device_t dev, bool rmrr);
 
 #endif /* _DEV_IOMMU_IOMMU_H_ */
