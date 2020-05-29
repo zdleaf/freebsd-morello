@@ -65,9 +65,10 @@ __FBSDID("$FreeBSD$");
 #include <machine/md_var.h>
 
 #if defined(__amd64__)
+#include <x86/iommu/intel_reg.h>
 #include <x86/busdma_impl.h>
-#include <x86/iommu/intel_dmar.h>
 #include <dev/iommu/busdma_iommu.h>
+#include <x86/iommu/intel_dmar.h>
 #else
 #include <machine/bus_dma_impl.h>
 #include <dev/iommu/busdma_iommu.h>
@@ -234,7 +235,7 @@ iommu_get_requester(device_t dev, uint16_t *rid)
 	return (requester);
 }
 
-static struct iommu_device *
+struct iommu_device *
 iommu_instantiate_device(struct iommu_unit *iommu, device_t dev, bool rmrr)
 {
 	device_t requester;
@@ -405,7 +406,7 @@ iommu_bus_dmamap_create(bus_dma_tag_t dmat, int flags, bus_dmamap_t *mapp)
 		}
 	}
 	TAILQ_INIT(&map->map_entries);
-	map->tag = tag;
+	map->device_tag = tag;
 	map->locked = true;
 	map->cansleep = false;
 	tag->map_count++;
@@ -787,7 +788,7 @@ iommu_bus_dmamap_waitok(bus_dma_tag_t dmat, bus_dmamap_t map1,
 		return;
 	map = (struct bus_dmamap_iommu *)map1;
 	map->mem = *mem;
-	map->tag = (struct bus_dma_tag_iommu *)dmat;
+	map->device_tag = (struct bus_dma_tag_iommu *)dmat;
 	map->callback = callback;
 	map->callback_arg = callback_arg;
 }
@@ -900,7 +901,7 @@ iommu_bus_task_dmamap(void *arg, int pending)
 	while ((map = TAILQ_FIRST(&unit->delayed_maps)) != NULL) {
 		TAILQ_REMOVE(&unit->delayed_maps, map, delay_link);
 		IOMMU_UNLOCK(unit);
-		tag = map->tag;
+		tag = map->device_tag;
 		map->cansleep = true;
 		map->locked = false;
 		bus_dmamap_load_mem((bus_dma_tag_t)tag, (bus_dmamap_t)map,

@@ -46,7 +46,7 @@ struct bus_dma_tag_iommu {
 };
 
 struct bus_dmamap_iommu {
-	struct bus_dma_tag_iommu *tag;
+	struct bus_dma_tag_iommu *device_tag;
 	struct memdesc mem;
 	bus_dmamap_callback_t *callback;
 	void *callback_arg;
