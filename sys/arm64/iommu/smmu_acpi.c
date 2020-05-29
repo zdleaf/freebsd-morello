@@ -40,6 +40,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/bus.h>
 #include <sys/kernel.h>
 #include <sys/malloc.h>
+#include <sys/memdesc.h>
 #include <sys/module.h>
 #include <sys/rman.h>
 
@@ -48,7 +49,10 @@ __FBSDID("$FreeBSD$");
 
 #include <contrib/dev/acpica/include/acpi.h>
 #include <dev/acpica/acpivar.h>
+
+#include <machine/bus_dma_impl.h>
 #include <dev/iommu/busdma_iommu.h>
+#include <arm64/iommu/iommu.h>
 
 #include "smmu_reg.h"
 #include "smmu_var.h"

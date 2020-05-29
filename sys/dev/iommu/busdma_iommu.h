@@ -34,29 +34,16 @@
 #ifndef _DEV_IOMMU_BUSDMA_IOMMU_H_
 #define _DEV_IOMMU_BUSDMA_IOMMU_H_
 
-#include <sys/systm.h>
-#include <sys/domainset.h>
-#include <sys/malloc.h>
-#include <sys/bus.h>
-#include <sys/conf.h>
-#include <sys/interrupt.h>
-#include <sys/kernel.h>
-#include <sys/ktr.h>
-#include <sys/lock.h>
-#include <sys/proc.h>
-#include <sys/memdesc.h>
-#include <sys/mutex.h>
-#include <sys/sysctl.h>
-#include <sys/rman.h>
-#include <sys/taskqueue.h>
-#include <sys/tree.h>
-#include <sys/uio.h>
-#include <sys/vmem.h>
+struct iommu_map_entry;
+TAILQ_HEAD(iommu_map_entries_tailq, iommu_map_entry);
 
-#include <arm64/iommu/iommu.h>
-
-#define	BUS_DMAMAP_IOMMU_MALLOC		0x0001
-#define	BUS_DMAMAP_IOMMU_KMEM_ALLOC	0x0002
+struct bus_dma_tag_iommu {
+	struct bus_dma_tag_common common;
+	struct iommu_device *device;
+	device_t owner;
+	int map_count;
+	bus_dma_segment_t *segments;
+};
 
 struct bus_dmamap_iommu {
 	struct bus_dma_tag_iommu *tag;
@@ -70,15 +57,10 @@ struct bus_dmamap_iommu {
 	int flags;
 };
 
-static inline bool
-iommu_test_boundary(iommu_gaddr_t start, iommu_gaddr_t size,
-    iommu_gaddr_t boundary)
-{
+#define	BUS_DMAMAP_IOMMU_MALLOC		0x0001
+#define	BUS_DMAMAP_IOMMU_KMEM_ALLOC	0x0002
 
-	if (boundary == 0)
-		return (true);
-	return (start + size <= ((start + boundary) & ~(boundary - 1)));
-}
+extern struct bus_dma_impl bus_dma_iommu_impl;
 
 bus_dma_tag_t acpi_iommu_get_dma_tag(device_t dev, device_t child);
 

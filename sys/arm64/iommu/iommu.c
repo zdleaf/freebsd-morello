@@ -43,6 +43,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/kernel.h>
 #include <sys/ktr.h>
 #include <sys/malloc.h>
+#include <sys/memdesc.h>
 #include <sys/module.h>
 #include <sys/queue.h>
 #include <sys/rman.h>
@@ -72,6 +73,8 @@ __FBSDID("$FreeBSD$");
 #include <dev/acpica/acpivar.h>
 #include <dev/acpica/acpi_pcibvar.h>
 #endif
+
+#include <dev/iommu/busdma_iommu.h>
 
 #include "iommu.h"
 #include "iommu_if.h"

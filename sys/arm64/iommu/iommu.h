@@ -63,6 +63,8 @@
 #include <vm/vm.h>
 #include <vm/pmap.h>
 
+#include <dev/iommu/busdma_iommu.h>
+
 #define	IOMMU_PAGE_SIZE		4096
 #define	IOMMU_PAGE_MASK		(IOMMU_PAGE_SIZE - 1)
 
@@ -110,16 +112,6 @@ struct iommu_map_entry {
 	TAILQ_ENTRY(iommu_map_entry) unroll_link; /* Link for unroll after
 						    dmamap_load failure */
 	struct iommu_domain *domain;
-};
-
-TAILQ_HEAD(iommu_map_entries_tailq, iommu_map_entry);
-
-struct bus_dma_tag_iommu {
-	struct bus_dma_tag_common common;
-	struct iommu_device *device;
-	device_t owner;
-	int map_count;
-	bus_dma_segment_t *segments;
 };
 
 struct iommu_unit {
@@ -171,6 +163,16 @@ struct iommu_device {
 					   ephemeral reference is kept
 					   to prevent context destruction */
 };
+
+static inline bool
+iommu_test_boundary(iommu_gaddr_t start, iommu_gaddr_t size,
+    iommu_gaddr_t boundary)
+{
+
+	if (boundary == 0)
+		return (true);
+	return (start + size <= ((start + boundary) & ~(boundary - 1)));
+}
 
 struct iommu_unit * iommu_find(device_t dev, bool verbose);
 
