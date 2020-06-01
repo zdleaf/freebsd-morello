@@ -165,8 +165,8 @@ ctx_id_entry_init_one(iommu_device_entry_t *ctxp, struct iommu_domain *domain,
 }
 
 static void
-ctx_id_entry_init(struct iommu_device *ctx, iommu_device_entry_t *ctxp, bool move,
-    int busno)
+ctx_id_entry_init(struct iommu_device *ctx, iommu_device_entry_t *ctxp,
+    bool move, int busno)
 {
 	struct iommu_unit *unit;
 	struct iommu_domain *domain;

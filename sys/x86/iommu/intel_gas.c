@@ -357,7 +357,8 @@ dmar_gas_match_insert(struct dmar_gas_match_args *a)
 }
 
 static int
-dmar_gas_lowermatch(struct dmar_gas_match_args *a, struct iommu_map_entry *entry)
+dmar_gas_lowermatch(struct dmar_gas_match_args *a,
+    struct iommu_map_entry *entry)
 {
 	struct iommu_map_entry *child;
 
@@ -388,7 +389,8 @@ dmar_gas_lowermatch(struct dmar_gas_match_args *a, struct iommu_map_entry *entry
 }
 
 static int
-dmar_gas_uppermatch(struct dmar_gas_match_args *a, struct iommu_map_entry *entry)
+dmar_gas_uppermatch(struct dmar_gas_match_args *a,
+    struct iommu_map_entry *entry)
 {
 	struct iommu_map_entry *child;
 
@@ -454,8 +456,8 @@ dmar_gas_find_space(struct iommu_domain *domain,
 }
 
 static int
-dmar_gas_alloc_region(struct iommu_domain *domain, struct iommu_map_entry *entry,
-    u_int flags)
+dmar_gas_alloc_region(struct iommu_domain *domain,
+    struct iommu_map_entry *entry, u_int flags)
 {
 	struct iommu_map_entry *next, *prev;
 	bool found;

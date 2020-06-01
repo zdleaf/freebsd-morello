@@ -148,7 +148,8 @@ domain_set_agaw(struct iommu_domain *domain, int mgaw)
  *     address space, accept the biggest sagaw, whatever is it.
  */
 int
-dmar_maxaddr2mgaw(struct iommu_unit *unit, dmar_gaddr_t maxaddr, bool allow_less)
+dmar_maxaddr2mgaw(struct iommu_unit *unit, dmar_gaddr_t maxaddr,
+    bool allow_less)
 {
 	int i;
 

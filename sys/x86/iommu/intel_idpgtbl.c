@@ -499,8 +499,8 @@ domain_map_buf_locked(struct iommu_domain *domain, dmar_gaddr_t base,
 }
 
 int
-domain_map_buf(struct iommu_domain *domain, dmar_gaddr_t base, dmar_gaddr_t size,
-    vm_page_t *ma, uint64_t pflags, int flags)
+domain_map_buf(struct iommu_domain *domain, dmar_gaddr_t base,
+    dmar_gaddr_t size, vm_page_t *ma, uint64_t pflags, int flags)
 {
 	struct iommu_unit *unit;
 	int error;
