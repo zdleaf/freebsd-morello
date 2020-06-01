@@ -813,7 +813,7 @@ iommu_domain_unload_emit_wait(struct iommu_domain *domain,
 }
 
 void
-iommu_unmap(struct iommu_domain *domain,
+iommu_domain_unload(struct iommu_domain *domain,
     struct iommu_map_entries_tailq *entries, bool cansleep)
 {
 	struct iommu_unit *unit;
@@ -865,6 +865,6 @@ iommu_domain_unload_task(void *arg, int pending)
 		IOMMU_DOMAIN_UNLOCK(domain);
 		if (TAILQ_EMPTY(&entries))
 			break;
-		iommu_unmap(domain, &entries, true);
+		iommu_domain_unload(domain, &entries, true);
 	}
 }

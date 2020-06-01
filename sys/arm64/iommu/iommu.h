@@ -185,14 +185,6 @@ int iommu_free_device(struct iommu_device *device);
 int iommu_free_device_locked(struct iommu_unit *iommu,
     struct iommu_device *device);
 
-int iommu_map(struct iommu_domain *domain,
-    const struct bus_dma_tag_common *common,
-    vm_size_t size, vm_offset_t offset,
-    int eflags, int iommu_flags,
-    vm_page_t *ma, struct iommu_map_entry **entry);
-int iommu_unmap(struct iommu_domain *domain,
-    struct iommu_map_entries_tailq *entries, bool free);
-
 int iommu_map_page(struct iommu_domain *domain,
     vm_offset_t va, vm_paddr_t pa, vm_prot_t prot);
 int iommu_unmap_page(struct iommu_domain *domain, vm_offset_t va);

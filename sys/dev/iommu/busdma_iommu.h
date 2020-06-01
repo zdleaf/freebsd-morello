@@ -64,4 +64,14 @@ extern struct bus_dma_impl bus_dma_iommu_impl;
 
 bus_dma_tag_t acpi_iommu_get_dma_tag(device_t dev, device_t child);
 
+struct iommu_domain;
+
+int iommu_map(struct iommu_domain *domain,
+    const struct bus_dma_tag_common *common,
+    size_t size, vm_offset_t offset,
+    int eflags, int iommu_flags,
+    vm_page_t *ma, struct iommu_map_entry **entry);
+int iommu_unmap(struct iommu_domain *domain,
+    struct iommu_map_entries_tailq *entries, bool free);
+
 #endif /* !_DEV_IOMMU_BUSDMA_IOMMU_H_*/

@@ -342,3 +342,28 @@ bus_dma_dmar_load_ident(bus_dma_tag_t dmat, bus_dmamap_t map1,
 	free(ma, M_TEMP);
 	return (error);
 }
+
+int
+iommu_unmap(struct iommu_domain *domain,
+    struct iommu_map_entries_tailq *entries, bool cansleep)
+{
+
+	iommu_domain_unload(domain, entries, cansleep);
+
+	return (0);
+}
+
+int
+iommu_map(struct iommu_domain *domain,
+    const struct bus_dma_tag_common *common,
+    size_t size, vm_offset_t offset,
+    int eflags, int iommu_flags,
+    vm_page_t *ma, struct iommu_map_entry **entry)
+{
+	int ret;
+
+	ret = dmar_gas_map(domain, common, (iommu_gaddr_t)size, (int)offset,
+	    eflags, iommu_flags, ma, entry);
+
+	return (ret);
+}
