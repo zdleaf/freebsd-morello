@@ -218,7 +218,7 @@ dmar_gas_init_domain(struct iommu_domain *domain)
 	KASSERT(RB_EMPTY(&domain->rb_root), ("non-empty entries %p", domain));
 
 	begin->start = 0;
-	begin->end = IOMMU_PAGE_SIZE;
+	begin->end = DMAR_PAGE_SIZE;
 	begin->flags = IOMMU_MAP_ENTRY_PLACE | IOMMU_MAP_ENTRY_UNMAPPED;
 	dmar_gas_rb_insert(domain, begin);
 
@@ -243,7 +243,7 @@ dmar_gas_fini_domain(struct iommu_domain *domain)
 
 	entry = RB_MIN(dmar_gas_entries_tree, &domain->rb_root);
 	KASSERT(entry->start == 0, ("start entry start %p", domain));
-	KASSERT(entry->end == IOMMU_PAGE_SIZE, ("start entry end %p", domain));
+	KASSERT(entry->end == DMAR_PAGE_SIZE, ("start entry end %p", domain));
 	KASSERT(entry->flags == IOMMU_MAP_ENTRY_PLACE,
 	    ("start entry flags %p", domain));
 	RB_REMOVE(dmar_gas_entries_tree, &domain->rb_root, entry);
@@ -287,14 +287,14 @@ dmar_gas_match_one(struct dmar_gas_match_args *a, dmar_gaddr_t beg,
 {
 	dmar_gaddr_t bs, start;
 
-	a->entry->start = roundup2(beg + IOMMU_PAGE_SIZE,
+	a->entry->start = roundup2(beg + DMAR_PAGE_SIZE,
 	    a->common->alignment);
 	if (a->entry->start + a->size > maxaddr)
 		return (false);
 
-	/* IOMMU_PAGE_SIZE to create gap after new entry. */
-	if (a->entry->start < beg + IOMMU_PAGE_SIZE ||
-	    a->entry->start + a->size + a->offset + IOMMU_PAGE_SIZE > end)
+	/* DMAR_PAGE_SIZE to create gap after new entry. */
+	if (a->entry->start < beg + DMAR_PAGE_SIZE ||
+	    a->entry->start + a->size + a->offset + DMAR_PAGE_SIZE > end)
 		return (false);
 
 	/* No boundary crossing. */
@@ -310,8 +310,8 @@ dmar_gas_match_one(struct dmar_gas_match_args *a, dmar_gaddr_t beg,
 	bs = rounddown2(a->entry->start + a->offset + a->common->boundary,
 	    a->common->boundary);
 	start = roundup2(bs, a->common->alignment);
-	/* IOMMU_PAGE_SIZE to create gap after new entry. */
-	if (start + a->offset + a->size + IOMMU_PAGE_SIZE <= end &&
+	/* DMAR_PAGE_SIZE to create gap after new entry. */
+	if (start + a->offset + a->size + DMAR_PAGE_SIZE <= end &&
 	    start + a->offset + a->size <= maxaddr &&
 	    iommu_test_boundary(start + a->offset, a->size,
 	    a->common->boundary)) {
@@ -369,7 +369,7 @@ dmar_gas_lowermatch(struct dmar_gas_match_args *a,
 		dmar_gas_match_insert(a);
 		return (0);
 	}
-	if (entry->free_down < a->size + a->offset + IOMMU_PAGE_SIZE)
+	if (entry->free_down < a->size + a->offset + DMAR_PAGE_SIZE)
 		return (ENOMEM);
 	if (entry->first >= a->common->lowaddr)
 		return (ENOMEM);
@@ -394,7 +394,7 @@ dmar_gas_uppermatch(struct dmar_gas_match_args *a,
 {
 	struct iommu_map_entry *child;
 
-	if (entry->free_down < a->size + a->offset + IOMMU_PAGE_SIZE)
+	if (entry->free_down < a->size + a->offset + DMAR_PAGE_SIZE)
 		return (ENOMEM);
 	if (entry->last < a->common->highaddr)
 		return (ENOMEM);
@@ -429,7 +429,7 @@ dmar_gas_find_space(struct iommu_domain *domain,
 
 	IOMMU_DOMAIN_ASSERT_LOCKED(domain);
 	KASSERT(entry->flags == 0, ("dirty entry %p %p", domain, entry));
-	KASSERT((size & IOMMU_PAGE_MASK) == 0, ("size %jx", (uintmax_t)size));
+	KASSERT((size & DMAR_PAGE_MASK) == 0, ("size %jx", (uintmax_t)size));
 
 	a.domain = domain;
 	a.size = size;
@@ -464,8 +464,8 @@ dmar_gas_alloc_region(struct iommu_domain *domain,
 
 	IOMMU_DOMAIN_ASSERT_LOCKED(domain);
 
-	if ((entry->start & IOMMU_PAGE_MASK) != 0 ||
-	    (entry->end & IOMMU_PAGE_MASK) != 0)
+	if ((entry->start & DMAR_PAGE_MASK) != 0 ||
+	    (entry->end & DMAR_PAGE_MASK) != 0)
 		return (EINVAL);
 	if (entry->start >= entry->end)
 		return (EINVAL);

@@ -213,12 +213,12 @@ pglvl_page_size(int total_pglvl, int lvl)
 {
 	int rlvl;
 	static const dmar_gaddr_t pg_sz[] = {
-		(dmar_gaddr_t)IOMMU_PAGE_SIZE,
-		(dmar_gaddr_t)IOMMU_PAGE_SIZE << DMAR_NPTEPGSHIFT,
-		(dmar_gaddr_t)IOMMU_PAGE_SIZE << (2 * DMAR_NPTEPGSHIFT),
-		(dmar_gaddr_t)IOMMU_PAGE_SIZE << (3 * DMAR_NPTEPGSHIFT),
-		(dmar_gaddr_t)IOMMU_PAGE_SIZE << (4 * DMAR_NPTEPGSHIFT),
-		(dmar_gaddr_t)IOMMU_PAGE_SIZE << (5 * DMAR_NPTEPGSHIFT)
+		(dmar_gaddr_t)DMAR_PAGE_SIZE,
+		(dmar_gaddr_t)DMAR_PAGE_SIZE << DMAR_NPTEPGSHIFT,
+		(dmar_gaddr_t)DMAR_PAGE_SIZE << (2 * DMAR_NPTEPGSHIFT),
+		(dmar_gaddr_t)DMAR_PAGE_SIZE << (3 * DMAR_NPTEPGSHIFT),
+		(dmar_gaddr_t)DMAR_PAGE_SIZE << (4 * DMAR_NPTEPGSHIFT),
+		(dmar_gaddr_t)DMAR_PAGE_SIZE << (5 * DMAR_NPTEPGSHIFT)
 	};
 
 	KASSERT(lvl >= 0 && lvl < total_pglvl,
@@ -243,7 +243,7 @@ calc_am(struct iommu_unit *unit, dmar_gaddr_t base, dmar_gaddr_t size,
 	int am;
 
 	for (am = DMAR_CAP_MAMV(unit->hw_cap);; am--) {
-		isize = 1ULL << (am + IOMMU_PAGE_SHIFT);
+		isize = 1ULL << (am + DMAR_PAGE_SHIFT);
 		if ((base & (isize - 1)) == 0 && size >= isize)
 			break;
 		if (am == 0)

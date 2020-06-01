@@ -34,12 +34,16 @@
 #ifndef __X86_IOMMU_INTEL_REG_H
 #define	__X86_IOMMU_INTEL_REG_H
 
-#define	IOMMU_PAGE_SIZE		PAGE_SIZE
-#define	IOMMU_PAGE_MASK		(IOMMU_PAGE_SIZE - 1)
-#define	IOMMU_PAGE_SHIFT	PAGE_SHIFT
-#define	DMAR_NPTEPG		(IOMMU_PAGE_SIZE / sizeof(dmar_pte_t))
+#define	DMAR_PAGE_SIZE		PAGE_SIZE
+#define	DMAR_PAGE_MASK		(DMAR_PAGE_SIZE - 1)
+#define	DMAR_PAGE_SHIFT		PAGE_SHIFT
+#define	DMAR_NPTEPG		(DMAR_PAGE_SIZE / sizeof(dmar_pte_t))
 #define	DMAR_NPTEPGSHIFT	9
 #define	DMAR_PTEMASK		(DMAR_NPTEPG - 1)
+
+/* For the iommu generic busdma backend. */
+#define	IOMMU_PAGE_SIZE		DMAR_PAGE_SIZE
+#define	IOMMU_PAGE_MASK		DMAR_PAGE_MASK
 
 typedef struct dmar_root_entry {
 	uint64_t r1;
@@ -49,7 +53,7 @@ typedef struct dmar_root_entry {
 #define	DMAR_ROOT_R1_CTP_MASK	0xfffffffffffff000 /* Mask for Context-Entry
 						      Table Pointer */
 
-#define	DMAR_CTX_CNT		(IOMMU_PAGE_SIZE / sizeof(dmar_root_entry_t))
+#define	DMAR_CTX_CNT		(DMAR_PAGE_SIZE / sizeof(dmar_root_entry_t))
 
 typedef	struct iommu_device_entry {
 	uint64_t ctx1;

@@ -269,7 +269,7 @@ domain_init_rmrr(struct iommu_domain *domain, device_t dev, int bus,
 				    "region (%jx, %jx) corrected\n",
 				    domain->iommu->unit, start, end);
 			}
-			entry->end += IOMMU_PAGE_SIZE * 0x20;
+			entry->end += DMAR_PAGE_SIZE * 0x20;
 		}
 		size = OFF_TO_IDX(entry->end - entry->start);
 		ma = malloc(sizeof(vm_page_t) * size, M_TEMP, M_WAITOK);

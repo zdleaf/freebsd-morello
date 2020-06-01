@@ -326,7 +326,7 @@ static int
 domain_pgtbl_pte_off(struct iommu_domain *domain, dmar_gaddr_t base, int lvl)
 {
 
-	base >>= IOMMU_PAGE_SHIFT + (domain->pglvl - lvl - 1) *
+	base >>= DMAR_PAGE_SHIFT + (domain->pglvl - lvl - 1) *
 	    DMAR_NPTEPGSHIFT;
 	return (base & DMAR_PTEMASK);
 }
@@ -442,7 +442,7 @@ domain_map_buf_locked(struct iommu_domain *domain, dmar_gaddr_t base,
 	    pi += run_sz) {
 		for (lvl = 0, c = 0, superpage = false;; lvl++) {
 			pg_sz = domain_page_size(domain, lvl);
-			run_sz = pg_sz >> IOMMU_PAGE_SHIFT;
+			run_sz = pg_sz >> DMAR_PAGE_SHIFT;
 			if (lvl == domain->pglvl - 1)
 				break;
 			/*
@@ -509,10 +509,10 @@ domain_map_buf(struct iommu_domain *domain, dmar_gaddr_t base,
 
 	KASSERT((domain->flags & DMAR_DOMAIN_IDMAP) == 0,
 	    ("modifying idmap pagetable domain %p", domain));
-	KASSERT((base & IOMMU_PAGE_MASK) == 0,
+	KASSERT((base & DMAR_PAGE_MASK) == 0,
 	    ("non-aligned base %p %jx %jx", domain, (uintmax_t)base,
 	    (uintmax_t)size));
-	KASSERT((size & IOMMU_PAGE_MASK) == 0,
+	KASSERT((size & DMAR_PAGE_MASK) == 0,
 	    ("non-aligned size %p %jx %jx", domain, (uintmax_t)base,
 	    (uintmax_t)size));
 	KASSERT(size > 0, ("zero size %p %jx %jx", domain, (uintmax_t)base,
@@ -620,10 +620,10 @@ domain_unmap_buf_locked(struct iommu_domain *domain, dmar_gaddr_t base,
 
 	KASSERT((domain->flags & DMAR_DOMAIN_IDMAP) == 0,
 	    ("modifying idmap pagetable domain %p", domain));
-	KASSERT((base & IOMMU_PAGE_MASK) == 0,
+	KASSERT((base & DMAR_PAGE_MASK) == 0,
 	    ("non-aligned base %p %jx %jx", domain, (uintmax_t)base,
 	    (uintmax_t)size));
-	KASSERT((size & IOMMU_PAGE_MASK) == 0,
+	KASSERT((size & DMAR_PAGE_MASK) == 0,
 	    ("non-aligned size %p %jx %jx", domain, (uintmax_t)base,
 	    (uintmax_t)size));
 	KASSERT(base < (1ULL << domain->agaw),

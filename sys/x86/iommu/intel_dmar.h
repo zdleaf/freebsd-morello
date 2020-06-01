@@ -39,7 +39,7 @@ typedef uint64_t dmar_haddr_t;
 /* Guest or bus address, before translation. */
 typedef uint64_t dmar_gaddr_t;
 
-/* For iommu generic busdma backend */
+/* For the iommu generic busdma backend. */
 typedef dmar_gaddr_t iommu_gaddr_t;
 
 struct dmar_qi_genseq {
