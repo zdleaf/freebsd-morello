@@ -189,69 +189,6 @@ dmar_get_requester(device_t dev, uint16_t *rid)
 	return (requester);
 }
 
-#if 0
-struct iommu_device *
-dmar_instantiate_ctx(struct iommu_unit *dmar, device_t dev, bool rmrr)
-{
-	device_t requester;
-	struct iommu_device *ctx;
-	bool disabled;
-	uint16_t rid;
-
-	requester = dmar_get_requester(dev, &rid);
-
-	/*
-	 * If the user requested the IOMMU disabled for the device, we
-	 * cannot disable the DMAR, due to possibility of other
-	 * devices on the same DMAR still requiring translation.
-	 * Instead provide the identity mapping for the device
-	 * context.
-	 */
-	disabled = dmar_bus_dma_is_dev_disabled(pci_get_domain(requester), 
-	    pci_get_bus(requester), pci_get_slot(requester), 
-	    pci_get_function(requester));
-	ctx = dmar_get_ctx_for_dev(dmar, requester, rid, disabled, rmrr);
-	if (ctx == NULL)
-		return (NULL);
-	if (disabled) {
-		/*
-		 * Keep the first reference on context, release the
-		 * later refs.
-		 */
-		IOMMU_LOCK(dmar);
-		if ((ctx->flags & IOMMU_CTX_DISABLED) == 0) {
-			ctx->flags |= IOMMU_CTX_DISABLED;
-			IOMMU_UNLOCK(dmar);
-		} else {
-			dmar_free_ctx_locked(dmar, ctx);
-		}
-		ctx = NULL;
-	}
-	return (ctx);
-}
-
-bus_dma_tag_t
-acpi_iommu_get_dma_tag(device_t dev, device_t child)
-{
-	struct iommu_unit *dmar;
-	struct iommu_device *ctx;
-	bus_dma_tag_t res;
-
-	dmar = dmar_find(child, bootverbose);
-	/* Not in scope of any DMAR ? */
-	if (dmar == NULL)
-		return (NULL);
-	if (!dmar->dma_enabled)
-		return (NULL);
-	dmar_quirks_pre_use(dmar);
-	dmar_instantiate_rmrr_ctxs(dmar);
-
-	ctx = dmar_instantiate_ctx(dmar, child, false);
-	res = ctx == NULL ? NULL : (bus_dma_tag_t)&ctx->ctx_tag;
-	return (res);
-}
-#endif
-
 bool
 bus_dma_dmar_set_buswide(device_t dev)
 {
