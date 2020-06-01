@@ -314,18 +314,22 @@ iommu_get_device(struct iommu_unit *iommu, device_t dev,
 }
 
 
-void
+int
 iommu_free_device(struct iommu_device *device)
 {
 
 	dmar_free_ctx(device);
+
+	return (0);
 }
 
-void
+int
 iommu_free_device_locked(struct iommu_unit *dmar, struct iommu_device *ctx)
 {
 
 	dmar_free_ctx_locked(dmar, ctx);
+
+	return (0);
 }
 
 struct iommu_unit *

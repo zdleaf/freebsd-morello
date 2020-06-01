@@ -78,8 +78,8 @@ int iommu_unmap(struct iommu_domain *domain,
 
 struct iommu_device * iommu_get_device(struct iommu_unit *iommu,
     device_t requester, uint16_t rid, bool disabled, bool rmrr);
-void iommu_free_device(struct iommu_device *device);
-void iommu_free_device_locked(struct iommu_unit *iommu,
+int iommu_free_device(struct iommu_device *device);
+int iommu_free_device_locked(struct iommu_unit *iommu,
     struct iommu_device *device);
 
 struct iommu_unit * iommu_find(device_t dev, bool verbose);
