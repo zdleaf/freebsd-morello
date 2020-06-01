@@ -148,7 +148,7 @@ domain_set_agaw(struct iommu_domain *domain, int mgaw)
  *     address space, accept the biggest sagaw, whatever is it.
  */
 int
-dmar_maxaddr2mgaw(struct iommu_unit *unit, iommu_gaddr_t maxaddr, bool allow_less)
+dmar_maxaddr2mgaw(struct iommu_unit *unit, dmar_gaddr_t maxaddr, bool allow_less)
 {
 	int i;
 
@@ -207,17 +207,17 @@ domain_is_sp_lvl(struct iommu_domain *domain, int lvl)
 	return (alvl < nitems(sagaw_sp) && (sagaw_sp[alvl] & cap_sps) != 0);
 }
 
-iommu_gaddr_t
+dmar_gaddr_t
 pglvl_page_size(int total_pglvl, int lvl)
 {
 	int rlvl;
-	static const iommu_gaddr_t pg_sz[] = {
-		(iommu_gaddr_t)IOMMU_PAGE_SIZE,
-		(iommu_gaddr_t)IOMMU_PAGE_SIZE << DMAR_NPTEPGSHIFT,
-		(iommu_gaddr_t)IOMMU_PAGE_SIZE << (2 * DMAR_NPTEPGSHIFT),
-		(iommu_gaddr_t)IOMMU_PAGE_SIZE << (3 * DMAR_NPTEPGSHIFT),
-		(iommu_gaddr_t)IOMMU_PAGE_SIZE << (4 * DMAR_NPTEPGSHIFT),
-		(iommu_gaddr_t)IOMMU_PAGE_SIZE << (5 * DMAR_NPTEPGSHIFT)
+	static const dmar_gaddr_t pg_sz[] = {
+		(dmar_gaddr_t)IOMMU_PAGE_SIZE,
+		(dmar_gaddr_t)IOMMU_PAGE_SIZE << DMAR_NPTEPGSHIFT,
+		(dmar_gaddr_t)IOMMU_PAGE_SIZE << (2 * DMAR_NPTEPGSHIFT),
+		(dmar_gaddr_t)IOMMU_PAGE_SIZE << (3 * DMAR_NPTEPGSHIFT),
+		(dmar_gaddr_t)IOMMU_PAGE_SIZE << (4 * DMAR_NPTEPGSHIFT),
+		(dmar_gaddr_t)IOMMU_PAGE_SIZE << (5 * DMAR_NPTEPGSHIFT)
 	};
 
 	KASSERT(lvl >= 0 && lvl < total_pglvl,
@@ -227,7 +227,7 @@ pglvl_page_size(int total_pglvl, int lvl)
 	return (pg_sz[rlvl]);
 }
 
-iommu_gaddr_t
+dmar_gaddr_t
 domain_page_size(struct iommu_domain *domain, int lvl)
 {
 
@@ -235,10 +235,10 @@ domain_page_size(struct iommu_domain *domain, int lvl)
 }
 
 int
-calc_am(struct iommu_unit *unit, iommu_gaddr_t base, iommu_gaddr_t size,
-    iommu_gaddr_t *isizep)
+calc_am(struct iommu_unit *unit, dmar_gaddr_t base, dmar_gaddr_t size,
+    dmar_gaddr_t *isizep)
 {
-	iommu_gaddr_t isize;
+	dmar_gaddr_t isize;
 	int am;
 
 	for (am = DMAR_CAP_MAMV(unit->hw_cap);; am--) {

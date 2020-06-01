@@ -362,7 +362,7 @@ iommu_map(struct iommu_domain *domain,
 {
 	int ret;
 
-	ret = dmar_gas_map(domain, common, (iommu_gaddr_t)size, (int)offset,
+	ret = dmar_gas_map(domain, common, (dmar_gaddr_t)size, (int)offset,
 	    eflags, iommu_flags, ma, entry);
 
 	return (ret);

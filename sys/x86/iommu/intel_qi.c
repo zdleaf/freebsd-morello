@@ -221,11 +221,11 @@ dmar_qi_wait_for_seq(struct iommu_unit *unit, const struct dmar_qi_genseq *gseq,
 }
 
 void
-dmar_qi_invalidate_locked(struct iommu_domain *domain, iommu_gaddr_t base,
-    iommu_gaddr_t size, struct dmar_qi_genseq *pseq, bool emit_wait)
+dmar_qi_invalidate_locked(struct iommu_domain *domain, dmar_gaddr_t base,
+    dmar_gaddr_t size, struct dmar_qi_genseq *pseq, bool emit_wait)
 {
 	struct iommu_unit *unit;
-	iommu_gaddr_t isize;
+	dmar_gaddr_t isize;
 	int am;
 
 	unit = domain->iommu;
