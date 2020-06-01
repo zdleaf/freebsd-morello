@@ -342,7 +342,7 @@ struct iommu_device *iommu_instantiate_device(struct iommu_unit *dmar,
     device_t dev, bool rmrr);
 struct iommu_device *dmar_get_ctx_for_dev(struct iommu_unit *dmar, device_t dev,
     uint16_t rid, bool id_mapped, bool rmrr_init);
-struct iommu_device *iommu_get_ctx_for_devpath(struct iommu_unit *dmar,
+struct iommu_device *dmar_get_ctx_for_devpath(struct iommu_unit *dmar,
     uint16_t rid, int dev_domain, int dev_busno, const void *dev_path,
     int dev_path_len, bool id_mapped, bool rmrr_init);
 int dmar_move_ctx_to_domain(struct iommu_domain *domain, struct iommu_device *ctx);

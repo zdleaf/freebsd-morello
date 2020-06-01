@@ -1051,7 +1051,7 @@ dmar_inst_rmrr_iter(ACPI_DMAR_HEADER *dmarh, void *arg)
 			    dev_path_len);
 			if (iria->dmar != unit)
 				continue;
-			iommu_get_ctx_for_devpath(iria->dmar, rid,
+			dmar_get_ctx_for_devpath(iria->dmar, rid,
 			    resmem->Segment, devscope->Bus, 
 			    (const ACPI_DMAR_PCI_PATH *)(devscope + 1),
 			    dev_path_len, false, true);

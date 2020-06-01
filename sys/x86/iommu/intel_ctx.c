@@ -588,7 +588,7 @@ dmar_get_ctx_for_dev(struct iommu_unit *dmar, device_t dev, uint16_t rid,
 }
 
 struct iommu_device *
-iommu_get_ctx_for_devpath(struct iommu_unit *dmar, uint16_t rid,
+dmar_get_ctx_for_devpath(struct iommu_unit *dmar, uint16_t rid,
     int dev_domain, int dev_busno,
     const void *dev_path, int dev_path_len,
     bool id_mapped, bool rmrr_init)
