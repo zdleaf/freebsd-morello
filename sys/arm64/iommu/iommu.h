@@ -174,18 +174,11 @@ iommu_test_boundary(iommu_gaddr_t start, iommu_gaddr_t size,
 	return (start + size <= ((start + boundary) & ~(boundary - 1)));
 }
 
-struct iommu_unit * iommu_find(device_t dev, bool verbose);
-
 int iommu_register(device_t dev, struct iommu_unit *unit, intptr_t xref);
 int iommu_unregister(device_t dev);
 
 int iommu_map_page(struct iommu_domain *domain,
     vm_offset_t va, vm_paddr_t pa, vm_prot_t prot);
 int iommu_unmap_page(struct iommu_domain *domain, vm_offset_t va);
-
-int iommu_init_busdma(struct iommu_unit *unit);
-void iommu_fini_busdma(struct iommu_unit *unit);
-struct iommu_device * iommu_instantiate_device(struct iommu_unit *iommu,
-    device_t dev, bool rmrr);
 
 #endif /* _DEV_IOMMU_IOMMU_H_ */

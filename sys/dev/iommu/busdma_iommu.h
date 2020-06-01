@@ -83,5 +83,9 @@ int iommu_free_device_locked(struct iommu_unit *iommu,
     struct iommu_device *device);
 
 struct iommu_unit * iommu_find(device_t dev, bool verbose);
+int iommu_init_busdma(struct iommu_unit *unit);
+void iommu_fini_busdma(struct iommu_unit *unit);
+struct iommu_device *iommu_instantiate_device(struct iommu_unit *dmar,
+    device_t dev, bool rmrr);
 
 #endif /* !_DEV_IOMMU_BUSDMA_IOMMU_H_*/
