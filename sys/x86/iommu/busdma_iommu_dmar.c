@@ -367,3 +367,11 @@ iommu_map(struct iommu_domain *domain,
 
 	return (ret);
 }
+
+struct iommu_device *
+iommu_get_device(struct iommu_unit *iommu, device_t dev,
+    uint16_t rid, bool id_mapped, bool rmrr_init)
+{
+
+	return (dmar_get_ctx_for_dev(iommu, dev, rid, id_mapped, rmrr_init));
+}

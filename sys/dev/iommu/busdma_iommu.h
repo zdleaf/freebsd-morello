@@ -65,6 +65,7 @@ extern struct bus_dma_impl bus_dma_iommu_impl;
 bus_dma_tag_t acpi_iommu_get_dma_tag(device_t dev, device_t child);
 
 struct iommu_domain;
+struct iommu_unit;
 
 int iommu_map(struct iommu_domain *domain,
     const struct bus_dma_tag_common *common,
@@ -73,5 +74,7 @@ int iommu_map(struct iommu_domain *domain,
     vm_page_t *ma, struct iommu_map_entry **entry);
 int iommu_unmap(struct iommu_domain *domain,
     struct iommu_map_entries_tailq *entries, bool free);
+struct iommu_device *iommu_get_device(struct iommu_unit *dmar, device_t dev,
+    uint16_t rid, bool id_mapped, bool rmrr_init);
 
 #endif /* !_DEV_IOMMU_BUSDMA_IOMMU_H_*/
