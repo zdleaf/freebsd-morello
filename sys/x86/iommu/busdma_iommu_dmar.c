@@ -335,7 +335,7 @@ bus_dma_dmar_load_ident(bus_dma_tag_t dmat, bus_dmamap_t map1,
 		entry->flags |= IOMMU_MAP_ENTRY_MAP;
 		IOMMU_DOMAIN_UNLOCK(domain);
 	} else {
-		iommu_domain_unload_entry(entry, true);
+		dmar_domain_unload_entry(entry, true);
 	}
 	for (i = 0; i < atop(length); i++)
 		vm_page_putfake(ma[i]);
@@ -348,7 +348,7 @@ iommu_unmap(struct iommu_domain *domain,
     struct iommu_map_entries_tailq *entries, bool cansleep)
 {
 
-	iommu_domain_unload(domain, entries, cansleep);
+	dmar_domain_unload(domain, entries, cansleep);
 
 	return (0);
 }

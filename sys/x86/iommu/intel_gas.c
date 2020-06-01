@@ -616,7 +616,7 @@ dmar_gas_map(struct iommu_domain *domain,
 	    ((eflags & IOMMU_MAP_ENTRY_TM) != 0 ? DMAR_PTE_TM : 0),
 	    (flags & IOMMU_MF_CANWAIT) != 0 ? DMAR_PGF_WAITOK : 0);
 	if (error == ENOMEM) {
-		iommu_domain_unload_entry(entry, true);
+		dmar_domain_unload_entry(entry, true);
 		return (error);
 	}
 	KASSERT(error == 0,
@@ -658,7 +658,7 @@ dmar_gas_map_region(struct iommu_domain *domain, struct iommu_map_entry *entry,
 	    ((eflags & IOMMU_MAP_ENTRY_TM) != 0 ? DMAR_PTE_TM : 0),
 	    (flags & IOMMU_MF_CANWAIT) != 0 ? DMAR_PGF_WAITOK : 0);
 	if (error == ENOMEM) {
-		iommu_domain_unload_entry(entry, false);
+		dmar_domain_unload_entry(entry, false);
 		return (error);
 	}
 	KASSERT(error == 0,

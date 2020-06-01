@@ -764,7 +764,7 @@ dmar_find_ctx_locked(struct iommu_unit *dmar, uint16_t rid)
 }
 
 void
-iommu_domain_free_entry(struct iommu_map_entry *entry, bool free)
+dmar_domain_free_entry(struct iommu_map_entry *entry, bool free)
 {
 	struct iommu_domain *domain;
 
@@ -782,7 +782,7 @@ iommu_domain_free_entry(struct iommu_map_entry *entry, bool free)
 }
 
 void
-iommu_domain_unload_entry(struct iommu_map_entry *entry, bool free)
+dmar_domain_unload_entry(struct iommu_map_entry *entry, bool free)
 {
 	struct iommu_unit *unit;
 
@@ -798,12 +798,12 @@ iommu_domain_unload_entry(struct iommu_map_entry *entry, bool free)
 	} else {
 		domain_flush_iotlb_sync(entry->domain, entry->start,
 		    entry->end - entry->start);
-		iommu_domain_free_entry(entry, free);
+		dmar_domain_free_entry(entry, free);
 	}
 }
 
 static bool
-iommu_domain_unload_emit_wait(struct iommu_domain *domain,
+dmar_domain_unload_emit_wait(struct iommu_domain *domain,
     struct iommu_map_entry *entry)
 {
 
@@ -813,7 +813,7 @@ iommu_domain_unload_emit_wait(struct iommu_domain *domain,
 }
 
 void
-iommu_domain_unload(struct iommu_domain *domain,
+dmar_domain_unload(struct iommu_domain *domain,
     struct iommu_map_entries_tailq *entries, bool cansleep)
 {
 	struct iommu_unit *unit;
@@ -832,7 +832,7 @@ iommu_domain_unload(struct iommu_domain *domain,
 			domain_flush_iotlb_sync(domain, entry->start,
 			    entry->end - entry->start);
 			TAILQ_REMOVE(entries, entry, dmamap_link);
-			iommu_domain_free_entry(entry, true);
+			dmar_domain_free_entry(entry, true);
 		}
 	}
 	if (TAILQ_EMPTY(entries))
@@ -843,7 +843,7 @@ iommu_domain_unload(struct iommu_domain *domain,
 	TAILQ_FOREACH(entry, entries, dmamap_link) {
 		dmar_qi_invalidate_locked(domain, entry->start, entry->end -
 		    entry->start, &entry->gseq,
-		    iommu_domain_unload_emit_wait(domain, entry));
+		    dmar_domain_unload_emit_wait(domain, entry));
 	}
 	TAILQ_CONCAT(&unit->tlb_flush_entries, entries, dmamap_link);
 	IOMMU_UNLOCK(unit);
@@ -865,6 +865,6 @@ dmar_domain_unload_task(void *arg, int pending)
 		IOMMU_DOMAIN_UNLOCK(domain);
 		if (TAILQ_EMPTY(&entries))
 			break;
-		iommu_domain_unload(domain, &entries, true);
+		dmar_domain_unload(domain, &entries, true);
 	}
 }

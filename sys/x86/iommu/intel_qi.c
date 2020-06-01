@@ -352,7 +352,7 @@ dmar_qi_task(void *arg, int pending __unused)
 			break;
 		TAILQ_REMOVE(&unit->tlb_flush_entries, entry, dmamap_link);
 		IOMMU_UNLOCK(unit);
-		iommu_domain_free_entry(entry, (entry->flags &
+		dmar_domain_free_entry(entry, (entry->flags &
 		    IOMMU_MAP_ENTRY_QI_NF) == 0);
 		IOMMU_LOCK(unit);
 	}

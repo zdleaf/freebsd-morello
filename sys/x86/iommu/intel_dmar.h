@@ -349,10 +349,10 @@ int dmar_move_ctx_to_domain(struct iommu_domain *domain, struct iommu_device *ct
 void iommu_free_device_locked(struct iommu_unit *dmar, struct iommu_device *ctx);
 void iommu_free_device(struct iommu_device *ctx);
 struct iommu_device *dmar_find_ctx_locked(struct iommu_unit *dmar, uint16_t rid);
-void iommu_domain_unload_entry(struct iommu_map_entry *entry, bool free);
-void iommu_domain_unload(struct iommu_domain *domain,
+void dmar_domain_unload_entry(struct iommu_map_entry *entry, bool free);
+void dmar_domain_unload(struct iommu_domain *domain,
     struct iommu_map_entries_tailq *entries, bool cansleep);
-void iommu_domain_free_entry(struct iommu_map_entry *entry, bool free);
+void dmar_domain_free_entry(struct iommu_map_entry *entry, bool free);
 
 int iommu_init_busdma(struct iommu_unit *unit);
 void iommu_fini_busdma(struct iommu_unit *unit);
