@@ -783,7 +783,7 @@ dmar_find_by_scope(int dev_domain, int dev_busno,
 }
 
 struct iommu_unit *
-iommu_find(device_t dev, bool verbose)
+dmar_find(device_t dev, bool verbose)
 {
 	device_t dmar_dev;
 	struct iommu_unit *unit;
@@ -1056,7 +1056,7 @@ dmar_inst_rmrr_iter(ACPI_DMAR_HEADER *dmarh, void *arg)
 			    (const ACPI_DMAR_PCI_PATH *)(devscope + 1),
 			    dev_path_len, false, true);
 		} else {
-			unit = iommu_find(dev, false);
+			unit = dmar_find(dev, false);
 			if (iria->dmar != unit)
 				continue;
 			iommu_instantiate_device(iria->dmar, dev, true);

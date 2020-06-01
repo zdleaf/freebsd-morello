@@ -237,7 +237,7 @@ acpi_iommu_get_dma_tag(device_t dev, device_t child)
 	struct iommu_device *ctx;
 	bus_dma_tag_t res;
 
-	dmar = iommu_find(child, bootverbose);
+	dmar = dmar_find(child, bootverbose);
 	/* Not in scope of any DMAR ? */
 	if (dmar == NULL)
 		return (NULL);
@@ -262,7 +262,7 @@ bus_dma_dmar_set_buswide(device_t dev)
 	parent = device_get_parent(dev);
 	if (device_get_devclass(parent) != devclass_find("pci"))
 		return (false);
-	dmar = iommu_find(dev, bootverbose);
+	dmar = dmar_find(dev, bootverbose);
 	if (dmar == NULL)
 		return (false);
 	busno = pci_get_bus(dev);
@@ -389,4 +389,11 @@ iommu_free_device_locked(struct iommu_unit *dmar, struct iommu_device *ctx)
 {
 
 	dmar_free_ctx_locked(dmar, ctx);
+}
+
+struct iommu_unit *
+iommu_find(device_t dev, bool verbose)
+{
+
+	return (dmar_find(dev, verbose));
 }

@@ -268,7 +268,7 @@ struct iommu_unit {
 #define	DMAR_BARRIER_RMRR	0
 #define	DMAR_BARRIER_USEQ	1
 
-struct iommu_unit *iommu_find(device_t dev, bool verbose);
+struct iommu_unit *dmar_find(device_t dev, bool verbose);
 struct iommu_unit *dmar_find_hpet(device_t dev, uint16_t *rid);
 struct iommu_unit *dmar_find_ioapic(u_int apic_id, uint16_t *rid);
 

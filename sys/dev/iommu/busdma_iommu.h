@@ -75,13 +75,13 @@ int iommu_map(struct iommu_domain *domain,
     vm_page_t *ma, struct iommu_map_entry **entry);
 int iommu_unmap(struct iommu_domain *domain,
     struct iommu_map_entries_tailq *entries, bool free);
-struct iommu_device *iommu_get_device(struct iommu_unit *dmar, device_t dev,
-    uint16_t rid, bool id_mapped, bool rmrr_init);
 
 struct iommu_device * iommu_get_device(struct iommu_unit *iommu,
     device_t requester, uint16_t rid, bool disabled, bool rmrr);
 void iommu_free_device(struct iommu_device *device);
 void iommu_free_device_locked(struct iommu_unit *iommu,
     struct iommu_device *device);
+
+struct iommu_unit * iommu_find(device_t dev, bool verbose);
 
 #endif /* !_DEV_IOMMU_BUSDMA_IOMMU_H_*/
