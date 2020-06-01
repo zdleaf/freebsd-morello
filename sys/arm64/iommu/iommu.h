@@ -179,12 +179,6 @@ struct iommu_unit * iommu_find(device_t dev, bool verbose);
 int iommu_register(device_t dev, struct iommu_unit *unit, intptr_t xref);
 int iommu_unregister(device_t dev);
 
-struct iommu_device * iommu_get_device(struct iommu_unit *iommu,
-    device_t requester, uint16_t rid, bool disabled, bool rmrr);
-int iommu_free_device(struct iommu_device *device);
-int iommu_free_device_locked(struct iommu_unit *iommu,
-    struct iommu_device *device);
-
 int iommu_map_page(struct iommu_domain *domain,
     vm_offset_t va, vm_paddr_t pa, vm_prot_t prot);
 int iommu_unmap_page(struct iommu_domain *domain, vm_offset_t va);

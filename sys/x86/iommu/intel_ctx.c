@@ -543,7 +543,7 @@ dmar_get_ctx_for_dev1(struct iommu_unit *dmar, device_t dev, uint16_t rid,
 
 	error = dmar_flush_for_ctx_entry(dmar, enable);
 	if (error != 0) {
-		iommu_free_device_locked(dmar, ctx);
+		dmar_free_ctx_locked(dmar, ctx);
 		TD_PINNED_ASSERT;
 		return (NULL);
 	}
@@ -563,7 +563,7 @@ dmar_get_ctx_for_dev1(struct iommu_unit *dmar, device_t dev, uint16_t rid,
 		} else {
 			printf("dmar%d: enabling translation failed, "
 			    "error %d\n", dmar->unit, error);
-			iommu_free_device_locked(dmar, ctx);
+			dmar_free_ctx_locked(dmar, ctx);
 			TD_PINNED_ASSERT;
 			return (NULL);
 		}
@@ -661,7 +661,7 @@ dmar_unref_domain_locked(struct iommu_unit *dmar, struct iommu_domain *domain)
 }
 
 void
-iommu_free_device_locked(struct iommu_unit *dmar, struct iommu_device *ctx)
+dmar_free_ctx_locked(struct iommu_unit *dmar, struct iommu_device *ctx)
 {
 	struct sf_buf *sf;
 	iommu_device_entry_t *ctxp;
@@ -734,13 +734,13 @@ iommu_free_device_locked(struct iommu_unit *dmar, struct iommu_device *ctx)
 }
 
 void
-iommu_free_device(struct iommu_device *ctx)
+dmar_free_ctx(struct iommu_device *ctx)
 {
 	struct iommu_unit *dmar;
 
 	dmar = ctx->domain->iommu;
 	IOMMU_LOCK(dmar);
-	iommu_free_device_locked(dmar, ctx);
+	dmar_free_ctx_locked(dmar, ctx);
 }
 
 /*

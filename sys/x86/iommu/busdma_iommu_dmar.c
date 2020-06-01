@@ -375,3 +375,18 @@ iommu_get_device(struct iommu_unit *iommu, device_t dev,
 
 	return (dmar_get_ctx_for_dev(iommu, dev, rid, id_mapped, rmrr_init));
 }
+
+
+void
+iommu_free_device(struct iommu_device *device)
+{
+
+	dmar_free_ctx(device);
+}
+
+void
+iommu_free_device_locked(struct iommu_unit *dmar, struct iommu_device *ctx)
+{
+
+	dmar_free_ctx_locked(dmar, ctx);
+}
