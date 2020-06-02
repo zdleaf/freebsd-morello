@@ -547,7 +547,6 @@ iommu_bus_dmamap_load_something1(struct bus_dma_tag_iommu *tag,
 		    iommu_flags, ma + idx, &entry);
 		if (error != 0)
 			break;
-
 		if ((iommu_flags & IOMMU_MF_CANSPLIT) != 0) {
 			KASSERT(size >= entry->end - entry->start,
 			    ("split increased entry size %jx %jx %jx",
