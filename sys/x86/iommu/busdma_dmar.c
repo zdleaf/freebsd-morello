@@ -293,13 +293,13 @@ iommu_unmap(struct iommu_domain *domain,
 int
 iommu_map(struct iommu_domain *domain,
     const struct bus_dma_tag_common *common,
-    size_t size, vm_offset_t offset,
+    bus_size_t size, int offset,
     int eflags, int iommu_flags,
     vm_page_t *ma, struct iommu_map_entry **entry)
 {
 	int ret;
 
-	ret = dmar_gas_map(domain, common, (dmar_gaddr_t)size, (int)offset,
+	ret = dmar_gas_map(domain, common, (dmar_gaddr_t)size, offset,
 	    eflags, iommu_flags, ma, entry);
 
 	return (ret);

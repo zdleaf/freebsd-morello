@@ -1591,7 +1591,7 @@ smmu_read_ivar(device_t dev, device_t child, int which, uintptr_t *result)
 
 static int
 smmu_unmap(device_t dev, struct iommu_domain *domain,
-    vm_offset_t va, vm_size_t size)
+    vm_offset_t va, bus_size_t size)
 {
 	struct smmu_domain *smmu_domain;
 	struct smmu_softc *sc;

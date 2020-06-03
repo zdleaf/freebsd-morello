@@ -46,7 +46,7 @@ METHOD int map {
 	struct iommu_domain	*domain;
 	vm_offset_t		va;
 	vm_paddr_t		pa;
-	vm_size_t		size;
+	bus_size_t		size;
 	vm_prot_t		prot;
 };
 
@@ -57,7 +57,7 @@ METHOD int unmap {
 	device_t		dev;
 	struct iommu_domain	*domain;
 	vm_offset_t		va;
-	vm_size_t		size;
+	bus_size_t		size;
 };
 
 #

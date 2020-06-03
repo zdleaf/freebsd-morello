@@ -70,7 +70,7 @@ struct iommu_unit;
 
 int iommu_map(struct iommu_domain *domain,
     const struct bus_dma_tag_common *common,
-    size_t size, vm_offset_t offset,
+    bus_size_t size, int offset,
     int eflags, int iommu_flags,
     vm_page_t *ma, struct iommu_map_entry **entry);
 int iommu_unmap(struct iommu_domain *domain,
