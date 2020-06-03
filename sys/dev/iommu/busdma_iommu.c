@@ -288,7 +288,6 @@ acpi_iommu_get_dma_tag(device_t dev, device_t child)
 		return (NULL);
 	if (!iommu->dma_enabled)
 		return (NULL);
-
 #if defined(__amd64__)
 	dmar_quirks_pre_use(iommu);
 	dmar_instantiate_rmrr_ctxs(iommu);
@@ -296,11 +295,11 @@ acpi_iommu_get_dma_tag(device_t dev, device_t child)
 
 	device = iommu_instantiate_device(iommu, child, false);
 	res = device == NULL ? NULL : (bus_dma_tag_t)&device->device_tag;
-
 	return (res);
 }
 
 static MALLOC_DEFINE(M_IOMMU_DMAMAP, "iommu_dmamap", "IOMMU DMA Map");
+
 static void iommu_bus_schedule_dmamap(struct iommu_unit *unit,
     struct bus_dmamap_iommu *map);
 
@@ -358,7 +357,8 @@ iommu_bus_dma_tag_destroy(bus_dma_tag_t dmat1)
 			goto out;
 		}
 		while (dmat != NULL) {
-			parent = (struct bus_dma_tag_iommu *)dmat->common.parent;
+			parent = (struct bus_dma_tag_iommu *)
+			    dmat->common.parent;
 			if (atomic_fetchadd_int(&dmat->common.ref_count, -1) ==
 			    1) {
 				if (dmat == &dmat->device->device_tag)
