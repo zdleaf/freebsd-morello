@@ -1,7 +1,7 @@
 /*-
  * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
  *
- * Copyright (c) 2019 Bob Frazier <bobf@mrp3.com>
+ * Copyright (c) 2020 Gergely Czuczy <gergely.czuczy@harmless.hu>
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -31,7 +31,7 @@
 /plugin/;
 
 / {
-	compatible = "brcm,bcm2837";
+	compatible = "brcm,bcm2711";
 };
 	
 &{/soc/spi@7e204000} {
