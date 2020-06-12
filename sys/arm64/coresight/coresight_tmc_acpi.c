@@ -57,7 +57,7 @@ tmc_acpi_probe(device_t dev)
 
 	error = ACPI_ID_PROBE(device_get_parent(dev), dev, tmc_ids, NULL);
 	if (error <= 0)
-		device_set_desc(dev, "Coresight Trace Memory Controller (TMC)");
+		device_set_desc(dev, "ARM Coresight TMC");
 
 	return (error);
 }

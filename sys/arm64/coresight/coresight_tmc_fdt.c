@@ -62,7 +62,7 @@ tmc_fdt_probe(device_t dev)
 	if (ofw_bus_search_compatible(dev, compat_data)->ocd_data == 0)
 		return (ENXIO);
 
-	device_set_desc(dev, "Coresight Trace Memory Controller (TMC)");
+	device_set_desc(dev, "ARM Coresight TMC");
 
 	return (BUS_PROBE_DEFAULT);
 }
