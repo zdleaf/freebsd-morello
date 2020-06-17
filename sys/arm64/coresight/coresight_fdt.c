@@ -93,7 +93,7 @@ coresight_get_ports(phandle_t dev_node,
 				if (OF_getproplen(endpoint_child,
 				    "slave-mode") >= 0) {
 					pdata->in_ports++;
-					endp->slave = 1;
+					endp->input = 1;
 				} else
 					pdata->out_ports++;
 

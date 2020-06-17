@@ -169,11 +169,11 @@ cs_is_acpi_coresight_graph(const union acpi_object *obj)
 static const union acpi_object *
 cs_get_dsd_graph(device_t dev)
 {
+	const union acpi_object *guid, *package;
 	union acpi_object *dsd;
 	ACPI_STATUS status;
 	ACPI_BUFFER buf;
 	device_t bus;
-	const union acpi_object *guid, *package;
 	int i;
 
 	buf.Length = PAGE_SIZE;
@@ -283,7 +283,7 @@ cs_acpi_record_endpoint(device_t dev,
 	if (dir == ACPI_CORESIGHT_LINK_OUTPUT) {
 		pdata->out_ports++;
 	} else {
-		endp->slave = 1;
+		endp->input = 1;
 		pdata->in_ports++;
 	}
 
@@ -302,7 +302,7 @@ coresight_get_ports(device_t dev,
 
 	graph = cs_get_coresight_graph(dev);
 	if (graph == NULL) {
-		device_printf(dev, "coresight graph not found\n");
+		device_printf(dev, "Coresight graph not found.\n");
 		return (ENXIO);
 	}
 

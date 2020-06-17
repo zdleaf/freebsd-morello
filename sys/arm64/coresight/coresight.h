@@ -83,7 +83,7 @@ struct endpoint {
 	ACPI_HANDLE their_handle;
 	ACPI_HANDLE dev_handle;
 #endif
-	boolean_t slave;
+	boolean_t input;
 	int reg;
 	struct coresight_device *cs_dev;
 	LIST_ENTRY(endpoint) endplink;

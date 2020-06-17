@@ -76,7 +76,7 @@ coresight_get_output_endpoint(struct coresight_platform_data *pdata)
 		return (NULL);
 
 	TAILQ_FOREACH(endp, &pdata->endpoints, link) {
-		if (endp->slave == 0)
+		if (endp->input == 0)
 			return (endp);
 	}
 

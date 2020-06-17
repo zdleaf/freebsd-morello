@@ -54,7 +54,7 @@ coresight_next_device(struct coresight_device *cs_dev,
 	struct endpoint *endp;
 
 	TAILQ_FOREACH(endp, &cs_dev->pdata->endpoints, link) {
-		if (endp->slave != 0)
+		if (endp->input != 0)
 			continue;
 
 		out = coresight_get_output_device(endp, &out_endp);
