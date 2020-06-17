@@ -41,9 +41,6 @@ __FBSDID("$FreeBSD$");
 #include <sys/mutex.h>
 #include <machine/bus.h>
 
-#include <dev/ofw/ofw_bus.h>
-#include <dev/ofw/ofw_bus_subr.h>
-
 #include <arm64/coresight/coresight.h>
 
 static struct mtx cs_mtx;
