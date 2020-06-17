@@ -47,7 +47,7 @@ __FBSDID("$FreeBSD$");
 #include <arm64/coresight/coresight.h>
 
 static int
-coresight_get_ports(phandle_t dev_node,
+coresight_fdt_get_ports(phandle_t dev_node,
     struct coresight_platform_data *pdata)
 {
 	phandle_t node, child;
@@ -109,7 +109,7 @@ coresight_get_ports(phandle_t dev_node,
 }
 
 static int
-coresight_get_cpu(phandle_t node,
+coresight_fdt_get_cpu(phandle_t node,
     struct coresight_platform_data *pdata)
 {
 	phandle_t cpu_node;
@@ -143,8 +143,8 @@ coresight_fdt_get_platform_data(device_t dev)
 	mtx_init(&pdata->mtx_lock, "Coresight Platform Data", NULL, MTX_DEF);
 	TAILQ_INIT(&pdata->endpoints);
 
-	coresight_get_cpu(node, pdata);
-	coresight_get_ports(node, pdata);
+	coresight_fdt_get_cpu(node, pdata);
+	coresight_fdt_get_ports(node, pdata);
 
 	if (bootverbose)
 		printf("Total ports: in %d out %d\n",

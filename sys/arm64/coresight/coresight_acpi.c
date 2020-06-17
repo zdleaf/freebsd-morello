@@ -283,7 +283,7 @@ cs_acpi_record_endpoint(device_t dev,
 	if (dir == ACPI_CORESIGHT_LINK_OUTPUT) {
 		pdata->out_ports++;
 	} else {
-		endp->input = 1;
+		endp->input = true;
 		pdata->in_ports++;
 	}
 
@@ -291,7 +291,7 @@ cs_acpi_record_endpoint(device_t dev,
 }
 
 static int
-coresight_get_ports(device_t dev,
+coresight_acpi_get_ports(device_t dev,
     struct coresight_platform_data *pdata)
 {
 	const union acpi_object *graph;
@@ -321,7 +321,7 @@ coresight_get_ports(device_t dev,
 }
 
 static int
-coresight_get_cpu(device_t dev, struct coresight_platform_data *pdata)
+coresight_acpi_get_cpu(device_t dev, struct coresight_platform_data *pdata)
 {
 	ACPI_HANDLE handle, parent;
 	ACPI_STATUS status;
@@ -357,8 +357,8 @@ coresight_acpi_get_platform_data(device_t dev)
 	mtx_init(&pdata->mtx_lock, "Coresight Platform Data", NULL, MTX_DEF);
 	TAILQ_INIT(&pdata->endpoints);
 
-	coresight_get_cpu(dev, pdata);
-	coresight_get_ports(dev, pdata);
+	coresight_acpi_get_cpu(dev, pdata);
+	coresight_acpi_get_ports(dev, pdata);
 
 	if (bootverbose)
 		printf("Total ports: in %d out %d\n",
