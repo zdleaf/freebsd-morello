@@ -275,7 +275,6 @@ cs_acpi_record_endpoint(device_t dev,
 	    M_CORESIGHT, M_WAITOK | M_ZERO);
 	endp->their_handle = handle;
 	endp->dev_handle = acpi_get_handle(dev);
-	endp->my_handle = acpi_get_handle(dev);
 
 	mtx_lock(&pdata->mtx_lock);
 	TAILQ_INSERT_TAIL(&pdata->endpoints, endp, link);

@@ -80,7 +80,6 @@ struct endpoint {
 	phandle_t dev_node;
 #endif
 #ifdef DEV_ACPI
-	ACPI_HANDLE my_handle;
 	ACPI_HANDLE their_handle;
 	ACPI_HANDLE dev_handle;
 #endif
