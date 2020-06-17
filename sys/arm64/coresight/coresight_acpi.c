@@ -274,7 +274,7 @@ cs_acpi_record_endpoint(device_t dev,
 	endp = malloc(sizeof(struct endpoint),
 	    M_CORESIGHT, M_WAITOK | M_ZERO);
 	endp->their_handle = handle;
-	endp->dev_handle = acpi_get_handle(dev);
+	endp->my_handle = acpi_get_handle(dev);
 
 	mtx_lock(&pdata->mtx_lock);
 	TAILQ_INSERT_TAIL(&pdata->endpoints, endp, link);
@@ -352,6 +352,8 @@ coresight_acpi_get_platform_data(device_t dev)
 
 	pdata = malloc(sizeof(struct coresight_platform_data),
 	    M_CORESIGHT, M_WAITOK | M_ZERO);
+	pdata->bus_type = CORESIGHT_BUS_ACPI;
+
 	mtx_init(&pdata->mtx_lock, "Coresight Platform Data", NULL, MTX_DEF);
 	TAILQ_INIT(&pdata->endpoints);
 

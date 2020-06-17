@@ -86,14 +86,31 @@ coresight_get_output_endpoint(struct coresight_platform_data *pdata)
 struct coresight_device *
 coresight_get_output_device(struct endpoint *endp, struct endpoint **out_endp)
 {
+	struct coresight_platform_data *pdata;
 	struct coresight_device *cs_dev;
 	struct endpoint *endp2;
 
 	TAILQ_FOREACH(cs_dev, &cs_devs, link) {
+		pdata = cs_dev->pdata;
 		TAILQ_FOREACH(endp2, &cs_dev->pdata->endpoints, link) {
-			if (endp->their_node == endp2->my_node) {
-				*out_endp = endp2;
-				return (cs_dev);
+			switch (pdata->bus_type) {
+			case CORESIGHT_BUS_FDT:
+#ifdef FDT
+				if (endp->their_node == endp2->my_node) {
+					*out_endp = endp2;
+					return (cs_dev);
+				}
+#endif
+				break;
+
+			case CORESIGHT_BUS_ACPI:
+#ifdef DEV_ACPI
+				if (endp->their_handle == endp2->my_handle) {
+					*out_endp = endp2;
+					return (cs_dev);
+				}
+#endif
+				break;
 			}
 		}
 	}

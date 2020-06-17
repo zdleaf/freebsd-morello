@@ -138,6 +138,8 @@ coresight_fdt_get_platform_data(device_t dev)
 
 	pdata = malloc(sizeof(struct coresight_platform_data),
 	    M_CORESIGHT, M_WAITOK | M_ZERO);
+	pdata->bus_type = CORESIGHT_BUS_FDT;
+
 	mtx_init(&pdata->mtx_lock, "Coresight Platform Data", NULL, MTX_DEF);
 	TAILQ_INIT(&pdata->endpoints);
 

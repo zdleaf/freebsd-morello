@@ -65,6 +65,11 @@ enum cs_dev_type {
 	CORESIGHT_CPU_DEBUG,
 };
 
+enum cs_bus_type {
+	CORESIGHT_BUS_ACPI,
+	CORESIGHT_BUS_FDT,
+};
+
 struct coresight_device {
 	TAILQ_ENTRY(coresight_device) link;
 	device_t dev;
@@ -81,7 +86,7 @@ struct endpoint {
 #endif
 #ifdef DEV_ACPI
 	ACPI_HANDLE their_handle;
-	ACPI_HANDLE dev_handle;
+	ACPI_HANDLE my_handle;
 #endif
 	boolean_t input;
 	int reg;
@@ -95,6 +100,7 @@ struct coresight_platform_data {
 	int out_ports;
 	struct mtx mtx_lock;
 	TAILQ_HEAD(endpoint_list, endpoint) endpoints;
+	enum cs_bus_type bus_type;
 };
 
 struct coresight_desc {
