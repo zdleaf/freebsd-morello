@@ -33,7 +33,19 @@
 #ifndef	_ARM64_CORESIGHT_CORESIGHT_H_
 #define	_ARM64_CORESIGHT_CORESIGHT_H_
 
+#include "opt_acpi.h"
+#include "opt_platform.h"
+
+#include <sys/bus.h>
+
+#ifdef FDT
 #include <dev/ofw/openfirm.h>
+#endif
+
+#ifdef DEV_ACPI
+#include <contrib/dev/acpica/include/acpi.h>
+#include <dev/acpica/acpivar.h>
+#endif
 
 #define	CORESIGHT_ITCTRL	0xf00
 #define	CORESIGHT_CLAIMSET	0xfa0
@@ -56,16 +68,22 @@ enum cs_dev_type {
 struct coresight_device {
 	TAILQ_ENTRY(coresight_device) link;
 	device_t dev;
-	phandle_t node;
 	enum cs_dev_type dev_type;
 	struct coresight_platform_data *pdata;
 };
 
 struct endpoint {
 	TAILQ_ENTRY(endpoint) link;
+#ifdef FDT
 	phandle_t my_node;
 	phandle_t their_node;
 	phandle_t dev_node;
+#endif
+#ifdef DEV_ACPI
+	ACPI_HANDLE my_handle;
+	ACPI_HANDLE their_handle;
+	ACPI_HANDLE dev_handle;
+#endif
 	boolean_t slave;
 	int reg;
 	struct coresight_device *cs_dev;
@@ -125,7 +143,10 @@ struct etm_config {
 	uint8_t excp_level;
 };
 
-struct coresight_platform_data * coresight_get_platform_data(device_t dev);
+static MALLOC_DEFINE(M_CORESIGHT, "coresight", "ARM Coresight");
+
+struct coresight_platform_data *coresight_fdt_get_platform_data(device_t dev);
+struct coresight_platform_data *coresight_acpi_get_platform_data(device_t dev);
 struct endpoint * coresight_get_output_endpoint(struct coresight_platform_data *pdata);
 struct coresight_device * coresight_get_output_device(struct endpoint *endp, struct endpoint **);
 int coresight_register(struct coresight_desc *desc);

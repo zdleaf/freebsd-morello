@@ -312,14 +312,13 @@ tmc_read(device_t dev, struct endpoint *endp,
 	return (0);
 }
 
-static int
+int
 tmc_attach(device_t dev)
 {
 	struct coresight_desc desc;
 	struct tmc_softc *sc;
 
 	sc = device_get_softc(dev);
-
 	sc->dev = dev;
 
 	if (bus_alloc_resources(dev, tmc_spec, &sc->res) != 0) {
@@ -327,7 +326,6 @@ tmc_attach(device_t dev)
 		return (ENXIO);
 	}
 
-	sc->pdata = coresight_get_platform_data(dev);
 	desc.pdata = sc->pdata;
 	desc.dev = dev;
 	desc.dev_type = CORESIGHT_TMC;

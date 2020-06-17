@@ -132,4 +132,6 @@ struct tmc_softc {
 	boolean_t			etf_configured;
 };
 
+int tmc_attach(device_t dev);
+
 #endif /* !_ARM64_CORESIGHT_CORESIGHT_TMC_H_ */
