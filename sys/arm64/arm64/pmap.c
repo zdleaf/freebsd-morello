@@ -1234,7 +1234,7 @@ pmap_extract_and_hold(pmap_t pmap, vm_offset_t va, vm_prot_t prot)
 	vm_offset_t off;
 	vm_page_t m;
 	int lvl;
-	bool wire;
+	bool use;
 
 	m = NULL;
 	PMAP_LOCK(pmap);
@@ -1250,18 +1250,18 @@ pmap_extract_and_hold(pmap_t pmap, vm_offset_t va, vm_prot_t prot)
 		    ("pmap_extract_and_hold: Invalid pte at L%d: %lx", lvl,
 		     tpte & ATTR_DESCR_MASK));
 
-		wire = false;
+		use = false;
 		if ((prot & VM_PROT_WRITE) == 0)
-			wire = true;
+			use = true;
 		else if (pmap->pm_stage == PM_STAGE1 &&
 		    (tpte & ATTR_S1_AP_RW_BIT) == ATTR_S1_AP(ATTR_S1_AP_RW))
-			wire = true;
+			use = true;
 		else if (pmap->pm_stage == PM_STAGE2 &&
 		    ((tpte & ATTR_S2_S2AP(ATTR_S2_S2AP_WRITE)) ==
 		     ATTR_S2_S2AP(ATTR_S2_S2AP_WRITE)))
-			wire = true;
+			use = true;
 
-		if (wire) {
+		if (use) {
 			switch(lvl) {
 			case 1:
 				off = va & L1_OFFSET;
