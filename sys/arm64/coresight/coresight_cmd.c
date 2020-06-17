@@ -67,6 +67,9 @@ coresight_next_device(struct coresight_device *cs_dev,
 			}
 
 			/* Add output device */
+			if (bootverbose)
+				printf("Adding device %s to the chain\n",
+				    device_get_nameunit(out->dev));
 			out_endp->cs_dev = out;
 			LIST_INSERT_HEAD(&event->endplist, out_endp, endplink);
 
