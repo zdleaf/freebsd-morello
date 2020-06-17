@@ -179,14 +179,14 @@ cs_get_dsd_graph(device_t dev)
 	buf.Length = PAGE_SIZE;
 	buf.Pointer = malloc(buf.Length, M_TEMP, M_NOWAIT | M_ZERO);
 	if (buf.Pointer == NULL) {
-		printf("failed to allocate memory\n");
+		printf("Failed to allocate memory.\n");
 		return (NULL);
 	}
 
 	bus = device_get_parent(dev);
 	status = ACPI_EVALUATE_OBJECT(bus, dev, "_DSD", NULL, &buf);
 	if (ACPI_FAILURE(status)) {
-		printf("failed to evaluate object\n");
+		printf("Failed to evaluate object.\n");
 		return (NULL);
 	}
 
@@ -273,6 +273,11 @@ cs_acpi_record_endpoint(device_t dev,
 
 	endp = malloc(sizeof(struct endpoint),
 	    M_CORESIGHT, M_WAITOK | M_ZERO);
+	if (endp == NULL) {
+		device_printf(dev, "Failed to allocate memory.\n");
+		return (ENXIO);
+	}
+
 	endp->their_handle = handle;
 	endp->my_handle = acpi_get_handle(dev);
 
