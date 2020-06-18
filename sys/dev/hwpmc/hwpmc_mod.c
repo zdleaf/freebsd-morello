@@ -78,6 +78,7 @@ __FBSDID("$FreeBSD$");
 #include <vm/vm_object.h>
 
 #include "hwpmc_soft.h"
+#include "hwpmc_vm.h"
 
 #define PMC_EPOCH_ENTER() struct epoch_tracker pmc_et; epoch_enter_preempt(global_epoch_preempt, &pmc_et)
 #define PMC_EPOCH_EXIT() epoch_exit_preempt(global_epoch_preempt, &pmc_et)
@@ -104,6 +105,7 @@ pmc_value_t		*pmc_pcpu_saved; /* saved PMC values: CSW handling */
 #define	PMC_PCPU_SAVED(C,R)	pmc_pcpu_saved[(R) + md->pmd_npmc*(C)]
 
 struct mtx_pool		*pmc_mtxpool;
+struct mtx_pool		*pmc_mtxpool_sleep;
 static int		*pmc_pmcdisp;	 /* PMC row dispositions */
 
 #define	PMC_ROW_DISP_IS_FREE(R)		(pmc_pmcdisp[(R)] == 0)
@@ -1469,6 +1471,8 @@ pmc_process_csw_in(struct thread *td)
 			    ("[pmc,%d] pmcval outside of expected range cpu=%d "
 			    "ri=%d pmcval=%jx pm_reloadcount=%jx", __LINE__,
 			    cpu, ri, newvalue, pm->pm_sc.pm_reloadcount));
+		} else if (PMC_TO_MODE(pm) == PMC_MODE_TT) {
+			/* Nothing */
 		} else {
 			KASSERT(PMC_TO_MODE(pm) == PMC_MODE_TC,
 			    ("[pmc,%d] illegal mode=%d", __LINE__,
@@ -1484,7 +1488,8 @@ pmc_process_csw_in(struct thread *td)
 		pcd->pcd_write_pmc(cpu, adjri, newvalue);
 
 		/* If a sampling mode PMC, reset stalled state. */
-		if (PMC_TO_MODE(pm) == PMC_MODE_TS)
+		if (PMC_TO_MODE(pm) == PMC_MODE_TS ||
+		    PMC_TO_MODE(pm) == PMC_MODE_TT)
 			pm->pm_pcpu_state[cpu].pps_stalled = 0;
 
 		/* Indicate that we desire this to run. */
@@ -1665,6 +1670,8 @@ pmc_process_csw_out(struct thread *td)
 						    pm->pm_sc.pm_reloadcount;
 				}
 				mtx_pool_unlock_spin(pmc_mtxpool, pm);
+			} else if (mode == PMC_MODE_TT) {
+				/* Nothing */
 			} else {
 				tmp = newvalue - PMC_PCPU_SAVED(cpu,ri);
 
@@ -1757,8 +1764,11 @@ pmc_process_mmap(struct thread *td, struct pmckern_map_in *pkm)
 	char *fullpath, *freepath;
 	const struct pmc *pm;
 	struct pmc_owner *po;
-	const struct pmc_process *pp;
+	struct pmc_process *pp;
+	struct proc *p;
+	bool pause_thread;
 
+	pause_thread = false;
 	freepath = fullpath = NULL;
 	MPASS(!in_epoch(global_epoch_preempt));
 	pmc_getfilename((struct vnode *) pkm->pm_file, &fullpath, &freepath);
@@ -1774,19 +1784,43 @@ pmc_process_mmap(struct thread *td, struct pmckern_map_in *pkm)
 	if ((pp = pmc_find_process_descriptor(td->td_proc, 0)) == NULL)
 		goto done;
 
+	p = td->td_proc;
+	if ((p->p_flag & P_HWPMC) == 0)
+		goto done;
+
 	/*
 	 * Inform sampling PMC owners tracking this process.
 	 */
-	for (ri = 0; ri < md->pmd_npmc; ri++)
-		if ((pm = pp->pp_pmcs[ri].pp_pmc) != NULL &&
-		    PMC_IS_SAMPLING_MODE(PMC_TO_MODE(pm)))
+	for (ri = 0; ri < md->pmd_npmc; ri++) {
+		if ((pm = pp->pp_pmcs[ri].pp_pmc) == NULL)
+			continue;
+		if (PMC_IS_SAMPLING_MODE(PMC_TO_MODE(pm)) ||
+		    PMC_TO_MODE(pm) == PMC_MODE_TT)
 			pmclog_process_map_in(pm->pm_owner,
 			    pid, pkm->pm_address, fullpath);
+		if (PMC_TO_MODE(pm) == PMC_MODE_TT)
+			pause_thread = true;
+	}
 
   done:
 	if (freepath)
 		free(freepath, M_TEMP);
 	PMC_EPOCH_EXIT();
+
+	/*
+	 * pmclog entry with mmap information just scheduled to ship
+	 * to userspace. This not yet received by pmctrace application.
+	 * Put this thread on pause before we continue. Once user process
+	 * receive log entry, it can reconfigure tracing filters, start
+	 * tracing operation and finally wakeup this thread.
+	 */
+	if (pp != NULL && pause_thread == true) {
+		pp->pp_refcnt++;
+		mtx_lock(pp->pp_tslock);
+		msleep(pp, pp->pp_tslock, PWAIT, "pmc-mmap", 0);
+		mtx_unlock(pp->pp_tslock);
+		pp->pp_refcnt--;
+	}
 }
 
 
@@ -1815,11 +1849,14 @@ pmc_process_munmap(struct thread *td, struct pmckern_map_out *pkm)
 	if ((pp = pmc_find_process_descriptor(td->td_proc, 0)) == NULL)
 		return;
 
-	for (ri = 0; ri < md->pmd_npmc; ri++)
-		if ((pm = pp->pp_pmcs[ri].pp_pmc) != NULL &&
-		    PMC_IS_SAMPLING_MODE(PMC_TO_MODE(pm)))
+	for (ri = 0; ri < md->pmd_npmc; ri++) {
+		if ((pm = pp->pp_pmcs[ri].pp_pmc) == NULL)
+			continue;
+		if (PMC_IS_SAMPLING_MODE(PMC_TO_MODE(pm)) ||
+		    PMC_TO_MODE(pm) == PMC_MODE_TT)
 			pmclog_process_map_out(pm->pm_owner, pid,
 			    pkm->pm_address, pkm->pm_address + pkm->pm_size);
+	}
 }
 
 /*
@@ -1833,7 +1870,8 @@ pmc_log_kernel_mappings(struct pmc *pm)
 	struct pmckern_map_in *km, *kmbase;
 
 	MPASS(in_epoch(global_epoch_preempt) || sx_xlocked(&pmc_sx));
-	KASSERT(PMC_IS_SAMPLING_MODE(PMC_TO_MODE(pm)),
+	KASSERT(PMC_IS_SAMPLING_MODE(PMC_TO_MODE(pm)) ||
+	    PMC_TO_MODE(pm) == PMC_MODE_ST,
 	    ("[pmc,%d] non-sampling PMC (%p) desires mapping information",
 		__LINE__, (void *) pm));
 
@@ -2597,8 +2635,8 @@ pmc_find_process_descriptor(struct proc *p, uint32_t mode)
 
 	mtx_lock_spin(&pmc_processhash_mtx);
 	LIST_FOREACH(pp, pph, pp_next)
-	    if (pp->pp_proc == p)
-		    break;
+		if (pp->pp_proc == p)
+			break;
 
 	if ((mode & PMC_FLAG_REMOVE) && pp != NULL)
 		LIST_REMOVE(pp, pp_next);
@@ -2608,6 +2646,7 @@ pmc_find_process_descriptor(struct proc *p, uint32_t mode)
 		ppnew->pp_proc = p;
 		LIST_INIT(&ppnew->pp_tds);
 		ppnew->pp_tdslock = mtx_pool_find(pmc_mtxpool, ppnew);
+		ppnew->pp_tslock = mtx_pool_find(pmc_mtxpool_sleep, ppnew);
 		LIST_INSERT_HEAD(pph, ppnew, pp_next);
 		mtx_unlock_spin(&pmc_processhash_mtx);
 		pp = ppnew;
@@ -2876,6 +2915,15 @@ pmc_release_pmc_descriptor(struct pmc *pm)
 		 */
 		LIST_FOREACH_SAFE(ptgt, &pm->pm_targets, pt_next, tmp) {
 			pp = ptgt->pt_process;
+
+			/*
+			 * Owner of this pmc descriptor is terminated.
+			 * If any tracing target thread that associated with
+			 * this pmc descriptor is sleeping, then release it
+			 * from sleeping.
+			 */
+			wakeup(pp);
+
 			pmc_unlink_target_process(pm, pp); /* frees 'ptgt' */
 
 			PMCDBG1(PMC,REL,3, "pp->refcnt=%d", pp->pp_refcnt);
@@ -3163,7 +3211,8 @@ pmc_start(struct pmc *pm)
 	 * If this is a sampling mode PMC, log mapping information for
 	 * the kernel modules that are currently loaded.
 	 */
-	if (PMC_IS_SAMPLING_MODE(PMC_TO_MODE(pm)))
+	if (PMC_IS_SAMPLING_MODE(PMC_TO_MODE(pm)) ||
+	    PMC_TO_MODE(pm) == PMC_MODE_ST)
 	    pmc_log_kernel_mappings(pm);
 
 	if (PMC_IS_VIRTUAL_MODE(mode)) {
@@ -3838,9 +3887,14 @@ pmc_syscall_handler(struct thread *td, void *syscall_args)
 		mode = pa.pm_mode;
 		cpu  = pa.pm_cpu;
 
-		if ((mode != PMC_MODE_SS  &&  mode != PMC_MODE_SC  &&
-		     mode != PMC_MODE_TS  &&  mode != PMC_MODE_TC) ||
-		    (cpu != (u_int) PMC_CPU_ANY && cpu >= pmc_cpu_max())) {
+		if (mode != PMC_MODE_SS && mode != PMC_MODE_TS &&
+		    mode != PMC_MODE_SC && mode != PMC_MODE_TC &&
+		    mode != PMC_MODE_ST && mode != PMC_MODE_TT) {
+			error = EINVAL;
+			break;
+		}
+
+		if (cpu != (u_int) PMC_CPU_ANY && cpu >= pmc_cpu_max()) {
 			error = EINVAL;
 			break;
 		}
@@ -4315,6 +4369,176 @@ pmc_syscall_handler(struct thread *td, void *syscall_args)
 	}
 	break;
 
+	case PMC_OP_LOG_KERNEL_MAP:
+	{
+		struct pmc_op_simple sp;
+		struct pmc *pm;
+
+		if ((error = copyin(arg, &sp, sizeof(sp))) != 0)
+			break;
+
+		/* locate pmc descriptor */
+		if ((error = pmc_find_pmc(sp.pm_pmcid, &pm)) != 0)
+			break;
+
+		if (PMC_TO_MODE(pm) != PMC_MODE_ST)
+			break;
+
+		if (pm->pm_state != PMC_STATE_ALLOCATED &&
+		    pm->pm_state != PMC_STATE_STOPPED &&
+		    pm->pm_state != PMC_STATE_RUNNING) {
+			error = EINVAL;
+			break;
+		}
+
+		pmc_log_kernel_mappings(pm);
+	}
+	break;
+
+	case PMC_OP_THREAD_WAKEUP:
+	{
+		struct pmc_op_thread_wakeup u;
+		struct pmc_process *pp;
+		struct proc *p;
+		struct pmc *pm;
+
+		if ((error = copyin(arg, &u, sizeof(u))) != 0)
+			break;
+
+		/* locate pmc descriptor */
+		if ((error = pmc_find_pmc(u.pm_pmcid, &pm)) != 0)
+			break;
+
+		/* lookup pid */
+		if ((p = pfind(u.pm_pid)) == NULL) {
+			error = ESRCH;
+			break;
+		}
+
+		if ((p->p_flag & P_HWPMC) == 0)
+			break;
+
+		if ((pp = pmc_find_process_descriptor(p, 0)) != NULL)
+			wakeup(pp);
+
+		PROC_UNLOCK(p);
+	}
+	break;
+
+	case PMC_OP_TRACE_CONFIG:
+	{
+		struct pmc_op_trace_config trc;
+		uint64_t *ranges;
+		struct pmc *pm;
+		struct pmc_binding pb;
+		struct pmc_classdep *pcd;
+		uint32_t nranges;
+		uint32_t cpu;
+		uint32_t ri;
+		int adjri;
+
+		if ((error = copyin(arg, &trc, sizeof(trc))) != 0)
+			break;
+
+		/* locate pmc descriptor */
+		if ((error = pmc_find_pmc(trc.pm_pmcid, &pm)) != 0)
+			break;
+
+		if (PMC_TO_MODE(pm) != PMC_MODE_ST &&
+		    PMC_TO_MODE(pm) != PMC_MODE_TT)
+			break;
+
+		/* Can't proceed with PMC that hasn't been started. */
+		if (pm->pm_state != PMC_STATE_ALLOCATED &&
+		    pm->pm_state != PMC_STATE_STOPPED &&
+		    pm->pm_state != PMC_STATE_RUNNING) {
+			error = EINVAL;
+			break;
+		}
+
+		cpu = trc.pm_cpu;
+
+		ri = PMC_TO_ROWINDEX(pm);
+		pcd = pmc_ri_to_classdep(md, ri, &adjri);
+		if (pcd->pcd_trace_config == NULL)
+			break;
+
+		/* switch to CPU 'cpu' */
+		pmc_save_cpu_binding(&pb);
+		pmc_select_cpu(cpu);
+
+		ranges = trc.ranges;
+		nranges = trc.nranges;
+
+		mtx_pool_lock_spin(pmc_mtxpool, pm);
+		error = (*pcd->pcd_trace_config)(cpu, adjri,
+		    pm, ranges, nranges);
+		mtx_pool_unlock_spin(pmc_mtxpool, pm);
+
+		pmc_restore_cpu_binding(&pb);
+	}
+	break;
+
+	/*
+	 * Read a PMC trace buffer ptr.
+	 */
+	case PMC_OP_TRACE_READ:
+	{
+		struct pmc_op_trace_read trr;
+		struct pmc_op_trace_read *trr_ret;
+		struct pmc_binding pb;
+		struct pmc_classdep *pcd;
+		struct pmc *pm;
+		pmc_value_t cycle;
+		pmc_value_t offset;
+		uint32_t cpu;
+		uint32_t ri;
+		int adjri;
+
+		if ((error = copyin(arg, &trr, sizeof(trr))) != 0)
+			break;
+
+		/* locate pmc descriptor */
+		if ((error = pmc_find_pmc(trr.pm_pmcid, &pm)) != 0)
+			break;
+
+		if (PMC_TO_MODE(pm) != PMC_MODE_ST &&
+		    PMC_TO_MODE(pm) != PMC_MODE_TT)
+			break;
+
+		/* Can't read a PMC that hasn't been started. */
+		if (pm->pm_state != PMC_STATE_ALLOCATED &&
+		    pm->pm_state != PMC_STATE_STOPPED &&
+		    pm->pm_state != PMC_STATE_RUNNING) {
+			error = EINVAL;
+			break;
+		}
+
+		cpu = trr.pm_cpu;
+
+		ri = PMC_TO_ROWINDEX(pm);
+		pcd = pmc_ri_to_classdep(md, ri, &adjri);
+
+		/* switch to CPU 'cpu' */
+		pmc_save_cpu_binding(&pb);
+		pmc_select_cpu(cpu);
+
+		mtx_pool_lock_spin(pmc_mtxpool, pm);
+		error = (*pcd->pcd_read_trace)(cpu, adjri,
+		    pm, &cycle, &offset);
+		mtx_pool_unlock_spin(pmc_mtxpool, pm);
+
+		pmc_restore_cpu_binding(&pb);
+
+		trr_ret = (struct pmc_op_trace_read *)arg;
+		if ((error = copyout(&cycle, &trr_ret->pm_cycle,
+		    sizeof(trr.pm_cycle))))
+			break;
+		if ((error = copyout(&offset, &trr_ret->pm_offset,
+		    sizeof(trr.pm_offset))))
+			break;
+	}
+	break;
 
 	/*
 	 * Read and/or write a PMC.
@@ -4418,7 +4642,7 @@ pmc_syscall_handler(struct thread *td, void *syscall_args)
 			/* save old value */
 			if (prw.pm_flags & PMC_F_OLDVALUE)
 				if ((error = (*pcd->pcd_read_pmc)(cpu, adjri,
-					 &oldvalue)))
+				    &oldvalue)))
 					goto error;
 			/* write out new value */
 			if (prw.pm_flags & PMC_F_NEWVALUE)
@@ -5588,6 +5812,12 @@ pmc_initialize(void)
 			return (ENOSYS);
         }
 
+	error = pmc_vm_initialize(md);
+	if (error) {
+		pmc_md_finalize(md);
+		return (error);
+	}
+
 	KASSERT(md->pmd_nclass >= 1 && md->pmd_npmc >= 1,
 	    ("[pmc,%d] no classes or pmcs", __LINE__));
 
@@ -5708,6 +5938,8 @@ pmc_initialize(void)
 	/* allocate a pool of spin mutexes */
 	pmc_mtxpool = mtx_pool_create("pmc-leaf", pmc_mtxpool_size,
 	    MTX_SPIN);
+	pmc_mtxpool_sleep = mtx_pool_create("pmc-sleep", pmc_mtxpool_size,
+	    MTX_DEF);
 
 	PMCDBG4(MOD,INI,1, "pmc_ownerhash=%p, mask=0x%lx "
 	    "targethash=%p mask=0x%lx", pmc_ownerhash, pmc_ownerhashmask,
@@ -5823,6 +6055,8 @@ pmc_cleanup(void)
 
 	if (pmc_mtxpool)
 		mtx_pool_destroy(&pmc_mtxpool);
+	if (pmc_mtxpool_sleep)
+		mtx_pool_destroy(&pmc_mtxpool_sleep);
 
 	mtx_destroy(&pmc_processhash_mtx);
 	if (pmc_processhash) {
@@ -5919,6 +6153,8 @@ pmc_cleanup(void)
 	}
 
 	pmclog_shutdown();
+	pmc_vm_finalize();
+
 	counter_u64_free(pmc_stats.pm_intr_ignored);
 	counter_u64_free(pmc_stats.pm_intr_processed);
 	counter_u64_free(pmc_stats.pm_intr_bufferfull);
