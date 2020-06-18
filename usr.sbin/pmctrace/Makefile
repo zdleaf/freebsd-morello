@@ -5,6 +5,7 @@ PROG_CXX=	pmctrace
 SRCS=	pmctrace.c
 MAN=
 
+CFLAGS+= -I${SRCTOP}/lib/libpmcstat
 LIBADD= elf pmc pmcstat
 
 .if ${MACHINE_CPUARCH} == "amd64"
