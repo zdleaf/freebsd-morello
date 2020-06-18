@@ -744,7 +744,7 @@ pt_trace_config(int cpu, int ri, struct pmc *pm,
 	pt_pc = pt_pcpu[cpu];
 
 	KASSERT(cpu == PCPU_GET(cpuid), ("Configuring wrong CPU\n"));
-	
+
 	/* Ensure tracing is turned off */
 	reg = rdmsr(MSR_IA32_RTIT_CTL);
 	if (reg & RTIT_CTL_TRACEEN)

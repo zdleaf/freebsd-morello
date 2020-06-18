@@ -193,7 +193,7 @@ packet_monitor(void *context __unused,
 	int offset;
 
 	offset = 0;
- 
+
 	switch(op) {
 	case OCSD_OP_DATA:
 		sprintf(packet_str, "Idx:%"  OCSD_TRC_IDX_STR ";", index_sop);
@@ -276,7 +276,7 @@ static ocsd_err_t
 create_generic_decoder(dcd_tree_handle_t handle, const char *p_name,
     const void *p_cfg, const void *p_context __unused, uint64_t base,
     uint64_t start, uint64_t end)
-{ 
+{
 	ocsd_err_t ret;
 	uint8_t CSID;
 
@@ -337,7 +337,7 @@ gen_trace_elem_print_lookup(const void *p_context,
     const ocsd_trc_index_t index_sop __unused,
     const uint8_t trc_chan_id __unused,
     const ocsd_generic_trace_elem *elem __unused)
-{ 
+{
 	const struct mtrace_data *mdata;
 	ocsd_datapath_resp_t resp;
 	struct pmcstat_symbol *sym;
