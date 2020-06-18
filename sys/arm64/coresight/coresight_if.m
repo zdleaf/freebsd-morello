@@ -39,6 +39,18 @@ METHOD int init {
 	device_t dev;
 };
 
+METHOD int allocate {
+	device_t dev;
+	struct endpoint *endp;
+	struct coresight_event *event;
+};
+
+METHOD int release {
+	device_t dev;
+	struct endpoint *endp;
+	struct coresight_event *event;
+};
+
 METHOD int enable {
 	device_t dev;
 	struct endpoint *endp;

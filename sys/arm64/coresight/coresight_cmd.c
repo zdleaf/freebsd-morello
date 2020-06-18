@@ -157,3 +157,27 @@ coresight_read(int cpu, struct coresight_event *event)
 	LIST_FOREACH(endp, &event->endplist, endplink)
 		CORESIGHT_READ(endp->cs_dev->dev, endp, event);
 }
+
+void
+coresight_allocate(int cpu, struct coresight_event *event)
+{
+	struct coresight_device *cs_dev;
+	struct endpoint *endp;
+
+	LIST_FOREACH(endp, &event->endplist, endplink) {
+		cs_dev = endp->cs_dev;
+		CORESIGHT_ALLOCATE(cs_dev->dev, endp, event);
+	}
+}
+
+void
+coresight_release(int cpu, struct coresight_event *event)
+{
+	struct coresight_device *cs_dev;
+	struct endpoint *endp;
+
+	LIST_FOREACH(endp, &event->endplist, endplink) {
+		cs_dev = endp->cs_dev;
+		CORESIGHT_RELEASE(cs_dev->dev, endp, event);
+	}
+}
