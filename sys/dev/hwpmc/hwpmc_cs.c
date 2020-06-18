@@ -68,8 +68,6 @@ __FBSDID("$FreeBSD$");
 
 #include <dev/hwpmc/hwpmc_vm.h>
 
-static MALLOC_DEFINE(M_CORESIGHT, "coresight", "CORESIGHT driver");
-
 extern struct cdev *pmc_cdev[MAXCPU];
 
 /*
