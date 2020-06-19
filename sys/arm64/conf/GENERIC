@@ -23,6 +23,7 @@ ident		GENERIC
 
 makeoptions	DEBUG=-g		# Build kernel with gdb(1) debug symbols
 makeoptions	WITH_CTF=1		# Run ctfconvert(1) for DTrace support
+makeoptions	MODULES_OVERRIDE="hwpmc"
 
 options 	SCHED_ULE		# ULE scheduler
 options 	NUMA			# Non-Uniform Memory Architecture support
@@ -42,10 +43,10 @@ options 	UFS_DIRHASH		# Improve performance on big directories
 options 	UFS_GJOURNAL		# Enable gjournal-based UFS journaling
 options 	QUOTA			# Enable disk quotas for UFS
 options 	MD_ROOT			# MD is a potential root device
-options 	NFSCL			# Network Filesystem Client
-options 	NFSD			# Network Filesystem Server
-options 	NFSLOCKD		# Network Lock Manager
-options 	NFS_ROOT		# NFS usable as /, requires NFSCL
+#options 	NFSCL			# Network Filesystem Client
+#options 	NFSD			# Network Filesystem Server
+#options 	NFSLOCKD		# Network Lock Manager
+#options 	NFS_ROOT		# NFS usable as /, requires NFSCL
 options 	MSDOSFS			# MSDOS Filesystem
 options 	CD9660			# ISO 9660 Filesystem
 options 	PROCFS			# Process filesystem (requires PSEUDOFS)
@@ -77,6 +78,8 @@ options 	RACCT_DEFAULT_TO_DISABLED # Set kern.racct.enable=0 by default
 options 	RCTL			# Resource limits
 options 	SMP
 options 	INTRNG
+
+options 	ROOTDEVNAME=\"ufs:da0p2\"
 
 # Debugging support.  Always need this:
 options 	KDB			# Enable kernel debugger support.
@@ -166,6 +169,7 @@ device		awg		# Allwinner EMAC Gigabit Ethernet
 device		axgbe		# AMD Opteron A1100 integrated NIC
 device		msk		# Marvell/SysKonnect Yukon II Gigabit Ethernet
 device		neta		# Marvell Armada 370/38x/XP/3700 NIC
+device		re		# RealTek 8139C+/8169/8169S/8110S
 device  	smc		# SMSC LAN91C111
 device		vnic		# Cavium ThunderX NIC
 device		al_eth		# Annapurna Alpine Ethernet NIC
