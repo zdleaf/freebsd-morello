@@ -216,6 +216,7 @@ static int virtio_msix = 1;
 #ifdef __amd64__
 static int x2apic_mode = 0;	/* default is xAPIC */
 #endif
+static int destroy_on_poweroff = 0;
 
 static int strictio;
 static int strictmsr = 1;
@@ -255,7 +256,7 @@ usage(int code)
 {
 
         fprintf(stderr,
-		"Usage: %s [-abehuwxACHPSWY]\n"
+		"Usage: %s [-abehuwxACDHPSWY]\n"
 		"       %*s [-c [[cpus=]numcpus][,sockets=n][,cores=n][,threads=n]]\n"
 		"       %*s [-g <gdb port>] [-l <lpc>]\n"
 		"       %*s [-m mem] [-p vcpu:hostcpu] [-s <pci>] [-U uuid] <vm>\n"
@@ -265,6 +266,7 @@ usage(int code)
 		"       -A: create ACPI tables\n"
 		"       -c: number of cpus and/or topology specification\n"
 		"       -C: include guest memory in core file\n"
+		"       -D: destroy on power-off\n"
 		"       -e: exit on unhandled I/O access\n"
 #ifdef __amd64__
 		"       -g: gdb port\n"
@@ -866,6 +868,8 @@ vmexit_suspend(struct vmctx *ctx, struct vm_exit *vmexit, int *pvcpu)
 	case VM_SUSPEND_RESET:
 		exit(0);
 	case VM_SUSPEND_POWEROFF:
+		if (destroy_on_poweroff)
+			vm_destroy(ctx);
 		exit(1);
 	case VM_SUSPEND_HALT:
 		exit(2);
@@ -1184,9 +1188,9 @@ main(int argc, char *argv[])
 	memflags = 0;
 
 #ifdef BHYVE_SNAPSHOT
-	optstr = "abehuwxABCHIPSWYp:g:G:c:s:m:l:U:r:";
+	optstr = "abehuwxABCDHIPSWYp:g:G:c:s:m:l:U:r:";
 #else
-	optstr = "abehuwxABCHIPSWYp:g:G:c:s:m:l:U:";
+	optstr = "abehuwxABCDHIPSWYp:g:G:c:s:m:l:U:";
 #endif
 	while ((c = getopt(argc, argv, optstr)) != -1) {
 		switch (c) {
@@ -1205,6 +1209,9 @@ main(int argc, char *argv[])
 		case 'B':
 			break;
 #endif
+		case 'D':
+			destroy_on_poweroff = 1;
+			break;
 		case 'p':
                         if (pincpu_parse(optarg) != 0) {
                             errx(EX_USAGE, "invalid vcpu pinning "
