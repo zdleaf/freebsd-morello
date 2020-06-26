@@ -181,3 +181,15 @@ coresight_release(int cpu, struct coresight_event *event)
 		CORESIGHT_RELEASE(cs_dev->dev, endp, event);
 	}
 }
+
+void
+coresight_info(int cpu, struct coresight_event *event)
+{
+	struct coresight_device *cs_dev;
+	struct endpoint *endp;
+
+	LIST_FOREACH(endp, &event->endplist, endplink) {
+		cs_dev = endp->cs_dev;
+		CORESIGHT_INFO(cs_dev->dev, endp, event);
+	}
+}

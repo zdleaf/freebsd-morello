@@ -360,8 +360,9 @@ enum pmc_event {
 	__PMC_OP(GETDYNEVENTINFO, "Get dynamic events list")		\
 	__PMC_OP(LOG_KERNEL_MAP, "Log kernel mappings")			\
 	__PMC_OP(THREAD_WAKEUP, "Thread wakeup")			\
-	__PMC_OP(TRACE_READ, "Read trace buffer pointer")		\
-	__PMC_OP(TRACE_CONFIG, "Setup trace IP ranges")
+	__PMC_OP(TRACE_INFO, "Tracing modules information")		\
+	__PMC_OP(TRACE_CONFIG, "Setup trace IP ranges")			\
+	__PMC_OP(TRACE_READ, "Read trace buffer pointer")
 
 
 enum pmc_ops {
@@ -567,6 +568,18 @@ struct pmc_op_trace_read {
 	uint32_t	pm_cpu;
 	pmc_value_t	pm_cycle;	/* returned value */
 	pmc_value_t	pm_offset;	/* returned value */
+};
+
+/*
+ * OP TRACE_INFO
+ */
+
+#define	TRACE_INFO_MAXLEN	128
+
+struct pmc_op_trace_info {
+	pmc_id_t	pm_pmcid;
+	uint32_t	pm_cpu;
+	uint8_t		data[TRACE_INFO_MAXLEN];
 };
 
 /*
@@ -1062,6 +1075,8 @@ struct pmc_classdep {
 	int (*pcd_write_pmc)(int _cpu, int _ri, pmc_value_t _value);
 
 	/* tracing */
+	int (*pcd_trace_info)(int _cpu, int _ri, struct pmc *_pm,
+	    struct pmc_op_trace_info *tri);
 	int (*pcd_read_trace)(int _cpu, int _ri, struct pmc *_pm,
 	    pmc_value_t *_cycle, pmc_value_t *_offset);
 	int (*pcd_trace_config)(int _cpu, int _ri, struct pmc *_pm,

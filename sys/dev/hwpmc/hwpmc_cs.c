@@ -272,7 +272,7 @@ coresight_buffer_prepare(uint32_t cpu, struct pmc *pm,
 	 * Set a trace ID required for ETM component.
 	 * TODO: this should be derived from pmctrace.
 	 */
-	event->etm.trace_id = 0x10;
+	event->etm.traceidr = 0x10;
 	coresight_allocate(cpu, event);
 
 	return (0);
@@ -543,6 +543,24 @@ coresight_read_trace(int cpu, int ri, struct pmc *pm,
 }
 
 static int
+coresight_trace_info(int cpu, int ri, struct pmc *pm,
+    struct pmc_op_trace_info *tri)
+{
+	struct coresight_event *event;
+	struct coresight_cpu *coresight_pc;
+
+	coresight_pc = coresight_pcpu[cpu];
+	event = &coresight_pc->event;
+
+	/* Collect information from coresight components */
+	coresight_info(cpu, event);
+
+	memcpy(tri->data, &event->etm, sizeof(struct etm_state));
+
+	return (0);
+}
+
+static int
 coresight_read_pmc(int cpu, int ri, pmc_value_t *v)
 {
 
@@ -690,6 +708,7 @@ pmc_coresight_initialize(struct pmc_mdep *md, int maxcpu)
 	pcd->pcd_read_pmc     = coresight_read_pmc;
 	pcd->pcd_read_trace   = coresight_read_trace;
 	pcd->pcd_trace_config = coresight_trace_config;
+	pcd->pcd_trace_info   = coresight_trace_info;
 	pcd->pcd_release_pmc  = coresight_release_pmc;
 	pcd->pcd_start_pmc    = coresight_start_pmc;
 	pcd->pcd_stop_pmc     = coresight_stop_pmc;

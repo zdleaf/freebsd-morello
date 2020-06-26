@@ -71,15 +71,21 @@ tmc_start(device_t dev)
 
 	/* Enable TMC */
 	bus_write_4(sc->res, TMC_CTL, CTL_TRACECAPTEN);
-	if ((bus_read_4(sc->res, TMC_CTL) & CTL_TRACECAPTEN) == 0)
-		panic("Not enabled\n");
+	if ((bus_read_4(sc->res, TMC_CTL) & CTL_TRACECAPTEN) == 0) {
+		device_printf(dev, "TMC is not enabled\n");
+		return (ENXIO);
+	}
 
 	do {
 		reg = bus_read_4(sc->res, TMC_STS);
 	} while ((reg & STS_TMCREADY) == 1);
 
-	if ((bus_read_4(sc->res, TMC_CTL) & CTL_TRACECAPTEN) == 0)
-		panic("Not enabled\n");
+	if ((bus_read_4(sc->res, TMC_CTL) & CTL_TRACECAPTEN) == 0) {
+		device_printf(dev, "TMC is not enabled\n");
+		return (-1);
+	}
+
+	dprintf("%s: tmc started\n", __func__);
 
 	return (0);
 }
@@ -203,11 +209,11 @@ tmc_init(device_t dev)
 	switch (reg) {
 	case DEVID_CONFIGTYPE_ETR:
 		sc->dev_type = CORESIGHT_ETR;
-		dprintf(dev, "ETR configuration found\n");
+		device_printf(dev, "ETR configuration found\n");
 		break;
 	case DEVID_CONFIGTYPE_ETF:
 		sc->dev_type = CORESIGHT_ETF;
-		dprintf(dev, "ETF configuration found\n");
+		device_printf(dev, "ETF configuration found\n");
 		if (sc->etf_configured == false) {
 			tmc_configure_etf(dev);
 			sc->etf_configured = true;

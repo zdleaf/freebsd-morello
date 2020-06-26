@@ -4480,6 +4480,59 @@ pmc_syscall_handler(struct thread *td, void *syscall_args)
 	break;
 
 	/*
+	 * Initialize a tracing component.
+	 */
+	case PMC_OP_TRACE_INFO:
+	{
+		struct pmc_op_trace_info tri;
+		struct pmc_op_trace_info *tri_ret;
+		struct pmc_binding pb;
+		struct pmc_classdep *pcd;
+		struct pmc *pm;
+		uint32_t cpu;
+		uint32_t ri;
+		int adjri;
+
+		if ((error = copyin(arg, &tri, sizeof(tri))) != 0)
+			break;
+
+		/* locate pmc descriptor */
+		if ((error = pmc_find_pmc(tri.pm_pmcid, &pm)) != 0)
+			break;
+
+		if (PMC_TO_MODE(pm) != PMC_MODE_ST &&
+		    PMC_TO_MODE(pm) != PMC_MODE_TT)
+			break;
+
+		if (pm->pm_state != PMC_STATE_ALLOCATED) {
+			error = EINVAL;
+			break;
+		}
+
+		cpu = tri.pm_cpu;
+
+		ri = PMC_TO_ROWINDEX(pm);
+		pcd = pmc_ri_to_classdep(md, ri, &adjri);
+
+		/* switch to CPU 'cpu' */
+		pmc_save_cpu_binding(&pb);
+		pmc_select_cpu(cpu);
+
+		mtx_pool_lock_spin(pmc_mtxpool, pm);
+		error = (*pcd->pcd_trace_info)(cpu, adjri, pm, &tri);
+		mtx_pool_unlock_spin(pmc_mtxpool, pm);
+
+		pmc_restore_cpu_binding(&pb);
+
+		tri_ret = (struct pmc_op_trace_info *)arg;
+
+		if ((error = copyout(&tri, tri_ret,
+		    sizeof(struct pmc_op_trace_info))))
+			break;
+	}
+	break;
+
+	/*
 	 * Read a PMC trace buffer ptr.
 	 */
 	case PMC_OP_TRACE_READ:

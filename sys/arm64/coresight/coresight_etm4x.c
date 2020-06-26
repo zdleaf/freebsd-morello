@@ -100,7 +100,7 @@ etm_prepare(device_t dev, struct coresight_event *event)
 	bus_write_4(sc->res, TRCSYNCPR, TRCSYNCPR_4K);
 
 	/* Set a value for the trace ID */
-	bus_write_4(sc->res, TRCTRACEIDR, event->etm.trace_id);
+	bus_write_4(sc->res, TRCTRACEIDR, event->etm.traceidr);
 
 	/*
 	 * Disable the timestamp event. The trace unit still generates
@@ -210,8 +210,10 @@ etm_enable(device_t dev, struct endpoint *endp,
 		reg = bus_read_4(sc->res, TRCSTATR);
 	} while ((reg & TRCSTATR_IDLE) == 1);
 
-	if ((bus_read_4(sc->res, TRCPRGCTLR) & TRCPRGCTLR_EN) == 0)
-		panic("etm is not enabled\n");
+	if ((bus_read_4(sc->res, TRCPRGCTLR) & TRCPRGCTLR_EN) == 0) {
+		device_printf(dev, "etm is not enabled\n");
+		return (ENXIO);
+	}
 
 	return (0);
 }
@@ -232,6 +234,24 @@ etm_disable(device_t dev, struct endpoint *endp,
 	do {
 		reg = bus_read_4(sc->res, TRCSTATR);
 	} while ((reg & TRCSTATR_IDLE) == 0);
+}
+
+static int
+etm_info(device_t dev, struct endpoint *endp,
+    struct coresight_event *event)
+{
+	struct etm_softc *sc;
+	int i;
+
+	sc = device_get_softc(dev);
+
+	event->etm.configr = bus_read_4(sc->res, TRCCONFIGR);
+	//event->etm.traceidr = bus_read_4(sc->res, TRCTRACEIDR);
+
+	for (i = 0; i < 14; i++)
+		event->etm.reg_idr[i] = bus_read_4(sc->res, TRCIDR(i));
+
+	return (0);
 }
 
 int
@@ -261,6 +281,7 @@ static device_method_t etm_methods[] = {
 	DEVMETHOD(coresight_init,	etm_init),
 	DEVMETHOD(coresight_enable,	etm_enable),
 	DEVMETHOD(coresight_disable,	etm_disable),
+	DEVMETHOD(coresight_info,	etm_info),
 	DEVMETHOD_END
 };
 

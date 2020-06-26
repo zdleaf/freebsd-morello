@@ -72,7 +72,7 @@ replicator_enable(device_t dev, struct endpoint *endp,
 	sc = device_get_softc(dev);
 
 	/* Enable the port. Keep the other port disabled */
-	if (endp->reg == 0) {
+	if (endp->reg == 1) {
 		bus_write_4(sc->res, REPLICATOR_IDFILTER0, 0x00);
 		bus_write_4(sc->res, REPLICATOR_IDFILTER1, 0xff);
 	} else {

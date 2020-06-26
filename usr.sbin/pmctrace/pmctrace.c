@@ -132,11 +132,13 @@ pmctrace_ncpu(void)
 }
 
 static int
-pmctrace_init_cpu(uint32_t cpu)
+pmctrace_init_cpu(uint32_t cpu, struct pmcstat_ev *ev __unused)
 {
 	struct trace_cpu *tc;
 	char filename[16];
 	struct mtrace_data *mdata;
+	uint8_t data[TRACE_INFO_MAXLEN];
+	int error;
 
 	tc = trace_cpus[cpu];
 	mdata = &tc->mdata;
@@ -160,11 +162,17 @@ pmctrace_init_cpu(uint32_t cpu)
 		printf("mmap failed: err %d\n", errno);
 		return (-1);
 	}
-	dprintf("%s: tc->base %lx, *tc->base %lx\n", __func__,
+	printf("%s: tc->base %lx, *tc->base %lx\n", __func__,
 	    (uint64_t)tc->base, *(uint64_t *)tc->base);
 
+	error = pmc_trace_info(cpu, ev->ev_pmcid, data, TRACE_INFO_MAXLEN);
+	if (error) {
+		printf("could not get tracing components information\n");
+		return (error);
+	}
+
 	if (pmctrace_cfg.trace_dev->methods->init != NULL)
-		pmctrace_cfg.trace_dev->methods->init(tc);
+		pmctrace_cfg.trace_dev->methods->init(tc, data);
 
 	return (0);
 }
@@ -529,7 +537,6 @@ usage(void)
 		"\t -e\tevent-spec\tcomma-separated event string\n"
 		"\t -i\tname\t\tfilter by dynamic library or kernel module name\n"
 		"\t -f\tname\t\tfilter by function name\n"
-
 #if defined(__amd64__)
 		"\n\tIntel Processor-Trace decoder options:\n"
 		"\t -t\t\t\t(toggle) enable taken/not taken branches packet"
@@ -541,6 +548,7 @@ int
 main(int argc, char *argv[])
 {
 	struct pmcstat_ev *ev;
+	struct pmcstat_ev *ev1;
 	bool user_mode;
 	bool supervisor_mode;
 	int option;
@@ -698,18 +706,19 @@ main(int argc, char *argv[])
 
 	pmctrace_open_logfile();
 
-	STAILQ_FOREACH(ev, &args.pa_events, ev_next) {
-		if (pmc_allocate(ev->ev_spec, ev->ev_mode,
-		    ev->ev_flags, ev->ev_cpu, &ev->ev_pmcid, ev->ev_count) < 0)
+	STAILQ_FOREACH(ev1, &args.pa_events, ev_next) {
+		if (pmc_allocate(ev1->ev_spec, ev1->ev_mode,
+		    ev1->ev_flags, ev1->ev_cpu, &ev1->ev_pmcid,
+		    ev1->ev_count) < 0)
 			err(EX_OSERR, "ERROR: Cannot allocate %s-mode"
 			    " pmc with specification \"%s\"",
-			    PMC_IS_SYSTEM_MODE(ev->ev_mode) ?
-			    "system" : "process", ev->ev_spec);
+			    PMC_IS_SYSTEM_MODE(ev1->ev_mode) ?
+			    "system" : "process", ev1->ev_spec);
 	}
 
 	for (i = 0; i < ncpu; i++) {
 		trace_cpus[i] = malloc(sizeof(struct trace_cpu));
-		pmctrace_init_cpu(i);
+		pmctrace_init_cpu(i, ev);
 	}
 
 	EV_SET(&kev, 0, EVFILT_TIMER, EV_ADD, 0, 100, NULL);

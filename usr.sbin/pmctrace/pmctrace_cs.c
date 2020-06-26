@@ -91,12 +91,18 @@ static char packet_str[PACKET_STR_LEN];
 
 static dcd_tree_handle_t dcdtree_handle;
 
-static int cs_init(struct trace_cpu *tc);
+static int cs_init(struct trace_cpu *tc, void *data);
 static int cs_flags;
 #define	FLAG_FORMAT			(1 << 0)
 #define	FLAG_FRAME_RAW_UNPACKED		(1 << 1)
 #define	FLAG_FRAME_RAW_PACKED		(1 << 2)
 #define	FLAG_CALLBACK_MEM_ACC		(1 << 3)
+
+struct etm_state {
+	uint32_t configr;
+	uint32_t traceidr;
+	uint32_t reg_idr[14];
+};
 
 static struct pmcstat_symbol *
 symbol_lookup(const struct mtrace_data *mdata, uint64_t ip,
@@ -136,6 +142,8 @@ attach_raw_printers(dcd_tree_handle_t dcd_tree_h)
 
 	flags = 0;
 	err = OCSD_OK;
+
+	flags = FLAG_FRAME_RAW_UNPACKED | FLAG_FRAME_RAW_PACKED;
 
 	if (cs_flags & FLAG_FRAME_RAW_UNPACKED)
 		flags |= OCSD_DFRMTR_UNPACKED_RAW_OUT;
@@ -182,11 +190,11 @@ print_data_array(const uint8_t *p_array, const int array_size,
 	return (chars_printed);
 }
 
-static void
+static void __unused
 packet_monitor(void *context __unused,
     const ocsd_datapath_op_t op,
     const ocsd_trc_index_t index_sop,
-    const void *p_packet_in,
+    const void *p_packet_in __unused,
     const uint32_t size,
     const uint8_t *p_data)
 {
@@ -203,7 +211,7 @@ packet_monitor(void *context __unused,
 
 		/*
 		 * Got a packet -- convert to string and use the libraries'
-		 * message output to print to file and stdoout
+		 * message output to print to file and stdout
 		 */
 
 		if (ocsd_pkt_str(OCSD_PROTOCOL_ETMV4I, p_packet_in,
@@ -255,7 +263,7 @@ create_test_memory_acc(dcd_tree_handle_t handle, uint64_t base,
 
 	address = (ocsd_vaddr_t)base;
 	p_mem_buffer = (uint8_t *)(base + start);
-	mem_length = (end-start);
+	mem_length = (end - start);
 
 	if (cs_flags & FLAG_CALLBACK_MEM_ACC)
 		ret = ocsd_dt_add_callback_mem_acc(handle, base + start,
@@ -299,33 +307,36 @@ create_generic_decoder(dcd_tree_handle_t handle, const char *p_name,
 	/* attach a memory accessor */
 	ret = create_test_memory_acc(handle, base, start, end);
 	if(ret != OCSD_OK)
-		ocsd_dt_remove_decoder(handle,CSID);
+		ocsd_dt_remove_decoder(handle, CSID);
 
 	return (ret);
 }
 
 static ocsd_err_t
-create_decoder_etmv4(dcd_tree_handle_t dcd_tree_h, uint64_t base,
-    uint64_t start, uint64_t end)
+create_decoder_etmv4(dcd_tree_handle_t dcd_tree_h, void *data,
+    uint64_t base, uint64_t start, uint64_t end)
 {
 	ocsd_etmv4_cfg trace_config;
+	struct etm_state *etm;
 	ocsd_err_t ret;
+
+	etm = (struct etm_state *)data;
 
 	trace_config.arch_ver = ARCH_V8;
 	trace_config.core_prof = profile_CortexA;
 
-	trace_config.reg_configr = 0x000000C1;
-	trace_config.reg_traceidr = 0x00000010;   /* Trace ID */
+	trace_config.reg_configr = etm->configr; //0x18c1;
+	trace_config.reg_traceidr = 0x00000010;
 
-	trace_config.reg_idr0   = 0x28000EA1;
-	trace_config.reg_idr1   = 0x4100F403;
-	trace_config.reg_idr2   = 0x00000488;
-	trace_config.reg_idr8   = 0x0;
-	trace_config.reg_idr9   = 0x0;
-	trace_config.reg_idr10  = 0x0;
-	trace_config.reg_idr11  = 0x0;
-	trace_config.reg_idr12  = 0x0;
-	trace_config.reg_idr13  = 0x0;
+	trace_config.reg_idr0   = etm->reg_idr[0];
+	trace_config.reg_idr1   = etm->reg_idr[1];
+	trace_config.reg_idr2   = etm->reg_idr[2];
+	trace_config.reg_idr8   = etm->reg_idr[8];
+	trace_config.reg_idr9   = etm->reg_idr[9];
+	trace_config.reg_idr10  = etm->reg_idr[10];
+	trace_config.reg_idr11  = etm->reg_idr[11];
+	trace_config.reg_idr12  = etm->reg_idr[12];
+	trace_config.reg_idr13  = etm->reg_idr[13];
 
 	ret = create_generic_decoder(dcd_tree_h, OCSD_BUILTIN_DCD_ETMV4I,
 	    (void *)&trace_config, 0, base, start, end);
@@ -347,11 +358,9 @@ gen_trace_elem_print_lookup(const void *p_context,
 
 	resp = OCSD_RESP_CONT;
 
-#if 0
 	dprintf("%s: Idx:%d ELEM TYPE %d, st_addr %lx, en_addr %lx\n",
 	    __func__, index_sop, elem->elem_type,
 	    elem->st_addr, elem->en_addr);
-#endif
 
 	if (elem->st_addr == 0)
 		return (0);
@@ -449,8 +458,6 @@ cs_process(struct trace_cpu *tc, struct pmcstat_process *pp,
 	mdata = &tc->mdata;
 	mdata->pp = pp;
 
-	cs_init(tc);
-
 	dprintf("%s: cpu %d, cycle %d, tc->base %lx, tc->offset %lx,"
 	    "offset %lx, *tc->base %lx\n",
 	    __func__, cpu, cycle, (uint64_t)tc->base,
@@ -486,8 +493,10 @@ cs_process(struct trace_cpu *tc, struct pmcstat_process *pp,
 }
 
 static int
-cs_init(struct trace_cpu *tc)
+cs_init(struct trace_cpu *tc, void *data)
 {
+	ocsd_dcd_tree_src_t format;
+	uint32_t flags;
 	uint64_t start;
 	uint64_t end;
 	int ret;
@@ -502,8 +511,10 @@ cs_init(struct trace_cpu *tc)
 		return (-1);
 #endif
 
-	dcdtree_handle = ocsd_create_dcd_tree(OCSD_TRC_SRC_FRAME_FORMATTED,
-	    OCSD_DFRMTR_FRAME_MEM_ALIGN);
+	flags = OCSD_DFRMTR_FRAME_MEM_ALIGN | OCSD_DFRMTR_RESET_ON_4X_FSYNC;
+	format = OCSD_TRC_SRC_FRAME_FORMATTED;
+
+	dcdtree_handle = ocsd_create_dcd_tree(format, flags);
 	if(dcdtree_handle == C_API_INVALID_TREE_HANDLE) {
 		printf("can't find dcd tree\n");
 		return (-1);
@@ -512,7 +523,7 @@ cs_init(struct trace_cpu *tc)
 	start = (uint64_t)tc->base;
 	end = (uint64_t)tc->base + tc->bufsize;
 
-	ret = create_decoder_etmv4(dcdtree_handle,
+	ret = create_decoder_etmv4(dcdtree_handle, data,
 	    (uint64_t)tc->base, start, end);
 	if (ret != OCSD_OK) {
 		printf("can't create decoder: base %lx start %lx end %lx\n",

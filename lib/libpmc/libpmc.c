@@ -2018,6 +2018,23 @@ pmc_read_trace(uint32_t cpu, pmc_id_t pmc,
 }
 
 int
+pmc_trace_info(uint32_t cpu, pmc_id_t pmc,
+    void *data, int datasize)
+{
+	struct pmc_op_trace_info pmc_ti;
+
+	pmc_ti.pm_pmcid = pmc;
+	pmc_ti.pm_cpu = cpu;
+
+	if (PMC_CALL(TRACE_INFO, &pmc_ti) < 0)
+		return (-1);
+
+	memcpy(data, pmc_ti.data, MIN(datasize, TRACE_INFO_MAXLEN));
+
+	return (0);
+}
+
+int
 pmc_trace_config(uint32_t cpu, pmc_id_t pmc,
     uint64_t *ranges, uint32_t nranges)
 {

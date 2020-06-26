@@ -53,7 +53,7 @@ struct trace_cpu {
 struct trace_dev_methods {
 	int (*process)(struct trace_cpu *, struct pmcstat_process *,
 	    uint32_t cpu, uint32_t cycle, uint64_t offset);
-	int (*init)(struct trace_cpu *tc);
+	int (*init)(struct trace_cpu *tc, void *data);
 	int (*option)(int option);
 };
 

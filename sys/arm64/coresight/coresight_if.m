@@ -68,3 +68,9 @@ METHOD int read {
 	struct endpoint *endp;
 	struct coresight_event *event;
 };
+
+METHOD int info {
+	device_t dev;
+	struct endpoint *endp;
+	struct coresight_event *event;
+};

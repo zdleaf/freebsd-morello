@@ -114,7 +114,9 @@ TAILQ_HEAD(coresight_device_list, coresight_device);
 #define	ETM_N_COMPRATOR		16
 
 struct etm_state {
-	uint32_t trace_id;
+	uint32_t configr;
+	uint32_t traceidr;
+	uint32_t reg_idr[14];
 };
 
 struct etr_state {
@@ -161,5 +163,6 @@ void coresight_release(int cpu, struct coresight_event *event);
 void coresight_enable(int cpu, struct coresight_event *event);
 void coresight_disable(int cpu, struct coresight_event *event);
 void coresight_read(int cpu, struct coresight_event *event);
+void coresight_info(int cpu, struct coresight_event *event);
 
 #endif /* !_ARM64_CORESIGHT_CORESIGHT_H_ */
