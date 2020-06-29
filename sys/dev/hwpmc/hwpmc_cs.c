@@ -598,11 +598,12 @@ coresight_release_pmc(int cpu, int ri, struct pmc *pm)
 	    ("[coresight,%d] PHW pmc %p non-NULL", __LINE__, phw->phw_pmc));
 
 	mode = PMC_TO_MODE(pm);
-	if (mode == PMC_MODE_TT)
+	if (mode == PMC_MODE_TT) {
 		for (i = 0; i < pmc_cpu_max(); i++) {
 			coresight_release(cpu, event);
 			coresight_buffer_deallocate(i,
 			    &pm_coresight->coresight_buffers[i]);
+		}
 	} else {
 		coresight_release(cpu, event);
 		coresight_buffer_deallocate(cpu,
