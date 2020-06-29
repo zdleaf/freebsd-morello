@@ -2036,13 +2036,14 @@ pmc_trace_info(uint32_t cpu, pmc_id_t pmc,
 
 int
 pmc_trace_config(uint32_t cpu, pmc_id_t pmc,
-    uint64_t *ranges, uint32_t nranges)
+    uint32_t traceid, uint64_t *ranges, uint32_t nranges)
 {
 	struct pmc_op_trace_config trc;
 
 	trc.pm_pmcid = pmc;
 	trc.pm_cpu = cpu;
 	trc.nranges = nranges;
+	trc.traceid = traceid;
 
 	if (nranges > PMC_FILTER_MAX_IP_RANGES)
 		return (-1);

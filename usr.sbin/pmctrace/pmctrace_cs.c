@@ -325,9 +325,8 @@ create_decoder_etmv4(dcd_tree_handle_t dcd_tree_h, void *data,
 	trace_config.arch_ver = ARCH_V8;
 	trace_config.core_prof = profile_CortexA;
 
-	trace_config.reg_configr = etm->configr; //0x18c1;
-	trace_config.reg_traceidr = 0x00000010;
-
+	trace_config.reg_configr = etm->configr;
+	trace_config.reg_traceidr = etm->traceidr;
 	trace_config.reg_idr0   = etm->reg_idr[0];
 	trace_config.reg_idr1   = etm->reg_idr[1];
 	trace_config.reg_idr2   = etm->reg_idr[2];

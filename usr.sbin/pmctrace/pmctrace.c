@@ -374,6 +374,28 @@ pmctrace_setup_cpumask(cpuset_t *cpumask)
 	CPU_COPY(&rootmask, cpumask);
 }
 
+static void
+pmctrace_trace_config(bool user_mode, uint64_t *ranges, int nranges)
+{
+	struct pmcstat_ev *ev;
+	int ncpu;
+	int i;
+
+	ncpu = pmctrace_ncpu();
+	if (ncpu < 0)
+		errx(EX_SOFTWARE, "ERROR: Can't get cpus\n");
+
+	if (user_mode) {
+		ev = STAILQ_FIRST(&args.pa_events);
+		for (i = 0; i < ncpu; i++)
+			pmc_trace_config(i, ev->ev_pmcid, 0, ranges, nranges);
+	} else {
+		STAILQ_FOREACH(ev, &args.pa_events, ev_next)
+			pmc_trace_config(ev->ev_cpu,
+			    ev->ev_pmcid, 0, ranges, nranges);
+	}
+}
+
 static int
 pmctrace_delayed_start(bool user_mode, char *func_name, char *func_image)
 {
@@ -381,18 +403,11 @@ pmctrace_delayed_start(bool user_mode, char *func_name, char *func_image)
 	struct pmcstat_symbol *sym;
 	struct pmcstat_target *pt;
 	struct pmcstat_process *pp;
-	struct pmcstat_ev *ev;
 	uintptr_t addr_start;
 	uintptr_t addr_end;
-	int ncpu;
-	int i;
 
 	if (func_name == NULL || func_image == NULL)
 		return (-1);
-
-	ncpu = pmctrace_ncpu();
-	if (ncpu < 0)
-		errx(EX_SOFTWARE, "ERROR: Can't get cpus\n");
 
 	if (user_mode) {
 		pt = SLIST_FIRST(&args.pa_targets);
@@ -415,16 +430,7 @@ pmctrace_delayed_start(bool user_mode, char *func_name, char *func_image)
 	ranges[0] = addr_start;
 	ranges[1] = addr_end;
 
-	if (user_mode) {
-		ev = STAILQ_FIRST(&args.pa_events);
-		for (i = 0; i < ncpu; i++)
-			pmc_trace_config(i, ev->ev_pmcid, &ranges[0], 1);
-	} else {
-		STAILQ_FOREACH(ev, &args.pa_events, ev_next)
-			pmc_trace_config(ev->ev_cpu,
-			    ev->ev_pmcid, &ranges[0], 1);
-	}
-
+	pmctrace_trace_config(user_mode, ranges, 1);
 	pmctrace_start_pmcs();
 
 	return (0);
@@ -446,6 +452,9 @@ pmctrace_run(bool user_mode, char *func_name, char *func_image)
 	stopping = 0;
 	running = 3;
 	started = 0;
+	ev = STAILQ_FIRST(&args.pa_events);
+
+	pmctrace_trace_config(user_mode, NULL, 0);
 
 	if (user_mode) {
 		pmcstat_create_process(pmcstat_sockpair, &args, pmcstat_kq);

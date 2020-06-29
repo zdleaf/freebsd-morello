@@ -557,6 +557,7 @@ struct pmc_op_trace_config {
 	uint32_t	pm_cpu;		/* CPU number or PMC_CPU_ANY */
 	uint64_t	ranges[2 * PMC_FILTER_MAX_IP_RANGES];
 	uint32_t	nranges;
+	uint32_t	traceid;
 };
 
 /*
@@ -1080,7 +1081,7 @@ struct pmc_classdep {
 	int (*pcd_read_trace)(int _cpu, int _ri, struct pmc *_pm,
 	    pmc_value_t *_cycle, pmc_value_t *_offset);
 	int (*pcd_trace_config)(int _cpu, int _ri, struct pmc *_pm,
-	    uint64_t *ranges, uint32_t nranges);
+	    struct pmc_op_trace_config *trc);
 
 	/* pmc allocation/release */
 	int (*pcd_allocate_pmc)(int _cpu, int _ri, struct pmc *_t,

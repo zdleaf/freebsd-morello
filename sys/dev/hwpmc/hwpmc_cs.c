@@ -267,12 +267,6 @@ coresight_buffer_prepare(uint32_t cpu, struct pmc *pm,
 	event->src = CORESIGHT_ETMV4;
 	event->sink = CORESIGHT_TMC;
 	coresight_init_event(cpu, event);
-
-	/*
-	 * Set a trace ID required for ETM component.
-	 * TODO: this should be derived from pmctrace.
-	 */
-	event->etm.traceidr = 0x10;
 	coresight_allocate(cpu, event);
 
 	return (0);
@@ -480,7 +474,7 @@ coresight_pcpu_fini(struct pmc_mdep *md, int cpu)
 
 static int
 coresight_trace_config(int cpu, int ri, struct pmc *pm,
-    uint64_t *ranges, uint32_t nranges)
+    struct pmc_op_trace_config *trc)
 {
 	struct coresight_event *event;
 	struct coresight_cpu *coresight_pc;
@@ -494,10 +488,10 @@ coresight_trace_config(int cpu, int ri, struct pmc *pm,
 
 	KASSERT(cpu == PCPU_GET(cpuid), ("Configuring wrong CPU\n"));
 
-	for (i = 0; i < nranges * 2; i++)
-		event->addr[i] = ranges[i];
+	for (i = 0; i < trc->nranges * 2; i++)
+		event->addr[i] = trc->ranges[i];
 
-	event->naddr = nranges;
+	event->naddr = trc->nranges;
 
 	mode = PMC_TO_MODE(pm);
 	if (mode == PMC_MODE_ST)
@@ -505,6 +499,7 @@ coresight_trace_config(int cpu, int ri, struct pmc *pm,
 	else
 		event->excp_level = 0;
 
+	event->etm.traceidr = trc->traceid;
 	event->src = CORESIGHT_ETMV4;
 	event->sink = CORESIGHT_TMC;
 

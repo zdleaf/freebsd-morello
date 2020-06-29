@@ -246,7 +246,7 @@ etm_info(device_t dev, struct endpoint *endp,
 	sc = device_get_softc(dev);
 
 	event->etm.configr = bus_read_4(sc->res, TRCCONFIGR);
-	//event->etm.traceidr = bus_read_4(sc->res, TRCTRACEIDR);
+	event->etm.traceidr = bus_read_4(sc->res, TRCTRACEIDR);
 
 	for (i = 0; i < 14; i++)
 		event->etm.reg_idr[i] = bus_read_4(sc->res, TRCIDR(i));
