@@ -385,14 +385,15 @@ pmctrace_trace_config(bool user_mode, uint64_t *ranges, int nranges)
 	if (ncpu < 0)
 		errx(EX_SOFTWARE, "ERROR: Can't get cpus\n");
 
-	ev = STAILQ_FIRST(&args.pa_events);
-
-	if (user_mode)
+	if (user_mode) {
+		ev = STAILQ_FIRST(&args.pa_events);
 		for (i = 0; i < ncpu; i++)
 			pmc_trace_config(i, ev->ev_pmcid, 0, ranges, nranges);
-	else
-		pmc_trace_config(ev->ev_cpu,
-		    ev->ev_pmcid, 0, ranges, nranges);
+	} else {
+		STAILQ_FOREACH(ev, &args.pa_events, ev_next)
+			pmc_trace_config(ev->ev_cpu,
+			    ev->ev_pmcid, 0, ranges, nranges);
+	}
 }
 
 static int
