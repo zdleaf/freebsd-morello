@@ -209,11 +209,9 @@ tmc_init(device_t dev)
 	switch (reg) {
 	case DEVID_CONFIGTYPE_ETR:
 		sc->dev_type = CORESIGHT_ETR;
-		device_printf(dev, "ETR configuration found\n");
 		break;
 	case DEVID_CONFIGTYPE_ETF:
 		sc->dev_type = CORESIGHT_ETF;
-		device_printf(dev, "ETF configuration found\n");
 		if (sc->etf_configured == false) {
 			tmc_configure_etf(dev);
 			sc->etf_configured = true;
