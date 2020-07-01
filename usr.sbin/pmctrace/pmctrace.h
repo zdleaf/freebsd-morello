@@ -48,6 +48,7 @@ struct trace_cpu {
 	uint32_t bufsize;
 	void *base;
 	int fd;
+	void *priv;
 };
 
 struct trace_dev_methods {

@@ -89,8 +89,6 @@ __FBSDID("$FreeBSD$");
 #define	PACKET_STR_LEN	1024
 static char packet_str[PACKET_STR_LEN];
 
-static dcd_tree_handle_t dcdtree_handle;
-
 static int cs_init(struct trace_cpu *tc, void *data);
 static int cs_flags;
 #define	FLAG_FORMAT			(1 << 0)
@@ -325,6 +323,8 @@ create_decoder_etmv4(dcd_tree_handle_t dcd_tree_h, void *data,
 	trace_config.arch_ver = ARCH_V8;
 	trace_config.core_prof = profile_CortexA;
 
+	dprintf("%s: traceid %x\n", __func__, etm->traceidr);
+
 	trace_config.reg_configr = etm->configr;
 	trace_config.reg_traceidr = etm->traceidr;
 	trace_config.reg_idr0   = etm->reg_idr[0];
@@ -365,7 +365,8 @@ gen_trace_elem_print_lookup(const void *p_context,
 		return (0);
 	sym = symbol_lookup(mdata, elem->st_addr, &image);
 	if (sym)
-		printf("cpu%d:  IP 0x%lx %s %s\n", mdata->cpu, elem->st_addr,
+		printf("cpu%d:  IP 0x%lx %s %s\n",
+		    mdata->cpu, elem->st_addr,
 		    pmcstat_string_unintern(image->pi_name),
 		    pmcstat_string_unintern(sym->ps_name));
 
@@ -399,9 +400,10 @@ gen_trace_elem_print_lookup(const void *p_context,
 }
 
 static int
-cs_process_chunk(struct mtrace_data *mdata __unused, uint64_t base,
-    uint64_t start, uint64_t end)
+cs_process_chunk(struct trace_cpu *tc, struct mtrace_data *mdata __unused,
+    uint64_t base, uint64_t start, uint64_t end)
 {
+	dcd_tree_handle_t dcdtree_handle;
 	uint32_t bytes_done;
 	uint32_t block_size;
 	uint8_t *p_block;
@@ -409,6 +411,8 @@ cs_process_chunk(struct mtrace_data *mdata __unused, uint64_t base,
 	int block_index;
 	int dp_ret;
 	int ret;
+
+	dcdtree_handle = tc->priv;
 
 	dprintf("%s: base %lx start %lx end %lx\n",
 	    __func__, base, start, end);
@@ -467,7 +471,7 @@ cs_process(struct trace_cpu *tc, struct pmcstat_process *pp,
 
 	if (cycle == tc->cycle) {
 		if (offset > tc->offset) {
-			cs_process_chunk(mdata, (uint64_t)tc->base,
+			cs_process_chunk(tc, mdata, (uint64_t)tc->base,
 			    tc->offset, offset);
 			tc->offset = offset;
 		} else if (offset < tc->offset) {
@@ -482,7 +486,7 @@ cs_process(struct trace_cpu *tc, struct pmcstat_process *pp,
 			    " we can process it (%d/%d). Consider setting"
 			    " trace filters",
 			    cpu, cycle, tc->cycle);
-		cs_process_chunk(mdata, (uint64_t)tc->base,
+		cs_process_chunk(tc, mdata, (uint64_t)tc->base,
 		    tc->offset, tc->bufsize);
 		tc->offset = 0;
 		tc->cycle += 1;
@@ -494,6 +498,7 @@ cs_process(struct trace_cpu *tc, struct pmcstat_process *pp,
 static int
 cs_init(struct trace_cpu *tc, void *data)
 {
+	dcd_tree_handle_t dcdtree_handle;
 	ocsd_dcd_tree_src_t format;
 	uint32_t flags;
 	uint64_t start;
@@ -518,6 +523,8 @@ cs_init(struct trace_cpu *tc, void *data)
 		printf("can't find dcd tree\n");
 		return (-1);
 	}
+
+	tc->priv = dcdtree_handle;
 
 	start = (uint64_t)tc->base;
 	end = (uint64_t)tc->base + tc->bufsize;
