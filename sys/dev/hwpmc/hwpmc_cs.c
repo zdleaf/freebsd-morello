@@ -591,10 +591,8 @@ coresight_release_pmc(int cpu, int ri, struct pmc *pm)
 	int i;
 
 	pm_coresight = (struct pmc_md_coresight_pmc *)&pm->pm_md;
-	coresight_pc = &coresight_pcpu[cpu];
-	event = &coresight_pc->event;
 
-	printf("%s: cpu %d (curcpu %d)\n", __func__, cpu, PCPU_GET(cpuid));
+	dprintf("%s: cpu %d (curcpu %d)\n", __func__, cpu, PCPU_GET(cpuid));
 
 	KASSERT(cpu >= 0 && cpu < pmc_cpu_max(),
 	    ("[coresight,%d] illegal CPU value %d", __LINE__, cpu));
@@ -609,11 +607,16 @@ coresight_release_pmc(int cpu, int ri, struct pmc *pm)
 
 	mode = PMC_TO_MODE(pm);
 	if (mode == PMC_MODE_TT) {
-		for (i = 0; i < pmc_cpu_max(); i++)
-			coresight_release(cpu, event);
+		for (i = 0; i < pmc_cpu_max(); i++) {
+			coresight_pc = &coresight_pcpu[i];
+			event = &coresight_pc->event;
+			coresight_release(i, event);
+		}
 		coresight_buffer_deallocate(0,
 		    &pm_coresight->coresight_buffers[0]);
 	} else {
+		coresight_pc = &coresight_pcpu[cpu];
+		event = &coresight_pc->event;
 		coresight_release(cpu, event);
 		coresight_buffer_deallocate(cpu,
 		    &pm_coresight->coresight_buffers[cpu]);
