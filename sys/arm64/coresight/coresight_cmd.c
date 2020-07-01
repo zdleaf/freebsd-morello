@@ -52,6 +52,7 @@ coresight_next_device(struct coresight_device *cs_dev,
 	struct coresight_device *out;
 	struct endpoint *out_endp;
 	struct endpoint *endp;
+	struct endpoint *endp1;
 
 	TAILQ_FOREACH(endp, &cs_dev->pdata->endpoints, link) {
 		if (endp->input != 0)
@@ -60,9 +61,15 @@ coresight_next_device(struct coresight_device *cs_dev,
 		out = coresight_get_output_device(endp, &out_endp);
 		if (out != NULL) {
 			if (LIST_EMPTY(&event->endplist)) {
+				if (bootverbose)
+					printf("Adding source device %s\n",
+					    device_get_nameunit(out->dev));
 				/* Add source device */
-				endp->cs_dev = cs_dev;
-				LIST_INSERT_HEAD(&event->endplist, endp,
+				endp1 = malloc(sizeof(struct endpoint),
+				    M_CORESIGHT, M_WAITOK);
+				memcpy(endp1, endp, sizeof(struct endpoint));
+				endp1->cs_dev = cs_dev;
+				LIST_INSERT_HEAD(&event->endplist, endp1,
 				    endplink);
 			}
 
@@ -70,8 +77,11 @@ coresight_next_device(struct coresight_device *cs_dev,
 			if (bootverbose)
 				printf("Adding device %s to the chain\n",
 				    device_get_nameunit(out->dev));
-			out_endp->cs_dev = out;
-			LIST_INSERT_HEAD(&event->endplist, out_endp, endplink);
+			endp1 = malloc(sizeof(struct endpoint),
+			    M_CORESIGHT, M_WAITOK);
+			memcpy(endp1, out_endp, sizeof(struct endpoint));
+			endp1->cs_dev = out;
+			LIST_INSERT_HEAD(&event->endplist, endp1, endplink);
 
 			return (out);
 		}
@@ -123,6 +133,17 @@ coresight_init_event(int cpu, struct coresight_event *event)
 	}
 
 	return (0);
+}
+
+void
+coresight_deinit_event(int cpu, struct coresight_event *event)
+{
+	struct endpoint *endp;
+	struct endpoint *endp1;
+
+	LIST_FOREACH_SAFE(endp, &event->endplist, endplink, endp1) {
+		free(endp, M_CORESIGHT);
+	}
 }
 
 void
@@ -180,6 +201,8 @@ coresight_release(int cpu, struct coresight_event *event)
 		cs_dev = endp->cs_dev;
 		CORESIGHT_RELEASE(cs_dev->dev, endp, event);
 	}
+
+	coresight_deinit_event(cpu, event);
 }
 
 void
