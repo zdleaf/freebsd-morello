@@ -221,20 +221,12 @@ coresight_buffer_prepare(uint32_t cpu, struct pmc *pm,
     const struct pmc_op_pmcallocate *a)
 {
 	const struct pmc_md_coresight_op_pmcallocate *pm_coresighta;
-	struct coresight_cpu *coresight_pc;
 	struct pmc_md_coresight_pmc *pm_coresight;
 	struct coresight_buffer *coresight_buf;
 	uint32_t bufsize;
-	enum pmc_mode mode;
-	uint32_t phys_lo;
-	uint32_t phys_hi;
 	int error;
-	struct coresight_event *event;
 
 	dprintf("%s%d\n", __func__, cpu);
-
-	coresight_pc = &coresight_pcpu[cpu];
-	event = &coresight_pc->event;
 
 	pm_coresighta = (const struct pmc_md_coresight_op_pmcallocate *)
 	    &a->pm_md.pm_coresight;
@@ -247,6 +239,17 @@ coresight_buffer_prepare(uint32_t cpu, struct pmc *pm,
 		dprintf("%s: can't allocate buffers\n", __func__);
 		return (EINVAL);
 	}
+
+	return (0);
+}
+
+static int
+coresight_event_prepare(int cpu, struct coresight_event *event, struct pmc *pm,
+    struct coresight_buffer *coresight_buf)
+{
+	uint32_t phys_lo;
+	uint32_t phys_hi;
+	enum pmc_mode mode;
 
 	phys_lo = coresight_buf->phys_base & 0xffffffff;
 	phys_hi = (coresight_buf->phys_base >> 32) & 0xffffffff;
@@ -317,13 +320,30 @@ coresight_allocate_pmc(int cpu, int ri, struct pmc *pm,
 		return (EUSERS);
 	}
 
+	struct coresight_buffer *cbuf;
+	struct pmc_md_coresight_pmc *pm_coresight;
+
+	pm_coresight = (struct pmc_md_coresight_pmc *)&pm->pm_md;
+
 	if (a->pm_mode == PMC_MODE_TT) {
+		/*
+		 * Since coresight funnelling traffic, then use
+		 * buffer 0 for all CPUs.
+		 */
+		if (coresight_buffer_prepare(0, pm, a))
+			return (EINVAL);
+		cbuf = &pm_coresight->coresight_buffers[0];
 		for (i = 0; i < pmc_cpu_max(); i++)
-			if (coresight_buffer_prepare(i, pm, a))
-				return (EINVAL);
-	} else
+			coresight_event_prepare(i, &coresight_pcpu[i].event,
+			    pm, cbuf);
+
+	} else {
 		if (coresight_buffer_prepare(cpu, pm, a))
 			return (EINVAL);
+		cbuf = &pm_coresight->coresight_buffers[cpu];
+		coresight_event_prepare(cpu, &coresight_pcpu[cpu].event,
+		    pm, cbuf);
+	}
 
 	if (a->pm_mode == PMC_MODE_ST)
 		coresight_pc->flags |= FLAG_CORESIGHT_ALLOCATED;
@@ -507,7 +527,7 @@ coresight_read_trace(int cpu, int ri, struct pmc *pm,
 	uint64_t offset;
 	uint64_t cycle;
 
-	dprintf("%s\n", __func__);
+	dprintf("%s: cpu %d\n", __func__, cpu);
 
 	coresight_pc = &coresight_pcpu[cpu];
 	coresight_pc->pm_mmap = pm;
@@ -589,11 +609,10 @@ coresight_release_pmc(int cpu, int ri, struct pmc *pm)
 
 	mode = PMC_TO_MODE(pm);
 	if (mode == PMC_MODE_TT) {
-		for (i = 0; i < pmc_cpu_max(); i++) {
+		for (i = 0; i < pmc_cpu_max(); i++)
 			coresight_release(cpu, event);
-			coresight_buffer_deallocate(i,
-			    &pm_coresight->coresight_buffers[i]);
-		}
+		coresight_buffer_deallocate(0,
+		    &pm_coresight->coresight_buffers[0]);
 	} else {
 		coresight_release(cpu, event);
 		coresight_buffer_deallocate(cpu,
@@ -636,7 +655,7 @@ coresight_stop_pmc(int cpu, int ri)
 	struct coresight_event *event;
 	struct coresight_cpu *coresight_pc;
 
-	dprintf("%s\n", __func__);
+	dprintf("%s: cpu %d\n", __func__, cpu);
 
 	coresight_pc = &coresight_pcpu[cpu];
 	event = &coresight_pc->event;

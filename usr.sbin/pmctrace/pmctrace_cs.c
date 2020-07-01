@@ -461,6 +461,13 @@ cs_process(struct trace_cpu *tc, struct pmcstat_process *pp,
 	mdata = &tc->mdata;
 	mdata->pp = pp;
 
+	/*
+	 * Since coresight funnelling all the traffic to a single stream,
+	 * we use cpu0 buffer only.
+	 */
+	if (cpu != 0)
+		return (0);
+
 	dprintf("%s: cpu %d, cycle %d, tc->base %lx, tc->offset %lx,"
 	    "offset %lx, *tc->base %lx\n",
 	    __func__, cpu, cycle, (uint64_t)tc->base,
