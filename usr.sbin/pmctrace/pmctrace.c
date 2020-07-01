@@ -76,8 +76,9 @@ __FBSDID("$FreeBSD$");
 #include "pmctrace_cs.h"
 #endif
 
-#define	MAX_CPU	4096
-#define	EV_SPEC_LEN	128
+#define	MAX_CPU			4096
+#define	EV_SPEC_LEN		128
+#define	DEFAULT_TRAICE_ID	0x10
 
 #define	PMCTRACE_DEBUG
 #undef	PMCTRACE_DEBUG
@@ -162,7 +163,7 @@ pmctrace_init_cpu(uint32_t cpu, struct pmcstat_ev *ev __unused)
 		printf("mmap failed: err %d\n", errno);
 		return (-1);
 	}
-	printf("%s: tc->base %lx, *tc->base %lx\n", __func__,
+	dprintf("%s: tc->base %lx, *tc->base %lx\n", __func__,
 	    (uint64_t)tc->base, *(uint64_t *)tc->base);
 
 	error = pmc_trace_info(cpu, ev->ev_pmcid, data, TRACE_INFO_MAXLEN);
@@ -388,11 +389,12 @@ pmctrace_trace_config(bool user_mode, uint64_t *ranges, int nranges)
 	if (user_mode) {
 		ev = STAILQ_FIRST(&args.pa_events);
 		for (i = 0; i < ncpu; i++)
-			pmc_trace_config(i, ev->ev_pmcid, 0, ranges, nranges);
+			pmc_trace_config(i, ev->ev_pmcid,
+			    DEFAULT_TRAICE_ID, ranges, nranges);
 	} else {
 		STAILQ_FOREACH(ev, &args.pa_events, ev_next)
-			pmc_trace_config(ev->ev_cpu,
-			    ev->ev_pmcid, 0, ranges, nranges);
+			pmc_trace_config(ev->ev_cpu, ev->ev_pmcid,
+			    DEFAULT_TRAICE_ID, ranges, nranges);
 	}
 }
 
