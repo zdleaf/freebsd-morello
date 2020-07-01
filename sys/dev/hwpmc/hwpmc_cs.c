@@ -130,7 +130,7 @@ struct coresight_cpu {
 	struct coresight_event		event;
 };
 
-static struct coresight_cpu **coresight_pcpu;
+static struct coresight_cpu coresight_pcpu[MAXCPU];
 
 static int
 coresight_buffer_allocate(uint32_t cpu,
@@ -231,7 +231,9 @@ coresight_buffer_prepare(uint32_t cpu, struct pmc *pm,
 	int error;
 	struct coresight_event *event;
 
-	coresight_pc = coresight_pcpu[cpu];
+	dprintf("%s%d\n", __func__, cpu);
+
+	coresight_pc = &coresight_pcpu[cpu];
 	event = &coresight_pc->event;
 
 	pm_coresighta = (const struct pmc_md_coresight_op_pmcallocate *)
@@ -279,7 +281,7 @@ coresight_allocate_pmc(int cpu, int ri, struct pmc *pm,
 	struct coresight_cpu *coresight_pc;
 	int i;
 
-	coresight_pc = coresight_pcpu[cpu];
+	coresight_pc = &coresight_pcpu[cpu];
 
 	dprintf("%s: curthread %lx, cpu %d (curcpu %d)\n", __func__,
 	    (uint64_t)curthread, cpu, PCPU_GET(cpuid));
@@ -343,7 +345,7 @@ coresight_config_pmc(int cpu, int ri, struct pmc *pm)
 	    ("[coresight,%d] illegal CPU value %d", __LINE__, cpu));
 	KASSERT(ri == 0, ("[coresight,%d] illegal row-index %d", __LINE__, ri));
 
-	coresight_pc = coresight_pcpu[cpu];
+	coresight_pc = &coresight_pcpu[cpu];
 	phw = &coresight_pc->tc_hw;
 
 	KASSERT(pm == NULL || phw->phw_pmc == NULL,
@@ -369,7 +371,7 @@ coresight_describe(int cpu, int ri, struct pmc_info *pi, struct pmc **ppmc)
 	    ("[coresight,%d] illegal CPU %d", __LINE__, cpu));
 	KASSERT(ri == 0, ("[coresight,%d] illegal row-index %d", __LINE__, ri));
 
-	phw = &coresight_pcpu[cpu]->tc_hw;
+	phw = &coresight_pcpu[cpu].tc_hw;
 	pd = &coresight_pmcdesc[ri];
 
 	if ((error = copystr(pd->pm_descr.pd_name, pi->pm_name,
@@ -399,7 +401,7 @@ coresight_get_config(int cpu, int ri, struct pmc **ppm)
 	    ("[coresight,%d] illegal CPU %d", __LINE__, cpu));
 	KASSERT(ri == 0, ("[coresight,%d] illegal row-index %d", __LINE__, ri));
 
-	coresight_pc = coresight_pcpu[cpu];
+	coresight_pc = &coresight_pcpu[cpu];
 	phw = &coresight_pc->tc_hw;
 
 	*ppm = phw->phw_pmc;
@@ -420,17 +422,10 @@ coresight_pcpu_init(struct pmc_mdep *md, int cpu)
 
 	KASSERT(cpu >= 0 && cpu < pmc_cpu_max(),
 	    ("[coresight,%d] illegal cpu %d", __LINE__, cpu));
-	KASSERT(coresight_pcpu, ("[coresight,%d] null pcpu", __LINE__));
-	KASSERT(coresight_pcpu[cpu] == NULL, ("[coresight,%d] non-null per-cpu",
-	    __LINE__));
-
-	coresight_pc = malloc(sizeof(struct coresight_cpu),
-	    M_CORESIGHT, M_WAITOK | M_ZERO);
+	coresight_pc = &coresight_pcpu[cpu];
 	coresight_pc->tc_hw.phw_state = PMC_PHW_FLAG_IS_ENABLED |
 	    PMC_PHW_CPU_TO_STATE(cpu) | PMC_PHW_INDEX_TO_STATE(0) |
 	    PMC_PHW_FLAG_IS_SHAREABLE;
-
-	coresight_pcpu[cpu] = coresight_pc;
 
 	ri = md->pmd_classdep[PMC_MDEP_CLASS_INDEX_CORESIGHT].pcd_ri;
 
@@ -456,13 +451,8 @@ coresight_pcpu_fini(struct pmc_mdep *md, int cpu)
 
 	KASSERT(cpu >= 0 && cpu < pmc_cpu_max(),
 	    ("[coresight,%d] illegal cpu %d", __LINE__, cpu));
-	KASSERT(coresight_pcpu[cpu] != NULL, ("[coresight,%d] null pcpu",
-	    __LINE__));
 
-	coresight_pc = coresight_pcpu[cpu];
-
-	free(coresight_pcpu[cpu], M_CORESIGHT);
-	coresight_pcpu[cpu] = NULL;
+	coresight_pc = &coresight_pcpu[cpu];
 
 	ri = md->pmd_classdep[PMC_MDEP_CLASS_INDEX_CORESIGHT].pcd_ri;
 
@@ -483,7 +473,7 @@ coresight_trace_config(int cpu, int ri, struct pmc *pm,
 
 	dprintf("%s\n", __func__);
 
-	coresight_pc = coresight_pcpu[cpu];
+	coresight_pc = &coresight_pcpu[cpu];
 	event = &coresight_pc->event;
 
 	KASSERT(cpu == PCPU_GET(cpuid), ("Configuring wrong CPU\n"));
@@ -519,7 +509,7 @@ coresight_read_trace(int cpu, int ri, struct pmc *pm,
 
 	dprintf("%s\n", __func__);
 
-	coresight_pc = coresight_pcpu[cpu];
+	coresight_pc = &coresight_pcpu[cpu];
 	coresight_pc->pm_mmap = pm;
 	event = &coresight_pc->event;
 
@@ -544,7 +534,7 @@ coresight_trace_info(int cpu, int ri, struct pmc *pm,
 	struct coresight_event *event;
 	struct coresight_cpu *coresight_pc;
 
-	coresight_pc = coresight_pcpu[cpu];
+	coresight_pc = &coresight_pcpu[cpu];
 	event = &coresight_pc->event;
 
 	/* Collect information from coresight components */
@@ -581,17 +571,17 @@ coresight_release_pmc(int cpu, int ri, struct pmc *pm)
 	int i;
 
 	pm_coresight = (struct pmc_md_coresight_pmc *)&pm->pm_md;
-	coresight_pc = coresight_pcpu[cpu];
+	coresight_pc = &coresight_pcpu[cpu];
 	event = &coresight_pc->event;
 
-	dprintf("%s: cpu %d (curcpu %d)\n", __func__, cpu, PCPU_GET(cpuid));
+	printf("%s: cpu %d (curcpu %d)\n", __func__, cpu, PCPU_GET(cpuid));
 
 	KASSERT(cpu >= 0 && cpu < pmc_cpu_max(),
 	    ("[coresight,%d] illegal CPU value %d", __LINE__, cpu));
 	KASSERT(ri == 0,
 	    ("[coresight,%d] illegal row-index %d", __LINE__, ri));
 
-	phw = &coresight_pcpu[cpu]->tc_hw;
+	phw = &coresight_pcpu[cpu].tc_hw;
 	phw->phw_pmc = NULL;
 
 	KASSERT(phw->phw_pmc == NULL,
@@ -625,7 +615,7 @@ coresight_start_pmc(int cpu, int ri)
 
 	dprintf("%s: cpu %d (curcpu %d)\n", __func__, cpu, PCPU_GET(cpuid));
 
-	coresight_pc = coresight_pcpu[cpu];
+	coresight_pc = &coresight_pcpu[cpu];
 	event = &coresight_pc->event;
 	phw = &coresight_pc->tc_hw;
 	if (phw == NULL || phw->phw_pmc == NULL)
@@ -648,7 +638,7 @@ coresight_stop_pmc(int cpu, int ri)
 
 	dprintf("%s\n", __func__);
 
-	coresight_pc = coresight_pcpu[cpu];
+	coresight_pc = &coresight_pcpu[cpu];
 	event = &coresight_pc->event;
 
 	KASSERT(cpu >= 0 && cpu < pmc_cpu_max(),
@@ -684,8 +674,7 @@ pmc_coresight_initialize(struct pmc_mdep *md, int maxcpu)
 	KASSERT(md->pmd_nclass >= 1, ("[coresight,%d] dubious md->nclass %d",
 	    __LINE__, md->pmd_nclass));
 
-	coresight_pcpu = malloc(sizeof(struct coresight_cpu *) * maxcpu,
-	    M_CORESIGHT, M_WAITOK | M_ZERO);
+	bzero(coresight_pcpu, sizeof(struct coresight_cpu) * MAXCPU);
 
 	pcd = &md->pmd_classdep[PMC_MDEP_CLASS_INDEX_CORESIGHT];
 
@@ -721,18 +710,6 @@ pmc_coresight_finalize(struct pmc_mdep *md)
 
 	dprintf("%s\n", __func__);
 
-#ifdef INVARIANTS
-	int i, ncpus;
-
-	ncpus = pmc_cpu_max();
-	for (i = 0; i < ncpus; i++)
-		KASSERT(coresight_pcpu[i] == NULL,
-		    ("[coresight,%d] non-null pcpu cpu %d", __LINE__, i));
-
 	KASSERT(md->pmd_classdep[PMC_MDEP_CLASS_INDEX_CORESIGHT].pcd_class ==
 	    PMC_CLASS_CORESIGHT, ("[coresight,%d] class mismatch", __LINE__));
-#endif
-
-	free(coresight_pcpu, M_CORESIGHT);
-	coresight_pcpu = NULL;
 }
