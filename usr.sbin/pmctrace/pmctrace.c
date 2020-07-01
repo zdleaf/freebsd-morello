@@ -159,10 +159,9 @@ pmctrace_init_cpu(uint32_t cpu, struct pmcstat_ev *ev __unused)
 	tc->offset = 0;
 
 	tc->base = mmap(NULL, tc->bufsize, PROT_READ, MAP_SHARED, tc->fd, 0);
-	if (tc->base == MAP_FAILED) {
-		printf("mmap failed: err %d\n", errno);
+	if (tc->base == MAP_FAILED)
 		return (-1);
-	}
+
 	dprintf("%s: tc->base %lx, *tc->base %lx\n", __func__,
 	    (uint64_t)tc->base, *(uint64_t *)tc->base);
 
