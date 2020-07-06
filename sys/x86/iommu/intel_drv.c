@@ -911,7 +911,7 @@ struct rmrr_iter_args {
 	int dev_busno;
 	const ACPI_DMAR_PCI_PATH *dev_path;
 	int dev_path_len;
-	struct dmar_map_entries_tailq *rmrr_entries;
+	struct iommu_map_entries_tailq *rmrr_entries;
 };
 
 static int
@@ -958,7 +958,7 @@ dmar_rmrr_iter(ACPI_DMAR_HEADER *dmarh, void *arg)
 void
 dmar_dev_parse_rmrr(struct iommu_domain *domain, int dev_domain, int dev_busno,
     const void *dev_path, int dev_path_len,
-    struct dmar_map_entries_tailq *rmrr_entries)
+    struct iommu_map_entries_tailq *rmrr_entries)
 {
 	struct rmrr_iter_args ria;
 

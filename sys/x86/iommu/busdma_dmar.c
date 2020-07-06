@@ -524,7 +524,7 @@ static int
 iommu_bus_dmamap_load_something1(struct bus_dma_tag_iommu *tag,
     struct bus_dmamap_iommu *map, vm_page_t *ma, int offset, bus_size_t buflen,
     int flags, bus_dma_segment_t *segs, int *segp,
-    struct dmar_map_entries_tailq *unroll_list)
+    struct iommu_map_entries_tailq *unroll_list)
 {
 	struct iommu_device *ctx;
 	struct iommu_domain *domain;
@@ -634,7 +634,7 @@ iommu_bus_dmamap_load_something(struct bus_dma_tag_iommu *tag,
 	struct iommu_device *ctx;
 	struct iommu_domain *domain;
 	struct iommu_map_entry *entry, *entry1;
-	struct dmar_map_entries_tailq unroll_list;
+	struct iommu_map_entries_tailq unroll_list;
 	int error;
 
 	ctx = tag->ctx;
@@ -855,7 +855,7 @@ iommu_bus_dmamap_unload(bus_dma_tag_t dmat, bus_dmamap_t map1)
 	struct iommu_device *ctx;
 	struct iommu_domain *domain;
 #if defined(__amd64__)
-	struct dmar_map_entries_tailq entries;
+	struct iommu_map_entries_tailq entries;
 #endif
 
 	tag = (struct bus_dma_tag_iommu *)dmat;

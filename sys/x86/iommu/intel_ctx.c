@@ -230,7 +230,7 @@ domain_init_rmrr(struct iommu_domain *domain, device_t dev, int bus,
     int slot, int func, int dev_domain, int dev_busno,
     const void *dev_path, int dev_path_len)
 {
-	struct dmar_map_entries_tailq rmrr_entries;
+	struct iommu_map_entries_tailq rmrr_entries;
 	struct iommu_map_entry *entry, *entry1;
 	vm_page_t *ma;
 	dmar_gaddr_t start, end;
@@ -814,7 +814,7 @@ iommu_domain_unload_emit_wait(struct iommu_domain *domain,
 
 void
 iommu_domain_unload(struct iommu_domain *domain,
-    struct dmar_map_entries_tailq *entries, bool cansleep)
+    struct iommu_map_entries_tailq *entries, bool cansleep)
 {
 	struct iommu_unit *unit;
 	struct iommu_map_entry *entry, *entry1;
@@ -853,7 +853,7 @@ static void
 iommu_domain_unload_task(void *arg, int pending)
 {
 	struct iommu_domain *domain;
-	struct dmar_map_entries_tailq entries;
+	struct iommu_map_entries_tailq entries;
 
 	domain = arg;
 	TAILQ_INIT(&entries);

@@ -35,7 +35,7 @@
 #define __X86_IOMMU_BUSDMA_DMAR_H
 
 struct iommu_map_entry;
-TAILQ_HEAD(dmar_map_entries_tailq, iommu_map_entry);
+TAILQ_HEAD(iommu_map_entries_tailq, iommu_map_entry);
 
 struct bus_dma_tag_iommu {
 	struct bus_dma_tag_common common;
@@ -50,7 +50,7 @@ struct bus_dmamap_iommu {
 	struct memdesc mem;
 	bus_dmamap_callback_t *callback;
 	void *callback_arg;
-	struct dmar_map_entries_tailq map_entries;
+	struct iommu_map_entries_tailq map_entries;
 	TAILQ_ENTRY(bus_dmamap_iommu) delay_link;
 	bool locked;
 	bool cansleep;

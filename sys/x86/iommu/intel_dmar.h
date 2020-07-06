@@ -113,7 +113,7 @@ struct iommu_domain {
 	u_int flags;			/* (u) */
 	u_int entries_cnt;		/* (d) */
 	struct dmar_gas_entries_tree rb_root; /* (d) */
-	struct dmar_map_entries_tailq unload_entries; /* (d) Entries to
+	struct iommu_map_entries_tailq unload_entries; /* (d) Entries to
 							 unload */
 	struct iommu_map_entry *first_place, *last_place; /* (d) */
 	struct task unload_task;	/* (c) */
@@ -230,7 +230,7 @@ struct iommu_unit {
 	vmem_t *irtids;
 
 	/* Delayed freeing of map entries queue processing */
-	struct dmar_map_entries_tailq tlb_flush_entries;
+	struct iommu_map_entries_tailq tlb_flush_entries;
 	struct task qi_task;
 	struct taskqueue *qi_taskqueue;
 
@@ -351,7 +351,7 @@ void dmar_free_ctx(struct iommu_device *ctx);
 struct iommu_device *dmar_find_ctx_locked(struct iommu_unit *dmar, uint16_t rid);
 void iommu_domain_unload_entry(struct iommu_map_entry *entry, bool free);
 void iommu_domain_unload(struct iommu_domain *domain,
-    struct dmar_map_entries_tailq *entries, bool cansleep);
+    struct iommu_map_entries_tailq *entries, bool cansleep);
 void iommu_domain_free_entry(struct iommu_map_entry *entry, bool free);
 
 int iommu_init_busdma(struct iommu_unit *unit);
@@ -378,7 +378,7 @@ int dmar_gas_reserve_region(struct iommu_domain *domain, dmar_gaddr_t start,
 
 void dmar_dev_parse_rmrr(struct iommu_domain *domain, int dev_domain,
     int dev_busno, const void *dev_path, int dev_path_len,
-    struct dmar_map_entries_tailq *rmrr_entries);
+    struct iommu_map_entries_tailq *rmrr_entries);
 int dmar_instantiate_rmrr_ctxs(struct iommu_unit *dmar);
 
 void dmar_quirks_post_ident(struct iommu_unit *dmar);
