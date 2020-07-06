@@ -132,11 +132,11 @@ struct iommu_device {
 	u_long unloads;			/* same */
 };
 
-#define	DMAR_DOMAIN_GAS_INITED		0x0001
-#define	DMAR_DOMAIN_PGTBL_INITED	0x0002
-#define	DMAR_DOMAIN_IDMAP		0x0010	/* Domain uses identity
+#define	IOMMU_DOMAIN_GAS_INITED		0x0001
+#define	IOMMU_DOMAIN_PGTBL_INITED	0x0002
+#define	IOMMU_DOMAIN_IDMAP		0x0010	/* Domain uses identity
 						   page table */
-#define	DMAR_DOMAIN_RMRR		0x0020	/* Domain contains RMRR entry,
+#define	IOMMU_DOMAIN_RMRR		0x0020	/* Domain contains RMRR entry,
 						   cannot be turned off */
 
 /* struct iommu_device flags */
@@ -146,15 +146,15 @@ struct iommu_device {
 					   ephemeral reference is kept
 					   to prevent context destruction */
 
-#define	DMAR_DOMAIN_PGLOCK(dom)		VM_OBJECT_WLOCK((dom)->pgtbl_obj)
-#define	DMAR_DOMAIN_PGTRYLOCK(dom)	VM_OBJECT_TRYWLOCK((dom)->pgtbl_obj)
-#define	DMAR_DOMAIN_PGUNLOCK(dom)	VM_OBJECT_WUNLOCK((dom)->pgtbl_obj)
-#define	DMAR_DOMAIN_ASSERT_PGLOCKED(dom) \
+#define	IOMMU_DOMAIN_PGLOCK(dom)		VM_OBJECT_WLOCK((dom)->pgtbl_obj)
+#define	IOMMU_DOMAIN_PGTRYLOCK(dom)	VM_OBJECT_TRYWLOCK((dom)->pgtbl_obj)
+#define	IOMMU_DOMAIN_PGUNLOCK(dom)	VM_OBJECT_WUNLOCK((dom)->pgtbl_obj)
+#define	IOMMU_DOMAIN_ASSERT_PGLOCKED(dom) \
 	VM_OBJECT_ASSERT_WLOCKED((dom)->pgtbl_obj)
 
-#define	DMAR_DOMAIN_LOCK(dom)	mtx_lock(&(dom)->lock)
-#define	DMAR_DOMAIN_UNLOCK(dom)	mtx_unlock(&(dom)->lock)
-#define	DMAR_DOMAIN_ASSERT_LOCKED(dom) mtx_assert(&(dom)->lock, MA_OWNED)
+#define	IOMMU_DOMAIN_LOCK(dom)	mtx_lock(&(dom)->lock)
+#define	IOMMU_DOMAIN_UNLOCK(dom)	mtx_unlock(&(dom)->lock)
+#define	IOMMU_DOMAIN_ASSERT_LOCKED(dom) mtx_assert(&(dom)->lock, MA_OWNED)
 
 struct dmar_msi_data {
 	int irq;

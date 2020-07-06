@@ -361,7 +361,7 @@ domain_pgtbl_map_pte(struct iommu_domain *domain, dmar_gaddr_t base, int lvl,
 	dmar_pte_t *pte, *ptep;
 	vm_pindex_t idx, idx1;
 
-	DMAR_DOMAIN_ASSERT_PGLOCKED(domain);
+	IOMMU_DOMAIN_ASSERT_PGLOCKED(domain);
 	KASSERT((flags & DMAR_PGF_OBJL) != 0, ("lost PGF_OBJL"));
 
 	idx = domain_pgtbl_get_pindex(domain, base, lvl);
@@ -431,7 +431,7 @@ domain_map_buf_locked(struct iommu_domain *domain, dmar_gaddr_t base,
 	int lvl;
 	bool superpage;
 
-	DMAR_DOMAIN_ASSERT_PGLOCKED(domain);
+	IOMMU_DOMAIN_ASSERT_PGLOCKED(domain);
 
 	base1 = base;
 	size1 = size;
@@ -507,7 +507,7 @@ domain_map_buf(struct iommu_domain *domain, dmar_gaddr_t base, dmar_gaddr_t size
 
 	unit = domain->dmar;
 
-	KASSERT((domain->flags & DMAR_DOMAIN_IDMAP) == 0,
+	KASSERT((domain->flags & IOMMU_DOMAIN_IDMAP) == 0,
 	    ("modifying idmap pagetable domain %p", domain));
 	KASSERT((base & DMAR_PAGE_MASK) == 0,
 	    ("non-aligned base %p %jx %jx", domain, (uintmax_t)base,
@@ -541,9 +541,9 @@ domain_map_buf(struct iommu_domain *domain, dmar_gaddr_t base, dmar_gaddr_t size
 	    domain, (uintmax_t)pflags));
 	KASSERT((flags & ~DMAR_PGF_WAITOK) == 0, ("invalid flags %x", flags));
 
-	DMAR_DOMAIN_PGLOCK(domain);
+	IOMMU_DOMAIN_PGLOCK(domain);
 	error = domain_map_buf_locked(domain, base, size, ma, pflags, flags);
-	DMAR_DOMAIN_PGUNLOCK(domain);
+	IOMMU_DOMAIN_PGUNLOCK(domain);
 	if (error != 0)
 		return (error);
 
@@ -614,11 +614,11 @@ domain_unmap_buf_locked(struct iommu_domain *domain, dmar_gaddr_t base,
 	dmar_gaddr_t pg_sz;
 	int lvl;
 
-	DMAR_DOMAIN_ASSERT_PGLOCKED(domain);
+	IOMMU_DOMAIN_ASSERT_PGLOCKED(domain);
 	if (size == 0)
 		return (0);
 
-	KASSERT((domain->flags & DMAR_DOMAIN_IDMAP) == 0,
+	KASSERT((domain->flags & IOMMU_DOMAIN_IDMAP) == 0,
 	    ("modifying idmap pagetable domain %p", domain));
 	KASSERT((base & DMAR_PAGE_MASK) == 0,
 	    ("non-aligned base %p %jx %jx", domain, (uintmax_t)base,
@@ -682,9 +682,9 @@ domain_unmap_buf(struct iommu_domain *domain, dmar_gaddr_t base,
 {
 	int error;
 
-	DMAR_DOMAIN_PGLOCK(domain);
+	IOMMU_DOMAIN_PGLOCK(domain);
 	error = domain_unmap_buf_locked(domain, base, size, flags);
-	DMAR_DOMAIN_PGUNLOCK(domain);
+	IOMMU_DOMAIN_PGUNLOCK(domain);
 	return (error);
 }
 
@@ -698,14 +698,14 @@ domain_alloc_pgtbl(struct iommu_domain *domain)
 
 	domain->pgtbl_obj = vm_pager_allocate(OBJT_PHYS, NULL,
 	    IDX_TO_OFF(pglvl_max_pages(domain->pglvl)), 0, 0, NULL);
-	DMAR_DOMAIN_PGLOCK(domain);
+	IOMMU_DOMAIN_PGLOCK(domain);
 	m = dmar_pgalloc(domain->pgtbl_obj, 0, DMAR_PGF_WAITOK |
 	    DMAR_PGF_ZERO | DMAR_PGF_OBJL);
 	/* No implicit free of the top level page table page. */
 	m->ref_count = 1;
-	DMAR_DOMAIN_PGUNLOCK(domain);
+	IOMMU_DOMAIN_PGUNLOCK(domain);
 	IOMMU_LOCK(domain->dmar);
-	domain->flags |= DMAR_DOMAIN_PGTBL_INITED;
+	domain->flags |= IOMMU_DOMAIN_PGTBL_INITED;
 	IOMMU_UNLOCK(domain->dmar);
 	return (0);
 }
@@ -719,16 +719,16 @@ domain_free_pgtbl(struct iommu_domain *domain)
 	obj = domain->pgtbl_obj;
 	if (obj == NULL) {
 		KASSERT((domain->dmar->hw_ecap & DMAR_ECAP_PT) != 0 &&
-		    (domain->flags & DMAR_DOMAIN_IDMAP) != 0,
+		    (domain->flags & IOMMU_DOMAIN_IDMAP) != 0,
 		    ("lost pagetable object domain %p", domain));
 		return;
 	}
-	DMAR_DOMAIN_ASSERT_PGLOCKED(domain);
+	IOMMU_DOMAIN_ASSERT_PGLOCKED(domain);
 	domain->pgtbl_obj = NULL;
 
-	if ((domain->flags & DMAR_DOMAIN_IDMAP) != 0) {
+	if ((domain->flags & IOMMU_DOMAIN_IDMAP) != 0) {
 		put_idmap_pgtbl(obj);
-		domain->flags &= ~DMAR_DOMAIN_IDMAP;
+		domain->flags &= ~IOMMU_DOMAIN_IDMAP;
 		return;
 	}
 

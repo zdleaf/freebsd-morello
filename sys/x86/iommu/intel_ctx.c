@@ -72,7 +72,7 @@ __FBSDID("$FreeBSD$");
 #include <dev/pci/pcivar.h>
 
 static MALLOC_DEFINE(M_DMAR_CTX, "iommu_device", "Intel DMAR Context");
-static MALLOC_DEFINE(M_DMAR_DOMAIN, "dmar_dom", "Intel DMAR Domain");
+static MALLOC_DEFINE(M_IOMMU_DOMAIN, "dmar_dom", "Intel DMAR Domain");
 
 static void iommu_domain_unload_task(void *arg, int pending);
 static void dmar_unref_domain_locked(struct iommu_unit *dmar,
@@ -181,7 +181,7 @@ ctx_id_entry_init(struct iommu_device *ctx, iommu_device_entry_t *ctxp, bool mov
 	    pci_get_function(ctx->device_tag.owner),
 	    ctxp->ctx1, ctxp->ctx2));
 
-	if ((domain->flags & DMAR_DOMAIN_IDMAP) != 0 &&
+	if ((domain->flags & IOMMU_DOMAIN_IDMAP) != 0 &&
 	    (unit->hw_ecap & DMAR_ECAP_PT) != 0) {
 		KASSERT(domain->pgtbl_obj == NULL,
 		    ("ctx %p non-null pgtbl_obj", ctx));
@@ -289,7 +289,7 @@ domain_init_rmrr(struct iommu_domain *domain, device_t dev, int bus,
 		if (error1 == 0 && entry->end != entry->start) {
 			IOMMU_LOCK(domain->dmar);
 			domain->refs++; /* XXXKIB prevent free */
-			domain->flags |= DMAR_DOMAIN_RMRR;
+			domain->flags |= IOMMU_DOMAIN_RMRR;
 			IOMMU_UNLOCK(domain->dmar);
 		} else {
 			if (error1 != 0) {
@@ -321,7 +321,7 @@ iommu_domain_alloc(struct iommu_unit *dmar, bool id_mapped)
 	id = alloc_unr(dmar->domids);
 	if (id == -1)
 		return (NULL);
-	domain = malloc(sizeof(*domain), M_DMAR_DOMAIN, M_WAITOK | M_ZERO);
+	domain = malloc(sizeof(*domain), M_IOMMU_DOMAIN, M_WAITOK | M_ZERO);
 	domain->domain = id;
 	LIST_INIT(&domain->contexts);
 	RB_INIT(&domain->rb_root);
@@ -352,7 +352,7 @@ iommu_domain_alloc(struct iommu_unit *dmar, bool id_mapped)
 			domain->pgtbl_obj = domain_get_idmap_pgtbl(domain,
 			    domain->end);
 		}
-		domain->flags |= DMAR_DOMAIN_IDMAP;
+		domain->flags |= IOMMU_DOMAIN_IDMAP;
 	} else {
 		error = domain_alloc_pgtbl(domain);
 		if (error != 0)
@@ -426,19 +426,19 @@ iommu_domain_destroy(struct iommu_domain *domain)
 	    ("destroying dom %p with ctx_cnt %d", domain, domain->ctx_cnt));
 	KASSERT(domain->refs == 0,
 	    ("destroying dom %p with refs %d", domain, domain->refs));
-	if ((domain->flags & DMAR_DOMAIN_GAS_INITED) != 0) {
-		DMAR_DOMAIN_LOCK(domain);
+	if ((domain->flags & IOMMU_DOMAIN_GAS_INITED) != 0) {
+		IOMMU_DOMAIN_LOCK(domain);
 		dmar_gas_fini_domain(domain);
-		DMAR_DOMAIN_UNLOCK(domain);
+		IOMMU_DOMAIN_UNLOCK(domain);
 	}
-	if ((domain->flags & DMAR_DOMAIN_PGTBL_INITED) != 0) {
+	if ((domain->flags & IOMMU_DOMAIN_PGTBL_INITED) != 0) {
 		if (domain->pgtbl_obj != NULL)
-			DMAR_DOMAIN_PGLOCK(domain);
+			IOMMU_DOMAIN_PGLOCK(domain);
 		domain_free_pgtbl(domain);
 	}
 	mtx_destroy(&domain->lock);
 	free_unr(domain->dmar->domids, domain->domain);
-	free(domain, M_DMAR_DOMAIN);
+	free(domain, M_IOMMU_DOMAIN);
 }
 
 static struct iommu_device *
@@ -627,7 +627,7 @@ dmar_move_ctx_to_domain(struct iommu_domain *domain, struct iommu_device *ctx)
 	/* If flush failed, rolling back would not work as well. */
 	printf("dmar%d rid %x domain %d->%d %s-mapped\n",
 	    dmar->unit, ctx->rid, old_domain->domain, domain->domain,
-	    (domain->flags & DMAR_DOMAIN_IDMAP) != 0 ? "id" : "re");
+	    (domain->flags & IOMMU_DOMAIN_IDMAP) != 0 ? "id" : "re");
 	dmar_unref_domain_locked(dmar, old_domain);
 	TD_PINNED_ASSERT;
 	return (error);
@@ -650,7 +650,7 @@ dmar_unref_domain_locked(struct iommu_unit *dmar, struct iommu_domain *domain)
 		return;
 	}
 
-	KASSERT((domain->flags & DMAR_DOMAIN_RMRR) == 0,
+	KASSERT((domain->flags & IOMMU_DOMAIN_RMRR) == 0,
 	    ("lost ref on RMRR domain %p", domain));
 
 	LIST_REMOVE(domain, link);
@@ -769,12 +769,12 @@ iommu_domain_free_entry(struct iommu_map_entry *entry, bool free)
 	struct iommu_domain *domain;
 
 	domain = entry->domain;
-	DMAR_DOMAIN_LOCK(domain);
+	IOMMU_DOMAIN_LOCK(domain);
 	if ((entry->flags & IOMMU_MAP_ENTRY_RMRR) != 0)
 		dmar_gas_free_region(domain, entry);
 	else
 		dmar_gas_free_space(domain, entry);
-	DMAR_DOMAIN_UNLOCK(domain);
+	IOMMU_DOMAIN_UNLOCK(domain);
 	if (free)
 		dmar_gas_free_entry(domain, entry);
 	else
@@ -859,10 +859,10 @@ iommu_domain_unload_task(void *arg, int pending)
 	TAILQ_INIT(&entries);
 
 	for (;;) {
-		DMAR_DOMAIN_LOCK(domain);
+		IOMMU_DOMAIN_LOCK(domain);
 		TAILQ_SWAP(&domain->unload_entries, &entries, iommu_map_entry,
 		    dmamap_link);
-		DMAR_DOMAIN_UNLOCK(domain);
+		IOMMU_DOMAIN_UNLOCK(domain);
 		if (TAILQ_EMPTY(&entries))
 			break;
 		iommu_domain_unload(domain, &entries, true);

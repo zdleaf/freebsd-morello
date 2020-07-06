@@ -444,12 +444,12 @@ dmar_bus_dmamap_destroy(bus_dma_tag_t dmat, bus_dmamap_t map1)
 	map = (struct bus_dmamap_dmar *)map1;
 	if (map != NULL) {
 		domain = tag->ctx->domain;
-		DMAR_DOMAIN_LOCK(domain);
+		IOMMU_DOMAIN_LOCK(domain);
 		if (!TAILQ_EMPTY(&map->map_entries)) {
-			DMAR_DOMAIN_UNLOCK(domain);
+			IOMMU_DOMAIN_UNLOCK(domain);
 			return (EBUSY);
 		}
-		DMAR_DOMAIN_UNLOCK(domain);
+		IOMMU_DOMAIN_UNLOCK(domain);
 		free_domain(map, M_DMAR_DMAMAP);
 	}
 	tag->map_count--;
@@ -607,10 +607,10 @@ dmar_bus_dmamap_load_something1(struct bus_dma_tag_dmar *tag,
 		    (uintmax_t)entry->start, (uintmax_t)entry->end,
 		    (uintmax_t)buflen1, (uintmax_t)tag->common.maxsegsz));
 
-		DMAR_DOMAIN_LOCK(domain);
+		IOMMU_DOMAIN_LOCK(domain);
 		TAILQ_INSERT_TAIL(&map->map_entries, entry, dmamap_link);
 		entry->flags |= IOMMU_MAP_ENTRY_MAP;
-		DMAR_DOMAIN_UNLOCK(domain);
+		IOMMU_DOMAIN_UNLOCK(domain);
 		TAILQ_INSERT_TAIL(unroll_list, entry, unroll_link);
 
 		segs[seg].ds_addr = entry->start + offset;
@@ -650,7 +650,7 @@ dmar_bus_dmamap_load_something(struct bus_dma_tag_dmar *tag,
 		 * partial buffer load, so unfortunately we have to
 		 * revert all work done.
 		 */
-		DMAR_DOMAIN_LOCK(domain);
+		IOMMU_DOMAIN_LOCK(domain);
 		TAILQ_FOREACH_SAFE(entry, &unroll_list, unroll_link,
 		    entry1) {
 			/*
@@ -664,7 +664,7 @@ dmar_bus_dmamap_load_something(struct bus_dma_tag_dmar *tag,
 			TAILQ_INSERT_TAIL(&domain->unload_entries, entry,
 			    dmamap_link);
 		}
-		DMAR_DOMAIN_UNLOCK(domain);
+		IOMMU_DOMAIN_UNLOCK(domain);
 		taskqueue_enqueue(domain->dmar->delayed_taskqueue,
 		    &domain->unload_task);
 	}
@@ -865,16 +865,16 @@ dmar_bus_dmamap_unload(bus_dma_tag_t dmat, bus_dmamap_t map1)
 	atomic_add_long(&ctx->unloads, 1);
 
 #if defined(__i386__)
-	DMAR_DOMAIN_LOCK(domain);
+	IOMMU_DOMAIN_LOCK(domain);
 	TAILQ_CONCAT(&domain->unload_entries, &map->map_entries, dmamap_link);
-	DMAR_DOMAIN_UNLOCK(domain);
+	IOMMU_DOMAIN_UNLOCK(domain);
 	taskqueue_enqueue(domain->dmar->delayed_taskqueue,
 	    &domain->unload_task);
 #else /* defined(__amd64__) */
 	TAILQ_INIT(&entries);
-	DMAR_DOMAIN_LOCK(domain);
+	IOMMU_DOMAIN_LOCK(domain);
 	TAILQ_CONCAT(&entries, &map->map_entries, dmamap_link);
-	DMAR_DOMAIN_UNLOCK(domain);
+	IOMMU_DOMAIN_UNLOCK(domain);
 	THREAD_NO_SLEEPING();
 	iommu_domain_unload(domain, &entries, false);
 	THREAD_SLEEPING_OK();
@@ -1024,10 +1024,10 @@ bus_dma_dmar_load_ident(bus_dma_tag_t dmat, bus_dmamap_t map1,
 	    ((flags & BUS_DMA_NOWRITE) ? 0 : IOMMU_MAP_ENTRY_WRITE),
 	    waitok ? IOMMU_MF_CANWAIT : 0, ma);
 	if (error == 0) {
-		DMAR_DOMAIN_LOCK(domain);
+		IOMMU_DOMAIN_LOCK(domain);
 		TAILQ_INSERT_TAIL(&map->map_entries, entry, dmamap_link);
 		entry->flags |= IOMMU_MAP_ENTRY_MAP;
-		DMAR_DOMAIN_UNLOCK(domain);
+		IOMMU_DOMAIN_UNLOCK(domain);
 	} else {
 		iommu_domain_unload_entry(entry, true);
 	}

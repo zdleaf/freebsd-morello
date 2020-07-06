@@ -213,7 +213,7 @@ dmar_gas_init_domain(struct iommu_domain *domain)
 	begin = dmar_gas_alloc_entry(domain, DMAR_PGF_WAITOK);
 	end = dmar_gas_alloc_entry(domain, DMAR_PGF_WAITOK);
 
-	DMAR_DOMAIN_LOCK(domain);
+	IOMMU_DOMAIN_LOCK(domain);
 	KASSERT(domain->entries_cnt == 2, ("dirty domain %p", domain));
 	KASSERT(RB_EMPTY(&domain->rb_root), ("non-empty entries %p", domain));
 
@@ -229,8 +229,8 @@ dmar_gas_init_domain(struct iommu_domain *domain)
 
 	domain->first_place = begin;
 	domain->last_place = end;
-	domain->flags |= DMAR_DOMAIN_GAS_INITED;
-	DMAR_DOMAIN_UNLOCK(domain);
+	domain->flags |= IOMMU_DOMAIN_GAS_INITED;
+	IOMMU_DOMAIN_UNLOCK(domain);
 }
 
 void
@@ -238,7 +238,7 @@ dmar_gas_fini_domain(struct iommu_domain *domain)
 {
 	struct iommu_map_entry *entry, *entry1;
 
-	DMAR_DOMAIN_ASSERT_LOCKED(domain);
+	IOMMU_DOMAIN_ASSERT_LOCKED(domain);
 	KASSERT(domain->entries_cnt == 2, ("domain still in use %p", domain));
 
 	entry = RB_MIN(dmar_gas_entries_tree, &domain->rb_root);
@@ -425,7 +425,7 @@ dmar_gas_find_space(struct iommu_domain *domain,
 	struct dmar_gas_match_args a;
 	int error;
 
-	DMAR_DOMAIN_ASSERT_LOCKED(domain);
+	IOMMU_DOMAIN_ASSERT_LOCKED(domain);
 	KASSERT(entry->flags == 0, ("dirty entry %p %p", domain, entry));
 	KASSERT((size & DMAR_PAGE_MASK) == 0, ("size %jx", (uintmax_t)size));
 
@@ -460,7 +460,7 @@ dmar_gas_alloc_region(struct iommu_domain *domain, struct iommu_map_entry *entry
 	struct iommu_map_entry *next, *prev;
 	bool found;
 
-	DMAR_DOMAIN_ASSERT_LOCKED(domain);
+	IOMMU_DOMAIN_ASSERT_LOCKED(domain);
 
 	if ((entry->start & DMAR_PAGE_MASK) != 0 ||
 	    (entry->end & DMAR_PAGE_MASK) != 0)
@@ -540,7 +540,7 @@ void
 dmar_gas_free_space(struct iommu_domain *domain, struct iommu_map_entry *entry)
 {
 
-	DMAR_DOMAIN_ASSERT_LOCKED(domain);
+	IOMMU_DOMAIN_ASSERT_LOCKED(domain);
 	KASSERT((entry->flags & (IOMMU_MAP_ENTRY_PLACE | IOMMU_MAP_ENTRY_RMRR |
 	    IOMMU_MAP_ENTRY_MAP)) == IOMMU_MAP_ENTRY_MAP,
 	    ("permanent entry %p %p", domain, entry));
@@ -558,7 +558,7 @@ dmar_gas_free_region(struct iommu_domain *domain, struct iommu_map_entry *entry)
 {
 	struct iommu_map_entry *next, *prev;
 
-	DMAR_DOMAIN_ASSERT_LOCKED(domain);
+	IOMMU_DOMAIN_ASSERT_LOCKED(domain);
 	KASSERT((entry->flags & (IOMMU_MAP_ENTRY_PLACE | IOMMU_MAP_ENTRY_RMRR |
 	    IOMMU_MAP_ENTRY_MAP)) == IOMMU_MAP_ENTRY_RMRR,
 	    ("non-RMRR entry %p %p", domain, entry));
@@ -589,11 +589,11 @@ dmar_gas_map(struct iommu_domain *domain,
 	    DMAR_PGF_WAITOK : 0);
 	if (entry == NULL)
 		return (ENOMEM);
-	DMAR_DOMAIN_LOCK(domain);
+	IOMMU_DOMAIN_LOCK(domain);
 	error = dmar_gas_find_space(domain, common, size, offset, flags,
 	    entry);
 	if (error == ENOMEM) {
-		DMAR_DOMAIN_UNLOCK(domain);
+		IOMMU_DOMAIN_UNLOCK(domain);
 		dmar_gas_free_entry(domain, entry);
 		return (error);
 	}
@@ -606,7 +606,7 @@ dmar_gas_map(struct iommu_domain *domain,
 	KASSERT(entry->end < domain->end, ("allocated GPA %jx, max GPA %jx",
 	    (uintmax_t)entry->end, (uintmax_t)domain->end));
 	entry->flags |= eflags;
-	DMAR_DOMAIN_UNLOCK(domain);
+	IOMMU_DOMAIN_UNLOCK(domain);
 
 	error = domain_map_buf(domain, entry->start, entry->end - entry->start,
 	    ma,
@@ -639,14 +639,14 @@ dmar_gas_map_region(struct iommu_domain *domain, struct iommu_map_entry *entry,
 	    ("invalid flags 0x%x", flags));
 
 	start = entry->start;
-	DMAR_DOMAIN_LOCK(domain);
+	IOMMU_DOMAIN_LOCK(domain);
 	error = dmar_gas_alloc_region(domain, entry, flags);
 	if (error != 0) {
-		DMAR_DOMAIN_UNLOCK(domain);
+		IOMMU_DOMAIN_UNLOCK(domain);
 		return (error);
 	}
 	entry->flags |= eflags;
-	DMAR_DOMAIN_UNLOCK(domain);
+	IOMMU_DOMAIN_UNLOCK(domain);
 	if (entry->end == entry->start)
 		return (0);
 
@@ -677,11 +677,11 @@ dmar_gas_reserve_region(struct iommu_domain *domain, dmar_gaddr_t start,
 	entry = dmar_gas_alloc_entry(domain, DMAR_PGF_WAITOK);
 	entry->start = start;
 	entry->end = end;
-	DMAR_DOMAIN_LOCK(domain);
+	IOMMU_DOMAIN_LOCK(domain);
 	error = dmar_gas_alloc_region(domain, entry, IOMMU_MF_CANWAIT);
 	if (error == 0)
 		entry->flags |= IOMMU_MAP_ENTRY_UNMAPPED;
-	DMAR_DOMAIN_UNLOCK(domain);
+	IOMMU_DOMAIN_UNLOCK(domain);
 	if (error != 0)
 		dmar_gas_free_entry(domain, entry);
 	return (error);
