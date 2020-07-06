@@ -920,7 +920,7 @@ dmar_rmrr_iter(ACPI_DMAR_HEADER *dmarh, void *arg)
 	struct rmrr_iter_args *ria;
 	ACPI_DMAR_RESERVED_MEMORY *resmem;
 	ACPI_DMAR_DEVICE_SCOPE *devscope;
-	struct dmar_map_entry *entry;
+	struct iommu_map_entry *entry;
 	char *ptr, *ptrend;
 	int match;
 
@@ -1107,9 +1107,9 @@ dmar_instantiate_rmrr_ctxs(struct iommu_unit *dmar)
 #include <ddb/db_lex.h>
 
 static void
-dmar_print_domain_entry(const struct dmar_map_entry *entry)
+dmar_print_domain_entry(const struct iommu_map_entry *entry)
 {
-	struct dmar_map_entry *l, *r;
+	struct iommu_map_entry *l, *r;
 
 	db_printf(
 	    "    start %jx end %jx first %jx last %jx free_down %jx flags %x ",
@@ -1145,7 +1145,7 @@ dmar_print_ctx(struct iommu_device *ctx)
 static void
 dmar_print_domain(struct iommu_domain *domain, bool show_mappings)
 {
-	struct dmar_map_entry *entry;
+	struct iommu_map_entry *entry;
 	struct iommu_device *ctx;
 
 	db_printf(

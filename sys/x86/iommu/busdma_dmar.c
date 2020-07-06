@@ -528,7 +528,7 @@ dmar_bus_dmamap_load_something1(struct bus_dma_tag_dmar *tag,
 {
 	struct iommu_device *ctx;
 	struct iommu_domain *domain;
-	struct dmar_map_entry *entry;
+	struct iommu_map_entry *entry;
 	dmar_gaddr_t size;
 	bus_size_t buflen1;
 	int error, idx, gas_flags, seg;
@@ -560,8 +560,8 @@ dmar_bus_dmamap_load_something1(struct bus_dma_tag_dmar *tag,
 			gas_flags |= DMAR_GM_CANSPLIT;
 
 		error = dmar_gas_map(domain, &tag->common, size, offset,
-		    DMAR_MAP_ENTRY_READ |
-		    ((flags & BUS_DMA_NOWRITE) == 0 ? DMAR_MAP_ENTRY_WRITE : 0),
+		    IOMMU_MAP_ENTRY_READ |
+		    ((flags & BUS_DMA_NOWRITE) == 0 ? IOMMU_MAP_ENTRY_WRITE : 0),
 		    gas_flags, ma + idx, &entry);
 		if (error != 0)
 			break;
@@ -609,7 +609,7 @@ dmar_bus_dmamap_load_something1(struct bus_dma_tag_dmar *tag,
 
 		DMAR_DOMAIN_LOCK(domain);
 		TAILQ_INSERT_TAIL(&map->map_entries, entry, dmamap_link);
-		entry->flags |= DMAR_MAP_ENTRY_MAP;
+		entry->flags |= IOMMU_MAP_ENTRY_MAP;
 		DMAR_DOMAIN_UNLOCK(domain);
 		TAILQ_INSERT_TAIL(unroll_list, entry, unroll_link);
 
@@ -633,7 +633,7 @@ dmar_bus_dmamap_load_something(struct bus_dma_tag_dmar *tag,
 {
 	struct iommu_device *ctx;
 	struct iommu_domain *domain;
-	struct dmar_map_entry *entry, *entry1;
+	struct iommu_map_entry *entry, *entry1;
 	struct dmar_map_entries_tailq unroll_list;
 	int error;
 
@@ -983,7 +983,7 @@ bus_dma_dmar_load_ident(bus_dma_tag_t dmat, bus_dmamap_t map1,
 	struct bus_dmamap_dmar *map;
 	struct iommu_device *ctx;
 	struct iommu_domain *domain;
-	struct dmar_map_entry *entry;
+	struct iommu_map_entry *entry;
 	vm_page_t *ma;
 	vm_size_t i;
 	int error;
@@ -1020,13 +1020,13 @@ bus_dma_dmar_load_ident(bus_dma_tag_t dmat, bus_dmamap_t map1,
 		ma[i] = vm_page_getfake(entry->start + PAGE_SIZE * i,
 		    VM_MEMATTR_DEFAULT);
 	}
-	error = dmar_gas_map_region(domain, entry, DMAR_MAP_ENTRY_READ |
-	    ((flags & BUS_DMA_NOWRITE) ? 0 : DMAR_MAP_ENTRY_WRITE),
+	error = dmar_gas_map_region(domain, entry, IOMMU_MAP_ENTRY_READ |
+	    ((flags & BUS_DMA_NOWRITE) ? 0 : IOMMU_MAP_ENTRY_WRITE),
 	    waitok ? DMAR_GM_CANWAIT : 0, ma);
 	if (error == 0) {
 		DMAR_DOMAIN_LOCK(domain);
 		TAILQ_INSERT_TAIL(&map->map_entries, entry, dmamap_link);
-		entry->flags |= DMAR_MAP_ENTRY_MAP;
+		entry->flags |= IOMMU_MAP_ENTRY_MAP;
 		DMAR_DOMAIN_UNLOCK(domain);
 	} else {
 		iommu_domain_unload_entry(entry, true);

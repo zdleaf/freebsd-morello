@@ -44,7 +44,7 @@ struct dmar_qi_genseq {
 	uint32_t seq;
 };
 
-struct dmar_map_entry {
+struct iommu_map_entry {
 	dmar_gaddr_t start;
 	dmar_gaddr_t end;
 	dmar_gaddr_t first;		/* Least start in subtree */
@@ -52,29 +52,29 @@ struct dmar_map_entry {
 	dmar_gaddr_t free_down;		/* Max free space below the
 					   current R/B tree node */
 	u_int flags;
-	TAILQ_ENTRY(dmar_map_entry) dmamap_link; /* Link for dmamap entries */
-	RB_ENTRY(dmar_map_entry) rb_entry;	 /* Links for domain entries */
-	TAILQ_ENTRY(dmar_map_entry) unroll_link; /* Link for unroll after
+	TAILQ_ENTRY(iommu_map_entry) dmamap_link; /* Link for dmamap entries */
+	RB_ENTRY(iommu_map_entry) rb_entry;	 /* Links for domain entries */
+	TAILQ_ENTRY(iommu_map_entry) unroll_link; /* Link for unroll after
 						    dmamap_load failure */
 	struct iommu_domain *domain;
 	struct dmar_qi_genseq gseq;
 };
 
-RB_HEAD(dmar_gas_entries_tree, dmar_map_entry);
-RB_PROTOTYPE(dmar_gas_entries_tree, dmar_map_entry, rb_entry,
+RB_HEAD(dmar_gas_entries_tree, iommu_map_entry);
+RB_PROTOTYPE(dmar_gas_entries_tree, iommu_map_entry, rb_entry,
     dmar_gas_cmp_entries);
 
-#define	DMAR_MAP_ENTRY_PLACE	0x0001	/* Fake entry */
-#define	DMAR_MAP_ENTRY_RMRR	0x0002	/* Permanent, not linked by
+#define	IOMMU_MAP_ENTRY_PLACE	0x0001	/* Fake entry */
+#define	IOMMU_MAP_ENTRY_RMRR	0x0002	/* Permanent, not linked by
 					   dmamap_link */
-#define	DMAR_MAP_ENTRY_MAP	0x0004	/* Busdma created, linked by
+#define	IOMMU_MAP_ENTRY_MAP	0x0004	/* Busdma created, linked by
 					   dmamap_link */
-#define	DMAR_MAP_ENTRY_UNMAPPED	0x0010	/* No backing pages */
-#define	DMAR_MAP_ENTRY_QI_NF	0x0020	/* qi task, do not free entry */
-#define	DMAR_MAP_ENTRY_READ	0x1000	/* Read permitted */
-#define	DMAR_MAP_ENTRY_WRITE	0x2000	/* Write permitted */
-#define	DMAR_MAP_ENTRY_SNOOP	0x4000	/* Snoop */
-#define	DMAR_MAP_ENTRY_TM	0x8000	/* Transient */
+#define	IOMMU_MAP_ENTRY_UNMAPPED	0x0010	/* No backing pages */
+#define	IOMMU_MAP_ENTRY_QI_NF	0x0020	/* qi task, do not free entry */
+#define	IOMMU_MAP_ENTRY_READ	0x1000	/* Read permitted */
+#define	IOMMU_MAP_ENTRY_WRITE	0x2000	/* Write permitted */
+#define	IOMMU_MAP_ENTRY_SNOOP	0x4000	/* Snoop */
+#define	IOMMU_MAP_ENTRY_TM	0x8000	/* Transient */
 
 /*
  * Locking annotations:
@@ -115,7 +115,7 @@ struct iommu_domain {
 	struct dmar_gas_entries_tree rb_root; /* (d) */
 	struct dmar_map_entries_tailq unload_entries; /* (d) Entries to
 							 unload */
-	struct dmar_map_entry *first_place, *last_place; /* (d) */
+	struct iommu_map_entry *first_place, *last_place; /* (d) */
 	struct task unload_task;	/* (c) */
 	u_int batch_no;
 };
@@ -349,10 +349,10 @@ int dmar_move_ctx_to_domain(struct iommu_domain *domain, struct iommu_device *ct
 void dmar_free_ctx_locked(struct iommu_unit *dmar, struct iommu_device *ctx);
 void dmar_free_ctx(struct iommu_device *ctx);
 struct iommu_device *dmar_find_ctx_locked(struct iommu_unit *dmar, uint16_t rid);
-void iommu_domain_unload_entry(struct dmar_map_entry *entry, bool free);
+void iommu_domain_unload_entry(struct iommu_map_entry *entry, bool free);
 void iommu_domain_unload(struct iommu_domain *domain,
     struct dmar_map_entries_tailq *entries, bool cansleep);
-void iommu_domain_free_entry(struct dmar_map_entry *entry, bool free);
+void iommu_domain_free_entry(struct iommu_map_entry *entry, bool free);
 
 int dmar_init_busdma(struct iommu_unit *unit);
 void dmar_fini_busdma(struct iommu_unit *unit);
@@ -360,19 +360,19 @@ device_t dmar_get_requester(device_t dev, uint16_t *rid);
 
 void dmar_gas_init_domain(struct iommu_domain *domain);
 void dmar_gas_fini_domain(struct iommu_domain *domain);
-struct dmar_map_entry *dmar_gas_alloc_entry(struct iommu_domain *domain,
+struct iommu_map_entry *dmar_gas_alloc_entry(struct iommu_domain *domain,
     u_int flags);
 void dmar_gas_free_entry(struct iommu_domain *domain,
-    struct dmar_map_entry *entry);
+    struct iommu_map_entry *entry);
 void dmar_gas_free_space(struct iommu_domain *domain,
-    struct dmar_map_entry *entry);
+    struct iommu_map_entry *entry);
 int dmar_gas_map(struct iommu_domain *domain,
     const struct bus_dma_tag_common *common, dmar_gaddr_t size, int offset,
-    u_int eflags, u_int flags, vm_page_t *ma, struct dmar_map_entry **res);
+    u_int eflags, u_int flags, vm_page_t *ma, struct iommu_map_entry **res);
 void dmar_gas_free_region(struct iommu_domain *domain,
-    struct dmar_map_entry *entry);
+    struct iommu_map_entry *entry);
 int dmar_gas_map_region(struct iommu_domain *domain,
-    struct dmar_map_entry *entry, u_int eflags, u_int flags, vm_page_t *ma);
+    struct iommu_map_entry *entry, u_int eflags, u_int flags, vm_page_t *ma);
 int dmar_gas_reserve_region(struct iommu_domain *domain, dmar_gaddr_t start,
     dmar_gaddr_t end);
 

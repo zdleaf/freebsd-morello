@@ -231,7 +231,7 @@ domain_init_rmrr(struct iommu_domain *domain, device_t dev, int bus,
     const void *dev_path, int dev_path_len)
 {
 	struct dmar_map_entries_tailq rmrr_entries;
-	struct dmar_map_entry *entry, *entry1;
+	struct iommu_map_entry *entry, *entry1;
 	vm_page_t *ma;
 	dmar_gaddr_t start, end;
 	vm_pindex_t size, i;
@@ -278,7 +278,7 @@ domain_init_rmrr(struct iommu_domain *domain, device_t dev, int bus,
 			    VM_MEMATTR_DEFAULT);
 		}
 		error1 = dmar_gas_map_region(domain, entry,
-		    DMAR_MAP_ENTRY_READ | DMAR_MAP_ENTRY_WRITE,
+		    IOMMU_MAP_ENTRY_READ | IOMMU_MAP_ENTRY_WRITE,
 		    DMAR_GM_CANWAIT | DMAR_GM_RMRR, ma);
 		/*
 		 * Non-failed RMRR entries are owned by context rb
@@ -764,13 +764,13 @@ dmar_find_ctx_locked(struct iommu_unit *dmar, uint16_t rid)
 }
 
 void
-iommu_domain_free_entry(struct dmar_map_entry *entry, bool free)
+iommu_domain_free_entry(struct iommu_map_entry *entry, bool free)
 {
 	struct iommu_domain *domain;
 
 	domain = entry->domain;
 	DMAR_DOMAIN_LOCK(domain);
-	if ((entry->flags & DMAR_MAP_ENTRY_RMRR) != 0)
+	if ((entry->flags & IOMMU_MAP_ENTRY_RMRR) != 0)
 		dmar_gas_free_region(domain, entry);
 	else
 		dmar_gas_free_space(domain, entry);
@@ -782,7 +782,7 @@ iommu_domain_free_entry(struct dmar_map_entry *entry, bool free)
 }
 
 void
-iommu_domain_unload_entry(struct dmar_map_entry *entry, bool free)
+iommu_domain_unload_entry(struct iommu_map_entry *entry, bool free)
 {
 	struct iommu_unit *unit;
 
@@ -792,7 +792,7 @@ iommu_domain_unload_entry(struct dmar_map_entry *entry, bool free)
 		dmar_qi_invalidate_locked(entry->domain, entry->start,
 		    entry->end - entry->start, &entry->gseq, true);
 		if (!free)
-			entry->flags |= DMAR_MAP_ENTRY_QI_NF;
+			entry->flags |= IOMMU_MAP_ENTRY_QI_NF;
 		TAILQ_INSERT_TAIL(&unit->tlb_flush_entries, entry, dmamap_link);
 		IOMMU_UNLOCK(unit);
 	} else {
@@ -804,7 +804,7 @@ iommu_domain_unload_entry(struct dmar_map_entry *entry, bool free)
 
 static bool
 iommu_domain_unload_emit_wait(struct iommu_domain *domain,
-    struct dmar_map_entry *entry)
+    struct iommu_map_entry *entry)
 {
 
 	if (TAILQ_NEXT(entry, dmamap_link) == NULL)
@@ -817,13 +817,13 @@ iommu_domain_unload(struct iommu_domain *domain,
     struct dmar_map_entries_tailq *entries, bool cansleep)
 {
 	struct iommu_unit *unit;
-	struct dmar_map_entry *entry, *entry1;
+	struct iommu_map_entry *entry, *entry1;
 	int error;
 
 	unit = domain->dmar;
 
 	TAILQ_FOREACH_SAFE(entry, entries, dmamap_link, entry1) {
-		KASSERT((entry->flags & DMAR_MAP_ENTRY_MAP) != 0,
+		KASSERT((entry->flags & IOMMU_MAP_ENTRY_MAP) != 0,
 		    ("not mapped entry %p %p", domain, entry));
 		error = domain_unmap_buf(domain, entry->start, entry->end -
 		    entry->start, cansleep ? DMAR_PGF_WAITOK : 0);
@@ -860,7 +860,7 @@ iommu_domain_unload_task(void *arg, int pending)
 
 	for (;;) {
 		DMAR_DOMAIN_LOCK(domain);
-		TAILQ_SWAP(&domain->unload_entries, &entries, dmar_map_entry,
+		TAILQ_SWAP(&domain->unload_entries, &entries, iommu_map_entry,
 		    dmamap_link);
 		DMAR_DOMAIN_UNLOCK(domain);
 		if (TAILQ_EMPTY(&entries))

@@ -34,8 +34,8 @@
 #ifndef __X86_IOMMU_BUSDMA_DMAR_H
 #define __X86_IOMMU_BUSDMA_DMAR_H
 
-struct dmar_map_entry;
-TAILQ_HEAD(dmar_map_entries_tailq, dmar_map_entry);
+struct iommu_map_entry;
+TAILQ_HEAD(dmar_map_entries_tailq, iommu_map_entry);
 
 struct bus_dma_tag_dmar {
 	struct bus_dma_tag_common common;

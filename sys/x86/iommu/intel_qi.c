@@ -338,7 +338,7 @@ static void
 dmar_qi_task(void *arg, int pending __unused)
 {
 	struct iommu_unit *unit;
-	struct dmar_map_entry *entry;
+	struct iommu_map_entry *entry;
 	uint32_t ics;
 
 	unit = arg;
@@ -353,7 +353,7 @@ dmar_qi_task(void *arg, int pending __unused)
 		TAILQ_REMOVE(&unit->tlb_flush_entries, entry, dmamap_link);
 		IOMMU_UNLOCK(unit);
 		iommu_domain_free_entry(entry, (entry->flags &
-		    DMAR_MAP_ENTRY_QI_NF) == 0);
+		    IOMMU_MAP_ENTRY_QI_NF) == 0);
 		IOMMU_LOCK(unit);
 	}
 	ics = dmar_read4(unit, DMAR_ICS_REG);
