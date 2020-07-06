@@ -64,7 +64,7 @@ __FBSDID("$FreeBSD$");
 #include <machine/bus.h>
 #include <machine/md_var.h>
 
-#if defined(__amd64__)
+#if defined(__amd64__) || defined(__i386__)
 #include <x86/iommu/intel_reg.h>
 #include <x86/busdma_impl.h>
 #include <dev/iommu/busdma_iommu.h>
@@ -288,7 +288,7 @@ acpi_iommu_get_dma_tag(device_t dev, device_t child)
 		return (NULL);
 	if (!iommu->dma_enabled)
 		return (NULL);
-#if defined(__amd64__)
+#if defined(__amd64__) || defined(__i386__)
 	dmar_quirks_pre_use(iommu);
 	dmar_instantiate_rmrr_ctxs(iommu);
 #endif
