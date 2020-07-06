@@ -123,21 +123,21 @@ dmar_map_ctx_entry(struct iommu_device *ctx, struct sf_buf **sfp)
 }
 
 static void
-ctx_tag_init(struct iommu_device *ctx, device_t dev)
+device_tag_init(struct iommu_device *ctx, device_t dev)
 {
 	bus_addr_t maxaddr;
 
 	maxaddr = MIN(ctx->domain->end, BUS_SPACE_MAXADDR);
-	ctx->ctx_tag.common.ref_count = 1; /* Prevent free */
-	ctx->ctx_tag.common.impl = &bus_dma_dmar_impl;
-	ctx->ctx_tag.common.boundary = 0;
-	ctx->ctx_tag.common.lowaddr = maxaddr;
-	ctx->ctx_tag.common.highaddr = maxaddr;
-	ctx->ctx_tag.common.maxsize = maxaddr;
-	ctx->ctx_tag.common.nsegments = BUS_SPACE_UNRESTRICTED;
-	ctx->ctx_tag.common.maxsegsz = maxaddr;
-	ctx->ctx_tag.ctx = ctx;
-	ctx->ctx_tag.owner = dev;
+	ctx->device_tag.common.ref_count = 1; /* Prevent free */
+	ctx->device_tag.common.impl = &bus_dma_dmar_impl;
+	ctx->device_tag.common.boundary = 0;
+	ctx->device_tag.common.lowaddr = maxaddr;
+	ctx->device_tag.common.highaddr = maxaddr;
+	ctx->device_tag.common.maxsize = maxaddr;
+	ctx->device_tag.common.nsegments = BUS_SPACE_UNRESTRICTED;
+	ctx->device_tag.common.maxsegsz = maxaddr;
+	ctx->device_tag.ctx = ctx;
+	ctx->device_tag.owner = dev;
 }
 
 static void
@@ -177,8 +177,8 @@ ctx_id_entry_init(struct iommu_device *ctx, iommu_device_entry_t *ctxp, bool mov
 	unit = domain->dmar;
 	KASSERT(move || (ctxp->ctx1 == 0 && ctxp->ctx2 == 0),
 	    ("dmar%d: initialized ctx entry %d:%d:%d 0x%jx 0x%jx",
-	    unit->unit, busno, pci_get_slot(ctx->ctx_tag.owner),
-	    pci_get_function(ctx->ctx_tag.owner),
+	    unit->unit, busno, pci_get_slot(ctx->device_tag.owner),
+	    pci_get_function(ctx->device_tag.owner),
 	    ctxp->ctx1, ctxp->ctx2));
 
 	if ((domain->flags & DMAR_DOMAIN_IDMAP) != 0 &&
@@ -505,8 +505,8 @@ dmar_get_ctx_for_dev1(struct iommu_unit *dmar, device_t dev, uint16_t rid,
 			domain = domain1;
 			ctx = ctx1;
 			iommu_device_link(ctx);
-			ctx->ctx_tag.owner = dev;
-			ctx_tag_init(ctx, dev);
+			ctx->device_tag.owner = dev;
+			device_tag_init(ctx, dev);
 
 			/*
 			 * This is the first activated context for the
@@ -536,8 +536,8 @@ dmar_get_ctx_for_dev1(struct iommu_unit *dmar, device_t dev, uint16_t rid,
 		}
 	} else {
 		domain = ctx->domain;
-		if (ctx->ctx_tag.owner == NULL)
-			ctx->ctx_tag.owner = dev;
+		if (ctx->device_tag.owner == NULL)
+			ctx->device_tag.owner = dev;
 		ctx->refs++; /* tag referenced us */
 	}
 

@@ -1136,9 +1136,9 @@ dmar_print_ctx(struct iommu_device *ctx)
 
 	db_printf(
 	    "    @%p pci%d:%d:%d refs %d flags %x loads %lu unloads %lu\n",
-	    ctx, pci_get_bus(ctx->ctx_tag.owner),
-	    pci_get_slot(ctx->ctx_tag.owner),
-	    pci_get_function(ctx->ctx_tag.owner), ctx->refs, ctx->flags,
+	    ctx, pci_get_bus(ctx->device_tag.owner),
+	    pci_get_slot(ctx->device_tag.owner),
+	    pci_get_function(ctx->device_tag.owner), ctx->refs, ctx->flags,
 	    ctx->loads, ctx->unloads);
 }
 
@@ -1231,11 +1231,11 @@ DB_FUNC(iommu_domain, db_dmar_print_domain, db_show_table, CS_OWN, NULL)
 		LIST_FOREACH(domain, &unit->domains, link) {
 			LIST_FOREACH(ctx, &domain->contexts, link) {
 				if (pci_domain == unit->segment && 
-				    bus == pci_get_bus(ctx->ctx_tag.owner) &&
+				    bus == pci_get_bus(ctx->device_tag.owner) &&
 				    device ==
-				    pci_get_slot(ctx->ctx_tag.owner) &&
+				    pci_get_slot(ctx->device_tag.owner) &&
 				    function ==
-				    pci_get_function(ctx->ctx_tag.owner)) {
+				    pci_get_function(ctx->device_tag.owner)) {
 					dmar_print_domain(domain,
 					    show_mappings);
 					goto out;
