@@ -117,7 +117,7 @@ dmar_bus_dma_is_dev_disabled(int domain, int bus, int slot, int func)
  * bounce mapping.
  */
 device_t
-dmar_get_requester(device_t dev, uint16_t *rid)
+iommu_get_requester(device_t dev, uint16_t *rid)
 {
 	devclass_t pci_class;
 	device_t l, pci, pcib, pcip, pcibp, requester;
@@ -137,15 +137,15 @@ dmar_get_requester(device_t dev, uint16_t *rid)
 	 */
 	for (;;) {
 		pci = device_get_parent(l);
-		KASSERT(pci != NULL, ("dmar_get_requester(%s): NULL parent "
+		KASSERT(pci != NULL, ("iommu_get_requester(%s): NULL parent "
 		    "for %s", device_get_name(dev), device_get_name(l)));
 		KASSERT(device_get_devclass(pci) == pci_class,
-		    ("dmar_get_requester(%s): non-pci parent %s for %s",
+		    ("iommu_get_requester(%s): non-pci parent %s for %s",
 		    device_get_name(dev), device_get_name(pci),
 		    device_get_name(l)));
 
 		pcib = device_get_parent(pci);
-		KASSERT(pcib != NULL, ("dmar_get_requester(%s): NULL bridge "
+		KASSERT(pcib != NULL, ("iommu_get_requester(%s): NULL bridge "
 		    "for %s", device_get_name(dev), device_get_name(pci)));
 
 		/*
@@ -236,7 +236,7 @@ dmar_instantiate_ctx(struct iommu_unit *dmar, device_t dev, bool rmrr)
 	bool disabled;
 	uint16_t rid;
 
-	requester = dmar_get_requester(dev, &rid);
+	requester = iommu_get_requester(dev, &rid);
 
 	/*
 	 * If the user requested the IOMMU disabled for the device, we
