@@ -483,12 +483,12 @@ iommu_bus_dmamem_alloc(bus_dma_tag_t dmat, void** vaddr, int flags,
 	    attr == VM_MEMATTR_DEFAULT) {
 		*vaddr = malloc_domainset(tag->common.maxsize, M_DEVBUF,
 		    DOMAINSET_PREF(tag->common.domain), mflags);
-		map->flags |= BUS_DMAMAP_DMAR_MALLOC;
+		map->flags |= BUS_DMAMAP_IOMMU_MALLOC;
 	} else {
 		*vaddr = (void *)kmem_alloc_attr_domainset(
 		    DOMAINSET_PREF(tag->common.domain), tag->common.maxsize,
 		    mflags, 0ul, BUS_SPACE_MAXADDR, attr);
-		map->flags |= BUS_DMAMAP_DMAR_KMEM_ALLOC;
+		map->flags |= BUS_DMAMAP_IOMMU_KMEM_ALLOC;
 	}
 	if (*vaddr == NULL) {
 		iommu_bus_dmamap_destroy(dmat, *mapp);
@@ -507,14 +507,14 @@ iommu_bus_dmamem_free(bus_dma_tag_t dmat, void *vaddr, bus_dmamap_t map1)
 	tag = (struct bus_dma_tag_iommu *)dmat;
 	map = (struct bus_dmamap_iommu *)map1;
 
-	if ((map->flags & BUS_DMAMAP_DMAR_MALLOC) != 0) {
+	if ((map->flags & BUS_DMAMAP_IOMMU_MALLOC) != 0) {
 		free_domain(vaddr, M_DEVBUF);
-		map->flags &= ~BUS_DMAMAP_DMAR_MALLOC;
+		map->flags &= ~BUS_DMAMAP_IOMMU_MALLOC;
 	} else {
-		KASSERT((map->flags & BUS_DMAMAP_DMAR_KMEM_ALLOC) != 0,
+		KASSERT((map->flags & BUS_DMAMAP_IOMMU_KMEM_ALLOC) != 0,
 		    ("iommu_bus_dmamem_free for non alloced map %p", map));
 		kmem_free((vm_offset_t)vaddr, tag->common.maxsize);
-		map->flags &= ~BUS_DMAMAP_DMAR_KMEM_ALLOC;
+		map->flags &= ~BUS_DMAMAP_IOMMU_KMEM_ALLOC;
 	}
 
 	iommu_bus_dmamap_destroy(dmat, map1);
