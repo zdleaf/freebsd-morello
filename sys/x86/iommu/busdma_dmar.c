@@ -256,10 +256,10 @@ dmar_instantiate_ctx(struct dmar_unit *dmar, device_t dev, bool rmrr)
 		 * Keep the first reference on context, release the
 		 * later refs.
 		 */
-		DMAR_LOCK(dmar);
+		IOMMU_LOCK(dmar);
 		if ((ctx->flags & DMAR_CTX_DISABLED) == 0) {
 			ctx->flags |= DMAR_CTX_DISABLED;
-			DMAR_UNLOCK(dmar);
+			IOMMU_UNLOCK(dmar);
 		} else {
 			dmar_free_ctx_locked(dmar, ctx);
 		}
@@ -914,10 +914,10 @@ dmar_bus_task_dmamap(void *arg, int pending)
 	struct dmar_unit *unit;
 
 	unit = arg;
-	DMAR_LOCK(unit);
+	IOMMU_LOCK(unit);
 	while ((map = TAILQ_FIRST(&unit->delayed_maps)) != NULL) {
 		TAILQ_REMOVE(&unit->delayed_maps, map, delay_link);
-		DMAR_UNLOCK(unit);
+		IOMMU_UNLOCK(unit);
 		tag = map->tag;
 		map->cansleep = true;
 		map->locked = false;
@@ -931,9 +931,9 @@ dmar_bus_task_dmamap(void *arg, int pending)
 		} else
 			map->locked = true;
 		map->cansleep = false;
-		DMAR_LOCK(unit);
+		IOMMU_LOCK(unit);
 	}
-	DMAR_UNLOCK(unit);
+	IOMMU_UNLOCK(unit);
 }
 
 static void
@@ -941,9 +941,9 @@ dmar_bus_schedule_dmamap(struct dmar_unit *unit, struct bus_dmamap_dmar *map)
 {
 
 	map->locked = false;
-	DMAR_LOCK(unit);
+	IOMMU_LOCK(unit);
 	TAILQ_INSERT_TAIL(&unit->delayed_maps, map, delay_link);
-	DMAR_UNLOCK(unit);
+	IOMMU_UNLOCK(unit);
 	taskqueue_enqueue(unit->delayed_taskqueue, &unit->dmamap_load_task);
 }
 

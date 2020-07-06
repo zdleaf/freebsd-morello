@@ -277,7 +277,7 @@ dmar_ir_program_irte(struct dmar_unit *unit, u_int idx, uint64_t low,
 		    "programming irte[%d] rid %#x high %#jx low %#jx\n",
 		    idx, rid, (uintmax_t)high, (uintmax_t)low);
 	}
-	DMAR_LOCK(unit);
+	IOMMU_LOCK(unit);
 	if ((irte->irte1 & DMAR_IRTE1_P) != 0) {
 		/*
 		 * The rte is already valid.  Assume that the request
@@ -294,7 +294,7 @@ dmar_ir_program_irte(struct dmar_unit *unit, u_int idx, uint64_t low,
 		dmar_pte_store(&irte->irte1, low);
 	}
 	dmar_qi_invalidate_iec(unit, idx, 1);
-	DMAR_UNLOCK(unit);
+	IOMMU_UNLOCK(unit);
 
 }
 
@@ -310,9 +310,9 @@ dmar_ir_free_irte(struct dmar_unit *unit, u_int cookie)
 	irte = &(unit->irt[cookie]);
 	dmar_pte_clear(&irte->irte1);
 	dmar_pte_clear(&irte->irte2);
-	DMAR_LOCK(unit);
+	IOMMU_LOCK(unit);
 	dmar_qi_invalidate_iec(unit, cookie, 1);
-	DMAR_UNLOCK(unit);
+	IOMMU_UNLOCK(unit);
 	vmem_free(unit->irtids, cookie, 1);
 	return (0);
 }
@@ -351,10 +351,10 @@ dmar_init_irt(struct dmar_unit *unit)
 	unit->irt_phys = pmap_kextract((vm_offset_t)unit->irt);
 	unit->irtids = vmem_create("dmarirt", 0, unit->irte_cnt, 1, 0,
 	    M_FIRSTFIT | M_NOWAIT);
-	DMAR_LOCK(unit);
+	IOMMU_LOCK(unit);
 	dmar_load_irt_ptr(unit);
 	dmar_qi_invalidate_iec_glob(unit);
-	DMAR_UNLOCK(unit);
+	IOMMU_UNLOCK(unit);
 
 	/*
 	 * Initialize mappings for already configured interrupt pins.
@@ -363,9 +363,9 @@ dmar_init_irt(struct dmar_unit *unit)
 	 */
 	intr_reprogram();
 
-	DMAR_LOCK(unit);
+	IOMMU_LOCK(unit);
 	dmar_enable_ir(unit);
-	DMAR_UNLOCK(unit);
+	IOMMU_UNLOCK(unit);
 	return (0);
 }
 

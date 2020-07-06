@@ -287,10 +287,10 @@ domain_init_rmrr(struct dmar_domain *domain, device_t dev, int bus,
 		 * loaded and removed on the context destruction.
 		 */
 		if (error1 == 0 && entry->end != entry->start) {
-			DMAR_LOCK(domain->dmar);
+			IOMMU_LOCK(domain->dmar);
 			domain->refs++; /* XXXKIB prevent free */
 			domain->flags |= DMAR_DOMAIN_RMRR;
-			DMAR_UNLOCK(domain->dmar);
+			IOMMU_UNLOCK(domain->dmar);
 		} else {
 			if (error1 != 0) {
 				if (dev != NULL)
@@ -464,7 +464,7 @@ dmar_get_ctx_for_dev1(struct dmar_unit *dmar, device_t dev, uint16_t rid,
 	}
 	enable = false;
 	TD_PREP_PINNED_ASSERT;
-	DMAR_LOCK(dmar);
+	IOMMU_LOCK(dmar);
 	KASSERT(!dmar_is_buswide_ctx(dmar, bus) || (slot == 0 && func == 0),
 	    ("dmar%d pci%d:%d:%d get_ctx for buswide", dmar->unit, bus,
 	    slot, func));
@@ -475,7 +475,7 @@ dmar_get_ctx_for_dev1(struct dmar_unit *dmar, device_t dev, uint16_t rid,
 		 * Perform the allocations which require sleep or have
 		 * higher chance to succeed if the sleep is allowed.
 		 */
-		DMAR_UNLOCK(dmar);
+		IOMMU_UNLOCK(dmar);
 		dmar_ensure_ctx_page(dmar, PCI_RID2BUS(rid));
 		domain1 = dmar_domain_alloc(dmar, id_mapped);
 		if (domain1 == NULL) {
@@ -494,7 +494,7 @@ dmar_get_ctx_for_dev1(struct dmar_unit *dmar, device_t dev, uint16_t rid,
 		}
 		ctx1 = dmar_ctx_alloc(domain1, rid);
 		ctxp = dmar_map_ctx_entry(ctx1, &sf);
-		DMAR_LOCK(dmar);
+		IOMMU_LOCK(dmar);
 
 		/*
 		 * Recheck the contexts, other thread might have
@@ -568,7 +568,7 @@ dmar_get_ctx_for_dev1(struct dmar_unit *dmar, device_t dev, uint16_t rid,
 			return (NULL);
 		}
 	}
-	DMAR_UNLOCK(dmar);
+	IOMMU_UNLOCK(dmar);
 	TD_PINNED_ASSERT;
 	return (ctx);
 }
@@ -617,7 +617,7 @@ dmar_move_ctx_to_domain(struct dmar_domain *domain, struct dmar_ctx *ctx)
 	TD_PREP_PINNED_ASSERT;
 
 	ctxp = dmar_map_ctx_entry(ctx, &sf);
-	DMAR_LOCK(dmar);
+	IOMMU_LOCK(dmar);
 	dmar_ctx_unlink(ctx);
 	ctx->domain = domain;
 	dmar_ctx_link(ctx);
@@ -646,7 +646,7 @@ dmar_unref_domain_locked(struct dmar_unit *dmar, struct dmar_domain *domain)
 
 	if (domain->refs > 1) {
 		domain->refs--;
-		DMAR_UNLOCK(dmar);
+		IOMMU_UNLOCK(dmar);
 		return;
 	}
 
@@ -654,7 +654,7 @@ dmar_unref_domain_locked(struct dmar_unit *dmar, struct dmar_domain *domain)
 	    ("lost ref on RMRR domain %p", domain));
 
 	LIST_REMOVE(domain, link);
-	DMAR_UNLOCK(dmar);
+	IOMMU_UNLOCK(dmar);
 
 	taskqueue_drain(dmar->delayed_taskqueue, &domain->unload_task);
 	dmar_domain_destroy(domain);
@@ -677,7 +677,7 @@ dmar_free_ctx_locked(struct dmar_unit *dmar, struct dmar_ctx *ctx)
 	 */
 	if (ctx->refs > 1) {
 		ctx->refs--;
-		DMAR_UNLOCK(dmar);
+		IOMMU_UNLOCK(dmar);
 		return;
 	}
 
@@ -689,10 +689,10 @@ dmar_free_ctx_locked(struct dmar_unit *dmar, struct dmar_ctx *ctx)
 	 * page table is destroyed.  The mapping of the context
 	 * entries page could require sleep, unlock the dmar.
 	 */
-	DMAR_UNLOCK(dmar);
+	IOMMU_UNLOCK(dmar);
 	TD_PREP_PINNED_ASSERT;
 	ctxp = dmar_map_ctx_entry(ctx, &sf);
-	DMAR_LOCK(dmar);
+	IOMMU_LOCK(dmar);
 	KASSERT(ctx->refs >= 1,
 	    ("dmar %p ctx %p refs %u", dmar, ctx, ctx->refs));
 
@@ -702,7 +702,7 @@ dmar_free_ctx_locked(struct dmar_unit *dmar, struct dmar_ctx *ctx)
 	 */
 	if (ctx->refs > 1) {
 		ctx->refs--;
-		DMAR_UNLOCK(dmar);
+		IOMMU_UNLOCK(dmar);
 		dmar_unmap_pgtbl(sf);
 		TD_PINNED_ASSERT;
 		return;
@@ -739,7 +739,7 @@ dmar_free_ctx(struct dmar_ctx *ctx)
 	struct dmar_unit *dmar;
 
 	dmar = ctx->domain->dmar;
-	DMAR_LOCK(dmar);
+	IOMMU_LOCK(dmar);
 	dmar_free_ctx_locked(dmar, ctx);
 }
 
@@ -788,13 +788,13 @@ dmar_domain_unload_entry(struct dmar_map_entry *entry, bool free)
 
 	unit = entry->domain->dmar;
 	if (unit->qi_enabled) {
-		DMAR_LOCK(unit);
+		IOMMU_LOCK(unit);
 		dmar_qi_invalidate_locked(entry->domain, entry->start,
 		    entry->end - entry->start, &entry->gseq, true);
 		if (!free)
 			entry->flags |= DMAR_MAP_ENTRY_QI_NF;
 		TAILQ_INSERT_TAIL(&unit->tlb_flush_entries, entry, dmamap_link);
-		DMAR_UNLOCK(unit);
+		IOMMU_UNLOCK(unit);
 	} else {
 		domain_flush_iotlb_sync(entry->domain, entry->start,
 		    entry->end - entry->start);
@@ -839,14 +839,14 @@ dmar_domain_unload(struct dmar_domain *domain,
 		return;
 
 	KASSERT(unit->qi_enabled, ("loaded entry left"));
-	DMAR_LOCK(unit);
+	IOMMU_LOCK(unit);
 	TAILQ_FOREACH(entry, entries, dmamap_link) {
 		dmar_qi_invalidate_locked(domain, entry->start, entry->end -
 		    entry->start, &entry->gseq,
 		    dmar_domain_unload_emit_wait(domain, entry));
 	}
 	TAILQ_CONCAT(&unit->tlb_flush_entries, entries, dmamap_link);
-	DMAR_UNLOCK(unit);
+	IOMMU_UNLOCK(unit);
 }	
 
 static void

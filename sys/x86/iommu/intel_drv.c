@@ -359,13 +359,13 @@ dmar_remap_intr(device_t dev, device_t child, u_int irq)
 			    dev, irq, &msi_addr, &msi_data);
 			if (error != 0)
 				return (error);
-			DMAR_LOCK(unit);
+			IOMMU_LOCK(unit);
 			(dmd->disable_intr)(unit);
 			dmar_write4(unit, dmd->msi_data_reg, msi_data);
 			dmar_write4(unit, dmd->msi_addr_reg, msi_addr);
 			dmar_write4(unit, dmd->msi_uaddr_reg, msi_addr >> 32);
 			(dmd->enable_intr)(unit);
-			DMAR_UNLOCK(unit);
+			IOMMU_UNLOCK(unit);
 			return (0);
 		}
 	}
@@ -493,29 +493,29 @@ dmar_attach(device_t dev)
 	 * done.
 	 */
 	dmar_pgalloc(unit->ctx_obj, 0, DMAR_PGF_WAITOK | DMAR_PGF_ZERO);
-	DMAR_LOCK(unit);
+	IOMMU_LOCK(unit);
 	error = dmar_load_root_entry_ptr(unit);
 	if (error != 0) {
-		DMAR_UNLOCK(unit);
+		IOMMU_UNLOCK(unit);
 		dmar_release_resources(dev, unit);
 		return (error);
 	}
 	error = dmar_inv_ctx_glob(unit);
 	if (error != 0) {
-		DMAR_UNLOCK(unit);
+		IOMMU_UNLOCK(unit);
 		dmar_release_resources(dev, unit);
 		return (error);
 	}
 	if ((unit->hw_ecap & DMAR_ECAP_DI) != 0) {
 		error = dmar_inv_iotlb_glob(unit);
 		if (error != 0) {
-			DMAR_UNLOCK(unit);
+			IOMMU_UNLOCK(unit);
 			dmar_release_resources(dev, unit);
 			return (error);
 		}
 	}
 
-	DMAR_UNLOCK(unit);
+	IOMMU_UNLOCK(unit);
 	error = dmar_init_fault_log(unit);
 	if (error != 0) {
 		dmar_release_resources(dev, unit);
@@ -538,14 +538,14 @@ dmar_attach(device_t dev)
 	}
 
 #ifdef NOTYET
-	DMAR_LOCK(unit);
+	IOMMU_LOCK(unit);
 	error = dmar_enable_translation(unit);
 	if (error != 0) {
-		DMAR_UNLOCK(unit);
+		IOMMU_UNLOCK(unit);
 		dmar_release_resources(dev, unit);
 		return (error);
 	}
-	DMAR_UNLOCK(unit);
+	IOMMU_UNLOCK(unit);
 #endif
 
 	return (0);
@@ -600,10 +600,10 @@ dmar_set_buswide_ctx(struct dmar_unit *unit, u_int busno)
 {
 
 	MPASS(busno <= PCI_BUSMAX);
-	DMAR_LOCK(unit);
+	IOMMU_LOCK(unit);
 	unit->buswide_ctxs[busno / NBBY / sizeof(uint32_t)] |=
 	    1 << (busno % (NBBY * sizeof(uint32_t)));
-	DMAR_UNLOCK(unit);
+	IOMMU_UNLOCK(unit);
 }
 
 bool
@@ -1082,7 +1082,7 @@ dmar_instantiate_rmrr_ctxs(struct dmar_unit *dmar)
 	error = 0;
 	iria.dmar = dmar;
 	dmar_iterate_tbl(dmar_inst_rmrr_iter, &iria);
-	DMAR_LOCK(dmar);
+	IOMMU_LOCK(dmar);
 	if (!LIST_EMPTY(&dmar->domains)) {
 		KASSERT((dmar->hw_gcmd & DMAR_GCMD_TE) == 0,
 	    ("dmar%d: RMRR not handled but translation is already enabled",

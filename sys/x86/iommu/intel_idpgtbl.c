@@ -263,9 +263,9 @@ end:
 		VM_OBJECT_WUNLOCK(res);
 	}
 	if ((unit->hw_cap & DMAR_CAP_RWBF) != 0) {
-		DMAR_LOCK(unit);
+		IOMMU_LOCK(unit);
 		dmar_flush_write_bufs(unit);
-		DMAR_UNLOCK(unit);
+		IOMMU_UNLOCK(unit);
 	}
 	
 	return (res);
@@ -551,9 +551,9 @@ domain_map_buf(struct dmar_domain *domain, dmar_gaddr_t base, dmar_gaddr_t size,
 		domain_flush_iotlb_sync(domain, base, size);
 	else if ((unit->hw_cap & DMAR_CAP_RWBF) != 0) {
 		/* See 11.1 Write Buffer Flushing. */
-		DMAR_LOCK(unit);
+		IOMMU_LOCK(unit);
 		dmar_flush_write_bufs(unit);
-		DMAR_UNLOCK(unit);
+		IOMMU_UNLOCK(unit);
 	}
 	return (0);
 }
@@ -704,9 +704,9 @@ domain_alloc_pgtbl(struct dmar_domain *domain)
 	/* No implicit free of the top level page table page. */
 	m->ref_count = 1;
 	DMAR_DOMAIN_PGUNLOCK(domain);
-	DMAR_LOCK(domain->dmar);
+	IOMMU_LOCK(domain->dmar);
 	domain->flags |= DMAR_DOMAIN_PGTBL_INITED;
-	DMAR_UNLOCK(domain->dmar);
+	IOMMU_UNLOCK(domain->dmar);
 	return (0);
 }
 
@@ -769,7 +769,7 @@ domain_flush_iotlb_sync(struct dmar_domain *domain, dmar_gaddr_t base,
 	KASSERT(!unit->qi_enabled, ("dmar%d: sync iotlb flush call",
 	    unit->unit));
 	iro = DMAR_ECAP_IRO(unit->hw_ecap) * 16;
-	DMAR_LOCK(unit);
+	IOMMU_LOCK(unit);
 	if ((unit->hw_cap & DMAR_CAP_PSI) == 0 || size > 2 * 1024 * 1024) {
 		iotlbr = domain_wait_iotlb_flush(unit, DMAR_IOTLB_IIRG_DOM |
 		    DMAR_IOTLB_DID(domain->domain), iro);
@@ -799,5 +799,5 @@ domain_flush_iotlb_sync(struct dmar_domain *domain, dmar_gaddr_t base,
 				break;
 		}
 	}
-	DMAR_UNLOCK(unit);
+	IOMMU_UNLOCK(unit);
 }

@@ -577,9 +577,9 @@ dmar_barrier_enter(struct dmar_unit *dmar, u_int barrier_id)
 {
 	BARRIER_F;
 
-	DMAR_LOCK(dmar);
+	IOMMU_LOCK(dmar);
 	if ((dmar->barrier_flags & f_done) != 0) {
-		DMAR_UNLOCK(dmar);
+		IOMMU_UNLOCK(dmar);
 		return (false);
 	}
 
@@ -591,12 +591,12 @@ dmar_barrier_enter(struct dmar_unit *dmar, u_int barrier_id)
 		}
 		KASSERT((dmar->barrier_flags & f_done) != 0,
 		    ("dmar%d barrier %d missing done", dmar->unit, barrier_id));
-		DMAR_UNLOCK(dmar);
+		IOMMU_UNLOCK(dmar);
 		return (false);
 	}
 
 	dmar->barrier_flags |= f_inproc;
-	DMAR_UNLOCK(dmar);
+	IOMMU_UNLOCK(dmar);
 	return (true);
 }
 
@@ -612,7 +612,7 @@ dmar_barrier_exit(struct dmar_unit *dmar, u_int barrier_id)
 	if ((dmar->barrier_flags & f_wakeup) != 0)
 		wakeup(&dmar->barrier_flags);
 	dmar->barrier_flags &= ~(f_inproc | f_wakeup);
-	DMAR_UNLOCK(dmar);
+	IOMMU_UNLOCK(dmar);
 }
 
 int dmar_batch_coalesce = 100;

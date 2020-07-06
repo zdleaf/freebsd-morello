@@ -251,8 +251,8 @@ struct dmar_unit {
 
 };
 
-#define	DMAR_LOCK(dmar)		mtx_lock(&(dmar)->lock)
-#define	DMAR_UNLOCK(dmar)	mtx_unlock(&(dmar)->lock)
+#define	IOMMU_LOCK(dmar)		mtx_lock(&(dmar)->lock)
+#define	IOMMU_UNLOCK(dmar)	mtx_unlock(&(dmar)->lock)
 #define	DMAR_ASSERT_LOCKED(dmar) mtx_assert(&(dmar)->lock, MA_OWNED)
 
 #define	DMAR_FAULT_LOCK(dmar)	mtx_lock_spin(&(dmar)->fault_lock)

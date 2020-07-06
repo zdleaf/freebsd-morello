@@ -343,7 +343,7 @@ dmar_qi_task(void *arg, int pending __unused)
 
 	unit = arg;
 
-	DMAR_LOCK(unit);
+	IOMMU_LOCK(unit);
 	for (;;) {
 		entry = TAILQ_FIRST(&unit->tlb_flush_entries);
 		if (entry == NULL)
@@ -351,10 +351,10 @@ dmar_qi_task(void *arg, int pending __unused)
 		if (!dmar_qi_seq_processed(unit, &entry->gseq))
 			break;
 		TAILQ_REMOVE(&unit->tlb_flush_entries, entry, dmamap_link);
-		DMAR_UNLOCK(unit);
+		IOMMU_UNLOCK(unit);
 		dmar_domain_free_entry(entry, (entry->flags &
 		    DMAR_MAP_ENTRY_QI_NF) == 0);
-		DMAR_LOCK(unit);
+		IOMMU_LOCK(unit);
 	}
 	ics = dmar_read4(unit, DMAR_ICS_REG);
 	if ((ics & DMAR_ICS_IWC) != 0) {
@@ -363,7 +363,7 @@ dmar_qi_task(void *arg, int pending __unused)
 	}
 	if (unit->inv_seq_waiters > 0)
 		wakeup(&unit->inv_seq_waiters);
-	DMAR_UNLOCK(unit);
+	IOMMU_UNLOCK(unit);
 }
 
 int
@@ -404,7 +404,7 @@ dmar_init_qi(struct dmar_unit *unit)
 	unit->inv_waitd_seq_hw_phys = pmap_kextract(
 	    (vm_offset_t)&unit->inv_waitd_seq_hw);
 
-	DMAR_LOCK(unit);
+	IOMMU_LOCK(unit);
 	dmar_write8(unit, DMAR_IQT_REG, 0);
 	iqa = pmap_kextract(unit->inv_queue);
 	iqa |= qi_sz;
@@ -416,7 +416,7 @@ dmar_init_qi(struct dmar_unit *unit)
 		dmar_write4(unit, DMAR_ICS_REG, ics);
 	}
 	dmar_enable_qi_intr(unit);
-	DMAR_UNLOCK(unit);
+	IOMMU_UNLOCK(unit);
 
 	return (0);
 }
@@ -432,7 +432,7 @@ dmar_fini_qi(struct dmar_unit *unit)
 	taskqueue_free(unit->qi_taskqueue);
 	unit->qi_taskqueue = NULL;
 
-	DMAR_LOCK(unit);
+	IOMMU_LOCK(unit);
 	/* quisce */
 	dmar_qi_ensure(unit, 1);
 	dmar_qi_emit_wait_seq(unit, &gseq, true);
@@ -443,7 +443,7 @@ dmar_fini_qi(struct dmar_unit *unit)
 	dmar_disable_qi(unit);
 	KASSERT(unit->inv_seq_waiters == 0,
 	    ("dmar%d: waiters on disabled queue", unit->unit));
-	DMAR_UNLOCK(unit);
+	IOMMU_UNLOCK(unit);
 
 	kmem_free(unit->inv_queue, unit->inv_queue_size);
 	unit->inv_queue = 0;

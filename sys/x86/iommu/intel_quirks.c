@@ -227,7 +227,7 @@ dmar_quirks_pre_use(struct dmar_unit *dmar)
 
 	if (!dmar_barrier_enter(dmar, DMAR_BARRIER_USEQ))
 		return;
-	DMAR_LOCK(dmar);
+	IOMMU_LOCK(dmar);
 	dmar_match_quirks(dmar, pre_use_nb, nitems(pre_use_nb),
 	    NULL, 0);
 	dmar_barrier_exit(dmar, DMAR_BARRIER_USEQ);

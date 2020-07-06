@@ -209,7 +209,7 @@ dmar_fault_task(void *arg, int pending __unused)
 
 		sid = DMAR_FRCD2_SID(fault_rec[1]);
 		printf("DMAR%d: ", unit->unit);
-		DMAR_LOCK(unit);
+		IOMMU_LOCK(unit);
 		ctx = dmar_find_ctx_locked(unit, sid);
 		if (ctx == NULL) {
 			printf("<unknown dev>:");
@@ -231,7 +231,7 @@ dmar_fault_task(void *arg, int pending __unused)
 			slot = pci_get_slot(ctx->ctx_tag.owner);
 			func = pci_get_function(ctx->ctx_tag.owner);
 		}
-		DMAR_UNLOCK(unit);
+		IOMMU_UNLOCK(unit);
 		printf(
 		    "pci%d:%d:%d sid %x fault acc %x adt 0x%x reason 0x%x "
 		    "addr %jx\n",
@@ -278,11 +278,11 @@ dmar_init_fault_log(struct dmar_unit *unit)
 	taskqueue_start_threads(&unit->fault_taskqueue, 1, PI_AV,
 	    "dmar%d fault taskq", unit->unit);
 
-	DMAR_LOCK(unit);
+	IOMMU_LOCK(unit);
 	dmar_disable_fault_intr(unit);
 	dmar_clear_faults(unit);
 	dmar_enable_fault_intr(unit);
-	DMAR_UNLOCK(unit);
+	IOMMU_UNLOCK(unit);
 
 	return (0);
 }
@@ -294,9 +294,9 @@ dmar_fini_fault_log(struct dmar_unit *unit)
 	if (unit->fault_taskqueue == NULL)
 		return;
 
-	DMAR_LOCK(unit);
+	IOMMU_LOCK(unit);
 	dmar_disable_fault_intr(unit);
-	DMAR_UNLOCK(unit);
+	IOMMU_UNLOCK(unit);
 
 	taskqueue_drain(unit->fault_taskqueue, &unit->fault_task);
 	taskqueue_free(unit->fault_taskqueue);
