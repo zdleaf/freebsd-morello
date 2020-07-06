@@ -313,7 +313,7 @@ dmar_enable_fault_intr(struct dmar_unit *unit)
 {
 	uint32_t fectl;
 
-	DMAR_ASSERT_LOCKED(unit);
+	IOMMU_ASSERT_LOCKED(unit);
 	fectl = dmar_read4(unit, DMAR_FECTL_REG);
 	fectl &= ~DMAR_FECTL_IM;
 	dmar_write4(unit, DMAR_FECTL_REG, fectl);
@@ -324,7 +324,7 @@ dmar_disable_fault_intr(struct dmar_unit *unit)
 {
 	uint32_t fectl;
 
-	DMAR_ASSERT_LOCKED(unit);
+	IOMMU_ASSERT_LOCKED(unit);
 	fectl = dmar_read4(unit, DMAR_FECTL_REG);
 	dmar_write4(unit, DMAR_FECTL_REG, fectl | DMAR_FECTL_IM);
 }

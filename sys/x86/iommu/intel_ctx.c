@@ -388,7 +388,7 @@ dmar_ctx_link(struct dmar_ctx *ctx)
 	struct dmar_domain *domain;
 
 	domain = ctx->domain;
-	DMAR_ASSERT_LOCKED(domain->dmar);
+	IOMMU_ASSERT_LOCKED(domain->dmar);
 	KASSERT(domain->refs >= domain->ctx_cnt,
 	    ("dom %p ref underflow %d %d", domain, domain->refs,
 	    domain->ctx_cnt));
@@ -403,7 +403,7 @@ dmar_ctx_unlink(struct dmar_ctx *ctx)
 	struct dmar_domain *domain;
 
 	domain = ctx->domain;
-	DMAR_ASSERT_LOCKED(domain->dmar);
+	IOMMU_ASSERT_LOCKED(domain->dmar);
 	KASSERT(domain->refs > 0,
 	    ("domain %p ctx dtr refs %d", domain, domain->refs));
 	KASSERT(domain->ctx_cnt >= domain->refs,
@@ -637,7 +637,7 @@ static void
 dmar_unref_domain_locked(struct dmar_unit *dmar, struct dmar_domain *domain)
 {
 
-	DMAR_ASSERT_LOCKED(dmar);
+	IOMMU_ASSERT_LOCKED(dmar);
 	KASSERT(domain->refs >= 1,
 	    ("dmar %d domain %p refs %u", dmar->unit, domain, domain->refs));
 	KASSERT(domain->refs > domain->ctx_cnt,
@@ -667,7 +667,7 @@ dmar_free_ctx_locked(struct dmar_unit *dmar, struct dmar_ctx *ctx)
 	dmar_ctx_entry_t *ctxp;
 	struct dmar_domain *domain;
 
-	DMAR_ASSERT_LOCKED(dmar);
+	IOMMU_ASSERT_LOCKED(dmar);
 	KASSERT(ctx->refs >= 1,
 	    ("dmar %p ctx %p refs %u", dmar, ctx, ctx->refs));
 
@@ -752,7 +752,7 @@ dmar_find_ctx_locked(struct dmar_unit *dmar, uint16_t rid)
 	struct dmar_domain *domain;
 	struct dmar_ctx *ctx;
 
-	DMAR_ASSERT_LOCKED(dmar);
+	IOMMU_ASSERT_LOCKED(dmar);
 
 	LIST_FOREACH(domain, &dmar->domains, link) {
 		LIST_FOREACH(ctx, &domain->contexts, link) {

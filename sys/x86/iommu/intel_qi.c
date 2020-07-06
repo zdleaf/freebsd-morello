@@ -76,7 +76,7 @@ dmar_enable_qi(struct dmar_unit *unit)
 {
 	int error;
 
-	DMAR_ASSERT_LOCKED(unit);
+	IOMMU_ASSERT_LOCKED(unit);
 	unit->hw_gcmd |= DMAR_GCMD_QIE;
 	dmar_write4(unit, DMAR_GCMD_REG, unit->hw_gcmd);
 	DMAR_WAIT_UNTIL(((dmar_read4(unit, DMAR_GSTS_REG) & DMAR_GSTS_QIES)
@@ -89,7 +89,7 @@ dmar_disable_qi(struct dmar_unit *unit)
 {
 	int error;
 
-	DMAR_ASSERT_LOCKED(unit);
+	IOMMU_ASSERT_LOCKED(unit);
 	unit->hw_gcmd &= ~DMAR_GCMD_QIE;
 	dmar_write4(unit, DMAR_GCMD_REG, unit->hw_gcmd);
 	DMAR_WAIT_UNTIL(((dmar_read4(unit, DMAR_GSTS_REG) & DMAR_GSTS_QIES)
@@ -101,7 +101,7 @@ static void
 dmar_qi_advance_tail(struct dmar_unit *unit)
 {
 
-	DMAR_ASSERT_LOCKED(unit);
+	IOMMU_ASSERT_LOCKED(unit);
 	dmar_write4(unit, DMAR_IQT_REG, unit->inv_queue_tail);
 }
 
@@ -111,7 +111,7 @@ dmar_qi_ensure(struct dmar_unit *unit, int descr_count)
 	uint32_t head;
 	int bytes;
 
-	DMAR_ASSERT_LOCKED(unit);
+	IOMMU_ASSERT_LOCKED(unit);
 	bytes = descr_count << DMAR_IQ_DESCR_SZ_SHIFT;
 	for (;;) {
 		if (bytes <= unit->inv_queue_avail)
@@ -144,7 +144,7 @@ static void
 dmar_qi_emit(struct dmar_unit *unit, uint64_t data1, uint64_t data2)
 {
 
-	DMAR_ASSERT_LOCKED(unit);
+	IOMMU_ASSERT_LOCKED(unit);
 	*(volatile uint64_t *)(unit->inv_queue + unit->inv_queue_tail) = data1;
 	unit->inv_queue_tail += DMAR_IQ_DESCR_SZ / 2;
 	KASSERT(unit->inv_queue_tail <= unit->inv_queue_size,
@@ -164,7 +164,7 @@ dmar_qi_emit_wait_descr(struct dmar_unit *unit, uint32_t seq, bool intr,
     bool memw, bool fence)
 {
 
-	DMAR_ASSERT_LOCKED(unit);
+	IOMMU_ASSERT_LOCKED(unit);
 	dmar_qi_emit(unit, DMAR_IQ_DESCR_WAIT_ID |
 	    (intr ? DMAR_IQ_DESCR_WAIT_IF : 0) |
 	    (memw ? DMAR_IQ_DESCR_WAIT_SW : 0) |
@@ -181,7 +181,7 @@ dmar_qi_emit_wait_seq(struct dmar_unit *unit, struct dmar_qi_genseq *pseq,
 	uint32_t seq;
 
 	KASSERT(pseq != NULL, ("wait descriptor with no place for seq"));
-	DMAR_ASSERT_LOCKED(unit);
+	IOMMU_ASSERT_LOCKED(unit);
 	if (unit->inv_waitd_seq == 0xffffffff) {
 		gsec.gen = unit->inv_waitd_gen;
 		gsec.seq = unit->inv_waitd_seq;
@@ -207,7 +207,7 @@ dmar_qi_wait_for_seq(struct dmar_unit *unit, const struct dmar_qi_genseq *gseq,
     bool nowait)
 {
 
-	DMAR_ASSERT_LOCKED(unit);
+	IOMMU_ASSERT_LOCKED(unit);
 	unit->inv_seq_waiters++;
 	while (!dmar_qi_seq_processed(unit, gseq)) {
 		if (cold || nowait) {
@@ -229,7 +229,7 @@ dmar_qi_invalidate_locked(struct dmar_domain *domain, dmar_gaddr_t base,
 	int am;
 
 	unit = domain->dmar;
-	DMAR_ASSERT_LOCKED(unit);
+	IOMMU_ASSERT_LOCKED(unit);
 	for (; size > 0; base += isize, size -= isize) {
 		am = calc_am(unit, base, size, &isize);
 		dmar_qi_ensure(unit, 1);
@@ -248,7 +248,7 @@ dmar_qi_invalidate_ctx_glob_locked(struct dmar_unit *unit)
 {
 	struct dmar_qi_genseq gseq;
 
-	DMAR_ASSERT_LOCKED(unit);
+	IOMMU_ASSERT_LOCKED(unit);
 	dmar_qi_ensure(unit, 2);
 	dmar_qi_emit(unit, DMAR_IQ_DESCR_CTX_INV | DMAR_IQ_DESCR_CTX_GLOB, 0);
 	dmar_qi_emit_wait_seq(unit, &gseq, true);
@@ -261,7 +261,7 @@ dmar_qi_invalidate_iotlb_glob_locked(struct dmar_unit *unit)
 {
 	struct dmar_qi_genseq gseq;
 
-	DMAR_ASSERT_LOCKED(unit);
+	IOMMU_ASSERT_LOCKED(unit);
 	dmar_qi_ensure(unit, 2);
 	dmar_qi_emit(unit, DMAR_IQ_DESCR_IOTLB_INV | DMAR_IQ_DESCR_IOTLB_GLOB |
 	    DMAR_IQ_DESCR_IOTLB_DW | DMAR_IQ_DESCR_IOTLB_DR, 0);
@@ -275,7 +275,7 @@ dmar_qi_invalidate_iec_glob(struct dmar_unit *unit)
 {
 	struct dmar_qi_genseq gseq;
 
-	DMAR_ASSERT_LOCKED(unit);
+	IOMMU_ASSERT_LOCKED(unit);
 	dmar_qi_ensure(unit, 2);
 	dmar_qi_emit(unit, DMAR_IQ_DESCR_IEC_INV, 0);
 	dmar_qi_emit_wait_seq(unit, &gseq, true);
@@ -289,7 +289,7 @@ dmar_qi_invalidate_iec(struct dmar_unit *unit, u_int start, u_int cnt)
 	struct dmar_qi_genseq gseq;
 	u_int c, l;
 
-	DMAR_ASSERT_LOCKED(unit);
+	IOMMU_ASSERT_LOCKED(unit);
 	KASSERT(start < unit->irte_cnt && start < start + cnt &&
 	    start + cnt <= unit->irte_cnt,
 	    ("inv iec overflow %d %d %d", unit->irte_cnt, start, cnt));
@@ -456,7 +456,7 @@ dmar_enable_qi_intr(struct dmar_unit *unit)
 {
 	uint32_t iectl;
 
-	DMAR_ASSERT_LOCKED(unit);
+	IOMMU_ASSERT_LOCKED(unit);
 	KASSERT(DMAR_HAS_QI(unit), ("dmar%d: QI is not supported", unit->unit));
 	iectl = dmar_read4(unit, DMAR_IECTL_REG);
 	iectl &= ~DMAR_IECTL_IM;
@@ -468,7 +468,7 @@ dmar_disable_qi_intr(struct dmar_unit *unit)
 {
 	uint32_t iectl;
 
-	DMAR_ASSERT_LOCKED(unit);
+	IOMMU_ASSERT_LOCKED(unit);
 	KASSERT(DMAR_HAS_QI(unit), ("dmar%d: QI is not supported", unit->unit));
 	iectl = dmar_read4(unit, DMAR_IECTL_REG);
 	dmar_write4(unit, DMAR_IECTL_REG, iectl | DMAR_IECTL_IM);
