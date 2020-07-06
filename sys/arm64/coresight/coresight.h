@@ -91,7 +91,7 @@ struct endpoint {
 	boolean_t input;
 	int reg;
 	struct coresight_device *cs_dev;
-	LIST_ENTRY(endpoint) endplink;
+	TAILQ_ENTRY(endpoint) endplink;
 };
 
 struct coresight_platform_data {
@@ -132,7 +132,7 @@ struct etr_state {
 };
 
 struct coresight_event {
-	LIST_HEAD(, endpoint) endplist;
+	TAILQ_HEAD(, endpoint) endplist;
 
 	uint64_t addr[ETM_N_COMPRATOR];
 	uint32_t naddr;
