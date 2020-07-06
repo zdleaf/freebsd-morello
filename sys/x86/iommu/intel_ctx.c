@@ -129,7 +129,7 @@ device_tag_init(struct iommu_device *ctx, device_t dev)
 
 	maxaddr = MIN(ctx->domain->end, BUS_SPACE_MAXADDR);
 	ctx->device_tag.common.ref_count = 1; /* Prevent free */
-	ctx->device_tag.common.impl = &bus_dma_dmar_impl;
+	ctx->device_tag.common.impl = &bus_dma_iommu_impl;
 	ctx->device_tag.common.boundary = 0;
 	ctx->device_tag.common.lowaddr = maxaddr;
 	ctx->device_tag.common.highaddr = maxaddr;

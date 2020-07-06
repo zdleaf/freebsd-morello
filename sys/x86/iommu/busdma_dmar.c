@@ -342,7 +342,7 @@ iommu_bus_dma_tag_create(bus_dma_tag_t parent, bus_size_t alignment,
 		goto out;
 
 	oldtag = (struct bus_dma_tag_iommu *)parent;
-	newtag->common.impl = &bus_dma_dmar_impl;
+	newtag->common.impl = &bus_dma_iommu_impl;
 	newtag->ctx = oldtag->ctx;
 	newtag->owner = oldtag->owner;
 
@@ -888,7 +888,7 @@ iommu_bus_dmamap_sync(bus_dma_tag_t dmat, bus_dmamap_t map,
 {
 }
 
-struct bus_dma_impl bus_dma_dmar_impl = {
+struct bus_dma_impl bus_dma_iommu_impl = {
 	.tag_create = iommu_bus_dma_tag_create,
 	.tag_destroy = iommu_bus_dma_tag_destroy,
 	.tag_set_domain = iommu_bus_dma_tag_set_domain,
@@ -996,7 +996,7 @@ bus_dma_dmar_load_ident(bus_dma_tag_t dmat, bus_dmamap_t map1,
 	MPASS((flags & ~(BUS_DMA_NOWAIT | BUS_DMA_NOWRITE)) == 0);
 
 	tc = (struct bus_dma_tag_common *)dmat;
-	if (tc->impl != &bus_dma_dmar_impl)
+	if (tc->impl != &bus_dma_iommu_impl)
 		return (0);
 
 	tag = (struct bus_dma_tag_iommu *)dmat;
