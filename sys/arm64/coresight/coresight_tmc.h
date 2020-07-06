@@ -79,6 +79,7 @@
 #define	 FFCR_FON_TRIG_EVT	(1 << 5)
 #define	 FFCR_FLUSH_MAN		(1 << 6)
 #define	 FFCR_TRIGON_TRIGIN	(1 << 8)
+#define	 FFCR_FLUSH_ON_STOP	(1 << 12)
 #define	TMC_PSCR	0x308 /* Periodic Synchronization Counter Register */
 #define	TMC_ITATBMDATA0	0xED0 /* Integration Test ATB Master Data Register 0 */
 #define	TMC_ITATBMCTR2	0xED4 /* Integration Test ATB Master Interface Control 2 Register */
