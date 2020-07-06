@@ -74,7 +74,7 @@ __FBSDID("$FreeBSD$");
  */
 
 static bool
-dmar_bus_dma_is_dev_disabled(int domain, int bus, int slot, int func)
+iommu_bus_dma_is_dev_disabled(int domain, int bus, int slot, int func)
 {
 	char str[128], *env;
 	int default_bounce;
@@ -245,7 +245,7 @@ dmar_instantiate_ctx(struct iommu_unit *dmar, device_t dev, bool rmrr)
 	 * Instead provide the identity mapping for the device
 	 * context.
 	 */
-	disabled = dmar_bus_dma_is_dev_disabled(pci_get_domain(requester), 
+	disabled = iommu_bus_dma_is_dev_disabled(pci_get_domain(requester),
 	    pci_get_bus(requester), pci_get_slot(requester), 
 	    pci_get_function(requester));
 	ctx = dmar_get_ctx_for_dev(dmar, requester, rid, disabled, rmrr);
