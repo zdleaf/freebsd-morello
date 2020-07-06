@@ -522,7 +522,7 @@ dmar_pte_clear(volatile uint64_t *dst)
 }
 
 static inline bool
-dmar_test_boundary(dmar_gaddr_t start, dmar_gaddr_t size,
+iommu_test_boundary(dmar_gaddr_t start, dmar_gaddr_t size,
     dmar_gaddr_t boundary)
 {
 

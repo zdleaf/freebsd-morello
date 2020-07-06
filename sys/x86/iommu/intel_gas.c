@@ -298,7 +298,7 @@ dmar_gas_match_one(struct dmar_gas_match_args *a, dmar_gaddr_t beg,
 		return (false);
 
 	/* No boundary crossing. */
-	if (dmar_test_boundary(a->entry->start + a->offset, a->size,
+	if (iommu_test_boundary(a->entry->start + a->offset, a->size,
 	    a->common->boundary))
 		return (true);
 
@@ -313,7 +313,7 @@ dmar_gas_match_one(struct dmar_gas_match_args *a, dmar_gaddr_t beg,
 	/* DMAR_PAGE_SIZE to create gap after new entry. */
 	if (start + a->offset + a->size + DMAR_PAGE_SIZE <= end &&
 	    start + a->offset + a->size <= maxaddr &&
-	    dmar_test_boundary(start + a->offset, a->size,
+	    iommu_test_boundary(start + a->offset, a->size,
 	    a->common->boundary)) {
 		a->entry->start = start;
 		return (true);

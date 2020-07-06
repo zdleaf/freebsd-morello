@@ -596,7 +596,7 @@ dmar_bus_dmamap_load_something1(struct bus_dma_tag_dmar *tag,
 		    (uintmax_t)entry->start, (uintmax_t)entry->end,
 		    (uintmax_t)tag->common.lowaddr,
 		    (uintmax_t)tag->common.highaddr));
-		KASSERT(dmar_test_boundary(entry->start + offset, buflen1,
+		KASSERT(iommu_test_boundary(entry->start + offset, buflen1,
 		    tag->common.boundary),
 		    ("boundary failed: ctx %p start 0x%jx end 0x%jx "
 		    "boundary 0x%jx", ctx, (uintmax_t)entry->start,
