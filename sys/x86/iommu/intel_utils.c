@@ -380,7 +380,7 @@ dmar_flush_pte_to_ram(struct iommu_unit *unit, dmar_pte_t *dst)
 }
 
 void
-dmar_flush_ctx_to_ram(struct iommu_unit *unit, dmar_ctx_entry_t *dst)
+dmar_flush_ctx_to_ram(struct iommu_unit *unit, iommu_device_entry_t *dst)
 {
 
 	dmar_flush_transl_to_ram(unit, dst, sizeof(*dst));

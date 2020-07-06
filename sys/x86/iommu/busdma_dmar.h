@@ -39,7 +39,7 @@ TAILQ_HEAD(dmar_map_entries_tailq, dmar_map_entry);
 
 struct bus_dma_tag_dmar {
 	struct bus_dma_tag_common common;
-	struct dmar_ctx *ctx;
+	struct iommu_device *ctx;
 	device_t owner;
 	int map_count;
 	bus_dma_segment_t *segments;

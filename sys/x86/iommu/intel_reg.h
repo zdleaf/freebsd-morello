@@ -51,10 +51,10 @@ typedef struct dmar_root_entry {
 
 #define	DMAR_CTX_CNT		(DMAR_PAGE_SIZE / sizeof(dmar_root_entry_t))
 
-typedef	struct dmar_ctx_entry {
+typedef	struct iommu_device_entry {
 	uint64_t ctx1;
 	uint64_t ctx2;
-} dmar_ctx_entry_t;
+} iommu_device_entry_t;
 #define	DMAR_CTX1_P		1		/* Present */
 #define	DMAR_CTX1_FPD		2		/* Fault Processing Disable */
 						/* Translation Type: */

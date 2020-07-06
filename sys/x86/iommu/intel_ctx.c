@@ -71,7 +71,7 @@ __FBSDID("$FreeBSD$");
 #include <x86/iommu/intel_dmar.h>
 #include <dev/pci/pcivar.h>
 
-static MALLOC_DEFINE(M_DMAR_CTX, "dmar_ctx", "Intel DMAR Context");
+static MALLOC_DEFINE(M_DMAR_CTX, "iommu_device", "Intel DMAR Context");
 static MALLOC_DEFINE(M_DMAR_DOMAIN, "dmar_dom", "Intel DMAR Domain");
 
 static void iommu_domain_unload_task(void *arg, int pending);
@@ -111,10 +111,10 @@ dmar_ensure_ctx_page(struct iommu_unit *dmar, int bus)
 	TD_PINNED_ASSERT;
 }
 
-static dmar_ctx_entry_t *
-dmar_map_ctx_entry(struct dmar_ctx *ctx, struct sf_buf **sfp)
+static iommu_device_entry_t *
+dmar_map_ctx_entry(struct iommu_device *ctx, struct sf_buf **sfp)
 {
-	dmar_ctx_entry_t *ctxp;
+	iommu_device_entry_t *ctxp;
 
 	ctxp = dmar_map_pgtbl(ctx->domain->dmar->ctx_obj, 1 +
 	    PCI_RID2BUS(ctx->rid), DMAR_PGF_NOALLOC | DMAR_PGF_WAITOK, sfp);
@@ -123,7 +123,7 @@ dmar_map_ctx_entry(struct dmar_ctx *ctx, struct sf_buf **sfp)
 }
 
 static void
-ctx_tag_init(struct dmar_ctx *ctx, device_t dev)
+ctx_tag_init(struct iommu_device *ctx, device_t dev)
 {
 	bus_addr_t maxaddr;
 
@@ -141,7 +141,7 @@ ctx_tag_init(struct dmar_ctx *ctx, device_t dev)
 }
 
 static void
-ctx_id_entry_init_one(dmar_ctx_entry_t *ctxp, struct iommu_domain *domain,
+ctx_id_entry_init_one(iommu_device_entry_t *ctxp, struct iommu_domain *domain,
     vm_page_t ctx_root)
 {
 	/*
@@ -165,7 +165,7 @@ ctx_id_entry_init_one(dmar_ctx_entry_t *ctxp, struct iommu_domain *domain,
 }
 
 static void
-ctx_id_entry_init(struct dmar_ctx *ctx, dmar_ctx_entry_t *ctxp, bool move,
+ctx_id_entry_init(struct iommu_device *ctx, iommu_device_entry_t *ctxp, bool move,
     int busno)
 {
 	struct iommu_unit *unit;
@@ -370,10 +370,10 @@ fail:
 	return (NULL);
 }
 
-static struct dmar_ctx *
-dmar_ctx_alloc(struct iommu_domain *domain, uint16_t rid)
+static struct iommu_device *
+iommu_device_alloc(struct iommu_domain *domain, uint16_t rid)
 {
-	struct dmar_ctx *ctx;
+	struct iommu_device *ctx;
 
 	ctx = malloc(sizeof(*ctx), M_DMAR_CTX, M_WAITOK | M_ZERO);
 	ctx->domain = domain;
@@ -383,7 +383,7 @@ dmar_ctx_alloc(struct iommu_domain *domain, uint16_t rid)
 }
 
 static void
-dmar_ctx_link(struct dmar_ctx *ctx)
+iommu_device_link(struct iommu_device *ctx)
 {
 	struct iommu_domain *domain;
 
@@ -398,7 +398,7 @@ dmar_ctx_link(struct dmar_ctx *ctx)
 }
 
 static void
-dmar_ctx_unlink(struct dmar_ctx *ctx)
+iommu_device_unlink(struct iommu_device *ctx)
 {
 	struct iommu_domain *domain;
 
@@ -441,14 +441,14 @@ iommu_domain_destroy(struct iommu_domain *domain)
 	free(domain, M_DMAR_DOMAIN);
 }
 
-static struct dmar_ctx *
+static struct iommu_device *
 dmar_get_ctx_for_dev1(struct iommu_unit *dmar, device_t dev, uint16_t rid,
     int dev_domain, int dev_busno, const void *dev_path, int dev_path_len,
     bool id_mapped, bool rmrr_init)
 {
 	struct iommu_domain *domain, *domain1;
-	struct dmar_ctx *ctx, *ctx1;
-	dmar_ctx_entry_t *ctxp;
+	struct iommu_device *ctx, *ctx1;
+	iommu_device_entry_t *ctxp;
 	struct sf_buf *sf;
 	int bus, slot, func, error;
 	bool enable;
@@ -492,7 +492,7 @@ dmar_get_ctx_for_dev1(struct iommu_unit *dmar, device_t dev, uint16_t rid,
 				return (NULL);
 			}
 		}
-		ctx1 = dmar_ctx_alloc(domain1, rid);
+		ctx1 = iommu_device_alloc(domain1, rid);
 		ctxp = dmar_map_ctx_entry(ctx1, &sf);
 		IOMMU_LOCK(dmar);
 
@@ -504,7 +504,7 @@ dmar_get_ctx_for_dev1(struct iommu_unit *dmar, device_t dev, uint16_t rid,
 		if (ctx == NULL) {
 			domain = domain1;
 			ctx = ctx1;
-			dmar_ctx_link(ctx);
+			iommu_device_link(ctx);
 			ctx->ctx_tag.owner = dev;
 			ctx_tag_init(ctx, dev);
 
@@ -573,7 +573,7 @@ dmar_get_ctx_for_dev1(struct iommu_unit *dmar, device_t dev, uint16_t rid,
 	return (ctx);
 }
 
-struct dmar_ctx *
+struct iommu_device *
 dmar_get_ctx_for_dev(struct iommu_unit *dmar, device_t dev, uint16_t rid,
     bool id_mapped, bool rmrr_init)
 {
@@ -587,7 +587,7 @@ dmar_get_ctx_for_dev(struct iommu_unit *dmar, device_t dev, uint16_t rid,
 	    dev_path, dev_path_len, id_mapped, rmrr_init));
 }
 
-struct dmar_ctx *
+struct iommu_device *
 dmar_get_ctx_for_devpath(struct iommu_unit *dmar, uint16_t rid,
     int dev_domain, int dev_busno,
     const void *dev_path, int dev_path_len,
@@ -599,11 +599,11 @@ dmar_get_ctx_for_devpath(struct iommu_unit *dmar, uint16_t rid,
 }
 
 int
-dmar_move_ctx_to_domain(struct iommu_domain *domain, struct dmar_ctx *ctx)
+dmar_move_ctx_to_domain(struct iommu_domain *domain, struct iommu_device *ctx)
 {
 	struct iommu_unit *dmar;
 	struct iommu_domain *old_domain;
-	dmar_ctx_entry_t *ctxp;
+	iommu_device_entry_t *ctxp;
 	struct sf_buf *sf;
 	int error;
 
@@ -618,9 +618,9 @@ dmar_move_ctx_to_domain(struct iommu_domain *domain, struct dmar_ctx *ctx)
 
 	ctxp = dmar_map_ctx_entry(ctx, &sf);
 	IOMMU_LOCK(dmar);
-	dmar_ctx_unlink(ctx);
+	iommu_device_unlink(ctx);
 	ctx->domain = domain;
-	dmar_ctx_link(ctx);
+	iommu_device_link(ctx);
 	ctx_id_entry_init(ctx, ctxp, true, PCI_BUSMAX + 100);
 	dmar_unmap_pgtbl(sf);
 	error = dmar_flush_for_ctx_entry(dmar, true);
@@ -661,10 +661,10 @@ dmar_unref_domain_locked(struct iommu_unit *dmar, struct iommu_domain *domain)
 }
 
 void
-dmar_free_ctx_locked(struct iommu_unit *dmar, struct dmar_ctx *ctx)
+dmar_free_ctx_locked(struct iommu_unit *dmar, struct iommu_device *ctx)
 {
 	struct sf_buf *sf;
-	dmar_ctx_entry_t *ctxp;
+	iommu_device_entry_t *ctxp;
 	struct iommu_domain *domain;
 
 	IOMMU_ASSERT_LOCKED(dmar);
@@ -727,14 +727,14 @@ dmar_free_ctx_locked(struct iommu_unit *dmar, struct dmar_ctx *ctx)
 	}
 	dmar_unmap_pgtbl(sf);
 	domain = ctx->domain;
-	dmar_ctx_unlink(ctx);
+	iommu_device_unlink(ctx);
 	free(ctx, M_DMAR_CTX);
 	dmar_unref_domain_locked(dmar, domain);
 	TD_PINNED_ASSERT;
 }
 
 void
-dmar_free_ctx(struct dmar_ctx *ctx)
+dmar_free_ctx(struct iommu_device *ctx)
 {
 	struct iommu_unit *dmar;
 
@@ -746,11 +746,11 @@ dmar_free_ctx(struct dmar_ctx *ctx)
 /*
  * Returns with the domain locked.
  */
-struct dmar_ctx *
+struct iommu_device *
 dmar_find_ctx_locked(struct iommu_unit *dmar, uint16_t rid)
 {
 	struct iommu_domain *domain;
-	struct dmar_ctx *ctx;
+	struct iommu_device *ctx;
 
 	IOMMU_ASSERT_LOCKED(dmar);
 

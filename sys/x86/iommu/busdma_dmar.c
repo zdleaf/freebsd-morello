@@ -228,11 +228,11 @@ dmar_get_requester(device_t dev, uint16_t *rid)
 	return (requester);
 }
 
-struct dmar_ctx *
+struct iommu_device *
 dmar_instantiate_ctx(struct iommu_unit *dmar, device_t dev, bool rmrr)
 {
 	device_t requester;
-	struct dmar_ctx *ctx;
+	struct iommu_device *ctx;
 	bool disabled;
 	uint16_t rid;
 
@@ -272,7 +272,7 @@ bus_dma_tag_t
 acpi_iommu_get_dma_tag(device_t dev, device_t child)
 {
 	struct iommu_unit *dmar;
-	struct dmar_ctx *ctx;
+	struct iommu_device *ctx;
 	bus_dma_tag_t res;
 
 	dmar = dmar_find(child, bootverbose);
@@ -526,7 +526,7 @@ dmar_bus_dmamap_load_something1(struct bus_dma_tag_dmar *tag,
     int flags, bus_dma_segment_t *segs, int *segp,
     struct dmar_map_entries_tailq *unroll_list)
 {
-	struct dmar_ctx *ctx;
+	struct iommu_device *ctx;
 	struct iommu_domain *domain;
 	struct dmar_map_entry *entry;
 	dmar_gaddr_t size;
@@ -631,7 +631,7 @@ dmar_bus_dmamap_load_something(struct bus_dma_tag_dmar *tag,
     struct bus_dmamap_dmar *map, vm_page_t *ma, int offset, bus_size_t buflen,
     int flags, bus_dma_segment_t *segs, int *segp)
 {
-	struct dmar_ctx *ctx;
+	struct iommu_device *ctx;
 	struct iommu_domain *domain;
 	struct dmar_map_entry *entry, *entry1;
 	struct dmar_map_entries_tailq unroll_list;
@@ -852,7 +852,7 @@ dmar_bus_dmamap_unload(bus_dma_tag_t dmat, bus_dmamap_t map1)
 {
 	struct bus_dma_tag_dmar *tag;
 	struct bus_dmamap_dmar *map;
-	struct dmar_ctx *ctx;
+	struct iommu_device *ctx;
 	struct iommu_domain *domain;
 #if defined(__amd64__)
 	struct dmar_map_entries_tailq entries;
@@ -878,7 +878,7 @@ dmar_bus_dmamap_unload(bus_dma_tag_t dmat, bus_dmamap_t map1)
 	THREAD_NO_SLEEPING();
 	iommu_domain_unload(domain, &entries, false);
 	THREAD_SLEEPING_OK();
-	KASSERT(TAILQ_EMPTY(&entries), ("lazy dmar_ctx_unload %p", ctx));
+	KASSERT(TAILQ_EMPTY(&entries), ("lazy iommu_device_unload %p", ctx));
 #endif
 }
 
@@ -981,7 +981,7 @@ bus_dma_dmar_load_ident(bus_dma_tag_t dmat, bus_dmamap_t map1,
 	struct bus_dma_tag_common *tc;
 	struct bus_dma_tag_dmar *tag;
 	struct bus_dmamap_dmar *map;
-	struct dmar_ctx *ctx;
+	struct iommu_device *ctx;
 	struct iommu_domain *domain;
 	struct dmar_map_entry *entry;
 	vm_page_t *ma;

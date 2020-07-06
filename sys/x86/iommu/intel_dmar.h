@@ -108,7 +108,7 @@ struct iommu_domain {
 	struct iommu_unit *dmar;		/* (c) */
 	struct mtx lock;		/* (c) */
 	LIST_ENTRY(iommu_domain) link;	/* (u) Member in the dmar list */
-	LIST_HEAD(, dmar_ctx) contexts;	/* (u) */
+	LIST_HEAD(, iommu_device) contexts;	/* (u) */
 	vm_object_t pgtbl_obj;		/* (c) Page table pages */
 	u_int flags;			/* (u) */
 	u_int entries_cnt;		/* (d) */
@@ -120,12 +120,12 @@ struct iommu_domain {
 	u_int batch_no;
 };
 
-struct dmar_ctx {
+struct iommu_device {
 	struct bus_dma_tag_dmar ctx_tag; /* (c) Root tag */
 	uint16_t rid;			/* (c) pci RID */
 	uint64_t last_fault_rec[2];	/* Last fault reported */
 	struct iommu_domain *domain;	/* (c) */
-	LIST_ENTRY(dmar_ctx) link;	/* (u) Member in the domain list */
+	LIST_ENTRY(iommu_device) link;	/* (u) Member in the domain list */
 	u_int refs;			/* (u) References from tags */
 	u_int flags;			/* (u) */
 	u_long loads;			/* atomic updates, for stat only */
@@ -139,7 +139,7 @@ struct dmar_ctx {
 #define	DMAR_DOMAIN_RMRR		0x0020	/* Domain contains RMRR entry,
 						   cannot be turned off */
 
-/* struct dmar_ctx flags */
+/* struct iommu_device flags */
 #define	DMAR_CTX_FAULTED	0x0001	/* Fault was reported,
 					   last_fault_rec is valid */
 #define	DMAR_CTX_DISABLED	0x0002	/* Device is disabled, the
@@ -293,7 +293,7 @@ int dmar_inv_ctx_glob(struct iommu_unit *unit);
 int dmar_inv_iotlb_glob(struct iommu_unit *unit);
 int dmar_flush_write_bufs(struct iommu_unit *unit);
 void dmar_flush_pte_to_ram(struct iommu_unit *unit, dmar_pte_t *dst);
-void dmar_flush_ctx_to_ram(struct iommu_unit *unit, dmar_ctx_entry_t *dst);
+void dmar_flush_ctx_to_ram(struct iommu_unit *unit, iommu_device_entry_t *dst);
 void dmar_flush_root_to_ram(struct iommu_unit *unit, dmar_root_entry_t *dst);
 int dmar_enable_translation(struct iommu_unit *unit);
 int dmar_disable_translation(struct iommu_unit *unit);
@@ -338,17 +338,17 @@ void domain_free_pgtbl(struct iommu_domain *domain);
 int dmar_dev_depth(device_t child);
 void dmar_dev_path(device_t child, int *busno, void *path1, int depth);
 
-struct dmar_ctx *dmar_instantiate_ctx(struct iommu_unit *dmar, device_t dev,
+struct iommu_device *dmar_instantiate_ctx(struct iommu_unit *dmar, device_t dev,
     bool rmrr);
-struct dmar_ctx *dmar_get_ctx_for_dev(struct iommu_unit *dmar, device_t dev,
+struct iommu_device *dmar_get_ctx_for_dev(struct iommu_unit *dmar, device_t dev,
     uint16_t rid, bool id_mapped, bool rmrr_init);
-struct dmar_ctx *dmar_get_ctx_for_devpath(struct iommu_unit *dmar, uint16_t rid,
+struct iommu_device *dmar_get_ctx_for_devpath(struct iommu_unit *dmar, uint16_t rid,
     int dev_domain, int dev_busno, const void *dev_path, int dev_path_len,
     bool id_mapped, bool rmrr_init);
-int dmar_move_ctx_to_domain(struct iommu_domain *domain, struct dmar_ctx *ctx);
-void dmar_free_ctx_locked(struct iommu_unit *dmar, struct dmar_ctx *ctx);
-void dmar_free_ctx(struct dmar_ctx *ctx);
-struct dmar_ctx *dmar_find_ctx_locked(struct iommu_unit *dmar, uint16_t rid);
+int dmar_move_ctx_to_domain(struct iommu_domain *domain, struct iommu_device *ctx);
+void dmar_free_ctx_locked(struct iommu_unit *dmar, struct iommu_device *ctx);
+void dmar_free_ctx(struct iommu_device *ctx);
+struct iommu_device *dmar_find_ctx_locked(struct iommu_unit *dmar, uint16_t rid);
 void iommu_domain_unload_entry(struct dmar_map_entry *entry, bool free);
 void iommu_domain_unload(struct iommu_domain *domain,
     struct dmar_map_entries_tailq *entries, bool cansleep);

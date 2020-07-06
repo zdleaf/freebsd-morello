@@ -191,7 +191,7 @@ static void
 dmar_fault_task(void *arg, int pending __unused)
 {
 	struct iommu_unit *unit;
-	struct dmar_ctx *ctx;
+	struct iommu_device *ctx;
 	uint64_t fault_rec[2];
 	int sid, bus, slot, func, faultp;
 

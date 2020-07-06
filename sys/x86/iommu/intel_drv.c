@@ -1131,7 +1131,7 @@ dmar_print_domain_entry(const struct dmar_map_entry *entry)
 }
 
 static void
-dmar_print_ctx(struct dmar_ctx *ctx)
+dmar_print_ctx(struct iommu_device *ctx)
 {
 
 	db_printf(
@@ -1146,7 +1146,7 @@ static void
 dmar_print_domain(struct iommu_domain *domain, bool show_mappings)
 {
 	struct dmar_map_entry *entry;
-	struct dmar_ctx *ctx;
+	struct iommu_device *ctx;
 
 	db_printf(
 	    "  @%p dom %d mgaw %d agaw %d pglvl %d end %jx refs %d\n"
@@ -1181,7 +1181,7 @@ DB_FUNC(iommu_domain, db_dmar_print_domain, db_show_table, CS_OWN, NULL)
 {
 	struct iommu_unit *unit;
 	struct iommu_domain *domain;
-	struct dmar_ctx *ctx;
+	struct iommu_device *ctx;
 	bool show_mappings, valid;
 	int pci_domain, bus, device, function, i, t;
 	db_expr_t radix;
