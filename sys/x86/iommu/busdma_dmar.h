@@ -45,13 +45,13 @@ struct bus_dma_tag_iommu {
 	bus_dma_segment_t *segments;
 };
 
-struct bus_dmamap_dmar {
+struct bus_dmamap_iommu {
 	struct bus_dma_tag_iommu *tag;
 	struct memdesc mem;
 	bus_dmamap_callback_t *callback;
 	void *callback_arg;
 	struct dmar_map_entries_tailq map_entries;
-	TAILQ_ENTRY(bus_dmamap_dmar) delay_link;
+	TAILQ_ENTRY(bus_dmamap_iommu) delay_link;
 	bool locked;
 	bool cansleep;
 	int flags;

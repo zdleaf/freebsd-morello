@@ -236,7 +236,7 @@ struct iommu_unit {
 
 	/* Busdma delayed map load */
 	struct task dmamap_load_task;
-	TAILQ_HEAD(, bus_dmamap_dmar) delayed_maps;
+	TAILQ_HEAD(, bus_dmamap_iommu) delayed_maps;
 	struct taskqueue *delayed_taskqueue;
 
 	int dma_enabled;
