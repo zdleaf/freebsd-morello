@@ -461,6 +461,7 @@ pmctrace_run(bool user_mode, char *func_name, char *func_image)
 		pmcstat_create_process(pmcstat_sockpair, &args, pmcstat_kq);
 		pmcstat_attach_pmcs(&args);
 		if (func_name == NULL || func_image == NULL) {
+			/* Start tracing immediately. */
 			pmctrace_start_pmcs();
 			started = 1;
 		}
