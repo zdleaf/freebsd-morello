@@ -121,7 +121,7 @@ struct iommu_domain {
 };
 
 struct iommu_device {
-	struct bus_dma_tag_dmar device_tag; /* (c) Root tag */
+	struct bus_dma_tag_iommu device_tag; /* (c) Root tag */
 	uint16_t rid;			/* (c) pci RID */
 	uint64_t last_fault_rec[2];	/* Last fault reported */
 	struct iommu_domain *domain;	/* (c) */

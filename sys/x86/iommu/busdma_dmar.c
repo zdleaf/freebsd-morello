@@ -329,19 +329,19 @@ iommu_bus_dma_tag_create(bus_dma_tag_t parent, bus_size_t alignment,
     int nsegments, bus_size_t maxsegsz, int flags, bus_dma_lock_t *lockfunc,
     void *lockfuncarg, bus_dma_tag_t *dmat)
 {
-	struct bus_dma_tag_dmar *newtag, *oldtag;
+	struct bus_dma_tag_iommu *newtag, *oldtag;
 	int error;
 
 	*dmat = NULL;
 	error = common_bus_dma_tag_create(parent != NULL ?
-	    &((struct bus_dma_tag_dmar *)parent)->common : NULL, alignment,
+	    &((struct bus_dma_tag_iommu *)parent)->common : NULL, alignment,
 	    boundary, lowaddr, highaddr, filter, filterarg, maxsize,
 	    nsegments, maxsegsz, flags, lockfunc, lockfuncarg,
-	    sizeof(struct bus_dma_tag_dmar), (void **)&newtag);
+	    sizeof(struct bus_dma_tag_iommu), (void **)&newtag);
 	if (error != 0)
 		goto out;
 
-	oldtag = (struct bus_dma_tag_dmar *)parent;
+	oldtag = (struct bus_dma_tag_iommu *)parent;
 	newtag->common.impl = &bus_dma_dmar_impl;
 	newtag->ctx = oldtag->ctx;
 	newtag->owner = oldtag->owner;
@@ -364,11 +364,11 @@ iommu_bus_dma_tag_set_domain(bus_dma_tag_t dmat)
 static int
 iommu_bus_dma_tag_destroy(bus_dma_tag_t dmat1)
 {
-	struct bus_dma_tag_dmar *dmat, *dmat_copy, *parent;
+	struct bus_dma_tag_iommu *dmat, *dmat_copy, *parent;
 	int error;
 
 	error = 0;
-	dmat_copy = dmat = (struct bus_dma_tag_dmar *)dmat1;
+	dmat_copy = dmat = (struct bus_dma_tag_iommu *)dmat1;
 
 	if (dmat != NULL) {
 		if (dmat->map_count != 0) {
@@ -376,7 +376,7 @@ iommu_bus_dma_tag_destroy(bus_dma_tag_t dmat1)
 			goto out;
 		}
 		while (dmat != NULL) {
-			parent = (struct bus_dma_tag_dmar *)dmat->common.parent;
+			parent = (struct bus_dma_tag_iommu *)dmat->common.parent;
 			if (atomic_fetchadd_int(&dmat->common.ref_count, -1) ==
 			    1) {
 				if (dmat == &dmat->ctx->device_tag)
@@ -403,10 +403,10 @@ iommu_bus_dma_id_mapped(bus_dma_tag_t dmat, vm_paddr_t buf, bus_size_t buflen)
 static int
 iommu_bus_dmamap_create(bus_dma_tag_t dmat, int flags, bus_dmamap_t *mapp)
 {
-	struct bus_dma_tag_dmar *tag;
+	struct bus_dma_tag_iommu *tag;
 	struct bus_dmamap_dmar *map;
 
-	tag = (struct bus_dma_tag_dmar *)dmat;
+	tag = (struct bus_dma_tag_iommu *)dmat;
 	map = malloc_domainset(sizeof(*map), M_DMAR_DMAMAP,
 	    DOMAINSET_PREF(tag->common.domain), M_NOWAIT | M_ZERO);
 	if (map == NULL) {
@@ -436,11 +436,11 @@ iommu_bus_dmamap_create(bus_dma_tag_t dmat, int flags, bus_dmamap_t *mapp)
 static int
 iommu_bus_dmamap_destroy(bus_dma_tag_t dmat, bus_dmamap_t map1)
 {
-	struct bus_dma_tag_dmar *tag;
+	struct bus_dma_tag_iommu *tag;
 	struct bus_dmamap_dmar *map;
 	struct iommu_domain *domain;
 
-	tag = (struct bus_dma_tag_dmar *)dmat;
+	tag = (struct bus_dma_tag_iommu *)dmat;
 	map = (struct bus_dmamap_dmar *)map1;
 	if (map != NULL) {
 		domain = tag->ctx->domain;
@@ -461,7 +461,7 @@ static int
 iommu_bus_dmamem_alloc(bus_dma_tag_t dmat, void** vaddr, int flags,
     bus_dmamap_t *mapp)
 {
-	struct bus_dma_tag_dmar *tag;
+	struct bus_dma_tag_iommu *tag;
 	struct bus_dmamap_dmar *map;
 	int error, mflags;
 	vm_memattr_t attr;
@@ -475,7 +475,7 @@ iommu_bus_dmamem_alloc(bus_dma_tag_t dmat, void** vaddr, int flags,
 	attr = (flags & BUS_DMA_NOCACHE) != 0 ? VM_MEMATTR_UNCACHEABLE :
 	    VM_MEMATTR_DEFAULT;
 
-	tag = (struct bus_dma_tag_dmar *)dmat;
+	tag = (struct bus_dma_tag_iommu *)dmat;
 	map = (struct bus_dmamap_dmar *)*mapp;
 
 	if (tag->common.maxsize < PAGE_SIZE &&
@@ -501,10 +501,10 @@ iommu_bus_dmamem_alloc(bus_dma_tag_t dmat, void** vaddr, int flags,
 static void
 iommu_bus_dmamem_free(bus_dma_tag_t dmat, void *vaddr, bus_dmamap_t map1)
 {
-	struct bus_dma_tag_dmar *tag;
+	struct bus_dma_tag_iommu *tag;
 	struct bus_dmamap_dmar *map;
 
-	tag = (struct bus_dma_tag_dmar *)dmat;
+	tag = (struct bus_dma_tag_iommu *)dmat;
 	map = (struct bus_dmamap_dmar *)map1;
 
 	if ((map->flags & BUS_DMAMAP_DMAR_MALLOC) != 0) {
@@ -521,7 +521,7 @@ iommu_bus_dmamem_free(bus_dma_tag_t dmat, void *vaddr, bus_dmamap_t map1)
 }
 
 static int
-iommu_bus_dmamap_load_something1(struct bus_dma_tag_dmar *tag,
+iommu_bus_dmamap_load_something1(struct bus_dma_tag_iommu *tag,
     struct bus_dmamap_dmar *map, vm_page_t *ma, int offset, bus_size_t buflen,
     int flags, bus_dma_segment_t *segs, int *segp,
     struct dmar_map_entries_tailq *unroll_list)
@@ -627,7 +627,7 @@ iommu_bus_dmamap_load_something1(struct bus_dma_tag_dmar *tag,
 }
 
 static int
-iommu_bus_dmamap_load_something(struct bus_dma_tag_dmar *tag,
+iommu_bus_dmamap_load_something(struct bus_dma_tag_iommu *tag,
     struct bus_dmamap_dmar *map, vm_page_t *ma, int offset, bus_size_t buflen,
     int flags, bus_dma_segment_t *segs, int *segp)
 {
@@ -682,10 +682,10 @@ iommu_bus_dmamap_load_ma(bus_dma_tag_t dmat, bus_dmamap_t map1,
     struct vm_page **ma, bus_size_t tlen, int ma_offs, int flags,
     bus_dma_segment_t *segs, int *segp)
 {
-	struct bus_dma_tag_dmar *tag;
+	struct bus_dma_tag_iommu *tag;
 	struct bus_dmamap_dmar *map;
 
-	tag = (struct bus_dma_tag_dmar *)dmat;
+	tag = (struct bus_dma_tag_iommu *)dmat;
 	map = (struct bus_dmamap_dmar *)map1;
 	return (iommu_bus_dmamap_load_something(tag, map, ma, ma_offs, tlen,
 	    flags, segs, segp));
@@ -696,13 +696,13 @@ iommu_bus_dmamap_load_phys(bus_dma_tag_t dmat, bus_dmamap_t map1,
     vm_paddr_t buf, bus_size_t buflen, int flags, bus_dma_segment_t *segs,
     int *segp)
 {
-	struct bus_dma_tag_dmar *tag;
+	struct bus_dma_tag_iommu *tag;
 	struct bus_dmamap_dmar *map;
 	vm_page_t *ma, fma;
 	vm_paddr_t pstart, pend, paddr;
 	int error, i, ma_cnt, mflags, offset;
 
-	tag = (struct bus_dma_tag_dmar *)dmat;
+	tag = (struct bus_dma_tag_iommu *)dmat;
 	map = (struct bus_dmamap_dmar *)map1;
 	pstart = trunc_page(buf);
 	pend = round_page(buf + buflen);
@@ -747,13 +747,13 @@ iommu_bus_dmamap_load_buffer(bus_dma_tag_t dmat, bus_dmamap_t map1, void *buf,
     bus_size_t buflen, pmap_t pmap, int flags, bus_dma_segment_t *segs,
     int *segp)
 {
-	struct bus_dma_tag_dmar *tag;
+	struct bus_dma_tag_iommu *tag;
 	struct bus_dmamap_dmar *map;
 	vm_page_t *ma, fma;
 	vm_paddr_t pstart, pend, paddr;
 	int error, i, ma_cnt, mflags, offset;
 
-	tag = (struct bus_dma_tag_dmar *)dmat;
+	tag = (struct bus_dma_tag_iommu *)dmat;
 	map = (struct bus_dmamap_dmar *)map1;
 	pstart = trunc_page((vm_offset_t)buf);
 	pend = round_page((vm_offset_t)buf + buflen);
@@ -805,7 +805,7 @@ iommu_bus_dmamap_waitok(bus_dma_tag_t dmat, bus_dmamap_t map1,
 		return;
 	map = (struct bus_dmamap_dmar *)map1;
 	map->mem = *mem;
-	map->tag = (struct bus_dma_tag_dmar *)dmat;
+	map->tag = (struct bus_dma_tag_iommu *)dmat;
 	map->callback = callback;
 	map->callback_arg = callback_arg;
 }
@@ -814,10 +814,10 @@ static bus_dma_segment_t *
 iommu_bus_dmamap_complete(bus_dma_tag_t dmat, bus_dmamap_t map1,
     bus_dma_segment_t *segs, int nsegs, int error)
 {
-	struct bus_dma_tag_dmar *tag;
+	struct bus_dma_tag_iommu *tag;
 	struct bus_dmamap_dmar *map;
 
-	tag = (struct bus_dma_tag_dmar *)dmat;
+	tag = (struct bus_dma_tag_iommu *)dmat;
 	map = (struct bus_dmamap_dmar *)map1;
 
 	if (!map->locked) {
@@ -850,7 +850,7 @@ iommu_bus_dmamap_complete(bus_dma_tag_t dmat, bus_dmamap_t map1,
 static void
 iommu_bus_dmamap_unload(bus_dma_tag_t dmat, bus_dmamap_t map1)
 {
-	struct bus_dma_tag_dmar *tag;
+	struct bus_dma_tag_iommu *tag;
 	struct bus_dmamap_dmar *map;
 	struct iommu_device *ctx;
 	struct iommu_domain *domain;
@@ -858,7 +858,7 @@ iommu_bus_dmamap_unload(bus_dma_tag_t dmat, bus_dmamap_t map1)
 	struct dmar_map_entries_tailq entries;
 #endif
 
-	tag = (struct bus_dma_tag_dmar *)dmat;
+	tag = (struct bus_dma_tag_iommu *)dmat;
 	map = (struct bus_dmamap_dmar *)map1;
 	ctx = tag->ctx;
 	domain = ctx->domain;
@@ -909,7 +909,7 @@ struct bus_dma_impl bus_dma_dmar_impl = {
 static void
 iommu_bus_task_dmamap(void *arg, int pending)
 {
-	struct bus_dma_tag_dmar *tag;
+	struct bus_dma_tag_iommu *tag;
 	struct bus_dmamap_dmar *map;
 	struct iommu_unit *unit;
 
@@ -979,7 +979,7 @@ bus_dma_dmar_load_ident(bus_dma_tag_t dmat, bus_dmamap_t map1,
     vm_paddr_t start, vm_size_t length, int flags)
 {
 	struct bus_dma_tag_common *tc;
-	struct bus_dma_tag_dmar *tag;
+	struct bus_dma_tag_iommu *tag;
 	struct bus_dmamap_dmar *map;
 	struct iommu_device *ctx;
 	struct iommu_domain *domain;
@@ -999,7 +999,7 @@ bus_dma_dmar_load_ident(bus_dma_tag_t dmat, bus_dmamap_t map1,
 	if (tc->impl != &bus_dma_dmar_impl)
 		return (0);
 
-	tag = (struct bus_dma_tag_dmar *)dmat;
+	tag = (struct bus_dma_tag_iommu *)dmat;
 	ctx = tag->ctx;
 	domain = ctx->domain;
 	map = (struct bus_dmamap_dmar *)map1;

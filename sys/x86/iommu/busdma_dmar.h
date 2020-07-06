@@ -37,7 +37,7 @@
 struct iommu_map_entry;
 TAILQ_HEAD(dmar_map_entries_tailq, iommu_map_entry);
 
-struct bus_dma_tag_dmar {
+struct bus_dma_tag_iommu {
 	struct bus_dma_tag_common common;
 	struct iommu_device *ctx;
 	device_t owner;
@@ -46,7 +46,7 @@ struct bus_dma_tag_dmar {
 };
 
 struct bus_dmamap_dmar {
-	struct bus_dma_tag_dmar *tag;
+	struct bus_dma_tag_iommu *tag;
 	struct memdesc mem;
 	bus_dmamap_callback_t *callback;
 	void *callback_arg;
