@@ -327,7 +327,7 @@ dmar_gas_match_one(struct dmar_gas_match_args *a, dmar_gaddr_t beg,
 	 * XXXKIB. It is possible that bs is exactly at the start of
 	 * the next entry, then we do not have gap.  Ignore for now.
 	 */
-	if ((a->gas_flags & DMAR_GM_CANSPLIT) != 0) {
+	if ((a->gas_flags & IOMMU_MF_CANSPLIT) != 0) {
 		a->size = bs - a->entry->start;
 		return (true);
 	}
@@ -486,14 +486,14 @@ dmar_gas_alloc_region(struct iommu_domain *domain, struct iommu_map_entry *entry
 	 */
 	if (prev != NULL && prev->end > entry->start &&
 	    (prev->flags & IOMMU_MAP_ENTRY_PLACE) == 0) {
-		if ((flags & DMAR_GM_RMRR) == 0 ||
+		if ((flags & IOMMU_MF_RMRR) == 0 ||
 		    (prev->flags & IOMMU_MAP_ENTRY_RMRR) == 0)
 			return (EBUSY);
 		entry->start = prev->end;
 	}
 	if (next->start < entry->end &&
 	    (next->flags & IOMMU_MAP_ENTRY_PLACE) == 0) {
-		if ((flags & DMAR_GM_RMRR) == 0 ||
+		if ((flags & IOMMU_MF_RMRR) == 0 ||
 		    (next->flags & IOMMU_MAP_ENTRY_RMRR) == 0)
 			return (EBUSY);
 		entry->end = next->start;
@@ -514,7 +514,7 @@ dmar_gas_alloc_region(struct iommu_domain *domain, struct iommu_map_entry *entry
 	found = dmar_gas_rb_insert(domain, entry);
 	KASSERT(found, ("found RMRR dup %p start %jx end %jx",
 	    domain, (uintmax_t)entry->start, (uintmax_t)entry->end));
-	if ((flags & DMAR_GM_RMRR) != 0)
+	if ((flags & IOMMU_MF_RMRR) != 0)
 		entry->flags = IOMMU_MAP_ENTRY_RMRR;
 
 #ifdef INVARIANTS
@@ -582,10 +582,10 @@ dmar_gas_map(struct iommu_domain *domain,
 	struct iommu_map_entry *entry;
 	int error;
 
-	KASSERT((flags & ~(DMAR_GM_CANWAIT | DMAR_GM_CANSPLIT)) == 0,
+	KASSERT((flags & ~(IOMMU_MF_CANWAIT | IOMMU_MF_CANSPLIT)) == 0,
 	    ("invalid flags 0x%x", flags));
 
-	entry = dmar_gas_alloc_entry(domain, (flags & DMAR_GM_CANWAIT) != 0 ?
+	entry = dmar_gas_alloc_entry(domain, (flags & IOMMU_MF_CANWAIT) != 0 ?
 	    DMAR_PGF_WAITOK : 0);
 	if (entry == NULL)
 		return (ENOMEM);
@@ -614,7 +614,7 @@ dmar_gas_map(struct iommu_domain *domain,
 	    ((eflags & IOMMU_MAP_ENTRY_WRITE) != 0 ? DMAR_PTE_W : 0) |
 	    ((eflags & IOMMU_MAP_ENTRY_SNOOP) != 0 ? DMAR_PTE_SNP : 0) |
 	    ((eflags & IOMMU_MAP_ENTRY_TM) != 0 ? DMAR_PTE_TM : 0),
-	    (flags & DMAR_GM_CANWAIT) != 0 ? DMAR_PGF_WAITOK : 0);
+	    (flags & IOMMU_MF_CANWAIT) != 0 ? DMAR_PGF_WAITOK : 0);
 	if (error == ENOMEM) {
 		iommu_domain_unload_entry(entry, true);
 		return (error);
@@ -635,7 +635,7 @@ dmar_gas_map_region(struct iommu_domain *domain, struct iommu_map_entry *entry,
 
 	KASSERT(entry->flags == 0, ("used RMRR entry %p %p %x", domain,
 	    entry, entry->flags));
-	KASSERT((flags & ~(DMAR_GM_CANWAIT | DMAR_GM_RMRR)) == 0,
+	KASSERT((flags & ~(IOMMU_MF_CANWAIT | IOMMU_MF_RMRR)) == 0,
 	    ("invalid flags 0x%x", flags));
 
 	start = entry->start;
@@ -656,7 +656,7 @@ dmar_gas_map_region(struct iommu_domain *domain, struct iommu_map_entry *entry,
 	    ((eflags & IOMMU_MAP_ENTRY_WRITE) != 0 ? DMAR_PTE_W : 0) |
 	    ((eflags & IOMMU_MAP_ENTRY_SNOOP) != 0 ? DMAR_PTE_SNP : 0) |
 	    ((eflags & IOMMU_MAP_ENTRY_TM) != 0 ? DMAR_PTE_TM : 0),
-	    (flags & DMAR_GM_CANWAIT) != 0 ? DMAR_PGF_WAITOK : 0);
+	    (flags & IOMMU_MF_CANWAIT) != 0 ? DMAR_PGF_WAITOK : 0);
 	if (error == ENOMEM) {
 		iommu_domain_unload_entry(entry, false);
 		return (error);
@@ -678,7 +678,7 @@ dmar_gas_reserve_region(struct iommu_domain *domain, dmar_gaddr_t start,
 	entry->start = start;
 	entry->end = end;
 	DMAR_DOMAIN_LOCK(domain);
-	error = dmar_gas_alloc_region(domain, entry, DMAR_GM_CANWAIT);
+	error = dmar_gas_alloc_region(domain, entry, IOMMU_MF_CANWAIT);
 	if (error == 0)
 		entry->flags |= IOMMU_MAP_ENTRY_UNMAPPED;
 	DMAR_DOMAIN_UNLOCK(domain);

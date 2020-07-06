@@ -555,9 +555,9 @@ dmar_bus_dmamap_load_something1(struct bus_dma_tag_dmar *tag,
 		 * (Too) optimistically allow split if there are more
 		 * then one segments left.
 		 */
-		gas_flags = map->cansleep ? DMAR_GM_CANWAIT : 0;
+		gas_flags = map->cansleep ? IOMMU_MF_CANWAIT : 0;
 		if (seg + 1 < tag->common.nsegments)
-			gas_flags |= DMAR_GM_CANSPLIT;
+			gas_flags |= IOMMU_MF_CANSPLIT;
 
 		error = dmar_gas_map(domain, &tag->common, size, offset,
 		    IOMMU_MAP_ENTRY_READ |
@@ -565,7 +565,7 @@ dmar_bus_dmamap_load_something1(struct bus_dma_tag_dmar *tag,
 		    gas_flags, ma + idx, &entry);
 		if (error != 0)
 			break;
-		if ((gas_flags & DMAR_GM_CANSPLIT) != 0) {
+		if ((gas_flags & IOMMU_MF_CANSPLIT) != 0) {
 			KASSERT(size >= entry->end - entry->start,
 			    ("split increased entry size %jx %jx %jx",
 			    (uintmax_t)size, (uintmax_t)entry->start,
@@ -1022,7 +1022,7 @@ bus_dma_dmar_load_ident(bus_dma_tag_t dmat, bus_dmamap_t map1,
 	}
 	error = dmar_gas_map_region(domain, entry, IOMMU_MAP_ENTRY_READ |
 	    ((flags & BUS_DMA_NOWRITE) ? 0 : IOMMU_MAP_ENTRY_WRITE),
-	    waitok ? DMAR_GM_CANWAIT : 0, ma);
+	    waitok ? IOMMU_MF_CANWAIT : 0, ma);
 	if (error == 0) {
 		DMAR_DOMAIN_LOCK(domain);
 		TAILQ_INSERT_TAIL(&map->map_entries, entry, dmamap_link);

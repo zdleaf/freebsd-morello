@@ -390,9 +390,10 @@ void dmar_fini_irt(struct iommu_unit *unit);
 void dmar_set_buswide_ctx(struct iommu_unit *unit, u_int busno);
 bool dmar_is_buswide_ctx(struct iommu_unit *unit, u_int busno);
 
-#define	DMAR_GM_CANWAIT	0x0001
-#define	DMAR_GM_CANSPLIT 0x0002
-#define	DMAR_GM_RMRR	0x0004
+/* Map flags */
+#define	IOMMU_MF_CANWAIT	0x0001
+#define	IOMMU_MF_CANSPLIT	0x0002
+#define	IOMMU_MF_RMRR		0x0004
 
 #define	DMAR_PGF_WAITOK	0x0001
 #define	DMAR_PGF_ZERO	0x0002
