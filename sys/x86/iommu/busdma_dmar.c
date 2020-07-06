@@ -319,11 +319,11 @@ bus_dma_dmar_set_buswide(device_t dev)
 
 static MALLOC_DEFINE(M_DMAR_DMAMAP, "dmar_dmamap", "Intel DMAR DMA Map");
 
-static void dmar_bus_schedule_dmamap(struct iommu_unit *unit,
+static void iommu_bus_schedule_dmamap(struct iommu_unit *unit,
     struct bus_dmamap_dmar *map);
 
 static int
-dmar_bus_dma_tag_create(bus_dma_tag_t parent, bus_size_t alignment,
+iommu_bus_dma_tag_create(bus_dma_tag_t parent, bus_size_t alignment,
     bus_addr_t boundary, bus_addr_t lowaddr, bus_addr_t highaddr,
     bus_dma_filter_t *filter, void *filterarg, bus_size_t maxsize,
     int nsegments, bus_size_t maxsegsz, int flags, bus_dma_lock_t *lockfunc,
@@ -355,14 +355,14 @@ out:
 }
 
 static int
-dmar_bus_dma_tag_set_domain(bus_dma_tag_t dmat)
+iommu_bus_dma_tag_set_domain(bus_dma_tag_t dmat)
 {
 
 	return (0);
 }
 
 static int
-dmar_bus_dma_tag_destroy(bus_dma_tag_t dmat1)
+iommu_bus_dma_tag_destroy(bus_dma_tag_t dmat1)
 {
 	struct bus_dma_tag_dmar *dmat, *dmat_copy, *parent;
 	int error;
@@ -394,14 +394,14 @@ out:
 }
 
 static bool
-dmar_bus_dma_id_mapped(bus_dma_tag_t dmat, vm_paddr_t buf, bus_size_t buflen)
+iommu_bus_dma_id_mapped(bus_dma_tag_t dmat, vm_paddr_t buf, bus_size_t buflen)
 {
 
 	return (false);
 }
 
 static int
-dmar_bus_dmamap_create(bus_dma_tag_t dmat, int flags, bus_dmamap_t *mapp)
+iommu_bus_dmamap_create(bus_dma_tag_t dmat, int flags, bus_dmamap_t *mapp)
 {
 	struct bus_dma_tag_dmar *tag;
 	struct bus_dmamap_dmar *map;
@@ -434,7 +434,7 @@ dmar_bus_dmamap_create(bus_dma_tag_t dmat, int flags, bus_dmamap_t *mapp)
 }
 
 static int
-dmar_bus_dmamap_destroy(bus_dma_tag_t dmat, bus_dmamap_t map1)
+iommu_bus_dmamap_destroy(bus_dma_tag_t dmat, bus_dmamap_t map1)
 {
 	struct bus_dma_tag_dmar *tag;
 	struct bus_dmamap_dmar *map;
@@ -458,7 +458,7 @@ dmar_bus_dmamap_destroy(bus_dma_tag_t dmat, bus_dmamap_t map1)
 
 
 static int
-dmar_bus_dmamem_alloc(bus_dma_tag_t dmat, void** vaddr, int flags,
+iommu_bus_dmamem_alloc(bus_dma_tag_t dmat, void** vaddr, int flags,
     bus_dmamap_t *mapp)
 {
 	struct bus_dma_tag_dmar *tag;
@@ -466,7 +466,7 @@ dmar_bus_dmamem_alloc(bus_dma_tag_t dmat, void** vaddr, int flags,
 	int error, mflags;
 	vm_memattr_t attr;
 
-	error = dmar_bus_dmamap_create(dmat, flags, mapp);
+	error = iommu_bus_dmamap_create(dmat, flags, mapp);
 	if (error != 0)
 		return (error);
 
@@ -491,7 +491,7 @@ dmar_bus_dmamem_alloc(bus_dma_tag_t dmat, void** vaddr, int flags,
 		map->flags |= BUS_DMAMAP_DMAR_KMEM_ALLOC;
 	}
 	if (*vaddr == NULL) {
-		dmar_bus_dmamap_destroy(dmat, *mapp);
+		iommu_bus_dmamap_destroy(dmat, *mapp);
 		*mapp = NULL;
 		return (ENOMEM);
 	}
@@ -499,7 +499,7 @@ dmar_bus_dmamem_alloc(bus_dma_tag_t dmat, void** vaddr, int flags,
 }
 
 static void
-dmar_bus_dmamem_free(bus_dma_tag_t dmat, void *vaddr, bus_dmamap_t map1)
+iommu_bus_dmamem_free(bus_dma_tag_t dmat, void *vaddr, bus_dmamap_t map1)
 {
 	struct bus_dma_tag_dmar *tag;
 	struct bus_dmamap_dmar *map;
@@ -512,16 +512,16 @@ dmar_bus_dmamem_free(bus_dma_tag_t dmat, void *vaddr, bus_dmamap_t map1)
 		map->flags &= ~BUS_DMAMAP_DMAR_MALLOC;
 	} else {
 		KASSERT((map->flags & BUS_DMAMAP_DMAR_KMEM_ALLOC) != 0,
-		    ("dmar_bus_dmamem_free for non alloced map %p", map));
+		    ("iommu_bus_dmamem_free for non alloced map %p", map));
 		kmem_free((vm_offset_t)vaddr, tag->common.maxsize);
 		map->flags &= ~BUS_DMAMAP_DMAR_KMEM_ALLOC;
 	}
 
-	dmar_bus_dmamap_destroy(dmat, map1);
+	iommu_bus_dmamap_destroy(dmat, map1);
 }
 
 static int
-dmar_bus_dmamap_load_something1(struct bus_dma_tag_dmar *tag,
+iommu_bus_dmamap_load_something1(struct bus_dma_tag_dmar *tag,
     struct bus_dmamap_dmar *map, vm_page_t *ma, int offset, bus_size_t buflen,
     int flags, bus_dma_segment_t *segs, int *segp,
     struct dmar_map_entries_tailq *unroll_list)
@@ -627,7 +627,7 @@ dmar_bus_dmamap_load_something1(struct bus_dma_tag_dmar *tag,
 }
 
 static int
-dmar_bus_dmamap_load_something(struct bus_dma_tag_dmar *tag,
+iommu_bus_dmamap_load_something(struct bus_dma_tag_dmar *tag,
     struct bus_dmamap_dmar *map, vm_page_t *ma, int offset, bus_size_t buflen,
     int flags, bus_dma_segment_t *segs, int *segp)
 {
@@ -642,7 +642,7 @@ dmar_bus_dmamap_load_something(struct bus_dma_tag_dmar *tag,
 	atomic_add_long(&ctx->loads, 1);
 
 	TAILQ_INIT(&unroll_list);
-	error = dmar_bus_dmamap_load_something1(tag, map, ma, offset,
+	error = iommu_bus_dmamap_load_something1(tag, map, ma, offset,
 	    buflen, flags, segs, segp, &unroll_list);
 	if (error != 0) {
 		/*
@@ -673,12 +673,12 @@ dmar_bus_dmamap_load_something(struct bus_dma_tag_dmar *tag,
 	    !map->cansleep)
 		error = EINPROGRESS;
 	if (error == EINPROGRESS)
-		dmar_bus_schedule_dmamap(domain->dmar, map);
+		iommu_bus_schedule_dmamap(domain->dmar, map);
 	return (error);
 }
 
 static int
-dmar_bus_dmamap_load_ma(bus_dma_tag_t dmat, bus_dmamap_t map1,
+iommu_bus_dmamap_load_ma(bus_dma_tag_t dmat, bus_dmamap_t map1,
     struct vm_page **ma, bus_size_t tlen, int ma_offs, int flags,
     bus_dma_segment_t *segs, int *segp)
 {
@@ -687,12 +687,12 @@ dmar_bus_dmamap_load_ma(bus_dma_tag_t dmat, bus_dmamap_t map1,
 
 	tag = (struct bus_dma_tag_dmar *)dmat;
 	map = (struct bus_dmamap_dmar *)map1;
-	return (dmar_bus_dmamap_load_something(tag, map, ma, ma_offs, tlen,
+	return (iommu_bus_dmamap_load_something(tag, map, ma, ma_offs, tlen,
 	    flags, segs, segp));
 }
 
 static int
-dmar_bus_dmamap_load_phys(bus_dma_tag_t dmat, bus_dmamap_t map1,
+iommu_bus_dmamap_load_phys(bus_dma_tag_t dmat, bus_dmamap_t map1,
     vm_paddr_t buf, bus_size_t buflen, int flags, bus_dma_segment_t *segs,
     int *segp)
 {
@@ -735,7 +735,7 @@ dmar_bus_dmamap_load_phys(bus_dma_tag_t dmat, bus_dmamap_t map1,
 			ma[i] = &fma[i];
 		}
 	}
-	error = dmar_bus_dmamap_load_something(tag, map, ma, offset, buflen,
+	error = iommu_bus_dmamap_load_something(tag, map, ma, offset, buflen,
 	    flags, segs, segp);
 	free(fma, M_DEVBUF);
 	free(ma, M_DEVBUF);
@@ -743,7 +743,7 @@ dmar_bus_dmamap_load_phys(bus_dma_tag_t dmat, bus_dmamap_t map1,
 }
 
 static int
-dmar_bus_dmamap_load_buffer(bus_dma_tag_t dmat, bus_dmamap_t map1, void *buf,
+iommu_bus_dmamap_load_buffer(bus_dma_tag_t dmat, bus_dmamap_t map1, void *buf,
     bus_size_t buflen, pmap_t pmap, int flags, bus_dma_segment_t *segs,
     int *segp)
 {
@@ -788,7 +788,7 @@ dmar_bus_dmamap_load_buffer(bus_dma_tag_t dmat, bus_dmamap_t map1, void *buf,
 			ma[i] = &fma[i];
 		}
 	}
-	error = dmar_bus_dmamap_load_something(tag, map, ma, offset, buflen,
+	error = iommu_bus_dmamap_load_something(tag, map, ma, offset, buflen,
 	    flags, segs, segp);
 	free(ma, M_DEVBUF);
 	free(fma, M_DEVBUF);
@@ -796,7 +796,7 @@ dmar_bus_dmamap_load_buffer(bus_dma_tag_t dmat, bus_dmamap_t map1, void *buf,
 }
 
 static void
-dmar_bus_dmamap_waitok(bus_dma_tag_t dmat, bus_dmamap_t map1,
+iommu_bus_dmamap_waitok(bus_dma_tag_t dmat, bus_dmamap_t map1,
     struct memdesc *mem, bus_dmamap_callback_t *callback, void *callback_arg)
 {
 	struct bus_dmamap_dmar *map;
@@ -811,7 +811,7 @@ dmar_bus_dmamap_waitok(bus_dma_tag_t dmat, bus_dmamap_t map1,
 }
 
 static bus_dma_segment_t *
-dmar_bus_dmamap_complete(bus_dma_tag_t dmat, bus_dmamap_t map1,
+iommu_bus_dmamap_complete(bus_dma_tag_t dmat, bus_dmamap_t map1,
     bus_dma_segment_t *segs, int nsegs, int error)
 {
 	struct bus_dma_tag_dmar *tag;
@@ -848,7 +848,7 @@ dmar_bus_dmamap_complete(bus_dma_tag_t dmat, bus_dmamap_t map1,
  * On amd64, we assume that sf allocation cannot fail.
  */
 static void
-dmar_bus_dmamap_unload(bus_dma_tag_t dmat, bus_dmamap_t map1)
+iommu_bus_dmamap_unload(bus_dma_tag_t dmat, bus_dmamap_t map1)
 {
 	struct bus_dma_tag_dmar *tag;
 	struct bus_dmamap_dmar *map;
@@ -883,31 +883,31 @@ dmar_bus_dmamap_unload(bus_dma_tag_t dmat, bus_dmamap_t map1)
 }
 
 static void
-dmar_bus_dmamap_sync(bus_dma_tag_t dmat, bus_dmamap_t map,
+iommu_bus_dmamap_sync(bus_dma_tag_t dmat, bus_dmamap_t map,
     bus_dmasync_op_t op)
 {
 }
 
 struct bus_dma_impl bus_dma_dmar_impl = {
-	.tag_create = dmar_bus_dma_tag_create,
-	.tag_destroy = dmar_bus_dma_tag_destroy,
-	.tag_set_domain = dmar_bus_dma_tag_set_domain,
-	.id_mapped = dmar_bus_dma_id_mapped,
-	.map_create = dmar_bus_dmamap_create,
-	.map_destroy = dmar_bus_dmamap_destroy,
-	.mem_alloc = dmar_bus_dmamem_alloc,
-	.mem_free = dmar_bus_dmamem_free,
-	.load_phys = dmar_bus_dmamap_load_phys,
-	.load_buffer = dmar_bus_dmamap_load_buffer,
-	.load_ma = dmar_bus_dmamap_load_ma,
-	.map_waitok = dmar_bus_dmamap_waitok,
-	.map_complete = dmar_bus_dmamap_complete,
-	.map_unload = dmar_bus_dmamap_unload,
-	.map_sync = dmar_bus_dmamap_sync,
+	.tag_create = iommu_bus_dma_tag_create,
+	.tag_destroy = iommu_bus_dma_tag_destroy,
+	.tag_set_domain = iommu_bus_dma_tag_set_domain,
+	.id_mapped = iommu_bus_dma_id_mapped,
+	.map_create = iommu_bus_dmamap_create,
+	.map_destroy = iommu_bus_dmamap_destroy,
+	.mem_alloc = iommu_bus_dmamem_alloc,
+	.mem_free = iommu_bus_dmamem_free,
+	.load_phys = iommu_bus_dmamap_load_phys,
+	.load_buffer = iommu_bus_dmamap_load_buffer,
+	.load_ma = iommu_bus_dmamap_load_ma,
+	.map_waitok = iommu_bus_dmamap_waitok,
+	.map_complete = iommu_bus_dmamap_complete,
+	.map_unload = iommu_bus_dmamap_unload,
+	.map_sync = iommu_bus_dmamap_sync,
 };
 
 static void
-dmar_bus_task_dmamap(void *arg, int pending)
+iommu_bus_task_dmamap(void *arg, int pending)
 {
 	struct bus_dma_tag_dmar *tag;
 	struct bus_dmamap_dmar *map;
@@ -937,7 +937,7 @@ dmar_bus_task_dmamap(void *arg, int pending)
 }
 
 static void
-dmar_bus_schedule_dmamap(struct iommu_unit *unit, struct bus_dmamap_dmar *map)
+iommu_bus_schedule_dmamap(struct iommu_unit *unit, struct bus_dmamap_dmar *map)
 {
 
 	map->locked = false;
@@ -954,7 +954,7 @@ dmar_init_busdma(struct iommu_unit *unit)
 	unit->dma_enabled = 1;
 	TUNABLE_INT_FETCH("hw.dmar.dma", &unit->dma_enabled);
 	TAILQ_INIT(&unit->delayed_maps);
-	TASK_INIT(&unit->dmamap_load_task, 0, dmar_bus_task_dmamap, unit);
+	TASK_INIT(&unit->dmamap_load_task, 0, iommu_bus_task_dmamap, unit);
 	unit->delayed_taskqueue = taskqueue_create("dmar", M_WAITOK,
 	    taskqueue_thread_enqueue, &unit->delayed_taskqueue);
 	taskqueue_start_threads(&unit->delayed_taskqueue, 1, PI_DISK,
