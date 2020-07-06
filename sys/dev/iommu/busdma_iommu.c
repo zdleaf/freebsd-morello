@@ -123,7 +123,7 @@ iommu_bus_dma_is_dev_disabled(int domain, int bus, int slot, int func)
  * domain, and must collectively be assigned to use either IOMMU or
  * bounce mapping.
  */
-static device_t
+device_t
 iommu_get_requester(device_t dev, uint16_t *rid)
 {
 	devclass_t pci_class;

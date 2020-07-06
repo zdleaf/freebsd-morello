@@ -87,5 +87,6 @@ int iommu_init_busdma(struct iommu_unit *unit);
 void iommu_fini_busdma(struct iommu_unit *unit);
 struct iommu_device *iommu_instantiate_device(struct iommu_unit *dmar,
     device_t dev, bool rmrr);
+device_t iommu_get_requester(device_t dev, uint16_t *rid);
 
 #endif /* !_DEV_IOMMU_BUSDMA_IOMMU_H_*/
