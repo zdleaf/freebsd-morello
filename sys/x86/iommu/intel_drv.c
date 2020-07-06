@@ -252,7 +252,7 @@ dmar_release_resources(device_t dev, struct iommu_unit *unit)
 {
 	int i;
 
-	dmar_fini_busdma(unit);
+	iommu_fini_busdma(unit);
 	dmar_fini_irt(unit);
 	dmar_fini_qi(unit);
 	dmar_fini_fault_log(unit);
@@ -531,7 +531,7 @@ dmar_attach(device_t dev)
 		dmar_release_resources(dev, unit);
 		return (error);
 	}
-	error = dmar_init_busdma(unit);
+	error = iommu_init_busdma(unit);
 	if (error != 0) {
 		dmar_release_resources(dev, unit);
 		return (error);

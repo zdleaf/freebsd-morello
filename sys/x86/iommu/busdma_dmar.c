@@ -948,7 +948,7 @@ iommu_bus_schedule_dmamap(struct iommu_unit *unit, struct bus_dmamap_iommu *map)
 }
 
 int
-dmar_init_busdma(struct iommu_unit *unit)
+iommu_init_busdma(struct iommu_unit *unit)
 {
 
 	unit->dma_enabled = 1;
@@ -963,7 +963,7 @@ dmar_init_busdma(struct iommu_unit *unit)
 }
 
 void
-dmar_fini_busdma(struct iommu_unit *unit)
+iommu_fini_busdma(struct iommu_unit *unit)
 {
 
 	if (unit->delayed_taskqueue == NULL)

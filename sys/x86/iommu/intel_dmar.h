@@ -354,8 +354,8 @@ void iommu_domain_unload(struct iommu_domain *domain,
     struct dmar_map_entries_tailq *entries, bool cansleep);
 void iommu_domain_free_entry(struct iommu_map_entry *entry, bool free);
 
-int dmar_init_busdma(struct iommu_unit *unit);
-void dmar_fini_busdma(struct iommu_unit *unit);
+int iommu_init_busdma(struct iommu_unit *unit);
+void iommu_fini_busdma(struct iommu_unit *unit);
 device_t iommu_get_requester(device_t dev, uint16_t *rid);
 
 void dmar_gas_init_domain(struct iommu_domain *domain);
