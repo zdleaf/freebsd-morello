@@ -1059,7 +1059,7 @@ dmar_inst_rmrr_iter(ACPI_DMAR_HEADER *dmarh, void *arg)
 			unit = dmar_find(dev, false);
 			if (iria->dmar != unit)
 				continue;
-			dmar_instantiate_ctx(iria->dmar, dev, true);
+			iommu_instantiate_device(iria->dmar, dev, true);
 		}
 	}
 

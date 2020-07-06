@@ -338,7 +338,7 @@ void domain_free_pgtbl(struct iommu_domain *domain);
 int dmar_dev_depth(device_t child);
 void dmar_dev_path(device_t child, int *busno, void *path1, int depth);
 
-struct iommu_device *dmar_instantiate_ctx(struct iommu_unit *dmar, device_t dev,
+struct iommu_device *iommu_instantiate_device(struct iommu_unit *dmar, device_t dev,
     bool rmrr);
 struct iommu_device *dmar_get_ctx_for_dev(struct iommu_unit *dmar, device_t dev,
     uint16_t rid, bool id_mapped, bool rmrr_init);

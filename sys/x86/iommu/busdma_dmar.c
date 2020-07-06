@@ -229,7 +229,7 @@ iommu_get_requester(device_t dev, uint16_t *rid)
 }
 
 struct iommu_device *
-dmar_instantiate_ctx(struct iommu_unit *dmar, device_t dev, bool rmrr)
+iommu_instantiate_device(struct iommu_unit *dmar, device_t dev, bool rmrr)
 {
 	device_t requester;
 	struct iommu_device *ctx;
@@ -284,7 +284,7 @@ acpi_iommu_get_dma_tag(device_t dev, device_t child)
 	dmar_quirks_pre_use(dmar);
 	dmar_instantiate_rmrr_ctxs(dmar);
 
-	ctx = dmar_instantiate_ctx(dmar, child, false);
+	ctx = iommu_instantiate_device(dmar, child, false);
 	res = ctx == NULL ? NULL : (bus_dma_tag_t)&ctx->device_tag;
 	return (res);
 }
