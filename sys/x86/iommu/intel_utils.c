@@ -106,7 +106,7 @@ static const struct sagaw_bits_tag {
 };
 
 bool
-dmar_pglvl_supported(struct dmar_unit *unit, int pglvl)
+dmar_pglvl_supported(struct iommu_unit *unit, int pglvl)
 {
 	int i;
 
@@ -148,7 +148,7 @@ domain_set_agaw(struct dmar_domain *domain, int mgaw)
  *     address space, accept the biggest sagaw, whatever is it.
  */
 int
-dmar_maxaddr2mgaw(struct dmar_unit *unit, dmar_gaddr_t maxaddr, bool allow_less)
+dmar_maxaddr2mgaw(struct iommu_unit *unit, dmar_gaddr_t maxaddr, bool allow_less)
 {
 	int i;
 
@@ -235,7 +235,7 @@ domain_page_size(struct dmar_domain *domain, int lvl)
 }
 
 int
-calc_am(struct dmar_unit *unit, dmar_gaddr_t base, dmar_gaddr_t size,
+calc_am(struct iommu_unit *unit, dmar_gaddr_t base, dmar_gaddr_t size,
     dmar_gaddr_t *isizep)
 {
 	dmar_gaddr_t isize;
@@ -360,7 +360,7 @@ dmar_unmap_pgtbl(struct sf_buf *sf)
 }
 
 static void
-dmar_flush_transl_to_ram(struct dmar_unit *unit, void *dst, size_t sz)
+dmar_flush_transl_to_ram(struct iommu_unit *unit, void *dst, size_t sz)
 {
 
 	if (DMAR_IS_COHERENT(unit))
@@ -373,21 +373,21 @@ dmar_flush_transl_to_ram(struct dmar_unit *unit, void *dst, size_t sz)
 }
 
 void
-dmar_flush_pte_to_ram(struct dmar_unit *unit, dmar_pte_t *dst)
+dmar_flush_pte_to_ram(struct iommu_unit *unit, dmar_pte_t *dst)
 {
 
 	dmar_flush_transl_to_ram(unit, dst, sizeof(*dst));
 }
 
 void
-dmar_flush_ctx_to_ram(struct dmar_unit *unit, dmar_ctx_entry_t *dst)
+dmar_flush_ctx_to_ram(struct iommu_unit *unit, dmar_ctx_entry_t *dst)
 {
 
 	dmar_flush_transl_to_ram(unit, dst, sizeof(*dst));
 }
 
 void
-dmar_flush_root_to_ram(struct dmar_unit *unit, dmar_root_entry_t *dst)
+dmar_flush_root_to_ram(struct iommu_unit *unit, dmar_root_entry_t *dst)
 {
 
 	dmar_flush_transl_to_ram(unit, dst, sizeof(*dst));
@@ -398,7 +398,7 @@ dmar_flush_root_to_ram(struct dmar_unit *unit, dmar_root_entry_t *dst)
  * the completion.
  */
 int
-dmar_load_root_entry_ptr(struct dmar_unit *unit)
+dmar_load_root_entry_ptr(struct iommu_unit *unit)
 {
 	vm_page_t root_entry;
 	int error;
@@ -424,7 +424,7 @@ dmar_load_root_entry_ptr(struct dmar_unit *unit)
  * the completion.
  */
 int
-dmar_inv_ctx_glob(struct dmar_unit *unit)
+dmar_inv_ctx_glob(struct iommu_unit *unit)
 {
 	int error;
 
@@ -451,7 +451,7 @@ dmar_inv_ctx_glob(struct dmar_unit *unit)
  * Globally invalidate the IOTLB, busily waiting for the completion.
  */
 int
-dmar_inv_iotlb_glob(struct dmar_unit *unit)
+dmar_inv_iotlb_glob(struct iommu_unit *unit)
 {
 	int error, reg;
 
@@ -472,7 +472,7 @@ dmar_inv_iotlb_glob(struct dmar_unit *unit)
  * in the architecture specification.
  */
 int
-dmar_flush_write_bufs(struct dmar_unit *unit)
+dmar_flush_write_bufs(struct iommu_unit *unit)
 {
 	int error;
 
@@ -491,7 +491,7 @@ dmar_flush_write_bufs(struct dmar_unit *unit)
 }
 
 int
-dmar_enable_translation(struct dmar_unit *unit)
+dmar_enable_translation(struct iommu_unit *unit)
 {
 	int error;
 
@@ -504,7 +504,7 @@ dmar_enable_translation(struct dmar_unit *unit)
 }
 
 int
-dmar_disable_translation(struct dmar_unit *unit)
+dmar_disable_translation(struct iommu_unit *unit)
 {
 	int error;
 
@@ -517,7 +517,7 @@ dmar_disable_translation(struct dmar_unit *unit)
 }
 
 int
-dmar_load_irt_ptr(struct dmar_unit *unit)
+dmar_load_irt_ptr(struct iommu_unit *unit)
 {
 	uint64_t irta, s;
 	int error;
@@ -539,7 +539,7 @@ dmar_load_irt_ptr(struct dmar_unit *unit)
 }
 
 int
-dmar_enable_ir(struct dmar_unit *unit)
+dmar_enable_ir(struct iommu_unit *unit)
 {
 	int error;
 
@@ -553,7 +553,7 @@ dmar_enable_ir(struct dmar_unit *unit)
 }
 
 int
-dmar_disable_ir(struct dmar_unit *unit)
+dmar_disable_ir(struct iommu_unit *unit)
 {
 	int error;
 
@@ -573,7 +573,7 @@ dmar_disable_ir(struct dmar_unit *unit)
 	f_wakeup = 1 << (barrier_id * 3 + 2)
 
 bool
-dmar_barrier_enter(struct dmar_unit *dmar, u_int barrier_id)
+dmar_barrier_enter(struct iommu_unit *dmar, u_int barrier_id)
 {
 	BARRIER_F;
 
@@ -601,7 +601,7 @@ dmar_barrier_enter(struct dmar_unit *dmar, u_int barrier_id)
 }
 
 void
-dmar_barrier_exit(struct dmar_unit *dmar, u_int barrier_id)
+dmar_barrier_exit(struct iommu_unit *dmar, u_int barrier_id)
 {
 	BARRIER_F;
 

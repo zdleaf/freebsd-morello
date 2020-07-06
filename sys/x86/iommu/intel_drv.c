@@ -232,7 +232,7 @@ dmar_probe(device_t dev)
 }
 
 static void
-dmar_release_intr(device_t dev, struct dmar_unit *unit, int idx)
+dmar_release_intr(device_t dev, struct iommu_unit *unit, int idx)
 {
 	struct dmar_msi_data *dmd;
 
@@ -248,7 +248,7 @@ dmar_release_intr(device_t dev, struct dmar_unit *unit, int idx)
 }
 
 static void
-dmar_release_resources(device_t dev, struct dmar_unit *unit)
+dmar_release_resources(device_t dev, struct iommu_unit *unit)
 {
 	int i;
 
@@ -276,7 +276,7 @@ dmar_release_resources(device_t dev, struct dmar_unit *unit)
 }
 
 static int
-dmar_alloc_irq(device_t dev, struct dmar_unit *unit, int idx)
+dmar_alloc_irq(device_t dev, struct iommu_unit *unit, int idx)
 {
 	device_t pcib;
 	struct dmar_msi_data *dmd;
@@ -344,7 +344,7 @@ err1:
 static int
 dmar_remap_intr(device_t dev, device_t child, u_int irq)
 {
-	struct dmar_unit *unit;
+	struct iommu_unit *unit;
 	struct dmar_msi_data *dmd;
 	uint64_t msi_addr;
 	uint32_t msi_data;
@@ -374,7 +374,7 @@ dmar_remap_intr(device_t dev, device_t child, u_int irq)
 #endif
 
 static void
-dmar_print_caps(device_t dev, struct dmar_unit *unit,
+dmar_print_caps(device_t dev, struct iommu_unit *unit,
     ACPI_DMAR_HARDWARE_UNIT *dmaru)
 {
 	uint32_t caphi, ecaphi;
@@ -406,7 +406,7 @@ dmar_print_caps(device_t dev, struct dmar_unit *unit,
 static int
 dmar_attach(device_t dev)
 {
-	struct dmar_unit *unit;
+	struct iommu_unit *unit;
 	ACPI_DMAR_HARDWARE_UNIT *dmaru;
 	uint64_t timeout;
 	int i, error;
@@ -589,14 +589,14 @@ static device_method_t dmar_methods[] = {
 static driver_t	dmar_driver = {
 	"dmar",
 	dmar_methods,
-	sizeof(struct dmar_unit),
+	sizeof(struct iommu_unit),
 };
 
 DRIVER_MODULE(dmar, acpi, dmar_driver, dmar_devclass, 0, 0);
 MODULE_DEPEND(dmar, acpi, 1, 1, 1);
 
 void
-dmar_set_buswide_ctx(struct dmar_unit *unit, u_int busno)
+dmar_set_buswide_ctx(struct iommu_unit *unit, u_int busno)
 {
 
 	MPASS(busno <= PCI_BUSMAX);
@@ -607,7 +607,7 @@ dmar_set_buswide_ctx(struct dmar_unit *unit, u_int busno)
 }
 
 bool
-dmar_is_buswide_ctx(struct dmar_unit *unit, u_int busno)
+dmar_is_buswide_ctx(struct iommu_unit *unit, u_int busno)
 {
 
 	MPASS(busno <= PCI_BUSMAX);
@@ -728,7 +728,7 @@ dmar_match_devscope(ACPI_DMAR_DEVICE_SCOPE *devscope, int dev_busno,
 }
 
 static bool
-dmar_match_by_path(struct dmar_unit *unit, int dev_domain, int dev_busno,
+dmar_match_by_path(struct iommu_unit *unit, int dev_domain, int dev_busno,
     const ACPI_DMAR_PCI_PATH *dev_path, int dev_path_len, const char **banner)
 {
 	ACPI_DMAR_HARDWARE_UNIT *dmarh;
@@ -764,11 +764,11 @@ dmar_match_by_path(struct dmar_unit *unit, int dev_domain, int dev_busno,
 	return (false);
 }
 
-static struct dmar_unit *
+static struct iommu_unit *
 dmar_find_by_scope(int dev_domain, int dev_busno,
     const ACPI_DMAR_PCI_PATH *dev_path, int dev_path_len)
 {
-	struct dmar_unit *unit;
+	struct iommu_unit *unit;
 	int i;
 
 	for (i = 0; i < dmar_devcnt; i++) {
@@ -782,11 +782,11 @@ dmar_find_by_scope(int dev_domain, int dev_busno,
 	return (NULL);
 }
 
-struct dmar_unit *
+struct iommu_unit *
 dmar_find(device_t dev, bool verbose)
 {
 	device_t dmar_dev;
-	struct dmar_unit *unit;
+	struct iommu_unit *unit;
 	const char *banner;
 	int i, dev_domain, dev_busno, dev_path_len;
 
@@ -826,11 +826,11 @@ dmar_find(device_t dev, bool verbose)
 	return (unit);
 }
 
-static struct dmar_unit *
+static struct iommu_unit *
 dmar_find_nonpci(u_int id, u_int entry_type, uint16_t *rid)
 {
 	device_t dmar_dev;
-	struct dmar_unit *unit;
+	struct iommu_unit *unit;
 	ACPI_DMAR_HARDWARE_UNIT *dmarh;
 	ACPI_DMAR_DEVICE_SCOPE *devscope;
 	ACPI_DMAR_PCI_PATH *path;
@@ -844,7 +844,7 @@ dmar_find_nonpci(u_int id, u_int entry_type, uint16_t *rid)
 		dmar_dev = dmar_devs[i];
 		if (dmar_dev == NULL)
 			continue;
-		unit = (struct dmar_unit *)device_get_softc(dmar_dev);
+		unit = (struct iommu_unit *)device_get_softc(dmar_dev);
 		dmarh = dmar_find_by_index(i);
 		if (dmarh == NULL)
 			continue;
@@ -890,7 +890,7 @@ dmar_find_nonpci(u_int id, u_int entry_type, uint16_t *rid)
 }
 
 
-struct dmar_unit *
+struct iommu_unit *
 dmar_find_hpet(device_t dev, uint16_t *rid)
 {
 
@@ -898,7 +898,7 @@ dmar_find_hpet(device_t dev, uint16_t *rid)
 	    rid));
 }
 
-struct dmar_unit *
+struct iommu_unit *
 dmar_find_ioapic(u_int apic_id, uint16_t *rid)
 {
 
@@ -972,7 +972,7 @@ dmar_dev_parse_rmrr(struct dmar_domain *domain, int dev_domain, int dev_busno,
 }
 
 struct inst_rmrr_iter_args {
-	struct dmar_unit *dmar;
+	struct iommu_unit *dmar;
 };
 
 static device_t
@@ -1004,7 +1004,7 @@ dmar_inst_rmrr_iter(ACPI_DMAR_HEADER *dmarh, void *arg)
 	struct inst_rmrr_iter_args *iria;
 	const char *ptr, *ptrend;
 	device_t dev;
-	struct dmar_unit *unit;
+	struct iommu_unit *unit;
 	int dev_path_len;
 	uint16_t rid;
 
@@ -1071,7 +1071,7 @@ dmar_inst_rmrr_iter(ACPI_DMAR_HEADER *dmarh, void *arg)
  * Pre-create all contexts for the DMAR which have RMRR entries.
  */
 int
-dmar_instantiate_rmrr_ctxs(struct dmar_unit *dmar)
+dmar_instantiate_rmrr_ctxs(struct iommu_unit *dmar)
 {
 	struct inst_rmrr_iter_args iria;
 	int error;
@@ -1179,7 +1179,7 @@ dmar_print_domain(struct dmar_domain *domain, bool show_mappings)
 
 DB_FUNC(dmar_domain, db_dmar_print_domain, db_show_table, CS_OWN, NULL)
 {
-	struct dmar_unit *unit;
+	struct iommu_unit *unit;
 	struct dmar_domain *domain;
 	struct dmar_ctx *ctx;
 	bool show_mappings, valid;
@@ -1249,7 +1249,7 @@ out:;
 static void
 dmar_print_one(int idx, bool show_domains, bool show_mappings)
 {
-	struct dmar_unit *unit;
+	struct iommu_unit *unit;
 	struct dmar_domain *domain;
 	int i, frir;
 

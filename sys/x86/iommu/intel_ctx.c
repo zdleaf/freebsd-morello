@@ -75,12 +75,12 @@ static MALLOC_DEFINE(M_DMAR_CTX, "dmar_ctx", "Intel DMAR Context");
 static MALLOC_DEFINE(M_DMAR_DOMAIN, "dmar_dom", "Intel DMAR Domain");
 
 static void dmar_domain_unload_task(void *arg, int pending);
-static void dmar_unref_domain_locked(struct dmar_unit *dmar,
+static void dmar_unref_domain_locked(struct iommu_unit *dmar,
     struct dmar_domain *domain);
 static void dmar_domain_destroy(struct dmar_domain *domain);
 
 static void
-dmar_ensure_ctx_page(struct dmar_unit *dmar, int bus)
+dmar_ensure_ctx_page(struct iommu_unit *dmar, int bus)
 {
 	struct sf_buf *sf;
 	dmar_root_entry_t *re;
@@ -168,7 +168,7 @@ static void
 ctx_id_entry_init(struct dmar_ctx *ctx, dmar_ctx_entry_t *ctxp, bool move,
     int busno)
 {
-	struct dmar_unit *unit;
+	struct iommu_unit *unit;
 	struct dmar_domain *domain;
 	vm_page_t ctx_root;
 	int i;
@@ -202,7 +202,7 @@ ctx_id_entry_init(struct dmar_ctx *ctx, dmar_ctx_entry_t *ctxp, bool move,
 }
 
 static int
-dmar_flush_for_ctx_entry(struct dmar_unit *dmar, bool force)
+dmar_flush_for_ctx_entry(struct iommu_unit *dmar, bool force)
 {
 	int error;
 
@@ -313,7 +313,7 @@ domain_init_rmrr(struct dmar_domain *domain, device_t dev, int bus,
 }
 
 static struct dmar_domain *
-dmar_domain_alloc(struct dmar_unit *dmar, bool id_mapped)
+dmar_domain_alloc(struct iommu_unit *dmar, bool id_mapped)
 {
 	struct dmar_domain *domain;
 	int error, id, mgaw;
@@ -442,7 +442,7 @@ dmar_domain_destroy(struct dmar_domain *domain)
 }
 
 static struct dmar_ctx *
-dmar_get_ctx_for_dev1(struct dmar_unit *dmar, device_t dev, uint16_t rid,
+dmar_get_ctx_for_dev1(struct iommu_unit *dmar, device_t dev, uint16_t rid,
     int dev_domain, int dev_busno, const void *dev_path, int dev_path_len,
     bool id_mapped, bool rmrr_init)
 {
@@ -574,7 +574,7 @@ dmar_get_ctx_for_dev1(struct dmar_unit *dmar, device_t dev, uint16_t rid,
 }
 
 struct dmar_ctx *
-dmar_get_ctx_for_dev(struct dmar_unit *dmar, device_t dev, uint16_t rid,
+dmar_get_ctx_for_dev(struct iommu_unit *dmar, device_t dev, uint16_t rid,
     bool id_mapped, bool rmrr_init)
 {
 	int dev_domain, dev_path_len, dev_busno;
@@ -588,7 +588,7 @@ dmar_get_ctx_for_dev(struct dmar_unit *dmar, device_t dev, uint16_t rid,
 }
 
 struct dmar_ctx *
-dmar_get_ctx_for_devpath(struct dmar_unit *dmar, uint16_t rid,
+dmar_get_ctx_for_devpath(struct iommu_unit *dmar, uint16_t rid,
     int dev_domain, int dev_busno,
     const void *dev_path, int dev_path_len,
     bool id_mapped, bool rmrr_init)
@@ -601,7 +601,7 @@ dmar_get_ctx_for_devpath(struct dmar_unit *dmar, uint16_t rid,
 int
 dmar_move_ctx_to_domain(struct dmar_domain *domain, struct dmar_ctx *ctx)
 {
-	struct dmar_unit *dmar;
+	struct iommu_unit *dmar;
 	struct dmar_domain *old_domain;
 	dmar_ctx_entry_t *ctxp;
 	struct sf_buf *sf;
@@ -634,7 +634,7 @@ dmar_move_ctx_to_domain(struct dmar_domain *domain, struct dmar_ctx *ctx)
 }
 
 static void
-dmar_unref_domain_locked(struct dmar_unit *dmar, struct dmar_domain *domain)
+dmar_unref_domain_locked(struct iommu_unit *dmar, struct dmar_domain *domain)
 {
 
 	IOMMU_ASSERT_LOCKED(dmar);
@@ -661,7 +661,7 @@ dmar_unref_domain_locked(struct dmar_unit *dmar, struct dmar_domain *domain)
 }
 
 void
-dmar_free_ctx_locked(struct dmar_unit *dmar, struct dmar_ctx *ctx)
+dmar_free_ctx_locked(struct iommu_unit *dmar, struct dmar_ctx *ctx)
 {
 	struct sf_buf *sf;
 	dmar_ctx_entry_t *ctxp;
@@ -736,7 +736,7 @@ dmar_free_ctx_locked(struct dmar_unit *dmar, struct dmar_ctx *ctx)
 void
 dmar_free_ctx(struct dmar_ctx *ctx)
 {
-	struct dmar_unit *dmar;
+	struct iommu_unit *dmar;
 
 	dmar = ctx->domain->dmar;
 	IOMMU_LOCK(dmar);
@@ -747,7 +747,7 @@ dmar_free_ctx(struct dmar_ctx *ctx)
  * Returns with the domain locked.
  */
 struct dmar_ctx *
-dmar_find_ctx_locked(struct dmar_unit *dmar, uint16_t rid)
+dmar_find_ctx_locked(struct iommu_unit *dmar, uint16_t rid)
 {
 	struct dmar_domain *domain;
 	struct dmar_ctx *ctx;
@@ -784,7 +784,7 @@ dmar_domain_free_entry(struct dmar_map_entry *entry, bool free)
 void
 dmar_domain_unload_entry(struct dmar_map_entry *entry, bool free)
 {
-	struct dmar_unit *unit;
+	struct iommu_unit *unit;
 
 	unit = entry->domain->dmar;
 	if (unit->qi_enabled) {
@@ -816,7 +816,7 @@ void
 dmar_domain_unload(struct dmar_domain *domain,
     struct dmar_map_entries_tailq *entries, bool cansleep)
 {
-	struct dmar_unit *unit;
+	struct iommu_unit *unit;
 	struct dmar_map_entry *entry, *entry1;
 	int error;
 

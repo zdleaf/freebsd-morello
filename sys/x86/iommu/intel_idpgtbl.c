@@ -165,7 +165,7 @@ domain_idmap_nextlvl(struct idpgtbl *tbl, int lvl, vm_pindex_t idx,
 vm_object_t
 domain_get_idmap_pgtbl(struct dmar_domain *domain, dmar_gaddr_t maxaddr)
 {
-	struct dmar_unit *unit;
+	struct iommu_unit *unit;
 	struct idpgtbl *tbl;
 	vm_object_t res;
 	vm_page_t m;
@@ -502,7 +502,7 @@ int
 domain_map_buf(struct dmar_domain *domain, dmar_gaddr_t base, dmar_gaddr_t size,
     vm_page_t *ma, uint64_t pflags, int flags)
 {
-	struct dmar_unit *unit;
+	struct iommu_unit *unit;
 	int error;
 
 	unit = domain->dmar;
@@ -741,7 +741,7 @@ domain_free_pgtbl(struct dmar_domain *domain)
 }
 
 static inline uint64_t
-domain_wait_iotlb_flush(struct dmar_unit *unit, uint64_t wt, int iro)
+domain_wait_iotlb_flush(struct iommu_unit *unit, uint64_t wt, int iro)
 {
 	uint64_t iotlbr;
 
@@ -760,7 +760,7 @@ void
 domain_flush_iotlb_sync(struct dmar_domain *domain, dmar_gaddr_t base,
     dmar_gaddr_t size)
 {
-	struct dmar_unit *unit;
+	struct iommu_unit *unit;
 	dmar_gaddr_t isize;
 	uint64_t iotlbr;
 	int am, iro;

@@ -62,7 +62,7 @@ __FBSDID("$FreeBSD$");
 #include <x86/iommu/intel_dmar.h>
 
 static bool
-dmar_qi_seq_processed(const struct dmar_unit *unit,
+dmar_qi_seq_processed(const struct iommu_unit *unit,
     const struct dmar_qi_genseq *pseq)
 {
 
@@ -72,7 +72,7 @@ dmar_qi_seq_processed(const struct dmar_unit *unit,
 }
 
 static int
-dmar_enable_qi(struct dmar_unit *unit)
+dmar_enable_qi(struct iommu_unit *unit)
 {
 	int error;
 
@@ -85,7 +85,7 @@ dmar_enable_qi(struct dmar_unit *unit)
 }
 
 static int
-dmar_disable_qi(struct dmar_unit *unit)
+dmar_disable_qi(struct iommu_unit *unit)
 {
 	int error;
 
@@ -98,7 +98,7 @@ dmar_disable_qi(struct dmar_unit *unit)
 }
 
 static void
-dmar_qi_advance_tail(struct dmar_unit *unit)
+dmar_qi_advance_tail(struct iommu_unit *unit)
 {
 
 	IOMMU_ASSERT_LOCKED(unit);
@@ -106,7 +106,7 @@ dmar_qi_advance_tail(struct dmar_unit *unit)
 }
 
 static void
-dmar_qi_ensure(struct dmar_unit *unit, int descr_count)
+dmar_qi_ensure(struct iommu_unit *unit, int descr_count)
 {
 	uint32_t head;
 	int bytes;
@@ -141,7 +141,7 @@ dmar_qi_ensure(struct dmar_unit *unit, int descr_count)
 }
 
 static void
-dmar_qi_emit(struct dmar_unit *unit, uint64_t data1, uint64_t data2)
+dmar_qi_emit(struct iommu_unit *unit, uint64_t data1, uint64_t data2)
 {
 
 	IOMMU_ASSERT_LOCKED(unit);
@@ -160,7 +160,7 @@ dmar_qi_emit(struct dmar_unit *unit, uint64_t data1, uint64_t data2)
 }
 
 static void
-dmar_qi_emit_wait_descr(struct dmar_unit *unit, uint32_t seq, bool intr,
+dmar_qi_emit_wait_descr(struct iommu_unit *unit, uint32_t seq, bool intr,
     bool memw, bool fence)
 {
 
@@ -174,7 +174,7 @@ dmar_qi_emit_wait_descr(struct dmar_unit *unit, uint32_t seq, bool intr,
 }
 
 static void
-dmar_qi_emit_wait_seq(struct dmar_unit *unit, struct dmar_qi_genseq *pseq,
+dmar_qi_emit_wait_seq(struct iommu_unit *unit, struct dmar_qi_genseq *pseq,
     bool emit_wait)
 {
 	struct dmar_qi_genseq gsec;
@@ -203,7 +203,7 @@ dmar_qi_emit_wait_seq(struct dmar_unit *unit, struct dmar_qi_genseq *pseq,
 }
 
 static void
-dmar_qi_wait_for_seq(struct dmar_unit *unit, const struct dmar_qi_genseq *gseq,
+dmar_qi_wait_for_seq(struct iommu_unit *unit, const struct dmar_qi_genseq *gseq,
     bool nowait)
 {
 
@@ -224,7 +224,7 @@ void
 dmar_qi_invalidate_locked(struct dmar_domain *domain, dmar_gaddr_t base,
     dmar_gaddr_t size, struct dmar_qi_genseq *pseq, bool emit_wait)
 {
-	struct dmar_unit *unit;
+	struct iommu_unit *unit;
 	dmar_gaddr_t isize;
 	int am;
 
@@ -244,7 +244,7 @@ dmar_qi_invalidate_locked(struct dmar_domain *domain, dmar_gaddr_t base,
 }
 
 void
-dmar_qi_invalidate_ctx_glob_locked(struct dmar_unit *unit)
+dmar_qi_invalidate_ctx_glob_locked(struct iommu_unit *unit)
 {
 	struct dmar_qi_genseq gseq;
 
@@ -257,7 +257,7 @@ dmar_qi_invalidate_ctx_glob_locked(struct dmar_unit *unit)
 }
 
 void
-dmar_qi_invalidate_iotlb_glob_locked(struct dmar_unit *unit)
+dmar_qi_invalidate_iotlb_glob_locked(struct iommu_unit *unit)
 {
 	struct dmar_qi_genseq gseq;
 
@@ -271,7 +271,7 @@ dmar_qi_invalidate_iotlb_glob_locked(struct dmar_unit *unit)
 }
 
 void
-dmar_qi_invalidate_iec_glob(struct dmar_unit *unit)
+dmar_qi_invalidate_iec_glob(struct iommu_unit *unit)
 {
 	struct dmar_qi_genseq gseq;
 
@@ -284,7 +284,7 @@ dmar_qi_invalidate_iec_glob(struct dmar_unit *unit)
 }
 
 void
-dmar_qi_invalidate_iec(struct dmar_unit *unit, u_int start, u_int cnt)
+dmar_qi_invalidate_iec(struct iommu_unit *unit, u_int start, u_int cnt)
 {
 	struct dmar_qi_genseq gseq;
 	u_int c, l;
@@ -326,7 +326,7 @@ dmar_qi_invalidate_iec(struct dmar_unit *unit, u_int start, u_int cnt)
 int
 dmar_qi_intr(void *arg)
 {
-	struct dmar_unit *unit;
+	struct iommu_unit *unit;
 
 	unit = arg;
 	KASSERT(unit->qi_enabled, ("dmar%d: QI is not enabled", unit->unit));
@@ -337,7 +337,7 @@ dmar_qi_intr(void *arg)
 static void
 dmar_qi_task(void *arg, int pending __unused)
 {
-	struct dmar_unit *unit;
+	struct iommu_unit *unit;
 	struct dmar_map_entry *entry;
 	uint32_t ics;
 
@@ -367,7 +367,7 @@ dmar_qi_task(void *arg, int pending __unused)
 }
 
 int
-dmar_init_qi(struct dmar_unit *unit)
+dmar_init_qi(struct iommu_unit *unit)
 {
 	uint64_t iqa;
 	uint32_t ics;
@@ -422,7 +422,7 @@ dmar_init_qi(struct dmar_unit *unit)
 }
 
 void
-dmar_fini_qi(struct dmar_unit *unit)
+dmar_fini_qi(struct iommu_unit *unit)
 {
 	struct dmar_qi_genseq gseq;
 
@@ -452,7 +452,7 @@ dmar_fini_qi(struct dmar_unit *unit)
 }
 
 void
-dmar_enable_qi_intr(struct dmar_unit *unit)
+dmar_enable_qi_intr(struct iommu_unit *unit)
 {
 	uint32_t iectl;
 
@@ -464,7 +464,7 @@ dmar_enable_qi_intr(struct dmar_unit *unit)
 }
 
 void
-dmar_disable_qi_intr(struct dmar_unit *unit)
+dmar_disable_qi_intr(struct iommu_unit *unit)
 {
 	uint32_t iectl;
 

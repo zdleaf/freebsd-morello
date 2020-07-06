@@ -60,16 +60,16 @@ __FBSDID("$FreeBSD$");
 #include <dev/pci/pcivar.h>
 #include <x86/iommu/iommu_intrmap.h>
 
-static struct dmar_unit *dmar_ir_find(device_t src, uint16_t *rid,
+static struct iommu_unit *dmar_ir_find(device_t src, uint16_t *rid,
     int *is_dmar);
-static void dmar_ir_program_irte(struct dmar_unit *unit, u_int idx,
+static void dmar_ir_program_irte(struct iommu_unit *unit, u_int idx,
     uint64_t low, uint16_t rid);
-static int dmar_ir_free_irte(struct dmar_unit *unit, u_int cookie);
+static int dmar_ir_free_irte(struct iommu_unit *unit, u_int cookie);
 
 int
 iommu_alloc_msi_intr(device_t src, u_int *cookies, u_int count)
 {
-	struct dmar_unit *unit;
+	struct iommu_unit *unit;
 	vmem_addr_t vmem_res;
 	u_int idx, i;
 	int error;
@@ -98,7 +98,7 @@ int
 iommu_map_msi_intr(device_t src, u_int cpu, u_int vector, u_int cookie,
     uint64_t *addr, uint32_t *data)
 {
-	struct dmar_unit *unit;
+	struct iommu_unit *unit;
 	uint64_t low;
 	uint16_t rid;
 	int is_dmar;
@@ -143,7 +143,7 @@ iommu_map_msi_intr(device_t src, u_int cpu, u_int vector, u_int cookie,
 int
 iommu_unmap_msi_intr(device_t src, u_int cookie)
 {
-	struct dmar_unit *unit;
+	struct iommu_unit *unit;
 
 	if (cookie == -1)
 		return (0);
@@ -155,7 +155,7 @@ int
 iommu_map_ioapic_intr(u_int ioapic_id, u_int cpu, u_int vector, bool edge,
     bool activehi, int irq, u_int *cookie, uint32_t *hi, uint32_t *lo)
 {
-	struct dmar_unit *unit;
+	struct iommu_unit *unit;
 	vmem_addr_t vmem_res;
 	uint64_t low, iorte;
 	u_int idx;
@@ -217,7 +217,7 @@ iommu_map_ioapic_intr(u_int ioapic_id, u_int cpu, u_int vector, bool edge,
 int
 iommu_unmap_ioapic_intr(u_int ioapic_id, u_int *cookie)
 {
-	struct dmar_unit *unit;
+	struct iommu_unit *unit;
 	u_int idx;
 
 	idx = *cookie;
@@ -230,11 +230,11 @@ iommu_unmap_ioapic_intr(u_int ioapic_id, u_int *cookie)
 	return (dmar_ir_free_irte(unit, idx));
 }
 
-static struct dmar_unit *
+static struct iommu_unit *
 dmar_ir_find(device_t src, uint16_t *rid, int *is_dmar)
 {
 	devclass_t src_class;
-	struct dmar_unit *unit;
+	struct iommu_unit *unit;
 
 	/*
 	 * We need to determine if the interrupt source generates FSB
@@ -261,7 +261,7 @@ dmar_ir_find(device_t src, uint16_t *rid, int *is_dmar)
 }
 
 static void
-dmar_ir_program_irte(struct dmar_unit *unit, u_int idx, uint64_t low,
+dmar_ir_program_irte(struct iommu_unit *unit, u_int idx, uint64_t low,
     uint16_t rid)
 {
 	dmar_irte_t *irte;
@@ -299,7 +299,7 @@ dmar_ir_program_irte(struct dmar_unit *unit, u_int idx, uint64_t low,
 }
 
 static int
-dmar_ir_free_irte(struct dmar_unit *unit, u_int cookie)
+dmar_ir_free_irte(struct iommu_unit *unit, u_int cookie)
 {
 	dmar_irte_t *irte;
 
@@ -325,7 +325,7 @@ clp2(u_int v)
 }
 
 int
-dmar_init_irt(struct dmar_unit *unit)
+dmar_init_irt(struct iommu_unit *unit)
 {
 
 	if ((unit->hw_ecap & DMAR_ECAP_IR) == 0)
@@ -370,7 +370,7 @@ dmar_init_irt(struct dmar_unit *unit)
 }
 
 void
-dmar_fini_irt(struct dmar_unit *unit)
+dmar_fini_irt(struct iommu_unit *unit)
 {
 
 	unit->ir_enabled = 0;
