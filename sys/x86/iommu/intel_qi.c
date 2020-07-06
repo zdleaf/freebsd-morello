@@ -221,7 +221,7 @@ dmar_qi_wait_for_seq(struct iommu_unit *unit, const struct dmar_qi_genseq *gseq,
 }
 
 void
-dmar_qi_invalidate_locked(struct dmar_domain *domain, dmar_gaddr_t base,
+dmar_qi_invalidate_locked(struct iommu_domain *domain, dmar_gaddr_t base,
     dmar_gaddr_t size, struct dmar_qi_genseq *pseq, bool emit_wait)
 {
 	struct iommu_unit *unit;
@@ -352,7 +352,7 @@ dmar_qi_task(void *arg, int pending __unused)
 			break;
 		TAILQ_REMOVE(&unit->tlb_flush_entries, entry, dmamap_link);
 		IOMMU_UNLOCK(unit);
-		dmar_domain_free_entry(entry, (entry->flags &
+		iommu_domain_free_entry(entry, (entry->flags &
 		    DMAR_MAP_ENTRY_QI_NF) == 0);
 		IOMMU_LOCK(unit);
 	}

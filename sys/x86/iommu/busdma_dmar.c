@@ -438,7 +438,7 @@ dmar_bus_dmamap_destroy(bus_dma_tag_t dmat, bus_dmamap_t map1)
 {
 	struct bus_dma_tag_dmar *tag;
 	struct bus_dmamap_dmar *map;
-	struct dmar_domain *domain;
+	struct iommu_domain *domain;
 
 	tag = (struct bus_dma_tag_dmar *)dmat;
 	map = (struct bus_dmamap_dmar *)map1;
@@ -527,7 +527,7 @@ dmar_bus_dmamap_load_something1(struct bus_dma_tag_dmar *tag,
     struct dmar_map_entries_tailq *unroll_list)
 {
 	struct dmar_ctx *ctx;
-	struct dmar_domain *domain;
+	struct iommu_domain *domain;
 	struct dmar_map_entry *entry;
 	dmar_gaddr_t size;
 	bus_size_t buflen1;
@@ -632,7 +632,7 @@ dmar_bus_dmamap_load_something(struct bus_dma_tag_dmar *tag,
     int flags, bus_dma_segment_t *segs, int *segp)
 {
 	struct dmar_ctx *ctx;
-	struct dmar_domain *domain;
+	struct iommu_domain *domain;
 	struct dmar_map_entry *entry, *entry1;
 	struct dmar_map_entries_tailq unroll_list;
 	int error;
@@ -853,7 +853,7 @@ dmar_bus_dmamap_unload(bus_dma_tag_t dmat, bus_dmamap_t map1)
 	struct bus_dma_tag_dmar *tag;
 	struct bus_dmamap_dmar *map;
 	struct dmar_ctx *ctx;
-	struct dmar_domain *domain;
+	struct iommu_domain *domain;
 #if defined(__amd64__)
 	struct dmar_map_entries_tailq entries;
 #endif
@@ -876,7 +876,7 @@ dmar_bus_dmamap_unload(bus_dma_tag_t dmat, bus_dmamap_t map1)
 	TAILQ_CONCAT(&entries, &map->map_entries, dmamap_link);
 	DMAR_DOMAIN_UNLOCK(domain);
 	THREAD_NO_SLEEPING();
-	dmar_domain_unload(domain, &entries, false);
+	iommu_domain_unload(domain, &entries, false);
 	THREAD_SLEEPING_OK();
 	KASSERT(TAILQ_EMPTY(&entries), ("lazy dmar_ctx_unload %p", ctx));
 #endif
@@ -982,7 +982,7 @@ bus_dma_dmar_load_ident(bus_dma_tag_t dmat, bus_dmamap_t map1,
 	struct bus_dma_tag_dmar *tag;
 	struct bus_dmamap_dmar *map;
 	struct dmar_ctx *ctx;
-	struct dmar_domain *domain;
+	struct iommu_domain *domain;
 	struct dmar_map_entry *entry;
 	vm_page_t *ma;
 	vm_size_t i;
@@ -1029,7 +1029,7 @@ bus_dma_dmar_load_ident(bus_dma_tag_t dmat, bus_dmamap_t map1,
 		entry->flags |= DMAR_MAP_ENTRY_MAP;
 		DMAR_DOMAIN_UNLOCK(domain);
 	} else {
-		dmar_domain_unload_entry(entry, true);
+		iommu_domain_unload_entry(entry, true);
 	}
 	for (i = 0; i < atop(length); i++)
 		vm_page_putfake(ma[i]);

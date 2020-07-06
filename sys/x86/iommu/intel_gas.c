@@ -87,7 +87,7 @@ intel_gas_init(void)
 SYSINIT(intel_gas, SI_SUB_DRIVERS, SI_ORDER_FIRST, intel_gas_init, NULL);
 
 struct dmar_map_entry *
-dmar_gas_alloc_entry(struct dmar_domain *domain, u_int flags)
+dmar_gas_alloc_entry(struct iommu_domain *domain, u_int flags)
 {
 	struct dmar_map_entry *res;
 
@@ -104,7 +104,7 @@ dmar_gas_alloc_entry(struct dmar_domain *domain, u_int flags)
 }
 
 void
-dmar_gas_free_entry(struct dmar_domain *domain, struct dmar_map_entry *entry)
+dmar_gas_free_entry(struct iommu_domain *domain, struct dmar_map_entry *entry)
 {
 
 	KASSERT(domain == entry->domain,
@@ -164,7 +164,7 @@ RB_GENERATE(dmar_gas_entries_tree, dmar_map_entry, rb_entry,
 
 #ifdef INVARIANTS
 static void
-dmar_gas_check_free(struct dmar_domain *domain)
+dmar_gas_check_free(struct iommu_domain *domain)
 {
 	struct dmar_map_entry *entry, *l, *r;
 	dmar_gaddr_t v;
@@ -190,7 +190,7 @@ dmar_gas_check_free(struct dmar_domain *domain)
 #endif
 
 static bool
-dmar_gas_rb_insert(struct dmar_domain *domain, struct dmar_map_entry *entry)
+dmar_gas_rb_insert(struct iommu_domain *domain, struct dmar_map_entry *entry)
 {
 	struct dmar_map_entry *found;
 
@@ -199,14 +199,14 @@ dmar_gas_rb_insert(struct dmar_domain *domain, struct dmar_map_entry *entry)
 }
 
 static void
-dmar_gas_rb_remove(struct dmar_domain *domain, struct dmar_map_entry *entry)
+dmar_gas_rb_remove(struct iommu_domain *domain, struct dmar_map_entry *entry)
 {
 
 	RB_REMOVE(dmar_gas_entries_tree, &domain->rb_root, entry);
 }
 
 void
-dmar_gas_init_domain(struct dmar_domain *domain)
+dmar_gas_init_domain(struct iommu_domain *domain)
 {
 	struct dmar_map_entry *begin, *end;
 
@@ -234,7 +234,7 @@ dmar_gas_init_domain(struct dmar_domain *domain)
 }
 
 void
-dmar_gas_fini_domain(struct dmar_domain *domain)
+dmar_gas_fini_domain(struct iommu_domain *domain)
 {
 	struct dmar_map_entry *entry, *entry1;
 
@@ -267,7 +267,7 @@ dmar_gas_fini_domain(struct dmar_domain *domain)
 }
 
 struct dmar_gas_match_args {
-	struct dmar_domain *domain;
+	struct iommu_domain *domain;
 	dmar_gaddr_t size;
 	int offset;
 	const struct bus_dma_tag_common *common;
@@ -418,7 +418,7 @@ dmar_gas_uppermatch(struct dmar_gas_match_args *a, struct dmar_map_entry *entry)
 }
 
 static int
-dmar_gas_find_space(struct dmar_domain *domain,
+dmar_gas_find_space(struct iommu_domain *domain,
     const struct bus_dma_tag_common *common, dmar_gaddr_t size,
     int offset, u_int flags, struct dmar_map_entry *entry)
 {
@@ -454,7 +454,7 @@ dmar_gas_find_space(struct dmar_domain *domain,
 }
 
 static int
-dmar_gas_alloc_region(struct dmar_domain *domain, struct dmar_map_entry *entry,
+dmar_gas_alloc_region(struct iommu_domain *domain, struct dmar_map_entry *entry,
     u_int flags)
 {
 	struct dmar_map_entry *next, *prev;
@@ -537,7 +537,7 @@ dmar_gas_alloc_region(struct dmar_domain *domain, struct dmar_map_entry *entry,
 }
 
 void
-dmar_gas_free_space(struct dmar_domain *domain, struct dmar_map_entry *entry)
+dmar_gas_free_space(struct iommu_domain *domain, struct dmar_map_entry *entry)
 {
 
 	DMAR_DOMAIN_ASSERT_LOCKED(domain);
@@ -554,7 +554,7 @@ dmar_gas_free_space(struct dmar_domain *domain, struct dmar_map_entry *entry)
 }
 
 void
-dmar_gas_free_region(struct dmar_domain *domain, struct dmar_map_entry *entry)
+dmar_gas_free_region(struct iommu_domain *domain, struct dmar_map_entry *entry)
 {
 	struct dmar_map_entry *next, *prev;
 
@@ -575,7 +575,7 @@ dmar_gas_free_region(struct dmar_domain *domain, struct dmar_map_entry *entry)
 }
 
 int
-dmar_gas_map(struct dmar_domain *domain,
+dmar_gas_map(struct iommu_domain *domain,
     const struct bus_dma_tag_common *common, dmar_gaddr_t size, int offset,
     u_int eflags, u_int flags, vm_page_t *ma, struct dmar_map_entry **res)
 {
@@ -616,7 +616,7 @@ dmar_gas_map(struct dmar_domain *domain,
 	    ((eflags & DMAR_MAP_ENTRY_TM) != 0 ? DMAR_PTE_TM : 0),
 	    (flags & DMAR_GM_CANWAIT) != 0 ? DMAR_PGF_WAITOK : 0);
 	if (error == ENOMEM) {
-		dmar_domain_unload_entry(entry, true);
+		iommu_domain_unload_entry(entry, true);
 		return (error);
 	}
 	KASSERT(error == 0,
@@ -627,7 +627,7 @@ dmar_gas_map(struct dmar_domain *domain,
 }
 
 int
-dmar_gas_map_region(struct dmar_domain *domain, struct dmar_map_entry *entry,
+dmar_gas_map_region(struct iommu_domain *domain, struct dmar_map_entry *entry,
     u_int eflags, u_int flags, vm_page_t *ma)
 {
 	dmar_gaddr_t start;
@@ -658,7 +658,7 @@ dmar_gas_map_region(struct dmar_domain *domain, struct dmar_map_entry *entry,
 	    ((eflags & DMAR_MAP_ENTRY_TM) != 0 ? DMAR_PTE_TM : 0),
 	    (flags & DMAR_GM_CANWAIT) != 0 ? DMAR_PGF_WAITOK : 0);
 	if (error == ENOMEM) {
-		dmar_domain_unload_entry(entry, false);
+		iommu_domain_unload_entry(entry, false);
 		return (error);
 	}
 	KASSERT(error == 0,
@@ -668,7 +668,7 @@ dmar_gas_map_region(struct dmar_domain *domain, struct dmar_map_entry *entry,
 }
 
 int
-dmar_gas_reserve_region(struct dmar_domain *domain, dmar_gaddr_t start,
+dmar_gas_reserve_region(struct iommu_domain *domain, dmar_gaddr_t start,
     dmar_gaddr_t end)
 {
 	struct dmar_map_entry *entry;

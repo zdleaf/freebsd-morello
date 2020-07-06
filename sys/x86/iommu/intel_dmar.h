@@ -56,7 +56,7 @@ struct dmar_map_entry {
 	RB_ENTRY(dmar_map_entry) rb_entry;	 /* Links for domain entries */
 	TAILQ_ENTRY(dmar_map_entry) unroll_link; /* Link for unroll after
 						    dmamap_load failure */
-	struct dmar_domain *domain;
+	struct iommu_domain *domain;
 	struct dmar_qi_genseq gseq;
 };
 
@@ -94,7 +94,7 @@ RB_PROTOTYPE(dmar_gas_entries_tree, dmar_map_entry, rb_entry,
  * Page tables pages and pages content is protected by the vm object
  * lock pgtbl_obj, which contains the page tables pages.
  */
-struct dmar_domain {
+struct iommu_domain {
 	int domain;			/* (c) DID, written in context entry */
 	int mgaw;			/* (c) Real max address width */
 	int agaw;			/* (c) Adjusted guest address width */
@@ -107,7 +107,7 @@ struct dmar_domain {
 	u_int refs;			/* (u) Refs, including ctx */
 	struct iommu_unit *dmar;		/* (c) */
 	struct mtx lock;		/* (c) */
-	LIST_ENTRY(dmar_domain) link;	/* (u) Member in the dmar list */
+	LIST_ENTRY(iommu_domain) link;	/* (u) Member in the dmar list */
 	LIST_HEAD(, dmar_ctx) contexts;	/* (u) */
 	vm_object_t pgtbl_obj;		/* (c) Page table pages */
 	u_int flags;			/* (u) */
@@ -124,7 +124,7 @@ struct dmar_ctx {
 	struct bus_dma_tag_dmar ctx_tag; /* (c) Root tag */
 	uint16_t rid;			/* (c) pci RID */
 	uint64_t last_fault_rec[2];	/* Last fault reported */
-	struct dmar_domain *domain;	/* (c) */
+	struct iommu_domain *domain;	/* (c) */
 	LIST_ENTRY(dmar_ctx) link;	/* (u) Member in the domain list */
 	u_int refs;			/* (u) References from tags */
 	u_int flags;			/* (u) */
@@ -194,7 +194,7 @@ struct iommu_unit {
 
 	/* Data for being a dmar */
 	struct mtx lock;
-	LIST_HEAD(, dmar_domain) domains;
+	LIST_HEAD(, iommu_domain) domains;
 	struct unrhdr *domids;
 	vm_object_t ctx_obj;
 	u_int barrier_flags;
@@ -274,13 +274,13 @@ struct iommu_unit *dmar_find_ioapic(u_int apic_id, uint16_t *rid);
 
 u_int dmar_nd2mask(u_int nd);
 bool dmar_pglvl_supported(struct iommu_unit *unit, int pglvl);
-int domain_set_agaw(struct dmar_domain *domain, int mgaw);
+int domain_set_agaw(struct iommu_domain *domain, int mgaw);
 int dmar_maxaddr2mgaw(struct iommu_unit *unit, dmar_gaddr_t maxaddr,
     bool allow_less);
 vm_pindex_t pglvl_max_pages(int pglvl);
-int domain_is_sp_lvl(struct dmar_domain *domain, int lvl);
+int domain_is_sp_lvl(struct iommu_domain *domain, int lvl);
 dmar_gaddr_t pglvl_page_size(int total_pglvl, int lvl);
-dmar_gaddr_t domain_page_size(struct dmar_domain *domain, int lvl);
+dmar_gaddr_t domain_page_size(struct iommu_domain *domain, int lvl);
 int calc_am(struct iommu_unit *unit, dmar_gaddr_t base, dmar_gaddr_t size,
     dmar_gaddr_t *isizep);
 struct vm_page *dmar_pgalloc(vm_object_t obj, vm_pindex_t idx, int flags);
@@ -316,24 +316,24 @@ void dmar_enable_qi_intr(struct iommu_unit *unit);
 void dmar_disable_qi_intr(struct iommu_unit *unit);
 int dmar_init_qi(struct iommu_unit *unit);
 void dmar_fini_qi(struct iommu_unit *unit);
-void dmar_qi_invalidate_locked(struct dmar_domain *domain, dmar_gaddr_t start,
+void dmar_qi_invalidate_locked(struct iommu_domain *domain, dmar_gaddr_t start,
     dmar_gaddr_t size, struct dmar_qi_genseq *psec, bool emit_wait);
 void dmar_qi_invalidate_ctx_glob_locked(struct iommu_unit *unit);
 void dmar_qi_invalidate_iotlb_glob_locked(struct iommu_unit *unit);
 void dmar_qi_invalidate_iec_glob(struct iommu_unit *unit);
 void dmar_qi_invalidate_iec(struct iommu_unit *unit, u_int start, u_int cnt);
 
-vm_object_t domain_get_idmap_pgtbl(struct dmar_domain *domain,
+vm_object_t domain_get_idmap_pgtbl(struct iommu_domain *domain,
     dmar_gaddr_t maxaddr);
 void put_idmap_pgtbl(vm_object_t obj);
-int domain_map_buf(struct dmar_domain *domain, dmar_gaddr_t base,
+int domain_map_buf(struct iommu_domain *domain, dmar_gaddr_t base,
     dmar_gaddr_t size, vm_page_t *ma, uint64_t pflags, int flags);
-int domain_unmap_buf(struct dmar_domain *domain, dmar_gaddr_t base,
+int domain_unmap_buf(struct iommu_domain *domain, dmar_gaddr_t base,
     dmar_gaddr_t size, int flags);
-void domain_flush_iotlb_sync(struct dmar_domain *domain, dmar_gaddr_t base,
+void domain_flush_iotlb_sync(struct iommu_domain *domain, dmar_gaddr_t base,
     dmar_gaddr_t size);
-int domain_alloc_pgtbl(struct dmar_domain *domain);
-void domain_free_pgtbl(struct dmar_domain *domain);
+int domain_alloc_pgtbl(struct iommu_domain *domain);
+void domain_free_pgtbl(struct iommu_domain *domain);
 
 int dmar_dev_depth(device_t child);
 void dmar_dev_path(device_t child, int *busno, void *path1, int depth);
@@ -345,38 +345,38 @@ struct dmar_ctx *dmar_get_ctx_for_dev(struct iommu_unit *dmar, device_t dev,
 struct dmar_ctx *dmar_get_ctx_for_devpath(struct iommu_unit *dmar, uint16_t rid,
     int dev_domain, int dev_busno, const void *dev_path, int dev_path_len,
     bool id_mapped, bool rmrr_init);
-int dmar_move_ctx_to_domain(struct dmar_domain *domain, struct dmar_ctx *ctx);
+int dmar_move_ctx_to_domain(struct iommu_domain *domain, struct dmar_ctx *ctx);
 void dmar_free_ctx_locked(struct iommu_unit *dmar, struct dmar_ctx *ctx);
 void dmar_free_ctx(struct dmar_ctx *ctx);
 struct dmar_ctx *dmar_find_ctx_locked(struct iommu_unit *dmar, uint16_t rid);
-void dmar_domain_unload_entry(struct dmar_map_entry *entry, bool free);
-void dmar_domain_unload(struct dmar_domain *domain,
+void iommu_domain_unload_entry(struct dmar_map_entry *entry, bool free);
+void iommu_domain_unload(struct iommu_domain *domain,
     struct dmar_map_entries_tailq *entries, bool cansleep);
-void dmar_domain_free_entry(struct dmar_map_entry *entry, bool free);
+void iommu_domain_free_entry(struct dmar_map_entry *entry, bool free);
 
 int dmar_init_busdma(struct iommu_unit *unit);
 void dmar_fini_busdma(struct iommu_unit *unit);
 device_t dmar_get_requester(device_t dev, uint16_t *rid);
 
-void dmar_gas_init_domain(struct dmar_domain *domain);
-void dmar_gas_fini_domain(struct dmar_domain *domain);
-struct dmar_map_entry *dmar_gas_alloc_entry(struct dmar_domain *domain,
+void dmar_gas_init_domain(struct iommu_domain *domain);
+void dmar_gas_fini_domain(struct iommu_domain *domain);
+struct dmar_map_entry *dmar_gas_alloc_entry(struct iommu_domain *domain,
     u_int flags);
-void dmar_gas_free_entry(struct dmar_domain *domain,
+void dmar_gas_free_entry(struct iommu_domain *domain,
     struct dmar_map_entry *entry);
-void dmar_gas_free_space(struct dmar_domain *domain,
+void dmar_gas_free_space(struct iommu_domain *domain,
     struct dmar_map_entry *entry);
-int dmar_gas_map(struct dmar_domain *domain,
+int dmar_gas_map(struct iommu_domain *domain,
     const struct bus_dma_tag_common *common, dmar_gaddr_t size, int offset,
     u_int eflags, u_int flags, vm_page_t *ma, struct dmar_map_entry **res);
-void dmar_gas_free_region(struct dmar_domain *domain,
+void dmar_gas_free_region(struct iommu_domain *domain,
     struct dmar_map_entry *entry);
-int dmar_gas_map_region(struct dmar_domain *domain,
+int dmar_gas_map_region(struct iommu_domain *domain,
     struct dmar_map_entry *entry, u_int eflags, u_int flags, vm_page_t *ma);
-int dmar_gas_reserve_region(struct dmar_domain *domain, dmar_gaddr_t start,
+int dmar_gas_reserve_region(struct iommu_domain *domain, dmar_gaddr_t start,
     dmar_gaddr_t end);
 
-void dmar_dev_parse_rmrr(struct dmar_domain *domain, int dev_domain,
+void dmar_dev_parse_rmrr(struct iommu_domain *domain, int dev_domain,
     int dev_busno, const void *dev_path, int dev_path_len,
     struct dmar_map_entries_tailq *rmrr_entries);
 int dmar_instantiate_rmrr_ctxs(struct iommu_unit *dmar);

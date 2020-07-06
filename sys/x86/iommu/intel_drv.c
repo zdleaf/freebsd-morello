@@ -906,7 +906,7 @@ dmar_find_ioapic(u_int apic_id, uint16_t *rid)
 }
 
 struct rmrr_iter_args {
-	struct dmar_domain *domain;
+	struct iommu_domain *domain;
 	int dev_domain;
 	int dev_busno;
 	const ACPI_DMAR_PCI_PATH *dev_path;
@@ -956,7 +956,7 @@ dmar_rmrr_iter(ACPI_DMAR_HEADER *dmarh, void *arg)
 }
 
 void
-dmar_dev_parse_rmrr(struct dmar_domain *domain, int dev_domain, int dev_busno,
+dmar_dev_parse_rmrr(struct iommu_domain *domain, int dev_domain, int dev_busno,
     const void *dev_path, int dev_path_len,
     struct dmar_map_entries_tailq *rmrr_entries)
 {
@@ -1143,7 +1143,7 @@ dmar_print_ctx(struct dmar_ctx *ctx)
 }
 
 static void
-dmar_print_domain(struct dmar_domain *domain, bool show_mappings)
+dmar_print_domain(struct iommu_domain *domain, bool show_mappings)
 {
 	struct dmar_map_entry *entry;
 	struct dmar_ctx *ctx;
@@ -1177,10 +1177,10 @@ dmar_print_domain(struct dmar_domain *domain, bool show_mappings)
 	}
 }
 
-DB_FUNC(dmar_domain, db_dmar_print_domain, db_show_table, CS_OWN, NULL)
+DB_FUNC(iommu_domain, db_dmar_print_domain, db_show_table, CS_OWN, NULL)
 {
 	struct iommu_unit *unit;
-	struct dmar_domain *domain;
+	struct iommu_domain *domain;
 	struct dmar_ctx *ctx;
 	bool show_mappings, valid;
 	int pci_domain, bus, device, function, i, t;
@@ -1222,7 +1222,7 @@ DB_FUNC(dmar_domain, db_dmar_print_domain, db_show_table, CS_OWN, NULL)
 			db_radix = radix;
 	db_skip_to_eol();
 	if (!valid) {
-		db_printf("usage: show dmar_domain [/m] "
+		db_printf("usage: show iommu_domain [/m] "
 		    "<domain> <bus> <device> <func>\n");
 		return;
 	}
@@ -1250,7 +1250,7 @@ static void
 dmar_print_one(int idx, bool show_domains, bool show_mappings)
 {
 	struct iommu_unit *unit;
-	struct dmar_domain *domain;
+	struct iommu_domain *domain;
 	int i, frir;
 
 	unit = device_get_softc(dmar_devs[idx]);

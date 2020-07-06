@@ -69,7 +69,7 @@ __FBSDID("$FreeBSD$");
 #include <dev/pci/pcireg.h>
 #include <x86/iommu/intel_dmar.h>
 
-static int domain_unmap_buf_locked(struct dmar_domain *domain,
+static int domain_unmap_buf_locked(struct iommu_domain *domain,
     dmar_gaddr_t base, dmar_gaddr_t size, int flags);
 
 /*
@@ -163,7 +163,7 @@ domain_idmap_nextlvl(struct idpgtbl *tbl, int lvl, vm_pindex_t idx,
  * maxaddr is typically mapped.
  */
 vm_object_t
-domain_get_idmap_pgtbl(struct dmar_domain *domain, dmar_gaddr_t maxaddr)
+domain_get_idmap_pgtbl(struct iommu_domain *domain, dmar_gaddr_t maxaddr)
 {
 	struct iommu_unit *unit;
 	struct idpgtbl *tbl;
@@ -323,7 +323,7 @@ put_idmap_pgtbl(vm_object_t obj)
  * the level lvl.
  */
 static int
-domain_pgtbl_pte_off(struct dmar_domain *domain, dmar_gaddr_t base, int lvl)
+domain_pgtbl_pte_off(struct iommu_domain *domain, dmar_gaddr_t base, int lvl)
 {
 
 	base >>= DMAR_PAGE_SHIFT + (domain->pglvl - lvl - 1) *
@@ -337,7 +337,7 @@ domain_pgtbl_pte_off(struct dmar_domain *domain, dmar_gaddr_t base, int lvl)
  * lvl.
  */
 static vm_pindex_t
-domain_pgtbl_get_pindex(struct dmar_domain *domain, dmar_gaddr_t base, int lvl)
+domain_pgtbl_get_pindex(struct iommu_domain *domain, dmar_gaddr_t base, int lvl)
 {
 	vm_pindex_t idx, pidx;
 	int i;
@@ -353,7 +353,7 @@ domain_pgtbl_get_pindex(struct dmar_domain *domain, dmar_gaddr_t base, int lvl)
 }
 
 static dmar_pte_t *
-domain_pgtbl_map_pte(struct dmar_domain *domain, dmar_gaddr_t base, int lvl,
+domain_pgtbl_map_pte(struct iommu_domain *domain, dmar_gaddr_t base, int lvl,
     int flags, vm_pindex_t *idxp, struct sf_buf **sf)
 {
 	vm_page_t m;
@@ -421,7 +421,7 @@ retry:
 }
 
 static int
-domain_map_buf_locked(struct dmar_domain *domain, dmar_gaddr_t base,
+domain_map_buf_locked(struct iommu_domain *domain, dmar_gaddr_t base,
     dmar_gaddr_t size, vm_page_t *ma, uint64_t pflags, int flags)
 {
 	dmar_pte_t *pte;
@@ -499,7 +499,7 @@ domain_map_buf_locked(struct dmar_domain *domain, dmar_gaddr_t base,
 }
 
 int
-domain_map_buf(struct dmar_domain *domain, dmar_gaddr_t base, dmar_gaddr_t size,
+domain_map_buf(struct iommu_domain *domain, dmar_gaddr_t base, dmar_gaddr_t size,
     vm_page_t *ma, uint64_t pflags, int flags)
 {
 	struct iommu_unit *unit;
@@ -558,12 +558,12 @@ domain_map_buf(struct dmar_domain *domain, dmar_gaddr_t base, dmar_gaddr_t size,
 	return (0);
 }
 
-static void domain_unmap_clear_pte(struct dmar_domain *domain,
+static void domain_unmap_clear_pte(struct iommu_domain *domain,
     dmar_gaddr_t base, int lvl, int flags, dmar_pte_t *pte,
     struct sf_buf **sf, bool free_fs);
 
 static void
-domain_free_pgtbl_pde(struct dmar_domain *domain, dmar_gaddr_t base,
+domain_free_pgtbl_pde(struct iommu_domain *domain, dmar_gaddr_t base,
     int lvl, int flags)
 {
 	struct sf_buf *sf;
@@ -576,7 +576,7 @@ domain_free_pgtbl_pde(struct dmar_domain *domain, dmar_gaddr_t base,
 }
 
 static void
-domain_unmap_clear_pte(struct dmar_domain *domain, dmar_gaddr_t base, int lvl,
+domain_unmap_clear_pte(struct iommu_domain *domain, dmar_gaddr_t base, int lvl,
     int flags, dmar_pte_t *pte, struct sf_buf **sf, bool free_sf)
 {
 	vm_page_t m;
@@ -605,7 +605,7 @@ domain_unmap_clear_pte(struct dmar_domain *domain, dmar_gaddr_t base, int lvl,
  * Assumes that the unmap is never partial.
  */
 static int
-domain_unmap_buf_locked(struct dmar_domain *domain, dmar_gaddr_t base,
+domain_unmap_buf_locked(struct iommu_domain *domain, dmar_gaddr_t base,
     dmar_gaddr_t size, int flags)
 {
 	dmar_pte_t *pte;
@@ -677,7 +677,7 @@ domain_unmap_buf_locked(struct dmar_domain *domain, dmar_gaddr_t base,
 }
 
 int
-domain_unmap_buf(struct dmar_domain *domain, dmar_gaddr_t base,
+domain_unmap_buf(struct iommu_domain *domain, dmar_gaddr_t base,
     dmar_gaddr_t size, int flags)
 {
 	int error;
@@ -689,7 +689,7 @@ domain_unmap_buf(struct dmar_domain *domain, dmar_gaddr_t base,
 }
 
 int
-domain_alloc_pgtbl(struct dmar_domain *domain)
+domain_alloc_pgtbl(struct iommu_domain *domain)
 {
 	vm_page_t m;
 
@@ -711,7 +711,7 @@ domain_alloc_pgtbl(struct dmar_domain *domain)
 }
 
 void
-domain_free_pgtbl(struct dmar_domain *domain)
+domain_free_pgtbl(struct iommu_domain *domain)
 {
 	vm_object_t obj;
 	vm_page_t m;
@@ -757,7 +757,7 @@ domain_wait_iotlb_flush(struct iommu_unit *unit, uint64_t wt, int iro)
 }
 
 void
-domain_flush_iotlb_sync(struct dmar_domain *domain, dmar_gaddr_t base,
+domain_flush_iotlb_sync(struct iommu_domain *domain, dmar_gaddr_t base,
     dmar_gaddr_t size)
 {
 	struct iommu_unit *unit;
