@@ -88,13 +88,15 @@ iommu_bus_dma_is_dev_disabled(int domain, int bus, int slot, int func)
 	bool ret;
 	static const char bounce_str[] = "bounce";
 	static const char iommu_str[] = "iommu";
+	static const char dmar_str[] = "dmar"; /* compatibility with old str */
 
 	default_bounce = 0;
 	env = kern_getenv("hw.busdma.default");
 	if (env != NULL) {
 		if (strcmp(env, bounce_str) == 0)
 			default_bounce = 1;
-		else if (strcmp(env, iommu_str) == 0)
+		else if (strcmp(env, iommu_str) == 0 ||
+		    strcmp(env, dmar_str) == 0)
 			default_bounce = 0;
 		freeenv(env);
 	}
