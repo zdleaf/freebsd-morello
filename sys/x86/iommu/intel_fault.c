@@ -80,7 +80,7 @@ __FBSDID("$FreeBSD$");
  */
 
 static int
-dmar_fault_next(struct iommu_unit *unit, int faultp)
+dmar_fault_next(struct dmar_unit *unit, int faultp)
 {
 
 	faultp += 2;
@@ -90,7 +90,7 @@ dmar_fault_next(struct iommu_unit *unit, int faultp)
 }
 
 static void
-dmar_fault_intr_clear(struct iommu_unit *unit, uint32_t fsts)
+dmar_fault_intr_clear(struct dmar_unit *unit, uint32_t fsts)
 {
 	uint32_t clear;
 
@@ -124,7 +124,7 @@ dmar_fault_intr_clear(struct iommu_unit *unit, uint32_t fsts)
 int
 dmar_fault_intr(void *arg)
 {
-	struct iommu_unit *unit;
+	struct dmar_unit *unit;
 	uint64_t fault_rec[2];
 	uint32_t fsts;
 	int fri, frir, faultp;
@@ -190,7 +190,7 @@ done:
 static void
 dmar_fault_task(void *arg, int pending __unused)
 {
-	struct iommu_unit *unit;
+	struct dmar_unit *unit;
 	struct iommu_device *ctx;
 	uint64_t fault_rec[2];
 	int sid, bus, slot, func, faultp;
@@ -244,7 +244,7 @@ dmar_fault_task(void *arg, int pending __unused)
 }
 
 static void
-dmar_clear_faults(struct iommu_unit *unit)
+dmar_clear_faults(struct dmar_unit *unit)
 {
 	uint32_t frec, frir, fsts;
 	int i;
@@ -261,7 +261,7 @@ dmar_clear_faults(struct iommu_unit *unit)
 }
 
 int
-dmar_init_fault_log(struct iommu_unit *unit)
+dmar_init_fault_log(struct dmar_unit *unit)
 {
 
 	mtx_init(&unit->fault_lock, "dmarflt", NULL, MTX_SPIN);
@@ -288,7 +288,7 @@ dmar_init_fault_log(struct iommu_unit *unit)
 }
 
 void
-dmar_fini_fault_log(struct iommu_unit *unit)
+dmar_fini_fault_log(struct dmar_unit *unit)
 {
 
 	if (unit->fault_taskqueue == NULL)
@@ -309,7 +309,7 @@ dmar_fini_fault_log(struct iommu_unit *unit)
 }
 
 void
-dmar_enable_fault_intr(struct iommu_unit *unit)
+dmar_enable_fault_intr(struct dmar_unit *unit)
 {
 	uint32_t fectl;
 
@@ -320,7 +320,7 @@ dmar_enable_fault_intr(struct iommu_unit *unit)
 }
 
 void
-dmar_disable_fault_intr(struct iommu_unit *unit)
+dmar_disable_fault_intr(struct dmar_unit *unit)
 {
 	uint32_t fectl;
 

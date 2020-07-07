@@ -229,7 +229,7 @@ iommu_get_requester(device_t dev, uint16_t *rid)
 }
 
 struct iommu_device *
-iommu_instantiate_device(struct iommu_unit *dmar, device_t dev, bool rmrr)
+iommu_instantiate_device(struct dmar_unit *dmar, device_t dev, bool rmrr)
 {
 	device_t requester;
 	struct iommu_device *ctx;
@@ -271,7 +271,7 @@ iommu_instantiate_device(struct iommu_unit *dmar, device_t dev, bool rmrr)
 bus_dma_tag_t
 acpi_iommu_get_dma_tag(device_t dev, device_t child)
 {
-	struct iommu_unit *dmar;
+	struct dmar_unit *dmar;
 	struct iommu_device *ctx;
 	bus_dma_tag_t res;
 
@@ -292,7 +292,7 @@ acpi_iommu_get_dma_tag(device_t dev, device_t child)
 bool
 bus_dma_dmar_set_buswide(device_t dev)
 {
-	struct iommu_unit *dmar;
+	struct dmar_unit *dmar;
 	device_t parent;
 	u_int busno, slot, func;
 
@@ -319,7 +319,7 @@ bus_dma_dmar_set_buswide(device_t dev)
 
 static MALLOC_DEFINE(M_DMAR_DMAMAP, "dmar_dmamap", "Intel DMAR DMA Map");
 
-static void iommu_bus_schedule_dmamap(struct iommu_unit *unit,
+static void iommu_bus_schedule_dmamap(struct dmar_unit *unit,
     struct bus_dmamap_iommu *map);
 
 static int
@@ -911,7 +911,7 @@ iommu_bus_task_dmamap(void *arg, int pending)
 {
 	struct bus_dma_tag_iommu *tag;
 	struct bus_dmamap_iommu *map;
-	struct iommu_unit *unit;
+	struct dmar_unit *unit;
 
 	unit = arg;
 	IOMMU_LOCK(unit);
@@ -937,7 +937,7 @@ iommu_bus_task_dmamap(void *arg, int pending)
 }
 
 static void
-iommu_bus_schedule_dmamap(struct iommu_unit *unit, struct bus_dmamap_iommu *map)
+iommu_bus_schedule_dmamap(struct dmar_unit *unit, struct bus_dmamap_iommu *map)
 {
 
 	map->locked = false;
@@ -948,7 +948,7 @@ iommu_bus_schedule_dmamap(struct iommu_unit *unit, struct bus_dmamap_iommu *map)
 }
 
 int
-iommu_init_busdma(struct iommu_unit *unit)
+iommu_init_busdma(struct dmar_unit *unit)
 {
 
 	unit->dma_enabled = 1;
@@ -963,7 +963,7 @@ iommu_init_busdma(struct iommu_unit *unit)
 }
 
 void
-iommu_fini_busdma(struct iommu_unit *unit)
+iommu_fini_busdma(struct dmar_unit *unit)
 {
 
 	if (unit->delayed_taskqueue == NULL)

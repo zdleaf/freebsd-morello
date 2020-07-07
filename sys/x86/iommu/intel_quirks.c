@@ -64,7 +64,7 @@ __FBSDID("$FreeBSD$");
 #include <x86/iommu/intel_dmar.h>
 #include <dev/pci/pcivar.h>
 
-typedef void (*dmar_quirk_cpu_fun)(struct iommu_unit *);
+typedef void (*dmar_quirk_cpu_fun)(struct dmar_unit *);
 
 struct intel_dmar_quirk_cpu {
 	u_int ext_family;
@@ -76,7 +76,7 @@ struct intel_dmar_quirk_cpu {
 	const char *descr;
 };
 
-typedef void (*dmar_quirk_nb_fun)(struct iommu_unit *, device_t nb);
+typedef void (*dmar_quirk_nb_fun)(struct dmar_unit *, device_t nb);
 
 struct intel_dmar_quirk_nb {
 	u_int dev_id;
@@ -88,7 +88,7 @@ struct intel_dmar_quirk_nb {
 #define	QUIRK_NB_ALL_REV	0xffffffff
 
 static void
-dmar_match_quirks(struct iommu_unit *dmar,
+dmar_match_quirks(struct dmar_unit *dmar,
     const struct intel_dmar_quirk_nb *nb_quirks, int nb_quirks_len,
     const struct intel_dmar_quirk_cpu *cpu_quirks, int cpu_quirks_len)
 {
@@ -149,21 +149,21 @@ dmar_match_quirks(struct iommu_unit *dmar,
 }
 
 static void
-nb_5400_no_low_high_prot_mem(struct iommu_unit *unit, device_t nb __unused)
+nb_5400_no_low_high_prot_mem(struct dmar_unit *unit, device_t nb __unused)
 {
 
 	unit->hw_cap &= ~(DMAR_CAP_PHMR | DMAR_CAP_PLMR);
 }
 
 static void
-nb_no_ir(struct iommu_unit *unit, device_t nb __unused)
+nb_no_ir(struct dmar_unit *unit, device_t nb __unused)
 {
 
 	unit->hw_ecap &= ~(DMAR_ECAP_IR | DMAR_ECAP_EIM);
 }
 
 static void
-nb_5500_no_ir_rev13(struct iommu_unit *unit, device_t nb)
+nb_5500_no_ir_rev13(struct dmar_unit *unit, device_t nb)
 {
 	u_int rev_no;
 
@@ -206,7 +206,7 @@ static const struct intel_dmar_quirk_nb pre_use_nb[] = {
 };
 
 static void
-cpu_e5_am9(struct iommu_unit *unit)
+cpu_e5_am9(struct dmar_unit *unit)
 {
 
 	unit->hw_cap &= ~(0x3fULL << 48);
@@ -222,7 +222,7 @@ static const struct intel_dmar_quirk_cpu post_ident_cpu[] = {
 };
 
 void
-dmar_quirks_pre_use(struct iommu_unit *dmar)
+dmar_quirks_pre_use(struct dmar_unit *dmar)
 {
 
 	if (!dmar_barrier_enter(dmar, DMAR_BARRIER_USEQ))
@@ -234,7 +234,7 @@ dmar_quirks_pre_use(struct iommu_unit *dmar)
 }
 
 void
-dmar_quirks_post_ident(struct iommu_unit *dmar)
+dmar_quirks_post_ident(struct dmar_unit *dmar)
 {
 
 	dmar_match_quirks(dmar, NULL, 0, post_ident_cpu,
