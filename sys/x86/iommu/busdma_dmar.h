@@ -72,6 +72,10 @@ struct bus_dmamap_iommu {
 #define	BUS_DMAMAP_IOMMU_MALLOC	0x0001
 #define	BUS_DMAMAP_IOMMU_KMEM_ALLOC 0x0002
 
+#define	IOMMU_LOCK(unit)	mtx_lock(&(unit)->lock)
+#define	IOMMU_UNLOCK(unit)	mtx_unlock(&(unit)->lock)
+#define	IOMMU_ASSERT_LOCKED(unit) mtx_assert(&(unit)->lock, MA_OWNED)
+
 extern struct bus_dma_impl bus_dma_iommu_impl;
 
 bus_dma_tag_t acpi_iommu_get_dma_tag(device_t dev, device_t child);
