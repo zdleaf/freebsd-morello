@@ -229,7 +229,7 @@ iommu_get_requester(device_t dev, uint16_t *rid)
 }
 
 struct iommu_device *
-iommu_instantiate_device(struct dmar_unit *dmar, device_t dev, bool rmrr)
+iommu_instantiate_device(struct iommu_unit *unit, device_t dev, bool rmrr)
 {
 	device_t requester;
 	struct iommu_device *ctx;
@@ -248,7 +248,7 @@ iommu_instantiate_device(struct dmar_unit *dmar, device_t dev, bool rmrr)
 	disabled = iommu_bus_dma_is_dev_disabled(pci_get_domain(requester),
 	    pci_get_bus(requester), pci_get_slot(requester), 
 	    pci_get_function(requester));
-	ctx = dmar_get_ctx_for_dev(dmar, requester, rid, disabled, rmrr);
+	ctx = dmar_get_ctx_for_dev(unit, requester, rid, disabled, rmrr);
 	if (ctx == NULL)
 		return (NULL);
 	if (disabled) {
@@ -256,12 +256,12 @@ iommu_instantiate_device(struct dmar_unit *dmar, device_t dev, bool rmrr)
 		 * Keep the first reference on context, release the
 		 * later refs.
 		 */
-		IOMMU_LOCK(dmar);
+		IOMMU_LOCK(unit);
 		if ((ctx->flags & DMAR_CTX_DISABLED) == 0) {
 			ctx->flags |= DMAR_CTX_DISABLED;
-			IOMMU_UNLOCK(dmar);
+			IOMMU_UNLOCK(unit);
 		} else {
-			dmar_free_ctx_locked(dmar, ctx);
+			dmar_free_ctx_locked(unit, ctx);
 		}
 		ctx = NULL;
 	}
@@ -271,20 +271,20 @@ iommu_instantiate_device(struct dmar_unit *dmar, device_t dev, bool rmrr)
 bus_dma_tag_t
 acpi_iommu_get_dma_tag(device_t dev, device_t child)
 {
-	struct dmar_unit *dmar;
+	struct iommu_unit *unit;
 	struct iommu_device *ctx;
 	bus_dma_tag_t res;
 
-	dmar = dmar_find(child, bootverbose);
+	unit = dmar_find(child, bootverbose);
 	/* Not in scope of any DMAR ? */
-	if (dmar == NULL)
+	if (unit == NULL)
 		return (NULL);
-	if (!dmar->dma_enabled)
+	if (!unit->dma_enabled)
 		return (NULL);
-	dmar_quirks_pre_use(dmar);
-	dmar_instantiate_rmrr_ctxs(dmar);
+	dmar_quirks_pre_use(unit);
+	dmar_instantiate_rmrr_ctxs(unit);
 
-	ctx = iommu_instantiate_device(dmar, child, false);
+	ctx = iommu_instantiate_device(unit, child, false);
 	res = ctx == NULL ? NULL : (bus_dma_tag_t)&ctx->device_tag;
 	return (res);
 }
@@ -292,15 +292,15 @@ acpi_iommu_get_dma_tag(device_t dev, device_t child)
 bool
 bus_dma_dmar_set_buswide(device_t dev)
 {
-	struct dmar_unit *dmar;
+	struct iommu_unit *unit;
 	device_t parent;
 	u_int busno, slot, func;
 
 	parent = device_get_parent(dev);
 	if (device_get_devclass(parent) != devclass_find("pci"))
 		return (false);
-	dmar = dmar_find(dev, bootverbose);
-	if (dmar == NULL)
+	unit = dmar_find(dev, bootverbose);
+	if (unit == NULL)
 		return (false);
 	busno = pci_get_bus(dev);
 	slot = pci_get_slot(dev);
@@ -309,17 +309,17 @@ bus_dma_dmar_set_buswide(device_t dev)
 		if (bootverbose) {
 			device_printf(dev,
 			    "dmar%d pci%d:%d:%d requested buswide busdma\n",
-			    dmar->unit, busno, slot, func);
+			    unit->unit, busno, slot, func);
 		}
 		return (false);
 	}
-	dmar_set_buswide_ctx(dmar, busno);
+	dmar_set_buswide_ctx(unit, busno);
 	return (true);
 }
 
 static MALLOC_DEFINE(M_DMAR_DMAMAP, "dmar_dmamap", "Intel DMAR DMA Map");
 
-static void iommu_bus_schedule_dmamap(struct dmar_unit *unit,
+static void iommu_bus_schedule_dmamap(struct iommu_unit *unit,
     struct bus_dmamap_iommu *map);
 
 static int
@@ -665,7 +665,7 @@ iommu_bus_dmamap_load_something(struct bus_dma_tag_iommu *tag,
 			    dmamap_link);
 		}
 		IOMMU_DOMAIN_UNLOCK(domain);
-		taskqueue_enqueue(domain->dmar->delayed_taskqueue,
+		taskqueue_enqueue(domain->iommu->delayed_taskqueue,
 		    &domain->unload_task);
 	}
 
@@ -673,7 +673,7 @@ iommu_bus_dmamap_load_something(struct bus_dma_tag_iommu *tag,
 	    !map->cansleep)
 		error = EINPROGRESS;
 	if (error == EINPROGRESS)
-		iommu_bus_schedule_dmamap(domain->dmar, map);
+		iommu_bus_schedule_dmamap(domain->iommu, map);
 	return (error);
 }
 
@@ -868,7 +868,7 @@ iommu_bus_dmamap_unload(bus_dma_tag_t dmat, bus_dmamap_t map1)
 	IOMMU_DOMAIN_LOCK(domain);
 	TAILQ_CONCAT(&domain->unload_entries, &map->map_entries, dmamap_link);
 	IOMMU_DOMAIN_UNLOCK(domain);
-	taskqueue_enqueue(domain->dmar->delayed_taskqueue,
+	taskqueue_enqueue(domain->iommu->delayed_taskqueue,
 	    &domain->unload_task);
 #else /* defined(__amd64__) */
 	TAILQ_INIT(&entries);
@@ -911,7 +911,7 @@ iommu_bus_task_dmamap(void *arg, int pending)
 {
 	struct bus_dma_tag_iommu *tag;
 	struct bus_dmamap_iommu *map;
-	struct dmar_unit *unit;
+	struct iommu_unit *unit;
 
 	unit = arg;
 	IOMMU_LOCK(unit);
@@ -937,7 +937,7 @@ iommu_bus_task_dmamap(void *arg, int pending)
 }
 
 static void
-iommu_bus_schedule_dmamap(struct dmar_unit *unit, struct bus_dmamap_iommu *map)
+iommu_bus_schedule_dmamap(struct iommu_unit *unit, struct bus_dmamap_iommu *map)
 {
 
 	map->locked = false;
@@ -948,7 +948,7 @@ iommu_bus_schedule_dmamap(struct dmar_unit *unit, struct bus_dmamap_iommu *map)
 }
 
 int
-iommu_init_busdma(struct dmar_unit *unit)
+iommu_init_busdma(struct iommu_unit *unit)
 {
 
 	unit->dma_enabled = 1;
@@ -963,7 +963,7 @@ iommu_init_busdma(struct dmar_unit *unit)
 }
 
 void
-iommu_fini_busdma(struct dmar_unit *unit)
+iommu_fini_busdma(struct iommu_unit *unit)
 {
 
 	if (unit->delayed_taskqueue == NULL)

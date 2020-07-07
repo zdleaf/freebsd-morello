@@ -37,6 +37,18 @@
 struct iommu_map_entry;
 TAILQ_HEAD(iommu_map_entries_tailq, iommu_map_entry);
 
+struct iommu_unit {
+	struct mtx lock;
+	int unit;
+
+	int dma_enabled;
+
+	/* Busdma delayed map load */
+	struct task dmamap_load_task;
+	TAILQ_HEAD(, bus_dmamap_iommu) delayed_maps;
+	struct taskqueue *delayed_taskqueue;
+};
+
 struct bus_dma_tag_iommu {
 	struct bus_dma_tag_common common;
 	struct iommu_device *ctx;

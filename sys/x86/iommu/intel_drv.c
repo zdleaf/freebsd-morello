@@ -252,7 +252,7 @@ dmar_release_resources(device_t dev, struct dmar_unit *unit)
 {
 	int i;
 
-	iommu_fini_busdma(unit);
+	iommu_fini_busdma(&unit->iommu);
 	dmar_fini_irt(unit);
 	dmar_fini_qi(unit);
 	dmar_fini_fault_log(unit);
@@ -359,13 +359,13 @@ dmar_remap_intr(device_t dev, device_t child, u_int irq)
 			    dev, irq, &msi_addr, &msi_data);
 			if (error != 0)
 				return (error);
-			IOMMU_LOCK(unit);
+			DMAR_LOCK(unit);
 			(dmd->disable_intr)(unit);
 			dmar_write4(unit, dmd->msi_data_reg, msi_data);
 			dmar_write4(unit, dmd->msi_addr_reg, msi_addr);
 			dmar_write4(unit, dmd->msi_uaddr_reg, msi_addr >> 32);
 			(dmd->enable_intr)(unit);
-			IOMMU_UNLOCK(unit);
+			DMAR_UNLOCK(unit);
 			return (0);
 		}
 	}
@@ -413,8 +413,8 @@ dmar_attach(device_t dev)
 
 	unit = device_get_softc(dev);
 	unit->dev = dev;
-	unit->unit = device_get_unit(dev);
-	dmaru = dmar_find_by_index(unit->unit);
+	unit->iommu.unit = device_get_unit(dev);
+	dmaru = dmar_find_by_index(unit->iommu.unit);
 	if (dmaru == NULL)
 		return (EINVAL);
 	unit->segment = dmaru->Segment;
@@ -469,9 +469,9 @@ dmar_attach(device_t dev)
 		}
 	}
 
-	mtx_init(&unit->lock, "dmarhw", NULL, MTX_DEF);
+	mtx_init(&unit->iommu.lock, "dmarhw", NULL, MTX_DEF);
 	unit->domids = new_unrhdr(0, dmar_nd2mask(DMAR_CAP_ND(unit->hw_cap)),
-	    &unit->lock);
+	    &unit->iommu.lock);
 	LIST_INIT(&unit->domains);
 
 	/*
@@ -493,29 +493,29 @@ dmar_attach(device_t dev)
 	 * done.
 	 */
 	dmar_pgalloc(unit->ctx_obj, 0, DMAR_PGF_WAITOK | DMAR_PGF_ZERO);
-	IOMMU_LOCK(unit);
+	DMAR_LOCK(unit);
 	error = dmar_load_root_entry_ptr(unit);
 	if (error != 0) {
-		IOMMU_UNLOCK(unit);
+		DMAR_UNLOCK(unit);
 		dmar_release_resources(dev, unit);
 		return (error);
 	}
 	error = dmar_inv_ctx_glob(unit);
 	if (error != 0) {
-		IOMMU_UNLOCK(unit);
+		DMAR_UNLOCK(unit);
 		dmar_release_resources(dev, unit);
 		return (error);
 	}
 	if ((unit->hw_ecap & DMAR_ECAP_DI) != 0) {
 		error = dmar_inv_iotlb_glob(unit);
 		if (error != 0) {
-			IOMMU_UNLOCK(unit);
+			DMAR_UNLOCK(unit);
 			dmar_release_resources(dev, unit);
 			return (error);
 		}
 	}
 
-	IOMMU_UNLOCK(unit);
+	DMAR_UNLOCK(unit);
 	error = dmar_init_fault_log(unit);
 	if (error != 0) {
 		dmar_release_resources(dev, unit);
@@ -531,21 +531,21 @@ dmar_attach(device_t dev)
 		dmar_release_resources(dev, unit);
 		return (error);
 	}
-	error = iommu_init_busdma(unit);
+	error = iommu_init_busdma(&unit->iommu);
 	if (error != 0) {
 		dmar_release_resources(dev, unit);
 		return (error);
 	}
 
 #ifdef NOTYET
-	IOMMU_LOCK(unit);
+	DMAR_LOCK(unit);
 	error = dmar_enable_translation(unit);
 	if (error != 0) {
-		IOMMU_UNLOCK(unit);
+		DMAR_UNLOCK(unit);
 		dmar_release_resources(dev, unit);
 		return (error);
 	}
-	IOMMU_UNLOCK(unit);
+	DMAR_UNLOCK(unit);
 #endif
 
 	return (0);
@@ -596,14 +596,17 @@ DRIVER_MODULE(dmar, acpi, dmar_driver, dmar_devclass, 0, 0);
 MODULE_DEPEND(dmar, acpi, 1, 1, 1);
 
 void
-dmar_set_buswide_ctx(struct dmar_unit *unit, u_int busno)
+dmar_set_buswide_ctx(struct iommu_unit *unit, u_int busno)
 {
+	struct dmar_unit *dmar;
+
+	dmar = (struct dmar_unit *)unit;
 
 	MPASS(busno <= PCI_BUSMAX);
-	IOMMU_LOCK(unit);
-	unit->buswide_ctxs[busno / NBBY / sizeof(uint32_t)] |=
+	DMAR_LOCK(dmar);
+	dmar->buswide_ctxs[busno / NBBY / sizeof(uint32_t)] |=
 	    1 << (busno % (NBBY * sizeof(uint32_t)));
-	IOMMU_UNLOCK(unit);
+	DMAR_UNLOCK(dmar);
 }
 
 bool
@@ -736,7 +739,7 @@ dmar_match_by_path(struct dmar_unit *unit, int dev_domain, int dev_busno,
 	char *ptr, *ptrend;
 	int match;
 
-	dmarh = dmar_find_by_index(unit->unit);
+	dmarh = dmar_find_by_index(unit->iommu.unit);
 	if (dmarh == NULL)
 		return (false);
 	if (dmarh->Segment != dev_domain)
@@ -782,7 +785,7 @@ dmar_find_by_scope(int dev_domain, int dev_busno,
 	return (NULL);
 }
 
-struct dmar_unit *
+struct iommu_unit *
 dmar_find(device_t dev, bool verbose)
 {
 	device_t dmar_dev;
@@ -818,12 +821,12 @@ dmar_find(device_t dev, bool verbose)
 	if (verbose) {
 		device_printf(dev, "pci%d:%d:%d:%d matched dmar%d by %s",
 		    dev_domain, pci_get_bus(dev), pci_get_slot(dev),
-		    pci_get_function(dev), unit->unit, banner);
+		    pci_get_function(dev), unit->iommu.unit, banner);
 		printf(" scope path ");
 		dmar_print_path(dev_busno, dev_path_len, dev_path);
 		printf("\n");
 	}
-	return (unit);
+	return (&unit->iommu);
 }
 
 static struct dmar_unit *
@@ -1004,7 +1007,8 @@ dmar_inst_rmrr_iter(ACPI_DMAR_HEADER *dmarh, void *arg)
 	struct inst_rmrr_iter_args *iria;
 	const char *ptr, *ptrend;
 	device_t dev;
-	struct dmar_unit *unit;
+	struct iommu_unit *unit;
+	struct dmar_unit *dmar;
 	int dev_path_len;
 	uint16_t rid;
 
@@ -1037,7 +1041,7 @@ dmar_inst_rmrr_iter(ACPI_DMAR_HEADER *dmarh, void *arg)
 			if (bootverbose) {
 				printf("dmar%d no dev found for RMRR "
 				    "[%#jx, %#jx] rid %#x scope path ",
-				     iria->dmar->unit,
+				     iria->dmar->iommu.unit,
 				     (uintmax_t)resmem->BaseAddress,
 				     (uintmax_t)resmem->EndAddress,
 				     rid);
@@ -1045,11 +1049,11 @@ dmar_inst_rmrr_iter(ACPI_DMAR_HEADER *dmarh, void *arg)
 				    (const ACPI_DMAR_PCI_PATH *)(devscope + 1));
 				printf("\n");
 			}
-			unit = dmar_find_by_scope(resmem->Segment,
+			dmar = dmar_find_by_scope(resmem->Segment,
 			    devscope->Bus,
 			    (const ACPI_DMAR_PCI_PATH *)(devscope + 1),
 			    dev_path_len);
-			if (iria->dmar != unit)
+			if (iria->dmar != dmar)
 				continue;
 			dmar_get_ctx_for_devpath(iria->dmar, rid,
 			    resmem->Segment, devscope->Bus, 
@@ -1057,9 +1061,11 @@ dmar_inst_rmrr_iter(ACPI_DMAR_HEADER *dmarh, void *arg)
 			    dev_path_len, false, true);
 		} else {
 			unit = dmar_find(dev, false);
-			if (iria->dmar != unit)
+			dmar = (struct dmar_unit *)unit;
+			if (iria->dmar != dmar)
 				continue;
-			iommu_instantiate_device(iria->dmar, dev, true);
+			iommu_instantiate_device(&(iria)->dmar->iommu,
+			    dev, true);
 		}
 	}
 
@@ -1071,10 +1077,13 @@ dmar_inst_rmrr_iter(ACPI_DMAR_HEADER *dmarh, void *arg)
  * Pre-create all contexts for the DMAR which have RMRR entries.
  */
 int
-dmar_instantiate_rmrr_ctxs(struct dmar_unit *dmar)
+dmar_instantiate_rmrr_ctxs(struct iommu_unit *unit)
 {
+	struct dmar_unit *dmar;
 	struct inst_rmrr_iter_args iria;
 	int error;
+
+	dmar = (struct dmar_unit *)unit;
 
 	if (!dmar_barrier_enter(dmar, DMAR_BARRIER_RMRR))
 		return (0);
@@ -1082,19 +1091,19 @@ dmar_instantiate_rmrr_ctxs(struct dmar_unit *dmar)
 	error = 0;
 	iria.dmar = dmar;
 	dmar_iterate_tbl(dmar_inst_rmrr_iter, &iria);
-	IOMMU_LOCK(dmar);
+	DMAR_LOCK(dmar);
 	if (!LIST_EMPTY(&dmar->domains)) {
 		KASSERT((dmar->hw_gcmd & DMAR_GCMD_TE) == 0,
 	    ("dmar%d: RMRR not handled but translation is already enabled",
-		    dmar->unit));
+		    dmar->iommu.unit));
 		error = dmar_enable_translation(dmar);
 		if (bootverbose) {
 			if (error == 0) {
 				printf("dmar%d: enabled translation\n",
-				    dmar->unit);
+				    dmar->iommu.unit);
 			} else {
 				printf("dmar%d: enabling translation failed, "
-				    "error %d\n", dmar->unit, error);
+				    "error %d\n", dmar->iommu.unit, error);
 			}
 		}
 	}
@@ -1254,8 +1263,9 @@ dmar_print_one(int idx, bool show_domains, bool show_mappings)
 	int i, frir;
 
 	unit = device_get_softc(dmar_devs[idx]);
-	db_printf("dmar%d at %p, root at 0x%jx, ver 0x%x\n", unit->unit, unit,
-	    dmar_read8(unit, DMAR_RTADDR_REG), dmar_read4(unit, DMAR_VER_REG));
+	db_printf("dmar%d at %p, root at 0x%jx, ver 0x%x\n", unit->iommu.unit,
+	    unit, dmar_read8(unit, DMAR_RTADDR_REG),
+	    dmar_read4(unit, DMAR_VER_REG));
 	db_printf("cap 0x%jx ecap 0x%jx gsts 0x%x fsts 0x%x fectl 0x%x\n",
 	    (uintmax_t)dmar_read8(unit, DMAR_CAP_REG),
 	    (uintmax_t)dmar_read8(unit, DMAR_ECAP_REG),

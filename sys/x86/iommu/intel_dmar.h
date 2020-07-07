@@ -39,6 +39,8 @@ typedef uint64_t dmar_haddr_t;
 /* Guest or bus address, before translation. */
 typedef uint64_t dmar_gaddr_t;
 
+struct dmar_unit;
+
 struct dmar_qi_genseq {
 	u_int gen;
 	uint32_t seq;
@@ -105,7 +107,7 @@ struct iommu_domain {
 					   the guest AS */
 	u_int ctx_cnt;			/* (u) Number of contexts owned */
 	u_int refs;			/* (u) Refs, including ctx */
-	struct dmar_unit *dmar;		/* (c) */
+	struct iommu_unit *iommu;	/* (c) */
 	struct mtx lock;		/* (c) */
 	LIST_ENTRY(iommu_domain) link;	/* (u) Member in the dmar list */
 	LIST_HEAD(, iommu_device) contexts;	/* (u) */
@@ -175,8 +177,8 @@ struct dmar_msi_data {
 #define	DMAR_INTR_TOTAL		2
 
 struct dmar_unit {
+	struct iommu_unit iommu;
 	device_t dev;
-	int unit;
 	uint16_t segment;
 	uint64_t base;
 
@@ -193,7 +195,6 @@ struct dmar_unit {
 	uint32_t hw_gcmd;
 
 	/* Data for being a dmar */
-	struct mtx lock;
 	LIST_HEAD(, iommu_domain) domains;
 	struct unrhdr *domids;
 	vm_object_t ctx_obj;
@@ -234,13 +235,6 @@ struct dmar_unit {
 	struct task qi_task;
 	struct taskqueue *qi_taskqueue;
 
-	/* Busdma delayed map load */
-	struct task dmamap_load_task;
-	TAILQ_HEAD(, bus_dmamap_iommu) delayed_maps;
-	struct taskqueue *delayed_taskqueue;
-
-	int dma_enabled;
-
 	/*
 	 * Bitmap of buses for which context must ignore slot:func,
 	 * duplicating the page table pointer into all context table
@@ -251,9 +245,13 @@ struct dmar_unit {
 
 };
 
-#define	IOMMU_LOCK(dmar)	mtx_lock(&(dmar)->lock)
-#define	IOMMU_UNLOCK(dmar)	mtx_unlock(&(dmar)->lock)
-#define	IOMMU_ASSERT_LOCKED(dmar) mtx_assert(&(dmar)->lock, MA_OWNED)
+#define	DMAR_LOCK(dmar)		mtx_lock(&(dmar)->iommu.lock)
+#define	DMAR_UNLOCK(dmar)	mtx_unlock(&(dmar)->iommu.lock)
+#define	DMAR_ASSERT_LOCKED(dmar) mtx_assert(&(dmar)->iommu.lock, MA_OWNED)
+
+#define	IOMMU_LOCK(unit)	mtx_lock(&(unit)->lock)
+#define	IOMMU_UNLOCK(unit)	mtx_unlock(&(unit)->lock)
+#define	IOMMU_ASSERT_LOCKED(unit) mtx_assert(&(unit)->lock, MA_OWNED)
 
 #define	DMAR_FAULT_LOCK(dmar)	mtx_lock_spin(&(dmar)->fault_lock)
 #define	DMAR_FAULT_UNLOCK(dmar)	mtx_unlock_spin(&(dmar)->fault_lock)
@@ -268,12 +266,12 @@ struct dmar_unit {
 #define	DMAR_BARRIER_RMRR	0
 #define	DMAR_BARRIER_USEQ	1
 
-struct dmar_unit *dmar_find(device_t dev, bool verbose);
+struct iommu_unit *dmar_find(device_t dev, bool verbose);
 struct dmar_unit *dmar_find_hpet(device_t dev, uint16_t *rid);
 struct dmar_unit *dmar_find_ioapic(u_int apic_id, uint16_t *rid);
 
 u_int dmar_nd2mask(u_int nd);
-bool dmar_pglvl_supported(struct dmar_unit *unit, int pglvl);
+bool dmar_pglvl_supported(struct iommu_unit *unit, int pglvl);
 int domain_set_agaw(struct iommu_domain *domain, int mgaw);
 int dmar_maxaddr2mgaw(struct dmar_unit *unit, dmar_gaddr_t maxaddr,
     bool allow_less);
@@ -338,15 +336,15 @@ void domain_free_pgtbl(struct iommu_domain *domain);
 int dmar_dev_depth(device_t child);
 void dmar_dev_path(device_t child, int *busno, void *path1, int depth);
 
-struct iommu_device *iommu_instantiate_device(struct dmar_unit *dmar, device_t dev,
-    bool rmrr);
-struct iommu_device *dmar_get_ctx_for_dev(struct dmar_unit *dmar, device_t dev,
+struct iommu_device *iommu_instantiate_device(struct iommu_unit *dmar,
+    device_t dev, bool rmrr);
+struct iommu_device *dmar_get_ctx_for_dev(struct iommu_unit *dmar, device_t dev,
     uint16_t rid, bool id_mapped, bool rmrr_init);
 struct iommu_device *dmar_get_ctx_for_devpath(struct dmar_unit *dmar, uint16_t rid,
     int dev_domain, int dev_busno, const void *dev_path, int dev_path_len,
     bool id_mapped, bool rmrr_init);
 int dmar_move_ctx_to_domain(struct iommu_domain *domain, struct iommu_device *ctx);
-void dmar_free_ctx_locked(struct dmar_unit *dmar, struct iommu_device *ctx);
+void dmar_free_ctx_locked(struct iommu_unit *dmar, struct iommu_device *ctx);
 void dmar_free_ctx(struct iommu_device *ctx);
 struct iommu_device *dmar_find_ctx_locked(struct dmar_unit *dmar, uint16_t rid);
 void iommu_domain_unload_entry(struct iommu_map_entry *entry, bool free);
@@ -354,8 +352,8 @@ void iommu_domain_unload(struct iommu_domain *domain,
     struct iommu_map_entries_tailq *entries, bool cansleep);
 void iommu_domain_free_entry(struct iommu_map_entry *entry, bool free);
 
-int iommu_init_busdma(struct dmar_unit *unit);
-void iommu_fini_busdma(struct dmar_unit *unit);
+int iommu_init_busdma(struct iommu_unit *unit);
+void iommu_fini_busdma(struct iommu_unit *unit);
 device_t iommu_get_requester(device_t dev, uint16_t *rid);
 
 void dmar_gas_init_domain(struct iommu_domain *domain);
@@ -379,15 +377,15 @@ int dmar_gas_reserve_region(struct iommu_domain *domain, dmar_gaddr_t start,
 void dmar_dev_parse_rmrr(struct iommu_domain *domain, int dev_domain,
     int dev_busno, const void *dev_path, int dev_path_len,
     struct iommu_map_entries_tailq *rmrr_entries);
-int dmar_instantiate_rmrr_ctxs(struct dmar_unit *dmar);
+int dmar_instantiate_rmrr_ctxs(struct iommu_unit *dmar);
 
 void dmar_quirks_post_ident(struct dmar_unit *dmar);
-void dmar_quirks_pre_use(struct dmar_unit *dmar);
+void dmar_quirks_pre_use(struct iommu_unit *dmar);
 
 int dmar_init_irt(struct dmar_unit *unit);
 void dmar_fini_irt(struct dmar_unit *unit);
 
-void dmar_set_buswide_ctx(struct dmar_unit *unit, u_int busno);
+void dmar_set_buswide_ctx(struct iommu_unit *unit, u_int busno);
 bool dmar_is_buswide_ctx(struct dmar_unit *unit, u_int busno);
 
 /* Map flags */
@@ -434,7 +432,7 @@ dmar_write4(const struct dmar_unit *unit, int reg, uint32_t val)
 
 	KASSERT(reg != DMAR_GCMD_REG || (val & DMAR_GCMD_TE) ==
 	    (unit->hw_gcmd & DMAR_GCMD_TE),
-	    ("dmar%d clearing TE 0x%08x 0x%08x", unit->unit,
+	    ("dmar%d clearing TE 0x%08x 0x%08x", unit->iommu.unit,
 	    unit->hw_gcmd, val));
 	bus_write_4(unit->regs, reg, val);
 }

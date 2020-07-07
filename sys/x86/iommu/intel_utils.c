@@ -106,14 +106,17 @@ static const struct sagaw_bits_tag {
 };
 
 bool
-dmar_pglvl_supported(struct dmar_unit *unit, int pglvl)
+dmar_pglvl_supported(struct iommu_unit *unit, int pglvl)
 {
+	struct dmar_unit *dmar;
 	int i;
+
+	dmar = (struct dmar_unit *)unit;
 
 	for (i = 0; i < nitems(sagaw_bits); i++) {
 		if (sagaw_bits[i].pglvl != pglvl)
 			continue;
-		if ((DMAR_CAP_SAGAW(unit->hw_cap) & sagaw_bits[i].cap) != 0)
+		if ((DMAR_CAP_SAGAW(dmar->hw_cap) & sagaw_bits[i].cap) != 0)
 			return (true);
 	}
 	return (false);
@@ -122,10 +125,13 @@ dmar_pglvl_supported(struct dmar_unit *unit, int pglvl)
 int
 domain_set_agaw(struct iommu_domain *domain, int mgaw)
 {
+	struct dmar_unit *dmar;
 	int sagaw, i;
 
+	dmar = (struct dmar_unit *)domain->iommu;
+
 	domain->mgaw = mgaw;
-	sagaw = DMAR_CAP_SAGAW(domain->dmar->hw_cap);
+	sagaw = DMAR_CAP_SAGAW(dmar->hw_cap);
 	for (i = 0; i < nitems(sagaw_bits); i++) {
 		if (sagaw_bits[i].agaw >= mgaw) {
 			domain->agaw = sagaw_bits[i].agaw;
@@ -134,7 +140,7 @@ domain_set_agaw(struct iommu_domain *domain, int mgaw)
 			return (0);
 		}
 	}
-	device_printf(domain->dmar->dev,
+	device_printf(dmar->dev,
 	    "context request mgaw %d: no agaw found, sagaw %x\n",
 	    mgaw, sagaw);
 	return (EINVAL);
@@ -194,6 +200,7 @@ pglvl_max_pages(int pglvl)
 int
 domain_is_sp_lvl(struct iommu_domain *domain, int lvl)
 {
+	struct dmar_unit *dmar;
 	int alvl, cap_sps;
 	static const int sagaw_sp[] = {
 		DMAR_CAP_SPS_2M,
@@ -203,7 +210,8 @@ domain_is_sp_lvl(struct iommu_domain *domain, int lvl)
 	};
 
 	alvl = domain->pglvl - lvl - 1;
-	cap_sps = DMAR_CAP_SPS(domain->dmar->hw_cap);
+	dmar = (struct dmar_unit *)domain->iommu;
+	cap_sps = DMAR_CAP_SPS(dmar->hw_cap);
 	return (alvl < nitems(sagaw_sp) && (sagaw_sp[alvl] & cap_sps) != 0);
 }
 
@@ -407,7 +415,7 @@ dmar_load_root_entry_ptr(struct dmar_unit *unit)
 	 * Access to the GCMD register must be serialized while the
 	 * command is submitted.
 	 */
-	IOMMU_ASSERT_LOCKED(unit);
+	DMAR_ASSERT_LOCKED(unit);
 
 	VM_OBJECT_RLOCK(unit->ctx_obj);
 	root_entry = vm_page_lookup(unit->ctx_obj, 0);
@@ -432,7 +440,7 @@ dmar_inv_ctx_glob(struct dmar_unit *unit)
 	 * Access to the CCMD register must be serialized while the
 	 * command is submitted.
 	 */
-	IOMMU_ASSERT_LOCKED(unit);
+	DMAR_ASSERT_LOCKED(unit);
 	KASSERT(!unit->qi_enabled, ("QI enabled"));
 
 	/*
@@ -455,7 +463,7 @@ dmar_inv_iotlb_glob(struct dmar_unit *unit)
 {
 	int error, reg;
 
-	IOMMU_ASSERT_LOCKED(unit);
+	DMAR_ASSERT_LOCKED(unit);
 	KASSERT(!unit->qi_enabled, ("QI enabled"));
 
 	reg = 16 * DMAR_ECAP_IRO(unit->hw_ecap);
@@ -476,13 +484,13 @@ dmar_flush_write_bufs(struct dmar_unit *unit)
 {
 	int error;
 
-	IOMMU_ASSERT_LOCKED(unit);
+	DMAR_ASSERT_LOCKED(unit);
 
 	/*
 	 * DMAR_GCMD_WBF is only valid when CAP_RWBF is reported.
 	 */
 	KASSERT((unit->hw_cap & DMAR_CAP_RWBF) != 0,
-	    ("dmar%d: no RWBF", unit->unit));
+	    ("dmar%d: no RWBF", unit->iommu.unit));
 
 	dmar_write4(unit, DMAR_GCMD_REG, unit->hw_gcmd | DMAR_GCMD_WBF);
 	DMAR_WAIT_UNTIL(((dmar_read4(unit, DMAR_GSTS_REG) & DMAR_GSTS_WBFS)
@@ -495,7 +503,7 @@ dmar_enable_translation(struct dmar_unit *unit)
 {
 	int error;
 
-	IOMMU_ASSERT_LOCKED(unit);
+	DMAR_ASSERT_LOCKED(unit);
 	unit->hw_gcmd |= DMAR_GCMD_TE;
 	dmar_write4(unit, DMAR_GCMD_REG, unit->hw_gcmd);
 	DMAR_WAIT_UNTIL(((dmar_read4(unit, DMAR_GSTS_REG) & DMAR_GSTS_TES)
@@ -508,7 +516,7 @@ dmar_disable_translation(struct dmar_unit *unit)
 {
 	int error;
 
-	IOMMU_ASSERT_LOCKED(unit);
+	DMAR_ASSERT_LOCKED(unit);
 	unit->hw_gcmd &= ~DMAR_GCMD_TE;
 	dmar_write4(unit, DMAR_GCMD_REG, unit->hw_gcmd);
 	DMAR_WAIT_UNTIL(((dmar_read4(unit, DMAR_GSTS_REG) & DMAR_GSTS_TES)
@@ -522,7 +530,7 @@ dmar_load_irt_ptr(struct dmar_unit *unit)
 	uint64_t irta, s;
 	int error;
 
-	IOMMU_ASSERT_LOCKED(unit);
+	DMAR_ASSERT_LOCKED(unit);
 	irta = unit->irt_phys;
 	if (DMAR_X2APIC(unit))
 		irta |= DMAR_IRTA_EIME;
@@ -543,7 +551,7 @@ dmar_enable_ir(struct dmar_unit *unit)
 {
 	int error;
 
-	IOMMU_ASSERT_LOCKED(unit);
+	DMAR_ASSERT_LOCKED(unit);
 	unit->hw_gcmd |= DMAR_GCMD_IRE;
 	unit->hw_gcmd &= ~DMAR_GCMD_CFI;
 	dmar_write4(unit, DMAR_GCMD_REG, unit->hw_gcmd);
@@ -557,7 +565,7 @@ dmar_disable_ir(struct dmar_unit *unit)
 {
 	int error;
 
-	IOMMU_ASSERT_LOCKED(unit);
+	DMAR_ASSERT_LOCKED(unit);
 	unit->hw_gcmd &= ~DMAR_GCMD_IRE;
 	dmar_write4(unit, DMAR_GCMD_REG, unit->hw_gcmd);
 	DMAR_WAIT_UNTIL(((dmar_read4(unit, DMAR_GSTS_REG) & DMAR_GSTS_IRES)
@@ -577,26 +585,27 @@ dmar_barrier_enter(struct dmar_unit *dmar, u_int barrier_id)
 {
 	BARRIER_F;
 
-	IOMMU_LOCK(dmar);
+	DMAR_LOCK(dmar);
 	if ((dmar->barrier_flags & f_done) != 0) {
-		IOMMU_UNLOCK(dmar);
+		DMAR_UNLOCK(dmar);
 		return (false);
 	}
 
 	if ((dmar->barrier_flags & f_inproc) != 0) {
 		while ((dmar->barrier_flags & f_inproc) != 0) {
 			dmar->barrier_flags |= f_wakeup;
-			msleep(&dmar->barrier_flags, &dmar->lock, 0,
+			msleep(&dmar->barrier_flags, &dmar->iommu.lock, 0,
 			    "dmarb", 0);
 		}
 		KASSERT((dmar->barrier_flags & f_done) != 0,
-		    ("dmar%d barrier %d missing done", dmar->unit, barrier_id));
-		IOMMU_UNLOCK(dmar);
+		    ("dmar%d barrier %d missing done", dmar->iommu.unit,
+		    barrier_id));
+		DMAR_UNLOCK(dmar);
 		return (false);
 	}
 
 	dmar->barrier_flags |= f_inproc;
-	IOMMU_UNLOCK(dmar);
+	DMAR_UNLOCK(dmar);
 	return (true);
 }
 
@@ -605,14 +614,14 @@ dmar_barrier_exit(struct dmar_unit *dmar, u_int barrier_id)
 {
 	BARRIER_F;
 
-	IOMMU_ASSERT_LOCKED(dmar);
+	DMAR_ASSERT_LOCKED(dmar);
 	KASSERT((dmar->barrier_flags & (f_done | f_inproc)) == f_inproc,
-	    ("dmar%d barrier %d missed entry", dmar->unit, barrier_id));
+	    ("dmar%d barrier %d missed entry", dmar->iommu.unit, barrier_id));
 	dmar->barrier_flags |= f_done;
 	if ((dmar->barrier_flags & f_wakeup) != 0)
 		wakeup(&dmar->barrier_flags);
 	dmar->barrier_flags &= ~(f_inproc | f_wakeup);
-	IOMMU_UNLOCK(dmar);
+	DMAR_UNLOCK(dmar);
 }
 
 int dmar_batch_coalesce = 100;

@@ -234,7 +234,8 @@ static struct dmar_unit *
 dmar_ir_find(device_t src, uint16_t *rid, int *is_dmar)
 {
 	devclass_t src_class;
-	struct dmar_unit *unit;
+	struct iommu_unit *unit;
+	struct dmar_unit *dmar;
 
 	/*
 	 * We need to determine if the interrupt source generates FSB
@@ -247,17 +248,18 @@ dmar_ir_find(device_t src, uint16_t *rid, int *is_dmar)
 		*is_dmar = FALSE;
 	src_class = device_get_devclass(src);
 	if (src_class == devclass_find("dmar")) {
-		unit = NULL;
+		dmar = NULL;
 		if (is_dmar != NULL)
 			*is_dmar = TRUE;
 	} else if (src_class == devclass_find("hpet")) {
-		unit = dmar_find_hpet(src, rid);
+		dmar = dmar_find_hpet(src, rid);
 	} else {
 		unit = dmar_find(src, bootverbose);
+		dmar = (struct dmar_unit *)unit;
 		if (unit != NULL && rid != NULL)
 			iommu_get_requester(src, rid);
 	}
-	return (unit);
+	return (dmar);
 }
 
 static void
@@ -277,7 +279,7 @@ dmar_ir_program_irte(struct dmar_unit *unit, u_int idx, uint64_t low,
 		    "programming irte[%d] rid %#x high %#jx low %#jx\n",
 		    idx, rid, (uintmax_t)high, (uintmax_t)low);
 	}
-	IOMMU_LOCK(unit);
+	DMAR_LOCK(unit);
 	if ((irte->irte1 & DMAR_IRTE1_P) != 0) {
 		/*
 		 * The rte is already valid.  Assume that the request
@@ -294,7 +296,7 @@ dmar_ir_program_irte(struct dmar_unit *unit, u_int idx, uint64_t low,
 		dmar_pte_store(&irte->irte1, low);
 	}
 	dmar_qi_invalidate_iec(unit, idx, 1);
-	IOMMU_UNLOCK(unit);
+	DMAR_UNLOCK(unit);
 
 }
 
@@ -310,9 +312,9 @@ dmar_ir_free_irte(struct dmar_unit *unit, u_int cookie)
 	irte = &(unit->irt[cookie]);
 	dmar_pte_clear(&irte->irte1);
 	dmar_pte_clear(&irte->irte2);
-	IOMMU_LOCK(unit);
+	DMAR_LOCK(unit);
 	dmar_qi_invalidate_iec(unit, cookie, 1);
-	IOMMU_UNLOCK(unit);
+	DMAR_UNLOCK(unit);
 	vmem_free(unit->irtids, cookie, 1);
 	return (0);
 }
@@ -351,10 +353,10 @@ dmar_init_irt(struct dmar_unit *unit)
 	unit->irt_phys = pmap_kextract((vm_offset_t)unit->irt);
 	unit->irtids = vmem_create("dmarirt", 0, unit->irte_cnt, 1, 0,
 	    M_FIRSTFIT | M_NOWAIT);
-	IOMMU_LOCK(unit);
+	DMAR_LOCK(unit);
 	dmar_load_irt_ptr(unit);
 	dmar_qi_invalidate_iec_glob(unit);
-	IOMMU_UNLOCK(unit);
+	DMAR_UNLOCK(unit);
 
 	/*
 	 * Initialize mappings for already configured interrupt pins.
@@ -363,9 +365,9 @@ dmar_init_irt(struct dmar_unit *unit)
 	 */
 	intr_reprogram();
 
-	IOMMU_LOCK(unit);
+	DMAR_LOCK(unit);
 	dmar_enable_ir(unit);
-	IOMMU_UNLOCK(unit);
+	DMAR_UNLOCK(unit);
 	return (0);
 }
 
