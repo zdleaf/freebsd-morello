@@ -72,7 +72,7 @@ __FBSDID("$FreeBSD$");
 #include <dev/pci/pcivar.h>
 
 static MALLOC_DEFINE(M_DMAR_CTX, "dmar_ctx", "Intel DMAR Context");
-static MALLOC_DEFINE(M_IOMMU_DOMAIN, "dmar_dom", "Intel DMAR Domain");
+static MALLOC_DEFINE(M_DMAR_DOMAIN, "dmar_dom", "Intel DMAR Domain");
 
 static void dmar_domain_unload_task(void *arg, int pending);
 static void dmar_unref_domain_locked(struct dmar_unit *dmar,
@@ -326,7 +326,7 @@ dmar_domain_alloc(struct dmar_unit *dmar, bool id_mapped)
 	id = alloc_unr(dmar->domids);
 	if (id == -1)
 		return (NULL);
-	domain = malloc(sizeof(*domain), M_IOMMU_DOMAIN, M_WAITOK | M_ZERO);
+	domain = malloc(sizeof(*domain), M_DMAR_DOMAIN, M_WAITOK | M_ZERO);
 	domain->domain = id;
 	LIST_INIT(&domain->contexts);
 	RB_INIT(&domain->rb_root);
@@ -446,7 +446,7 @@ dmar_domain_destroy(struct dmar_domain *domain)
 	mtx_destroy(&domain->iodom.lock);
 	dmar = (struct dmar_unit *)domain->iodom.iommu;
 	free_unr(dmar->domids, domain->domain);
-	free(domain, M_IOMMU_DOMAIN);
+	free(domain, M_DMAR_DOMAIN);
 }
 
 static struct dmar_ctx *
