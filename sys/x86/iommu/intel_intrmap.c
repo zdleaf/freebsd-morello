@@ -254,7 +254,7 @@ dmar_ir_find(device_t src, uint16_t *rid, int *is_dmar)
 	} else if (src_class == devclass_find("hpet")) {
 		dmar = dmar_find_hpet(src, rid);
 	} else {
-		unit = dmar_find(src, bootverbose);
+		unit = iommu_find(src, bootverbose);
 		dmar = (struct dmar_unit *)unit;
 		if (unit != NULL && rid != NULL)
 			iommu_get_requester(src, rid);

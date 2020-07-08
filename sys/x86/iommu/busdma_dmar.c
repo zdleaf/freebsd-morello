@@ -275,7 +275,7 @@ acpi_iommu_get_dma_tag(device_t dev, device_t child)
 	struct iommu_device *ctx;
 	bus_dma_tag_t res;
 
-	unit = dmar_find(child, bootverbose);
+	unit = iommu_find(child, bootverbose);
 	/* Not in scope of any DMAR ? */
 	if (unit == NULL)
 		return (NULL);
@@ -299,7 +299,7 @@ bus_dma_dmar_set_buswide(device_t dev)
 	parent = device_get_parent(dev);
 	if (device_get_devclass(parent) != devclass_find("pci"))
 		return (false);
-	unit = dmar_find(dev, bootverbose);
+	unit = iommu_find(dev, bootverbose);
 	if (unit == NULL)
 		return (false);
 	busno = pci_get_bus(dev);
