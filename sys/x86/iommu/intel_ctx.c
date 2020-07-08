@@ -133,16 +133,16 @@ device_tag_init(struct dmar_ctx *ctx, device_t dev)
 
 	domain = (struct dmar_domain *)ctx->device.domain;
 	maxaddr = MIN(domain->end, BUS_SPACE_MAXADDR);
-	ctx->device.device_tag.common.ref_count = 1; /* Prevent free */
-	ctx->device.device_tag.common.impl = &bus_dma_iommu_impl;
-	ctx->device.device_tag.common.boundary = 0;
-	ctx->device.device_tag.common.lowaddr = maxaddr;
-	ctx->device.device_tag.common.highaddr = maxaddr;
-	ctx->device.device_tag.common.maxsize = maxaddr;
-	ctx->device.device_tag.common.nsegments = BUS_SPACE_UNRESTRICTED;
-	ctx->device.device_tag.common.maxsegsz = maxaddr;
-	ctx->device.device_tag.ctx = (struct iommu_device *)ctx;
-	ctx->device.device_tag.owner = dev;
+	ctx->device.tag.common.ref_count = 1; /* Prevent free */
+	ctx->device.tag.common.impl = &bus_dma_iommu_impl;
+	ctx->device.tag.common.boundary = 0;
+	ctx->device.tag.common.lowaddr = maxaddr;
+	ctx->device.tag.common.highaddr = maxaddr;
+	ctx->device.tag.common.maxsize = maxaddr;
+	ctx->device.tag.common.nsegments = BUS_SPACE_UNRESTRICTED;
+	ctx->device.tag.common.maxsegsz = maxaddr;
+	ctx->device.tag.ctx = (struct iommu_device *)ctx;
+	ctx->device.tag.owner = dev;
 }
 
 static void
@@ -182,8 +182,8 @@ ctx_id_entry_init(struct dmar_ctx *ctx, dmar_ctx_entry_t *ctxp, bool move,
 	unit = (struct dmar_unit *)domain->iodom.iommu;
 	KASSERT(move || (ctxp->ctx1 == 0 && ctxp->ctx2 == 0),
 	    ("dmar%d: initialized ctx entry %d:%d:%d 0x%jx 0x%jx",
-	    unit->iommu.unit, busno, pci_get_slot(ctx->device.device_tag.owner),
-	    pci_get_function(ctx->device.device_tag.owner),
+	    unit->iommu.unit, busno, pci_get_slot(ctx->device.tag.owner),
+	    pci_get_function(ctx->device.tag.owner),
 	    ctxp->ctx1, ctxp->ctx2));
 
 	if ((domain->flags & IOMMU_DOMAIN_IDMAP) != 0 &&
@@ -513,7 +513,7 @@ dmar_get_ctx_for_dev1(struct dmar_unit *dmar, device_t dev, uint16_t rid,
 			domain = domain1;
 			ctx = ctx1;
 			dmar_ctx_link(ctx);
-			ctx->device.device_tag.owner = dev;
+			ctx->device.tag.owner = dev;
 			device_tag_init(ctx, dev);
 
 			/*
@@ -544,8 +544,8 @@ dmar_get_ctx_for_dev1(struct dmar_unit *dmar, device_t dev, uint16_t rid,
 		}
 	} else {
 		domain = (struct dmar_domain *)ctx->device.domain;
-		if (ctx->device.device_tag.owner == NULL)
-			ctx->device.device_tag.owner = dev;
+		if (ctx->device.tag.owner == NULL)
+			ctx->device.tag.owner = dev;
 		ctx->refs++; /* tag referenced us */
 	}
 

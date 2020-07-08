@@ -285,7 +285,7 @@ acpi_iommu_get_dma_tag(device_t dev, device_t child)
 	dmar_instantiate_rmrr_ctxs(unit);
 
 	ctx = iommu_instantiate_device(unit, child, false);
-	res = ctx == NULL ? NULL : (bus_dma_tag_t)&ctx->device_tag;
+	res = ctx == NULL ? NULL : (bus_dma_tag_t)&ctx->tag;
 	return (res);
 }
 
@@ -379,7 +379,7 @@ iommu_bus_dma_tag_destroy(bus_dma_tag_t dmat1)
 			parent = (struct bus_dma_tag_iommu *)dmat->common.parent;
 			if (atomic_fetchadd_int(&dmat->common.ref_count, -1) ==
 			    1) {
-				if (dmat == &dmat->ctx->device_tag)
+				if (dmat == &dmat->ctx->tag)
 					dmar_free_ctx(dmat->ctx);
 				free_domain(dmat->segments, M_DMAR_DMAMAP);
 				free(dmat, M_DEVBUF);

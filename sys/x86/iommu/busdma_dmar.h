@@ -67,7 +67,7 @@ struct bus_dma_tag_iommu {
 
 struct iommu_device {
 	struct iommu_domain *domain;	/* (c) */
-	struct bus_dma_tag_iommu device_tag; /* (c) Root tag */
+	struct bus_dma_tag_iommu tag;	/* (c) Root tag */
 	u_long loads;			/* atomic updates, for stat only */
 	u_long unloads;			/* same */
 	u_int flags;			/* (u) */
