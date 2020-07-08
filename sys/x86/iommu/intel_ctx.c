@@ -111,11 +111,11 @@ dmar_ensure_ctx_page(struct dmar_unit *dmar, int bus)
 	TD_PINNED_ASSERT;
 }
 
-static iommu_device_entry_t *
+static dmar_ctx_entry_t *
 dmar_map_ctx_entry(struct iommu_device *ctx, struct sf_buf **sfp)
 {
 	struct dmar_unit *dmar;
-	iommu_device_entry_t *ctxp;
+	dmar_ctx_entry_t *ctxp;
 
 	dmar = (struct dmar_unit *)ctx->domain->iommu;
 
@@ -144,7 +144,7 @@ device_tag_init(struct iommu_device *ctx, device_t dev)
 }
 
 static void
-ctx_id_entry_init_one(iommu_device_entry_t *ctxp, struct iommu_domain *domain,
+ctx_id_entry_init_one(dmar_ctx_entry_t *ctxp, struct iommu_domain *domain,
     vm_page_t ctx_root)
 {
 	/*
@@ -168,7 +168,7 @@ ctx_id_entry_init_one(iommu_device_entry_t *ctxp, struct iommu_domain *domain,
 }
 
 static void
-ctx_id_entry_init(struct iommu_device *ctx, iommu_device_entry_t *ctxp, bool move,
+ctx_id_entry_init(struct iommu_device *ctx, dmar_ctx_entry_t *ctxp, bool move,
     int busno)
 {
 	struct dmar_unit *unit;
@@ -453,7 +453,7 @@ dmar_get_ctx_for_dev1(struct dmar_unit *dmar, device_t dev, uint16_t rid,
 {
 	struct iommu_domain *domain, *domain1;
 	struct iommu_device *ctx, *ctx1;
-	iommu_device_entry_t *ctxp;
+	dmar_ctx_entry_t *ctxp;
 	struct sf_buf *sf;
 	int bus, slot, func, error;
 	bool enable;
@@ -609,7 +609,7 @@ dmar_move_ctx_to_domain(struct iommu_domain *domain, struct iommu_device *ctx)
 {
 	struct dmar_unit *dmar;
 	struct iommu_domain *old_domain;
-	iommu_device_entry_t *ctxp;
+	dmar_ctx_entry_t *ctxp;
 	struct sf_buf *sf;
 	int error;
 
@@ -673,7 +673,7 @@ dmar_free_ctx_locked(struct iommu_unit *unit, struct iommu_device *ctx)
 {
 	struct dmar_unit *dmar;
 	struct sf_buf *sf;
-	iommu_device_entry_t *ctxp;
+	dmar_ctx_entry_t *ctxp;
 	struct iommu_domain *domain;
 
 	dmar = (struct dmar_unit *)unit;

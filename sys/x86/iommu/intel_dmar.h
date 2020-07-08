@@ -287,7 +287,7 @@ int dmar_inv_ctx_glob(struct dmar_unit *unit);
 int dmar_inv_iotlb_glob(struct dmar_unit *unit);
 int dmar_flush_write_bufs(struct dmar_unit *unit);
 void dmar_flush_pte_to_ram(struct dmar_unit *unit, dmar_pte_t *dst);
-void dmar_flush_ctx_to_ram(struct dmar_unit *unit, iommu_device_entry_t *dst);
+void dmar_flush_ctx_to_ram(struct dmar_unit *unit, dmar_ctx_entry_t *dst);
 void dmar_flush_root_to_ram(struct dmar_unit *unit, dmar_root_entry_t *dst);
 int dmar_enable_translation(struct dmar_unit *unit);
 int dmar_disable_translation(struct dmar_unit *unit);

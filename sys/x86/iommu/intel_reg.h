@@ -54,7 +54,7 @@ typedef struct dmar_root_entry {
 typedef	struct iommu_device_entry {
 	uint64_t ctx1;
 	uint64_t ctx2;
-} iommu_device_entry_t;
+} dmar_ctx_entry_t;
 #define	DMAR_CTX1_P		1		/* Present */
 #define	DMAR_CTX1_FPD		2		/* Fault Processing Disable */
 						/* Translation Type: */
