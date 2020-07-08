@@ -191,7 +191,7 @@ static void
 dmar_fault_task(void *arg, int pending __unused)
 {
 	struct dmar_unit *unit;
-	struct iommu_device *ctx;
+	struct dmar_ctx *ctx;
 	uint64_t fault_rec[2];
 	int sid, bus, slot, func, faultp;
 
@@ -223,13 +223,13 @@ dmar_fault_task(void *arg, int pending __unused)
 			slot = PCI_RID2SLOT(sid);
 			func = PCI_RID2FUNC(sid);
 		} else {
-			ctx->flags |= DMAR_CTX_FAULTED;
+			ctx->device.flags |= DMAR_CTX_FAULTED;
 			ctx->last_fault_rec[0] = fault_rec[0];
 			ctx->last_fault_rec[1] = fault_rec[1];
-			device_print_prettyname(ctx->device_tag.owner);
-			bus = pci_get_bus(ctx->device_tag.owner);
-			slot = pci_get_slot(ctx->device_tag.owner);
-			func = pci_get_function(ctx->device_tag.owner);
+			device_print_prettyname(ctx->device.device_tag.owner);
+			bus = pci_get_bus(ctx->device.device_tag.owner);
+			slot = pci_get_slot(ctx->device.device_tag.owner);
+			func = pci_get_function(ctx->device.device_tag.owner);
 		}
 		DMAR_UNLOCK(unit);
 		printf(

@@ -49,12 +49,28 @@ struct iommu_unit {
 	struct taskqueue *delayed_taskqueue;
 };
 
+struct iommu_domain {
+	struct iommu_unit *iommu;	/* (c) */
+	struct mtx lock;		/* (c) */
+	struct task unload_task;	/* (c) */
+	struct iommu_map_entries_tailq unload_entries; /* (d) Entries to
+							 unload */
+};
+
 struct bus_dma_tag_iommu {
 	struct bus_dma_tag_common common;
 	struct iommu_device *ctx;
 	device_t owner;
 	int map_count;
 	bus_dma_segment_t *segments;
+};
+
+struct iommu_device {
+	struct iommu_domain *domain;	/* (c) */
+	struct bus_dma_tag_iommu device_tag; /* (c) Root tag */
+	u_long loads;			/* atomic updates, for stat only */
+	u_long unloads;			/* same */
+	u_int flags;			/* (u) */
 };
 
 struct bus_dmamap_iommu {

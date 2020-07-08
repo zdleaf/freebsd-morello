@@ -123,12 +123,12 @@ dmar_pglvl_supported(struct iommu_unit *unit, int pglvl)
 }
 
 int
-domain_set_agaw(struct iommu_domain *domain, int mgaw)
+domain_set_agaw(struct dmar_domain *domain, int mgaw)
 {
 	struct dmar_unit *dmar;
 	int sagaw, i;
 
-	dmar = (struct dmar_unit *)domain->iommu;
+	dmar = (struct dmar_unit *)domain->iodom.iommu;
 
 	domain->mgaw = mgaw;
 	sagaw = DMAR_CAP_SAGAW(dmar->hw_cap);
@@ -198,7 +198,7 @@ pglvl_max_pages(int pglvl)
  * the context ctx.
  */
 int
-domain_is_sp_lvl(struct iommu_domain *domain, int lvl)
+domain_is_sp_lvl(struct dmar_domain *domain, int lvl)
 {
 	struct dmar_unit *dmar;
 	int alvl, cap_sps;
@@ -210,7 +210,7 @@ domain_is_sp_lvl(struct iommu_domain *domain, int lvl)
 	};
 
 	alvl = domain->pglvl - lvl - 1;
-	dmar = (struct dmar_unit *)domain->iommu;
+	dmar = (struct dmar_unit *)domain->iodom.iommu;
 	cap_sps = DMAR_CAP_SPS(dmar->hw_cap);
 	return (alvl < nitems(sagaw_sp) && (sagaw_sp[alvl] & cap_sps) != 0);
 }
@@ -236,7 +236,7 @@ pglvl_page_size(int total_pglvl, int lvl)
 }
 
 dmar_gaddr_t
-domain_page_size(struct iommu_domain *domain, int lvl)
+domain_page_size(struct dmar_domain *domain, int lvl)
 {
 
 	return (pglvl_page_size(domain->pglvl, lvl));

@@ -51,7 +51,7 @@ typedef struct dmar_root_entry {
 
 #define	DMAR_CTX_CNT		(DMAR_PAGE_SIZE / sizeof(dmar_root_entry_t))
 
-typedef	struct iommu_device_entry {
+typedef	struct dmar_ctx_entry {
 	uint64_t ctx1;
 	uint64_t ctx2;
 } dmar_ctx_entry_t;

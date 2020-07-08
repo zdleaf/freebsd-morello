@@ -909,7 +909,7 @@ dmar_find_ioapic(u_int apic_id, uint16_t *rid)
 }
 
 struct rmrr_iter_args {
-	struct iommu_domain *domain;
+	struct dmar_domain *domain;
 	int dev_domain;
 	int dev_busno;
 	const ACPI_DMAR_PCI_PATH *dev_path;
@@ -945,7 +945,7 @@ dmar_rmrr_iter(ACPI_DMAR_HEADER *dmarh, void *arg)
 		match = dmar_match_devscope(devscope, ria->dev_busno,
 		    ria->dev_path, ria->dev_path_len);
 		if (match == 1) {
-			entry = dmar_gas_alloc_entry(ria->domain,
+			entry = dmar_gas_alloc_entry(&ria->domain->iodom,
 			    DMAR_PGF_WAITOK);
 			entry->start = resmem->BaseAddress;
 			/* The RMRR entry end address is inclusive. */
@@ -959,7 +959,7 @@ dmar_rmrr_iter(ACPI_DMAR_HEADER *dmarh, void *arg)
 }
 
 void
-dmar_dev_parse_rmrr(struct iommu_domain *domain, int dev_domain, int dev_busno,
+dmar_dev_parse_rmrr(struct dmar_domain *domain, int dev_domain, int dev_busno,
     const void *dev_path, int dev_path_len,
     struct iommu_map_entries_tailq *rmrr_entries)
 {
@@ -1140,22 +1140,22 @@ dmar_print_domain_entry(const struct iommu_map_entry *entry)
 }
 
 static void
-dmar_print_ctx(struct iommu_device *ctx)
+dmar_print_ctx(struct dmar_ctx *ctx)
 {
 
 	db_printf(
 	    "    @%p pci%d:%d:%d refs %d flags %x loads %lu unloads %lu\n",
-	    ctx, pci_get_bus(ctx->device_tag.owner),
-	    pci_get_slot(ctx->device_tag.owner),
-	    pci_get_function(ctx->device_tag.owner), ctx->refs, ctx->flags,
-	    ctx->loads, ctx->unloads);
+	    ctx, pci_get_bus(ctx->device.device_tag.owner),
+	    pci_get_slot(ctx->device.device_tag.owner),
+	    pci_get_function(ctx->device.device_tag.owner), ctx->refs,
+	    ctx->device.flags, ctx->device.loads, ctx->device.unloads);
 }
 
 static void
-dmar_print_domain(struct iommu_domain *domain, bool show_mappings)
+dmar_print_domain(struct dmar_domain *domain, bool show_mappings)
 {
 	struct iommu_map_entry *entry;
-	struct iommu_device *ctx;
+	struct dmar_ctx *ctx;
 
 	db_printf(
 	    "  @%p dom %d mgaw %d agaw %d pglvl %d end %jx refs %d\n"
@@ -1179,18 +1179,18 @@ dmar_print_domain(struct iommu_domain *domain, bool show_mappings)
 	if (db_pager_quit)
 		return;
 	db_printf("    unloading:\n");
-	TAILQ_FOREACH(entry, &domain->unload_entries, dmamap_link) {
+	TAILQ_FOREACH(entry, &domain->iodom.unload_entries, dmamap_link) {
 		dmar_print_domain_entry(entry);
 		if (db_pager_quit)
 			break;
 	}
 }
 
-DB_FUNC(iommu_domain, db_dmar_print_domain, db_show_table, CS_OWN, NULL)
+DB_FUNC(dmar_domain, db_dmar_print_domain, db_show_table, CS_OWN, NULL)
 {
 	struct dmar_unit *unit;
-	struct iommu_domain *domain;
-	struct iommu_device *ctx;
+	struct dmar_domain *domain;
+	struct dmar_ctx *ctx;
 	bool show_mappings, valid;
 	int pci_domain, bus, device, function, i, t;
 	db_expr_t radix;
@@ -1231,7 +1231,7 @@ DB_FUNC(iommu_domain, db_dmar_print_domain, db_show_table, CS_OWN, NULL)
 			db_radix = radix;
 	db_skip_to_eol();
 	if (!valid) {
-		db_printf("usage: show iommu_domain [/m] "
+		db_printf("usage: show dmar_domain [/m] "
 		    "<domain> <bus> <device> <func>\n");
 		return;
 	}
@@ -1240,11 +1240,11 @@ DB_FUNC(iommu_domain, db_dmar_print_domain, db_show_table, CS_OWN, NULL)
 		LIST_FOREACH(domain, &unit->domains, link) {
 			LIST_FOREACH(ctx, &domain->contexts, link) {
 				if (pci_domain == unit->segment && 
-				    bus == pci_get_bus(ctx->device_tag.owner) &&
+				    bus == pci_get_bus(ctx->device.device_tag.owner) &&
 				    device ==
-				    pci_get_slot(ctx->device_tag.owner) &&
+				    pci_get_slot(ctx->device.device_tag.owner) &&
 				    function ==
-				    pci_get_function(ctx->device_tag.owner)) {
+				    pci_get_function(ctx->device.device_tag.owner)) {
 					dmar_print_domain(domain,
 					    show_mappings);
 					goto out;
@@ -1259,7 +1259,7 @@ static void
 dmar_print_one(int idx, bool show_domains, bool show_mappings)
 {
 	struct dmar_unit *unit;
-	struct iommu_domain *domain;
+	struct dmar_domain *domain;
 	int i, frir;
 
 	unit = device_get_softc(dmar_devs[idx]);
