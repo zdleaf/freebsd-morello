@@ -37,6 +37,31 @@
 struct iommu_map_entry;
 TAILQ_HEAD(iommu_map_entries_tailq, iommu_map_entry);
 
+struct bus_dma_tag_iommu {
+	struct bus_dma_tag_common common;
+	struct iommu_device *ctx;
+	device_t owner;
+	int map_count;
+	bus_dma_segment_t *segments;
+};
+
+struct bus_dmamap_iommu {
+	struct bus_dma_tag_iommu *tag;
+	struct memdesc mem;
+	bus_dmamap_callback_t *callback;
+	void *callback_arg;
+	struct iommu_map_entries_tailq map_entries;
+	TAILQ_ENTRY(bus_dmamap_iommu) delay_link;
+	bool locked;
+	bool cansleep;
+	int flags;
+};
+
+#define	BUS_DMAMAP_IOMMU_MALLOC	0x0001
+#define	BUS_DMAMAP_IOMMU_KMEM_ALLOC 0x0002
+
+extern struct bus_dma_impl bus_dma_iommu_impl;
+
 struct iommu_unit {
 	struct mtx lock;
 	int unit;
@@ -57,14 +82,6 @@ struct iommu_domain {
 							 unload */
 };
 
-struct bus_dma_tag_iommu {
-	struct bus_dma_tag_common common;
-	struct iommu_device *ctx;
-	device_t owner;
-	int map_count;
-	bus_dma_segment_t *segments;
-};
-
 struct iommu_device {
 	struct iommu_domain *domain;	/* (c) */
 	struct bus_dma_tag_iommu tag;	/* (c) Root tag */
@@ -73,26 +90,9 @@ struct iommu_device {
 	u_int flags;			/* (u) */
 };
 
-struct bus_dmamap_iommu {
-	struct bus_dma_tag_iommu *tag;
-	struct memdesc mem;
-	bus_dmamap_callback_t *callback;
-	void *callback_arg;
-	struct iommu_map_entries_tailq map_entries;
-	TAILQ_ENTRY(bus_dmamap_iommu) delay_link;
-	bool locked;
-	bool cansleep;
-	int flags;
-};
-
-#define	BUS_DMAMAP_IOMMU_MALLOC	0x0001
-#define	BUS_DMAMAP_IOMMU_KMEM_ALLOC 0x0002
-
 #define	IOMMU_LOCK(unit)	mtx_lock(&(unit)->lock)
 #define	IOMMU_UNLOCK(unit)	mtx_unlock(&(unit)->lock)
 #define	IOMMU_ASSERT_LOCKED(unit) mtx_assert(&(unit)->lock, MA_OWNED)
-
-extern struct bus_dma_impl bus_dma_iommu_impl;
 
 bus_dma_tag_t acpi_iommu_get_dma_tag(device_t dev, device_t child);
 
