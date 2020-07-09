@@ -619,7 +619,7 @@ dmar_move_ctx_to_domain(struct dmar_domain *domain, struct dmar_ctx *ctx)
 	struct sf_buf *sf;
 	int error;
 
-	dmar = (struct dmar_unit *)domain->iodom.iommu;
+	dmar = domain->dmar;
 	old_domain = (struct dmar_domain *)ctx->context.domain;
 	if (domain == old_domain)
 		return (0);
