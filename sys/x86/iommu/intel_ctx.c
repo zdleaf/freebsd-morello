@@ -582,22 +582,18 @@ dmar_get_ctx_for_dev1(struct dmar_unit *dmar, device_t dev, uint16_t rid,
 	return (ctx);
 }
 
-struct iommu_device *
-dmar_get_ctx_for_dev(struct iommu_unit *dmar, device_t dev, uint16_t rid,
+struct dmar_ctx *
+dmar_get_ctx_for_dev(struct dmar_unit *dmar, device_t dev, uint16_t rid,
     bool id_mapped, bool rmrr_init)
 {
-	struct dmar_ctx *ret;
 	int dev_domain, dev_path_len, dev_busno;
 
 	dev_domain = pci_get_domain(dev);
 	dev_path_len = dmar_dev_depth(dev);
 	ACPI_DMAR_PCI_PATH dev_path[dev_path_len];
 	dmar_dev_path(dev, &dev_busno, dev_path, dev_path_len);
-	ret = dmar_get_ctx_for_dev1((struct dmar_unit *)dmar, dev, rid,
-	    dev_domain, dev_busno, dev_path, dev_path_len, id_mapped,
-	    rmrr_init);
-
-	return ((struct iommu_device *)ret);
+	return (dmar_get_ctx_for_dev1(dmar, dev, rid, dev_domain, dev_busno,
+	    dev_path, dev_path_len, id_mapped, rmrr_init));
 }
 
 struct dmar_ctx *
@@ -892,4 +888,18 @@ dmar_domain_unload_task(void *arg, int pending)
 			break;
 		iommu_domain_unload(&domain->iodom, &entries, true);
 	}
+}
+
+struct iommu_device *
+iommu_get_device(struct iommu_unit *iommu, device_t dev, uint16_t rid,
+    bool id_mapped, bool rmrr_init)
+{
+	struct dmar_unit *dmar;
+	struct dmar_ctx *ret;
+
+	dmar = (struct dmar_unit *)iommu;
+
+	ret = dmar_get_ctx_for_dev(dmar, dev, rid, id_mapped, rmrr_init);
+
+	return ((struct iommu_device *)ret);
 }

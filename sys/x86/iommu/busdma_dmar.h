@@ -96,4 +96,7 @@ struct iommu_device {
 
 bus_dma_tag_t acpi_iommu_get_dma_tag(device_t dev, device_t child);
 
+struct iommu_device *iommu_get_device(struct iommu_unit *, device_t dev,
+    uint16_t rid, bool id_mapped, bool rmrr_init);
+
 #endif
