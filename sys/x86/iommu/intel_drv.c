@@ -1062,7 +1062,7 @@ dmar_inst_rmrr_iter(ACPI_DMAR_HEADER *dmarh, void *arg)
 			unit = dmar_find(dev, false);
 			if (iria->dmar != unit)
 				continue;
-			iommu_instantiate_device(&(iria)->dmar->iommu,
+			iommu_instantiate_ctx(&(iria)->dmar->iommu,
 			    dev, true);
 		}
 	}
@@ -1143,10 +1143,10 @@ dmar_print_ctx(struct dmar_ctx *ctx)
 
 	db_printf(
 	    "    @%p pci%d:%d:%d refs %d flags %x loads %lu unloads %lu\n",
-	    ctx, pci_get_bus(ctx->device.tag.owner),
-	    pci_get_slot(ctx->device.tag.owner),
-	    pci_get_function(ctx->device.tag.owner), ctx->refs,
-	    ctx->device.flags, ctx->device.loads, ctx->device.unloads);
+	    ctx, pci_get_bus(ctx->context.tag.owner),
+	    pci_get_slot(ctx->context.tag.owner),
+	    pci_get_function(ctx->context.tag.owner), ctx->refs,
+	    ctx->context.flags, ctx->context.loads, ctx->context.unloads);
 }
 
 static void
@@ -1238,11 +1238,11 @@ DB_FUNC(dmar_domain, db_dmar_print_domain, db_show_table, CS_OWN, NULL)
 		LIST_FOREACH(domain, &unit->domains, link) {
 			LIST_FOREACH(ctx, &domain->contexts, link) {
 				if (pci_domain == unit->segment && 
-				    bus == pci_get_bus(ctx->device.tag.owner) &&
+				    bus == pci_get_bus(ctx->context.tag.owner) &&
 				    device ==
-				    pci_get_slot(ctx->device.tag.owner) &&
+				    pci_get_slot(ctx->context.tag.owner) &&
 				    function ==
-				    pci_get_function(ctx->device.tag.owner)) {
+				    pci_get_function(ctx->context.tag.owner)) {
 					dmar_print_domain(domain,
 					    show_mappings);
 					goto out;

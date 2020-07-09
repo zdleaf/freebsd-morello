@@ -120,7 +120,7 @@ struct dmar_domain {
 };
 
 struct dmar_ctx {
-	struct iommu_device device;
+	struct iommu_ctx context;
 	uint16_t rid;			/* (c) pci RID */
 	uint64_t last_fault_rec[2];	/* Last fault reported */
 	LIST_ENTRY(dmar_ctx) link;	/* (u) Member in the domain list */
@@ -325,7 +325,7 @@ void domain_free_pgtbl(struct dmar_domain *domain);
 int dmar_dev_depth(device_t child);
 void dmar_dev_path(device_t child, int *busno, void *path1, int depth);
 
-struct iommu_device *iommu_instantiate_device(struct iommu_unit *dmar,
+struct iommu_ctx *iommu_instantiate_ctx(struct iommu_unit *dmar,
     device_t dev, bool rmrr);
 struct dmar_ctx *dmar_get_ctx_for_dev(struct dmar_unit *dmar, device_t dev,
     uint16_t rid, bool id_mapped, bool rmrr_init);
@@ -333,8 +333,8 @@ struct dmar_ctx *dmar_get_ctx_for_devpath(struct dmar_unit *dmar, uint16_t rid,
     int dev_domain, int dev_busno, const void *dev_path, int dev_path_len,
     bool id_mapped, bool rmrr_init);
 int dmar_move_ctx_to_domain(struct dmar_domain *domain, struct dmar_ctx *ctx);
-void dmar_free_ctx_locked(struct iommu_unit *dmar, struct iommu_device *ctx);
-void dmar_free_ctx(struct iommu_device *ctx);
+void dmar_free_ctx_locked(struct iommu_unit *dmar, struct iommu_ctx *ctx);
+void dmar_free_ctx(struct iommu_ctx *ctx);
 struct dmar_ctx *dmar_find_ctx_locked(struct dmar_unit *dmar, uint16_t rid);
 void dmar_domain_unload_entry(struct iommu_map_entry *entry, bool free);
 void dmar_domain_unload(struct dmar_domain *domain,

@@ -228,11 +228,11 @@ iommu_get_requester(device_t dev, uint16_t *rid)
 	return (requester);
 }
 
-struct iommu_device *
-iommu_instantiate_device(struct iommu_unit *unit, device_t dev, bool rmrr)
+struct iommu_ctx *
+iommu_instantiate_ctx(struct iommu_unit *unit, device_t dev, bool rmrr)
 {
 	device_t requester;
-	struct iommu_device *ctx;
+	struct iommu_ctx *ctx;
 	bool disabled;
 	uint16_t rid;
 
@@ -248,7 +248,7 @@ iommu_instantiate_device(struct iommu_unit *unit, device_t dev, bool rmrr)
 	disabled = iommu_bus_dma_is_dev_disabled(pci_get_domain(requester),
 	    pci_get_bus(requester), pci_get_slot(requester), 
 	    pci_get_function(requester));
-	ctx = iommu_get_device(unit, requester, rid, disabled, rmrr);
+	ctx = iommu_get_ctx(unit, requester, rid, disabled, rmrr);
 	if (ctx == NULL)
 		return (NULL);
 	if (disabled) {
@@ -272,7 +272,7 @@ bus_dma_tag_t
 acpi_iommu_get_dma_tag(device_t dev, device_t child)
 {
 	struct iommu_unit *unit;
-	struct iommu_device *ctx;
+	struct iommu_ctx *ctx;
 	bus_dma_tag_t res;
 
 	unit = iommu_find(child, bootverbose);
@@ -284,7 +284,7 @@ acpi_iommu_get_dma_tag(device_t dev, device_t child)
 	dmar_quirks_pre_use(unit);
 	dmar_instantiate_rmrr_ctxs(unit);
 
-	ctx = iommu_instantiate_device(unit, child, false);
+	ctx = iommu_instantiate_ctx(unit, child, false);
 	res = ctx == NULL ? NULL : (bus_dma_tag_t)&ctx->tag;
 	return (res);
 }
@@ -526,7 +526,7 @@ iommu_bus_dmamap_load_something1(struct bus_dma_tag_iommu *tag,
     int flags, bus_dma_segment_t *segs, int *segp,
     struct iommu_map_entries_tailq *unroll_list)
 {
-	struct iommu_device *ctx;
+	struct iommu_ctx *ctx;
 	struct iommu_domain *domain;
 	struct iommu_map_entry *entry;
 	dmar_gaddr_t size;
@@ -631,7 +631,7 @@ iommu_bus_dmamap_load_something(struct bus_dma_tag_iommu *tag,
     struct bus_dmamap_iommu *map, vm_page_t *ma, int offset, bus_size_t buflen,
     int flags, bus_dma_segment_t *segs, int *segp)
 {
-	struct iommu_device *ctx;
+	struct iommu_ctx *ctx;
 	struct iommu_domain *domain;
 	struct iommu_map_entry *entry, *entry1;
 	struct iommu_map_entries_tailq unroll_list;
@@ -852,7 +852,7 @@ iommu_bus_dmamap_unload(bus_dma_tag_t dmat, bus_dmamap_t map1)
 {
 	struct bus_dma_tag_iommu *tag;
 	struct bus_dmamap_iommu *map;
-	struct iommu_device *ctx;
+	struct iommu_ctx *ctx;
 	struct iommu_domain *domain;
 #if defined(__amd64__)
 	struct iommu_map_entries_tailq entries;
@@ -878,7 +878,7 @@ iommu_bus_dmamap_unload(bus_dma_tag_t dmat, bus_dmamap_t map1)
 	THREAD_NO_SLEEPING();
 	iommu_domain_unload(domain, &entries, false);
 	THREAD_SLEEPING_OK();
-	KASSERT(TAILQ_EMPTY(&entries), ("lazy iommu_device_unload %p", ctx));
+	KASSERT(TAILQ_EMPTY(&entries), ("lazy iommu_ctx_unload %p", ctx));
 #endif
 }
 
@@ -981,7 +981,7 @@ bus_dma_dmar_load_ident(bus_dma_tag_t dmat, bus_dmamap_t map1,
 	struct bus_dma_tag_common *tc;
 	struct bus_dma_tag_iommu *tag;
 	struct bus_dmamap_iommu *map;
-	struct iommu_device *ctx;
+	struct iommu_ctx *ctx;
 	struct iommu_domain *domain;
 	struct iommu_map_entry *entry;
 	vm_page_t *ma;

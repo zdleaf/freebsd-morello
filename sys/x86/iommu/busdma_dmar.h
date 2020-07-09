@@ -39,7 +39,7 @@ TAILQ_HEAD(iommu_map_entries_tailq, iommu_map_entry);
 
 struct bus_dma_tag_iommu {
 	struct bus_dma_tag_common common;
-	struct iommu_device *ctx;
+	struct iommu_ctx *ctx;
 	device_t owner;
 	int map_count;
 	bus_dma_segment_t *segments;
@@ -82,7 +82,7 @@ struct iommu_domain {
 							 unload */
 };
 
-struct iommu_device {
+struct iommu_ctx {
 	struct iommu_domain *domain;	/* (c) */
 	struct bus_dma_tag_iommu tag;	/* (c) Root tag */
 	u_long loads;			/* atomic updates, for stat only */
@@ -100,7 +100,7 @@ struct iommu_device {
 
 bus_dma_tag_t acpi_iommu_get_dma_tag(device_t dev, device_t child);
 
-struct iommu_device *iommu_get_device(struct iommu_unit *, device_t dev,
+struct iommu_ctx *iommu_get_ctx(struct iommu_unit *, device_t dev,
     uint16_t rid, bool id_mapped, bool rmrr_init);
 struct iommu_unit *iommu_find(device_t dev, bool verbose);
 void iommu_domain_unload_entry(struct iommu_map_entry *entry, bool free);

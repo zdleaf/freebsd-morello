@@ -117,7 +117,7 @@ dmar_map_ctx_entry(struct dmar_ctx *ctx, struct sf_buf **sfp)
 	struct dmar_unit *dmar;
 	dmar_ctx_entry_t *ctxp;
 
-	dmar = (struct dmar_unit *)ctx->device.domain->iommu;
+	dmar = (struct dmar_unit *)ctx->context.domain->iommu;
 
 	ctxp = dmar_map_pgtbl(dmar->ctx_obj, 1 +
 	    PCI_RID2BUS(ctx->rid), DMAR_PGF_NOALLOC | DMAR_PGF_WAITOK, sfp);
@@ -131,18 +131,18 @@ device_tag_init(struct dmar_ctx *ctx, device_t dev)
 	struct dmar_domain *domain;
 	bus_addr_t maxaddr;
 
-	domain = (struct dmar_domain *)ctx->device.domain;
+	domain = (struct dmar_domain *)ctx->context.domain;
 	maxaddr = MIN(domain->end, BUS_SPACE_MAXADDR);
-	ctx->device.tag.common.ref_count = 1; /* Prevent free */
-	ctx->device.tag.common.impl = &bus_dma_iommu_impl;
-	ctx->device.tag.common.boundary = 0;
-	ctx->device.tag.common.lowaddr = maxaddr;
-	ctx->device.tag.common.highaddr = maxaddr;
-	ctx->device.tag.common.maxsize = maxaddr;
-	ctx->device.tag.common.nsegments = BUS_SPACE_UNRESTRICTED;
-	ctx->device.tag.common.maxsegsz = maxaddr;
-	ctx->device.tag.ctx = (struct iommu_device *)ctx;
-	ctx->device.tag.owner = dev;
+	ctx->context.tag.common.ref_count = 1; /* Prevent free */
+	ctx->context.tag.common.impl = &bus_dma_iommu_impl;
+	ctx->context.tag.common.boundary = 0;
+	ctx->context.tag.common.lowaddr = maxaddr;
+	ctx->context.tag.common.highaddr = maxaddr;
+	ctx->context.tag.common.maxsize = maxaddr;
+	ctx->context.tag.common.nsegments = BUS_SPACE_UNRESTRICTED;
+	ctx->context.tag.common.maxsegsz = maxaddr;
+	ctx->context.tag.ctx = (struct iommu_ctx *)ctx;
+	ctx->context.tag.owner = dev;
 }
 
 static void
@@ -178,12 +178,12 @@ ctx_id_entry_init(struct dmar_ctx *ctx, dmar_ctx_entry_t *ctxp, bool move,
 	vm_page_t ctx_root;
 	int i;
 
-	domain = (struct dmar_domain *)ctx->device.domain;
+	domain = (struct dmar_domain *)ctx->context.domain;
 	unit = (struct dmar_unit *)domain->iodom.iommu;
 	KASSERT(move || (ctxp->ctx1 == 0 && ctxp->ctx2 == 0),
 	    ("dmar%d: initialized ctx entry %d:%d:%d 0x%jx 0x%jx",
-	    unit->iommu.unit, busno, pci_get_slot(ctx->device.tag.owner),
-	    pci_get_function(ctx->device.tag.owner),
+	    unit->iommu.unit, busno, pci_get_slot(ctx->context.tag.owner),
+	    pci_get_function(ctx->context.tag.owner),
 	    ctxp->ctx1, ctxp->ctx2));
 
 	if ((domain->flags & DMAR_DOMAIN_IDMAP) != 0 &&
@@ -383,7 +383,7 @@ dmar_ctx_alloc(struct dmar_domain *domain, uint16_t rid)
 	struct dmar_ctx *ctx;
 
 	ctx = malloc(sizeof(*ctx), M_DMAR_CTX, M_WAITOK | M_ZERO);
-	ctx->device.domain = (struct iommu_domain *)domain;
+	ctx->context.domain = (struct iommu_domain *)domain;
 	ctx->rid = rid;
 	ctx->refs = 1;
 	return (ctx);
@@ -394,7 +394,7 @@ dmar_ctx_link(struct dmar_ctx *ctx)
 {
 	struct dmar_domain *domain;
 
-	domain = (struct dmar_domain *)ctx->device.domain;
+	domain = (struct dmar_domain *)ctx->context.domain;
 	IOMMU_ASSERT_LOCKED(domain->iodom.iommu);
 	KASSERT(domain->refs >= domain->ctx_cnt,
 	    ("dom %p ref underflow %d %d", domain, domain->refs,
@@ -409,7 +409,7 @@ dmar_ctx_unlink(struct dmar_ctx *ctx)
 {
 	struct dmar_domain *domain;
 
-	domain = (struct dmar_domain *)ctx->device.domain;
+	domain = (struct dmar_domain *)ctx->context.domain;
 	IOMMU_ASSERT_LOCKED(domain->iodom.iommu);
 	KASSERT(domain->refs > 0,
 	    ("domain %p ctx dtr refs %d", domain, domain->refs));
@@ -514,7 +514,7 @@ dmar_get_ctx_for_dev1(struct dmar_unit *dmar, device_t dev, uint16_t rid,
 			domain = domain1;
 			ctx = ctx1;
 			dmar_ctx_link(ctx);
-			ctx->device.tag.owner = dev;
+			ctx->context.tag.owner = dev;
 			device_tag_init(ctx, dev);
 
 			/*
@@ -540,19 +540,19 @@ dmar_get_ctx_for_dev1(struct dmar_unit *dmar, device_t dev, uint16_t rid,
 			dmar_domain_destroy(domain1);
 			/* Nothing needs to be done to destroy ctx1. */
 			free(ctx1, M_DMAR_CTX);
-			domain = (struct dmar_domain *)ctx->device.domain;
+			domain = (struct dmar_domain *)ctx->context.domain;
 			ctx->refs++; /* tag referenced us */
 		}
 	} else {
-		domain = (struct dmar_domain *)ctx->device.domain;
-		if (ctx->device.tag.owner == NULL)
-			ctx->device.tag.owner = dev;
+		domain = (struct dmar_domain *)ctx->context.domain;
+		if (ctx->context.tag.owner == NULL)
+			ctx->context.tag.owner = dev;
 		ctx->refs++; /* tag referenced us */
 	}
 
 	error = dmar_flush_for_ctx_entry(dmar, enable);
 	if (error != 0) {
-		dmar_free_ctx_locked(&dmar->iommu, (struct iommu_device *)ctx);
+		dmar_free_ctx_locked(&dmar->iommu, (struct iommu_ctx *)ctx);
 		TD_PINNED_ASSERT;
 		return (NULL);
 	}
@@ -573,7 +573,7 @@ dmar_get_ctx_for_dev1(struct dmar_unit *dmar, device_t dev, uint16_t rid,
 			printf("dmar%d: enabling translation failed, "
 			    "error %d\n", dmar->iommu.unit, error);
 			dmar_free_ctx_locked(&dmar->iommu,
-			    (struct iommu_device *)ctx);
+			    (struct iommu_ctx *)ctx);
 			TD_PINNED_ASSERT;
 			return (NULL);
 		}
@@ -618,7 +618,7 @@ dmar_move_ctx_to_domain(struct dmar_domain *domain, struct dmar_ctx *ctx)
 	int error;
 
 	dmar = (struct dmar_unit *)domain->iodom.iommu;
-	old_domain = (struct dmar_domain *)ctx->device.domain;
+	old_domain = (struct dmar_domain *)ctx->context.domain;
 	if (domain == old_domain)
 		return (0);
 	KASSERT(old_domain->iodom.iommu == domain->iodom.iommu,
@@ -630,7 +630,7 @@ dmar_move_ctx_to_domain(struct dmar_domain *domain, struct dmar_ctx *ctx)
 	ctxp = dmar_map_ctx_entry(ctx, &sf);
 	DMAR_LOCK(dmar);
 	dmar_ctx_unlink(ctx);
-	ctx->device.domain = &domain->iodom;
+	ctx->context.domain = &domain->iodom;
 	dmar_ctx_link(ctx);
 	ctx_id_entry_init(ctx, ctxp, true, PCI_BUSMAX + 100);
 	dmar_unmap_pgtbl(sf);
@@ -674,7 +674,7 @@ dmar_unref_domain_locked(struct dmar_unit *dmar, struct dmar_domain *domain)
 }
 
 void
-dmar_free_ctx_locked(struct iommu_unit *unit, struct iommu_device *device)
+dmar_free_ctx_locked(struct iommu_unit *unit, struct iommu_ctx *device)
 {
 	struct dmar_ctx *ctx;
 	struct dmar_unit *dmar;
@@ -699,7 +699,7 @@ dmar_free_ctx_locked(struct iommu_unit *unit, struct iommu_device *device)
 		return;
 	}
 
-	KASSERT((ctx->device.flags & DMAR_CTX_DISABLED) == 0,
+	KASSERT((ctx->context.flags & DMAR_CTX_DISABLED) == 0,
 	    ("lost ref on disabled ctx %p", ctx));
 
 	/*
@@ -726,7 +726,7 @@ dmar_free_ctx_locked(struct iommu_unit *unit, struct iommu_device *device)
 		return;
 	}
 
-	KASSERT((ctx->device.flags & DMAR_CTX_DISABLED) == 0,
+	KASSERT((ctx->context.flags & DMAR_CTX_DISABLED) == 0,
 	    ("lost ref on disabled ctx %p", ctx));
 
 	/*
@@ -744,7 +744,7 @@ dmar_free_ctx_locked(struct iommu_unit *unit, struct iommu_device *device)
 			dmar_inv_iotlb_glob(dmar);
 	}
 	dmar_unmap_pgtbl(sf);
-	domain = (struct dmar_domain *)ctx->device.domain;
+	domain = (struct dmar_domain *)ctx->context.domain;
 	dmar_ctx_unlink(ctx);
 	free(ctx, M_DMAR_CTX);
 	dmar_unref_domain_locked(dmar, domain);
@@ -752,15 +752,15 @@ dmar_free_ctx_locked(struct iommu_unit *unit, struct iommu_device *device)
 }
 
 void
-dmar_free_ctx(struct iommu_device *device)
+dmar_free_ctx(struct iommu_ctx *device)
 {
 	struct dmar_ctx *ctx;
 	struct dmar_unit *dmar;
 
 	ctx = (struct dmar_ctx *)device;
-	dmar = (struct dmar_unit *)ctx->device.domain->iommu;
+	dmar = (struct dmar_unit *)ctx->context.domain->iommu;
 	DMAR_LOCK(dmar);
-	dmar_free_ctx_locked(&dmar->iommu, (struct iommu_device *)ctx);
+	dmar_free_ctx_locked(&dmar->iommu, (struct iommu_ctx *)ctx);
 }
 
 /*
@@ -889,8 +889,8 @@ dmar_domain_unload_task(void *arg, int pending)
 	}
 }
 
-struct iommu_device *
-iommu_get_device(struct iommu_unit *iommu, device_t dev, uint16_t rid,
+struct iommu_ctx *
+iommu_get_ctx(struct iommu_unit *iommu, device_t dev, uint16_t rid,
     bool id_mapped, bool rmrr_init)
 {
 	struct dmar_unit *dmar;
@@ -900,7 +900,7 @@ iommu_get_device(struct iommu_unit *iommu, device_t dev, uint16_t rid,
 
 	ret = dmar_get_ctx_for_dev(dmar, dev, rid, id_mapped, rmrr_init);
 
-	return ((struct iommu_device *)ret);
+	return ((struct iommu_ctx *)ret);
 }
 
 void
