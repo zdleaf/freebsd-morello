@@ -44,7 +44,7 @@ RB_PROTOTYPE(dmar_gas_entries_tree, iommu_map_entry, rb_entry,
 
 /*
  * Locking annotations:
- * (u) - Protected by dmar unit lock
+ * (u) - Protected by iommu unit lock
  * (d) - Protected by domain lock
  * (c) - Immutable after initialization
  */

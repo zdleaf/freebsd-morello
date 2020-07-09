@@ -90,6 +90,13 @@ struct iommu_unit {
 	struct taskqueue *delayed_taskqueue;
 };
 
+/*
+ * Locking annotations:
+ * (u) - Protected by iommu unit lock
+ * (d) - Protected by domain lock
+ * (c) - Immutable after initialization
+ */
+
 struct iommu_domain {
 	struct iommu_unit *iommu;	/* (c) */
 	struct mtx lock;		/* (c) */
