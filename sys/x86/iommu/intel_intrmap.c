@@ -234,8 +234,7 @@ static struct dmar_unit *
 dmar_ir_find(device_t src, uint16_t *rid, int *is_dmar)
 {
 	devclass_t src_class;
-	struct iommu_unit *unit;
-	struct dmar_unit *dmar;
+	struct dmar_unit *unit;
 
 	/*
 	 * We need to determine if the interrupt source generates FSB
@@ -248,18 +247,17 @@ dmar_ir_find(device_t src, uint16_t *rid, int *is_dmar)
 		*is_dmar = FALSE;
 	src_class = device_get_devclass(src);
 	if (src_class == devclass_find("dmar")) {
-		dmar = NULL;
+		unit = NULL;
 		if (is_dmar != NULL)
 			*is_dmar = TRUE;
 	} else if (src_class == devclass_find("hpet")) {
-		dmar = dmar_find_hpet(src, rid);
+		unit = dmar_find_hpet(src, rid);
 	} else {
-		unit = iommu_find(src, bootverbose);
-		dmar = (struct dmar_unit *)unit;
+		unit = dmar_find(src, bootverbose);
 		if (unit != NULL && rid != NULL)
 			iommu_get_requester(src, rid);
 	}
-	return (dmar);
+	return (unit);
 }
 
 static void
