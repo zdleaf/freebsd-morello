@@ -801,7 +801,7 @@ dmar_domain_free_entry(struct iommu_map_entry *entry, bool free)
 }
 
 void
-iommu_domain_unload_entry(struct iommu_map_entry *entry, bool free)
+dmar_domain_unload_entry(struct iommu_map_entry *entry, bool free)
 {
 	struct dmar_unit *unit;
 
@@ -832,15 +832,13 @@ dmar_domain_unload_emit_wait(struct dmar_domain *domain,
 }
 
 void
-iommu_domain_unload(struct iommu_domain *iodom,
+dmar_domain_unload(struct dmar_domain *domain,
     struct iommu_map_entries_tailq *entries, bool cansleep)
 {
-	struct dmar_domain *domain;
 	struct dmar_unit *unit;
 	struct iommu_map_entry *entry, *entry1;
 	int error;
 
-	domain = (struct dmar_domain *)iodom;
 	unit = (struct dmar_unit *)domain->iodom.iommu;
 
 	TAILQ_FOREACH_SAFE(entry, entries, dmamap_link, entry1) {
@@ -886,7 +884,7 @@ dmar_domain_unload_task(void *arg, int pending)
 		DMAR_DOMAIN_UNLOCK(domain);
 		if (TAILQ_EMPTY(&entries))
 			break;
-		iommu_domain_unload(&domain->iodom, &entries, true);
+		dmar_domain_unload(domain, &entries, true);
 	}
 }
 
@@ -902,4 +900,22 @@ iommu_get_device(struct iommu_unit *iommu, device_t dev, uint16_t rid,
 	ret = dmar_get_ctx_for_dev(dmar, dev, rid, id_mapped, rmrr_init);
 
 	return ((struct iommu_device *)ret);
+}
+
+void
+iommu_domain_unload_entry(struct iommu_map_entry *entry, bool free)
+{
+
+	dmar_domain_unload_entry(entry, free);
+}
+
+void
+iommu_domain_unload(struct iommu_domain *iodom,
+    struct iommu_map_entries_tailq *entries, bool cansleep)
+{
+	struct dmar_domain *domain;
+
+	domain = (struct dmar_domain *)iodom;
+
+	dmar_domain_unload(domain, entries, cansleep);
 }
