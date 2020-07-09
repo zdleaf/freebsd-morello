@@ -38,24 +38,24 @@
 #include <sys/tree.h> 
 
 /* Host or physical memory address, after translation. */
-typedef uint64_t dmar_haddr_t;
+typedef uint64_t iommu_haddr_t;
 /* Guest or bus address, before translation. */
-typedef uint64_t dmar_gaddr_t;
+typedef uint64_t iommu_gaddr_t;
 
 struct iommu_map_entry;
 TAILQ_HEAD(iommu_map_entries_tailq, iommu_map_entry);
 
-struct dmar_qi_genseq {
+struct iommu_qi_genseq {
 	u_int gen;
 	uint32_t seq;
 };
 
 struct iommu_map_entry {
-	dmar_gaddr_t start;
-	dmar_gaddr_t end;
-	dmar_gaddr_t first;		/* Least start in subtree */
-	dmar_gaddr_t last;		/* Greatest end in subtree */
-	dmar_gaddr_t free_down;		/* Max free space below the
+	iommu_gaddr_t start;
+	iommu_gaddr_t end;
+	iommu_gaddr_t first;		/* Least start in subtree */
+	iommu_gaddr_t last;		/* Greatest end in subtree */
+	iommu_gaddr_t free_down;	/* Max free space below the
 					   current R/B tree node */
 	u_int flags;
 	TAILQ_ENTRY(iommu_map_entry) dmamap_link; /* Link for dmamap entries */
@@ -63,7 +63,7 @@ struct iommu_map_entry {
 	TAILQ_ENTRY(iommu_map_entry) unroll_link; /* Link for unroll after
 						    dmamap_load failure */
 	struct dmar_domain *domain;
-	struct dmar_qi_genseq gseq;
+	struct iommu_qi_genseq gseq;
 };
 
 #define	IOMMU_MAP_ENTRY_PLACE	0x0001	/* Fake entry */

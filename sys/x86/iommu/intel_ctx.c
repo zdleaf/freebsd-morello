@@ -238,7 +238,7 @@ domain_init_rmrr(struct dmar_domain *domain, device_t dev, int bus,
 	struct iommu_map_entries_tailq rmrr_entries;
 	struct iommu_map_entry *entry, *entry1;
 	vm_page_t *ma;
-	dmar_gaddr_t start, end;
+	iommu_gaddr_t start, end;
 	vm_pindex_t size, i;
 	int error, error1;
 

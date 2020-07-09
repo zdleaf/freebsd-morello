@@ -146,7 +146,7 @@ static void
 dmar_gas_augment_entry(struct iommu_map_entry *entry)
 {
 	struct iommu_map_entry *child;
-	dmar_gaddr_t free_down;
+	iommu_gaddr_t free_down;
 
 	free_down = 0;
 	if ((child = RB_LEFT(entry, rb_entry)) != NULL) {
@@ -173,7 +173,7 @@ static void
 dmar_gas_check_free(struct dmar_domain *domain)
 {
 	struct iommu_map_entry *entry, *l, *r;
-	dmar_gaddr_t v;
+	iommu_gaddr_t v;
 
 	RB_FOREACH(entry, dmar_gas_entries_tree, &domain->rb_root) {
 		KASSERT(domain == entry->domain,
@@ -274,7 +274,7 @@ dmar_gas_fini_domain(struct dmar_domain *domain)
 
 struct dmar_gas_match_args {
 	struct dmar_domain *domain;
-	dmar_gaddr_t size;
+	iommu_gaddr_t size;
 	int offset;
 	const struct bus_dma_tag_common *common;
 	u_int gas_flags;
@@ -288,10 +288,10 @@ struct dmar_gas_match_args {
  * by a, and return 'true' if and only if the allocation attempt succeeds.
  */
 static bool
-dmar_gas_match_one(struct dmar_gas_match_args *a, dmar_gaddr_t beg,
-    dmar_gaddr_t end, dmar_gaddr_t maxaddr)
+dmar_gas_match_one(struct dmar_gas_match_args *a, iommu_gaddr_t beg,
+    iommu_gaddr_t end, iommu_gaddr_t maxaddr)
 {
-	dmar_gaddr_t bs, start;
+	iommu_gaddr_t bs, start;
 
 	a->entry->start = roundup2(beg + DMAR_PAGE_SIZE,
 	    a->common->alignment);
@@ -425,7 +425,7 @@ dmar_gas_uppermatch(struct dmar_gas_match_args *a, struct iommu_map_entry *entry
 
 static int
 dmar_gas_find_space(struct dmar_domain *domain,
-    const struct bus_dma_tag_common *common, dmar_gaddr_t size,
+    const struct bus_dma_tag_common *common, iommu_gaddr_t size,
     int offset, u_int flags, struct iommu_map_entry *entry)
 {
 	struct dmar_gas_match_args a;
@@ -582,7 +582,7 @@ dmar_gas_free_region(struct dmar_domain *domain, struct iommu_map_entry *entry)
 
 int
 dmar_gas_map(struct iommu_domain *iodom,
-    const struct bus_dma_tag_common *common, dmar_gaddr_t size, int offset,
+    const struct bus_dma_tag_common *common, iommu_gaddr_t size, int offset,
     u_int eflags, u_int flags, vm_page_t *ma, struct iommu_map_entry **res)
 {
 	struct dmar_domain *domain;
@@ -640,7 +640,7 @@ dmar_gas_map_region(struct iommu_domain *iodom, struct iommu_map_entry *entry,
     u_int eflags, u_int flags, vm_page_t *ma)
 {
 	struct dmar_domain *domain;
-	dmar_gaddr_t start;
+	iommu_gaddr_t start;
 	int error;
 
 	domain = (struct dmar_domain *)iodom;
@@ -680,8 +680,8 @@ dmar_gas_map_region(struct iommu_domain *iodom, struct iommu_map_entry *entry,
 }
 
 int
-dmar_gas_reserve_region(struct dmar_domain *domain, dmar_gaddr_t start,
-    dmar_gaddr_t end)
+dmar_gas_reserve_region(struct dmar_domain *domain, iommu_gaddr_t start,
+    iommu_gaddr_t end)
 {
 	struct iommu_map_entry *entry;
 	int error;

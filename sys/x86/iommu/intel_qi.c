@@ -63,7 +63,7 @@ __FBSDID("$FreeBSD$");
 
 static bool
 dmar_qi_seq_processed(const struct dmar_unit *unit,
-    const struct dmar_qi_genseq *pseq)
+    const struct iommu_qi_genseq *pseq)
 {
 
 	return (pseq->gen < unit->inv_waitd_gen ||
@@ -174,10 +174,10 @@ dmar_qi_emit_wait_descr(struct dmar_unit *unit, uint32_t seq, bool intr,
 }
 
 static void
-dmar_qi_emit_wait_seq(struct dmar_unit *unit, struct dmar_qi_genseq *pseq,
+dmar_qi_emit_wait_seq(struct dmar_unit *unit, struct iommu_qi_genseq *pseq,
     bool emit_wait)
 {
-	struct dmar_qi_genseq gsec;
+	struct iommu_qi_genseq gsec;
 	uint32_t seq;
 
 	KASSERT(pseq != NULL, ("wait descriptor with no place for seq"));
@@ -203,7 +203,7 @@ dmar_qi_emit_wait_seq(struct dmar_unit *unit, struct dmar_qi_genseq *pseq,
 }
 
 static void
-dmar_qi_wait_for_seq(struct dmar_unit *unit, const struct dmar_qi_genseq *gseq,
+dmar_qi_wait_for_seq(struct dmar_unit *unit, const struct iommu_qi_genseq *gseq,
     bool nowait)
 {
 
@@ -221,11 +221,11 @@ dmar_qi_wait_for_seq(struct dmar_unit *unit, const struct dmar_qi_genseq *gseq,
 }
 
 void
-dmar_qi_invalidate_locked(struct dmar_domain *domain, dmar_gaddr_t base,
-    dmar_gaddr_t size, struct dmar_qi_genseq *pseq, bool emit_wait)
+dmar_qi_invalidate_locked(struct dmar_domain *domain, iommu_gaddr_t base,
+    iommu_gaddr_t size, struct iommu_qi_genseq *pseq, bool emit_wait)
 {
 	struct dmar_unit *unit;
-	dmar_gaddr_t isize;
+	iommu_gaddr_t isize;
 	int am;
 
 	unit = domain->dmar;
@@ -246,7 +246,7 @@ dmar_qi_invalidate_locked(struct dmar_domain *domain, dmar_gaddr_t base,
 void
 dmar_qi_invalidate_ctx_glob_locked(struct dmar_unit *unit)
 {
-	struct dmar_qi_genseq gseq;
+	struct iommu_qi_genseq gseq;
 
 	DMAR_ASSERT_LOCKED(unit);
 	dmar_qi_ensure(unit, 2);
@@ -259,7 +259,7 @@ dmar_qi_invalidate_ctx_glob_locked(struct dmar_unit *unit)
 void
 dmar_qi_invalidate_iotlb_glob_locked(struct dmar_unit *unit)
 {
-	struct dmar_qi_genseq gseq;
+	struct iommu_qi_genseq gseq;
 
 	DMAR_ASSERT_LOCKED(unit);
 	dmar_qi_ensure(unit, 2);
@@ -273,7 +273,7 @@ dmar_qi_invalidate_iotlb_glob_locked(struct dmar_unit *unit)
 void
 dmar_qi_invalidate_iec_glob(struct dmar_unit *unit)
 {
-	struct dmar_qi_genseq gseq;
+	struct iommu_qi_genseq gseq;
 
 	DMAR_ASSERT_LOCKED(unit);
 	dmar_qi_ensure(unit, 2);
@@ -286,7 +286,7 @@ dmar_qi_invalidate_iec_glob(struct dmar_unit *unit)
 void
 dmar_qi_invalidate_iec(struct dmar_unit *unit, u_int start, u_int cnt)
 {
-	struct dmar_qi_genseq gseq;
+	struct iommu_qi_genseq gseq;
 	u_int c, l;
 
 	DMAR_ASSERT_LOCKED(unit);
@@ -425,7 +425,7 @@ dmar_init_qi(struct dmar_unit *unit)
 void
 dmar_fini_qi(struct dmar_unit *unit)
 {
-	struct dmar_qi_genseq gseq;
+	struct iommu_qi_genseq gseq;
 
 	if (!unit->qi_enabled)
 		return;
