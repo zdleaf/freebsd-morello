@@ -334,6 +334,7 @@ dmar_domain_alloc(struct dmar_unit *dmar, bool id_mapped)
 	TASK_INIT(&domain->iodom.unload_task, 0, dmar_domain_unload_task,
 	    domain);
 	mtx_init(&domain->iodom.lock, "dmardom", NULL, MTX_DEF);
+	domain->dmar = dmar;
 	domain->iodom.iommu = &dmar->iommu;
 
 	/*

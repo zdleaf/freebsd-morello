@@ -106,17 +106,14 @@ static const struct sagaw_bits_tag {
 };
 
 bool
-dmar_pglvl_supported(struct iommu_unit *unit, int pglvl)
+dmar_pglvl_supported(struct dmar_unit *unit, int pglvl)
 {
-	struct dmar_unit *dmar;
 	int i;
-
-	dmar = (struct dmar_unit *)unit;
 
 	for (i = 0; i < nitems(sagaw_bits); i++) {
 		if (sagaw_bits[i].pglvl != pglvl)
 			continue;
-		if ((DMAR_CAP_SAGAW(dmar->hw_cap) & sagaw_bits[i].cap) != 0)
+		if ((DMAR_CAP_SAGAW(unit->hw_cap) & sagaw_bits[i].cap) != 0)
 			return (true);
 	}
 	return (false);

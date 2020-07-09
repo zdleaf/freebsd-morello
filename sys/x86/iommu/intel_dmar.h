@@ -98,6 +98,7 @@ RB_PROTOTYPE(dmar_gas_entries_tree, iommu_map_entry, rb_entry,
  */
 struct dmar_domain {
 	struct iommu_domain iodom;
+	struct dmar_unit *dmar;
 	int domain;			/* (c) DID, written in context entry */
 	int mgaw;			/* (c) Real max address width */
 	int agaw;			/* (c) Adjusted guest address width */
@@ -263,7 +264,7 @@ struct dmar_unit *dmar_find_hpet(device_t dev, uint16_t *rid);
 struct dmar_unit *dmar_find_ioapic(u_int apic_id, uint16_t *rid);
 
 u_int dmar_nd2mask(u_int nd);
-bool dmar_pglvl_supported(struct iommu_unit *unit, int pglvl);
+bool dmar_pglvl_supported(struct dmar_unit *unit, int pglvl);
 int domain_set_agaw(struct dmar_domain *domain, int mgaw);
 int dmar_maxaddr2mgaw(struct dmar_unit *unit, dmar_gaddr_t maxaddr,
     bool allow_less);

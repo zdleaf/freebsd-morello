@@ -194,7 +194,7 @@ domain_get_idmap_pgtbl(struct dmar_domain *domain, dmar_gaddr_t maxaddr)
 	sx_slock(&idpgtbl_lock);
 	LIST_FOREACH(tbl, &idpgtbls, link) {
 		if (tbl->maxaddr >= maxaddr &&
-		    dmar_pglvl_supported(domain->iodom.iommu, tbl->pglvl) &&
+		    dmar_pglvl_supported(domain->dmar, tbl->pglvl) &&
 		    tbl->leaf == leaf) {
 			res = tbl->pgtbl_obj;
 			vm_object_reference(res);
@@ -213,7 +213,7 @@ domain_get_idmap_pgtbl(struct dmar_domain *domain, dmar_gaddr_t maxaddr)
 	sx_xlock(&idpgtbl_lock);
 	LIST_FOREACH(tbl, &idpgtbls, link) {
 		if (tbl->maxaddr >= maxaddr &&
-		    dmar_pglvl_supported(domain->iodom.iommu, tbl->pglvl) &&
+		    dmar_pglvl_supported(domain->dmar, tbl->pglvl) &&
 		    tbl->leaf == leaf) {
 			res = tbl->pgtbl_obj;
 			vm_object_reference(res);
