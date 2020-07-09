@@ -785,8 +785,8 @@ dmar_find_by_scope(int dev_domain, int dev_busno,
 	return (NULL);
 }
 
-struct iommu_unit *
-iommu_find(device_t dev, bool verbose)
+struct dmar_unit *
+dmar_find(device_t dev, bool verbose)
 {
 	device_t dmar_dev;
 	struct dmar_unit *unit;
@@ -826,7 +826,7 @@ iommu_find(device_t dev, bool verbose)
 		dmar_print_path(dev_busno, dev_path_len, dev_path);
 		printf("\n");
 	}
-	return (&unit->iommu);
+	return (unit);
 }
 
 static struct dmar_unit *
@@ -1352,3 +1352,13 @@ DB_SHOW_ALL_COMMAND(dmars, db_show_all_dmars)
 	}
 }
 #endif
+
+struct iommu_unit *
+iommu_find(device_t dev, bool verbose)
+{
+	struct dmar_unit *dmar;
+
+	dmar = dmar_find(dev, verbose);
+
+	return (&dmar->iommu);
+}
