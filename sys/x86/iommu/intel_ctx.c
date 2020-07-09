@@ -791,7 +791,7 @@ dmar_domain_free_entry(struct iommu_map_entry *entry, bool free)
 {
 	struct dmar_domain *domain;
 
-	domain = entry->domain;
+	domain = (struct dmar_domain *)entry->domain;
 	DMAR_DOMAIN_LOCK(domain);
 	if ((entry->flags & IOMMU_MAP_ENTRY_RMRR) != 0)
 		dmar_gas_free_region(domain, entry);
@@ -807,20 +807,23 @@ dmar_domain_free_entry(struct iommu_map_entry *entry, bool free)
 void
 dmar_domain_unload_entry(struct iommu_map_entry *entry, bool free)
 {
+	struct dmar_domain *domain;
 	struct dmar_unit *unit;
 
-	unit = (struct dmar_unit *)entry->domain->iodom.iommu;
+	domain = (struct dmar_domain *)entry->domain;
+	unit = (struct dmar_unit *)domain->iodom.iommu;
 	if (unit->qi_enabled) {
 		DMAR_LOCK(unit);
-		dmar_qi_invalidate_locked(entry->domain, entry->start,
-		    entry->end - entry->start, &entry->gseq, true);
+		dmar_qi_invalidate_locked((struct dmar_domain *)entry->domain,
+		    entry->start, entry->end - entry->start, &entry->gseq,
+		    true);
 		if (!free)
 			entry->flags |= IOMMU_MAP_ENTRY_QI_NF;
 		TAILQ_INSERT_TAIL(&unit->tlb_flush_entries, entry, dmamap_link);
 		DMAR_UNLOCK(unit);
 	} else {
-		domain_flush_iotlb_sync(entry->domain, entry->start,
-		    entry->end - entry->start);
+		domain_flush_iotlb_sync((struct dmar_domain *)entry->domain,
+		    entry->start, entry->end - entry->start);
 		dmar_domain_free_entry(entry, free);
 	}
 }

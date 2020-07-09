@@ -62,7 +62,7 @@ struct iommu_map_entry {
 	RB_ENTRY(iommu_map_entry) rb_entry;	 /* Links for domain entries */
 	TAILQ_ENTRY(iommu_map_entry) unroll_link; /* Link for unroll after
 						    dmamap_load failure */
-	struct dmar_domain *domain;
+	struct iommu_domain *domain;
 	struct iommu_qi_genseq gseq;
 };
 

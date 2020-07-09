@@ -100,7 +100,7 @@ dmar_gas_alloc_entry(struct iommu_domain *iodom, u_int flags)
 	res = uma_zalloc(iommu_map_entry_zone, ((flags & DMAR_PGF_WAITOK) !=
 	    0 ? M_WAITOK : M_NOWAIT) | M_ZERO);
 	if (res != NULL) {
-		res->domain = domain;
+		res->domain = (struct iommu_domain *)domain;
 		atomic_add_int(&domain->entries_cnt, 1);
 	}
 	return (res);
@@ -113,7 +113,7 @@ dmar_gas_free_entry(struct iommu_domain *iodom, struct iommu_map_entry *entry)
 
 	domain = (struct dmar_domain *)iodom;
 
-	KASSERT(domain == entry->domain,
+	KASSERT(domain == (struct dmar_domain *)entry->domain,
 	    ("mismatched free domain %p entry %p entry->domain %p", domain,
 	    entry, entry->domain));
 	atomic_subtract_int(&domain->entries_cnt, 1);
@@ -176,7 +176,7 @@ dmar_gas_check_free(struct dmar_domain *domain)
 	iommu_gaddr_t v;
 
 	RB_FOREACH(entry, dmar_gas_entries_tree, &domain->rb_root) {
-		KASSERT(domain == entry->domain,
+		KASSERT(domain == (struct dmar_domain *)entry->domain,
 		    ("mismatched free domain %p entry %p entry->domain %p",
 		    domain, entry, entry->domain));
 		l = RB_LEFT(entry, rb_entry);
