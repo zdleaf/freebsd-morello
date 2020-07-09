@@ -1,0 +1,124 @@
+/*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
+ * Copyright (c) 2013 The FreeBSD Foundation
+ * All rights reserved.
+ *
+ * This software was developed by Konstantin Belousov <kib@FreeBSD.org>
+ * under sponsorship from the FreeBSD Foundation.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED. IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
+ *
+ * $FreeBSD$
+ */
+
+#ifndef _SYS_IOMMU_H_
+#define _SYS_IOMMU_H_
+
+#include <sys/taskqueue.h>
+#include <sys/tree.h> 
+
+/* Host or physical memory address, after translation. */
+typedef uint64_t dmar_haddr_t;
+/* Guest or bus address, before translation. */
+typedef uint64_t dmar_gaddr_t;
+
+struct iommu_map_entry;
+TAILQ_HEAD(iommu_map_entries_tailq, iommu_map_entry);
+
+struct dmar_qi_genseq {
+	u_int gen;
+	uint32_t seq;
+};
+
+struct iommu_map_entry {
+	dmar_gaddr_t start;
+	dmar_gaddr_t end;
+	dmar_gaddr_t first;		/* Least start in subtree */
+	dmar_gaddr_t last;		/* Greatest end in subtree */
+	dmar_gaddr_t free_down;		/* Max free space below the
+					   current R/B tree node */
+	u_int flags;
+	TAILQ_ENTRY(iommu_map_entry) dmamap_link; /* Link for dmamap entries */
+	RB_ENTRY(iommu_map_entry) rb_entry;	 /* Links for domain entries */
+	TAILQ_ENTRY(iommu_map_entry) unroll_link; /* Link for unroll after
+						    dmamap_load failure */
+	struct dmar_domain *domain;
+	struct dmar_qi_genseq gseq;
+};
+
+#define	IOMMU_MAP_ENTRY_PLACE	0x0001	/* Fake entry */
+#define	IOMMU_MAP_ENTRY_RMRR	0x0002	/* Permanent, not linked by
+					   dmamap_link */
+#define	IOMMU_MAP_ENTRY_MAP	0x0004	/* Busdma created, linked by
+					   dmamap_link */
+#define	IOMMU_MAP_ENTRY_UNMAPPED	0x0010	/* No backing pages */
+#define	IOMMU_MAP_ENTRY_QI_NF	0x0020	/* qi task, do not free entry */
+#define	IOMMU_MAP_ENTRY_READ	0x1000	/* Read permitted */
+#define	IOMMU_MAP_ENTRY_WRITE	0x2000	/* Write permitted */
+#define	IOMMU_MAP_ENTRY_SNOOP	0x4000	/* Snoop */
+#define	IOMMU_MAP_ENTRY_TM	0x8000	/* Transient */
+
+struct iommu_unit {
+	struct mtx lock;
+	int unit;
+
+	int dma_enabled;
+
+	/* Busdma delayed map load */
+	struct task dmamap_load_task;
+	TAILQ_HEAD(, bus_dmamap_iommu) delayed_maps;
+	struct taskqueue *delayed_taskqueue;
+};
+
+struct iommu_domain {
+	struct iommu_unit *iommu;	/* (c) */
+	struct mtx lock;		/* (c) */
+	struct task unload_task;	/* (c) */
+	struct iommu_map_entries_tailq unload_entries; /* (d) Entries to
+							 unload */
+};
+
+struct iommu_ctx {
+	struct iommu_domain *domain;	/* (c) */
+	struct bus_dma_tag_iommu *tag;	/* (c) Root tag */
+	u_long loads;			/* atomic updates, for stat only */
+	u_long unloads;			/* same */
+	u_int flags;			/* (u) */
+};
+
+#define	IOMMU_LOCK(unit)		mtx_lock(&(unit)->lock)
+#define	IOMMU_UNLOCK(unit)		mtx_unlock(&(unit)->lock)
+#define	IOMMU_ASSERT_LOCKED(unit)	mtx_assert(&(unit)->lock, MA_OWNED)
+
+#define	IOMMU_DOMAIN_LOCK(dom)		mtx_lock(&(dom)->lock)
+#define	IOMMU_DOMAIN_UNLOCK(dom)	mtx_unlock(&(dom)->lock)
+#define	IOMMU_DOMAIN_ASSERT_LOCKED(dom)	mtx_assert(&(dom)->lock, MA_OWNED)
+
+struct iommu_ctx *iommu_get_ctx(struct iommu_unit *, device_t dev,
+    uint16_t rid, bool id_mapped, bool rmrr_init);
+struct iommu_unit *iommu_find(device_t dev, bool verbose);
+void iommu_domain_unload_entry(struct iommu_map_entry *entry, bool free);
+void iommu_domain_unload(struct iommu_domain *domain,
+    struct iommu_map_entries_tailq *entries, bool cansleep);
+
+#endif /* !_SYS_IOMMU_H_ */

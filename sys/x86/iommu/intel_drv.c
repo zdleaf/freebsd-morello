@@ -1143,9 +1143,9 @@ dmar_print_ctx(struct dmar_ctx *ctx)
 
 	db_printf(
 	    "    @%p pci%d:%d:%d refs %d flags %x loads %lu unloads %lu\n",
-	    ctx, pci_get_bus(ctx->context.tag.owner),
-	    pci_get_slot(ctx->context.tag.owner),
-	    pci_get_function(ctx->context.tag.owner), ctx->refs,
+	    ctx, pci_get_bus(ctx->context.tag->owner),
+	    pci_get_slot(ctx->context.tag->owner),
+	    pci_get_function(ctx->context.tag->owner), ctx->refs,
 	    ctx->context.flags, ctx->context.loads, ctx->context.unloads);
 }
 
@@ -1238,11 +1238,11 @@ DB_FUNC(dmar_domain, db_dmar_print_domain, db_show_table, CS_OWN, NULL)
 		LIST_FOREACH(domain, &unit->domains, link) {
 			LIST_FOREACH(ctx, &domain->contexts, link) {
 				if (pci_domain == unit->segment && 
-				    bus == pci_get_bus(ctx->context.tag.owner) &&
+				    bus == pci_get_bus(ctx->context.tag->owner) &&
 				    device ==
-				    pci_get_slot(ctx->context.tag.owner) &&
+				    pci_get_slot(ctx->context.tag->owner) &&
 				    function ==
-				    pci_get_function(ctx->context.tag.owner)) {
+				    pci_get_function(ctx->context.tag->owner)) {
 					dmar_print_domain(domain,
 					    show_mappings);
 					goto out;

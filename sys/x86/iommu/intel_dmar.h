@@ -34,49 +34,13 @@
 #ifndef __X86_IOMMU_INTEL_DMAR_H
 #define	__X86_IOMMU_INTEL_DMAR_H
 
-/* Host or physical memory address, after translation. */
-typedef uint64_t dmar_haddr_t;
-/* Guest or bus address, before translation. */
-typedef uint64_t dmar_gaddr_t;
+#include <sys/iommu.h>
 
 struct dmar_unit;
-
-struct dmar_qi_genseq {
-	u_int gen;
-	uint32_t seq;
-};
-
-struct iommu_map_entry {
-	dmar_gaddr_t start;
-	dmar_gaddr_t end;
-	dmar_gaddr_t first;		/* Least start in subtree */
-	dmar_gaddr_t last;		/* Greatest end in subtree */
-	dmar_gaddr_t free_down;		/* Max free space below the
-					   current R/B tree node */
-	u_int flags;
-	TAILQ_ENTRY(iommu_map_entry) dmamap_link; /* Link for dmamap entries */
-	RB_ENTRY(iommu_map_entry) rb_entry;	 /* Links for domain entries */
-	TAILQ_ENTRY(iommu_map_entry) unroll_link; /* Link for unroll after
-						    dmamap_load failure */
-	struct dmar_domain *domain;
-	struct dmar_qi_genseq gseq;
-};
 
 RB_HEAD(dmar_gas_entries_tree, iommu_map_entry);
 RB_PROTOTYPE(dmar_gas_entries_tree, iommu_map_entry, rb_entry,
     dmar_gas_cmp_entries);
-
-#define	IOMMU_MAP_ENTRY_PLACE	0x0001	/* Fake entry */
-#define	IOMMU_MAP_ENTRY_RMRR	0x0002	/* Permanent, not linked by
-					   dmamap_link */
-#define	IOMMU_MAP_ENTRY_MAP	0x0004	/* Busdma created, linked by
-					   dmamap_link */
-#define	IOMMU_MAP_ENTRY_UNMAPPED	0x0010	/* No backing pages */
-#define	IOMMU_MAP_ENTRY_QI_NF	0x0020	/* qi task, do not free entry */
-#define	IOMMU_MAP_ENTRY_READ	0x1000	/* Read permitted */
-#define	IOMMU_MAP_ENTRY_WRITE	0x2000	/* Write permitted */
-#define	IOMMU_MAP_ENTRY_SNOOP	0x4000	/* Snoop */
-#define	IOMMU_MAP_ENTRY_TM	0x8000	/* Transient */
 
 /*
  * Locking annotations:

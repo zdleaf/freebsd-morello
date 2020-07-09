@@ -34,8 +34,7 @@
 #ifndef __X86_IOMMU_BUSDMA_DMAR_H
 #define __X86_IOMMU_BUSDMA_DMAR_H
 
-struct iommu_map_entry;
-TAILQ_HEAD(iommu_map_entries_tailq, iommu_map_entry);
+#include <sys/iommu.h>
 
 struct bus_dma_tag_iommu {
 	struct bus_dma_tag_common common;
@@ -62,49 +61,6 @@ struct bus_dmamap_iommu {
 
 extern struct bus_dma_impl bus_dma_iommu_impl;
 
-struct iommu_unit {
-	struct mtx lock;
-	int unit;
-
-	int dma_enabled;
-
-	/* Busdma delayed map load */
-	struct task dmamap_load_task;
-	TAILQ_HEAD(, bus_dmamap_iommu) delayed_maps;
-	struct taskqueue *delayed_taskqueue;
-};
-
-struct iommu_domain {
-	struct iommu_unit *iommu;	/* (c) */
-	struct mtx lock;		/* (c) */
-	struct task unload_task;	/* (c) */
-	struct iommu_map_entries_tailq unload_entries; /* (d) Entries to
-							 unload */
-};
-
-struct iommu_ctx {
-	struct iommu_domain *domain;	/* (c) */
-	struct bus_dma_tag_iommu tag;	/* (c) Root tag */
-	u_long loads;			/* atomic updates, for stat only */
-	u_long unloads;			/* same */
-	u_int flags;			/* (u) */
-};
-
-#define	IOMMU_LOCK(unit)		mtx_lock(&(unit)->lock)
-#define	IOMMU_UNLOCK(unit)		mtx_unlock(&(unit)->lock)
-#define	IOMMU_ASSERT_LOCKED(unit)	mtx_assert(&(unit)->lock, MA_OWNED)
-
-#define	IOMMU_DOMAIN_LOCK(dom)		mtx_lock(&(dom)->lock)
-#define	IOMMU_DOMAIN_UNLOCK(dom)	mtx_unlock(&(dom)->lock)
-#define	IOMMU_DOMAIN_ASSERT_LOCKED(dom)	mtx_assert(&(dom)->lock, MA_OWNED)
-
 bus_dma_tag_t acpi_iommu_get_dma_tag(device_t dev, device_t child);
-
-struct iommu_ctx *iommu_get_ctx(struct iommu_unit *, device_t dev,
-    uint16_t rid, bool id_mapped, bool rmrr_init);
-struct iommu_unit *iommu_find(device_t dev, bool verbose);
-void iommu_domain_unload_entry(struct iommu_map_entry *entry, bool free);
-void iommu_domain_unload(struct iommu_domain *domain,
-    struct iommu_map_entries_tailq *entries, bool cansleep);
 
 #endif

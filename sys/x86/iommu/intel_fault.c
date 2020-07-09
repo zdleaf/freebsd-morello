@@ -226,10 +226,10 @@ dmar_fault_task(void *arg, int pending __unused)
 			ctx->context.flags |= DMAR_CTX_FAULTED;
 			ctx->last_fault_rec[0] = fault_rec[0];
 			ctx->last_fault_rec[1] = fault_rec[1];
-			device_print_prettyname(ctx->context.tag.owner);
-			bus = pci_get_bus(ctx->context.tag.owner);
-			slot = pci_get_slot(ctx->context.tag.owner);
-			func = pci_get_function(ctx->context.tag.owner);
+			device_print_prettyname(ctx->context.tag->owner);
+			bus = pci_get_bus(ctx->context.tag->owner);
+			slot = pci_get_slot(ctx->context.tag->owner);
+			func = pci_get_function(ctx->context.tag->owner);
 		}
 		DMAR_UNLOCK(unit);
 		printf(

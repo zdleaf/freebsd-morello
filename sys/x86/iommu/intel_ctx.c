@@ -133,16 +133,16 @@ device_tag_init(struct dmar_ctx *ctx, device_t dev)
 
 	domain = (struct dmar_domain *)ctx->context.domain;
 	maxaddr = MIN(domain->end, BUS_SPACE_MAXADDR);
-	ctx->context.tag.common.ref_count = 1; /* Prevent free */
-	ctx->context.tag.common.impl = &bus_dma_iommu_impl;
-	ctx->context.tag.common.boundary = 0;
-	ctx->context.tag.common.lowaddr = maxaddr;
-	ctx->context.tag.common.highaddr = maxaddr;
-	ctx->context.tag.common.maxsize = maxaddr;
-	ctx->context.tag.common.nsegments = BUS_SPACE_UNRESTRICTED;
-	ctx->context.tag.common.maxsegsz = maxaddr;
-	ctx->context.tag.ctx = (struct iommu_ctx *)ctx;
-	ctx->context.tag.owner = dev;
+	ctx->context.tag->common.ref_count = 1; /* Prevent free */
+	ctx->context.tag->common.impl = &bus_dma_iommu_impl;
+	ctx->context.tag->common.boundary = 0;
+	ctx->context.tag->common.lowaddr = maxaddr;
+	ctx->context.tag->common.highaddr = maxaddr;
+	ctx->context.tag->common.maxsize = maxaddr;
+	ctx->context.tag->common.nsegments = BUS_SPACE_UNRESTRICTED;
+	ctx->context.tag->common.maxsegsz = maxaddr;
+	ctx->context.tag->ctx = (struct iommu_ctx *)ctx;
+	ctx->context.tag->owner = dev;
 }
 
 static void
@@ -182,8 +182,8 @@ ctx_id_entry_init(struct dmar_ctx *ctx, dmar_ctx_entry_t *ctxp, bool move,
 	unit = (struct dmar_unit *)domain->iodom.iommu;
 	KASSERT(move || (ctxp->ctx1 == 0 && ctxp->ctx2 == 0),
 	    ("dmar%d: initialized ctx entry %d:%d:%d 0x%jx 0x%jx",
-	    unit->iommu.unit, busno, pci_get_slot(ctx->context.tag.owner),
-	    pci_get_function(ctx->context.tag.owner),
+	    unit->iommu.unit, busno, pci_get_slot(ctx->context.tag->owner),
+	    pci_get_function(ctx->context.tag->owner),
 	    ctxp->ctx1, ctxp->ctx2));
 
 	if ((domain->flags & DMAR_DOMAIN_IDMAP) != 0 &&
@@ -384,6 +384,8 @@ dmar_ctx_alloc(struct dmar_domain *domain, uint16_t rid)
 
 	ctx = malloc(sizeof(*ctx), M_DMAR_CTX, M_WAITOK | M_ZERO);
 	ctx->context.domain = (struct iommu_domain *)domain;
+	ctx->context.tag = malloc(sizeof(struct bus_dma_tag_iommu),
+	    M_DMAR_CTX, M_WAITOK | M_ZERO);
 	ctx->rid = rid;
 	ctx->refs = 1;
 	return (ctx);
@@ -514,7 +516,7 @@ dmar_get_ctx_for_dev1(struct dmar_unit *dmar, device_t dev, uint16_t rid,
 			domain = domain1;
 			ctx = ctx1;
 			dmar_ctx_link(ctx);
-			ctx->context.tag.owner = dev;
+			ctx->context.tag->owner = dev;
 			device_tag_init(ctx, dev);
 
 			/*
@@ -545,8 +547,8 @@ dmar_get_ctx_for_dev1(struct dmar_unit *dmar, device_t dev, uint16_t rid,
 		}
 	} else {
 		domain = (struct dmar_domain *)ctx->context.domain;
-		if (ctx->context.tag.owner == NULL)
-			ctx->context.tag.owner = dev;
+		if (ctx->context.tag->owner == NULL)
+			ctx->context.tag->owner = dev;
 		ctx->refs++; /* tag referenced us */
 	}
 
@@ -746,6 +748,7 @@ dmar_free_ctx_locked(struct iommu_unit *unit, struct iommu_ctx *context)
 	dmar_unmap_pgtbl(sf);
 	domain = (struct dmar_domain *)ctx->context.domain;
 	dmar_ctx_unlink(ctx);
+	free(ctx->context.tag, M_DMAR_CTX);
 	free(ctx, M_DMAR_CTX);
 	dmar_unref_domain_locked(dmar, domain);
 	TD_PINNED_ASSERT;
