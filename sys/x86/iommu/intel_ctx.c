@@ -441,7 +441,7 @@ dmar_domain_destroy(struct dmar_domain *domain)
 	}
 	if ((domain->flags & IOMMU_DOMAIN_PGTBL_INITED) != 0) {
 		if (domain->pgtbl_obj != NULL)
-			IOMMU_DOMAIN_PGLOCK(domain);
+			DMAR_DOMAIN_PGLOCK(domain);
 		domain_free_pgtbl(domain);
 	}
 	mtx_destroy(&domain->iodom.lock);

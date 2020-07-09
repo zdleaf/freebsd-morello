@@ -141,10 +141,10 @@ struct dmar_ctx {
 					   ephemeral reference is kept
 					   to prevent context destruction */
 
-#define	IOMMU_DOMAIN_PGLOCK(dom)		VM_OBJECT_WLOCK((dom)->pgtbl_obj)
-#define	IOMMU_DOMAIN_PGTRYLOCK(dom)	VM_OBJECT_TRYWLOCK((dom)->pgtbl_obj)
-#define	IOMMU_DOMAIN_PGUNLOCK(dom)	VM_OBJECT_WUNLOCK((dom)->pgtbl_obj)
-#define	IOMMU_DOMAIN_ASSERT_PGLOCKED(dom) \
+#define	DMAR_DOMAIN_PGLOCK(dom)		VM_OBJECT_WLOCK((dom)->pgtbl_obj)
+#define	DMAR_DOMAIN_PGTRYLOCK(dom)	VM_OBJECT_TRYWLOCK((dom)->pgtbl_obj)
+#define	DMAR_DOMAIN_PGUNLOCK(dom)	VM_OBJECT_WUNLOCK((dom)->pgtbl_obj)
+#define	DMAR_DOMAIN_ASSERT_PGLOCKED(dom) \
 	VM_OBJECT_ASSERT_WLOCKED((dom)->pgtbl_obj)
 
 #define	IOMMU_DOMAIN_LOCK(dom)	mtx_lock(&(dom)->lock)

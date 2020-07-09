@@ -228,7 +228,7 @@ dmar_qi_invalidate_locked(struct dmar_domain *domain, dmar_gaddr_t base,
 	dmar_gaddr_t isize;
 	int am;
 
-	unit = (struct dmar_unit *)domain->iodom.iommu;
+	unit = domain->dmar;
 	DMAR_ASSERT_LOCKED(unit);
 	for (; size > 0; base += isize, size -= isize) {
 		am = calc_am(unit, base, size, &isize);
