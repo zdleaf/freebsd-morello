@@ -674,7 +674,7 @@ dmar_unref_domain_locked(struct dmar_unit *dmar, struct dmar_domain *domain)
 }
 
 void
-dmar_free_ctx_locked(struct iommu_unit *unit, struct iommu_ctx *device)
+dmar_free_ctx_locked(struct iommu_unit *unit, struct iommu_ctx *context)
 {
 	struct dmar_ctx *ctx;
 	struct dmar_unit *dmar;
@@ -682,7 +682,7 @@ dmar_free_ctx_locked(struct iommu_unit *unit, struct iommu_ctx *device)
 	dmar_ctx_entry_t *ctxp;
 	struct dmar_domain *domain;
 
-	ctx = (struct dmar_ctx *)device;
+	ctx = (struct dmar_ctx *)context;
 	dmar = (struct dmar_unit *)unit;
 
 	DMAR_ASSERT_LOCKED(dmar);
@@ -752,12 +752,12 @@ dmar_free_ctx_locked(struct iommu_unit *unit, struct iommu_ctx *device)
 }
 
 void
-dmar_free_ctx(struct iommu_ctx *device)
+dmar_free_ctx(struct iommu_ctx *context)
 {
 	struct dmar_ctx *ctx;
 	struct dmar_unit *dmar;
 
-	ctx = (struct dmar_ctx *)device;
+	ctx = (struct dmar_ctx *)context;
 	dmar = (struct dmar_unit *)ctx->context.domain->iommu;
 	DMAR_LOCK(dmar);
 	dmar_free_ctx_locked(&dmar->iommu, (struct iommu_ctx *)ctx);
