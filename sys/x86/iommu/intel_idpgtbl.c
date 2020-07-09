@@ -408,8 +408,7 @@ retry:
 			}
 			dmar_pte_store(&ptep->pte, DMAR_PTE_R | DMAR_PTE_W |
 			    VM_PAGE_TO_PHYS(m));
-			dmar_flush_pte_to_ram(
-			    (struct dmar_unit *)domain->iodom.iommu, ptep);
+			dmar_flush_pte_to_ram(domain->dmar, ptep);
 			sf_buf_page(sfp)->ref_count += 1;
 			m->ref_count--;
 			dmar_unmap_pgtbl(sfp);
@@ -490,8 +489,7 @@ domain_map_buf_locked(struct dmar_domain *domain, dmar_gaddr_t base,
 		}
 		dmar_pte_store(&pte->pte, VM_PAGE_TO_PHYS(ma[pi]) | pflags |
 		    (superpage ? DMAR_PTE_SP : 0));
-		dmar_flush_pte_to_ram(
-		    (struct dmar_unit *)domain->iodom.iommu, pte);
+		dmar_flush_pte_to_ram(domain->dmar, pte);
 		sf_buf_page(sf)->ref_count += 1;
 	}
 	if (sf != NULL)
@@ -584,7 +582,7 @@ domain_unmap_clear_pte(struct dmar_domain *domain, dmar_gaddr_t base, int lvl,
 	vm_page_t m;
 
 	dmar_pte_clear(&pte->pte);
-	dmar_flush_pte_to_ram((struct dmar_unit *)domain->iodom.iommu, pte);
+	dmar_flush_pte_to_ram(domain->dmar, pte);
 	m = sf_buf_page(*sf);
 	if (free_sf) {
 		dmar_unmap_pgtbl(*sf);
@@ -706,24 +704,21 @@ domain_alloc_pgtbl(struct dmar_domain *domain)
 	/* No implicit free of the top level page table page. */
 	m->ref_count = 1;
 	DMAR_DOMAIN_PGUNLOCK(domain);
-	IOMMU_LOCK(domain->iodom.iommu);
+	DMAR_LOCK(domain->dmar);
 	domain->flags |= DMAR_DOMAIN_PGTBL_INITED;
-	IOMMU_UNLOCK(domain->iodom.iommu);
+	DMAR_UNLOCK(domain->dmar);
 	return (0);
 }
 
 void
 domain_free_pgtbl(struct dmar_domain *domain)
 {
-	struct dmar_unit *dmar;
 	vm_object_t obj;
 	vm_page_t m;
 
-	dmar = (struct dmar_unit *)domain->iodom.iommu;
-
 	obj = domain->pgtbl_obj;
 	if (obj == NULL) {
-		KASSERT((dmar->hw_ecap & DMAR_ECAP_PT) != 0 &&
+		KASSERT((domain->dmar->hw_ecap & DMAR_ECAP_PT) != 0 &&
 		    (domain->flags & DMAR_DOMAIN_IDMAP) != 0,
 		    ("lost pagetable object domain %p", domain));
 		return;
@@ -770,7 +765,7 @@ domain_flush_iotlb_sync(struct dmar_domain *domain, dmar_gaddr_t base,
 	uint64_t iotlbr;
 	int am, iro;
 
-	unit = (struct dmar_unit *)domain->iodom.iommu;
+	unit = domain->dmar;
 	KASSERT(!unit->qi_enabled, ("dmar%d: sync iotlb flush call",
 	    unit->iommu.unit));
 	iro = DMAR_ECAP_IRO(unit->hw_ecap) * 16;
