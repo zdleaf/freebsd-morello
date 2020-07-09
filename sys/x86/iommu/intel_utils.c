@@ -122,13 +122,10 @@ dmar_pglvl_supported(struct dmar_unit *unit, int pglvl)
 int
 domain_set_agaw(struct dmar_domain *domain, int mgaw)
 {
-	struct dmar_unit *dmar;
 	int sagaw, i;
 
-	dmar = (struct dmar_unit *)domain->iodom.iommu;
-
 	domain->mgaw = mgaw;
-	sagaw = DMAR_CAP_SAGAW(dmar->hw_cap);
+	sagaw = DMAR_CAP_SAGAW(domain->dmar->hw_cap);
 	for (i = 0; i < nitems(sagaw_bits); i++) {
 		if (sagaw_bits[i].agaw >= mgaw) {
 			domain->agaw = sagaw_bits[i].agaw;
@@ -137,7 +134,7 @@ domain_set_agaw(struct dmar_domain *domain, int mgaw)
 			return (0);
 		}
 	}
-	device_printf(dmar->dev,
+	device_printf(domain->dmar->dev,
 	    "context request mgaw %d: no agaw found, sagaw %x\n",
 	    mgaw, sagaw);
 	return (EINVAL);
@@ -197,7 +194,6 @@ pglvl_max_pages(int pglvl)
 int
 domain_is_sp_lvl(struct dmar_domain *domain, int lvl)
 {
-	struct dmar_unit *dmar;
 	int alvl, cap_sps;
 	static const int sagaw_sp[] = {
 		DMAR_CAP_SPS_2M,
@@ -207,8 +203,7 @@ domain_is_sp_lvl(struct dmar_domain *domain, int lvl)
 	};
 
 	alvl = domain->pglvl - lvl - 1;
-	dmar = (struct dmar_unit *)domain->iodom.iommu;
-	cap_sps = DMAR_CAP_SPS(dmar->hw_cap);
+	cap_sps = DMAR_CAP_SPS(domain->dmar->hw_cap);
 	return (alvl < nitems(sagaw_sp) && (sagaw_sp[alvl] & cap_sps) != 0);
 }
 
