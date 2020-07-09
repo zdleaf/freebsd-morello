@@ -147,13 +147,9 @@ struct dmar_ctx {
 #define	DMAR_DOMAIN_ASSERT_PGLOCKED(dom) \
 	VM_OBJECT_ASSERT_WLOCKED((dom)->pgtbl_obj)
 
-#define	IOMMU_DOMAIN_LOCK(dom)	mtx_lock(&(dom)->lock)
-#define	IOMMU_DOMAIN_UNLOCK(dom)	mtx_unlock(&(dom)->lock)
-#define	IOMMU_DOMAIN_ASSERT_LOCKED(dom) mtx_assert(&(dom)->lock, MA_OWNED)
-
-#define	DMAR_DOMAIN_LOCK(dom)		mtx_lock(&(dom)->iodom.lock)
-#define	DMAR_DOMAIN_UNLOCK(dom)		mtx_unlock(&(dom)->iodom.lock)
-#define	DMAR_DOMAIN_ASSERT_LOCKED(dom)	mtx_assert(&(dom)->iodom.lock, MA_OWNED)
+#define	DMAR_DOMAIN_LOCK(dom)	mtx_lock(&(dom)->iodom.lock)
+#define	DMAR_DOMAIN_UNLOCK(dom)	mtx_unlock(&(dom)->iodom.lock)
+#define	DMAR_DOMAIN_ASSERT_LOCKED(dom) mtx_assert(&(dom)->iodom.lock, MA_OWNED)
 
 struct dmar_msi_data {
 	int irq;

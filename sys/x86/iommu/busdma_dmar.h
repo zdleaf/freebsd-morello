@@ -94,6 +94,10 @@ struct iommu_device {
 #define	IOMMU_UNLOCK(unit)	mtx_unlock(&(unit)->lock)
 #define	IOMMU_ASSERT_LOCKED(unit) mtx_assert(&(unit)->lock, MA_OWNED)
 
+#define	IOMMU_DOMAIN_LOCK(dom)		mtx_lock(&(dom)->lock)
+#define	IOMMU_DOMAIN_UNLOCK(dom)	mtx_unlock(&(dom)->lock)
+#define	IOMMU_DOMAIN_ASSERT_LOCKED(dom) mtx_assert(&(dom)->lock, MA_OWNED)
+
 bus_dma_tag_t acpi_iommu_get_dma_tag(device_t dev, device_t child);
 
 struct iommu_device *iommu_get_device(struct iommu_unit *, device_t dev,
