@@ -1007,8 +1007,7 @@ dmar_inst_rmrr_iter(ACPI_DMAR_HEADER *dmarh, void *arg)
 	struct inst_rmrr_iter_args *iria;
 	const char *ptr, *ptrend;
 	device_t dev;
-	struct iommu_unit *unit;
-	struct dmar_unit *dmar;
+	struct dmar_unit *unit;
 	int dev_path_len;
 	uint16_t rid;
 
@@ -1049,20 +1048,19 @@ dmar_inst_rmrr_iter(ACPI_DMAR_HEADER *dmarh, void *arg)
 				    (const ACPI_DMAR_PCI_PATH *)(devscope + 1));
 				printf("\n");
 			}
-			dmar = dmar_find_by_scope(resmem->Segment,
+			unit = dmar_find_by_scope(resmem->Segment,
 			    devscope->Bus,
 			    (const ACPI_DMAR_PCI_PATH *)(devscope + 1),
 			    dev_path_len);
-			if (iria->dmar != dmar)
+			if (iria->dmar != unit)
 				continue;
 			dmar_get_ctx_for_devpath(iria->dmar, rid,
 			    resmem->Segment, devscope->Bus, 
 			    (const ACPI_DMAR_PCI_PATH *)(devscope + 1),
 			    dev_path_len, false, true);
 		} else {
-			unit = iommu_find(dev, false);
-			dmar = (struct dmar_unit *)unit;
-			if (iria->dmar != dmar)
+			unit = dmar_find(dev, false);
+			if (iria->dmar != unit)
 				continue;
 			iommu_instantiate_device(&(iria)->dmar->iommu,
 			    dev, true);
