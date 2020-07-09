@@ -127,11 +127,11 @@ struct dmar_ctx {
 	u_int refs;			/* (u) References from tags */
 };
 
-#define	IOMMU_DOMAIN_GAS_INITED		0x0001
-#define	IOMMU_DOMAIN_PGTBL_INITED	0x0002
-#define	IOMMU_DOMAIN_IDMAP		0x0010	/* Domain uses identity
+#define	DMAR_DOMAIN_GAS_INITED		0x0001
+#define	DMAR_DOMAIN_PGTBL_INITED	0x0002
+#define	DMAR_DOMAIN_IDMAP		0x0010	/* Domain uses identity
 						   page table */
-#define	IOMMU_DOMAIN_RMRR		0x0020	/* Domain contains RMRR entry,
+#define	DMAR_DOMAIN_RMRR		0x0020	/* Domain contains RMRR entry,
 						   cannot be turned off */
 
 /* struct dmar_ctx flags */

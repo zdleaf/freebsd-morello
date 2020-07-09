@@ -235,7 +235,7 @@ dmar_gas_init_domain(struct dmar_domain *domain)
 
 	domain->first_place = begin;
 	domain->last_place = end;
-	domain->flags |= IOMMU_DOMAIN_GAS_INITED;
+	domain->flags |= DMAR_DOMAIN_GAS_INITED;
 	DMAR_DOMAIN_UNLOCK(domain);
 }
 

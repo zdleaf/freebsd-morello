@@ -186,7 +186,7 @@ ctx_id_entry_init(struct dmar_ctx *ctx, dmar_ctx_entry_t *ctxp, bool move,
 	    pci_get_function(ctx->device.tag.owner),
 	    ctxp->ctx1, ctxp->ctx2));
 
-	if ((domain->flags & IOMMU_DOMAIN_IDMAP) != 0 &&
+	if ((domain->flags & DMAR_DOMAIN_IDMAP) != 0 &&
 	    (unit->hw_ecap & DMAR_ECAP_PT) != 0) {
 		KASSERT(domain->pgtbl_obj == NULL,
 		    ("ctx %p non-null pgtbl_obj", ctx));
@@ -294,7 +294,7 @@ domain_init_rmrr(struct dmar_domain *domain, device_t dev, int bus,
 		if (error1 == 0 && entry->end != entry->start) {
 			IOMMU_LOCK(domain->iodom.iommu);
 			domain->refs++; /* XXXKIB prevent free */
-			domain->flags |= IOMMU_DOMAIN_RMRR;
+			domain->flags |= DMAR_DOMAIN_RMRR;
 			IOMMU_UNLOCK(domain->iodom.iommu);
 		} else {
 			if (error1 != 0) {
@@ -359,7 +359,7 @@ dmar_domain_alloc(struct dmar_unit *dmar, bool id_mapped)
 			domain->pgtbl_obj = domain_get_idmap_pgtbl(domain,
 			    domain->end);
 		}
-		domain->flags |= IOMMU_DOMAIN_IDMAP;
+		domain->flags |= DMAR_DOMAIN_IDMAP;
 	} else {
 		error = domain_alloc_pgtbl(domain);
 		if (error != 0)
@@ -434,12 +434,12 @@ dmar_domain_destroy(struct dmar_domain *domain)
 	    ("destroying dom %p with ctx_cnt %d", domain, domain->ctx_cnt));
 	KASSERT(domain->refs == 0,
 	    ("destroying dom %p with refs %d", domain, domain->refs));
-	if ((domain->flags & IOMMU_DOMAIN_GAS_INITED) != 0) {
+	if ((domain->flags & DMAR_DOMAIN_GAS_INITED) != 0) {
 		DMAR_DOMAIN_LOCK(domain);
 		dmar_gas_fini_domain(domain);
 		DMAR_DOMAIN_UNLOCK(domain);
 	}
-	if ((domain->flags & IOMMU_DOMAIN_PGTBL_INITED) != 0) {
+	if ((domain->flags & DMAR_DOMAIN_PGTBL_INITED) != 0) {
 		if (domain->pgtbl_obj != NULL)
 			DMAR_DOMAIN_PGLOCK(domain);
 		domain_free_pgtbl(domain);
@@ -638,7 +638,7 @@ dmar_move_ctx_to_domain(struct dmar_domain *domain, struct dmar_ctx *ctx)
 	/* If flush failed, rolling back would not work as well. */
 	printf("dmar%d rid %x domain %d->%d %s-mapped\n",
 	    dmar->iommu.unit, ctx->rid, old_domain->domain, domain->domain,
-	    (domain->flags & IOMMU_DOMAIN_IDMAP) != 0 ? "id" : "re");
+	    (domain->flags & DMAR_DOMAIN_IDMAP) != 0 ? "id" : "re");
 	dmar_unref_domain_locked(dmar, old_domain);
 	TD_PINNED_ASSERT;
 	return (error);
@@ -662,7 +662,7 @@ dmar_unref_domain_locked(struct dmar_unit *dmar, struct dmar_domain *domain)
 		return;
 	}
 
-	KASSERT((domain->flags & IOMMU_DOMAIN_RMRR) == 0,
+	KASSERT((domain->flags & DMAR_DOMAIN_RMRR) == 0,
 	    ("lost ref on RMRR domain %p", domain));
 
 	LIST_REMOVE(domain, link);
