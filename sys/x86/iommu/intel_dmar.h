@@ -98,7 +98,6 @@ RB_PROTOTYPE(dmar_gas_entries_tree, iommu_map_entry, rb_entry,
  */
 struct dmar_domain {
 	struct iommu_domain iodom;
-	struct dmar_unit *dmar;
 	int domain;			/* (c) DID, written in context entry */
 	int mgaw;			/* (c) Real max address width */
 	int agaw;			/* (c) Adjusted guest address width */
@@ -109,6 +108,7 @@ struct dmar_domain {
 					   the guest AS */
 	u_int ctx_cnt;			/* (u) Number of contexts owned */
 	u_int refs;			/* (u) Refs, including ctx */
+	struct dmar_unit *dmar;		/* (c) */
 	LIST_ENTRY(dmar_domain) link;	/* (u) Member in the dmar list */
 	LIST_HEAD(, dmar_ctx) contexts;	/* (u) */
 	vm_object_t pgtbl_obj;		/* (c) Page table pages */
