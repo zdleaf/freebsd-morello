@@ -575,15 +575,12 @@ dmar_gas_free_region(struct dmar_domain *domain, struct iommu_map_entry *entry)
 }
 
 int
-dmar_gas_map(struct iommu_domain *iodom,
+dmar_gas_map(struct dmar_domain *domain,
     const struct bus_dma_tag_common *common, iommu_gaddr_t size, int offset,
     u_int eflags, u_int flags, vm_page_t *ma, struct iommu_map_entry **res)
 {
-	struct dmar_domain *domain;
 	struct iommu_map_entry *entry;
 	int error;
-
-	domain = (struct dmar_domain *)iodom;
 
 	KASSERT((flags & ~(IOMMU_MF_CANWAIT | IOMMU_MF_CANSPLIT)) == 0,
 	    ("invalid flags 0x%x", flags));
@@ -714,4 +711,20 @@ iommu_map_free_entry(struct iommu_domain *iodom, struct iommu_map_entry *entry)
 	domain = (struct dmar_domain *)iodom;
 
 	dmar_gas_free_entry(domain, entry);
+}
+
+int
+iommu_map(struct iommu_domain *iodom,
+    const struct bus_dma_tag_common *common, iommu_gaddr_t size, int offset,
+    u_int eflags, u_int flags, vm_page_t *ma, struct iommu_map_entry **res)
+{
+	struct dmar_domain *domain;
+	int error;
+
+	domain = (struct dmar_domain *)iodom;
+
+	error = dmar_gas_map(domain, common, size, offset, eflags, flags,
+	    ma, res);
+
+	return (error);
 }

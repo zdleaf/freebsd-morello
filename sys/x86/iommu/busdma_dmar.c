@@ -559,7 +559,7 @@ iommu_bus_dmamap_load_something1(struct bus_dma_tag_iommu *tag,
 		if (seg + 1 < tag->common.nsegments)
 			gas_flags |= IOMMU_MF_CANSPLIT;
 
-		error = dmar_gas_map(domain, &tag->common, size, offset,
+		error = iommu_map(domain, &tag->common, size, offset,
 		    IOMMU_MAP_ENTRY_READ |
 		    ((flags & BUS_DMA_NOWRITE) == 0 ? IOMMU_MAP_ENTRY_WRITE : 0),
 		    gas_flags, ma + idx, &entry);
