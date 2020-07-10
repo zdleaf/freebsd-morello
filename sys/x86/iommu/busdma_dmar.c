@@ -101,7 +101,8 @@ iommu_bus_dma_is_dev_disabled(int domain, int bus, int slot, int func)
 		return (default_bounce != 0);
 	if (strcmp(env, bounce_str) == 0)
 		ret = true;
-	else if (strcmp(env, dmar_str) == 0)
+	else if (strcmp(env, iommu_str) == 0 ||
+	    strcmp(env, dmar_str) == 0)
 		ret = false;
 	else
 		ret = default_bounce != 0;
