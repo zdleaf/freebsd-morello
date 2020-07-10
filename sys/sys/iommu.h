@@ -35,7 +35,7 @@
 #define _SYS_IOMMU_H_
 
 #include <sys/taskqueue.h>
-#include <sys/tree.h> 
+#include <sys/tree.h>
 
 /* Host or physical memory address, after translation. */
 typedef uint64_t iommu_haddr_t;
@@ -127,5 +127,11 @@ struct iommu_unit *iommu_find(device_t dev, bool verbose);
 void iommu_domain_unload_entry(struct iommu_map_entry *entry, bool free);
 void iommu_domain_unload(struct iommu_domain *domain,
     struct iommu_map_entries_tailq *entries, bool cansleep);
+
+struct iommu_ctx *iommu_instantiate_ctx(struct iommu_unit *iommu,
+    device_t dev, bool rmrr);
+device_t iommu_get_requester(device_t dev, uint16_t *rid);
+int iommu_init_busdma(struct iommu_unit *unit);
+void iommu_fini_busdma(struct iommu_unit *unit);
 
 #endif /* !_SYS_IOMMU_H_ */

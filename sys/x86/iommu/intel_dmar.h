@@ -289,8 +289,6 @@ void domain_free_pgtbl(struct dmar_domain *domain);
 int dmar_dev_depth(device_t child);
 void dmar_dev_path(device_t child, int *busno, void *path1, int depth);
 
-struct iommu_ctx *iommu_instantiate_ctx(struct iommu_unit *dmar,
-    device_t dev, bool rmrr);
 struct dmar_ctx *dmar_get_ctx_for_dev(struct dmar_unit *dmar, device_t dev,
     uint16_t rid, bool id_mapped, bool rmrr_init);
 struct dmar_ctx *dmar_get_ctx_for_devpath(struct dmar_unit *dmar, uint16_t rid,
@@ -304,10 +302,6 @@ void dmar_domain_unload_entry(struct iommu_map_entry *entry, bool free);
 void dmar_domain_unload(struct dmar_domain *domain,
     struct iommu_map_entries_tailq *entries, bool cansleep);
 void dmar_domain_free_entry(struct iommu_map_entry *entry, bool free);
-
-int iommu_init_busdma(struct iommu_unit *unit);
-void iommu_fini_busdma(struct iommu_unit *unit);
-device_t iommu_get_requester(device_t dev, uint16_t *rid);
 
 void dmar_gas_init_domain(struct dmar_domain *domain);
 void dmar_gas_fini_domain(struct dmar_domain *domain);
