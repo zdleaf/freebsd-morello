@@ -953,10 +953,11 @@ iommu_bus_schedule_dmamap(struct iommu_unit *unit, struct bus_dmamap_iommu *map)
 int
 iommu_init_busdma(struct iommu_unit *unit)
 {
+	int error;
 
 	unit->dma_enabled = 1;
-	TUNABLE_INT_FETCH("hw.iommu.dma", &unit->dma_enabled);
-	if (!unit->dma_enabled) /* compatibility */
+	error = TUNABLE_INT_FETCH("hw.iommu.dma", &unit->dma_enabled);
+	if (error == 0) /* compatibility */
 		TUNABLE_INT_FETCH("hw.dmar.dma", &unit->dma_enabled);
 	TAILQ_INIT(&unit->delayed_maps);
 	TASK_INIT(&unit->dmamap_load_task, 0, iommu_bus_task_dmamap, unit);
