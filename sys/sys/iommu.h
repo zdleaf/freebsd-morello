@@ -121,6 +121,8 @@ struct iommu_ctx {
 #define	IOMMU_DOMAIN_UNLOCK(dom)	mtx_unlock(&(dom)->lock)
 #define	IOMMU_DOMAIN_ASSERT_LOCKED(dom)	mtx_assert(&(dom)->lock, MA_OWNED)
 
+void iommu_free_ctx(struct iommu_ctx *ctx);
+void iommu_free_ctx_locked(struct iommu_unit *iommu, struct iommu_ctx *ctx);
 struct iommu_ctx *iommu_get_ctx(struct iommu_unit *, device_t dev,
     uint16_t rid, bool id_mapped, bool rmrr_init);
 struct iommu_unit *iommu_find(device_t dev, bool verbose);

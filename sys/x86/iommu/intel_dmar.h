@@ -295,8 +295,8 @@ struct dmar_ctx *dmar_get_ctx_for_devpath(struct dmar_unit *dmar, uint16_t rid,
     int dev_domain, int dev_busno, const void *dev_path, int dev_path_len,
     bool id_mapped, bool rmrr_init);
 int dmar_move_ctx_to_domain(struct dmar_domain *domain, struct dmar_ctx *ctx);
-void dmar_free_ctx_locked(struct iommu_unit *dmar, struct iommu_ctx *ctx);
-void dmar_free_ctx(struct iommu_ctx *ctx);
+void dmar_free_ctx_locked(struct dmar_unit *dmar, struct dmar_ctx *ctx);
+void dmar_free_ctx(struct dmar_ctx *ctx);
 struct dmar_ctx *dmar_find_ctx_locked(struct dmar_unit *dmar, uint16_t rid);
 void dmar_domain_unload_entry(struct iommu_map_entry *entry, bool free);
 void dmar_domain_unload(struct dmar_domain *domain,

@@ -554,7 +554,7 @@ dmar_get_ctx_for_dev1(struct dmar_unit *dmar, device_t dev, uint16_t rid,
 
 	error = dmar_flush_for_ctx_entry(dmar, enable);
 	if (error != 0) {
-		dmar_free_ctx_locked(&dmar->iommu, (struct iommu_ctx *)ctx);
+		dmar_free_ctx_locked(dmar, ctx);
 		TD_PINNED_ASSERT;
 		return (NULL);
 	}
@@ -574,8 +574,7 @@ dmar_get_ctx_for_dev1(struct dmar_unit *dmar, device_t dev, uint16_t rid,
 		} else {
 			printf("dmar%d: enabling translation failed, "
 			    "error %d\n", dmar->iommu.unit, error);
-			dmar_free_ctx_locked(&dmar->iommu,
-			    (struct iommu_ctx *)ctx);
+			dmar_free_ctx_locked(dmar, ctx);
 			TD_PINNED_ASSERT;
 			return (NULL);
 		}
@@ -676,16 +675,11 @@ dmar_unref_domain_locked(struct dmar_unit *dmar, struct dmar_domain *domain)
 }
 
 void
-dmar_free_ctx_locked(struct iommu_unit *unit, struct iommu_ctx *context)
+dmar_free_ctx_locked(struct dmar_unit *dmar, struct dmar_ctx *ctx)
 {
-	struct dmar_ctx *ctx;
-	struct dmar_unit *dmar;
 	struct sf_buf *sf;
 	dmar_ctx_entry_t *ctxp;
 	struct dmar_domain *domain;
-
-	ctx = (struct dmar_ctx *)context;
-	dmar = (struct dmar_unit *)unit;
 
 	DMAR_ASSERT_LOCKED(dmar);
 	KASSERT(ctx->refs >= 1,
@@ -755,15 +749,13 @@ dmar_free_ctx_locked(struct iommu_unit *unit, struct iommu_ctx *context)
 }
 
 void
-dmar_free_ctx(struct iommu_ctx *context)
+dmar_free_ctx(struct dmar_ctx *ctx)
 {
-	struct dmar_ctx *ctx;
 	struct dmar_unit *dmar;
 
-	ctx = (struct dmar_ctx *)context;
 	dmar = (struct dmar_unit *)ctx->context.domain->iommu;
 	DMAR_LOCK(dmar);
-	dmar_free_ctx_locked(&dmar->iommu, (struct iommu_ctx *)ctx);
+	dmar_free_ctx_locked(dmar, ctx);
 }
 
 /*
@@ -907,6 +899,30 @@ iommu_get_ctx(struct iommu_unit *iommu, device_t dev, uint16_t rid,
 	ret = dmar_get_ctx_for_dev(dmar, dev, rid, id_mapped, rmrr_init);
 
 	return ((struct iommu_ctx *)ret);
+}
+
+void
+iommu_free_ctx_locked(struct iommu_unit *iommu, struct iommu_ctx *context)
+{
+	struct dmar_unit *dmar;
+	struct dmar_ctx *ctx;
+
+	dmar = (struct dmar_unit *)iommu;
+	ctx = (struct dmar_ctx *)context;
+
+	dmar_free_ctx_locked(dmar, ctx);
+}
+
+void
+iommu_free_ctx(struct iommu_ctx *context)
+{
+	struct dmar_unit *dmar;
+	struct dmar_ctx *ctx;
+
+	ctx = (struct dmar_ctx *)context;
+	dmar = (struct dmar_unit *)ctx->context.domain->iommu;
+
+	dmar_free_ctx(ctx);
 }
 
 void
