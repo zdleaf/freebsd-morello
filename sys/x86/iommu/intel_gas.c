@@ -627,14 +627,11 @@ dmar_gas_map(struct dmar_domain *domain,
 }
 
 int
-dmar_gas_map_region(struct iommu_domain *iodom, struct iommu_map_entry *entry,
+dmar_gas_map_region(struct dmar_domain *domain, struct iommu_map_entry *entry,
     u_int eflags, u_int flags, vm_page_t *ma)
 {
-	struct dmar_domain *domain;
 	iommu_gaddr_t start;
 	int error;
-
-	domain = (struct dmar_domain *)iodom;
 
 	KASSERT(entry->flags == 0, ("used RMRR entry %p %p %x", domain,
 	    entry, entry->flags));
@@ -725,6 +722,20 @@ iommu_map(struct iommu_domain *iodom,
 
 	error = dmar_gas_map(domain, common, size, offset, eflags, flags,
 	    ma, res);
+
+	return (error);
+}
+
+int
+iommu_map_region(struct iommu_domain *iodom, struct iommu_map_entry *entry,
+    u_int eflags, u_int flags, vm_page_t *ma)
+{
+	struct dmar_domain *domain;
+	int error;
+
+	domain = (struct dmar_domain *)iodom;
+
+	error = dmar_gas_map_region(domain, entry, eflags, flags, ma);
 
 	return (error);
 }

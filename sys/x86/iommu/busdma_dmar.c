@@ -1020,7 +1020,7 @@ bus_dma_dmar_load_ident(bus_dma_tag_t dmat, bus_dmamap_t map1,
 		ma[i] = vm_page_getfake(entry->start + PAGE_SIZE * i,
 		    VM_MEMATTR_DEFAULT);
 	}
-	error = dmar_gas_map_region(domain, entry, IOMMU_MAP_ENTRY_READ |
+	error = iommu_map_region(domain, entry, IOMMU_MAP_ENTRY_READ |
 	    ((flags & BUS_DMA_NOWRITE) ? 0 : IOMMU_MAP_ENTRY_WRITE),
 	    waitok ? IOMMU_MF_CANWAIT : 0, ma);
 	if (error == 0) {

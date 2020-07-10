@@ -316,7 +316,7 @@ int dmar_gas_map(struct dmar_domain *domain,
     u_int eflags, u_int flags, vm_page_t *ma, struct iommu_map_entry **res);
 void dmar_gas_free_region(struct dmar_domain *domain,
     struct iommu_map_entry *entry);
-int dmar_gas_map_region(struct iommu_domain *domain,
+int dmar_gas_map_region(struct dmar_domain *domain,
     struct iommu_map_entry *entry, u_int eflags, u_int flags, vm_page_t *ma);
 int dmar_gas_reserve_region(struct dmar_domain *domain, iommu_gaddr_t start,
     iommu_gaddr_t end);
