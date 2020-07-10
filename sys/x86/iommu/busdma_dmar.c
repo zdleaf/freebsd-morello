@@ -317,7 +317,7 @@ bus_dma_dmar_set_buswide(device_t dev)
 	return (true);
 }
 
-static MALLOC_DEFINE(M_DMAR_DMAMAP, "dmar_dmamap", "Intel DMAR DMA Map");
+static MALLOC_DEFINE(M_IOMMU_DMAMAP, "iommu_dmamap", "IOMMU DMA Map");
 
 static void iommu_bus_schedule_dmamap(struct iommu_unit *unit,
     struct bus_dmamap_iommu *map);
@@ -381,7 +381,7 @@ iommu_bus_dma_tag_destroy(bus_dma_tag_t dmat1)
 			    1) {
 				if (dmat == dmat->ctx->tag)
 					iommu_free_ctx(dmat->ctx);
-				free_domain(dmat->segments, M_DMAR_DMAMAP);
+				free_domain(dmat->segments, M_IOMMU_DMAMAP);
 				free(dmat, M_DEVBUF);
 				dmat = parent;
 			} else
@@ -407,7 +407,7 @@ iommu_bus_dmamap_create(bus_dma_tag_t dmat, int flags, bus_dmamap_t *mapp)
 	struct bus_dmamap_iommu *map;
 
 	tag = (struct bus_dma_tag_iommu *)dmat;
-	map = malloc_domainset(sizeof(*map), M_DMAR_DMAMAP,
+	map = malloc_domainset(sizeof(*map), M_IOMMU_DMAMAP,
 	    DOMAINSET_PREF(tag->common.domain), M_NOWAIT | M_ZERO);
 	if (map == NULL) {
 		*mapp = NULL;
@@ -415,10 +415,10 @@ iommu_bus_dmamap_create(bus_dma_tag_t dmat, int flags, bus_dmamap_t *mapp)
 	}
 	if (tag->segments == NULL) {
 		tag->segments = malloc_domainset(sizeof(bus_dma_segment_t) *
-		    tag->common.nsegments, M_DMAR_DMAMAP,
+		    tag->common.nsegments, M_IOMMU_DMAMAP,
 		    DOMAINSET_PREF(tag->common.domain), M_NOWAIT);
 		if (tag->segments == NULL) {
-			free_domain(map, M_DMAR_DMAMAP);
+			free_domain(map, M_IOMMU_DMAMAP);
 			*mapp = NULL;
 			return (ENOMEM);
 		}
@@ -450,7 +450,7 @@ iommu_bus_dmamap_destroy(bus_dma_tag_t dmat, bus_dmamap_t map1)
 			return (EBUSY);
 		}
 		IOMMU_DOMAIN_UNLOCK(domain);
-		free_domain(map, M_DMAR_DMAMAP);
+		free_domain(map, M_IOMMU_DMAMAP);
 	}
 	tag->map_count--;
 	return (0);
