@@ -958,10 +958,10 @@ iommu_init_busdma(struct iommu_unit *unit)
 	TUNABLE_INT_FETCH("hw.dmar.dma", &unit->dma_enabled);
 	TAILQ_INIT(&unit->delayed_maps);
 	TASK_INIT(&unit->dmamap_load_task, 0, iommu_bus_task_dmamap, unit);
-	unit->delayed_taskqueue = taskqueue_create("dmar", M_WAITOK,
+	unit->delayed_taskqueue = taskqueue_create("iommu", M_WAITOK,
 	    taskqueue_thread_enqueue, &unit->delayed_taskqueue);
 	taskqueue_start_threads(&unit->delayed_taskqueue, 1, PI_DISK,
-	    "dmar%d busdma taskq", unit->unit);
+	    "iommu%d busdma taskq", unit->unit);
 	return (0);
 }
 
