@@ -305,9 +305,9 @@ void dmar_domain_free_entry(struct iommu_map_entry *entry, bool free);
 
 void dmar_gas_init_domain(struct dmar_domain *domain);
 void dmar_gas_fini_domain(struct dmar_domain *domain);
-struct iommu_map_entry *dmar_gas_alloc_entry(struct iommu_domain *domain,
+struct iommu_map_entry *dmar_gas_alloc_entry(struct dmar_domain *domain,
     u_int flags);
-void dmar_gas_free_entry(struct iommu_domain *domain,
+void dmar_gas_free_entry(struct dmar_domain *domain,
     struct iommu_map_entry *entry);
 void dmar_gas_free_space(struct dmar_domain *domain,
     struct iommu_map_entry *entry);

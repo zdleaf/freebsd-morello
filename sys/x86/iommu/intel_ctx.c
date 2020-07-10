@@ -308,7 +308,7 @@ domain_init_rmrr(struct dmar_domain *domain, device_t dev, int bus,
 				error = error1;
 			}
 			TAILQ_REMOVE(&rmrr_entries, entry, unroll_link);
-			dmar_gas_free_entry(&domain->iodom, entry);
+			dmar_gas_free_entry(domain, entry);
 		}
 		for (i = 0; i < size; i++)
 			vm_page_putfake(ma[i]);
@@ -791,7 +791,7 @@ dmar_domain_free_entry(struct iommu_map_entry *entry, bool free)
 		dmar_gas_free_space(domain, entry);
 	DMAR_DOMAIN_UNLOCK(domain);
 	if (free)
-		dmar_gas_free_entry(&domain->iodom, entry);
+		dmar_gas_free_entry(domain, entry);
 	else
 		entry->flags = 0;
 }

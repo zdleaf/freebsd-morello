@@ -1005,7 +1005,7 @@ bus_dma_dmar_load_ident(bus_dma_tag_t dmat, bus_dmamap_t map1,
 	map = (struct bus_dmamap_iommu *)map1;
 	waitok = (flags & BUS_DMA_NOWAIT) != 0;
 
-	entry = dmar_gas_alloc_entry(domain, waitok ? 0 : DMAR_PGF_WAITOK);
+	entry = iommu_map_alloc_entry(domain, waitok ? 0 : DMAR_PGF_WAITOK);
 	if (entry == NULL)
 		return (ENOMEM);
 	entry->start = start;
@@ -1013,7 +1013,7 @@ bus_dma_dmar_load_ident(bus_dma_tag_t dmat, bus_dmamap_t map1,
 	ma = malloc(sizeof(vm_page_t) * atop(length), M_TEMP, waitok ?
 	    M_WAITOK : M_NOWAIT);
 	if (ma == NULL) {
-		dmar_gas_free_entry(domain, entry);
+		iommu_map_free_entry(domain, entry);
 		return (ENOMEM);
 	}
 	for (i = 0; i < atop(length); i++) {

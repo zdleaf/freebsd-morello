@@ -87,12 +87,9 @@ intel_gas_init(void)
 SYSINIT(intel_gas, SI_SUB_DRIVERS, SI_ORDER_FIRST, intel_gas_init, NULL);
 
 struct iommu_map_entry *
-dmar_gas_alloc_entry(struct iommu_domain *iodom, u_int flags)
+dmar_gas_alloc_entry(struct dmar_domain *domain, u_int flags)
 {
-	struct dmar_domain *domain;
 	struct iommu_map_entry *res;
-
-	domain = (struct dmar_domain *)iodom;
 
 	KASSERT((flags & ~(DMAR_PGF_WAITOK)) == 0,
 	    ("unsupported flags %x", flags));
@@ -107,11 +104,8 @@ dmar_gas_alloc_entry(struct iommu_domain *iodom, u_int flags)
 }
 
 void
-dmar_gas_free_entry(struct iommu_domain *iodom, struct iommu_map_entry *entry)
+dmar_gas_free_entry(struct dmar_domain *domain, struct iommu_map_entry *entry)
 {
-	struct dmar_domain *domain;
-
-	domain = (struct dmar_domain *)iodom;
 
 	KASSERT(domain == (struct dmar_domain *)entry->domain,
 	    ("mismatched free domain %p entry %p entry->domain %p", domain,
@@ -216,8 +210,8 @@ dmar_gas_init_domain(struct dmar_domain *domain)
 {
 	struct iommu_map_entry *begin, *end;
 
-	begin = dmar_gas_alloc_entry(&domain->iodom, DMAR_PGF_WAITOK);
-	end = dmar_gas_alloc_entry(&domain->iodom, DMAR_PGF_WAITOK);
+	begin = dmar_gas_alloc_entry(domain, DMAR_PGF_WAITOK);
+	end = dmar_gas_alloc_entry(domain, DMAR_PGF_WAITOK);
 
 	DMAR_DOMAIN_LOCK(domain);
 	KASSERT(domain->entries_cnt == 2, ("dirty domain %p", domain));
@@ -253,7 +247,7 @@ dmar_gas_fini_domain(struct dmar_domain *domain)
 	KASSERT(entry->flags == IOMMU_MAP_ENTRY_PLACE,
 	    ("start entry flags %p", domain));
 	RB_REMOVE(dmar_gas_entries_tree, &domain->rb_root, entry);
-	dmar_gas_free_entry(&domain->iodom, entry);
+	dmar_gas_free_entry(domain, entry);
 
 	entry = RB_MAX(dmar_gas_entries_tree, &domain->rb_root);
 	KASSERT(entry->start == domain->end, ("end entry start %p", domain));
@@ -261,14 +255,14 @@ dmar_gas_fini_domain(struct dmar_domain *domain)
 	KASSERT(entry->flags == IOMMU_MAP_ENTRY_PLACE,
 	    ("end entry flags %p", domain));
 	RB_REMOVE(dmar_gas_entries_tree, &domain->rb_root, entry);
-	dmar_gas_free_entry(&domain->iodom, entry);
+	dmar_gas_free_entry(domain, entry);
 
 	RB_FOREACH_SAFE(entry, dmar_gas_entries_tree, &domain->rb_root,
 	    entry1) {
 		KASSERT((entry->flags & IOMMU_MAP_ENTRY_RMRR) != 0,
 		    ("non-RMRR entry left %p", domain));
 		RB_REMOVE(dmar_gas_entries_tree, &domain->rb_root, entry);
-		dmar_gas_free_entry(&domain->iodom, entry);
+		dmar_gas_free_entry(domain, entry);
 	}
 }
 
@@ -594,7 +588,7 @@ dmar_gas_map(struct iommu_domain *iodom,
 	KASSERT((flags & ~(IOMMU_MF_CANWAIT | IOMMU_MF_CANSPLIT)) == 0,
 	    ("invalid flags 0x%x", flags));
 
-	entry = dmar_gas_alloc_entry(&domain->iodom,
+	entry = dmar_gas_alloc_entry(domain,
 	    (flags & IOMMU_MF_CANWAIT) != 0 ?  DMAR_PGF_WAITOK : 0);
 	if (entry == NULL)
 		return (ENOMEM);
@@ -603,7 +597,7 @@ dmar_gas_map(struct iommu_domain *iodom,
 	    entry);
 	if (error == ENOMEM) {
 		DMAR_DOMAIN_UNLOCK(domain);
-		dmar_gas_free_entry(&domain->iodom, entry);
+		dmar_gas_free_entry(domain, entry);
 		return (error);
 	}
 #ifdef INVARIANTS
@@ -686,7 +680,7 @@ dmar_gas_reserve_region(struct dmar_domain *domain, iommu_gaddr_t start,
 	struct iommu_map_entry *entry;
 	int error;
 
-	entry = dmar_gas_alloc_entry(&domain->iodom, DMAR_PGF_WAITOK);
+	entry = dmar_gas_alloc_entry(domain, DMAR_PGF_WAITOK);
 	entry->start = start;
 	entry->end = end;
 	DMAR_DOMAIN_LOCK(domain);
@@ -695,6 +689,29 @@ dmar_gas_reserve_region(struct dmar_domain *domain, iommu_gaddr_t start,
 		entry->flags |= IOMMU_MAP_ENTRY_UNMAPPED;
 	DMAR_DOMAIN_UNLOCK(domain);
 	if (error != 0)
-		dmar_gas_free_entry(&domain->iodom, entry);
+		dmar_gas_free_entry(domain, entry);
 	return (error);
+}
+
+struct iommu_map_entry *
+iommu_map_alloc_entry(struct iommu_domain *iodom, u_int flags)
+{
+	struct dmar_domain *domain;
+	struct iommu_map_entry *res;
+
+	domain = (struct dmar_domain *)iodom;
+
+	res = dmar_gas_alloc_entry(domain, flags);
+
+	return (res);
+}
+
+void
+iommu_map_free_entry(struct iommu_domain *iodom, struct iommu_map_entry *entry)
+{
+	struct dmar_domain *domain;
+
+	domain = (struct dmar_domain *)iodom;
+
+	dmar_gas_free_entry(domain, entry);
 }

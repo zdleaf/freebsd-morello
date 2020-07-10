@@ -945,7 +945,7 @@ dmar_rmrr_iter(ACPI_DMAR_HEADER *dmarh, void *arg)
 		match = dmar_match_devscope(devscope, ria->dev_busno,
 		    ria->dev_path, ria->dev_path_len);
 		if (match == 1) {
-			entry = dmar_gas_alloc_entry(&ria->domain->iodom,
+			entry = dmar_gas_alloc_entry(ria->domain,
 			    DMAR_PGF_WAITOK);
 			entry->start = resmem->BaseAddress;
 			/* The RMRR entry end address is inclusive. */

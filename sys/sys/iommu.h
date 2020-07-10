@@ -135,5 +135,8 @@ struct iommu_ctx *iommu_instantiate_ctx(struct iommu_unit *iommu,
 device_t iommu_get_requester(device_t dev, uint16_t *rid);
 int iommu_init_busdma(struct iommu_unit *unit);
 void iommu_fini_busdma(struct iommu_unit *unit);
+struct iommu_map_entry *iommu_map_alloc_entry(struct iommu_domain *iodom,
+    u_int flags);
+void iommu_map_free_entry(struct iommu_domain *, struct iommu_map_entry *);
 
 #endif /* !_SYS_IOMMU_H_ */
