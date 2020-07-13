@@ -260,8 +260,8 @@ iommu_instantiate_ctx(struct iommu_unit *unit, device_t dev, bool rmrr)
 		 * later refs.
 		 */
 		IOMMU_LOCK(unit);
-		if ((ctx->flags & DMAR_CTX_DISABLED) == 0) {
-			ctx->flags |= DMAR_CTX_DISABLED;
+		if ((ctx->flags & IOMMU_CTX_DISABLED) == 0) {
+			ctx->flags |= IOMMU_CTX_DISABLED;
 			IOMMU_UNLOCK(unit);
 		} else {
 			iommu_free_ctx_locked(unit, ctx);

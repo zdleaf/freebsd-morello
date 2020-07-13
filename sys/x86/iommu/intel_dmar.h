@@ -98,13 +98,6 @@ struct dmar_ctx {
 #define	DMAR_DOMAIN_RMRR		0x0020	/* Domain contains RMRR entry,
 						   cannot be turned off */
 
-/* struct dmar_ctx flags */
-#define	DMAR_CTX_FAULTED	0x0001	/* Fault was reported,
-					   last_fault_rec is valid */
-#define	DMAR_CTX_DISABLED	0x0002	/* Device is disabled, the
-					   ephemeral reference is kept
-					   to prevent context destruction */
-
 #define	DMAR_DOMAIN_PGLOCK(dom)		VM_OBJECT_WLOCK((dom)->pgtbl_obj)
 #define	DMAR_DOMAIN_PGTRYLOCK(dom)	VM_OBJECT_TRYWLOCK((dom)->pgtbl_obj)
 #define	DMAR_DOMAIN_PGUNLOCK(dom)	VM_OBJECT_WUNLOCK((dom)->pgtbl_obj)

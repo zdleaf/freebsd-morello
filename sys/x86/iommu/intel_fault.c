@@ -223,7 +223,7 @@ dmar_fault_task(void *arg, int pending __unused)
 			slot = PCI_RID2SLOT(sid);
 			func = PCI_RID2FUNC(sid);
 		} else {
-			ctx->context.flags |= DMAR_CTX_FAULTED;
+			ctx->context.flags |= IOMMU_CTX_FAULTED;
 			ctx->last_fault_rec[0] = fault_rec[0];
 			ctx->last_fault_rec[1] = fault_rec[1];
 			device_print_prettyname(ctx->context.tag->owner);

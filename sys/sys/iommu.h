@@ -113,6 +113,13 @@ struct iommu_ctx {
 	u_int flags;			/* (u) */
 };
 
+/* struct iommu_ctx flags */
+#define	IOMMU_CTX_FAULTED	0x0001	/* Fault was reported,
+					   last_fault_rec is valid */
+#define	IOMMU_CTX_DISABLED	0x0002	/* Device is disabled, the
+					   ephemeral reference is kept
+					   to prevent context destruction */
+
 #define	IOMMU_LOCK(unit)		mtx_lock(&(unit)->lock)
 #define	IOMMU_UNLOCK(unit)		mtx_unlock(&(unit)->lock)
 #define	IOMMU_ASSERT_LOCKED(unit)	mtx_assert(&(unit)->lock, MA_OWNED)

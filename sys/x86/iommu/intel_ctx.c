@@ -695,7 +695,7 @@ dmar_free_ctx_locked(struct dmar_unit *dmar, struct dmar_ctx *ctx)
 		return;
 	}
 
-	KASSERT((ctx->context.flags & DMAR_CTX_DISABLED) == 0,
+	KASSERT((ctx->context.flags & IOMMU_CTX_DISABLED) == 0,
 	    ("lost ref on disabled ctx %p", ctx));
 
 	/*
@@ -722,7 +722,7 @@ dmar_free_ctx_locked(struct dmar_unit *dmar, struct dmar_ctx *ctx)
 		return;
 	}
 
-	KASSERT((ctx->context.flags & DMAR_CTX_DISABLED) == 0,
+	KASSERT((ctx->context.flags & IOMMU_CTX_DISABLED) == 0,
 	    ("lost ref on disabled ctx %p", ctx));
 
 	/*
