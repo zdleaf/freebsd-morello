@@ -34,6 +34,11 @@
 
 #include <vm/vm.h>
 
+#include <sys/types.h>
+
+#include <machine/bus.h>
+#include <machine/bus_dma_impl.h>
+#include <sys/iommu.h>
 #include <arm64/iommu/iommu.h>
 
 INTERFACE iommu;
@@ -43,7 +48,7 @@ INTERFACE iommu;
 #
 METHOD int map {
 	device_t		dev;
-	struct iommu_domain	*domain;
+	struct iommu1_domain	*domain;
 	vm_offset_t		va;
 	vm_paddr_t		pa;
 	bus_size_t		size;
@@ -55,7 +60,7 @@ METHOD int map {
 #
 METHOD int unmap {
 	device_t		dev;
-	struct iommu_domain	*domain;
+	struct iommu1_domain	*domain;
 	vm_offset_t		va;
 	bus_size_t		size;
 };
@@ -63,7 +68,7 @@ METHOD int unmap {
 #
 # Allocate an IOMMU domain.
 #
-METHOD struct iommu_domain * domain_alloc {
+METHOD struct iommu1_domain * domain_alloc {
 	device_t		dev;
 };
 
@@ -72,22 +77,22 @@ METHOD struct iommu_domain * domain_alloc {
 #
 METHOD int domain_free {
 	device_t		dev;
-	struct iommu_domain	*domain;
+	struct iommu1_domain	*domain;
 };
 
 #
 # Attach a consumer device to a IOMMU domain.
 #
-METHOD int device_attach {
+METHOD int ctx_attach {
 	device_t		dev;
-	struct iommu_domain	*domain;
-	struct iommu_device	*device;
+	struct iommu1_domain	*domain;
+	struct iommu1_ctx	*device;
 };
 
 #
 # Detach a consumer device from IOMMU domain.
 #
-METHOD int device_detach {
+METHOD int ctx_detach {
 	device_t		dev;
-	struct iommu_device	*device;
+	struct iommu1_ctx	*device;
 };

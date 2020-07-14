@@ -52,6 +52,7 @@ __FBSDID("$FreeBSD$");
 
 #include <machine/bus_dma_impl.h>
 #include <dev/iommu/busdma_iommu.h>
+#include <sys/iommu.h>
 #include <arm64/iommu/iommu.h>
 
 #include "smmu_reg.h"

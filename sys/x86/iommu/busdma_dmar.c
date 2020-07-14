@@ -62,11 +62,18 @@ __FBSDID("$FreeBSD$");
 #include <machine/atomic.h>
 #include <machine/bus.h>
 #include <machine/md_var.h>
+#if defined(__amd64__)
 #include <machine/specialreg.h>
 #include <x86/include/busdma_impl.h>
 #include <x86/iommu/intel_reg.h>
 #include <x86/iommu/busdma_dmar.h>
 #include <x86/iommu/intel_dmar.h>
+#else
+#include <machine/bus_dma_impl.h>
+#include <x86/iommu/busdma_dmar.h>
+#include <arm64/iommu/iommu.h>
+#endif
+#include <sys/iommu.h>
 
 /*
  * busdma_dmar.c, the implementation of the busdma(9) interface using
@@ -284,14 +291,17 @@ acpi_iommu_get_dma_tag(device_t dev, device_t child)
 		return (NULL);
 	if (!unit->dma_enabled)
 		return (NULL);
+#if defined(__amd64__)
 	dmar_quirks_pre_use(unit);
 	dmar_instantiate_rmrr_ctxs(unit);
+#endif
 
 	ctx = iommu_instantiate_ctx(unit, child, false);
 	res = ctx == NULL ? NULL : (bus_dma_tag_t)ctx->tag;
 	return (res);
 }
 
+#if defined(__amd64__)
 bool
 bus_dma_dmar_set_buswide(device_t dev)
 {
@@ -319,6 +329,7 @@ bus_dma_dmar_set_buswide(device_t dev)
 	dmar_set_buswide_ctx(unit, busno);
 	return (true);
 }
+#endif
 
 static MALLOC_DEFINE(M_IOMMU_DMAMAP, "iommu_dmamap", "IOMMU DMA Map");
 
@@ -536,7 +547,7 @@ iommu_bus_dmamap_load_something1(struct bus_dma_tag_iommu *tag,
 	bus_size_t buflen1;
 	int error, idx, gas_flags, seg;
 
-	KASSERT(offset < DMAR_PAGE_SIZE, ("offset %d", offset));
+	KASSERT(offset < IOMMU_PAGE_SIZE, ("offset %d", offset));
 	if (segs == NULL)
 		segs = tag->segments;
 	ctx = tag->ctx;
@@ -621,7 +632,7 @@ iommu_bus_dmamap_load_something1(struct bus_dma_tag_iommu *tag,
 
 		idx += OFF_TO_IDX(trunc_page(offset + buflen1));
 		offset += buflen1;
-		offset &= DMAR_PAGE_MASK;
+		offset &= IOMMU_PAGE_MASK;
 		buflen -= buflen1;
 	}
 	if (error == 0)
@@ -857,7 +868,7 @@ iommu_bus_dmamap_unload(bus_dma_tag_t dmat, bus_dmamap_t map1)
 	struct bus_dmamap_iommu *map;
 	struct iommu_ctx *ctx;
 	struct iommu_domain *domain;
-#if defined(__amd64__)
+#if defined(__amd64__) || defined(__aarch64__)
 	struct iommu_map_entries_tailq entries;
 #endif
 
@@ -980,6 +991,7 @@ iommu_fini_busdma(struct iommu_unit *unit)
 	unit->delayed_taskqueue = NULL;
 }
 
+#if defined(__amd64__)
 int
 bus_dma_dmar_load_ident(bus_dma_tag_t dmat, bus_dmamap_t map1,
     vm_paddr_t start, vm_size_t length, int flags)
@@ -1042,3 +1054,4 @@ bus_dma_dmar_load_ident(bus_dma_tag_t dmat, bus_dmamap_t map1,
 	free(ma, M_TEMP);
 	return (error);
 }
+#endif

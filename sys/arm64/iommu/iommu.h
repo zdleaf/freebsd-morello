@@ -63,7 +63,13 @@
 #include <vm/vm.h>
 #include <vm/pmap.h>
 
+#if 0
 #include <dev/iommu/busdma_iommu.h>
+#endif
+#include <machine/bus.h>
+#include <machine/bus_dma_impl.h>
+#include <sys/iommu.h>
+#include <arm64/iommu/iommu.h>
 
 #define	IOMMU_PAGE_SIZE		4096
 #define	IOMMU_PAGE_MASK		(IOMMU_PAGE_SIZE - 1)
@@ -77,6 +83,7 @@
 #define	IOMMU_PGF_NOALLOC	0x0008
 #define	IOMMU_PGF_OBJL		0x0010
 
+#if 0
 #define	IOMMU_MAP_ENTRY_PLACE	0x0001	/* Fake entry */
 #define	IOMMU_MAP_ENTRY_RMRR	0x0002	/* Permanent, not linked by
 					   dmamap_link */
@@ -113,14 +120,17 @@ struct iommu_map_entry {
 						    dmamap_load failure */
 	struct iommu_domain *domain;
 };
+#endif
 
-struct iommu_unit {
-	LIST_HEAD(, iommu_domain)	domain_list;
-	LIST_ENTRY(iommu_unit)		next;
+struct iommu1_unit {
+	struct iommu_unit		unit;
+	LIST_HEAD(, iommu1_domain)	domain_list;
+	LIST_ENTRY(iommu1_unit)		next;
 	struct mtx			mtx_lock;
 	device_t			dev;
 	intptr_t			xref;
 
+#if 0
 	int unit;
 	int dma_enabled;
 
@@ -133,37 +143,30 @@ struct iommu_unit {
 	struct task dmamap_load_task;
 	TAILQ_HEAD(, bus_dmamap_iommu) delayed_maps;
 	struct taskqueue *delayed_taskqueue;
+#endif
 };
 
-struct iommu_domain {
-	LIST_HEAD(, iommu_device)	device_list;
-	LIST_ENTRY(iommu_domain)	next;
+struct iommu1_domain {
+	struct iommu_domain		domain;
+	LIST_HEAD(, iommu1_ctx)		ctx_list;
+	LIST_ENTRY(iommu1_domain)	next;
 	struct mtx			mtx_lock;
 	vmem_t				*vmem;
-	struct iommu_unit		*iommu;
-	struct task unload_task;
-	struct iommu_map_entries_tailq unload_entries; /* Entries to unload */
+	struct iommu1_unit		*iommu;
 	u_int entries_cnt;
 };
 
 /* Consumer device. */
-struct iommu_device {
-	LIST_ENTRY(iommu_device)	next;
-	struct iommu_domain		*domain;
-	struct bus_dma_tag_iommu	device_tag;
+struct iommu1_ctx {
+	struct iommu_ctx		ctx;
+	LIST_ENTRY(iommu1_ctx)		next;
 	device_t dev;
 	uint16_t rid;
-	u_long loads;
-	u_long unloads;
 	bool bypass;
-	u_int flags;
-#define	IOMMU_DEVICE_FAULTED	0x0001	/* Fault was reported,
-					   last_fault_rec is valid */
-#define	IOMMU_DEVICE_DISABLED	0x0002	/* Device is disabled, the
-					   ephemeral reference is kept
-					   to prevent context destruction */
+	struct iommu1_domain		*domain;
 };
 
+#if 0
 static inline bool
 iommu_test_boundary(iommu_gaddr_t start, iommu_gaddr_t size,
     iommu_gaddr_t boundary)
@@ -173,12 +176,13 @@ iommu_test_boundary(iommu_gaddr_t start, iommu_gaddr_t size,
 		return (true);
 	return (start + size <= ((start + boundary) & ~(boundary - 1)));
 }
+#endif
 
-int iommu_register(device_t dev, struct iommu_unit *unit, intptr_t xref);
-int iommu_unregister(device_t dev);
-
-int iommu_map_page(struct iommu_domain *domain,
+int iommu_map_page(struct iommu1_domain *domain,
     vm_offset_t va, vm_paddr_t pa, vm_prot_t prot);
-int iommu_unmap_page(struct iommu_domain *domain, vm_offset_t va);
+int iommu_unmap_page(struct iommu1_domain *domain, vm_offset_t va);
+
+int iommu_register(device_t dev, struct iommu1_unit *unit, intptr_t xref);
+int iommu_unregister(device_t dev);
 
 #endif /* _DEV_IOMMU_IOMMU_H_ */

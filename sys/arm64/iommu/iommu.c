@@ -75,6 +75,7 @@ __FBSDID("$FreeBSD$");
 #endif
 
 #include <dev/iommu/busdma_iommu.h>
+#include <x86/iommu/busdma_dmar.h>
 
 #include "iommu.h"
 #include "iommu_if.h"
@@ -99,86 +100,87 @@ static struct mtx iommu_mtx;
 
 #define GICV3_ITS_PAGE  0x300b0000
 
-static LIST_HEAD(, iommu_unit) iommu_list = LIST_HEAD_INITIALIZER(iommu_list);
+static LIST_HEAD(, iommu1_unit) iommu_list = LIST_HEAD_INITIALIZER(iommu_list);
 static uma_zone_t iommu_map_entry_zone;
 
 static int
-iommu_domain_add_va_range(struct iommu_domain *domain,
+iommu_domain_add_va_range(struct iommu1_domain *domain,
     vm_offset_t va, vm_size_t size)
 {
-	struct iommu_unit *iommu;
 	int error;
 
 	KASSERT(size > 0, ("wrong size"));
-
-	iommu = domain->iommu;
 
 	error = vmem_add(domain->vmem, va, size, M_WAITOK);
 
 	return (error);
 }
 
-static struct iommu_domain *
-iommu_domain_alloc(struct iommu_unit *iommu)
+static struct iommu1_domain *
+iommu_domain_alloc(struct iommu1_unit *iommu)
 {
-	struct iommu_domain *domain;
+	struct iommu_unit *unit;
+	struct iommu1_domain *domain;
 
 	domain = IOMMU_DOMAIN_ALLOC(iommu->dev);
 	if (domain == NULL)
 		return (NULL);
 
-	LIST_INIT(&domain->device_list);
+	LIST_INIT(&domain->ctx_list);
 	mtx_init(&domain->mtx_lock, "IOMMU domain", NULL, MTX_DEF);
-	domain->iommu = iommu;
 
 	domain->vmem = vmem_create("IOMMU vmem", 0, 0, PAGE_SIZE,
 	    PAGE_SIZE, M_FIRSTFIT | M_WAITOK);
 	if (domain->vmem == NULL)
 		return (NULL);
 
-	IOMMU_LOCK(iommu);
+	unit = (struct iommu_unit *)iommu;
+
+	IOMMU_LOCK(unit);
 	LIST_INSERT_HEAD(&iommu->domain_list, domain, next);
-	IOMMU_UNLOCK(iommu);
+	IOMMU_UNLOCK(unit);
 
 	return (domain);
 }
 
 static int
-iommu_domain_free(struct iommu_domain *domain)
+iommu_domain_free(struct iommu1_domain *domain)
 {
-	struct iommu_unit *iommu;
+	struct iommu_unit *unit;
+	struct iommu1_unit *iommu;
 	vmem_t *vmem;
 	int error;
 
-	iommu = domain->iommu;
+	unit = domain->domain.iommu;
+	iommu = (struct iommu1_unit *)unit;
 	vmem = domain->vmem;
 
-	IOMMU_LOCK(iommu);
+	IOMMU_LOCK(unit);
 	LIST_REMOVE(domain, next);
 	error = IOMMU_DOMAIN_FREE(iommu->dev, domain);
 	if (error) {
 		LIST_INSERT_HEAD(&iommu->domain_list, domain, next);
-		IOMMU_UNLOCK(iommu);
+		IOMMU_UNLOCK(unit);
 		return (error);
 	}
 
-	IOMMU_UNLOCK(iommu);
+	IOMMU_UNLOCK(unit);
 
 	vmem_destroy(vmem);
 
 	return (0);
 }
 
-static struct iommu_device *
-iommu_device_lookup(device_t dev)
+static struct iommu1_ctx *
+iommu_ctx_lookup(device_t dev)
 {
-	struct iommu_domain *domain;
-	struct iommu_device *device;
-	struct iommu_unit *iommu;
+	struct iommu1_domain *domain;
+	struct iommu1_ctx *device;
+	struct iommu1_unit *iommu;
 
 	LIST_FOREACH(iommu, &iommu_list, next) {
 		LIST_FOREACH(domain, &iommu->domain_list, next) {
-			LIST_FOREACH(device, &domain->device_list, next) {
+			LIST_FOREACH(device, &domain->ctx_list, next) {
 				if (device->dev == dev)
 					return (device);
 			}
@@ -205,10 +207,10 @@ iommu_tag_init(struct bus_dma_tag_iommu *t)
 	t->common.maxsegsz = maxaddr;
 }
 
-static struct iommu_device *
-iommu_device_alloc(device_t dev)
+static struct iommu1_ctx *
+iommu_ctx_alloc(device_t dev)
 {
-	struct iommu_device *device;
+	struct iommu1_ctx *device;
 
 	device = malloc(sizeof(*device), M_IOMMU, M_WAITOK | M_ZERO);
 	device->rid = pci_get_rid(dev);
@@ -220,64 +222,67 @@ iommu_device_alloc(device_t dev)
  * Attach a consumer device to a domain.
  */
 static int
-iommu_device_attach(struct iommu_domain *domain, struct iommu_device *device)
+iommu_ctx_attach(struct iommu1_domain *domain, struct iommu1_ctx *ctx)
 {
-	struct iommu_unit *iommu;
+	struct iommu_domain *iodom;
+	struct iommu1_unit *iommu;
 	int error;
 
 	iommu = domain->iommu;
 
-	error = IOMMU_DEVICE_ATTACH(iommu->dev, domain, device);
+	error = IOMMU_CTX_ATTACH(iommu->dev, domain, ctx);
 	if (error) {
-		device_printf(iommu->dev, "Failed to add device\n");
-		free(device, M_IOMMU);
+		device_printf(iommu->dev, "Failed to add ctx\n");
+		//free(ctx, M_IOMMU);
 		return (error);
 	}
 
-	device->domain = domain;
+	ctx->domain = domain;
 
-	IOMMU_DOMAIN_LOCK(domain);
-	LIST_INSERT_HEAD(&domain->device_list, device, next);
-	IOMMU_DOMAIN_UNLOCK(domain);
+	iodom = (struct iommu_domain *)domain;
+
+	IOMMU_DOMAIN_LOCK(iodom);
+	LIST_INSERT_HEAD(&domain->ctx_list, ctx, next);
+	IOMMU_DOMAIN_UNLOCK(iodom);
 
 	return (error);
 }
 
 
-struct iommu_device *
-iommu_get_device(struct iommu_unit *iommu, device_t requester,
+struct iommu_ctx *
+iommu_get_ctx(struct iommu_unit *iommu, device_t requester,
     uint16_t rid, bool disabled, bool rmrr)
 {
-	struct iommu_device *device;
-	struct iommu_domain *domain;
+	struct iommu1_ctx *ctx;
+	struct iommu1_domain *domain;
 	struct bus_dma_tag_iommu *tag;
 	int error;
 
-	device = iommu_device_lookup(requester);
-	if (device)
-		return (device);
+	ctx = iommu_ctx_lookup(requester);
+	if (ctx)
+		return (&ctx->ctx);
 
-	device = iommu_device_alloc(requester);
-	if (device == NULL)
+	ctx = iommu_ctx_alloc(requester);
+	if (ctx == NULL)
 		return (NULL);
 
 	if (disabled)
-		device->bypass = true;
+		ctx->bypass = true;
 
-	/* In our current configuration we have a domain per each device. */
-	domain = iommu_domain_alloc(iommu);
+	/* In our current configuration we have a domain per each ctx. */
+	domain = iommu_domain_alloc((struct iommu1_unit *)iommu);
 	if (domain == NULL)
 		return (NULL);
 
-	tag = &device->device_tag;
+	tag = ctx->ctx.tag;
 	tag->owner = requester;
-	tag->device = device;
+	tag->ctx = (struct iommu_ctx *)ctx;
 
 	iommu_tag_init(tag);
 
-	device->domain = domain;
+	ctx->domain = domain;
 
-	error = iommu_device_attach(domain, device);
+	error = iommu_ctx_attach(domain, ctx);
 	if (error) {
 		iommu_domain_free(domain);
 		return (NULL);
@@ -289,59 +294,56 @@ iommu_get_device(struct iommu_unit *iommu, device_t requester,
 	/* Map the GICv3 ITS page so the device could send MSI interrupts. */
 	iommu_map_page(domain, GICV3_ITS_PAGE, GICV3_ITS_PAGE, VM_PROT_WRITE);
 
-	return (device);
+	return (&ctx->ctx);
 }
 
-int
-iommu_free_device_locked(struct iommu_unit *iommu, struct iommu_device *device)
+void
+iommu_free_ctx_locked(struct iommu_unit *unit, struct iommu_ctx *ctx)
 {
-	struct iommu_domain *domain;
+	struct iommu1_domain *domain;
+	struct iommu1_unit *iommu;
 	int error;
 
-	IOMMU_ASSERT_LOCKED(iommu);
+	IOMMU_ASSERT_LOCKED(unit);
 
-	domain = device->domain;
+	domain = (struct iommu1_domain *)ctx->domain;
+	iommu = (struct iommu1_unit *)unit;
 
-	error = IOMMU_DEVICE_DETACH(iommu->dev, device);
+	error = IOMMU_CTX_DETACH(iommu->dev, (struct iommu1_ctx *)ctx);
 	if (error) {
 		device_printf(iommu->dev, "Failed to remove device\n");
-		return (error);
+		return;
 	}
 
-	LIST_REMOVE(device, next);
+	LIST_REMOVE((struct iommu1_ctx *)ctx, next);
 
-	IOMMU_UNLOCK(iommu);
+	IOMMU_UNLOCK(unit);
 
-	/* Since we have a domain per each device, remove the domain too. */
+	/* Since we have a domain per each ctx, remove the domain too. */
 	iommu_unmap_page(domain, GICV3_ITS_PAGE);
 	error = iommu_domain_free(domain);
 	if (error)
 		device_printf(iommu->dev, "Could not free a domain\n");
-
-	return (0);
 }
 
-int
-iommu_free_device(struct iommu_device *device)
+void
+iommu_free_ctx(struct iommu_ctx *ctx)
 {
 	struct iommu_unit *iommu;
 	struct iommu_domain *domain;
-	int error;
 
-	domain = device->domain;
+	domain = ctx->domain;
 	iommu = domain->iommu;
 
 	IOMMU_LOCK(iommu);
-	error = iommu_free_device_locked(iommu, device);
-
-	return (error);
+	iommu_free_ctx_locked(iommu, ctx);
 }
 
 int
-iommu_map_page(struct iommu_domain *domain,
+iommu_map_page(struct iommu1_domain *domain,
     vm_offset_t va, vm_paddr_t pa, vm_prot_t prot)
 {
-	struct iommu_unit *iommu;
+	struct iommu1_unit *iommu;
 	int error;
 
 	iommu = domain->iommu;
@@ -354,9 +356,9 @@ iommu_map_page(struct iommu_domain *domain,
 }
 
 int
-iommu_unmap_page(struct iommu_domain *domain, vm_offset_t va)
+iommu_unmap_page(struct iommu1_domain *domain, vm_offset_t va)
 {
-	struct iommu_unit *iommu;
+	struct iommu1_unit *iommu;
 	int error;
 
 	iommu = domain->iommu;
@@ -368,7 +370,7 @@ iommu_unmap_page(struct iommu_domain *domain, vm_offset_t va)
 	return (0);
 }
 
-static struct iommu_map_entry *
+struct iommu_map_entry *
 iommu_map_alloc_entry(struct iommu_domain *domain, u_int flags)
 {
 	struct iommu_map_entry *res;
@@ -385,8 +387,8 @@ iommu_map_alloc_entry(struct iommu_domain *domain, u_int flags)
 	return (res);
 }
 
-static void
-iommu_map_free_entry(struct iommu_domain *domain, struct iommu_map_entry *entry)
+void iommu_map_free_entry(struct iommu_domain *domain,
+    struct iommu_map_entry *entry)
 {
 
 	KASSERT(domain == entry->domain,
@@ -397,29 +399,29 @@ iommu_map_free_entry(struct iommu_domain *domain, struct iommu_map_entry *entry)
 }
 
 int
-iommu_map(struct iommu_domain *domain,
-    const struct bus_dma_tag_common *common,
-    bus_size_t size, int offset,
-    int eflags, int iommu_flags,
-    vm_page_t *ma, struct iommu_map_entry **res)
+iommu_map(struct iommu_domain *iodom,
+    const struct bus_dma_tag_common *common, iommu_gaddr_t size, int offset,
+    u_int eflags, u_int flags, vm_page_t *ma, struct iommu_map_entry **res)
 {
 	struct iommu_map_entry *entry;
-	struct iommu_unit *iommu;
+	struct iommu1_unit *iommu;
+	struct iommu1_domain *domain;
 	vm_prot_t prot;
 	vm_offset_t va;
 	vm_paddr_t pa;
 	int error;
 
-	iommu = domain->iommu;
+	domain = (struct iommu1_domain *)iodom;
+	iommu = (struct iommu1_unit *)iodom->iommu;
 
-	entry = iommu_map_alloc_entry(domain, 0);
+	entry = iommu_map_alloc_entry(iodom, 0);
 	if (entry == NULL)
 		return (ENOMEM);
 
 	error = vmem_alloc(domain->vmem, size,
 	    M_FIRSTFIT | M_NOWAIT, &va);
 	if (error) {
-		iommu_map_free_entry(domain, entry);
+		iommu_map_free_entry(iodom, entry);
 		return (error);
 	}
 
@@ -427,7 +429,6 @@ iommu_map(struct iommu_domain *domain,
 
 	entry->start = va;
 	entry->end = va + size;
-	entry->size = size;
 
 	prot = 0;
 	if (eflags & IOMMU_MAP_ENTRY_READ)
@@ -437,7 +438,7 @@ iommu_map(struct iommu_domain *domain,
 
 	error = IOMMU_MAP(iommu->dev, domain, va, pa, size, prot);
 	if (error) {
-		iommu_map_free_entry(domain, entry);
+		iommu_map_free_entry(iodom, entry);
 		return (error);
 	}
 
@@ -446,30 +447,32 @@ iommu_map(struct iommu_domain *domain,
 	return (0);
 }
 
-int
-iommu_unmap(struct iommu_domain *domain,
+void
+iommu_domain_unload(struct iommu_domain *iodom,
     struct iommu_map_entries_tailq *entries, bool free)
 {
-	struct iommu_unit *iommu;
+	struct iommu1_unit *iommu;
+	struct iommu1_domain *domain;
 	struct iommu_map_entry *entry, *entry1;
+	size_t size;
 	int error;
 
-	iommu = domain->iommu;
+	iommu = (struct iommu1_unit *)iodom->iommu;
+	domain = (struct iommu1_domain *)iodom;
 
 	TAILQ_FOREACH_SAFE(entry, entries, dmamap_link, entry1) {
 		TAILQ_REMOVE(entries, entry, dmamap_link);
+		size = entry->end - entry->start;
 		error = IOMMU_UNMAP(iommu->dev, domain,
-		    entry->start, entry->size);
+		    entry->start, size);
 		if (error == 0)
-			vmem_free(domain->vmem, entry->start, entry->size);
-		iommu_map_free_entry(domain, entry);
+			vmem_free(domain->vmem, entry->start, size);
+		iommu_map_free_entry(iodom, entry);
 	};
-
-	return (0);
 }
 
 int
-iommu_register(device_t dev, struct iommu_unit *iommu, intptr_t xref)
+iommu_register(device_t dev, struct iommu1_unit *iommu, intptr_t xref)
 {
 
 	iommu->dev = dev;
@@ -482,7 +485,7 @@ iommu_register(device_t dev, struct iommu_unit *iommu, intptr_t xref)
 	LIST_INSERT_HEAD(&iommu_list, iommu, next);
 	IOMMU_LIST_UNLOCK();
 
-	iommu_init_busdma(iommu);
+	iommu_init_busdma((struct iommu_unit *)iommu);
 
 	return (0);
 }
@@ -490,7 +493,7 @@ iommu_register(device_t dev, struct iommu_unit *iommu, intptr_t xref)
 int
 iommu_unregister(device_t dev)
 {
-	struct iommu_unit *iommu;
+	struct iommu1_unit *iommu;
 	bool found;
 
 	found = false;
@@ -521,10 +524,10 @@ iommu_unregister(device_t dev)
 	return (0);
 }
 
-static struct iommu_unit *
+static struct iommu1_unit *
 iommu_lookup(intptr_t xref)
 {
-	struct iommu_unit *iommu;
+	struct iommu1_unit *iommu;
 
 	LIST_FOREACH(iommu, &iommu_list, next) {
 		if (iommu->xref == xref)
@@ -537,7 +540,7 @@ iommu_lookup(intptr_t xref)
 struct iommu_unit *
 iommu_find(device_t dev, bool verbose)
 {
-	struct iommu_unit *iommu;
+	struct iommu1_unit *iommu;
 	u_int xref, sid;
 	uint16_t rid;
 	int error;
@@ -569,7 +572,7 @@ iommu_find(device_t dev, bool verbose)
 		return (NULL);
 	}
 
-	return (iommu);
+	return ((struct iommu_unit *)iommu);
 }
 
 static void

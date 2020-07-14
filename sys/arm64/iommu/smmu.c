@@ -1590,7 +1590,7 @@ smmu_read_ivar(device_t dev, device_t child, int which, uintptr_t *result)
 }
 
 static int
-smmu_unmap(device_t dev, struct iommu_domain *domain,
+smmu_unmap(device_t dev, struct iommu1_domain *domain,
     vm_offset_t va, bus_size_t size)
 {
 	struct smmu_domain *smmu_domain;
@@ -1620,7 +1620,7 @@ smmu_unmap(device_t dev, struct iommu_domain *domain,
 }
 
 static int
-smmu_map(device_t dev, struct iommu_domain *domain,
+smmu_map(device_t dev, struct iommu1_domain *domain,
     vm_offset_t va, vm_paddr_t pa, vm_size_t size,
     vm_prot_t prot)
 {
@@ -1645,7 +1645,7 @@ smmu_map(device_t dev, struct iommu_domain *domain,
 	return (0);
 }
 
-static struct iommu_domain *
+static struct iommu1_domain *
 smmu_domain_alloc(device_t dev)
 {
 	struct smmu_domain *domain;
@@ -1686,7 +1686,7 @@ smmu_domain_alloc(device_t dev)
 }
 
 static int
-smmu_domain_free(device_t dev, struct iommu_domain *domain)
+smmu_domain_free(device_t dev, struct iommu1_domain *domain)
 {
 	struct smmu_domain *smmu_domain;
 	struct smmu_softc *sc;
@@ -1715,8 +1715,8 @@ smmu_domain_free(device_t dev, struct iommu_domain *domain)
 }
 
 static int
-smmu_device_attach(device_t dev, struct iommu_domain *domain,
-    struct iommu_device *device)
+smmu_device_attach(device_t dev, struct iommu1_domain *domain,
+    struct iommu1_ctx *device)
 {
 	struct smmu_domain *smmu_domain;
 	struct smmu_master *master;
@@ -1765,11 +1765,11 @@ smmu_device_attach(device_t dev, struct iommu_domain *domain,
 }
 
 static int
-smmu_device_detach(device_t dev, struct iommu_device *device)
+smmu_device_detach(device_t dev, struct iommu1_ctx *device)
 {
 	struct smmu_domain *smmu_domain;
 	struct smmu_master *master, *master1;
-	struct iommu_domain *domain;
+	struct iommu1_domain *domain;
 	struct smmu_softc *sc;
 	bool found;
 
@@ -1808,8 +1808,8 @@ static device_method_t smmu_methods[] = {
 	DEVMETHOD(iommu_unmap,		smmu_unmap),
 	DEVMETHOD(iommu_domain_alloc,	smmu_domain_alloc),
 	DEVMETHOD(iommu_domain_free,	smmu_domain_free),
-	DEVMETHOD(iommu_device_attach,	smmu_device_attach),
-	DEVMETHOD(iommu_device_detach,	smmu_device_detach),
+	DEVMETHOD(iommu_ctx_attach,	smmu_device_attach),
+	DEVMETHOD(iommu_ctx_detach,	smmu_device_detach),
 
 	/* Bus interface */
 	DEVMETHOD(bus_read_ivar,	smmu_read_ivar),

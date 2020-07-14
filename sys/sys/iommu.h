@@ -34,7 +34,9 @@
 #ifndef _SYS_IOMMU_H_
 #define _SYS_IOMMU_H_
 
+#include <sys/mutex.h>
 #include <sys/queue.h>
+#include <sys/taskqueue.h>
 #include <sys/tree.h>
 #include <sys/types.h>
 
@@ -104,6 +106,7 @@ struct iommu_domain {
 	struct task unload_task;	/* (c) */
 	struct iommu_map_entries_tailq unload_entries; /* (d) Entries to
 							 unload */
+	u_int entries_cnt;		/* (d) */
 };
 
 struct iommu_ctx {
@@ -129,6 +132,16 @@ struct iommu_ctx {
 #define	IOMMU_DOMAIN_UNLOCK(dom)	mtx_unlock(&(dom)->lock)
 #define	IOMMU_DOMAIN_ASSERT_LOCKED(dom)	mtx_assert(&(dom)->lock, MA_OWNED)
 
+static inline bool
+iommu_test_boundary(iommu_gaddr_t start, iommu_gaddr_t size,
+    iommu_gaddr_t boundary)
+{
+
+	if (boundary == 0)
+		return (true);
+	return (start + size <= ((start + boundary) & ~(boundary - 1)));
+}
+
 void iommu_free_ctx(struct iommu_ctx *ctx);
 void iommu_free_ctx_locked(struct iommu_unit *iommu, struct iommu_ctx *ctx);
 struct iommu_ctx *iommu_get_ctx(struct iommu_unit *, device_t dev,
@@ -149,6 +162,7 @@ void iommu_map_free_entry(struct iommu_domain *, struct iommu_map_entry *);
 int iommu_map(struct iommu_domain *iodom,
     const struct bus_dma_tag_common *common, iommu_gaddr_t size, int offset,
     u_int eflags, u_int flags, vm_page_t *ma, struct iommu_map_entry **res);
+
 int iommu_map_region(struct iommu_domain *domain,
     struct iommu_map_entry *entry, u_int eflags, u_int flags, vm_page_t *ma);
 
