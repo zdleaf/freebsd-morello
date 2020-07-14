@@ -70,7 +70,7 @@ __FBSDID("$FreeBSD$");
 
 /*
  * busdma_dmar.c, the implementation of the busdma(9) interface using
- * DMAR units from Intel VT-d.
+ * IOMMU units.
  */
 
 static bool
@@ -112,11 +112,11 @@ iommu_bus_dma_is_dev_disabled(int domain, int bus, int slot, int func)
 
 /*
  * Given original device, find the requester ID that will be seen by
- * the DMAR unit and used for page table lookup.  PCI bridges may take
+ * the IOMMU unit and used for page table lookup.  PCI bridges may take
  * ownership of transactions from downstream devices, so it may not be
  * the same as the BSF of the target device.  In those cases, all
  * devices downstream of the bridge must share a single mapping
- * domain, and must collectively be assigned to use either DMAR or
+ * domain, and must collectively be assigned to use either IOMMU or
  * bounce mapping.
  */
 device_t
@@ -135,7 +135,7 @@ iommu_get_requester(device_t dev, uint16_t *rid)
 
 	/*
 	 * Walk the bridge hierarchy from the target device to the
-	 * host port to find the translating bridge nearest the DMAR
+	 * host port to find the translating bridge nearest the IOMMU
 	 * unit.
 	 */
 	for (;;) {
@@ -173,7 +173,7 @@ iommu_get_requester(device_t dev, uint16_t *rid)
 		} else {
 			/*
 			 * Device is not PCIe, it cannot be seen as a
-			 * requester by DMAR unit.  Check whether the
+			 * requester by IOMMU unit.  Check whether the
 			 * bridge is PCIe.
 			 */
 			bridge_is_pcie = pci_find_cap(pcib, PCIY_EXPRESS,
@@ -243,8 +243,8 @@ iommu_instantiate_ctx(struct iommu_unit *unit, device_t dev, bool rmrr)
 
 	/*
 	 * If the user requested the IOMMU disabled for the device, we
-	 * cannot disable the DMAR, due to possibility of other
-	 * devices on the same DMAR still requiring translation.
+	 * cannot disable the IOMMU unit, due to possibility of other
+	 * devices on the same IOMMU unit still requiring translation.
 	 * Instead provide the identity mapping for the device
 	 * context.
 	 */
@@ -279,7 +279,7 @@ acpi_iommu_get_dma_tag(device_t dev, device_t child)
 	bus_dma_tag_t res;
 
 	unit = iommu_find(child, bootverbose);
-	/* Not in scope of any DMAR ? */
+	/* Not in scope of any IOMMU ? */
 	if (unit == NULL)
 		return (NULL);
 	if (!unit->dma_enabled)
@@ -536,7 +536,7 @@ iommu_bus_dmamap_load_something1(struct bus_dma_tag_iommu *tag,
 	bus_size_t buflen1;
 	int error, idx, gas_flags, seg;
 
-	KASSERT(offset < DMAR_PAGE_SIZE, ("offset %d", offset));
+	KASSERT(offset < IOMMU_PAGE_SIZE, ("offset %d", offset));
 	if (segs == NULL)
 		segs = tag->segments;
 	ctx = tag->ctx;
@@ -621,7 +621,7 @@ iommu_bus_dmamap_load_something1(struct bus_dma_tag_iommu *tag,
 
 		idx += OFF_TO_IDX(trunc_page(offset + buflen1));
 		offset += buflen1;
-		offset &= DMAR_PAGE_MASK;
+		offset &= IOMMU_PAGE_MASK;
 		buflen -= buflen1;
 	}
 	if (error == 0)
@@ -841,7 +841,7 @@ iommu_bus_dmamap_complete(bus_dma_tag_t dmat, bus_dmamap_t map1,
 }
 
 /*
- * The limitations of busdma KPI forces the dmar to perform the actual
+ * The limitations of busdma KPI forces the iommu to perform the actual
  * unload, consisting of the unmapping of the map entries page tables,
  * from the delayed context on i386, since page table page mapping
  * might require a sleep to be successfull.  The unfortunate
