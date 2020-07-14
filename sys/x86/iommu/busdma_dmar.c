@@ -70,7 +70,7 @@ __FBSDID("$FreeBSD$");
 
 /*
  * busdma_dmar.c, the implementation of the busdma(9) interface using
- * IOMMU units.
+ * DMAR units from Intel VT-d.
  */
 
 static bool
