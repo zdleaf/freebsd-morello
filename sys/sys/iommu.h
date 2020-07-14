@@ -102,6 +102,7 @@ struct iommu_domain {
 	struct iommu_unit *iommu;	/* (c) */
 	struct mtx lock;		/* (c) */
 	struct task unload_task;	/* (c) */
+	u_int entries_cnt;		/* (d) */
 	struct iommu_map_entries_tailq unload_entries; /* (d) Entries to
 							 unload */
 };
@@ -128,6 +129,16 @@ struct iommu_ctx {
 #define	IOMMU_DOMAIN_LOCK(dom)		mtx_lock(&(dom)->lock)
 #define	IOMMU_DOMAIN_UNLOCK(dom)	mtx_unlock(&(dom)->lock)
 #define	IOMMU_DOMAIN_ASSERT_LOCKED(dom)	mtx_assert(&(dom)->lock, MA_OWNED)
+
+static inline bool
+iommu_test_boundary(iommu_gaddr_t start, iommu_gaddr_t size,
+    iommu_gaddr_t boundary)
+{
+
+	if (boundary == 0)
+		return (true);
+	return (start + size <= ((start + boundary) & ~(boundary - 1)));
+}
 
 void iommu_free_ctx(struct iommu_ctx *ctx);
 void iommu_free_ctx_locked(struct iommu_unit *iommu, struct iommu_ctx *ctx);
