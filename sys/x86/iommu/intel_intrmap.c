@@ -60,16 +60,16 @@ __FBSDID("$FreeBSD$");
 #include <dev/pci/pcivar.h>
 #include <x86/iommu/iommu_intrmap.h>
 
-static struct iommu_unit *dmar_ir_find(device_t src, uint16_t *rid,
+static struct dmar_unit *dmar_ir_find(device_t src, uint16_t *rid,
     int *is_dmar);
-static void dmar_ir_program_irte(struct iommu_unit *unit, u_int idx,
+static void dmar_ir_program_irte(struct dmar_unit *unit, u_int idx,
     uint64_t low, uint16_t rid);
-static int dmar_ir_free_irte(struct iommu_unit *unit, u_int cookie);
+static int dmar_ir_free_irte(struct dmar_unit *unit, u_int cookie);
 
 int
 iommu_alloc_msi_intr(device_t src, u_int *cookies, u_int count)
 {
-	struct iommu_unit *unit;
+	struct dmar_unit *unit;
 	vmem_addr_t vmem_res;
 	u_int idx, i;
 	int error;
@@ -98,7 +98,7 @@ int
 iommu_map_msi_intr(device_t src, u_int cpu, u_int vector, u_int cookie,
     uint64_t *addr, uint32_t *data)
 {
-	struct iommu_unit *unit;
+	struct dmar_unit *unit;
 	uint64_t low;
 	uint16_t rid;
 	int is_dmar;
@@ -143,7 +143,7 @@ iommu_map_msi_intr(device_t src, u_int cpu, u_int vector, u_int cookie,
 int
 iommu_unmap_msi_intr(device_t src, u_int cookie)
 {
-	struct iommu_unit *unit;
+	struct dmar_unit *unit;
 
 	if (cookie == -1)
 		return (0);
@@ -155,7 +155,7 @@ int
 iommu_map_ioapic_intr(u_int ioapic_id, u_int cpu, u_int vector, bool edge,
     bool activehi, int irq, u_int *cookie, uint32_t *hi, uint32_t *lo)
 {
-	struct iommu_unit *unit;
+	struct dmar_unit *unit;
 	vmem_addr_t vmem_res;
 	uint64_t low, iorte;
 	u_int idx;
@@ -217,7 +217,7 @@ iommu_map_ioapic_intr(u_int ioapic_id, u_int cpu, u_int vector, bool edge,
 int
 iommu_unmap_ioapic_intr(u_int ioapic_id, u_int *cookie)
 {
-	struct iommu_unit *unit;
+	struct dmar_unit *unit;
 	u_int idx;
 
 	idx = *cookie;
@@ -230,11 +230,11 @@ iommu_unmap_ioapic_intr(u_int ioapic_id, u_int *cookie)
 	return (dmar_ir_free_irte(unit, idx));
 }
 
-static struct iommu_unit *
+static struct dmar_unit *
 dmar_ir_find(device_t src, uint16_t *rid, int *is_dmar)
 {
 	devclass_t src_class;
-	struct iommu_unit *unit;
+	struct dmar_unit *unit;
 
 	/*
 	 * We need to determine if the interrupt source generates FSB
@@ -261,7 +261,7 @@ dmar_ir_find(device_t src, uint16_t *rid, int *is_dmar)
 }
 
 static void
-dmar_ir_program_irte(struct iommu_unit *unit, u_int idx, uint64_t low,
+dmar_ir_program_irte(struct dmar_unit *unit, u_int idx, uint64_t low,
     uint16_t rid)
 {
 	dmar_irte_t *irte;
@@ -277,7 +277,7 @@ dmar_ir_program_irte(struct iommu_unit *unit, u_int idx, uint64_t low,
 		    "programming irte[%d] rid %#x high %#jx low %#jx\n",
 		    idx, rid, (uintmax_t)high, (uintmax_t)low);
 	}
-	IOMMU_LOCK(unit);
+	DMAR_LOCK(unit);
 	if ((irte->irte1 & DMAR_IRTE1_P) != 0) {
 		/*
 		 * The rte is already valid.  Assume that the request
@@ -294,12 +294,12 @@ dmar_ir_program_irte(struct iommu_unit *unit, u_int idx, uint64_t low,
 		dmar_pte_store(&irte->irte1, low);
 	}
 	dmar_qi_invalidate_iec(unit, idx, 1);
-	IOMMU_UNLOCK(unit);
+	DMAR_UNLOCK(unit);
 
 }
 
 static int
-dmar_ir_free_irte(struct iommu_unit *unit, u_int cookie)
+dmar_ir_free_irte(struct dmar_unit *unit, u_int cookie)
 {
 	dmar_irte_t *irte;
 
@@ -310,9 +310,9 @@ dmar_ir_free_irte(struct iommu_unit *unit, u_int cookie)
 	irte = &(unit->irt[cookie]);
 	dmar_pte_clear(&irte->irte1);
 	dmar_pte_clear(&irte->irte2);
-	IOMMU_LOCK(unit);
+	DMAR_LOCK(unit);
 	dmar_qi_invalidate_iec(unit, cookie, 1);
-	IOMMU_UNLOCK(unit);
+	DMAR_UNLOCK(unit);
 	vmem_free(unit->irtids, cookie, 1);
 	return (0);
 }
@@ -325,7 +325,7 @@ clp2(u_int v)
 }
 
 int
-dmar_init_irt(struct iommu_unit *unit)
+dmar_init_irt(struct dmar_unit *unit)
 {
 
 	if ((unit->hw_ecap & DMAR_ECAP_IR) == 0)
@@ -351,10 +351,10 @@ dmar_init_irt(struct iommu_unit *unit)
 	unit->irt_phys = pmap_kextract((vm_offset_t)unit->irt);
 	unit->irtids = vmem_create("dmarirt", 0, unit->irte_cnt, 1, 0,
 	    M_FIRSTFIT | M_NOWAIT);
-	IOMMU_LOCK(unit);
+	DMAR_LOCK(unit);
 	dmar_load_irt_ptr(unit);
 	dmar_qi_invalidate_iec_glob(unit);
-	IOMMU_UNLOCK(unit);
+	DMAR_UNLOCK(unit);
 
 	/*
 	 * Initialize mappings for already configured interrupt pins.
@@ -363,14 +363,14 @@ dmar_init_irt(struct iommu_unit *unit)
 	 */
 	intr_reprogram();
 
-	IOMMU_LOCK(unit);
+	DMAR_LOCK(unit);
 	dmar_enable_ir(unit);
-	IOMMU_UNLOCK(unit);
+	DMAR_UNLOCK(unit);
 	return (0);
 }
 
 void
-dmar_fini_irt(struct iommu_unit *unit)
+dmar_fini_irt(struct dmar_unit *unit)
 {
 
 	unit->ir_enabled = 0;
