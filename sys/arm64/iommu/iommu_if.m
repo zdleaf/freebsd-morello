@@ -86,7 +86,7 @@ METHOD int domain_free {
 METHOD int ctx_attach {
 	device_t		dev;
 	struct smmu_domain	*domain;
-	struct smmu_ctx	*device;
+	struct smmu_ctx		*ctx;
 };
 
 #
@@ -94,5 +94,5 @@ METHOD int ctx_attach {
 #
 METHOD int ctx_detach {
 	device_t		dev;
-	struct smmu_ctx	*device;
+	struct smmu_ctx		*ctx;
 };

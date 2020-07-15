@@ -1713,7 +1713,7 @@ smmu_domain_free(device_t dev, struct smmu_domain *domain)
 
 static int
 smmu_device_attach(device_t dev, struct smmu_domain *domain,
-    struct smmu_ctx *device)
+    struct smmu_ctx *ctx)
 {
 	struct smmu_softc *sc;
 	uint16_t rid;
@@ -1723,13 +1723,13 @@ smmu_device_attach(device_t dev, struct smmu_domain *domain,
 
 	sc = device_get_softc(dev);
 
-	seg = pci_get_domain(device->dev);
-	rid = pci_get_rid(device->dev);
+	seg = pci_get_domain(ctx->dev);
+	rid = pci_get_rid(ctx->dev);
 	err = acpi_iort_map_pci_smmuv3(seg, rid, &xref, &sid);
 	if (err)
 		return (ENOENT);
 
-	device->sid = sid;
+	ctx->sid = sid;
 
 	if (sc->features & SMMU_FEATURE_2_LVL_STREAM_TABLE) {
 		err = smmu_init_l1_entry(sc, sid);
@@ -1744,19 +1744,19 @@ smmu_device_attach(device_t dev, struct smmu_domain *domain,
 	 * 0x600 sata
 	 */
 
-	smmu_init_ste(sc, domain->cd, device->sid, device->bypass);
+	smmu_init_ste(sc, domain->cd, ctx->sid, ctx->bypass);
 
 	return (0);
 }
 
 static int
-smmu_device_detach(device_t dev, struct smmu_ctx *device)
+smmu_device_detach(device_t dev, struct smmu_ctx *ctx)
 {
 	struct smmu_softc *sc;
 
 	sc = device_get_softc(dev);
 
-	smmu_deinit_l1_entry(sc, device->sid);
+	smmu_deinit_l1_entry(sc, ctx->sid);
 
 	return (0);
 }
