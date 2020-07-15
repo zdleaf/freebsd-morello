@@ -80,19 +80,19 @@
 #define	IOMMU_PGF_NOALLOC	0x0008
 #define	IOMMU_PGF_OBJL		0x0010
 
-struct iommu1_unit {
+struct smmu_unit {
 	struct iommu_unit		unit;
-	LIST_HEAD(, iommu1_domain)	domain_list;
-	LIST_ENTRY(iommu1_unit)		next;
+	LIST_HEAD(, smmu_domain)	domain_list;
+	LIST_ENTRY(smmu_unit)		next;
 	device_t			dev;
 	intptr_t			xref;
 };
 
-struct iommu1_domain {
+struct smmu_domain {
 	struct iommu_domain		domain;
-	struct iommu1_unit		*iommu;
-	LIST_HEAD(, iommu1_ctx)		ctx_list;
-	LIST_ENTRY(iommu1_domain)	next;
+	struct smmu_unit		*iommu;
+	LIST_HEAD(, smmu_ctx)		ctx_list;
+	LIST_ENTRY(smmu_domain)	next;
 	vmem_t				*vmem;
 	u_int entries_cnt;
 	struct smmu_cd			*cd;
@@ -100,10 +100,10 @@ struct iommu1_domain {
 	uint16_t			asid;
 };
 
-struct iommu1_ctx {
+struct smmu_ctx {
 	struct iommu_ctx		ctx;
-	struct iommu1_domain		*domain;
-	LIST_ENTRY(iommu1_ctx)		next;
+	struct smmu_domain		*domain;
+	LIST_ENTRY(smmu_ctx)		next;
 	device_t dev;
 	uint16_t rid;
 	bool bypass;
@@ -111,9 +111,9 @@ struct iommu1_ctx {
 };
 
 int iommu_unregister(device_t dev);
-int iommu_register(device_t dev, struct iommu1_unit *unit, intptr_t xref);
-int iommu_map_page(struct iommu1_domain *domain, vm_offset_t va, vm_paddr_t pa,
+int iommu_register(device_t dev, struct smmu_unit *unit, intptr_t xref);
+int iommu_map_page(struct smmu_domain *domain, vm_offset_t va, vm_paddr_t pa,
     vm_prot_t prot);
-int iommu_unmap_page(struct iommu1_domain *domain, vm_offset_t va);
+int iommu_unmap_page(struct smmu_domain *domain, vm_offset_t va);
 
 #endif /* _DEV_IOMMU_IOMMU_H_ */

@@ -145,7 +145,7 @@ struct smmu_softc {
 	bitstr_t			*asid_set;
 	int				asid_set_size;
 	struct mtx			asid_set_mutex;
-	struct iommu1_unit		unit;
+	struct smmu_unit		unit;
 };
 
 MALLOC_DECLARE(M_SMMU);

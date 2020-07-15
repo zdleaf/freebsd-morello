@@ -802,7 +802,7 @@ smmu_init_ste(struct smmu_softc *sc, struct smmu_cd *cd, int sid, bool bypass)
 }
 
 static int
-smmu_init_cd(struct smmu_softc *sc, struct iommu1_domain *domain)
+smmu_init_cd(struct smmu_softc *sc, struct smmu_domain *domain)
 {
 	vm_paddr_t paddr;
 	uint64_t *ptr;
@@ -1591,23 +1591,23 @@ smmu_read_ivar(device_t dev, device_t child, int which, uintptr_t *result)
 }
 
 static int
-smmu_unmap(device_t dev, struct iommu1_domain *domain,
+smmu_unmap(device_t dev, struct smmu_domain *domain,
     vm_offset_t va, bus_size_t size)
 {
-	struct iommu1_domain *iommu1_domain;
+	struct smmu_domain *smmu_domain;
 	struct smmu_softc *sc;
 	int err;
 	int i;
 
 	sc = device_get_softc(dev);
-	iommu1_domain = (struct iommu1_domain *)domain;
+	smmu_domain = (struct smmu_domain *)domain;
 
 	err = 0;
 
 	for (i = 0; i < size; i += PAGE_SIZE) {
-		if (pmap_sremove(&iommu1_domain->p, va)) {
+		if (pmap_sremove(&smmu_domain->p, va)) {
 			/* pmap entry removed, invalidate TLB. */
-			smmu_tlbi_va(sc, va, iommu1_domain->asid);
+			smmu_tlbi_va(sc, va, smmu_domain->asid);
 		} else {
 			err = ENOENT;
 			break;
@@ -1621,22 +1621,22 @@ smmu_unmap(device_t dev, struct iommu1_domain *domain,
 }
 
 static int
-smmu_map(device_t dev, struct iommu1_domain *domain,
+smmu_map(device_t dev, struct smmu_domain *domain,
     vm_offset_t va, vm_paddr_t pa, vm_size_t size,
     vm_prot_t prot)
 {
-	struct iommu1_domain *iommu1_domain;
+	struct smmu_domain *smmu_domain;
 	struct smmu_softc *sc;
 	int error;
 
 	sc = device_get_softc(dev);
-	iommu1_domain = (struct iommu1_domain *)domain;
+	smmu_domain = (struct smmu_domain *)domain;
 
 	for (; size > 0; size -= PAGE_SIZE) {
-		error = pmap_senter(&iommu1_domain->p, va, pa, prot, 0);
+		error = pmap_senter(&smmu_domain->p, va, pa, prot, 0);
 		if (error)
 			return (error);
-		smmu_tlbi_va(sc, va, iommu1_domain->asid);
+		smmu_tlbi_va(sc, va, smmu_domain->asid);
 		pa += PAGE_SIZE;
 		va += PAGE_SIZE;
 	}
@@ -1646,10 +1646,10 @@ smmu_map(device_t dev, struct iommu1_domain *domain,
 	return (0);
 }
 
-static struct iommu1_domain *
+static struct smmu_domain *
 smmu_domain_alloc(device_t dev)
 {
-	struct iommu1_domain *domain;
+	struct smmu_domain *domain;
 	struct smmu_softc *sc;
 	int error;
 	int new_asid;
@@ -1684,7 +1684,7 @@ smmu_domain_alloc(device_t dev)
 }
 
 static int
-smmu_domain_free(device_t dev, struct iommu1_domain *domain)
+smmu_domain_free(device_t dev, struct smmu_domain *domain)
 {
 	struct smmu_softc *sc;
 	struct smmu_cd *cd;
@@ -1712,8 +1712,8 @@ smmu_domain_free(device_t dev, struct iommu1_domain *domain)
 }
 
 static int
-smmu_device_attach(device_t dev, struct iommu1_domain *domain,
-    struct iommu1_ctx *device)
+smmu_device_attach(device_t dev, struct smmu_domain *domain,
+    struct smmu_ctx *device)
 {
 	struct smmu_softc *sc;
 	uint16_t rid;
@@ -1750,7 +1750,7 @@ smmu_device_attach(device_t dev, struct iommu1_domain *domain,
 }
 
 static int
-smmu_device_detach(device_t dev, struct iommu1_ctx *device)
+smmu_device_detach(device_t dev, struct smmu_ctx *device)
 {
 	struct smmu_softc *sc;
 

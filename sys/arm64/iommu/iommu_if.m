@@ -48,7 +48,7 @@ INTERFACE iommu;
 #
 METHOD int map {
 	device_t		dev;
-	struct iommu1_domain	*domain;
+	struct smmu_domain	*domain;
 	vm_offset_t		va;
 	vm_paddr_t		pa;
 	bus_size_t		size;
@@ -60,7 +60,7 @@ METHOD int map {
 #
 METHOD int unmap {
 	device_t		dev;
-	struct iommu1_domain	*domain;
+	struct smmu_domain	*domain;
 	vm_offset_t		va;
 	bus_size_t		size;
 };
@@ -68,7 +68,7 @@ METHOD int unmap {
 #
 # Allocate an IOMMU domain.
 #
-METHOD struct iommu1_domain * domain_alloc {
+METHOD struct smmu_domain * domain_alloc {
 	device_t		dev;
 };
 
@@ -77,7 +77,7 @@ METHOD struct iommu1_domain * domain_alloc {
 #
 METHOD int domain_free {
 	device_t		dev;
-	struct iommu1_domain	*domain;
+	struct smmu_domain	*domain;
 };
 
 #
@@ -85,8 +85,8 @@ METHOD int domain_free {
 #
 METHOD int ctx_attach {
 	device_t		dev;
-	struct iommu1_domain	*domain;
-	struct iommu1_ctx	*device;
+	struct smmu_domain	*domain;
+	struct smmu_ctx	*device;
 };
 
 #
@@ -94,5 +94,5 @@ METHOD int ctx_attach {
 #
 METHOD int ctx_detach {
 	device_t		dev;
-	struct iommu1_ctx	*device;
+	struct smmu_ctx	*device;
 };
