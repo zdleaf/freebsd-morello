@@ -1668,7 +1668,6 @@ smmu_domain_alloc(device_t dev)
 	domain->asid = (uint16_t)new_asid;
 
 	mtx_init(&domain->mtx_lock, "SMMU domain", NULL, MTX_DEF);
-	LIST_INIT(&domain->master_list);
 
 	pmap_pinit(&domain->p);
 	PMAP_LOCK_INIT(&domain->p);
@@ -1719,7 +1718,6 @@ smmu_device_attach(device_t dev, struct iommu1_domain *domain,
     struct iommu1_ctx *device)
 {
 	struct smmu_domain *smmu_domain;
-	struct smmu_master *master;
 	struct smmu_softc *sc;
 	uint16_t rid;
 	u_int xref, sid;
@@ -1729,18 +1727,13 @@ smmu_device_attach(device_t dev, struct iommu1_domain *domain,
 	sc = device_get_softc(dev);
 	smmu_domain = (struct smmu_domain *)domain;
 
-	master = malloc(sizeof(*master), M_SMMU, M_WAITOK | M_ZERO);
-	master->device = device;
-
 	seg = pci_get_domain(device->dev);
 	rid = pci_get_rid(device->dev);
 	err = acpi_iort_map_pci_smmuv3(seg, rid, &xref, &sid);
-	if (err) {
-		free(master, M_SMMU);
+	if (err)
 		return (ENOENT);
-	}
 
-	master->sid = sid;
+	device->sid = sid;
 
 	if (sc->features & SMMU_FEATURE_2_LVL_STREAM_TABLE) {
 		err = smmu_init_l1_entry(sc, sid);
@@ -1755,11 +1748,7 @@ smmu_device_attach(device_t dev, struct iommu1_domain *domain,
 	 * 0x600 sata
 	 */
 
-	SMMU_DOMAIN_LOCK(smmu_domain);
-	LIST_INSERT_HEAD(&smmu_domain->master_list, master, next);
-	SMMU_DOMAIN_UNLOCK(smmu_domain);
-
-	smmu_init_ste(sc, &smmu_domain->cd, master->sid, device->bypass);
+	smmu_init_ste(sc, &smmu_domain->cd, device->sid, device->bypass);
 
 	return (0);
 }
@@ -1767,34 +1756,11 @@ smmu_device_attach(device_t dev, struct iommu1_domain *domain,
 static int
 smmu_device_detach(device_t dev, struct iommu1_ctx *device)
 {
-	struct smmu_domain *smmu_domain;
-	struct smmu_master *master, *master1;
-	struct iommu1_domain *domain;
 	struct smmu_softc *sc;
-	bool found;
 
 	sc = device_get_softc(dev);
-	domain = device->domain;
-	smmu_domain = (struct smmu_domain *)domain;
 
-	found = false;
-
-	SMMU_DOMAIN_LOCK(smmu_domain);
-	LIST_FOREACH_SAFE(master, &smmu_domain->master_list, next, master1) {
-		if (master->device == device) {
-			found = true;
-			LIST_REMOVE(master, next);
-			break;
-		}
-	}
-	SMMU_DOMAIN_UNLOCK(smmu_domain);
-
-	if (!found)
-		return (ENODEV);
-
-	smmu_deinit_l1_entry(sc, master->sid);
-
-	free(master, M_SMMU);
+	smmu_deinit_l1_entry(sc, device->sid);
 
 	return (0);
 }

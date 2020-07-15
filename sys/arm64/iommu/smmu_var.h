@@ -153,17 +153,10 @@ struct smmu_softc {
 	struct iommu1_unit		unit;
 };
 
-struct smmu_master {
-	LIST_ENTRY(smmu_master)	next;
-	struct iommu1_ctx		*device;
-	int				sid;
-};
-
 struct smmu_domain {
 	struct iommu1_domain		domain;
 	struct mtx			mtx_lock;
 	LIST_ENTRY(smmu_domain)	next;
-	LIST_HEAD(, smmu_master)	master_list;
 	struct smmu_cd			cd;
 	struct pmap			p;
 	uint16_t			asid;

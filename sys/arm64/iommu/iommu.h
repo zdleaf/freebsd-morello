@@ -104,6 +104,7 @@ struct iommu1_ctx {
 	device_t dev;
 	uint16_t rid;
 	bool bypass;
+	int sid;
 };
 
 int iommu_unregister(device_t dev);
