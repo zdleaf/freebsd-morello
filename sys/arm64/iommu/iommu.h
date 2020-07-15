@@ -90,20 +90,20 @@ struct iommu1_unit {
 
 struct iommu1_domain {
 	struct iommu_domain		domain;
+	struct iommu1_unit		*iommu;
 	LIST_HEAD(, iommu1_ctx)		ctx_list;
 	LIST_ENTRY(iommu1_domain)	next;
 	vmem_t				*vmem;
-	struct iommu1_unit		*iommu;
 	u_int entries_cnt;
 };
 
 struct iommu1_ctx {
 	struct iommu_ctx		ctx;
+	struct iommu1_domain		*domain;
 	LIST_ENTRY(iommu1_ctx)		next;
 	device_t dev;
 	uint16_t rid;
 	bool bypass;
-	struct iommu1_domain		*domain;
 };
 
 int iommu_unregister(device_t dev);
