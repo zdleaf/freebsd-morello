@@ -41,11 +41,6 @@
 #define	SMMU_LOCK(_sc)		mtx_lock(&(_sc)->sc_mtx)
 #define	SMMU_UNLOCK(_sc)	mtx_unlock(&(_sc)->sc_mtx)
 
-#define	SMMU_DOMAIN_LOCK(domain)		mtx_lock(&(domain)->mtx_lock)
-#define	SMMU_DOMAIN_UNLOCK(domain)		mtx_unlock(&(domain)->mtx_lock)
-#define	SMMU_DOMAIN_ASSERT_LOCKED(domain)	\
-    mtx_assert(&(domain)->mtx_lock, MA_OWNED)
-
 DECLARE_CLASS(smmu_driver);
 
 struct smmu_queue_local_copy {
@@ -151,15 +146,6 @@ struct smmu_softc {
 	int				asid_set_size;
 	struct mtx			asid_set_mutex;
 	struct iommu1_unit		unit;
-};
-
-struct smmu_domain {
-	struct iommu1_domain		domain;
-	struct mtx			mtx_lock;
-	LIST_ENTRY(smmu_domain)	next;
-	struct smmu_cd			cd;
-	struct pmap			p;
-	uint16_t			asid;
 };
 
 MALLOC_DECLARE(M_SMMU);

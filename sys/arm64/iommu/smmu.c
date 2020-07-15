@@ -802,7 +802,7 @@ smmu_init_ste(struct smmu_softc *sc, struct smmu_cd *cd, int sid, bool bypass)
 }
 
 static int
-smmu_init_cd(struct smmu_softc *sc, struct smmu_domain *domain)
+smmu_init_cd(struct smmu_softc *sc, struct iommu1_domain *domain)
 {
 	vm_paddr_t paddr;
 	uint64_t *ptr;
@@ -814,7 +814,8 @@ smmu_init_cd(struct smmu_softc *sc, struct smmu_domain *domain)
 	size = 1 * (CD_DWORDS << 3);
 
 	p = &domain->p;
-	cd = &domain->cd;
+	cd = domain->cd = malloc(sizeof(struct smmu_cd),
+	    M_SMMU, M_WAITOK | M_ZERO);
 
 	cd->vaddr = contigmalloc(size, M_SMMU,
 	    M_WAITOK | M_ZERO,	/* flags */
@@ -1593,20 +1594,20 @@ static int
 smmu_unmap(device_t dev, struct iommu1_domain *domain,
     vm_offset_t va, bus_size_t size)
 {
-	struct smmu_domain *smmu_domain;
+	struct iommu1_domain *iommu1_domain;
 	struct smmu_softc *sc;
 	int err;
 	int i;
 
 	sc = device_get_softc(dev);
-	smmu_domain = (struct smmu_domain *)domain;
+	iommu1_domain = (struct iommu1_domain *)domain;
 
 	err = 0;
 
 	for (i = 0; i < size; i += PAGE_SIZE) {
-		if (pmap_sremove(&smmu_domain->p, va)) {
+		if (pmap_sremove(&iommu1_domain->p, va)) {
 			/* pmap entry removed, invalidate TLB. */
-			smmu_tlbi_va(sc, va, smmu_domain->asid);
+			smmu_tlbi_va(sc, va, iommu1_domain->asid);
 		} else {
 			err = ENOENT;
 			break;
@@ -1624,18 +1625,18 @@ smmu_map(device_t dev, struct iommu1_domain *domain,
     vm_offset_t va, vm_paddr_t pa, vm_size_t size,
     vm_prot_t prot)
 {
-	struct smmu_domain *smmu_domain;
+	struct iommu1_domain *iommu1_domain;
 	struct smmu_softc *sc;
 	int error;
 
 	sc = device_get_softc(dev);
-	smmu_domain = (struct smmu_domain *)domain;
+	iommu1_domain = (struct iommu1_domain *)domain;
 
 	for (; size > 0; size -= PAGE_SIZE) {
-		error = pmap_senter(&smmu_domain->p, va, pa, prot, 0);
+		error = pmap_senter(&iommu1_domain->p, va, pa, prot, 0);
 		if (error)
 			return (error);
-		smmu_tlbi_va(sc, va, smmu_domain->asid);
+		smmu_tlbi_va(sc, va, iommu1_domain->asid);
 		pa += PAGE_SIZE;
 		va += PAGE_SIZE;
 	}
@@ -1648,7 +1649,7 @@ smmu_map(device_t dev, struct iommu1_domain *domain,
 static struct iommu1_domain *
 smmu_domain_alloc(device_t dev)
 {
-	struct smmu_domain *domain;
+	struct iommu1_domain *domain;
 	struct smmu_softc *sc;
 	int error;
 	int new_asid;
@@ -1667,8 +1668,6 @@ smmu_domain_alloc(device_t dev)
 
 	domain->asid = (uint16_t)new_asid;
 
-	mtx_init(&domain->mtx_lock, "SMMU domain", NULL, MTX_DEF);
-
 	pmap_pinit(&domain->p);
 	PMAP_LOCK_INIT(&domain->p);
 
@@ -1681,34 +1680,33 @@ smmu_domain_alloc(device_t dev)
 
 	smmu_tlbi_asid(sc, domain->asid);
 
-	return (&domain->domain);
+	return (domain);
 }
 
 static int
 smmu_domain_free(device_t dev, struct iommu1_domain *domain)
 {
-	struct smmu_domain *smmu_domain;
 	struct smmu_softc *sc;
 	struct smmu_cd *cd;
 	int error;
 
 	sc = device_get_softc(dev);
 
-	smmu_domain = (struct smmu_domain *)domain;
-	cd = &smmu_domain->cd;
+	cd = domain->cd;
 
-	error = pmap_sremove_all(&smmu_domain->p);
+	error = pmap_sremove_all(&domain->p);
 	if (error != 0)
 		return (error);
 
-	pmap_release(&smmu_domain->p);
+	pmap_release(&domain->p);
 
-	smmu_tlbi_asid(sc, smmu_domain->asid);
-	smmu_asid_free(sc, smmu_domain->asid);
+	smmu_tlbi_asid(sc, domain->asid);
+	smmu_asid_free(sc, domain->asid);
 
 	contigfree(cd->vaddr, cd->size, M_SMMU);
+	free(cd, M_SMMU);
 
-	free(smmu_domain, M_SMMU);
+	free(domain, M_SMMU);
 
 	return (0);
 }
@@ -1717,7 +1715,6 @@ static int
 smmu_device_attach(device_t dev, struct iommu1_domain *domain,
     struct iommu1_ctx *device)
 {
-	struct smmu_domain *smmu_domain;
 	struct smmu_softc *sc;
 	uint16_t rid;
 	u_int xref, sid;
@@ -1725,7 +1722,6 @@ smmu_device_attach(device_t dev, struct iommu1_domain *domain,
 	int err;
 
 	sc = device_get_softc(dev);
-	smmu_domain = (struct smmu_domain *)domain;
 
 	seg = pci_get_domain(device->dev);
 	rid = pci_get_rid(device->dev);
@@ -1748,7 +1744,7 @@ smmu_device_attach(device_t dev, struct iommu1_domain *domain,
 	 * 0x600 sata
 	 */
 
-	smmu_init_ste(sc, &smmu_domain->cd, device->sid, device->bypass);
+	smmu_init_ste(sc, domain->cd, device->sid, device->bypass);
 
 	return (0);
 }

@@ -95,6 +95,9 @@ struct iommu1_domain {
 	LIST_ENTRY(iommu1_domain)	next;
 	vmem_t				*vmem;
 	u_int entries_cnt;
+	struct smmu_cd			*cd;
+	struct pmap			p;
+	uint16_t			asid;
 };
 
 struct iommu1_ctx {
