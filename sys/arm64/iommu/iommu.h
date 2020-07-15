@@ -47,6 +47,7 @@
 #include <sys/bus.h>
 #include <sys/conf.h>
 #include <sys/interrupt.h>
+#include <sys/iommu.h>
 #include <sys/kernel.h>
 #include <sys/ktr.h>
 #include <sys/lock.h>
@@ -65,8 +66,6 @@
 
 #include <machine/bus.h>
 #include <machine/bus_dma_impl.h>
-
-#include <sys/iommu.h>
 
 #define	IOMMU_PAGE_SIZE		4096
 #define	IOMMU_PAGE_MASK		(IOMMU_PAGE_SIZE - 1)

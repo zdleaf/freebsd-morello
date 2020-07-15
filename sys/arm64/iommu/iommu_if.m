@@ -36,9 +36,6 @@
 
 #include <sys/types.h>
 
-#include <machine/bus.h>
-#include <machine/bus_dma_impl.h>
-#include <sys/iommu.h>
 #include <arm64/iommu/iommu.h>
 
 INTERFACE iommu;
