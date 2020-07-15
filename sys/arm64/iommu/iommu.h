@@ -126,7 +126,6 @@ struct iommu1_unit {
 	struct iommu_unit		unit;
 	LIST_HEAD(, iommu1_domain)	domain_list;
 	LIST_ENTRY(iommu1_unit)		next;
-	struct mtx			mtx_lock;
 	device_t			dev;
 	intptr_t			xref;
 
@@ -150,7 +149,6 @@ struct iommu1_domain {
 	struct iommu_domain		domain;
 	LIST_HEAD(, iommu1_ctx)		ctx_list;
 	LIST_ENTRY(iommu1_domain)	next;
-	struct mtx			mtx_lock;
 	vmem_t				*vmem;
 	struct iommu1_unit		*iommu;
 	u_int entries_cnt;

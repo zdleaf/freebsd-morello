@@ -127,7 +127,7 @@ iommu_domain_alloc(struct iommu1_unit *iommu)
 		return (NULL);
 
 	LIST_INIT(&domain->ctx_list);
-	mtx_init(&domain->mtx_lock, "IOMMU domain", NULL, MTX_DEF);
+	mtx_init(&domain->domain.lock, "IOMMU domain", NULL, MTX_DEF);
 
 	domain->vmem = vmem_create("IOMMU vmem", 0, 0, PAGE_SIZE,
 	    PAGE_SIZE, M_FIRSTFIT | M_WAITOK);
@@ -479,7 +479,7 @@ iommu_register(device_t dev, struct iommu1_unit *iommu, intptr_t xref)
 	iommu->xref = xref;
 
 	LIST_INIT(&iommu->domain_list);
-	mtx_init(&iommu->mtx_lock, "IOMMU", NULL, MTX_DEF);
+	mtx_init(&iommu->unit.lock, "IOMMU", NULL, MTX_DEF);
 
 	IOMMU_LIST_LOCK();
 	LIST_INSERT_HEAD(&iommu_list, iommu, next);
