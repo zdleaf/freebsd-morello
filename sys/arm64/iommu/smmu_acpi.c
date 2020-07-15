@@ -51,7 +51,6 @@ __FBSDID("$FreeBSD$");
 #include <dev/acpica/acpivar.h>
 
 #include <machine/bus_dma_impl.h>
-#include <dev/iommu/busdma_iommu.h>
 #include <sys/iommu.h>
 #include <arm64/iommu/iommu.h>
 

@@ -74,7 +74,6 @@ __FBSDID("$FreeBSD$");
 #include <dev/acpica/acpi_pcibvar.h>
 #endif
 
-#include <dev/iommu/busdma_iommu.h>
 #include <x86/iommu/busdma_dmar.h>
 
 #include "iommu.h"
