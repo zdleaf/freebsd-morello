@@ -122,6 +122,8 @@ iommu_domain_alloc(struct iommu1_unit *iommu)
 	struct iommu_unit *unit;
 	struct iommu1_domain *domain;
 
+	unit = (struct iommu_unit *)iommu;
+
 	domain = IOMMU_DOMAIN_ALLOC(iommu->dev);
 	if (domain == NULL)
 		return (NULL);
@@ -134,7 +136,8 @@ iommu_domain_alloc(struct iommu1_unit *iommu)
 	if (domain->vmem == NULL)
 		return (NULL);
 
-	unit = (struct iommu_unit *)iommu;
+	domain->iommu = iommu;
+	domain->domain.iommu = unit;
 
 	IOMMU_LOCK(unit);
 	LIST_INSERT_HEAD(&iommu->domain_list, domain, next);
@@ -175,14 +178,14 @@ static struct iommu1_ctx *
 iommu_ctx_lookup(device_t dev)
 {
 	struct iommu1_domain *domain;
-	struct iommu1_ctx *device;
+	struct iommu1_ctx *ctx;
 	struct iommu1_unit *iommu;
 
 	LIST_FOREACH(iommu, &iommu_list, next) {
 		LIST_FOREACH(domain, &iommu->domain_list, next) {
-			LIST_FOREACH(device, &domain->ctx_list, next) {
-				if (device->dev == dev)
-					return (device);
+			LIST_FOREACH(ctx, &domain->ctx_list, next) {
+				if (ctx->dev == dev)
+					return (ctx);
 			}
 		}
 	}
@@ -210,13 +213,13 @@ iommu_tag_init(struct bus_dma_tag_iommu *t)
 static struct iommu1_ctx *
 iommu_ctx_alloc(device_t dev)
 {
-	struct iommu1_ctx *device;
+	struct iommu1_ctx *ctx;
 
-	device = malloc(sizeof(*device), M_IOMMU, M_WAITOK | M_ZERO);
-	device->rid = pci_get_rid(dev);
-	device->dev = dev;
+	ctx = malloc(sizeof(struct iommu1_ctx), M_IOMMU, M_WAITOK | M_ZERO);
+	ctx->rid = pci_get_rid(dev);
+	ctx->dev = dev;
 
-	return (device);
+	return (ctx);
 }
 /*
  * Attach a consumer device to a domain.
@@ -274,9 +277,11 @@ iommu_get_ctx(struct iommu_unit *iommu, device_t requester,
 	if (domain == NULL)
 		return (NULL);
 
-	tag = ctx->ctx.tag;
+	tag = ctx->ctx.tag = malloc(sizeof(struct bus_dma_tag_iommu),
+	    M_IOMMU, M_WAITOK | M_ZERO);
 	tag->owner = requester;
 	tag->ctx = (struct iommu_ctx *)ctx;
+	tag->ctx->domain = (struct iommu_domain *)domain;
 
 	iommu_tag_init(tag);
 
@@ -316,6 +321,7 @@ iommu_free_ctx_locked(struct iommu_unit *unit, struct iommu_ctx *ctx)
 	}
 
 	LIST_REMOVE((struct iommu1_ctx *)ctx, next);
+	free(ctx->tag, M_IOMMU);
 
 	IOMMU_UNLOCK(unit);
 
