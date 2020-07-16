@@ -135,7 +135,6 @@ iommu_domain_alloc(struct smmu_unit *iommu)
 	if (domain->vmem == NULL)
 		return (NULL);
 
-	domain->iommu = iommu;
 	domain->domain.iommu = unit;
 
 	IOMMU_LOCK(unit);
@@ -230,12 +229,11 @@ iommu_ctx_attach(struct smmu_domain *domain, struct smmu_ctx *ctx)
 	struct smmu_unit *iommu;
 	int error;
 
-	iommu = domain->iommu;
+	iommu = (struct smmu_unit *)domain->domain.iommu;
 
 	error = IOMMU_CTX_ATTACH(iommu->dev, domain, ctx);
 	if (error) {
 		device_printf(iommu->dev, "Failed to add ctx\n");
-		//free(ctx, M_IOMMU);
 		return (error);
 	}
 
@@ -351,7 +349,7 @@ iommu_map_page(struct smmu_domain *domain,
 	struct smmu_unit *iommu;
 	int error;
 
-	iommu = domain->iommu;
+	iommu = (struct smmu_unit *)domain->domain.iommu;
 
 	error = IOMMU_MAP(iommu->dev, domain, va, pa, PAGE_SIZE, prot);
 	if (error)
@@ -366,7 +364,7 @@ iommu_unmap_page(struct smmu_domain *domain, vm_offset_t va)
 	struct smmu_unit *iommu;
 	int error;
 
-	iommu = domain->iommu;
+	iommu = (struct smmu_unit *)domain->domain.iommu;
 
 	error = IOMMU_UNMAP(iommu->dev, domain, va, PAGE_SIZE);
 	if (error)

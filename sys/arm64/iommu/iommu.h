@@ -89,7 +89,6 @@ struct smmu_unit {
 
 struct smmu_domain {
 	struct iommu_domain		domain;
-	struct smmu_unit		*iommu;
 	LIST_HEAD(, smmu_ctx)		ctx_list;
 	LIST_ENTRY(smmu_domain)	next;
 	vmem_t				*vmem;
