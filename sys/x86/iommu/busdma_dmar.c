@@ -39,6 +39,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/bus.h>
 #include <sys/conf.h>
 #include <sys/interrupt.h>
+#include <sys/iommu.h>
 #include <sys/kernel.h>
 #include <sys/ktr.h>
 #include <sys/lock.h>
@@ -62,11 +63,13 @@ __FBSDID("$FreeBSD$");
 #include <machine/atomic.h>
 #include <machine/bus.h>
 #include <machine/md_var.h>
+#if defined(__amd64__) || defined(__i386__)
 #include <machine/specialreg.h>
 #include <x86/include/busdma_impl.h>
 #include <x86/iommu/intel_reg.h>
 #include <x86/iommu/busdma_dmar.h>
 #include <x86/iommu/intel_dmar.h>
+#endif
 
 /*
  * busdma_dmar.c, the implementation of the busdma(9) interface using
