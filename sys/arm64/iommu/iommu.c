@@ -116,12 +116,12 @@ iommu_domain_add_va_range(struct smmu_domain *domain,
 }
 
 static struct smmu_domain *
-iommu_domain_alloc(struct smmu_unit *iommu)
+iommu_domain_alloc(struct iommu_unit *unit)
 {
-	struct iommu_unit *unit;
+	struct smmu_unit *iommu;
 	struct smmu_domain *domain;
 
-	unit = (struct iommu_unit *)iommu;
+	iommu = (struct smmu_unit *)unit;
 
 	domain = IOMMU_DOMAIN_ALLOC(iommu->dev);
 	if (domain == NULL)
@@ -270,7 +270,7 @@ iommu_get_ctx(struct iommu_unit *iommu, device_t requester,
 		ctx->bypass = true;
 
 	/* In our current configuration we have a domain per each ctx. */
-	domain = iommu_domain_alloc((struct smmu_unit *)iommu);
+	domain = iommu_domain_alloc(iommu);
 	if (domain == NULL)
 		return (NULL);
 
