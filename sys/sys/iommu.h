@@ -45,6 +45,7 @@ typedef uint64_t iommu_haddr_t;
 /* Guest or bus address, before translation. */
 typedef uint64_t iommu_gaddr_t;
 
+struct bus_dma_tag_common;
 struct iommu_map_entry;
 TAILQ_HEAD(iommu_map_entries_tailq, iommu_map_entry);
 
