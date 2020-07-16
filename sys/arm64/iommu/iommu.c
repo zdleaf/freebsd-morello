@@ -82,8 +82,6 @@ __FBSDID("$FreeBSD$");
 static MALLOC_DEFINE(M_IOMMU, "IOMMU", "IOMMU framework");
 static MALLOC_DEFINE(M_BUSDMA, "SMMU", "ARM64 busdma SMMU");
 
-static struct mtx iommu_mtx;
-
 #define	IOMMU_LIST_LOCK()		mtx_lock(&iommu_mtx)
 #define	IOMMU_LIST_UNLOCK()		mtx_unlock(&iommu_mtx)
 #define	IOMMU_LIST_ASSERT_LOCKED()	mtx_assert(&iommu_mtx, MA_OWNED)
@@ -99,6 +97,7 @@ static struct mtx iommu_mtx;
 
 #define GICV3_ITS_PAGE  0x300b0000
 
+static struct mtx iommu_mtx;
 static LIST_HEAD(, smmu_unit) iommu_list = LIST_HEAD_INITIALIZER(iommu_list);
 static uma_zone_t iommu_map_entry_zone;
 
