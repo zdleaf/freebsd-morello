@@ -105,6 +105,7 @@ struct iommu_domain {
 	struct iommu_unit *iommu;	/* (c) */
 	struct mtx lock;		/* (c) */
 	struct task unload_task;	/* (c) */
+	u_int entries_cnt;		/* (d) */
 	struct iommu_map_entries_tailq unload_entries; /* (d) Entries to
 							 unload */
 	u_int entries_cnt;		/* (d) */
