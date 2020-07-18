@@ -34,7 +34,6 @@
 #ifndef _SYS_IOMMU_H_
 #define _SYS_IOMMU_H_
 
-#include <sys/mutex.h>
 #include <sys/queue.h>
 #include <sys/taskqueue.h>
 #include <sys/tree.h>
@@ -163,7 +162,6 @@ void iommu_map_free_entry(struct iommu_domain *, struct iommu_map_entry *);
 int iommu_map(struct iommu_domain *iodom,
     const struct bus_dma_tag_common *common, iommu_gaddr_t size, int offset,
     u_int eflags, u_int flags, vm_page_t *ma, struct iommu_map_entry **res);
-
 int iommu_map_region(struct iommu_domain *domain,
     struct iommu_map_entry *entry, u_int eflags, u_int flags, vm_page_t *ma);
 
