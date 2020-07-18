@@ -108,7 +108,6 @@ struct iommu_domain {
 	u_int entries_cnt;		/* (d) */
 	struct iommu_map_entries_tailq unload_entries; /* (d) Entries to
 							 unload */
-	u_int entries_cnt;		/* (d) */
 };
 
 struct iommu_ctx {
