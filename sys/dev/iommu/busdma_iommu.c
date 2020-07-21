@@ -67,7 +67,7 @@ __FBSDID("$FreeBSD$");
 #include <machine/specialreg.h>
 #include <x86/include/busdma_impl.h>
 #include <x86/iommu/intel_reg.h>
-#include <x86/iommu/busdma_dmar.h>
+#include <dev/iommu/busdma_iommu.h>
 #include <x86/iommu/intel_dmar.h>
 #else
 #include <x86/iommu/busdma_dmar.h>
@@ -75,8 +75,8 @@ __FBSDID("$FreeBSD$");
 #endif
 
 /*
- * busdma_dmar.c, the implementation of the busdma(9) interface using
- * DMAR units from Intel VT-d.
+ * busdma_iommu.c, the implementation of the busdma(9) interface using
+ * IOMMU units from Intel VT-d.
  */
 
 static bool
