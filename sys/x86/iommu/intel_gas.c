@@ -617,12 +617,8 @@ iommu_gas_map(struct iommu_domain *domain,
 	IOMMU_DOMAIN_UNLOCK(domain);
 
 	error = domain_map_buf(domain, entry->start, entry->end - entry->start,
-	    ma,
-	    ((eflags & IOMMU_MAP_ENTRY_READ) != 0 ? DMAR_PTE_R : 0) |
-	    ((eflags & IOMMU_MAP_ENTRY_WRITE) != 0 ? DMAR_PTE_W : 0) |
-	    ((eflags & IOMMU_MAP_ENTRY_SNOOP) != 0 ? DMAR_PTE_SNP : 0) |
-	    ((eflags & IOMMU_MAP_ENTRY_TM) != 0 ? DMAR_PTE_TM : 0),
-	    (flags & IOMMU_MF_CANWAIT) != 0 ? DMAR_PGF_WAITOK : 0);
+	    ma, eflags,
+	    ((flags & IOMMU_MF_CANWAIT) != 0 ? DMAR_PGF_WAITOK : 0));
 	if (error == ENOMEM) {
 		iommu_domain_unload_entry(entry, true);
 		return (error);
@@ -659,12 +655,8 @@ iommu_gas_map_region(struct iommu_domain *domain, struct iommu_map_entry *entry,
 		return (0);
 
 	error = domain_map_buf(domain, entry->start, entry->end - entry->start,
-	    ma + OFF_TO_IDX(start - entry->start),
-	    ((eflags & IOMMU_MAP_ENTRY_READ) != 0 ? DMAR_PTE_R : 0) |
-	    ((eflags & IOMMU_MAP_ENTRY_WRITE) != 0 ? DMAR_PTE_W : 0) |
-	    ((eflags & IOMMU_MAP_ENTRY_SNOOP) != 0 ? DMAR_PTE_SNP : 0) |
-	    ((eflags & IOMMU_MAP_ENTRY_TM) != 0 ? DMAR_PTE_TM : 0),
-	    (flags & IOMMU_MF_CANWAIT) != 0 ? DMAR_PGF_WAITOK : 0);
+	    ma + OFF_TO_IDX(start - entry->start), eflags,
+	    ((flags & IOMMU_MF_CANWAIT) != 0 ? DMAR_PGF_WAITOK : 0));
 	if (error == ENOMEM) {
 		iommu_domain_unload_entry(entry, false);
 		return (error);

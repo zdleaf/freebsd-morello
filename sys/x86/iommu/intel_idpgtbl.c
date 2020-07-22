@@ -500,11 +500,17 @@ domain_map_buf_locked(struct dmar_domain *domain, iommu_gaddr_t base,
 
 int
 domain_map_buf(struct iommu_domain *iodom, iommu_gaddr_t base,
-    iommu_gaddr_t size, vm_page_t *ma, uint64_t pflags, int flags)
+    iommu_gaddr_t size, vm_page_t *ma, uint64_t eflags, int flags)
 {
 	struct dmar_domain *domain;
 	struct dmar_unit *unit;
+	uint64_t pflags;
 	int error;
+
+	pflags = ((eflags & IOMMU_MAP_ENTRY_READ) != 0 ? DMAR_PTE_R : 0) |
+	    ((eflags & IOMMU_MAP_ENTRY_WRITE) != 0 ? DMAR_PTE_W : 0) |
+	    ((eflags & IOMMU_MAP_ENTRY_SNOOP) != 0 ? DMAR_PTE_SNP : 0) |
+	    ((eflags & IOMMU_MAP_ENTRY_TM) != 0 ? DMAR_PTE_TM : 0);
 
 	domain = (struct dmar_domain *)iodom;
 	unit = domain->dmar;
