@@ -696,12 +696,9 @@ iommu_gas_reserve_region(struct iommu_domain *domain, iommu_gaddr_t start,
 }
 
 struct iommu_map_entry *
-iommu_map_alloc_entry(struct iommu_domain *iodom, u_int flags)
+iommu_map_alloc_entry(struct iommu_domain *domain, u_int flags)
 {
-	struct iommu_domain *domain;
 	struct iommu_map_entry *res;
-
-	domain = (struct iommu_domain *)iodom;
 
 	res = iommu_gas_alloc_entry(domain, flags);
 
@@ -709,24 +706,18 @@ iommu_map_alloc_entry(struct iommu_domain *iodom, u_int flags)
 }
 
 void
-iommu_map_free_entry(struct iommu_domain *iodom, struct iommu_map_entry *entry)
+iommu_map_free_entry(struct iommu_domain *domain, struct iommu_map_entry *entry)
 {
-	struct iommu_domain *domain;
-
-	domain = (struct iommu_domain *)iodom;
 
 	iommu_gas_free_entry(domain, entry);
 }
 
 int
-iommu_map(struct iommu_domain *iodom,
+iommu_map(struct iommu_domain *domain,
     const struct bus_dma_tag_common *common, iommu_gaddr_t size, int offset,
     u_int eflags, u_int flags, vm_page_t *ma, struct iommu_map_entry **res)
 {
-	struct iommu_domain *domain;
 	int error;
-
-	domain = (struct iommu_domain *)iodom;
 
 	error = iommu_gas_map(domain, common, size, offset, eflags, flags,
 	    ma, res);
@@ -735,13 +726,10 @@ iommu_map(struct iommu_domain *iodom,
 }
 
 int
-iommu_map_region(struct iommu_domain *iodom, struct iommu_map_entry *entry,
+iommu_map_region(struct iommu_domain *domain, struct iommu_map_entry *entry,
     u_int eflags, u_int flags, vm_page_t *ma)
 {
-	struct iommu_domain *domain;
 	int error;
-
-	domain = (struct iommu_domain *)iodom;
 
 	error = iommu_gas_map_region(domain, entry, eflags, flags, ma);
 
