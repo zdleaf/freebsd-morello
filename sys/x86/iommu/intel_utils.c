@@ -641,7 +641,6 @@ dmar_get_timeout(void)
 	    dmar_hw_timeout.tv_nsec);
 }
 
-#ifdef INVARIANTS
 static int
 dmar_timeout_sysctl(SYSCTL_HANDLER_ARGS)
 {
@@ -668,4 +667,3 @@ SYSCTL_PROC(_hw_iommu_dmar, OID_AUTO, timeout,
     CTLTYPE_U64 | CTLFLAG_RW | CTLFLAG_MPSAFE, 0, 0,
     dmar_timeout_sysctl, "QU",
     "Timeout for command wait, in nanoseconds");
-#endif
