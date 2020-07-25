@@ -372,6 +372,7 @@ iommu_unmap_page(struct smmu_domain *domain, vm_offset_t va)
 	return (0);
 }
 
+#if 0
 struct iommu_map_entry *
 iommu_map_alloc_entry(struct iommu_domain *domain, u_int flags)
 {
@@ -448,6 +449,7 @@ iommu_map(struct iommu_domain *iodom,
 
 	return (0);
 }
+#endif
 
 void
 iommu_domain_unload(struct iommu_domain *iodom,
@@ -575,6 +577,19 @@ iommu_find(device_t dev, bool verbose)
 	}
 
 	return ((struct iommu_unit *)iommu);
+}
+
+void
+iommu_domain_unload_entry(struct iommu_map_entry *entry, bool free)
+{
+}
+
+int
+domain_map_buf(struct iommu_domain *iodom, iommu_gaddr_t base,
+    iommu_gaddr_t size, vm_page_t *ma, uint64_t eflags, int flags)
+{
+
+	return (0);
 }
 
 static void

@@ -69,7 +69,7 @@ __FBSDID("$FreeBSD$");
 #include <dev/iommu/busdma_iommu.h>
 #include <dev/iommu/iommu.h>
 #include <x86/iommu/intel_dmar.h>
-#else
+#elif defined(__aarch64__)
 #include <dev/iommu/busdma_iommu.h>
 #include <arm64/iommu/iommu.h>
 #endif
