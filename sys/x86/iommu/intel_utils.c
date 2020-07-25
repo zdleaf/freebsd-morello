@@ -641,6 +641,7 @@ dmar_get_timeout(void)
 	    dmar_hw_timeout.tv_nsec);
 }
 
+#ifdef INVARIANTS
 static int
 dmar_timeout_sysctl(SYSCTL_HANDLER_ARGS)
 {
@@ -655,13 +656,16 @@ dmar_timeout_sysctl(SYSCTL_HANDLER_ARGS)
 	return (error);
 }
 
-SYSCTL_INT(_hw_iommu, OID_AUTO, tbl_pagecnt, CTLFLAG_RD,
+static SYSCTL_NODE(_hw_iommu, OID_AUTO, dmar, CTLFLAG_RD | CTLFLAG_MPSAFE,
+    NULL, "");
+SYSCTL_INT(_hw_iommu_dmar, OID_AUTO, tbl_pagecnt, CTLFLAG_RD,
     &dmar_tbl_pagecnt, 0,
     "Count of pages used for DMAR pagetables");
-SYSCTL_INT(_hw_iommu, OID_AUTO, batch_coalesce, CTLFLAG_RWTUN,
+SYSCTL_INT(_hw_iommu_dmar, OID_AUTO, batch_coalesce, CTLFLAG_RWTUN,
     &dmar_batch_coalesce, 0,
     "Number of qi batches between interrupt");
-SYSCTL_PROC(_hw_iommu, OID_AUTO, timeout,
+SYSCTL_PROC(_hw_iommu_dmar, OID_AUTO, timeout,
     CTLTYPE_U64 | CTLFLAG_RW | CTLFLAG_MPSAFE, 0, 0,
     dmar_timeout_sysctl, "QU",
     "Timeout for command wait, in nanoseconds");
+#endif
