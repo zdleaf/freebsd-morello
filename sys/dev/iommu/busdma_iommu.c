@@ -290,6 +290,7 @@ acpi_iommu_get_dma_tag(device_t dev, device_t child)
 		return (NULL);
 	if (!unit->dma_enabled)
 		return (NULL);
+
 #if defined(__amd64__) || defined(__i386__)
 	dmar_quirks_pre_use(unit);
 	dmar_instantiate_rmrr_ctxs(unit);
