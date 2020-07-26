@@ -175,9 +175,6 @@ dmar_identify(driver_t *driver, device_t parent)
 	TUNABLE_INT_FETCH("hw.dmar.enable", &dmar_enable);
 	if (!dmar_enable)
 		return;
-#ifdef INVARIANTS
-	TUNABLE_INT_FETCH("hw.iommu.check_free", &iommu_check_free);
-#endif
 	status = AcpiGetTable(ACPI_SIG_DMAR, 1, (ACPI_TABLE_HEADER **)&dmartbl);
 	if (ACPI_FAILURE(status))
 		return;
@@ -492,7 +489,7 @@ dmar_attach(device_t dev)
 	 * address translation after the required invalidations are
 	 * done.
 	 */
-	dmar_pgalloc(unit->ctx_obj, 0, DMAR_PGF_WAITOK | DMAR_PGF_ZERO);
+	dmar_pgalloc(unit->ctx_obj, 0, IOMMU_PGF_WAITOK | IOMMU_PGF_ZERO);
 	DMAR_LOCK(unit);
 	error = dmar_load_root_entry_ptr(unit);
 	if (error != 0) {
@@ -947,7 +944,7 @@ dmar_rmrr_iter(ACPI_DMAR_HEADER *dmarh, void *arg)
 		if (match == 1) {
 			entry = iommu_gas_alloc_entry(
 			    (struct iommu_domain *)ria->domain,
-			    DMAR_PGF_WAITOK);
+			    IOMMU_PGF_WAITOK);
 			entry->start = resmem->BaseAddress;
 			/* The RMRR entry end address is inclusive. */
 			entry->end = resmem->EndAddress;
