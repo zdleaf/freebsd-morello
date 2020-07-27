@@ -291,14 +291,22 @@ iommu_get_ctx(struct iommu_unit *iommu, device_t requester,
 
 	ctx->domain = domain;
 
-	error = iommu_ctx_attach(domain, ctx);
-	if (error) {
+	/* Reserve the GIC page */
+	error = iommu_gas_reserve_region(&domain->domain, GICV3_ITS_PAGE,
+	    GICV3_ITS_PAGE + PAGE_SIZE);
+	if (error != 0) {
 		iommu_domain_free(domain);
 		return (NULL);
 	}
 
 	/* Map the GICv3 ITS page so the device could send MSI interrupts. */
 	iommu_map_page(domain, GICV3_ITS_PAGE, GICV3_ITS_PAGE, VM_PROT_WRITE);
+
+	error = iommu_ctx_attach(domain, ctx);
+	if (error) {
+		iommu_domain_free(domain);
+		return (NULL);
+	}
 
 	return (&ctx->ctx);
 }
