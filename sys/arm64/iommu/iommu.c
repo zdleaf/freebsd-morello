@@ -101,7 +101,7 @@ static struct mtx iommu_mtx;
 static LIST_HEAD(, smmu_unit) iommu_list = LIST_HEAD_INITIALIZER(iommu_list);
 
 static void
-iommu_domain_unload_task(void *arg, int pending)
+smmu_domain_unload_task(void *arg, int pending)
 {
 	struct iommu_domain *iodom;
 	struct smmu_domain *domain;
@@ -125,7 +125,7 @@ iommu_domain_unload_task(void *arg, int pending)
 }
 
 static struct smmu_domain *
-iommu_domain_alloc(struct iommu_unit *unit)
+smmu_domain_alloc(struct iommu_unit *unit)
 {
 	struct smmu_unit *iommu;
 	struct smmu_domain *domain;
@@ -140,7 +140,7 @@ iommu_domain_alloc(struct iommu_unit *unit)
 
 	RB_INIT(&domain->domain.rb_root);
 	TAILQ_INIT(&domain->domain.unload_entries);
-	TASK_INIT(&domain->domain.unload_task, 0, iommu_domain_unload_task,
+	TASK_INIT(&domain->domain.unload_task, 0, smmu_domain_unload_task,
 	    domain);
 	mtx_init(&domain->domain.lock, "IOMMU domain", NULL, MTX_DEF);
 
@@ -156,7 +156,7 @@ iommu_domain_alloc(struct iommu_unit *unit)
 }
 
 static int
-iommu_domain_free(struct smmu_domain *domain)
+smmu_domain_free(struct smmu_domain *domain)
 {
 	struct iommu_unit *unit;
 	struct smmu_unit *iommu;
@@ -180,7 +180,7 @@ iommu_domain_free(struct smmu_domain *domain)
 }
 
 static struct smmu_ctx *
-iommu_ctx_lookup(device_t dev)
+smmu_ctx_lookup(device_t dev)
 {
 	struct smmu_domain *domain;
 	struct smmu_ctx *ctx;
@@ -199,7 +199,7 @@ iommu_ctx_lookup(device_t dev)
 }
 
 static void
-iommu_tag_init(struct bus_dma_tag_iommu *t)
+smmu_tag_init(struct bus_dma_tag_iommu *t)
 {
 	bus_addr_t maxaddr;
 
@@ -216,7 +216,7 @@ iommu_tag_init(struct bus_dma_tag_iommu *t)
 }
 
 static struct smmu_ctx *
-iommu_ctx_alloc(device_t dev)
+smmu_ctx_alloc(device_t dev)
 {
 	struct smmu_ctx *ctx;
 
@@ -230,7 +230,7 @@ iommu_ctx_alloc(device_t dev)
  * Attach a consumer device to a domain.
  */
 static int
-iommu_ctx_attach(struct smmu_domain *domain, struct smmu_ctx *ctx)
+smmu_ctx_attach(struct smmu_domain *domain, struct smmu_ctx *ctx)
 {
 	struct iommu_domain *iodom;
 	struct smmu_unit *iommu;
@@ -265,11 +265,11 @@ iommu_get_ctx(struct iommu_unit *iommu, device_t requester,
 	struct bus_dma_tag_iommu *tag;
 	int error;
 
-	ctx = iommu_ctx_lookup(requester);
+	ctx = smmu_ctx_lookup(requester);
 	if (ctx)
 		return (&ctx->ctx);
 
-	ctx = iommu_ctx_alloc(requester);
+	ctx = smmu_ctx_alloc(requester);
 	if (ctx == NULL)
 		return (NULL);
 
@@ -277,7 +277,7 @@ iommu_get_ctx(struct iommu_unit *iommu, device_t requester,
 		ctx->bypass = true;
 
 	/* In our current configuration we have a domain per each ctx. */
-	domain = iommu_domain_alloc(iommu);
+	domain = smmu_domain_alloc(iommu);
 	if (domain == NULL)
 		return (NULL);
 
@@ -287,7 +287,7 @@ iommu_get_ctx(struct iommu_unit *iommu, device_t requester,
 	tag->ctx = (struct iommu_ctx *)ctx;
 	tag->ctx->domain = (struct iommu_domain *)domain;
 
-	iommu_tag_init(tag);
+	smmu_tag_init(tag);
 
 	ctx->domain = domain;
 
@@ -295,16 +295,16 @@ iommu_get_ctx(struct iommu_unit *iommu, device_t requester,
 	error = iommu_gas_reserve_region(&domain->domain, GICV3_ITS_PAGE,
 	    GICV3_ITS_PAGE + PAGE_SIZE);
 	if (error != 0) {
-		iommu_domain_free(domain);
+		smmu_domain_free(domain);
 		return (NULL);
 	}
 
 	/* Map the GICv3 ITS page so the device could send MSI interrupts. */
 	iommu_map_page(domain, GICV3_ITS_PAGE, GICV3_ITS_PAGE, VM_PROT_WRITE);
 
-	error = iommu_ctx_attach(domain, ctx);
+	error = smmu_ctx_attach(domain, ctx);
 	if (error) {
-		iommu_domain_free(domain);
+		smmu_domain_free(domain);
 		return (NULL);
 	}
 
@@ -336,7 +336,7 @@ iommu_free_ctx_locked(struct iommu_unit *unit, struct iommu_ctx *ctx)
 
 	/* Since we have a domain per each ctx, remove the domain too. */
 	iommu_unmap_page(domain, GICV3_ITS_PAGE);
-	error = iommu_domain_free(domain);
+	error = smmu_domain_free(domain);
 	if (error)
 		device_printf(iommu->dev, "Could not free a domain\n");
 }
@@ -386,7 +386,7 @@ iommu_unmap_page(struct smmu_domain *domain, vm_offset_t va)
 }
 
 static void
-iommu_domain_free_entry(struct iommu_map_entry *entry, bool free)
+smmu_domain_free_entry(struct iommu_map_entry *entry, bool free)
 {
 	struct iommu_domain *domain;
 
@@ -435,7 +435,7 @@ iommu_domain_unload(struct iommu_domain *domain,
 		    entry->start, cansleep ? IOMMU_PGF_WAITOK : 0);
 		KASSERT(error == 0, ("unmap %p error %d", domain, error));
 		TAILQ_REMOVE(entries, entry, dmamap_link);
-		iommu_domain_free_entry(entry, true);
+		smmu_domain_free_entry(entry, true);
         }
 
 	if (TAILQ_EMPTY(entries))
@@ -498,7 +498,7 @@ iommu_unregister(device_t dev)
 }
 
 static struct smmu_unit *
-iommu_lookup(intptr_t xref)
+smmu_lookup(intptr_t xref)
 {
 	struct smmu_unit *iommu;
 
@@ -539,7 +539,7 @@ iommu_find(device_t dev, bool verbose)
 	/*
 	 * Find a registered IOMMU controller by xref.
 	 */
-	iommu = iommu_lookup(xref);
+	iommu = smmu_lookup(xref);
 	if (iommu == NULL) {
 		/* SMMU device is not registered in the IOMMU framework. */
 		return (NULL);
@@ -554,7 +554,7 @@ iommu_domain_unload_entry(struct iommu_map_entry *entry, bool free)
 
 	printf("%s\n", __func__);
 
-	iommu_domain_free_entry(entry, free);
+	smmu_domain_free_entry(entry, free);
 }
 
 int
