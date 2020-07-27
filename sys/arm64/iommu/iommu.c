@@ -100,19 +100,6 @@ static MALLOC_DEFINE(M_BUSDMA, "SMMU", "ARM64 busdma SMMU");
 static struct mtx iommu_mtx;
 static LIST_HEAD(, smmu_unit) iommu_list = LIST_HEAD_INITIALIZER(iommu_list);
 
-static int
-iommu_domain_add_va_range(struct smmu_domain *domain,
-    vm_offset_t va, vm_size_t size)
-{
-	int error;
-
-	KASSERT(size > 0, ("wrong size"));
-
-	error = vmem_add(domain->vmem, va, size, M_WAITOK);
-
-	return (error);
-}
-
 static void
 iommu_domain_unload_task(void *arg, int pending)
 {
@@ -157,11 +144,6 @@ iommu_domain_alloc(struct iommu_unit *unit)
 	    domain);
 	mtx_init(&domain->domain.lock, "IOMMU domain", NULL, MTX_DEF);
 
-	domain->vmem = vmem_create("IOMMU vmem", 0, 0, PAGE_SIZE,
-	    PAGE_SIZE, M_FIRSTFIT | M_WAITOK);
-	if (domain->vmem == NULL)
-		return (NULL);
-
 	domain->domain.iommu = unit;
 	domain->domain.end = BUS_SPACE_MAXADDR;
 	iommu_gas_init_domain(&domain->domain);
@@ -178,12 +160,10 @@ iommu_domain_free(struct smmu_domain *domain)
 {
 	struct iommu_unit *unit;
 	struct smmu_unit *iommu;
-	vmem_t *vmem;
 	int error;
 
 	unit = domain->domain.iommu;
 	iommu = (struct smmu_unit *)unit;
-	vmem = domain->vmem;
 
 	IOMMU_LOCK(unit);
 	LIST_REMOVE(domain, next);
@@ -195,8 +175,6 @@ iommu_domain_free(struct smmu_domain *domain)
 	}
 
 	IOMMU_UNLOCK(unit);
-
-	vmem_destroy(vmem);
 
 	return (0);
 }
@@ -319,9 +297,6 @@ iommu_get_ctx(struct iommu_unit *iommu, device_t requester,
 		return (NULL);
 	}
 
-	/* Add some virtual address range for this domain. */
-	iommu_domain_add_va_range(domain, 0x40000000, 0x40000000);
-
 	/* Map the GICv3 ITS page so the device could send MSI interrupts. */
 	iommu_map_page(domain, GICV3_ITS_PAGE, GICV3_ITS_PAGE, VM_PROT_WRITE);
 
@@ -401,85 +376,6 @@ iommu_unmap_page(struct smmu_domain *domain, vm_offset_t va)
 
 	return (0);
 }
-
-#if 0
-struct iommu_map_entry *
-iommu_map_alloc_entry(struct iommu_domain *domain, u_int flags)
-{
-	struct iommu_map_entry *res;
-
-	KASSERT((flags & ~(IOMMU_PGF_WAITOK)) == 0,
-	    ("unsupported flags %x", flags));
-
-	res = uma_zalloc(iommu_map_entry_zone, ((flags & IOMMU_PGF_WAITOK) !=
-	    0 ? M_WAITOK : M_NOWAIT) | M_ZERO);
-	if (res != NULL) {
-		res->domain = domain;
-		atomic_add_int(&domain->entries_cnt, 1);
-	}
-	return (res);
-}
-
-void iommu_map_free_entry(struct iommu_domain *domain,
-    struct iommu_map_entry *entry)
-{
-
-	KASSERT(domain == entry->domain,
-	    ("mismatched free domain %p entry %p entry->domain %p", domain,
-	    entry, entry->domain));
-	atomic_subtract_int(&domain->entries_cnt, 1);
-	uma_zfree(iommu_map_entry_zone, entry);
-}
-
-int
-iommu_map(struct iommu_domain *iodom,
-    const struct bus_dma_tag_common *common, iommu_gaddr_t size, int offset,
-    u_int eflags, u_int flags, vm_page_t *ma, struct iommu_map_entry **res)
-{
-	struct iommu_map_entry *entry;
-	struct smmu_unit *iommu;
-	struct smmu_domain *domain;
-	vm_prot_t prot;
-	vm_offset_t va;
-	vm_paddr_t pa;
-	int error;
-
-	domain = (struct smmu_domain *)iodom;
-	iommu = (struct smmu_unit *)iodom->iommu;
-
-	entry = iommu_map_alloc_entry(iodom, 0);
-	if (entry == NULL)
-		return (ENOMEM);
-
-	error = vmem_alloc(domain->vmem, size,
-	    M_FIRSTFIT | M_NOWAIT, &va);
-	if (error) {
-		iommu_map_free_entry(iodom, entry);
-		return (error);
-	}
-
-	pa = VM_PAGE_TO_PHYS(ma[0]);
-
-	entry->start = va;
-	entry->end = va + size;
-
-	prot = 0;
-	if (eflags & IOMMU_MAP_ENTRY_READ)
-		prot |= VM_PROT_READ;
-	if (eflags & IOMMU_MAP_ENTRY_WRITE)
-		prot |= VM_PROT_WRITE;
-
-	error = IOMMU_MAP(iommu->dev, domain, va, pa, size, prot);
-	if (error) {
-		iommu_map_free_entry(iodom, entry);
-		return (error);
-	}
-
-	*res = entry;
-
-	return (0);
-}
-#endif
 
 static void
 iommu_domain_free_entry(struct iommu_map_entry *entry, bool free)

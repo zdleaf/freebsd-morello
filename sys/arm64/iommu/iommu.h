@@ -39,7 +39,6 @@
 
 #include <sys/mutex.h>
 #include <sys/bus_dma.h>
-#include <sys/vmem.h>
 
 #include <sys/systm.h>
 #include <sys/domainset.h>
@@ -58,7 +57,6 @@
 #include <sys/taskqueue.h>
 #include <sys/tree.h>
 #include <sys/uio.h>
-#include <sys/vmem.h>
 
 #include <vm/vm.h>
 #include <vm/pmap.h>
@@ -92,7 +90,6 @@ struct smmu_domain {
 	struct iommu_domain		domain;
 	LIST_HEAD(, smmu_ctx)		ctx_list;
 	LIST_ENTRY(smmu_domain)	next;
-	vmem_t				*vmem;
 	u_int entries_cnt;
 	struct smmu_cd			*cd;
 	struct pmap			p;
