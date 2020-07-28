@@ -987,7 +987,7 @@ iommu_fini_busdma(struct iommu_unit *unit)
 }
 
 int
-bus_dma_dmar_load_ident(bus_dma_tag_t dmat, bus_dmamap_t map1,
+bus_dma_iommu_load_ident(bus_dma_tag_t dmat, bus_dmamap_t map1,
     vm_paddr_t start, vm_size_t length, int flags)
 {
 	struct bus_dma_tag_common *tc;
