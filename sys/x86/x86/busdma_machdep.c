@@ -301,7 +301,7 @@ bus_dma_tag_destroy(bus_dma_tag_t dmat)
 
 #ifndef ACPI_DMAR
 bool
-bus_dma_dmar_set_buswide(device_t dev)
+bus_dma_iommu_set_buswide(device_t dev)
 {
 	return (false);
 }
