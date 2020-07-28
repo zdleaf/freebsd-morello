@@ -34,11 +34,11 @@
 #ifndef _SYS_IOMMU_H_
 #define _SYS_IOMMU_H_
 
+#include <sys/types.h>
 #include <sys/queue.h>
 #include <sys/sysctl.h>
 #include <sys/taskqueue.h>
 #include <sys/tree.h>
-#include <sys/types.h>
 
 #include <dev/pci/pcireg.h>
 
