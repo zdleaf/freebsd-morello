@@ -322,8 +322,23 @@ bus_dma_iommu_set_buswide(device_t dev)
 		}
 		return (false);
 	}
-	iommu_set_buswide_ctx(unit, busno);
+
+	MPASS(busno <= PCI_BUSMAX);
+	IOMMU_LOCK(unit);
+	unit->buswide_ctxs[busno / NBBY / sizeof(uint32_t)] |=
+	    1 << (busno % (NBBY * sizeof(uint32_t)));
+	IOMMU_UNLOCK(unit);
+
 	return (true);
+}
+
+bool
+iommu_is_buswide_ctx(struct iommu_unit *unit, u_int busno)
+{
+
+	MPASS(busno <= PCI_BUSMAX);
+	return ((unit->buswide_ctxs[busno / NBBY / sizeof(uint32_t)] &
+	    (1U << (busno % (NBBY * sizeof(uint32_t))))) != 0);
 }
 
 static MALLOC_DEFINE(M_IOMMU_DMAMAP, "iommu_dmamap", "IOMMU DMA Map");
