@@ -301,7 +301,6 @@ acpi_iommu_get_dma_tag(device_t dev, device_t child)
 	return (res);
 }
 
-#if defined(__amd64__)
 bool
 bus_dma_iommu_set_buswide(device_t dev)
 {
@@ -329,7 +328,6 @@ bus_dma_iommu_set_buswide(device_t dev)
 	iommu_set_buswide_ctx(unit, busno);
 	return (true);
 }
-#endif
 
 static MALLOC_DEFINE(M_IOMMU_DMAMAP, "iommu_dmamap", "IOMMU DMA Map");
 
@@ -991,7 +989,6 @@ iommu_fini_busdma(struct iommu_unit *unit)
 	unit->delayed_taskqueue = NULL;
 }
 
-#if defined(__amd64__)
 int
 bus_dma_iommu_load_ident(bus_dma_tag_t dmat, bus_dmamap_t map1,
     vm_paddr_t start, vm_size_t length, int flags)
@@ -1054,4 +1051,3 @@ bus_dma_iommu_load_ident(bus_dma_tag_t dmat, bus_dmamap_t map1,
 	free(ma, M_TEMP);
 	return (error);
 }
-#endif
