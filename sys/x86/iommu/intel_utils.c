@@ -65,8 +65,8 @@ __FBSDID("$FreeBSD$");
 #include <x86/include/apicvar.h>
 #include <x86/include/busdma_impl.h>
 #include <x86/iommu/intel_reg.h>
-#include <dev/iommu/busdma_iommu.h>
 #include <dev/pci/pcireg.h>
+#include <dev/iommu/busdma_iommu.h>
 #include <x86/iommu/intel_dmar.h>
 
 u_int
