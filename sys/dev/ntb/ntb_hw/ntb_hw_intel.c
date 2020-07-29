@@ -50,6 +50,8 @@ __FBSDID("$FreeBSD$");
 #include <sys/module.h>
 #include <sys/mutex.h>
 #include <sys/pciio.h>
+#include <sys/taskqueue.h>
+#include <sys/tree.h>
 #include <sys/queue.h>
 #include <sys/rman.h>
 #include <sys/sbuf.h>
@@ -61,6 +63,7 @@ __FBSDID("$FreeBSD$");
 #include <machine/resource.h>
 #include <dev/pci/pcireg.h>
 #include <dev/pci/pcivar.h>
+#include <dev/iommu/iommu.h>
 
 #include "ntb_hw_intel.h"
 #include "../ntb.h"
