@@ -38,6 +38,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/types.h>
 #include <sys/systm.h>
 #include <sys/bus.h>
+#include <sys/bitstring.h>
 #include <sys/kernel.h>
 #include <sys/tree.h>
 #include <sys/taskqueue.h>
@@ -45,10 +46,8 @@ __FBSDID("$FreeBSD$");
 #include <sys/memdesc.h>
 #include <sys/module.h>
 #include <sys/rman.h>
-
 #include <vm/vm.h>
 #include <vm/pmap.h>
-
 #include <contrib/dev/acpica/include/acpi.h>
 #include <dev/acpica/acpivar.h>
 #include <dev/pci/pcireg.h>
@@ -57,6 +56,7 @@ __FBSDID("$FreeBSD$");
 
 #include <machine/intr.h>
 #include <machine/resource.h>
+#include <arm64/iommu/iommu.h>
 
 #include "smmu_reg.h"
 #include "smmu_var.h"

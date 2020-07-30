@@ -35,9 +35,6 @@
 #ifndef _DEV_IOMMU_SMMU_VAR_H_
 #define _DEV_IOMMU_SMMU_VAR_H_
 
-#include <sys/bitstring.h>
-#include <arm64/iommu/iommu.h>
-
 #define	SMMU_DEVSTR		"ARM System Memory Management Unit"
 #define	SMMU_LOCK(_sc)		mtx_lock(&(_sc)->sc_mtx)
 #define	SMMU_UNLOCK(_sc)	mtx_unlock(&(_sc)->sc_mtx)

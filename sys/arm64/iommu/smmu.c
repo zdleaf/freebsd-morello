@@ -104,18 +104,14 @@ __FBSDID("$FreeBSD$");
 #include <sys/lock.h>
 #include <sys/tree.h>
 #include <sys/taskqueue.h>
-
 #include <vm/vm.h>
 #include <vm/pmap.h>
-
 #if DEV_ACPI
 #include <contrib/dev/acpica/include/acpi.h>
 #include <contrib/dev/acpica/include/accommon.h>
-
 #include <dev/acpica/acpivar.h>
 #include <dev/acpica/acpi_pcibvar.h>
 #endif
-
 #include <dev/pci/pcireg.h>
 #include <dev/pci/pcivar.h>
 #include <dev/iommu/iommu.h>
