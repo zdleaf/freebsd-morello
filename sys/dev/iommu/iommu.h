@@ -34,14 +34,6 @@
 #ifndef _SYS_IOMMU_H_
 #define _SYS_IOMMU_H_
 
-#include <sys/types.h>
-#include <sys/queue.h>
-#include <sys/sysctl.h>
-#include <sys/taskqueue.h>
-#include <sys/tree.h>
-
-#include <dev/pci/pcireg.h>
-
 /* Host or physical memory address, after translation. */
 typedef uint64_t iommu_haddr_t;
 /* Guest or bus address, before translation. */
@@ -220,6 +212,13 @@ int iommu_gas_map_region(struct iommu_domain *domain,
     struct iommu_map_entry *entry, u_int eflags, u_int flags, vm_page_t *ma);
 int iommu_gas_reserve_region(struct iommu_domain *domain, iommu_gaddr_t start,
     iommu_gaddr_t end);
+
+void iommu_set_buswide_ctx(struct iommu_unit *unit, u_int busno);
+bool iommu_is_buswide_ctx(struct iommu_unit *unit, u_int busno);
+
+bool bus_dma_iommu_set_buswide(device_t dev);
+int bus_dma_iommu_load_ident(bus_dma_tag_t dmat, bus_dmamap_t map,
+    vm_paddr_t start, vm_size_t length, int flags);
 
 SYSCTL_DECL(_hw_iommu);
 
