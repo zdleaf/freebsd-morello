@@ -84,14 +84,7 @@ static MALLOC_DEFINE(M_BUSDMA, "SMMU", "ARM64 busdma SMMU");
 #define	IOMMU_LIST_UNLOCK()		mtx_unlock(&iommu_mtx)
 #define	IOMMU_LIST_ASSERT_LOCKED()	mtx_assert(&iommu_mtx, MA_OWNED)
 
-#define IOMMU_DEBUG
-#undef IOMMU_DEBUG
-
-#ifdef IOMMU_DEBUG
-#define DPRINTF(fmt, ...)  printf(fmt, ##__VA_ARGS__)
-#else
-#define DPRINTF(fmt, ...)
-#endif
+#define dprintf(fmt, ...)
 
 #define GICV3_ITS_PAGE  0x300b0000
 
@@ -108,8 +101,6 @@ smmu_domain_unload_task(void *arg, int pending)
 	domain = arg;
 	iodom = (struct iommu_domain *)domain;
 	TAILQ_INIT(&entries);
-
-	printf("%s\n", __func__);
 
 	for (;;) {
 		IOMMU_DOMAIN_LOCK(iodom);
@@ -550,7 +541,7 @@ void
 iommu_domain_unload_entry(struct iommu_map_entry *entry, bool free)
 {
 
-	printf("%s\n", __func__);
+	dprintf("%s\n", __func__);
 
 	smmu_domain_free_entry(entry, free);
 }
@@ -568,7 +559,7 @@ domain_map_buf(struct iommu_domain *iodom, iommu_gaddr_t base,
 
 	domain = (struct smmu_domain *)iodom;
 
-	//printf("%s: base %lx, size %lx\n", __func__, base, size);
+	dprintf("%s: base %lx, size %lx\n", __func__, base, size);
 
 	prot = 0;
 	if (eflags & IOMMU_MAP_ENTRY_READ)
