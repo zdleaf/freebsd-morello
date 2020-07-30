@@ -246,7 +246,7 @@ vm_object_t domain_get_idmap_pgtbl(struct dmar_domain *domain,
 void put_idmap_pgtbl(vm_object_t obj);
 int domain_map_buf(struct iommu_domain *domain, iommu_gaddr_t base,
     iommu_gaddr_t size, vm_page_t *ma, uint64_t pflags, int flags);
-int domain_unmap_buf(struct dmar_domain *domain, iommu_gaddr_t base,
+int domain_unmap_buf(struct iommu_domain *domain, iommu_gaddr_t base,
     iommu_gaddr_t size, int flags);
 void domain_flush_iotlb_sync(struct dmar_domain *domain, iommu_gaddr_t base,
     iommu_gaddr_t size);

@@ -342,6 +342,9 @@ dmar_domain_alloc(struct dmar_unit *dmar, bool id_mapped)
 	domain->dmar = dmar;
 	domain->iodom.iommu = &dmar->iommu;
 
+	iodom->ops.map = domain_map_buf;
+	iodom->ops.unmap = domain_unmap_buf;
+
 	/*
 	 * For now, use the maximal usable physical address of the
 	 * installed memory to calculate the mgaw on id_mapped domain.
@@ -842,15 +845,17 @@ dmar_domain_unload(struct dmar_domain *domain,
     struct iommu_map_entries_tailq *entries, bool cansleep)
 {
 	struct dmar_unit *unit;
+	struct iommu_domain *iodom;
 	struct iommu_map_entry *entry, *entry1;
 	int error;
 
+	iodom = (struct iommu_domain *)domain;
 	unit = (struct dmar_unit *)domain->iodom.iommu;
 
 	TAILQ_FOREACH_SAFE(entry, entries, dmamap_link, entry1) {
 		KASSERT((entry->flags & IOMMU_MAP_ENTRY_MAP) != 0,
 		    ("not mapped entry %p %p", domain, entry));
-		error = domain_unmap_buf(domain, entry->start, entry->end -
+		error = iodom->ops.unmap(iodom, entry->start, entry->end -
 		    entry->start, cansleep ? IOMMU_PGF_WAITOK : 0);
 		KASSERT(error == 0, ("unmap %p error %d", domain, error));
 		if (!unit->qi_enabled) {

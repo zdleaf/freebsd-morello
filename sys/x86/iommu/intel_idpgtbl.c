@@ -685,10 +685,13 @@ domain_unmap_buf_locked(struct dmar_domain *domain, iommu_gaddr_t base,
 }
 
 int
-domain_unmap_buf(struct dmar_domain *domain, iommu_gaddr_t base,
+domain_unmap_buf(struct iommu_domain *iodom, iommu_gaddr_t base,
     iommu_gaddr_t size, int flags)
 {
+	struct dmar_domain *domain;
 	int error;
+
+	domain = (struct dmar_domain *)iodom;
 
 	DMAR_DOMAIN_PGLOCK(domain);
 	error = domain_unmap_buf_locked(domain, base, size, flags);
