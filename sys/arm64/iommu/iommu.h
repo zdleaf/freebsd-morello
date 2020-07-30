@@ -35,37 +35,6 @@
 #ifndef _DEV_IOMMU_IOMMU_H_
 #define _DEV_IOMMU_IOMMU_H_
 
-#include <machine/bus.h>
-
-#include <sys/mutex.h>
-#include <sys/bus_dma.h>
-
-#include <sys/systm.h>
-#include <sys/domainset.h>
-#include <sys/malloc.h>
-#include <sys/bus.h>
-#include <sys/conf.h>
-#include <sys/interrupt.h>
-#include <sys/kernel.h>
-#include <sys/ktr.h>
-#include <sys/lock.h>
-#include <sys/proc.h>
-#include <sys/memdesc.h>
-#include <sys/mutex.h>
-#include <sys/sysctl.h>
-#include <sys/rman.h>
-#include <sys/taskqueue.h>
-#include <sys/tree.h>
-#include <sys/uio.h>
-
-#include <vm/vm.h>
-#include <vm/pmap.h>
-
-#include <machine/bus.h>
-#include <machine/bus_dma_impl.h>
-
-#include <dev/iommu/iommu.h>
-
 #define	IOMMU_PAGE_SIZE		4096
 #define	IOMMU_PAGE_MASK		(IOMMU_PAGE_SIZE - 1)
 
