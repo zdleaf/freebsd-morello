@@ -320,11 +320,6 @@ domain_init_rmrr(struct dmar_domain *domain, device_t dev, int bus,
 	return (error);
 }
 
-static const struct iommu_domain_map_ops dmar_domain_map_ops = {
-	.map = domain_map_buf,
-	.unmap = domain_unmap_buf,
-};
-
 static struct dmar_domain *
 dmar_domain_alloc(struct dmar_unit *dmar, bool id_mapped)
 {
@@ -346,8 +341,7 @@ dmar_domain_alloc(struct dmar_unit *dmar, bool id_mapped)
 	mtx_init(&domain->iodom.lock, "dmardom", NULL, MTX_DEF);
 	domain->dmar = dmar;
 	domain->iodom.iommu = &dmar->iommu;
-
-	iodom->ops = &dmar_domain_map_ops;
+	domain_pgtbl_init(domain);
 
 	/*
 	 * For now, use the maximal usable physical address of the
