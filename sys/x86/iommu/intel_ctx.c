@@ -320,6 +320,11 @@ domain_init_rmrr(struct dmar_domain *domain, device_t dev, int bus,
 	return (error);
 }
 
+static const struct iommu_domain_map_ops dmar_domain_map_ops = {
+	.map = domain_map_buf,
+	.unmap = domain_unmap_buf,
+};
+
 static struct dmar_domain *
 dmar_domain_alloc(struct dmar_unit *dmar, bool id_mapped)
 {
@@ -342,8 +347,7 @@ dmar_domain_alloc(struct dmar_unit *dmar, bool id_mapped)
 	domain->dmar = dmar;
 	domain->iodom.iommu = &dmar->iommu;
 
-	iodom->ops.map = domain_map_buf;
-	iodom->ops.unmap = domain_unmap_buf;
+	iodom->ops = &dmar_domain_map_ops;
 
 	/*
 	 * For now, use the maximal usable physical address of the
@@ -855,7 +859,7 @@ dmar_domain_unload(struct dmar_domain *domain,
 	TAILQ_FOREACH_SAFE(entry, entries, dmamap_link, entry1) {
 		KASSERT((entry->flags & IOMMU_MAP_ENTRY_MAP) != 0,
 		    ("not mapped entry %p %p", domain, entry));
-		error = iodom->ops.unmap(iodom, entry->start, entry->end -
+		error = iodom->ops->unmap(iodom, entry->start, entry->end -
 		    entry->start, cansleep ? IOMMU_PGF_WAITOK : 0);
 		KASSERT(error == 0, ("unmap %p error %d", domain, error));
 		if (!unit->qi_enabled) {

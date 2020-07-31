@@ -617,9 +617,9 @@ iommu_gas_map(struct iommu_domain *domain,
 	entry->flags |= eflags;
 	IOMMU_DOMAIN_UNLOCK(domain);
 
-	error = domain->ops.map(domain, entry->start, entry->end - entry->start,
-	    ma, eflags,
-	    ((flags & IOMMU_MF_CANWAIT) != 0 ? IOMMU_PGF_WAITOK : 0));
+	error = domain->ops->map(domain, entry->start,
+	    entry->end - entry->start, ma, eflags,
+	    ((flags & IOMMU_MF_CANWAIT) != 0 ?  IOMMU_PGF_WAITOK : 0));
 	if (error == ENOMEM) {
 		iommu_domain_unload_entry(entry, true);
 		return (error);
@@ -655,9 +655,9 @@ iommu_gas_map_region(struct iommu_domain *domain, struct iommu_map_entry *entry,
 	if (entry->end == entry->start)
 		return (0);
 
-	error = domain->ops.map(domain, entry->start, entry->end - entry->start,
-	    ma + OFF_TO_IDX(start - entry->start), eflags,
-	    ((flags & IOMMU_MF_CANWAIT) != 0 ? IOMMU_PGF_WAITOK : 0));
+	error = domain->ops->map(domain, entry->start,
+	    entry->end - entry->start, ma + OFF_TO_IDX(start - entry->start),
+	    eflags, ((flags & IOMMU_MF_CANWAIT) != 0 ? IOMMU_PGF_WAITOK : 0));
 	if (error == ENOMEM) {
 		iommu_domain_unload_entry(entry, false);
 		return (error);

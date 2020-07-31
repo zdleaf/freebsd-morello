@@ -116,7 +116,7 @@ struct iommu_domain_map_ops {
 
 struct iommu_domain {
 	struct iommu_unit *iommu;	/* (c) */
-	struct iommu_domain_map_ops ops;
+	const struct iommu_domain_map_ops *ops;
 	struct mtx lock;		/* (c) */
 	struct task unload_task;	/* (c) */
 	u_int entries_cnt;		/* (d) */
