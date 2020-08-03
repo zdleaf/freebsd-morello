@@ -68,9 +68,8 @@ __FBSDID("$FreeBSD$");
 #if defined(__amd64__) || defined(__i386__)
 #include <x86/iommu/intel_reg.h>
 #elif defined(__aarch64__)
-#include <arm64/iommu/iommu.h>
 #include <dev/iommu/busdma_iommu.h>
-#include <dev/iommu/iommu.h>
+#include <arm64/iommu/iommu.h>
 #endif
 #include <dev/iommu/busdma_iommu.h>
 

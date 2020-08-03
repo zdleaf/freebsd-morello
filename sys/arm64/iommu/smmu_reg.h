@@ -32,7 +32,7 @@
  * $FreeBSD$
  */
 
-#ifndef _DEV_IOMMU_SMMU_REG_H_
+#ifndef	_DEV_IOMMU_SMMU_REG_H_
 #define	_DEV_IOMMU_SMMU_REG_H_
 
 #define	SMMU_IDR0		0x000
@@ -316,7 +316,7 @@
 #define	STE0_CONFIG_ALL_TRANS	(0x7 << STE0_CONFIG_S)
 #define	STE0_S1FMT_S		4
 #define	STE0_S1FMT_M		(0x3 << STE0_S1FMT_S)
-#define STE0_S1FMT_LINEAR	(0x0 << STE0_S1FMT_S)
+#define	STE0_S1FMT_LINEAR	(0x0 << STE0_S1FMT_S)
 #define	STE0_S1FMT_4KB_L2	(0x1 << STE0_S1FMT_S)
 #define	STE0_S1FMT_64KB_L2	(0x2 << STE0_S1FMT_S)
 #define	STE0_S1CONTEXTPTR_S	6
