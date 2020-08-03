@@ -113,6 +113,57 @@ smmu_domain_unload_task(void *arg, int pending)
 	}
 }
 
+static int
+domain_unmap_buf(struct iommu_domain *iodom, iommu_gaddr_t base,
+    iommu_gaddr_t size, int flags)
+{
+	struct smmu_domain *domain;
+	struct smmu_unit *unit;
+	int error;
+
+	unit = (struct smmu_unit *)iodom->iommu;
+	domain = (struct smmu_domain *)iodom;
+
+	error = IOMMU_UNMAP(unit->dev, domain, base, size);
+
+	return (error);
+}
+
+static int
+domain_map_buf(struct iommu_domain *iodom, iommu_gaddr_t base,
+    iommu_gaddr_t size, vm_page_t *ma, uint64_t eflags, int flags)
+{
+	struct smmu_unit *unit;
+	struct smmu_domain *domain;
+	vm_prot_t prot;
+	vm_offset_t va;
+	vm_paddr_t pa;
+	int error;
+
+	domain = (struct smmu_domain *)iodom;
+
+	dprintf("%s: base %lx, size %lx\n", __func__, base, size);
+
+	prot = 0;
+	if (eflags & IOMMU_MAP_ENTRY_READ)
+		prot |= VM_PROT_READ;
+	if (eflags & IOMMU_MAP_ENTRY_WRITE)
+		prot |= VM_PROT_WRITE;
+
+	va = base;
+	pa = VM_PAGE_TO_PHYS(ma[0]);
+
+	unit = (struct smmu_unit *)iodom->iommu;
+	error = IOMMU_MAP(unit->dev, domain, va, pa, size, prot);
+
+	return (0);
+}
+
+static const struct iommu_domain_map_ops smmu_domain_map_ops = {
+	.map = domain_map_buf,
+	.unmap = domain_unmap_buf,
+};
+
 static struct smmu_domain *
 smmu_domain_alloc(struct iommu_unit *unit)
 {
@@ -136,6 +187,7 @@ smmu_domain_alloc(struct iommu_unit *unit)
 	domain->domain.iommu = unit;
 	domain->domain.end = BUS_SPACE_MAXADDR;
 	iommu_gas_init_domain(&domain->domain);
+	domain->domain.ops = &smmu_domain_map_ops;
 
 	IOMMU_LOCK(unit);
 	LIST_INSERT_HEAD(&iommu->domain_list, domain, next);
@@ -391,22 +443,6 @@ smmu_domain_free_entry(struct iommu_map_entry *entry, bool free)
 		entry->flags = 0;
 }
 
-static int
-domain_unmap_buf(struct iommu_domain *iodom, iommu_gaddr_t base,
-    iommu_gaddr_t size, int flags)
-{
-	struct smmu_domain *domain;
-	struct smmu_unit *unit;
-	int error;
-
-	unit = (struct smmu_unit *)iodom->iommu;
-	domain = (struct smmu_domain *)iodom;
-
-	error = IOMMU_UNMAP(unit->dev, domain, base, size);
-
-	return (error);
-}
-
 void
 iommu_domain_unload(struct iommu_domain *domain,
     struct iommu_map_entries_tailq *entries, bool cansleep)
@@ -420,7 +456,7 @@ iommu_domain_unload(struct iommu_domain *domain,
 	TAILQ_FOREACH_SAFE(entry, entries, dmamap_link, entry1) {
 		KASSERT((entry->flags & IOMMU_MAP_ENTRY_MAP) != 0,
 		    ("not mapped entry %p %p", domain, entry));
-		error = domain_unmap_buf(domain, entry->start, entry->end -
+		error = domain->ops->unmap(domain, entry->start, entry->end -
 		    entry->start, cansleep ? IOMMU_PGF_WAITOK : 0);
 		KASSERT(error == 0, ("unmap %p error %d", domain, error));
 		TAILQ_REMOVE(entries, entry, dmamap_link);
@@ -544,36 +580,6 @@ iommu_domain_unload_entry(struct iommu_map_entry *entry, bool free)
 	dprintf("%s\n", __func__);
 
 	smmu_domain_free_entry(entry, free);
-}
-
-int
-domain_map_buf(struct iommu_domain *iodom, iommu_gaddr_t base,
-    iommu_gaddr_t size, vm_page_t *ma, uint64_t eflags, int flags)
-{
-	struct smmu_unit *unit;
-	struct smmu_domain *domain;
-	vm_prot_t prot;
-	vm_offset_t va;
-	vm_paddr_t pa;
-	int error;
-
-	domain = (struct smmu_domain *)iodom;
-
-	dprintf("%s: base %lx, size %lx\n", __func__, base, size);
-
-	prot = 0;
-	if (eflags & IOMMU_MAP_ENTRY_READ)
-		prot |= VM_PROT_READ;
-	if (eflags & IOMMU_MAP_ENTRY_WRITE)
-		prot |= VM_PROT_WRITE;
-
-	va = base;
-	pa = VM_PAGE_TO_PHYS(ma[0]);
-
-	unit = (struct smmu_unit *)iodom->iommu;
-	error = IOMMU_MAP(unit->dev, domain, va, pa, size, prot);
-
-	return (0);
 }
 
 static void

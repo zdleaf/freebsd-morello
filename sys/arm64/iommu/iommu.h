@@ -81,7 +81,4 @@ int iommu_map_page(struct smmu_domain *domain, vm_offset_t va, vm_paddr_t pa,
     vm_prot_t prot);
 int iommu_unmap_page(struct smmu_domain *domain, vm_offset_t va);
 
-int domain_map_buf(struct iommu_domain *domain, iommu_gaddr_t base,
-    iommu_gaddr_t size, vm_page_t *ma, uint64_t pflags, int flags);
-
 #endif /* _DEV_IOMMU_IOMMU_H_ */
