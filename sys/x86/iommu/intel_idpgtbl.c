@@ -823,6 +823,6 @@ domain_pgtbl_init(struct dmar_domain *domain)
 {
 	struct iommu_domain *iodom;
 
-	iodom = (struct iommu_domain *)domain;
+	iodom = DMAR2IODOM(domain);
 	iodom->ops = &dmar_domain_map_ops;
 }

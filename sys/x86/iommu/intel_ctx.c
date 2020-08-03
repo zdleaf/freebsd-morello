@@ -283,8 +283,7 @@ domain_init_rmrr(struct dmar_domain *domain, device_t dev, int bus,
 			ma[i] = vm_page_getfake(entry->start + PAGE_SIZE * i,
 			    VM_MEMATTR_DEFAULT);
 		}
-		error1 = iommu_gas_map_region((struct iommu_domain *)domain,
-		    entry,
+		error1 = iommu_gas_map_region(DMAR2IODOM(domain), entry,
 		    IOMMU_MAP_ENTRY_READ | IOMMU_MAP_ENTRY_WRITE,
 		    IOMMU_MF_CANWAIT | IOMMU_MF_RMRR, ma);
 		/*
@@ -310,8 +309,7 @@ domain_init_rmrr(struct dmar_domain *domain, device_t dev, int bus,
 				error = error1;
 			}
 			TAILQ_REMOVE(&rmrr_entries, entry, unroll_link);
-			iommu_gas_free_entry((struct iommu_domain *)domain,
-			    entry);
+			iommu_gas_free_entry(DMAR2IODOM(domain), entry);
 		}
 		for (i = 0; i < size; i++)
 			vm_page_putfake(ma[i]);
@@ -331,7 +329,7 @@ dmar_domain_alloc(struct dmar_unit *dmar, bool id_mapped)
 	if (id == -1)
 		return (NULL);
 	domain = malloc(sizeof(*domain), M_DMAR_DOMAIN, M_WAITOK | M_ZERO);
-	iodom = (struct iommu_domain *)domain;
+	iodom = DMAR2IODOM(domain);
 	domain->domain = id;
 	LIST_INIT(&domain->contexts);
 	RB_INIT(&domain->iodom.rb_root);
@@ -358,7 +356,7 @@ dmar_domain_alloc(struct dmar_unit *dmar, bool id_mapped)
 		/* Use all supported address space for remapping. */
 		domain->iodom.end = 1ULL << (domain->agaw - 1);
 
-	iommu_gas_init_domain((struct iommu_domain *)domain);
+	iommu_gas_init_domain(DMAR2IODOM(domain));
 
 	if (id_mapped) {
 		if ((dmar->hw_ecap & DMAR_ECAP_PT) == 0) {
@@ -389,7 +387,7 @@ dmar_ctx_alloc(struct dmar_domain *domain, uint16_t rid)
 	struct dmar_ctx *ctx;
 
 	ctx = malloc(sizeof(*ctx), M_DMAR_CTX, M_WAITOK | M_ZERO);
-	ctx->context.domain = (struct iommu_domain *)domain;
+	ctx->context.domain = DMAR2IODOM(domain);
 	ctx->context.tag = malloc(sizeof(struct bus_dma_tag_iommu),
 	    M_DMAR_CTX, M_WAITOK | M_ZERO);
 	ctx->rid = rid;
@@ -444,7 +442,7 @@ dmar_domain_destroy(struct dmar_domain *domain)
 	    ("destroying dom %p with refs %d", domain, domain->refs));
 	if ((domain->iodom.flags & IOMMU_DOMAIN_GAS_INITED) != 0) {
 		DMAR_DOMAIN_LOCK(domain);
-		iommu_gas_fini_domain((struct iommu_domain *)domain);
+		iommu_gas_fini_domain(DMAR2IODOM(domain));
 		DMAR_DOMAIN_UNLOCK(domain);
 	}
 	if ((domain->iodom.flags & IOMMU_DOMAIN_PGTBL_INITED) != 0) {
@@ -847,7 +845,7 @@ dmar_domain_unload(struct dmar_domain *domain,
 	struct iommu_map_entry *entry, *entry1;
 	int error;
 
-	iodom = (struct iommu_domain *)domain;
+	iodom = DMAR2IODOM(domain);
 	unit = (struct dmar_unit *)domain->iodom.iommu;
 
 	TAILQ_FOREACH_SAFE(entry, entries, dmamap_link, entry1) {
