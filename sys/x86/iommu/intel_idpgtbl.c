@@ -512,7 +512,7 @@ domain_map_buf(struct iommu_domain *iodom, iommu_gaddr_t base,
 	    ((eflags & IOMMU_MAP_ENTRY_SNOOP) != 0 ? DMAR_PTE_SNP : 0) |
 	    ((eflags & IOMMU_MAP_ENTRY_TM) != 0 ? DMAR_PTE_TM : 0);
 
-	domain = (struct dmar_domain *)iodom;
+	domain = IODOM2DMAR(iodom);
 	unit = domain->dmar;
 
 	KASSERT((domain->iodom.flags & IOMMU_DOMAIN_IDMAP) == 0,
@@ -691,7 +691,7 @@ domain_unmap_buf(struct iommu_domain *iodom, iommu_gaddr_t base,
 	struct dmar_domain *domain;
 	int error;
 
-	domain = (struct dmar_domain *)iodom;
+	domain = IODOM2DMAR(iodom);
 
 	DMAR_DOMAIN_PGLOCK(domain);
 	error = domain_unmap_buf_locked(domain, base, size, flags);

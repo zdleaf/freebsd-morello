@@ -92,6 +92,7 @@ struct dmar_ctx {
 #define	DMAR_DOMAIN_ASSERT_LOCKED(dom) mtx_assert(&(dom)->iodom.lock, MA_OWNED)
 
 #define	DMAR2IODOM(dmar)	(struct iommu_domain *)(dmar)
+#define	IODOM2DMAR(iodom)	(struct dmar_domain *)(iodom)
 
 struct dmar_msi_data {
 	int irq;
