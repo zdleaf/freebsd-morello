@@ -141,7 +141,7 @@ device_tag_init(struct dmar_ctx *ctx, device_t dev)
 	ctx->context.tag->common.maxsize = maxaddr;
 	ctx->context.tag->common.nsegments = BUS_SPACE_UNRESTRICTED;
 	ctx->context.tag->common.maxsegsz = maxaddr;
-	ctx->context.tag->ctx = (struct iommu_ctx *)ctx;
+	ctx->context.tag->ctx = CTX2IOCTX(ctx);
 	ctx->context.tag->owner = dev;
 }
 
@@ -196,7 +196,7 @@ ctx_id_entry_init(struct dmar_ctx *ctx, dmar_ctx_entry_t *ctxp, bool move,
 		    IOMMU_PGF_NOALLOC);
 	}
 
-	if (iommu_is_buswide_ctx((struct iommu_unit *)unit, busno)) {
+	if (iommu_is_buswide_ctx(DMAR2IOMMU(unit), busno)) {
 		MPASS(!move);
 		for (i = 0; i <= PCI_BUSMAX; i++) {
 			ctx_id_entry_init_one(&ctxp[i], domain, ctx_root);
@@ -480,7 +480,7 @@ dmar_get_ctx_for_dev1(struct dmar_unit *dmar, device_t dev, uint16_t rid,
 	}
 	enable = false;
 	TD_PREP_PINNED_ASSERT;
-	unit = (struct iommu_unit *)dmar;
+	unit = DMAR2IOMMU(dmar);
 	DMAR_LOCK(dmar);
 	KASSERT(!iommu_is_buswide_ctx(unit, bus) || (slot == 0 && func == 0),
 	    ("iommu%d pci%d:%d:%d get_ctx for buswide", dmar->iommu.unit, bus,
@@ -906,7 +906,7 @@ iommu_get_ctx(struct iommu_unit *iommu, device_t dev, uint16_t rid,
 
 	ret = dmar_get_ctx_for_dev(dmar, dev, rid, id_mapped, rmrr_init);
 
-	return ((struct iommu_ctx *)ret);
+	return (CTX2IOCTX(ret));
 }
 
 void
