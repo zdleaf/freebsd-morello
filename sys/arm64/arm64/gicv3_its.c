@@ -1411,10 +1411,13 @@ gicv3_its_map_msi(device_t dev, device_t child, struct intr_irqsrc *isrc,
 	struct gicv3_its_irqsrc *girq;
 
 	sc = device_get_softc(dev);
-	girq = (struct gicv3_its_irqsrc *)isrc;
 
 	*addr = vtophys(rman_get_virtual(sc->sc_its_res)) + GITS_TRANSLATER;
-	*data = girq->gi_id;
+
+	if (isrc) {
+		girq = (struct gicv3_its_irqsrc *)isrc;
+		*data = girq->gi_id;
+	}
 
 	return (0);
 }
