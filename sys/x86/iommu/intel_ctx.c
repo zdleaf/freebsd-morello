@@ -902,7 +902,7 @@ iommu_get_ctx(struct iommu_unit *iommu, device_t dev, uint16_t rid,
 	struct dmar_unit *dmar;
 	struct dmar_ctx *ret;
 
-	dmar = (struct dmar_unit *)iommu;
+	dmar = IOMMU2DMAR(iommu);
 
 	ret = dmar_get_ctx_for_dev(dmar, dev, rid, id_mapped, rmrr_init);
 
@@ -915,7 +915,7 @@ iommu_free_ctx_locked(struct iommu_unit *iommu, struct iommu_ctx *context)
 	struct dmar_unit *dmar;
 	struct dmar_ctx *ctx;
 
-	dmar = (struct dmar_unit *)iommu;
+	dmar = IOMMU2DMAR(iommu);
 	ctx = (struct dmar_ctx *)context;
 
 	dmar_free_ctx_locked(dmar, ctx);
