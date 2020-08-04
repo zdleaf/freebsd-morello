@@ -916,7 +916,7 @@ iommu_free_ctx_locked(struct iommu_unit *iommu, struct iommu_ctx *context)
 	struct dmar_ctx *ctx;
 
 	dmar = IOMMU2DMAR(iommu);
-	ctx = (struct dmar_ctx *)context;
+	ctx = IOCTX2CTX(context);
 
 	dmar_free_ctx_locked(dmar, ctx);
 }
@@ -924,11 +924,9 @@ iommu_free_ctx_locked(struct iommu_unit *iommu, struct iommu_ctx *context)
 void
 iommu_free_ctx(struct iommu_ctx *context)
 {
-	struct dmar_unit *dmar;
 	struct dmar_ctx *ctx;
 
-	ctx = (struct dmar_ctx *)context;
-	dmar = CTX2DMAR(ctx);
+	ctx = IOCTX2CTX(context);
 
 	dmar_free_ctx(ctx);
 }

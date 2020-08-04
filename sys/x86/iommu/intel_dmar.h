@@ -99,8 +99,12 @@ struct dmar_ctx {
 #define	IODOM2DOM(domain)	\
 	__containerof((domain), struct dmar_domain, iodom)
 
+#define	CTX2IOCTX(ctx)		&((ctx)->context)
+#define	IOCTX2CTX(ctx)		\
+	__containerof((ctx), struct dmar_ctx, context)
+
 #define	CTX2DOM(ctx)		IODOM2DOM((ctx)->context.domain)
-#define	CTX2DMAR(ctx)		CTX2DOM(ctx)->dmar
+#define	CTX2DMAR(ctx)		(CTX2DOM(ctx)->dmar)
 #define	DOM2DMAR(domain)	((domain)->dmar)
 
 struct dmar_msi_data {
