@@ -117,7 +117,7 @@ dmar_map_ctx_entry(struct dmar_ctx *ctx, struct sf_buf **sfp)
 	struct dmar_unit *dmar;
 	dmar_ctx_entry_t *ctxp;
 
-	dmar = (struct dmar_unit *)ctx->context.domain->iommu;
+	dmar = CTX2DMAR(ctx);
 
 	ctxp = dmar_map_pgtbl(dmar->ctx_obj, 1 +
 	    PCI_RID2BUS(ctx->rid), IOMMU_PGF_NOALLOC | IOMMU_PGF_WAITOK, sfp);
@@ -179,7 +179,7 @@ ctx_id_entry_init(struct dmar_ctx *ctx, dmar_ctx_entry_t *ctxp, bool move,
 	int i;
 
 	domain = CTX2DOM(ctx);
-	unit = (struct dmar_unit *)domain->iodom.iommu;
+	unit = DOM2DMAR(domain);
 	KASSERT(move || (ctxp->ctx1 == 0 && ctxp->ctx2 == 0),
 	    ("dmar%d: initialized ctx entry %d:%d:%d 0x%jx 0x%jx",
 	    unit->iommu.unit, busno, pci_get_slot(ctx->context.tag->owner),
@@ -451,7 +451,7 @@ dmar_domain_destroy(struct dmar_domain *domain)
 		domain_free_pgtbl(domain);
 	}
 	mtx_destroy(&domain->iodom.lock);
-	dmar = (struct dmar_unit *)domain->iodom.iommu;
+	dmar = DOM2DMAR(domain);
 	free_unr(dmar->domids, domain->domain);
 	free(domain, M_DMAR_DOMAIN);
 }
@@ -759,7 +759,7 @@ dmar_free_ctx(struct dmar_ctx *ctx)
 {
 	struct dmar_unit *dmar;
 
-	dmar = (struct dmar_unit *)ctx->context.domain->iommu;
+	dmar = CTX2DMAR(ctx);
 	DMAR_LOCK(dmar);
 	dmar_free_ctx_locked(dmar, ctx);
 }
@@ -809,7 +809,7 @@ dmar_domain_unload_entry(struct iommu_map_entry *entry, bool free)
 	struct dmar_unit *unit;
 
 	domain = IODOM2DOM(entry->domain);
-	unit = (struct dmar_unit *)domain->iodom.iommu;
+	unit = DOM2DMAR(domain);
 	if (unit->qi_enabled) {
 		DMAR_LOCK(unit);
 		dmar_qi_invalidate_locked(IODOM2DOM(entry->domain),
@@ -846,7 +846,7 @@ dmar_domain_unload(struct dmar_domain *domain,
 	int error;
 
 	iodom = DOM2IODOM(domain);
-	unit = (struct dmar_unit *)domain->iodom.iommu;
+	unit = DOM2DMAR(domain);
 
 	TAILQ_FOREACH_SAFE(entry, entries, dmamap_link, entry1) {
 		KASSERT((entry->flags & IOMMU_MAP_ENTRY_MAP) != 0,
@@ -928,7 +928,7 @@ iommu_free_ctx(struct iommu_ctx *context)
 	struct dmar_ctx *ctx;
 
 	ctx = (struct dmar_ctx *)context;
-	dmar = (struct dmar_unit *)ctx->context.domain->iommu;
+	dmar = CTX2DMAR(ctx);
 
 	dmar_free_ctx(ctx);
 }

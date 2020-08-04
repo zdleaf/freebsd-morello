@@ -1055,7 +1055,7 @@ dmar_instantiate_rmrr_ctxs(struct iommu_unit *unit)
 	struct inst_rmrr_iter_args iria;
 	int error;
 
-	dmar = (struct dmar_unit *)unit;
+	dmar = IOMMU2DMAR(unit);
 
 	if (!dmar_barrier_enter(dmar, DMAR_BARRIER_RMRR))
 		return (0);
