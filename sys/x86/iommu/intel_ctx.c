@@ -131,7 +131,7 @@ device_tag_init(struct dmar_ctx *ctx, device_t dev)
 	struct dmar_domain *domain;
 	bus_addr_t maxaddr;
 
-	domain = IODOM2DMAR(ctx->context.domain);
+	domain = CTX2DMARDOM(ctx);
 	maxaddr = MIN(domain->iodom.end, BUS_SPACE_MAXADDR);
 	ctx->context.tag->common.ref_count = 1; /* Prevent free */
 	ctx->context.tag->common.impl = &bus_dma_iommu_impl;
@@ -178,7 +178,7 @@ ctx_id_entry_init(struct dmar_ctx *ctx, dmar_ctx_entry_t *ctxp, bool move,
 	vm_page_t ctx_root;
 	int i;
 
-	domain = IODOM2DMAR(ctx->context.domain);
+	domain = CTX2DMARDOM(ctx);
 	unit = (struct dmar_unit *)domain->iodom.iommu;
 	KASSERT(move || (ctxp->ctx1 == 0 && ctxp->ctx2 == 0),
 	    ("dmar%d: initialized ctx entry %d:%d:%d 0x%jx 0x%jx",
@@ -400,7 +400,7 @@ dmar_ctx_link(struct dmar_ctx *ctx)
 {
 	struct dmar_domain *domain;
 
-	domain = IODOM2DMAR(ctx->context.domain);
+	domain = CTX2DMARDOM(ctx);
 	IOMMU_ASSERT_LOCKED(domain->iodom.iommu);
 	KASSERT(domain->refs >= domain->ctx_cnt,
 	    ("dom %p ref underflow %d %d", domain, domain->refs,
@@ -415,7 +415,7 @@ dmar_ctx_unlink(struct dmar_ctx *ctx)
 {
 	struct dmar_domain *domain;
 
-	domain = IODOM2DMAR(ctx->context.domain);
+	domain = CTX2DMARDOM(ctx);
 	IOMMU_ASSERT_LOCKED(domain->iodom.iommu);
 	KASSERT(domain->refs > 0,
 	    ("domain %p ctx dtr refs %d", domain, domain->refs));
@@ -548,11 +548,11 @@ dmar_get_ctx_for_dev1(struct dmar_unit *dmar, device_t dev, uint16_t rid,
 			dmar_domain_destroy(domain1);
 			/* Nothing needs to be done to destroy ctx1. */
 			free(ctx1, M_DMAR_CTX);
-			domain = IODOM2DMAR(ctx->context.domain);
+			domain = CTX2DMARDOM(ctx);
 			ctx->refs++; /* tag referenced us */
 		}
 	} else {
-		domain = IODOM2DMAR(ctx->context.domain);
+		domain = CTX2DMARDOM(ctx);
 		if (ctx->context.tag->owner == NULL)
 			ctx->context.tag->owner = dev;
 		ctx->refs++; /* tag referenced us */
@@ -625,7 +625,7 @@ dmar_move_ctx_to_domain(struct dmar_domain *domain, struct dmar_ctx *ctx)
 	int error;
 
 	dmar = domain->dmar;
-	old_domain = IODOM2DMAR(ctx->context.domain);
+	old_domain = CTX2DMARDOM(ctx);
 	if (domain == old_domain)
 		return (0);
 	KASSERT(old_domain->iodom.iommu == domain->iodom.iommu,
@@ -746,7 +746,7 @@ dmar_free_ctx_locked(struct dmar_unit *dmar, struct dmar_ctx *ctx)
 			dmar_inv_iotlb_glob(dmar);
 	}
 	dmar_unmap_pgtbl(sf);
-	domain = IODOM2DMAR(ctx->context.domain);
+	domain = CTX2DMARDOM(ctx);
 	dmar_ctx_unlink(ctx);
 	free(ctx->context.tag, M_DMAR_CTX);
 	free(ctx, M_DMAR_CTX);

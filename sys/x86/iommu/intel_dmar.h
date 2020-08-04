@@ -94,6 +94,7 @@ struct dmar_ctx {
 #define	DMAR2IODOM(domain)	&((domain)->iodom)
 #define	IODOM2DMAR(domain)	\
 	__containerof((domain),	 struct dmar_domain, iodom)
+#define	CTX2DMARDOM(ctx)	IODOM2DMAR((ctx)->context.domain)
 
 struct dmar_msi_data {
 	int irq;
