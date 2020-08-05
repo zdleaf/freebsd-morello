@@ -322,6 +322,7 @@ static struct dmar_domain *
 dmar_domain_alloc(struct dmar_unit *dmar, bool id_mapped)
 {
 	struct iommu_domain *iodom;
+	struct iommu_unit *unit;
 	struct dmar_domain *domain;
 	int error, id, mgaw;
 
@@ -330,14 +331,14 @@ dmar_domain_alloc(struct dmar_unit *dmar, bool id_mapped)
 		return (NULL);
 	domain = malloc(sizeof(*domain), M_DMAR_DOMAIN, M_WAITOK | M_ZERO);
 	iodom = DOM2IODOM(domain);
+	unit = DMAR2IOMMU(dmar);
 	domain->domain = id;
 	LIST_INIT(&domain->contexts);
 	TASK_INIT(&domain->iodom.unload_task, 0, dmar_domain_unload_task,
 	    domain);
-	iommu_domain_init(iodom);
+	iommu_domain_init(unit, iodom);
 
 	domain->dmar = dmar;
-	domain->iodom.iommu = &dmar->iommu;
 	domain_pgtbl_init(domain);
 
 	/*

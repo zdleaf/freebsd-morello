@@ -223,7 +223,7 @@ int iommu_gas_reserve_region(struct iommu_domain *domain, iommu_gaddr_t start,
 
 void iommu_set_buswide_ctx(struct iommu_unit *unit, u_int busno);
 bool iommu_is_buswide_ctx(struct iommu_unit *unit, u_int busno);
-void iommu_domain_init(struct iommu_domain *domain);
+void iommu_domain_init(struct iommu_unit *unit, struct iommu_domain *domain);
 void iommu_domain_fini(struct iommu_domain *domain);
 
 bool bus_dma_iommu_set_buswide(device_t dev);
