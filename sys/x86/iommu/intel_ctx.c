@@ -334,8 +334,9 @@ dmar_domain_alloc(struct dmar_unit *dmar, bool id_mapped)
 	unit = DMAR2IOMMU(dmar);
 	domain->domain = id;
 	LIST_INIT(&domain->contexts);
-	iommu_domain_init(unit, iodom, &dmar_domain_map_ops,
-	    dmar_domain_unload_task);
+	TASK_INIT(&domain->iodom.unload_task, 0, dmar_domain_unload_task,
+	    domain);
+	iommu_domain_init(unit, iodom, &dmar_domain_map_ops);
 
 	domain->dmar = dmar;
 

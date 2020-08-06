@@ -1066,14 +1066,12 @@ bus_dma_iommu_load_ident(bus_dma_tag_t dmat, bus_dmamap_t map1,
 
 void
 iommu_domain_init(struct iommu_unit *unit, struct iommu_domain *domain,
-    const struct iommu_domain_map_ops *ops,
-    void (*domain_unload_task)(void *, int))
+    const struct iommu_domain_map_ops *ops)
 {
 
 	domain->ops = ops;
 	domain->iommu = unit;
 
-	TASK_INIT(&domain->unload_task, 0, domain_unload_task, domain);
 	RB_INIT(&domain->rb_root);
 	TAILQ_INIT(&domain->unload_entries);
 	mtx_init(&domain->lock, "iodom", NULL, MTX_DEF);
