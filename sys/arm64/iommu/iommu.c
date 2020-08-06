@@ -89,28 +89,6 @@ static MALLOC_DEFINE(M_BUSDMA, "SMMU", "ARM64 busdma SMMU");
 static struct mtx iommu_mtx;
 static LIST_HEAD(, smmu_unit) iommu_list = LIST_HEAD_INITIALIZER(iommu_list);
 
-static void
-smmu_domain_unload_task(void *arg, int pending)
-{
-	struct iommu_domain *iodom;
-	struct smmu_domain *domain;
-	struct iommu_map_entries_tailq entries;
-
-	domain = arg;
-	iodom = (struct iommu_domain *)domain;
-	TAILQ_INIT(&entries);
-
-	for (;;) {
-		IOMMU_DOMAIN_LOCK(iodom);
-		TAILQ_SWAP(&domain->domain.unload_entries, &entries,
-		    iommu_map_entry, dmamap_link);
-		IOMMU_DOMAIN_UNLOCK(iodom);
-		if (TAILQ_EMPTY(&entries))
-			break;
-		iommu_domain_unload(iodom, &entries, true);
-	}
-}
-
 static int
 domain_unmap_buf(struct iommu_domain *iodom, iommu_gaddr_t base,
     iommu_gaddr_t size, int flags)
@@ -178,8 +156,6 @@ smmu_domain_alloc(struct iommu_unit *unit)
 	iodom = (struct iommu_domain *)domain;
 
 	LIST_INIT(&domain->ctx_list);
-	TASK_INIT(&domain->domain.unload_task, 0, smmu_domain_unload_task,
-	    domain);
 	iommu_domain_init(unit, iodom, &smmu_domain_map_ops);
 
 	domain->domain.end = BUS_SPACE_MAXADDR;
