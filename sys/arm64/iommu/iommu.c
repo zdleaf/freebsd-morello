@@ -561,7 +561,7 @@ iommu_domain_unload_entry(struct iommu_map_entry *entry, bool free)
 }
 
 void
-smmu_map_msi(device_t pci, device_t child, uint64_t msi_addr)
+smmu_map_msi(device_t child, uint64_t msi_addr)
 {
 	struct smmu_ctx *ctx;
 	uint64_t gic_page;
