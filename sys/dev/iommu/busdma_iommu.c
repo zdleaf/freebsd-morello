@@ -59,20 +59,12 @@ __FBSDID("$FreeBSD$");
 #include <vm/vm_object.h>
 #include <vm/vm_page.h>
 #include <vm/vm_map.h>
+#include <dev/iommu/iommu.h>
 #include <machine/atomic.h>
 #include <machine/bus.h>
 #include <machine/md_var.h>
-#if defined(__amd64__) || defined(__i386__)
-#include <machine/specialreg.h>
-#include <x86/include/busdma_impl.h>
-#include <x86/iommu/intel_reg.h>
+#include <machine/iommu.h>
 #include <dev/iommu/busdma_iommu.h>
-#include <dev/iommu/iommu.h>
-#include <x86/iommu/intel_dmar.h>
-#elif defined(__aarch64__)
-#include <dev/iommu/busdma_iommu.h>
-#include <arm64/iommu/iommu.h>
-#endif
 
 /*
  * busdma_iommu.c, the implementation of the busdma(9) interface using
@@ -886,7 +878,7 @@ iommu_bus_dmamap_unload(bus_dma_tag_t dmat, bus_dmamap_t map1)
 	struct bus_dmamap_iommu *map;
 	struct iommu_ctx *ctx;
 	struct iommu_domain *domain;
-#if defined(__amd64__) || defined(__aarch64__)
+#if defined(__amd64__)
 	struct iommu_map_entries_tailq entries;
 #endif
 
@@ -1070,4 +1062,24 @@ bus_dma_iommu_load_ident(bus_dma_tag_t dmat, bus_dmamap_t map1,
 		vm_page_putfake(ma[i]);
 	free(ma, M_TEMP);
 	return (error);
+}
+
+void
+iommu_domain_init(struct iommu_unit *unit, struct iommu_domain *domain,
+    const struct iommu_domain_map_ops *ops)
+{
+
+	domain->ops = ops;
+	domain->iommu = unit;
+
+	RB_INIT(&domain->rb_root);
+	TAILQ_INIT(&domain->unload_entries);
+	mtx_init(&domain->lock, "iodom", NULL, MTX_DEF);
+}
+
+void
+iommu_domain_fini(struct iommu_domain *domain)
+{
+
+	mtx_destroy(&domain->lock);
 }
