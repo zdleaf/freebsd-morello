@@ -165,6 +165,7 @@ static const struct iommu_domain_map_ops smmu_domain_map_ops = {
 static struct smmu_domain *
 smmu_domain_alloc(struct iommu_unit *unit)
 {
+	struct iommu_domain *iodom;
 	struct smmu_unit *iommu;
 	struct smmu_domain *domain;
 
@@ -174,18 +175,15 @@ smmu_domain_alloc(struct iommu_unit *unit)
 	if (domain == NULL)
 		return (NULL);
 
-	LIST_INIT(&domain->ctx_list);
+	iodom = (struct iommu_domain *)domain;
 
-	RB_INIT(&domain->domain.rb_root);
-	TAILQ_INIT(&domain->domain.unload_entries);
+	LIST_INIT(&domain->ctx_list);
 	TASK_INIT(&domain->domain.unload_task, 0, smmu_domain_unload_task,
 	    domain);
-	mtx_init(&domain->domain.lock, "IOMMU domain", NULL, MTX_DEF);
+	iommu_domain_init(unit, iodom, &smmu_domain_map_ops);
 
-	domain->domain.iommu = unit;
 	domain->domain.end = BUS_SPACE_MAXADDR;
 	iommu_gas_init_domain(&domain->domain);
-	domain->domain.ops = &smmu_domain_map_ops;
 
 	IOMMU_LOCK(unit);
 	LIST_INSERT_HEAD(&iommu->domain_list, domain, next);
