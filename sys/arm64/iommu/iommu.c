@@ -284,7 +284,7 @@ iommu_get_gic_page(device_t dev, uint64_t *gic_page)
 	if (error)
 		return (error);
 
-	error = intr_map_msi(NULL, dev, xref, 0, &msi_addr, NULL);
+	error = intr_map_msi(NULL, dev, xref, -1, &msi_addr, NULL);
 	if (error)
 		return (error);
 
