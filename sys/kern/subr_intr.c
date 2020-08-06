@@ -1441,12 +1441,9 @@ intr_map_msi(device_t pci, device_t child, intptr_t xref, int irq,
 	    ("%s: Found a non-MSI controller: %s", __func__,
 	     device_get_name(pic->pic_dev)));
 
-	if (irq >= 0) {
-		isrc = intr_map_get_isrc(irq);
-		if (isrc == NULL)
-			return (EINVAL);
-	} else
-		isrc = NULL;
+	isrc = intr_map_get_isrc(irq);
+	if (isrc == NULL)
+		return (EINVAL);
 
 	err = MSI_MAP_MSI(pic->pic_dev, child, isrc, addr, data);
 	return (err);

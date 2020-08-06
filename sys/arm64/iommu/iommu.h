@@ -80,5 +80,6 @@ int iommu_register(device_t dev, struct smmu_unit *unit, intptr_t xref);
 int iommu_map_page(struct smmu_domain *domain, vm_offset_t va, vm_paddr_t pa,
     vm_prot_t prot);
 int iommu_unmap_page(struct smmu_domain *domain, vm_offset_t va);
+void smmu_map_msi(device_t, device_t, uint64_t);
 
 #endif /* _DEV_IOMMU_IOMMU_H_ */

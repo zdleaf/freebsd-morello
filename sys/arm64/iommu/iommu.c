@@ -269,39 +269,9 @@ smmu_ctx_attach(struct smmu_domain *domain, struct smmu_ctx *ctx)
 }
 
 static int
-iommu_get_gic_page(device_t dev, uint64_t *gic_page)
+iommu_map_gic_page(struct smmu_domain *domain, uint64_t gic_page)
 {
-	uint64_t msi_addr;
-	uint16_t rid;
-	u_int devid;
-	u_int xref;
 	int error;
-	int seg;
-
-	seg = pci_get_domain(dev);
-	rid = pci_get_rid(dev);
-	error = acpi_iort_map_pci_msi(seg, rid, &xref, &devid);
-	if (error)
-		return (error);
-
-	error = intr_map_msi(NULL, dev, xref, -1, &msi_addr, NULL);
-	if (error)
-		return (error);
-
-	*gic_page = trunc_page(msi_addr);
-
-	return (0);
-}
-
-static int
-iommu_map_gic_page(device_t dev, struct smmu_domain *domain)
-{
-	uint64_t gic_page;
-	int error;
-
-	error = iommu_get_gic_page(dev, &gic_page);
-	if (error != 0)
-		return (error);
 
 	/* Reserve the GIC page */
 	error = iommu_gas_reserve_region(&domain->domain, gic_page,
@@ -311,21 +281,6 @@ iommu_map_gic_page(device_t dev, struct smmu_domain *domain)
 
 	/* Map the GICv3 ITS page so the device could send MSI interrupts. */
 	iommu_map_page(domain, gic_page, gic_page, VM_PROT_WRITE);
-
-	return (0);
-}
-
-static int
-iommu_unmap_gic_page(device_t dev, struct smmu_domain *domain)
-{
-	uint64_t gic_page;
-	int error;
-
-	error = iommu_get_gic_page(dev, &gic_page);
-	if (error)
-		return (error);
-
-	iommu_unmap_page(domain, gic_page);
 
 	return (0);
 }
@@ -365,8 +320,6 @@ iommu_get_ctx(struct iommu_unit *iommu, device_t requester,
 
 	ctx->domain = domain;
 
-	iommu_map_gic_page(requester, domain);
-
 	error = smmu_ctx_attach(domain, ctx);
 	if (error) {
 		smmu_domain_free(domain);
@@ -395,8 +348,6 @@ iommu_free_ctx_locked(struct iommu_unit *unit, struct iommu_ctx *ctx)
 		device_printf(iommu->dev, "Failed to remove device\n");
 		return;
 	}
-
-	iommu_unmap_gic_page(context->dev, domain);
 
 	LIST_REMOVE((struct smmu_ctx *)ctx, next);
 	free(ctx->tag, M_IOMMU);
@@ -607,6 +558,19 @@ iommu_domain_unload_entry(struct iommu_map_entry *entry, bool free)
 	dprintf("%s\n", __func__);
 
 	smmu_domain_free_entry(entry, free);
+}
+
+void
+smmu_map_msi(device_t pci, device_t child, uint64_t msi_addr)
+{
+	struct smmu_ctx *ctx;
+	uint64_t gic_page;
+
+	ctx = smmu_ctx_lookup(child);
+	if (ctx) {
+		gic_page = trunc_page(msi_addr);
+		iommu_map_gic_page(ctx->domain, gic_page);
+	}
 }
 
 static void

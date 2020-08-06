@@ -39,13 +39,17 @@ __FBSDID("$FreeBSD$");
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/malloc.h>
+#include <sys/memdesc.h>
 #include <sys/kernel.h>
+#include <sys/tree.h>
 #include <sys/rman.h>
 #include <sys/module.h>
 #include <sys/bus.h>
 #include <sys/endian.h>
 #include <sys/cpuset.h>
 #include <sys/rwlock.h>
+#include <vm/vm.h>
+#include <vm/vm_page.h>
 
 #include <contrib/dev/acpica/include/acpi.h>
 #include <contrib/dev/acpica/include/accommon.h>
@@ -58,10 +62,12 @@ __FBSDID("$FreeBSD$");
 #include <dev/pci/pcib_private.h>
 #include <dev/pci/pci_host_generic.h>
 #include <dev/pci/pci_host_generic_acpi.h>
+#include <dev/iommu/busdma_iommu.h>
 
 #include <machine/cpu.h>
 #include <machine/bus.h>
 #include <machine/intr.h>
+#include <machine/iommu.h>
 
 #include "pcib_if.h"
 #include "acpi_bus_if.h"
@@ -391,13 +397,22 @@ static int
 generic_pcie_acpi_map_msi(device_t pci, device_t child, int irq, uint64_t *addr,
     uint32_t *data)
 {
+	int error;
 
 #if defined(INTRNG)
-	return (intr_map_msi(pci, child, generic_pcie_get_xref(pci, child), irq,
-	    addr, data));
+	error = intr_map_msi(pci, child, generic_pcie_get_xref(pci, child), irq,
+	    addr, data);
+	if (error)
+		return (error);
 #else
 	return (ENXIO);
 #endif
+
+#if defined(ACPI_SMMU)
+	smmu_map_msi(pci, child, *addr);
+#endif
+
+	return (0);
 }
 
 static int
