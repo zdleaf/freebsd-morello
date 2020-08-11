@@ -409,7 +409,9 @@ generic_pcie_acpi_map_msi(device_t pci, device_t child, int irq, uint64_t *addr,
 #endif
 
 #if defined(ACPI_SMMU)
-	smmu_map_msi(child, *addr);
+	error = smmu_map_msi(child, *addr);
+	if (error)
+		return (error);
 #endif
 
 	return (0);

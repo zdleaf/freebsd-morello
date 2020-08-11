@@ -560,17 +560,21 @@ iommu_domain_unload_entry(struct iommu_map_entry *entry, bool free)
 	smmu_domain_free_entry(entry, free);
 }
 
-void
+int
 smmu_map_msi(device_t child, uint64_t msi_addr)
 {
 	struct smmu_ctx *ctx;
 	uint64_t gic_page;
+	int error;
 
 	ctx = smmu_ctx_lookup(child);
 	if (ctx) {
 		gic_page = trunc_page(msi_addr);
-		iommu_map_gic_page(ctx->domain, gic_page);
+		error = iommu_map_gic_page(ctx->domain, gic_page);
+		return (error);
 	}
+
+	return (ENOENT);
 }
 
 static void
