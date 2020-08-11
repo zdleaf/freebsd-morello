@@ -568,13 +568,14 @@ smmu_map_msi(device_t child, uint64_t msi_addr)
 	int error;
 
 	ctx = smmu_ctx_lookup(child);
-	if (ctx) {
-		gic_page = trunc_page(msi_addr);
-		error = iommu_map_gic_page(ctx->domain, gic_page);
-		return (error);
-	}
+	if (!ctx || ctx->bypass)
+		return (0);
 
-	return (ENOENT);
+	gic_page = trunc_page(msi_addr);
+
+	error = iommu_map_gic_page(ctx->domain, gic_page);
+
+	return (error);
 }
 
 static void
