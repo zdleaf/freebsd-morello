@@ -121,7 +121,7 @@ __FBSDID("$FreeBSD$");
 #include <machine/intr.h>
 
 #include "iommu.h"
-#include "iommu_if.h"
+#include "smmu_if.h"
 
 #include "smmu_reg.h"
 #include "smmu_var.h"
@@ -1765,13 +1765,13 @@ static device_method_t smmu_methods[] = {
 	/* Device interface */
 	DEVMETHOD(device_detach,	smmu_detach),
 
-	/* IOMMU interface */
-	DEVMETHOD(iommu_map,		smmu_map),
-	DEVMETHOD(iommu_unmap,		smmu_unmap),
-	DEVMETHOD(iommu_domain_alloc,	smmu_domain_alloc),
-	DEVMETHOD(iommu_domain_free,	smmu_domain_free),
-	DEVMETHOD(iommu_ctx_attach,	smmu_device_attach),
-	DEVMETHOD(iommu_ctx_detach,	smmu_device_detach),
+	/* SMMU interface */
+	DEVMETHOD(smmu_map,		smmu_map),
+	DEVMETHOD(smmu_unmap,		smmu_unmap),
+	DEVMETHOD(smmu_domain_alloc,	smmu_domain_alloc),
+	DEVMETHOD(smmu_domain_free,	smmu_domain_free),
+	DEVMETHOD(smmu_ctx_attach,	smmu_device_attach),
+	DEVMETHOD(smmu_ctx_detach,	smmu_device_detach),
 
 	/* Bus interface */
 	DEVMETHOD(bus_read_ivar,	smmu_read_ivar),

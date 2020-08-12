@@ -212,7 +212,7 @@ arm64/intel/firmware.c				optional soc_intel_stratix10
 arm64/intel/stratix10-soc-fpga-mgr.c		optional soc_intel_stratix10
 arm64/intel/stratix10-svc.c			optional soc_intel_stratix10
 arm64/iommu/iommu.c				optional iommu
-arm64/iommu/iommu_if.m				optional iommu
+arm64/iommu/smmu_if.m				optional iommu
 arm64/iommu/smmu.c				optional iommu
 arm64/iommu/smmu_acpi.c				optional iommu
 arm64/qoriq/ls1046_gpio.c			optional ls1046_gpio gpio fdt SOC_NXP_LS
@@ -309,6 +309,7 @@ dev/iicbus/sy8106a.c		optional	sy8106a fdt
 dev/iicbus/twsi/mv_twsi.c	optional	twsi fdt
 dev/iicbus/twsi/a10_twsi.c	optional	twsi fdt
 dev/iicbus/twsi/twsi.c		optional	twsi fdt
+dev/iommu/iommu_if.m		optional	iommu
 dev/iommu/busdma_iommu.c	optional	iommu
 dev/iommu/iommu_gas.c		optional	iommu
 dev/hwpmc/hwpmc_arm64.c		optional	hwpmc

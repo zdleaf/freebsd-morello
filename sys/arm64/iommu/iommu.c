@@ -75,7 +75,7 @@ __FBSDID("$FreeBSD$");
 #include <machine/intr.h>
 
 #include "iommu.h"
-#include "iommu_if.h"
+#include "smmu_if.h"
 
 static MALLOC_DEFINE(M_IOMMU, "IOMMU", "IOMMU framework");
 static MALLOC_DEFINE(M_BUSDMA, "SMMU", "ARM64 busdma SMMU");
@@ -100,7 +100,7 @@ domain_unmap_buf(struct iommu_domain *iodom, iommu_gaddr_t base,
 	unit = (struct smmu_unit *)iodom->iommu;
 	domain = (struct smmu_domain *)iodom;
 
-	error = IOMMU_UNMAP(unit->dev, domain, base, size);
+	error = SMMU_UNMAP(unit->dev, domain, base, size);
 
 	return (error);
 }
@@ -130,7 +130,7 @@ domain_map_buf(struct iommu_domain *iodom, iommu_gaddr_t base,
 	pa = VM_PAGE_TO_PHYS(ma[0]);
 
 	unit = (struct smmu_unit *)iodom->iommu;
-	error = IOMMU_MAP(unit->dev, domain, va, pa, size, prot);
+	error = SMMU_MAP(unit->dev, domain, va, pa, size, prot);
 
 	return (0);
 }
@@ -149,7 +149,7 @@ smmu_domain_alloc(struct iommu_unit *unit)
 
 	iommu = (struct smmu_unit *)unit;
 
-	domain = IOMMU_DOMAIN_ALLOC(iommu->dev);
+	domain = SMMU_DOMAIN_ALLOC(iommu->dev);
 	if (domain == NULL)
 		return (NULL);
 
@@ -180,7 +180,7 @@ smmu_domain_free(struct smmu_domain *domain)
 
 	IOMMU_LOCK(unit);
 	LIST_REMOVE(domain, next);
-	error = IOMMU_DOMAIN_FREE(iommu->dev, domain);
+	error = SMMU_DOMAIN_FREE(iommu->dev, domain);
 	if (error) {
 		LIST_INSERT_HEAD(&iommu->domain_list, domain, next);
 		IOMMU_UNLOCK(unit);
@@ -251,7 +251,7 @@ smmu_ctx_attach(struct smmu_domain *domain, struct smmu_ctx *ctx)
 
 	iommu = (struct smmu_unit *)domain->domain.iommu;
 
-	error = IOMMU_CTX_ATTACH(iommu->dev, domain, ctx);
+	error = SMMU_CTX_ATTACH(iommu->dev, domain, ctx);
 	if (error) {
 		device_printf(iommu->dev, "Failed to add ctx\n");
 		return (error);
@@ -343,7 +343,7 @@ iommu_free_ctx_locked(struct iommu_unit *unit, struct iommu_ctx *ctx)
 	iommu = (struct smmu_unit *)unit;
 	context = (struct smmu_ctx *)ctx;
 
-	error = IOMMU_CTX_DETACH(iommu->dev, (struct smmu_ctx *)ctx);
+	error = SMMU_CTX_DETACH(iommu->dev, (struct smmu_ctx *)ctx);
 	if (error) {
 		device_printf(iommu->dev, "Failed to remove device\n");
 		return;
@@ -382,7 +382,7 @@ iommu_map_page(struct smmu_domain *domain,
 
 	iommu = (struct smmu_unit *)domain->domain.iommu;
 
-	error = IOMMU_MAP(iommu->dev, domain, va, pa, PAGE_SIZE, prot);
+	error = SMMU_MAP(iommu->dev, domain, va, pa, PAGE_SIZE, prot);
 	if (error)
 		return (error);
 
@@ -397,7 +397,7 @@ iommu_unmap_page(struct smmu_domain *domain, vm_offset_t va)
 
 	iommu = (struct smmu_unit *)domain->domain.iommu;
 
-	error = IOMMU_UNMAP(iommu->dev, domain, va, PAGE_SIZE);
+	error = SMMU_UNMAP(iommu->dev, domain, va, PAGE_SIZE);
 	if (error)
 		return (error);
 

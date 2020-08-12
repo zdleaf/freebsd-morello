@@ -48,7 +48,7 @@
 
 #include <arm64/iommu/iommu.h>
 
-INTERFACE iommu;
+INTERFACE smmu;
 
 #
 # Map a virtual address VA to a physical address PA.
