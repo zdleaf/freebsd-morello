@@ -54,12 +54,12 @@ END(vmm_call_hyp)
 
 .macro vempty
 	.align 7
-	1: b 	1b
+	1: b	1b
 .endm
 
 .macro vector name
 	.align 7
-	b 	handle_\name
+	b	handle_\name
 .endm
 
 	.align 11
@@ -152,7 +152,7 @@ hyp_vectors:
 
 
 .macro do_world_switch_to_host
-	.align 	7
+	.align	7
 	SAVE_GUEST_REGS()
 #ifdef VFP
 	/*
@@ -172,7 +172,7 @@ hyp_vectors:
 
 
 .macro handle_el2_excp type
-	.align 	7
+	.align	7
 	/* Save registers before modifying so we can restore them */
 	str	x9, [sp, #-16]!
 
@@ -232,8 +232,8 @@ ENTRY(handle_el2_el1_sync64)
 	/* Restore register */
 	ldr	x9, [sp], #16
 
-	cmp 	x0, #HYP_GET_VECTOR_TABLE
-	beq 	2f
+	cmp	x0, #HYP_GET_VECTOR_TABLE
+	beq	2f
 	b	call_function
 2:
 	/* Return the vector table base address */
@@ -255,16 +255,16 @@ ENTRY(call_function)
 	mov	x9, x0
 
 	/* Shuffle function parameters */
-	mov 	x0, x1
+	mov	x0, x1
 	mov	x1, x2
-	mov 	x2, x3
+	mov	x2, x3
 	mov	x3, x4
 	mov	x4, x5
 	mov	x5, x6
-	mov 	x6, x7
+	mov	x6, x7
 
 	/* Call function */
-	br 	x9
+	br	x9
 END(call_function)
 
 
@@ -318,9 +318,9 @@ ENTRY(vmm_enter_guest)
 	SAVE_HOST_VFP_REGS()
 	/*
 	 * Loading the guest VFP registers needs to come before loading the
- 	 * rest of the registers because this process dirties the regular
+	 * rest of the registers because this process dirties the regular
 	 * registers.
- 	 */
+	 */
 	LOAD_GUEST_VFP_REGS()
 #endif
 	LOAD_GUEST_REGS()

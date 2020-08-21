@@ -356,7 +356,7 @@
 	 * saved because they are modified by the hardware as part of the
 	 * interrupt virtualization process and we need to inspect them in
 	 * the VGIC driver.
- 	 */						\
+	 */						\
 	SAVE_SYS_REG32(HYPCTX_VGIC, ICH_EISR_EL2);	\
 	SAVE_SYS_REG32(HYPCTX_VGIC, ICH_ELRSR_EL2);	\
 	SAVE_SYS_REG32(HYPCTX_VGIC, ICH_MISR_EL2);	\
