@@ -665,14 +665,27 @@ arm_vmrun(void *arg, int vcpu, register_t pc, pmap_t pmap,
 }
 
 static void
+arm_pcpu_vmcleanup(void *arg)
+{
+	struct hyp *hyp;
+	int i, maxcpus;
+
+	hyp = arg;
+	maxcpus = vm_get_maxcpus(hyp->vm);
+	for (i = 0; i < maxcpus; i++) {
+		if (arm64_get_active_vcpu() == &hyp->ctx[i]) {
+			arm64_set_active_vcpu(NULL);
+			break;
+		}
+	}
+}
+
+static void
 arm_vmcleanup(void *arg)
 {
 	struct hyp *hyp = arg;
-	struct hypctx *hypctx;
 
-	hypctx = &hyp->ctx[0];
-	if (arm64_get_active_vcpu() == hypctx)
-		arm64_set_active_vcpu(NULL);
+	smp_rendezvous(NULL, arm_pcpu_vmcleanup, NULL, hyp);
 
 	/* Unmap the VM hyp struct from the hyp mode translation table */
 	hypmap_map(hyp_pmap, (vm_offset_t)hyp, sizeof(struct hyp),
