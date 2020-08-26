@@ -305,6 +305,7 @@ arm_vminit(struct vm *vm, pmap_t pmap)
 
 	vtimer_vminit(hyp);
 	vgic_v3_vminit(hyp);
+	vgic_its_vminit(hyp);
 	for (i = 0; i < VM_MAXCPU; i++) {
 		hypctx = &hyp->ctx[i];
 		vtimer_cpuinit(hypctx);

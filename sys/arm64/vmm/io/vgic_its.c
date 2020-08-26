@@ -476,6 +476,16 @@ vgic_its_raise_msi(struct vm *vm, uint64_t msg, uint64_t addr, uint32_t devid)
 	return (error);
 }
 
+void
+vgic_its_vminit(void *arg)
+{
+	struct hyp *hyp = arg;
+	struct vgic_its *its = &hyp->vgic_its;
+
+	memset(its, 0, sizeof(*its));
+	sx_init(&its->its_mtx, "vits lock");
+}
+
 int
 vgic_its_attach_to_vm(struct vm *vm, uint64_t start, size_t size)
 {
@@ -483,10 +493,8 @@ vgic_its_attach_to_vm(struct vm *vm, uint64_t start, size_t size)
 	struct vgic_its *its = &hyp->vgic_its;
 	int i;
 
-	memset(its, 0, sizeof(*its));
 	its->start = start;
 	its->end = start + size;
-	sx_init(&its->its_mtx, "vits lock");
 	SLIST_INIT(&its->its_msi);
 
 	its->col_entries = vm_get_maxcpus(vm);
@@ -520,6 +528,4 @@ vgic_its_detach_from_vm(struct vm *vm)
 		SLIST_REMOVE(&its->its_msi, msi, vgic_its_msi, next);
 		free(msi, M_VITS);
 	}
-	sx_destroy(&its->its_mtx);
-	memset(its, 0, sizeof(*its));
 }
