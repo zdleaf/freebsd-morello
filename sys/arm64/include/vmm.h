@@ -373,6 +373,7 @@ enum vm_exitcode {
 	VM_EXITCODE_HYP,
 	VM_EXITCODE_WFI,
 	VM_EXITCODE_PAGING,
+	VM_EXITCODE_SMCCC,
 	VM_EXITCODE_MAX
 };
 
@@ -421,6 +422,16 @@ struct vm_exit {
 		struct {
 			struct hypctx *hypctx;
 		} wfi;
+
+		/*
+		 * A SMCCC call, e.g. starting a core via PSCI.
+		 * Further arguments can be read by asking the kernel for
+		 * all register values.
+		 */
+		struct {
+			uint64_t	func_id;
+			uint64_t	args[3];
+		} smccc_call;
 		/*
 		 * VMX specific payload. Used when there is no "better"
 		 * exitcode to represent the VM-exit.

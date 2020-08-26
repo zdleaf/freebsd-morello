@@ -63,7 +63,7 @@ psci_handle_call(struct vm *vm, int vcpuid, struct vm_exit *vme, bool *retu)
 	struct hypctx *hypctx;
 	uint64_t func_id;
 	uint32_t esr_el2, esr_iss;
-	int error;
+	int error, i;
 
 	hyp = vm_get_cookie(vm);
 	hypctx = &hyp->ctx[vcpuid];
@@ -87,9 +87,13 @@ psci_handle_call(struct vm *vm, int vcpuid, struct vm_exit *vme, bool *retu)
 		error = psci_system_off(vme, retu);
 		break;
 	default:
-		eprintf("Unimplemented PSCI function: 0x%016lx\n", func_id);
-		hypctx->regs.x[0] = PSCI_RETVAL_NOT_SUPPORTED;
-		error = 1;
+		vme->exitcode = VM_EXITCODE_SMCCC;
+		vme->u.smccc_call.func_id = func_id;
+		for (i = 0; i < nitems(vme->u.smccc_call.args); i++)
+			vme->u.smccc_call.args[i] = hypctx->regs.x[i + 1];
+		*retu = true;
+		error = 0;
+		break;
 	}
 
 out:

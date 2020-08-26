@@ -52,6 +52,11 @@ __FBSDID("$FreeBSD$");
 #include <machine/segments.h>
 #endif
 
+#if defined(__aarch64__)
+#include <dev/psci/psci.h>
+#include <dev/psci/smccc.h>
+#endif
+
 #ifndef WITHOUT_CAPSICUM
 #include <capsicum_helpers.h>
 #endif
@@ -562,6 +567,55 @@ vmexit_handle_notify(struct vmctx *ctx, struct vm_exit *vme, int *pvcpu,
 	return (VMEXIT_CONTINUE);
 }
 
+#ifdef __aarch64__
+static int
+vmexit_smccc(struct vmctx *ctx, struct vm_exit *vme, int *pvcpu)
+{
+	uint64_t newcpu, smccc_rv;
+	int error;
+
+	/* Return the Unknown Function Identifier  by default */
+	smccc_rv = SMCCC_RET_NOT_SUPPORTED;
+
+	switch (vme->u.smccc_call.func_id) {
+	case PSCI_FNID_CPU_ON:
+		printf("CPU ON: %lx %lx %lx %lx\n", vme->u.smccc_call.func_id,
+		    vme->u.smccc_call.args[0], vme->u.smccc_call.args[1],
+		    vme->u.smccc_call.args[2]);
+
+		newcpu = vme->u.smccc_call.args[0];
+		if (newcpu > guest_ncpus) {
+			smccc_rv = PSCI_RETVAL_INVALID_PARAMS;
+			break;
+		}
+
+		fbsdrun_set_capabilities(ctx, newcpu);
+
+		/* Set the context ID */
+		error = vm_set_register(ctx, newcpu, VM_REG_GUEST_X0,
+		    vme->u.smccc_call.args[2]);
+		assert(error == 0);
+
+		/* Set the start program counter */
+		error = vm_set_register(ctx, newcpu, VM_REG_GUEST_PC,
+		    vme->u.smccc_call.args[1]);
+		assert(error == 0);
+
+		fbsdrun_addcpu(ctx, BSP, newcpu, vme->u.smccc_call.args[1]);
+
+		smccc_rv = PSCI_RETVAL_SUCCESS;
+		break;
+	default:
+		break;
+	}
+
+	error = vm_set_register(ctx, *pvcpu, VM_REG_GUEST_X0, smccc_rv);
+	assert(error == 0);
+
+	return (VMEXIT_CONTINUE);
+}
+#endif
+
 #ifdef __amd64__
 static int
 vmexit_inout(struct vmctx *ctx, struct vm_exit *vme, int *pvcpu)
@@ -934,6 +988,9 @@ static vmexit_handler_t handler[VM_EXITCODE_MAX] = {
 	[VM_EXITCODE_TASK_SWITCH] = vmexit_task_switch,
 	[VM_EXITCODE_DEBUG] = vmexit_debug,
 	[VM_EXITCODE_BPT] = vmexit_breakpoint,
+#endif
+#ifdef __aarch64__
+	[VM_EXITCODE_SMCCC] = vmexit_smccc,
 #endif
 };
 
