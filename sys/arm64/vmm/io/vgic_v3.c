@@ -751,6 +751,55 @@ redist_write(void *vm, int vcpuid, uint64_t fault_ipa, uint64_t wval,
 	panic("%s: %lx", __func__, reg);
 }
 
+int
+vgic_v3_icc_sgi1r_read(void *vm, int vcpuid, uint64_t *rval, void *arg)
+{
+	bool *retu = arg;
+
+	/*
+	 * TODO: Inject an unknown exception.
+	 */
+	*rval = 0;
+	*retu = false;
+	return (0);
+}
+
+int
+vgic_v3_icc_sgi1r_write(void *vm, int vcpuid, uint64_t rval, void *arg)
+{
+	struct hyp *hyp;
+	cpuset_t active_cpus;
+	int cpus, irq, vcpu;
+	bool *retu = arg;
+
+	hyp = vm_get_cookie(vm);
+	active_cpus = vm_active_cpus(vm);
+	if ((rval & ICC_SGI1R_EL1_IRM) == 0) {
+		/*
+		 * TODO: Support on mure than 16 CPUs. This is the mask for the
+		 * affinity bits. These should be 0.
+		 */
+		if ((rval & 0xff00ff00ff000ul) != 0)
+			return (0);
+		irq = (rval >> ICC_SGI1R_EL1_SGIID_SHIFT) &
+		    ICC_SGI1R_EL1_SGIID_MASK;
+		cpus = rval & 0xff;
+		vcpu = 0;
+		while (cpus > 0) {
+			if (CPU_ISSET(vcpu, &active_cpus) && vcpu != vcpuid) {
+				vgic_v3_inject_irq(&hyp->ctx[vcpu], irq,
+				    VGIC_IRQ_MISC);
+			}
+			vcpu++;
+			cpus >>= 1;
+		}
+	}
+
+	*retu = false;
+
+	return (0);
+}
+
 static void
 vgic_v3_mmio_init(struct hyp *hyp)
 {
@@ -1043,7 +1092,6 @@ vgic_v3_inject_irq(void *arg, uint32_t irq, enum vgic_v3_irqtype irqtype)
 	uint8_t priority;
 	bool enabled;
 
-	KASSERT(irq > GIC_LAST_SGI, ("SGI interrupts not implemented"));
 
 	if (irq >= dist->nirqs || irqtype >= VGIC_IRQ_INVALID) {
 		eprintf("Malformed IRQ %u.\n", irq);

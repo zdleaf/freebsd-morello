@@ -743,6 +743,11 @@ vm_handle_reg_emul(struct vm *vm, int vcpuid, bool *retu)
 		rwrite = vtimer_phys_tval_write;
 		break;
 
+	/* Interrupt controller registers */
+	case ISS_ICC_SGI1R_EL1:
+		rread = vgic_v3_icc_sgi1r_read;
+		rwrite = vgic_v3_icc_sgi1r_write;
+		break;
 
 	default:
 		*retu = true;

@@ -39,6 +39,21 @@
 #include <arm64/arm64/gic_v3_reg.h>
 #include <arm/arm/gic_common.h>
 
+#define	ICC_SGI1R_EL1_OP0	0b11
+#define	ICC_SGI1R_EL1_OP2	0b101
+#define	ICC_SGI1R_EL1_OP1	0b000
+#define	ICC_SGI1R_EL1_CRn	0b1100
+#define	ICC_SGI1R_EL1_CRm	0b1011
+#define	ISS_ICC_SGI1R_EL1	\
+    (ICC_SGI1R_EL1_OP0 << ISS_MSR_OP0_SHIFT | 	\
+     ICC_SGI1R_EL1_OP2 << ISS_MSR_OP2_SHIFT |	\
+     ICC_SGI1R_EL1_OP1 << ISS_MSR_OP1_SHIFT | 	\
+     ICC_SGI1R_EL1_CRn << ISS_MSR_CRn_SHIFT |	\
+     ICC_SGI1R_EL1_CRm << ISS_MSR_CRm_SHIFT)
+
+int vgic_v3_icc_sgi1r_read(void *vm, int vcpuid, uint64_t *rval, void *arg);
+int vgic_v3_icc_sgi1r_write(void *vm, int vcpuid, uint64_t rval, void *arg);
+
 #define VGIC_SGI_NUM		(GIC_LAST_SGI - GIC_FIRST_SGI + 1)
 #define VGIC_PPI_NUM		(GIC_LAST_PPI - GIC_FIRST_PPI + 1)
 #define VGIC_SPI_NUM		(GIC_LAST_SPI - GIC_FIRST_SPI + 1)
