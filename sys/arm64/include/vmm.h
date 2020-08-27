@@ -432,54 +432,10 @@ struct vm_exit {
 			uint64_t	func_id;
 			uint64_t	args[3];
 		} smccc_call;
-		/*
-		 * VMX specific payload. Used when there is no "better"
-		 * exitcode to represent the VM-exit.
-		 */
-		struct {
-			int		status;		/* vmx inst status */
-			/*
-			 * 'exit_reason' and 'exit_qualification' are valid
-			 * only if 'status' is zero.
-			 */
-			uint32_t	exit_reason;
-			uint64_t	exit_qualification;
-			/*
-			 * 'inst_error' and 'inst_type' are valid
-			 * only if 'status' is non-zero.
-			 */
-			int		inst_type;
-			int		inst_error;
-		} vmx;
-		/*
-		 * SVM specific payload.
-		 */
-		struct {
-			uint64_t	exitcode;
-			uint64_t	exitinfo1;
-			uint64_t	exitinfo2;
-		} svm;
-		struct {
-#ifdef __aarch64__
-#else
-			uint32_t	code;		/* ecx value */
-			uint64_t	wval;
-#endif
-		} msr;
-		struct {
-			int		vcpu;
-			uint64_t	rip;
-		} spinup_ap;
-		struct {
-			uint64_t	rflags;
-		} hlt;
-		struct {
-			int		vector;
-		} ioapic_eoi;
+
 		struct {
 			enum vm_suspend_how how;
 		} suspended;
-		struct vm_task_switch task_switch;
 	} u;
 };
 
