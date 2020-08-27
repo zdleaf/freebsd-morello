@@ -719,15 +719,13 @@ vm_handle_reg_emul(struct vm *vm, int vcpuid, bool *retu)
 	struct vre *vre;
 	reg_read_t rread;
 	reg_write_t rwrite;
-	uint32_t iss_reg;
-	int error;
 
 	hyp = (struct hyp *)vm->cookie;
 	vme = vm_exitinfo(vm, vcpuid);
 	vre = &vme->u.reg_emul.vre;
 
-	iss_reg = vre->inst_syndrome & ISS_MSR_REG_MASK;
-	switch (iss_reg) {
+	switch(vre->inst_syndrome & ISS_MSR_REG_MASK) {
+	/* Counter registers */
 	case ISS_CNTP_CTL_EL0:
 		rread = vtimer_phys_ctl_read;
 		rwrite = vtimer_phys_ctl_write;
@@ -744,17 +742,14 @@ vm_handle_reg_emul(struct vm *vm, int vcpuid, bool *retu)
 		rread = vtimer_phys_tval_read;
 		rwrite = vtimer_phys_tval_write;
 		break;
+
+
 	default:
-		goto out_user;
+		*retu = true;
+		return (0);
 	}
 
-	error = vmm_emulate_register(vm, vcpuid, vre, rread, rwrite, retu);
-
-	return (error);
-
-out_user:
-	*retu = true;
-	return (0);
+	return (vmm_emulate_register(vm, vcpuid, vre, rread, rwrite, retu));
 }
 
 void
