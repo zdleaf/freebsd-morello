@@ -158,7 +158,6 @@
 #define	CPU_MATCH_ERRATA_CAVIUM_THUNDERX_1_1	0
 #endif
 
-
 extern char btext[];
 extern char etext[];
 
