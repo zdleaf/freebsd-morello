@@ -786,6 +786,7 @@ smmu_init_ste(struct smmu_softc *sc, struct smmu_cd *cd, int sid, bool bypass)
 	if (sc->features & SMMU_FEATURE_2_LVL_STREAM_TABLE) {
 		l1_desc = &strtab->l1[sid >> STRTAB_SPLIT];
 		addr = l1_desc->va;
+		addr += (sid & ((1 << STRTAB_SPLIT) - 1)) * STRTAB_STE_DWORDS;
 	} else {
 		addr = (void *)((uint64_t)strtab->vaddr +
 		    STRTAB_STE_DWORDS * 8 * sid);
@@ -1594,20 +1595,22 @@ static int
 smmu_unmap(device_t dev, struct smmu_domain *domain,
     vm_offset_t va, bus_size_t size)
 {
-	struct smmu_domain *smmu_domain;
 	struct smmu_softc *sc;
 	int err;
 	int i;
 
 	sc = device_get_softc(dev);
-	smmu_domain = (struct smmu_domain *)domain;
 
 	err = 0;
 
+#if 0
+	printf("%s: %lx, %ld, domain %d\n", __func__, va, size, domain->asid);
+#endif
+
 	for (i = 0; i < size; i += PAGE_SIZE) {
-		if (pmap_sremove(&smmu_domain->p, va)) {
+		if (pmap_sremove(&domain->p, va)) {
 			/* pmap entry removed, invalidate TLB. */
-			smmu_tlbi_va(sc, va, smmu_domain->asid);
+			smmu_tlbi_va(sc, va, domain->asid);
 		} else {
 			err = ENOENT;
 			break;
@@ -1625,18 +1628,21 @@ smmu_map(device_t dev, struct smmu_domain *domain,
     vm_offset_t va, vm_paddr_t pa, vm_size_t size,
     vm_prot_t prot)
 {
-	struct smmu_domain *smmu_domain;
 	struct smmu_softc *sc;
 	int error;
 
 	sc = device_get_softc(dev);
-	smmu_domain = (struct smmu_domain *)domain;
+
+#if 0
+	printf("%s: %lx -> %lx, %ld, domain %d\n",
+	    __func__, va, pa, size, domain->asid);
+#endif
 
 	for (; size > 0; size -= PAGE_SIZE) {
-		error = pmap_senter(&smmu_domain->p, va, pa, prot, 0);
+		error = pmap_senter(&domain->p, va, pa, prot, 0);
 		if (error)
 			return (error);
-		smmu_tlbi_va(sc, va, smmu_domain->asid);
+		smmu_tlbi_va(sc, va, domain->asid);
 		pa += PAGE_SIZE;
 		va += PAGE_SIZE;
 	}
@@ -1711,11 +1717,39 @@ smmu_domain_free(device_t dev, struct smmu_domain *domain)
 	return (0);
 }
 
+struct smmu_walk_token {
+	device_t dev;
+	struct smmu_ctx *ctx;
+	struct smmu_domain *domain;
+};
+
+static int
+smmu_walk_aliases(device_t dev, uint8_t alias, void *arg)
+{
+	struct smmu_walk_token *token;
+	struct smmu_softc *sc;
+	struct smmu_ctx *ctx;
+	struct smmu_domain *domain;
+
+	token = arg;
+	domain = token->domain;
+	ctx = token->ctx;
+
+	sc = device_get_softc(token->dev);
+
+	printf("%s: alias %d sc %p\n", __func__, alias, sc);
+
+	smmu_init_ste(sc, domain->cd, (ctx->sid | alias), ctx->bypass);
+
+	return (0);
+}
+
 static int
 smmu_device_attach(device_t dev, struct smmu_domain *domain,
     struct smmu_ctx *ctx)
 {
 	struct smmu_softc *sc;
+	struct smmu_walk_token token;
 	uint16_t rid;
 	u_int xref, sid;
 	int seg;
@@ -1744,7 +1778,14 @@ smmu_device_attach(device_t dev, struct smmu_domain *domain,
 	 * 0x600 sata
 	 */
 
+	token.ctx = ctx;
+	token.dev = dev;
+	token.domain = domain;
+
 	smmu_init_ste(sc, domain->cd, ctx->sid, ctx->bypass);
+
+	/* Handle PCI function aliases, if any. */
+	pci_for_each_dma_alias(ctx->dev, smmu_walk_aliases, &token);
 
 	return (0);
 }

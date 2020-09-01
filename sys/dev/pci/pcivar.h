@@ -31,6 +31,7 @@
 #ifndef _PCIVAR_H_
 #define	_PCIVAR_H_
 
+#include <sys/bitstring.h>
 #include <sys/queue.h>
 #include <sys/_eventhandler.h>
 
@@ -211,6 +212,9 @@ typedef struct pcicfg {
     uint8_t	func;		/* config space function number */
 
     uint32_t	flags;		/* flags defined above */
+
+    bitstr_t	*dma_aliases;	/* PCI function aliases for IOMMU. */
+    struct mtx	dma_aliases_mtx; /* protection for aliases bitstr */
 
     struct pcicfg_bridge bridge; /* Bridges */
     struct pcicfg_pp pp;	/* Power management */
@@ -693,6 +697,10 @@ bool	pcie_wait_for_pending_transactions(device_t dev, u_int max_delay);
 int	pcie_link_reset(device_t port, int pcie_location);
 
 void	pci_print_faulted_dev(void);
+
+int	pci_add_dma_alias(device_t dev, uint8_t devfn_from, uint32_t nr_devfns);
+int	pci_for_each_dma_alias(device_t dev, int (*fn)(device_t dev,
+	    uint8_t alias, void *data), void *data);
 
 #endif	/* _SYS_BUS_H_ */
 

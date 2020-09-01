@@ -240,6 +240,14 @@ iommu_instantiate_ctx(struct iommu_unit *unit, device_t dev, bool rmrr)
 	requester = iommu_get_requester(dev, &rid);
 
 	/*
+	 * Marvel SATA quirk.
+	 * The controller issues DMA requests from PCI function 1.
+	 */
+	if (pci_get_vendor(dev) == 0x1b4b && \
+	    pci_get_device(dev) == 0x9170)
+		pci_add_dma_alias(dev, 1, 1);
+
+	/*
 	 * If the user requested the IOMMU disabled for the device, we
 	 * cannot disable the IOMMU unit, due to possibility of other
 	 * devices on the same IOMMU unit still requiring translation.

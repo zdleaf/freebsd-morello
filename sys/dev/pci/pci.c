@@ -80,6 +80,8 @@ __FBSDID("$FreeBSD$");
 #include "pcib_if.h"
 #include "pci_if.h"
 
+#define	PCI_MAX_FUNC_ALIASES	256
+
 #define	PCIR_IS_BIOS(cfg, reg)						\
 	(((cfg)->hdrtype == PCIM_HDRTYPE_NORMAL && reg == PCIR_BIOS) ||	\
 	 ((cfg)->hdrtype == PCIM_HDRTYPE_BRIDGE && reg == PCIR_BIOS_1))
@@ -503,6 +505,73 @@ pci_printf(pcicfgregs *cfg, const char *fmt, ...)
 	return (retval);
 }
 
+static pcicfgregs *
+pci_dev_to_cfg(device_t dev)
+{
+	struct pci_devinfo *dinfo;
+	pcicfgregs *cfg;
+
+	dinfo = NULL;
+
+	STAILQ_FOREACH(dinfo, &pci_devq, pci_links) {
+		if (dinfo->cfg.dev == dev)
+			break;
+	}
+
+	if (dinfo == NULL)
+		return (NULL);
+
+	cfg = &dinfo->cfg;
+
+	return (cfg);
+}
+
+int
+pci_add_dma_alias(device_t dev, uint8_t devfn_from, uint32_t nr_devfns)
+{
+	pcicfgregs *cfg;
+
+	if (nr_devfns == 0)
+		return (EINVAL);
+
+	cfg = pci_dev_to_cfg(dev);
+	if (cfg == NULL)
+		return (ENODEV);
+
+	if (cfg->dma_aliases == NULL)
+		cfg->dma_aliases = bit_alloc(PCI_MAX_FUNC_ALIASES, M_DEVBUF,
+		    M_WAITOK | M_ZERO);
+
+	mtx_lock_spin(&cfg->dma_aliases_mtx);
+	bit_nset(cfg->dma_aliases, devfn_from, nr_devfns);
+	mtx_unlock_spin(&cfg->dma_aliases_mtx);
+
+	return (0);
+}
+
+int
+pci_for_each_dma_alias(device_t dev, int (*fn)(device_t dev,
+    uint8_t alias, void *data), void *data)
+{
+	pcicfgregs *cfg;
+	int n;
+
+	cfg = pci_dev_to_cfg(dev);
+	if (cfg == NULL)
+		return (ENODEV);
+
+	if (cfg->dma_aliases == NULL)
+		return (ENOENT);
+
+	bit_ffs_at(cfg->dma_aliases, 0, PCI_MAX_FUNC_ALIASES, &n);
+	while (n >= 0) {
+		fn(dev, n, data);
+		bit_ffs_at(cfg->dma_aliases, n + 1, PCI_MAX_FUNC_ALIASES, &n);
+	}
+
+	return (0);
+}
+
 /* return base address of memory or port map */
 
 static pci_addr_t
@@ -705,6 +774,8 @@ pci_fill_devinfo(device_t pcib, device_t bus, int d, int b, int s, int f,
 	STAILQ_INIT(&cfg->maps);
 
 	cfg->iov		= NULL;
+
+	mtx_init(&cfg->dma_aliases_mtx, "func bit set", NULL, MTX_SPIN);
 
 	pci_fixancient(cfg);
 	pci_hdrtypedata(pcib, b, s, f, cfg);
@@ -2721,6 +2792,7 @@ pci_freecfg(struct pci_devinfo *dinfo)
 		free(pm, M_DEVBUF);
 	}
 	STAILQ_REMOVE(devlist_head, dinfo, pci_devinfo, pci_links);
+	mtx_destroy(&dinfo->cfg.dma_aliases_mtx);
 	free(dinfo, M_DEVBUF);
 
 	/* increment the generation count */
