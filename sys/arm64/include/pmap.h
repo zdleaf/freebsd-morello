@@ -85,6 +85,7 @@ enum pmap_stage {
 struct pmap {
 	struct mtx		pm_mtx;
 	struct pmap_statistics	pm_stats;	/* pmap statistics */
+	uint64_t		pm_ttbr;
 	vm_paddr_t		pm_l0_paddr;
 	pd_entry_t		*pm_l0;
 	TAILQ_HEAD(,pv_chunk)	pm_pvchunk;	/* list of mappings in pmap */
