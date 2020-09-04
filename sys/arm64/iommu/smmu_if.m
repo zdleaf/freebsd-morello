@@ -57,8 +57,19 @@ METHOD int map {
 	device_t		dev;
 	struct smmu_domain	*domain;
 	vm_offset_t		va;
-	vm_paddr_t		pa;
+	vm_page_t		*ma;
 	bus_size_t		size;
+	vm_prot_t		prot;
+};
+
+#
+# Map a virtual address VA to a physical address PA.
+#
+METHOD int map_page {
+	device_t		dev;
+	struct smmu_domain	*domain;
+	vm_offset_t		va;
+	vm_paddr_t		pa;
 	vm_prot_t		prot;
 };
 

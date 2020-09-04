@@ -113,7 +113,6 @@ domain_map_buf(struct iommu_domain *iodom, iommu_gaddr_t base,
 	struct smmu_domain *domain;
 	vm_prot_t prot;
 	vm_offset_t va;
-	vm_paddr_t pa;
 	int error;
 
 	domain = (struct smmu_domain *)iodom;
@@ -127,10 +126,9 @@ domain_map_buf(struct iommu_domain *iodom, iommu_gaddr_t base,
 		prot |= VM_PROT_WRITE;
 
 	va = base;
-	pa = VM_PAGE_TO_PHYS(ma[0]);
 
 	unit = (struct smmu_unit *)iodom->iommu;
-	error = SMMU_MAP(unit->dev, domain, va, pa, size, prot);
+	error = SMMU_MAP(unit->dev, domain, va, ma, size, prot);
 
 	return (0);
 }
@@ -382,7 +380,7 @@ iommu_map_page(struct smmu_domain *domain,
 
 	iommu = (struct smmu_unit *)domain->domain.iommu;
 
-	error = SMMU_MAP(iommu->dev, domain, va, pa, PAGE_SIZE, prot);
+	error = SMMU_MAP_PAGE(iommu->dev, domain, va, pa, prot);
 	if (error)
 		return (error);
 

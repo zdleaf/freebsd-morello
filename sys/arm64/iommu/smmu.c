@@ -105,7 +105,10 @@ __FBSDID("$FreeBSD$");
 #include <sys/tree.h>
 #include <sys/taskqueue.h>
 #include <vm/vm.h>
+#include <vm/uma.h>
 #include <vm/pmap.h>
+#include <vm/vm_extern.h>
+#include <vm/vm_page.h>
 #if DEV_ACPI
 #include <contrib/dev/acpica/include/acpi.h>
 #include <contrib/dev/acpica/include/accommon.h>
@@ -1624,12 +1627,32 @@ smmu_unmap(device_t dev, struct smmu_domain *domain,
 }
 
 static int
-smmu_map(device_t dev, struct smmu_domain *domain,
-    vm_offset_t va, vm_paddr_t pa, vm_size_t size,
-    vm_prot_t prot)
+smmu_map_page(device_t dev, struct smmu_domain *domain,
+    vm_offset_t va, vm_paddr_t pa, vm_prot_t prot)
 {
 	struct smmu_softc *sc;
 	int error;
+
+	sc = device_get_softc(dev);
+
+	error = pmap_senter(&domain->p, va, pa, prot, 0);
+	if (error)
+		return (error);
+	smmu_tlbi_va(sc, va, domain->asid);
+	smmu_sync(sc);
+
+	return (0);
+}
+
+static int
+smmu_map(device_t dev, struct smmu_domain *domain,
+    vm_offset_t va, vm_page_t *ma, vm_size_t size,
+    vm_prot_t prot)
+{
+	struct smmu_softc *sc;
+	vm_paddr_t pa;
+	int error;
+	int i;
 
 	sc = device_get_softc(dev);
 
@@ -1638,7 +1661,10 @@ smmu_map(device_t dev, struct smmu_domain *domain,
 	    __func__, va, pa, size, domain->asid);
 #endif
 
+	i = 0;
+
 	for (; size > 0; size -= PAGE_SIZE) {
+		pa = VM_PAGE_TO_PHYS(ma[i++]);
 		error = pmap_senter(&domain->p, va, pa, prot, 0);
 		if (error)
 			return (error);
@@ -1808,6 +1834,7 @@ static device_method_t smmu_methods[] = {
 
 	/* SMMU interface */
 	DEVMETHOD(smmu_map,		smmu_map),
+	DEVMETHOD(smmu_map_page,	smmu_map_page),
 	DEVMETHOD(smmu_unmap,		smmu_unmap),
 	DEVMETHOD(smmu_domain_alloc,	smmu_domain_alloc),
 	DEVMETHOD(smmu_domain_free,	smmu_domain_free),
