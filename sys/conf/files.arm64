@@ -259,6 +259,11 @@ dev/axgbe/xgbe-dev.c		optional	axgbe
 dev/axgbe/xgbe-drv.c		optional	axgbe
 dev/axgbe/xgbe-mdio.c		optional	axgbe
 dev/cpufreq/cpufreq_dt.c	optional	cpufreq fdt
+dev/gpio/pl061.c		optional	pl061 gpio
+dev/gpio/pl061_acpi.c		optional	pl061 gpio acpi
+dev/gpio/pl061_fdt.c		optional	pl061 gpio fdt
+dev/hwpmc/hwpmc_arm64.c		optional	hwpmc
+dev/hwpmc/hwpmc_arm64_md.c	optional	hwpmc
 dev/ice/if_ice_iflib.c		optional	ice pci \
 	compile-with "${NORMAL_C} -I$S/dev/ice"
 dev/ice/ice_lib.c		optional	ice pci \
