@@ -509,15 +509,18 @@ pci_dev_to_cfg(device_t dev)
 {
 	struct pci_devinfo *dinfo;
 	pcicfgregs *cfg;
+	bool found;
 
-	dinfo = NULL;
+	found = false;
 
 	STAILQ_FOREACH(dinfo, &pci_devq, pci_links) {
-		if (dinfo->cfg.dev == dev)
+		if (dinfo->cfg.dev == dev) {
+			found = true;
 			break;
+		}
 	}
 
-	if (dinfo == NULL)
+	if (!found)
 		return (NULL);
 
 	cfg = &dinfo->cfg;
@@ -536,10 +539,6 @@ pci_add_dma_alias(device_t dev, uint8_t devfn_from, uint32_t nr_devfns)
 	cfg = pci_dev_to_cfg(dev);
 	if (cfg == NULL)
 		return (ENODEV);
-
-	if (cfg->dma_aliases == NULL)
-		cfg->dma_aliases = bit_alloc(PCI_MAX_FUNC_ALIASES, M_DEVBUF,
-		    M_WAITOK | M_ZERO);
 
 	mtx_lock_spin(&cfg->dma_aliases_mtx);
 	bit_nset(cfg->dma_aliases, devfn_from, nr_devfns);
@@ -562,10 +561,16 @@ pci_for_each_dma_alias(device_t dev, int (*fn)(device_t dev,
 	if (cfg->dma_aliases == NULL)
 		return (ENOENT);
 
+	mtx_lock_spin(&cfg->dma_aliases_mtx);
 	bit_ffs_at(cfg->dma_aliases, 0, PCI_MAX_FUNC_ALIASES, &n);
+	mtx_unlock_spin(&cfg->dma_aliases_mtx);
+
 	while (n >= 0) {
 		fn(dev, n, data);
+
+		mtx_lock_spin(&cfg->dma_aliases_mtx);
 		bit_ffs_at(cfg->dma_aliases, n + 1, PCI_MAX_FUNC_ALIASES, &n);
+		mtx_unlock_spin(&cfg->dma_aliases_mtx);
 	}
 
 	return (0);
@@ -774,7 +779,9 @@ pci_fill_devinfo(device_t pcib, device_t bus, int d, int b, int s, int f,
 
 	cfg->iov		= NULL;
 
-	mtx_init(&cfg->dma_aliases_mtx, "func bit set", NULL, MTX_SPIN);
+	mtx_init(&cfg->dma_aliases_mtx, "alias bit set", NULL, MTX_SPIN);
+	cfg->dma_aliases = bit_alloc(PCI_MAX_FUNC_ALIASES, M_DEVBUF,
+	    M_WAITOK | M_ZERO);
 
 	pci_fixancient(cfg);
 	pci_hdrtypedata(pcib, b, s, f, cfg);
@@ -2789,6 +2796,7 @@ pci_freecfg(struct pci_devinfo *dinfo)
 	}
 	STAILQ_REMOVE(devlist_head, dinfo, pci_devinfo, pci_links);
 	mtx_destroy(&dinfo->cfg.dma_aliases_mtx);
+	free(&dinfo->cfg.dma_aliases, M_DEVBUF);
 	free(dinfo, M_DEVBUF);
 
 	/* increment the generation count */
