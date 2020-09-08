@@ -698,7 +698,7 @@ int	pcie_link_reset(device_t port, int pcie_location);
 
 void	pci_print_faulted_dev(void);
 
-int	pci_add_dma_alias(device_t dev, uint8_t devfn_from, uint32_t nr_devfns);
+int	pci_add_dma_alias(device_t dev, uint8_t devfn_from, uint8_t nr_devfns);
 int	pci_for_each_dma_alias(device_t dev, int (*fn)(device_t dev,
 	    uint8_t alias, void *data), void *data);
 

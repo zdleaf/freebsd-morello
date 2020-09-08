@@ -80,7 +80,7 @@ __FBSDID("$FreeBSD$");
 #include "pcib_if.h"
 #include "pci_if.h"
 
-#define	PCI_MAX_FUNC_ALIASES	256
+#define	PCI_MAX_FUNC_ALIASES	255
 
 #define	PCIR_IS_BIOS(cfg, reg)						\
 	(((cfg)->hdrtype == PCIM_HDRTYPE_NORMAL && reg == PCIR_BIOS) ||	\
@@ -529,11 +529,14 @@ pci_dev_to_cfg(device_t dev)
 }
 
 int
-pci_add_dma_alias(device_t dev, uint8_t devfn_from, uint32_t nr_devfns)
+pci_add_dma_alias(device_t dev, uint8_t devfn_from, uint8_t nr_devfns)
 {
 	pcicfgregs *cfg;
 
 	if (nr_devfns == 0)
+		return (EINVAL);
+
+	if ((devfn_from + nr_devfns - 1) > PCI_MAX_FUNC_ALIASES)
 		return (EINVAL);
 
 	cfg = pci_dev_to_cfg(dev);
