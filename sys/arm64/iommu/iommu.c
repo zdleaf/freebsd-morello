@@ -232,7 +232,7 @@ smmu_ctx_alloc(device_t dev)
 	struct smmu_ctx *ctx;
 
 	ctx = malloc(sizeof(struct smmu_ctx), M_IOMMU, M_WAITOK | M_ZERO);
-	ctx->rid = pci_get_rid(dev);
+	ctx->ctx.rid = pci_get_rid(dev);
 	ctx->dev = dev;
 
 	return (ctx);

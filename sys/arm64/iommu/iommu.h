@@ -70,7 +70,6 @@ struct smmu_ctx {
 	struct smmu_domain		*domain;
 	LIST_ENTRY(smmu_ctx)		next;
 	device_t dev;
-	uint16_t rid;
 	bool bypass;
 	int sid;
 };
