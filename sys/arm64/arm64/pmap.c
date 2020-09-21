@@ -178,7 +178,31 @@ __FBSDID("$FreeBSD$");
 #endif
 
 #define	pmap_l2_pindex(v)	((v) >> L2_SHIFT)
-#define	pa_to_pvh(pa)		(&pv_table[pmap_l2_pindex(pa)])
+
+static struct md_page *
+pa_to_pvh(vm_paddr_t pa)
+{
+	struct vm_phys_seg *seg;
+	int segind;
+
+	for (segind = 0; segind < vm_phys_nsegs; segind++) {
+		seg = &vm_phys_segs[segind];
+		if (pa >= seg->start && pa < seg->end)
+			return ((struct md_page *)seg->md_first +
+			    pmap_l2_pindex(pa) - pmap_l2_pindex(seg->start));
+	}
+	panic("pa 0x%jx not within vm_phys_segs", (uintmax_t)pa);
+}
+
+static struct md_page *
+page_to_pvh(vm_page_t m)
+{
+	struct vm_phys_seg *seg;
+
+	seg = &vm_phys_segs[m->segind];
+	return ((struct md_page *)seg->md_first +
+	    pmap_l2_pindex(VM_PAGE_TO_PHYS(m)) - pmap_l2_pindex(seg->start));
+}
 
 #define	NPV_LIST_LOCKS	MAXCPU
 
@@ -1051,6 +1075,8 @@ pmap_init_asids(struct asid_set *set, int bits)
 void
 pmap_init(void)
 {
+	struct vm_phys_seg *seg, *next_seg;
+	struct md_page *pvh;
 	vm_size_t s;
 	uint64_t mmfr1;
 	int i, pv_npg, vmid_bits;
@@ -1095,7 +1121,12 @@ pmap_init(void)
 	/*
 	 * Calculate the size of the pv head table for superpages.
 	 */
-	pv_npg = howmany(vm_phys_segs[vm_phys_nsegs - 1].end, L2_SIZE);
+	pv_npg = 0;
+	for (i = 0; i < vm_phys_nsegs; i++) {
+		seg = &vm_phys_segs[i];
+		pv_npg += pmap_l2_pindex(roundup2(seg->end, L2_SIZE)) -
+		    pmap_l2_pindex(seg->start);
+	}
 
 	/*
 	 * Allocate memory for the pv head table for superpages.
@@ -1106,6 +1137,31 @@ pmap_init(void)
 	for (i = 0; i < pv_npg; i++)
 		TAILQ_INIT(&pv_table[i].pv_list);
 	TAILQ_INIT(&pv_dummy.pv_list);
+
+	/*
+	 * Set pointers from vm_phys_segs to pv_table.
+	 */
+	for (i = 0, pvh = pv_table; i < vm_phys_nsegs; i++) {
+		seg = &vm_phys_segs[i];
+		seg->md_first = pvh;
+		pvh += pmap_l2_pindex(roundup2(seg->end, L2_SIZE)) -
+		    pmap_l2_pindex(seg->start);
+
+		/*
+		 * If there is a following segment, and the final
+		 * superpage of this segment and the initial superpage
+		 * of the next segment are the same then adjust the
+		 * pv_table entry for that next segment down by one so
+		 * that the pv_table entries will be shared.
+		 */
+		if (i + 1 < vm_phys_nsegs) {
+			next_seg = &vm_phys_segs[i + 1];
+			if (pmap_l2_pindex(roundup2(seg->end, L2_SIZE)) - 1 ==
+			    pmap_l2_pindex(next_seg->start)) {
+				pvh--;
+			}
+		}
+	}
 
 	vm_initialized = 1;
 }
@@ -2285,7 +2341,7 @@ reclaim_pv_chunk(pmap_t locked_pmap, struct rwlock **lockp)
 				m->md.pv_gen++;
 				if (TAILQ_EMPTY(&m->md.pv_list) &&
 				    (m->flags & PG_FICTITIOUS) == 0) {
-					pvh = pa_to_pvh(VM_PAGE_TO_PHYS(m));
+					pvh = page_to_pvh(m);
 					if (TAILQ_EMPTY(&pvh->pv_list)) {
 						vm_page_aflag_clear(m,
 						    PGA_WRITEABLE);
@@ -2826,7 +2882,7 @@ pmap_remove_l3(pmap_t pmap, pt_entry_t *l3, vm_offset_t va,
 		pmap_pvh_free(&m->md, pmap, va);
 		if (TAILQ_EMPTY(&m->md.pv_list) &&
 		    (m->flags & PG_FICTITIOUS) == 0) {
-			pvh = pa_to_pvh(VM_PAGE_TO_PHYS(m));
+			pvh = page_to_pvh(m);
 			if (TAILQ_EMPTY(&pvh->pv_list))
 				vm_page_aflag_clear(m, PGA_WRITEABLE);
 		}
@@ -2898,7 +2954,7 @@ pmap_remove_l3_range(pmap_t pmap, pd_entry_t l2e, vm_offset_t sva,
 			pmap_pvh_free(&m->md, pmap, sva);
 			if (TAILQ_EMPTY(&m->md.pv_list) &&
 			    (m->flags & PG_FICTITIOUS) == 0) {
-				pvh = pa_to_pvh(VM_PAGE_TO_PHYS(m));
+				pvh = page_to_pvh(m);
 				if (TAILQ_EMPTY(&pvh->pv_list))
 					vm_page_aflag_clear(m, PGA_WRITEABLE);
 			}
@@ -3037,8 +3093,7 @@ pmap_remove_all(vm_page_t m)
 	    ("pmap_remove_all: page %p is not managed", m));
 	SLIST_INIT(&free);
 	lock = VM_PAGE_TO_PV_LIST_LOCK(m);
-	pvh = (m->flags & PG_FICTITIOUS) != 0 ? &pv_dummy :
-	    pa_to_pvh(VM_PAGE_TO_PHYS(m));
+	pvh = (m->flags & PG_FICTITIOUS) != 0 ? &pv_dummy : page_to_pvh(m);
 retry:
 	rw_wlock(lock);
 	while ((pv = TAILQ_FIRST(&pvh->pv_list)) != NULL) {
@@ -4520,7 +4575,7 @@ pmap_page_exists_quick(pmap_t pmap, vm_page_t m)
 			break;
 	}
 	if (!rv && loops < 16 && (m->flags & PG_FICTITIOUS) == 0) {
-		pvh = pa_to_pvh(VM_PAGE_TO_PHYS(m));
+		pvh = page_to_pvh(m);
 		TAILQ_FOREACH(pv, &pvh->pv_list, pv_next) {
 			if (PV_PMAP(pv) == pmap) {
 				rv = TRUE;
@@ -4575,7 +4630,7 @@ restart:
 		PMAP_UNLOCK(pmap);
 	}
 	if ((m->flags & PG_FICTITIOUS) == 0) {
-		pvh = pa_to_pvh(VM_PAGE_TO_PHYS(m));
+		pvh = page_to_pvh(m);
 		TAILQ_FOREACH(pv, &pvh->pv_list, pv_next) {
 			pmap = PV_PMAP(pv);
 			if (!PMAP_TRYLOCK(pmap)) {
@@ -4617,7 +4672,7 @@ pmap_page_is_mapped(vm_page_t m)
 	rw_rlock(lock);
 	rv = !TAILQ_EMPTY(&m->md.pv_list) ||
 	    ((m->flags & PG_FICTITIOUS) == 0 &&
-	    !TAILQ_EMPTY(&pa_to_pvh(VM_PAGE_TO_PHYS(m))->pv_list));
+	    !TAILQ_EMPTY(&page_to_pvh(m)->pv_list));
 	rw_runlock(lock);
 	return (rv);
 }
@@ -4780,8 +4835,7 @@ pmap_remove_pages(pmap_t pmap)
 					if ((m->a.flags & PGA_WRITEABLE) != 0 &&
 					    TAILQ_EMPTY(&m->md.pv_list) &&
 					    (m->flags & PG_FICTITIOUS) == 0) {
-						pvh = pa_to_pvh(
-						    VM_PAGE_TO_PHYS(m));
+						pvh = page_to_pvh(m);
 						if (TAILQ_EMPTY(&pvh->pv_list))
 							vm_page_aflag_clear(m,
 							    PGA_WRITEABLE);
@@ -4858,7 +4912,7 @@ restart:
 			goto out;
 	}
 	if ((m->flags & PG_FICTITIOUS) == 0) {
-		pvh = pa_to_pvh(VM_PAGE_TO_PHYS(m));
+		pvh = page_to_pvh(m);
 		TAILQ_FOREACH(pv, &pvh->pv_list, pv_next) {
 			pmap = PV_PMAP(pv);
 			PMAP_ASSERT_STAGE1(pmap);
@@ -4978,8 +5032,7 @@ pmap_remove_write(vm_page_t m)
 	if (!pmap_page_is_write_mapped(m))
 		return;
 	lock = VM_PAGE_TO_PV_LIST_LOCK(m);
-	pvh = (m->flags & PG_FICTITIOUS) != 0 ? &pv_dummy :
-	    pa_to_pvh(VM_PAGE_TO_PHYS(m));
+	pvh = (m->flags & PG_FICTITIOUS) != 0 ? &pv_dummy : page_to_pvh(m);
 retry_pv_loop:
 	rw_wlock(lock);
 	TAILQ_FOREACH_SAFE(pv, &pvh->pv_list, pv_next, next_pv) {
@@ -5075,7 +5128,7 @@ pmap_ts_referenced(vm_page_t m)
 	cleared = 0;
 	pa = VM_PAGE_TO_PHYS(m);
 	lock = PHYS_TO_PV_LIST_LOCK(pa);
-	pvh = (m->flags & PG_FICTITIOUS) != 0 ? &pv_dummy : pa_to_pvh(pa);
+	pvh = (m->flags & PG_FICTITIOUS) != 0 ? &pv_dummy : page_to_pvh(m);
 	rw_wlock(lock);
 retry:
 	not_cleared = 0;
@@ -5352,8 +5405,7 @@ pmap_clear_modify(vm_page_t m)
 
 	if (!pmap_page_is_write_mapped(m))
 		return;
-	pvh = (m->flags & PG_FICTITIOUS) != 0 ? &pv_dummy :
-	    pa_to_pvh(VM_PAGE_TO_PHYS(m));
+	pvh = (m->flags & PG_FICTITIOUS) != 0 ? &pv_dummy : page_to_pvh(m);
 	lock = VM_PAGE_TO_PV_LIST_LOCK(m);
 	rw_wlock(lock);
 restart:
