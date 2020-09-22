@@ -3,6 +3,8 @@
 
 PACKAGE=	tests
 
+WARNS?=		3
+
 _LIBARCHIVEDIR=	${SRCTOP}/contrib/libarchive
 
 ATF_TESTS_SH+=	functional_test
@@ -16,7 +18,6 @@ PROGS+=	libarchive_test
 CFLAGS+= -I${.CURDIR} -I${.CURDIR:H} -I${.OBJDIR}
 CFLAGS+= -I${_LIBARCHIVEDIR}/libarchive -I${_LIBARCHIVEDIR}/libarchive/test
 CFLAGS+= -I${_LIBARCHIVEDIR}/test_utils
-.include "../Makefile.inc"
 
 # Uncomment to link against dmalloc
 #LDADD+= -L/usr/local/lib -ldmalloc
