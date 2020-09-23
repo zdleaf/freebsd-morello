@@ -1771,7 +1771,7 @@ smmu_walk_aliases(device_t dev, uint8_t alias, void *arg)
 }
 
 static int
-smmu_device_attach(device_t dev, struct smmu_domain *domain,
+smmu_ctx_attach(device_t dev, struct smmu_domain *domain,
     struct smmu_ctx *ctx)
 {
 	struct smmu_softc *sc;
@@ -1817,7 +1817,7 @@ smmu_device_attach(device_t dev, struct smmu_domain *domain,
 }
 
 static int
-smmu_device_detach(device_t dev, struct smmu_ctx *ctx)
+smmu_ctx_detach(device_t dev, struct smmu_ctx *ctx)
 {
 	struct smmu_softc *sc;
 
@@ -1838,8 +1838,8 @@ static device_method_t smmu_methods[] = {
 	DEVMETHOD(smmu_unmap,		smmu_unmap),
 	DEVMETHOD(smmu_domain_alloc,	smmu_domain_alloc),
 	DEVMETHOD(smmu_domain_free,	smmu_domain_free),
-	DEVMETHOD(smmu_ctx_attach,	smmu_device_attach),
-	DEVMETHOD(smmu_ctx_detach,	smmu_device_detach),
+	DEVMETHOD(smmu_ctx_attach,	smmu_ctx_attach),
+	DEVMETHOD(smmu_ctx_detach,	smmu_ctx_detach),
 
 	/* Bus interface */
 	DEVMETHOD(bus_read_ivar,	smmu_read_ivar),
