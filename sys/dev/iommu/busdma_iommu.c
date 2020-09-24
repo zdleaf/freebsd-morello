@@ -245,7 +245,7 @@ iommu_instantiate_ctx(struct iommu_unit *unit, device_t dev, bool rmrr)
 	 */
 	if (pci_get_vendor(dev) == 0x1b4b && \
 	    pci_get_device(dev) == 0x9170)
-		pci_add_dma_alias(dev, 1, 1);
+		bus_dma_iommu_set_buswide(dev);
 
 	/*
 	 * If the user requested the IOMMU disabled for the device, we

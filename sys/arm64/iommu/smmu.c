@@ -1743,29 +1743,17 @@ smmu_domain_free(device_t dev, struct smmu_domain *domain)
 	return (0);
 }
 
-struct smmu_walk_token {
-	device_t dev;
-	struct smmu_ctx *ctx;
-	struct smmu_domain *domain;
-};
-
 static int
-smmu_walk_aliases(device_t dev, uint8_t alias, void *arg)
+smmu_set_buswide(device_t dev, struct smmu_domain *domain,
+    struct smmu_ctx *ctx)
 {
-	struct smmu_walk_token *token;
 	struct smmu_softc *sc;
-	struct smmu_ctx *ctx;
-	struct smmu_domain *domain;
+	int i;
 
-	token = arg;
-	domain = token->domain;
-	ctx = token->ctx;
+	sc = device_get_softc(dev);
 
-	sc = device_get_softc(token->dev);
-
-	printf("%s: alias %d sc %p\n", __func__, alias, sc);
-
-	smmu_init_ste(sc, domain->cd, (ctx->sid | alias), ctx->bypass);
+	for (i = 0; i < PCI_SLOTMAX; i++)
+		smmu_init_ste(sc, domain->cd, (ctx->sid | i), ctx->bypass);
 
 	return (0);
 }
@@ -1774,14 +1762,16 @@ static int
 smmu_ctx_attach(device_t dev, struct smmu_domain *domain,
     struct smmu_ctx *ctx)
 {
+	struct iommu_domain *iodom;
 	struct smmu_softc *sc;
-	struct smmu_walk_token token;
 	uint16_t rid;
 	u_int xref, sid;
 	int seg;
 	int err;
 
 	sc = device_get_softc(dev);
+
+	iodom = (struct iommu_domain *)domain;
 
 	seg = pci_get_domain(ctx->dev);
 	rid = pci_get_rid(ctx->dev);
@@ -1804,14 +1794,10 @@ smmu_ctx_attach(device_t dev, struct smmu_domain *domain,
 	 * 0x600 sata
 	 */
 
-	token.ctx = ctx;
-	token.dev = dev;
-	token.domain = domain;
-
 	smmu_init_ste(sc, domain->cd, ctx->sid, ctx->bypass);
 
-	/* Handle PCI function aliases, if any. */
-	pci_for_each_dma_alias(ctx->dev, smmu_walk_aliases, &token);
+	if (iommu_is_buswide_ctx(iodom->iommu, pci_get_bus(ctx->dev)))
+		smmu_set_buswide(dev, domain, ctx);
 
 	return (0);
 }
