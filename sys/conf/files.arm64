@@ -314,7 +314,6 @@ dev/iicbus/sy8106a.c		optional	sy8106a fdt
 dev/iicbus/twsi/mv_twsi.c	optional	twsi fdt
 dev/iicbus/twsi/a10_twsi.c	optional	twsi fdt
 dev/iicbus/twsi/twsi.c		optional	twsi fdt
-dev/iommu/iommu_if.m		optional	iommu
 dev/iommu/busdma_iommu.c	optional	iommu
 dev/iommu/iommu_gas.c		optional	iommu
 dev/hwpmc/hwpmc_arm64.c		optional	hwpmc
