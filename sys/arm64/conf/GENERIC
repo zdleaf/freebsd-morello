@@ -80,7 +80,7 @@ options 	RACCT_DEFAULT_TO_DISABLED # Set kern.racct.enable=0 by default
 options 	RCTL			# Resource limits
 options 	SMP
 options 	INTRNG
-options		ACPI_SMMU
+options 	IOMMU
 
 #options 	MD_ROOT_SIZE=47104
 #options 	ROOTDEVNAME=\"ufs:md0\"
@@ -376,8 +376,6 @@ device		aw_syscon
 
 # IO Domains
 device		rk_iodomain
-
-device		iommu
 
 # The `bpf' device enables the Berkeley Packet Filter.
 # Be aware of the administrative consequences of enabling this!

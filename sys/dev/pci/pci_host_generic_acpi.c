@@ -35,6 +35,7 @@
 __FBSDID("$FreeBSD$");
 
 #include "opt_platform.h"
+#include "opt_iommu.h"
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -408,7 +409,7 @@ generic_pcie_acpi_map_msi(device_t pci, device_t child, int irq, uint64_t *addr,
 	return (ENXIO);
 #endif
 
-#if defined(ACPI_SMMU)
+#if defined(IOMMU)
 	error = smmu_map_msi(child, *addr);
 	if (error)
 		return (error);
