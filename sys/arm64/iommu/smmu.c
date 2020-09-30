@@ -1669,7 +1669,6 @@ smmu_map(device_t dev, struct smmu_domain *domain,
 		if (error)
 			return (error);
 		smmu_tlbi_va(sc, va, domain->asid);
-		pa += PAGE_SIZE;
 		va += PAGE_SIZE;
 	}
 
