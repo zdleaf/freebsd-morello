@@ -267,18 +267,18 @@ smmu_ctx_attach(struct smmu_domain *domain, struct smmu_ctx *ctx)
 }
 
 static int
-iommu_map_gic_page(struct smmu_domain *domain, uint64_t gic_page)
+iommu_map_msi_page(struct smmu_domain *domain, uint64_t msi_page)
 {
 	int error;
 
-	/* Reserve the GIC page */
-	error = iommu_gas_reserve_region(&domain->domain, gic_page,
-	    gic_page + PAGE_SIZE);
+	/* Reserve the MSI page. */
+	error = iommu_gas_reserve_region(&domain->domain, msi_page,
+	    msi_page + PAGE_SIZE);
 	if (error != 0)
 		return (error);
 
-	/* Map the GICv3 ITS page so the device could send MSI interrupts. */
-	iommu_map_page(domain, gic_page, gic_page, VM_PROT_WRITE);
+	/* Map the MSI page so the device could send MSI interrupts. */
+	iommu_map_page(domain, msi_page, msi_page, VM_PROT_WRITE);
 
 	return (0);
 }
@@ -562,16 +562,16 @@ int
 smmu_map_msi(device_t child, uint64_t msi_addr)
 {
 	struct smmu_ctx *ctx;
-	uint64_t gic_page;
+	uint64_t msi_page;
 	int error;
 
 	ctx = smmu_ctx_lookup(child);
 	if (!ctx || ctx->bypass)
 		return (0);
 
-	gic_page = trunc_page(msi_addr);
+	msi_page = trunc_page(msi_addr);
 
-	error = iommu_map_gic_page(ctx->domain, gic_page);
+	error = iommu_map_msi_page(ctx->domain, msi_page);
 
 	return (error);
 }
