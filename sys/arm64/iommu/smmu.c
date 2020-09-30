@@ -123,7 +123,7 @@ __FBSDID("$FreeBSD$");
 #include <machine/cpu.h>
 #include <machine/intr.h>
 
-#include "iommu.h"
+#include "iommu_smmu.h"
 #include "smmu_if.h"
 
 #include "smmu_reg.h"

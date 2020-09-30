@@ -46,7 +46,7 @@
 #include <dev/pci/pcivar.h>
 #include <dev/iommu/iommu.h>
 
-#include <arm64/iommu/iommu.h>
+#include <arm64/iommu/iommu_smmu.h>
 
 INTERFACE smmu;
 
