@@ -81,6 +81,7 @@ __FBSDID("$FreeBSD$");
 #include <dev/usb/controller/uhcireg.h>
 
 #include <dev/iommu/iommu.h>
+#include <dev/iommu/iommu_var.h>
 
 #include "pcib_if.h"
 #include "pci_if.h"

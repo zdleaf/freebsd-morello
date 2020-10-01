@@ -80,25 +80,7 @@ struct iommu_map_entry {
 #define	IOMMU_MAP_ENTRY_SNOOP	0x4000	/* Snoop */
 #define	IOMMU_MAP_ENTRY_TM	0x8000	/* Transient */
 
-struct iommu_unit {
-	struct mtx lock;
-	int unit;
-
-	int dma_enabled;
-
-	/* Busdma delayed map load */
-	struct task dmamap_load_task;
-	TAILQ_HEAD(, bus_dmamap_iommu) delayed_maps;
-	struct taskqueue *delayed_taskqueue;
-
-	/*
-	 * Bitmap of buses for which context must ignore slot:func,
-	 * duplicating the page table pointer into all context table
-	 * entries.  This is a client-controlled quirk to support some
-	 * NTBs.
-	 */
-	uint32_t buswide_ctxs[(PCI_BUSMAX + 1) / NBBY / sizeof(uint32_t)];
-};
+struct iommu_unit;
 
 struct iommu_domain_map_ops {
 	int (*map)(struct iommu_domain *domain, iommu_gaddr_t base,
@@ -107,36 +89,8 @@ struct iommu_domain_map_ops {
 	    iommu_gaddr_t size, int flags);
 };
 
-/*
- * Locking annotations:
- * (u) - Protected by iommu unit lock
- * (d) - Protected by domain lock
- * (c) - Immutable after initialization
- */
-
-struct iommu_domain {
-	struct iommu_unit *iommu;	/* (c) */
-	const struct iommu_domain_map_ops *ops;
-	struct mtx lock;		/* (c) */
-	struct task unload_task;	/* (c) */
-	u_int entries_cnt;		/* (d) */
-	struct iommu_map_entries_tailq unload_entries; /* (d) Entries to
-							 unload */
-	struct iommu_gas_entries_tree rb_root; /* (d) */
-	iommu_gaddr_t end;		/* (c) Highest address + 1 in
-					   the guest AS */
-	struct iommu_map_entry *first_place, *last_place; /* (d) */
-	u_int flags;			/* (u) */
-};
-
-struct iommu_ctx {
-	struct iommu_domain *domain;	/* (c) */
-	struct bus_dma_tag_iommu *tag;	/* (c) Root tag */
-	u_long loads;			/* atomic updates, for stat only */
-	u_long unloads;			/* same */
-	u_int flags;			/* (u) */
-	uint16_t rid;			/* (c) pci RID */
-};
+struct iommu_domain;
+struct iommu_ctx;
 
 /* struct iommu_ctx flags */
 #define	IOMMU_CTX_FAULTED	0x0001	/* Fault was reported,

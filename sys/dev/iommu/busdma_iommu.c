@@ -60,6 +60,7 @@ __FBSDID("$FreeBSD$");
 #include <vm/vm_page.h>
 #include <vm/vm_map.h>
 #include <dev/iommu/iommu.h>
+#include <dev/iommu/iommu_var.h>
 #include <machine/atomic.h>
 #include <machine/bus.h>
 #include <machine/md_var.h>

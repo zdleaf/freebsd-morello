@@ -50,6 +50,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/queue.h>
 #include <sys/bus.h>
 #include <sys/interrupt.h>
+#include <sys/tree.h>
 #include <sys/conf.h>
 #include <sys/cpuset.h>
 #include <sys/rman.h>
@@ -59,6 +60,8 @@ __FBSDID("$FreeBSD$");
 #ifdef HWPMC_HOOKS
 #include <sys/pmckern.h>
 #endif
+
+#include <dev/iommu/iommu.h>
 
 #include <machine/atomic.h>
 #include <machine/intr.h>
