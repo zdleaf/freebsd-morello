@@ -218,6 +218,7 @@ smmu_tag_init(struct bus_dma_tag_iommu *t)
 
 	t->common.ref_count = 0;
 	t->common.impl = &bus_dma_iommu_impl;
+	t->common.alignment = 1;
 	t->common.boundary = 0;
 	t->common.lowaddr = maxaddr;
 	t->common.highaddr = maxaddr;
