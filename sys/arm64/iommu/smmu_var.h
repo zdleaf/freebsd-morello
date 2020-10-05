@@ -152,4 +152,6 @@ MALLOC_DECLARE(M_SMMU);
 int smmu_attach(device_t dev);
 int smmu_detach(device_t dev);
 
+bool smmu_quirks_check(u_int sid, uint8_t event_id, uintptr_t input_addr);
+
 #endif /* _DEV_IOMMU_SMMU_VAR_H_ */

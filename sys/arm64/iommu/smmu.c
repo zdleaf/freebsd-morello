@@ -439,7 +439,7 @@ static void
 smmu_print_event(struct smmu_softc *sc, uint32_t *evt)
 {
 	struct smmu_event *ev;
-	uint64_t input_addr;
+	uintptr_t input_addr;
 	uint8_t event_id;
 	int sid;
 	int i;
@@ -453,16 +453,21 @@ smmu_print_event(struct smmu_softc *sc, uint32_t *evt)
 		}
 	}
 
+	sid = evt[1];
+	input_addr = evt[5];
+	input_addr <<= 32;
+	input_addr |= evt[4];
+
+	if (smmu_quirks_check(sid, event_id, input_addr)) {
+		/* The event is known. Don't print anything. */
+		return;
+	}
+
 	if (ev) {
 		device_printf(sc->dev,
 		    "Event %s (%s) received.\n", ev->str, ev->msg);
 	} else
 		device_printf(sc->dev, "Event 0x%x received\n", event_id);
-
-	sid = evt[1];
-	input_addr = evt[5];
-	input_addr <<= 32;
-	input_addr |= evt[4];
 
 	device_printf(sc->dev, "SID %x, Input Address: %jx\n",
 	    sid, input_addr);

@@ -209,6 +209,25 @@ smmu_ctx_lookup(device_t dev)
 	return (NULL);
 }
 
+struct smmu_ctx *
+smmu_ctx_lookup_by_sid(u_int sid)
+{
+	struct smmu_domain *domain;
+	struct smmu_ctx *ctx;
+	struct smmu_unit *iommu;
+
+	LIST_FOREACH(iommu, &iommu_list, next) {
+		LIST_FOREACH(domain, &iommu->domain_list, next) {
+			LIST_FOREACH(ctx, &domain->ctx_list, next) {
+				if (ctx->sid == sid)
+					return (ctx);
+			}
+		}
+	}
+
+	return (NULL);
+}
+
 static void
 smmu_tag_init(struct bus_dma_tag_iommu *t)
 {
@@ -234,6 +253,8 @@ smmu_ctx_alloc(device_t dev)
 
 	ctx = malloc(sizeof(struct smmu_ctx), M_IOMMU, M_WAITOK | M_ZERO);
 	ctx->ctx.rid = pci_get_rid(dev);
+	ctx->vendor = pci_get_vendor(dev);
+	ctx->device = pci_get_device(dev);
 	ctx->dev = dev;
 
 	return (ctx);

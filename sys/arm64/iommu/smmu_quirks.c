@@ -28,60 +28,70 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
-#ifndef _DEV_IOMMU_IOMMU_H_
-#define _DEV_IOMMU_IOMMU_H_
+#include "opt_platform.h"
+#include "opt_acpi.h"
 
-#define	IOMMU_PAGE_SIZE		4096
-#define	IOMMU_PAGE_MASK		(IOMMU_PAGE_SIZE - 1)
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD$");
 
-#define	IOMMU_MF_CANWAIT	0x0001
-#define	IOMMU_MF_CANSPLIT	0x0002
+#include <sys/param.h>
+#include <sys/bitstring.h>
+#include <sys/systm.h>
+#include <sys/bus.h>
+#include <sys/kernel.h>
+#include <sys/rman.h>
+#include <sys/tree.h>
+#include <sys/taskqueue.h>
+#include <sys/sysctl.h>
+#include <vm/vm.h>
+#include <vm/uma.h>
+#include <vm/pmap.h>
+#include <vm/vm_extern.h>
+#include <vm/vm_page.h>
+#include <dev/pci/pcireg.h>
+#include <dev/pci/pcivar.h>
+#include <dev/iommu/iommu.h>
+#include <dev/iommu/iommu_var.h>
 
-#define	IOMMU_PGF_WAITOK	0x0001
-#define	IOMMU_PGF_ZERO		0x0002
-#define	IOMMU_PGF_ALLOC		0x0004
-#define	IOMMU_PGF_NOALLOC	0x0008
-#define	IOMMU_PGF_OBJL		0x0010
+#include "iommu_smmu.h"
 
-struct smmu_unit {
-	struct iommu_unit		unit;
-	LIST_HEAD(, smmu_domain)	domain_list;
-	LIST_ENTRY(smmu_unit)		next;
-	device_t			dev;
-	intptr_t			xref;
+#include "smmu_var.h"
+
+struct smmu_quirk_entry {
+	uint16_t vendor;
+	uint16_t device;
+	const char *name;
+	uint8_t event_id;
+	uintptr_t input_address;
 };
 
-struct smmu_domain {
-	struct iommu_domain		domain;
-	LIST_HEAD(, smmu_ctx)		ctx_list;
-	LIST_ENTRY(smmu_domain)	next;
-	u_int entries_cnt;
-	struct smmu_cd			*cd;
-	struct pmap			p;
-	uint16_t			asid;
+/* List of events that are known and will be silenced. */
+static const struct smmu_quirk_entry smmu_quirk_table[] = {
+	{ 0x10ec, 0x8168, "RealTek 8168/8111", 0x10 /* F_TRANSLATION */, 0x0 },
+	{ 0, 0, NULL, 0, 0 },
 };
 
-struct smmu_ctx {
-	struct iommu_ctx		ctx;
-	struct smmu_domain		*domain;
-	LIST_ENTRY(smmu_ctx)		next;
-	device_t			dev;
-	bool				bypass;
-	int				sid;
-	uint16_t			vendor;
-	uint16_t			device;
-};
+bool
+smmu_quirks_check(u_int sid, uint8_t event_id, uintptr_t input_addr)
+{
+	const struct smmu_quirk_entry *q;
+	struct smmu_ctx *ctx;
+	int i;
 
-int iommu_unregister(device_t dev);
-int iommu_register(device_t dev, struct smmu_unit *unit, intptr_t xref);
-int iommu_map_page(struct smmu_domain *domain, vm_offset_t va, vm_paddr_t pa,
-    vm_prot_t prot);
-int iommu_unmap_page(struct smmu_domain *domain, vm_offset_t va);
-int smmu_map_msi(device_t child, uint64_t msi_addr);
-struct smmu_ctx * smmu_ctx_lookup_by_sid(u_int sid);
+	ctx = smmu_ctx_lookup_by_sid(sid);
+	if (!ctx)
+		return (false);
 
-#endif /* _DEV_IOMMU_IOMMU_H_ */
+	for (i = 0; smmu_quirk_table[i].vendor != 0; i++) {
+		q = &smmu_quirk_table[i];
+		if (ctx->vendor == q->vendor &&
+		    ctx->device == q->device &&
+		    input_addr == q->input_address &&
+		    event_id == q->event_id)
+			return (true);
+	}
+
+	return (false);
+}
