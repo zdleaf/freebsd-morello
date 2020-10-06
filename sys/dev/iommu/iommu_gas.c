@@ -209,6 +209,14 @@ iommu_gas_rb_remove(struct iommu_domain *domain, struct iommu_map_entry *entry)
 	RB_REMOVE(iommu_gas_entries_tree, &domain->rb_root, entry);
 }
 
+
+struct iommu_domain *
+iommu_get_ctx_domain(struct iommu_ctx *ctx)
+{
+
+	return (ctx->domain);
+}
+
 void
 iommu_gas_init_domain(struct iommu_domain *domain)
 {
@@ -715,6 +723,65 @@ iommu_map(struct iommu_domain *domain,
 	    ma, res);
 
 	return (error);
+}
+
+int
+iommu_map_msi(struct iommu_ctx *ctx, iommu_gaddr_t size, int offset,
+    u_int eflags, u_int flags, vm_page_t *ma)
+{
+	struct iommu_domain *domain;
+	struct iommu_map_entry *entry;
+	int error;
+
+	error = 0;
+	domain = ctx->domain;
+
+	/* Check if there is already an MSI page allocated */
+	IOMMU_DOMAIN_LOCK(domain);
+	entry = domain->msi_entry;
+	IOMMU_DOMAIN_UNLOCK(domain);
+
+	if (entry == NULL) {
+		error = iommu_gas_map(domain, &ctx->tag->common, size, offset,
+		    eflags, flags, ma, &entry);
+		IOMMU_DOMAIN_LOCK(domain);
+		if (error == 0) {
+			if (domain->msi_entry == NULL) {
+				MPASS(domain->msi_base == 0);
+				MPASS(domain->msi_phys == 0);
+
+				domain->msi_entry = entry;
+				domain->msi_base = entry->start;
+				domain->msi_phys = VM_PAGE_TO_PHYS(ma[0]);
+			} else {
+				/*
+				 * We lost the race and already have an
+				 * MSI page allocated. Free the unneeded entry.
+				 */
+				iommu_gas_free_entry(domain, entry);
+			}
+		} else if (domain->msi_entry != NULL) {
+			/*
+			 * The allocation failed, but another succeeded.
+			 * Return success as there is a valid MSI page.
+			 */
+			error = 0;
+		}
+		IOMMU_DOMAIN_UNLOCK(domain);
+	}
+
+	return (error);
+}
+
+void
+iommu_translate_msi(struct iommu_domain *domain, uint64_t *addr)
+{
+
+	KASSERT(*addr >= domain->msi_base,
+	    ("%s: Address is below the MSI base address (%jx < %jx)", __func__,
+	    (uintmax_t)*addr, (uintmax_t)domain->msi_base));
+
+	*addr = (*addr - domain->msi_phys) + domain->msi_base;
 }
 
 int

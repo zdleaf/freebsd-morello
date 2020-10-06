@@ -118,6 +118,7 @@ void iommu_domain_unload_entry(struct iommu_map_entry *entry, bool free);
 void iommu_domain_unload(struct iommu_domain *domain,
     struct iommu_map_entries_tailq *entries, bool cansleep);
 
+struct iommu_ctx *iommu_get_dev_ctx(device_t dev);
 struct iommu_ctx *iommu_instantiate_ctx(struct iommu_unit *iommu,
     device_t dev, bool rmrr);
 device_t iommu_get_requester(device_t dev, uint16_t *rid);
@@ -131,7 +132,10 @@ int iommu_map(struct iommu_domain *iodom,
     u_int eflags, u_int flags, vm_page_t *ma, struct iommu_map_entry **res);
 int iommu_map_region(struct iommu_domain *domain,
     struct iommu_map_entry *entry, u_int eflags, u_int flags, vm_page_t *ma);
+int iommu_map_msi(struct iommu_ctx *ctx, iommu_gaddr_t size, int offset,
+    u_int eflags, u_int flags, vm_page_t *ma);
 
+struct iommu_domain *iommu_get_ctx_domain(struct iommu_ctx *ctx);
 void iommu_gas_init_domain(struct iommu_domain *domain);
 void iommu_gas_fini_domain(struct iommu_domain *domain);
 struct iommu_map_entry *iommu_gas_alloc_entry(struct iommu_domain *domain,
@@ -156,12 +160,8 @@ void iommu_domain_init(struct iommu_unit *unit, struct iommu_domain *domain,
     const struct iommu_domain_map_ops *ops);
 void iommu_domain_fini(struct iommu_domain *domain);
 
-bool bus_dma_iommu_set_buswide(device_t dev);
-int bus_dma_iommu_load_ident(bus_dma_tag_t dmat, bus_dmamap_t map,
-    vm_paddr_t start, vm_size_t length, int flags);
+void iommu_translate_msi(struct iommu_domain *domain, uint64_t *addr);
 
 bus_dma_tag_t iommu_get_dma_tag(device_t dev, device_t child);
-
-SYSCTL_DECL(_hw_iommu);
 
 #endif /* !_SYS_IOMMU_H_ */

@@ -98,6 +98,9 @@ struct iommu_domain {
 	iommu_gaddr_t end;		/* (c) Highest address + 1 in
 					   the guest AS */
 	struct iommu_map_entry *first_place, *last_place; /* (d) */
+	struct iommu_map_entry *msi_entry; /* (d) */
+	iommu_gaddr_t msi_base;		/* (d) */
+	vm_paddr_t msi_phys;		/* (d) */
 	u_int flags;			/* (u) */
 };
 
@@ -109,5 +112,7 @@ struct iommu_ctx {
 	u_int flags;			/* (u) */
 	uint16_t rid;			/* (c) pci RID */
 };
+
+SYSCTL_DECL(_hw_iommu);
 
 #endif /* !_SYS_IOMMU_VAR_H_ */

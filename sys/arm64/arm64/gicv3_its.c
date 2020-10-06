@@ -32,6 +32,7 @@
 
 #include "opt_acpi.h"
 #include "opt_platform.h"
+#include "opt_iommu.h"
 
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
@@ -56,6 +57,7 @@ __FBSDID("$FreeBSD$");
 
 #include <vm/vm.h>
 #include <vm/pmap.h>
+#include <vm/vm_page.h>
 
 #include <machine/bus.h>
 #include <machine/intr.h>
@@ -71,6 +73,10 @@ __FBSDID("$FreeBSD$");
 #endif
 #include <dev/pci/pcireg.h>
 #include <dev/pci/pcivar.h>
+
+#ifdef IOMMU
+#include <dev/iommu/iommu.h>
+#endif
 
 #include "pcib_if.h"
 #include "pic_if.h"
@@ -269,6 +275,7 @@ struct gicv3_its_softc {
 #define	ITS_FLAGS_ERRATA_CAVIUM_22375	0x00000004
 	u_int sc_its_flags;
 	bool	trace_enable;
+	vm_page_t ma; /* fake msi page */
 };
 
 static void *conf_base;
@@ -321,6 +328,9 @@ static msi_release_msi_t gicv3_its_release_msi;
 static msi_alloc_msix_t gicv3_its_alloc_msix;
 static msi_release_msix_t gicv3_its_release_msix;
 static msi_map_msi_t gicv3_its_map_msi;
+#ifdef IOMMU
+static msi_iommu_init_t gicv3_iommu_init;
+#endif
 
 static void its_cmd_movi(device_t, struct gicv3_its_irqsrc *);
 static void its_cmd_mapc(device_t, struct its_col *, uint8_t);
@@ -352,6 +362,9 @@ static device_method_t gicv3_its_methods[] = {
 	DEVMETHOD(msi_alloc_msix,	gicv3_its_alloc_msix),
 	DEVMETHOD(msi_release_msix,	gicv3_its_release_msix),
 	DEVMETHOD(msi_map_msi,		gicv3_its_map_msi),
+#ifdef IOMMU
+	DEVMETHOD(msi_iommu_init,	gicv3_iommu_init),
+#endif
 
 	/* End */
 	DEVMETHOD_END
@@ -803,8 +816,9 @@ static int
 gicv3_its_attach(device_t dev)
 {
 	struct gicv3_its_softc *sc;
-	uint32_t iidr;
 	int domain, err, i, rid;
+	uint64_t phys;
+	uint32_t iidr;
 
 	sc = device_get_softc(dev);
 
@@ -819,6 +833,12 @@ gicv3_its_attach(device_t dev)
 		device_printf(dev, "Could not allocate memory\n");
 		return (ENXIO);
 	}
+
+	phys = rounddown2(vtophys(rman_get_virtual(sc->sc_its_res)) +
+	    GITS_TRANSLATER, PAGE_SIZE);
+	printf("phys %lx\n", phys);
+	sc->ma = malloc(sizeof(struct vm_page), M_DEVBUF, M_WAITOK | M_ZERO);
+	vm_page_initfake(sc->ma, phys, VM_MEMATTR_DEFAULT);
 
 	iidr = gic_its_read_4(sc, GITS_IIDR);
 	for (i = 0; i < nitems(its_quirks); i++) {
@@ -1418,6 +1438,24 @@ gicv3_its_map_msi(device_t dev, device_t child, struct intr_irqsrc *isrc,
 
 	return (0);
 }
+
+#ifdef IOMMU
+static int
+gicv3_iommu_init(device_t dev, device_t child, struct iommu_domain **domain)
+{
+	struct gicv3_its_softc *sc;
+	struct iommu_ctx *ctx;
+	int error;
+
+	sc = device_get_softc(dev);
+	ctx = iommu_get_dev_ctx(child);
+	error = iommu_map_msi(ctx, PAGE_SIZE, GITS_TRANSLATER,
+	    IOMMU_MAP_ENTRY_WRITE, IOMMU_MF_CANWAIT, &sc->ma);
+	*domain = iommu_get_ctx_domain(ctx);
+
+	return (error);
+}
+#endif
 
 /*
  * Commands handling.

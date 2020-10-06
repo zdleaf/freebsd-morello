@@ -62,4 +62,9 @@ struct bus_dmamap_iommu {
 
 extern struct bus_dma_impl bus_dma_iommu_impl;
 
+bool bus_dma_iommu_set_buswide(device_t dev);
+int bus_dma_iommu_load_ident(bus_dma_tag_t dmat, bus_dmamap_t map,
+    vm_paddr_t start, vm_size_t length, int flags);
+
+
 #endif

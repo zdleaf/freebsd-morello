@@ -288,23 +288,6 @@ smmu_ctx_attach(struct smmu_domain *domain, struct smmu_ctx *ctx)
 	return (error);
 }
 
-static int
-iommu_map_msi_page(struct smmu_domain *domain, uint64_t msi_page)
-{
-	int error;
-
-	/* Reserve the MSI page. */
-	error = iommu_gas_reserve_region(&domain->domain, msi_page,
-	    msi_page + PAGE_SIZE);
-	if (error != 0)
-		return (error);
-
-	/* Map the MSI page so the device could send MSI interrupts. */
-	iommu_map_page(domain, msi_page, msi_page, VM_PROT_WRITE);
-
-	return (0);
-}
-
 struct iommu_ctx *
 iommu_get_ctx(struct iommu_unit *iommu, device_t requester,
     uint16_t rid, bool disabled, bool rmrr)
@@ -578,24 +561,6 @@ iommu_domain_unload_entry(struct iommu_map_entry *entry, bool free)
 	dprintf("%s\n", __func__);
 
 	smmu_domain_free_entry(entry, free);
-}
-
-int
-smmu_map_msi(device_t child, uint64_t msi_addr)
-{
-	struct smmu_ctx *ctx;
-	uint64_t msi_page;
-	int error;
-
-	ctx = smmu_ctx_lookup(child);
-	if (!ctx || ctx->bypass)
-		return (0);
-
-	msi_page = trunc_page(msi_addr);
-
-	error = iommu_map_msi_page(ctx->domain, msi_page);
-
-	return (error);
 }
 
 static void
