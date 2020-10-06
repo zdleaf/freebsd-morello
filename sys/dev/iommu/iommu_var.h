@@ -34,6 +34,31 @@
 #ifndef _SYS_IOMMU_VAR_H_
 #define _SYS_IOMMU_VAR_H_
 
+RB_HEAD(iommu_gas_entries_tree, iommu_map_entry);
+RB_PROTOTYPE(iommu_gas_entries_tree, iommu_map_entry, rb_entry,
+    iommu_gas_cmp_entries);
+
+struct iommu_qi_genseq {
+	u_int gen;
+	uint32_t seq;
+};
+
+struct iommu_map_entry {
+	iommu_gaddr_t start;
+	iommu_gaddr_t end;
+	iommu_gaddr_t first;		/* Least start in subtree */
+	iommu_gaddr_t last;		/* Greatest end in subtree */
+	iommu_gaddr_t free_down;	/* Max free space below the
+					   current R/B tree node */
+	u_int flags;
+	TAILQ_ENTRY(iommu_map_entry) dmamap_link; /* Link for dmamap entries */
+	RB_ENTRY(iommu_map_entry) rb_entry;	 /* Links for domain entries */
+	TAILQ_ENTRY(iommu_map_entry) unroll_link; /* Link for unroll after
+						    dmamap_load failure */
+	struct iommu_domain *domain;
+	struct iommu_qi_genseq gseq;
+};
+
 struct iommu_unit {
 	struct mtx lock;
 	int unit;

@@ -43,31 +43,6 @@ struct bus_dma_tag_common;
 struct iommu_map_entry;
 TAILQ_HEAD(iommu_map_entries_tailq, iommu_map_entry);
 
-RB_HEAD(iommu_gas_entries_tree, iommu_map_entry);
-RB_PROTOTYPE(iommu_gas_entries_tree, iommu_map_entry, rb_entry,
-    iommu_gas_cmp_entries);
-
-struct iommu_qi_genseq {
-	u_int gen;
-	uint32_t seq;
-};
-
-struct iommu_map_entry {
-	iommu_gaddr_t start;
-	iommu_gaddr_t end;
-	iommu_gaddr_t first;		/* Least start in subtree */
-	iommu_gaddr_t last;		/* Greatest end in subtree */
-	iommu_gaddr_t free_down;	/* Max free space below the
-					   current R/B tree node */
-	u_int flags;
-	TAILQ_ENTRY(iommu_map_entry) dmamap_link; /* Link for dmamap entries */
-	RB_ENTRY(iommu_map_entry) rb_entry;	 /* Links for domain entries */
-	TAILQ_ENTRY(iommu_map_entry) unroll_link; /* Link for unroll after
-						    dmamap_load failure */
-	struct iommu_domain *domain;
-	struct iommu_qi_genseq gseq;
-};
-
 #define	IOMMU_MAP_ENTRY_PLACE	0x0001	/* Fake entry */
 #define	IOMMU_MAP_ENTRY_RMRR	0x0002	/* Permanent, not linked by
 					   dmamap_link */
@@ -81,6 +56,8 @@ struct iommu_map_entry {
 #define	IOMMU_MAP_ENTRY_TM	0x8000	/* Transient */
 
 struct iommu_unit;
+struct iommu_domain;
+struct iommu_ctx;
 
 struct iommu_domain_map_ops {
 	int (*map)(struct iommu_domain *domain, iommu_gaddr_t base,
@@ -88,9 +65,6 @@ struct iommu_domain_map_ops {
 	int (*unmap)(struct iommu_domain *domain, iommu_gaddr_t base,
 	    iommu_gaddr_t size, int flags);
 };
-
-struct iommu_domain;
-struct iommu_ctx;
 
 /* struct iommu_ctx flags */
 #define	IOMMU_CTX_FAULTED	0x0001	/* Fault was reported,
