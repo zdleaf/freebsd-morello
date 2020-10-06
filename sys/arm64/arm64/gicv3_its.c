@@ -836,7 +836,6 @@ gicv3_its_attach(device_t dev)
 
 	phys = rounddown2(vtophys(rman_get_virtual(sc->sc_its_res)) +
 	    GITS_TRANSLATER, PAGE_SIZE);
-	printf("phys %lx\n", phys);
 	sc->ma = malloc(sizeof(struct vm_page), M_DEVBUF, M_WAITOK | M_ZERO);
 	vm_page_initfake(sc->ma, phys, VM_MEMATTR_DEFAULT);
 
