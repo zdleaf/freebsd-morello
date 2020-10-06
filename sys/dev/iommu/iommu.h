@@ -160,6 +160,10 @@ void iommu_domain_init(struct iommu_unit *unit, struct iommu_domain *domain,
     const struct iommu_domain_map_ops *ops);
 void iommu_domain_fini(struct iommu_domain *domain);
 
+bool bus_dma_iommu_set_buswide(device_t dev);
+int bus_dma_iommu_load_ident(bus_dma_tag_t dmat, bus_dmamap_t map,
+    vm_paddr_t start, vm_size_t length, int flags);
+
 void iommu_translate_msi(struct iommu_domain *domain, uint64_t *addr);
 
 bus_dma_tag_t iommu_get_dma_tag(device_t dev, device_t child);
