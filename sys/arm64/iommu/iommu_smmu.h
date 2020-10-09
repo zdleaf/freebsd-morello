@@ -32,8 +32,8 @@
  * $FreeBSD$
  */
 
-#ifndef _DEV_IOMMU_IOMMU_H_
-#define _DEV_IOMMU_IOMMU_H_
+#ifndef _ARM64_IOMMU_IOMMU_SMMU_H_
+#define _ARM64_IOMMU_IOMMU_SMMU_H_
 
 #define	IOMMU_PAGE_SIZE		4096
 #define	IOMMU_PAGE_MASK		(IOMMU_PAGE_SIZE - 1)
@@ -84,4 +84,4 @@ int iommu_unmap_page(struct smmu_domain *domain, vm_offset_t va);
 int smmu_map_msi(device_t child, uint64_t msi_addr);
 struct smmu_ctx * smmu_ctx_lookup_by_sid(u_int sid);
 
-#endif /* _DEV_IOMMU_IOMMU_H_ */
+#endif /* _ARM64_IOMMU_IOMMU_SMMU_H_ */

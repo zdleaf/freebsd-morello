@@ -62,7 +62,8 @@ __FBSDID("$FreeBSD$");
 #include <dev/pci/pcireg.h>
 #include <dev/pci/pcivar.h>
 #include <dev/iommu/iommu.h>
-#include <dev/iommu/iommu_var.h>
+#include <dev/iommu/iommu_gas.h>
+#include <dev/iommu/iommu_msi.h>
 #include <machine/atomic.h>
 #include <machine/bus.h>
 #include <machine/md_var.h>
@@ -208,7 +209,6 @@ iommu_gas_rb_remove(struct iommu_domain *domain, struct iommu_map_entry *entry)
 
 	RB_REMOVE(iommu_gas_entries_tree, &domain->rb_root, entry);
 }
-
 
 struct iommu_domain *
 iommu_get_ctx_domain(struct iommu_ctx *ctx)

@@ -75,7 +75,7 @@ __FBSDID("$FreeBSD$");
 #include <dev/pci/pcivar.h>
 
 #ifdef IOMMU
-#include <dev/iommu/iommu.h>
+#include <dev/iommu/iommu_gas.h>
 #endif
 
 #include "pcib_if.h"

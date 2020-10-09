@@ -31,35 +31,19 @@
  * $FreeBSD$
  */
 
-#ifndef __X86_IOMMU_BUSDMA_DMAR_H
-#define __X86_IOMMU_BUSDMA_DMAR_H
+#ifndef _DEV_IOMMU_IOMMU_MSI_H_
+#define _DEV_IOMMU_IOMMU_MSI_H_
 
-#include <dev/iommu/iommu.h>
-#include <dev/iommu/iommu_gas.h>
+#include <dev/iommu/iommu_types.h>
 
-struct bus_dma_tag_iommu {
-	struct bus_dma_tag_common common;
-	struct iommu_ctx *ctx;
-	device_t owner;
-	int map_count;
-	bus_dma_segment_t *segments;
-};
+struct iommu_unit;
+struct iommu_domain;
+struct iommu_ctx;
 
-struct bus_dmamap_iommu {
-	struct bus_dma_tag_iommu *tag;
-	struct memdesc mem;
-	bus_dmamap_callback_t *callback;
-	void *callback_arg;
-	struct iommu_map_entries_tailq map_entries;
-	TAILQ_ENTRY(bus_dmamap_iommu) delay_link;
-	bool locked;
-	bool cansleep;
-	int flags;
-};
+void iommu_translate_msi(struct iommu_domain *domain, uint64_t *addr);
+struct iommu_domain *iommu_get_ctx_domain(struct iommu_ctx *ctx);
+int iommu_map_msi(struct iommu_ctx *ctx, iommu_gaddr_t size, int offset,
+    u_int eflags, u_int flags, vm_page_t *ma);
+struct iommu_ctx *iommu_get_dev_ctx(device_t dev);
 
-#define	BUS_DMAMAP_IOMMU_MALLOC	0x0001
-#define	BUS_DMAMAP_IOMMU_KMEM_ALLOC 0x0002
-
-extern struct bus_dma_impl bus_dma_iommu_impl;
-
-#endif
+#endif /* !_DEV_IOMMU_IOMMU_MSI_H_ */

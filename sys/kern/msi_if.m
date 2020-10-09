@@ -35,7 +35,7 @@ HEADER {
 	#include "opt_iommu.h"
 #ifdef IOMMU
 	#include <machine/bus.h>
-	#include <dev/iommu/iommu.h>
+	#include <dev/iommu/iommu_msi.h>
 #endif
 
 	struct intr_irqsrc;

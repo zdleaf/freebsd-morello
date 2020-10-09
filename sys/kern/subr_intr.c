@@ -51,6 +51,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/queue.h>
 #include <sys/bus.h>
 #include <sys/interrupt.h>
+#include <sys/taskqueue.h>
 #include <sys/tree.h>
 #include <sys/conf.h>
 #include <sys/cpuset.h>
@@ -61,8 +62,6 @@ __FBSDID("$FreeBSD$");
 #ifdef HWPMC_HOOKS
 #include <sys/pmckern.h>
 #endif
-
-#include <dev/iommu/iommu.h>
 
 #include <machine/atomic.h>
 #include <machine/intr.h>
@@ -75,7 +74,7 @@ __FBSDID("$FreeBSD$");
 #endif
 
 #ifdef IOMMU
-#include <dev/iommu/iommu.h>
+#include <dev/iommu/iommu_msi.h>
 #endif
 
 #include "pic_if.h"

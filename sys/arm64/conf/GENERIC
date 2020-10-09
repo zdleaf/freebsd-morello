@@ -85,7 +85,7 @@ options 	IOMMU
 #options 	MD_ROOT_SIZE=47104
 #options 	ROOTDEVNAME=\"ufs:md0\"
 #makeoptions	MFS_IMAGE=/home/br/dev/freebsd-head/arm64.img
-options 	ROOTDEVNAME=\"ufs:da0p2\"
+options 	ROOTDEVNAME=\"ufs:ada0\"
 options 	LINUX_BOOT_ABI		# Boot using booti command from U-Boot
 
 # Debugging support.  Always need this:
