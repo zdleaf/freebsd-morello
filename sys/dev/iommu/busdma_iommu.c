@@ -898,7 +898,7 @@ iommu_bus_dmamap_unload(bus_dma_tag_t dmat, bus_dmamap_t map1)
 	struct bus_dmamap_iommu *map;
 	struct iommu_ctx *ctx;
 	struct iommu_domain *domain;
-#if !defined(__i386__)
+#ifndef IOMMU_DOMAIN_UNLOAD_SLEEP
 	struct iommu_map_entries_tailq entries;
 #endif
 
@@ -908,7 +908,7 @@ iommu_bus_dmamap_unload(bus_dma_tag_t dmat, bus_dmamap_t map1)
 	domain = ctx->domain;
 	atomic_add_long(&ctx->unloads, 1);
 
-#if defined(__i386__)
+#if defined(IOMMU_DOMAIN_UNLOAD_SLEEP)
 	IOMMU_DOMAIN_LOCK(domain);
 	TAILQ_CONCAT(&domain->unload_entries, &map->map_entries, dmamap_link);
 	IOMMU_DOMAIN_UNLOCK(domain);
