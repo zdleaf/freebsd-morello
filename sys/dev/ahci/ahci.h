@@ -624,6 +624,7 @@ enum ahci_err_type {
 #define AHCI_Q_MRVL_SR_DEL	0x00200000
 #define AHCI_Q_NOCCS		0x00400000
 #define AHCI_Q_NOAUX		0x00800000
+#define AHCI_Q_IOMMU_BUSWIDE	0x01000000
 
 #define AHCI_Q_BIT_STRING	\
 	"\020"			\

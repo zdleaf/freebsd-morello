@@ -37,12 +37,16 @@ __FBSDID("$FreeBSD$");
 #include <sys/malloc.h>
 #include <sys/lock.h>
 #include <sys/mutex.h>
+#include <sys/sysctl.h>
+#include <sys/taskqueue.h>
+#include <sys/tree.h>
 #include <machine/stdarg.h>
 #include <machine/resource.h>
 #include <machine/bus.h>
 #include <sys/rman.h>
 #include <dev/pci/pcivar.h>
 #include <dev/pci/pcireg.h>
+#include <dev/iommu/iommu.h>
 #include "ahci.h"
 
 static int force_ahci = 1;
@@ -263,6 +267,7 @@ static const struct {
 	{0x91251b4b, 0x00, "Marvell 88SE9125",	0},
 	{0x91281b4b, 0x00, "Marvell 88SE9128",	AHCI_Q_ALTSIG},
 	{0x91301b4b, 0x00, "Marvell 88SE9130",  AHCI_Q_ALTSIG},
+	{0x91701b4b, 0x00, "Marvell 88SE9170",	AHCI_Q_IOMMU_BUSWIDE},
 	{0x91721b4b, 0x00, "Marvell 88SE9172",	0},
 	{0x91821b4b, 0x00, "Marvell 88SE9182",	0},
 	{0x91831b4b, 0x00, "Marvell 88SS9183",	0},
@@ -482,6 +487,16 @@ ahci_pci_attach(device_t dev)
 	     ahci_ids[i].rev > revid))
 		i++;
 	ctlr->quirks = ahci_ids[i].quirks;
+
+	if (ctlr->quirks & AHCI_Q_IOMMU_BUSWIDE) {
+		/*
+		 * The controller issues DMA requests from PCI function 1,
+		 * but the device is not multifunction.
+		 * Ref: https://bugzilla.kernel.org/show_bug.cgi?id=42679
+		 */
+		bus_dma_iommu_set_buswide(dev);
+	}
+
 	/* Limit speed for my onboard JMicron external port.
 	 * It is not eSATA really, limit to SATA 1 */
 	if (pci_get_devid(dev) == 0x2363197b &&
