@@ -41,9 +41,7 @@ struct iommu_domain;
 struct iommu_ctx;
 
 void iommu_translate_msi(struct iommu_domain *domain, uint64_t *addr);
-struct iommu_domain *iommu_get_ctx_domain(struct iommu_ctx *ctx);
 int iommu_map_msi(struct iommu_ctx *ctx, iommu_gaddr_t size, int offset,
     u_int eflags, u_int flags, vm_page_t *ma);
-struct iommu_ctx *iommu_get_dev_ctx(device_t dev);
 
 #endif /* !_DEV_IOMMU_IOMMU_MSI_H_ */

@@ -48,6 +48,8 @@ __FBSDID("$FreeBSD$");
 #include <sys/module.h>
 #include <sys/mutex.h>
 #include <sys/proc.h>
+#include <sys/taskqueue.h>
+#include <sys/tree.h>
 #include <sys/queue.h>
 #include <sys/rman.h>
 #include <sys/sbuf.h>
@@ -75,6 +77,7 @@ __FBSDID("$FreeBSD$");
 #include <dev/pci/pcivar.h>
 
 #ifdef IOMMU
+#include <dev/iommu/iommu.h>
 #include <dev/iommu/iommu_gas.h>
 #endif
 

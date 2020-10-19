@@ -777,11 +777,15 @@ void
 iommu_translate_msi(struct iommu_domain *domain, uint64_t *addr)
 {
 
-	KASSERT(*addr >= domain->msi_base,
-	    ("%s: Address is below the MSI base address (%jx < %jx)", __func__,
-	    (uintmax_t)*addr, (uintmax_t)domain->msi_base));
-
 	*addr = (*addr - domain->msi_phys) + domain->msi_base;
+
+	KASSERT(*addr >= domain->msi_entry->start,
+	    ("%s: Address is below the MSI entry start address (%jx < %jx)",
+	    __func__, (uintmax_t)*addr, (uintmax_t)domain->msi_entry->start));
+
+	KASSERT(*addr + sizeof(*addr) <= domain->msi_entry->end,
+	    ("%s: Address is above the MSI entry end address (%jx < %jx)",
+	    __func__, (uintmax_t)*addr, (uintmax_t)domain->msi_entry->end));
 }
 
 int
