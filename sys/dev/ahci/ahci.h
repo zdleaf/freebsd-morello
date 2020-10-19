@@ -651,7 +651,8 @@ enum ahci_err_type {
 	"\025NOMSIX"		\
 	"\026MRVL_SR_DEL"	\
 	"\027NOCCS"		\
-	"\030NOAUX"
+	"\030NOAUX"		\
+	"\031IOMMU_BUSWIDE"
 
 int ahci_attach(device_t dev);
 int ahci_detach(device_t dev);
