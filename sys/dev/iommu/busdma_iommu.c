@@ -229,6 +229,21 @@ iommu_get_requester(device_t dev, uint16_t *rid)
 	return (requester);
 }
 
+static void
+iommu_setup_quirks(device_t dev)
+{
+
+	/*
+	 * Marvel SATA quirk.
+	 * The controller issues DMA requests from PCI function 1,
+	 * while the device is not PCI multifunction.
+	 * Ref: https://bugzilla.kernel.org/show_bug.cgi?id=42679
+	 */
+	if (pci_get_vendor(dev) == 0x1b4b && \
+	    pci_get_device(dev) == 0x9170)
+		bus_dma_iommu_set_buswide(dev);
+}
+
 struct iommu_ctx *
 iommu_instantiate_ctx(struct iommu_unit *unit, device_t dev, bool rmrr)
 {
@@ -238,14 +253,7 @@ iommu_instantiate_ctx(struct iommu_unit *unit, device_t dev, bool rmrr)
 	uint16_t rid;
 
 	requester = iommu_get_requester(dev, &rid);
-
-	/*
-	 * Marvel SATA quirk.
-	 * The controller issues DMA requests from PCI function 1.
-	 */
-	if (pci_get_vendor(dev) == 0x1b4b && \
-	    pci_get_device(dev) == 0x9170)
-		bus_dma_iommu_set_buswide(dev);
+	iommu_setup_quirks(dev);
 
 	/*
 	 * If the user requested the IOMMU disabled for the device, we
