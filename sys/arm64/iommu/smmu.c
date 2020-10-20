@@ -1616,7 +1616,7 @@ smmu_unmap(device_t dev, struct smmu_domain *domain,
 #endif
 
 	for (i = 0; i < size; i += PAGE_SIZE) {
-		if (pmap_sremove(&domain->p, va)) {
+		if (pmap_sremove(&domain->p, va) == 0) {
 			/* pmap entry removed, invalidate TLB. */
 			smmu_tlbi_va(sc, va, domain->asid);
 		} else {

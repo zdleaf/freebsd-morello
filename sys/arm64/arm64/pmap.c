@@ -3719,9 +3719,9 @@ pmap_sremove(pmap_t pmap, vm_offset_t va)
 
 	if (pte != NULL) {
 		pmap_clear(pte);
-		rc = KERN_FAILURE;
-	} else
 		rc = KERN_SUCCESS;
+	} else
+		rc = KERN_FAILURE;
 
 	PMAP_UNLOCK(pmap);
 
