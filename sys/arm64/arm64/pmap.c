@@ -3605,41 +3605,6 @@ restart:
 }
 
 /*
- * Preallocate l1, l2 page directories for a specific VA range.
- * This is optional and not in use currently.
- */
-int
-pmap_bootstrap_smmu(pmap_t pmap, vm_offset_t sva, int count)
-{
-	struct rwlock *lock;
-	pd_entry_t *pde;
-	vm_page_t mpte;
-	vm_offset_t va;
-	int lvl;
-	int i;
-
-	lock = NULL;
-	PMAP_LOCK(pmap);
-
-	va = sva;
-	for (i = 0; i < count; i++) {
-		pde = pmap_pde(pmap, va, &lvl);
-		if (pde != NULL && lvl == 2)
-			return (EEXIST);
-		mpte = _pmap_alloc_l3(pmap, pmap_l2_pindex(va), &lock);
-		if (mpte == NULL)
-			return (ENOMEM);
-		va += L2_SIZE;
-	}
-
-	if (lock != NULL)
-		rw_wunlock(lock);
-	PMAP_UNLOCK(pmap);
-
-	return (0);
-}
-
-/*
  * Add a single SMMU entry. This function does not sleep.
  */
 int
