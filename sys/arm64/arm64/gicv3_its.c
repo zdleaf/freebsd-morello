@@ -333,6 +333,7 @@ static msi_release_msix_t gicv3_its_release_msix;
 static msi_map_msi_t gicv3_its_map_msi;
 #ifdef IOMMU
 static msi_iommu_init_t gicv3_iommu_init;
+static msi_iommu_deinit_t gicv3_iommu_deinit;
 #endif
 
 static void its_cmd_movi(device_t, struct gicv3_its_irqsrc *);
@@ -367,6 +368,7 @@ static device_method_t gicv3_its_methods[] = {
 	DEVMETHOD(msi_map_msi,		gicv3_its_map_msi),
 #ifdef IOMMU
 	DEVMETHOD(msi_iommu_init,	gicv3_iommu_init),
+	DEVMETHOD(msi_iommu_deinit,	gicv3_iommu_deinit),
 #endif
 
 	/* End */
@@ -1456,6 +1458,16 @@ gicv3_iommu_init(device_t dev, device_t child, struct iommu_domain **domain)
 	*domain = iommu_get_ctx_domain(ctx);
 
 	return (error);
+}
+
+static void
+gicv3_iommu_deinit(device_t dev, device_t child)
+{
+	struct iommu_ctx *ctx;
+
+	ctx = iommu_get_dev_ctx(child);
+
+	iommu_unmap_msi(ctx);
 }
 #endif
 

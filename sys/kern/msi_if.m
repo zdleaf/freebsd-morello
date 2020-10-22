@@ -80,3 +80,8 @@ METHOD int iommu_init {
 	device_t	child;
 	struct iommu_domain **domain;
 };
+
+METHOD void iommu_deinit {
+	device_t	dev;
+	device_t	child;
+};

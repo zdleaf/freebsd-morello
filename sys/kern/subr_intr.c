@@ -1375,6 +1375,10 @@ intr_release_msi(device_t pci, device_t child, intptr_t xref, int count,
 		isrc[i] = msi->isrc;
 	}
 
+#ifdef IOMMU
+	MSI_IOMMU_DEINIT(pic->pic_dev, child);
+#endif
+
 	err = MSI_RELEASE_MSI(pic->pic_dev, child, count, isrc);
 
 	for (i = 0; i < count; i++) {
@@ -1456,6 +1460,10 @@ intr_release_msix(device_t pci, device_t child, intptr_t xref, int irq)
 		intr_unmap_irq(irq);
 		return (EINVAL);
 	}
+
+#ifdef IOMMU
+	MSI_IOMMU_DEINIT(pic->pic_dev, child);
+#endif
 
 	err = MSI_RELEASE_MSIX(pic->pic_dev, child, isrc);
 	intr_unmap_irq(irq);
