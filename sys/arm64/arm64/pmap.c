@@ -3699,7 +3699,7 @@ pmap_sremove(pmap_t pmap, vm_offset_t va)
  * this function returns error.
  */
 int
-pmap_sremove_all(pmap_t pmap)
+pmap_sremove_pages(pmap_t pmap)
 {
 	pd_entry_t l0e, *l1, l1e, *l2, l2e;
 	pt_entry_t *l3, l3e;

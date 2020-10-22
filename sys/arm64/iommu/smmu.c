@@ -1730,7 +1730,7 @@ smmu_domain_free(device_t dev, struct smmu_domain *domain)
 
 	cd = domain->cd;
 
-	error = pmap_sremove_all(&domain->p);
+	error = pmap_sremove_pages(&domain->p);
 	if (error != 0)
 		return (error);
 
