@@ -3746,10 +3746,6 @@ pmap_sremove_pages(pmap_t pmap)
 					sva += L2_SIZE;
 					continue;
 				}
-				if ((l2e & ATTR_DESCR_MASK) == L2_BLOCK) {
-					sva += L2_SIZE;
-					continue;
-				}
 				pa = l2e & ~ATTR_MASK;
 				m = PHYS_TO_VM_PAGE(pa);
 				l3 = (pt_entry_t *)PHYS_TO_DMAP(pa);
