@@ -34,6 +34,8 @@
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
+#include "opt_iommu.h"
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/malloc.h>
@@ -252,3 +254,22 @@ bus_dma_tag_set_domain(bus_dma_tag_t dmat, int domain)
 
 	return (0);
 }
+
+#ifndef IOMMU
+bool bus_dma_iommu_set_buswide(device_t dev);
+int bus_dma_iommu_load_ident(bus_dma_tag_t dmat, bus_dmamap_t map,
+    vm_paddr_t start, vm_size_t length, int flags);
+
+bool
+bus_dma_iommu_set_buswide(device_t dev)
+{
+	return (false);
+}
+
+int
+bus_dma_iommu_load_ident(bus_dma_tag_t dmat, bus_dmamap_t map,
+    vm_paddr_t start, vm_size_t length, int flags)
+{
+	return (0);
+}
+#endif
