@@ -1049,6 +1049,8 @@ main(int argc, CHAR16 *argv[])
 	    ST->FirmwareRevision >> 16, ST->FirmwareRevision & 0xffff);
 	printf("   Console: %s (%#x)\n", getenv("console"), howto);
 
+	setenv("currdev", "disk0p3", 1);
+
 	/* Determine the devpath of our image so we can prefer it. */
 	text = efi_devpath_name(boot_img->FilePath);
 	if (text != NULL) {
@@ -1154,6 +1156,8 @@ main(int argc, CHAR16 *argv[])
 		if (uefi_boot_mgr &&
 		    !interactive_interrupt("Failed to find bootable partition"))
 			return (EFI_NOT_FOUND);
+
+	setenv("currdev", "disk0p3", 1);
 
 	efi_init_environment();
 
@@ -1599,6 +1603,7 @@ command_chain(int argc, char *argv[])
 
 COMMAND_SET(chain, "chain", "chain load file", command_chain);
 
+#if 0
 extern struct in_addr servip;
 static int
 command_netserver(int argc, char *argv[])
@@ -1629,3 +1634,4 @@ command_netserver(int argc, char *argv[])
 
 COMMAND_SET(netserver, "netserver", "change or display netserver URI",
     command_netserver);
+#endif
