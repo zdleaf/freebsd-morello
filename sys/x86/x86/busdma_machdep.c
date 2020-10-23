@@ -34,7 +34,6 @@
 __FBSDID("$FreeBSD$");
 
 #include "opt_acpi.h"
-#include "opt_iommu.h"
 
 #include <sys/param.h>
 #include <sys/systm.h>
