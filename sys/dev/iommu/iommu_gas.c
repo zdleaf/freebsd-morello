@@ -735,6 +735,8 @@ iommu_unmap_msi(struct iommu_ctx *ctx)
 
 	domain = ctx->domain;
 	entry = domain->msi_entry;
+	if (entry == NULL)
+		return;
 
 	domain->ops->unmap(domain, entry->start, entry->end -
 	    entry->start, IOMMU_PGF_WAITOK);
