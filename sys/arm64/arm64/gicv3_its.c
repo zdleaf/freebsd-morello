@@ -1466,7 +1466,6 @@ gicv3_iommu_deinit(device_t dev, device_t child)
 	struct iommu_ctx *ctx;
 
 	ctx = iommu_get_dev_ctx(child);
-
 	iommu_unmap_msi(ctx);
 }
 #endif
