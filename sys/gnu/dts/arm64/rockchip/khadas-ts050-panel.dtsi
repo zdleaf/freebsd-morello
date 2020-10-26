@@ -146,7 +146,7 @@
 	status = "disabled";
 };
 
-&dsi {
+&mipi_dsi {
     status = "okay";
     rockchip,lane-rate = <1000>;
     dsi_panel: panel@0 {
