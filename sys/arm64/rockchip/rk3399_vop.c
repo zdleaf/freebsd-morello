@@ -144,8 +144,89 @@ struct rk_vop_softc {
 	struct resource		*res[2];
 };
 
+static void
+rk_vop_set_polarity(struct rk_vop_softc *sc, uint32_t pin_polarity)
+{
+	uint32_t reg;
+
+	/* MIPI */
+	reg = VOP_READ(sc, RK3399_DSP_CTRL1);
+	reg &= ~DSP_CTRL1_MIPI_POL_M;
+	reg |= pin_polarity << DSP_CTRL1_MIPI_POL_S;
+	VOP_WRITE(sc, RK3399_DSP_CTRL1, reg);
+}
+
 static int
-rk_vop_enable(device_t dev, phandle_t node)
+rk_vop_mode_set(device_t dev, struct display_timing *edid)
+{
+	struct rk_vop_softc *sc;
+	uint32_t pin_polarity;
+	uint32_t mode;
+	uint32_t reg;
+
+	sc = device_get_softc(dev);
+
+	pin_polarity = (1 << DCLK_INVERT);
+	rk_vop_set_polarity(sc, pin_polarity);
+
+	/* Remove standby bit */
+	reg = VOP_READ(sc, RK3399_SYS_CTRL);
+	reg &= ~SYS_CTRL_STANDBY_EN;
+	VOP_WRITE(sc, RK3399_SYS_CTRL, reg);
+
+	/* Enable MIPI output only. */
+	reg &= ~SYS_CTRL_ALL_OUT_EN;
+	VOP_WRITE(sc, RK3399_SYS_CTRL, reg);
+	reg |= SYS_CTRL_MIPI_OUT_EN;
+	VOP_WRITE(sc, RK3399_SYS_CTRL, reg);
+
+	/* Set mode */
+	mode = 0; /* RGB888 */
+	reg = VOP_READ(sc, RK3399_DSP_CTRL0);
+	reg &= ~DSP_CTRL0_OUT_MODE_M;
+	reg |= (mode << DSP_CTRL0_OUT_MODE_S);
+	VOP_WRITE(sc, RK3399_DSP_CTRL0, reg);
+
+	uint32_t hactive = edid->hactive.typ;
+	uint32_t vactive = edid->vactive.typ;
+	uint32_t hsync_len = edid->hsync_len.typ;
+	uint32_t hback_porch = edid->hback_porch.typ;
+	uint32_t vsync_len = edid->vsync_len.typ;
+	uint32_t vback_porch = edid->vback_porch.typ;
+	uint32_t hfront_porch = edid->hfront_porch.typ;
+	uint32_t vfront_porch = edid->vfront_porch.typ;
+
+	reg = hsync_len;
+	reg |= (hsync_len + hback_porch + hactive + hfront_porch) << 16;
+	VOP_WRITE(sc, RK3399_DSP_HTOTAL_HS_END, reg);
+
+	reg = (hsync_len + hback_porch + hactive);
+	reg |= (hsync_len + hback_porch) << 16;
+	VOP_WRITE(sc, RK3399_DSP_HACT_ST_END, reg);
+
+	reg = vsync_len;
+	reg |= (vsync_len + vback_porch + vactive + vfront_porch) << 16;
+	VOP_WRITE(sc, RK3399_DSP_VTOTAL_VS_END, reg);
+
+	reg = (vsync_len + vback_porch + vactive);
+	reg |= (vsync_len + vback_porch) << 16;
+	VOP_WRITE(sc, RK3399_DSP_VACT_ST_END, reg);
+
+	reg = hsync_len + hback_porch + hactive;
+	reg |= (hsync_len + hback_porch) << 16;
+	VOP_WRITE(sc, RK3399_POST_DSP_HACT_INFO, reg);
+
+	reg = vsync_len + vback_porch + vactive;
+	reg |= (vsync_len + vback_porch) << 16;
+	VOP_WRITE(sc, RK3399_POST_DSP_VACT_INFO, reg);
+
+	VOP_WRITE(sc, RK3399_REG_CFG_DONE, 1);
+
+	return (0);
+}
+
+static int
+rk_vop_enable(device_t dev, phandle_t node, struct display_timing *edid)
 {
 	struct rk_vop_softc *sc;
 	uint64_t rate_aclk, rate_dclk, rate_hclk;
@@ -197,21 +278,6 @@ rk_vop_enable(device_t dev, phandle_t node)
 	device_printf(dev, "aclk rate is %ld\n", rate_aclk);
 	device_printf(dev, "dclk rate is %ld\n", rate_dclk);
 	device_printf(dev, "hclk rate is %ld\n", rate_hclk);
-
-	struct display_timing *edid;
-
-	edid = &ts050_timings;
-
-	/* TODO: read edid from DTS */
-	edid->pixelclock.typ = 0x07270e00;
-	edid->hactive.typ = 0x00000440;
-	edid->hfront_porch.typ = 0x00000018;
-	edid->hback_porch.typ = 0x00000017;
-	edid->hsync_len.typ = 0x00000004;
-	edid->vactive.typ = 0x00000780;
-	edid->vfront_porch.typ = 0x00000004;
-	edid->vback_porch.typ = 0x00000003;
-	edid->vsync_len.typ = 0x00000002;
 
 	uint32_t reg;
 	reg = (edid->hactive.typ - 1);
@@ -307,7 +373,23 @@ rk_vop_attach(device_t dev)
 		return (ENXIO);
 	}
 
-	rk_vop_enable(dev, node);
+	struct display_timing *edid;
+
+	/* TODO: read edid from DTS */
+
+	edid = &ts050_timings;
+	edid->pixelclock.typ = 0x07270e00;
+	edid->hactive.typ = 0x00000440;
+	edid->hfront_porch.typ = 0x00000018;
+	edid->hback_porch.typ = 0x00000017;
+	edid->hsync_len.typ = 0x00000004;
+	edid->vactive.typ = 0x00000780;
+	edid->vfront_porch.typ = 0x00000004;
+	edid->vback_porch.typ = 0x00000003;
+	edid->vsync_len.typ = 0x00000002;
+
+	rk_vop_mode_set(dev, edid);
+	rk_vop_enable(dev, node, edid);
 
 	return (0);
 }

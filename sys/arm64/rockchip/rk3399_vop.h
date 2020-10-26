@@ -4,9 +4,22 @@
 #define	RK3399_REG_CFG_DONE			0x0000
 #define	RK3399_VERSION_INFO			0x0004
 #define	RK3399_SYS_CTRL				0x0008
+#define	 SYS_CTRL_STANDBY_EN			(1 << 22)
+#define	 SYS_CTRL_MIPI_OUT_EN			(1 << 15)
+#define	 SYS_CTRL_EDP_OUT_EN			(1 << 14)
+#define	 SYS_CTRL_HDMI_OUT_EN			(1 << 13)
+#define	 SYS_CTRL_RGB_OUT_EN			(1 << 12)
+#define	 SYS_CTRL_ALL_OUT_EN			(SYS_CTRL_MIPI_OUT_EN |\
+						 SYS_CTRL_EDP_OUT_EN |\
+						 SYS_CTRL_HDMI_OUT_EN |\
+						 SYS_CTRL_RGB_OUT_EN)
 #define	RK3399_SYS_CTRL1			0x000c
 #define	RK3399_DSP_CTRL0			0x0010
+#define	 DSP_CTRL0_OUT_MODE_S			0
+#define	 DSP_CTRL0_OUT_MODE_M			(0xf << DSP_CTRL0_OUT_MODE_S)
 #define	RK3399_DSP_CTRL1			0x0014
+#define	 DSP_CTRL1_MIPI_POL_S			28
+#define	 DSP_CTRL1_MIPI_POL_M			(0xf << DSP_CTRL1_MIPI_POL_S)
 #define	RK3399_DSP_BG				0x0018
 #define	RK3399_MCU_CTRL				0x001c
 #define	RK3399_WB_CTRL0				0x0020
@@ -212,6 +225,22 @@ enum {
 	LB_RGB_2560X4 = 0x3,
 	LB_RGB_1920X5 = 0x4,
 	LB_RGB_1280X8 = 0x5
+};
+
+enum vop_modes {
+	VOP_MODE_EDP = 0,
+	VOP_MODE_MIPI,
+	VOP_MODE_HDMI,
+	VOP_MODE_MIPI1,
+	VOP_MODE_DP,
+	VOP_MODE_NONE,
+};
+
+enum vop_pol {
+	HSYNC_POSITIVE = 0,
+	VSYNC_POSITIVE,
+	DEN_NEGATIVE,
+	DCLK_INVERT,
 };
 
 #endif /* !_ARM64_ROCKCHIP_RK3399_VOP_ */
