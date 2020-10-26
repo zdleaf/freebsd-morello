@@ -9,6 +9,7 @@ fi
 make -j8 TARGET=arm64 KERN${A}=EDGE buildkernel || exit 1
 
 cp /usr/obj/usr/home/br/dev/freebsd-head/arm64.aarch64/sys/EDGE/kernel /tftpboot/edge/
+# cp /usr/obj/usr/home/br/dev/freebsd-head/arm64.aarch64/sys/EDGE/rk3399-khadas-edge-captain-mipi.dtb /tftpboot/edge/rk3399-khadas-edge-captain.dtb
 
 #echo "setenv serverip 10.8.0.1 ; setenv ipaddr 10.8.0.44; usb start; tftpboot edge/kernel; fatwrite mmc 1 0x1000000 kernel \$filesize; tftpboot 0x1000000 loader.efi; tftpboot 0x83000000 dragonboard410c.dtb; usb stop; bootefi 0x81000000 0x83000000"
 
