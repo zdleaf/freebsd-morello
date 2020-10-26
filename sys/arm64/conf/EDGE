@@ -1,5 +1,5 @@
 #
-# GENERIC -- Generic kernel configuration file for FreeBSD/arm64
+# EDGE -- Generic kernel configuration file for Khadas Edge Captain
 #
 # For more information on this file, please read the config(5) manual page,
 # and/or the handbook section on Kernel Configuration Files:
@@ -19,7 +19,7 @@
 # $FreeBSD$
 
 cpu		ARM64
-ident		GENERIC
+ident		EDGE
 
 makeoptions	DEBUG=-g		# Build kernel with gdb(1) debug symbols
 makeoptions	WITH_CTF=1		# Run ctfconvert(1) for DTrace support
@@ -372,3 +372,6 @@ makeoptions	MODULES_EXTRA="dtb/allwinner dtb/imx8 dtb/mv dtb/rockchip dtb/rpi"
 
 # Uncomment for static DTB
 # makeoptions 	FDT_DTS_FILE=rockchip/rk3399-khadas-edge-captain.dts
+
+# options 	FDT_DTB_STATIC
+# makeoptions 	FDT_DTS_FILE=rockchip/rk3399-khadas-edge-captain-mipi.dts
