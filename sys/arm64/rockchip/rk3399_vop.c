@@ -40,6 +40,11 @@ __FBSDID("$FreeBSD$");
 #include <sys/kernel.h>
 #include <sys/module.h>
 #include <sys/gpio.h>
+#include <vm/vm.h>
+#include <vm/vm_extern.h>
+#include <vm/vm_kern.h>
+#include <vm/pmap.h>
+
 #include <machine/bus.h>
 
 #include <dev/fdt/fdt_common.h>
@@ -54,10 +59,81 @@ __FBSDID("$FreeBSD$");
 
 #include "syscon_if.h"
 
+#define	VOP_READ(sc, reg)	bus_read_4((sc)->res[0], (reg))
+#define	VOP_WRITE(sc, reg, val)	bus_write_4((sc)->res[0], (reg), (val))
+
 static struct ofw_compat_data compat_data[] = {
 	{ "rockchip,rk3399-vop-lit",	1 },
 	{ NULL,				0 }
 };
+
+static struct resource_spec rk_vop_spec[] = {
+	{ SYS_RES_MEMORY,	0,	RF_ACTIVE },
+	{ SYS_RES_IRQ,		0,	RF_ACTIVE | RF_SHAREABLE },
+	{ -1, 0 }
+};
+
+/*
+timing0 {
+	clock-frequency = <0x07270e00>;
+	hactive = <0x00000440>;
+	hfront-porch = <0x00000018>;
+	hback-porch = <0x00000017>;
+	hsync-len = <0x00000004>;
+	vactive = <0x00000780>;
+	vfront-porch = <0x00000004>;
+	vback-porch = <0x00000003>;
+	vsync-len = <0x00000002>;
+	hsync-active = <0x00000000>;
+	vsync-active = <0x00000000>;
+	de-active = <0x00000000>;
+	pixelclk-active = <0x00000000>;
+	phandle = <0x000000ba>;
+};
+*/
+
+enum display_flags {
+	DISPLAY_FLAGS_HSYNC_LOW		= 1 << 0,
+	DISPLAY_FLAGS_HSYNC_HIGH	= 1 << 1,
+	DISPLAY_FLAGS_VSYNC_LOW		= 1 << 2,
+	DISPLAY_FLAGS_VSYNC_HIGH	= 1 << 3,
+
+	/* data enable flag */
+	DISPLAY_FLAGS_DE_LOW		= 1 << 4,
+	DISPLAY_FLAGS_DE_HIGH		= 1 << 5,
+	/* drive data on pos. edge */
+	DISPLAY_FLAGS_PIXDATA_POSEDGE	= 1 << 6,
+	/* drive data on neg. edge */
+	DISPLAY_FLAGS_PIXDATA_NEGEDGE	= 1 << 7,
+	DISPLAY_FLAGS_INTERLACED	= 1 << 8,
+	DISPLAY_FLAGS_DOUBLESCAN	= 1 << 9,
+	DISPLAY_FLAGS_DOUBLECLK		= 1 << 10,
+};
+
+struct timing_entry {
+	uint32_t min;
+	uint32_t typ;
+	uint32_t max;
+};
+
+struct display_timing {
+	struct timing_entry pixelclock;
+
+	struct timing_entry hactive;		/* hor. active video */
+	struct timing_entry hfront_porch;	/* hor. front porch */
+	struct timing_entry hback_porch;	/* hor. back porch */
+	struct timing_entry hsync_len;		/* hor. sync len */
+
+	struct timing_entry vactive;		/* ver. active video */
+	struct timing_entry vfront_porch;	/* ver. front porch */
+	struct timing_entry vback_porch;	/* ver. back porch */
+	struct timing_entry vsync_len;		/* ver. sync len */
+
+	enum display_flags flags;		/* display flags */
+	bool hdmi_monitor;			/* is hdmi monitor? */
+};
+
+struct display_timing ts050_timings;
 
 struct rk_vop_softc {
 	struct syscon		*syscon;
@@ -65,6 +141,7 @@ struct rk_vop_softc {
 	clk_t			aclk;
 	clk_t			dclk;
 	clk_t			hclk;
+	struct resource		*res[2];
 };
 
 static int
@@ -121,6 +198,84 @@ rk_vop_enable(device_t dev, phandle_t node)
 	device_printf(dev, "dclk rate is %ld\n", rate_dclk);
 	device_printf(dev, "hclk rate is %ld\n", rate_hclk);
 
+	struct display_timing *edid;
+
+	edid = &ts050_timings;
+
+	/* TODO: read edid from DTS */
+	edid->pixelclock.typ = 0x07270e00;
+	edid->hactive.typ = 0x00000440;
+	edid->hfront_porch.typ = 0x00000018;
+	edid->hback_porch.typ = 0x00000017;
+	edid->hsync_len.typ = 0x00000004;
+	edid->vactive.typ = 0x00000780;
+	edid->vfront_porch.typ = 0x00000004;
+	edid->vback_porch.typ = 0x00000003;
+	edid->vsync_len.typ = 0x00000002;
+
+	uint32_t reg;
+	reg = (edid->hactive.typ - 1);
+	reg |= (edid->vactive.typ - 1) << 16;
+	VOP_WRITE(sc, RK3399_WIN0_ACT_INFO, reg);
+
+	reg = (edid->hsync_len.typ + edid->hback_porch.typ);
+	reg |= (edid->vsync_len.typ + edid->vback_porch.typ) << 16;
+	VOP_WRITE(sc, RK3399_WIN0_DSP_ST, reg);
+
+	reg = (edid->hactive.typ - 1);
+	reg |= (edid->vactive.typ - 1) << 16;
+	VOP_WRITE(sc, RK3399_WIN0_DSP_INFO, reg);
+
+	reg = VOP_READ(sc, RK3399_WIN0_COLOR_KEY);
+	device_printf(dev, "color key %x\n", reg);
+	reg = 0;
+	VOP_WRITE(sc, RK3399_WIN0_COLOR_KEY, reg);
+
+	uint32_t lb_mode, rgb_mode;
+	int bpp;
+
+	bpp = 24; //lets say
+
+	switch (bpp) {
+	case 24:
+		rgb_mode = RGB888;
+		VOP_WRITE(sc, RK3399_WIN0_VIR,
+		    WIN0_VIR_WIDTH_RGB888(edid->hactive.typ));
+		break;
+	default:
+		panic("unknown bpp");
+	};
+
+	if (edid->hactive.typ <= 1280)
+		lb_mode = LB_RGB_1280X8;
+	else
+		panic("unknown lb_mode");
+
+	reg = VOP_READ(sc, RK3399_WIN0_CTRL0);
+	device_printf(dev, "win0 ctrl0 %x\n", reg);
+	reg &= ~WIN0_CTRL0_LB_MODE_M;
+	reg &= ~WIN0_CTRL0_DATA_FMT_M;
+	reg &= ~WIN0_CTRL0_EN;
+	VOP_WRITE(sc, RK3399_WIN0_CTRL0, reg);
+
+	reg |= lb_mode << WIN0_CTRL0_LB_MODE_S;
+	reg |= rgb_mode << WIN0_CTRL0_DATA_FMT_S;
+	reg |= WIN0_CTRL0_EN;
+	VOP_WRITE(sc, RK3399_WIN0_CTRL0, reg);
+
+	uint64_t vbase;
+	uint64_t fb_base;
+	int sz;
+	sz = edid->hactive.typ * edid->vactive.typ * 3;
+	vbase = (intptr_t)kmem_alloc_contig(sz, M_ZERO, 0, ~0, PAGE_SIZE, 0,
+	    VM_MEMATTR_UNCACHEABLE);
+	fb_base = (intptr_t)vtophys(vbase);
+
+	device_printf(dev, "fb_base %lx\n", fb_base);
+
+	VOP_WRITE(sc, RK3399_WB_YRGB_MST, fb_base);
+	VOP_WRITE(sc, RK3399_REG_CFG_DONE, 1);
+
 	return (0);
 }
 
@@ -141,40 +296,16 @@ rk_vop_probe(device_t dev)
 static int
 rk_vop_attach(device_t dev)
 {
-#if 0
-	struct phynode_init_def phy_init;
-	struct phynode *phynode;
 	struct rk_vop_softc *sc;
 	phandle_t node;
-	phandle_t xnode;
-	pcell_t handle;
-	intptr_t phy;
 
 	sc = device_get_softc(dev);
 	node = ofw_bus_get_node(dev);
 
-	if (OF_getencprop(node, "clocks", (void *)&handle,
-	    sizeof(handle)) <= 0) {
-		device_printf(dev, "cannot get clocks handle\n");
+	if (bus_alloc_resources(dev, rk_vop_spec, sc->res) != 0) {
+		device_printf(dev, "cannot allocate resources for device\n");
 		return (ENXIO);
 	}
-	xnode = OF_node_from_xref(handle);
-	if (OF_hasprop(xnode, "arasan,soc-ctl-syscon") &&
-	    syscon_get_by_ofw_property(dev, xnode,
-	    "arasan,soc-ctl-syscon", &sc->syscon) != 0) {
-		device_printf(dev, "cannot get grf driver handle\n");
-		return (ENXIO);
-	}
-
-	if (sc->syscon == NULL) {
-		device_printf(dev, "failed to get syscon\n");
-		return (ENXIO);
-	}
-#endif
-
-	phandle_t node;
-
-	node = ofw_bus_get_node(dev);
 
 	rk_vop_enable(dev, node);
 

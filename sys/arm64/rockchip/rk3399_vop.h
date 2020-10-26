@@ -14,9 +14,16 @@
 #define	RK3399_WB_YRGB_MST			0x0028
 #define	RK3399_WB_CBR_MST			0x002c
 #define	RK3399_WIN0_CTRL0			0x0030
+#define	 WIN0_CTRL0_LB_MODE_S	5
+#define	 WIN0_CTRL0_LB_MODE_M	(0x7 << WIN0_CTRL0_LB_MODE_S)
+#define	 WIN0_CTRL0_DATA_FMT_S	1
+#define	 WIN0_CTRL0_DATA_FMT_M	(0x7 << WIN0_CTRL0_DATA_FMT_S)
+#define	 WIN0_CTRL0_EN		(1 << 0)
+
 #define	RK3399_WIN0_CTRL1			0x0034
 #define	RK3399_WIN0_COLOR_KEY			0x0038
 #define	RK3399_WIN0_VIR				0x003c
+#define	 WIN0_VIR_WIDTH_RGB888(x) (((((x * 3) >> 2)+((x) % 3)) & 0x3fff) << 0)
 #define	RK3399_WIN0_YRGB_MST			0x0040
 #define	RK3399_WIN0_CBR_MST			0x0044
 #define	RK3399_WIN0_ACT_INFO			0x0048
@@ -191,5 +198,20 @@
 #define	RK3399_HWC_LUT_ADDR			0x1800
 #define	RK3399_CABC_GAMMA_LUT_ADDR		0x1c00
 #define	RK3399_GAMMA_LUT_ADDR			0x2000
+
+enum rockchip_data_format {
+	ARGB8888 = 0,
+	RGB888 = 1,
+	RGB565 = 2,
+};
+
+enum {
+	LB_YUV_3840X5 = 0x0,
+	LB_YUV_2560X8 = 0x1,
+	LB_RGB_3840X2 = 0x2,
+	LB_RGB_2560X4 = 0x3,
+	LB_RGB_1920X5 = 0x4,
+	LB_RGB_1280X8 = 0x5
+};
 
 #endif /* !_ARM64_ROCKCHIP_RK3399_VOP_ */
