@@ -109,6 +109,7 @@ static void	syncer_shutdown(void *arg, int howto);
 static int	vtryrecycle(struct vnode *vp);
 static void	v_init_counters(struct vnode *);
 static void	vgonel(struct vnode *);
+static bool	vhold_recycle(struct vnode *);
 static void	vfs_knllock(void *arg);
 static void	vfs_knlunlock(void *arg);
 static void	vfs_knl_assert_locked(void *arg);
@@ -1121,24 +1122,13 @@ restart:
 		if (vp->v_type == VBAD || vp->v_type == VNON)
 			goto next_iter;
 
-		if (!VI_TRYLOCK(vp))
-			goto next_iter;
-
-		if (vp->v_usecount > 0 || vp->v_holdcnt == 0 ||
-		    (!reclaim_nc_src && !LIST_EMPTY(&vp->v_cache_src)) ||
-		    VN_IS_DOOMED(vp) || vp->v_type == VNON) {
-			VI_UNLOCK(vp);
-			goto next_iter;
-		}
-
 		object = atomic_load_ptr(&vp->v_object);
 		if (object == NULL || object->resident_page_count > trigger) {
-			VI_UNLOCK(vp);
 			goto next_iter;
 		}
 
-		vholdl(vp);
-		VI_UNLOCK(vp);
+		if (!vhold_recycle(vp))
+			goto next_iter;
 		TAILQ_REMOVE(&vnode_list, mvp, v_vnodelist);
 		TAILQ_INSERT_AFTER(&vnode_list, vp, mvp, v_vnodelist);
 		mtx_unlock(&vnode_list_mtx);
@@ -1235,21 +1225,19 @@ restart:
 		 * blocking.
 		 */
 		if (vp->v_holdcnt > 0 || (mnt_op != NULL && (mp = vp->v_mount) != NULL &&
-		    mp->mnt_op != mnt_op) || !VI_TRYLOCK(vp)) {
+		    mp->mnt_op != mnt_op)) {
 			continue;
 		}
 		TAILQ_REMOVE(&vnode_list, mvp, v_vnodelist);
 		TAILQ_INSERT_AFTER(&vnode_list, vp, mvp, v_vnodelist);
 		if (__predict_false(vp->v_type == VBAD || vp->v_type == VNON)) {
-			VI_UNLOCK(vp);
 			continue;
 		}
-		vholdl(vp);
+		if (!vhold_recycle(vp))
+			continue;
 		count--;
 		mtx_unlock(&vnode_list_mtx);
-		VI_UNLOCK(vp);
 		vtryrecycle(vp);
-		vdrop(vp);
 		mtx_lock(&vnode_list_mtx);
 		goto restart;
 	}
@@ -1520,6 +1508,7 @@ vtryrecycle(struct vnode *vp)
 		CTR2(KTR_VFS,
 		    "%s: impossible to recycle, vp %p lock is already held",
 		    __func__, vp);
+		vdrop(vp);
 		return (EWOULDBLOCK);
 	}
 	/*
@@ -1530,6 +1519,7 @@ vtryrecycle(struct vnode *vp)
 		CTR2(KTR_VFS,
 		    "%s: impossible to recycle, cannot start the write for %p",
 		    __func__, vp);
+		vdrop(vp);
 		return (EBUSY);
 	}
 	/*
@@ -1541,7 +1531,7 @@ vtryrecycle(struct vnode *vp)
 	VI_LOCK(vp);
 	if (vp->v_usecount) {
 		VOP_UNLOCK(vp);
-		VI_UNLOCK(vp);
+		vdropl(vp);
 		vn_finished_write(vnmp);
 		CTR2(KTR_VFS,
 		    "%s: impossible to recycle, %p is already referenced",
@@ -1553,7 +1543,7 @@ vtryrecycle(struct vnode *vp)
 		vgonel(vp);
 	}
 	VOP_UNLOCK(vp);
-	VI_UNLOCK(vp);
+	vdropl(vp);
 	vn_finished_write(vnmp);
 	return (0);
 }
@@ -3261,12 +3251,10 @@ vholdnz(struct vnode *vp)
  * However, while this is more performant, it hinders debugging by eliminating
  * the previously mentioned invariant.
  */
-bool
-vhold_smr(struct vnode *vp)
+static bool __always_inline
+_vhold_cond(struct vnode *vp)
 {
 	int count;
-
-	VFS_SMR_ASSERT_ENTERED();
 
 	count = atomic_load_int(&vp->v_holdcnt);
 	for (;;) {
@@ -3283,6 +3271,28 @@ vhold_smr(struct vnode *vp)
 			return (true);
 		}
 	}
+}
+
+bool
+vhold_smr(struct vnode *vp)
+{
+
+	VFS_SMR_ASSERT_ENTERED();
+	return (_vhold_cond(vp));
+}
+
+/*
+ * Special case for vnode recycling.
+ *
+ * Vnodes are present on the global list until UMA takes them out.
+ * Attempts to recycle only need the relevant lock and have no use for SMR.
+ */
+static bool
+vhold_recycle(struct vnode *vp)
+{
+
+	mtx_assert(&vnode_list_mtx, MA_OWNED);
+	return (_vhold_cond(vp));
 }
 
 static void __noinline
