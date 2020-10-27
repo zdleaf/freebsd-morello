@@ -115,7 +115,9 @@ pwm_backlight_attach(device_t dev)
 	if (regulator_get_by_ofw_property(dev, 0, "power-supply",
 	    &sc->power_supply) != 0) {
 		device_printf(dev, "No power-supply property\n");
+#if 0
 		return (ENXIO);
+#endif
 	}
 
 	if (OF_hasprop(node, "brightness-levels")) {
@@ -158,7 +160,13 @@ pwm_backlight_attach(device_t dev)
 		}
 	}
 
+	sc->channel->duty = 20000;
+	device_printf(dev, "period %ld duty %ld\n",
+	    sc->channel->period, sc->channel->duty);
+
+#if 0
 	regulator_enable(sc->power_supply);
+#endif
 	sc->channel->enabled = true;
 	PWMBUS_CHANNEL_CONFIG(sc->channel->dev, sc->channel->channel,
 	    sc->channel->period, sc->channel->duty);
@@ -167,9 +175,11 @@ pwm_backlight_attach(device_t dev)
 
 	sc->current_level = pwm_backlight_find_level_per_percent(sc,
 	    sc->channel->period / sc->channel->duty);
+#if 0
 	sc->cdev = backlight_register("pwm_backlight", dev);
 	if (sc->cdev == NULL)
 		device_printf(dev, "Cannot register as a backlight\n");
+#endif
 
 	return (0);
 }
@@ -182,7 +192,9 @@ pwm_backlight_detach(device_t dev)
 	sc = device_get_softc(dev);
 	if (sc->nlevels > 0)
 		OF_prop_free(sc->levels);
+#if 0
 	regulator_disable(sc->power_supply);
+#endif
 	backlight_destroy(sc->cdev);
 	return (0);
 }
@@ -216,7 +228,9 @@ static int
 pwm_backlight_update_status(device_t dev, struct backlight_props *props)
 {
 	struct pwm_backlight_softc *sc;
+#if 0
 	int reg_status;
+#endif
 	int error;
 
 	sc = device_get_softc(dev);
@@ -240,6 +254,7 @@ pwm_backlight_update_status(device_t dev, struct backlight_props *props)
 	    sc->channel->period, sc->channel->duty);
 	PWMBUS_CHANNEL_ENABLE(sc->channel->dev, sc->channel->channel,
 	    sc->channel->enabled);
+#if 0
 	error = regulator_status(sc->power_supply, &reg_status);
 	if (error != 0)
 		device_printf(dev,
@@ -253,6 +268,7 @@ pwm_backlight_update_status(device_t dev, struct backlight_props *props)
 				regulator_disable(sc->power_supply);
 		}
 	}
+#endif
 
 	return (0);
 }
