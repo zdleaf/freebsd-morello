@@ -1724,16 +1724,12 @@ smmu_domain_free(device_t dev, struct smmu_domain *domain)
 {
 	struct smmu_softc *sc;
 	struct smmu_cd *cd;
-	int error;
 
 	sc = device_get_softc(dev);
 
 	cd = domain->cd;
 
-	error = pmap_sremove_pages(&domain->p);
-	if (error != 0)
-		return (error);
-
+	pmap_sremove_pages(&domain->p);
 	pmap_release(&domain->p);
 
 	smmu_tlbi_asid(sc, domain->asid);

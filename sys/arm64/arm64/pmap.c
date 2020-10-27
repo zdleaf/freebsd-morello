@@ -3698,25 +3698,22 @@ pmap_sremove(pmap_t pmap, vm_offset_t va)
  * All the L3 entires must be cleared in advance, otherwise
  * this function returns error.
  */
-int
+void
 pmap_sremove_pages(pmap_t pmap)
 {
 	pd_entry_t l0e, *l1, l1e, *l2, l2e;
 	pt_entry_t *l3, l3e;
+	vm_page_t m, m0, m1;
 	vm_offset_t sva;
 	vm_paddr_t pa;
 	vm_paddr_t pa0;
 	vm_paddr_t pa1;
 	int i, j, k, l;
-	vm_page_t m;
-	vm_page_t m0;
-	vm_page_t m1;
-	int rc;
 
 	PMAP_LOCK(pmap);
 
-	for (sva = VM_MINUSER_ADDRESS, i = pmap_l0_index(sva); i < Ln_ENTRIES;
-	    i++) {
+	for (sva = VM_MINUSER_ADDRESS, i = pmap_l0_index(sva);
+	    (i < Ln_ENTRIES && sva < VM_MAXUSER_ADDRESS); i++) {
 		l0e = pmap->pm_l0[i];
 		if ((l0e & ATTR_DESCR_VALID) == 0) {
 			sva += L0_SIZE;
@@ -3755,10 +3752,8 @@ pmap_sremove_pages(pmap_t pmap)
 					l3e = l3[l];
 					if ((l3e & ATTR_DESCR_VALID) == 0)
 						continue;
-					printf("%s: l3e found for va %jx\n",
+					panic("%s: l3e found for va %jx\n",
 					    __func__, sva);
-					rc = KERN_FAILURE;
-					goto out;
 				}
 
 				vm_page_unwire_noq(m1);
@@ -3782,11 +3777,7 @@ pmap_sremove_pages(pmap_t pmap)
 	KASSERT(pmap->pm_stats.resident_count == 0,
 	    ("Invalid resident count %jd", pmap->pm_stats.resident_count));
 
-	rc = KERN_SUCCESS;
-out:
 	PMAP_UNLOCK(pmap);
-
-	return (rc);
 }
 
 /*
