@@ -123,11 +123,11 @@ __FBSDID("$FreeBSD$");
 #include <machine/cpu.h>
 #include <machine/intr.h>
 
-#include "iommu_smmu.h"
-#include "smmu_if.h"
-
+#include "smmu_iommu.h"
 #include "smmu_reg.h"
 #include "smmu_var.h"
+
+#include "smmu_if.h"
 
 #define	STRTAB_L1_SZ_SHIFT	20
 #define	STRTAB_SPLIT		8

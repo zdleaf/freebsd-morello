@@ -56,7 +56,7 @@ __FBSDID("$FreeBSD$");
 
 #include <machine/intr.h>
 #include <machine/resource.h>
-#include <arm64/iommu/iommu_smmu.h>
+#include <arm64/iommu/smmu_iommu.h>
 
 #include "smmu_reg.h"
 #include "smmu_var.h"

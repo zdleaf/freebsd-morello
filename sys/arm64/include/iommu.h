@@ -6,6 +6,6 @@
 #ifndef	_MACHINE_IOMMU_H_
 #define	_MACHINE_IOMMU_H_
 
-#include <arm64/iommu/iommu_smmu.h>
+#include <arm64/iommu/smmu_iommu.h>
 
 #endif /* !_MACHINE_IOMMU_H_ */
