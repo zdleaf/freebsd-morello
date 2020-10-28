@@ -3696,7 +3696,7 @@ pmap_sremove(pmap_t pmap, vm_offset_t va)
 /*
  * Remove all the allocated L1, L2 pages from SMMU pmap.
  * All the L3 entires must be cleared in advance, otherwise
- * this function returns error.
+ * this function panics.
  */
 void
 pmap_sremove_pages(pmap_t pmap)
