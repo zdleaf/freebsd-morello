@@ -56,12 +56,15 @@ __FBSDID("$FreeBSD$");
 #include <dev/extres/syscon/syscon.h>
 #include <dev/extres/phy/phy.h>
 
+#include <arm64/rockchip/rk3399_vop.h>
 #include <arm64/rockchip/rk3399_mipi.h>
 
 #include "syscon_if.h"
 
-#define	MIPI_READ(sc, reg)	bus_read_4((sc)->res[0], (reg))
-#define	MIPI_WRITE(sc, reg, val)	bus_write_4((sc)->res[0], (reg), (val))
+#define	RD4(sc, reg)	bus_read_4((sc)->res[0], (reg))
+#define	WR4(sc, reg, val)	bus_write_4((sc)->res[0], (reg), (val))
+
+static struct display_timing ts050_timings;
 
 static struct ofw_compat_data compat_data[] = {
 	{ "rockchip,rk3399-mipi-dsi",	1 },
@@ -154,6 +157,98 @@ rk_mipi_enable(device_t dev)
 	return (0);
 }
 
+static void
+rk_mipi_dsi_enable(device_t dev, struct display_timing *timing)
+{
+	struct rk_mipi_softc *sc;
+	uint32_t reg;
+
+	sc = device_get_softc(dev);
+
+	WR4(sc, DSI_VHSACR, timing->hsync_len.typ);
+	WR4(sc, DSI_VHBPCR, timing->hback_porch.typ);
+	WR4(sc, DSI_VLCR, (timing->hsync_len.typ +
+	    timing->hback_porch.typ + timing->hactive.typ +
+	    timing->hfront_porch.typ));
+	WR4(sc, DSI_VVSACR, timing->vsync_len.typ);
+	WR4(sc, DSI_VVBPCR, timing->vback_porch.typ);
+	WR4(sc, DSI_VVFPCR, timing->vfront_porch.typ);
+	WR4(sc, DSI_VVACR, timing->vactive.typ);
+
+	/* Signal polarity: all high. */
+	WR4(sc, DSI_LPCR, 0);
+
+	/* Set video mode */
+	reg = RD4(sc, DSI_MCR);
+	reg &= ~MCR_CMDM;
+	WR4(sc, DSI_MCR, reg);
+
+	/* Burst transmittion */
+	reg = RD4(sc, DSI_VMCR);
+	reg &= ~VMCR_VMT_M;
+	reg |= (VMCR_VMT_BRST << VMCR_VMT_S);
+	WR4(sc, DSI_VMCR, reg);
+
+	/* pix num */
+	reg = (0x4b0 << VPCR_VPSIZE_S);
+	WR4(sc, DSI_VPCR, reg);
+
+	/* Set color coding to 24 bit. */
+	reg = (LCOLCR_COLC_24 << LCOLCR_COLC_S);
+	WR4(sc, DSI_LCOLCR, reg);
+
+        /* Enable low power mode */
+	reg = RD4(sc, DSI_VMCR);
+	reg |= VMCR_LPCE;
+	reg |= VMCR_LPHFPE;
+	reg |= VMCR_LPVAE;
+	reg |= VMCR_LPVFPE;
+	reg |= VMCR_LPVBPE;
+	reg |= VMCR_LPVSAE;
+	WR4(sc, DSI_VMCR, reg);
+
+	uint32_t txbyte_clk, txesc_clk;
+	txbyte_clk = (timing->pixelclock.typ * 6) / 8;
+	txesc_clk = 20000000;
+
+	reg = RD4(sc, DSI_CCR);
+	reg &= ~CCR_TOCKDIV_M;
+	reg &= ~CCR_TXECKDIV_M;
+	reg |= 0x0a << CCR_TOCKDIV_S;
+	reg |= (txbyte_clk / txesc_clk) << CCR_TXECKDIV_S;
+	WR4(sc, DSI_CCR, reg);
+
+        /* Timeout count for hs<->lp transation between Line period */
+	reg = RD4(sc, DSI_TCCR0);
+	reg &= ~(0xffff << 16);
+	reg |= 0x3e8 << 16;
+	WR4(sc, DSI_TCCR0, reg);
+
+        /* Phy State transfer timing */
+	reg = RD4(sc, DSI_PCONFR);
+	reg &= ~SW_TIME_M;
+	reg |= (32 << SW_TIME_S); /* Stop Wait Time */
+	WR4(sc, DSI_PCONFR, reg);
+
+	reg = RD4(sc, DSI_CLCR);
+	reg |= CLCR_DPCC; /* D-PHY Clock Control */
+	WR4(sc, DSI_CLCR, reg);
+
+	reg = RD4(sc, DSI_CLTCR);
+	reg &= ~(0xff << 24);
+	reg |= 0x14 << 24; /* PHY_HS2LP_TIME */
+	reg &= ~(0xff << 16);
+	reg |= 0x10 << 16; /* PHY_LP2HS_TIME */
+	reg &= ~(0x7fff << 0);
+	reg |= 0x2710 << 0; /* MAX_RD_TIME */
+	WR4(sc, DSI_CLTCR, reg);
+
+	/* Enable the DSI */
+	reg = RD4(sc, DSI_CR);
+	reg |= CR_EN;
+	WR4(sc, DSI_CR, reg);
+}
+
 static int
 rk_mipi_probe(device_t dev)
 {
@@ -184,7 +279,23 @@ rk_mipi_attach(device_t dev)
 		return (ENXIO);
 	}
 
+	struct display_timing *edid;
+
+	/* TODO: read edid from DTS */
+
+	edid = &ts050_timings;
+	edid->pixelclock.typ = 0x07270e00;
+	edid->hactive.typ = 0x00000440;
+	edid->hfront_porch.typ = 0x00000018;
+	edid->hback_porch.typ = 0x00000017;
+	edid->hsync_len.typ = 0x00000004;
+	edid->vactive.typ = 0x00000780;
+	edid->vfront_porch.typ = 0x00000004;
+	edid->vback_porch.typ = 0x00000003;
+	edid->vsync_len.typ = 0x00000002;
+
 	rk_mipi_enable(dev);
+	rk_mipi_dsi_enable(dev, edid);
 
 	simplebus_init(dev, node);
 #if 0
@@ -193,6 +304,8 @@ rk_mipi_attach(device_t dev)
 		return (ENXIO);
 	}
 #endif
+
+	device_printf(dev, "DSI version: %x\n", RD4(sc, DSI_VR));
 
 	bus_generic_probe(dev);
 
