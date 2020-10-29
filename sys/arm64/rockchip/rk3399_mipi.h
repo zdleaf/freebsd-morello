@@ -37,26 +37,26 @@
 #define	 CCR_TXECKDIV_M	(0xff << CCR_TXECKDIV_S)
 #define	DSI_LVCIDR	0x000C /* DSI Host LTDC VCID Register */
 #define	 LVCIDR_VCID_S	0 /* Virtual Channel ID */
-#define	 LVCIDR_VCID_M	0x3
+#define	 LVCIDR_VCID_M	(0x3 << LVCIDR_VCID_S)
 #define	DSI_LCOLCR	0x0010 /* DSI Host LTDC Color Coding Register */
 #define	 LCOLCR_LPE	(1 << 8) /* Loosely Packet Enable */
 #define	 LCOLCR_COLC_S	0 /* Color Coding */
-#define	 LCOLCR_COLC_M	0xf
-#define	 LCOLCR_COLC_16_1	0x0 /* 16-bit */
-#define	 LCOLCR_COLC_16_2	0x1 /* 16-bit */
-#define	 LCOLCR_COLC_16_3	0x2 /* 16-bit */
-#define	 LCOLCR_COLC_18_1	0x3 /* 18-bit */
-#define	 LCOLCR_COLC_18_2	0x4 /* 18-bit */
-#define	 LCOLCR_COLC_24		0x5 /* 24-bit */
+#define	 LCOLCR_COLC_M		(0xf << LCOLCR_COLC_S)
+#define	 LCOLCR_COLC_16_1	(0x0 << LCOLCR_COLC_S) /* 16-bit */
+#define	 LCOLCR_COLC_16_2	(0x1 << LCOLCR_COLC_S) /* 16-bit */
+#define	 LCOLCR_COLC_16_3	(0x2 << LCOLCR_COLC_S) /* 16-bit */
+#define	 LCOLCR_COLC_18_1	(0x3 << LCOLCR_COLC_S) /* 18-bit */
+#define	 LCOLCR_COLC_18_2	(0x4 << LCOLCR_COLC_S) /* 18-bit */
+#define	 LCOLCR_COLC_24		(0x5 << LCOLCR_COLC_S) /* 24-bit */
 #define	DSI_LPCR	0x0014 /* DSI Host LTDC Polarity Configuration Register */
 #define	 LPCR_HSP	(1 << 2) /* HSYNC Polarity */
 #define	 LPCR_VSP	(1 << 1) /* VSYNC Polarity */
 #define	 LPCR_DEP	(1 << 0) /* Data Enable Polarity */
 #define	DSI_LPMCR	0x0018 /* DSI Host Low-Power mode Configuration Register */
 #define	 LPMCR_LPSIZE_S		16 /* Largest Packet Size */
-#define	 LPMCR_LPSIZE_M		0xff
+#define	 LPMCR_LPSIZE_M		(0xff << LPMCR_LPSIZE_S)
 #define	 LPMCR_VLPSIZE_S	0 /* VACT Largest Packet Size */
-#define	 LPMCR_VLPSIZE_M	0xff
+#define	 LPMCR_VLPSIZE_M	(0xff << LPMCR_LPSIZE_S)
 #define	DSI_PCR		0x002C /* DSI Host Protocol Configuration Register */
 #define	DSI_GVCIDR	0x0030 /* DSI Host Generic VCID Register */
 #define	DSI_MCR		0x0034 /* DSI Host mode Configuration Register */
@@ -80,10 +80,10 @@
 #define	 VPCR_VPSISE_M	(0x3fff << VPCR_VPSIZE_S)
 #define	DSI_VCCR	0x0040 /* DSI Host Video Chunks Configuration Register */
 #define	 VCCR_NUMC_S	0 /* Number of Chunks */
-#define	 VCCR_NUMC_M	0x1fff
+#define	 VCCR_NUMC_M	(0x1fff << VCCR_NUMC_S)
 #define	DSI_VNPCR	0x0044 /* DSI Host Video Null Packet Configuration Register */
 #define	 VNPCR_NPSIZE_S	0 /* Null Packet Size */
-#define	 VNPCR_NPSIZE_M	0x1fff
+#define	 VNPCR_NPSIZE_M	(0x1fff << VCCR_NUMC_S)
 #define	DSI_VHSACR	0x0048 /* DSI Host Video HSA Configuration Register */
 #define	DSI_VHBPCR	0x004C /* DSI Host Video HBP Configuration Register */
 #define	DSI_VLCR	0x0050 /* DSI Host Video Line Configuration Register */
@@ -95,13 +95,13 @@
 #define	DSI_CMCR	0x0068 /* DSI Host Command mode Configuration Register */
 #define	DSI_GHCR	0x006C /* DSI Host Generic Header Configuration Register */
 #define	 GHCR_WCMSB_S	16 /* WordCount MSB */
-#define	 GHCR_WCMSB_M	0xff
+#define	 GHCR_WCMSB_M	(0xff << GHCR_WCMSB_S)
 #define	 GHCR_WCLSB_S	8 /* WordCount LSB */
-#define	 GHCR_WCLSB_M	0xff
+#define	 GHCR_WCLSB_M	(0xff << GHCR_WCLSB_S)
 #define	 GHCR_VCID_S	6 /* Channel */
-#define	 GHCR_VCID_M	0x3
+#define	 GHCR_VCID_M	(0x3 << GHCR_VCID_S)
 #define	 GHCR_DT_S	0 /* Type */
-#define	 GHCR_DT_M	0x3f
+#define	 GHCR_DT_M	(0x3f << GHCR_DT_S)
 #define	DSI_GPDR	0x0070 /* DSI Host Generic Payload Data Register */
 #define	DSI_GPSR	0x0074 /* DSI Host Generic Packet Status Register */
 #define	 GPSR_PRDFE	(1 << 4) /* Payload Read FIFO Empty */
