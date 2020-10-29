@@ -61,8 +61,9 @@ __FBSDID("$FreeBSD$");
 
 #include "syscon_if.h"
 
-#define	RD4(sc, reg)	bus_read_4((sc)->res[0], (reg))
+#define	RD4(sc, reg)		bus_read_4((sc)->res[0], (reg))
 #define	WR4(sc, reg, val)	bus_write_4((sc)->res[0], (reg), (val))
+#define	ARRAY_SIZE(x)		(sizeof(x) / sizeof(x[0]))
 
 static struct display_timing ts050_timings;
 
@@ -298,16 +299,39 @@ rk_mipi_phy_enable(device_t dev, struct display_timing *timing)
 {
 	struct rk_mipi_softc *sc;
 	uint8_t test_data[2];
+	uint32_t max_fbdiv;
 	uint32_t ddr_clk;
+	uint32_t ref_clk;
+	uint32_t remain;
+	uint32_t prediv;
 	uint32_t reg;
+	uint64_t fbdiv;
+	int i;
 
 	sc = device_get_softc(dev);
 
 	ddr_clk = (timing->pixelclock.typ * 6);
+	ref_clk = 24000000;
+	remain = ref_clk;
+	max_fbdiv = 512;
+	prediv = 1;
+
+	int freq_rang[][2] = {
+		{90, 0x01},   {100, 0x10},  {110, 0x20},  {130, 0x01},
+		{140, 0x11},  {150, 0x21},  {170, 0x02},  {180, 0x12},
+		{200, 0x22},  {220, 0x03},  {240, 0x13},  {250, 0x23},
+		{270, 0x04},  {300, 0x14},  {330, 0x05},  {360, 0x15},
+		{400, 0x25},  {450, 0x06},  {500, 0x16},  {550, 0x07},
+		{600, 0x17},  {650, 0x08},  {700, 0x18},  {750, 0x09},
+		{800, 0x19},  {850, 0x29},  {900, 0x39},  {950, 0x0a},
+		{1000, 0x1a}, {1050, 0x2a}, {1100, 0x3a}, {1150, 0x0b},
+		{1200, 0x1b}, {1250, 0x2b}, {1300, 0x3b}, {1350, 0x0c},
+		{1400, 0x1c}, {1450, 0x2c}, {1500, 0x3c}
+        };
 
 	/* Shutdown mode */
 	reg = RD4(sc, DSI_PCTLR);
-	reg &= ~PCTLR_SHUTDOWN;
+	reg &= ~PCTLR_UNSHUTDOWN;
 	reg &= ~PCTLR_DEN;
 	WR4(sc, DSI_PCTLR, reg);
 
@@ -320,6 +344,93 @@ rk_mipi_phy_enable(device_t dev, struct display_timing *timing)
 
 	test_data[0] = 0x80 | (ddr_clk / (200000000)) << 3 | 0x3;
 	rk_mipi_phy_write(sc, CODE_PLL_VCORANGE_VCOCAP, test_data, 1);
+
+	test_data[0] = 0x8;
+	rk_mipi_phy_write(sc, CODE_PLL_CPCTRL, test_data, 1);
+
+	test_data[0] = 0x80 | 0x40;
+	rk_mipi_phy_write(sc, CODE_PLL_LPF_CP, test_data, 1);
+
+	/* Select a suitable value for fsfreqrang reg */
+
+	for (i = 0; i < ARRAY_SIZE(freq_rang); i++) {
+		if (ddr_clk / 1000000 <= freq_rang[i][0])
+			break;
+	}
+
+	if (i == ARRAY_SIZE(freq_rang))
+		panic("out of range\n");
+
+	test_data[0] = freq_rang[i][1] << 1;
+	rk_mipi_phy_write(sc, CODE_HS_RX_LANE0, test_data, 1);
+
+	uint32_t max_prediv, min_prediv;
+
+	max_prediv = (ref_clk / (5 * 1000000));
+	min_prediv = ((ref_clk / (40 * 1000000)) ?
+	    (ref_clk / (40 * 1000000) + 1) : 1);
+
+	if (max_prediv < min_prediv)
+		panic("Invalid ref_clk\n");
+
+	for (i = min_prediv; i < max_prediv; i++) {
+		if ((ddr_clk * i % ref_clk < remain) &&
+		    (ddr_clk * i / ref_clk) < max_fbdiv) {
+			prediv = i;
+			remain = ddr_clk * i % ref_clk;
+		}
+	}
+	fbdiv = ddr_clk * prediv / ref_clk;
+	ddr_clk = ref_clk * fbdiv / prediv;
+
+	device_printf(dev, "ref_clk=%u, prediv=%u, fbdiv=%lu, phyclk=%u\n",
+	    ref_clk, prediv, fbdiv, ddr_clk);
+
+	/* config prediv and feedback reg */
+	test_data[0] = prediv - 1;
+	rk_mipi_phy_write(sc, CODE_PLL_INPUT_DIV_RAT, test_data, 1);
+	test_data[0] = (fbdiv - 1) & 0x1f;
+	rk_mipi_phy_write(sc, CODE_PLL_LOOP_DIV_RAT, test_data, 1);
+	test_data[0] = (fbdiv - 1) >> 5 | 0x80;
+	rk_mipi_phy_write(sc, CODE_PLL_LOOP_DIV_RAT, test_data, 1);
+	test_data[0] = 0x30;
+	rk_mipi_phy_write(sc, CODE_PLL_INPUT_LOOP_DIV_RAT, test_data, 1);
+
+	/* rest config */
+	test_data[0] = 0x4d;
+	rk_mipi_phy_write(sc, CODE_BANDGAP_BIAS_CTRL, test_data, 1);
+
+	test_data[0] = 0x3d;
+	rk_mipi_phy_write(sc, CODE_TERMINATION_CTRL, test_data, 1);
+
+	test_data[0] = 0xdf;
+	rk_mipi_phy_write(sc, CODE_TERMINATION_CTRL, test_data, 1);
+
+	test_data[0] =  0x7;
+	rk_mipi_phy_write(sc, CODE_AFE_BIAS_BANDGAP_ANOLOG, test_data, 1);
+
+	test_data[0] = 0x80 | 0x7;
+	rk_mipi_phy_write(sc, CODE_AFE_BIAS_BANDGAP_ANOLOG, test_data, 1);
+
+	test_data[0] = 0x80 | 15;
+	rk_mipi_phy_write(sc, CODE_HSTXDATALANEREQUSETSTATETIME,
+			  test_data, 1);
+	test_data[0] = 0x80 | 85;
+	rk_mipi_phy_write(sc, CODE_HSTXDATALANEPREPARESTATETIME,
+			  test_data, 1);
+	test_data[0] = 0x40 | 10;
+	rk_mipi_phy_write(sc, CODE_HSTXDATALANEHSZEROSTATETIME,
+			  test_data, 1);
+
+	/* enter into stop mode */
+	reg = RD4(sc, DSI_PCONFR);
+	reg &= ~PCONFR_NL_M;
+	reg |= PCONFR_NL_4;
+	WR4(sc, DSI_PCONFR, reg);
+
+	reg = RD4(sc, DSI_PCTLR);
+	reg |= PCTLR_FORCEPLL | PCTLR_CKE | PCTLR_DEN | PCTLR_UNSHUTDOWN;
+	WR4(sc, DSI_PCTLR, reg);
 }
 
 static int

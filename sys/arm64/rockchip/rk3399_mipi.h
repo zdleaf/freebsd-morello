@@ -119,16 +119,19 @@
 #define	DSI_CLTCR	0x0098 /* DSI Host Clock Lane Timer Configuration Register */
 #define	DSI_DLTCR	0x009C /* DSI Host Data Lane Timer Configuration Register */
 #define	DSI_PCTLR	0x00A0 /* DSI Host PHY Control Register */
-#define	 PCTLR_CKE	(1 << 2) /* Clock Enable */
-#define	 PCTLR_DEN	(1 << 1) /* Digital Enable */
-#define	 PCTLR_SHUTDOWN	(1 << 0) /* Shutdown */
+#define	 PCTLR_FORCEPLL		(1 << 3)
+#define	 PCTLR_CKE		(1 << 2) /* Clock Enable */
+#define	 PCTLR_DEN		(1 << 1) /* Digital Enable */
+#define	 PCTLR_UNSHUTDOWN	(1 << 0) /* Unshutdown */
 #define	DSI_PCONFR	0x00A4 /* DSI Host PHY Configuration Register */
 #define	 SW_TIME_S	8 /* Stop Wait Time */
 #define	 SW_TIME_M	(0xff << SW_TIME_S)
 #define	 PCONFR_NL_S	0 /* Number of Lanes */
-#define	 PCONFR_NL_M	0x3
+#define	 PCONFR_NL_M	(0x3 << PCONFR_NL_S)
 #define	 PCONFR_NL_1	(0 << PCONFR_NL_S)
-#define	 PCONFR_NL_2	(1 << PCONFR_NL_S)	/* Reset value */
+#define	 PCONFR_NL_2	(1 << PCONFR_NL_S)
+#define	 PCONFR_NL_3	(2 << PCONFR_NL_S)
+#define	 PCONFR_NL_4	(3 << PCONFR_NL_S)
 #define	DSI_PUCR	0x00A8 /* DSI Host PHY ULPS Control Register */
 #define	DSI_PTTCR	0x00AC /* DSI Host PHY TX Triggers Configuration Register */
 #define	DSI_PSR		0x00B0 /* DSI Host PHY Status Register */
@@ -163,7 +166,25 @@
 #define	DSI_VVFPCCR	0x015C /* DSI Host Video VFP Current Configuration Register */
 #define	DSI_VVACCR	0x0160 /* DSI Host Video VA Current Configuration Register */
 
+#define	CODE_HS_RX_CLOCK	0x34
+#define	CODE_HS_RX_LANE0	0x44
+#define	CODE_HS_RX_LANE1	0x54
+#define	CODE_HS_RX_LANE2	0x84
+#define	CODE_HS_RX_LANE3	0x94
+
 #define	CODE_PLL_VCORANGE_VCOCAP	0x10
+#define	CODE_PLL_CPCTRL			0x11
+#define	CODE_PLL_LPF_CP			0x12
+#define	CODE_PLL_INPUT_DIV_RAT		0x17
+#define	CODE_PLL_LOOP_DIV_RAT		0x18
+#define	CODE_PLL_INPUT_LOOP_DIV_RAT	0x19
+#define	CODE_BANDGAP_BIAS_CTRL		0x20
+#define	CODE_TERMINATION_CTRL		0x21
+#define	CODE_AFE_BIAS_BANDGAP_ANOLOG	0x22
+
+#define	CODE_HSTXDATALANEREQUSETSTATETIME	0x70
+#define	CODE_HSTXDATALANEPREPARESTATETIME	0x71
+#define	CODE_HSTXDATALANEHSZEROSTATETIME	0x72
 
 struct stm32f4_dsi_config {
 	uint8_t ndiv;
