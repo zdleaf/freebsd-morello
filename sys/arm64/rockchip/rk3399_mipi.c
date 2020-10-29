@@ -249,6 +249,79 @@ rk_mipi_dsi_enable(device_t dev, struct display_timing *timing)
 	WR4(sc, DSI_CR, reg);
 }
 
+static void
+rk_mipi_phy_write(struct rk_mipi_softc *sc, uint8_t test_code,
+    uint8_t *test_data, uint8_t size)
+{
+	uint32_t reg;
+	int i;
+
+	/* Write Test code */
+	reg = RD4(sc, DSI_PHY_TST_CTRL0);
+	reg |= TST_CTRL0_TESTCLK;
+	WR4(sc, DSI_PHY_TST_CTRL0, reg);
+
+	reg = RD4(sc, DSI_PHY_TST_CTRL1);
+	reg &= ~TST_CTRL1_TESTDIN_M;
+	reg |= test_code << TST_CTRL1_TESTDIN_S;
+	WR4(sc, DSI_PHY_TST_CTRL1, reg);
+	reg |= TST_CTRL1_TESTEN;
+	WR4(sc, DSI_PHY_TST_CTRL1, reg);
+
+	reg = RD4(sc, DSI_PHY_TST_CTRL0);
+	reg &= ~TST_CTRL0_TESTCLK;
+	WR4(sc, DSI_PHY_TST_CTRL0, reg);
+
+	reg = RD4(sc, DSI_PHY_TST_CTRL1);
+	reg &= ~TST_CTRL1_TESTEN;
+	WR4(sc, DSI_PHY_TST_CTRL1, reg);
+
+	/* Write Test data */
+	for (i = 0; i < size; i++) {
+		reg = RD4(sc, DSI_PHY_TST_CTRL0);
+		reg &= ~TST_CTRL0_TESTCLK;
+		WR4(sc, DSI_PHY_TST_CTRL0, reg);
+
+		reg = RD4(sc, DSI_PHY_TST_CTRL1);
+		reg &= ~TST_CTRL1_TESTDIN_M;
+		reg |= test_data[i] << TST_CTRL1_TESTDIN_S;
+		WR4(sc, DSI_PHY_TST_CTRL1, reg);
+
+		reg = RD4(sc, DSI_PHY_TST_CTRL0);
+		reg |= TST_CTRL0_TESTCLK;
+		WR4(sc, DSI_PHY_TST_CTRL0, reg);
+	}
+}
+
+static void
+rk_mipi_phy_enable(device_t dev, struct display_timing *timing)
+{
+	struct rk_mipi_softc *sc;
+	uint8_t test_data[2];
+	uint32_t ddr_clk;
+	uint32_t reg;
+
+	sc = device_get_softc(dev);
+
+	ddr_clk = (timing->pixelclock.typ * 6);
+
+	/* Shutdown mode */
+	reg = RD4(sc, DSI_PCTLR);
+	reg &= ~PCTLR_SHUTDOWN;
+	reg &= ~PCTLR_DEN;
+	WR4(sc, DSI_PCTLR, reg);
+
+	/* PLL locking */
+	reg = RD4(sc, DSI_PHY_TST_CTRL0);
+	reg |= TST_CTRL0_TESTCLR;
+	WR4(sc, DSI_PHY_TST_CTRL0, reg);
+	reg &= ~TST_CTRL0_TESTCLR;
+	WR4(sc, DSI_PHY_TST_CTRL0, reg);
+
+	test_data[0] = 0x80 | (ddr_clk / (200000000)) << 3 | 0x3;
+	rk_mipi_phy_write(sc, CODE_PLL_VCORANGE_VCOCAP, test_data, 1);
+}
+
 static int
 rk_mipi_probe(device_t dev)
 {
@@ -296,6 +369,7 @@ rk_mipi_attach(device_t dev)
 
 	rk_mipi_enable(dev);
 	rk_mipi_dsi_enable(dev, edid);
+	rk_mipi_phy_enable(dev, edid);
 
 	simplebus_init(dev, node);
 #if 0

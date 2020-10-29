@@ -121,6 +121,7 @@
 #define	DSI_PCTLR	0x00A0 /* DSI Host PHY Control Register */
 #define	 PCTLR_CKE	(1 << 2) /* Clock Enable */
 #define	 PCTLR_DEN	(1 << 1) /* Digital Enable */
+#define	 PCTLR_SHUTDOWN	(1 << 0) /* Shutdown */
 #define	DSI_PCONFR	0x00A4 /* DSI Host PHY Configuration Register */
 #define	 SW_TIME_S	8 /* Stop Wait Time */
 #define	 SW_TIME_M	(0xff << SW_TIME_S)
@@ -131,6 +132,15 @@
 #define	DSI_PUCR	0x00A8 /* DSI Host PHY ULPS Control Register */
 #define	DSI_PTTCR	0x00AC /* DSI Host PHY TX Triggers Configuration Register */
 #define	DSI_PSR		0x00B0 /* DSI Host PHY Status Register */
+#define	DSI_PHY_TST_CTRL0	0x00B4
+#define	 TST_CTRL0_TESTCLK	(1 << 1)
+#define	 TST_CTRL0_TESTCLR	(1 << 0)
+#define	DSI_PHY_TST_CTRL1	0x00B8
+#define	 TST_CTRL1_TESTEN	(1 << 16)
+#define	 TST_CTRL1_TESTDIN_S	0
+#define	 TST_CTRL1_TESTDIN_M	(0xff << TST_CTRL1_TESTDIN_S)
+#define	 TST_CTRL1_TESTDOUT_S	8
+#define	 TST_CTRL1_TESTDOUT_M	(0xff << TST_CTRL1_TESTDOUT_S)
 #define	DSI_ISR0	0x00BC /* DSI Host Interrupt & Status Register 0 */
 #define	DSI_ISR1	0x00C0 /* DSI Host Interrupt & Status Register 1 */
 #define	DSI_IER0	0x00C4 /* DSI Host Interrupt Enable Register 0 */
@@ -152,6 +162,8 @@
 #define	DSI_VVBPCCR	0x0158 /* DSI Host Video VBP Current Configuration Register */
 #define	DSI_VVFPCCR	0x015C /* DSI Host Video VFP Current Configuration Register */
 #define	DSI_VVACCR	0x0160 /* DSI Host Video VA Current Configuration Register */
+
+#define	CODE_PLL_VCORANGE_VCOCAP	0x10
 
 struct stm32f4_dsi_config {
 	uint8_t ndiv;
