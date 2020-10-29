@@ -73,6 +73,7 @@ __FBSDID("$FreeBSD$");
 #include <machine/bus.h>
 #include <machine/cpu.h>
 #include <machine/intr.h>
+#include <machine/vmparam.h>
 
 #include "smmu_iommu.h"
 #include "smmu_if.h"
@@ -156,7 +157,7 @@ smmu_domain_alloc(struct iommu_unit *unit)
 	LIST_INIT(&domain->ctx_list);
 	iommu_domain_init(unit, iodom, &smmu_domain_map_ops);
 
-	domain->domain.end = BUS_SPACE_MAXADDR;
+	domain->domain.end = VM_MAXUSER_ADDRESS;
 	iommu_gas_init_domain(&domain->domain);
 
 	IOMMU_LOCK(unit);
