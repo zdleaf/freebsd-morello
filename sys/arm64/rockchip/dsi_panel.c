@@ -89,6 +89,17 @@ struct dsi_panel_softc {
 	struct gpiobus_pin	*gpio_en;
 };
 
+struct cmd_ctrl_hdr {
+	uint8_t dtype;	/* data type */
+	uint8_t wait;	/* delay ms */
+	uint8_t len;	/* payload len */
+};
+
+struct dsi_command {
+	struct cmd_ctrl_hdr hdr;
+	uint8_t *data;
+};
+
 #if 0
 static int
 dsi_panel_enable(device_t dev)
@@ -198,6 +209,73 @@ dsi_panel_attach(device_t dev)
 	if (error != 0) {
 		device_printf(dev, "Could not set gpio pin\n");
 		return (ENXIO);
+	}
+
+	uint8_t *seq;
+	phandle_t node;
+	int nitems;
+	int len;
+
+	node = ofw_bus_get_node(dev);
+
+	if ((len = OF_getproplen(node, "panel-init-sequence")) <= 0) {
+		device_printf(dev, "could not find panel init sequence");
+		return (ENXIO);
+	}
+
+	printf("len %d\n", len);
+
+	nitems = OF_getprop_alloc_multi(node, "panel-init-sequence",
+	    len, (void **)&seq);
+	if (nitems != 1)
+		return (ENXIO);
+
+	struct cmd_ctrl_hdr *dchdr;
+	uint8_t *bufp;
+	int cnt;
+
+	bufp = seq;
+	cnt = 0;
+
+	/* Count amount of commands first */
+	while (len > sizeof(*dchdr)) {
+		dchdr = (struct cmd_ctrl_hdr *)bufp;
+		bufp += sizeof(*dchdr);
+		len -= sizeof(*dchdr);
+		bufp += dchdr->len;
+		len -= dchdr->len;
+		cnt++;
+	}
+
+	printf("cnt %d\n", cnt);
+
+	struct dsi_command *cmds;
+	struct dsi_command *cmd;
+	int i;
+	int j;
+
+	cmds = malloc(sizeof(struct dsi_command) * cnt, M_DEVBUF,
+	    M_WAITOK | M_ZERO);
+
+	bufp = seq;
+
+	for (i = 0; i < cnt; i++) {
+		dchdr = (struct cmd_ctrl_hdr *)bufp;
+		len -= sizeof(*dchdr);
+		bufp += sizeof(*dchdr);
+		cmds[i].hdr = *dchdr;
+		cmds[i].data = bufp;
+		bufp += dchdr->len;
+		len -= dchdr->len;
+	}
+
+	for (i = 0; i < cnt; i++) {
+		cmd = &cmds[i];
+		printf("cmd %x, wait %x, len %d, data ",
+		    cmd->hdr.dtype, cmd->hdr.wait, cmd->hdr.len);
+		for (j = 0; j < cmd->hdr.len; j++)
+			printf("%x ", cmd->data[j]);
+		printf("\n");
 	}
 
 	return (0);
