@@ -434,6 +434,30 @@ rk_mipi_phy_enable(device_t dev, struct display_timing *timing)
 	WR4(sc, DSI_PCTLR, reg);
 }
 
+static void
+rk_mipi_configure(struct rk_mipi_softc *sc)
+{
+	uint32_t reg;
+
+	/* Select VOP Little for MIPI DSI. */
+	reg = SYSCON_READ_4(sc->grf, GRF_SOC_CON20);
+	reg &= ~CON20_DSI0_VOP_SEL_M;
+	reg |= CON20_DSI0_VOP_SEL_L;
+	SYSCON_WRITE_4(sc->grf, GRF_SOC_CON20, reg);
+
+	reg = SYSCON_READ_4(sc->grf, GRF_SOC_CON22);
+	/* Configure in TX mode */
+	reg &= ~CON22_DPHY_TX0_RXMODE_M;
+	reg |= CON22_DPHY_TX0_RXMODE_DIS;
+	/* Disable stop mode */
+	reg &= ~CON22_DPHY_TX0_TXSTOPMODE_M;
+	reg |= CON22_DPHY_TX0_TXSTOPMODE_DIS;
+	/* Disable turnequest */
+	reg &= ~CON22_DPHY_TX0_TURNREQUEST_M;
+	reg |= CON22_DPHY_TX0_TURNREQUEST_DIS;
+	SYSCON_WRITE_4(sc->grf, GRF_SOC_CON22, reg);
+}
+
 static int
 rk_mipi_probe(device_t dev)
 {
@@ -487,6 +511,7 @@ rk_mipi_attach(device_t dev)
 	edid->vsync_len.typ = 0x00000002;
 
 	rk_mipi_enable(dev);
+	rk_mipi_configure(sc);
 	rk_mipi_dsi_enable(dev, edid);
 	rk_mipi_phy_enable(dev, edid);
 
