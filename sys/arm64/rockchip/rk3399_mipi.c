@@ -85,8 +85,9 @@ struct rk_mipi_softc {
 	clk_t			ref;
 	clk_t			pclk;
 	clk_t			phy_cfg;
-	clk_t			grf;
+	clk_t			grf_clk;
 	struct resource		*res[2];
+	struct syscon		*grf;
 };
 
 static int
@@ -138,13 +139,13 @@ rk_mipi_enable(device_t dev)
 	}
 
 	/* grf */
-	error = clk_get_by_ofw_name(dev, 0, "grf", &sc->grf);
+	error = clk_get_by_ofw_name(dev, 0, "grf", &sc->grf_clk);
 	if (error != 0) {
 		device_printf(dev, "cannot get grf clock\n");
 		return (ENXIO);
 	}
 
-	error = clk_get_freq(sc->grf, &rate_grf);
+	error = clk_get_freq(sc->grf_clk, &rate_grf);
 	if (error != 0) {
 		device_printf(dev, "cannot get grf frequency\n");
 		return (ENXIO);
@@ -454,9 +455,16 @@ rk_mipi_attach(device_t dev)
 	device_t cdev;
 	phandle_t node;
 	phandle_t child;
+	int err;
 
 	sc = device_get_softc(dev);
 	node = ofw_bus_get_node(dev);
+
+	err = syscon_get_by_ofw_property(dev, node, "rockchip,grf", &sc->grf);
+	if (err != 0) {
+		device_printf(dev, "cannot get grf syscon: %d\n", err);
+		return (ENXIO);
+	}
 
 	if (bus_alloc_resources(dev, rk_mipi_spec, sc->res) != 0) {
 		device_printf(dev, "cannot allocate resources for device\n");
