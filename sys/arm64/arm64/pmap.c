@@ -3657,6 +3657,7 @@ retry:
 
 	/* New mapping */
 	pmap_store(l3, new_l3);
+	pmap_resident_count_inc(pmap, 1);
 	dsb(ishst);
 
 	rv = KERN_SUCCESS;
@@ -3683,6 +3684,7 @@ pmap_sremove(pmap_t pmap, vm_offset_t va)
 	    ("Invalid SMMU pagetable level: %d != 3", lvl));
 
 	if (pte != NULL) {
+		pmap_resident_count_dec(pmap, 1);
 		pmap_clear(pte);
 		rc = KERN_SUCCESS;
 	} else
