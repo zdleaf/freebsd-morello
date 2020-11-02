@@ -116,7 +116,7 @@ rk_mipi_enable(device_t dev)
 			return (ENXIO);
 		}
 
-		device_printf(dev, "%s rate is %ld\n", clk_table[i], rate);
+		device_printf(dev, "%s rate is %ld Hz\n", clk_table[i], rate);
 	}
 
 	return (0);
