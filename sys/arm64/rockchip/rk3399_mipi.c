@@ -78,83 +78,46 @@ static struct resource_spec rk_mipi_spec[] = {
 	{ -1, 0 }
 };
 
+#define	CLK_NENTRIES	4
+
 struct rk_mipi_softc {
 	struct simplebus_softc	sc;
 	struct syscon		*syscon;
 	struct rk_mipi_conf	*phy_conf;
-	clk_t			ref;
-	clk_t			pclk;
-	clk_t			phy_cfg;
-	clk_t			grf_clk;
+	clk_t			clk[CLK_NENTRIES];
 	struct resource		*res[2];
 	struct syscon		*grf;
 };
+
+static char * clk_table[CLK_NENTRIES] = { "ref", "pclk", "phy_cfg", "grf" };
 
 static int
 rk_mipi_enable(device_t dev)
 {
 	struct rk_mipi_softc *sc;
-	uint64_t rate_ref, rate_pclk, rate_phy_cfg, rate_grf;
+	uint64_t rate;
 	int error;
+	int i;
 
 	sc = device_get_softc(dev);
 
-	/* ref */
-	error = clk_get_by_ofw_name(dev, 0, "ref", &sc->ref);
-	if (error != 0) {
-		device_printf(dev, "cannot get ref clock\n");
-		return (ENXIO);
-	}
+	for (i = 0; i < CLK_NENTRIES; i++) {
+		error = clk_get_by_ofw_name(dev, 0, clk_table[i], &sc->clk[i]);
+		if (error != 0) {
+			device_printf(dev, "cannot get '%s' clock\n",
+			    clk_table[i]);
+			return (ENXIO);
+		}
 
-	error = clk_get_freq(sc->ref, &rate_ref);
-	if (error != 0) {
-		device_printf(dev, "cannot get aclk frequency\n");
-		return (ENXIO);
-	}
+		error = clk_get_freq(sc->clk[i], &rate);
+		if (error != 0) {
+			device_printf(dev, "cannot get '%s' clock frequency\n",
+			    clk_table[i]);
+			return (ENXIO);
+		}
 
-	/* pclk */
-	error = clk_get_by_ofw_name(dev, 0, "pclk", &sc->pclk);
-	if (error != 0) {
-		device_printf(dev, "cannot get pclk clock\n");
-		return (ENXIO);
+		device_printf(dev, "%s rate is %ld\n", clk_table[i], rate);
 	}
-
-	error = clk_get_freq(sc->pclk, &rate_pclk);
-	if (error != 0) {
-		device_printf(dev, "cannot get pclk frequency\n");
-		return (ENXIO);
-	}
-
-	/* phy_cfg */
-	error = clk_get_by_ofw_name(dev, 0, "phy_cfg", &sc->phy_cfg);
-	if (error != 0) {
-		device_printf(dev, "cannot get phy_cfg clock\n");
-		return (ENXIO);
-	}
-
-	error = clk_get_freq(sc->phy_cfg, &rate_phy_cfg);
-	if (error != 0) {
-		device_printf(dev, "cannot get phy_cfg frequency\n");
-		return (ENXIO);
-	}
-
-	/* grf */
-	error = clk_get_by_ofw_name(dev, 0, "grf", &sc->grf_clk);
-	if (error != 0) {
-		device_printf(dev, "cannot get grf clock\n");
-		return (ENXIO);
-	}
-
-	error = clk_get_freq(sc->grf_clk, &rate_grf);
-	if (error != 0) {
-		device_printf(dev, "cannot get grf frequency\n");
-		return (ENXIO);
-	}
-
-	device_printf(dev, "ref rate is %ld\n", rate_ref);
-	device_printf(dev, "pclk rate is %ld\n", rate_pclk);
-	device_printf(dev, "phy_cfg rate is %ld\n", rate_phy_cfg);
-	device_printf(dev, "grf rate is %ld\n", rate_grf);
 
 	return (0);
 }

@@ -81,11 +81,6 @@ static struct resource_spec rk_hdmi_spec[] = {
 struct rk_hdmi_softc {
 	struct syscon		*syscon;
 	struct rk_hdmi_conf	*phy_conf;
-	clk_t			iahb;
-	clk_t			isfr;
-	clk_t			vpll;
-	clk_t			grf_clk;
-	clk_t			cec;
 	clk_t			clk[CLK_NENTRIES];
 	struct resource		*res[2];
 	struct syscon		*grf;
@@ -112,7 +107,8 @@ rk_hdmi_enable(device_t dev)
 	for (i = 0; i < CLK_NENTRIES; i++) {
 		error = clk_get_by_ofw_name(dev, 0, clk_table[i], &sc->clk[i]);
 		if (error != 0) {
-			device_printf(dev, "cannot get ref clock\n");
+			device_printf(dev, "cannot get '%s' clock\n",
+			    clk_table[i]);
 			return (ENXIO);
 		}
 
