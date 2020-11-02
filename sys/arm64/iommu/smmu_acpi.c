@@ -62,8 +62,7 @@ __FBSDID("$FreeBSD$");
 #include "smmu_var.h"
 #include "pic_if.h"
 
-/* TODO: check this */
-#define	MEMORY_RESOURCE_SIZE	0x40000
+#define	MEMORY_RESOURCE_SIZE	0x20000
 #define	MAX_SMMU		8
 
 struct smmu_acpi_devinfo {
