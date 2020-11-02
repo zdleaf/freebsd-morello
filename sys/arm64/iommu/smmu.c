@@ -1318,27 +1318,35 @@ smmu_check_features(struct smmu_softc *sc)
 	reg = bus_read_4(sc->res[0], SMMU_IDR0);
 
 	if (reg & IDR0_ST_LVL_2) {
-		device_printf(sc->dev, "2-level stream table supported.\n");
+		if (bootverbose)
+			device_printf(sc->dev,
+			    "2-level stream table supported.\n");
 		sc->features |= SMMU_FEATURE_2_LVL_STREAM_TABLE;
 	}
 
 	if (reg & IDR0_CD2L) {
-		device_printf(sc->dev, "2-level CD table supported.\n");
+		if (bootverbose)
+			device_printf(sc->dev,
+			    "2-level CD table supported.\n");
 		sc->features |= SMMU_FEATURE_2_LVL_CD;
 	}
 
 	switch (reg & IDR0_TTENDIAN_M) {
 	case IDR0_TTENDIAN_MIXED:
-		device_printf(sc->dev, "Mixed endianess supported.\n");
+		if (bootverbose)
+			device_printf(sc->dev, "Mixed endianess supported.\n");
 		sc->features |= SMMU_FEATURE_TT_LE;
 		sc->features |= SMMU_FEATURE_TT_BE;
 		break;
 	case IDR0_TTENDIAN_LITTLE:
-		device_printf(sc->dev, "Little endian supported only.\n");
+		if (bootverbose)
+			device_printf(sc->dev,
+			    "Little endian supported only.\n");
 		sc->features |= SMMU_FEATURE_TT_LE;
 		break;
 	case IDR0_TTENDIAN_BIG:
-		device_printf(sc->dev, "Big endian supported only.\n");
+		if (bootverbose)
+			device_printf(sc->dev, "Big endian supported only.\n");
 		sc->features |= SMMU_FEATURE_TT_BE;
 		break;
 	default:
@@ -1350,13 +1358,14 @@ smmu_check_features(struct smmu_softc *sc)
 		sc->features |= SMMU_FEATURE_SEV;
 
 	if (reg & IDR0_MSI) {
-		device_printf(sc->dev, "MSI feature present.\n");
+		if (bootverbose)
+			device_printf(sc->dev, "MSI feature present.\n");
 		sc->features |= SMMU_FEATURE_MSI;
-	} else
-		device_printf(sc->dev, "MSI feature not present.\n");
+	}
 
 	if (reg & IDR0_HYP) {
-		device_printf(sc->dev, "HYP feature present.\n");
+		if (bootverbose)
+			device_printf(sc->dev, "HYP feature present.\n");
 		sc->features |= SMMU_FEATURE_HYP;
 	}
 
@@ -1378,11 +1387,15 @@ smmu_check_features(struct smmu_softc *sc)
 
 	/* Grab translation stages supported. */
 	if (reg & IDR0_S1P) {
-		device_printf(sc->dev, "Stage 1 translation supported.\n");
+		if (bootverbose)
+			device_printf(sc->dev,
+			    "Stage 1 translation supported.\n");
 		sc->features |= SMMU_FEATURE_S1P;
 	}
 	if (reg & IDR0_S2P) {
-		device_printf(sc->dev, "Stage 2 translation supported.\n");
+		if (bootverbose)
+			device_printf(sc->dev,
+			    "Stage 2 translation supported.\n");
 		sc->features |= SMMU_FEATURE_S2P;
 	}
 
@@ -1401,7 +1414,8 @@ smmu_check_features(struct smmu_softc *sc)
 	else
 		sc->asid_bits = 8;
 
-	device_printf(sc->dev, "ASID bits %d\n", sc->asid_bits);
+	if (bootverbose)
+		device_printf(sc->dev, "ASID bits %d\n", sc->asid_bits);
 
 	if (reg & IDR0_VMID16)
 		sc->vmid_bits = 16;
@@ -1418,16 +1432,19 @@ smmu_check_features(struct smmu_softc *sc)
 
 	val = (reg & IDR1_CMDQS_M) >> IDR1_CMDQS_S;
 	sc->cmdq.size_log2 = val;
-	device_printf(sc->dev, "CMD queue bits %d\n", val);
+	if (bootverbose)
+		device_printf(sc->dev, "CMD queue bits %d\n", val);
 
 	val = (reg & IDR1_EVENTQS_M) >> IDR1_EVENTQS_S;
 	sc->evtq.size_log2 = val;
-	device_printf(sc->dev, "EVENT queue bits %d\n", val);
+	if (bootverbose)
+		device_printf(sc->dev, "EVENT queue bits %d\n", val);
 
 	if (sc->features & SMMU_FEATURE_PRI) {
 		val = (reg & IDR1_PRIQS_M) >> IDR1_PRIQS_S;
 		sc->priq.size_log2 = val;
-		device_printf(sc->dev, "PRI queue bits %d\n", val);
+		if (bootverbose)
+			device_printf(sc->dev, "PRI queue bits %d\n", val);
 	}
 
 	sc->ssid_bits = (reg & IDR1_SSIDSIZE_M) >> IDR1_SSIDSIZE_S;
@@ -1436,8 +1453,10 @@ smmu_check_features(struct smmu_softc *sc)
 	if (sc->sid_bits <= STRTAB_SPLIT)
 		sc->features &= ~SMMU_FEATURE_2_LVL_STREAM_TABLE;
 
-	device_printf(sc->dev, "SSID bits %d\n", sc->ssid_bits);
-	device_printf(sc->dev, "SID bits %d\n", sc->sid_bits);
+	if (bootverbose) {
+		device_printf(sc->dev, "SSID bits %d\n", sc->ssid_bits);
+		device_printf(sc->dev, "SID bits %d\n", sc->sid_bits);
+	}
 
 	/* IDR3 */
 	reg = bus_read_4(sc->res[0], SMMU_IDR3);
