@@ -312,8 +312,7 @@ static inline int
 ilog2(long x)
 {
 
-	KASSERT(x > 0 && powerof2(x),
-	    ("%s: invalid arg %ld", __func__, x));
+	KASSERT(x > 0 && powerof2(x), ("%s: invalid arg %ld", __func__, x));
 
 	return (flsl(x) - 1);
 }
@@ -446,6 +445,7 @@ smmu_print_event(struct smmu_softc *sc, uint32_t *evt)
 	int i;
 
 	ev = NULL;
+
 	event_id = evt[0] & 0xff;
 	for (i = 0; events[i].ident != 0; i++) {
 		if (events[i].ident == event_id) {
