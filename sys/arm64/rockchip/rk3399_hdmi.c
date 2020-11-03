@@ -61,8 +61,8 @@ __FBSDID("$FreeBSD$");
 
 #include "syscon_if.h"
 
-#define	RD4(sc, reg)		bus_read_4((sc)->res[0], (reg))
-#define	WR4(sc, reg, val)	bus_write_4((sc)->res[0], (reg), (val))
+#define	RD4(sc, reg)		bus_read_4((sc)->res[0], ((reg) << 2))
+#define	WR4(sc, reg, val)	bus_write_4((sc)->res[0], ((reg) << 2), (val))
 #define	ARRAY_SIZE(x)		(sizeof(x) / sizeof(x[0]))
 
 static struct ofw_compat_data compat_data[] = {
@@ -94,6 +94,23 @@ static char * clk_table[CLK_NENTRIES] = {
 	"cec",
 };
 
+static void
+rk_hdmi_init(device_t dev)
+{
+	struct rk_hdmi_softc *sc;
+	uint32_t reg;
+
+	sc = device_get_softc(dev);
+
+	reg = IH_MUTE_WAKEUP_INTERRUPT | IH_MUTE_WAKEUP_INTERRUPT;
+	WR4(sc, HDMI_IH_MUTE, reg);
+
+	WR4(sc, HDMI_PHY_I2CM_INT, PHY_I2CM_INT_DONE_M);
+
+	reg = PHY_I2CM_CTLINT_NACK_M | PHY_I2CM_CTLINT_ARBITRATION_M;
+	WR4(sc, HDMI_PHY_I2CM_CTLINT, reg);
+};
+
 static int
 rk_hdmi_enable(device_t dev)
 {
@@ -121,6 +138,11 @@ rk_hdmi_enable(device_t dev)
 
 		device_printf(dev, "%s rate is %ld Hz\n", clk_table[i], rate);
 	}
+
+	uint32_t reg;
+
+	reg = RD4(sc, HDMI_PHY_STAT0);
+	device_printf(dev, "phy stat0 %x\n", reg);
 
 	return (0);
 }
@@ -197,6 +219,7 @@ rk_hdmi_attach(device_t dev)
 	/* TODO: read edid from a connected HDMI monitor. */
 	edid = NULL;
 
+	rk_hdmi_init(dev);
 	rk_hdmi_enable(dev);
 	rk_hdmi_configure(sc);
 	rk_hdmi_dsi_enable(dev, edid);
