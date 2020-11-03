@@ -521,25 +521,6 @@ handle_el1_sync_excp(struct hyp *hyp, int vcpu, struct vm_exit *vme_ret,
 			break;
 		}
 
-		/* Check if instruction syndrome is valid */
-		if (!(esr_iss & ISS_DATA_ISV)) {
-			eprintf("Data abort with invalid instruction syndrome\n");
-			arm64_print_hyp_regs(vme_ret);
-			vme_ret->exitcode = VM_EXITCODE_HYP;
-			break;
-		}
-
-		/*
-		 * Check if the data abort was caused by a translation fault.
-		 * Any other type of data fault will be treated as an error.
-		 */
-		if (!(ISS_DATA_DFSC_TF(esr_iss))) {
-			eprintf("Data abort not on a stage 2 translation\n");
-			arm64_print_hyp_regs(vme_ret);
-			vme_ret->exitcode = VM_EXITCODE_HYP;
-			break;
-		}
-
 		if (esr_ec == EXCP_DATA_ABORT_L) {
 			arm64_gen_inst_emul_data(&hyp->ctx[vcpu], esr_iss,
 			    vme_ret);
