@@ -65,6 +65,10 @@ __FBSDID("$FreeBSD$");
 #define	WR4(sc, reg, val)	bus_write_4((sc)->res[0], ((reg) << 2), (val))
 #define	ARRAY_SIZE(x)		(sizeof(x) / sizeof(x[0]))
 
+#define	DDC_SLAVE_ADDR		0x50
+#define	DDC_EDID_SEG_ADDR	0x30
+#define	HDMI_EDID_BLOCK_SIZE	128
+
 static struct ofw_compat_data compat_data[] = {
 	{ "rockchip,rk3399-dw-hdmi",	1 },
 	{ NULL,				0 }
@@ -93,6 +97,75 @@ static char * clk_table[CLK_NENTRIES] = {
 	"grf",
 	"cec",
 };
+
+static int
+rk_hdmi_wait_i2c(struct rk_hdmi_softc *sc)
+{
+	uint32_t reg;
+	int timeout;
+
+	timeout = 10000;
+
+	do {
+		reg = RD4(sc, HDMI_IH_I2CM_STAT0);
+		if (reg & IH_I2CM_STAT0_I2C_MASTER_DONE) {
+			WR4(sc, HDMI_IH_I2CMPHY_STAT0, reg);
+			return (0);
+		}
+
+	} while (timeout--);
+
+	return (1);
+}
+
+static int
+rk_hdmi_read_edid(device_t dev, int block, struct display_timing *edid)
+{
+	struct rk_hdmi_softc *sc;
+	uint32_t i2c_clk_high, i2c_clk_low;
+	uint32_t reg;
+	uint8_t data;
+	int error;
+	int shift;
+	int i;
+
+	sc = device_get_softc(dev);
+
+	i2c_clk_high = 0x7a;
+	i2c_clk_low = 0x8d;
+	shift = (block % 2) * 0x80;
+
+	WR4(sc, HDMI_PHY_I2CM_SS_SCL_HCNT_0_ADDR, i2c_clk_high);
+	WR4(sc, HDMI_PHY_I2CM_SS_SCL_LCNT_0_ADDR, i2c_clk_low);
+
+	reg = RD4(sc, HDMI_PHY_I2CM_DIV);
+	reg &= ~PHY_I2CM_DIV_FAST_STD_MODE;
+	WR4(sc, HDMI_PHY_I2CM_DIV, reg);
+
+	WR4(sc, HDMI_I2CM_SLAVE, DDC_SLAVE_ADDR);
+	WR4(sc, HDMI_I2CM_SEGADDR, DDC_EDID_SEG_ADDR);
+	WR4(sc, HDMI_I2CM_SEGPTR, block >> 1);
+
+	for (i = 0; i < HDMI_EDID_BLOCK_SIZE; i++) {
+		WR4(sc, HDMI_I2CM_ADDRESS, shift + i);
+
+		if (block == 0)
+			WR4(sc, HDMI_I2CM_OPERATION, I2CM_OPERATION_RD);
+		else
+			WR4(sc, HDMI_I2CM_OPERATION, I2CM_OPERATION_RD_EXT);
+
+		error = rk_hdmi_wait_i2c(sc);
+		if (error != 0) {
+			printf("Could not read EDID data\n");
+			return (-1);
+		}
+
+		data = RD4(sc, HDMI_I2CM_DATAI);
+		printf("data %x\n", data);
+	}
+
+	return (0);
+}
 
 static void
 rk_hdmi_init(device_t dev)
