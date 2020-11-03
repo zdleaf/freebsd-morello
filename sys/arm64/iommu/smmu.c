@@ -159,6 +159,8 @@ static struct resource_spec smmu_spec[] = {
 
 MALLOC_DEFINE(M_SMMU, "SMMU", SMMU_DEVSTR);
 
+#define	dprintf(fmt, ...)
+
 struct smmu_event {
 	int ident;
 	char *str;
@@ -1630,9 +1632,7 @@ smmu_unmap(device_t dev, struct smmu_domain *domain,
 
 	err = 0;
 
-#if 0
-	printf("%s: %lx, %ld, domain %d\n", __func__, va, size, domain->asid);
-#endif
+	dprintf("%s: %lx, %ld, domain %d\n", __func__, va, size, domain->asid);
 
 	for (i = 0; i < size; i += PAGE_SIZE) {
 		if (pmap_sremove(&domain->p, va) == 0) {
@@ -1680,10 +1680,8 @@ smmu_map(device_t dev, struct smmu_domain *domain,
 
 	sc = device_get_softc(dev);
 
-#if 0
-	printf("%s: %lx -> %lx, %ld, domain %d\n",
-	    __func__, va, pa, size, domain->asid);
-#endif
+	dprintf("%s: %lx -> %lx, %ld, domain %d\n", __func__, va, pa, size,
+	    domain->asid);
 
 	i = 0;
 
