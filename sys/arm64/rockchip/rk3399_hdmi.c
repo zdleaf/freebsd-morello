@@ -148,16 +148,13 @@ rk_hdmi_phy_enable(device_t dev, struct display_timing *timing)
 static void
 rk_hdmi_configure(struct rk_hdmi_softc *sc)
 {
-#if 0
 	uint32_t reg;
 
-	/* Select VOP Little for MIPI DSI. */
+	/* Select VOP Little for HDMI. */
 	reg = SYSCON_READ_4(sc->grf, GRF_SOC_CON20);
+	reg &= ~CON20_HDMI_VOP_SEL_M;
+	reg |= CON20_HDMI_VOP_SEL_L;
 	SYSCON_WRITE_4(sc->grf, GRF_SOC_CON20, reg);
-
-	reg = SYSCON_READ_4(sc->grf, GRF_SOC_CON22);
-	SYSCON_WRITE_4(sc->grf, GRF_SOC_CON22, reg);
-#endif
 }
 
 static int
