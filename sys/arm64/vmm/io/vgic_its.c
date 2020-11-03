@@ -307,7 +307,14 @@ its_read(void *vm, int vcpuid, uint64_t fault_ipa, uint64_t *rval,
 		return (EINVAL);
 
 	switch(reg) {
+	case GICD_PIDR2:
+		*rval = 3 << 4;
+		*retu = false;
+		return (0);
 	case GITS_CTLR:
+		*rval = (1u << 31);
+		*retu = false;
+		return (0);
 	case GITS_IIDR:
 		/* TODO: Report a useful ID register */
 		*rval = 0;
