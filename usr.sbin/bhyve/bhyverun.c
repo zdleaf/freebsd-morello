@@ -1533,10 +1533,10 @@ main(int argc, char *argv[])
 	}
 #endif
 
+#ifdef __amd64__
 	error = vm_get_register(ctx, BSP, VM_REG_GUEST_PC, &rip);
 	assert(error == 0);
 
-#ifdef __amd64__
 	/*
 	 * build the guest tables, MP etc.
 	 */
