@@ -111,6 +111,20 @@ rk_hdmi_init(device_t dev)
 	WR4(sc, HDMI_PHY_I2CM_CTLINT, reg);
 };
 
+static void
+rk_hdmi_phy_init(device_t dev)
+{
+	struct rk_hdmi_softc *sc;
+
+	sc = device_get_softc(dev);
+
+	/* Unmask hot plug interrupt */
+	WR4(sc, HDMI_PHY_MASK0, (uint8_t)~PHY_MASK0_HPD);
+
+	/* Clear hot plug interrupts */
+	WR4(sc, HDMI_IH_PHY_STAT0, IH_PHY_STAT0_HPD);
+};
+
 static int
 rk_hdmi_enable(device_t dev)
 {
@@ -220,7 +234,9 @@ rk_hdmi_attach(device_t dev)
 	edid = NULL;
 
 	rk_hdmi_init(dev);
+	rk_hdmi_phy_init(dev);
 	rk_hdmi_enable(dev);
+
 	rk_hdmi_configure(sc);
 	rk_hdmi_dsi_enable(dev, edid);
 	rk_hdmi_phy_enable(dev, edid);

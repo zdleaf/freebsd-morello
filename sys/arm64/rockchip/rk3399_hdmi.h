@@ -36,6 +36,7 @@
 #define	 PHY_STAT0_HPD		(1 << 1) /* HDMI Hot Plug Detect indication */
 #define	HDMI_PHY_INT0		0x3005
 #define	HDMI_PHY_MASK0		0x3006
+#define	 PHY_MASK0_HPD		(1 << 1) /* Mask bit for PHY_INT0.HPD */
 #define	HDMI_PHY_POL0		0x3007
 
 #define	HDMI_PHY_I2CM_SLAVE			0x3020
@@ -46,6 +47,7 @@
 #define	HDMI_PHY_I2CM_DATAI_0			0x3025
 #define	HDMI_PHY_I2CM_OPERATION			0x3026
 #define	HDMI_PHY_I2CM_INT			0x3027
+#define	 PHY_I2CM_INT_DONE_POL			(1 << 3)
 #define	 PHY_I2CM_INT_DONE_M			(1 << 2)
 #define	HDMI_PHY_I2CM_CTLINT			0x3028
 #define	 PHY_I2CM_CTLINT_NACK_M			(1 << 6)
@@ -68,6 +70,7 @@
 #define	HDMI_IH_FC_STAT2			0x102
 #define	HDMI_IH_AS_STAT0			0x103
 #define	HDMI_IH_PHY_STAT0			0x104
+#define	 IH_PHY_STAT0_HPD	(1 << 0) /* R/W1C HDMI HPD indication */
 #define	HDMI_IH_I2CM_STAT0			0x105
 #define	HDMI_IH_CEC_STAT0			0x106
 #define	HDMI_IH_VP_STAT0			0x107
