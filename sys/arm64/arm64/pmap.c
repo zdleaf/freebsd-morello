@@ -1972,7 +1972,7 @@ pmap_release(pmap_t pmap)
 		SLIST_INIT(&free);
 		m = PHYS_TO_VM_PAGE(pmap->pm_ttbr);
 		PMAP_LOCK(pmap);
-		rv = pmap_unwire_l3(pmap, 0, m, NULL);
+		rv = pmap_unwire_l3(pmap, 0, m, &free);
 		PMAP_UNLOCK(pmap);
 		MPASS(rv == TRUE);
 		vm_page_free_pages_toq(&free, true);
