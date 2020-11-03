@@ -9,6 +9,7 @@ __FBSDID("$FreeBSD$");
 #include <string.h>
 
 #include <machine/vmm.h>
+#include <vmmapi.h>
 
 #include <dev/ic/ns16550.h>
 
@@ -16,16 +17,22 @@ __FBSDID("$FreeBSD$");
 #include "mem.h"
 #include "uart_emul.h"
 
-void init_uart(void);
+void init_uart(struct vmctx *);
 
 static void
 mmio_uart_intr_assert(void *arg)
 {
+	struct vmctx *ctx = arg;
+
+	vm_assert_irq(ctx, 33);
 }
 
 static void
 mmio_uart_intr_deassert(void *arg)
 {
+	struct vmctx *ctx = arg;
+
+	vm_deassert_irq(ctx, 32);
 }
 
 static int
@@ -37,7 +44,7 @@ mmio_uart_mem_handler(struct vmctx *ctx, int vcpu, int dir, uint64_t addr,
 
 	reg = (addr - arg2) >> 2;
 	if (dir == MEM_F_WRITE) {
-		uart_write(sc, reg, (*val >> 0) & 0xff);
+		uart_write(sc, reg, *val);
 	} else {
 		*val = uart_read(sc, reg);
 	}
@@ -46,13 +53,13 @@ mmio_uart_mem_handler(struct vmctx *ctx, int vcpu, int dir, uint64_t addr,
 }
 
 void
-init_uart(void)
+init_uart(struct vmctx *ctx)
 {
 	struct uart_softc *sc;
 	struct mem_range mr;
 	int error;
 
-	sc = uart_init(mmio_uart_intr_assert, mmio_uart_intr_deassert, NULL);
+	sc = uart_init(mmio_uart_intr_assert, mmio_uart_intr_deassert, ctx);
 	if (uart_set_backend(sc, "stdio") != 0) {
 		EPRINTLN("Unable to initialize backend '%s' for "
 		    "mmio uart", "stdio");

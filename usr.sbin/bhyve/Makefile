@@ -45,7 +45,7 @@ SRCS=	\
 	post.c			\
 	smbiostbl.c		\
 	sockstream.c		\
-	uart_emul.c		\
+	uart_backend.c		\
 	usb_emul.c		\
 	usb_mouse.c		\
 	virtio.c		\
@@ -57,7 +57,8 @@ SRCS=	\
 CFLAGS+=	-DWITHOUT_CAPSICUM
 SRCS+=	\
 	bootcode.c		\
-	mmio_uart.c
+	mmio_uart.c		\
+	pl011.c
 .endif
 
 .if ${MACHINE_CPUARCH} == "amd64"
@@ -80,6 +81,7 @@ SRCS+=	\
 	rfb.c			\
 	rtc.c			\
 	task_switch.c		\
+	uart_emul.c		\
 	xmsr.c			\
 	spinup_ap.c		\
 	vga.c			\
