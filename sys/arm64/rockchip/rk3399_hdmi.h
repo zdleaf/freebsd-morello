@@ -83,7 +83,15 @@
 
 /* PHY Configuration Registers */
 #define	HDMI_PHY_CONF0		0x3000
+#define	 PHY_CONF0_PDZ		(1 << 7) /* Power-down enable */
+#define	 PHY_CONF0_ENTMDS	(1 << 6) /* Enable TMDS drivers, bias */
+#define	 PHY_CONF0_PDDQ		(1 << 4)
+#define	 PHY_CONF0_TXPWRON	(1 << 3)
+#define	 PHY_CONF0_SELDATAENPOL	(1 << 1) /* Data enable polarity */
+#define	 PHY_CONF0_SELDIPIF	(1 << 0) /* Interface control */
 #define	HDMI_PHY_TST0		0x3001
+#define	 PHY_TST0_TESTCLR	(1 << 5)
+#define	 PHY_TST0_TESTEN	(1 << 4)
 #define	HDMI_PHY_TST1		0x3002
 #define	HDMI_PHY_TST2		0x3003
 #define	HDMI_PHY_STAT0		0x3004
@@ -94,12 +102,16 @@
 #define	HDMI_PHY_POL0		0x3007
 
 #define	HDMI_PHY_I2CM_SLAVE			0x3020
+#define	 PHY_I2CM_SLAVE_PHY_GEN2		0x69
+#define	 PHY_I2CM_SLAVE_PHY_HEAC		0x49
 #define	HDMI_PHY_I2CM_ADDRESS			0x3021
 #define	HDMI_PHY_I2CM_DATAO_1			0x3022
 #define	HDMI_PHY_I2CM_DATAO_0			0x3023
 #define	HDMI_PHY_I2CM_DATAI_1			0x3024
 #define	HDMI_PHY_I2CM_DATAI_0			0x3025
 #define	HDMI_PHY_I2CM_OPERATION			0x3026
+#define	 PHY_I2CM_OPERATION_WR			(1 << 4)
+#define	 PHY_I2CM_OPERATION_RD			(1 << 0)
 #define	HDMI_PHY_I2CM_INT			0x3027
 #define	 PHY_I2CM_INT_DONE_POL			(1 << 3)
 #define	 PHY_I2CM_INT_DONE_M			(1 << 2)
@@ -118,6 +130,23 @@
 #define	HDMI_PHY_I2CM_FS_SCL_LCNT_1_ADDR	0x3031
 #define	HDMI_PHY_I2CM_FS_SCL_LCNT_0_ADDR	0x3032
 #define	HDMI_PHY_I2CM_SDA_HOLD			0x3033
+
+/* Main Controller Registers */
+#define	HDMI_MC_SFRDIV		0x4000
+#define	HDMI_MC_CLKDIS		0x4001
+#define	HDMI_MC_SWRSTZREQ	0x4002
+#define	HDMI_MC_OPCTRL		0x4003
+#define	HDMI_MC_FLOWCTRL	0x4004
+#define	HDMI_MC_PHYRSTZ		0x4005
+#define	 MC_PHYRSTZ_RST		(1 << 0)
+#define	HDMI_MC_LOCKONCLOCK	0x4006
+#define	HDMI_MC_HEACPHY_RST	0x4007
+#define	 MC_HEACPHY_RST		(1 << 0)
+#define	HDMI_MC_LOCKONCLOCK_2	0x4009
+#define	HDMI_MC_SWRSTZREQ_2	0x400a
+#define	HDMI_MC_OPSTS		0x4010
+#define	HDMI_BASE_SFRDIVLOW	0x4018
+#define	HDMI_BASE_SFRDIVHIGH	0x4019
 
 /* E-DDC Registers */
 #define	HDMI_I2CM_SLAVE				0x7E00
@@ -162,6 +191,8 @@
 #define	HDMI_IH_CEC_STAT0			0x106
 #define	HDMI_IH_VP_STAT0			0x107
 #define	HDMI_IH_I2CMPHY_STAT0			0x108
+#define	 IH_I2CMPHY_STAT0_I2CMPHYDONE		(1 << 1)
+#define	 IH_I2CMPHY_STAT0_I2CMPHYERROR		(1 << 0)
 #define	HDMI_IH_AHBDMAAUD_STAT0			0x109
 #define	HDMI_IH_DECODE				0x170
 #define	HDMI_IH_MUTE_FC_STAT0			0x180
@@ -177,6 +208,16 @@
 #define	HDMI_IH_MUTE				0x1FF
 #define	 IH_MUTE_WAKEUP_INTERRUPT		(1 << 1)
 #define	 IH_MUTE_ALL_INTERRUPT			(1 << 0)
+
+#define	PHY_CKCALCTRL		0x05
+#define	PHY_OPMODE_PLLCFG	0x06
+#define	PHY_CKSYMTXCTRL		0x09
+#define	PHY_VLEVCTRL		0x0E
+#define	PHY_PLLCURRCTRL		0x10
+#define	PHY_PLLPHBYCTRL		0x13
+#define	PHY_PLLGMPCTRL		0x15
+#define	PHY_PLLCLKBISTPHASE	0x17
+#define	PHY_TXTERM		0x19
 
 #define	GRF_SOC_CON20	0x6250
 #define	 CON20_DSI0_VOP_SEL_S	0
@@ -201,5 +242,19 @@
 #define	 CON22_DPHY_TX0_TURNREQUEST_M	(0xf << CON22_DPHY_TX0_TURNREQUEST_S)
 #define	 CON22_DPHY_TX0_TURNREQUEST_EN	(0x1 << CON22_DPHY_TX0_TURNREQUEST_S)
 #define	 CON22_DPHY_TX0_TURNREQUEST_DIS	(0x0 << CON22_DPHY_TX0_TURNREQUEST_S)
+
+struct hdmi_mpll_config {
+	uint64_t mpixelclock;
+	uint32_t cpce;
+	uint32_t gmp;
+	uint32_t curr;
+};
+
+struct hdmi_phy_config {
+	uint64_t mpixelclock;
+	uint32_t sym_ctr;
+	uint32_t term;
+	uint32_t vlev_ctr;
+};
 
 #endif /* !_ARM64_ROCKCHIP_RK3399_HDMI_H_ */

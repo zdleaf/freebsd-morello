@@ -98,6 +98,58 @@ static char * clk_table[CLK_NENTRIES] = {
 	"cec",
 };
 
+#if 0
+static const struct hdmi_phy_config rockchip_phy_config[] = {
+	{
+		.mpixelclock = 74250000,
+		.sym_ctr = 0x8009, .term = 0x0004, .vlev_ctr = 0x0272,
+	}, {
+		.mpixelclock = 148500000,
+		.sym_ctr = 0x802b, .term = 0x0004, .vlev_ctr = 0x028d,
+	}, {
+		.mpixelclock = 297000000,
+		.sym_ctr = 0x8039, .term = 0x0005, .vlev_ctr = 0x028d,
+	}, {
+		.mpixelclock = 584000000,
+		.sym_ctr = 0x8039, .term = 0x0000, .vlev_ctr = 0x019d,
+	}, {
+		.mpixelclock = ~0ul,
+		.sym_ctr = 0x0000, .term = 0x0000, .vlev_ctr = 0x0000,
+	}
+};
+#endif
+
+static const struct hdmi_mpll_config rockchip_mpll_cfg[] = {
+	{
+		.mpixelclock = 40000000,
+		.cpce = 0x00b3, .gmp = 0x0000, .curr = 0x0018,
+	}, {
+		.mpixelclock = 65000000,
+		.cpce = 0x0072, .gmp = 0x0001, .curr = 0x0028,
+	}, {
+		.mpixelclock = 66000000,
+		.cpce = 0x013e, .gmp = 0x0003, .curr = 0x0038,
+	}, {
+		.mpixelclock = 83500000,
+		.cpce = 0x0072, .gmp = 0x0001, .curr = 0x0028,
+	}, {
+		.mpixelclock = 146250000,
+		.cpce = 0x0051, .gmp = 0x0002, .curr = 0x0038,
+	}, {
+		.mpixelclock = 148500000,
+		.cpce = 0x0051, .gmp = 0x0003, .curr = 0x0000,
+	}, {
+		.mpixelclock = 272000000,
+		.cpce = 0x0040, .gmp = 0x0003, .curr = 0x0000,
+	}, {
+		.mpixelclock = 340000000,
+		.cpce = 0x0040, .gmp = 0x0003, .curr = 0x0000,
+	}, {
+		.mpixelclock = ~0ul,
+		.cpce = 0x0051, .gmp = 0x0003, .curr = 0x0000,
+	}
+};
+
 static int
 rk_hdmi_wait_i2c(struct rk_hdmi_softc *sc)
 {
@@ -234,6 +286,95 @@ rk_hdmi_clk_enable(device_t dev)
 	return (0);
 }
 
+static int
+hdmi_phy_write(struct rk_hdmi_softc *sc, uint32_t addr, uint32_t data)
+{
+	int timeout;
+	uint32_t reg;
+
+	timeout = 10000;
+
+	WR4(sc, HDMI_IH_I2CMPHY_STAT0, 0xff);
+	WR4(sc, HDMI_PHY_I2CM_ADDRESS, addr);
+	WR4(sc, HDMI_PHY_I2CM_DATAO_1, (data >> 8) & 0xff);
+	WR4(sc, HDMI_PHY_I2CM_DATAO_0, data & 0xff);
+	WR4(sc, HDMI_PHY_I2CM_OPERATION, PHY_I2CM_OPERATION_WR);
+
+	do {
+		reg = RD4(sc, HDMI_IH_I2CMPHY_STAT0);
+		if (reg & IH_I2CMPHY_STAT0_I2CMPHYDONE) {
+			/* TODO: check for IH_I2CMPHY_STAT0_I2CMPHYERROR bit */
+			WR4(sc, HDMI_IH_I2CMPHY_STAT0, reg);
+			return (0);
+		}
+
+		DELAY(1000);
+	} while (timeout--);
+
+	return (1);
+}
+
+static void
+hdmi_phy_configure(struct rk_hdmi_softc *sc, struct display_timing *edid)
+{
+	uint32_t reg;
+	int i;
+
+	reg = RD4(sc, HDMI_PHY_CONF0);
+	reg &= ~PHY_CONF0_TXPWRON;
+	reg |= PHY_CONF0_PDDQ;
+	WR4(sc, HDMI_PHY_CONF0, reg);
+
+	reg = RD4(sc, HDMI_MC_PHYRSTZ);
+	reg &= ~MC_PHYRSTZ_RST;
+	WR4(sc, HDMI_MC_PHYRSTZ, reg);
+	reg |= MC_PHYRSTZ_RST;
+	WR4(sc, HDMI_MC_PHYRSTZ, reg);
+	WR4(sc, HDMI_MC_HEACPHY_RST, MC_HEACPHY_RST);
+
+	reg = RD4(sc, HDMI_PHY_TST0);
+	reg |= PHY_TST0_TESTCLR;
+	WR4(sc, HDMI_PHY_TST0, reg);
+	WR4(sc, HDMI_PHY_I2CM_SLAVE, PHY_I2CM_SLAVE_PHY_GEN2);
+	reg &= ~PHY_TST0_TESTCLR;
+	WR4(sc, HDMI_PHY_TST0, reg);
+
+	const struct hdmi_mpll_config *mpll_cfg;
+	mpll_cfg = rockchip_mpll_cfg;
+
+	for (i = 0; mpll_cfg[i].mpixelclock != (~0ul); i++)
+		if (edid->pixelclock.typ <= mpll_cfg[i].mpixelclock)
+			break;
+
+	hdmi_phy_write(sc, PHY_OPMODE_PLLCFG, mpll_cfg[i].cpce);
+	hdmi_phy_write(sc, PHY_PLLGMPCTRL, mpll_cfg[i].gmp);
+	hdmi_phy_write(sc, PHY_PLLCURRCTRL, mpll_cfg[i].curr);
+	hdmi_phy_write(sc, PHY_PLLPHBYCTRL, 0);
+	hdmi_phy_write(sc, PHY_PLLCLKBISTPHASE, 0x6);
+}
+
+static void
+hdmi_phy_set(struct rk_hdmi_softc *sc, struct display_timing *edid)
+{
+	uint32_t reg;
+	int i;
+
+	//edid->pixelclock.typ;
+
+	/* Twice per HDMI spec */
+
+	for (i = 0; i < 2; i++) {
+		reg = RD4(sc, HDMI_PHY_CONF0);
+		reg |= PHY_CONF0_SELDATAENPOL;
+		reg &= ~PHY_CONF0_SELDIPIF;
+		reg &= ~PHY_CONF0_ENTMDS;
+		reg &= ~PHY_CONF0_PDZ;
+		WR4(sc, HDMI_PHY_CONF0, reg);
+
+		hdmi_phy_configure(sc, edid);
+	}
+}
+
 static void
 hdmi_av_composer(struct rk_hdmi_softc *sc, struct display_timing *edid)
 {
@@ -280,6 +421,7 @@ rk_hdmi_enable(device_t dev, struct display_timing *edid)
 	sc = device_get_softc(dev);
 
 	hdmi_av_composer(sc, edid);
+	hdmi_phy_set(sc, edid);
 }
 
 static void
