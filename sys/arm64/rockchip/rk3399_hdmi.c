@@ -199,7 +199,7 @@ rk_hdmi_phy_init(device_t dev)
 };
 
 static int
-rk_hdmi_enable(device_t dev)
+rk_hdmi_clk_enable(device_t dev)
 {
 	struct rk_hdmi_softc *sc;
 	uint64_t rate;
@@ -235,11 +235,51 @@ rk_hdmi_enable(device_t dev)
 }
 
 static void
-rk_hdmi_dsi_enable(device_t dev, struct display_timing *timing)
+hdmi_av_composer(struct rk_hdmi_softc *sc, struct display_timing *edid)
+{
+	uint32_t hbl;
+	uint32_t vbl;
+	uint32_t reg;
+
+	hbl = edid->hback_porch.typ + edid->hfront_porch.typ +
+	    edid->hsync_len.typ;
+	vbl = edid->vback_porch.typ + edid->vfront_porch.typ +
+	    edid->vsync_len.typ;
+
+	reg = FC_INVIDCONF_DE_IN_POLARITY |
+	      FC_INVIDCONF_R_V_BLANK_IN_OSC |
+	      FC_INVIDCONF_IN_I_P;
+	if (edid->flags & DISPLAY_FLAGS_VSYNC_HIGH)
+		reg |= FC_INVIDCONF_VSYNC_IN_POLARITY;
+	if (edid->flags & DISPLAY_FLAGS_HSYNC_HIGH)
+		reg |= FC_INVIDCONF_HSYNC_IN_POLARITY;
+	if (edid->hdmi_monitor)
+		reg |= FC_INVIDCONF_DVI_MODEZ;
+	WR4(sc, HDMI_FC_INVIDCONF, reg);
+
+	WR4(sc, HDMI_FC_INHACTIV1, edid->hactive.typ >> 8);
+	WR4(sc, HDMI_FC_INHACTIV0, edid->hactive.typ);
+	WR4(sc, HDMI_FC_INVACTIV1, edid->vactive.typ >> 8);
+	WR4(sc, HDMI_FC_INVACTIV0, edid->vactive.typ);
+	WR4(sc, HDMI_FC_INHBLANK1, hbl >> 8);
+	WR4(sc, HDMI_FC_INHBLANK0, hbl);
+	WR4(sc, HDMI_FC_INVBLANK, vbl);
+	WR4(sc, HDMI_FC_HSYNCINDELAY1, edid->hfront_porch.typ >> 8);
+	WR4(sc, HDMI_FC_HSYNCINDELAY0, edid->hfront_porch.typ);
+	WR4(sc, HDMI_FC_VSYNCINDELAY, edid->vfront_porch.typ);
+	WR4(sc, HDMI_FC_HSYNCINWIDTH1, edid->hsync_len.typ >> 8);
+	WR4(sc, HDMI_FC_HSYNCINWIDTH0, edid->hsync_len.typ);
+	WR4(sc, HDMI_FC_VSYNCINWIDTH, edid->vsync_len.typ);
+}
+
+static void
+rk_hdmi_enable(device_t dev, struct display_timing *edid)
 {
 	struct rk_hdmi_softc *sc;
 
 	sc = device_get_softc(dev);
+
+	hdmi_av_composer(sc, edid);
 }
 
 static void
@@ -307,11 +347,11 @@ rk_hdmi_attach(device_t dev)
 	edid = NULL;
 
 	rk_hdmi_init(dev);
+	rk_hdmi_clk_enable(dev);
 	rk_hdmi_phy_init(dev);
-	rk_hdmi_enable(dev);
 
 	rk_hdmi_configure(sc);
-	rk_hdmi_dsi_enable(dev, edid);
+	rk_hdmi_enable(dev, edid);
 	rk_hdmi_phy_enable(dev, edid);
 
 	return (0);

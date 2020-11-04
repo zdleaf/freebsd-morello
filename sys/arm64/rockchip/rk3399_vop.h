@@ -243,19 +243,15 @@ enum vop_pol {
 	DCLK_INVERT,
 };
 
-/* generic */
+/* generic display timings */
 enum display_flags {
 	DISPLAY_FLAGS_HSYNC_LOW		= 1 << 0,
 	DISPLAY_FLAGS_HSYNC_HIGH	= 1 << 1,
 	DISPLAY_FLAGS_VSYNC_LOW		= 1 << 2,
 	DISPLAY_FLAGS_VSYNC_HIGH	= 1 << 3,
-
-	/* data enable flag */
 	DISPLAY_FLAGS_DE_LOW		= 1 << 4,
 	DISPLAY_FLAGS_DE_HIGH		= 1 << 5,
-	/* drive data on pos. edge */
 	DISPLAY_FLAGS_PIXDATA_POSEDGE	= 1 << 6,
-	/* drive data on neg. edge */
 	DISPLAY_FLAGS_PIXDATA_NEGEDGE	= 1 << 7,
 	DISPLAY_FLAGS_INTERLACED	= 1 << 8,
 	DISPLAY_FLAGS_DOUBLESCAN	= 1 << 9,
