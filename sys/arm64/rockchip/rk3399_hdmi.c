@@ -47,6 +47,9 @@ __FBSDID("$FreeBSD$");
 
 #include <machine/bus.h>
 
+#include <dev/videomode/videomode.h>
+#include <dev/videomode/edidvar.h>
+
 #include <dev/fdt/simplebus.h>
 #include <dev/fdt/fdt_common.h>
 #include <dev/ofw/ofw_bus.h>
@@ -59,6 +62,9 @@ __FBSDID("$FreeBSD$");
 #include <arm64/rockchip/rk3399_vop.h>
 #include <arm64/rockchip/rk3399_hdmi.h>
 
+#include <dev/hdmi/dwc_hdmi.h>
+
+#include "hdmi_if.h"
 #include "syscon_if.h"
 
 #define	RD4(sc, reg)		bus_read_4((sc)->res[0], ((reg) << 2))
@@ -74,20 +80,25 @@ static struct ofw_compat_data compat_data[] = {
 	{ NULL,				0 }
 };
 
+#if 0
 static struct resource_spec rk_hdmi_spec[] = {
 	{ SYS_RES_MEMORY,	0,	RF_ACTIVE },
 	{ SYS_RES_IRQ,		0,	RF_ACTIVE | RF_SHAREABLE },
 	{ -1, 0 }
 };
+#endif
 
 #define	CLK_NENTRIES	5
 
 struct rk_hdmi_softc {
+	struct dwc_hdmi_softc	base;
 	struct syscon		*syscon;
 	struct rk_hdmi_conf	*phy_conf;
 	clk_t			clk[CLK_NENTRIES];
 	struct resource		*res[2];
 	struct syscon		*grf;
+	phandle_t		i2c_xref;
+	eventhandler_tag	eh_tag;
 };
 
 static char * clk_table[CLK_NENTRIES] = {
@@ -149,6 +160,20 @@ static const struct hdmi_mpll_config rockchip_mpll_cfg[] = {
 		.cpce = 0x0051, .gmp = 0x0003, .curr = 0x0000,
 	}
 };
+
+static device_t
+imx_hdmi_get_i2c_dev(device_t dev)
+{
+	struct rk_hdmi_softc *sc;
+
+	sc = device_get_softc(dev);
+	if (sc->i2c_xref == 0)
+		return (NULL);
+
+	device_printf(dev, "%s: i2c dev returned\n", __func__);
+
+	return (OF_device_from_xref(sc->i2c_xref));
+}
 
 static int
 rk_hdmi_wait_i2c(struct rk_hdmi_softc *sc)
@@ -457,6 +482,33 @@ rk_hdmi_configure(struct rk_hdmi_softc *sc)
 	SYSCON_WRITE_4(sc->grf, GRF_SOC_CON20, reg);
 }
 
+static void
+imx_hdmi_init(void *arg)
+{
+	struct rk_hdmi_softc *sc;
+	device_t dev;
+
+	dev = arg;
+
+	sc = device_get_softc(dev);
+
+	if (OF_device_from_xref(sc->i2c_xref) != NULL) {
+		if (sc->eh_tag != NULL)
+			EVENTHANDLER_DEREGISTER_NOWAIT(device_attach,
+			    sc->eh_tag);
+		printf("%s: dwc_hdmi_init\n", __func__);
+		dwc_hdmi_init(dev);
+		return;
+	}
+
+	//if (bootverbose)
+		device_printf((device_t)dev, "Waiting for DDC i2c device\n");
+
+	if (sc->eh_tag == NULL)
+		sc->eh_tag = EVENTHANDLER_REGISTER(device_attach,
+			imx_hdmi_init, dev, EVENTHANDLER_PRI_ANY);
+}
+
 static int
 rk_hdmi_probe(device_t dev)
 {
@@ -475,7 +527,7 @@ static int
 rk_hdmi_attach(device_t dev)
 {
 	struct rk_hdmi_softc *sc;
-	phandle_t node;
+	phandle_t node, i2c_xref;
 	int err;
 
 	sc = device_get_softc(dev);
@@ -487,10 +539,39 @@ rk_hdmi_attach(device_t dev)
 		return (ENXIO);
 	}
 
+#if 0
 	if (bus_alloc_resources(dev, rk_hdmi_spec, sc->res) != 0) {
 		device_printf(dev, "cannot allocate resources for device\n");
 		return (ENXIO);
 	}
+#endif
+
+	sc->base.sc_dev = dev;
+	sc->base.sc_get_i2c_dev = imx_hdmi_get_i2c_dev;
+
+	err = 0;
+	/* Allocate memory resources. */
+	sc->base.sc_reg_shift = 2;
+	sc->base.sc_mem_rid = 0;
+	sc->base.sc_mem_res = bus_alloc_resource_any(dev, SYS_RES_MEMORY,
+	    &sc->base.sc_mem_rid, RF_ACTIVE);
+	if (sc->base.sc_mem_res == NULL) {
+		device_printf(dev, "Cannot allocate memory resources\n");
+		err = ENXIO;
+		return (ENXIO);
+		//goto out;
+	}   
+
+	if (OF_getencprop(node, "ddc-i2c-bus",
+	    &i2c_xref, sizeof(i2c_xref)) == -1) {
+		panic("could not get ddc i2c\n");
+		sc->i2c_xref = 0;
+	} else
+		sc->i2c_xref = i2c_xref;
+
+	config_intrhook_oneshot(imx_hdmi_init, dev);
+
+	return (0);
 
 	struct display_timing *edid;
 
@@ -501,6 +582,8 @@ rk_hdmi_attach(device_t dev)
 	rk_hdmi_clk_enable(dev);
 	rk_hdmi_phy_init(dev);
 	rk_hdmi_configure(sc);
+
+	return (0);
 
 	while (1) {
 		rk_hdmi_read_edid(dev, 0, NULL);
@@ -517,6 +600,10 @@ static device_method_t rk_hdmi_methods[] = {
 	/* Device interface */
 	DEVMETHOD(device_probe,		rk_hdmi_probe),
 	DEVMETHOD(device_attach,	rk_hdmi_attach),
+
+	/* HDMI methods */
+	DEVMETHOD(hdmi_get_edid,	dwc_hdmi_get_edid),
+	DEVMETHOD(hdmi_set_videomode,	dwc_hdmi_set_videomode),
 	DEVMETHOD_END
 };
 

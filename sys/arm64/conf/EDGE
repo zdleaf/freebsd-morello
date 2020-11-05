@@ -128,6 +128,9 @@ options 	SOC_ROCKCHIP_RK3328
 options 	SOC_ROCKCHIP_RK3399
 options 	SOC_XILINX_ZYNQ
 
+device		videomode
+device		hdmi
+
 # Timer drivers
 device		a10_timer
 

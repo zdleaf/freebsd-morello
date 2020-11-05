@@ -39,6 +39,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/rman.h>
 #include <sys/kernel.h>
 #include <sys/module.h>
+#include <sys/eventhandler.h>
 #include <sys/gpio.h>
 #include <vm/vm.h>
 #include <vm/vm_extern.h>
@@ -55,8 +56,12 @@ __FBSDID("$FreeBSD$");
 #include <dev/extres/syscon/syscon.h>
 #include <dev/extres/phy/phy.h>
 
+#include <dev/videomode/videomode.h>
+#include <dev/videomode/edidvar.h>
+
 #include <arm64/rockchip/rk3399_vop.h>
 
+#include "hdmi_if.h"
 #include "syscon_if.h"
 
 #define	VOP_READ(sc, reg)	bus_read_4((sc)->res[0], (reg))
@@ -95,12 +100,15 @@ timing0 {
 static struct display_timing ts050_timings;
 
 struct rk_vop_softc {
+	device_t		dev;
 	struct syscon		*syscon;
 	struct rk_vop_conf	*phy_conf;
 	clk_t			aclk;
 	clk_t			dclk;
 	clk_t			hclk;
 	struct resource		*res[2];
+	eventhandler_tag        sc_hdmi_evh;
+	const struct videomode	*sc_mode;
 };
 
 static void
@@ -304,6 +312,46 @@ rk_vop_enable(device_t dev, phandle_t node, struct display_timing *edid)
 	return (0);
 }
 
+static void
+rk_vop_hdmi_event(void *arg, device_t hdmi_dev)
+{
+	struct rk_vop_softc *sc;
+	uint8_t *edid;
+	uint32_t edid_len;
+	struct edid_info ei;
+	const struct videomode *videomode;
+
+	sc = arg;
+
+	printf("%s\n", __func__);
+
+	edid = NULL;
+	edid_len = 0;
+	if (HDMI_GET_EDID(hdmi_dev, &edid, &edid_len) != 0)
+		device_printf(sc->dev,
+		    "failed to get EDID info from HDMI framer\n");
+	else
+		device_printf(sc->dev, "got edid, len %d\n", edid_len);
+
+	int i;
+	printf("%s: edid: \n", __func__);
+	for (i = 0; i < 128; i++)
+		printf("%x ", edid[i]);
+	printf("\n");
+
+	if (edid) {
+		if (edid_parse(edid, &ei) == 0)
+			edid_print(&ei);
+		else
+			printf("failed to parse EDID\n");
+	}
+
+	videomode = pick_mode_by_ref(640, 480, 60);
+	sc->sc_mode = videomode;
+
+	HDMI_SET_VIDEOMODE(hdmi_dev, sc->sc_mode);
+}
+
 static int
 rk_vop_probe(device_t dev)
 {
@@ -325,12 +373,17 @@ rk_vop_attach(device_t dev)
 	phandle_t node;
 
 	sc = device_get_softc(dev);
+	sc->dev = dev;
+
 	node = ofw_bus_get_node(dev);
 
 	if (bus_alloc_resources(dev, rk_vop_spec, sc->res) != 0) {
 		device_printf(dev, "cannot allocate resources for device\n");
 		return (ENXIO);
 	}
+
+	sc->sc_hdmi_evh = EVENTHANDLER_REGISTER(hdmi_event,
+	    rk_vop_hdmi_event, sc, 0);
 
 	struct display_timing *edid;
 
