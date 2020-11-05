@@ -163,6 +163,7 @@
 #define	HDMI_I2CM_INT				0x7E05
 #define	HDMI_I2CM_CTLINT			0x7E06
 #define	HDMI_I2CM_DIV				0x7E07
+#define	 I2CM_DIV_FAST_STD_MODE			(1 << 3)
 #define	HDMI_I2CM_SEGADDR			0x7E08
 #define	HDMI_I2CM_SOFTRSTZ			0x7E09
 #define	HDMI_I2CM_SEGPTR			0x7E0A
@@ -176,8 +177,8 @@
 #define	HDMI_I2CM_FS_SCL_LCNT_0_ADDR		0x7E12
 #define	HDMI_I2CM_SDA_HOLD			0x7E13
 #define	HDMI_I2CM_SCDC_READ_UPDATE		0x7E14
-#define	HDMI_I2CM_BUF0				0x7E20
-#define	HDMI_I2CM_BUF1				0x7E21
+#define	HDMI_I2CM_BUFF0				0x7E20
+#define	HDMI_I2CM_BUFF1				0x7E21
 
 /* Interrupt Registers */
 #define	HDMI_IH_FC_STAT0			0x100

@@ -161,10 +161,10 @@ rk_hdmi_wait_i2c(struct rk_hdmi_softc *sc)
 	do {
 		reg = RD4(sc, HDMI_IH_I2CM_STAT0);
 		if (reg & IH_I2CM_STAT0_I2C_MASTER_DONE) {
-			WR4(sc, HDMI_IH_I2CMPHY_STAT0, reg);
+			WR4(sc, HDMI_IH_I2CM_STAT0, reg);
 			return (0);
 		}
-
+		DELAY(100);
 	} while (timeout--);
 
 	return (1);
@@ -187,12 +187,12 @@ rk_hdmi_read_edid(device_t dev, int block, struct display_timing *edid)
 	i2c_clk_low = 0x8d;
 	shift = (block % 2) * 0x80;
 
-	WR4(sc, HDMI_PHY_I2CM_SS_SCL_HCNT_0_ADDR, i2c_clk_high);
-	WR4(sc, HDMI_PHY_I2CM_SS_SCL_LCNT_0_ADDR, i2c_clk_low);
+	WR4(sc, HDMI_I2CM_SS_SCL_HCNT_0_ADDR, i2c_clk_high);
+	WR4(sc, HDMI_I2CM_SS_SCL_LCNT_0_ADDR, i2c_clk_low);
 
-	reg = RD4(sc, HDMI_PHY_I2CM_DIV);
-	reg &= ~PHY_I2CM_DIV_FAST_STD_MODE;
-	WR4(sc, HDMI_PHY_I2CM_DIV, reg);
+	reg = RD4(sc, HDMI_I2CM_DIV);
+	reg &= ~I2CM_DIV_FAST_STD_MODE;
+	WR4(sc, HDMI_I2CM_DIV, reg);
 
 	WR4(sc, HDMI_I2CM_SLAVE, DDC_SLAVE_ADDR);
 	WR4(sc, HDMI_I2CM_SEGADDR, DDC_EDID_SEG_ADDR);
@@ -214,6 +214,8 @@ rk_hdmi_read_edid(device_t dev, int block, struct display_timing *edid)
 
 		data = RD4(sc, HDMI_I2CM_DATAI);
 		printf("data %x\n", data);
+		if (data != 0)
+			panic("ok");
 	}
 
 	return (0);
@@ -264,6 +266,13 @@ rk_hdmi_clk_enable(device_t dev)
 		error = clk_get_by_ofw_name(dev, 0, clk_table[i], &sc->clk[i]);
 		if (error != 0) {
 			device_printf(dev, "cannot get '%s' clock\n",
+			    clk_table[i]);
+			return (ENXIO);
+		}
+
+		error = clk_enable(sc->clk[i]);
+		if (error != 0) {
+			device_printf(dev, "cannot enable '%s' clock\n",
 			    clk_table[i]);
 			return (ENXIO);
 		}
@@ -491,8 +500,13 @@ rk_hdmi_attach(device_t dev)
 	rk_hdmi_init(dev);
 	rk_hdmi_clk_enable(dev);
 	rk_hdmi_phy_init(dev);
-
 	rk_hdmi_configure(sc);
+
+	while (1) {
+		rk_hdmi_read_edid(dev, 0, NULL);
+		rk_hdmi_read_edid(dev, 1, NULL);
+	}
+
 	rk_hdmi_enable(dev, edid);
 	rk_hdmi_phy_enable(dev, edid);
 
