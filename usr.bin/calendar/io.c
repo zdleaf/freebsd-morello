@@ -50,7 +50,6 @@ __FBSDID("$FreeBSD$");
 #include <ctype.h>
 #include <err.h>
 #include <errno.h>
-#include <langinfo.h>
 #include <locale.h>
 #include <pwd.h>
 #include <stdbool.h>
@@ -159,7 +158,9 @@ cal_path(void)
 {
 	static char buffer[MAXPATHLEN + 10];
 
-	if (cal_dir[0] == '/')
+	if (cal_dir == NULL)
+		snprintf(buffer, sizeof(buffer), "%s", cal_file);
+	else if (cal_dir[0] == '/')
 		snprintf(buffer, sizeof(buffer), "%s/%s", cal_dir, cal_file);
 	else
 		snprintf(buffer, sizeof(buffer), "%s/%s/%s", cal_home, cal_dir, cal_file);
@@ -171,6 +172,16 @@ cal_path(void)
 #define	WARN1(format, arg1)		   \
 	warnx(format " in %s line %d", arg1, cal_path(), cal_line)
 
+static char*
+cmptoken(char *line, const char* token)
+{
+	char len = strlen(token);
+
+	if (strncmp(line, token, len) != 0)
+		return NULL;
+	return (line + len);
+}
+
 static int
 token(char *line, FILE *out, int *skip, int *unskip)
 {
@@ -180,21 +191,24 @@ token(char *line, FILE *out, int *skip, int *unskip)
 	const char *this_cal_file;
 	int this_cal_line;
 
-	if (strncmp(line, "endif", 5) == 0) {
-		if (*skip > 0)
-			--*skip;
-		else if (*unskip > 0)
-			--*unskip;
-		else {
+	while (isspace(*line))
+		line++;
+
+	if (cmptoken(line, "endif")) {
+		if (*skip + *unskip == 0) {
 			WARN0("#endif without prior #ifdef or #ifndef");
 			return (T_ERR);
 		}
+		if (*skip > 0)
+			--*skip;
+		else
+			--*unskip;
 
 		return (T_OK);
 	}
 
-	if (strncmp(line, "ifdef", 5) == 0) {
-		walk = line + 5;
+	walk = cmptoken(line, "ifdef");
+	if (walk != NULL) {
 		sep = trimlr(&walk);
 
 		if (*walk == '\0') {
@@ -216,8 +230,8 @@ token(char *line, FILE *out, int *skip, int *unskip)
 		return (T_OK);
 	}
 
-	if (strncmp(line, "ifndef", 6) == 0) {
-		walk = line + 6;
+	walk = cmptoken(line, "ifndef");
+	if (walk != NULL) {
 		sep = trimlr(&walk);
 
 		if (*walk == '\0') {
@@ -239,26 +253,25 @@ token(char *line, FILE *out, int *skip, int *unskip)
 		return (T_OK);
 	}
 
-	if (strncmp(line, "else", 4) == 0) {
-		walk = line + 4;
+	walk = cmptoken(line, "else");
+	if (walk != NULL) {
 		(void)trimlr(&walk);
 
 		if (*walk != '\0') {
 			WARN0("Expecting no arguments after #else");
 			return (T_ERR);
 		}
+		if (*skip + *unskip == 0) {
+			WARN0("#else without prior #ifdef or #ifndef");
+			return (T_ERR);
+		}
 
-		if (*unskip == 0) {
-			if (*skip == 0) {
-				WARN0("#else without prior #ifdef or #ifndef");
-				return (T_ERR);
-			} else if (*skip == 1) {
-				*skip = 0;
-				*unskip = 1;
-			}
-		} else if (*unskip == 1) {
-			*skip = 1;
-			*unskip = 0;
+		if (*skip == 0) {
+			++*skip;
+			--*unskip;
+		} else if (*skip == 1) {
+			--*skip;
+			++*unskip;
 		}
 
 		return (T_OK);
@@ -267,9 +280,8 @@ token(char *line, FILE *out, int *skip, int *unskip)
 	if (*skip != 0)
 		return (T_OK);
 
-	if (strncmp(line, "include", 7) == 0) {
-		walk = line + 7;
-
+	walk = cmptoken(line, "include");
+	if (walk != NULL) {
 		(void)trimlr(&walk);
 
 		if (*walk == '\0') {
@@ -306,10 +318,10 @@ token(char *line, FILE *out, int *skip, int *unskip)
 		return (T_OK);
 	}
 
-	if (strncmp(line, "define", 6) == 0) {
+	walk = cmptoken(line, "define");
+	if (walk != NULL) {
 		if (definitions == NULL)
 			definitions = sl_init();
-		walk = line + 6;
 		sep = trimlr(&walk);
 		*sep = '\0';
 
@@ -323,9 +335,9 @@ token(char *line, FILE *out, int *skip, int *unskip)
 		return (T_OK);
 	}
 
-	if (strncmp(line, "undef", 5) == 0) {
+	walk = cmptoken(line, "undef");
+	if (walk != NULL) {
 		if (definitions != NULL) {
-			walk = line + 5;
 			sep = trimlr(&walk);
 
 			if (*walk == '\0') {
@@ -345,8 +357,32 @@ token(char *line, FILE *out, int *skip, int *unskip)
 		return (T_OK);
 	}
 
-	return (T_PROCESS);
+	walk = cmptoken(line, "warning");
+	if (walk != NULL) {
+		(void)trimlr(&walk);
+		WARN1("Warning: %s", walk);
+	}
 
+	walk = cmptoken(line, "error");
+	if (walk != NULL) {
+		(void)trimlr(&walk);
+		WARN1("Error: %s", walk);
+		return (T_ERR);
+	}
+
+	WARN1("Undefined pre-processor command \"#%s\"", line);
+	return (T_ERR);
+}
+
+static void
+setup_locale(const char *locale)
+{
+	(void)setlocale(LC_ALL, locale);
+#ifdef WITH_ICONV
+	if (!doall)
+		set_new_encoding();
+#endif
+	setnnames();
 }
 
 #define	REPLACE(string, slen, struct_) \
@@ -361,12 +397,12 @@ token(char *line, FILE *out, int *skip, int *unskip)
 static int
 cal_parse(FILE *in, FILE *out)
 {
+	char *mylocale = NULL;
 	char *line = NULL;
 	char *buf;
 	size_t linecap = 0;
 	ssize_t linelen;
 	ssize_t l;
-	static int d_first = -1;
 	static int count = 0;
 	int i;
 	int month[MAXCOUNT];
@@ -374,18 +410,10 @@ cal_parse(FILE *in, FILE *out)
 	int year[MAXCOUNT];
 	int skip = 0;
 	int unskip = 0;
-	char dbuf[80];
 	char *pp, p;
-	struct tm tm;
 	int flags;
 	char *c, *cc;
 	bool incomment = false;
-
-	/* Unused */
-	tm.tm_sec = 0;
-	tm.tm_min = 0;
-	tm.tm_hour = 0;
-	tm.tm_wday = 0;
 
 	if (in == NULL)
 		return (1);
@@ -468,12 +496,9 @@ cal_parse(FILE *in, FILE *out)
 		 * and does not run iconv(), this variable has little use.
 		 */
 		if (strncmp(buf, "LANG=", 5) == 0) {
-			(void)setlocale(LC_CTYPE, buf + 5);
-#ifdef WITH_ICONV
-			if (!doall)
-				set_new_encoding();
-#endif
-			setnnames();
+			if (mylocale == NULL)
+				mylocale = strdup(setlocale(LC_ALL, NULL));
+			setup_locale(buf + 5);
 			continue;
 		}
 		/* Parse special definitions: Easter, Paskha etc */
@@ -532,18 +557,10 @@ cal_parse(FILE *in, FILE *out)
 		while (pp[1] == '\t')
 			pp++;
 
-		if (d_first < 0)
-			d_first = (*nl_langinfo(D_MD_ORDER) == 'd');
-
 		for (i = 0; i < count; i++) {
-			tm.tm_mon = month[i] - 1;
-			tm.tm_mday = day[i];
-			tm.tm_year = year[i] - 1900;
-			(void)strftime(dbuf, sizeof(dbuf),
-			    d_first ? "%e %b" : "%b %e", &tm);
 			if (debug)
 				WARN1("got \"%s\"", pp);
-			events[i] = event_add(year[i], month[i], day[i], dbuf,
+			events[i] = event_add(year[i], month[i], day[i],
 			    ((flags &= F_VARIABLE) != 0) ? 1 : 0, pp,
 			    extradata[i]);
 		}
@@ -555,6 +572,10 @@ cal_parse(FILE *in, FILE *out)
 
 	free(line);
 	fclose(in);
+	if (mylocale != NULL) {
+		setup_locale(mylocale);
+		free(mylocale);
+	}
 
 	return (0);
 }
@@ -592,6 +613,7 @@ opencalin(void)
 	FILE *fpin;
 
 	/* open up calendar file */
+	cal_file = calendarFile;
 	if ((fpin = fopen(calendarFile, "r")) == NULL) {
 		if (doall) {
 			if (chdir(calendarHomes[0]) != 0)
