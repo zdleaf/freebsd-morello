@@ -25,13 +25,13 @@ cloudabi64_vdso_blob.o		optional	compat_cloudabi64	\
 #
 hyp_genassym.o			optional	vmm			\
 	dependency	"$S/arm64/vmm/hyp_genassym.c offset.inc"	\
-	compile-with	"${CC} ${CFLAGS:N-flto:N-fno-common} -c ${.IMPSRC}" \
+	compile-with	"${CC} ${CFLAGS:N-flto:N-fno-common} -fcommon -c ${.IMPSRC}" \
 	no-obj no-implicit-rule						\
 	clean		"hyp_genassym.o"
 #
 hyp_assym.h			optional	vmm			\
 	dependency	"$S/kern/genassym.sh hyp_genassym.o"		\
-	compile-with	"sh $S/kern/genassym.sh hyp_genassym.o > ${.TARGET}" \
+	compile-with	"NM='${NM}' NMFLAGS='${NMFLAGS}' sh $S/kern/genassym.sh hyp_genassym.o > ${.TARGET}" \
 	no-obj no-implicit-rule before-depend				\
 	clean		"hyp_assym.h"
 
