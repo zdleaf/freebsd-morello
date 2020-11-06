@@ -461,9 +461,7 @@ dist_write(void *vm, int vcpuid, uint64_t fault_ipa, uint64_t wval,
 	int n;
 
 	/* Check the register is one of ours and is the correct size */
-	if (fault_ipa < dist->start || fault_ipa + size > dist->end ||
-	    size != 4) {
-		/* TODO: GICD_IROUTER is an 8 byte register */
+	if (fault_ipa < dist->start || fault_ipa + size > dist->end) {
 		return (EINVAL);
 	}
 
