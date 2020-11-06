@@ -78,27 +78,6 @@ static struct resource_spec rk_vop_spec[] = {
 	{ -1, 0 }
 };
 
-/*
-timing0 {
-	clock-frequency = <0x07270e00>;
-	hactive = <0x00000440>;
-	hfront-porch = <0x00000018>;
-	hback-porch = <0x00000017>;
-	hsync-len = <0x00000004>;
-	vactive = <0x00000780>;
-	vfront-porch = <0x00000004>;
-	vback-porch = <0x00000003>;
-	vsync-len = <0x00000002>;
-	hsync-active = <0x00000000>;
-	vsync-active = <0x00000000>;
-	de-active = <0x00000000>;
-	pixelclk-active = <0x00000000>;
-	phandle = <0x000000ba>;
-};
-*/
-
-static struct display_timing ts050_timings;
-
 struct rk_vop_softc {
 	device_t		dev;
 	struct syscon		*syscon;
@@ -116,19 +95,19 @@ rk_vop_set_polarity(struct rk_vop_softc *sc, uint32_t pin_polarity)
 {
 	uint32_t reg;
 
-	/* MIPI */
+	/* HDMI */
 	reg = VOP_READ(sc, RK3399_DSP_CTRL1);
-	reg &= ~DSP_CTRL1_MIPI_POL_M;
-	reg |= pin_polarity << DSP_CTRL1_MIPI_POL_S;
+	reg &= ~DSP_CTRL1_HDMI_POL_M;
+	reg |= pin_polarity << DSP_CTRL1_HDMI_POL_S;
 	VOP_WRITE(sc, RK3399_DSP_CTRL1, reg);
 }
 
 static int
-rk_vop_mode_set(device_t dev, struct display_timing *edid)
+rk_vop_mode_set(device_t dev, const struct videomode *mode)
 {
 	struct rk_vop_softc *sc;
 	uint32_t pin_polarity;
-	uint32_t mode;
+	uint32_t mode1;
 	uint32_t reg;
 
 	sc = device_get_softc(dev);
@@ -141,27 +120,27 @@ rk_vop_mode_set(device_t dev, struct display_timing *edid)
 	reg &= ~SYS_CTRL_STANDBY_EN;
 	VOP_WRITE(sc, RK3399_SYS_CTRL, reg);
 
-	/* Enable MIPI output only. */
+	/* Enable HDMI output only. */
 	reg &= ~SYS_CTRL_ALL_OUT_EN;
 	VOP_WRITE(sc, RK3399_SYS_CTRL, reg);
-	reg |= SYS_CTRL_MIPI_OUT_EN;
+	reg |= SYS_CTRL_HDMI_OUT_EN;
 	VOP_WRITE(sc, RK3399_SYS_CTRL, reg);
 
 	/* Set mode */
-	mode = 0; /* RGB888 */
+	mode1 = 0; /* RGB888 */
 	reg = VOP_READ(sc, RK3399_DSP_CTRL0);
 	reg &= ~DSP_CTRL0_OUT_MODE_M;
-	reg |= (mode << DSP_CTRL0_OUT_MODE_S);
+	reg |= (mode1 << DSP_CTRL0_OUT_MODE_S);
 	VOP_WRITE(sc, RK3399_DSP_CTRL0, reg);
 
-	uint32_t hactive = edid->hactive.typ;
-	uint32_t vactive = edid->vactive.typ;
-	uint32_t hsync_len = edid->hsync_len.typ;
-	uint32_t hback_porch = edid->hback_porch.typ;
-	uint32_t vsync_len = edid->vsync_len.typ;
-	uint32_t vback_porch = edid->vback_porch.typ;
-	uint32_t hfront_porch = edid->hfront_porch.typ;
-	uint32_t vfront_porch = edid->vfront_porch.typ;
+	uint32_t hactive = mode->hdisplay;
+	uint32_t vactive = mode->vdisplay;
+	uint32_t hsync_len = mode->htotal;
+	uint32_t hback_porch = mode->hsync_end;
+	uint32_t vsync_len = mode->vtotal;
+	uint32_t vback_porch = mode->vsync_end;
+	uint32_t hfront_porch = mode->hsync_start;
+	uint32_t vfront_porch = mode->vsync_start;
 
 	reg = hsync_len;
 	reg |= (hsync_len + hback_porch + hactive + hfront_porch) << 16;
@@ -193,7 +172,7 @@ rk_vop_mode_set(device_t dev, struct display_timing *edid)
 }
 
 static int
-rk_vop_enable(device_t dev, phandle_t node, struct display_timing *edid)
+rk_vop_enable(device_t dev, phandle_t node, const struct videomode *mode)
 {
 	struct rk_vop_softc *sc;
 	uint64_t rate_aclk, rate_dclk, rate_hclk;
@@ -247,16 +226,16 @@ rk_vop_enable(device_t dev, phandle_t node, struct display_timing *edid)
 	device_printf(dev, "hclk rate is %ld\n", rate_hclk);
 
 	uint32_t reg;
-	reg = (edid->hactive.typ - 1);
-	reg |= (edid->vactive.typ - 1) << 16;
+	reg = (mode->hdisplay - 1);
+	reg |= (mode->vdisplay - 1) << 16;
 	VOP_WRITE(sc, RK3399_WIN0_ACT_INFO, reg);
 
-	reg = (edid->hsync_len.typ + edid->hback_porch.typ);
-	reg |= (edid->vsync_len.typ + edid->vback_porch.typ) << 16;
+	reg = (mode->htotal + mode->hsync_end);
+	reg |= (mode->vtotal + mode->vsync_end) << 16;
 	VOP_WRITE(sc, RK3399_WIN0_DSP_ST, reg);
 
-	reg = (edid->hactive.typ - 1);
-	reg |= (edid->vactive.typ - 1) << 16;
+	reg = (mode->hdisplay - 1);
+	reg |= (mode->vdisplay - 1) << 16;
 	VOP_WRITE(sc, RK3399_WIN0_DSP_INFO, reg);
 
 	reg = VOP_READ(sc, RK3399_WIN0_COLOR_KEY);
@@ -273,16 +252,18 @@ rk_vop_enable(device_t dev, phandle_t node, struct display_timing *edid)
 	case 24:
 		rgb_mode = RGB888;
 		VOP_WRITE(sc, RK3399_WIN0_VIR,
-		    WIN0_VIR_WIDTH_RGB888(edid->hactive.typ));
+		    WIN0_VIR_WIDTH_RGB888(mode->hdisplay));
 		break;
 	default:
 		panic("unknown bpp");
 	};
 
-	if (edid->hactive.typ <= 1280)
+	if (mode->hdisplay <= 1280)
 		lb_mode = LB_RGB_1280X8;
+	else if (mode->hdisplay <= 1920)
+		lb_mode = LB_RGB_1920X5;
 	else
-		panic("unknown lb_mode");
+		panic("unknown lb_mode: %d", mode->hdisplay);
 
 	reg = VOP_READ(sc, RK3399_WIN0_CTRL0);
 	device_printf(dev, "win0 ctrl0 %x\n", reg);
@@ -299,7 +280,7 @@ rk_vop_enable(device_t dev, phandle_t node, struct display_timing *edid)
 	uint64_t vbase;
 	uint64_t fb_base;
 	int sz;
-	sz = edid->hactive.typ * edid->vactive.typ * 3;
+	sz = mode->hdisplay * mode->vdisplay * 3;
 	vbase = (intptr_t)kmem_alloc_contig(sz, M_ZERO, 0, ~0, PAGE_SIZE, 0,
 	    VM_MEMATTR_UNCACHEABLE);
 	fb_base = (intptr_t)vtophys(vbase);
@@ -312,6 +293,52 @@ rk_vop_enable(device_t dev, phandle_t node, struct display_timing *edid)
 	return (0);
 }
 
+static int
+vop_mode_is_valid(const struct videomode *mode)
+{
+
+	//if ((mode->dot_clock < 13500) || (mode->dot_clock > 216000))
+	//	return (0);
+
+	if (mode->dot_clock != 148500)
+		return (0);
+
+	return (1);
+}
+
+static const struct videomode *
+vop_pick_mode(struct edid_info *ei)
+{
+	const struct videomode *videomode;
+	const struct videomode *m;
+	int n;
+
+	videomode = NULL;
+
+	/*
+	 * Pick a mode.
+	 */
+	if (ei->edid_preferred_mode != NULL) {
+		if (vop_mode_is_valid(ei->edid_preferred_mode))
+			videomode = ei->edid_preferred_mode;
+	}
+
+	if (videomode == NULL) {
+		m = ei->edid_modes;
+
+		sort_modes(ei->edid_modes,
+		    &ei->edid_preferred_mode,
+		    ei->edid_nmodes);
+		for (n = 0; n < ei->edid_nmodes; n++)
+			if (vop_mode_is_valid(&m[n])) {
+				videomode = &m[n];
+				break;
+			}
+	}
+
+	return videomode;
+}
+
 static void
 rk_vop_hdmi_event(void *arg, device_t hdmi_dev)
 {
@@ -320,8 +347,11 @@ rk_vop_hdmi_event(void *arg, device_t hdmi_dev)
 	uint32_t edid_len;
 	struct edid_info ei;
 	const struct videomode *videomode;
+	device_t dev;
 
 	sc = arg;
+
+	dev = sc->dev;
 
 	printf("%s\n", __func__);
 
@@ -346,8 +376,15 @@ rk_vop_hdmi_event(void *arg, device_t hdmi_dev)
 			printf("failed to parse EDID\n");
 	}
 
-	videomode = pick_mode_by_ref(640, 480, 60);
+	//videomode = pick_mode_by_ref(1920, 1080, 60);
+	videomode = vop_pick_mode(&ei);
 	sc->sc_mode = videomode;
+
+	phandle_t node;
+	node = ofw_bus_get_node(dev);
+
+	rk_vop_mode_set(dev, sc->sc_mode);
+	rk_vop_enable(dev, node, sc->sc_mode);
 
 	HDMI_SET_VIDEOMODE(hdmi_dev, sc->sc_mode);
 }
@@ -384,24 +421,6 @@ rk_vop_attach(device_t dev)
 
 	sc->sc_hdmi_evh = EVENTHANDLER_REGISTER(hdmi_event,
 	    rk_vop_hdmi_event, sc, 0);
-
-	struct display_timing *edid;
-
-	/* TODO: read edid from DTS */
-
-	edid = &ts050_timings;
-	edid->pixelclock.typ = 0x07270e00;
-	edid->hactive.typ = 0x00000440;
-	edid->hfront_porch.typ = 0x00000018;
-	edid->hback_porch.typ = 0x00000017;
-	edid->hsync_len.typ = 0x00000004;
-	edid->vactive.typ = 0x00000780;
-	edid->vfront_porch.typ = 0x00000004;
-	edid->vback_porch.typ = 0x00000003;
-	edid->vsync_len.typ = 0x00000002;
-
-	rk_vop_mode_set(dev, edid);
-	rk_vop_enable(dev, node, edid);
 
 	return (0);
 }

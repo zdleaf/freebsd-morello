@@ -67,8 +67,9 @@ __FBSDID("$FreeBSD$");
 #include "hdmi_if.h"
 #include "syscon_if.h"
 
-#define	RD4(sc, reg)		bus_read_4((sc)->res[0], ((reg) << 2))
-#define	WR4(sc, reg, val)	bus_write_4((sc)->res[0], ((reg) << 2), (val))
+#define	RD4(sc, reg)		bus_read_4((sc)->base.sc_mem_res, ((reg) << 2))
+#define	WR4(sc, reg, val)	bus_write_4((sc)->base.sc_mem_res, \
+				    ((reg) << 2), (val))
 #define	ARRAY_SIZE(x)		(sizeof(x) / sizeof(x[0]))
 
 #define	DDC_SLAVE_ADDR		0x50
@@ -571,6 +572,9 @@ rk_hdmi_attach(device_t dev)
 
 	config_intrhook_oneshot(imx_hdmi_init, dev);
 
+	rk_hdmi_clk_enable(dev);
+	rk_hdmi_configure(sc);
+
 	return (0);
 
 	struct display_timing *edid;
@@ -579,9 +583,7 @@ rk_hdmi_attach(device_t dev)
 	edid = NULL;
 
 	rk_hdmi_init(dev);
-	rk_hdmi_clk_enable(dev);
 	rk_hdmi_phy_init(dev);
-	rk_hdmi_configure(sc);
 
 	return (0);
 

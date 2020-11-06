@@ -177,7 +177,8 @@ dwc_hdmi_av_composer(struct dwc_hdmi_softc *sc)
 	WR1(sc, HDMI_FC_HSYNCINWIDTH0, hsync_len);
 
 	/* Set up VSYNC active edge delay (in pixel clks) */
-	WR1(sc, HDMI_FC_VSYNCINWIDTH, (sc->sc_mode.vsync_end - sc->sc_mode.vsync_start));
+	WR1(sc, HDMI_FC_VSYNCINWIDTH,
+	    (sc->sc_mode.vsync_end - sc->sc_mode.vsync_start));
 }
 
 static void
@@ -305,59 +306,84 @@ dwc_hdmi_phy_configure(struct dwc_hdmi_softc *sc)
 	 * PLL/MPLL config, see section 24.7.22 in TRM
 	 *  config, see section 24.7.22
 	 */
-	if (sc->sc_mode.dot_clock*1000 <= 45250000) {
-		dwc_hdmi_phy_i2c_write(sc, CPCE_CTRL_45_25, HDMI_PHY_I2C_CPCE_CTRL);
-		dwc_hdmi_phy_i2c_write(sc, GMPCTRL_45_25, HDMI_PHY_I2C_GMPCTRL);
-	} else if (sc->sc_mode.dot_clock*1000 <= 92500000) {
-		dwc_hdmi_phy_i2c_write(sc, CPCE_CTRL_92_50, HDMI_PHY_I2C_CPCE_CTRL);
+#if 0
+	if (sc->sc_mode.dot_clock * 1000 <= 45250000) {
+		dwc_hdmi_phy_i2c_write(sc, CPCE_CTRL_45_25,
+		    HDMI_PHY_I2C_CPCE_CTRL);
+		dwc_hdmi_phy_i2c_write(sc, GMPCTRL_45_25,
+		    HDMI_PHY_I2C_GMPCTRL);
+	} else if (sc->sc_mode.dot_clock * 1000 <= 92500000) {
+		dwc_hdmi_phy_i2c_write(sc, CPCE_CTRL_92_50,
+		    HDMI_PHY_I2C_CPCE_CTRL);
 		dwc_hdmi_phy_i2c_write(sc, GMPCTRL_92_50, HDMI_PHY_I2C_GMPCTRL);
-	} else if (sc->sc_mode.dot_clock*1000 <= 185000000) {
-		dwc_hdmi_phy_i2c_write(sc, CPCE_CTRL_185, HDMI_PHY_I2C_CPCE_CTRL);
+	} else if (sc->sc_mode.dot_clock * 1000 <= 185000000) {
+		dwc_hdmi_phy_i2c_write(sc, CPCE_CTRL_185,
+		    HDMI_PHY_I2C_CPCE_CTRL);
 		dwc_hdmi_phy_i2c_write(sc, GMPCTRL_185, HDMI_PHY_I2C_GMPCTRL);
 	} else {
-		dwc_hdmi_phy_i2c_write(sc, CPCE_CTRL_370, HDMI_PHY_I2C_CPCE_CTRL);
+		dwc_hdmi_phy_i2c_write(sc, CPCE_CTRL_370,
+		    HDMI_PHY_I2C_CPCE_CTRL);
 		dwc_hdmi_phy_i2c_write(sc, GMPCTRL_370, HDMI_PHY_I2C_GMPCTRL);
 	}
+#endif
 
+	dwc_hdmi_phy_i2c_write(sc, 0x0051, HDMI_PHY_I2C_CPCE_CTRL);
+	dwc_hdmi_phy_i2c_write(sc, 0x0003, HDMI_PHY_I2C_GMPCTRL);
+	dwc_hdmi_phy_i2c_write(sc, 0x0000, HDMI_PHY_I2C_CURRCTRL);
+
+#if 0
 	/*
 	 * Values described in TRM section 34.9.2 PLL/MPLL Generic
 	 *    Configuration Settings. Table 34-23.
 	 */
-	if (sc->sc_mode.dot_clock*1000 <= 54000000) {
+	if (sc->sc_mode.dot_clock * 1000 <= 54000000) {
 		dwc_hdmi_phy_i2c_write(sc, 0x091c, HDMI_PHY_I2C_CURRCTRL);
-	} else if (sc->sc_mode.dot_clock*1000 <= 58400000) {
+	} else if (sc->sc_mode.dot_clock * 1000 <= 58400000) {
 		dwc_hdmi_phy_i2c_write(sc, 0x091c, HDMI_PHY_I2C_CURRCTRL);
-	} else if (sc->sc_mode.dot_clock*1000 <= 72000000) {
+	} else if (sc->sc_mode.dot_clock * 1000 <= 72000000) {
 		dwc_hdmi_phy_i2c_write(sc, 0x06dc, HDMI_PHY_I2C_CURRCTRL);
-	} else if (sc->sc_mode.dot_clock*1000 <= 74250000) {
+	} else if (sc->sc_mode.dot_clock * 1000 <= 74250000) {
 		dwc_hdmi_phy_i2c_write(sc, 0x06dc, HDMI_PHY_I2C_CURRCTRL);
-	} else if (sc->sc_mode.dot_clock*1000 <= 118800000) {
+	} else if (sc->sc_mode.dot_clock * 1000 <= 118800000) {
 		dwc_hdmi_phy_i2c_write(sc, 0x091c, HDMI_PHY_I2C_CURRCTRL);
-	} else if (sc->sc_mode.dot_clock*1000 <= 216000000) {
+	} else if (sc->sc_mode.dot_clock * 1000 <= 216000000) {
 		dwc_hdmi_phy_i2c_write(sc, 0x06dc, HDMI_PHY_I2C_CURRCTRL);
 	} else {
 		panic("Unsupported mode\n");
 	}
+#endif
 
 	dwc_hdmi_phy_i2c_write(sc, 0x0000, HDMI_PHY_I2C_PLLPHBYCTRL);
 	dwc_hdmi_phy_i2c_write(sc, MSM_CTRL_FB_CLK, HDMI_PHY_I2C_MSM_CTRL);
+
 	/* RESISTANCE TERM 133 Ohm */
-	dwc_hdmi_phy_i2c_write(sc, TXTERM_133, HDMI_PHY_I2C_TXTERM);
+	//dwc_hdmi_phy_i2c_write(sc, TXTERM_133, HDMI_PHY_I2C_TXTERM);
 
 	/* REMOVE CLK TERM */
 	dwc_hdmi_phy_i2c_write(sc, CKCALCTRL_OVERRIDE, HDMI_PHY_I2C_CKCALCTRL);
 
-	if (sc->sc_mode.dot_clock*1000 > 148500000) {
-		dwc_hdmi_phy_i2c_write(sc,CKSYMTXCTRL_OVERRIDE | CKSYMTXCTRL_TX_SYMON |
-		    CKSYMTXCTRL_TX_TRBON | CKSYMTXCTRL_TX_CK_SYMON, HDMI_PHY_I2C_CKSYMTXCTRL); 
-		dwc_hdmi_phy_i2c_write(sc, VLEVCTRL_TX_LVL(9) | VLEVCTRL_CK_LVL(9),
-		    HDMI_PHY_I2C_VLEVCTRL);
+	printf("dot clock is %d\n", sc->sc_mode.dot_clock);
+
+#if 0
+	if (sc->sc_mode.dot_clock * 1000 > 148500000) {
+		dwc_hdmi_phy_i2c_write(sc, CKSYMTXCTRL_OVERRIDE |
+		    CKSYMTXCTRL_TX_SYMON | CKSYMTXCTRL_TX_TRBON |
+		    CKSYMTXCTRL_TX_CK_SYMON, HDMI_PHY_I2C_CKSYMTXCTRL);
+		dwc_hdmi_phy_i2c_write(sc, VLEVCTRL_TX_LVL(9) |
+		    VLEVCTRL_CK_LVL(9), HDMI_PHY_I2C_VLEVCTRL);
 	} else {
-		dwc_hdmi_phy_i2c_write(sc,CKSYMTXCTRL_OVERRIDE | CKSYMTXCTRL_TX_SYMON |
-		    CKSYMTXCTRL_TX_TRAON | CKSYMTXCTRL_TX_CK_SYMON, HDMI_PHY_I2C_CKSYMTXCTRL); 
-		dwc_hdmi_phy_i2c_write(sc, VLEVCTRL_TX_LVL(13) | VLEVCTRL_CK_LVL(13),
-		    HDMI_PHY_I2C_VLEVCTRL);
+		dwc_hdmi_phy_i2c_write(sc, CKSYMTXCTRL_OVERRIDE |
+		    CKSYMTXCTRL_TX_SYMON | CKSYMTXCTRL_TX_TRAON |
+		    CKSYMTXCTRL_TX_CK_SYMON, HDMI_PHY_I2C_CKSYMTXCTRL);
+		dwc_hdmi_phy_i2c_write(sc, VLEVCTRL_TX_LVL(13) |
+		    VLEVCTRL_CK_LVL(13), HDMI_PHY_I2C_VLEVCTRL);
 	}
+#endif
+
+	//.sym_ctr = 0x802b, .term = 0x0004, .vlev_ctr = 0x028d,
+	dwc_hdmi_phy_i2c_write(sc, 0x802b, HDMI_PHY_I2C_CKSYMTXCTRL);
+	dwc_hdmi_phy_i2c_write(sc, 0x0004, HDMI_PHY_I2C_TXTERM);
+	dwc_hdmi_phy_i2c_write(sc, 0x028d, HDMI_PHY_I2C_VLEVCTRL);
 
 	dwc_hdmi_phy_enable_power(sc, 1);
 
@@ -369,7 +395,7 @@ dwc_hdmi_phy_configure(struct dwc_hdmi_softc *sc)
 	dwc_hdmi_phy_gen2_txpwron(sc, 1);
 	dwc_hdmi_phy_gen2_pddq(sc, 0);
 
-	/*Wait for PHY PLL lock */
+	/* Wait for PHY PLL lock */
 	msec = 4;
 	val = RD1(sc, HDMI_PHY_STAT0) & HDMI_PHY_TX_PHY_LOCK;
 	while (val == 0) {
@@ -688,7 +714,8 @@ hdmi_edid_read(struct dwc_hdmi_softc *sc, int block, uint8_t **edid,
 	result = iicbus_request_bus(i2c_dev, sc->sc_dev, IIC_INTRWAIT);
 
 	if (result) {
-		device_printf(sc->sc_dev, "failed to request i2c bus: %d\n", result);
+		device_printf(sc->sc_dev, "failed to request i2c bus: %d\n",
+		    result);
 		return (result);
 	}
 

@@ -37,6 +37,8 @@ __FBSDID("$FreeBSD$");
 #include <dev/videomode/videomode.h>
 #include "opt_videomode.h"
 
+#define	PICKMODE_DEBUG
+
 #ifdef PICKMODE_DEBUG
 #define DPRINTF printf
 #else

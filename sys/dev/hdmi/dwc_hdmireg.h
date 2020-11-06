@@ -665,8 +665,8 @@
 #define	HDMI_PHY_I2C_CPCE_CTRL	0x6
 #define	  CPCE_CTRL_45_25		((3 << 7) | (3 << 5))
 #define	  CPCE_CTRL_92_50		((2 << 7) | (2 << 5))
-#define	  CPCE_CTRL_185		((1 << 7) | (1 << 5))
-#define	  CPCE_CTRL_370		((0 << 7) | (0 << 5))
+#define	  CPCE_CTRL_185			((1 << 7) | (1 << 5))
+#define	  CPCE_CTRL_370			((0 << 7) | (0 << 5))
 #define	HDMI_PHY_I2C_CKSYMTXCTRL	0x9
 #define	  CKSYMTXCTRL_OVERRIDE	(1 << 15)
 #define	  CKSYMTXCTRL_TX_SYMON	(1 << 3)
