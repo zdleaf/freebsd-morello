@@ -527,7 +527,14 @@ dist_write(void *vm, int vcpuid, uint64_t fault_ipa, uint64_t wval,
 
 	/* TODO: GICD_ISPENDR 0x0200 */
 	/* TODO: GICD_ICPENDR 0x0280 */
+
 	/* TODO: GICD_ICACTIVER 0x0380 */
+	if (reg >= GICD_ICACTIVER(0) && /* 0x0380 */
+	    reg < GICD_ICACTIVER(0) + 0x80) {
+		/* TODO: Implement */
+		*retu = false;
+		return (0);
+	}
 
 	if (reg >= GICD_IPRIORITYR(0) && /* 0x0400 */
 	    reg < GICD_IPRIORITYR(0) + dist->gicd_ipriority_size) {
@@ -727,6 +734,10 @@ redist_write(void *vm, int vcpuid, uint64_t fault_ipa, uint64_t wval,
 		return (0);
 	case GICR_SGI_BASE_SIZE + GICR_IPRIORITYR_BASE:
 		break;
+	case GICR_SGI_BASE_SIZE + GICR_ICACTIVER0:
+		/* TODO: Implement */
+		*retu = false;
+		return (0);
 	case GICR_SGI_BASE_SIZE + GICR_ICFGR0_BASE:
 		redist->gicr_icfgr0 = wval;
 		*retu = false;
