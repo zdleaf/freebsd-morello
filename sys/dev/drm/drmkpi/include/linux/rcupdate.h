@@ -48,27 +48,27 @@
 } while (0)
 
 #define	call_rcu(ptr, func) do {		\
-	linux_call_rcu(RCU_TYPE_REGULAR, ptr, func);	\
+	drmkpi_call_rcu(RCU_TYPE_REGULAR, ptr, func);	\
 } while (0)
 
 #define	rcu_barrier(void) do {			\
-	linux_rcu_barrier(RCU_TYPE_REGULAR);	\
+	drmkpi_rcu_barrier(RCU_TYPE_REGULAR);	\
 } while (0)
 
 #define	rcu_read_lock(void) do {		\
-	linux_rcu_read_lock(RCU_TYPE_REGULAR);	\
+	drmkpi_rcu_read_lock(RCU_TYPE_REGULAR);	\
 } while (0)
 
 #define	rcu_read_unlock(void) do {		\
-	linux_rcu_read_unlock(RCU_TYPE_REGULAR);\
+	drmkpi_rcu_read_unlock(RCU_TYPE_REGULAR);\
 } while (0)
 
 #define	synchronize_rcu(void) do {	\
-	linux_synchronize_rcu(RCU_TYPE_REGULAR);	\
+	drmkpi_synchronize_rcu(RCU_TYPE_REGULAR);	\
 } while (0)
 
 #define	synchronize_rcu_expedited(void) do {	\
-	linux_synchronize_rcu(RCU_TYPE_REGULAR);	\
+	drmkpi_synchronize_rcu(RCU_TYPE_REGULAR);	\
 } while (0)
 
 #define	kfree_rcu(ptr, rcu_head) do {				\
@@ -105,11 +105,11 @@
 
 /* prototypes */
 
-extern void linux_call_rcu(unsigned type, struct rcu_head *ptr, rcu_callback_t func);
-extern void linux_rcu_barrier(unsigned type);
-extern void linux_rcu_read_lock(unsigned type);
-extern void linux_rcu_read_unlock(unsigned type);
-extern void linux_synchronize_rcu(unsigned type);
+void drmkpi_call_rcu(unsigned type, struct rcu_head *ptr, rcu_callback_t func);
+void drmkpi_rcu_barrier(unsigned type);
+void drmkpi_rcu_read_lock(unsigned type);
+void drmkpi_rcu_read_unlock(unsigned type);
+void drmkpi_synchronize_rcu(unsigned type);
 
 /* Empty implementation for !DEBUG */
 #define	init_rcu_head(...)

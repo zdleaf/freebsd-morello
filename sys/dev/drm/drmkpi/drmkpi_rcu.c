@@ -163,7 +163,7 @@ linux_rcu_cleaner_func(void *context, int pending __unused)
 	mtx_unlock(&head->lock);
 
 	/* synchronize */
-	linux_synchronize_rcu(head - linux_epoch_head);
+	drmkpi_synchronize_rcu(head - linux_epoch_head);
 
 	/* dispatch all callbacks, if any */
 	while ((rcu = STAILQ_FIRST(&tmp_head)) != NULL) {
@@ -179,7 +179,7 @@ linux_rcu_cleaner_func(void *context, int pending __unused)
 }
 
 void
-linux_rcu_read_lock(unsigned type)
+drmkpi_rcu_read_lock(unsigned type)
 {
 	struct linux_epoch_record *record;
 	struct task_struct *ts;
@@ -211,7 +211,7 @@ linux_rcu_read_lock(unsigned type)
 }
 
 void
-linux_rcu_read_unlock(unsigned type)
+drmkpi_rcu_read_unlock(unsigned type)
 {
 	struct linux_epoch_record *record;
 	struct task_struct *ts;
@@ -296,7 +296,7 @@ linux_synchronize_rcu_cb(ck_epoch_t *epoch __unused, ck_epoch_record_t *epoch_re
 }
 
 void
-linux_synchronize_rcu(unsigned type)
+drmkpi_synchronize_rcu(unsigned type)
 {
 	struct thread *td;
 	int was_bound;
@@ -310,7 +310,7 @@ linux_synchronize_rcu(unsigned type)
 		return;
 
 	WITNESS_WARN(WARN_GIANTOK | WARN_SLEEPOK, NULL,
-	    "linux_synchronize_rcu() can sleep");
+	    "drmkpi_synchronize_rcu() can sleep");
 
 	td = curthread;
 	DROP_GIANT();
@@ -352,13 +352,13 @@ linux_synchronize_rcu(unsigned type)
 }
 
 void
-linux_rcu_barrier(unsigned type)
+drmkpi_rcu_barrier(unsigned type)
 {
 	struct linux_epoch_head *head;
 
 	MPASS(type < RCU_TYPE_MAX);
 
-	linux_synchronize_rcu(type);
+	drmkpi_synchronize_rcu(type);
 
 	head = &linux_epoch_head[type];
 
@@ -367,7 +367,7 @@ linux_rcu_barrier(unsigned type)
 }
 
 void
-linux_call_rcu(unsigned type, struct rcu_head *context, rcu_callback_t func)
+drmkpi_call_rcu(unsigned type, struct rcu_head *context, rcu_callback_t func)
 {
 	struct callback_head *rcu;
 	struct linux_epoch_head *head;
@@ -385,37 +385,37 @@ linux_call_rcu(unsigned type, struct rcu_head *context, rcu_callback_t func)
 }
 
 int
-init_srcu_struct(struct srcu_struct *srcu)
+drmkpi_init_srcu_struct(struct srcu_struct *srcu)
 {
 	return (0);
 }
 
 void
-cleanup_srcu_struct(struct srcu_struct *srcu)
+drmkpi_cleanup_srcu_struct(struct srcu_struct *srcu)
 {
 }
 
 int
-srcu_read_lock(struct srcu_struct *srcu)
+drmkpi_srcu_read_lock(struct srcu_struct *srcu)
 {
-	linux_rcu_read_lock(RCU_TYPE_SLEEPABLE);
+	drmkpi_rcu_read_lock(RCU_TYPE_SLEEPABLE);
 	return (0);
 }
 
 void
-srcu_read_unlock(struct srcu_struct *srcu, int key __unused)
+drmkpi_srcu_read_unlock(struct srcu_struct *srcu, int key __unused)
 {
-	linux_rcu_read_unlock(RCU_TYPE_SLEEPABLE);
+	drmkpi_rcu_read_unlock(RCU_TYPE_SLEEPABLE);
 }
 
 void
-synchronize_srcu(struct srcu_struct *srcu)
+drmkpi_synchronize_srcu(struct srcu_struct *srcu)
 {
-	linux_synchronize_rcu(RCU_TYPE_SLEEPABLE);
+	drmkpi_synchronize_rcu(RCU_TYPE_SLEEPABLE);
 }
 
 void
-srcu_barrier(struct srcu_struct *srcu)
+drmkpi_srcu_barrier(struct srcu_struct *srcu)
 {
-	linux_rcu_barrier(RCU_TYPE_SLEEPABLE);
+	drmkpi_rcu_barrier(RCU_TYPE_SLEEPABLE);
 }

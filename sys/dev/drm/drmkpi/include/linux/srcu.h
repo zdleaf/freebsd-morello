@@ -41,11 +41,18 @@ struct srcu_struct {
 
 /* prototypes */
 
-extern int srcu_read_lock(struct srcu_struct *);
-extern void srcu_read_unlock(struct srcu_struct *, int index);
-extern void synchronize_srcu(struct srcu_struct *);
-extern void srcu_barrier(struct srcu_struct *);
-extern int init_srcu_struct(struct srcu_struct *);
-extern void cleanup_srcu_struct(struct srcu_struct *);
+int drmkpi_srcu_read_lock(struct srcu_struct *);
+void drmkpi_srcu_read_unlock(struct srcu_struct *, int index);
+void drmkpi_synchronize_srcu(struct srcu_struct *);
+void drmkpi_srcu_barrier(struct srcu_struct *);
+int drmkpi_init_srcu_struct(struct srcu_struct *);
+void drmkpi_cleanup_srcu_struct(struct srcu_struct *);
+
+#define	srcu_read_lock(s)	drmkpi_srcu_read_lock(s)
+#define	srcu_read_unlock(s, i)	drmkpi_srcu_read_unlock(s, i)
+#define	synchronize_srcu(s)	drmkpi_synchronize_srcu(s)
+#define	scru_barrier(s)	drmkpi_srcu_barrier(s)
+#define	cleanup_srcu_struct(s)	drmkpi_cleanup_srcu_struct(s)
+#define	init_srcu_struct(s)	drmkpi_init_srcu_struct(s)
 
 #endif					/* _LINUX_SRCU_H_ */
