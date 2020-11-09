@@ -32,6 +32,7 @@
 #define	HDMI_REVISION_ID	0x0001
 #define	HDMI_PRODUCT_ID0	0x0002
 #define	HDMI_PRODUCT_ID1	0x0003
+#define	HDMI_CONFIG2_ID		0x0006
 
 /* Interrupt Registers */
 #define	HDMI_IH_FC_STAT0			0x0100
@@ -415,7 +416,8 @@
 #define	  HDMI_PHY_CONF0_PDZ_OFFSET		7
 #define	  HDMI_PHY_CONF0_ENTMDS_MASK		0x40
 #define	  HDMI_PHY_CONF0_ENTMDS_OFFSET		6
-#define	  HDMI_PHY_CONF0_SPARECTRL		0x20
+#define	  HDMI_PHY_CONF0_SPARECTRL_MASK		0x20
+#define	  HDMI_PHY_CONF0_SPARECTRL_OFFSET	5
 #define	  HDMI_PHY_CONF0_GEN2_PDDQ_MASK		0x10
 #define	  HDMI_PHY_CONF0_GEN2_PDDQ_OFFSET		4
 #define	  HDMI_PHY_CONF0_GEN2_TXPWRON_MASK	0x8
@@ -658,6 +660,7 @@
 #define	HDMI_I2CM_FS_SCL_HCNT_0_ADDR		0x7E10
 #define	HDMI_I2CM_FS_SCL_LCNT_1_ADDR		0x7E11
 #define	HDMI_I2CM_FS_SCL_LCNT_0_ADDR		0x7E12
+#define	HDMI_I2CM_SDA_HOLD			0x7E13
 
 /* HDMI PHY register with access through I2C */
 #define	HDMI_PHY_I2C_CKCALCTRL	0x5
@@ -665,8 +668,8 @@
 #define	HDMI_PHY_I2C_CPCE_CTRL	0x6
 #define	  CPCE_CTRL_45_25		((3 << 7) | (3 << 5))
 #define	  CPCE_CTRL_92_50		((2 << 7) | (2 << 5))
-#define	  CPCE_CTRL_185			((1 << 7) | (1 << 5))
-#define	  CPCE_CTRL_370			((0 << 7) | (0 << 5))
+#define	  CPCE_CTRL_185		((1 << 7) | (1 << 5))
+#define	  CPCE_CTRL_370		((0 << 7) | (0 << 5))
 #define	HDMI_PHY_I2C_CKSYMTXCTRL	0x9
 #define	  CKSYMTXCTRL_OVERRIDE	(1 << 15)
 #define	  CKSYMTXCTRL_TX_SYMON	(1 << 3)
