@@ -55,6 +55,9 @@ __FBSDID("$FreeBSD$");
 #include <dev/ofw/ofw_bus.h>
 #include <dev/ofw/ofw_bus_subr.h>
 
+#include <dev/fdt/fdt_pinctrl.h>
+
+#include <dev/extres/hwreset/hwreset.h>
 #include <dev/extres/clk/clk.h>
 #include <dev/extres/syscon/syscon.h>
 #include <dev/extres/phy/phy.h>
@@ -100,6 +103,7 @@ struct rk_hdmi_softc {
 	struct syscon		*grf;
 	phandle_t		i2c_xref;
 	eventhandler_tag	eh_tag;
+	int			pinctrl;
 };
 
 static char * clk_table[CLK_NENTRIES] = {
@@ -197,88 +201,6 @@ rk_hdmi_wait_i2c(struct rk_hdmi_softc *sc)
 }
 
 static int
-rk_hdmi_read_edid(device_t dev, int block, struct display_timing *edid)
-{
-	struct rk_hdmi_softc *sc;
-	uint32_t i2c_clk_high, i2c_clk_low;
-	uint32_t reg;
-	uint8_t data;
-	int error;
-	int shift;
-	int i;
-
-	sc = device_get_softc(dev);
-
-	i2c_clk_high = 0x7a;
-	i2c_clk_low = 0x8d;
-	shift = (block % 2) * 0x80;
-
-	WR4(sc, HDMI_I2CM_SS_SCL_HCNT_0_ADDR, i2c_clk_high);
-	WR4(sc, HDMI_I2CM_SS_SCL_LCNT_0_ADDR, i2c_clk_low);
-
-	reg = RD4(sc, HDMI_I2CM_DIV);
-	reg &= ~I2CM_DIV_FAST_STD_MODE;
-	WR4(sc, HDMI_I2CM_DIV, reg);
-
-	WR4(sc, HDMI_I2CM_SLAVE, DDC_SLAVE_ADDR);
-	WR4(sc, HDMI_I2CM_SEGADDR, DDC_EDID_SEG_ADDR);
-	WR4(sc, HDMI_I2CM_SEGPTR, block >> 1);
-
-	for (i = 0; i < HDMI_EDID_BLOCK_SIZE; i++) {
-		WR4(sc, HDMI_I2CM_ADDRESS, shift + i);
-
-		if (block == 0)
-			WR4(sc, HDMI_I2CM_OPERATION, I2CM_OPERATION_RD);
-		else
-			WR4(sc, HDMI_I2CM_OPERATION, I2CM_OPERATION_RD_EXT);
-
-		error = rk_hdmi_wait_i2c(sc);
-		if (error != 0) {
-			printf("Could not read EDID data\n");
-			return (-1);
-		}
-
-		data = RD4(sc, HDMI_I2CM_DATAI);
-		printf("data %x\n", data);
-		if (data != 0)
-			panic("ok");
-	}
-
-	return (0);
-}
-
-static void
-rk_hdmi_init(device_t dev)
-{
-	struct rk_hdmi_softc *sc;
-	uint32_t reg;
-
-	sc = device_get_softc(dev);
-
-	reg = IH_MUTE_WAKEUP_INTERRUPT | IH_MUTE_WAKEUP_INTERRUPT;
-	WR4(sc, HDMI_IH_MUTE, reg);
-
-	WR4(sc, HDMI_PHY_I2CM_INT, PHY_I2CM_INT_DONE_M);
-
-	reg = PHY_I2CM_CTLINT_NACK_M | PHY_I2CM_CTLINT_ARBITRATION_M;
-	WR4(sc, HDMI_PHY_I2CM_CTLINT, reg);
-};
-
-static void
-rk_hdmi_phy_init(device_t dev)
-{
-	struct rk_hdmi_softc *sc;
-
-	sc = device_get_softc(dev);
-
-	/* Unmask hot plug interrupt */
-	WR4(sc, HDMI_PHY_MASK0, (uint8_t)~PHY_MASK0_HPD);
-
-	/* Clear hot plug interrupts */
-	WR4(sc, HDMI_IH_PHY_STAT0, IH_PHY_STAT0_HPD);
-};
-
-static int
 rk_hdmi_clk_enable(device_t dev)
 {
 	struct rk_hdmi_softc *sc;
@@ -295,7 +217,14 @@ rk_hdmi_clk_enable(device_t dev)
 			    clk_table[i]);
 			return (ENXIO);
 		}
+	}
 
+	/* vpll should be the same as vop dclk */
+	error = clk_set_freq(sc->clk[2], 148500000, 0);
+	if (error != 0)
+		panic("could not set freq\n");
+
+	for (i = 0; i < CLK_NENTRIES; i++) {
 		error = clk_enable(sc->clk[i]);
 		if (error != 0) {
 			device_printf(dev, "cannot enable '%s' clock\n",
@@ -378,7 +307,7 @@ hdmi_phy_configure(struct rk_hdmi_softc *sc, struct display_timing *edid)
 	mpll_cfg = rockchip_mpll_cfg;
 
 	for (i = 0; mpll_cfg[i].mpixelclock != (~0ul); i++)
-		if (edid->pixelclock.typ <= mpll_cfg[i].mpixelclock)
+		if (148500000 <= mpll_cfg[i].mpixelclock)
 			break;
 
 	hdmi_phy_write(sc, PHY_OPMODE_PLLCFG, mpll_cfg[i].cpce);
@@ -393,8 +322,6 @@ hdmi_phy_set(struct rk_hdmi_softc *sc, struct display_timing *edid)
 {
 	uint32_t reg;
 	int i;
-
-	//edid->pixelclock.typ;
 
 	/* Twice per HDMI spec */
 
@@ -467,11 +394,6 @@ rk_hdmi_phy_write(struct rk_hdmi_softc *sc, uint8_t test_code,
 }
 
 static void
-rk_hdmi_phy_enable(device_t dev, struct display_timing *timing)
-{
-}
-
-static void
 rk_hdmi_configure(struct rk_hdmi_softc *sc)
 {
 	uint32_t reg;
@@ -484,7 +406,7 @@ rk_hdmi_configure(struct rk_hdmi_softc *sc)
 }
 
 static void
-imx_hdmi_init(void *arg)
+vop_hdmi_init(void *arg)
 {
 	struct rk_hdmi_softc *sc;
 	device_t dev;
@@ -497,17 +419,14 @@ imx_hdmi_init(void *arg)
 		if (sc->eh_tag != NULL)
 			EVENTHANDLER_DEREGISTER_NOWAIT(device_attach,
 			    sc->eh_tag);
-		printf("%s: dwc_hdmi_init\n", __func__);
+		//hdmi_phy_configure(sc, NULL);
 		dwc_hdmi_init(dev);
 		return;
 	}
 
-	//if (bootverbose)
-		device_printf((device_t)dev, "Waiting for DDC i2c device\n");
-
 	if (sc->eh_tag == NULL)
 		sc->eh_tag = EVENTHANDLER_REGISTER(device_attach,
-			imx_hdmi_init, dev, EVENTHANDLER_PRI_ANY);
+			vop_hdmi_init, dev, EVENTHANDLER_PRI_ANY);
 }
 
 static int
@@ -570,30 +489,24 @@ rk_hdmi_attach(device_t dev)
 	} else
 		sc->i2c_xref = i2c_xref;
 
-	config_intrhook_oneshot(imx_hdmi_init, dev);
+	int cfgidx;
+	char wrkstr[32];
+	err = ofw_bus_find_string_index(node, "pinctrl-names", "default",
+	    &cfgidx);
+        if (err == 0) {
+		snprintf(wrkstr, sizeof(wrkstr), "pinctrl-%d", cfgidx);
+		if (OF_hasprop(node, "pinctrl-0") && OF_hasprop(node, wrkstr))
+		sc->pinctrl = cfgidx;
+	} else
+		panic("error");
 
-	rk_hdmi_clk_enable(dev);
+
+	//fdt_pinctrl_configure(dev, sc->pinctrl);
+
 	rk_hdmi_configure(sc);
+	rk_hdmi_clk_enable(dev);
 
-	return (0);
-
-	struct display_timing *edid;
-
-	/* TODO: read edid from a connected HDMI monitor. */
-	edid = NULL;
-
-	rk_hdmi_init(dev);
-	rk_hdmi_phy_init(dev);
-
-	return (0);
-
-	while (1) {
-		rk_hdmi_read_edid(dev, 0, NULL);
-		rk_hdmi_read_edid(dev, 1, NULL);
-	}
-
-	rk_hdmi_enable(dev, edid);
-	rk_hdmi_phy_enable(dev, edid);
+	config_intrhook_oneshot(vop_hdmi_init, dev);
 
 	return (0);
 }

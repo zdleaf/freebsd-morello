@@ -39,6 +39,7 @@
 #define	RK3399_WIN0_COLOR_KEY			0x0038
 #define	RK3399_WIN0_VIR				0x003c
 #define	 WIN0_VIR_WIDTH_RGB888(x) (((((x * 3) >> 2)+((x) % 3)) & 0x3fff) << 0)
+#define	 WIN0_VIR_WIDTH_ARGB888(x)   (((x) & 0x3fff) << 0)
 #define	RK3399_WIN0_YRGB_MST			0x0040
 #define	RK3399_WIN0_CBR_MST			0x0044
 #define	RK3399_WIN0_ACT_INFO			0x0048

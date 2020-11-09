@@ -52,6 +52,7 @@ __FBSDID("$FreeBSD$");
 #include <dev/ofw/ofw_bus.h>
 #include <dev/ofw/ofw_bus_subr.h>
 
+#include <dev/extres/hwreset/hwreset.h>
 #include <dev/extres/clk/clk.h>
 #include <dev/extres/syscon/syscon.h>
 #include <dev/extres/phy/phy.h>
@@ -78,16 +79,18 @@ static struct resource_spec rk_vop_spec[] = {
 	{ -1, 0 }
 };
 
+#define	CLK_NENTRIES	3
 struct rk_vop_softc {
 	device_t		dev;
 	struct syscon		*syscon;
 	struct rk_vop_conf	*phy_conf;
-	clk_t			aclk;
-	clk_t			dclk;
-	clk_t			hclk;
+	clk_t			clk[CLK_NENTRIES];
 	struct resource		*res[2];
 	eventhandler_tag        sc_hdmi_evh;
 	const struct videomode	*sc_mode;
+	hwreset_t		hwreset_axi;
+	hwreset_t		hwreset_ahb;
+	hwreset_t		hwreset_dclk;
 };
 
 static void
@@ -112,7 +115,15 @@ rk_vop_mode_set(device_t dev, const struct videomode *mode)
 
 	sc = device_get_softc(dev);
 
+	reg = VOP_READ(sc, RK3399_REG_CFG_DONE);
+	printf("cfg done %x\n", reg);
+	VOP_WRITE(sc, RK3399_REG_CFG_DONE, 0);
+
 	pin_polarity = (1 << DCLK_INVERT);
+	if (mode->flags & VID_PHSYNC)
+		pin_polarity |= 1 << HSYNC_POSITIVE;
+	if (mode->flags & VID_PVSYNC)
+		pin_polarity |= 1 << VSYNC_POSITIVE;
 	rk_vop_set_polarity(sc, pin_polarity);
 
 	/* Remove standby bit */
@@ -121,10 +132,12 @@ rk_vop_mode_set(device_t dev, const struct videomode *mode)
 	VOP_WRITE(sc, RK3399_SYS_CTRL, reg);
 
 	/* Enable HDMI output only. */
+	reg = VOP_READ(sc, RK3399_SYS_CTRL);
 	reg &= ~SYS_CTRL_ALL_OUT_EN;
-	VOP_WRITE(sc, RK3399_SYS_CTRL, reg);
 	reg |= SYS_CTRL_HDMI_OUT_EN;
 	VOP_WRITE(sc, RK3399_SYS_CTRL, reg);
+
+	printf("SYS_CTRL %x\n", VOP_READ(sc, RK3399_SYS_CTRL));
 
 	/* Set mode */
 	mode1 = 0; /* RGB888 */
@@ -135,13 +148,18 @@ rk_vop_mode_set(device_t dev, const struct videomode *mode)
 
 	uint32_t hactive = mode->hdisplay;
 	uint32_t vactive = mode->vdisplay;
-	uint32_t hsync_len = mode->htotal;
-	uint32_t hback_porch = mode->hsync_end;
-	uint32_t vsync_len = mode->vtotal;
-	uint32_t vback_porch = mode->vsync_end;
-	uint32_t hfront_porch = mode->hsync_start;
-	uint32_t vfront_porch = mode->vsync_start;
 
+	uint32_t hsync_len = mode->hsync_end - mode->hsync_start;
+	uint32_t vsync_len = mode->vsync_end - mode->vsync_start;
+
+	uint32_t hback_porch = mode->htotal - mode->hsync_end;
+	uint32_t vback_porch = mode->vtotal - mode->vsync_end;
+
+	/* TODO: not sure where to take this numbers */
+	uint32_t hfront_porch = 88;
+	uint32_t vfront_porch = 4;
+
+	reg = VOP_READ(sc, RK3399_DSP_HTOTAL_HS_END);
 	reg = hsync_len;
 	reg |= (hsync_len + hback_porch + hactive + hfront_porch) << 16;
 	VOP_WRITE(sc, RK3399_DSP_HTOTAL_HS_END, reg);
@@ -171,67 +189,141 @@ rk_vop_mode_set(device_t dev, const struct videomode *mode)
 	return (0);
 }
 
+static char * clk_table[CLK_NENTRIES] = { "aclk_vop", "dclk_vop", "hclk_vop" };
+
+static int
+rk_vop_clk_enable(device_t dev, const struct videomode *mode)
+{
+	struct rk_vop_softc *sc;
+	uint64_t rate;
+	int error;
+	int i;
+
+	sc = device_get_softc(dev);
+
+	/* Resets. */
+	error = hwreset_get_by_ofw_name(sc->dev, 0, "axi", &sc->hwreset_axi);
+	if (error != 0) {
+		device_printf(sc->dev, "Cannot get 'axi' reset\n");
+		return (ENXIO);
+	}
+	error = hwreset_get_by_ofw_name(sc->dev, 0, "ahb", &sc->hwreset_ahb);
+	if (error != 0) {
+		device_printf(sc->dev, "Cannot get 'ahb' reset\n");
+		return (ENXIO);
+	}
+	error = hwreset_get_by_ofw_name(sc->dev, 0, "dclk", &sc->hwreset_dclk);
+	if (error != 0) {
+		device_printf(sc->dev, "Cannot get 'dclk' reset\n");
+		return (ENXIO);
+	}
+
+#if 0
+	error = hwreset_assert(sc->hwreset_axi);
+	if (error != 0) {
+		device_printf(sc->dev, "Cannot assert 'axi' reset\n");
+		return (error);
+	}
+
+	error = hwreset_assert(sc->hwreset_ahb);
+	if (error != 0) {
+		device_printf(sc->dev, "Cannot assert 'ahb' reset\n");
+		return (error);
+	}
+
+	error = hwreset_assert(sc->hwreset_dclk);
+	if (error != 0) {
+		device_printf(sc->dev, "Cannot assert 'dclk' reset\n");
+		return (error);
+	}
+#endif
+
+	for (i = 0; i < CLK_NENTRIES; i++) {
+		error = clk_get_by_ofw_name(dev, 0, clk_table[i], &sc->clk[i]);
+		if (error != 0) {
+			device_printf(dev, "cannot get '%s' clock\n",
+			    clk_table[i]);
+			return (ENXIO);
+		}
+	}
+
+#if 1
+	/* DCLK */
+	error = clk_set_freq(sc->clk[1], 148500000, 0);
+	if (error != 0) {
+		panic("dclk fail to set");
+	}
+
+	/* ACLK */
+	error = clk_set_freq(sc->clk[0], 800000000, 0);
+	if (error != 0) {
+		panic("aclk fail to set");
+	}
+
+	/* HCLK */
+	error = clk_set_freq(sc->clk[2], 400000000, 0);
+	if (error != 0) {
+		panic("hclk fail to set");
+	}
+#endif
+
+	for (i = 0; i < CLK_NENTRIES; i++) {
+		error = clk_enable(sc->clk[i]);
+		if (error != 0) {
+			device_printf(dev, "cannot enable '%s' clock\n",
+			    clk_table[i]);
+			return (ENXIO);
+		}
+
+		error = clk_get_freq(sc->clk[i], &rate);
+		if (error != 0) {
+			device_printf(dev, "cannot get '%s' clock frequency\n",
+			    clk_table[i]);
+			return (ENXIO);
+		}
+
+		device_printf(dev, "%s rate is %ld Hz\n", clk_table[i], rate);
+	}
+
+#if 0
+	error = hwreset_deassert(sc->hwreset_axi);
+	if (error != 0) {
+		device_printf(sc->dev, "Cannot deassert 'axi' reset\n");
+		return (error);
+	}
+
+	error = hwreset_deassert(sc->hwreset_ahb);
+	if (error != 0) {
+		device_printf(sc->dev, "Cannot deassert 'ahb' reset\n");
+		return (error);
+	}
+
+	error = hwreset_deassert(sc->hwreset_dclk);
+	if (error != 0) {
+		device_printf(sc->dev, "Cannot deassert 'dclk' reset\n");
+		return (error);
+	}
+#endif
+
+	return (0);
+}
+
 static int
 rk_vop_enable(device_t dev, phandle_t node, const struct videomode *mode)
 {
 	struct rk_vop_softc *sc;
-	uint64_t rate_aclk, rate_dclk, rate_hclk;
-	int error;
+	uint32_t reg;
 
 	sc = device_get_softc(dev);
 
-	//"aclk_vop", "dclk_vop", "hclk_vop";
-
-	/* aclk */
-	error = clk_get_by_ofw_name(dev, 0, "aclk_vop", &sc->aclk);
-	if (error != 0) {
-		device_printf(dev, "cannot get aclk_vop clock\n");
-		return (ENXIO);
-	}
-
-	error = clk_get_freq(sc->aclk, &rate_aclk);
-	if (error != 0) {
-		device_printf(dev, "cannot get aclk frequency\n");
-		return (ENXIO);
-	}
-
-	/* dclk */
-	error = clk_get_by_ofw_name(dev, 0, "dclk_vop", &sc->dclk);
-	if (error != 0) {
-		device_printf(dev, "cannot get dclk_vop clock\n");
-		return (ENXIO);
-	}
-
-	error = clk_get_freq(sc->dclk, &rate_dclk);
-	if (error != 0) {
-		device_printf(dev, "cannot get dclk frequency\n");
-		return (ENXIO);
-	}
-
-	/* hclk */
-	error = clk_get_by_ofw_name(dev, 0, "hclk_vop", &sc->hclk);
-	if (error != 0) {
-		device_printf(dev, "cannot get hclk_vop clock\n");
-		return (ENXIO);
-	}
-
-	error = clk_get_freq(sc->hclk, &rate_hclk);
-	if (error != 0) {
-		device_printf(dev, "cannot get hclk frequency\n");
-		return (ENXIO);
-	}
-
-	device_printf(dev, "aclk rate is %ld\n", rate_aclk);
-	device_printf(dev, "dclk rate is %ld\n", rate_dclk);
-	device_printf(dev, "hclk rate is %ld\n", rate_hclk);
-
-	uint32_t reg;
 	reg = (mode->hdisplay - 1);
 	reg |= (mode->vdisplay - 1) << 16;
 	VOP_WRITE(sc, RK3399_WIN0_ACT_INFO, reg);
 
-	reg = (mode->htotal + mode->hsync_end);
-	reg |= (mode->vtotal + mode->vsync_end) << 16;
+	reg = (mode->hsync_end - mode->hsync_start +
+		mode->htotal - mode->hsync_end);
+	reg |= (mode->vsync_end - mode->vsync_start +
+		mode->vtotal - mode->vsync_end) << 16;
 	VOP_WRITE(sc, RK3399_WIN0_DSP_ST, reg);
 
 	reg = (mode->hdisplay - 1);
@@ -239,20 +331,21 @@ rk_vop_enable(device_t dev, phandle_t node, const struct videomode *mode)
 	VOP_WRITE(sc, RK3399_WIN0_DSP_INFO, reg);
 
 	reg = VOP_READ(sc, RK3399_WIN0_COLOR_KEY);
+	reg &= ~(1 << 31);
+	reg &= ~(0x3fffffff);
 	device_printf(dev, "color key %x\n", reg);
-	reg = 0;
 	VOP_WRITE(sc, RK3399_WIN0_COLOR_KEY, reg);
 
 	uint32_t lb_mode, rgb_mode;
 	int bpp;
 
-	bpp = 24; //lets say
+	bpp = 32; // HDMI
 
 	switch (bpp) {
-	case 24:
-		rgb_mode = RGB888;
+	case 32:
+		rgb_mode = ARGB8888;
 		VOP_WRITE(sc, RK3399_WIN0_VIR,
-		    WIN0_VIR_WIDTH_RGB888(mode->hdisplay));
+		    WIN0_VIR_WIDTH_ARGB888(mode->hdisplay));
 		break;
 	default:
 		panic("unknown bpp");
@@ -279,15 +372,21 @@ rk_vop_enable(device_t dev, phandle_t node, const struct videomode *mode)
 
 	uint64_t vbase;
 	uint64_t fb_base;
+	uint8_t *base;
 	int sz;
-	sz = mode->hdisplay * mode->vdisplay * 3;
+	sz = mode->hdisplay * mode->vdisplay * 4;
 	vbase = (intptr_t)kmem_alloc_contig(sz, M_ZERO, 0, ~0, PAGE_SIZE, 0,
 	    VM_MEMATTR_UNCACHEABLE);
+	base = (uint8_t *)vbase;
 	fb_base = (intptr_t)vtophys(vbase);
+
+	int i;
+	for (i = 0; i < 1920*1080; i++)
+		base[i] = 0x12;
 
 	device_printf(dev, "fb_base %lx\n", fb_base);
 
-	VOP_WRITE(sc, RK3399_WB_YRGB_MST, fb_base);
+	VOP_WRITE(sc, RK3399_WIN0_YRGB_MST, fb_base);
 	VOP_WRITE(sc, RK3399_REG_CFG_DONE, 1);
 
 	return (0);
@@ -296,9 +395,6 @@ rk_vop_enable(device_t dev, phandle_t node, const struct videomode *mode)
 static int
 vop_mode_is_valid(const struct videomode *mode)
 {
-
-	//if ((mode->dot_clock < 13500) || (mode->dot_clock > 216000))
-	//	return (0);
 
 	if (mode->dot_clock != 148500)
 		return (0);
@@ -339,15 +435,17 @@ vop_pick_mode(struct edid_info *ei)
 	return videomode;
 }
 
+static uint8_t my_edid[128] = {0x0, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x0, 0x4, 0x69, 0xa3, 0x28, 0xec, 0xa2, 0x2, 0x0, 0x1b, 0x18, 0x1, 0x3, 0x80, 0x3e, 0x22, 0x78, 0x3a, 0x1c, 0xb5, 0xa3, 0x57, 0x4f, 0xa0, 0x27, 0xd, 0x50, 0x54, 0xbf, 0xef, 0x0, 0xd1, 0xc0, 0x81, 0x40, 0x81, 0x80, 0x95, 0x0, 0xb3, 0x0, 0x71, 0x4f, 0x81, 0xc0, 0x1, 0x1, 0x4, 0x74, 0x0, 0x30, 0xf2, 0x70, 0x5a, 0x80, 0xb0, 0x58, 0x8a, 0x0, 0x6d, 0x55, 0x21, 0x0, 0x0, 0x1a, 0x2, 0x3a, 0x80, 0x18, 0x71, 0x38, 0x2d, 0x40, 0x58, 0x2c, 0x45, 0x0, 0x6d, 0x55, 0x21, 0x0, 0x0, 0x1e, 0x0, 0x0, 0x0, 0xfd, 0x0, 0x1e, 0x50, 0x18, 0xa0, 0x1e, 0x0, 0xa, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x0, 0x0, 0x0, 0xfc, 0x0, 0x41, 0x53, 0x55, 0x53, 0x20, 0x50, 0x42, 0x32, 0x38, 0x37, 0x51, 0xa, 0x20, 0x1, 0x5e};
+
 static void
 rk_vop_hdmi_event(void *arg, device_t hdmi_dev)
 {
 	struct rk_vop_softc *sc;
 	uint8_t *edid;
-	uint32_t edid_len;
 	struct edid_info ei;
 	const struct videomode *videomode;
 	device_t dev;
+	int error;
 
 	sc = arg;
 
@@ -355,6 +453,8 @@ rk_vop_hdmi_event(void *arg, device_t hdmi_dev)
 
 	printf("%s\n", __func__);
 
+#if 0
+	uint32_t edid_len;
 	edid = NULL;
 	edid_len = 0;
 	if (HDMI_GET_EDID(hdmi_dev, &edid, &edid_len) != 0)
@@ -362,6 +462,9 @@ rk_vop_hdmi_event(void *arg, device_t hdmi_dev)
 		    "failed to get EDID info from HDMI framer\n");
 	else
 		device_printf(sc->dev, "got edid, len %d\n", edid_len);
+#endif
+
+	edid = my_edid;
 
 	int i;
 	printf("%s: edid: \n", __func__);
@@ -376,17 +479,26 @@ rk_vop_hdmi_event(void *arg, device_t hdmi_dev)
 			printf("failed to parse EDID\n");
 	}
 
-	//videomode = pick_mode_by_ref(1920, 1080, 60);
 	videomode = vop_pick_mode(&ei);
 	sc->sc_mode = videomode;
 
 	phandle_t node;
 	node = ofw_bus_get_node(dev);
 
+	error = rk_vop_clk_enable(dev, sc->sc_mode);
+	if (error != 0)
+		panic("error 1");
+
 	rk_vop_mode_set(dev, sc->sc_mode);
 	rk_vop_enable(dev, node, sc->sc_mode);
 
-	HDMI_SET_VIDEOMODE(hdmi_dev, sc->sc_mode);
+#if 0
+	printf("config done\n");
+	for (i = 0; i < 0x2000; i += 4)
+		printf("reg %x %x\n", i, VOP_READ(sc, i));
+#endif
+
+	//HDMI_SET_VIDEOMODE(hdmi_dev, sc->sc_mode);
 }
 
 static int
