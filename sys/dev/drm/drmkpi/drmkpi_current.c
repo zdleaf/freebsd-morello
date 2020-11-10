@@ -95,7 +95,6 @@ drmkpi_alloc_current(struct thread *td, int flags)
 	/* use allocated mm_struct as a fallback */
 	if (ts->mm == NULL) {
 		/* setup new mm_struct */
-		init_rwsem(&mm->mmap_sem);
 		atomic_set(&mm->mm_count, 1);
 		atomic_set(&mm->mm_users, 1);
 		/* set mm_struct pointer */

@@ -158,16 +158,3 @@ drmkpi_mutex_lock_interruptible(mutex_t *m)
 	}
 	return (error);
 }
-
-int
-drmkpi_down_write_killable(struct rw_semaphore *rw)
-{
-	int error;
-
-	error = -sx_xlock_sig(&rw->sx);
-	if (error != 0) {
-		linux_schedule_save_interrupt_value(current, error);
-		error = -EINTR;
-	}
-	return (error);
-}

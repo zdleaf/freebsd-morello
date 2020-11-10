@@ -45,38 +45,6 @@ struct mm_struct {
 	atomic_t mm_count;
 	atomic_t mm_users;
 	size_t pinned_vm;
-	struct rw_semaphore mmap_sem;
 };
-
-extern void linux_mm_dtor(struct mm_struct *mm);
-
-static inline void
-mmdrop(struct mm_struct *mm)
-{
-	if (__predict_false(atomic_dec_and_test(&mm->mm_count)))
-		linux_mm_dtor(mm);
-}
-
-static inline bool
-mmget_not_zero(struct mm_struct *mm)
-{
-	return (atomic_inc_not_zero(&mm->mm_users));
-}
-
-static inline void
-mmput(struct mm_struct *mm)
-{
-	if (__predict_false(atomic_dec_and_test(&mm->mm_users)))
-		mmdrop(mm);
-}
-
-static inline void
-mmgrab(struct mm_struct *mm)
-{
-	atomic_inc(&mm->mm_count);
-}
-
-extern struct mm_struct *linux_get_task_mm(struct task_struct *);
-#define	get_task_mm(task) linux_get_task_mm(task)
 
 #endif					/* _LINUX_MM_TYPES_H_ */
