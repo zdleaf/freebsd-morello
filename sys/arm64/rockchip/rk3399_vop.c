@@ -148,16 +148,12 @@ rk_vop_mode_set(device_t dev, const struct videomode *mode)
 
 	uint32_t hactive = mode->hdisplay;
 	uint32_t vactive = mode->vdisplay;
-
 	uint32_t hsync_len = mode->hsync_end - mode->hsync_start;
 	uint32_t vsync_len = mode->vsync_end - mode->vsync_start;
-
 	uint32_t hback_porch = mode->htotal - mode->hsync_end;
 	uint32_t vback_porch = mode->vtotal - mode->vsync_end;
-
-	/* TODO: not sure where to take this numbers */
-	uint32_t hfront_porch = 88;
-	uint32_t vfront_porch = 4;
+	uint32_t hfront_porch = mode->hsync_start - mode->hdisplay;
+	uint32_t vfront_porch = mode->vsync_start - mode->vdisplay;
 
 	reg = VOP_READ(sc, RK3399_DSP_HTOTAL_HS_END);
 	reg = hsync_len;
@@ -382,7 +378,7 @@ rk_vop_enable(device_t dev, phandle_t node, const struct videomode *mode)
 
 	int i;
 	for (i = 0; i < 1920*1080; i++)
-		base[i] = 0x12;
+		base[i] = 0xa2;
 
 	device_printf(dev, "fb_base %lx\n", fb_base);
 
@@ -498,7 +494,7 @@ rk_vop_hdmi_event(void *arg, device_t hdmi_dev)
 		printf("reg %x %x\n", i, VOP_READ(sc, i));
 #endif
 
-	//HDMI_SET_VIDEOMODE(hdmi_dev, sc->sc_mode);
+	HDMI_SET_VIDEOMODE(hdmi_dev, sc->sc_mode);
 }
 
 static int
