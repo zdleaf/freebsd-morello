@@ -81,89 +81,16 @@ CTASSERT((__GFP_DMA32 & GFP_NATIVE_MASK) == 0);
 CTASSERT((__GFP_BITS_MASK & GFP_NATIVE_MASK) == GFP_NATIVE_MASK);
 
 /*
- * Resolve a page into a virtual address:
- *
- * NOTE: This function only works for pages allocated by the kernel.
- */
-void *drmkpi_page_address(struct page *);
-
-#define	page_address(page) drmkpi_page_address(page)
-
-/*
- * Page management for unmapped pages:
- */
-vm_page_t drmkpi_alloc_pages(gfp_t flags, unsigned int order);
-void drmkpi_free_pages(vm_page_t page, unsigned int order);
-
-static inline struct page *
-alloc_page(gfp_t flags)
-{
-
-	return (drmkpi_alloc_pages(flags, 0));
-}
-
-static inline struct page *
-alloc_pages(gfp_t flags, unsigned int order)
-{
-
-	return (drmkpi_alloc_pages(flags, order));
-}
-
-static inline struct page *
-alloc_pages_node(int node_id, gfp_t flags, unsigned int order)
-{
-
-	return (drmkpi_alloc_pages(flags, order));
-}
-
-static inline void
-__free_pages(struct page *page, unsigned int order)
-{
-
-	drmkpi_free_pages(page, order);
-}
-
-static inline void
-__free_page(struct page *page)
-{
-
-	drmkpi_free_pages(page, 0);
-}
-
-/*
  * Page management for mapped pages:
  */
 vm_offset_t drmkpi_alloc_kmem(gfp_t flags, unsigned int order);
 void drmkpi_free_kmem(vm_offset_t, unsigned int order);
 
 static inline vm_offset_t
-get_zeroed_page(gfp_t flags)
-{
-
-	return (drmkpi_alloc_kmem(flags | __GFP_ZERO, 0));
-}
-
-static inline vm_offset_t
 __get_free_page(gfp_t flags)
 {
 
 	return (drmkpi_alloc_kmem(flags, 0));
-}
-
-static inline vm_offset_t
-__get_free_pages(gfp_t flags, unsigned int order)
-{
-
-	return (drmkpi_alloc_kmem(flags, order));
-}
-
-static inline void
-free_pages(uintptr_t addr, unsigned int order)
-{
-	if (addr == 0)
-		return;
-
-	drmkpi_free_kmem(addr, order);
 }
 
 static inline void
@@ -173,12 +100,6 @@ free_page(uintptr_t addr)
 		return;
 
 	drmkpi_free_kmem(addr, 0);
-}
-
-static inline bool
-gfpflags_allow_blocking(const gfp_t gfp_flags)
-{
-	return ((gfp_flags & (M_WAITOK | M_NOWAIT)) == M_WAITOK);
 }
 
 #define	SetPageReserved(page)	do { } while (0)	/* NOP */

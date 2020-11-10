@@ -158,12 +158,6 @@ get_order(unsigned long size)
 	return (order);
 }
 
-static inline void *
-lowmem_page_address(struct page *page)
-{
-	return (page_address(page));
-}
-
 /*
  * This only works via memory map operations.
  */
@@ -261,6 +255,5 @@ vmalloc_to_page(const void *addr)
 }
 
 extern int is_vmalloc_addr(const void *addr);
-void si_meminfo(struct sysinfo *si);
 
 #endif					/* _LINUX_MM_H_ */

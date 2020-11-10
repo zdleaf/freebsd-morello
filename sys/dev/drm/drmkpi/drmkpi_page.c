@@ -64,109 +64,6 @@ __FBSDID("$FreeBSD$");
 #include <linux/fs.h>
 #include <linux/shmem_fs.h>
 
-void
-drmkpi_si_meminfo(struct sysinfo *si)
-{
-	si->totalram = physmem;
-	si->totalhigh = 0;
-	si->mem_unit = PAGE_SIZE;
-}
-
-void *
-drmkpi_page_address(struct page *page)
-{
-
-	if (page->object != kernel_object) {
-		return (PMAP_HAS_DMAP ?
-		    ((void *)(uintptr_t)PHYS_TO_DMAP(VM_PAGE_TO_PHYS(page))) :
-		    NULL);
-	}
-	return ((void *)(uintptr_t)(VM_MIN_KERNEL_ADDRESS +
-	    IDX_TO_OFF(page->pindex)));
-}
-
-vm_page_t
-drmkpi_alloc_pages(gfp_t flags, unsigned int order)
-{
-	vm_page_t page;
-
-	if (PMAP_HAS_DMAP) {
-		unsigned long npages = 1UL << order;
-		int req = VM_ALLOC_NOOBJ | VM_ALLOC_WIRED | VM_ALLOC_NORMAL;
-
-		if ((flags & M_ZERO) != 0)
-			req |= VM_ALLOC_ZERO;
-		if (order == 0 && (flags & GFP_DMA32) == 0) {
-			page = vm_page_alloc(NULL, 0, req);
-			if (page == NULL)
-				return (NULL);
-		} else {
-			vm_paddr_t pmax = (flags & GFP_DMA32) ?
-			    BUS_SPACE_MAXADDR_32BIT : BUS_SPACE_MAXADDR;
-		retry:
-			page = vm_page_alloc_contig(NULL, 0, req,
-			    npages, 0, pmax, PAGE_SIZE, 0, VM_MEMATTR_DEFAULT);
-
-			if (page == NULL) {
-				if (flags & M_WAITOK) {
-					if (!vm_page_reclaim_contig(req,
-					    npages, 0, pmax, PAGE_SIZE, 0)) {
-						vm_wait(NULL);
-					}
-					flags &= ~M_WAITOK;
-					goto retry;
-				}
-				return (NULL);
-			}
-		}
-		if (flags & M_ZERO) {
-			unsigned long x;
-
-			for (x = 0; x != npages; x++) {
-				vm_page_t pgo = page + x;
-
-				if ((pgo->flags & PG_ZERO) == 0)
-					pmap_zero_page(pgo);
-			}
-		}
-	} else {
-		vm_offset_t vaddr;
-
-		vaddr = drmkpi_alloc_kmem(flags, order);
-		if (vaddr == 0)
-			return (NULL);
-
-		page = PHYS_TO_VM_PAGE(vtophys((void *)vaddr));
-
-		KASSERT(vaddr == (vm_offset_t)page_address(page),
-		    ("Page address mismatch"));
-	}
-
-	return (page);
-}
-
-void
-drmkpi_free_pages(vm_page_t page, unsigned int order)
-{
-	if (PMAP_HAS_DMAP) {
-		unsigned long npages = 1UL << order;
-		unsigned long x;
-
-		for (x = 0; x != npages; x++) {
-			vm_page_t pgo = page + x;
-
-			if (vm_page_unwire_noq(pgo))
-				vm_page_free(pgo);
-		}
-	} else {
-		vm_offset_t vaddr;
-
-		vaddr = (vm_offset_t)page_address(page);
-
-		drmkpi_free_kmem(vaddr, order);
-	}
-}
-
 vm_offset_t
 drmkpi_alloc_kmem(gfp_t flags, unsigned int order)
 {
@@ -188,42 +85,6 @@ drmkpi_free_kmem(vm_offset_t addr, unsigned int order)
 	size_t size = ((size_t)PAGE_SIZE) << order;
 
 	kmem_free(addr, size);
-}
-
-struct page *
-drmkpi_shmem_read_mapping_page_gfp(vm_object_t obj, int pindex, gfp_t gfp)
-{
-	vm_page_t page;
-	int rv;
-
-	if ((gfp & GFP_NOWAIT) != 0)
-		panic("GFP_NOWAIT is unimplemented");
-
-	VM_OBJECT_WLOCK(obj);
-	page = vm_page_grab(obj, pindex, VM_ALLOC_NORMAL | VM_ALLOC_NOBUSY |
-	    VM_ALLOC_WIRED);
-	if (page->valid != VM_PAGE_BITS_ALL) {
-		vm_page_xbusy(page);
-		if (vm_pager_has_page(obj, pindex, NULL, NULL)) {
-			rv = vm_pager_get_pages(obj, &page, 1, NULL, NULL);
-			if (rv != VM_PAGER_OK) {
-				vm_page_lock(page);
-				vm_page_unwire(page, PQ_NONE);
-				vm_page_free(page);
-				vm_page_unlock(page);
-				VM_OBJECT_WUNLOCK(obj);
-				return (ERR_PTR(-EINVAL));
-			}
-			MPASS(page->valid == VM_PAGE_BITS_ALL);
-		} else {
-			pmap_zero_page(page);
-			page->valid = VM_PAGE_BITS_ALL;
-			page->dirty = 0;
-		}
-		vm_page_xunbusy(page);
-	}
-	VM_OBJECT_WUNLOCK(obj);
-	return (page);
 }
 
 struct file *
@@ -266,34 +127,4 @@ err_1:
 	kfree(filp);
 err_0:
 	return (ERR_PTR(error));
-}
-
-static vm_ooffset_t
-linux_invalidate_mapping_pages_sub(vm_object_t obj, vm_pindex_t start,
-    vm_pindex_t end, int flags)
-{
-	int start_count, end_count;
-
-	VM_OBJECT_WLOCK(obj);
-	start_count = obj->resident_page_count;
-	vm_object_page_remove(obj, start, end, flags);
-	end_count = obj->resident_page_count;
-	VM_OBJECT_WUNLOCK(obj);
-	return (start_count - end_count);
-}
-
-unsigned long
-drmkpi_invalidate_mapping_pages(vm_object_t obj, pgoff_t start, pgoff_t end)
-{
-
-	return (linux_invalidate_mapping_pages_sub(obj, start, end, OBJPR_CLEANONLY));
-}
-
-void
-drmkpi_shmem_truncate_range(vm_object_t obj, loff_t lstart, loff_t lend)
-{
-	vm_pindex_t start = OFF_TO_IDX(lstart + PAGE_SIZE - 1);
-	vm_pindex_t end = OFF_TO_IDX(lend + 1);
-
-	(void) linux_invalidate_mapping_pages_sub(obj, start, end, 0);
 }

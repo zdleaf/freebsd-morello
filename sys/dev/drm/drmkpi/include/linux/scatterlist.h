@@ -111,13 +111,6 @@ sg_page(struct scatterlist *sg)
 	return ((struct page *)((sg)->page_link & ~SG_PAGE_LINK_MASK));
 }
 
-static inline void
-sg_set_buf(struct scatterlist *sg, const void *buf, unsigned int buflen)
-{
-	sg_set_page(sg, virt_to_page(buf), buflen,
-	    ((uintptr_t)buf) & (PAGE_SIZE - 1));
-}
-
 static inline struct scatterlist *
 sg_next(struct scatterlist *sg)
 {
@@ -345,28 +338,6 @@ sg_alloc_table_from_pages(struct sg_table *sgt,
 	    SCATTERLIST_MAX_SEGMENT, gfp_mask));
 }
 
-static inline int
-sg_nents(struct scatterlist *sg)
-{
-	int nents;
-
-	for (nents = 0; sg; sg = sg_next(sg))
-		nents++;
-	return (nents);
-}
-
-static inline void
-__sg_page_iter_start(struct sg_page_iter *piter,
-    struct scatterlist *sglist, unsigned int nents,
-    unsigned long pgoffset)
-{
-	piter->internal.pg_advance = 0;
-	piter->internal.nents = nents;
-
-	piter->sg = sglist;
-	piter->sg_pgoffset = pgoffset;
-}
-
 static inline void
 _sg_iter_next(struct sg_page_iter *iter)
 {
@@ -388,34 +359,6 @@ _sg_iter_next(struct sg_page_iter *iter)
 	iter->sg = sg;
 }
 
-static inline int
-sg_page_count(struct scatterlist *sg)
-{
-	return (PAGE_ALIGN(sg->offset + sg->length) >> PAGE_SHIFT);
-}
-
-static inline bool
-__sg_page_iter_next(struct sg_page_iter *piter)
-{
-	if (piter->internal.nents == 0)
-		return (0);
-	if (piter->sg == NULL)
-		return (0);
-
-	piter->sg_pgoffset += piter->internal.pg_advance;
-	piter->internal.pg_advance = 1;
-
-	while (piter->sg_pgoffset >= sg_page_count(piter->sg)) {
-		piter->sg_pgoffset -= sg_page_count(piter->sg);
-		piter->sg = sg_next(piter->sg);
-		if (--piter->internal.nents == 0)
-			return (0);
-		if (piter->sg == NULL)
-			return (0);
-	}
-	return (1);
-}
-
 static inline void
 _sg_iter_init(struct scatterlist *sgl, struct sg_page_iter *iter,
     unsigned int nents, unsigned long pgoffset)
@@ -430,12 +373,6 @@ _sg_iter_init(struct scatterlist *sgl, struct sg_page_iter *iter,
 		iter->sg_pgoffset = 0;
 		iter->maxents = 0;
 	}
-}
-
-static inline dma_addr_t
-sg_page_iter_dma_address(struct sg_page_iter *spi)
-{
-	return (spi->sg->address + (spi->sg_pgoffset << PAGE_SHIFT));
 }
 
 static inline struct page *
