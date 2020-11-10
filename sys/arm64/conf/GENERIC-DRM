@@ -15,3 +15,5 @@ options		COMPAT_DRMKPI
 options		COMPAT_LINUXKPI
 
 device		drm
+device		aw_de2_drm
+device		dw_hdmi
