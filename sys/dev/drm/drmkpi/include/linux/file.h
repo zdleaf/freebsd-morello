@@ -28,8 +28,9 @@
  *
  * $FreeBSD$
  */
-#ifndef	_LINUX_FILE_H_
-#define	_LINUX_FILE_H_
+
+#ifndef __DRMKPI_FILE_H__
+#define	__DRMKPI_FILE_H__
 
 #include <sys/param.h>
 #include <sys/file.h>
@@ -112,4 +113,4 @@ fput(struct file *file)
 	}
 }
 
-#endif	/* _LINUX_FILE_H_ */
+#endif	/* __DRMKPI_FILE_H__ */

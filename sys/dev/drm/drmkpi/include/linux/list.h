@@ -28,8 +28,9 @@
  *
  * $FreeBSD$
  */
-#ifndef _LINUX_LIST_H_
-#define _LINUX_LIST_H_
+
+#ifndef __DRMKPI_LIST_H__
+#define	__DRMKPI_LIST_H__
 
 /*
  * Since LIST_HEAD conflicts with the linux definition we must include any
@@ -478,4 +479,4 @@ void drmkpi_list_sort(void *priv, struct list_head *head, int (*cmp)(void *priv,
 
 #define	list_sort(priv, head, cmp)	drmkpi_list_sort(priv, head, cmp)
 
-#endif /* _LINUX_LIST_H_ */
+#endif /* __DRMKPI_LIST_H__ */

@@ -28,8 +28,9 @@
  *
  * $FreeBSD$
  */
-#ifndef	_LINUX_POLL_H_
-#define	_LINUX_POLL_H_
+
+#ifndef __DRMKPI_POLL_H__
+#define	__DRMKPI_POLL_H__
 
 #include <sys/poll.h>
 #include <sys/fcntl.h>
@@ -37,4 +38,4 @@
 #include <linux/wait.h>
 #include <linux/file.h>
 
-#endif	/* _LINUX_POLL_H_ */
+#endif	/* __DRMKPI_POLL_H__ */

@@ -28,8 +28,9 @@
  *
  * $FreeBSD$
  */
-#ifndef	_LINUX_SPINLOCK_H_
-#define	_LINUX_SPINLOCK_H_
+
+#ifndef __DRMKPI_SPINLOCK_H__
+#define	__DRMKPI_SPINLOCK_H__
 
 #include <sys/param.h>
 #include <sys/kernel.h>
@@ -160,4 +161,4 @@ spin_lock_destroy(spinlock_t *lock)
 	mtx_assert(&(_l)->m, MA_OWNED);		\
 } while (0)
 
-#endif					/* _LINUX_SPINLOCK_H_ */
+#endif	/* __DRMKPI_SPINLOCK_H__ */

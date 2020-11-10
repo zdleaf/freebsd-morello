@@ -28,8 +28,8 @@
  * $FreeBSD$
  */
 
-#ifndef __LINUX_SIZES_H__
-#define	__LINUX_SIZES_H__
+#ifndef __DRMKPI_SIZES_H__
+#define	__DRMKPI_SIZES_H__
 
 #define SZ_1K	(1024 * 1)
 #define SZ_4K	(1024 * 4)
@@ -48,4 +48,4 @@
 #define SZ_32M	(1024 * 1024 * 32)
 #define SZ_64M	(1024 * 1024 * 64)
 
-#endif
+#endif	/* __DRMKPI_SIZES_H__ */

@@ -28,8 +28,9 @@
  *
  * $FreeBSD$
  */
-#ifndef	_LINUX_WORKQUEUE_H_
-#define	_LINUX_WORKQUEUE_H_
+
+#ifndef	__DRMKPI_WORKQUEUE_H__
+#define	__DRMKPI_WORKQUEUE_H__
 
 #include <linux/types.h>
 #include <linux/kernel.h>
@@ -242,4 +243,4 @@ extern bool drmkpi_work_pending(struct work_struct *);
 extern bool drmkpi_work_busy(struct work_struct *);
 extern struct work_struct *drmkpi_current_work(void);
 
-#endif					/* _LINUX_WORKQUEUE_H_ */
+#endif	/* __DRMKPI_WORKQUEUE_H__ */

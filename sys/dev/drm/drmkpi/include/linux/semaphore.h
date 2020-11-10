@@ -28,8 +28,9 @@
  *
  * $FreeBSD$
  */
-#ifndef _LINUX_SEMAPHORE_H_
-#define _LINUX_SEMAPHORE_H_
+
+#ifndef __DRMKPI_SEMAPHORE_H__
+#define	__DRMKPI_SEMAPHORE_H__
 
 #include <sys/param.h>
 #include <sys/lock.h>
@@ -67,4 +68,4 @@ init_MUTEX(struct semaphore *sem)
 
 #define	sema_init	linux_sema_init
 
-#endif /* _LINUX_SEMAPHORE_H_ */
+#endif /* __DRMKPI_SEMAPHORE_H__ */

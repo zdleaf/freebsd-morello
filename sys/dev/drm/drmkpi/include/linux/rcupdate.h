@@ -25,8 +25,9 @@
  *
  * $FreeBSD$
  */
-#ifndef	_LINUX_RCUPDATE_H_
-#define	_LINUX_RCUPDATE_H_
+
+#ifndef	__DRMKPI_RCUPDATE_H__
+#define	__DRMKPI_RCUPDATE_H__
 
 #include <linux/compiler.h>
 #include <linux/types.h>
@@ -117,4 +118,4 @@ void drmkpi_synchronize_rcu(unsigned type);
 #define	init_rcu_head_on_stack(...)
 #define	destroy_rcu_head_on_stack(...)
 
-#endif					/* _LINUX_RCUPDATE_H_ */
+#endif	/* __DRMKPI_RCUPDATE_H__ */

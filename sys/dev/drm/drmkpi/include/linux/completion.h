@@ -28,8 +28,9 @@
  *
  * $FreeBSD$
  */
-#ifndef	_LINUX_COMPLETION_H_
-#define	_LINUX_COMPLETION_H_
+
+#ifndef	__DRMKPI_COMPLETION_H__
+#define	__DRMKPI_COMPLETION_H__
 
 #include <linux/errno.h>
 
@@ -66,4 +67,4 @@ extern int drmkpi_wait_for_timeout_common(struct completion *, int, int);
 extern int drmkpi_try_wait_for_completion(struct completion *);
 extern int drmkpi_completion_done(struct completion *);
 
-#endif					/* _LINUX_COMPLETION_H_ */
+#endif	/* __DRMKPI_COMPLETION_H__ */

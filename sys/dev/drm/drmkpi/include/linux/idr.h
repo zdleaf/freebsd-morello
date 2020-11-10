@@ -28,8 +28,9 @@
  *
  * $FreeBSD$
  */
-#ifndef	_LINUX_IDR_H_
-#define	_LINUX_IDR_H_
+
+#ifndef __DRMKPI_IDR_H__
+#define	__DRMKPI_IDR_H__
 
 #include <sys/param.h>
 #include <sys/lock.h>
@@ -148,4 +149,4 @@ ida_get_new(struct ida *ida, int *p_id)
 	return (drmkpi_ida_get_new_above(ida, 0, p_id));
 }
 
-#endif	/* _LINUX_IDR_H_ */
+#endif	/* __DRMKPI_IDR_H__ */

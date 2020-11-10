@@ -28,8 +28,9 @@
  *
  * $FreeBSD$
  */
-#ifndef	_LINUX_ERR_H_
-#define	_LINUX_ERR_H_
+
+#ifndef __DRMKPI_ERR_H__
+#define	__DRMKPI_ERR_H__
 
 #include <sys/types.h>
 
@@ -80,4 +81,4 @@ PTR_ERR_OR_ZERO(const void *ptr)
 
 #define PTR_RET(p) PTR_ERR_OR_ZERO(p)
 
-#endif	/* _LINUX_ERR_H_ */
+#endif	/* __DRMKPI_ERR_H__ */

@@ -28,8 +28,9 @@
  *
  * $FreeBSD$
  */
-#ifndef	_LINUX_SLAB_H_
-#define	_LINUX_SLAB_H_
+
+#ifndef __DRMKPI_SLAB_H__
+#define	__DRMKPI_SLAB_H__
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -190,4 +191,4 @@ linux_kmem_cache_free(struct linux_kmem_cache *c, void *m)
 
 extern void linux_kmem_cache_destroy(struct linux_kmem_cache *);
 
-#endif					/* _LINUX_SLAB_H_ */
+#endif	/* __DRMKPI_SLAB_H__ */

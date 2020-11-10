@@ -29,8 +29,9 @@
  *
  * $FreeBSD$
  */
-#ifndef	_LINUX_SCATTERLIST_H_
-#define	_LINUX_SCATTERLIST_H_
+
+#ifndef __DRMKPI_SCATTERLIST_H__
+#define	__DRMKPI_SCATTERLIST_H__
 
 #include <linux/page.h>
 #include <linux/slab.h>
@@ -382,4 +383,4 @@ sg_page_iter_page(struct sg_page_iter *piter)
 }
 
 
-#endif					/* _LINUX_SCATTERLIST_H_ */
+#endif	/* __DRMKPI_SCATTERLIST_H__ */

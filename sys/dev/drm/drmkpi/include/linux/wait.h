@@ -30,8 +30,8 @@
  * $FreeBSD$
  */
 
-#ifndef _LINUX_WAIT_H_
-#define	_LINUX_WAIT_H_
+#ifndef __DRMKPI_WAIT_H__
+#define	__DRMKPI_WAIT_H__
 
 #include <linux/compiler.h>
 #include <linux/list.h>
@@ -307,4 +307,4 @@ bool drmkpi_wake_up_state(struct task_struct *, unsigned int);
 #define	wake_up_process(task)		drmkpi_wake_up_state(task, TASK_NORMAL)
 #define	wake_up_state(task, state)	drmkpi_wake_up_state(task, state)
 
-#endif /* _LINUX_WAIT_H_ */
+#endif /* __DRMKPI_WAIT_H__ */

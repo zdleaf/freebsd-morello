@@ -29,8 +29,8 @@
  * $FreeBSD$
  */
 
-#ifndef _LINUX_LOCKDEP_H_
-#define	_LINUX_LOCKDEP_H_
+#ifndef __DRMKPI_LOCKDEP_H__
+#define	__DRMKPI_LOCKDEP_H__
 
 #include <sys/lock.h>
 
@@ -61,4 +61,4 @@ struct lock_class_key {
 #define	mutex_acquire(...) do { } while (0)
 #define	mutex_release(...) do { } while (0)
 
-#endif /* _LINUX_LOCKDEP_H_ */
+#endif /* __DRMKPI_LOCKDEP_H__ */

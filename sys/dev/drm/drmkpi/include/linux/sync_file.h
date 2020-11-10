@@ -1,5 +1,5 @@
-#ifndef _LINUX_SYNC_FILE_H
-#define _LINUX_SYNC_FILE_H
+#ifndef __DRMKPI_SYNC_FILE_H__
+#define __DRMKPI_SYNC_FILE_H__
 
 #include <sys/types.h>
 #include <sys/mutex.h>
@@ -24,4 +24,4 @@ struct sync_file *sync_file_create(struct dma_fence *fence);
 struct dma_fence *sync_file_get_fence(int fd);
 char *sync_file_get_name(struct sync_file *sync_file, char *buf, int len);
 
-#endif /* _LINUX_SYNC_H */
+#endif /* __DRMKPI_SYNC_H__ */

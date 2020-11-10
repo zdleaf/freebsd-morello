@@ -28,8 +28,9 @@
  *
  * $FreeBSD$
  */
-#ifndef	_LINUX_IO_H_
-#define	_LINUX_IO_H_
+
+#ifndef __DRMKPI_IO_H__
+#define	__DRMKPI_IO_H__
 
 #include <sys/endian.h>
 #include <sys/types.h>
@@ -309,4 +310,4 @@ arch_phys_wc_index(int handle)
 #endif
 #endif
 
-#endif	/* _LINUX_IO_H_ */
+#endif	/* __DRMKPI_IO_H__ */

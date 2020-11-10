@@ -28,8 +28,9 @@
  *
  * $FreeBSD$
  */
-#ifndef	_LINUX_DEVICE_H_
-#define	_LINUX_DEVICE_H_
+
+#ifndef __DRMKPI_DEVICE_H__
+#define	__DRMKPI_DEVICE_H__
 
 #include <linux/err.h>
 #include <linux/types.h>
@@ -57,4 +58,4 @@ char *kasprintf(gfp_t, const char *, ...);
 
 #define	devm_add_action(parent, func, dev)	0
 
-#endif	/* _LINUX_DEVICE_H_ */
+#endif	/* __DRMKPI__DEVICE_H__ */

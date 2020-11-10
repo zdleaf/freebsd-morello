@@ -26,8 +26,8 @@
  * $FreeBSD$
  */
 
-#ifndef _LINUX_PFN_H_
-#define	_LINUX_PFN_H_
+#ifndef __DRMKPI_PFN_H__
+#define	__DRMKPI_PFN_H__
 
 #include <linux/types.h>
 
@@ -41,4 +41,4 @@ typedef struct {
 #define	PFN_PHYS(x)	((phys_addr_t)(x) << PAGE_SHIFT)
 #define	PHYS_PFN(x)	((unsigned long)((x) >> PAGE_SHIFT))
 
-#endif					/* _LINUX_PFN_H_ */
+#endif	/* __DRMKPI_PFN_H__ */

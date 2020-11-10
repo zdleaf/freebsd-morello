@@ -29,8 +29,9 @@
  *
  * $FreeBSD$
  */
-#ifndef _LINUX_KREF_H_
-#define _LINUX_KREF_H_
+
+#ifndef __DRMKPI_KREF_H__
+#define	__DRMKPI_KREF_H__
 
 #include <sys/types.h>
 #include <sys/refcount.h>
@@ -146,4 +147,4 @@ kref_exclusive_p(struct kref *kref)
 	return (kref->refcount.counter == 1);
 }
 
-#endif /* _LINUX_KREF_H_ */
+#endif /* __DRMKPI_KREF_H__ */

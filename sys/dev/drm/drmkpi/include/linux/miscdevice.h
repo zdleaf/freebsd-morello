@@ -28,12 +28,13 @@
  *
  * $FreeBSD$
  */
-#ifndef	_LINUX_MISCDEVICE_H_
-#define	_LINUX_MISCDEVICE_H_
+
+#ifndef __DRMKPI_MISCDEVICE_H__
+#define	__DRMKPI_MISCDEVICE_H__
 
 #define	MISC_DYNAMIC_MINOR	-1
 
 #include <linux/device.h>
 #include <linux/cdev.h>
 
-#endif	/* _LINUX_MISCDEVICE_H_ */
+#endif	/* __DRMKPI_MISCDEVICE_H__ */

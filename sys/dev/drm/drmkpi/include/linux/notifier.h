@@ -28,8 +28,9 @@
  *
  * $FreeBSD$
  */
-#ifndef	_LINUX_NOTIFIER_H_
-#define	_LINUX_NOTIFIER_H_
+
+#ifndef __DRMKPI_NOTIFIER_H__
+#define	__DRMKPI_NOTIFIER_H__
 
 #include <sys/types.h>
 #include <sys/eventhandler.h>
@@ -54,4 +55,4 @@ struct notifier_block {
 	eventhandler_tag tags[LINUX_NOTIFY_TAGS];
 };
 
-#endif					/* _LINUX_NOTIFIER_H_ */
+#endif	/* __DRMKPI_NOTIFIER_H__ */

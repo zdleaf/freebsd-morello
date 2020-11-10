@@ -25,8 +25,8 @@
  *
  * $FreeBSD$
  */
-#ifndef	_DRMKPI_WW_MUTEX_H_
-#define	_DRMKPI_WW_MUTEX_H_
+#ifndef	__DRMKPI_WW_MUTEX_H__
+#define	__DRMKPI_WW_MUTEX_H__
 
 #include <sys/param.h>
 #include <sys/proc.h>
@@ -141,4 +141,4 @@ ww_acquire_done(struct ww_acquire_ctx *ctx)
 {
 }
 
-#endif					/* _DRMKPI_WW_MUTEX_H_ */
+#endif	/* __DRMKPI_WW_MUTEX_H__ */

@@ -28,8 +28,9 @@
  *
  * $FreeBSD$
  */
-#ifndef	_LINUX_LOG2_H_
-#define	_LINUX_LOG2_H_
+
+#ifndef __DRMKPI_LOG2_H__
+#define	__DRMKPI_LOG2_H__
 
 #include <linux/types.h>
 
@@ -128,4 +129,4 @@ rounddown_pow_of_two(unsigned long x)
 
 #define	order_base_2(x) ilog2(roundup_pow_of_two(x))
 
-#endif	/* _LINUX_LOG2_H_ */
+#endif	/* __DRMKPI_LOG2_H__ */

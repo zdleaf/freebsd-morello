@@ -26,8 +26,8 @@
  * $FreeBSD$
  */
 
-#ifndef	_LINUX_SWAP_H_
-#define	_LINUX_SWAP_H_
+#ifndef __DRMKPI_SWAP_H__
+#define	__DRMKPI_SWAP_H__
 
 #include <vm/swap_pager.h>
 #include <vm/vm_pageout.h>
@@ -49,4 +49,4 @@ current_is_kswapd(void)
 	return (curproc == pageproc);
 }
 
-#endif
+#endif	/* __DRMKPI_SWAP_H__ */

@@ -28,8 +28,9 @@
  *
  * $FreeBSD$
  */
-#ifndef	_LINUX_PAGE_H_
-#define _LINUX_PAGE_H_
+
+#ifndef __DRMKPI_PAGE_H__
+#define	__DRMKPI_PAGE_H__
 
 #include <linux/types.h>
 
@@ -127,4 +128,4 @@ void unmap_mapping_range(void *obj, loff_t const holebegin,
 #define linux_clflushopt(arg) __linux_clflushopt((u_long)(arg))
 extern void __linux_clflushopt(u_long addr);
 
-#endif	/* _LINUX_PAGE_H_ */
+#endif	/* __DRMKPI_PAGE_H__ */

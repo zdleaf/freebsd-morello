@@ -28,8 +28,9 @@
  *
  * $FreeBSD$
  */
-#ifndef	_LINUX_BITOPS_H_
-#define	_LINUX_BITOPS_H_
+
+#ifndef	__DRMKPI_BITOPS_H__
+#define	__DRMKPI_BITOPS_H__
 
 #include <sys/param.h>
 #include <sys/types.h>
@@ -407,4 +408,4 @@ sign_extend64(uint64_t value, int index)
 	return ((int64_t)(value << shift) >> shift);
 }
 
-#endif	/* _LINUX_BITOPS_H_ */
+#endif	/* __DRMKPI_BITOPS_H__ */

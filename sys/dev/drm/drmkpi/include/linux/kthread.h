@@ -28,8 +28,9 @@
  *
  * $FreeBSD$
  */
-#ifndef	_LINUX_KTHREAD_H_
-#define	_LINUX_KTHREAD_H_
+
+#ifndef __DRMKPI_KTHREAD_H__
+#define	__DRMKPI_KTHREAD_H__
 
 #include <linux/sched.h>
 
@@ -70,4 +71,4 @@ int drmkpi_in_atomic(void);
 
 #define	in_atomic()			drmkpi_in_atomic()
 
-#endif /* _LINUX_KTHREAD_H_ */
+#endif /* __DRMKPI_KTHREAD_H__ */

@@ -28,8 +28,9 @@
  *
  * $FreeBSD$
  */
-#ifndef	_LINUX_RWLOCK_H_
-#define	_LINUX_RWLOCK_H_
+
+#ifndef __DRMKPI_RWLOCK_H__
+#define	__DRMKPI_RWLOCK_H__
 
 #include <sys/types.h>
 #include <sys/lock.h>
@@ -65,4 +66,4 @@ rwlock_init(rwlock_t *lock)
 	rw_init_flags(&lock->rw, "lnxrw", RW_NOWITNESS);
 }
 
-#endif	/* _LINUX_RWLOCK_H_ */
+#endif	/* __DRMKPI_RWLOCK_H__ */

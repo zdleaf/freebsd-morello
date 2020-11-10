@@ -28,8 +28,9 @@
  *
  * $FreeBSD$
  */
-#ifndef	_LINUX_DMA_ATTR_H_
-#define	_LINUX_DMA_ATTR_H_
+
+#ifndef __DRMKPI_DMA_ATTR_H__
+#define	__DRMKPI_DMA_ATTR_H__
 
 #define	DMA_ATTR_WRITE_BARRIER		(1 << 0)
 #define	DMA_ATTR_WEAK_ORDERING		(1 << 1)
@@ -53,4 +54,4 @@ init_dma_attrs(struct dma_attrs *attrs)
 	attrs->flags = 0;
 }
 
-#endif	/* _LINUX_DMA_ATTR_H_ */
+#endif	/* __DRMKPI_DMA_ATTR_H__ */

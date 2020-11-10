@@ -28,11 +28,12 @@
  *
  * $FreeBSD$
  */
-#ifndef	_LINUX_IOCTL_H_
-#define	_LINUX_IOCTL_H_
+
+#ifndef __DRMKPI_IOCTL_H__
+#define	__DRMKPI_IOCTL_H__
 
 #include <sys/ioccom.h>
 
 #define	_IOC_SIZE(cmd) IOCPARM_LEN(cmd)
 
-#endif	/* _LINUX_IOCTL_H_ */
+#endif	/* __DRMKPI_IOCTL_H__ */

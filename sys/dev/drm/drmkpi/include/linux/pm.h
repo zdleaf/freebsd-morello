@@ -26,8 +26,8 @@
  * $FreeBSD$
  */
 
-#ifndef	_LINUX_PM_H_
-#define	_LINUX_PM_H_
+#ifndef __DRMKPI_PM_H__
+#define	__DRMKPI_PM_H__
 
 struct device;
 struct dev_pm_ops {
@@ -56,4 +56,4 @@ struct dev_pm_ops {
     int (*runtime_idle)(struct device *dev);
 };
 
-#endif
+#endif	/* __DRMKPI_PM_H__ */

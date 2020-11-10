@@ -29,8 +29,9 @@
  *
  * $FreeBSD$
  */
-#ifndef _LINUX_DELAY_H_
-#define	_LINUX_DELAY_H_
+
+#ifndef __DRMKPI_DELAY_H__
+#define	__DRMKPI_DELAY_H__
 
 #include <linux/jiffies.h>
 #include <sys/systm.h>
@@ -73,4 +74,4 @@ usleep_range(unsigned long min, unsigned long max)
 
 extern unsigned int linux_msleep_interruptible(unsigned int ms);
 
-#endif	/* _LINUX_DELAY_H_ */
+#endif	/* __DRMKPI_DELAY_H__ */

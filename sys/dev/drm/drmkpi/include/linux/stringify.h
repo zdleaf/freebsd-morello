@@ -1,6 +1,6 @@
-#ifndef __LINUX_STRINGIFY_H
-#define __LINUX_STRINGIFY_H
+#ifndef __DRMKPI_STRINGIFY_H__
+#define __DRMKPI_STRINGIFY_H__
 
 #include <linux/compiler.h>
 
-#endif	/* !__LINUX_STRINGIFY_H */
+#endif	/* __DRMKPI_STRINGIFY_H__ */

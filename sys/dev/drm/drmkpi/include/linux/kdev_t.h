@@ -28,8 +28,9 @@
  *
  * $FreeBSD$
  */
-#ifndef	_LINUX_KDEV_T_H_
-#define	_LINUX_KDEV_T_H_
+
+#ifndef _DRMKPI_KDEV_T_H__
+#define	_DRMKPI_KDEV_T_H__
 
 #include <sys/types.h>
 
@@ -43,4 +44,4 @@ old_encode_dev(dev_t dev)
 	return ((MAJOR(dev) << 8) | MINOR(dev));
 }
 
-#endif	/* _LINUX_KDEV_T_H_ */
+#endif	/* __DRMKPI_KDEV_T_H__ */

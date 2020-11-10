@@ -28,8 +28,9 @@
  *
  * $FreeBSD$
  */
-#ifndef	_LINUX_STRING_H_
-#define	_LINUX_STRING_H_
+
+#ifndef __DRMKPI_STRING_H__
+#define	__DRMKPI_STRING_H__
 
 #include <sys/ctype.h>
 
@@ -107,4 +108,4 @@ str_has_prefix(const char *str, const char *prefix)
 	return (strncmp(str, prefix, len) == 0 ? len : 0);
 }
 
-#endif					/* _LINUX_STRING_H_ */
+#endif	/* __DRMKPI_STRING_H__ */

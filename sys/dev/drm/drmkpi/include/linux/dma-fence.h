@@ -29,8 +29,8 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef	_LINUX_DMA_FENCE_H_
-#define	_LINUX_DMA_FENCE_H_
+#ifndef __DRMKPI_DMA_FENCE_H__
+#define	__DRMKPI_DMA_FENCE_H__
 
 #include <sys/types.h>
 #include <sys/condvar.h>
@@ -155,4 +155,4 @@ DMA_FENCE_TRACE(struct dma_fence *f, const char *fmt, ...)
 	}
 }
 
-#endif	/* _LINUX_DMA_FENCE_H_ */
+#endif	/* __DRMKPI_DMA_FENCE_H__ */

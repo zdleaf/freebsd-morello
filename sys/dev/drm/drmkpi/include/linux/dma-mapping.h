@@ -28,8 +28,9 @@
  *
  * $FreeBSD$
  */
-#ifndef	_LINUX_DMA_MAPPING_H_
-#define _LINUX_DMA_MAPPING_H_
+
+#ifndef __DRMKPI_DMA_MAPPING_H__
+#define	__DRMKPI_DMA_MAPPING_H__
 
 #include <linux/types.h>
 #include <linux/device.h>
@@ -361,4 +362,4 @@ extern int uma_align_cache;
 #define	dma_get_cache_alignment()	uma_align_cache
 #endif
 
-#endif	/* _LINUX_DMA_MAPPING_H_ */
+#endif	/* __DRMKPI_DMA_MAPPING_H__ */

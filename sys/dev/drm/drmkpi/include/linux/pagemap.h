@@ -28,8 +28,8 @@
  * $FreeBSD$
  */
 
-#ifndef _LINUX_PAGEMAP_H_
-#define _LINUX_PAGEMAP_H_
+#ifndef __DRMKPI_PAGEMAP_H__
+#define	__DRMKPI_PAGEMAP_H__
 
 #include <linux/mm.h>
 
@@ -44,4 +44,4 @@ release_pages(struct page **pages, int nr)
 		put_page(pages[i]);
 }
 
-#endif
+#endif	/* __DRMKPI_PAGEMAP_H__ */

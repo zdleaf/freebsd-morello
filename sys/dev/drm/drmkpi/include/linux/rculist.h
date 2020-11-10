@@ -27,8 +27,8 @@
  * $FreeBSD$
  */
 
-#ifndef _LINUX_RCULIST_H_
-#define	_LINUX_RCULIST_H_
+#ifndef __DRMKPI_RCULIST_H__
+#define	__DRMKPI_RCULIST_H__
 
 #include <linux/list.h>
 #include <linux/rcupdate.h>
@@ -105,4 +105,4 @@ hlist_del_init_rcu(struct hlist_node *n)
 	}
 }
 
-#endif					/* _LINUX_RCULIST_H_ */
+#endif	/* __DRMKPI_RCULIST_H__ */

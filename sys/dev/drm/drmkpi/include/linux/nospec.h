@@ -1,8 +1,8 @@
 /* Public domain. */
 
-#ifndef _LINUX_NOSPEC_H
-#define _LINUX_NOSPEC_H
+#ifndef __DRMKPI_NOSPEC_H__
+#define __DRMKPI_NOSPEC_H__
 
 #define array_index_nospec(a, b)	(a)
 
-#endif
+#endif	/* __DRMKPI_NOSPEC_H__ */
