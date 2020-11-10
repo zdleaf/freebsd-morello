@@ -214,6 +214,17 @@ dwc_hdmi_phy_gen2_pddq(struct dwc_hdmi_softc *sc, uint8_t enable)
 }
 
 static void
+dwc_hdmi_phy_enable_spare(struct dwc_hdmi_softc *sc, uint8_t enable)
+{
+	uint8_t reg;
+
+	reg = RD1(sc, HDMI_PHY_CONF0);
+	reg &= ~HDMI_PHY_CONF0_SPARECTRL_MASK;
+	reg |= (enable << HDMI_PHY_CONF0_SPARECTRL_OFFSET);
+	WR1(sc, HDMI_PHY_CONF0, reg);
+}
+
+static void
 dwc_hdmi_phy_gen2_txpwron(struct dwc_hdmi_softc *sc, uint8_t enable)
 {
 	uint8_t reg;
@@ -301,6 +312,7 @@ dwc_hdmi_phy_configure(struct dwc_hdmi_softc *sc)
 	 * Following initialization are for 8bit per color case
 	 */
 
+#if 0
 	/*
 	 * PLL/MPLL config, see section 24.7.22 in TRM
 	 *  config, see section 24.7.22
@@ -318,7 +330,15 @@ dwc_hdmi_phy_configure(struct dwc_hdmi_softc *sc)
 		dwc_hdmi_phy_i2c_write(sc, CPCE_CTRL_370, HDMI_PHY_I2C_CPCE_CTRL);
 		dwc_hdmi_phy_i2c_write(sc, GMPCTRL_370, HDMI_PHY_I2C_GMPCTRL);
 	}
+#endif
 
+#if 1
+	dwc_hdmi_phy_i2c_write(sc, 0x0051, HDMI_PHY_I2C_CPCE_CTRL);
+	dwc_hdmi_phy_i2c_write(sc, 0x0003, HDMI_PHY_I2C_GMPCTRL);
+	dwc_hdmi_phy_i2c_write(sc, 0x0000, HDMI_PHY_I2C_CURRCTRL);
+#endif
+
+#if 0
 	/*
 	 * Values described in TRM section 34.9.2 PLL/MPLL Generic
 	 *    Configuration Settings. Table 34-23.
@@ -338,15 +358,20 @@ dwc_hdmi_phy_configure(struct dwc_hdmi_softc *sc)
 	} else {
 		panic("Unsupported mode\n");
 	}
+#endif
 
 	dwc_hdmi_phy_i2c_write(sc, 0x0000, HDMI_PHY_I2C_PLLPHBYCTRL);
 	dwc_hdmi_phy_i2c_write(sc, MSM_CTRL_FB_CLK, HDMI_PHY_I2C_MSM_CTRL);
+
+#if 0
 	/* RESISTANCE TERM 133 Ohm */
 	dwc_hdmi_phy_i2c_write(sc, TXTERM_133, HDMI_PHY_I2C_TXTERM);
+#endif
 
 	/* REMOVE CLK TERM */
 	dwc_hdmi_phy_i2c_write(sc, CKCALCTRL_OVERRIDE, HDMI_PHY_I2C_CKCALCTRL);
 
+#if 0
 	if (sc->sc_mode.dot_clock*1000 > 148500000) {
 		dwc_hdmi_phy_i2c_write(sc,CKSYMTXCTRL_OVERRIDE | CKSYMTXCTRL_TX_SYMON |
 		    CKSYMTXCTRL_TX_TRBON | CKSYMTXCTRL_TX_CK_SYMON, HDMI_PHY_I2C_CKSYMTXCTRL); 
@@ -358,6 +383,13 @@ dwc_hdmi_phy_configure(struct dwc_hdmi_softc *sc)
 		dwc_hdmi_phy_i2c_write(sc, VLEVCTRL_TX_LVL(13) | VLEVCTRL_CK_LVL(13),
 		    HDMI_PHY_I2C_VLEVCTRL);
 	}
+#endif
+
+#if 1
+	dwc_hdmi_phy_i2c_write(sc, 0x802b, HDMI_PHY_I2C_CKSYMTXCTRL);
+	dwc_hdmi_phy_i2c_write(sc, 0x0004, HDMI_PHY_I2C_TXTERM);
+	dwc_hdmi_phy_i2c_write(sc, 0x028d, HDMI_PHY_I2C_VLEVCTRL);
+#endif
 
 	dwc_hdmi_phy_enable_power(sc, 1);
 
@@ -368,6 +400,8 @@ dwc_hdmi_phy_configure(struct dwc_hdmi_softc *sc)
 	/* gen2 tx power on */
 	dwc_hdmi_phy_gen2_txpwron(sc, 1);
 	dwc_hdmi_phy_gen2_pddq(sc, 0);
+
+	dwc_hdmi_phy_enable_spare(sc, 1);
 
 	/*Wait for PHY PLL lock */
 	msec = 4;

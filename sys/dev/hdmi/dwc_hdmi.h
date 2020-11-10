@@ -47,13 +47,13 @@ struct dwc_hdmi_softc {
 static inline uint8_t
 RD1(struct dwc_hdmi_softc *sc, bus_size_t off)
 {
-	return (bus_read_1(sc->sc_mem_res, off << sc->sc_reg_shift));
+	return (bus_read_4(sc->sc_mem_res, off << sc->sc_reg_shift));
 }
 
 static inline void
 WR1(struct dwc_hdmi_softc *sc, bus_size_t off, uint8_t val)
 {
-	bus_write_1(sc->sc_mem_res, off << sc->sc_reg_shift, val);
+	bus_write_4(sc->sc_mem_res, off << sc->sc_reg_shift, val);
 }
 
 int	dwc_hdmi_get_edid(device_t, uint8_t **, uint32_t *);
