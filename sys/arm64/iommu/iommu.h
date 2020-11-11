@@ -32,8 +32,8 @@
  * $FreeBSD$
  */
 
-#ifndef _ARM64_IOMMU_IOMMU_SMMU_H_
-#define _ARM64_IOMMU_IOMMU_SMMU_H_
+#ifndef _ARM64_IOMMU_IOMMU_H_
+#define _ARM64_IOMMU_IOMMU_H_
 
 #define	IOMMU_PAGE_SIZE		4096
 #define	IOMMU_PAGE_MASK		(IOMMU_PAGE_SIZE - 1)
@@ -47,36 +47,7 @@
 #define	IOMMU_PGF_NOALLOC	0x0008
 #define	IOMMU_PGF_OBJL		0x0010
 
-struct smmu_unit {
-	struct iommu_unit		unit;
-	LIST_HEAD(, smmu_domain)	domain_list;
-	LIST_ENTRY(smmu_unit)		next;
-	device_t			dev;
-	intptr_t			xref;
-};
-
-struct smmu_domain {
-	struct iommu_domain		domain;
-	LIST_HEAD(, smmu_ctx)		ctx_list;
-	LIST_ENTRY(smmu_domain)	next;
-	u_int entries_cnt;
-	struct smmu_cd			*cd;
-	struct pmap			p;
-	uint16_t			asid;
-};
-
-struct smmu_ctx {
-	struct iommu_ctx		ctx;
-	struct smmu_domain		*domain;
-	LIST_ENTRY(smmu_ctx)		next;
-	device_t			dev;
-	bool				bypass;
-	int				sid;
-	uint16_t			vendor;
-	uint16_t			device;
-};
-
 int iommu_unregister(struct iommu_unit *unit);
 int iommu_register(struct iommu_unit *unit);
 
-#endif /* _ARM64_IOMMU_IOMMU_SMMU_H_ */
+#endif /* _ARM64_IOMMU_IOMMU_H_ */

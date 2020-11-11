@@ -41,6 +41,35 @@
 
 DECLARE_CLASS(smmu_driver);
 
+struct smmu_unit {
+	struct iommu_unit		unit;
+	LIST_HEAD(, smmu_domain)	domain_list;
+	LIST_ENTRY(smmu_unit)		next;
+	device_t			dev;
+	intptr_t			xref;
+};
+
+struct smmu_domain {
+	struct iommu_domain		domain;
+	LIST_HEAD(, smmu_ctx)		ctx_list;
+	LIST_ENTRY(smmu_domain)	next;
+	u_int entries_cnt;
+	struct smmu_cd			*cd;
+	struct pmap			p;
+	uint16_t			asid;
+};
+
+struct smmu_ctx {
+	struct iommu_ctx		ctx;
+	struct smmu_domain		*domain;
+	LIST_ENTRY(smmu_ctx)		next;
+	device_t			dev;
+	bool				bypass;
+	int				sid;
+	uint16_t			vendor;
+	uint16_t			device;
+};
+
 struct smmu_queue_local_copy {
 	union {
 		uint64_t val;

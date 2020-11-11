@@ -75,11 +75,10 @@ __FBSDID("$FreeBSD$");
 #include <machine/intr.h>
 #include <machine/vmparam.h>
 
-#include "smmu_iommu.h"
-#include "smmu_if.h"
+#include "iommu.h"
+#include "iommu_if.h"
 
 static MALLOC_DEFINE(M_IOMMU, "IOMMU", "IOMMU framework");
-static MALLOC_DEFINE(M_BUSDMA, "SMMU", "ARM64 busdma SMMU");
 
 #define	IOMMU_LIST_LOCK()		mtx_lock(&iommu_mtx)
 #define	IOMMU_LIST_UNLOCK()		mtx_unlock(&iommu_mtx)
@@ -99,7 +98,7 @@ domain_unmap_buf(struct iommu_domain *iodom, iommu_gaddr_t base,
 
 	iommu = iodom->iommu;
 
-	error = SMMU_UNMAP(iommu->dev, iodom, base, size);
+	error = IOMMU_UNMAP(iommu->dev, iodom, base, size);
 
 	return (error);
 }
@@ -125,7 +124,7 @@ domain_map_buf(struct iommu_domain *iodom, iommu_gaddr_t base,
 
 	iommu = (struct iommu_unit *)iodom->iommu;
 
-	error = SMMU_MAP(iommu->dev, iodom, va, ma, size, prot);
+	error = IOMMU_MAP(iommu->dev, iodom, va, ma, size, prot);
 
 	return (0);
 }
@@ -140,7 +139,7 @@ smmu_domain_alloc(struct iommu_unit *iommu)
 {
 	struct iommu_domain *iodom;
 
-	iodom = SMMU_DOMAIN_ALLOC(iommu->dev, iommu);
+	iodom = IOMMU_DOMAIN_ALLOC(iommu->dev, iommu);
 	if (iodom == NULL)
 		return (NULL);
 
@@ -161,7 +160,7 @@ smmu_domain_free(struct iommu_domain *domain)
 	iommu = domain->iommu;
 
 	IOMMU_LOCK(iommu);
-	error = SMMU_DOMAIN_FREE(iommu->dev, domain);
+	error = IOMMU_DOMAIN_FREE(iommu->dev, domain);
 	if (error) {
 		IOMMU_UNLOCK(iommu);
 		return (error);
@@ -181,7 +180,7 @@ iommu_ctx_lookup(device_t dev)
 
 	IOMMU_LIST_LOCK();
 	LIST_FOREACH(iommu, &iommu_list, next) {
-		ctx = SMMU_CTX_LOOKUP(iommu->dev, iommu, dev);
+		ctx = IOMMU_CTX_LOOKUP(iommu->dev, iommu, dev);
 		if (ctx != NULL)
 			break;
 	}
@@ -216,7 +215,7 @@ iommu_ctx_alloc(device_t dev, struct iommu_domain *iodom)
 
 	iommu = iodom->iommu;
 
-	ctx = SMMU_CTX_ALLOC(iommu->dev, iodom, dev);
+	ctx = IOMMU_CTX_ALLOC(iommu->dev, iodom, dev);
 	if (ctx == NULL)
 		return (NULL);
 
@@ -236,7 +235,7 @@ iommu_ctx_attach(struct iommu_domain *iodom, struct iommu_ctx *ctx,
 
 	iommu = iodom->iommu;
 
-	error = SMMU_CTX_ATTACH(iommu->dev, iodom, ctx, disabled);
+	error = IOMMU_CTX_ATTACH(iommu->dev, iodom, ctx, disabled);
 	if (error) {
 		device_printf(iommu->dev, "Failed to add ctx\n");
 		return (error);
@@ -296,7 +295,7 @@ iommu_free_ctx_locked(struct iommu_unit *iommu, struct iommu_ctx *ctx)
 
 	IOMMU_ASSERT_LOCKED(iommu);
 
-	error = SMMU_CTX_DETACH(iommu->dev, ctx);
+	error = IOMMU_CTX_DETACH(iommu->dev, ctx);
 	if (error) {
 		device_printf(iommu->dev, "Failed to remove device\n");
 		return;
@@ -400,7 +399,7 @@ iommu_find(device_t dev, bool verbose)
 	struct iommu_unit *iommu, *iommu1;
 
 	LIST_FOREACH(iommu, &iommu_list, next) {
-		iommu1 = SMMU_FIND(iommu->dev, dev);
+		iommu1 = IOMMU_FIND(iommu->dev, dev);
 		if (iommu1 != NULL)
 			return (iommu1);
 	}

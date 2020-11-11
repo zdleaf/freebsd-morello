@@ -46,9 +46,9 @@
 #include <dev/pci/pcivar.h>
 #include <dev/iommu/iommu.h>
 
-#include <arm64/iommu/smmu_iommu.h>
+#include <arm64/iommu/iommu.h>
 
-INTERFACE smmu;
+INTERFACE iommu;
 
 METHOD struct iommu_unit * find {
 	device_t		dev;
