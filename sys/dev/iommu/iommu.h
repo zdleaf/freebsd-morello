@@ -68,7 +68,6 @@ struct iommu_map_entry {
 struct iommu_unit {
 	struct mtx lock;
 	device_t dev;
-	LIST_ENTRY(iommu_unit) next;
 	int unit;
 
 	int dma_enabled;

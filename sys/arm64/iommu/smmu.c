@@ -1896,12 +1896,10 @@ smmu_ctx_lookup(device_t dev, device_t child)
 	return (NULL);
 }
 
-static struct iommu_unit *
+static int
 smmu_find(device_t dev, device_t child)
 {
-	struct iommu_unit *iommu;
 	struct smmu_softc *sc;
-	struct smmu_unit *unit;
 	u_int xref, sid;
 	uint16_t rid;
 	int error;
@@ -1911,8 +1909,6 @@ smmu_find(device_t dev, device_t child)
 
 	rid = pci_get_rid(child);
 	seg = pci_get_domain(child);
-	unit = &sc->unit;
-	iommu = &unit->unit;
 
 	/*
 	 * Find an xref of an IOMMU controller that serves traffic for dev.
@@ -1921,18 +1917,18 @@ smmu_find(device_t dev, device_t child)
 	error = acpi_iort_map_pci_smmuv3(seg, rid, &xref, &sid);
 	if (error) {
 		/* Could not find reference to an SMMU device. */
-		return (NULL);
+		return (ENOENT);
 	}
 #else
 	/* TODO: add FDT support. */
-	return (NULL);
+	return (ENXIO);
 #endif
 
 	/* Check if xref is ours. */
 	if (xref != sc->xref)
-		return (NULL);
+		return (EFAULT);
 
-	return (iommu);
+	return (0);
 }
 
 static device_method_t smmu_methods[] = {

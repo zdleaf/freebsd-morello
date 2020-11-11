@@ -51,9 +51,10 @@
 INTERFACE iommu;
 
 #
-# Find an iommu controller that is responsible to serve traffic for a child.
+# Check if this iommu controller is responsible to serve traffic for
+# a given child.
 #
-METHOD struct iommu_unit * find {
+METHOD int find {
 	device_t		dev;
 	device_t		child;
 };

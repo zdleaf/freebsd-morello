@@ -87,7 +87,12 @@ static MALLOC_DEFINE(M_IOMMU, "IOMMU", "IOMMU framework");
 #define dprintf(fmt, ...)
 
 static struct mtx iommu_mtx;
-static LIST_HEAD(, iommu_unit) iommu_list = LIST_HEAD_INITIALIZER(iommu_list);
+
+struct iommu_entry {
+	struct iommu_unit *iommu;
+	LIST_ENTRY(iommu_entry) next;
+};
+static LIST_HEAD(, iommu_entry) iommu_list = LIST_HEAD_INITIALIZER(iommu_list);
 
 static int
 iommu_domain_unmap_buf(struct iommu_domain *iodom, iommu_gaddr_t base,
@@ -326,11 +331,15 @@ iommu_domain_unload(struct iommu_domain *iodom,
 int
 iommu_register(struct iommu_unit *iommu)
 {
+	struct iommu_entry *entry;
 
 	mtx_init(&iommu->lock, "IOMMU", NULL, MTX_DEF);
 
+	entry = malloc(sizeof(struct iommu_entry), M_IOMMU, M_WAITOK | M_ZERO);
+	entry->iommu = iommu;
+
 	IOMMU_LIST_LOCK();
-	LIST_INSERT_HEAD(&iommu_list, iommu, next);
+	LIST_INSERT_HEAD(&iommu_list, entry, next);
 	IOMMU_LIST_UNLOCK();
 
 	iommu_init_busdma(iommu);
@@ -341,10 +350,12 @@ iommu_register(struct iommu_unit *iommu)
 int
 iommu_unregister(struct iommu_unit *iommu)
 {
+	struct iommu_entry *entry, *tmp;
 
-	IOMMU_LIST_LOCK();
-	LIST_REMOVE(iommu, next);
-	IOMMU_LIST_UNLOCK();
+	LIST_FOREACH_SAFE(entry, &iommu_list, next, tmp) {
+		if (entry->iommu == iommu)
+			LIST_REMOVE(entry, next);
+	}
 
 	iommu_fini_busdma(iommu);
 
@@ -356,12 +367,15 @@ iommu_unregister(struct iommu_unit *iommu)
 struct iommu_unit *
 iommu_find(device_t dev, bool verbose)
 {
-	struct iommu_unit *iommu, *iommu1;
+	struct iommu_entry *entry;
+	struct iommu_unit *iommu;
+	int error;
 
-	LIST_FOREACH(iommu, &iommu_list, next) {
-		iommu1 = IOMMU_FIND(iommu->dev, dev);
-		if (iommu1 != NULL)
-			return (iommu1);
+	LIST_FOREACH(entry, &iommu_list, next) {
+		iommu = entry->iommu;
+		error = IOMMU_FIND(iommu->dev, dev);
+		if (error == 0)
+			return (entry->iommu);
 	}
 
 	return (NULL);
