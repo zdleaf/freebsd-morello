@@ -170,25 +170,6 @@ iommu_domain_free(struct iommu_domain *iodom)
 	return (0);
 }
 
-static struct iommu_ctx *
-iommu_ctx_lookup(device_t dev)
-{
-	struct iommu_unit *iommu;
-	struct iommu_ctx *ctx;
-
-	ctx = NULL;
-
-	IOMMU_LIST_LOCK();
-	LIST_FOREACH(iommu, &iommu_list, next) {
-		ctx = IOMMU_CTX_LOOKUP(iommu->dev, dev);
-		if (ctx != NULL)
-			break;
-	}
-	IOMMU_LIST_UNLOCK();
-
-	return (ctx);
-}
-
 static void
 iommu_tag_init(struct bus_dma_tag_iommu *t)
 {
@@ -208,40 +189,20 @@ iommu_tag_init(struct bus_dma_tag_iommu *t)
 }
 
 static struct iommu_ctx *
-iommu_ctx_alloc(device_t dev, struct iommu_domain *iodom)
+iommu_ctx_alloc(device_t dev, struct iommu_domain *iodom, bool disabled)
 {
 	struct iommu_unit *iommu;
 	struct iommu_ctx *ctx;
 
 	iommu = iodom->iommu;
 
-	ctx = IOMMU_CTX_ALLOC(iommu->dev, iodom, dev);
+	ctx = IOMMU_CTX_ALLOC(iommu->dev, iodom, dev, disabled);
 	if (ctx == NULL)
 		return (NULL);
 
 	ctx->rid = pci_get_rid(dev);
 
 	return (ctx);
-}
-/*
- * Attach a consumer device to a domain.
- */
-static int
-iommu_ctx_attach(struct iommu_domain *iodom, struct iommu_ctx *ctx,
-    bool disabled)
-{
-	struct iommu_unit *iommu;
-	int error;
-
-	iommu = iodom->iommu;
-
-	error = IOMMU_CTX_ATTACH(iommu->dev, iodom, ctx, disabled);
-	if (error) {
-		device_printf(iommu->dev, "Failed to add ctx\n");
-		return (error);
-	}
-
-	return (error);
 }
 
 struct iommu_ctx *
@@ -251,9 +212,8 @@ iommu_get_ctx(struct iommu_unit *iommu, device_t requester,
 	struct iommu_ctx *ctx;
 	struct iommu_domain *iodom;
 	struct bus_dma_tag_iommu *tag;
-	int error;
 
-	ctx = iommu_ctx_lookup(requester);
+	ctx = IOMMU_CTX_LOOKUP(iommu->dev, requester);
 	if (ctx)
 		return (ctx);
 
@@ -265,9 +225,11 @@ iommu_get_ctx(struct iommu_unit *iommu, device_t requester,
 	if (iodom == NULL)
 		return (NULL);
 
-	ctx = iommu_ctx_alloc(requester, iodom);
-	if (ctx == NULL)
+	ctx = iommu_ctx_alloc(requester, iodom, disabled);
+	if (ctx == NULL) {
+		iommu_domain_free(iodom);
 		return (NULL);
+	}
 
 	tag = ctx->tag = malloc(sizeof(struct bus_dma_tag_iommu),
 	    M_IOMMU, M_WAITOK | M_ZERO);
@@ -276,12 +238,6 @@ iommu_get_ctx(struct iommu_unit *iommu, device_t requester,
 	tag->ctx->domain = iodom;
 
 	iommu_tag_init(tag);
-
-	error = iommu_ctx_attach(iodom, ctx, disabled);
-	if (error) {
-		iommu_domain_free(iodom);
-		return (NULL);
-	}
 
 	ctx->domain = iodom;
 
@@ -295,20 +251,13 @@ iommu_free_ctx_locked(struct iommu_unit *iommu, struct iommu_ctx *ctx)
 
 	IOMMU_ASSERT_LOCKED(iommu);
 
-	error = IOMMU_CTX_DETACH(iommu->dev, ctx);
+	error = IOMMU_CTX_FREE(iommu->dev, ctx);
 	if (error) {
 		device_printf(iommu->dev, "Failed to remove device\n");
 		return;
 	}
 
 	free(ctx->tag, M_IOMMU);
-
-	IOMMU_UNLOCK(iommu);
-
-	/* Since we have a domain per each ctx, remove the domain too. */
-	error = iommu_domain_free(ctx->domain);
-	if (error)
-		device_printf(iommu->dev, "Could not free a domain\n");
 }
 
 void
@@ -316,12 +265,19 @@ iommu_free_ctx(struct iommu_ctx *ctx)
 {
 	struct iommu_unit *iommu;
 	struct iommu_domain *iodom;
+	int error;
 
 	iodom = ctx->domain;
 	iommu = iodom->iommu;
 
 	IOMMU_LOCK(iommu);
 	iommu_free_ctx_locked(iommu, ctx);
+	IOMMU_UNLOCK(iommu);
+
+	/* Since we have a domain per each ctx, remove the domain too. */
+	error = iommu_domain_free(iodom);
+	if (error)
+		device_printf(iommu->dev, "Could not free a domain\n");
 }
 
 static void
@@ -386,6 +342,10 @@ iommu_unregister(struct iommu_unit *iommu)
 	IOMMU_LIST_LOCK();
 	LIST_REMOVE(iommu, next);
 	IOMMU_LIST_UNLOCK();
+
+	iommu_fini_busdma(iommu);
+
+	mtx_destroy(&iommu->lock);
 
 	return (0);
 }

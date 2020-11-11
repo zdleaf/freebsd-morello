@@ -50,6 +50,9 @@
 
 INTERFACE iommu;
 
+#
+# Find an iommu controller that is responsible to serve traffic for a child.
+#
 METHOD struct iommu_unit * find {
 	device_t		dev;
 	device_t		child;
@@ -101,7 +104,7 @@ METHOD struct iommu_domain * domain_lookup {
 };
 
 #
-# Find a context for a device.
+# Find an allocated context for a device.
 #
 METHOD struct iommu_ctx * ctx_lookup {
 	device_t		dev;
@@ -109,28 +112,19 @@ METHOD struct iommu_ctx * ctx_lookup {
 };
 
 #
-# Allocate an iommu context.
+# Allocate a new iommu context.
 #
 METHOD struct iommu_ctx * ctx_alloc {
 	device_t		dev;
 	struct iommu_domain	*domain;
 	device_t		child;
-};
-
-#
-# Attach a consumer device to a IOMMU domain.
-#
-METHOD int ctx_attach {
-	device_t		dev;
-	struct iommu_domain	*domain;
-	struct iommu_ctx	*ctx;
 	bool			disabled;
 };
 
 #
-# Detach a consumer device from IOMMU domain.
+# Free the iommu context.
 #
-METHOD int ctx_detach {
+METHOD int ctx_free {
 	device_t		dev;
 	struct iommu_ctx	*ctx;
 };

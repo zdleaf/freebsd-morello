@@ -1780,21 +1780,8 @@ smmu_set_buswide(device_t dev, struct smmu_domain *domain,
 }
 
 static struct iommu_ctx *
-smmu_ctx_alloc(device_t dev, struct iommu_domain *iodom, device_t child)
-{
-	struct smmu_ctx *ctx;
-
-	ctx = malloc(sizeof(struct smmu_ctx), M_SMMU, M_WAITOK | M_ZERO);
-	ctx->vendor = pci_get_vendor(child);
-	ctx->device = pci_get_device(child);
-	ctx->dev = child;
-
-	return (&ctx->ctx);
-}
-
-static int
-smmu_ctx_attach(device_t dev, struct iommu_domain *iodom,
-    struct iommu_ctx *ioctx, bool disabled)
+smmu_ctx_alloc(device_t dev, struct iommu_domain *iodom, device_t child,
+    bool disabled)
 {
 	struct smmu_domain *domain;
 	struct smmu_softc *sc;
@@ -1805,27 +1792,28 @@ smmu_ctx_attach(device_t dev, struct iommu_domain *iodom,
 	int err;
 
 	sc = device_get_softc(dev);
-
 	domain = (struct smmu_domain *)iodom;
-	ctx = (struct smmu_ctx *)ioctx;
-	ctx->domain = domain;
 
-	if (disabled)
-		ctx->bypass = true;
-
-	seg = pci_get_domain(ctx->dev);
-	rid = pci_get_rid(ctx->dev);
+	seg = pci_get_domain(child);
+	rid = pci_get_rid(child);
 	err = acpi_iort_map_pci_smmuv3(seg, rid, &xref, &sid);
 	if (err)
-		return (ENOENT);
-
-	ctx->sid = sid;
+		return (NULL);
 
 	if (sc->features & SMMU_FEATURE_2_LVL_STREAM_TABLE) {
 		err = smmu_init_l1_entry(sc, sid);
 		if (err)
-			return (ENXIO);
+			return (NULL);
 	}
+
+	ctx = malloc(sizeof(struct smmu_ctx), M_SMMU, M_WAITOK | M_ZERO);
+	ctx->vendor = pci_get_vendor(child);
+	ctx->device = pci_get_device(child);
+	ctx->dev = child;
+	ctx->sid = sid;
+	ctx->domain = domain;
+	if (disabled)
+		ctx->bypass = true;
 
 	/*
 	 * Neoverse N1 SDP:
@@ -1843,11 +1831,11 @@ smmu_ctx_attach(device_t dev, struct iommu_domain *iodom,
 	LIST_INSERT_HEAD(&domain->ctx_list, ctx, next);
 	IOMMU_DOMAIN_UNLOCK(iodom);
 
-	return (0);
+	return (&ctx->ctx);
 }
 
 static int
-smmu_ctx_detach(device_t dev, struct iommu_ctx *ioctx)
+smmu_ctx_free(device_t dev, struct iommu_ctx *ioctx)
 {
 	struct smmu_softc *sc;
 	struct smmu_ctx *ctx;
@@ -1858,6 +1846,8 @@ smmu_ctx_detach(device_t dev, struct iommu_ctx *ioctx)
 	smmu_deinit_l1_entry(sc, ctx->sid);
 
 	LIST_REMOVE(ctx, next);
+
+	free(ctx, M_SMMU);
 
 	return (0);
 }
@@ -1956,9 +1946,8 @@ static device_method_t smmu_methods[] = {
 	DEVMETHOD(iommu_domain_alloc,	smmu_domain_alloc),
 	DEVMETHOD(iommu_domain_free,	smmu_domain_free),
 	DEVMETHOD(iommu_ctx_alloc,	smmu_ctx_alloc),
+	DEVMETHOD(iommu_ctx_free,	smmu_ctx_free),
 	DEVMETHOD(iommu_ctx_lookup,	smmu_ctx_lookup),
-	DEVMETHOD(iommu_ctx_attach,	smmu_ctx_attach),
-	DEVMETHOD(iommu_ctx_detach,	smmu_ctx_detach),
 
 	/* Bus interface */
 	DEVMETHOD(bus_read_ivar,	smmu_read_ivar),
