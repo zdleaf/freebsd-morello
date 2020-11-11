@@ -353,8 +353,10 @@ iommu_unregister(struct iommu_unit *iommu)
 	struct iommu_entry *entry, *tmp;
 
 	LIST_FOREACH_SAFE(entry, &iommu_list, next, tmp) {
-		if (entry->iommu == iommu)
+		if (entry->iommu == iommu) {
 			LIST_REMOVE(entry, next);
+			free(entry, M_IOMMU);
+		}
 	}
 
 	iommu_fini_busdma(iommu);
