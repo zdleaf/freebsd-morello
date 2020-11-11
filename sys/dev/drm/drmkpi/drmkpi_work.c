@@ -27,12 +27,30 @@
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
-#include <linux/workqueue.h>
-#include <linux/wait.h>
-#include <linux/compat.h>
-#include <linux/spinlock.h>
-
 #include <sys/kernel.h>
+#include <sys/mutex.h>
+#include <sys/smp.h>
+#include <sys/taskqueue.h>
+#include <sys/time.h>
+
+#include <linux/sched.h>	/* Still needed for task* */
+
+#include <drmkpi/work.h>
+
+/* Redefined spin_lock_name here for now */
+#ifdef WITNESS_ALL
+/* NOTE: the maximum WITNESS name is 64 chars */
+#define	__spin_lock_name(name, file, line)		\
+	(((const char *){file ":" #line "-" name}) +	\
+	(sizeof(file) > 16 ? sizeof(file) - 16 : 0))
+#else
+#define	__spin_lock_name(name, file, line)	name
+#endif
+#define	_spin_lock_name(...)		__spin_lock_name(__VA_ARGS__)
+#define	spin_lock_name(name)		_spin_lock_name(name, __FILE__, __LINE__)
+
+#define	WQ_EXEC_LOCK(wq) mtx_lock(&(wq)->exec_mtx)
+#define	WQ_EXEC_UNLOCK(wq) mtx_unlock(&(wq)->exec_mtx)
 
 /*
  * Define all work struct states
@@ -55,8 +73,6 @@ static struct workqueue_struct *drmkpi__system_long_wq;
 struct workqueue_struct *drmkpi_system_wq;
 struct workqueue_struct *drmkpi_system_long_wq;
 struct workqueue_struct *drmkpi_system_unbound_wq;
-struct workqueue_struct *drmkpi_system_highpri_wq;
-struct workqueue_struct *drmkpi_system_power_efficient_wq;
 
 static int drmkpi_default_wq_cpus = 4;
 
@@ -138,7 +154,7 @@ drmkpi_queue_work_on(int cpu __unused, struct workqueue_struct *wq,
 	};
 
 	if (atomic_read(&wq->draining) != 0)
-		return (!work_pending(work));
+		return (!drmkpi_work_pending(work));
 
 	switch (drmkpi_update_state(&work->state, states)) {
 	case WORK_ST_EXEC:
@@ -174,23 +190,23 @@ drmkpi_queue_delayed_work_on(int cpu, struct workqueue_struct *wq,
 	};
 
 	if (atomic_read(&wq->draining) != 0)
-		return (!work_pending(&dwork->work));
+		return (!drmkpi_work_pending(&dwork->work));
 
 	switch (drmkpi_update_state(&dwork->work.state, states)) {
 	case WORK_ST_EXEC:
 	case WORK_ST_CANCEL:
 		if (delay == 0 && drmkpi_work_exec_unblock(&dwork->work) != 0) {
-			dwork->timer.expires = jiffies;
+			dwork->timer.expires = ticks;
 			return (1);
 		}
 		/* FALLTHROUGH */
 	case WORK_ST_IDLE:
 		dwork->work.work_queue = wq;
-		dwork->timer.expires = jiffies + delay;
+		dwork->timer.expires = ticks + delay;
 
 		if (delay == 0) {
 			drmkpi_delayed_work_enqueue(dwork);
-		} else if (unlikely(cpu != WORK_CPU_UNBOUND)) {
+		} else if (unlikely(cpu != MAXCPU)) {
 			mtx_lock(&dwork->timer.mtx);
 			callout_reset_on(&dwork->timer.callout, delay,
 			    &drmkpi_delayed_work_timer_fn, dwork, cpu);
@@ -569,7 +585,9 @@ void
 drmkpi_destroy_workqueue(struct workqueue_struct *wq)
 {
 	atomic_inc(&wq->draining);
-	drain_workqueue(wq);
+	atomic_inc(&wq->draining);
+	taskqueue_drain_all(wq->taskqueue);
+	atomic_dec(&wq->draining);
 	taskqueue_free(wq->taskqueue);
 	mtx_destroy(&wq->exec_mtx);
 	kfree(wq);
@@ -604,29 +622,25 @@ drmkpi_work_init(void *arg)
 	/* set default number of CPUs */
 	drmkpi_default_wq_cpus = max_wq_cpus;
 
-	drmkpi__system_short_wq = alloc_workqueue("linuxkpi_short_wq", 0, max_wq_cpus);
-	drmkpi__system_long_wq = alloc_workqueue("linuxkpi_long_wq", 0, max_wq_cpus);
+	drmkpi__system_short_wq = drmkpi_create_workqueue_common("linuxkpi_short_wq", max_wq_cpus);
+	drmkpi__system_long_wq = drmkpi_create_workqueue_common("linuxkpi_long_wq", max_wq_cpus);
 
 	/* populate the workqueue pointers */
-	system_long_wq = drmkpi__system_long_wq;
-	system_wq = drmkpi__system_short_wq;
-	system_power_efficient_wq = drmkpi__system_short_wq;
-	system_unbound_wq = drmkpi__system_short_wq;
-	system_highpri_wq = drmkpi__system_short_wq;
+	drmkpi_system_long_wq = drmkpi__system_long_wq;
+	drmkpi_system_wq = drmkpi__system_short_wq;
+	drmkpi_system_unbound_wq = drmkpi__system_short_wq;
 }
 SYSINIT(drmkpi_work_init, SI_SUB_TASKQ, SI_ORDER_THIRD, drmkpi_work_init, NULL);
 
 static void
 drmkpi_work_uninit(void *arg)
 {
-	destroy_workqueue(drmkpi__system_short_wq);
-	destroy_workqueue(drmkpi__system_long_wq);
+	drmkpi_destroy_workqueue(drmkpi__system_short_wq);
+	drmkpi_destroy_workqueue(drmkpi__system_long_wq);
 
 	/* clear workqueue pointers */
-	system_long_wq = NULL;
-	system_wq = NULL;
-	system_power_efficient_wq = NULL;
-	system_unbound_wq = NULL;
-	system_highpri_wq = NULL;
+	drmkpi_system_long_wq = NULL;
+	drmkpi_system_wq = NULL;
+	drmkpi_system_unbound_wq = NULL;
 }
 SYSUNINIT(drmkpi_work_uninit, SI_SUB_TASKQ, SI_ORDER_THIRD, drmkpi_work_uninit, NULL);

@@ -43,34 +43,11 @@
 #include <sys/taskqueue.h>
 #include <sys/mutex.h>
 
+#include <drmkpi/work.h>
+
 #define	WORK_CPU_UNBOUND MAXCPU
 #define	WQ_UNBOUND (1 << 0)
 #define	WQ_HIGHPRI (1 << 1)
-
-struct work_struct;
-typedef void (*work_func_t)(struct work_struct *);
-
-struct work_exec {
-	TAILQ_ENTRY(work_exec) entry;
-	struct work_struct *target;
-};
-
-struct workqueue_struct {
-	struct taskqueue *taskqueue;
-	struct mtx exec_mtx;
-	TAILQ_HEAD(, work_exec) exec_head;
-	atomic_t draining;
-};
-
-#define	WQ_EXEC_LOCK(wq) mtx_lock(&(wq)->exec_mtx)
-#define	WQ_EXEC_UNLOCK(wq) mtx_unlock(&(wq)->exec_mtx)
-
-struct work_struct {
-	struct task work_task;
-	struct workqueue_struct *work_queue;
-	work_func_t func;
-	atomic_t state;
-};
 
 #define	DECLARE_WORK(name, fn)						\
 	struct work_struct name;					\
@@ -79,15 +56,6 @@ struct work_struct {
 		INIT_WORK(&name, fn);					\
 	}								\
 	SYSINIT(name, SI_SUB_LOCK, SI_ORDER_SECOND, name##_init, NULL)
-
-struct delayed_work {
-	struct work_struct work;
-	struct {
-		struct callout callout;
-		struct mtx mtx;
-		int	expires;
-	} timer;
-};
 
 #define	DECLARE_DELAYED_WORK(name, fn)					\
 	struct delayed_work name;					\
@@ -217,30 +185,5 @@ do {									\
 
 #define	current_work() \
 	drmkpi_current_work()
-
-/* prototypes */
-
-extern struct workqueue_struct *drmkpi_system_wq;
-extern struct workqueue_struct *drmkpi_system_long_wq;
-extern struct workqueue_struct *drmkpi_system_unbound_wq;
-extern struct workqueue_struct *drmkpi_system_highpri_wq;
-extern struct workqueue_struct *drmkpi_system_power_efficient_wq;
-
-extern void drmkpi_init_delayed_work(struct delayed_work *, work_func_t);
-extern void drmkpi_work_fn(void *, int);
-extern void drmkpi_delayed_work_fn(void *, int);
-extern struct workqueue_struct *drmkpi_create_workqueue_common(const char *, int);
-extern void drmkpi_destroy_workqueue(struct workqueue_struct *);
-extern bool drmkpi_queue_work_on(int cpu, struct workqueue_struct *, struct work_struct *);
-extern bool drmkpi_queue_delayed_work_on(int cpu, struct workqueue_struct *,
-    struct delayed_work *, unsigned delay);
-extern bool drmkpi_cancel_delayed_work(struct delayed_work *);
-extern bool drmkpi_cancel_work_sync(struct work_struct *);
-extern bool drmkpi_cancel_delayed_work_sync(struct delayed_work *);
-extern bool drmkpi_flush_work(struct work_struct *);
-extern bool drmkpi_flush_delayed_work(struct delayed_work *);
-extern bool drmkpi_work_pending(struct work_struct *);
-extern bool drmkpi_work_busy(struct work_struct *);
-extern struct work_struct *drmkpi_current_work(void);
 
 #endif	/* __DRMKPI_WORKQUEUE_H__ */
