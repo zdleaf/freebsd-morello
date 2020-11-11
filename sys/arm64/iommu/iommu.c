@@ -122,7 +122,7 @@ iommu_domain_map_buf(struct iommu_domain *iodom, iommu_gaddr_t base,
 
 	va = base;
 
-	iommu = (struct iommu_unit *)iodom->iommu;
+	iommu = iodom->iommu;
 
 	error = IOMMU_MAP(iommu->dev, iodom, va, ma, size, prot);
 
@@ -152,15 +152,15 @@ iommu_domain_alloc(struct iommu_unit *iommu)
 }
 
 static int
-iommu_domain_free(struct iommu_domain *domain)
+iommu_domain_free(struct iommu_domain *iodom)
 {
 	struct iommu_unit *iommu;
 	int error;
 
-	iommu = domain->iommu;
+	iommu = iodom->iommu;
 
 	IOMMU_LOCK(iommu);
-	error = IOMMU_DOMAIN_FREE(iommu->dev, domain);
+	error = IOMMU_DOMAIN_FREE(iommu->dev, iodom);
 	if (error) {
 		IOMMU_UNLOCK(iommu);
 		return (error);
@@ -249,7 +249,7 @@ iommu_get_ctx(struct iommu_unit *iommu, device_t requester,
     uint16_t rid, bool disabled, bool rmrr)
 {
 	struct iommu_ctx *ctx;
-	struct iommu_domain *domain;
+	struct iommu_domain *iodom;
 	struct bus_dma_tag_iommu *tag;
 	int error;
 
@@ -261,11 +261,11 @@ iommu_get_ctx(struct iommu_unit *iommu, device_t requester,
 	 * In our current configuration we have a domain per each ctx.
 	 * So allocate a domain first.
 	 */
-	domain = iommu_domain_alloc(iommu);
-	if (domain == NULL)
+	iodom = iommu_domain_alloc(iommu);
+	if (iodom == NULL)
 		return (NULL);
 
-	ctx = iommu_ctx_alloc(requester, domain);
+	ctx = iommu_ctx_alloc(requester, iodom);
 	if (ctx == NULL)
 		return (NULL);
 
@@ -273,17 +273,17 @@ iommu_get_ctx(struct iommu_unit *iommu, device_t requester,
 	    M_IOMMU, M_WAITOK | M_ZERO);
 	tag->owner = requester;
 	tag->ctx = ctx;
-	tag->ctx->domain = domain;
+	tag->ctx->domain = iodom;
 
 	iommu_tag_init(tag);
 
-	error = iommu_ctx_attach(domain, ctx, disabled);
+	error = iommu_ctx_attach(iodom, ctx, disabled);
 	if (error) {
-		iommu_domain_free(domain);
+		iommu_domain_free(iodom);
 		return (NULL);
 	}
 
-	ctx->domain = domain;
+	ctx->domain = iodom;
 
 	return (ctx);
 }
@@ -315,10 +315,10 @@ void
 iommu_free_ctx(struct iommu_ctx *ctx)
 {
 	struct iommu_unit *iommu;
-	struct iommu_domain *domain;
+	struct iommu_domain *iodom;
 
-	domain = ctx->domain;
-	iommu = domain->iommu;
+	iodom = ctx->domain;
+	iommu = iodom->iommu;
 
 	IOMMU_LOCK(iommu);
 	iommu_free_ctx_locked(iommu, ctx);
@@ -327,36 +327,33 @@ iommu_free_ctx(struct iommu_ctx *ctx)
 static void
 iommu_domain_free_entry(struct iommu_map_entry *entry, bool free)
 {
-	struct iommu_domain *domain;
+	struct iommu_domain *iodom;
 
-	domain = entry->domain;
+	iodom = entry->domain;
 
-	IOMMU_DOMAIN_LOCK(domain);
-	iommu_gas_free_space(domain, entry);
-	IOMMU_DOMAIN_UNLOCK(domain);
+	IOMMU_DOMAIN_LOCK(iodom);
+	iommu_gas_free_space(iodom, entry);
+	IOMMU_DOMAIN_UNLOCK(iodom);
 
 	if (free)
-		iommu_gas_free_entry(domain, entry);
+		iommu_gas_free_entry(iodom, entry);
 	else
 		entry->flags = 0;
 }
 
 void
-iommu_domain_unload(struct iommu_domain *domain,
+iommu_domain_unload(struct iommu_domain *iodom,
     struct iommu_map_entries_tailq *entries, bool cansleep)
 {
-	struct iommu_unit *iommu;
 	struct iommu_map_entry *entry, *entry1;
 	int error;
 
-	iommu = (struct iommu_unit *)domain->iommu;
-
 	TAILQ_FOREACH_SAFE(entry, entries, dmamap_link, entry1) {
 		KASSERT((entry->flags & IOMMU_MAP_ENTRY_MAP) != 0,
-		    ("not mapped entry %p %p", domain, entry));
-		error = domain->ops->unmap(domain, entry->start, entry->end -
+		    ("not mapped entry %p %p", iodom, entry));
+		error = iodom->ops->unmap(iodom, entry->start, entry->end -
 		    entry->start, cansleep ? IOMMU_PGF_WAITOK : 0);
-		KASSERT(error == 0, ("unmap %p error %d", domain, error));
+		KASSERT(error == 0, ("unmap %p error %d", iodom, error));
 		TAILQ_REMOVE(entries, entry, dmamap_link);
 		iommu_domain_free_entry(entry, true);
         }
