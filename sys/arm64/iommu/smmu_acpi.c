@@ -58,8 +58,8 @@ __FBSDID("$FreeBSD$");
 #include <machine/resource.h>
 #include <arm64/iommu/iommu.h>
 
-#include "smmu_reg.h"
-#include "smmu_var.h"
+#include "smmureg.h"
+#include "smmuvar.h"
 #include "pic_if.h"
 
 #define	MEMORY_RESOURCE_SIZE	0x20000

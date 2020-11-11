@@ -126,8 +126,8 @@ __FBSDID("$FreeBSD$");
 #include "iommu.h"
 #include "iommu_if.h"
 
-#include "smmu_reg.h"
-#include "smmu_var.h"
+#include "smmureg.h"
+#include "smmuvar.h"
 
 #define	STRTAB_L1_SZ_SHIFT	20
 #define	STRTAB_SPLIT		8

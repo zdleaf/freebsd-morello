@@ -52,7 +52,7 @@ __FBSDID("$FreeBSD$");
 #include <dev/pci/pcivar.h>
 #include <dev/iommu/iommu.h>
 
-#include "smmu_var.h"
+#include "smmuvar.h"
 
 struct smmu_quirk_entry {
 	uint16_t vendor;
