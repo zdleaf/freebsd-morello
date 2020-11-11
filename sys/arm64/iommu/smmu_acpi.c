@@ -192,6 +192,8 @@ static int
 smmu_acpi_attach(device_t dev)
 {
 	struct smmu_softc *sc;
+	struct smmu_unit *iommu;
+	struct iommu_unit *unit;
 	uintptr_t priv;
 	int err;
 
@@ -209,9 +211,6 @@ smmu_acpi_attach(device_t dev)
 	err = smmu_attach(dev);
 	if (err != 0)
 		goto error;
-
-	struct smmu_unit *iommu;
-	struct iommu_unit *unit;
 
 	iommu = &sc->unit;
 	iommu->dev = dev;

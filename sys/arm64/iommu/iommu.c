@@ -180,7 +180,7 @@ iommu_ctx_lookup(device_t dev)
 
 	IOMMU_LIST_LOCK();
 	LIST_FOREACH(iommu, &iommu_list, next) {
-		ctx = IOMMU_CTX_LOOKUP(iommu->dev, iommu, dev);
+		ctx = IOMMU_CTX_LOOKUP(iommu->dev, dev);
 		if (ctx != NULL)
 			break;
 	}

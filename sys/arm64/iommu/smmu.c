@@ -1866,8 +1866,8 @@ struct smmu_ctx *
 smmu_ctx_lookup_by_sid(device_t dev, u_int sid)
 {
 	struct smmu_softc *sc;
-	struct smmu_unit *unit;
 	struct smmu_domain *domain;
+	struct smmu_unit *unit;
 	struct smmu_ctx *ctx;
 
 	sc = device_get_softc(dev);
@@ -1885,13 +1885,16 @@ smmu_ctx_lookup_by_sid(device_t dev, u_int sid)
 }
 
 static struct iommu_ctx *
-smmu_ctx_lookup(device_t dev, struct iommu_unit *iommu, device_t child)
+smmu_ctx_lookup(device_t dev, device_t child)
 {
+	struct smmu_softc *sc;
 	struct smmu_domain *domain;
 	struct smmu_unit *unit;
 	struct smmu_ctx *ctx;
 
-	unit = (struct smmu_unit *)iommu;
+	sc = device_get_softc(dev);
+
+	unit = &sc->unit;
 
 	LIST_FOREACH(domain, &unit->domain_list, next) {
 		LIST_FOREACH(ctx, &domain->ctx_list, next) {

@@ -105,7 +105,6 @@ METHOD struct iommu_domain * domain_lookup {
 #
 METHOD struct iommu_ctx * ctx_lookup {
 	device_t		dev;
-	struct iommu_unit	*unit;
 	device_t		child;
 };
 
