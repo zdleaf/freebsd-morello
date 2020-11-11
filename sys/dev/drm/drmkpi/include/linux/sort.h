@@ -1,10 +1,9 @@
-#ifndef __DRMKPI_SORT_H__
-#define	__DRMKPI_SORT_H__
+#ifndef __LINUX_SORT_H__
+#define	__LINUX_SORT_H__
 
 #include <linux/types.h>
+#include <drmkpi/sort.h>
 
-void sort(void *base, size_t num, size_t size,
-	  int (*cmp)(const void *, const void *),
-	  void (*swap)(void *, void *, int));
+#define	sort(b, n, s, cmp, swap)	drmkpi_sort(b, n, s, cmp, swap)
 
-#endif	/* __DRMKPI_SORT_H__ */
+#endif	/* __LINUX_SORT_H__ */
