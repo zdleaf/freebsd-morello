@@ -128,13 +128,12 @@ SDT_PROBE_DEFINE(proc, , , lwp__exit);
  */
 static uma_zone_t thread_zone;
 
-TAILQ_HEAD(, thread) zombie_threads = TAILQ_HEAD_INITIALIZER(zombie_threads);
-static struct mtx zombie_lock;
-MTX_SYSINIT(zombie_lock, &zombie_lock, "zombie lock", MTX_SPIN);
+static __exclusive_cache_line struct thread *thread_zombies;
 
 static void thread_zombie(struct thread *);
 static int thread_unsuspend_one(struct thread *td, struct proc *p,
     bool boundary);
+static void thread_free_batched(struct thread *td);
 
 static struct mtx tid_lock;
 static bitstr_t *tid_bitmap;
@@ -202,18 +201,38 @@ tid_alloc(void)
 }
 
 static void
-tid_free(lwpid_t rtid)
+tid_free_locked(lwpid_t rtid)
 {
 	lwpid_t tid;
 
+	mtx_assert(&tid_lock, MA_OWNED);
 	KASSERT(rtid >= NO_PID,
 	    ("%s: invalid tid %d\n", __func__, rtid));
 	tid = rtid - NO_PID;
-	mtx_lock(&tid_lock);
 	KASSERT(bit_test(tid_bitmap, tid) != 0,
 	    ("thread ID %d not allocated\n", rtid));
 	bit_clear(tid_bitmap, tid);
 	nthreads--;
+}
+
+static void
+tid_free(lwpid_t rtid)
+{
+
+	mtx_lock(&tid_lock);
+	tid_free_locked(rtid);
+	mtx_unlock(&tid_lock);
+}
+
+static void
+tid_free_batch(lwpid_t *batch, int n)
+{
+	int i;
+
+	mtx_lock(&tid_lock);
+	for (i = 0; i < n; i++) {
+		tid_free_locked(batch[i]);
+	}
 	mtx_unlock(&tid_lock);
 }
 
@@ -409,14 +428,20 @@ threadinit(void)
 
 /*
  * Place an unused thread on the zombie list.
- * Use the slpq as that must be unused by now.
  */
 void
 thread_zombie(struct thread *td)
 {
-	mtx_lock_spin(&zombie_lock);
-	TAILQ_INSERT_HEAD(&zombie_threads, td, td_slpq);
-	mtx_unlock_spin(&zombie_lock);
+	struct thread *ztd;
+
+	ztd = atomic_load_ptr(&thread_zombies);
+	for (;;) {
+		td->td_zombie = ztd;
+		if (atomic_fcmpset_rel_ptr((uintptr_t *)&thread_zombies,
+		    (uintptr_t *)&ztd, (uintptr_t)td))
+			break;
+		continue;
+	}
 }
 
 /*
@@ -430,29 +455,40 @@ thread_stash(struct thread *td)
 }
 
 /*
- * Reap zombie resources.
+ * Reap zombie threads.
  */
 void
 thread_reap(void)
 {
-	struct thread *td_first, *td_next;
+	struct thread *itd, *ntd;
+	lwpid_t tidbatch[16];
+	int tidbatchn;
 
 	/*
-	 * Don't even bother to lock if none at this instant,
-	 * we really don't care about the next instant.
+	 * Reading upfront is pessimal if followed by concurrent atomic_swap,
+	 * but most of the time the list is empty.
 	 */
-	if (!TAILQ_EMPTY(&zombie_threads)) {
-		mtx_lock_spin(&zombie_lock);
-		td_first = TAILQ_FIRST(&zombie_threads);
-		if (td_first)
-			TAILQ_INIT(&zombie_threads);
-		mtx_unlock_spin(&zombie_lock);
-		while (td_first) {
-			td_next = TAILQ_NEXT(td_first, td_slpq);
-			thread_cow_free(td_first);
-			thread_free(td_first);
-			td_first = td_next;
+	if (thread_zombies == NULL)
+		return;
+
+	itd = (struct thread *)atomic_swap_ptr((uintptr_t *)&thread_zombies,
+	    (uintptr_t)NULL);
+	tidbatchn = 0;
+	while (itd != NULL) {
+		ntd = itd->td_zombie;
+		tidbatch[tidbatchn] = itd->td_tid;
+		tidbatchn++;
+		thread_cow_free(itd);
+		thread_free_batched(itd);
+		if (tidbatchn == nitems(tidbatch)) {
+			tid_free_batch(tidbatch, tidbatchn);
+			tidbatchn = 0;
 		}
+		itd = ntd;
+	}
+
+	if (tidbatchn != 0) {
+		tid_free_batch(tidbatch, tidbatchn);
 	}
 }
 
@@ -500,8 +536,8 @@ thread_alloc_stack(struct thread *td, int pages)
 /*
  * Deallocate a thread.
  */
-void
-thread_free(struct thread *td)
+static void
+thread_free_batched(struct thread *td)
 {
 
 	EVENTHANDLER_DIRECT_INVOKE(thread_dtor, td);
@@ -513,9 +549,21 @@ thread_free(struct thread *td)
 	if (td->td_kstack != 0)
 		vm_thread_dispose(td);
 	callout_drain(&td->td_slpcallout);
-	tid_free(td->td_tid);
+	/*
+	 * Freeing handled by the caller.
+	 */
 	td->td_tid = -1;
 	uma_zfree(thread_zone, td);
+}
+
+void
+thread_free(struct thread *td)
+{
+	lwpid_t tid;
+
+	tid = td->td_tid;
+	thread_free_batched(td);
+	tid_free(tid);
 }
 
 void
