@@ -70,13 +70,14 @@ static const struct smmu_quirk_entry smmu_quirk_table[] = {
 };
 
 bool
-smmu_quirks_check(u_int sid, uint8_t event_id, uintptr_t input_addr)
+smmu_quirks_check(device_t dev, u_int sid, uint8_t event_id,
+    uintptr_t input_addr)
 {
 	const struct smmu_quirk_entry *q;
 	struct smmu_ctx *ctx;
 	int i;
 
-	ctx = smmu_ctx_lookup_by_sid(sid);
+	ctx = smmu_ctx_lookup_by_sid(dev, sid);
 	if (!ctx)
 		return (false);
 

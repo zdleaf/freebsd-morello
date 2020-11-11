@@ -192,7 +192,6 @@ static int
 smmu_acpi_attach(device_t dev)
 {
 	struct smmu_softc *sc;
-	uintptr_t start;
 	uintptr_t priv;
 	int err;
 
@@ -211,9 +210,21 @@ smmu_acpi_attach(device_t dev)
 	if (err != 0)
 		goto error;
 
+	struct smmu_unit *iommu;
+	struct iommu_unit *unit;
+
+	iommu = &sc->unit;
+	iommu->dev = dev;
+
+	unit = &iommu->unit;
+	unit->dev = dev;
+
+	LIST_INIT(&iommu->domain_list);
+
 	/* Use memory start address as an xref. */
-	start = bus_get_resource_start(dev, SYS_RES_MEMORY, 0);
-	err = iommu_register(dev, &sc->unit, start);
+	sc->xref = bus_get_resource_start(dev, SYS_RES_MEMORY, 0);
+
+	err = iommu_register(unit);
 	if (err) {
 		device_printf(dev, "Failed to register SMMU.\n");
 		return (ENXIO);

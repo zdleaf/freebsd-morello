@@ -76,12 +76,7 @@ struct smmu_ctx {
 	uint16_t			device;
 };
 
-int iommu_unregister(device_t dev);
-int iommu_register(device_t dev, struct smmu_unit *unit, intptr_t xref);
-int iommu_map_page(struct smmu_domain *domain, vm_offset_t va, vm_paddr_t pa,
-    vm_prot_t prot);
-int iommu_unmap_page(struct smmu_domain *domain, vm_offset_t va);
-int smmu_map_msi(device_t child, uint64_t msi_addr);
-struct smmu_ctx * smmu_ctx_lookup_by_sid(u_int sid);
+int iommu_unregister(struct iommu_unit *unit);
+int iommu_register(struct iommu_unit *unit);
 
 #endif /* _ARM64_IOMMU_IOMMU_SMMU_H_ */

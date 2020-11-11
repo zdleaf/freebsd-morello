@@ -441,11 +441,13 @@ smmu_print_event(struct smmu_softc *sc, uint32_t *evt)
 	struct smmu_event *ev;
 	uintptr_t input_addr;
 	uint8_t event_id;
+	device_t dev;
 	int sid;
 	int i;
 
-	ev = NULL;
+	dev = sc->dev;
 
+	ev = NULL;
 	event_id = evt[0] & 0xff;
 	for (i = 0; events[i].ident != 0; i++) {
 		if (events[i].ident == event_id) {
@@ -459,7 +461,7 @@ smmu_print_event(struct smmu_softc *sc, uint32_t *evt)
 	input_addr <<= 32;
 	input_addr |= evt[4];
 
-	if (smmu_quirks_check(sid, event_id, input_addr)) {
+	if (smmu_quirks_check(dev, sid, event_id, input_addr)) {
 		/* The event is known. Don't print anything. */
 		return;
 	}
@@ -1621,14 +1623,17 @@ smmu_read_ivar(device_t dev, device_t child, int which, uintptr_t *result)
 }
 
 static int
-smmu_unmap(device_t dev, struct smmu_domain *domain,
+smmu_unmap(device_t dev, struct iommu_domain *iodomain,
     vm_offset_t va, bus_size_t size)
 {
+	struct smmu_domain *domain;
 	struct smmu_softc *sc;
 	int err;
 	int i;
 
 	sc = device_get_softc(dev);
+
+	domain = (struct smmu_domain *)iodomain;
 
 	err = 0;
 
@@ -1651,34 +1656,19 @@ smmu_unmap(device_t dev, struct smmu_domain *domain,
 }
 
 static int
-smmu_map_page(device_t dev, struct smmu_domain *domain,
-    vm_offset_t va, vm_paddr_t pa, vm_prot_t prot)
-{
-	struct smmu_softc *sc;
-	int error;
-
-	sc = device_get_softc(dev);
-
-	error = pmap_senter(&domain->p, va, pa, prot, 0);
-	if (error)
-		return (error);
-	smmu_tlbi_va(sc, va, domain->asid);
-	smmu_sync(sc);
-
-	return (0);
-}
-
-static int
-smmu_map(device_t dev, struct smmu_domain *domain,
+smmu_map(device_t dev, struct iommu_domain *iodomain,
     vm_offset_t va, vm_page_t *ma, vm_size_t size,
     vm_prot_t prot)
 {
+	struct smmu_domain *domain;
 	struct smmu_softc *sc;
 	vm_paddr_t pa;
 	int error;
 	int i;
 
 	sc = device_get_softc(dev);
+
+	domain = (struct smmu_domain *)iodomain;
 
 	dprintf("%s: %lx -> %lx, %ld, domain %d\n", __func__, va, pa, size,
 	    domain->asid);
@@ -1699,15 +1689,18 @@ smmu_map(device_t dev, struct smmu_domain *domain,
 	return (0);
 }
 
-static struct smmu_domain *
-smmu_domain_alloc(device_t dev)
+static struct iommu_domain *
+smmu_domain_alloc(device_t dev, struct iommu_unit *iommu)
 {
 	struct smmu_domain *domain;
+	struct smmu_unit *unit;
 	struct smmu_softc *sc;
 	int error;
 	int new_asid;
 
 	sc = device_get_softc(dev);
+
+	unit = (struct smmu_unit *)iommu;
 
 	domain = malloc(sizeof(*domain), M_SMMU, M_WAITOK | M_ZERO);
 
@@ -1733,16 +1726,27 @@ smmu_domain_alloc(device_t dev)
 
 	smmu_tlbi_asid(sc, domain->asid);
 
-	return (domain);
+	LIST_INIT(&domain->ctx_list);
+
+	IOMMU_LOCK(iommu);
+	LIST_INSERT_HEAD(&unit->domain_list, domain, next);
+	IOMMU_UNLOCK(iommu);
+
+	return (&domain->domain);
 }
 
 static int
-smmu_domain_free(device_t dev, struct smmu_domain *domain)
+smmu_domain_free(device_t dev, struct iommu_domain *iodomain)
 {
+	struct smmu_domain *domain;
 	struct smmu_softc *sc;
 	struct smmu_cd *cd;
 
 	sc = device_get_softc(dev);
+
+	domain = (struct smmu_domain *)iodomain;
+
+	LIST_REMOVE(domain, next);
 
 	cd = domain->cd;
 
@@ -1775,12 +1779,26 @@ smmu_set_buswide(device_t dev, struct smmu_domain *domain,
 	return (0);
 }
 
-static int
-smmu_ctx_attach(device_t dev, struct smmu_domain *domain,
-    struct smmu_ctx *ctx)
+static struct iommu_ctx *
+smmu_ctx_alloc(device_t dev, struct iommu_domain *iodom, device_t child)
 {
-	struct iommu_domain *iodom;
+	struct smmu_ctx *ctx;
+
+	ctx = malloc(sizeof(struct smmu_ctx), M_SMMU, M_WAITOK | M_ZERO);
+	ctx->vendor = pci_get_vendor(child);
+	ctx->device = pci_get_device(child);
+	ctx->dev = child;
+
+	return (&ctx->ctx);
+}
+
+static int
+smmu_ctx_attach(device_t dev, struct iommu_domain *iodom,
+    struct iommu_ctx *ioctx, bool disabled)
+{
+	struct smmu_domain *domain;
 	struct smmu_softc *sc;
+	struct smmu_ctx *ctx;
 	uint16_t rid;
 	u_int xref, sid;
 	int seg;
@@ -1788,7 +1806,12 @@ smmu_ctx_attach(device_t dev, struct smmu_domain *domain,
 
 	sc = device_get_softc(dev);
 
-	iodom = (struct iommu_domain *)domain;
+	domain = (struct smmu_domain *)iodom;
+	ctx = (struct smmu_ctx *)ioctx;
+	ctx->domain = domain;
+
+	if (disabled)
+		ctx->bypass = true;
 
 	seg = pci_get_domain(ctx->dev);
 	rid = pci_get_rid(ctx->dev);
@@ -1816,19 +1839,107 @@ smmu_ctx_attach(device_t dev, struct smmu_domain *domain,
 	if (iommu_is_buswide_ctx(iodom->iommu, pci_get_bus(ctx->dev)))
 		smmu_set_buswide(dev, domain, ctx);
 
+	IOMMU_DOMAIN_LOCK(iodom);
+	LIST_INSERT_HEAD(&domain->ctx_list, ctx, next);
+	IOMMU_DOMAIN_UNLOCK(iodom);
+
 	return (0);
 }
 
 static int
-smmu_ctx_detach(device_t dev, struct smmu_ctx *ctx)
+smmu_ctx_detach(device_t dev, struct iommu_ctx *ioctx)
 {
 	struct smmu_softc *sc;
+	struct smmu_ctx *ctx;
 
 	sc = device_get_softc(dev);
+	ctx = (struct smmu_ctx *)ioctx;
 
 	smmu_deinit_l1_entry(sc, ctx->sid);
 
+	LIST_REMOVE(ctx, next);
+
 	return (0);
+}
+
+struct smmu_ctx *
+smmu_ctx_lookup_by_sid(device_t dev, u_int sid)
+{
+	struct smmu_softc *sc;
+	struct smmu_unit *unit;
+	struct smmu_domain *domain;
+	struct smmu_ctx *ctx;
+
+	sc = device_get_softc(dev);
+
+	unit = &sc->unit;
+
+	LIST_FOREACH(domain, &unit->domain_list, next) {
+		LIST_FOREACH(ctx, &domain->ctx_list, next) {
+			if (ctx->sid == sid)
+				return (ctx);
+		}
+	}
+
+	return (NULL);
+}
+
+static struct iommu_ctx *
+smmu_ctx_lookup(device_t dev, struct iommu_unit *iommu, device_t child)
+{
+	struct smmu_domain *domain;
+	struct smmu_unit *unit;
+	struct smmu_ctx *ctx;
+
+	unit = (struct smmu_unit *)iommu;
+
+	LIST_FOREACH(domain, &unit->domain_list, next) {
+		LIST_FOREACH(ctx, &domain->ctx_list, next) {
+			if (ctx->dev == child)
+				return (&ctx->ctx);
+		}
+	}
+
+	return (NULL);
+}
+
+static struct iommu_unit *
+smmu_find(device_t dev, device_t child)
+{
+	struct iommu_unit *iommu;
+	struct smmu_softc *sc;
+	struct smmu_unit *unit;
+	u_int xref, sid;
+	uint16_t rid;
+	int error;
+	int seg;
+
+	sc = device_get_softc(dev);
+
+	rid = pci_get_rid(child);
+	seg = pci_get_domain(child);
+	unit = &sc->unit;
+	iommu = &unit->unit;
+
+	/*
+	 * Find an xref of an IOMMU controller that serves traffic for dev.
+	 */
+#ifdef DEV_ACPI
+	error = acpi_iort_map_pci_smmuv3(seg, rid, &xref, &sid);
+	if (error) {
+		/* Could not find reference to an SMMU device. */
+		return (NULL);
+	}
+#else
+	/* TODO: add FDT support. */
+	return (NULL);
+#endif
+
+	/* Check if xref is ours. */
+	if (xref != sc->xref)
+		return (NULL);
+
+	return (iommu);
 }
 
 static device_method_t smmu_methods[] = {
@@ -1836,11 +1947,13 @@ static device_method_t smmu_methods[] = {
 	DEVMETHOD(device_detach,	smmu_detach),
 
 	/* SMMU interface */
+	DEVMETHOD(smmu_find,		smmu_find),
 	DEVMETHOD(smmu_map,		smmu_map),
-	DEVMETHOD(smmu_map_page,	smmu_map_page),
 	DEVMETHOD(smmu_unmap,		smmu_unmap),
 	DEVMETHOD(smmu_domain_alloc,	smmu_domain_alloc),
 	DEVMETHOD(smmu_domain_free,	smmu_domain_free),
+	DEVMETHOD(smmu_ctx_alloc,	smmu_ctx_alloc),
+	DEVMETHOD(smmu_ctx_lookup,	smmu_ctx_lookup),
 	DEVMETHOD(smmu_ctx_attach,	smmu_ctx_attach),
 	DEVMETHOD(smmu_ctx_detach,	smmu_ctx_detach),
 

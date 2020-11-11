@@ -144,6 +144,7 @@ struct smmu_softc {
 	int				asid_set_size;
 	struct mtx			asid_set_mutex;
 	struct smmu_unit		unit;
+	uintptr_t			xref;
 };
 
 MALLOC_DECLARE(M_SMMU);
@@ -152,6 +153,8 @@ MALLOC_DECLARE(M_SMMU);
 int smmu_attach(device_t dev);
 int smmu_detach(device_t dev);
 
-bool smmu_quirks_check(u_int sid, uint8_t event_id, uintptr_t input_addr);
+struct smmu_ctx * smmu_ctx_lookup_by_sid(device_t dev, u_int sid);
+bool smmu_quirks_check(device_t dev, u_int sid, uint8_t event_id,
+    uintptr_t input_addr);
 
 #endif /* _DEV_IOMMU_SMMU_VAR_H_ */

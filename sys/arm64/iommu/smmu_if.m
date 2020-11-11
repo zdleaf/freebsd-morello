@@ -50,26 +50,20 @@
 
 INTERFACE smmu;
 
-#
-# Map a virtual address VA to a physical address PA.
-#
-METHOD int map {
+METHOD struct iommu_unit * find {
 	device_t		dev;
-	struct smmu_domain	*domain;
-	vm_offset_t		va;
-	vm_page_t		*ma;
-	bus_size_t		size;
-	vm_prot_t		prot;
+	device_t		child;
 };
 
 #
 # Map a virtual address VA to a physical address PA.
 #
-METHOD int map_page {
+METHOD int map {
 	device_t		dev;
-	struct smmu_domain	*domain;
+	struct iommu_domain	*domain;
 	vm_offset_t		va;
-	vm_paddr_t		pa;
+	vm_page_t		*ma;
+	bus_size_t		size;
 	vm_prot_t		prot;
 };
 
@@ -78,7 +72,7 @@ METHOD int map_page {
 #
 METHOD int unmap {
 	device_t		dev;
-	struct smmu_domain	*domain;
+	struct iommu_domain	*domain;
 	vm_offset_t		va;
 	bus_size_t		size;
 };
@@ -86,8 +80,9 @@ METHOD int unmap {
 #
 # Allocate an IOMMU domain.
 #
-METHOD struct smmu_domain * domain_alloc {
+METHOD struct iommu_domain * domain_alloc {
 	device_t		dev;
+	struct iommu_unit	*unit;
 };
 
 #
@@ -95,7 +90,32 @@ METHOD struct smmu_domain * domain_alloc {
 #
 METHOD int domain_free {
 	device_t		dev;
-	struct smmu_domain	*domain;
+	struct iommu_domain	*domain;
+};
+
+#
+# Find a domain allocated for a dev.
+#
+METHOD struct iommu_domain * domain_lookup {
+	device_t		dev;
+};
+
+#
+# Find a context for a device.
+#
+METHOD struct iommu_ctx * ctx_lookup {
+	device_t		dev;
+	struct iommu_unit	*unit;
+	device_t		child;
+};
+
+#
+# Allocate an iommu context.
+#
+METHOD struct iommu_ctx * ctx_alloc {
+	device_t		dev;
+	struct iommu_domain	*domain;
+	device_t		child;
 };
 
 #
@@ -103,8 +123,9 @@ METHOD int domain_free {
 #
 METHOD int ctx_attach {
 	device_t		dev;
-	struct smmu_domain	*domain;
-	struct smmu_ctx		*ctx;
+	struct iommu_domain	*domain;
+	struct iommu_ctx	*ctx;
+	bool			disabled;
 };
 
 #
@@ -112,5 +133,5 @@ METHOD int ctx_attach {
 #
 METHOD int ctx_detach {
 	device_t		dev;
-	struct smmu_ctx		*ctx;
+	struct iommu_ctx	*ctx;
 };
