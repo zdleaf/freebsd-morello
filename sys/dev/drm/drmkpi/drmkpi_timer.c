@@ -27,23 +27,37 @@
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
-#include <linux/compat.h>
-#include <linux/jiffies.h>
-#include <linux/timer.h>
+#include <sys/param.h>
+#include <sys/time.h>
+#include <sys/kernel.h>
+
+#include <drmkpi/timer.h>
+
+#include <linux/compat.h>	/* For linux_set_current */
 
 unsigned long drmkpi_timer_hz_mask;
 
-uint64_t drmkpi_nsec2hz_rem;
-uint64_t drmkpi_nsec2hz_div = 1000000000ULL;
-uint64_t drmkpi_nsec2hz_max;
+static uint64_t drmkpi_nsec2hz_rem;
+static uint64_t drmkpi_nsec2hz_div = 1000000000ULL;
+static uint64_t drmkpi_nsec2hz_max;
 
-uint64_t drmkpi_usec2hz_rem;
-uint64_t drmkpi_usec2hz_div = 1000000ULL;
-uint64_t drmkpi_usec2hz_max;
+static uint64_t drmkpi_usec2hz_rem;
+static uint64_t drmkpi_usec2hz_div = 1000000ULL;
+static uint64_t drmkpi_usec2hz_max;
 
-uint64_t drmkpi_msec2hz_rem;
-uint64_t drmkpi_msec2hz_div = 1000ULL;
-uint64_t drmkpi_msec2hz_max;
+static uint64_t drmkpi_msec2hz_rem;
+static uint64_t drmkpi_msec2hz_div = 1000ULL;
+static uint64_t drmkpi_msec2hz_max;
+
+static inline int
+timer_jiffies_until(int expires)
+{
+	int delta = expires - ticks;
+	/* guard against already expired values */
+	if (delta < 1)
+		delta = 1;
+	return (delta);
+}
 
 /* greatest common divisor, Euclid equation */
 static uint64_t
@@ -79,7 +93,7 @@ drmkpi_mod_timer(struct timer_list *timer, int expires)
 
 	timer->expires = expires;
 	ret = callout_reset(&timer->callout,
-	    linux_timer_jiffies_until(expires),
+	    timer_jiffies_until(expires),
 	    &drmkpi_timer_callback_wrapper, timer);
 
 	MPASS(ret == 0 || ret == 1);
@@ -92,7 +106,7 @@ drmkpi_add_timer(struct timer_list *timer)
 {
 
 	callout_reset(&timer->callout,
-	    linux_timer_jiffies_until(timer->expires),
+	    timer_jiffies_until(timer->expires),
 	    &drmkpi_timer_callback_wrapper, timer);
 }
 
@@ -101,7 +115,7 @@ drmkpi_add_timer_on(struct timer_list *timer, int cpu)
 {
 
 	callout_reset_on(&timer->callout,
-	    linux_timer_jiffies_until(timer->expires),
+	    timer_jiffies_until(timer->expires),
 	    &drmkpi_timer_callback_wrapper, timer, cpu);
 }
 

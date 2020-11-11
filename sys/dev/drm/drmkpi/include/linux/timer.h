@@ -29,24 +29,15 @@
  * $FreeBSD$
  */
 
-#ifndef __DRMKPI_TIMER_H__
-#define	__DRMKPI_TIMER_H__
+#ifndef __LINUX_TIMER_H__
+#define	__LINUX_TIMER_H__
 
 #include <linux/types.h>
+#include <drmkpi/timer.h>
 
 #include <sys/param.h>
 #include <sys/kernel.h>
 #include <sys/callout.h>
-
-struct timer_list {
-	struct callout callout;
-	union {
-		void (*function) (unsigned long);	/* < v4.15 */
-		void (*function_415) (struct timer_list *);
-	};
-	unsigned long data;
-	int expires;
-};
 
 extern unsigned long drmkpi_timer_hz_mask;
 
@@ -79,13 +70,6 @@ extern unsigned long drmkpi_timer_hz_mask;
 	callout_init(&(timer)->callout, 1);			\
 } while (0)
 
-int drmkpi_mod_timer(struct timer_list *timer, int expires);
-void drmkpi_add_timer(struct timer_list *timer);
-void drmkpi_add_timer_on(struct timer_list *timer, int cpu);
-int drmkpi_del_timer(struct timer_list *timer);
-int drmkpi_del_timer_sync(struct timer_list *timer);
-
-
 #define	mod_timer(timer, expires)	\
 	drmkpi_mod_timer(timer, expires)
 #define	add_timer(timer)		\
@@ -104,4 +88,4 @@ int drmkpi_del_timer_sync(struct timer_list *timer);
 #define	round_jiffies_up(j)	round_jiffies(j)
 #define	round_jiffies_up_relative(j) round_jiffies_up(j)
 
-#endif	/* __DRMKPI_TIMER_H__ */
+#endif	/* __LINUX_TIMER_H__ */
