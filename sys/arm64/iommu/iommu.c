@@ -247,9 +247,12 @@ iommu_get_ctx(struct iommu_unit *iommu, device_t requester,
 void
 iommu_free_ctx_locked(struct iommu_unit *iommu, struct iommu_ctx *ctx)
 {
+	struct bus_dma_tag_iommu *tag;
 	int error;
 
 	IOMMU_ASSERT_LOCKED(iommu);
+
+	tag = ctx->tag;
 
 	error = IOMMU_CTX_FREE(iommu->dev, ctx);
 	if (error) {
@@ -257,7 +260,7 @@ iommu_free_ctx_locked(struct iommu_unit *iommu, struct iommu_ctx *ctx)
 		return;
 	}
 
-	free(ctx->tag, M_IOMMU);
+	free(tag, M_IOMMU);
 }
 
 void

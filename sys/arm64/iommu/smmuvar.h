@@ -182,7 +182,7 @@ MALLOC_DECLARE(M_SMMU);
 int smmu_attach(device_t dev);
 int smmu_detach(device_t dev);
 
-struct smmu_ctx * smmu_ctx_lookup_by_sid(device_t dev, u_int sid);
+struct smmu_ctx *smmu_ctx_lookup_by_sid(device_t dev, u_int sid);
 bool smmu_quirks_check(device_t dev, u_int sid, uint8_t event_id,
     uintptr_t input_addr);
 
