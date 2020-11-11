@@ -90,7 +90,7 @@ static struct mtx iommu_mtx;
 static LIST_HEAD(, iommu_unit) iommu_list = LIST_HEAD_INITIALIZER(iommu_list);
 
 static int
-domain_unmap_buf(struct iommu_domain *iodom, iommu_gaddr_t base,
+iommu_domain_unmap_buf(struct iommu_domain *iodom, iommu_gaddr_t base,
     iommu_gaddr_t size, int flags)
 {
 	struct iommu_unit *iommu;
@@ -104,7 +104,7 @@ domain_unmap_buf(struct iommu_domain *iodom, iommu_gaddr_t base,
 }
 
 static int
-domain_map_buf(struct iommu_domain *iodom, iommu_gaddr_t base,
+iommu_domain_map_buf(struct iommu_domain *iodom, iommu_gaddr_t base,
     iommu_gaddr_t size, vm_page_t *ma, uint64_t eflags, int flags)
 {
 	struct iommu_unit *iommu;
@@ -129,13 +129,13 @@ domain_map_buf(struct iommu_domain *iodom, iommu_gaddr_t base,
 	return (0);
 }
 
-static const struct iommu_domain_map_ops smmu_domain_map_ops = {
-	.map = domain_map_buf,
-	.unmap = domain_unmap_buf,
+static const struct iommu_domain_map_ops domain_map_ops = {
+	.map = iommu_domain_map_buf,
+	.unmap = iommu_domain_unmap_buf,
 };
 
 static struct iommu_domain *
-smmu_domain_alloc(struct iommu_unit *iommu)
+iommu_domain_alloc(struct iommu_unit *iommu)
 {
 	struct iommu_domain *iodom;
 
@@ -143,7 +143,7 @@ smmu_domain_alloc(struct iommu_unit *iommu)
 	if (iodom == NULL)
 		return (NULL);
 
-	iommu_domain_init(iommu, iodom, &smmu_domain_map_ops);
+	iommu_domain_init(iommu, iodom, &domain_map_ops);
 	iodom->end = VM_MAXUSER_ADDRESS;
 	iodom->iommu = iommu;
 	iommu_gas_init_domain(iodom);
@@ -152,7 +152,7 @@ smmu_domain_alloc(struct iommu_unit *iommu)
 }
 
 static int
-smmu_domain_free(struct iommu_domain *domain)
+iommu_domain_free(struct iommu_domain *domain)
 {
 	struct iommu_unit *iommu;
 	int error;
@@ -190,7 +190,7 @@ iommu_ctx_lookup(device_t dev)
 }
 
 static void
-smmu_tag_init(struct bus_dma_tag_iommu *t)
+iommu_tag_init(struct bus_dma_tag_iommu *t)
 {
 	bus_addr_t maxaddr;
 
@@ -261,7 +261,7 @@ iommu_get_ctx(struct iommu_unit *iommu, device_t requester,
 	 * In our current configuration we have a domain per each ctx.
 	 * So allocate a domain first.
 	 */
-	domain = smmu_domain_alloc(iommu);
+	domain = iommu_domain_alloc(iommu);
 	if (domain == NULL)
 		return (NULL);
 
@@ -275,11 +275,11 @@ iommu_get_ctx(struct iommu_unit *iommu, device_t requester,
 	tag->ctx = ctx;
 	tag->ctx->domain = domain;
 
-	smmu_tag_init(tag);
+	iommu_tag_init(tag);
 
 	error = iommu_ctx_attach(domain, ctx, disabled);
 	if (error) {
-		smmu_domain_free(domain);
+		iommu_domain_free(domain);
 		return (NULL);
 	}
 
@@ -306,7 +306,7 @@ iommu_free_ctx_locked(struct iommu_unit *iommu, struct iommu_ctx *ctx)
 	IOMMU_UNLOCK(iommu);
 
 	/* Since we have a domain per each ctx, remove the domain too. */
-	error = smmu_domain_free(ctx->domain);
+	error = iommu_domain_free(ctx->domain);
 	if (error)
 		device_printf(iommu->dev, "Could not free a domain\n");
 }
