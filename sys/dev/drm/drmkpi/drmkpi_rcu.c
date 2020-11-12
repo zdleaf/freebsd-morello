@@ -43,11 +43,10 @@ __FBSDID("$FreeBSD$");
 
 #include <ck_epoch.h>
 
-#include <linux/rcupdate.h>
-#include <linux/srcu.h>
-#include <linux/slab.h>
 #include <linux/kernel.h>
-#include <linux/compat.h>
+
+#include <drmkpi/rcupdate.h>
+#include <drmkpi/srcu.h>
 
 /*
  * By defining CONFIG_NO_RCU_SKIP LinuxKPI RCU locks and asserts will

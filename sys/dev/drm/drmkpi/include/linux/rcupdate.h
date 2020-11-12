@@ -34,12 +34,7 @@
 
 #include <machine/atomic.h>
 
-#define	LINUX_KFREE_RCU_OFFSET_MAX	4096	/* exclusive */
-
-/* BSD specific defines */
-#define	RCU_TYPE_REGULAR 0
-#define	RCU_TYPE_SLEEPABLE 1
-#define	RCU_TYPE_MAX 2
+#include <drmkpi/rcupdate.h>
 
 #define	RCU_INITIALIZER(v)			\
 	((__typeof(*(v)) *)(v))
@@ -103,14 +98,6 @@
 	rcu_assign_pointer(rcu, ptr);				\
 	(ptr) = p;						\
 } while (0)
-
-/* prototypes */
-
-void drmkpi_call_rcu(unsigned type, struct rcu_head *ptr, rcu_callback_t func);
-void drmkpi_rcu_barrier(unsigned type);
-void drmkpi_rcu_read_lock(unsigned type);
-void drmkpi_rcu_read_unlock(unsigned type);
-void drmkpi_synchronize_rcu(unsigned type);
 
 /* Empty implementation for !DEBUG */
 #define	init_rcu_head(...)

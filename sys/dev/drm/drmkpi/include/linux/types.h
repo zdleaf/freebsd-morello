@@ -77,12 +77,6 @@ typedef size_t __kernel_size_t;
 
 typedef unsigned long irq_hw_number_t;
 
-struct rcu_head {
-	void *raw[2];
-} __aligned(sizeof(void *));
-
-typedef void (*rcu_callback_t)(struct rcu_head *head);
-typedef void (*call_rcu_func_t)(struct rcu_head *head, rcu_callback_t func);
 typedef int linux_task_fn_t(void *data);
 
 #endif	/* __DRMKPI_LINUX_TYPES_H__ */
