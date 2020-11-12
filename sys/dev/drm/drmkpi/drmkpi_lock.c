@@ -26,12 +26,16 @@
  * $FreeBSD$
  */
 
+#include <sys/param.h>
+
+#include <sys/condvar.h>
+#include <sys/kernel.h>
 #include <sys/queue.h>
 #include <sys/sx.h>
 
 #include <linux/sched.h>
-#include <linux/mutex.h>
 
+#include <drmkpi/mutex.h>
 #include <drmkpi/lock.h>
 
 struct ww_mutex_thread {

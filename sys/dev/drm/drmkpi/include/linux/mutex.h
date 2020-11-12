@@ -39,9 +39,7 @@
 
 #include <linux/spinlock.h>
 
-typedef struct mutex {
-	struct sx sx;
-} mutex_t;
+#include <drmkpi/mutex.h>
 
 /*
  * By defining CONFIG_NO_MUTEX_SKIP LinuxKPI mutexes and asserts will

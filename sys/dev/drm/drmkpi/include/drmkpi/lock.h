@@ -1,6 +1,8 @@
 #ifndef __DRMKPI_LOCK_H__
 #define	__DRMKPI_LOCK_H__
 
+#include <drmkpi/mutex.h>
+
 struct ww_mutex {
 	struct mutex base;
 	struct cv condvar;
@@ -12,4 +14,3 @@ int drmkpi_ww_mutex_lock_sub(struct ww_mutex *,
 void drmkpi_ww_mutex_unlock_sub(struct ww_mutex *);
 
 #endif	/* __DRMKPI_LOCK_H__ */
-
