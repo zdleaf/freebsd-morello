@@ -33,13 +33,11 @@ __FBSDID("$FreeBSD$");
 #include <sys/signalvar.h>
 #include <sys/sleepqueue.h>
 
-#include <linux/delay.h>
-#include <linux/errno.h>
 #include <linux/kernel.h>
-#include <linux/list.h>
-#include <linux/sched.h>
-#include <linux/spinlock.h>
 #include <linux/wait.h>
+
+#include <drmkpi/completion.h>
+#include <drmkpi/sched.h>
 
 static int
 drmkpi_add_to_sleepqueue(void *wchan, struct task_struct *task,

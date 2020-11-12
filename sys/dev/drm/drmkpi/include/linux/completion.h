@@ -34,9 +34,7 @@
 
 #include <linux/errno.h>
 
-struct completion {
-	unsigned int done;
-};
+#include <drmkpi/completion.h>
 
 #define	INIT_COMPLETION(c) \
 	((c).done = 0)
@@ -60,11 +58,5 @@ struct completion {
 	drmkpi_try_wait_for_completion(c)
 #define	completion_done(c) \
 	drmkpi_completion_done(c)
-
-extern void drmkpi_complete_common(struct completion *, int);
-extern int drmkpi_wait_for_common(struct completion *, int);
-extern int drmkpi_wait_for_timeout_common(struct completion *, int, int);
-extern int drmkpi_try_wait_for_completion(struct completion *);
-extern int drmkpi_completion_done(struct completion *);
 
 #endif	/* __DRMKPI_LINUX_COMPLETION_H__ */
