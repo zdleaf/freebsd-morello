@@ -34,10 +34,13 @@ __FBSDID("$FreeBSD$");
 #include <sys/sleepqueue.h>
 
 #include <linux/kernel.h>
-#include <linux/wait.h>
+#include <linux/list.h>
+#include <linux/spinlock.h>
 
 #include <drmkpi/completion.h>
+#include <drmkpi/lock.h>
 #include <drmkpi/sched.h>
+#include <drmkpi/wait.h>
 
 static int
 drmkpi_add_to_sleepqueue(void *wchan, struct task_struct *task,
@@ -222,7 +225,7 @@ drmkpi_prepare_to_wait(wait_queue_head_t *wqh, wait_queue_t *wq, int state)
 
 	spin_lock(&wqh->lock);
 	if (list_empty(&wq->task_list))
-		__add_wait_queue(wqh, wq);
+		list_add(&wqh->task_list, &wq->task_list);
 	set_task_state(current, state);
 	spin_unlock(&wqh->lock);
 }
@@ -234,7 +237,7 @@ drmkpi_finish_wait(wait_queue_head_t *wqh, wait_queue_t *wq)
 	spin_lock(&wqh->lock);
 	set_task_state(current, TASK_RUNNING);
 	if (!list_empty(&wq->task_list)) {
-		__remove_wait_queue(wqh, wq);
+		list_del(&wq->task_list);
 		INIT_LIST_HEAD(&wq->task_list);
 	}
 	spin_unlock(&wqh->lock);

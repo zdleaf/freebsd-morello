@@ -39,6 +39,8 @@
 
 #include <asm/atomic.h>
 
+#include <drmkpi/wait.h>
+
 #include <sys/param.h>
 #include <sys/systm.h>
 
@@ -50,46 +52,6 @@
 #define	might_sleep_if(cond) do { \
 	if (cond) { might_sleep(); } \
 } while (0)
-
-struct wait_queue;
-struct wait_queue_head;
-
-#define	wait_queue_entry wait_queue
-
-typedef struct wait_queue wait_queue_t;
-typedef struct wait_queue_entry wait_queue_entry_t;
-typedef struct wait_queue_head wait_queue_head_t;
-
-typedef int wait_queue_func_t(wait_queue_t *, unsigned int, int, void *);
-
-/*
- * Many API consumers directly reference these fields and those of
- * wait_queue_head.
- */
-struct wait_queue {
-	unsigned int flags;	/* always 0 */
-	void *private;
-	wait_queue_func_t *func;
-	union {
-		struct list_head task_list; /* < v4.13 */
-		struct list_head entry; /* >= v4.13 */
-	};
-};
-
-struct wait_queue_head {
-	spinlock_t lock;
-	union {
-		struct list_head task_list; /* < v4.13 */
-		struct list_head head; /* >= v4.13 */
-	};
-};
-
-/*
- * This function is referenced by at least one DRM driver, so it may not be
- * renamed and furthermore must be the default wait queue callback.
- */
-extern wait_queue_func_t drmkpi_autoremove_wake_function;
-extern wait_queue_func_t drmkpi_default_wake_function;
 
 #define	DEFINE_WAIT_FUNC(name, function)				\
 	wait_queue_t name = {						\
@@ -119,9 +81,6 @@ extern wait_queue_func_t drmkpi_default_wake_function;
 	INIT_LIST_HEAD(&(wqh)->task_list);				\
 } while (0)
 
-void drmkpi_init_wait_entry(wait_queue_t *, int);
-void drmkpi_wake_up(wait_queue_head_t *, unsigned int, int, bool);
-
 #define	init_wait_entry(wq, flags)					\
         drmkpi_init_wait_entry(wq, flags)
 #define	wake_up(wqh)							\
@@ -136,9 +95,6 @@ void drmkpi_wake_up(wait_queue_head_t *, unsigned int, int, bool);
 	drmkpi_wake_up(wqh, TASK_INTERRUPTIBLE, 1, false)
 #define	wake_up_interruptible_all(wqh)					\
 	drmkpi_wake_up(wqh, TASK_INTERRUPTIBLE, 0, false)
-
-int drmkpi_wait_event_common(wait_queue_head_t *, wait_queue_t *, int,
-    unsigned int, spinlock_t *);
 
 /*
  * Returns -ERESTARTSYS for a signal, 0 if cond is false after timeout, 1 if
@@ -272,20 +228,10 @@ remove_wait_queue(wait_queue_head_t *wqh, wait_queue_t *wq)
 	spin_unlock(&wqh->lock);
 }
 
-bool drmkpi_waitqueue_active(wait_queue_head_t *);
-
 #define	waitqueue_active(wqh)		linux_waitqueue_active(wqh)
-
-void drmkpi_prepare_to_wait(wait_queue_head_t *, wait_queue_t *, int);
-void drmkpi_finish_wait(wait_queue_head_t *, wait_queue_t *);
 
 #define	prepare_to_wait(wqh, wq, state)	drmkpi_prepare_to_wait(wqh, wq, state)
 #define	finish_wait(wqh, wq)		drmkpi_finish_wait(wqh, wq)
-
-void drmkpi_wake_up_bit(void *, int);
-int drmkpi_wait_on_bit_timeout(unsigned long *, int, unsigned int, int);
-void drmkpi_wake_up_atomic_t(atomic_t *);
-int drmkpi_wait_on_atomic_t(atomic_t *, unsigned int);
 
 #define	wake_up_bit(word, bit)		drmkpi_wake_up_bit(word, bit)
 #define	wait_on_bit(word, bit, state)					\
@@ -300,9 +246,6 @@ int drmkpi_wait_on_atomic_t(atomic_t *, unsigned int);
  * schedule() will require special treatment.
  */
 #define	wait_on_atomic_t(a, state)	drmkp_wait_on_atomic_t(a, state)
-
-struct task_struct;
-bool drmkpi_wake_up_state(struct task_struct *, unsigned int);
 
 #define	wake_up_process(task)		drmkpi_wake_up_state(task, TASK_NORMAL)
 #define	wake_up_state(task, state)	drmkpi_wake_up_state(task, state)
