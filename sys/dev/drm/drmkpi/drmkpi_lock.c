@@ -27,9 +27,12 @@
  */
 
 #include <sys/queue.h>
+#include <sys/sx.h>
 
 #include <linux/sched.h>
-#include <linux/ww_mutex.h>
+#include <linux/mutex.h>
+
+#include <drmkpi/lock.h>
 
 struct ww_mutex_thread {
 	TAILQ_ENTRY(ww_mutex_thread) entry;

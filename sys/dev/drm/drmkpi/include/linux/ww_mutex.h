@@ -34,18 +34,13 @@
 #include <sys/kernel.h>
 
 #include <linux/mutex.h>
+#include <drmkpi/lock.h>
 
 struct ww_class {
 	const char *mutex_name;
 };
 
 struct ww_acquire_ctx {
-};
-
-struct ww_mutex {
-	struct mutex base;
-	struct cv condvar;
-	struct ww_acquire_ctx *ctx;
 };
 
 #define	DEFINE_WW_CLASS(name)					\
@@ -76,9 +71,6 @@ ww_mutex_trylock(struct ww_mutex *lock)
 	return (mutex_trylock(&lock->base));
 }
 
-extern int drmkpi_ww_mutex_lock_sub(struct ww_mutex *,
-    struct ww_acquire_ctx *, int catch_signal);
-
 static inline int
 ww_mutex_lock(struct ww_mutex *lock, struct ww_acquire_ctx *ctx)
 {
@@ -100,8 +92,6 @@ ww_mutex_lock_interruptible(struct ww_mutex *lock, struct ww_acquire_ctx *ctx)
 	else
 		return (drmkpi_ww_mutex_lock_sub(lock, ctx, 1));
 }
-
-extern void drmkpi_ww_mutex_unlock_sub(struct ww_mutex *);
 
 static inline void
 ww_mutex_unlock(struct ww_mutex *lock)
