@@ -30,8 +30,8 @@
  * $FreeBSD$
  */
 
-#ifndef	__DRMKPI_UACCESS_H__
-#define	__DRMKPI_UACCESS_H__
+#ifndef	__DRMKPI_LINUX_UACCESS_H__
+#define	__DRMKPI_LINUX_UACCESS_H__
 
 #include <sys/param.h>
 #include <sys/lock.h>
@@ -88,4 +88,4 @@ pagefault_disabled(void)
 	return ((curthread->td_pflags & TDP_NOFAULTING) != 0);
 }
 
-#endif	/* __DRMKPI_UACCESS_H__ */
+#endif	/* __DRMKPI_LINUX_UACCESS_H__ */

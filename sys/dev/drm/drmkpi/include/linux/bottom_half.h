@@ -26,10 +26,10 @@
  * $FreeBSD$
  */
 
-#ifndef __DRMKPI_BOTTOM_HALF_H__
-#define	__DRMKPI_BOTTOM_HALF_H__
+#ifndef __DRMKPI_LINUX_BOTTOM_HALF_H__
+#define	__DRMKPI_LINUX_BOTTOM_HALF_H__
 
 extern void drmkpi_local_bh_enable(void);
 extern void drmkpi_local_bh_disable(void);
 
-#endif	/* __DRMKPI_BOTTOM_HALF_H__ */
+#endif	/* __DRMKPI_LINUX_BOTTOM_HALF_H__ */

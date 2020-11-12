@@ -1,7 +1,7 @@
 /* Public domain */
 
-#ifndef __DRMKPI_FB_H_
-#define __DRMKPI_FB_H_
+#ifndef __DRMKPI_LINUX_FB_H_
+#define __DRMKPI_LINUX_FB_H_
 #include <sys/fbio.h>
 
 #include <linux/fs.h>
@@ -41,4 +41,4 @@ struct vt_kms_softc {
 	struct task              fb_mode_task;
 };
 
-#endif /* __DRMKPI_FB_H_ */
+#endif /* __DRMKPI_LINUX_FB_H_ */

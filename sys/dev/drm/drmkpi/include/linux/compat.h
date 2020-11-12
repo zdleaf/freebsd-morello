@@ -29,8 +29,8 @@
  * $FreeBSD$
  */
 
-#ifndef __DRMKPI_COMPAT_H__
-#define	__DRMKPI_COMPAT_H__
+#ifndef __DRMKPI_LINUX_COMPAT_H__
+#define	__DRMKPI_LINUX_COMPAT_H__
 
 #include <sys/param.h>
 #include <sys/proc.h>
@@ -57,4 +57,4 @@ linux_set_current_flags(struct thread *td, int flags)
 	return (0);
 }
 
-#endif	/* __DRMKPI_COMPAT_H__ */
+#endif	/* __DRMKPI_LINUX_COMPAT_H__ */

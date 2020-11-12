@@ -31,8 +31,8 @@
  * $FreeBSD$
  */
 
-#ifndef __DRMKPI_MM_H__
-#define	__DRMKPI_MM_H__
+#ifndef __DRMKPI_LINUX_MM_H__
+#define	__DRMKPI_LINUX_MM_H__
 
 #include <linux/spinlock.h>
 #include <linux/gfp.h>
@@ -257,4 +257,4 @@ vmalloc_to_page(const void *addr)
 
 extern int is_vmalloc_addr(const void *addr);
 
-#endif	/* __DRMKPI_MM_H__ */
+#endif	/* __DRMKPI_LINUX_MM_H__ */

@@ -24,8 +24,8 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef __DRMKPI_SEQ_FILE_H__
-#define __DRMKPI_SEQ_FILE_H__
+#ifndef __DRMKPI_LINUX_SEQ_FILE_H__
+#define __DRMKPI_LINUX_SEQ_FILE_H__
 
 #include <linux/types.h>
 #include <linux/bug.h>
@@ -63,4 +63,4 @@ int single_release(struct inode *, struct file *);
 #define seq_read		linux_seq_read
 
 
-#endif	/* __DRMKPI_SEQ_FILE_H__ */
+#endif	/* __DRMKPI_LINUX_SEQ_FILE_H__ */

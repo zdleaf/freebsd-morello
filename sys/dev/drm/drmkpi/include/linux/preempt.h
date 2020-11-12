@@ -26,8 +26,8 @@
  * $FreeBSD$
  */
 
-#ifndef __DRMKPI_PREEMPT_H__
-#define	__DRMKPI_PREEMPT_H__
+#ifndef __DRMKPI_LINUX_PREEMPT_H__
+#define	__DRMKPI_LINUX_PREEMPT_H__
 
 #include <linux/hardirq.h>
 #include <linux/list.h>
@@ -44,4 +44,4 @@ int drmkpi_in_atomic(void);
 #define	preempt_disable()	critical_enter()
 #define	preempt_enable()	critical_exit()
 
-#endif	/* __DRMKPI_PREEMPT_H__ */
+#endif	/* __DRMKPI_LINUX_PREEMPT_H__ */

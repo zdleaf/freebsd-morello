@@ -29,8 +29,8 @@
  * $FreeBSD$
  */
 
-#ifndef	__DRMKPI_MODULEPARAM_H__
-#define	__DRMKPI_MODULEPARAM_H__
+#ifndef	__DRMKPI_LINUX_MODULEPARAM_H__
+#define	__DRMKPI_LINUX_MODULEPARAM_H__
 
 #include <sys/types.h>
 #include <sys/sysctl.h>
@@ -131,4 +131,4 @@
 
 SYSCTL_DECL(_dev_drm);
 
-#endif	/* __DRMKPI_MODULEPARAM_H__ */
+#endif	/* __DRMKPI_LINUX_MODULEPARAM_H__ */

@@ -29,8 +29,8 @@
  * $FreeBSD$
  */
 
-#ifndef	__DRMKPI_FS_H__
-#define	__DRMKPI_FS_H__
+#ifndef	__DRMKPI_LINUX_FS_H__
+#define	__DRMKPI_LINUX_FS_H__
 
 #include <sys/cdefs.h>
 #include <sys/param.h>
@@ -129,4 +129,4 @@ void drmkpi_shmem_truncate_range(vm_object_t, loff_t, loff_t);
 
 unsigned int iminor(struct inode *inode);
 
-#endif /* __DRMKPI_FS_H__ */
+#endif /* __DRMKPI_LINUX_FS_H__ */

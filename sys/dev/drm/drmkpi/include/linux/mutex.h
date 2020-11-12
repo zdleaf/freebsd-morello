@@ -29,8 +29,8 @@
  * $FreeBSD$
  */
 
-#ifndef __DRMKPI_MUTEX_H__
-#define	__DRMKPI_MUTEX_H__
+#ifndef __DRMKPI_LINUX_MUTEX_H__
+#define	__DRMKPI_LINUX_MUTEX_H__
 
 #include <sys/param.h>
 #include <sys/proc.h>
@@ -156,4 +156,4 @@ linux_mutex_destroy(mutex_t *m)
 
 extern int drmkpi_mutex_lock_interruptible(mutex_t *m);
 
-#endif	/* __DRMKPI_MUTEX_H__ */
+#endif	/* __DRMKPI_LINUX_MUTEX_H__ */

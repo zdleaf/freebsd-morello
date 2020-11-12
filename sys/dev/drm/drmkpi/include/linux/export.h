@@ -25,10 +25,10 @@
  * $FreeBSD$
  */
 
-#ifndef __DRMKPI_EXPORT_H__
-#define	__DRMKPI_EXPORT_H__
+#ifndef __DRMKPI_LINUX_EXPORT_H__
+#define	__DRMKPI_LINUX_EXPORT_H__
 
 #define	EXPORT_SYMBOL(name)
 #define	EXPORT_SYMBOL_GPL(name)
 
-#endif	/* __DRMKPI_EXPORT_H__ */
+#endif	/* __DRMKPI_LINUX_EXPORT_H__ */

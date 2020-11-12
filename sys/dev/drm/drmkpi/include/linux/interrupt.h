@@ -29,8 +29,8 @@
  * $FreeBSD$
  */
 
-#ifndef __DRMKPI_INTERRUPT_H__
-#define	__DRMKPI_INTERRUPT_H__
+#ifndef __DRMKPI_LINUX_INTERRUPT_H__
+#define	__DRMKPI_LINUX_INTERRUPT_H__
 
 #include <linux/device.h>
 #include <linux/pci.h>
@@ -215,4 +215,4 @@ extern int tasklet_trylock(struct tasklet_struct *);
 extern void tasklet_unlock(struct tasklet_struct *);
 extern void tasklet_unlock_wait(struct tasklet_struct *ts);
 
-#endif	/* __DRMKPI_INTERRUPT_H__ */
+#endif	/* __DRMKPI_LINUX_INTERRUPT_H__ */

@@ -29,8 +29,8 @@
  * $FreeBSD$
  */
 
-#ifndef	__DRMKPI_WORKQUEUE_H__
-#define	__DRMKPI_WORKQUEUE_H__
+#ifndef	__DRMKPI_LINUX_WORKQUEUE_H__
+#define	__DRMKPI_LINUX_WORKQUEUE_H__
 
 #include <linux/types.h>
 #include <linux/kernel.h>
@@ -186,4 +186,4 @@ do {									\
 #define	current_work() \
 	drmkpi_current_work()
 
-#endif	/* __DRMKPI_WORKQUEUE_H__ */
+#endif	/* __DRMKPI_LINUX_WORKQUEUE_H__ */

@@ -29,8 +29,8 @@
  * $FreeBSD$
  */
 
-#ifndef __DRMKPI_GFP_H__
-#define	__DRMKPI_GFP_H__
+#ifndef __DRMKPI_LINUX_GFP_H__
+#define	__DRMKPI_LINUX_GFP_H__
 
 #include <sys/cdefs.h>
 #include <sys/types.h>
@@ -106,4 +106,4 @@ free_page(uintptr_t addr)
 #define	SetPageReserved(page)	do { } while (0)	/* NOP */
 #define	ClearPageReserved(page)	do { } while (0)	/* NOP */
 
-#endif	/* __DRMKPI_GFP_H__ */
+#endif	/* __DRMKPI_LINUX_GFP_H__ */

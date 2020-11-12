@@ -29,8 +29,8 @@
  * $FreeBSD$
  */
 
-#ifndef __DRMKPI_TYPES_H__
-#define	__DRMKPI_TYPES_H__
+#ifndef __DRMKPI_LINUX_TYPES_H__
+#define	__DRMKPI_LINUX_TYPES_H__
 
 #include <sys/cdefs.h>
 #include <sys/types.h>
@@ -85,4 +85,4 @@ typedef void (*rcu_callback_t)(struct rcu_head *head);
 typedef void (*call_rcu_func_t)(struct rcu_head *head, rcu_callback_t func);
 typedef int linux_task_fn_t(void *data);
 
-#endif	/* __DRMKPI_TYPES_H__ */
+#endif	/* __DRMKPI_LINUX_TYPES_H__ */
