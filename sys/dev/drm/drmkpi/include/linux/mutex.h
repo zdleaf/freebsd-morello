@@ -152,6 +152,4 @@ linux_mutex_destroy(mutex_t *m)
 	sx_destroy(&m->sx);
 }
 
-extern int drmkpi_mutex_lock_interruptible(mutex_t *m);
-
 #endif	/* __DRMKPI_LINUX_MUTEX_H__ */
