@@ -43,15 +43,26 @@ __FBSDID("$FreeBSD$");
 
 #include <machine/stdarg.h>
 
+#include <vm/vm.h>
+#include <vm/pmap.h>
+
 #include <linux/bitmap.h>
-#include <linux/kobject.h>
-#include <linux/slab.h>
-#include <linux/idr.h>
 #include <linux/err.h>
 #include <linux/spinlock.h>
 
+#include <drmkpi/idr.h>
+
 #define	MAX_IDR_LEVEL	((MAX_IDR_SHIFT + IDR_BITS - 1) / IDR_BITS)
 #define	MAX_IDR_FREE	(MAX_IDR_LEVEL * 2)
+
+#define	MAX_ID_SHIFT	((sizeof(int) * NBBY) - 1)
+#define	MAX_ID_BIT	(1U << MAX_ID_SHIFT)
+#define	MAX_ID_MASK	(MAX_ID_BIT - 1)
+#define	MAX_LEVEL	(MAX_ID_SHIFT + IDR_BITS - 1) / IDR_BITS
+
+#define	MAX_IDR_SHIFT (sizeof(int)*8 - 1)
+#define	MAX_IDR_BIT (1U << MAX_IDR_SHIFT)
+#define	MAX_IDR_MASK (MAX_IDR_BIT - 1)
 
 struct drmkpi_idr_cache {
 	spinlock_t lock;
@@ -185,7 +196,7 @@ drmkpi_idr_destroy(struct idr *idr)
 {
 	struct idr_layer *il, *iln;
 
-	idr_remove_all(idr);
+	drmkpi_idr_remove_all(idr);
 	mtx_lock(&idr->lock);
 	for (il = idr->free; il != NULL; il = iln) {
 		iln = il->ary[0];
@@ -633,7 +644,7 @@ drmkpi_idr_get_new_above(struct idr *idr, void *ptr, int starting_id, int *idp)
 int
 drmkpi_ida_get_new_above(struct ida *ida, int starting_id, int *p_id)
 {
-	return (idr_get_new_above(&ida->idr, NULL, starting_id, p_id));
+	return (drmkpi_idr_get_new_above(&ida->idr, NULL, starting_id, p_id));
 }
 
 static int
@@ -737,13 +748,13 @@ bool
 drmkpi_idr_is_empty(struct idr *idp)
 {
 
-	return (idr_for_each(idp, idr_has_entry, NULL) == 0);
+	return (drmkpi_idr_for_each(idp, idr_has_entry, NULL) == 0);
 }
 
 int
 drmkpi_ida_pre_get(struct ida *ida, gfp_t flags)
 {
-	if (idr_pre_get(&ida->idr, flags) == 0)
+	if (drmkpi_idr_pre_get(&ida->idr, flags) == 0)
 		return (0);
 
 	if (ida->free_bitmap == NULL) {
@@ -770,12 +781,12 @@ drmkpi_ida_simple_get(struct ida *ida, unsigned int start, unsigned int end,
 		max = end - 1;
 	}
 again:
-	if (!ida_pre_get(ida, flags))
+	if (!drmkpi_ida_pre_get(ida, flags))
 		return (-ENOMEM);
 
 	if ((ret = drmkpi_ida_get_new_above(ida, start, &id)) == 0) {
 		if (id > max) {
-			ida_remove(ida, id);
+			drmkpi_ida_remove(ida, id);
 			ret = -ENOSPC;
 		} else {
 			ret = id;
@@ -790,24 +801,24 @@ again:
 void
 drmkpi_ida_simple_remove(struct ida *ida, unsigned int id)
 {
-	idr_remove(&ida->idr, id);
+	drmkpi_idr_remove(&ida->idr, id);
 }
 
 void
 drmkpi_ida_remove(struct ida *ida, int id)
 {
-	idr_remove(&ida->idr, id);
+	drmkpi_idr_remove(&ida->idr, id);
 }
 
 void
 drmkpi_ida_init(struct ida *ida)
 {
-	idr_init(&ida->idr);
+	drmkpi_idr_init(&ida->idr);
 }
 
 void
 drmkpi_ida_destroy(struct ida *ida)
 {
-	idr_destroy(&ida->idr);
+	drmkpi_idr_destroy(&ida->idr);
 	free(ida->free_bitmap, M_IDR);
 }
