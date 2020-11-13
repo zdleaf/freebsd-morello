@@ -252,7 +252,8 @@ dw_hdmi_transfer(device_t dev, struct iic_msg *msgs, uint32_t nmsgs)
 			if (msgs[i].len == 1) {
 				sc->i2cm_addr = msgs[i].buf[0];
 			} else 
-				ret =dw_hdmi_i2c_write(sc, msgs[i].buf, msgs[i].len);
+				ret = dw_hdmi_i2c_write(sc, msgs[i].buf,
+				    msgs[i].len);
 		}
 
 		if (ret != 0)
@@ -295,10 +296,11 @@ dw_hdmi_bridge_attach(struct drm_bridge *bridge)
 	sc = container_of(bridge, struct dw_hdmi_softc, bridge);
 
 	sc->connector.polled = DRM_CONNECTOR_POLL_HPD;
-	drm_connector_helper_add(&sc->connector, &dw_hdmi_connector_helper_funcs);
+	drm_connector_helper_add(&sc->connector,
+	    &dw_hdmi_connector_helper_funcs);
 
-	drm_connector_init(bridge->dev, &sc->connector, &dw_hdmi_connector_funcs,
-			   DRM_MODE_CONNECTOR_HDMIA);
+	drm_connector_init(bridge->dev, &sc->connector,
+	    &dw_hdmi_connector_funcs, DRM_MODE_CONNECTOR_HDMIA);
 
 	drm_connector_attach_encoder(&sc->connector, &sc->encoder);
 
@@ -449,17 +451,26 @@ dw_hdmi_bridge_enable(struct drm_bridge *bridge)
 	/* Frame composer setup */
 	DW_HDMI_WRITE_1(sc, DW_HDMI_FC_INHACTIV0, sc->mode.hdisplay & 0xFF);
 	DW_HDMI_WRITE_1(sc, DW_HDMI_FC_INHACTIV1, sc->mode.hdisplay >> 8);
-	DW_HDMI_WRITE_1(sc, DW_HDMI_FC_INHBLANK0, (sc->mode.htotal - sc->mode.hdisplay) & 0xFF);
-	DW_HDMI_WRITE_1(sc, DW_HDMI_FC_INHBLANK1, (sc->mode.htotal - sc->mode.hdisplay) >> 8);
+	DW_HDMI_WRITE_1(sc, DW_HDMI_FC_INHBLANK0,
+	    (sc->mode.htotal - sc->mode.hdisplay) & 0xFF);
+	DW_HDMI_WRITE_1(sc, DW_HDMI_FC_INHBLANK1,
+	    (sc->mode.htotal - sc->mode.hdisplay) >> 8);
 	DW_HDMI_WRITE_1(sc, DW_HDMI_FC_INVACTIV0, sc->mode.vdisplay & 0xFF);
 	DW_HDMI_WRITE_1(sc, DW_HDMI_FC_INVACTIV1, sc->mode.vdisplay >> 8);
-	DW_HDMI_WRITE_1(sc, DW_HDMI_FC_INVBLANK, sc->mode.vtotal - sc->mode.vdisplay);
-	DW_HDMI_WRITE_1(sc, DW_HDMI_FC_HSYNCINDELAY0, (sc->mode.hsync_start - sc->mode.hdisplay) & 0xFF);
-	DW_HDMI_WRITE_1(sc, DW_HDMI_FC_HSYNCINDELAY1, (sc->mode.hsync_start - sc->mode.hdisplay) >> 8);
-	DW_HDMI_WRITE_1(sc, DW_HDMI_FC_HSYNCINWIDTH0, (sc->mode.hsync_end - sc->mode.hsync_start) & 0xFF);
-	DW_HDMI_WRITE_1(sc, DW_HDMI_FC_HSYNCINWIDTH1, (sc->mode.hsync_end - sc->mode.hsync_start) >> 8);
-	DW_HDMI_WRITE_1(sc, DW_HDMI_FC_VSYNCINDELAY, sc->mode.vsync_start - sc->mode.vdisplay);
-	DW_HDMI_WRITE_1(sc, DW_HDMI_FC_VSYNCINWIDTH, sc->mode.vsync_end - sc->mode.vsync_start);
+	DW_HDMI_WRITE_1(sc, DW_HDMI_FC_INVBLANK,
+	    sc->mode.vtotal - sc->mode.vdisplay);
+	DW_HDMI_WRITE_1(sc, DW_HDMI_FC_HSYNCINDELAY0,
+	    (sc->mode.hsync_start - sc->mode.hdisplay) & 0xFF);
+	DW_HDMI_WRITE_1(sc, DW_HDMI_FC_HSYNCINDELAY1,
+	    (sc->mode.hsync_start - sc->mode.hdisplay) >> 8);
+	DW_HDMI_WRITE_1(sc, DW_HDMI_FC_HSYNCINWIDTH0,
+	    (sc->mode.hsync_end - sc->mode.hsync_start) & 0xFF);
+	DW_HDMI_WRITE_1(sc, DW_HDMI_FC_HSYNCINWIDTH1,
+	    (sc->mode.hsync_end - sc->mode.hsync_start) >> 8);
+	DW_HDMI_WRITE_1(sc, DW_HDMI_FC_VSYNCINDELAY,
+	    sc->mode.vsync_start - sc->mode.vdisplay);
+	DW_HDMI_WRITE_1(sc, DW_HDMI_FC_VSYNCINWIDTH,
+	    sc->mode.vsync_end - sc->mode.vsync_start);
 
 	/* Configure the PHY */
 	DW_HDMI_PHY_CONFIG(sc->phydev, &sc->mode);
@@ -528,7 +539,8 @@ static void aw_de2_dw_hdmi_encoder_mode_set(struct drm_encoder *encoder,
 	    freq);
 }
 
-static const struct drm_encoder_helper_funcs aw_de2_dw_hdmi_encoder_helper_funcs = {
+static const struct drm_encoder_helper_funcs
+    aw_de2_dw_hdmi_encoder_helper_funcs = {
 	.mode_set = aw_de2_dw_hdmi_encoder_mode_set,
 };
 
@@ -537,13 +549,15 @@ static const struct drm_encoder_funcs aw_dw_hdmi_encoder_funcs = {
 };
 
 static int
-aw_dw_hdmi_add_encoder(device_t dev, struct drm_crtc *crtc, struct drm_device *drm)
+aw_dw_hdmi_add_encoder(device_t dev, struct drm_crtc *crtc,
+    struct drm_device *drm)
 {
 	struct aw_dw_hdmi_softc *sc;
 
 	sc = device_get_softc(dev);
 
-	drm_encoder_helper_add(&sc->base_sc.encoder, &aw_de2_dw_hdmi_encoder_helper_funcs);
+	drm_encoder_helper_add(&sc->base_sc.encoder,
+	    &aw_de2_dw_hdmi_encoder_helper_funcs);
 	sc->base_sc.encoder.possible_crtcs = drm_crtc_mask(crtc);
 	drm_encoder_init(drm, &sc->base_sc.encoder, &aw_dw_hdmi_encoder_funcs,
 	  DRM_MODE_ENCODER_TMDS, NULL);
@@ -575,13 +589,15 @@ static const struct drm_encoder_funcs rk_dw_hdmi_encoder_funcs = {
 };
 
 static int
-rk_dw_hdmi_add_encoder(device_t dev, struct drm_crtc *crtc, struct drm_device *drm)
+rk_dw_hdmi_add_encoder(device_t dev, struct drm_crtc *crtc,
+    struct drm_device *drm)
 {
 	struct rk_dw_hdmi_softc *sc;
 
 	sc = device_get_softc(dev);
 
-	drm_encoder_helper_add(&sc->base_sc.encoder, &rk_dw_hdmi_encoder_helper_funcs);
+	drm_encoder_helper_add(&sc->base_sc.encoder,
+	    &rk_dw_hdmi_encoder_helper_funcs);
 	sc->base_sc.encoder.possible_crtcs = drm_crtc_mask(crtc);
 	drm_encoder_init(drm, &sc->base_sc.encoder, &rk_dw_hdmi_encoder_funcs,
 	  DRM_MODE_ENCODER_TMDS, NULL);
@@ -642,7 +658,8 @@ dw_hdmi_attach(device_t dev)
 	node = ofw_bus_get_node(dev);
 
 	/* Clock and reset */
-	if ((error = clk_get_by_ofw_name(dev, node, "iahb", &sc->clk_iahb)) != 0) {
+	if ((error = clk_get_by_ofw_name(dev, node, "iahb",
+	    &sc->clk_iahb)) != 0) {
 		device_printf(dev, "Cannot get iahb clock\n");
 		goto fail;
 	}
@@ -650,7 +667,8 @@ dw_hdmi_attach(device_t dev)
 		device_printf(dev, "Cannot enable iahb clock\n");
 		goto fail;
 	}
-	if ((error = clk_get_by_ofw_name(dev, node, "isfr", &sc->clk_isfr)) != 0) {
+	if ((error = clk_get_by_ofw_name(dev, node, "isfr",
+	    &sc->clk_isfr)) != 0) {
 		device_printf(dev, "Cannot get isfr clock\n");
 		goto fail;
 	}
@@ -734,8 +752,9 @@ dw_hdmi_attach(device_t dev)
 
 	/* If no ddc is provided by the driver use the internal one */
 	if (sc->ddc == NULL) {
-		if ((sc->iicbus = device_add_child(dev, "iicbus", -1)) == NULL) {
-			device_printf(dev, "could not allocate iicbus instance\n");
+		if ((sc->iicbus = device_add_child(dev, "iicbus", -1)) == NULL){
+			device_printf(dev,
+			    "could not allocate iicbus instance\n");
 			return (ENXIO);
 		}
 		sc->ddc = i2c_bsd_adapter(sc->iicbus);
@@ -785,7 +804,8 @@ aw_de2_dw_hdmi_attach(device_t dev)
 
 	node = ofw_bus_get_node(dev);
 
-	if ((error = clk_get_by_ofw_name(dev, node, "tmds", &sc->clk_tmds)) != 0) {
+	if ((error = clk_get_by_ofw_name(dev, node, "tmds",
+	    &sc->clk_tmds)) != 0) {
 		device_printf(dev, "Cannot get tmds clock\n");
 		goto fail;
 	}
@@ -793,7 +813,8 @@ aw_de2_dw_hdmi_attach(device_t dev)
 		device_printf(dev, "Cannot enable tmds clock\n");
 		goto fail;
 	}
-	if ((error = hwreset_get_by_ofw_name(dev, node, "ctrl", &sc->reset_ctrl)) != 0) {
+	if ((error = hwreset_get_by_ofw_name(dev, node, "ctrl",
+	    &sc->reset_ctrl)) != 0) {
 		device_printf(dev, "Cannot get reset\n");
 		goto fail;
 	}
