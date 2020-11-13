@@ -52,6 +52,17 @@ __FBSDID("$FreeBSD$");
 #include <dev/ofw/ofw_bus.h>
 #include <dev/ofw/ofw_bus_subr.h>
 
+#include <drm/drm_drv.h>
+#include <drm/drm_atomic.h>
+#include <drm/drm_atomic_helper.h>
+#include <drm/drm_gem_framebuffer_helper.h>
+#include <drm/drm_plane_helper.h>
+#include <drm/drm_fb_cma_helper.h>
+#include <drm/drm_fb_helper.h>
+#include <drm/drm_fb_cma_helper.h>
+#include <drm/drm_gem_cma_helper.h>
+#include <drm/drm_fourcc.h>
+
 #include <dev/extres/hwreset/hwreset.h>
 #include <dev/extres/clk/clk.h>
 #include <dev/extres/syscon/syscon.h>
@@ -82,6 +93,10 @@ static struct resource_spec rk_vop_spec[] = {
 	{ -1, 0 }
 };
 
+struct rk_vop_plane {
+	struct rk_vop_softc	*sc;
+};
+
 #define	CLK_NENTRIES	3
 struct rk_vop_softc {
 	device_t		dev;
@@ -94,6 +109,7 @@ struct rk_vop_softc {
 	hwreset_t		hwreset_axi;
 	hwreset_t		hwreset_ahb;
 	hwreset_t		hwreset_dclk;
+	struct drm_plane	planes[2];
 };
 
 static void
@@ -554,7 +570,7 @@ rk_vop_attach(device_t dev)
 static int
 rk_vop_commit(device_t dev)
 {
-	struct rk_vop_mixer_softc *sc;
+	struct rk_vop_softc *sc;
 
 	sc = device_get_softc(dev);
 
@@ -571,9 +587,73 @@ rk_vop_commit(device_t dev)
 }
 
 static int
+rk_vop_plane_atomic_check(struct drm_plane *plane,
+    struct drm_plane_state *state)
+{
+	struct drm_crtc *crtc;
+	struct drm_crtc_state *crtc_state;
+
+	crtc = state->crtc;
+	if (crtc == NULL)
+		return (0);
+
+	crtc_state = drm_atomic_get_existing_crtc_state(state->state, crtc);
+	if (crtc_state == NULL)
+		return (-EINVAL);
+
+	return (drm_atomic_helper_check_plane_state(state, crtc_state,
+	    DRM_PLANE_HELPER_NO_SCALING,
+	    DRM_PLANE_HELPER_NO_SCALING,
+	    true, true));
+}
+
+static void
+rk_vop_plane_atomic_disable(struct drm_plane *plane,
+    struct drm_plane_state *old_state)
+{
+#if 0
+	struct rk_vop_mixer_plane *mixer_plane;
+	struct rk_vop_oftc *sc;
+	uint32_t reg;
+
+	mixer_plane = container_of(plane, struct rk_vop_mixer_plane, plane);
+	sc = mixer_plane->sc;
+
+	reg = AW_DE2_MIXER_READ_4(sc, OVL_UI_ATTR_CTL(mixer_plane->id));
+	reg &= ~OVL_UI_ATTR_EN;
+	AW_DE2_MIXER_WRITE_4(sc, OVL_UI_ATTR_CTL(mixer_plane->id), reg);
+#endif
+}
+
+static void rk_vop_plane_atomic_update(struct drm_plane *plane,
+					 struct drm_plane_state *old_state)
+{
+
+}
+
+static struct drm_plane_helper_funcs rk_vop_plane_helper_funcs = {
+	.atomic_check	= rk_vop_plane_atomic_check,
+	.atomic_disable	= rk_vop_plane_atomic_disable,
+	.atomic_update	= rk_vop_plane_atomic_update,
+};
+
+static const struct drm_plane_funcs rk_vop_plane_funcs = {
+	.atomic_destroy_state	= drm_atomic_helper_plane_destroy_state,
+	.atomic_duplicate_state	= drm_atomic_helper_plane_duplicate_state,
+	.destroy		= drm_plane_cleanup,
+	.disable_plane		= drm_atomic_helper_disable_plane,
+	.reset			= drm_atomic_helper_plane_reset,
+	.update_plane		= drm_atomic_helper_update_plane,
+};
+
+static const u32 rk_vop_plane_formats[] = {
+	DRM_FORMAT_ARGB8888,
+};
+
+static int
 rk_vop_create_pipeline(device_t dev, struct drm_device *drm)
 {
-	struct rk_vop_mixer_softc *sc;
+	struct rk_vop_softc *sc;
 
 	sc = device_get_softc(dev);
 
@@ -591,6 +671,26 @@ rk_vop_create_pipeline(device_t dev, struct drm_device *drm)
 	AW_DE2_TCON_CREATE_CRTC(sc->tcon, drm,
 	    &sc->ui_planes[0].plane, &sc->vi_planes[0].plane);
 #endif
+
+	enum drm_plane_type type;
+	int i;
+
+	type = DRM_PLANE_TYPE_PRIMARY;
+
+	for (i = 0; i < 2; i++) {
+		if (i > 0)
+			type = DRM_PLANE_TYPE_OVERLAY;
+
+		drm_universal_plane_init(drm,
+		    &sc->planes[i],
+		    0,
+		    &rk_vop_plane_funcs,
+		    rk_vop_plane_formats,
+		    nitems(rk_vop_plane_formats),
+		    NULL, type, NULL);
+		drm_plane_helper_add(&sc->planes[i],
+		    &rk_vop_plane_helper_funcs);
+	}
 
 	return (0);
 }
