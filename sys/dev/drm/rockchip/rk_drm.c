@@ -62,6 +62,7 @@ __FBSDID("$FreeBSD$");
 #include <drm/drm_vblank.h>
 
 #include "fb_if.h"
+#include "rk_vop_if.h"
 
 struct rk_drm_softc {
 	device_t		dev;
@@ -260,11 +261,8 @@ rk_drm_irq_hook(void *arg)
 			    ports[i]);
 		portdev = OF_device_from_xref(ports[i]);
 		if (portdev != NULL) {
-#if 0
-			AW_DE2_MIXER_CREATE_PIPELINE(portdev, &sc->drm_dev);
-#else
 			device_printf(sc->dev, "port found\n");
-#endif
+			RK_VOP_CREATE_PIPELINE(portdev, &sc->drm_dev);
 		} else
 			device_printf(sc->dev,
 			    "Cannot find port with phandle %x\n", ports[i]);
