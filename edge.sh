@@ -6,6 +6,8 @@ fi
 # make -j6 TARGET=arm64 NO_ROOT=1 DESTDIR=/home/br/world-arm64 installworld
 # make -j6 TARGET=arm64 KERNCONF=GENERIC kernel-toolchain
 
+export MK_CTF=no
+
 make -j8 TARGET=arm64 KERN${A}=EDGE buildkernel || exit 1
 
 cp /usr/obj/usr/home/br/dev/freebsd-head/arm64.aarch64/sys/EDGE/kernel /tftpboot/edge/
