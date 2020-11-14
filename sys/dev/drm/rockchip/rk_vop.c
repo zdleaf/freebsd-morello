@@ -62,6 +62,8 @@ __FBSDID("$FreeBSD$");
 #include <drm/drm_fb_cma_helper.h>
 #include <drm/drm_gem_cma_helper.h>
 #include <drm/drm_fourcc.h>
+#include <drm/drm_print.h>
+#include <drm/drm_vblank.h>
 
 #include <dev/extres/hwreset/hwreset.h>
 #include <dev/extres/clk/clk.h>
@@ -74,8 +76,8 @@ __FBSDID("$FreeBSD$");
 #include <dev/drm/rockchip/rk_vop.h>
 
 #include "rk_vop_if.h"
+#include "dw_hdmi_if.h"
 #if 0
-#include "hdmi_if.h"
 #include "syscon_if.h"
 #endif
 
@@ -110,6 +112,13 @@ struct rk_vop_softc {
 	hwreset_t		hwreset_ahb;
 	hwreset_t		hwreset_dclk;
 	struct drm_plane	planes[2];
+
+	struct drm_pending_vblank_event	*event;
+	struct drm_device		*drm;
+	struct drm_crtc			crtc;
+	struct drm_encoder		encoder;
+	uint32_t			vbl_counter;
+	device_t			outport;
 };
 
 static void
@@ -650,6 +659,189 @@ static const u32 rk_vop_plane_formats[] = {
 	DRM_FORMAT_ARGB8888,
 };
 
+/*
+ * VBLANK functions
+ */
+static int
+rk_vop_enable_vblank(struct drm_crtc *crtc)
+{
+#if 0
+	struct rk_vop_softc *sc;
+
+	sc = container_of(crtc, struct rk_vop_softc, crtc);
+	DRM_DEBUG_DRIVER("%s: Enabling VBLANK\n", __func__);
+	AW_DE2_TCON_WRITE_4(sc, TCON_GINT0,
+	    TCON0_GINT0_VB_EN | TCON1_GINT0_VB_EN);
+#endif
+
+	return (0);
+}
+
+static void
+rk_vop_disable_vblank(struct drm_crtc *crtc)
+{
+#if 0
+	struct rk_vop_softc *sc;
+
+	sc = container_of(crtc, struct rk_vop_softc, crtc);
+	DRM_DEBUG_DRIVER("%s: Disabling VBLANK\n", __func__);
+	AW_DE2_TCON_WRITE_4(sc, TCON_GINT0, 0x00);
+#endif
+}
+
+static uint32_t
+rk_vop_get_vblank_counter(struct drm_crtc *crtc)
+{
+	struct rk_vop_softc *sc;
+
+	sc = container_of(crtc, struct rk_vop_softc, crtc);
+
+	return (sc->vbl_counter);
+}
+
+static const struct drm_crtc_funcs rk_vop_funcs = {
+	.atomic_destroy_state	= drm_atomic_helper_crtc_destroy_state,
+	.atomic_duplicate_state	= drm_atomic_helper_crtc_duplicate_state,
+	.destroy		= drm_crtc_cleanup,
+	.page_flip		= drm_atomic_helper_page_flip,
+	.reset			= drm_atomic_helper_crtc_reset,
+	.set_config		= drm_atomic_helper_set_config,
+
+	.get_vblank_counter	= rk_vop_get_vblank_counter,
+	.enable_vblank		= rk_vop_enable_vblank,
+	.disable_vblank		= rk_vop_disable_vblank,
+};
+
+static int
+rk_crtc_atomic_check(struct drm_crtc *crtc, struct drm_crtc_state *state)
+{
+
+	/* Not sure we need to something here, should replace with an helper */
+	return (0);
+}
+
+static void
+rk_crtc_atomic_begin(struct drm_crtc *crtc, struct drm_crtc_state *old_state)
+{
+	struct rk_vop_softc *sc;
+	unsigned long flags;
+
+	sc = container_of(crtc, struct rk_vop_softc, crtc);
+
+	if (crtc->state->event == NULL)
+		return;
+
+	spin_lock_irqsave(&crtc->dev->event_lock, flags);
+
+	if (drm_crtc_vblank_get(crtc) != 0)
+		drm_crtc_send_vblank_event(crtc, crtc->state->event);
+	else
+		drm_crtc_arm_vblank_event(crtc, crtc->state->event);
+
+	crtc->state->event = NULL;
+	spin_unlock_irqrestore(&crtc->dev->event_lock, flags);
+}
+
+static void
+rk_crtc_atomic_flush(struct drm_crtc *crtc,
+    struct drm_crtc_state *old_state)
+{
+	struct rk_vop_softc *sc;
+	struct drm_pending_vblank_event *event;
+
+	event = crtc->state->event;
+
+	sc = container_of(crtc, struct rk_vop_softc, crtc);
+
+	//AW_DE2_MIXER_COMMIT(sc->mixer);
+
+	if (event) {
+		crtc->state->event = NULL;
+
+		spin_lock_irq(&sc->drm->event_lock);
+		/*
+		 * If not in page flip, arm it for later
+		 * Else send it
+		 */
+		if (drm_crtc_vblank_get(crtc) == 0)
+			drm_crtc_arm_vblank_event(crtc, event);
+		else
+			drm_crtc_send_vblank_event(crtc, event);
+		spin_unlock_irq(&sc->drm->event_lock);
+	}
+}
+
+static void
+rk_crtc_atomic_enable(struct drm_crtc *crtc, struct drm_crtc_state *old_state)
+{
+	struct rk_vop_softc *sc;
+
+	sc = container_of(crtc, struct rk_vop_softc, crtc);
+
+#if 0
+	int32_t reg;
+
+	/* Enable TCON */
+	AW_DE2_TCON_LOCK(sc);
+	reg = AW_DE2_TCON_READ_4(sc, TCON_CTL);
+	reg |= TCON_CTL_EN;
+	AW_DE2_TCON_WRITE_4(sc, TCON_CTL, reg);
+	AW_DE2_TCON_UNLOCK(sc);
+#endif
+
+	/* Enable VBLANK events */
+	drm_crtc_vblank_on(crtc);
+}
+
+static void
+rk_crtc_atomic_disable(struct drm_crtc *crtc, struct drm_crtc_state *old_state)
+{
+	struct rk_vop_softc *sc;
+	uint32_t irqflags;
+
+	sc = container_of(crtc, struct rk_vop_softc, crtc);
+
+#if 0
+	uint32_t reg;
+
+	/* Disable TCON */
+	AW_DE2_TCON_LOCK(sc);
+	reg = AW_DE2_TCON_READ_4(sc, TCON_CTL);
+	reg &= ~TCON_CTL_EN;
+	AW_DE2_TCON_WRITE_4(sc, TCON_CTL, reg);
+	AW_DE2_TCON_UNLOCK(sc);
+#endif
+
+	/* Disable VBLANK events */
+	drm_crtc_vblank_off(crtc);
+
+	spin_lock_irqsave(&crtc->dev->event_lock, irqflags);
+
+	if (crtc->state->event) {
+		drm_crtc_send_vblank_event(crtc, crtc->state->event);
+		crtc->state->event = NULL;
+	}
+
+	spin_unlock_irqrestore(&crtc->dev->event_lock, irqflags);
+
+}
+
+static void
+rk_crtc_mode_set_nofb(struct drm_crtc *crtc)
+{
+
+	printf("%s\n", __func__);
+}
+
+static const struct drm_crtc_helper_funcs rk_vop_crtc_helper_funcs = {
+	.atomic_check	= rk_crtc_atomic_check,
+	.atomic_begin	= rk_crtc_atomic_begin,
+	.atomic_flush	= rk_crtc_atomic_flush,
+	.atomic_enable	= rk_crtc_atomic_enable,
+	.atomic_disable	= rk_crtc_atomic_disable,
+	.mode_set_nofb	= rk_crtc_mode_set_nofb,
+};
+
 static int
 rk_vop_create_pipeline(device_t dev, struct drm_device *drm)
 {
@@ -673,6 +865,7 @@ rk_vop_create_pipeline(device_t dev, struct drm_device *drm)
 #endif
 
 	enum drm_plane_type type;
+	int error;
 	int i;
 
 	type = DRM_PLANE_TYPE_PRIMARY;
@@ -691,6 +884,22 @@ rk_vop_create_pipeline(device_t dev, struct drm_device *drm)
 		drm_plane_helper_add(&sc->planes[i],
 		    &rk_vop_plane_helper_funcs);
 	}
+
+	error = drm_crtc_init_with_planes(drm, &sc->crtc,
+	    &sc->planes[0], &sc->planes[1],
+	    &rk_vop_funcs,
+	    NULL);
+	if (error != 0) {
+		device_printf(sc->dev,
+		    "%s: drm_crtc_init_with_planes failed\n", __func__);
+		return (error);
+	}
+
+	drm_crtc_helper_add(&sc->crtc, &rk_vop_crtc_helper_funcs);
+
+	printf("%s: add encoder\n", __func__);
+
+	DW_HDMI_ADD_ENCODER(sc->outport, &sc->crtc, drm);
 
 	return (0);
 }
