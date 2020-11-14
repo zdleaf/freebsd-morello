@@ -163,6 +163,7 @@ struct {
 	{64, "malloc-64", },
 	{128, "malloc-128", },
 	{256, "malloc-256", },
+	{384, "malloc-384", },
 	{512, "malloc-512", },
 	{1024, "malloc-1024", },
 	{2048, "malloc-2048", },
@@ -173,11 +174,6 @@ struct {
 	{65536, "malloc-65536", },
 	{0, NULL},
 };
-
-/*
- * Zone to allocate per-CPU storage for statistics.
- */
-static uma_zone_t mt_stats_zone;
 
 u_long vm_kmem_size;
 SYSCTL_ULONG(_vm, OID_AUTO, kmem_size, CTLFLAG_RDTUN, &vm_kmem_size, 0,
@@ -227,18 +223,7 @@ SYSCTL_PROC(_vm_malloc, OID_AUTO, zone_sizes,
  */
 struct mtx malloc_mtx;
 
-#ifdef MALLOC_PROFILE
-uint64_t krequests[KMEM_ZSIZE + 1];
-
-static int sysctl_kern_mprof(SYSCTL_HANDLER_ARGS);
-#endif
-
 static int sysctl_kern_malloc_stats(SYSCTL_HANDLER_ARGS);
-
-/*
- * time_uptime of the last malloc(9) failure (induced or real).
- */
-static time_t t_malloc_fail;
 
 #if defined(MALLOC_MAKE_FAILURES) || (MALLOC_DEBUG_MAXZONES > 1)
 static SYSCTL_NODE(_debug, OID_AUTO, malloc, CTLFLAG_RD | CTLFLAG_MPSAFE, 0,
@@ -376,13 +361,6 @@ mtp_get_subzone(struct malloc_type *mtp)
 	return (0);
 }
 #endif /* MALLOC_DEBUG_MAXZONES > 1 */
-
-int
-malloc_last_fail(void)
-{
-
-	return (time_uptime - t_malloc_fail);
-}
 
 /*
  * An allocation has succeeded -- update malloc type statistics for the
@@ -539,7 +517,6 @@ malloc_dbg(caddr_t *vap, size_t *sizep, struct malloc_type *mtp,
 		atomic_add_int(&malloc_nowait_count, 1);
 		if ((malloc_nowait_count % malloc_failure_rate) == 0) {
 			atomic_add_int(&malloc_failure_count, 1);
-			t_malloc_fail = time_uptime;
 			*vap = NULL;
 			return (EJUSTRETURN);
 		}
@@ -652,9 +629,6 @@ void *
 			size = (size & ~KMEM_ZMASK) + KMEM_ZBASE;
 		indx = kmemsize[size >> KMEM_ZSHIFT];
 		zone = kmemzones[indx].kz_zone[mtp_get_subzone(mtp)];
-#ifdef MALLOC_PROFILE
-		krequests[size >> KMEM_ZSHIFT]++;
-#endif
 		va = uma_zalloc(zone, flags);
 		if (va != NULL)
 			size = zone->uz_size;
@@ -666,7 +640,6 @@ void *
 	if (__predict_false(va == NULL)) {
 		KASSERT((flags & M_WAITOK) == 0,
 		    ("malloc(M_WAITOK) returned NULL"));
-		t_malloc_fail = time_uptime;
 	}
 #ifdef DEBUG_REDZONE
 	if (va != NULL)
@@ -691,9 +664,6 @@ malloc_domain(size_t *sizep, int *indxp, struct malloc_type *mtp, int domain,
 		size = (size & ~KMEM_ZMASK) + KMEM_ZBASE;
 	indx = kmemsize[size >> KMEM_ZSHIFT];
 	zone = kmemzones[indx].kz_zone[mtp_get_subzone(mtp)];
-#ifdef MALLOC_PROFILE
-	krequests[size >> KMEM_ZSHIFT]++;
-#endif
 	va = uma_zalloc_domain(zone, NULL, domain, flags);
 	if (va != NULL)
 		*sizep = zone->uz_size;
@@ -734,7 +704,6 @@ malloc_domainset(size_t size, struct malloc_type *mtp, struct domainset *ds,
 	if (__predict_false(va == NULL)) {
 		KASSERT((flags & M_WAITOK) == 0,
 		    ("malloc(M_WAITOK) returned NULL"));
-		t_malloc_fail = time_uptime;
 	}
 #ifdef DEBUG_REDZONE
 	if (va != NULL)
@@ -765,7 +734,6 @@ malloc_exec(size_t size, struct malloc_type *mtp, int flags)
 	if (__predict_false(va == NULL)) {
 		KASSERT((flags & M_WAITOK) == 0,
 		    ("malloc(M_WAITOK) returned NULL"));
-		t_malloc_fail = time_uptime;
 	}
 #ifdef DEBUG_REDZONE
 	if (va != NULL)
@@ -795,7 +763,6 @@ malloc_domainset_exec(size_t size, struct malloc_type *mtp, struct domainset *ds
 	if (__predict_false(va == NULL)) {
 		KASSERT((flags & M_WAITOK) == 0,
 		    ("malloc(M_WAITOK) returned NULL"));
-		t_malloc_fail = time_uptime;
 	}
 #ifdef DEBUG_REDZONE
 	if (va != NULL)
@@ -1184,9 +1151,6 @@ mallocinit(void *dummy)
 	if (kmem_zmax < PAGE_SIZE || kmem_zmax > KMEM_ZMAX)
 		kmem_zmax = KMEM_ZMAX;
 
-	mt_stats_zone = uma_zcreate("mt_stats_zone",
-	    sizeof(struct malloc_type_stats), NULL, NULL, NULL, NULL,
-	    UMA_ALIGN_PTR, UMA_ZONE_PCPU);
 	for (i = 0, indx = 0; kmemzones[indx].kz_size != 0; indx++) {
 		int size = kmemzones[indx].kz_size;
 		const char *name = kmemzones[indx].kz_name;
@@ -1222,7 +1186,7 @@ malloc_init(void *data)
 		    mtp->ks_shortdesc, mtp->ks_version);
 
 	mtip = &mtp->ks_mti;
-	mtip->mti_stats = uma_zalloc_pcpu(mt_stats_zone, M_WAITOK | M_ZERO);
+	mtip->mti_stats = uma_zalloc_pcpu(pcpu_zone_64, M_WAITOK | M_ZERO);
 	mtp_set_subzone(mtp);
 
 	mtx_lock(&malloc_mtx);
@@ -1279,7 +1243,7 @@ malloc_uninit(void *data)
 		    temp_allocs, temp_bytes);
 	}
 
-	uma_zfree_pcpu(mt_stats_zone, mtip->mti_stats);
+	uma_zfree_pcpu(pcpu_zone_64, mtip->mti_stats);
 }
 
 struct malloc_type *
@@ -1519,52 +1483,3 @@ DB_SHOW_COMMAND(multizone_matches, db_show_multizone_matches)
 }
 #endif /* MALLOC_DEBUG_MAXZONES > 1 */
 #endif /* DDB */
-
-#ifdef MALLOC_PROFILE
-
-static int
-sysctl_kern_mprof(SYSCTL_HANDLER_ARGS)
-{
-	struct sbuf sbuf;
-	uint64_t count;
-	uint64_t waste;
-	uint64_t mem;
-	int error;
-	int rsize;
-	int size;
-	int i;
-
-	waste = 0;
-	mem = 0;
-
-	error = sysctl_wire_old_buffer(req, 0);
-	if (error != 0)
-		return (error);
-	sbuf_new_for_sysctl(&sbuf, NULL, 128, req);
-	sbuf_printf(&sbuf, 
-	    "\n  Size                    Requests  Real Size\n");
-	for (i = 0; i < KMEM_ZSIZE; i++) {
-		size = i << KMEM_ZSHIFT;
-		rsize = kmemzones[kmemsize[i]].kz_size;
-		count = (long long unsigned)krequests[i];
-
-		sbuf_printf(&sbuf, "%6d%28llu%11d\n", size,
-		    (unsigned long long)count, rsize);
-
-		if ((rsize * count) > (size * count))
-			waste += (rsize * count) - (size * count);
-		mem += (rsize * count);
-	}
-	sbuf_printf(&sbuf,
-	    "\nTotal memory used:\t%30llu\nTotal Memory wasted:\t%30llu\n",
-	    (unsigned long long)mem, (unsigned long long)waste);
-	error = sbuf_finish(&sbuf);
-	sbuf_delete(&sbuf);
-	return (error);
-}
-
-SYSCTL_OID(_kern, OID_AUTO, mprof,
-    CTLTYPE_STRING | CTLFLAG_RD | CTLFLAG_NEEDGIANT, NULL, 0,
-    sysctl_kern_mprof, "A",
-    "Malloc Profiling");
-#endif /* MALLOC_PROFILE */
