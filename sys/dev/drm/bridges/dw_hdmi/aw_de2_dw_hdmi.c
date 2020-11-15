@@ -138,11 +138,15 @@ dw_hdmi_connector_detect(struct drm_connector *connector, bool force)
 
 	sc = container_of(connector, struct dw_hdmi_softc, connector);
 
+printf("%s\n", __func__);
+
 	if (sc->phydev != NULL) {
 		if (DW_HDMI_PHY_DETECT_HPD(sc->phydev))
 			return (connector_status_connected);
 	} else {
+		printf("disconnected-> connected\n");
 		/* Handle internal phy */
+		return (connector_status_connected);
 	}
 
 	return (connector_status_disconnected);
@@ -160,6 +164,8 @@ static const struct drm_connector_funcs dw_hdmi_connector_funcs = {
 static void
 dw_hdmi_i2cm_init(struct dw_hdmi_softc *sc)
 {
+
+printf("%s\n", __func__);
 
 	/* I2CM Setup */
 	DW_HDMI_WRITE_1(sc, DW_HDMI_PHY_I2CM_INT_ADDR, 0x08);
@@ -187,6 +193,8 @@ dw_hdmi_i2c_write(struct dw_hdmi_softc *sc, uint8_t *buf, uint16_t len)
 {
 	int i, err = 0;
 
+printf("%s\n", __func__);
+
 	for (i = 0; i < len; i++) {
 		DW_HDMI_WRITE_1(sc, DW_HDMI_I2CM_DATAO, buf[i]);
 		DW_HDMI_WRITE_1(sc, DW_HDMI_I2CM_ADDRESS, i);
@@ -207,6 +215,8 @@ static int
 dw_hdmi_i2c_read(struct dw_hdmi_softc *sc, uint8_t *buf, uint16_t len)
 {
 	int i, err = 0;
+
+printf("%s\n", __func__);
 
 	for (i = 0; i < len; i++) {
 		DW_HDMI_WRITE_1(sc, DW_HDMI_I2CM_ADDRESS, sc->i2cm_addr++);
@@ -232,6 +242,8 @@ dw_hdmi_transfer(device_t dev, struct iic_msg *msgs, uint32_t nmsgs)
 {
 	struct dw_hdmi_softc *sc;
 	int i, ret;
+
+printf("%s\n", __func__);
 
 	sc = device_get_softc(dev);
 	DW_HDMI_LOCK(sc);
@@ -274,6 +286,8 @@ dw_hdmi_connector_get_modes(struct drm_connector *connector)
 	struct edid *edid = NULL;
 	int ret = 0;
 
+printf("%s\n", __func__);
+
 	sc = container_of(connector, struct dw_hdmi_softc, connector);
 
 	edid = drm_get_edid(connector, sc->ddc);
@@ -283,7 +297,8 @@ dw_hdmi_connector_get_modes(struct drm_connector *connector)
 	return (ret);
 }
 
-static const struct drm_connector_helper_funcs dw_hdmi_connector_helper_funcs = {
+static const struct drm_connector_helper_funcs
+    dw_hdmi_connector_helper_funcs = {
 	.get_modes = dw_hdmi_connector_get_modes,
 };
 
@@ -292,6 +307,8 @@ static int
 dw_hdmi_bridge_attach(struct drm_bridge *bridge)
 {
 	struct dw_hdmi_softc *sc;
+
+printf("%s\n", __func__);
 
 	sc = container_of(bridge, struct dw_hdmi_softc, bridge);
 
@@ -314,6 +331,8 @@ dw_hdmi_bridge_mode_valid(struct drm_bridge *bridge,
 {
 	struct dw_hdmi_softc *sc;
 
+printf("%s\n", __func__);
+
 	sc = container_of(bridge, struct dw_hdmi_softc, bridge);
 
 	return (MODE_OK);
@@ -326,6 +345,8 @@ dw_hdmi_bridge_mode_set(struct drm_bridge *bridge,
 {
 	struct dw_hdmi_softc *sc;
 
+printf("%s\n", __func__);
+
 	sc = container_of(bridge, struct dw_hdmi_softc, bridge);
 
 	/* Copy the mode, this will be set in bridge_enable function */
@@ -337,6 +358,8 @@ dw_hdmi_bridge_disable(struct drm_bridge *bridge)
 {
 	struct dw_hdmi_softc *sc;
 
+printf("%s\n", __func__);
+
 	sc = container_of(bridge, struct dw_hdmi_softc, bridge);
 }
 
@@ -344,6 +367,8 @@ static inline void
 dw_hdmi_dump_vp_regs(struct dw_hdmi_softc *sc)
 {
 	uint8_t	reg;
+
+printf("%s\n", __func__);
 
 	DRM_DEBUG_DRIVER("%s: DW_HDMI VP Registers\n", __func__);
 	reg = DW_HDMI_READ_1(sc, DW_HDMI_VP_STATUS);
@@ -364,6 +389,8 @@ static inline void
 dw_hdmi_dump_fc_regs(struct dw_hdmi_softc *sc)
 {
 	uint8_t	reg;
+
+printf("%s\n", __func__);
 
 	DRM_DEBUG_DRIVER("%s: DW_HDMI FC Registers\n", __func__);
 	reg = DW_HDMI_READ_1(sc, DW_HDMI_FC_INVIDCONF);
@@ -411,6 +438,8 @@ dw_hdmi_bridge_enable(struct drm_bridge *bridge)
 	uint8_t reg;
 
 	sc = container_of(bridge, struct dw_hdmi_softc, bridge);
+
+printf("%s\n", __func__);
 
 	DRM_DEBUG_DRIVER("%s: Mode information:\n"
 	    "hdisplay: %d\n"
@@ -522,6 +551,8 @@ static void aw_de2_dw_hdmi_encoder_mode_set(struct drm_encoder *encoder,
 	struct dw_hdmi_softc *base_sc;
 	uint64_t freq;
 
+printf("%s\n", __func__);
+
 	base_sc = container_of(encoder, struct dw_hdmi_softc, encoder);
 	sc = container_of(base_sc, struct aw_dw_hdmi_softc, base_sc);
 
@@ -556,6 +587,8 @@ aw_dw_hdmi_add_encoder(device_t dev, struct drm_crtc *crtc,
 
 	sc = device_get_softc(dev);
 
+printf("%s\n", __func__);
+
 	drm_encoder_helper_add(&sc->base_sc.encoder,
 	    &aw_de2_dw_hdmi_encoder_helper_funcs);
 	sc->base_sc.encoder.possible_crtcs = drm_crtc_mask(crtc);
@@ -575,6 +608,8 @@ static void rk_dw_hdmi_encoder_mode_set(struct drm_encoder *encoder,
 {
 	struct rk_dw_hdmi_softc *sc;
 	struct dw_hdmi_softc *base_sc;
+
+printf("%s\n", __func__);
 
 	base_sc = container_of(encoder, struct dw_hdmi_softc, encoder);
 	sc = container_of(base_sc, struct rk_dw_hdmi_softc, base_sc);
@@ -596,6 +631,8 @@ rk_dw_hdmi_add_encoder(device_t dev, struct drm_crtc *crtc,
 
 	sc = device_get_softc(dev);
 
+printf("%s\n", __func__);
+
 	drm_encoder_helper_add(&sc->base_sc.encoder,
 	    &rk_dw_hdmi_encoder_helper_funcs);
 	sc->base_sc.encoder.possible_crtcs = drm_crtc_mask(crtc);
@@ -615,6 +652,8 @@ dw_hdmi_intr(void *arg)
 	struct dw_hdmi_softc *sc;
 
 	sc = (struct dw_hdmi_softc *)arg;
+
+printf("%s\n", __func__);
 
 	sc->i2cm_stat = DW_HDMI_READ_1(sc, DW_HDMI_IH_I2CM_STAT0);
 	if (sc->i2cm_stat != 0) {
