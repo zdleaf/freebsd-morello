@@ -899,6 +899,15 @@ rk_vop_create_pipeline(device_t dev, struct drm_device *drm)
 
 	printf("%s: add encoder\n", __func__);
 
+	phandle_t node;
+	intptr_t xref;
+
+	if ((node = OF_finddevice("/hdmi")) == -1)
+		panic("could not find hdmi node");
+
+	xref = OF_xref_from_node(node);
+	sc->outport = OF_device_from_xref(xref);
+
 	DW_HDMI_ADD_ENCODER(sc->outport, &sc->crtc, drm);
 
 	return (0);
