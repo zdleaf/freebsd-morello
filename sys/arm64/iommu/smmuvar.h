@@ -168,7 +168,6 @@ struct smmu_softc {
 	struct smmu_strtab strtab;
 	int				sync;
 	struct mtx			sc_mtx;
-
 	bitstr_t			*asid_set;
 	int				asid_set_size;
 	struct mtx			asid_set_mutex;
