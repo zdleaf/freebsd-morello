@@ -259,7 +259,7 @@ iommu_gas_fini_domain(struct iommu_domain *domain)
 	KASSERT(entry->start == 0, ("start entry start %p", domain));
 	KASSERT(entry->end == IOMMU_PAGE_SIZE, ("start entry end %p", domain));
 	KASSERT(entry->flags ==
-		(IOMMU_MAP_ENTRY_PLACE | IOMMU_MAP_ENTRY_UNMAPPED),
+	    (IOMMU_MAP_ENTRY_PLACE | IOMMU_MAP_ENTRY_UNMAPPED),
 	    ("start entry flags %p", domain));
 	RB_REMOVE(iommu_gas_entries_tree, &domain->rb_root, entry);
 	iommu_gas_free_entry(domain, entry);
@@ -268,7 +268,7 @@ iommu_gas_fini_domain(struct iommu_domain *domain)
 	KASSERT(entry->start == domain->end, ("end entry start %p", domain));
 	KASSERT(entry->end == domain->end, ("end entry end %p", domain));
 	KASSERT(entry->flags ==
-		(IOMMU_MAP_ENTRY_PLACE | IOMMU_MAP_ENTRY_UNMAPPED),
+	    (IOMMU_MAP_ENTRY_PLACE | IOMMU_MAP_ENTRY_UNMAPPED),
 	    ("end entry flags %p", domain));
 	RB_REMOVE(iommu_gas_entries_tree, &domain->rb_root, entry);
 	iommu_gas_free_entry(domain, entry);
