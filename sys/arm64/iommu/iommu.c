@@ -205,6 +205,11 @@ iommu_ctx_alloc(device_t dev, struct iommu_domain *iodom, bool disabled)
 	if (ctx == NULL)
 		return (NULL);
 
+	/*
+	 * iommu can also be used for non-PCI based devices.
+	 * This should be reimplemented as new newbus method with
+	 * pci_get_rid() as a default for PCI device class.
+	 */
 	ctx->rid = pci_get_rid(dev);
 
 	return (ctx);
@@ -352,12 +357,14 @@ iommu_unregister(struct iommu_unit *iommu)
 {
 	struct iommu_entry *entry, *tmp;
 
+	IOMMU_LIST_LOCK();
 	LIST_FOREACH_SAFE(entry, &iommu_list, next, tmp) {
 		if (entry->iommu == iommu) {
 			LIST_REMOVE(entry, next);
 			free(entry, M_IOMMU);
 		}
 	}
+	IOMMU_LIST_UNLOCK();
 
 	iommu_fini_busdma(iommu);
 
@@ -373,12 +380,16 @@ iommu_find(device_t dev, bool verbose)
 	struct iommu_unit *iommu;
 	int error;
 
+	IOMMU_LIST_LOCK();
 	LIST_FOREACH(entry, &iommu_list, next) {
 		iommu = entry->iommu;
 		error = IOMMU_FIND(iommu->dev, dev);
-		if (error == 0)
+		if (error == 0) {
+			IOMMU_LIST_UNLOCK();
 			return (entry->iommu);
+		}
 	}
+	IOMMU_LIST_UNLOCK();
 
 	return (NULL);
 }
