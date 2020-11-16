@@ -45,8 +45,8 @@
 INTERFACE iommu;
 
 #
-# Check if this iommu controller is responsible to serve traffic for
-# a given child.
+# Check if the iommu controller dev is responsible to serve traffic
+# for a given child.
 #
 METHOD int find {
 	device_t		dev;

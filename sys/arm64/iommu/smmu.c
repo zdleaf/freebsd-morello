@@ -1651,9 +1651,7 @@ smmu_map(device_t dev, struct iommu_domain *iodom,
 	dprintf("%s: %lx -> %lx, %ld, domain %d\n", __func__, va, pa, size,
 	    domain->asid);
 
-	i = 0;
-
-	for (; size > 0; size -= PAGE_SIZE) {
+	for (i = 0; size > 0; size -= PAGE_SIZE) {
 		pa = VM_PAGE_TO_PHYS(ma[i++]);
 		error = pmap_senter(&domain->p, va, pa, prot, 0);
 		if (error)
