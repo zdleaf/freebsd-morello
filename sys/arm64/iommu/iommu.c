@@ -8,6 +8,9 @@
  * Technology) under DARPA contract HR0011-18-C-0016 ("ECATS"), as part of the
  * DARPA SSITH research programme.
  *
+ * Portions of this work was supported by Innovate UK project 105694,
+ * "Digital Security by Design (DSbD) Technology Platform Prototype".
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
  * are met:
