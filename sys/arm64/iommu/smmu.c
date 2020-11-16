@@ -1612,7 +1612,7 @@ smmu_read_ivar(device_t dev, device_t child, int which, uintptr_t *result)
 }
 
 static int
-smmu_unmap(device_t dev, struct iommu_domain *iodomain,
+smmu_unmap(device_t dev, struct iommu_domain *iodom,
     vm_offset_t va, bus_size_t size)
 {
 	struct smmu_domain *domain;
@@ -1622,7 +1622,7 @@ smmu_unmap(device_t dev, struct iommu_domain *iodomain,
 
 	sc = device_get_softc(dev);
 
-	domain = (struct smmu_domain *)iodomain;
+	domain = (struct smmu_domain *)iodom;
 
 	err = 0;
 
@@ -1645,7 +1645,7 @@ smmu_unmap(device_t dev, struct iommu_domain *iodomain,
 }
 
 static int
-smmu_map(device_t dev, struct iommu_domain *iodomain,
+smmu_map(device_t dev, struct iommu_domain *iodom,
     vm_offset_t va, vm_page_t *ma, vm_size_t size,
     vm_prot_t prot)
 {
@@ -1657,7 +1657,7 @@ smmu_map(device_t dev, struct iommu_domain *iodomain,
 
 	sc = device_get_softc(dev);
 
-	domain = (struct smmu_domain *)iodomain;
+	domain = (struct smmu_domain *)iodom;
 
 	dprintf("%s: %lx -> %lx, %ld, domain %d\n", __func__, va, pa, size,
 	    domain->asid);
@@ -1721,11 +1721,11 @@ smmu_domain_alloc(device_t dev, struct iommu_unit *iommu)
 	LIST_INSERT_HEAD(&unit->domain_list, domain, next);
 	IOMMU_UNLOCK(iommu);
 
-	return (&domain->domain);
+	return (&domain->iodom);
 }
 
-static int
-smmu_domain_free(device_t dev, struct iommu_domain *iodomain)
+static void
+smmu_domain_free(device_t dev, struct iommu_domain *iodom)
 {
 	struct smmu_domain *domain;
 	struct smmu_softc *sc;
@@ -1733,7 +1733,7 @@ smmu_domain_free(device_t dev, struct iommu_domain *iodomain)
 
 	sc = device_get_softc(dev);
 
-	domain = (struct smmu_domain *)iodomain;
+	domain = (struct smmu_domain *)iodom;
 
 	LIST_REMOVE(domain, next);
 
@@ -1749,8 +1749,6 @@ smmu_domain_free(device_t dev, struct iommu_domain *iodomain)
 	free(cd, M_SMMU);
 
 	free(domain, M_SMMU);
-
-	return (0);
 }
 
 static int
@@ -1820,14 +1818,16 @@ smmu_ctx_alloc(device_t dev, struct iommu_domain *iodom, device_t child,
 	LIST_INSERT_HEAD(&domain->ctx_list, ctx, next);
 	IOMMU_DOMAIN_UNLOCK(iodom);
 
-	return (&ctx->ctx);
+	return (&ctx->ioctx);
 }
 
-static int
+static void
 smmu_ctx_free(device_t dev, struct iommu_ctx *ioctx)
 {
 	struct smmu_softc *sc;
 	struct smmu_ctx *ctx;
+
+	IOMMU_ASSERT_LOCKED(ioctx->domain->iommu);
 
 	sc = device_get_softc(dev);
 	ctx = (struct smmu_ctx *)ioctx;
@@ -1837,8 +1837,6 @@ smmu_ctx_free(device_t dev, struct iommu_ctx *ioctx)
 	LIST_REMOVE(ctx, next);
 
 	free(ctx, M_SMMU);
-
-	return (0);
 }
 
 struct smmu_ctx *
@@ -1866,6 +1864,7 @@ smmu_ctx_lookup_by_sid(device_t dev, u_int sid)
 static struct iommu_ctx *
 smmu_ctx_lookup(device_t dev, device_t child)
 {
+	struct iommu_unit *iommu;
 	struct smmu_softc *sc;
 	struct smmu_domain *domain;
 	struct smmu_unit *unit;
@@ -1874,13 +1873,18 @@ smmu_ctx_lookup(device_t dev, device_t child)
 	sc = device_get_softc(dev);
 
 	unit = &sc->unit;
+	iommu = &unit->iommu;
 
+	IOMMU_LOCK(iommu);
 	LIST_FOREACH(domain, &unit->domain_list, next) {
 		LIST_FOREACH(ctx, &domain->ctx_list, next) {
-			if (ctx->dev == child)
-				return (&ctx->ctx);
+			if (ctx->dev == child) {
+				IOMMU_UNLOCK(iommu);
+				return (&ctx->ioctx);
+			}
 		}
 	}
+	IOMMU_UNLOCK(iommu);
 
 	return (NULL);
 }
