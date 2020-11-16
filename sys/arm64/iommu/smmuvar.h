@@ -32,8 +32,8 @@
  * $FreeBSD$
  */
 
-#ifndef _DEV_IOMMU_SMMUVAR_H_
-#define _DEV_IOMMU_SMMUVAR_H_
+#ifndef _ARM64_IOMMU_SMMUVAR_H_
+#define _ARM64_IOMMU_SMMUVAR_H_
 
 #define	SMMU_DEVSTR		"ARM System Memory Management Unit"
 #define	SMMU_LOCK(_sc)		mtx_lock(&(_sc)->sc_mtx)
@@ -186,4 +186,4 @@ struct smmu_ctx *smmu_ctx_lookup_by_sid(device_t dev, u_int sid);
 bool smmu_quirks_check(device_t dev, u_int sid, uint8_t event_id,
     uintptr_t input_addr);
 
-#endif /* _DEV_IOMMU_SMMUVAR_H_ */
+#endif /* _ARM64_IOMMU_SMMUVAR_H_ */

@@ -32,8 +32,8 @@
  * $FreeBSD$
  */
 
-#ifndef	_DEV_IOMMU_SMMUREG_H_
-#define	_DEV_IOMMU_SMMUREG_H_
+#ifndef	_ARM64_IOMMU_SMMUREG_H_
+#define	_ARM64_IOMMU_SMMUREG_H_
 
 #define	SMMU_IDR0		0x000
 #define	 IDR0_ST_LVL_S		27
@@ -475,4 +475,4 @@
 #define	CD1_TTB0_S		4 /* Address of TT0 base. */
 #define	CD1_TTB0_M		(0xffffffffffff << CD1_TTB0_S)
 
-#endif /* _DEV_IOMMU_SMMUREG_H_ */
+#endif /* _ARM64_IOMMU_SMMUREG_H_ */
