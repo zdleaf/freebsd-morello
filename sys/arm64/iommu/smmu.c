@@ -84,7 +84,7 @@
  *
  * Interrupts are not required by this driver for normal operation.
  * The standard wired interrupt is only triggered when an event comes from
- * the SMMU, which is only in a case of a translation fault.
+ * the SMMU, which is only in a case of a error (e.g. translation fault).
  */
 
 #include "opt_platform.h"
