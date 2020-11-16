@@ -43,7 +43,6 @@ __FBSDID("$FreeBSD$");
 #include <sys/tree.h>
 #include <sys/taskqueue.h>
 #include <sys/malloc.h>
-#include <sys/memdesc.h>
 #include <sys/module.h>
 #include <vm/vm.h>
 #include <vm/pmap.h>
@@ -53,13 +52,9 @@ __FBSDID("$FreeBSD$");
 #include <dev/pci/pcivar.h>
 #include <dev/iommu/iommu.h>
 
-#include <machine/intr.h>
-#include <machine/resource.h>
 #include <arm64/iommu/iommu.h>
 
-#include "smmureg.h"
 #include "smmuvar.h"
-#include "pic_if.h"
 
 #define	MEMORY_RESOURCE_SIZE	0x20000
 #define	MAX_SMMU		8
