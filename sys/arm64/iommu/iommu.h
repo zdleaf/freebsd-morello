@@ -38,15 +38,6 @@
 #define	IOMMU_PAGE_SIZE		4096
 #define	IOMMU_PAGE_MASK		(IOMMU_PAGE_SIZE - 1)
 
-#define	IOMMU_MF_CANWAIT	0x0001
-#define	IOMMU_MF_CANSPLIT	0x0002
-
-#define	IOMMU_PGF_WAITOK	0x0001
-#define	IOMMU_PGF_ZERO		0x0002
-#define	IOMMU_PGF_ALLOC		0x0004
-#define	IOMMU_PGF_NOALLOC	0x0008
-#define	IOMMU_PGF_OBJL		0x0010
-
 int iommu_unregister(struct iommu_unit *unit);
 int iommu_register(struct iommu_unit *unit);
 
