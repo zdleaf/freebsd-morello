@@ -738,20 +738,18 @@ smmu_init_ste_s1(struct smmu_softc *sc, struct smmu_cd *cd,
 
 	val = STE0_VALID;
 
-	ste[1] = 0;
+	/* S1 */
+	ste[1] = STE1_EATS_FULLATS	|
+		 STE1_S1CSH_IS		|
+		 STE1_S1CIR_WBRA	|
+		 STE1_S1COR_WBRA	|
+		 STE1_STRW_NS_EL1;
 	ste[2] = 0;
 	ste[3] = 0;
 	ste[4] = 0;
 	ste[5] = 0;
 	ste[6] = 0;
 	ste[7] = 0;
-
-	/* S1 */
-	ste[1] |= STE1_EATS_FULLATS
-		| STE1_S1CSH_IS
-		| STE1_S1CIR_WBRA
-		| STE1_S1COR_WBRA
-		| STE1_STRW_NS_EL1;
 
 	if (sc->features & SMMU_FEATURE_STALL &&
 	    ((sc->features & SMMU_FEATURE_STALL_FORCE) == 0))
@@ -760,15 +758,6 @@ smmu_init_ste_s1(struct smmu_softc *sc, struct smmu_cd *cd,
 	/* Configure STE */
 	val |= (cd->paddr & STE0_S1CONTEXTPTR_M);
 	val |= STE0_CONFIG_S1_TRANS;
-
-	/* One Context descriptor (S1Fmt is IGNORED). */
-
-	/*
-	 * Set for a linear table of CDs.
-	 *
-	 * val |= STE0_S1FMT_LINEAR;
-	 * val |= 1 << STE0_S1CDMAX_S;
-	 */
 
 	smmu_invalidate_sid(sc, sid);
 
@@ -862,10 +851,10 @@ smmu_init_cd(struct smmu_softc *sc, struct smmu_domain *domain)
 
 	ptr[1] = paddr;
 	ptr[2] = 0;
-	ptr[3] = MAIR_ATTR(MAIR_DEVICE_nGnRnE, VM_MEMATTR_DEVICE)	|\
-		MAIR_ATTR(MAIR_NORMAL_NC, VM_MEMATTR_UNCACHEABLE)	|\
-		MAIR_ATTR(MAIR_NORMAL_WB, VM_MEMATTR_WRITE_BACK)	|\
-		MAIR_ATTR(MAIR_NORMAL_WT, VM_MEMATTR_WRITE_THROUGH);
+	ptr[3] = MAIR_ATTR(MAIR_DEVICE_nGnRnE, VM_MEMATTR_DEVICE)	|
+		 MAIR_ATTR(MAIR_NORMAL_NC, VM_MEMATTR_UNCACHEABLE)	|
+		 MAIR_ATTR(MAIR_NORMAL_WB, VM_MEMATTR_WRITE_BACK)	|
+		 MAIR_ATTR(MAIR_NORMAL_WT, VM_MEMATTR_WRITE_THROUGH);
 
 	/* Install the CD. */
 	ptr[0] = val;
@@ -1227,12 +1216,12 @@ smmu_reset(struct smmu_softc *sc)
 		return (ENXIO);
 	}
 
-	reg = CR1_TABLE_SH_IS
-	    | CR1_TABLE_OC_WBC
-	    | CR1_TABLE_IC_WBC
-	    | CR1_QUEUE_SH_IS
-	    | CR1_QUEUE_OC_WBC
-	    | CR1_QUEUE_IC_WBC;
+	reg = CR1_TABLE_SH_IS	|
+	      CR1_TABLE_OC_WBC	|
+	      CR1_TABLE_IC_WBC	|
+	      CR1_QUEUE_SH_IS	|
+	      CR1_QUEUE_OC_WBC	|
+	      CR1_QUEUE_IC_WBC;
 	bus_write_4(sc->res[0], SMMU_CR1, reg);
 
 	reg = CR2_PTM | CR2_RECINVSID | CR2_E2H;
