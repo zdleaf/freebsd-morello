@@ -1936,5 +1936,4 @@ static device_method_t smmu_methods[] = {
 	DEVMETHOD_END
 };
 
-DEFINE_CLASS_0(smmu, smmu_driver, smmu_methods,
-    sizeof(struct smmu_softc));
+DEFINE_CLASS_0(smmu, smmu_driver, smmu_methods, sizeof(struct smmu_softc));
