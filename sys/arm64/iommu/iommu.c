@@ -227,9 +227,13 @@ iommu_get_ctx(struct iommu_unit *iommu, device_t requester,
 	struct iommu_domain *iodom;
 	struct bus_dma_tag_iommu *tag;
 
+	IOMMU_LOCK(iommu);
 	ioctx = IOMMU_CTX_LOOKUP(iommu->dev, requester);
-	if (ioctx)
+	if (ioctx) {
+		IOMMU_UNLOCK(iommu);
 		return (ioctx);
+	}
+	IOMMU_UNLOCK(iommu);
 
 	/*
 	 * In our current configuration we have a domain per each ctx.

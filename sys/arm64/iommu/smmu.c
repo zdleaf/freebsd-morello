@@ -1875,16 +1875,18 @@ smmu_ctx_lookup(device_t dev, device_t child)
 	unit = &sc->unit;
 	iommu = &unit->iommu;
 
-	IOMMU_LOCK(iommu);
+	IOMMU_ASSERT_LOCKED(iommu);
+
 	LIST_FOREACH(domain, &unit->domain_list, next) {
+		IOMMU_DOMAIN_LOCK(&domain->iodom);
 		LIST_FOREACH(ctx, &domain->ctx_list, next) {
 			if (ctx->dev == child) {
-				IOMMU_UNLOCK(iommu);
+				IOMMU_DOMAIN_UNLOCK(&domain->iodom);
 				return (&ctx->ioctx);
 			}
 		}
+		IOMMU_DOMAIN_UNLOCK(&domain->iodom);
 	}
-	IOMMU_UNLOCK(iommu);
 
 	return (NULL);
 }
