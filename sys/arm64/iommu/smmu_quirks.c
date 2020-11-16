@@ -29,7 +29,6 @@
  */
 
 #include "opt_platform.h"
-#include "opt_acpi.h"
 
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
@@ -39,15 +38,11 @@ __FBSDID("$FreeBSD$");
 #include <sys/systm.h>
 #include <sys/bus.h>
 #include <sys/kernel.h>
-#include <sys/rman.h>
 #include <sys/tree.h>
 #include <sys/taskqueue.h>
 #include <sys/sysctl.h>
 #include <vm/vm.h>
-#include <vm/uma.h>
 #include <vm/pmap.h>
-#include <vm/vm_extern.h>
-#include <vm/vm_page.h>
 #include <dev/pci/pcireg.h>
 #include <dev/pci/pcivar.h>
 #include <dev/iommu/iommu.h>

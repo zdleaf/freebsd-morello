@@ -105,9 +105,6 @@ __FBSDID("$FreeBSD$");
 #include <sys/tree.h>
 #include <sys/taskqueue.h>
 #include <vm/vm.h>
-#include <vm/uma.h>
-#include <vm/pmap.h>
-#include <vm/vm_extern.h>
 #include <vm/vm_page.h>
 #if DEV_ACPI
 #include <contrib/dev/acpica/include/acpi.h>

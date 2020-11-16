@@ -45,7 +45,6 @@ __FBSDID("$FreeBSD$");
 #include <sys/malloc.h>
 #include <sys/memdesc.h>
 #include <sys/module.h>
-#include <sys/rman.h>
 #include <vm/vm.h>
 #include <vm/pmap.h>
 #include <contrib/dev/acpica/include/acpi.h>
