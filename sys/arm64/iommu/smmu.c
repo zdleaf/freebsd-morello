@@ -68,8 +68,8 @@
  * to inferface SMMU.
  *
  * These are a Command queue for commands to send to the SMMU and an Event
- * queue for event/fault reports from the SMMU. Optionally PRI queue is for
- * receipt of PCIe page requests.
+ * queue for event/fault reports from the SMMU. Optionally PRI queue is
+ * designed for PCIe page requests reception.
  *
  * Note that not every hardware supports PRI services. For instance they were
  * not found in Neoverse N1 SDP machine.
@@ -84,7 +84,7 @@
  *
  * Interrupts are not required by this driver for normal operation.
  * The standard wired interrupt is only triggered when an event comes from
- * the SMMU, which is only in a case of a error (e.g. translation fault).
+ * the SMMU, which is only in a case of errors (e.g. translation fault).
  */
 
 #include "opt_platform.h"
