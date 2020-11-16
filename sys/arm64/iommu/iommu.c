@@ -160,16 +160,20 @@ static int
 iommu_domain_free(struct iommu_domain *iodom)
 {
 	struct iommu_unit *iommu;
-	int error;
 
 	iommu = iodom->iommu;
 
 	IOMMU_LOCK(iommu);
-	error = IOMMU_DOMAIN_FREE(iommu->dev, iodom);
-	if (error) {
-		IOMMU_UNLOCK(iommu);
-		return (error);
+
+	if ((iodom->flags & IOMMU_DOMAIN_GAS_INITED) != 0) {
+		IOMMU_DOMAIN_LOCK(iodom);
+		iommu_gas_fini_domain(iodom);
+		IOMMU_DOMAIN_UNLOCK(iodom);
 	}
+
+	iommu_domain_fini(iodom);
+
+	IOMMU_DOMAIN_FREE(iommu->dev, iodom);
 	IOMMU_UNLOCK(iommu);
 
 	return (0);
@@ -197,12 +201,12 @@ static struct iommu_ctx *
 iommu_ctx_alloc(device_t dev, struct iommu_domain *iodom, bool disabled)
 {
 	struct iommu_unit *iommu;
-	struct iommu_ctx *ctx;
+	struct iommu_ctx *ioctx;
 
 	iommu = iodom->iommu;
 
-	ctx = IOMMU_CTX_ALLOC(iommu->dev, iodom, dev, disabled);
-	if (ctx == NULL)
+	ioctx = IOMMU_CTX_ALLOC(iommu->dev, iodom, dev, disabled);
+	if (ioctx == NULL)
 		return (NULL);
 
 	/*
@@ -210,22 +214,22 @@ iommu_ctx_alloc(device_t dev, struct iommu_domain *iodom, bool disabled)
 	 * This should be reimplemented as new newbus method with
 	 * pci_get_rid() as a default for PCI device class.
 	 */
-	ctx->rid = pci_get_rid(dev);
+	ioctx->rid = pci_get_rid(dev);
 
-	return (ctx);
+	return (ioctx);
 }
 
 struct iommu_ctx *
 iommu_get_ctx(struct iommu_unit *iommu, device_t requester,
     uint16_t rid, bool disabled, bool rmrr)
 {
-	struct iommu_ctx *ctx;
+	struct iommu_ctx *ioctx;
 	struct iommu_domain *iodom;
 	struct bus_dma_tag_iommu *tag;
 
-	ctx = IOMMU_CTX_LOOKUP(iommu->dev, requester);
-	if (ctx)
-		return (ctx);
+	ioctx = IOMMU_CTX_LOOKUP(iommu->dev, requester);
+	if (ioctx)
+		return (ioctx);
 
 	/*
 	 * In our current configuration we have a domain per each ctx.
@@ -235,56 +239,51 @@ iommu_get_ctx(struct iommu_unit *iommu, device_t requester,
 	if (iodom == NULL)
 		return (NULL);
 
-	ctx = iommu_ctx_alloc(requester, iodom, disabled);
-	if (ctx == NULL) {
+	ioctx = iommu_ctx_alloc(requester, iodom, disabled);
+	if (ioctx == NULL) {
 		iommu_domain_free(iodom);
 		return (NULL);
 	}
 
-	tag = ctx->tag = malloc(sizeof(struct bus_dma_tag_iommu),
+	tag = ioctx->tag = malloc(sizeof(struct bus_dma_tag_iommu),
 	    M_IOMMU, M_WAITOK | M_ZERO);
 	tag->owner = requester;
-	tag->ctx = ctx;
+	tag->ctx = ioctx;
 	tag->ctx->domain = iodom;
 
 	iommu_tag_init(tag);
 
-	ctx->domain = iodom;
+	ioctx->domain = iodom;
 
-	return (ctx);
+	return (ioctx);
 }
 
 void
-iommu_free_ctx_locked(struct iommu_unit *iommu, struct iommu_ctx *ctx)
+iommu_free_ctx_locked(struct iommu_unit *iommu, struct iommu_ctx *ioctx)
 {
 	struct bus_dma_tag_iommu *tag;
-	int error;
 
 	IOMMU_ASSERT_LOCKED(iommu);
 
-	tag = ctx->tag;
+	tag = ioctx->tag;
 
-	error = IOMMU_CTX_FREE(iommu->dev, ctx);
-	if (error) {
-		device_printf(iommu->dev, "Failed to remove device\n");
-		return;
-	}
+	IOMMU_CTX_FREE(iommu->dev, ioctx);
 
 	free(tag, M_IOMMU);
 }
 
 void
-iommu_free_ctx(struct iommu_ctx *ctx)
+iommu_free_ctx(struct iommu_ctx *ioctx)
 {
 	struct iommu_unit *iommu;
 	struct iommu_domain *iodom;
 	int error;
 
-	iodom = ctx->domain;
+	iodom = ioctx->domain;
 	iommu = iodom->iommu;
 
 	IOMMU_LOCK(iommu);
-	iommu_free_ctx_locked(iommu, ctx);
+	iommu_free_ctx_locked(iommu, ioctx);
 	IOMMU_UNLOCK(iommu);
 
 	/* Since we have a domain per each ctx, remove the domain too. */
