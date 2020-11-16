@@ -42,7 +42,7 @@
 DECLARE_CLASS(smmu_driver);
 
 struct smmu_unit {
-	struct iommu_unit		unit;
+	struct iommu_unit		iommu;
 	LIST_HEAD(, smmu_domain)	domain_list;
 	LIST_ENTRY(smmu_unit)		next;
 	device_t			dev;
@@ -50,7 +50,7 @@ struct smmu_unit {
 };
 
 struct smmu_domain {
-	struct iommu_domain		domain;
+	struct iommu_domain		iodom;
 	LIST_HEAD(, smmu_ctx)		ctx_list;
 	LIST_ENTRY(smmu_domain)	next;
 	u_int entries_cnt;
@@ -60,7 +60,7 @@ struct smmu_domain {
 };
 
 struct smmu_ctx {
-	struct iommu_ctx		ctx;
+	struct iommu_ctx		ioctx;
 	struct smmu_domain		*domain;
 	LIST_ENTRY(smmu_ctx)		next;
 	device_t			dev;

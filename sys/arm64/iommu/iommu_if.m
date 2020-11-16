@@ -64,7 +64,7 @@ METHOD int find {
 #
 METHOD int map {
 	device_t		dev;
-	struct iommu_domain	*domain;
+	struct iommu_domain	*iodom;
 	vm_offset_t		va;
 	vm_page_t		*ma;
 	bus_size_t		size;
@@ -76,7 +76,7 @@ METHOD int map {
 #
 METHOD int unmap {
 	device_t		dev;
-	struct iommu_domain	*domain;
+	struct iommu_domain	*iodom;
 	vm_offset_t		va;
 	bus_size_t		size;
 };
@@ -86,15 +86,15 @@ METHOD int unmap {
 #
 METHOD struct iommu_domain * domain_alloc {
 	device_t		dev;
-	struct iommu_unit	*unit;
+	struct iommu_unit	*iommu;
 };
 
 #
 # Release all the resources held by IOMMU domain.
 #
-METHOD int domain_free {
+METHOD void domain_free {
 	device_t		dev;
-	struct iommu_domain	*domain;
+	struct iommu_domain	*iodom;
 };
 
 #
@@ -117,7 +117,7 @@ METHOD struct iommu_ctx * ctx_lookup {
 #
 METHOD struct iommu_ctx * ctx_alloc {
 	device_t		dev;
-	struct iommu_domain	*domain;
+	struct iommu_domain	*iodom;
 	device_t		child;
 	bool			disabled;
 };
@@ -125,7 +125,7 @@ METHOD struct iommu_ctx * ctx_alloc {
 #
 # Free the iommu context.
 #
-METHOD int ctx_free {
+METHOD void ctx_free {
 	device_t		dev;
-	struct iommu_ctx	*ctx;
+	struct iommu_ctx	*ioctx;
 };
