@@ -32,8 +32,8 @@
  * $FreeBSD$
  */
 
-#ifndef _ARM64_IOMMU_SMMUVAR_H_
-#define _ARM64_IOMMU_SMMUVAR_H_
+#ifndef	_ARM64_IOMMU_SMMUVAR_H_
+#define	_ARM64_IOMMU_SMMUVAR_H_
 
 #define	SMMU_DEVSTR		"ARM System Memory Management Unit"
 #define	SMMU_LOCK(_sc)		mtx_lock(&(_sc)->sc_mtx)

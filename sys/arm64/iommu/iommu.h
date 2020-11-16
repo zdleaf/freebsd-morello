@@ -32,8 +32,8 @@
  * $FreeBSD$
  */
 
-#ifndef _ARM64_IOMMU_IOMMU_H_
-#define _ARM64_IOMMU_IOMMU_H_
+#ifndef	_ARM64_IOMMU_IOMMU_H_
+#define	_ARM64_IOMMU_IOMMU_H_
 
 #define	IOMMU_PAGE_SIZE		4096
 #define	IOMMU_PAGE_MASK		(IOMMU_PAGE_SIZE - 1)
