@@ -77,6 +77,7 @@ SRCS+=	\
 	pci_irq.c		\
 	pci_lpc.c		\
 	pci_passthru.c		\
+	pctestdev.c		\
 	pm.c			\
 	ps2kbd.c		\
 	ps2mouse.c		\
