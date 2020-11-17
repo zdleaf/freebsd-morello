@@ -927,12 +927,21 @@ static int
 rk_dw_hdmi_attach(device_t dev)
 {
 	struct rk_dw_hdmi_softc *sc;
+	phandle_t ddc;
 	phandle_t node;
+	device_t i2c_dev;
 	int error;
 
 	sc = device_get_softc(dev);
 
 	node = ofw_bus_get_node(dev);
+
+	ddc = 0;
+	OF_getencprop(node, "ddc-i2c-bus", &ddc, sizeof(ddc));
+	if (ddc > 0) {
+		i2c_dev = OF_device_from_xref(ddc);
+		sc->base_sc.ddc = i2c_bsd_adapter(i2c_dev);
+	}
 
 	error = dw_hdmi_attach(dev);
 	if (error != 0)
