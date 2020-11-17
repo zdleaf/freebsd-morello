@@ -797,6 +797,8 @@ long drm_ioctl_kernel(struct file *file, drm_ioctl_t *func, void *kdata,
 	struct drm_device *dev = file_priv->minor->dev;
 	int retcode;
 
+	printf("%s\n", __func__);
+
 	if (drm_dev_is_unplugged(dev))
 		return -ENODEV;
 
@@ -843,6 +845,8 @@ long drm_ioctl(struct file *filp,
 	char *kdata = NULL;
 	unsigned int in_size, out_size, drv_size, ksize;
 	bool is_driver_ioctl;
+
+	printf("%s\n", __func__);
 
 	dev = file_priv->minor->dev;
 

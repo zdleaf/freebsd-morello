@@ -143,6 +143,8 @@ rk_vop_mode_set(device_t dev, const struct videomode *mode)
 
 	sc = device_get_softc(dev);
 
+printf("%s\n", __func__);
+
 	reg = VOP_READ(sc, RK3399_REG_CFG_DONE);
 	printf("cfg done %x\n", reg);
 	VOP_WRITE(sc, RK3399_REG_CFG_DONE, 0);
@@ -340,6 +342,8 @@ rk_vop_enable(device_t dev, phandle_t node, const struct videomode *mode)
 
 	sc = device_get_softc(dev);
 
+printf("%s\n", __func__);
+
 	reg = (mode->hdisplay - 1);
 	reg |= (mode->vdisplay - 1) << 16;
 	VOP_WRITE(sc, RK3399_WIN0_ACT_INFO, reg);
@@ -423,6 +427,8 @@ rk_vop_enable(device_t dev, phandle_t node, const struct videomode *mode)
 static int
 vop_mode_is_valid(const struct videomode *mode)
 {
+
+printf("%s\n", __func__);
 
 	if (mode->dot_clock != 148500)
 		return (0);
@@ -602,6 +608,8 @@ rk_vop_plane_atomic_check(struct drm_plane *plane,
 	struct drm_crtc *crtc;
 	struct drm_crtc_state *crtc_state;
 
+	printf("%s\n", __func__);
+
 	crtc = state->crtc;
 	if (crtc == NULL)
 		return (0);
@@ -620,6 +628,8 @@ static void
 rk_vop_plane_atomic_disable(struct drm_plane *plane,
     struct drm_plane_state *old_state)
 {
+
+	printf("%s\n", __func__);
 #if 0
 	struct rk_vop_mixer_plane *mixer_plane;
 	struct rk_vop_oftc *sc;
@@ -638,6 +648,7 @@ static void rk_vop_plane_atomic_update(struct drm_plane *plane,
 					 struct drm_plane_state *old_state)
 {
 
+	printf("%s\n", __func__);
 }
 
 static struct drm_plane_helper_funcs rk_vop_plane_helper_funcs = {
@@ -665,6 +676,8 @@ static const u32 rk_vop_plane_formats[] = {
 static int
 rk_vop_enable_vblank(struct drm_crtc *crtc)
 {
+
+	printf("%s\n", __func__);
 #if 0
 	struct rk_vop_softc *sc;
 
@@ -680,6 +693,8 @@ rk_vop_enable_vblank(struct drm_crtc *crtc)
 static void
 rk_vop_disable_vblank(struct drm_crtc *crtc)
 {
+
+	printf("%s\n", __func__);
 #if 0
 	struct rk_vop_softc *sc;
 
@@ -693,6 +708,8 @@ static uint32_t
 rk_vop_get_vblank_counter(struct drm_crtc *crtc)
 {
 	struct rk_vop_softc *sc;
+
+	printf("%s\n", __func__);
 
 	sc = container_of(crtc, struct rk_vop_softc, crtc);
 
@@ -716,6 +733,8 @@ static int
 rk_crtc_atomic_check(struct drm_crtc *crtc, struct drm_crtc_state *state)
 {
 
+	printf("%s\n", __func__);
+
 	/* Not sure we need to something here, should replace with an helper */
 	return (0);
 }
@@ -725,6 +744,8 @@ rk_crtc_atomic_begin(struct drm_crtc *crtc, struct drm_crtc_state *old_state)
 {
 	struct rk_vop_softc *sc;
 	unsigned long flags;
+
+	printf("%s\n", __func__);
 
 	sc = container_of(crtc, struct rk_vop_softc, crtc);
 
@@ -748,6 +769,8 @@ rk_crtc_atomic_flush(struct drm_crtc *crtc,
 {
 	struct rk_vop_softc *sc;
 	struct drm_pending_vblank_event *event;
+
+	printf("%s\n", __func__);
 
 	event = crtc->state->event;
 
@@ -778,6 +801,8 @@ rk_crtc_atomic_enable(struct drm_crtc *crtc, struct drm_crtc_state *old_state)
 
 	sc = container_of(crtc, struct rk_vop_softc, crtc);
 
+	printf("%s\n", __func__);
+
 #if 0
 	int32_t reg;
 
@@ -798,6 +823,8 @@ rk_crtc_atomic_disable(struct drm_crtc *crtc, struct drm_crtc_state *old_state)
 {
 	struct rk_vop_softc *sc;
 	uint32_t irqflags;
+
+	printf("%s\n", __func__);
 
 	sc = container_of(crtc, struct rk_vop_softc, crtc);
 
