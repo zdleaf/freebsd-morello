@@ -781,6 +781,9 @@ rk_vop_plane_atomic_update(struct drm_plane *plane,
 	int rgb_mode;
 	int lb_mode;
 
+	VOP_WRITE(sc, RK3399_WIN0_VIR,
+	    WIN0_VIR_WIDTH_ARGB888(crtc->mode.hdisplay));
+
 	rgb_mode = vop_convert_format(rk_vop_plane_formats[i]);
 	printf("fmt %d\n", rgb_mode);
 
