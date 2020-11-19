@@ -845,9 +845,7 @@ rk_vop_enable_vblank(struct drm_crtc *crtc)
 
 	DRM_DEBUG_DRIVER("%s: Enabling VBLANK\n", __func__);
 	VOP_WRITE(sc, RK3399_INTR_EN0, INTR_EN0_FS_INTR);
-	VOP_WRITE(sc, RK3399_INTR_EN0, 0xffff);
-	VOP_WRITE(sc, RK3399_INTR_EN1, 0xffff);
-	VOP_WRITE(sc, RK3399_LINE_FLAG, 100);
+	VOP_WRITE(sc, RK3399_INTR_EN1, INTR_EN0_FS_INTR);
 
 	return (0);
 }
@@ -1024,18 +1022,8 @@ rk_crtc_atomic_enable(struct drm_crtc *crtc, struct drm_crtc_state *old_state)
 	VOP_WRITE(sc, RK3399_DSP_VACT_ST_END, reg);
 	VOP_WRITE(sc, RK3399_POST_DSP_VACT_INFO, reg);
 
+	VOP_WRITE(sc, RK3399_LINE_FLAG, vact_end);
 	VOP_WRITE(sc, RK3399_REG_CFG_DONE, 1);
-
-#if 0
-	int32_t reg;
-
-	/* Enable TCON */
-	AW_DE2_TCON_LOCK(sc);
-	reg = AW_DE2_TCON_READ_4(sc, TCON_CTL);
-	reg |= TCON_CTL_EN;
-	AW_DE2_TCON_WRITE_4(sc, TCON_CTL, reg);
-	AW_DE2_TCON_UNLOCK(sc);
-#endif
 
 	/* Enable VBLANK events */
 	drm_crtc_vblank_on(crtc);
