@@ -221,7 +221,7 @@ printf("%s\n", __func__);
 static char * clk_table[CLK_NENTRIES] = { "aclk_vop", "dclk_vop", "hclk_vop" };
 
 static int
-rk_vop_clk_enable(device_t dev, const struct videomode *mode)
+rk_vop_clk_enable(device_t dev)
 {
 	struct rk_vop_softc *sc;
 	uint64_t rate;
@@ -523,7 +523,7 @@ rk_vop_hdmi_event(void *arg, device_t hdmi_dev)
 	phandle_t node;
 	node = ofw_bus_get_node(dev);
 
-	error = rk_vop_clk_enable(dev, sc->sc_mode);
+	error = rk_vop_clk_enable(dev);
 	if (error != 0)
 		panic("error 1");
 
@@ -566,6 +566,7 @@ rk_vop_attach(device_t dev)
 {
 	struct rk_vop_softc *sc;
 	phandle_t node;
+	int error;
 
 	sc = device_get_softc(dev);
 	sc->dev = dev;
@@ -591,6 +592,10 @@ rk_vop_attach(device_t dev)
 		printf("port node found, %d\n", node);
 		OF_device_register_xref(OF_xref_from_node(node), dev);
 	}
+
+	error = rk_vop_clk_enable(dev);
+	if (error != 0)
+		return (ENXIO);
 
 #if 0
 	sc->sc_hdmi_evh = EVENTHANDLER_REGISTER(hdmi_event,
@@ -662,17 +667,42 @@ rk_vop_plane_atomic_disable(struct drm_plane *plane,
 #endif
 }
 
-static void rk_vop_plane_atomic_update(struct drm_plane *plane,
-					 struct drm_plane_state *old_state)
+static void
+rk_vop_plane_atomic_update(struct drm_plane *plane,
+    struct drm_plane_state *old_state)
 {
+	struct drm_plane_state *state;
 	struct rk_vop_plane *vop_plane;
 	struct rk_vop_softc *sc;
+	struct drm_gem_cma_object *bo;
+	struct drm_fb_cma *fb;
+	uint32_t src_w, src_h, dst_w, dst_h;
+	dma_addr_t paddr;
 
+	state = plane->state;
 	vop_plane = container_of(plane, struct rk_vop_plane, plane);
+	fb = container_of(plane->state->fb, struct drm_fb_cma, drm_fb);
+
 	sc = vop_plane->sc;
 
-	//panic("implement me");
-	printf("%s\n", __func__);
+	src_w = drm_rect_width(&state->src) >> 16;
+	src_h = drm_rect_height(&state->src) >> 16;
+	dst_w = drm_rect_width(&state->dst);
+	dst_h = drm_rect_height(&state->dst);
+
+	printf("%s: src w %d h %d, dst w %d h %d\n",
+	    __func__, src_w, src_h, dst_w, dst_h);
+
+	if (!plane->state->visible)
+		panic("plane is not visible");
+
+	bo = drm_fb_cma_get_gem_obj(fb, 0);
+
+	paddr = bo->pbase + fb->drm_fb.offsets[0];
+	paddr += (state->src.x1 >> 16) * fb->drm_fb.format->cpp[0];
+	paddr += (state->src.y1 >> 16) * fb->drm_fb.pitches[0];
+
+	printf("buf paddr %x\n", paddr);
 }
 
 static struct drm_plane_helper_funcs rk_vop_plane_helper_funcs = {
