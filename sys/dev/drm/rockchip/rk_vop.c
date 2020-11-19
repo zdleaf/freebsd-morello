@@ -585,7 +585,7 @@ static void
 rk_vop_intr(void *arg)
 {
 
-	printf("%s\n", __func__);
+	panic("%s\n", __func__);
 }
 
 static int
@@ -834,16 +834,17 @@ static const struct drm_plane_funcs rk_vop_plane_funcs = {
 static int
 rk_vop_enable_vblank(struct drm_crtc *crtc)
 {
-
-	printf("%s\n", __func__);
-#if 0
 	struct rk_vop_softc *sc;
 
+	printf("%s\n", __func__);
+
 	sc = container_of(crtc, struct rk_vop_softc, crtc);
+
 	DRM_DEBUG_DRIVER("%s: Enabling VBLANK\n", __func__);
-	AW_DE2_TCON_WRITE_4(sc, TCON_GINT0,
-	    TCON0_GINT0_VB_EN | TCON1_GINT0_VB_EN);
-#endif
+	VOP_WRITE(sc, RK3399_INTR_EN0, INTR_EN0_FS_INTR);
+	VOP_WRITE(sc, RK3399_INTR_EN0, 0xffff);
+	VOP_WRITE(sc, RK3399_INTR_EN1, 0xffff);
+	VOP_WRITE(sc, RK3399_LINE_FLAG, 100);
 
 	return (0);
 }

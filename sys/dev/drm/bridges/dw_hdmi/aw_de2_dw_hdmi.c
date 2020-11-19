@@ -41,6 +41,7 @@ __FBSDID("$FreeBSD$");
 #include <dev/ofw/ofw_bus_subr.h>
 
 #include <dev/extres/clk/clk.h>
+#include <dev/extres/syscon/syscon.h>
 #include <dev/extres/hwreset/hwreset.h>
 
 #include <drm/drm_atomic_helper.h>
@@ -57,6 +58,7 @@ __FBSDID("$FreeBSD$");
 #include "dw_hdmi_if.h"
 #include "dw_hdmi_phy_if.h"
 
+#include "syscon_if.h"
 #include "iicbus_if.h"
 
 /* Redefine msleep because of linuxkpi */
@@ -104,8 +106,12 @@ struct aw_dw_hdmi_softc {
 	hwreset_t	reset_ctrl;	/* Allwinner specific */
 };
 
+#define	CLK_NENTRIES	5
+
 struct rk_dw_hdmi_softc {
 	struct dw_hdmi_softc base_sc;
+	struct syscon		*grf;
+	clk_t	clk[CLK_NENTRIES];
 };
 
 static struct resource_spec dw_hdmi_spec[] = {
@@ -1126,6 +1132,75 @@ MODULE_DEPEND(aw_de2_dw_hdmi, aw_de2_hdmi_phy, 1, 1, 1);
 
 /* Rockchip */
 
+static void
+rk_hdmi_configure(struct rk_dw_hdmi_softc *sc)
+{
+	uint32_t reg;
+
+	/* Select VOP Little for HDMI. */
+	reg = SYSCON_READ_4(sc->grf, GRF_SOC_CON20);
+	reg &= ~CON20_HDMI_VOP_SEL_M;
+	reg |= CON20_HDMI_VOP_SEL_L;
+	SYSCON_WRITE_4(sc->grf, GRF_SOC_CON20, reg);
+}
+
+static char * clk_table[CLK_NENTRIES] = {
+	"iahb",
+	"isfr",
+	"vpll",
+	"grf",
+	"cec",
+};
+
+static int
+rk_hdmi_clk_enable(device_t dev)
+{
+	struct rk_dw_hdmi_softc *sc;
+	uint64_t rate;
+	int error;
+	int i;
+
+	sc = device_get_softc(dev);
+
+	for (i = 0; i < CLK_NENTRIES; i++) {
+		error = clk_get_by_ofw_name(dev, 0, clk_table[i], &sc->clk[i]);
+		if (error != 0) {
+			device_printf(dev, "cannot get '%s' clock\n",
+			    clk_table[i]);
+			return (ENXIO);
+		}
+	}
+
+	/* vpll should be the same as vop dclk */
+	error = clk_set_freq(sc->clk[2], 148500000, 0);
+	if (error != 0)
+		panic("could not set freq\n");
+
+	for (i = 0; i < CLK_NENTRIES; i++) {
+		error = clk_enable(sc->clk[i]);
+		if (error != 0) {
+			device_printf(dev, "cannot enable '%s' clock\n",
+			    clk_table[i]);
+			return (ENXIO);
+		}
+
+		error = clk_get_freq(sc->clk[i], &rate);
+		if (error != 0) {
+			device_printf(dev, "cannot get '%s' clock frequency\n",
+			    clk_table[i]);
+			return (ENXIO);
+		}
+
+		device_printf(dev, "%s rate is %ld Hz\n", clk_table[i], rate);
+	}
+
+	//uint32_t reg;
+	//reg = RD4(sc, HDMI_PHY_STAT0);
+	//device_printf(dev, "phy stat0 %x\n", reg);
+
+	return (0);
+}
+
 static int
 rk_dw_hdmi_probe(device_t dev)
 {
@@ -1151,6 +1226,15 @@ rk_dw_hdmi_attach(device_t dev)
 	sc = device_get_softc(dev);
 
 	node = ofw_bus_get_node(dev);
+
+	error = syscon_get_by_ofw_property(dev, node, "rockchip,grf", &sc->grf);
+	if (error != 0) {
+		device_printf(dev, "cannot get grf syscon: %d\n", error);
+		return (ENXIO);
+	}
+
+	rk_hdmi_configure(sc);
+	rk_hdmi_clk_enable(dev);
 
 	ddc = 0;
 	OF_getencprop(node, "ddc-i2c-bus", &ddc, sizeof(ddc));
