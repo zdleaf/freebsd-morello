@@ -118,6 +118,8 @@ rk_drm_output_poll_changed(struct drm_device *drm_dev)
 {
 	struct rk_drm_softc *sc;
 
+	printf("%s\n", __func__);
+
 	sc = container_of(drm_dev, struct rk_drm_softc, drm_dev);
 	if (sc->fb != NULL)
 		drm_fb_helper_hotplug_event(&sc->fb->fb_helper);
@@ -139,6 +141,8 @@ drm_fb_cma_helper_getinfo(device_t dev)
 {
 	struct rk_drm_softc *sc;
 
+	printf("%s\n", __func__);
+
 	sc = device_get_softc(dev);
 	if (sc->fb == NULL)
 		return (NULL);
@@ -155,6 +159,8 @@ rk_drm_fb_preinit(struct drm_device *drm_dev)
 	struct drm_fb_cma *fb;
 	struct rk_drm_softc *sc;
 
+	printf("%s\n", __func__);
+
 	sc = container_of(drm_dev, struct rk_drm_softc, drm_dev);
 
 	fb = malloc(sizeof(*fb), DRM_MEM_DRIVER, M_WAITOK | M_ZERO);
@@ -169,6 +175,8 @@ rk_drm_fb_init(struct drm_device *drm_dev)
 {
 	struct rk_drm_softc *sc;
 	int rv;
+
+	printf("%s\n", __func__);
 
 	sc = container_of(drm_dev, struct rk_drm_softc, drm_dev);
 
@@ -210,6 +218,8 @@ rk_drm_fb_destroy(struct drm_device *drm_dev)
 	struct drm_fb_cma *fb;
 	struct rk_drm_softc *sc;
 
+	printf("%s\n", __func__);
+
 	sc = container_of(drm_dev, struct rk_drm_softc, drm_dev);
 	fb = sc->fb;
 	if (fb == NULL)
@@ -235,6 +245,8 @@ rk_drm_irq_hook(void *arg)
 	int rv, nports, i;
 
 	sc = arg;
+
+	printf("%s\n", __func__);
 
 	node = ofw_bus_get_node(sc->dev);
 

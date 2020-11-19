@@ -629,6 +629,7 @@ rk_vop_plane_atomic_disable(struct drm_plane *plane,
     struct drm_plane_state *old_state)
 {
 
+	//panic("implement me");
 	printf("%s\n", __func__);
 #if 0
 	struct rk_vop_mixer_plane *mixer_plane;
@@ -648,6 +649,7 @@ static void rk_vop_plane_atomic_update(struct drm_plane *plane,
 					 struct drm_plane_state *old_state)
 {
 
+	//panic("implement me");
 	printf("%s\n", __func__);
 }
 
@@ -668,6 +670,25 @@ static const struct drm_plane_funcs rk_vop_plane_funcs = {
 
 static const u32 rk_vop_plane_formats[] = {
 	DRM_FORMAT_ARGB8888,
+	DRM_FORMAT_ABGR8888,
+	DRM_FORMAT_RGBA8888,
+	DRM_FORMAT_BGRA8888,
+	DRM_FORMAT_XRGB8888,
+	DRM_FORMAT_XBGR8888,
+	DRM_FORMAT_RGBX8888,
+	DRM_FORMAT_BGRX8888,
+	DRM_FORMAT_RGB888,
+	DRM_FORMAT_BGR888,
+	DRM_FORMAT_RGB565,
+	DRM_FORMAT_BGR565,
+	DRM_FORMAT_ARGB4444,
+	DRM_FORMAT_ABGR4444,
+	DRM_FORMAT_RGBA4444,
+	DRM_FORMAT_BGRA4444,
+	DRM_FORMAT_ARGB1555,
+	DRM_FORMAT_ABGR1555,
+	DRM_FORMAT_RGBA5551,
+	DRM_FORMAT_BGRA5551,
 };
 
 /*
@@ -899,15 +920,18 @@ rk_vop_create_pipeline(device_t dev, struct drm_device *drm)
 
 	for (i = 0; i < 2; i++) {
 		if (i > 0)
-			type = DRM_PLANE_TYPE_OVERLAY;
+			type = DRM_PLANE_TYPE_CURSOR;
+		//type = DRM_PLANE_TYPE_OVERLAY;
 
-		drm_universal_plane_init(drm,
+		error = drm_universal_plane_init(drm,
 		    &sc->planes[i],
 		    0,
 		    &rk_vop_plane_funcs,
 		    rk_vop_plane_formats,
 		    nitems(rk_vop_plane_formats),
 		    NULL, type, NULL);
+		if (error != 0)
+			panic("could not init plane");
 		drm_plane_helper_add(&sc->planes[i],
 		    &rk_vop_plane_helper_funcs);
 	}

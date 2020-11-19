@@ -441,9 +441,9 @@ dw_hdmi_bridge_enable(struct drm_bridge *bridge)
 
 	sc = container_of(bridge, struct dw_hdmi_softc, bridge);
 
-printf("%s\n", __func__);
+printf("%s: sc %p\n", __func__, sc);
 
-	DRM_DEBUG_DRIVER("%s: Mode information:\n"
+	printf("%s: Mode information:\n"
 	    "hdisplay: %d\n"
 	    "vdisplay: %d\n"
 	    "htotal: %d\n"
@@ -503,8 +503,10 @@ printf("%s\n", __func__);
 	DW_HDMI_WRITE_1(sc, DW_HDMI_FC_VSYNCINWIDTH,
 	    sc->mode.vsync_end - sc->mode.vsync_start);
 
+	printf("conf phy\n");
 	/* Configure the PHY */
-	DW_HDMI_PHY_CONFIG(sc->phydev, &sc->mode);
+	//DW_HDMI_PHY_CONFIG(sc->phydev, &sc->mode);
+	printf("conf phy done\n");
 
 	/* 12 pixel clock cycles */
 	DW_HDMI_WRITE_1(sc, DW_HDMI_FC_CTRLDUR, 12);
