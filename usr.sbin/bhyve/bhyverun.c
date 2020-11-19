@@ -866,7 +866,11 @@ vmexit_inst_emul(struct vmctx *ctx, struct vm_exit *vmexit, int *pvcpu)
 		vie_restart(vie);
 		mode = vmexit->u.inst_emul.paging.cpu_mode;
 		cs_d = vmexit->u.inst_emul.cs_d;
-		(void)vmm_decode_instruction(mode, cs_d, vie);
+		if (vmm_decode_instruction(mode, cs_d, vie) != 0)
+			goto fail;
+		if (vm_set_register(ctx, *pvcpu, VM_REG_GUEST_RIP,
+		    vmexit->rip + vie->num_processed) != 0)
+			goto fail;
 	}
 #endif
 
@@ -878,19 +882,21 @@ vmexit_inst_emul(struct vmctx *ctx, struct vm_exit *vmexit, int *pvcpu)
 			EPRINTLN("Unhandled memory access to 0x%lx\n",
 			    vmexit->u.inst_emul.gpa);
 		}
-
-		fprintf(stderr, "Failed to emulate instruction ");
-#ifdef __amd64__
-		fprintf(stderr, "sequence [ ");
-		for (i = 0; i < vie->num_valid; i++)
-			fprintf(stderr, "%02x", vie->inst[i]);
-		fprintf(stderr, "] ");
-#endif
-		FPRINTLN(stderr, "at 0x%lx", VM_EXIT_PC(*vmexit));
-		return (VMEXIT_ABORT);
+		goto fail;
 	}
 
 	return (VMEXIT_CONTINUE);
+
+fail:
+	fprintf(stderr, "Failed to emulate instruction ");
+#ifdef __amd64__
+	fprintf(stderr, "sequence [ ");
+	for (i = 0; i < vie->num_valid; i++)
+		fprintf(stderr, "%02x", vie->inst[i]);
+	fprintf(stderr, " ] ");
+#endif
+	FPRINTLN(stderr, "at 0x%lx", VM_EXIT_PC(*vmexit));
+	return (VMEXIT_ABORT);
 }
 
 static pthread_mutex_t resetcpu_mtx = PTHREAD_MUTEX_INITIALIZER;
