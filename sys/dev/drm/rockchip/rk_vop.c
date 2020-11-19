@@ -119,6 +119,7 @@ struct rk_vop_softc {
 	struct drm_encoder		encoder;
 	uint32_t			vbl_counter;
 	device_t			outport;
+	void				*intrhand;
 };
 
 static void
@@ -537,6 +538,13 @@ rk_vop_hdmi_event(void *arg, device_t hdmi_dev)
 }
 #endif
 
+static void
+rk_vop_intr(void *arg)
+{
+
+	printf("%s\n", __func__);
+}
+
 static int
 rk_vop_probe(device_t dev)
 {
@@ -564,6 +572,14 @@ rk_vop_attach(device_t dev)
 
 	if (bus_alloc_resources(dev, rk_vop_spec, sc->res) != 0) {
 		device_printf(dev, "cannot allocate resources for device\n");
+		return (ENXIO);
+	}
+
+	if (bus_setup_intr(dev, sc->res[1],
+	    INTR_TYPE_MISC | INTR_MPSAFE, NULL, rk_vop_intr, sc,
+	    &sc->intrhand)) {
+		bus_release_resources(dev, rk_vop_spec, sc->res);
+		device_printf(dev, "cannot setup interrupt handler\n");
 		return (ENXIO);
 	}
 
