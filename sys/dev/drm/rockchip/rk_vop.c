@@ -96,7 +96,9 @@ static struct resource_spec rk_vop_spec[] = {
 };
 
 struct rk_vop_plane {
+	struct drm_plane	plane;
 	struct rk_vop_softc	*sc;
+	int id;
 };
 
 #define	CLK_NENTRIES	3
@@ -111,7 +113,7 @@ struct rk_vop_softc {
 	hwreset_t		hwreset_axi;
 	hwreset_t		hwreset_ahb;
 	hwreset_t		hwreset_dclk;
-	struct drm_plane	planes[2];
+	struct rk_vop_plane	planes[2];
 
 	struct drm_pending_vblank_event	*event;
 	struct drm_device		*drm;
@@ -645,11 +647,10 @@ rk_vop_plane_atomic_disable(struct drm_plane *plane,
     struct drm_plane_state *old_state)
 {
 
-	//panic("implement me");
-	printf("%s\n", __func__);
+	panic("implement me");
 #if 0
 	struct rk_vop_mixer_plane *mixer_plane;
-	struct rk_vop_oftc *sc;
+	struct rk_vop_softc *sc;
 	uint32_t reg;
 
 	mixer_plane = container_of(plane, struct rk_vop_mixer_plane, plane);
@@ -664,6 +665,11 @@ rk_vop_plane_atomic_disable(struct drm_plane *plane,
 static void rk_vop_plane_atomic_update(struct drm_plane *plane,
 					 struct drm_plane_state *old_state)
 {
+	struct rk_vop_plane *vop_plane;
+	struct rk_vop_softc *sc;
+
+	vop_plane = container_of(plane, struct rk_vop_plane, plane);
+	sc = vop_plane->sc;
 
 	//panic("implement me");
 	printf("%s\n", __func__);
@@ -940,7 +946,7 @@ rk_vop_create_pipeline(device_t dev, struct drm_device *drm)
 		//type = DRM_PLANE_TYPE_OVERLAY;
 
 		error = drm_universal_plane_init(drm,
-		    &sc->planes[i],
+		    &sc->planes[i].plane,
 		    0,
 		    &rk_vop_plane_funcs,
 		    rk_vop_plane_formats,
@@ -948,12 +954,15 @@ rk_vop_create_pipeline(device_t dev, struct drm_device *drm)
 		    NULL, type, NULL);
 		if (error != 0)
 			panic("could not init plane");
-		drm_plane_helper_add(&sc->planes[i],
+		drm_plane_helper_add(&sc->planes[i].plane,
 		    &rk_vop_plane_helper_funcs);
+
+		sc->planes[i].sc = sc;
+		sc->planes[i].id = i;
 	}
 
 	error = drm_crtc_init_with_planes(drm, &sc->crtc,
-	    &sc->planes[0], &sc->planes[1],
+	    &sc->planes[0].plane, &sc->planes[1].plane,
 	    &rk_vop_funcs,
 	    NULL);
 	if (error != 0) {
