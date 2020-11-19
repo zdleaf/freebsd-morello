@@ -584,8 +584,18 @@ rk_vop_hdmi_event(void *arg, device_t hdmi_dev)
 static void
 rk_vop_intr(void *arg)
 {
+	struct rk_vop_softc *sc;
+	int status;
 
-	panic("%s\n", __func__);
+	sc = arg;
+
+	status = VOP_READ(sc, RK3399_INTR_STATUS0);
+	//printf("%s: status0 %x\n", __func__, status);
+	status = 0xffffffff;
+	VOP_WRITE(sc, RK3399_INTR_CLEAR0, status);
+
+	atomic_add_32(&sc->vbl_counter, 1);
+	drm_crtc_handle_vblank(&sc->crtc);
 }
 
 static int
@@ -845,8 +855,18 @@ rk_vop_enable_vblank(struct drm_crtc *crtc)
 	sc = container_of(crtc, struct rk_vop_softc, crtc);
 
 	DRM_DEBUG_DRIVER("%s: Enabling VBLANK\n", __func__);
-	VOP_WRITE(sc, RK3399_INTR_EN0, INTR_EN0_FS_INTR);
-	VOP_WRITE(sc, RK3399_INTR_EN1, INTR_EN0_FS_INTR);
+
+	uint32_t reg;
+
+	reg = VOP_READ(sc, RK3399_INTR_EN0);
+	reg |= INTR_EN0_FS_INTR;
+	reg |= (1 << 0);
+	reg |= 0xffff0000;
+	VOP_WRITE(sc, RK3399_INTR_EN0, reg);
+
+	printf("%s: en0 %x\n", __func__, VOP_READ(sc, RK3399_INTR_EN0));
+	printf("%s: status0 %x\n", __func__, VOP_READ(sc, RK3399_INTR_STATUS0));
+	printf("%s: rstatus0 %x\n", __func__, VOP_READ(sc, RK3399_INTR_RAW_STATUS0));
 
 	return (0);
 }
@@ -854,15 +874,17 @@ rk_vop_enable_vblank(struct drm_crtc *crtc)
 static void
 rk_vop_disable_vblank(struct drm_crtc *crtc)
 {
-
-	printf("%s\n", __func__);
-#if 0
 	struct rk_vop_softc *sc;
+	uint32_t reg;
 
 	sc = container_of(crtc, struct rk_vop_softc, crtc);
+
 	DRM_DEBUG_DRIVER("%s: Disabling VBLANK\n", __func__);
-	AW_DE2_TCON_WRITE_4(sc, TCON_GINT0, 0x00);
-#endif
+
+	printf("%s\n", __func__);
+
+	reg = 0xffff0000;
+	VOP_WRITE(sc, RK3399_INTR_EN0, reg);
 }
 
 static uint32_t
@@ -870,7 +892,7 @@ rk_vop_get_vblank_counter(struct drm_crtc *crtc)
 {
 	struct rk_vop_softc *sc;
 
-	printf("%s\n", __func__);
+	//printf("%s\n", __func__);
 
 	sc = container_of(crtc, struct rk_vop_softc, crtc);
 
@@ -1062,7 +1084,6 @@ rk_crtc_atomic_disable(struct drm_crtc *crtc, struct drm_crtc_state *old_state)
 	}
 
 	spin_unlock_irqrestore(&crtc->dev->event_lock, irqflags);
-
 }
 
 static void
