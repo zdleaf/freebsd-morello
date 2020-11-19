@@ -638,6 +638,7 @@ rk_vop_attach(device_t dev)
 	if (error != 0)
 		return (ENXIO);
 
+	printf("vop version: %x\n", VOP_READ(sc, RK3399_VERSION_INFO));
 #if 0
 	sc->sc_hdmi_evh = EVENTHANDLER_REGISTER(hdmi_event,
 	    rk_vop_hdmi_event, sc, 0);
