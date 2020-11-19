@@ -720,8 +720,15 @@ rk_vop_plane_atomic_update(struct drm_plane *plane,
 	uint32_t src_w, src_h, dst_w, dst_h;
 	dma_addr_t paddr;
 	uint32_t reg;
+	struct drm_crtc *crtc;
+	struct drm_rect *src;
+	struct drm_rect *dst;
+	uint32_t dsp_stx, dsp_sty;
 
 	state = plane->state;
+	dst = &state->dst;
+	src = &state->src;
+	crtc = state->crtc;
 	vop_plane = container_of(plane, struct rk_vop_plane, plane);
 	fb = container_of(plane->state->fb, struct drm_fb_cma, drm_fb);
 
@@ -740,11 +747,31 @@ rk_vop_plane_atomic_update(struct drm_plane *plane,
 	if (!plane->state->visible)
 		panic("plane is not visible");
 
-#if 0
-	reg = (mode->hdisplay - 1);
-	reg |= (mode->vdisplay - 1) << 16;
+	/* Actual size. */
+	reg = (src_w - 1);
+	reg |= (src_h - 1) << 16;
 	VOP_WRITE(sc, RK3399_WIN0_ACT_INFO, reg);
+
+	dsp_stx = dst->x1 + crtc->mode.htotal - crtc->mode.hsync_start;
+	dsp_sty = dst->y1 + crtc->mode.vtotal - crtc->mode.vsync_start;
+	reg = dsp_sty << 16 | (dsp_stx & 0xffff);
+
+#if 0
+	reg = (mode->hsync_end - mode->hsync_start +
+		mode->htotal - mode->hsync_end);
+	reg |= (mode->vsync_end - mode->vsync_start +
+		mode->vtotal - mode->vsync_end) << 16;
 #endif
+	VOP_WRITE(sc, RK3399_WIN0_DSP_ST, reg);
+
+	reg = (dst_w - 1);
+	reg |= (dst_h - 1) << 16;
+	VOP_WRITE(sc, RK3399_WIN0_DSP_INFO, reg);
+
+	reg = VOP_READ(sc, RK3399_WIN0_COLOR_KEY);
+	reg &= ~(1 << 31);
+	reg &= ~(0x3fffffff);
+	VOP_WRITE(sc, RK3399_WIN0_COLOR_KEY, reg);
 
 	int i;
 	for (i = 0; i < nitems(rk_vop_plane_formats); i++)
