@@ -216,9 +216,12 @@
 #define	RK3399_GAMMA_LUT_ADDR			0x2000
 
 enum rockchip_data_format {
-	ARGB8888 = 0,
-	RGB888 = 1,
-	RGB565 = 2,
+	VOP_FMT_ARGB8888 = 0,
+	VOP_FMT_RGB888 = 1,
+	VOP_FMT_RGB565 = 2,
+	VOP_FMT_YUV420SP = 4,
+	VOP_FMT_YUV422SP = 5,
+	VOP_FMT_YUV444SP = 6,
 };
 
 enum {

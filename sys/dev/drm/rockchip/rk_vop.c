@@ -84,6 +84,20 @@ __FBSDID("$FreeBSD$");
 #define	VOP_READ(sc, reg)	bus_read_4((sc)->res[0], (reg))
 #define	VOP_WRITE(sc, reg, val)	bus_write_4((sc)->res[0], (reg), (val))
 
+static const u32 rk_vop_plane_formats[] = {
+	DRM_FORMAT_XRGB8888,
+	DRM_FORMAT_ARGB8888,
+	DRM_FORMAT_XBGR8888,
+	DRM_FORMAT_ABGR8888,
+	DRM_FORMAT_RGB888,
+	DRM_FORMAT_BGR888,
+	DRM_FORMAT_RGB565,
+	DRM_FORMAT_BGR565,
+	DRM_FORMAT_NV12,
+	DRM_FORMAT_NV16,
+	DRM_FORMAT_NV24,
+};
+
 static struct ofw_compat_data compat_data[] = {
 	{ "rockchip,rk3399-vop-lit",	1 },
 	{ NULL,				0 }
@@ -123,6 +137,33 @@ struct rk_vop_softc {
 	device_t			outport;
 	void				*intrhand;
 };
+
+static enum rockchip_data_format
+vop_convert_format(uint32_t format)
+{
+
+	switch (format) {
+	case DRM_FORMAT_XRGB8888:
+	case DRM_FORMAT_ARGB8888:
+	case DRM_FORMAT_XBGR8888:
+	case DRM_FORMAT_ABGR8888:
+		return VOP_FMT_ARGB8888;
+	case DRM_FORMAT_RGB888:
+	case DRM_FORMAT_BGR888:
+		return VOP_FMT_RGB888;
+	case DRM_FORMAT_RGB565:
+	case DRM_FORMAT_BGR565:
+		return VOP_FMT_RGB565;
+	case DRM_FORMAT_NV12:
+		return VOP_FMT_YUV420SP;
+	case DRM_FORMAT_NV16:
+		return VOP_FMT_YUV422SP;
+	case DRM_FORMAT_NV24:
+		return VOP_FMT_YUV444SP;
+	default:
+		return (-1);
+	}
+}
 
 static void
 rk_vop_set_polarity(struct rk_vop_softc *sc, uint32_t pin_polarity)
@@ -374,7 +415,7 @@ printf("%s\n", __func__);
 
 	switch (bpp) {
 	case 32:
-		rgb_mode = ARGB8888;
+		rgb_mode = VOP_FMT_ARGB8888;
 		VOP_WRITE(sc, RK3399_WIN0_VIR,
 		    WIN0_VIR_WIDTH_ARGB888(mode->hdisplay));
 		break;
@@ -678,12 +719,15 @@ rk_vop_plane_atomic_update(struct drm_plane *plane,
 	struct drm_fb_cma *fb;
 	uint32_t src_w, src_h, dst_w, dst_h;
 	dma_addr_t paddr;
+	uint32_t reg;
 
 	state = plane->state;
 	vop_plane = container_of(plane, struct rk_vop_plane, plane);
 	fb = container_of(plane->state->fb, struct drm_fb_cma, drm_fb);
 
 	sc = vop_plane->sc;
+
+	printf("%s: id %d\n", __func__, vop_plane->id);
 
 	src_w = drm_rect_width(&state->src) >> 16;
 	src_h = drm_rect_height(&state->src) >> 16;
@@ -696,11 +740,48 @@ rk_vop_plane_atomic_update(struct drm_plane *plane,
 	if (!plane->state->visible)
 		panic("plane is not visible");
 
-	bo = drm_fb_cma_get_gem_obj(fb, 0);
+#if 0
+	reg = (mode->hdisplay - 1);
+	reg |= (mode->vdisplay - 1) << 16;
+	VOP_WRITE(sc, RK3399_WIN0_ACT_INFO, reg);
+#endif
 
+	int i;
+	for (i = 0; i < nitems(rk_vop_plane_formats); i++)
+		if (rk_vop_plane_formats[i] == state->fb->format->format)
+			break;
+
+	int rgb_mode;
+	int lb_mode;
+
+	rgb_mode = vop_convert_format(rk_vop_plane_formats[i]);
+	printf("fmt %d\n", rgb_mode);
+
+	if (dst_w <= 1280)
+		lb_mode = LB_RGB_1280X8;
+	else if (dst_w <= 1920)
+		lb_mode = LB_RGB_1920X5;
+	else
+		panic("unknown lb_mode, dst_w %d", dst_w);
+
+	reg = VOP_READ(sc, RK3399_WIN0_CTRL0);
+	reg &= ~WIN0_CTRL0_LB_MODE_M;
+	reg &= ~WIN0_CTRL0_DATA_FMT_M;
+	reg &= ~WIN0_CTRL0_EN;
+	VOP_WRITE(sc, RK3399_WIN0_CTRL0, reg);
+
+	reg |= lb_mode << WIN0_CTRL0_LB_MODE_S;
+	reg |= rgb_mode << WIN0_CTRL0_DATA_FMT_S;
+	reg |= WIN0_CTRL0_EN;
+	VOP_WRITE(sc, RK3399_WIN0_CTRL0, reg);
+
+	bo = drm_fb_cma_get_gem_obj(fb, 0);
 	paddr = bo->pbase + fb->drm_fb.offsets[0];
 	paddr += (state->src.x1 >> 16) * fb->drm_fb.format->cpp[0];
 	paddr += (state->src.y1 >> 16) * fb->drm_fb.pitches[0];
+
+	VOP_WRITE(sc, RK3399_WIN0_YRGB_MST, paddr);
+	VOP_WRITE(sc, RK3399_REG_CFG_DONE, 1);
 
 	printf("buf paddr %x\n", paddr);
 }
@@ -718,29 +799,6 @@ static const struct drm_plane_funcs rk_vop_plane_funcs = {
 	.disable_plane		= drm_atomic_helper_disable_plane,
 	.reset			= drm_atomic_helper_plane_reset,
 	.update_plane		= drm_atomic_helper_update_plane,
-};
-
-static const u32 rk_vop_plane_formats[] = {
-	DRM_FORMAT_ARGB8888,
-	DRM_FORMAT_ABGR8888,
-	DRM_FORMAT_RGBA8888,
-	DRM_FORMAT_BGRA8888,
-	DRM_FORMAT_XRGB8888,
-	DRM_FORMAT_XBGR8888,
-	DRM_FORMAT_RGBX8888,
-	DRM_FORMAT_BGRX8888,
-	DRM_FORMAT_RGB888,
-	DRM_FORMAT_BGR888,
-	DRM_FORMAT_RGB565,
-	DRM_FORMAT_BGR565,
-	DRM_FORMAT_ARGB4444,
-	DRM_FORMAT_ABGR4444,
-	DRM_FORMAT_RGBA4444,
-	DRM_FORMAT_BGRA4444,
-	DRM_FORMAT_ARGB1555,
-	DRM_FORMAT_ABGR1555,
-	DRM_FORMAT_RGBA5551,
-	DRM_FORMAT_BGRA5551,
 };
 
 /*
