@@ -956,10 +956,80 @@ static void
 rk_crtc_atomic_enable(struct drm_crtc *crtc, struct drm_crtc_state *old_state)
 {
 	struct rk_vop_softc *sc;
+	struct drm_display_mode *adj;
+	uint32_t mode1;
+	uint32_t reg;
+
+	adj = &crtc->state->adjusted_mode;
 
 	sc = container_of(crtc, struct rk_vop_softc, crtc);
 
 	printf("%s\n", __func__);
+
+	int pol;
+
+	pol = (1 << DCLK_INVERT);
+	if (adj->flags & DRM_MODE_FLAG_PHSYNC)
+		pol |= (1 << HSYNC_POSITIVE);
+	if (adj->flags & DRM_MODE_FLAG_PVSYNC)
+		pol |= (1 << VSYNC_POSITIVE);
+	rk_vop_set_polarity(sc, pol);
+
+	/* Remove standby bit */
+	reg = VOP_READ(sc, RK3399_SYS_CTRL);
+	reg &= ~SYS_CTRL_STANDBY_EN;
+	VOP_WRITE(sc, RK3399_SYS_CTRL, reg);
+
+	/* Enable HDMI output only. */
+	reg = VOP_READ(sc, RK3399_SYS_CTRL);
+	reg &= ~SYS_CTRL_ALL_OUT_EN;
+	reg |= SYS_CTRL_HDMI_OUT_EN;
+	VOP_WRITE(sc, RK3399_SYS_CTRL, reg);
+
+	printf("SYS_CTRL %x\n", VOP_READ(sc, RK3399_SYS_CTRL));
+
+	/* Set mode */
+	mode1 = 0; /* RGB888 */
+	reg = VOP_READ(sc, RK3399_DSP_CTRL0);
+	reg &= ~DSP_CTRL0_OUT_MODE_M;
+	reg |= (mode1 << DSP_CTRL0_OUT_MODE_S);
+	VOP_WRITE(sc, RK3399_DSP_CTRL0, reg);
+
+	uint32_t hactive = adj->hdisplay;
+	uint32_t vactive = adj->vdisplay;
+	uint32_t hsync_len = adj->hsync_end - adj->hsync_start;
+	uint32_t vsync_len = adj->vsync_end - adj->vsync_start;
+	uint32_t hback_porch = adj->htotal - adj->hsync_end;
+	uint32_t vback_porch = adj->vtotal - adj->vsync_end;
+	uint32_t hfront_porch = adj->hsync_start - adj->hdisplay;
+	uint32_t vfront_porch = adj->vsync_start - adj->vdisplay;
+
+	reg = VOP_READ(sc, RK3399_DSP_HTOTAL_HS_END);
+	reg = hsync_len;
+	reg |= (hsync_len + hback_porch + hactive + hfront_porch) << 16;
+	VOP_WRITE(sc, RK3399_DSP_HTOTAL_HS_END, reg);
+
+	reg = (hsync_len + hback_porch + hactive);
+	reg |= (hsync_len + hback_porch) << 16;
+	VOP_WRITE(sc, RK3399_DSP_HACT_ST_END, reg);
+
+	reg = vsync_len;
+	reg |= (vsync_len + vback_porch + vactive + vfront_porch) << 16;
+	VOP_WRITE(sc, RK3399_DSP_VTOTAL_VS_END, reg);
+
+	reg = (vsync_len + vback_porch + vactive);
+	reg |= (vsync_len + vback_porch) << 16;
+	VOP_WRITE(sc, RK3399_DSP_VACT_ST_END, reg);
+
+	reg = hsync_len + hback_porch + hactive;
+	reg |= (hsync_len + hback_porch) << 16;
+	VOP_WRITE(sc, RK3399_POST_DSP_HACT_INFO, reg);
+
+	reg = vsync_len + vback_porch + vactive;
+	reg |= (vsync_len + vback_porch) << 16;
+	VOP_WRITE(sc, RK3399_POST_DSP_VACT_INFO, reg);
+
+	VOP_WRITE(sc, RK3399_REG_CFG_DONE, 1);
 
 #if 0
 	int32_t reg;
