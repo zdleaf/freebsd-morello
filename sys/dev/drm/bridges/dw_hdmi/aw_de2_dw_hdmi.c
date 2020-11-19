@@ -113,8 +113,8 @@ static struct resource_spec dw_hdmi_spec[] = {
 	{ -1, 0 }
 };
 
-#define	DW_HDMI_READ_1(sc, reg)		bus_read_1((sc)->res[0], (reg << 2))
-#define	DW_HDMI_WRITE_1(sc, reg, val)	bus_write_1((sc)->res[0], (reg << 2), \
+#define	DW_HDMI_READ_1(sc, reg)		bus_read_4((sc)->res[0], (reg << 2))
+#define	DW_HDMI_WRITE_1(sc, reg, val)	bus_write_4((sc)->res[0], (reg << 2), \
     (val))
 #define	DW_HDMI_READ_4(sc, reg)		bus_read_4((sc)->res[0], (reg << 2))
 #define	DW_HDMI_WRITE_4(sc, reg, val)	bus_write_4((sc)->res[0], (reg << 2), \
