@@ -715,8 +715,7 @@ rk_vop_plane_atomic_update(struct drm_plane *plane,
 		panic("unknown lb_mode, dst_w %d", dst_w);
 
 	if (id == 0) {
-		VOP_WRITE(sc, RK3399_WIN0_VIR,
-		    WIN0_VIR_WIDTH_ARGB888(crtc->mode.hdisplay));
+		VOP_WRITE(sc, RK3399_WIN0_VIR, state->fb->pitches[0] >> 2);
 
 		reg = VOP_READ(sc, RK3399_WIN0_CTRL0);
 		reg &= ~WIN0_CTRL0_LB_MODE_M;
@@ -728,8 +727,7 @@ rk_vop_plane_atomic_update(struct drm_plane *plane,
 		reg |= WIN0_CTRL0_EN;
 		VOP_WRITE(sc, RK3399_WIN0_CTRL0, reg);
 	} else {
-		VOP_WRITE(sc, RK3399_WIN2_VIR0_1,
-		    WIN0_VIR_WIDTH_ARGB888(crtc->mode.hdisplay));
+		VOP_WRITE(sc, RK3399_WIN2_VIR0_1, state->fb->pitches[0] >> 2);
 
 		reg = VOP_READ(sc, RK3399_WIN2_CTRL0);
 		reg &= ~WIN2_CTRL0_DATA_FMT_M;
@@ -741,19 +739,17 @@ rk_vop_plane_atomic_update(struct drm_plane *plane,
 		VOP_WRITE(sc, RK3399_WIN2_CTRL0, reg);
 	}
 
-#if 0
 	if (state->fb->format->has_alpha && id > 0) {
 		printf("has alpha\n");
 		printf("has alpha\n");
 		printf("has alpha\n");
-		VOP_WRITE(sc, RK3399_WIN_DST_ALPHA_CTRL(id), (3 << 6));
+		VOP_WRITE(sc, RK3399_WIN2_DST_ALPHA_CTRL, (3 << 6));
 		reg = (1 << 0); //SRC_ALPHA_EN
-		reg |= (1 << 3); //SRC_BLEND_M0
+		reg |= (0 << 3); //SRC_BLEND_M0
 		reg |= (1 << 5); //SRC_ALPHA_CAL_M0
 		reg |= (1 << 6); //SRC_FACTOR_M0
-		VOP_WRITE(sc, RK3399_WIN_SRC_ALPHA_CTRL(id), reg);
+		VOP_WRITE(sc, RK3399_WIN2_SRC_ALPHA_CTRL, reg);
 	}
-#endif
 
 	bo = drm_fb_cma_get_gem_obj(fb, 0);
 	paddr = bo->pbase + fb->drm_fb.offsets[0];
