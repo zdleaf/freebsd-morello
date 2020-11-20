@@ -379,96 +379,6 @@ rk_vop_clk_enable(device_t dev)
 }
 
 static int
-rk_vop_enable(device_t dev, phandle_t node, const struct videomode *mode)
-{
-	struct rk_vop_softc *sc;
-	uint32_t reg;
-
-	sc = device_get_softc(dev);
-
-printf("%s\n", __func__);
-
-	reg = (mode->hdisplay - 1);
-	reg |= (mode->vdisplay - 1) << 16;
-	VOP_WRITE(sc, RK3399_WIN0_ACT_INFO, reg);
-
-	reg = (mode->hsync_end - mode->hsync_start +
-		mode->htotal - mode->hsync_end);
-	reg |= (mode->vsync_end - mode->vsync_start +
-		mode->vtotal - mode->vsync_end) << 16;
-	VOP_WRITE(sc, RK3399_WIN0_DSP_ST, reg);
-
-	reg = (mode->hdisplay - 1);
-	reg |= (mode->vdisplay - 1) << 16;
-	VOP_WRITE(sc, RK3399_WIN0_DSP_INFO, reg);
-
-	reg = VOP_READ(sc, RK3399_WIN0_COLOR_KEY);
-	reg &= ~(1 << 31);
-	reg &= ~(0x3fffffff);
-	device_printf(dev, "color key %x\n", reg);
-	VOP_WRITE(sc, RK3399_WIN0_COLOR_KEY, reg);
-
-	uint32_t lb_mode, rgb_mode;
-	int bpp;
-
-	bpp = 32; // HDMI
-
-	switch (bpp) {
-	case 32:
-		rgb_mode = VOP_FMT_ARGB8888;
-		VOP_WRITE(sc, RK3399_WIN0_VIR,
-		    WIN0_VIR_WIDTH_ARGB888(mode->hdisplay));
-		break;
-	default:
-		panic("unknown bpp");
-	};
-
-	if (mode->hdisplay <= 1280)
-		lb_mode = LB_RGB_1280X8;
-	else if (mode->hdisplay <= 1920)
-		lb_mode = LB_RGB_1920X5;
-	else
-		panic("unknown lb_mode: %d", mode->hdisplay);
-
-	reg = VOP_READ(sc, RK3399_WIN0_CTRL0);
-	device_printf(dev, "win0 ctrl0 %x\n", reg);
-	reg &= ~WIN0_CTRL0_LB_MODE_M;
-	reg &= ~WIN0_CTRL0_DATA_FMT_M;
-	reg &= ~WIN0_CTRL0_EN;
-	VOP_WRITE(sc, RK3399_WIN0_CTRL0, reg);
-
-	reg |= lb_mode << WIN0_CTRL0_LB_MODE_S;
-	reg |= rgb_mode << WIN0_CTRL0_DATA_FMT_S;
-	reg |= WIN0_CTRL0_EN;
-	VOP_WRITE(sc, RK3399_WIN0_CTRL0, reg);
-
-	uint64_t vbase;
-	uint64_t fb_base;
-	uint8_t *base;
-	int sz;
-	sz = mode->hdisplay * mode->vdisplay * 4;
-	vbase = (intptr_t)kmem_alloc_contig(sz, M_ZERO, 0, ~0, PAGE_SIZE, 0,
-	    VM_MEMATTR_UNCACHEABLE);
-	base = (uint8_t *)vbase;
-	fb_base = (intptr_t)vtophys(vbase);
-
-	int i;
-	for (i = 0; i < 1920*1080; i += 4) {
-		base[i] = 0;
-		base[i + 1] = 0;
-		base[i + 2] = 0xff;
-		base[i + 3] = 0x00;
-	}
-
-	device_printf(dev, "fb_base %lx\n", fb_base);
-
-	VOP_WRITE(sc, RK3399_WIN0_YRGB_MST, fb_base);
-	VOP_WRITE(sc, RK3399_REG_CFG_DONE, 1);
-
-	return (0);
-}
-
-static int
 vop_mode_is_valid(const struct videomode *mode)
 {
 
@@ -569,7 +479,6 @@ rk_vop_hdmi_event(void *arg, device_t hdmi_dev)
 		panic("error 1");
 
 	rk_vop_mode_set(dev, sc->sc_mode);
-	rk_vop_enable(dev, node, sc->sc_mode);
 
 #if 0
 	printf("config done\n");
@@ -735,6 +644,7 @@ rk_vop_plane_atomic_update(struct drm_plane *plane,
 	struct drm_rect *src;
 	struct drm_rect *dst;
 	uint32_t dsp_stx, dsp_sty;
+	int id;
 
 	state = plane->state;
 	dst = &state->dst;
@@ -744,6 +654,7 @@ rk_vop_plane_atomic_update(struct drm_plane *plane,
 	fb = container_of(plane->state->fb, struct drm_fb_cma, drm_fb);
 
 	sc = vop_plane->sc;
+	id = vop_plane->id;
 
 	printf("%s: id %d\n", __func__, vop_plane->id);
 
@@ -761,7 +672,7 @@ rk_vop_plane_atomic_update(struct drm_plane *plane,
 	/* Actual size. */
 	reg = (src_w - 1);
 	reg |= (src_h - 1) << 16;
-	VOP_WRITE(sc, RK3399_WIN0_ACT_INFO, reg);
+	VOP_WRITE(sc, RK3399_WIN_ACT_INFO(id), reg);
 
 	dsp_stx = dst->x1 + crtc->mode.htotal - crtc->mode.hsync_start;
 	dsp_sty = dst->y1 + crtc->mode.vtotal - crtc->mode.vsync_start;
@@ -773,16 +684,16 @@ rk_vop_plane_atomic_update(struct drm_plane *plane,
 	reg |= (mode->vsync_end - mode->vsync_start +
 		mode->vtotal - mode->vsync_end) << 16;
 #endif
-	VOP_WRITE(sc, RK3399_WIN0_DSP_ST, reg);
+	VOP_WRITE(sc, RK3399_WIN_DSP_ST(id), reg);
 
 	reg = (dst_w - 1);
 	reg |= (dst_h - 1) << 16;
-	VOP_WRITE(sc, RK3399_WIN0_DSP_INFO, reg);
+	VOP_WRITE(sc, RK3399_WIN_DSP_INFO(id), reg);
 
-	reg = VOP_READ(sc, RK3399_WIN0_COLOR_KEY);
+	reg = VOP_READ(sc, RK3399_WIN_COLOR_KEY(id));
 	reg &= ~(1 << 31);
 	reg &= ~(0x3fffffff);
-	VOP_WRITE(sc, RK3399_WIN0_COLOR_KEY, reg);
+	VOP_WRITE(sc, RK3399_WIN_COLOR_KEY(id), reg);
 
 	int i;
 	for (i = 0; i < nitems(rk_vop_plane_formats); i++)
@@ -792,7 +703,7 @@ rk_vop_plane_atomic_update(struct drm_plane *plane,
 	int rgb_mode;
 	int lb_mode;
 
-	VOP_WRITE(sc, RK3399_WIN0_VIR,
+	VOP_WRITE(sc, RK3399_WIN_VIR(id),
 	    WIN0_VIR_WIDTH_ARGB888(crtc->mode.hdisplay));
 
 	rgb_mode = vop_convert_format(rk_vop_plane_formats[i]);
@@ -805,23 +716,23 @@ rk_vop_plane_atomic_update(struct drm_plane *plane,
 	else
 		panic("unknown lb_mode, dst_w %d", dst_w);
 
-	reg = VOP_READ(sc, RK3399_WIN0_CTRL0);
+	reg = VOP_READ(sc, RK3399_WIN_CTRL0(id));
 	reg &= ~WIN0_CTRL0_LB_MODE_M;
 	reg &= ~WIN0_CTRL0_DATA_FMT_M;
 	reg &= ~WIN0_CTRL0_EN;
-	VOP_WRITE(sc, RK3399_WIN0_CTRL0, reg);
+	VOP_WRITE(sc, RK3399_WIN_CTRL0(id), reg);
 
 	reg |= lb_mode << WIN0_CTRL0_LB_MODE_S;
 	reg |= rgb_mode << WIN0_CTRL0_DATA_FMT_S;
 	reg |= WIN0_CTRL0_EN;
-	VOP_WRITE(sc, RK3399_WIN0_CTRL0, reg);
+	VOP_WRITE(sc, RK3399_WIN_CTRL0(id), reg);
 
 	bo = drm_fb_cma_get_gem_obj(fb, 0);
 	paddr = bo->pbase + fb->drm_fb.offsets[0];
 	paddr += (state->src.x1 >> 16) * fb->drm_fb.format->cpp[0];
 	paddr += (state->src.y1 >> 16) * fb->drm_fb.pitches[0];
 
-	VOP_WRITE(sc, RK3399_WIN0_YRGB_MST, paddr);
+	VOP_WRITE(sc, RK3399_WIN_YRGB_MST(id), paddr);
 	VOP_WRITE(sc, RK3399_REG_CFG_DONE, 1);
 
 	printf("buf paddr %x\n", paddr);
@@ -1132,8 +1043,7 @@ rk_vop_create_pipeline(device_t dev, struct drm_device *drm)
 
 	for (i = 0; i < 2; i++) {
 		if (i > 0)
-			type = DRM_PLANE_TYPE_CURSOR;
-		//type = DRM_PLANE_TYPE_OVERLAY;
+			type = DRM_PLANE_TYPE_OVERLAY;
 
 		error = drm_universal_plane_init(drm,
 		    &sc->planes[i].plane,
