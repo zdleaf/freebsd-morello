@@ -667,28 +667,34 @@ rk_vop_plane_atomic_update(struct drm_plane *plane,
 	/* Actual size. */
 	reg = (src_w - 1);
 	reg |= (src_h - 1) << 16;
-	VOP_WRITE(sc, RK3399_WIN_ACT_INFO(id), reg);
+	if (id == 0)
+		VOP_WRITE(sc, RK3399_WIN0_ACT_INFO, reg);
 
 	dsp_stx = dst->x1 + crtc->mode.htotal - crtc->mode.hsync_start;
 	dsp_sty = dst->y1 + crtc->mode.vtotal - crtc->mode.vsync_start;
 	reg = dsp_sty << 16 | (dsp_stx & 0xffff);
-
-#if 0
-	reg = (mode->hsync_end - mode->hsync_start +
-		mode->htotal - mode->hsync_end);
-	reg |= (mode->vsync_end - mode->vsync_start +
-		mode->vtotal - mode->vsync_end) << 16;
-#endif
-	VOP_WRITE(sc, RK3399_WIN_DSP_ST(id), reg);
+	if (id == 0)
+		VOP_WRITE(sc, RK3399_WIN0_DSP_ST, reg);
+	else
+		VOP_WRITE(sc, RK3399_WIN2_DSP_ST0, reg);
 
 	reg = (dst_w - 1);
 	reg |= (dst_h - 1) << 16;
-	VOP_WRITE(sc, RK3399_WIN_DSP_INFO(id), reg);
+	if (id == 0)
+		VOP_WRITE(sc, RK3399_WIN0_DSP_INFO, reg);
+	else
+		VOP_WRITE(sc, RK3399_WIN2_DSP_INFO0, reg);
 
-	reg = VOP_READ(sc, RK3399_WIN_COLOR_KEY(id));
+	if (id == 0)
+		reg = VOP_READ(sc, RK3399_WIN0_COLOR_KEY);
+	else
+		reg = VOP_READ(sc, RK3399_WIN2_COLOR_KEY);
 	reg &= ~(1 << 31);
 	reg &= ~(0x3fffffff);
-	VOP_WRITE(sc, RK3399_WIN_COLOR_KEY(id), reg);
+	if (id == 0)
+		VOP_WRITE(sc, RK3399_WIN0_COLOR_KEY, reg);
+	else
+		VOP_WRITE(sc, RK3399_WIN2_COLOR_KEY, reg);
 
 	int i;
 	for (i = 0; i < nitems(rk_vop_plane_formats); i++)
@@ -697,9 +703,6 @@ rk_vop_plane_atomic_update(struct drm_plane *plane,
 
 	int rgb_mode;
 	int lb_mode;
-
-	VOP_WRITE(sc, RK3399_WIN_VIR(id),
-	    WIN0_VIR_WIDTH_ARGB888(crtc->mode.hdisplay));
 
 	rgb_mode = vop_convert_format(rk_vop_plane_formats[i]);
 	printf("fmt %d\n", rgb_mode);
@@ -711,23 +714,61 @@ rk_vop_plane_atomic_update(struct drm_plane *plane,
 	else
 		panic("unknown lb_mode, dst_w %d", dst_w);
 
-	reg = VOP_READ(sc, RK3399_WIN_CTRL0(id));
-	reg &= ~WIN0_CTRL0_LB_MODE_M;
-	reg &= ~WIN0_CTRL0_DATA_FMT_M;
-	reg &= ~WIN0_CTRL0_EN;
-	VOP_WRITE(sc, RK3399_WIN_CTRL0(id), reg);
+	if (id == 0) {
+		VOP_WRITE(sc, RK3399_WIN0_VIR,
+		    WIN0_VIR_WIDTH_ARGB888(crtc->mode.hdisplay));
 
-	reg |= lb_mode << WIN0_CTRL0_LB_MODE_S;
-	reg |= rgb_mode << WIN0_CTRL0_DATA_FMT_S;
-	reg |= WIN0_CTRL0_EN;
-	VOP_WRITE(sc, RK3399_WIN_CTRL0(id), reg);
+		reg = VOP_READ(sc, RK3399_WIN0_CTRL0);
+		reg &= ~WIN0_CTRL0_LB_MODE_M;
+		reg &= ~WIN0_CTRL0_DATA_FMT_M;
+		reg &= ~WIN0_CTRL0_EN;
+		VOP_WRITE(sc, RK3399_WIN0_CTRL0, reg);
+		reg |= lb_mode << WIN0_CTRL0_LB_MODE_S;
+		reg |= rgb_mode << WIN0_CTRL0_DATA_FMT_S;
+		reg |= WIN0_CTRL0_EN;
+		VOP_WRITE(sc, RK3399_WIN0_CTRL0, reg);
+	} else {
+		VOP_WRITE(sc, RK3399_WIN2_VIR0_1,
+		    WIN0_VIR_WIDTH_ARGB888(crtc->mode.hdisplay));
+
+		reg = VOP_READ(sc, RK3399_WIN2_CTRL0);
+		reg &= ~WIN2_CTRL0_DATA_FMT_M;
+		reg &= ~WIN2_CTRL0_EN;
+		VOP_WRITE(sc, RK3399_WIN2_CTRL0, reg);
+		reg |= rgb_mode << WIN2_CTRL0_DATA_FMT_S;
+		reg |= WIN2_CTRL0_EN;
+		reg |= (1 << 0); //ungate
+		VOP_WRITE(sc, RK3399_WIN2_CTRL0, reg);
+	}
+
+#if 0
+	if (state->fb->format->has_alpha && id > 0) {
+		printf("has alpha\n");
+		printf("has alpha\n");
+		printf("has alpha\n");
+		VOP_WRITE(sc, RK3399_WIN_DST_ALPHA_CTRL(id), (3 << 6));
+		reg = (1 << 0); //SRC_ALPHA_EN
+		reg |= (1 << 3); //SRC_BLEND_M0
+		reg |= (1 << 5); //SRC_ALPHA_CAL_M0
+		reg |= (1 << 6); //SRC_FACTOR_M0
+		VOP_WRITE(sc, RK3399_WIN_SRC_ALPHA_CTRL(id), reg);
+	}
+#endif
 
 	bo = drm_fb_cma_get_gem_obj(fb, 0);
 	paddr = bo->pbase + fb->drm_fb.offsets[0];
 	paddr += (state->src.x1 >> 16) * fb->drm_fb.format->cpp[0];
 	paddr += (state->src.y1 >> 16) * fb->drm_fb.pitches[0];
 
-	VOP_WRITE(sc, RK3399_WIN_YRGB_MST(id), paddr);
+	if (id == 0)
+		VOP_WRITE(sc, RK3399_WIN0_YRGB_MST, paddr);
+	else
+		VOP_WRITE(sc, RK3399_WIN2_MST0, paddr);
+
+	//reg = VOP_READ(sc, RK3399_WIN_CTRL0(id));
+	//reg |= WIN0_CTRL0_EN;
+	//VOP_WRITE(sc, RK3399_WIN_CTRL0(id), reg);
+
 	VOP_WRITE(sc, RK3399_REG_CFG_DONE, 1);
 
 	printf("buf paddr %x\n", paddr);
@@ -1034,11 +1075,12 @@ rk_vop_create_pipeline(device_t dev, struct drm_device *drm)
 	int error;
 	int i;
 
-	type = DRM_PLANE_TYPE_PRIMARY;
 
 	for (i = 0; i < 2; i++) {
-		if (i > 0)
-			type = DRM_PLANE_TYPE_OVERLAY;
+		if (i == 0)
+			type = DRM_PLANE_TYPE_PRIMARY;
+		else
+			type = DRM_PLANE_TYPE_CURSOR;
 
 		error = drm_universal_plane_init(drm,
 		    &sc->planes[i].plane,

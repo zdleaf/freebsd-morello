@@ -29,30 +29,12 @@
 #define	RK3399_WB_YRGB_MST			0x0028
 #define	RK3399_WB_CBR_MST			0x002c
 
-#define	RK3399_WIN_CTRL0(n)			(0x0030 + 0x40 * (n))
-#define	RK3399_WIN_CTRL1(n)			(0x0034 + 0x40 * (n))
-#define	RK3399_WIN_COLOR_KEY(n)			(0x0038 + 0x40 * (n))
-#define	RK3399_WIN_VIR(n)			(0x003c + 0x40 * (n))
-#define	RK3399_WIN_YRGB_MST(n)			(0x0040 + 0x40 * (n))
-#define	RK3399_WIN_CBR_MST(n)			(0x0044 + 0x40 * (n))
-#define	RK3399_WIN_ACT_INFO(n)			(0x0048 + 0x40 * (n))
-#define	RK3399_WIN_DSP_INFO(n)			(0x004c + 0x40 * (n))
-#define	RK3399_WIN_DSP_ST(n)			(0x0050 + 0x40 * (n))
-#define	RK3399_WIN_SCL_FACTOR_YRGB(n)		(0x0054 + 0x40 * (n))
-#define	RK3399_WIN_SCL_FACTOR_CBR(n)		(0x0058 + 0x40 * (n))
-#define	RK3399_WIN_SCL_OFFSET(n)		(0x005c + 0x40 * (n))
-#define	RK3399_WIN_SRC_ALPHA_CTRL(n)		(0x0060 + 0x40 * (n))
-#define	RK3399_WIN_DST_ALPHA_CTRL(n)		(0x0064 + 0x40 * (n))
-#define	RK3399_WIN_FADING_CTRL(n)		(0x0068 + 0x40 * (n))
-#define	RK3399_WIN_CTRL2(n)			(0x006c + 0x40 * (n))
-
 #define	RK3399_WIN0_CTRL0			0x0030
 #define	 WIN0_CTRL0_LB_MODE_S	5
 #define	 WIN0_CTRL0_LB_MODE_M	(0x7 << WIN0_CTRL0_LB_MODE_S)
 #define	 WIN0_CTRL0_DATA_FMT_S	1
 #define	 WIN0_CTRL0_DATA_FMT_M	(0x7 << WIN0_CTRL0_DATA_FMT_S)
 #define	 WIN0_CTRL0_EN		(1 << 0)
-
 #define	RK3399_WIN0_CTRL1			0x0034
 #define	RK3399_WIN0_COLOR_KEY			0x0038
 #define	RK3399_WIN0_VIR				0x003c
@@ -86,7 +68,11 @@
 #define	RK3399_WIN1_DST_ALPHA_CTRL		0x00a4
 #define	RK3399_WIN1_FADING_CTRL			0x00a8
 #define	RK3399_WIN1_CTRL2			0x00ac
+
 #define	RK3399_WIN2_CTRL0			0x00b0
+#define	 WIN2_CTRL0_DATA_FMT_S	5
+#define	 WIN2_CTRL0_DATA_FMT_M	(0x3 << WIN0_CTRL0_DATA_FMT_S)
+#define	 WIN2_CTRL0_EN				(1 << 4)
 #define	RK3399_WIN2_CTRL1			0x00b4
 #define	RK3399_WIN2_VIR0_1			0x00b8
 #define	RK3399_WIN2_VIR2_3			0x00bc
@@ -106,6 +92,7 @@
 #define	RK3399_WIN2_DSP_INFO3			0x00f4
 #define	RK3399_WIN2_DSP_ST3			0x00f8
 #define	RK3399_WIN2_FADING_CTRL			0x00fc
+
 #define	RK3399_WIN3_CTRL0			0x0100
 #define	RK3399_WIN3_CTRL1			0x0104
 #define	RK3399_WIN3_VIR0_1			0x0108
