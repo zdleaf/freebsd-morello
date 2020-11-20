@@ -612,20 +612,15 @@ static void
 rk_vop_plane_atomic_disable(struct drm_plane *plane,
     struct drm_plane_state *old_state)
 {
+	//struct rk_vop_plane *plane;
+	//struct rk_vop_softc *sc;
 
-	panic("implement me");
-#if 0
-	struct rk_vop_mixer_plane *mixer_plane;
-	struct rk_vop_softc *sc;
-	uint32_t reg;
+	//plane = container_of(plane, struct rk_vop_plane, plane);
+	//sc = plane->sc;
 
-	mixer_plane = container_of(plane, struct rk_vop_mixer_plane, plane);
-	sc = mixer_plane->sc;
-
-	reg = AW_DE2_MIXER_READ_4(sc, OVL_UI_ATTR_CTL(mixer_plane->id));
-	reg &= ~OVL_UI_ATTR_EN;
-	AW_DE2_MIXER_WRITE_4(sc, OVL_UI_ATTR_CTL(mixer_plane->id), reg);
-#endif
+	//reg = AW_DE2_MIXER_READ_4(sc, OVL_UI_ATTR_CTL(mixer_plane->id));
+	//reg &= ~OVL_UI_ATTR_EN;
+	//AW_DE2_MIXER_WRITE_4(sc, OVL_UI_ATTR_CTL(mixer_plane->id), reg);
 }
 
 static void
