@@ -177,88 +177,6 @@ rk_vop_set_polarity(struct rk_vop_softc *sc, uint32_t pin_polarity)
 	VOP_WRITE(sc, RK3399_DSP_CTRL1, reg);
 }
 
-static int
-rk_vop_mode_set(device_t dev, const struct videomode *mode)
-{
-	struct rk_vop_softc *sc;
-	uint32_t pin_polarity;
-	uint32_t mode1;
-	uint32_t reg;
-
-	sc = device_get_softc(dev);
-
-printf("%s\n", __func__);
-
-	reg = VOP_READ(sc, RK3399_REG_CFG_DONE);
-	printf("cfg done %x\n", reg);
-	VOP_WRITE(sc, RK3399_REG_CFG_DONE, 0);
-
-	pin_polarity = (1 << DCLK_INVERT);
-	if (mode->flags & VID_PHSYNC)
-		pin_polarity |= 1 << HSYNC_POSITIVE;
-	if (mode->flags & VID_PVSYNC)
-		pin_polarity |= 1 << VSYNC_POSITIVE;
-	rk_vop_set_polarity(sc, pin_polarity);
-
-	/* Remove standby bit */
-	reg = VOP_READ(sc, RK3399_SYS_CTRL);
-	reg &= ~SYS_CTRL_STANDBY_EN;
-	VOP_WRITE(sc, RK3399_SYS_CTRL, reg);
-
-	/* Enable HDMI output only. */
-	reg = VOP_READ(sc, RK3399_SYS_CTRL);
-	reg &= ~SYS_CTRL_ALL_OUT_EN;
-	reg |= SYS_CTRL_HDMI_OUT_EN;
-	VOP_WRITE(sc, RK3399_SYS_CTRL, reg);
-
-	printf("SYS_CTRL %x\n", VOP_READ(sc, RK3399_SYS_CTRL));
-
-	/* Set mode */
-	mode1 = 0; /* RGB888 */
-	reg = VOP_READ(sc, RK3399_DSP_CTRL0);
-	reg &= ~DSP_CTRL0_OUT_MODE_M;
-	reg |= (mode1 << DSP_CTRL0_OUT_MODE_S);
-	VOP_WRITE(sc, RK3399_DSP_CTRL0, reg);
-
-	uint32_t hactive = mode->hdisplay;
-	uint32_t vactive = mode->vdisplay;
-	uint32_t hsync_len = mode->hsync_end - mode->hsync_start;
-	uint32_t vsync_len = mode->vsync_end - mode->vsync_start;
-	uint32_t hback_porch = mode->htotal - mode->hsync_end;
-	uint32_t vback_porch = mode->vtotal - mode->vsync_end;
-	uint32_t hfront_porch = mode->hsync_start - mode->hdisplay;
-	uint32_t vfront_porch = mode->vsync_start - mode->vdisplay;
-
-	reg = VOP_READ(sc, RK3399_DSP_HTOTAL_HS_END);
-	reg = hsync_len;
-	reg |= (hsync_len + hback_porch + hactive + hfront_porch) << 16;
-	VOP_WRITE(sc, RK3399_DSP_HTOTAL_HS_END, reg);
-
-	reg = (hsync_len + hback_porch + hactive);
-	reg |= (hsync_len + hback_porch) << 16;
-	VOP_WRITE(sc, RK3399_DSP_HACT_ST_END, reg);
-
-	reg = vsync_len;
-	reg |= (vsync_len + vback_porch + vactive + vfront_porch) << 16;
-	VOP_WRITE(sc, RK3399_DSP_VTOTAL_VS_END, reg);
-
-	reg = (vsync_len + vback_porch + vactive);
-	reg |= (vsync_len + vback_porch) << 16;
-	VOP_WRITE(sc, RK3399_DSP_VACT_ST_END, reg);
-
-	reg = hsync_len + hback_porch + hactive;
-	reg |= (hsync_len + hback_porch) << 16;
-	VOP_WRITE(sc, RK3399_POST_DSP_HACT_INFO, reg);
-
-	reg = vsync_len + vback_porch + vactive;
-	reg |= (vsync_len + vback_porch) << 16;
-	VOP_WRITE(sc, RK3399_POST_DSP_VACT_INFO, reg);
-
-	VOP_WRITE(sc, RK3399_REG_CFG_DONE, 1);
-
-	return (0);
-}
-
 static char * clk_table[CLK_NENTRIES] = { "aclk_vop", "dclk_vop", "hclk_vop" };
 
 static int
@@ -378,116 +296,8 @@ rk_vop_clk_enable(device_t dev)
 	return (0);
 }
 
-static int
-vop_mode_is_valid(const struct videomode *mode)
-{
-
-printf("%s\n", __func__);
-
-	if (mode->dot_clock != 148500)
-		return (0);
-
-	return (1);
-}
-
-static const struct videomode *
-vop_pick_mode(struct edid_info *ei)
-{
-	const struct videomode *videomode;
-	const struct videomode *m;
-	int n;
-
-	videomode = NULL;
-
-	/*
-	 * Pick a mode.
-	 */
-	if (ei->edid_preferred_mode != NULL) {
-		if (vop_mode_is_valid(ei->edid_preferred_mode))
-			videomode = ei->edid_preferred_mode;
-	}
-
-	if (videomode == NULL) {
-		m = ei->edid_modes;
-
-		sort_modes(ei->edid_modes,
-		    &ei->edid_preferred_mode,
-		    ei->edid_nmodes);
-		for (n = 0; n < ei->edid_nmodes; n++)
-			if (vop_mode_is_valid(&m[n])) {
-				videomode = &m[n];
-				break;
-			}
-	}
-
-	return videomode;
-}
-
 #if 0
 static uint8_t my_edid[128] = {0x0, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x0, 0x4, 0x69, 0xa3, 0x28, 0xec, 0xa2, 0x2, 0x0, 0x1b, 0x18, 0x1, 0x3, 0x80, 0x3e, 0x22, 0x78, 0x3a, 0x1c, 0xb5, 0xa3, 0x57, 0x4f, 0xa0, 0x27, 0xd, 0x50, 0x54, 0xbf, 0xef, 0x0, 0xd1, 0xc0, 0x81, 0x40, 0x81, 0x80, 0x95, 0x0, 0xb3, 0x0, 0x71, 0x4f, 0x81, 0xc0, 0x1, 0x1, 0x4, 0x74, 0x0, 0x30, 0xf2, 0x70, 0x5a, 0x80, 0xb0, 0x58, 0x8a, 0x0, 0x6d, 0x55, 0x21, 0x0, 0x0, 0x1a, 0x2, 0x3a, 0x80, 0x18, 0x71, 0x38, 0x2d, 0x40, 0x58, 0x2c, 0x45, 0x0, 0x6d, 0x55, 0x21, 0x0, 0x0, 0x1e, 0x0, 0x0, 0x0, 0xfd, 0x0, 0x1e, 0x50, 0x18, 0xa0, 0x1e, 0x0, 0xa, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x0, 0x0, 0x0, 0xfc, 0x0, 0x41, 0x53, 0x55, 0x53, 0x20, 0x50, 0x42, 0x32, 0x38, 0x37, 0x51, 0xa, 0x20, 0x1, 0x5e};
-
-static void
-rk_vop_hdmi_event(void *arg, device_t hdmi_dev)
-{
-	struct rk_vop_softc *sc;
-	uint8_t *edid;
-	struct edid_info ei;
-	const struct videomode *videomode;
-	device_t dev;
-	int error;
-
-	sc = arg;
-
-	dev = sc->dev;
-
-	printf("%s\n", __func__);
-
-#if 0
-	uint32_t edid_len;
-	edid = NULL;
-	edid_len = 0;
-	if (HDMI_GET_EDID(hdmi_dev, &edid, &edid_len) != 0)
-		device_printf(sc->dev,
-		    "failed to get EDID info from HDMI framer\n");
-	else
-		device_printf(sc->dev, "got edid, len %d\n", edid_len);
-#endif
-
-	edid = my_edid;
-
-	int i;
-	printf("%s: edid: \n", __func__);
-	for (i = 0; i < 128; i++)
-		printf("%x ", edid[i]);
-	printf("\n");
-
-	if (edid) {
-		if (edid_parse(edid, &ei) == 0)
-			edid_print(&ei);
-		else
-			printf("failed to parse EDID\n");
-	}
-
-	videomode = vop_pick_mode(&ei);
-	sc->sc_mode = videomode;
-
-	phandle_t node;
-	node = ofw_bus_get_node(dev);
-
-	error = rk_vop_clk_enable(dev);
-	if (error != 0)
-		panic("error 1");
-
-	rk_vop_mode_set(dev, sc->sc_mode);
-
-#if 0
-	printf("config done\n");
-	for (i = 0; i < 0x2000; i += 4)
-		printf("reg %x %x\n", i, VOP_READ(sc, i));
-#endif
-
-	HDMI_SET_VIDEOMODE(hdmi_dev, sc->sc_mode);
-}
 #endif
 
 static void
@@ -558,10 +368,6 @@ rk_vop_attach(device_t dev)
 		return (ENXIO);
 
 	printf("vop version: %x\n", VOP_READ(sc, RK3399_VERSION_INFO));
-#if 0
-	sc->sc_hdmi_evh = EVENTHANDLER_REGISTER(hdmi_event,
-	    rk_vop_hdmi_event, sc, 0);
-#endif
 
 	return (0);
 }
