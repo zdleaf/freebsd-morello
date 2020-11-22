@@ -221,9 +221,9 @@ typedef struct {
 	uint32_t	handle;	/* handle associated with this command */
 } isp_hdl_t;
 #define	ISP_HANDLE_FREE		0x00000000
-#define	ISP_HANDLE_CMD_MASK	0x00001fff
-#define	ISP_HANDLE_USAGE_MASK	0x0000e000
-#define	ISP_HANDLE_USAGE_SHIFT	13
+#define	ISP_HANDLE_CMD_MASK	0x00003fff
+#define	ISP_HANDLE_USAGE_MASK	0x0000c000
+#define	ISP_HANDLE_USAGE_SHIFT	14
 #define	ISP_H2HT(hdl)	((hdl & ISP_HANDLE_USAGE_MASK) >> ISP_HANDLE_USAGE_SHIFT)
 #	define	ISP_HANDLE_NONE		0
 #	define	ISP_HANDLE_INITIATOR	1
@@ -232,13 +232,15 @@ typedef struct {
 #define	ISP_HANDLE_SEQ_MASK	0xffff0000
 #define	ISP_HANDLE_SEQ_SHIFT	16
 #define	ISP_H2SEQ(hdl)	((hdl & ISP_HANDLE_SEQ_MASK) >> ISP_HANDLE_SEQ_SHIFT)
-#define	ISP_VALID_HANDLE(c, hdl)	\
+#define	ISP_HANDLE_MAX		(ISP_HANDLE_CMD_MASK + 1)
+#define	ISP_HANDLE_RESERVE	256
+#define	ISP_HANDLE_NUM(isp)	((isp)->isp_maxcmds + ISP_HANDLE_RESERVE)
+#define	ISP_VALID_HANDLE(isp, hdl)	\
 	((ISP_H2HT(hdl) == ISP_HANDLE_INITIATOR || \
 	  ISP_H2HT(hdl) == ISP_HANDLE_TARGET || \
 	  ISP_H2HT(hdl) == ISP_HANDLE_CTRL) && \
-	 ((hdl) & ISP_HANDLE_CMD_MASK) < (c)->isp_maxcmds && \
-	 (hdl) == ((c)->isp_xflist[(hdl) & ISP_HANDLE_CMD_MASK].handle))
-#define	ISP_BAD_HANDLE_INDEX	0xffffffff
+	 ((hdl) & ISP_HANDLE_CMD_MASK) < ISP_HANDLE_NUM(isp) && \
+	 (hdl) == ((isp)->isp_xflist[(hdl) & ISP_HANDLE_CMD_MASK].handle))
 
 
 /*
@@ -359,7 +361,6 @@ typedef struct {
 	uint16_t		isp_loopid;		/* hard loop id */
 	uint16_t		isp_sns_hdl;		/* N-port handle for SNS */
 	uint16_t		isp_lasthdl;		/* only valid for channel 0 */
-	uint16_t		isp_maxalloc;
 	uint16_t		isp_fabric_params;
 	uint16_t		isp_login_hdl;		/* Logging in handle */
 	uint8_t			isp_retry_delay;
@@ -541,7 +542,6 @@ struct ispsoftc {
 #define	ISP_CFG_FCTAPE		0x200	/* enable FC-Tape */
 #define	ISP_CFG_OWNFSZ		0x400	/* override NVRAM frame size */
 #define	ISP_CFG_OWNLOOPID	0x800	/* override NVRAM loopid */
-#define	ISP_CFG_OWNEXCTHROTTLE	0x1000	/* override NVRAM execution throttle */
 #define	ISP_CFG_4GB		0x2000	/* force 4Gb connection (24XX only) */
 #define	ISP_CFG_8GB		0x4000	/* force 8Gb connection (25XX only) */
 #define	ISP_CFG_16GB		0x8000	/* force 16Gb connection (26XX only) */
@@ -893,7 +893,6 @@ void isp_async(ispsoftc_t *, ispasync_t, ...);
  *	XS_SENSE_VALID(xs)		indicates whether sense is valid
  *
  *	DEFAULT_FRAMESIZE(ispsoftc_t *)		Default Frame Size
- *	DEFAULT_EXEC_THROTTLE(ispsoftc_t *)	Default Execution Throttle
  *
  *	DEFAULT_ROLE(ispsoftc_t *, int)		Get Default Role for a channel
  *	DEFAULT_LOOPID(ispsoftc_t *, int)	Default FC Loop ID
