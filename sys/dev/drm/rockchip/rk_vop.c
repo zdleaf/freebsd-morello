@@ -84,6 +84,8 @@ __FBSDID("$FreeBSD$");
 #define	VOP_READ(sc, reg)	bus_read_4((sc)->res[0], (reg))
 #define	VOP_WRITE(sc, reg, val)	bus_write_4((sc)->res[0], (reg), (val))
 
+#define	dprintf(fmt, ...)
+
 static const u32 rk_vop_plane_formats[] = {
 	DRM_FORMAT_XRGB8888,
 	DRM_FORMAT_ARGB8888,
@@ -309,7 +311,7 @@ rk_vop_intr(void *arg)
 	sc = arg;
 
 	status = VOP_READ(sc, RK3399_INTR_STATUS0);
-	//printf("%s: status0 %x\n", __func__, status);
+	dprintf("%s: status0 %x\n", __func__, status);
 	status = 0xffffffff;
 	VOP_WRITE(sc, RK3399_INTR_CLEAR0, status);
 
@@ -379,7 +381,7 @@ rk_vop_commit(device_t dev)
 
 	sc = device_get_softc(dev);
 
-	printf("%s\n", __func__);
+	dprintf("%s\n", __func__);
 
 #if 0
 	AW_DE2_MIXER_WRITE_4(sc, 0x08, 1);
@@ -398,7 +400,7 @@ rk_vop_plane_atomic_check(struct drm_plane *plane,
 	struct drm_crtc *crtc;
 	struct drm_crtc_state *crtc_state;
 
-	printf("%s\n", __func__);
+	dprintf("%s\n", __func__);
 
 	crtc = state->crtc;
 	if (crtc == NULL)
@@ -457,14 +459,14 @@ rk_vop_plane_atomic_update(struct drm_plane *plane,
 	sc = vop_plane->sc;
 	id = vop_plane->id;
 
-	printf("%s: id %d\n", __func__, vop_plane->id);
+	dprintf("%s: id %d\n", __func__, vop_plane->id);
 
 	src_w = drm_rect_width(&state->src) >> 16;
 	src_h = drm_rect_height(&state->src) >> 16;
 	dst_w = drm_rect_width(&state->dst);
 	dst_h = drm_rect_height(&state->dst);
 
-	printf("%s: src w %d h %d, dst w %d h %d\n",
+	dprintf("%s: src w %d h %d, dst w %d h %d\n",
 	    __func__, src_w, src_h, dst_w, dst_h);
 
 	if (!plane->state->visible)
@@ -511,7 +513,7 @@ rk_vop_plane_atomic_update(struct drm_plane *plane,
 	int lb_mode;
 
 	rgb_mode = vop_convert_format(rk_vop_plane_formats[i]);
-	printf("fmt %d\n", rgb_mode);
+	dprintf("fmt %d\n", rgb_mode);
 
 	if (dst_w <= 1280)
 		lb_mode = LB_RGB_1280X8;
@@ -546,12 +548,9 @@ rk_vop_plane_atomic_update(struct drm_plane *plane,
 	}
 
 	if (state->fb->format->has_alpha && id > 0) {
-		printf("has alpha\n");
-		printf("has alpha\n");
-		printf("has alpha\n");
 		VOP_WRITE(sc, RK3399_WIN2_DST_ALPHA_CTRL, (3 << 6));
 		reg = (1 << 0); //SRC_ALPHA_EN
-		reg |= (0 << 3); //SRC_BLEND_M0
+		reg |= (1 << 3); //SRC_BLEND_M0
 		reg |= (1 << 5); //SRC_ALPHA_CAL_M0
 		reg |= (1 << 6); //SRC_FACTOR_M0
 		VOP_WRITE(sc, RK3399_WIN2_SRC_ALPHA_CTRL, reg);
@@ -573,7 +572,7 @@ rk_vop_plane_atomic_update(struct drm_plane *plane,
 
 	VOP_WRITE(sc, RK3399_REG_CFG_DONE, 1);
 
-	printf("buf paddr %x\n", paddr);
+	dprintf("buf paddr %x\n", paddr);
 }
 
 static struct drm_plane_helper_funcs rk_vop_plane_helper_funcs = {
@@ -599,7 +598,7 @@ rk_vop_enable_vblank(struct drm_crtc *crtc)
 {
 	struct rk_vop_softc *sc;
 
-	printf("%s\n", __func__);
+	dprintf("%s\n", __func__);
 
 	sc = container_of(crtc, struct rk_vop_softc, crtc);
 
@@ -613,9 +612,9 @@ rk_vop_enable_vblank(struct drm_crtc *crtc)
 	reg |= 0xffff0000;
 	VOP_WRITE(sc, RK3399_INTR_EN0, reg);
 
-	printf("%s: en0 %x\n", __func__, VOP_READ(sc, RK3399_INTR_EN0));
-	printf("%s: status0 %x\n", __func__, VOP_READ(sc, RK3399_INTR_STATUS0));
-	printf("%s: rstatus0 %x\n", __func__, VOP_READ(sc, RK3399_INTR_RAW_STATUS0));
+	dprintf("%s: en0 %x\n", __func__, VOP_READ(sc, RK3399_INTR_EN0));
+	dprintf("%s: status0 %x\n", __func__, VOP_READ(sc, RK3399_INTR_STATUS0));
+	dprintf("%s: rstatus0 %x\n", __func__, VOP_READ(sc, RK3399_INTR_RAW_STATUS0));
 
 	return (0);
 }
@@ -630,7 +629,7 @@ rk_vop_disable_vblank(struct drm_crtc *crtc)
 
 	DRM_DEBUG_DRIVER("%s: Disabling VBLANK\n", __func__);
 
-	printf("%s\n", __func__);
+	dprintf("%s\n", __func__);
 
 	reg = 0xffff0000;
 	VOP_WRITE(sc, RK3399_INTR_EN0, reg);
@@ -641,7 +640,7 @@ rk_vop_get_vblank_counter(struct drm_crtc *crtc)
 {
 	struct rk_vop_softc *sc;
 
-	//printf("%s\n", __func__);
+	dprintf("%s\n", __func__);
 
 	sc = container_of(crtc, struct rk_vop_softc, crtc);
 
@@ -665,7 +664,7 @@ static int
 rk_crtc_atomic_check(struct drm_crtc *crtc, struct drm_crtc_state *state)
 {
 
-	printf("%s\n", __func__);
+	dprintf("%s\n", __func__);
 
 	/* Not sure we need to something here, should replace with an helper */
 	return (0);
@@ -677,7 +676,7 @@ rk_crtc_atomic_begin(struct drm_crtc *crtc, struct drm_crtc_state *old_state)
 	struct rk_vop_softc *sc;
 	unsigned long flags;
 
-	printf("%s\n", __func__);
+	dprintf("%s\n", __func__);
 
 	sc = container_of(crtc, struct rk_vop_softc, crtc);
 
@@ -702,7 +701,7 @@ rk_crtc_atomic_flush(struct drm_crtc *crtc,
 	struct rk_vop_softc *sc;
 	struct drm_pending_vblank_event *event;
 
-	printf("%s\n", __func__);
+	dprintf("%s\n", __func__);
 
 	event = crtc->state->event;
 
@@ -738,7 +737,7 @@ rk_crtc_atomic_enable(struct drm_crtc *crtc, struct drm_crtc_state *old_state)
 
 	sc = container_of(crtc, struct rk_vop_softc, crtc);
 
-	printf("%s\n", __func__);
+	dprintf("%s\n", __func__);
 
 	int pol;
 
@@ -760,7 +759,7 @@ rk_crtc_atomic_enable(struct drm_crtc *crtc, struct drm_crtc_state *old_state)
 	reg |= SYS_CTRL_HDMI_OUT_EN;
 	VOP_WRITE(sc, RK3399_SYS_CTRL, reg);
 
-	printf("SYS_CTRL %x\n", VOP_READ(sc, RK3399_SYS_CTRL));
+	dprintf("SYS_CTRL %x\n", VOP_READ(sc, RK3399_SYS_CTRL));
 
 	/* Set mode */
 	mode1 = 0; /* RGB888 */
@@ -807,7 +806,7 @@ rk_crtc_atomic_disable(struct drm_crtc *crtc, struct drm_crtc_state *old_state)
 	struct rk_vop_softc *sc;
 	uint32_t irqflags;
 
-	printf("%s\n", __func__);
+	dprintf("%s\n", __func__);
 
 	sc = container_of(crtc, struct rk_vop_softc, crtc);
 
@@ -839,7 +838,7 @@ static void
 rk_crtc_mode_set_nofb(struct drm_crtc *crtc)
 {
 
-	printf("%s\n", __func__);
+	dprintf("%s\n", __func__);
 }
 
 static const struct drm_crtc_helper_funcs rk_vop_crtc_helper_funcs = {
@@ -858,7 +857,7 @@ rk_vop_create_pipeline(device_t dev, struct drm_device *drm)
 
 	sc = device_get_softc(dev);
 
-	printf("%s\n", __func__);
+	dprintf("%s\n", __func__);
 
 #if 0
 	/* Create the different planes available */
@@ -912,7 +911,7 @@ rk_vop_create_pipeline(device_t dev, struct drm_device *drm)
 
 	drm_crtc_helper_add(&sc->crtc, &rk_vop_crtc_helper_funcs);
 
-	printf("%s: add encoder\n", __func__);
+	dprintf("%s: add encoder\n", __func__);
 
 	phandle_t node;
 	intptr_t xref;
