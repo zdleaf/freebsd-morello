@@ -62,13 +62,8 @@ __FBSDID("$FreeBSD$");
 
 #include "fb_if.h"
 #include "panfrost_drm.h"
-
-struct panfrost_softc {
-	device_t		dev;
-
-	struct drm_device	drm_dev;
-	struct drm_fb_cma	*fb;
-};
+#include "panfrost_drv.h"
+#include "panfrost_device.h"
 
 static struct ofw_compat_data compat_data[] = {
 	{ "arm,mali-t860",	1 },
@@ -95,6 +90,8 @@ static int
 panfrost_open(struct drm_device *dev, struct drm_file *file)
 {
 
+	printf("%s\n", __func__);
+
 	return (0);
 }
 
@@ -102,11 +99,14 @@ static void
 panfrost_postclose(struct drm_device *dev, struct drm_file *file)
 {
 
+	printf("%s\n", __func__);
 }
 
 static struct drm_gem_object *
 panfrost_gem_create_object(struct drm_device *dev, size_t size)
 {
+
+	printf("%s\n", __func__);
 
 	return (NULL);
 }
@@ -115,6 +115,8 @@ static struct drm_gem_object *
 panfrost_gem_prime_import_sg_table(struct drm_device *dev,
     struct dma_buf_attachment *attach, struct sg_table *sgt)
 {
+
+	printf("%s\n", __func__);
 
 	return (NULL);
 }
@@ -372,6 +374,8 @@ panfrost_irq_hook(void *arg)
 		return;
 	}
 
+	panfrost_device_init(sc);
+
 #if 0
 	panfrost_fb_preinit(&sc->drm_dev);
 
@@ -418,11 +422,32 @@ static int
 panfrost_attach(device_t dev)
 {
 	struct panfrost_softc *sc;
+	phandle_t node;
+	int err;
 
 	sc = device_get_softc(dev);
 	sc->dev = dev;
 
-	config_intrhook_oneshot(&panfrost_irq_hook, sc);
+	printf("%s\n", __func__);
+
+	node = ofw_bus_get_node(sc->dev);
+
+	drm_mode_config_init(&sc->drm_dev);
+
+	err = drm_dev_init(&sc->drm_dev, &panfrost_drm_driver,
+	    sc->dev);
+	if (err != 0) {
+		device_printf(sc->dev, "drm_dev_init(): %d\n", err);
+		return (ENXIO);
+	}
+
+	panfrost_device_init(sc);
+
+	err = drm_dev_register(&sc->drm_dev, 0);
+	if (err < 0) {
+		device_printf(sc->dev, "drm_dev_register(): %d\n", err);
+		return (ENXIO);
+	}
 
 	return (0);
 }
