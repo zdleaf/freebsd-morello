@@ -79,7 +79,7 @@ static int panfrost_attach(device_t dev);
 static int panfrost_detach(device_t dev);
 
 /* DRM driver fops */
-static const struct file_operations panfrost_drv_fops = {
+static const struct file_operations panfrost_drm_driver_fops = {
 	.owner = THIS_MODULE,
 	.open = drm_open,
 	.release = drm_release,
@@ -91,21 +91,54 @@ static const struct file_operations panfrost_drv_fops = {
 	/* .llseek = noop_llseek, */
 };
 
-static struct drm_driver panfrost_driver = {
-	.driver_features = DRIVER_GEM | DRIVER_MODESET | \
-	    DRIVER_ATOMIC | DRIVER_PRIME,
+static int
+panfrost_open(struct drm_device *dev, struct drm_file *file)
+{
 
-	/* Generic Operations */
-	.lastclose = drm_fb_helper_lastclose,
-	.fops = &panfrost_drv_fops,
+	return (0);
+}
 
-	/* GEM Opeations */
-	.dumb_create = drm_gem_cma_dumb_create,
-	.gem_free_object = drm_gem_cma_free_object,
-	.gem_vm_ops = &drm_gem_cma_vm_ops,
+static void
+panfrost_postclose(struct drm_device *dev, struct drm_file *file)
+{
+
+}
+
+static struct drm_gem_object *
+panfrost_gem_create_object(struct drm_device *dev, size_t size)
+{
+
+	return (NULL);
+}
+
+static struct drm_gem_object *
+panfrost_gem_prime_import_sg_table(struct drm_device *dev,
+    struct dma_buf_attachment *attach, struct sg_table *sgt)
+{
+
+	return (NULL);
+}
+
+static const struct drm_ioctl_desc panfrost_drm_driver_ioctls[] = {
+};
+
+static struct drm_driver panfrost_drm_driver = {
+	.driver_features = DRIVER_RENDER | DRIVER_GEM | DRIVER_SYNCOBJ,
+
+	.open			= panfrost_open,
+	.postclose		= panfrost_postclose,
+	.ioctls			= panfrost_drm_driver_ioctls,
+	.num_ioctls		= ARRAY_SIZE(panfrost_drm_driver_ioctls),
+	.fops			= &panfrost_drm_driver_fops,
+
+	.gem_create_object	= panfrost_gem_create_object,
+	.prime_handle_to_fd	= drm_gem_prime_handle_to_fd,
+	.prime_fd_to_handle	= drm_gem_prime_fd_to_handle,
+	.gem_prime_import_sg_table = panfrost_gem_prime_import_sg_table,
+	.gem_prime_mmap		= drm_gem_prime_mmap,
 
 	.name			= "panfrost",
-	.desc			= "Panfrost",
+	.desc			= "panfrost DRM",
 	.date			= "20201124",
 	.major			= 1,
 	.minor			= 0,
@@ -250,7 +283,7 @@ panfrost_irq_hook(void *arg)
 
 	drm_mode_config_init(&sc->drm_dev);
 
-	rv = drm_dev_init(&sc->drm_dev, &panfrost_driver,
+	rv = drm_dev_init(&sc->drm_dev, &panfrost_drm_driver,
 	    sc->dev);
 	if (rv != 0) {
 		device_printf(sc->dev, "drm_dev_init(): %d\n", rv);
@@ -336,7 +369,7 @@ static device_method_t panfrost_methods[] = {
 	DEVMETHOD_END
 };
 
-static driver_t rk_driver = {
+static driver_t panfrost_driver = {
 	"panfrost",
 	panfrost_methods,
 	sizeof(struct panfrost_softc),
@@ -344,9 +377,10 @@ static driver_t rk_driver = {
 
 static devclass_t panfrost_devclass;
 
-DRIVER_MODULE(panfrost, simplebus, rk_driver, panfrost_devclass, 0, 0);
-MODULE_DEPEND(panfrost, rk_vop, 1, 1, 1);
+DRIVER_MODULE(panfrost, simplebus, panfrost_driver, panfrost_devclass, 0, 0);
+#if 0
 /* Bindings for fbd device. */
 extern devclass_t fbd_devclass;
 extern driver_t fbd_driver;
 DRIVER_MODULE(fbd, panfrost, fbd_driver, fbd_devclass, 0, 0);
+#endif
