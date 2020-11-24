@@ -612,9 +612,12 @@ rk_vop_enable_vblank(struct drm_crtc *crtc)
 	reg |= 0xffff0000;
 	VOP_WRITE(sc, RK3399_INTR_EN0, reg);
 
-	dprintf("%s: en0 %x\n", __func__, VOP_READ(sc, RK3399_INTR_EN0));
-	dprintf("%s: status0 %x\n", __func__, VOP_READ(sc, RK3399_INTR_STATUS0));
-	dprintf("%s: rstatus0 %x\n", __func__, VOP_READ(sc, RK3399_INTR_RAW_STATUS0));
+	dprintf("%s: en0 %x\n", __func__,
+	    VOP_READ(sc, RK3399_INTR_EN0));
+	dprintf("%s: status0 %x\n", __func__,
+	    VOP_READ(sc, RK3399_INTR_STATUS0));
+	dprintf("%s: rstatus0 %x\n", __func__,
+	    VOP_READ(sc, RK3399_INTR_RAW_STATUS0));
 
 	return (0);
 }
