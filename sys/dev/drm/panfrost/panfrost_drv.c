@@ -127,9 +127,67 @@ panfrost_ioctl_submit(struct drm_device *dev, void *data,
 	return (0);
 }
 
+static int
+panfrost_ioctl_wait_bo(struct drm_device *dev, void *data,
+    struct drm_file *file_priv)
+{
+
+	return (0);
+}
+
+static int
+panfrost_ioctl_create_bo(struct drm_device *dev, void *data,
+    struct drm_file *file)
+{
+
+	return (0);
+}
+
+static int
+panfrost_ioctl_mmap_bo(struct drm_device *dev, void *data,
+    struct drm_file *file_priv)
+{
+
+	return (0);
+}
+
+static int
+panfrost_ioctl_get_param(struct drm_device *ddev, void *data,
+    struct drm_file *file)
+{
+
+	return (0);
+}
+
+static int
+panfrost_ioctl_get_bo_offset(struct drm_device *dev, void *data,
+    struct drm_file *file_priv)
+{
+
+	return (0);
+}
+
+static int
+panfrost_ioctl_madvise(struct drm_device *dev, void *data,
+    struct drm_file *file_priv)
+{
+
+	return (0);
+}
+
 static const struct drm_ioctl_desc panfrost_drm_driver_ioctls[] = {
-	DRM_IOCTL_DEF_DRV(PANFROST_SUBMIT, panfrost_ioctl_submit,
-	    DRM_RENDER_ALLOW)
+#define	PANFROST_IOCTL(name, func, flags) \
+	DRM_IOCTL_DEF_DRV(PANFROST_##name, panfrost_ioctl_##func, flags)
+
+	PANFROST_IOCTL(SUBMIT,		submit,		DRM_RENDER_ALLOW),
+	PANFROST_IOCTL(WAIT_BO,		wait_bo,	DRM_RENDER_ALLOW),
+	PANFROST_IOCTL(CREATE_BO,	create_bo,	DRM_RENDER_ALLOW),
+	PANFROST_IOCTL(MMAP_BO,		mmap_bo,	DRM_RENDER_ALLOW),
+	PANFROST_IOCTL(GET_PARAM,	get_param,	DRM_RENDER_ALLOW),
+	PANFROST_IOCTL(GET_BO_OFFSET,	get_bo_offset,	DRM_RENDER_ALLOW),
+	//PANFROST_IOCTL(PERFCNT_ENABLE,perfcnt_enable,	DRM_RENDER_ALLOW),
+	//PANFROST_IOCTL(PERFCNT_DUMP,	perfcnt_dump,	DRM_RENDER_ALLOW),
+	PANFROST_IOCTL(MADVISE,		madvise,	DRM_RENDER_ALLOW),
 };
 
 static struct drm_driver panfrost_drm_driver = {
