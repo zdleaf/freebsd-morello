@@ -71,24 +71,23 @@ struct panfrost_softc {
 
 static struct ofw_compat_data compat_data[] = {
 	{ "arm,mali-t860",	1 },
-	{ NULL,				0 }
+	{ NULL,			0 }
 };
 
 static int panfrost_probe(device_t dev);
 static int panfrost_attach(device_t dev);
 static int panfrost_detach(device_t dev);
 
-/* DRM driver fops */
 static const struct file_operations panfrost_drm_driver_fops = {
-	.owner = THIS_MODULE,
-	.open = drm_open,
-	.release = drm_release,
-	.unlocked_ioctl = drm_ioctl,
-	.compat_ioctl = drm_compat_ioctl,
-	.poll = drm_poll,
-	.read = drm_read,
-	.mmap = drm_gem_cma_mmap,
-	/* .llseek = noop_llseek, */
+	.owner		= THIS_MODULE,
+	.open		= drm_open,
+	.release	= drm_release,
+	.unlocked_ioctl	= drm_ioctl,
+	.compat_ioctl	= drm_compat_ioctl,
+	.poll		= drm_poll,
+	.read		= drm_read,
+	/*.llseek	= noop_llseek,*/
+	.mmap		= drm_gem_mmap,
 };
 
 static int
