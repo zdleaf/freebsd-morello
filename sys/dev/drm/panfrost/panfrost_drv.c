@@ -61,6 +61,7 @@ __FBSDID("$FreeBSD$");
 #include <drm/drm_vblank.h>
 
 #include "fb_if.h"
+#include "panfrost_drm.h"
 
 struct panfrost_softc {
 	device_t		dev;
@@ -118,7 +119,17 @@ panfrost_gem_prime_import_sg_table(struct drm_device *dev,
 	return (NULL);
 }
 
+static int
+panfrost_ioctl_submit(struct drm_device *dev, void *data,
+    struct drm_file *file)
+{
+
+	return (0);
+}
+
 static const struct drm_ioctl_desc panfrost_drm_driver_ioctls[] = {
+	DRM_IOCTL_DEF_DRV(PANFROST_SUBMIT, panfrost_ioctl_submit,
+	    DRM_RENDER_ALLOW)
 };
 
 static struct drm_driver panfrost_drm_driver = {
