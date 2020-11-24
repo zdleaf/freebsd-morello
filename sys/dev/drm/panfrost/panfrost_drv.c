@@ -124,6 +124,8 @@ panfrost_ioctl_submit(struct drm_device *dev, void *data,
     struct drm_file *file)
 {
 
+	printf("%s\n", __func__);
+
 	return (0);
 }
 
@@ -131,6 +133,8 @@ static int
 panfrost_ioctl_wait_bo(struct drm_device *dev, void *data,
     struct drm_file *file_priv)
 {
+
+	printf("%s\n", __func__);
 
 	return (0);
 }
@@ -140,6 +144,8 @@ panfrost_ioctl_create_bo(struct drm_device *dev, void *data,
     struct drm_file *file)
 {
 
+	printf("%s\n", __func__);
+
 	return (0);
 }
 
@@ -147,6 +153,8 @@ static int
 panfrost_ioctl_mmap_bo(struct drm_device *dev, void *data,
     struct drm_file *file_priv)
 {
+
+	printf("%s\n", __func__);
 
 	return (0);
 }
@@ -156,6 +164,8 @@ panfrost_ioctl_get_param(struct drm_device *ddev, void *data,
     struct drm_file *file)
 {
 
+	printf("%s\n", __func__);
+
 	return (0);
 }
 
@@ -164,6 +174,8 @@ panfrost_ioctl_get_bo_offset(struct drm_device *dev, void *data,
     struct drm_file *file_priv)
 {
 
+	printf("%s\n", __func__);
+
 	return (0);
 }
 
@@ -171,6 +183,8 @@ static int
 panfrost_ioctl_madvise(struct drm_device *dev, void *data,
     struct drm_file *file_priv)
 {
+
+	printf("%s\n", __func__);
 
 	return (0);
 }
