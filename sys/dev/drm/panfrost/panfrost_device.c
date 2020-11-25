@@ -62,8 +62,39 @@ __FBSDID("$FreeBSD$");
 int
 panfrost_device_init(struct panfrost_softc *sc)
 {
+	uint32_t reg;
+	int num_js;
+	int i;
 
-	printf("GPU_ID %x\n", GPU_READ(sc, GPU_ID));
+	reg = GPU_READ(sc, GPU_ID);
+
+	sc->features.revision = reg & 0xffff;
+	sc->features.id = reg >> 16;
+	sc->features.l2_features = GPU_READ(sc, GPU_L2_FEATURES);
+	sc->features.core_features = GPU_READ(sc, GPU_CORE_FEATURES);
+	sc->features.tiler_features = GPU_READ(sc, GPU_TILER_FEATURES);
+	sc->features.mem_features = GPU_READ(sc, GPU_MEM_FEATURES);
+	sc->features.mmu_features = GPU_READ(sc, GPU_MMU_FEATURES);
+	sc->features.thread_features = GPU_READ(sc, GPU_THREAD_FEATURES);
+	sc->features.thread_max_threads = GPU_READ(sc, GPU_THREAD_MAX_THREADS);
+	sc->features.thread_max_workgroup_size =
+	    GPU_READ(sc, GPU_THREAD_MAX_WORKGROUP_SIZE);
+	sc->features.thread_max_barrier_size =
+	    GPU_READ(sc, GPU_THREAD_MAX_BARRIER_SIZE);
+	sc->features.coherency_features = GPU_READ(sc, GPU_COHERENCY_FEATURES);
+	sc->features.as_present = GPU_READ(sc, GPU_AS_PRESENT);
+	sc->features.js_present = GPU_READ(sc, GPU_JS_PRESENT);
+
+	for (i = 0; i < 4; i++)
+		sc->features.texture_features[i] =
+		    GPU_READ(sc, GPU_TEXTURE_FEATURES(i));
+
+	num_js = hweight32(sc->features.js_present);
+	for (i = 0; i < num_js; i++)
+		sc->features.js_features[i] = GPU_READ(sc, GPU_JS_FEATURES(i));
+
+	printf("GPU revision %x, id %x\n", sc->features.revision,
+	    sc->features.id);
 
 	return (0);
 }

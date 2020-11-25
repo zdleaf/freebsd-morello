@@ -33,12 +33,37 @@
 #ifndef	_DEV_DRM_PANFROST_PANFROST_DRV_H_
 #define	_DEV_DRM_PANFROST_PANFROST_DRV_H_
 
+struct panfrost_features {
+	uint16_t		revision;
+	uint16_t		id;
+	uint32_t		l2_features;
+	uint32_t		core_features;
+	uint32_t		tiler_features;
+	uint32_t		mem_features;
+	uint32_t		mmu_features;
+	uint32_t		thread_features;
+	uint32_t		thread_max_threads;
+	uint32_t		thread_max_workgroup_size;
+	uint32_t		thread_max_barrier_size;
+	uint32_t		coherency_features;
+	uint32_t		texture_features[4];
+	uint32_t		js_features[16];
+
+	uint32_t		as_present;
+	uint32_t		js_present;
+	uint64_t		shader_present;
+	uint64_t		tiler_present;
+	uint64_t		l2_present;
+	uint64_t		stack_present;
+};
+
 struct panfrost_softc {
 	device_t		dev;
 	struct drm_device	drm_dev;
 	struct drm_fb_cma	*fb;
 	struct resource		*res[4];
 	void			*intrhand[4];
+	struct panfrost_features features;
 };
 
 #define	GPU_READ(sc, reg)	bus_read_4((sc)->res[0], (reg))

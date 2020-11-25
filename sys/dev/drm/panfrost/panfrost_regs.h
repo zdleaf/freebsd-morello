@@ -22,20 +22,18 @@
  * Begin Register Offsets
  */
 
-#define GPU_CONTROL_BASE        0x0000
-#define GPU_CONTROL_REG(r)      (GPU_CONTROL_BASE + (r))
-#define GPU_ID                  0x000	/* (RO) GPU and revision identifier */
-#define L2_FEATURES             0x004	/* (RO) Level 2 cache features */
-#define L3_FEATURES             0x008	/* (RO) Level 3 cache features */
-#define TILER_FEATURES          0x00C	/* (RO) Tiler Features */
-#define MEM_FEATURES            0x010	/* (RO) Memory system features */
-#define MMU_FEATURES            0x014	/* (RO) MMU features */
-#define AS_PRESENT              0x018	/* (RO) Address space slots present */
-#define JS_PRESENT              0x01C	/* (RO) Job slots present */
-#define GPU_IRQ_RAWSTAT         0x020	/* (RW) */
-#define GPU_IRQ_CLEAR           0x024	/* (WO) */
-#define GPU_IRQ_MASK            0x028	/* (RW) */
-#define GPU_IRQ_STATUS          0x02C	/* (RO) */
+#define	GPU_ID			0x000	/* (RO) GPU and revision identifier */
+#define	GPU_L2_FEATURES		0x004	/* (RO) Level 2 cache features */
+#define	GPU_CORE_FEATURES	0x008	/* (RO) Core features */
+#define	GPU_TILER_FEATURES	0x00C	/* (RO) Tiler Features */
+#define	GPU_MEM_FEATURES	0x010	/* (RO) Memory system features */
+#define	GPU_MMU_FEATURES	0x014	/* (RO) MMU features */
+#define	GPU_AS_PRESENT		0x018	/* (RO) Address space slots present */
+#define	GPU_JS_PRESENT		0x01C	/* (RO) Job slots present */
+#define	GPU_IRQ_RAWSTAT		0x020	/* (RW) */
+#define	GPU_IRQ_CLEAR		0x024	/* (WO) */
+#define	GPU_IRQ_MASK		0x028	/* (RW) */
+#define	GPU_IRQ_STATUS		0x02C	/* (RO) */
 
 /* IRQ flags */
 #define GPU_FAULT               (1 << 0)	/* A GPU Fault has occurred */
@@ -80,16 +78,15 @@
 #define TIMESTAMP_LO            0x098	/* (RO) Global time stamp counter, low word */
 #define TIMESTAMP_HI            0x09C	/* (RO) Global time stamp counter, high word */
 
-#define THREAD_MAX_THREADS		0x0A0	/* (RO) Maximum number of threads per core */
-#define THREAD_MAX_WORKGROUP_SIZE 0x0A4	/* (RO) Maximum workgroup size */
-#define THREAD_MAX_BARRIER_SIZE 0x0A8	/* (RO) Maximum threads waiting at a barrier */
-#define THREAD_FEATURES         0x0AC	/* (RO) Thread features */
+#define	GPU_THREAD_MAX_THREADS	0x0A0	/* (RO) Maximum number of threads per core */
+#define	GPU_THREAD_MAX_WORKGROUP_SIZE	0x0A4	/* (RO) Maximum workgroup size */
+#define	GPU_THREAD_MAX_BARRIER_SIZE	0x0A8	/* (RO) Maximum threads waiting at a barrier */
+#define	GPU_THREAD_FEATURES	0x0AC	/* (RO) Thread features */
 
 #define TEXTURE_FEATURES_0      0x0B0	/* (RO) Support flags for indexed texture formats 0..31 */
 #define TEXTURE_FEATURES_1      0x0B4	/* (RO) Support flags for indexed texture formats 32..63 */
 #define TEXTURE_FEATURES_2      0x0B8	/* (RO) Support flags for indexed texture formats 64..95 */
-
-#define TEXTURE_FEATURES_REG(n) GPU_CONTROL_REG(TEXTURE_FEATURES_0 + ((n) << 2))
+#define	GPU_TEXTURE_FEATURES(n)	(TEXTURE_FEATURES_0 + 0x4 * (n)) /* (RO) Support flags for indexed texture formats */
 
 #define JS0_FEATURES            0x0C0	/* (RO) Features of job slot 0 */
 #define JS1_FEATURES            0x0C4	/* (RO) Features of job slot 1 */
@@ -108,7 +105,7 @@
 #define JS14_FEATURES           0x0F8	/* (RO) Features of job slot 14 */
 #define JS15_FEATURES           0x0FC	/* (RO) Features of job slot 15 */
 
-#define JS_FEATURES_REG(n)      GPU_CONTROL_REG(JS0_FEATURES + ((n) << 2))
+#define	GPU_JS_FEATURES(n)	(JS0_FEATURES + (n) * 4)
 
 #define SHADER_PRESENT_LO       0x100	/* (RO) Shader core present bitmap, low word */
 #define SHADER_PRESENT_HI       0x104	/* (RO) Shader core present bitmap, high word */
@@ -181,6 +178,8 @@
 
 #define L3_PWRACTIVE_LO         0x270	/* (RO) Level 3 cache active bitmap, low word */
 #define L3_PWRACTIVE_HI         0x274	/* (RO) Level 3 cache active bitmap, high word */
+
+#define	GPU_COHERENCY_FEATURES	0x300	/* (RO) Coherency features */
 
 #define SHADER_CONFIG           0xF04	/* (RW) Shader core configuration settings (Mali-T60x additional register) */
 #define L2_MMU_CONFIG           0xF0C	/* (RW) Configuration of the L2 cache and MMU (Mali-T60x additional register) */
