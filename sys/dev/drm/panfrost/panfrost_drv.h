@@ -55,6 +55,9 @@ struct panfrost_features {
 	uint64_t		tiler_present;
 	uint64_t		l2_present;
 	uint64_t		stack_present;
+
+	uint32_t		nr_core_groups;
+	uint32_t		thread_tls_alloc;
 };
 
 struct panfrost_softc {

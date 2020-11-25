@@ -67,7 +67,6 @@ panfrost_device_init(struct panfrost_softc *sc)
 	int i;
 
 	reg = GPU_READ(sc, GPU_ID);
-
 	sc->features.revision = reg & 0xffff;
 	sc->features.id = reg >> 16;
 	sc->features.l2_features = GPU_READ(sc, GPU_L2_FEATURES);
@@ -95,6 +94,25 @@ panfrost_device_init(struct panfrost_softc *sc)
 
 	printf("GPU revision %x, id %x\n", sc->features.revision,
 	    sc->features.id);
+
+	sc->features.nr_core_groups = hweight64(sc->features.l2_present);
+	sc->features.thread_tls_alloc = GPU_READ(sc, GPU_THREAD_TLS_ALLOC);
+
+	sc->features.shader_present = GPU_READ(sc, GPU_SHADER_PRESENT_LO);
+	sc->features.shader_present |=
+	    (uint64_t)GPU_READ(sc, GPU_SHADER_PRESENT_HI) << 32;
+
+	sc->features.tiler_present = GPU_READ(sc, GPU_TILER_PRESENT_LO);
+	sc->features.tiler_present |=
+	    (uint64_t)GPU_READ(sc, GPU_TILER_PRESENT_HI) << 32;
+
+	sc->features.l2_present = GPU_READ(sc, GPU_L2_PRESENT_LO);
+	sc->features.l2_present |=
+	    (uint64_t)GPU_READ(sc, GPU_L2_PRESENT_HI) << 32;
+
+	sc->features.stack_present = GPU_READ(sc, GPU_STACK_PRESENT_LO);
+	sc->features.stack_present |=
+	    (uint64_t)GPU_READ(sc, GPU_STACK_PRESENT_HI) << 32;
 
 	return (0);
 }

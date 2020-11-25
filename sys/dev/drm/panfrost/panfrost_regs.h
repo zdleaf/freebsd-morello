@@ -107,14 +107,14 @@
 
 #define	GPU_JS_FEATURES(n)	(JS0_FEATURES + (n) * 4)
 
-#define SHADER_PRESENT_LO       0x100	/* (RO) Shader core present bitmap, low word */
-#define SHADER_PRESENT_HI       0x104	/* (RO) Shader core present bitmap, high word */
+#define	GPU_SHADER_PRESENT_LO	0x100	/* (RO) Shader core present bitmap, low word */
+#define	GPU_SHADER_PRESENT_HI	0x104	/* (RO) Shader core present bitmap, high word */
 
-#define TILER_PRESENT_LO        0x110	/* (RO) Tiler core present bitmap, low word */
-#define TILER_PRESENT_HI        0x114	/* (RO) Tiler core present bitmap, high word */
+#define	GPU_TILER_PRESENT_LO	0x110	/* (RO) Tiler core present bitmap, low word */
+#define	GPU_TILER_PRESENT_HI	0x114	/* (RO) Tiler core present bitmap, high word */
 
-#define L2_PRESENT_LO           0x120	/* (RO) Level 2 cache present bitmap, low word */
-#define L2_PRESENT_HI           0x124	/* (RO) Level 2 cache present bitmap, high word */
+#define	GPU_L2_PRESENT_LO	0x120	/* (RO) Level 2 cache present bitmap, low word */
+#define	GPU_L2_PRESENT_HI	0x124	/* (RO) Level 2 cache present bitmap, high word */
 
 #define L3_PRESENT_LO           0x130	/* (RO) Level 3 cache present bitmap, low word */
 #define L3_PRESENT_HI           0x134	/* (RO) Level 3 cache present bitmap, high word */
@@ -180,6 +180,10 @@
 #define L3_PWRACTIVE_HI         0x274	/* (RO) Level 3 cache active bitmap, high word */
 
 #define	GPU_COHERENCY_FEATURES	0x300	/* (RO) Coherency features */
+#define	GPU_THREAD_TLS_ALLOC	0x310	/* (RO) Number of threads per core that TLS must be allocated for */
+
+#define	GPU_STACK_PRESENT_LO	0xE00	/* (RO) Core stack present bitmap, low word */
+#define	GPU_STACK_PRESENT_HI	0xE04	/* (RO) Core stack present bitmap, low word */
 
 #define SHADER_CONFIG           0xF04	/* (RW) Shader core configuration settings (Mali-T60x additional register) */
 #define L2_MMU_CONFIG           0xF0C	/* (RW) Configuration of the L2 cache and MMU (Mali-T60x additional register) */
