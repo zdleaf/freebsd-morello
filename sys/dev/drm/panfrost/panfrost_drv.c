@@ -65,6 +65,14 @@ __FBSDID("$FreeBSD$");
 #include "panfrost_drv.h"
 #include "panfrost_device.h"
 
+static struct resource_spec mali_spec[] = {
+	{ SYS_RES_MEMORY,	0,	RF_ACTIVE },
+	{ SYS_RES_IRQ,		0,	RF_ACTIVE | RF_SHAREABLE },
+	{ SYS_RES_IRQ,		1,	RF_ACTIVE | RF_SHAREABLE },
+	{ SYS_RES_IRQ,		2,	RF_ACTIVE | RF_SHAREABLE },
+	{ -1, 0 }
+};
+
 static struct ofw_compat_data compat_data[] = {
 	{ "arm,mali-t860",	1 },
 	{ NULL,			0 }
@@ -405,6 +413,27 @@ fail:
 
 }
 
+static void
+panfrost_job_intr(void *arg)
+{
+
+	printf("%s\n", __func__);
+}
+
+static void
+panfrost_mmu_intr(void *arg)
+{
+
+	printf("%s\n", __func__);
+}
+
+static void
+panfrost_gpu_intr(void *arg)
+{
+
+	printf("%s\n", __func__);
+}
+
 static int
 panfrost_probe(device_t dev)
 {
@@ -431,6 +460,32 @@ panfrost_attach(device_t dev)
 	printf("%s\n", __func__);
 
 	node = ofw_bus_get_node(sc->dev);
+
+	if (bus_alloc_resources(dev, mali_spec, sc->res) != 0) {
+		device_printf(dev, "cannot allocate resources for device\n");
+		return (ENXIO);
+	}
+
+	if (bus_setup_intr(dev, sc->res[1],
+	    INTR_TYPE_MISC | INTR_MPSAFE, NULL, panfrost_job_intr, sc,
+	    &sc->intrhand[0])) {
+		device_printf(dev, "cannot setup interrupt handler\n");
+		return (ENXIO);
+	}
+
+	if (bus_setup_intr(dev, sc->res[2],
+	    INTR_TYPE_MISC | INTR_MPSAFE, NULL, panfrost_mmu_intr, sc,
+	    &sc->intrhand[1])) {
+		device_printf(dev, "cannot setup interrupt handler\n");
+		return (ENXIO);
+	}
+
+	if (bus_setup_intr(dev, sc->res[3],
+	    INTR_TYPE_MISC | INTR_MPSAFE, NULL, panfrost_gpu_intr, sc,
+	    &sc->intrhand[2])) {
+		device_printf(dev, "cannot setup interrupt handler\n");
+		return (ENXIO);
+	}
 
 	drm_mode_config_init(&sc->drm_dev);
 
