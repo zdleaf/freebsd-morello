@@ -135,5 +135,9 @@ panfrost_device_init(struct panfrost_softc *sc)
 	    sc->features.as_present,
 	    sc->features.js_present);
 
+	/* (TODO) use T860 for now */
+	sc->features.hw_features = hw_features_t860;
+	sc->features.hw_issues = hw_issues_all | hw_issues_t860;
+
 	return (0);
 }
