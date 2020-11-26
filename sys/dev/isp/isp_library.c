@@ -782,8 +782,8 @@ isp_put_icb_2400(ispsoftc_t *isp, isp_icb_2400_t *src, isp_icb_2400_t *dst)
 	ISP_IOXPUT_16(isp, src->icb_qos, &dst->icb_qos);
 	for (i = 0; i < 3; i++)
 		ISP_IOXPUT_16(isp, src->icb_reserved2[i], &dst->icb_reserved2[i]);
-	for (i = 0; i < 3; i++)
-		ISP_IOXPUT_16(isp, src->icb_enodemac[i], &dst->icb_enodemac[i]);
+	for (i = 0; i < 6; i++)
+		ISP_IOXPUT_8(isp, src->icb_enodemac[i], &dst->icb_enodemac[i]);
 	ISP_IOXPUT_16(isp, src->icb_disctime, &dst->icb_disctime);
 	for (i = 0; i < 4; i++)
 		ISP_IOXPUT_16(isp, src->icb_reserved3[i], &dst->icb_reserved3[i]);
@@ -1653,82 +1653,6 @@ isp_del_wwn_entry(ispsoftc_t *isp, int chan, uint64_t wwpn, uint16_t nphdl, uint
 
 	/* Notify above levels about gone port. */
 	isp_async(isp, ISPASYNC_DEV_GONE, chan, lp);
-}
-
-void
-isp_del_all_wwn_entries(ispsoftc_t *isp, int chan)
-{
-	fcparam *fcp;
-	int i;
-
-	/*
-	 * Handle iterations over all channels via recursion
-	 */
-	if (chan == ISP_NOCHAN) {
-		for (chan = 0; chan < isp->isp_nchan; chan++) {
-			isp_del_all_wwn_entries(isp, chan);
-		}
-		return;
-	}
-
-	if (chan > isp->isp_nchan) {
-		return;
-	}
-
-	fcp = FCPARAM(isp, chan);
-	if (fcp == NULL) {
-		return;
-	}
-	for (i = 0; i < MAX_FC_TARG; i++) {
-		fcportdb_t *lp = &fcp->portdb[i];
-
-		if (lp->state != FC_PORTDB_STATE_NIL)
-			isp_del_wwn_entry(isp, chan, lp->port_wwn, lp->handle, lp->portid);
-	}
-}
-
-void
-isp_del_wwn_entries(ispsoftc_t *isp, isp_notify_t *mp)
-{
-	fcportdb_t *lp;
-
-	/*
-	 * Handle iterations over all channels via recursion
-	 */
-	if (mp->nt_channel == ISP_NOCHAN) {
-		for (mp->nt_channel = 0; mp->nt_channel < isp->isp_nchan; mp->nt_channel++) {
-			isp_del_wwn_entries(isp, mp);
-		}
-		mp->nt_channel = ISP_NOCHAN;
-		return;
-	}
-
-	/*
-	 * We have an entry which is only partially identified.
-	 *
-	 * It's only known by WWN, N-Port handle, or Port ID.
-	 * We need to find the actual entry so we can delete it.
-	 */
-	if (mp->nt_nphdl != NIL_HANDLE) {
-		if (isp_find_pdb_by_handle(isp, mp->nt_channel, mp->nt_nphdl, &lp)) {
-			isp_del_wwn_entry(isp, mp->nt_channel, lp->port_wwn, lp->handle, lp->portid);
-			return;
-		}
-	}
-	if (VALID_INI(mp->nt_wwn)) {
-		if (isp_find_pdb_by_wwpn(isp, mp->nt_channel, mp->nt_wwn, &lp)) {
-			isp_del_wwn_entry(isp, mp->nt_channel, lp->port_wwn, lp->handle, lp->portid);
-			return;
-		}
-	}
-	if (VALID_PORT(mp->nt_sid)) {
-		if (isp_find_pdb_by_portid(isp, mp->nt_channel, mp->nt_sid, &lp)) {
-			isp_del_wwn_entry(isp, mp->nt_channel, lp->port_wwn, lp->handle, lp->portid);
-			return;
-		}
-	}
-	isp_prt(isp, ISP_LOGWARN, "Chan %d unable to find entry to delete WWPN 0x%016jx PortID 0x%06x handle 0x%x",
-	    mp->nt_channel, mp->nt_wwn, mp->nt_sid, mp->nt_nphdl);
 }
 
 void
