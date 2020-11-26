@@ -58,6 +58,9 @@ struct panfrost_features {
 
 	uint32_t		nr_core_groups;
 	uint32_t		thread_tls_alloc;
+
+	uint64_t		hw_features;
+	uint64_t		hw_issues;
 };
 
 struct panfrost_softc {

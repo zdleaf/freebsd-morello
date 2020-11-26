@@ -58,6 +58,8 @@ __FBSDID("$FreeBSD$");
 #include "panfrost_drv.h"
 #include "panfrost_device.h"
 #include "panfrost_regs.h"
+#include "panfrost_features.h"
+#include "panfrost_issues.h"
 
 int
 panfrost_device_init(struct panfrost_softc *sc)
