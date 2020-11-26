@@ -114,5 +114,24 @@ panfrost_device_init(struct panfrost_softc *sc)
 	sc->features.stack_present |=
 	    (uint64_t)GPU_READ(sc, GPU_STACK_PRESENT_HI) << 32;
 
+	uint32_t major, minor, status;
+
+	major = (sc->features.revision >> 12) & 0xf;
+	minor = (sc->features.revision >> 4) & 0xff;
+	status = sc->features.revision & 0xf;
+
+	device_printf(sc->dev, "Mali %x, major %x, minor %x, status %x\n",
+	    sc->features.id, major, minor, status);
+
+	device_printf(sc->dev, "Features: L2 %x, Shader %x, Tiler %x, Mem %x,"
+	    " MMU %x, AS %x, JS %x\n",
+	    sc->features.l2_features,
+	    sc->features.core_features,
+	    sc->features.tiler_features,
+	    sc->features.mem_features,
+	    sc->features.mmu_features,
+	    sc->features.as_present,
+	    sc->features.js_present);
+
 	return (0);
 }
