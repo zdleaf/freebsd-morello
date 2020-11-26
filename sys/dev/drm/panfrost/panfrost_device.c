@@ -61,8 +61,8 @@ __FBSDID("$FreeBSD$");
 #include "panfrost_features.h"
 #include "panfrost_issues.h"
 
-int
-panfrost_device_init(struct panfrost_softc *sc)
+void
+panfrost_device_init_features(struct panfrost_softc *sc)
 {
 	uint32_t reg;
 	int num_js;
@@ -138,6 +138,75 @@ panfrost_device_init(struct panfrost_softc *sc)
 	/* (TODO) use T860 for now */
 	sc->features.hw_features = hw_features_t860;
 	sc->features.hw_issues = hw_issues_all | hw_issues_t860;
+}
+
+void
+panfrost_device_init_quirks(struct panfrost_softc *sc)
+{
+	uint32_t quirks;
+
+	quirks = 0;
+
+	if (panfrost_has_hw_issue(sc, HW_ISSUE_8443) ||
+	    panfrost_has_hw_issue(sc, HW_ISSUE_11035))
+		quirks |= SC_LS_PAUSEBUFFER_DISABLE;
+
+	if (panfrost_has_hw_issue(sc, HW_ISSUE_10327))
+		quirks |= SC_SDC_DISABLE_OQ_DISCARD;
+
+	if (panfrost_has_hw_issue(sc, HW_ISSUE_10797))
+		quirks |= SC_ENABLE_TEXGRD_FLAGS;
+
+	if (!panfrost_has_hw_issue(sc, GPUCORE_1619)) {
+		if (sc->features.id < 0x750)
+			quirks |= SC_LS_ATTR_CHECK_DISABLE;
+		else if (sc->features.id < 0x880)
+			quirks |= SC_LS_ALLOW_ATTR_TYPES;
+	}
+
+	if (panfrost_has_hw_feature(sc, HW_FEATURE_TLS_HASHING))
+		quirks |= SC_TLS_HASH_ENABLE;
+
+	if (quirks)
+		GPU_WRITE(sc, GPU_SHADER_CONFIG, quirks);
+
+	quirks = GPU_READ(sc, GPU_TILER_CONFIG);
+	if (panfrost_has_hw_issue(sc, HW_ISSUE_T76X_3953))
+		quirks |= TC_CLOCK_GATE_OVERRIDE;
+	GPU_WRITE(sc, GPU_TILER_CONFIG, quirks);
+
+	quirks = GPU_READ(sc, GPU_L2_MMU_CONFIG);
+	if (panfrost_has_hw_feature(sc, HW_FEATURE_3BIT_EXT_RW_L2_MMU_CONFIG))
+		quirks &= ~(L2_MMU_CONFIG_3BIT_LIMIT_EXTERNAL_READS |
+		    L2_MMU_CONFIG_3BIT_LIMIT_EXTERNAL_WRITES);
+	else
+		quirks &= ~(L2_MMU_CONFIG_LIMIT_EXTERNAL_READS |
+		    L2_MMU_CONFIG_LIMIT_EXTERNAL_WRITES);
+	GPU_WRITE(sc, GPU_L2_MMU_CONFIG, quirks);
+
+	quirks = 0;
+	if ((sc->features.id == 0x860 || sc->features.id == 0x880) &&
+	    sc->features.revision >= 0x2000)
+		quirks |= JM_MAX_JOB_THROTTLE_LIMIT <<
+		    JM_JOB_THROTTLE_LIMIT_SHIFT;
+
+	else if (sc->features.id == 0x6000 &&
+	    sc->features.coherency_features == COHERENCY_ACE)
+		quirks |= (COHERENCY_ACE_LITE | COHERENCY_ACE) <<
+		    JM_FORCE_COHERENCY_FEATURES_SHIFT;
+
+	if (quirks)
+		GPU_WRITE(sc, GPU_JM_CONFIG, quirks);
+
+	/* Put here any platform specific quirks if needed. */
+}
+
+int
+panfrost_device_init(struct panfrost_softc *sc)
+{
+
+	panfrost_device_init_features(sc);
+	panfrost_device_init_quirks(sc);
 
 	return (0);
 }
