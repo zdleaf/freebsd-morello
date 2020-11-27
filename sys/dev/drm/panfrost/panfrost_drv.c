@@ -64,6 +64,7 @@ __FBSDID("$FreeBSD$");
 #include "panfrost_drm.h"
 #include "panfrost_drv.h"
 #include "panfrost_device.h"
+#include "panfrost_regs.h"
 
 static struct resource_spec mali_spec[] = {
 	{ SYS_RES_MEMORY,	0,	RF_ACTIVE },
@@ -430,8 +431,21 @@ panfrost_mmu_intr(void *arg)
 static void
 panfrost_gpu_intr(void *arg)
 {
+	struct panfrost_softc *sc;
+	uint32_t pending;
 
-	printf("%s\n", __func__);
+	sc = arg;
+
+	pending = GPU_READ(sc, GPU_INT_STAT);
+
+	printf("%s: pending %x\n", __func__, pending);
+
+	if (pending & GPU_IRQ_POWER_CHANGED ||
+	    pending & GPU_IRQ_POWER_CHANGED_ALL) {
+		/* Ignore power events. */
+	}
+
+	GPU_WRITE(sc, GPU_INT_CLEAR, pending);
 }
 
 static int

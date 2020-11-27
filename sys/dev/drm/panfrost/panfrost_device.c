@@ -61,6 +61,78 @@ __FBSDID("$FreeBSD$");
 #include "panfrost_features.h"
 #include "panfrost_issues.h"
 
+int
+panfrost_device_reset(struct panfrost_softc *sc)
+{
+	uint32_t reg;
+	int timeout;
+
+	GPU_WRITE(sc, GPU_INT_MASK, 0);
+	GPU_WRITE(sc, GPU_INT_CLEAR, GPU_IRQ_RESET_COMPLETED);
+	GPU_WRITE(sc, GPU_CMD, GPU_CMD_SOFT_RESET);
+
+	timeout = 100;
+
+	do {
+		reg = GPU_READ(sc, GPU_INT_RAWSTAT);
+		if (reg & GPU_IRQ_RESET_COMPLETED)
+			break;
+	} while (timeout--);
+
+	if (timeout <= 0)
+		return (-1);
+
+	return (0);
+}
+
+int
+panfrost_device_power_on(struct panfrost_softc *sc)
+{
+	uint32_t reg;
+	int timeout;
+
+	GPU_WRITE(sc, L2_PWRON_LO, sc->features.l2_present);
+
+	timeout = 100;
+
+	do {
+		reg = GPU_READ(sc, L2_READY_LO);
+		if (reg == sc->features.l2_present)
+			break;
+	} while (timeout--);
+
+	if (timeout <= 0)
+		return (-1);
+
+	GPU_WRITE(sc, SHADER_PWRON_LO, sc->features.shader_present);
+
+	timeout = 100;
+
+	do {
+		reg = GPU_READ(sc, SHADER_READY_LO);
+		if (reg == sc->features.shader_present)
+			break;
+	} while (timeout--);
+
+	if (timeout <= 0)
+		return (-2);
+
+	GPU_WRITE(sc, TILER_PWRON_LO, sc->features.tiler_present);
+
+	timeout = 100;
+
+	do {
+		reg = GPU_READ(sc, TILER_READY_LO);
+		if (reg == sc->features.tiler_present)
+			break;
+	} while (timeout--);
+
+	if (timeout <= 0)
+		return (-3);
+
+	return (0);
+}
+
 void
 panfrost_device_init_features(struct panfrost_softc *sc)
 {
@@ -204,9 +276,23 @@ panfrost_device_init_quirks(struct panfrost_softc *sc)
 int
 panfrost_device_init(struct panfrost_softc *sc)
 {
+	int error;
+
+	error = panfrost_device_reset(sc);
+	if (error != 0)
+		return (error);
+
+	GPU_WRITE(sc, GPU_INT_MASK, GPU_IRQ_MASK_ALL);
+	GPU_WRITE(sc, GPU_INT_CLEAR, GPU_IRQ_MASK_ALL);
 
 	panfrost_device_init_features(sc);
 	panfrost_device_init_quirks(sc);
+
+	error = panfrost_device_power_on(sc);
+	if (error != 0)
+		return (error);
+
+	device_printf(sc->dev, "GPU is powered on\n");
 
 	return (0);
 }
