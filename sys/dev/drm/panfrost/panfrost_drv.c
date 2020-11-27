@@ -100,8 +100,12 @@ static const struct file_operations panfrost_drm_driver_fops = {
 static int
 panfrost_open(struct drm_device *dev, struct drm_file *file)
 {
+	struct drm_mm mm;
 
 	printf("%s\n", __func__);
+
+	drm_mm_init(&mm, 32*1024*1024 >> PAGE_SHIFT,
+	    (4*1024*1024*1024ULL - 32*1024*1024) >> PAGE_SHIFT);
 
 	return (0);
 }
@@ -176,8 +180,21 @@ static int
 panfrost_ioctl_get_param(struct drm_device *ddev, void *data,
     struct drm_file *file)
 {
+	struct drm_panfrost_get_param *param;
+	struct panfrost_softc *sc;
 
-	printf("%s\n", __func__);
+	sc = ddev->dev_private;
+	param = data;
+
+	if (param->pad != 0)
+		return (EINVAL);
+
+	printf("%s: param %d\n", __func__, param->param);
+
+	switch (param->param) {
+	case DRM_PANFROST_PARAM_GPU_PROD_ID:
+		param->value = sc->features.id;
+	}
 
 	return (0);
 }
@@ -527,6 +544,8 @@ panfrost_attach(device_t dev)
 		device_printf(sc->dev, "drm_dev_init(): %d\n", err);
 		return (ENXIO);
 	}
+
+	sc->drm_dev.dev_private = sc;
 
 	panfrost_device_init(sc);
 
