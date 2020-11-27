@@ -47,6 +47,8 @@ __FBSDID("$FreeBSD$");
 #include <dev/ofw/ofw_bus.h>
 #include <dev/ofw/ofw_bus_subr.h>
 
+#include <dev/extres/clk/clk.h>
+
 #include <drm/drm_atomic_helper.h>
 #include <drm/drm_gem_cma_helper.h>
 #include <drm/drm_gem_framebuffer_helper.h>
@@ -500,6 +502,22 @@ panfrost_attach(device_t dev)
 		device_printf(dev, "cannot setup interrupt handler\n");
 		return (ENXIO);
 	}
+
+	if (clk_get_by_ofw_index(sc->dev, 0, 0, &sc->clk) != 0) {
+		device_printf(dev, "cannot get clock\n");
+		return (ENXIO);
+	}
+
+	err = clk_enable(sc->clk);
+	if (err != 0) {
+		device_printf(sc->dev, "could not enable clock: %d\n", err);
+		return (ENXIO);
+	}
+
+	uint64_t rate;
+	clk_get_freq(sc->clk, &rate);
+
+	device_printf(dev, "Mali GPU clock rate %jd Hz\n", rate);
 
 	drm_mode_config_init(&sc->drm_dev);
 

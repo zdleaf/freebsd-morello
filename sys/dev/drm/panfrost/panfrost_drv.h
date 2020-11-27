@@ -70,6 +70,7 @@ struct panfrost_softc {
 	struct resource		*res[4];
 	void			*intrhand[4];
 	struct panfrost_features features;
+	clk_t			clk;
 };
 
 #define	GPU_READ(sc, reg)	bus_read_4((sc)->res[0], (reg))
