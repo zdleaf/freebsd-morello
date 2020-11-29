@@ -106,7 +106,7 @@ static struct drm_driver rk_drm_driver = {
 	.gem_free_object = drm_gem_cma_free_object,
 	.gem_vm_ops = &drm_gem_cma_vm_ops,
 
-	.name			= "rk-drm",
+	.name			= "rockchip",
 	.desc			= "Rockchip Display Subsystem",
 	.date			= "20201113",
 	.major			= 1,
