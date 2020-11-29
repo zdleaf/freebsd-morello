@@ -380,6 +380,7 @@ panfrost_fb_destroy(struct drm_device *drm_dev)
 	sc->fb = NULL;
 }
 
+#if 0
 static void
 panfrost_irq_hook(void *arg)
 {
@@ -404,7 +405,6 @@ panfrost_irq_hook(void *arg)
 
 	panfrost_device_init(sc);
 
-#if 0
 	panfrost_fb_preinit(&sc->drm_dev);
 
 	drm_vblank_init(&sc->drm_dev, sc->drm_dev.mode_config.num_crtc);
@@ -429,9 +429,8 @@ panfrost_irq_hook(void *arg)
 	return;
 fail:
 	device_printf(sc->dev, "drm_dev_register(): %d\n", rv);
-#endif
-
 }
+#endif
 
 static void
 panfrost_job_intr(void *arg)
@@ -467,6 +466,36 @@ panfrost_gpu_intr(void *arg)
 	GPU_WRITE(sc, GPU_INT_CLEAR, pending);
 }
 
+static void
+panfrost_irq_hook(void *arg)
+{
+	struct panfrost_softc *sc;
+	int err;
+
+	sc = arg;
+
+	printf("%s\n", __func__);
+
+	drm_mode_config_init(&sc->drm_dev);
+
+	err = drm_dev_init(&sc->drm_dev, &panfrost_drm_driver,
+	    sc->dev);
+	if (err != 0) {
+		device_printf(sc->dev, "drm_dev_init(): %d\n", err);
+		return;
+	}
+
+	sc->drm_dev.dev_private = sc;
+
+	panfrost_device_init(sc);
+
+	err = drm_dev_register(&sc->drm_dev, 0);
+	if (err < 0) {
+		device_printf(sc->dev, "drm_dev_register(): %d\n", err);
+		return;
+	}
+}
+
 static int
 panfrost_probe(device_t dev)
 {
@@ -489,8 +518,6 @@ panfrost_attach(device_t dev)
 
 	sc = device_get_softc(dev);
 	sc->dev = dev;
-
-	printf("%s\n", __func__);
 
 	node = ofw_bus_get_node(sc->dev);
 
@@ -536,24 +563,7 @@ panfrost_attach(device_t dev)
 
 	device_printf(dev, "Mali GPU clock rate %jd Hz\n", rate);
 
-	drm_mode_config_init(&sc->drm_dev);
-
-	err = drm_dev_init(&sc->drm_dev, &panfrost_drm_driver,
-	    sc->dev);
-	if (err != 0) {
-		device_printf(sc->dev, "drm_dev_init(): %d\n", err);
-		return (ENXIO);
-	}
-
-	sc->drm_dev.dev_private = sc;
-
-	panfrost_device_init(sc);
-
-	err = drm_dev_register(&sc->drm_dev, 0);
-	if (err < 0) {
-		device_printf(sc->dev, "drm_dev_register(): %d\n", err);
-		return (ENXIO);
-	}
+	config_intrhook_oneshot(&panfrost_irq_hook, sc);
 
 	return (0);
 }
@@ -590,7 +600,8 @@ static driver_t panfrost_driver = {
 
 static devclass_t panfrost_devclass;
 
-DRIVER_MODULE(panfrost, simplebus, panfrost_driver, panfrost_devclass, 0, 0);
+EARLY_DRIVER_MODULE(panfrost, simplebus, panfrost_driver, panfrost_devclass, 0, 0, BUS_PASS_INTERRUPT + BUS_PASS_ORDER_LAST);
+
 #if 0
 /* Bindings for fbd device. */
 extern devclass_t fbd_devclass;

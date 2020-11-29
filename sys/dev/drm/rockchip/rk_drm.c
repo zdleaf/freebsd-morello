@@ -366,7 +366,8 @@ static driver_t rk_driver = {
 
 static devclass_t rk_drm_devclass;
 
-DRIVER_MODULE(rk_drm, simplebus, rk_driver, rk_drm_devclass, 0, 0);
+EARLY_DRIVER_MODULE(rk_drm, simplebus, rk_driver, rk_drm_devclass, 0, 0, BUS_PASS_INTERRUPT + BUS_PASS_ORDER_FIRST);
+
 MODULE_DEPEND(rk_drm, rk_vop, 1, 1, 1);
 /* Bindings for fbd device. */
 extern devclass_t fbd_devclass;
