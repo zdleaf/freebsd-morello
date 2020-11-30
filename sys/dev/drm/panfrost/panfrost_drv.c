@@ -194,6 +194,76 @@ panfrost_ioctl_get_param(struct drm_device *ddev, void *data,
 	switch (param->param) {
 	case DRM_PANFROST_PARAM_GPU_PROD_ID:
 		param->value = sc->features.id;
+		break;
+	case DRM_PANFROST_PARAM_GPU_REVISION:
+		param->value = sc->features.revision;
+		break;
+	case DRM_PANFROST_PARAM_SHADER_PRESENT:
+		param->value = sc->features.shader_present;
+		break;
+	case DRM_PANFROST_PARAM_TILER_PRESENT:
+		param->value = sc->features.tiler_present;
+		break;
+	case DRM_PANFROST_PARAM_L2_PRESENT:
+		param->value = sc->features.l2_present;
+		break;
+	case DRM_PANFROST_PARAM_STACK_PRESENT:
+		param->value = sc->features.stack_present;
+		break;
+	case DRM_PANFROST_PARAM_AS_PRESENT:
+		param->value = sc->features.as_present;
+		break;
+	case DRM_PANFROST_PARAM_JS_PRESENT:
+		param->value = sc->features.js_present;
+		break;
+	case DRM_PANFROST_PARAM_L2_FEATURES:
+		param->value = sc->features.l2_features;
+		break;
+	case DRM_PANFROST_PARAM_CORE_FEATURES:
+		param->value = sc->features.core_features;
+		break;
+	case DRM_PANFROST_PARAM_TILER_FEATURES:
+		param->value = sc->features.tiler_features;
+		break;
+	case DRM_PANFROST_PARAM_MEM_FEATURES:
+		param->value = sc->features.mem_features;
+		break;
+	case DRM_PANFROST_PARAM_MMU_FEATURES:
+		param->value = sc->features.mmu_features;
+		break;
+	case DRM_PANFROST_PARAM_THREAD_FEATURES:
+		param->value = sc->features.thread_features;
+		break;
+	case DRM_PANFROST_PARAM_MAX_THREADS:
+		param->value = sc->features.thread_max_threads;
+		break;
+	case DRM_PANFROST_PARAM_THREAD_MAX_WORKGROUP_SZ:
+		param->value = sc->features.thread_max_workgroup_size;
+		break;
+	case DRM_PANFROST_PARAM_THREAD_MAX_BARRIER_SZ:
+		param->value = sc->features.thread_max_barrier_size;
+		break;
+	case DRM_PANFROST_PARAM_COHERENCY_FEATURES:
+		param->value = sc->features.coherency_features;
+		break;
+	case DRM_PANFROST_PARAM_NR_CORE_GROUPS:
+		param->value = sc->features.nr_core_groups;
+		break;
+	case DRM_PANFROST_PARAM_THREAD_TLS_ALLOC:
+		param->value = sc->features.thread_tls_alloc;
+		break;
+	case DRM_PANFROST_PARAM_TEXTURE_FEATURES0 ...
+	    DRM_PANFROST_PARAM_TEXTURE_FEATURES3:
+		param->value = sc->features.texture_features[param->param -
+		    DRM_PANFROST_PARAM_TEXTURE_FEATURES0];
+		break;
+	case DRM_PANFROST_PARAM_JS_FEATURES0 ...
+	    DRM_PANFROST_PARAM_JS_FEATURES15:
+		param->value = sc->features.js_features[param->param -
+		    DRM_PANFROST_PARAM_JS_FEATURES0];
+		break;
+	default:
+		return (EINVAL);
 	}
 
 	return (0);
