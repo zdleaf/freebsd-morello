@@ -107,8 +107,8 @@ __FBSDID("$FreeBSD$");
 #endif
 
 
-#ifndef _ARM_ARCH_5E
-#error FreeBSD requires ARMv5 or later
+#ifndef _ARM_ARCH_6
+#error FreeBSD requires ARMv6 or later
 #endif
 
 struct pcpu __pcpu[MAXCPU];
@@ -302,6 +302,8 @@ DELAY(int usec)
 void
 cpu_pcpu_init(struct pcpu *pcpu, int cpuid, size_t size)
 {
+
+	pcpu->pc_mpidr = 0xffffffff;
 }
 
 void
@@ -684,6 +686,7 @@ pcpu0_init(void)
 {
 	set_curthread(&thread0);
 	pcpu_init(pcpup, 0, sizeof(struct pcpu));
+	pcpup->pc_mpidr = cp15_mpidr_get() & 0xFFFFFF;
 	PCPU_SET(curthread, &thread0);
 }
 
