@@ -160,8 +160,13 @@ static int
 panfrost_ioctl_create_bo(struct drm_device *dev, void *data,
     struct drm_file *file)
 {
+	struct drm_panfrost_create_bo *args;
 
-	printf("%s\n", __func__);
+	args = data;
+
+	printf("%s: size %d flags %d handle %d pad %d offset %jd\n",
+	    __func__, args->size, args->flags, args->handle, args->pad,
+	    args->offset);
 
 	return (0);
 }
