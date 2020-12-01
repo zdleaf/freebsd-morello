@@ -35,4 +35,14 @@
 
 int panfrost_device_init(struct panfrost_softc *);
 
+struct panfrost_mmu {
+	int a;
+};
+
+struct panfrost_file {
+	struct panfrost_softc *sc;
+	struct drm_mm mm;
+	struct panfrost_mmu mmu;
+};
+
 #endif /* !_DEV_DRM_PANFROST_PANFROST_DEVICE_H_ */

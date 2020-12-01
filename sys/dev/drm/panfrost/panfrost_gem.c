@@ -64,6 +64,7 @@ __FBSDID("$FreeBSD$");
 #include "panfrost_regs.h"
 #include "panfrost_features.h"
 #include "panfrost_issues.h"
+#include "panfrost_mmu.h"
 
 static void
 panfrost_gem_free_object(struct drm_gem_object *obj)
@@ -75,8 +76,33 @@ panfrost_gem_free_object(struct drm_gem_object *obj)
 int
 panfrost_gem_open(struct drm_gem_object *obj, struct drm_file *file_priv)
 {
+	struct panfrost_gem_mapping *mapping;
+	struct panfrost_gem_object *bo;
+	struct panfrost_file *pfile;
+	int error;
+	uint32_t align;
+	int color;
+
+	bo = (struct panfrost_gem_object *)obj;
+	pfile = file_priv->driver_priv;
+
+	mapping = malloc(sizeof(*mapping), M_DEVBUF, M_ZERO | M_WAITOK);
+
+	drm_gem_object_get(obj);
+	mapping->obj = bo;
+
+	if (bo->noexec)
+		align = obj->size >= 0x200000 ? 0x200000 >> PAGE_SHIFT : 0;
+	else
+		align = obj->size >> PAGE_SHIFT;
+
+	mapping->mmu = &pfile->mmu;
 
 	printf("%s\n", __func__);
+
+	color = bo->noexec ? PANFROST_BO_NOEXEC : 0;
+	error = drm_mm_insert_node_generic(&pfile->mm, &mapping->mmnode,
+	    obj->size >> PAGE_SHIFT, align, color, 0 /* mode */);
 
 	return (0);
 }

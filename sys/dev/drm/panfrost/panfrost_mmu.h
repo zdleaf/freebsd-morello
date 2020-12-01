@@ -30,22 +30,9 @@
  * $FreeBSD$
  */
 
-#ifndef	_DEV_DRM_PANFROST_PANFROST_GEM_H_
-#define	_DEV_DRM_PANFROST_PANFROST_GEM_H_
+#ifndef	_DEV_DRM_PANFROST_PANFROST_MMU_H_
+#define	_DEV_DRM_PANFROST_PANFROST_MMU_H_
 
-struct panfrost_gem_object * panfrost_gem_create_object(struct drm_file *file,
-    struct drm_device *dev, size_t size, uint32_t flags, uint32_t *handle);
+int panfrost_mmu_pgtable_alloc(struct panfrost_file *pfile);
 
-struct panfrost_gem_object {
-	struct drm_gem_object base;	/* Must go first */
-	bool noexec;
-	bool is_heap;
-};
-
-struct panfrost_gem_mapping {
-	struct panfrost_gem_object *obj;
-	struct drm_mm_node mmnode;
-	struct panfrost_mmu *mmu;
-};
-
-#endif /* !_DEV_DRM_PANFROST_PANFROST_GEM_H_ */
+#endif /* !_DEV_DRM_PANFROST_PANFROST_MMU_H_ */

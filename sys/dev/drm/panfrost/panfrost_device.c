@@ -62,6 +62,7 @@ __FBSDID("$FreeBSD$");
 #include "panfrost_regs.h"
 #include "panfrost_features.h"
 #include "panfrost_issues.h"
+#include "panfrost_mmu.h"
 
 int
 panfrost_device_reset(struct panfrost_softc *sc)

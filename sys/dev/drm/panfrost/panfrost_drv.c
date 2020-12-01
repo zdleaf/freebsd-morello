@@ -68,6 +68,7 @@ __FBSDID("$FreeBSD$");
 #include "panfrost_device.h"
 #include "panfrost_regs.h"
 #include "panfrost_gem.h"
+#include "panfrost_mmu.h"
 
 static struct resource_spec mali_spec[] = {
 	{ SYS_RES_MEMORY,	0,	RF_ACTIVE },
@@ -98,15 +99,40 @@ static const struct file_operations panfrost_drm_driver_fops = {
 	.mmap		= drm_gem_mmap,
 };
 
+static void
+panfrost_drm_mm_color_adjust(const struct drm_mm_node *node,
+    unsigned long color, u64 *start, u64 *end)
+{
+
+	panic("implement me");
+}
+
 static int
 panfrost_open(struct drm_device *dev, struct drm_file *file)
 {
+	struct panfrost_file *pfile;
+	struct panfrost_softc *sc;
 	struct drm_mm mm;
+	int error;
 
 	printf("%s\n", __func__);
 
+	sc = dev->dev_private;
+
+	pfile = malloc(sizeof(*pfile), M_DEVBUF, M_WAITOK | M_ZERO);
+	pfile->sc = sc;
+	file->driver_priv = pfile;
+
 	drm_mm_init(&mm, 32*1024*1024 >> PAGE_SHIFT,
 	    (4*1024*1024*1024ULL - 32*1024*1024) >> PAGE_SHIFT);
+	pfile->mm.color_adjust = panfrost_drm_mm_color_adjust;
+
+	error = panfrost_mmu_pgtable_alloc(pfile);
+	if (error != 0) {
+		drm_mm_takedown(&pfile->mm);
+		free(pfile, M_DEVBUF);
+		return (error);
+	}
 
 	return (0);
 }
