@@ -67,6 +67,7 @@ __FBSDID("$FreeBSD$");
 #include "panfrost_drv.h"
 #include "panfrost_device.h"
 #include "panfrost_regs.h"
+#include "panfrost_gem.h"
 
 static struct resource_spec mali_spec[] = {
 	{ SYS_RES_MEMORY,	0,	RF_ACTIVE },
@@ -118,15 +119,6 @@ panfrost_postclose(struct drm_device *dev, struct drm_file *file)
 }
 
 static struct drm_gem_object *
-panfrost_gem_create_object(struct drm_device *dev, size_t size)
-{
-
-	printf("%s\n", __func__);
-
-	return (NULL);
-}
-
-static struct drm_gem_object *
 panfrost_gem_prime_import_sg_table(struct drm_device *dev,
     struct dma_buf_attachment *attach, struct sg_table *sgt)
 {
@@ -167,6 +159,9 @@ panfrost_ioctl_create_bo(struct drm_device *dev, void *data,
 	printf("%s: size %d flags %d handle %d pad %d offset %jd\n",
 	    __func__, args->size, args->flags, args->handle, args->pad,
 	    args->offset);
+
+	panfrost_gem_create_object(file, dev, args->size, args->flags,
+	    &args->handle);
 
 	return (0);
 }
@@ -318,7 +313,9 @@ static struct drm_driver panfrost_drm_driver = {
 	.num_ioctls		= ARRAY_SIZE(panfrost_drm_driver_ioctls),
 	.fops			= &panfrost_drm_driver_fops,
 
+#if 0
 	.gem_create_object	= panfrost_gem_create_object,
+#endif
 	.prime_handle_to_fd	= drm_gem_prime_handle_to_fd,
 	.prime_fd_to_handle	= drm_gem_prime_fd_to_handle,
 	.gem_prime_import_sg_table = panfrost_gem_prime_import_sg_table,
