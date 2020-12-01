@@ -123,6 +123,8 @@ panfrost_open(struct drm_device *dev, struct drm_file *file)
 	pfile->sc = sc;
 	file->driver_priv = pfile;
 
+	mtx_init(&pfile->mm_lock, "mm", NULL, MTX_SPIN);
+
 	drm_mm_init(&mm, 32*1024*1024 >> PAGE_SHIFT,
 	    (4*1024*1024*1024ULL - 32*1024*1024) >> PAGE_SHIFT);
 	pfile->mm.color_adjust = panfrost_drm_mm_color_adjust;

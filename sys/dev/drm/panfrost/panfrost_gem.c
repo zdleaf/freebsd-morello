@@ -79,30 +79,33 @@ panfrost_gem_open(struct drm_gem_object *obj, struct drm_file *file_priv)
 	struct panfrost_gem_mapping *mapping;
 	struct panfrost_gem_object *bo;
 	struct panfrost_file *pfile;
-	int error;
 	uint32_t align;
+	int error;
 	int color;
 
 	bo = (struct panfrost_gem_object *)obj;
 	pfile = file_priv->driver_priv;
 
 	mapping = malloc(sizeof(*mapping), M_DEVBUF, M_ZERO | M_WAITOK);
+	mapping->obj = bo;
+	mapping->mmu = &pfile->mmu;
 
 	drm_gem_object_get(obj);
-	mapping->obj = bo;
 
-	if (bo->noexec)
+	if (bo->noexec) {
 		align = obj->size >= 0x200000 ? 0x200000 >> PAGE_SHIFT : 0;
-	else
+		color = PANFROST_BO_NOEXEC;
+	} else {
 		align = obj->size >> PAGE_SHIFT;
-
-	mapping->mmu = &pfile->mmu;
+		color = 0;
+	}
 
 	printf("%s\n", __func__);
 
-	color = bo->noexec ? PANFROST_BO_NOEXEC : 0;
+	mtx_lock_spin(&pfile->mm_lock);
 	error = drm_mm_insert_node_generic(&pfile->mm, &mapping->mmnode,
 	    obj->size >> PAGE_SHIFT, align, color, 0 /* mode */);
+	mtx_unlock_spin(&pfile->mm_lock);
 
 	return (0);
 }

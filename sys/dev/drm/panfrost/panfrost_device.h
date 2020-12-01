@@ -40,9 +40,11 @@ struct panfrost_mmu {
 };
 
 struct panfrost_file {
-	struct panfrost_softc *sc;
-	struct drm_mm mm;
-	struct panfrost_mmu mmu;
+	struct		panfrost_softc *sc;
+	struct		panfrost_mmu mmu;
+
+	struct		drm_mm mm;
+	struct mtx	mm_lock;
 };
 
 #endif /* !_DEV_DRM_PANFROST_PANFROST_DEVICE_H_ */
