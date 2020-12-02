@@ -38,6 +38,7 @@ struct panfrost_gem_object * panfrost_gem_create_object(struct drm_file *file,
 
 struct panfrost_gem_object {
 	struct drm_gem_object base;	/* Must go first */
+	vm_page_t pages;
 	bool noexec;
 	bool is_heap;
 };

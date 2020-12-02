@@ -99,12 +99,26 @@ static const struct file_operations panfrost_drm_driver_fops = {
 	.mmap		= drm_gem_mmap,
 };
 
+#define	PN_16M		0x1000
+#define	PN_4GB		0x100000
+#define	PN_4GB_MASK	(PN_4GB - 1)
+
 static void
 panfrost_drm_mm_color_adjust(const struct drm_mm_node *node,
-    unsigned long color, u64 *start, u64 *end)
+    unsigned long color, uint64_t *start, uint64_t *end)
 {
+	uint64_t next_seg;
 
-	panic("implement me");
+	if ((color & PANFROST_BO_NOEXEC) == 0) {
+		if ((*start & PN_4GB_MASK) == 0)
+			(*start)++;
+		if ((*end & PN_4GB_MASK) == 0)
+			(*end)--;
+		next_seg = ALIGN(*start, PN_4GB);
+		if (next_seg - *start <= PN_16M)
+			*start = next_seg + 1;
+		*end = min(*end, ALIGN(*start, PN_4GB) - 1);
+	}
 }
 
 static int
@@ -112,7 +126,6 @@ panfrost_open(struct drm_device *dev, struct drm_file *file)
 {
 	struct panfrost_file *pfile;
 	struct panfrost_softc *sc;
-	struct drm_mm mm;
 	int error;
 
 	printf("%s\n", __func__);
@@ -125,7 +138,7 @@ panfrost_open(struct drm_device *dev, struct drm_file *file)
 
 	mtx_init(&pfile->mm_lock, "mm", NULL, MTX_SPIN);
 
-	drm_mm_init(&mm, 32*1024*1024 >> PAGE_SHIFT,
+	drm_mm_init(&pfile->mm, 32*1024*1024 >> PAGE_SHIFT,
 	    (4*1024*1024*1024ULL - 32*1024*1024) >> PAGE_SHIFT);
 	pfile->mm.color_adjust = panfrost_drm_mm_color_adjust;
 

@@ -76,6 +76,33 @@ panfrost_mmu_pgtable_alloc(struct panfrost_file *pfile)
 int
 panfrost_mmu_map(struct panfrost_gem_mapping *mapping)
 {
+	struct panfrost_gem_object *bo;
+	struct drm_gem_object *obj;
+	vm_paddr_t low, high, boundary;
+	vm_page_t m;
+	int pflags;
+	int alignment;
+	int npages;
+	vm_memattr_t memattr;
+
+	bo = mapping->obj;
+	obj = &bo->base;
+
+	alignment = PAGE_SIZE;
+	low = 0;
+	high = -1UL;
+	boundary = 0;
+	pflags = VM_ALLOC_NORMAL  | VM_ALLOC_NOOBJ | VM_ALLOC_NOBUSY |
+	    VM_ALLOC_WIRED | VM_ALLOC_ZERO;
+	memattr = VM_MEMATTR_DEFAULT;
+
+	npages = obj->size / PAGE_SIZE;
+
+	m = vm_page_alloc_contig(NULL, 0, pflags, npages, low, high, alignment,
+	    boundary, memattr);
+	if (m == NULL)
+		panic("could not allocate %d physical pages\n", npages);
+	bo->pages = m;
 
 	return (0);
 }
