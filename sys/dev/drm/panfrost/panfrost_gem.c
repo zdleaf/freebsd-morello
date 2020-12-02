@@ -106,6 +106,24 @@ panfrost_gem_open(struct drm_gem_object *obj, struct drm_file *file_priv)
 	error = drm_mm_insert_node_generic(&pfile->mm, &mapping->mmnode,
 	    obj->size >> PAGE_SHIFT, align, color, 0 /* mode */);
 	mtx_unlock_spin(&pfile->mm_lock);
+	if (error) {
+		/* put mapping */
+		return (error);
+	}
+
+	printf("%s: mapping->mmnode.start %lx\n",
+	    __func__, mapping->mmnode.start);
+
+#if 0
+	struct page **pages;
+	pages = drm_gem_get_pages(obj);
+#endif
+
+	if (!bo->is_heap) {
+		error = panfrost_mmu_map(mapping);
+		if (error)
+			return (error);
+	}
 
 	return (0);
 }
@@ -194,16 +212,15 @@ panfrost_gem_create_object(struct drm_file *file, struct drm_device *dev,
 	struct panfrost_gem_object *obj;
 	int error;
 
+printf("%s\n", __func__);
+
 	obj = malloc(sizeof(*obj), M_DEVBUF, M_ZERO | M_WAITOK);
 	obj->base.funcs = &panfrost_gem_funcs;
 
-printf("%s 0\n", __func__);
 	size = PAGE_ALIGN(size);
 
 	drm_gem_object_init(dev, &obj->base, size);
-printf("%s 1\n", __func__);
 	error = drm_gem_create_mmap_offset(&obj->base);
-printf("%s 2\n", __func__);
 	if (error != 0) {
 		printf("failed to create mmap offset");
 		return (NULL);
@@ -211,12 +228,8 @@ printf("%s 2\n", __func__);
 	obj->noexec = !!(flags & PANFROST_BO_NOEXEC);
 	obj->is_heap = !!(flags & PANFROST_BO_HEAP);
 
-printf("%s 3\n", __func__);
-
 	error = drm_gem_handle_create(file, &obj->base, handle);
-printf("%s 4\n", __func__);
 	drm_gem_object_put(&obj->base);
-printf("%s 5\n", __func__);
 	if (error) {
 		printf("failed to create handle");
 		return (NULL);

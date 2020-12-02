@@ -72,3 +72,10 @@ panfrost_mmu_pgtable_alloc(struct panfrost_file *pfile)
 
 	return (0);
 }
+
+int
+panfrost_mmu_map(struct panfrost_gem_mapping *mapping)
+{
+
+	return (0);
+}
