@@ -112,8 +112,8 @@ panfrost_gem_open(struct drm_gem_object *obj, struct drm_file *file_priv)
 		return (error);
 	}
 
-	printf("%s: mapping->mmnode.start %lx\n", __func__,
-	    mapping->mmnode.start);
+	printf("%s: mapping->mmnode.start page %lx va %lx\n", __func__,
+	    mapping->mmnode.start, mapping->mmnode.start << PAGE_SHIFT);
 
 #if 0
 	struct page **pages;
@@ -237,6 +237,14 @@ printf("%s\n", __func__);
 		printf("Failed to create handle\n");
 		return (NULL);
 	}
+
+	return (NULL);
+}
+
+struct panfrost_gem_mapping *
+panfrost_gem_mapping_get(struct panfrost_gem_object *bo,
+    struct panfrost_file *priv)
+{
 
 	return (NULL);
 }

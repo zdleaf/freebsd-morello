@@ -33,8 +33,11 @@
 #ifndef	_DEV_DRM_PANFROST_PANFROST_GEM_H_
 #define	_DEV_DRM_PANFROST_PANFROST_GEM_H_
 
-struct panfrost_gem_object * panfrost_gem_create_object(struct drm_file *file,
+struct panfrost_gem_object *panfrost_gem_create_object(struct drm_file *file,
     struct drm_device *dev, size_t size, uint32_t flags, uint32_t *handle);
+struct panfrost_gem_mapping *
+    panfrost_gem_mapping_get(struct panfrost_gem_object *bo,
+    struct panfrost_file *priv);
 
 struct panfrost_gem_object {
 	struct drm_gem_object base;	/* Must go first */
@@ -47,6 +50,7 @@ struct panfrost_gem_mapping {
 	struct panfrost_gem_object *obj;
 	struct drm_mm_node mmnode;
 	struct panfrost_mmu *mmu;
+	bool active;
 };
 
 #endif /* !_DEV_DRM_PANFROST_PANFROST_GEM_H_ */

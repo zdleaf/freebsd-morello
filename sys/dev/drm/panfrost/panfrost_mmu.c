@@ -69,6 +69,18 @@ __FBSDID("$FreeBSD$");
 int
 panfrost_mmu_pgtable_alloc(struct panfrost_file *pfile)
 {
+	struct panfrost_mmu *mmu;
+	pmap_t p;
+
+	mmu = &pfile->mmu;
+	p = &mmu->p;
+
+	printf("p is %p\n", p);
+	p->pm_l0_paddr = 1;
+	printf("p is %p\n", p);
+
+	pmap_pinit(p);
+	PMAP_LOCK_INIT(p);
 
 	return (0);
 }
@@ -77,16 +89,24 @@ int
 panfrost_mmu_map(struct panfrost_gem_mapping *mapping)
 {
 	struct panfrost_gem_object *bo;
-	struct drm_gem_object *obj;
 	vm_paddr_t low, high, boundary;
+	struct drm_gem_object *obj;
+	struct panfrost_mmu *mmu;
+	vm_memattr_t memattr;
+	vm_prot_t prot;
+	vm_offset_t va;
 	vm_page_t m;
+	vm_page_t *ma;
 	int pflags;
 	int alignment;
 	int npages;
-	vm_memattr_t memattr;
+	vm_paddr_t pa;
+	int error;
+	int i;
 
 	bo = mapping->obj;
 	obj = &bo->base;
+	mmu = mapping->mmu;
 
 	alignment = PAGE_SIZE;
 	low = 0;
@@ -98,11 +118,27 @@ panfrost_mmu_map(struct panfrost_gem_mapping *mapping)
 
 	npages = obj->size / PAGE_SIZE;
 
-	m = vm_page_alloc_contig(NULL, 0, pflags, npages, low, high, alignment,
-	    boundary, memattr);
+	m = vm_page_alloc_contig(NULL, 0, pflags, npages, low, high,
+	    alignment, boundary, memattr);
 	if (m == NULL)
 		panic("could not allocate %d physical pages\n", npages);
 	bo->pages = m;
+
+	ma = &m;
+
+	va = mapping->mmnode.start << PAGE_SHIFT;
+	prot = VM_PROT_READ | VM_PROT_WRITE;
+	if (bo->noexec == 0)
+		prot |= VM_PROT_EXECUTE;
+
+	/* map pages */
+	for (i = 0; i < npages; i++) {
+		pa = VM_PAGE_TO_PHYS(ma[i]);
+		error = pmap_senter(&mmu->p, va, pa, prot, 0);
+		va += PAGE_SIZE;
+	}
+
+	mapping->active = true;
 
 	return (0);
 }

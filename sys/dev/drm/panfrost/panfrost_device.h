@@ -36,7 +36,7 @@
 int panfrost_device_init(struct panfrost_softc *);
 
 struct panfrost_mmu {
-	int a;
+	struct pmap p;
 };
 
 struct panfrost_file {
