@@ -222,12 +222,32 @@ panfrost_ioctl_create_bo(struct drm_device *dev, void *data,
 
 static int
 panfrost_ioctl_mmap_bo(struct drm_device *dev, void *data,
-    struct drm_file *file_priv)
+    struct drm_file *file)
 {
+	struct drm_panfrost_mmap_bo *args;
+	struct panfrost_gem_object *bo;
+	struct drm_gem_object *obj;
+	int error;
 
-	printf("%s\n", __func__);
+	args = data;
 
-	return (0);
+	if (args->flags != 0)
+		panic("unknown flags");
+
+	obj = drm_gem_object_lookup(file, args->handle);
+	if (obj == NULL)
+		panic("Object not found");
+
+	bo = (struct panfrost_gem_object *)obj;
+
+	error = drm_gem_create_mmap_offset(obj);
+	if (error == 0)
+		args->offset = drm_vma_node_offset_addr(&obj->vma_node);
+
+	printf("%s: error %d args->offset %lx\n", __func__, error,
+	    args->offset);
+
+	return (error);
 }
 
 static int
