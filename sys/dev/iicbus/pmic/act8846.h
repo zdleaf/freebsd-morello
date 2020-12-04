@@ -1,7 +1,8 @@
 /*-
  * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
  *
- * Copyright 2018 Emmanuel Vadot <manu@FreeBSD.org>
+ * Copyright (c) 2019 Michal Meloun <mmel@FreeBSD.org>
+ * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -27,42 +28,40 @@
  * $FreeBSD$
  */
 
-#ifndef _RK_CLK_PLL_H_
-#define _RK_CLK_PLL_H_
+#ifndef _ACT8846_H_
+#define _ACT8846_H_
 
-#include <dev/extres/clk/clk.h>
+#include <dev/iicbus/pmic/act8846_reg.h>
 
-struct rk_clk_pll_rate {
-	uint32_t	freq;
-	uint32_t	refdiv;
-	uint32_t	fbdiv;
-	uint32_t	postdiv1;
-	uint32_t	postdiv2;
-	uint32_t	dsmpd;
-	uint32_t	frac;
-	uint32_t	bwadj;
+struct act8846_reg_sc;
+struct act8846_gpio_pin;
+
+struct act8846_softc {
+	device_t		dev;
+	struct sx		lock;
+	int			bus_addr;
+
+	/* Regulators. */
+	struct act8846_reg_sc	**regs;
+	int			nregs;
 };
 
-struct rk_clk_pll_def {
-	struct clknode_init_def	clkdef;
-	uint32_t		base_offset;
+#define	RD1(sc, reg, val)	act8846_read(sc, reg, val)
+#define	WR1(sc, reg, val)	act8846_write(sc, reg, val)
+#define	RM1(sc, reg, clr, set)	act8846_modify(sc, reg, clr, set)
 
-	uint32_t		gate_offset;
-	uint32_t		gate_shift;
+int act8846_read(struct act8846_softc *sc, uint8_t reg, uint8_t *val);
+int act8846_write(struct act8846_softc *sc, uint8_t reg, uint8_t val);
+int act8846_modify(struct act8846_softc *sc, uint8_t reg, uint8_t clear,
+    uint8_t set);
+int act8846_read_buf(struct act8846_softc *sc, uint8_t reg, uint8_t *buf,
+    size_t size);
+int act8846_write_buf(struct act8846_softc *sc, uint8_t reg, uint8_t *buf,
+    size_t size);
 
-	uint32_t		mode_reg;
-	uint32_t		mode_shift;
+/* Regulators */
+int act8846_regulator_attach(struct act8846_softc *sc, phandle_t node);
+int act8846_regulator_map(device_t dev, phandle_t xref, int ncells,
+    pcell_t *cells, int *num);
 
-	uint32_t		flags;
-
-	struct rk_clk_pll_rate	*rates;
-	struct rk_clk_pll_rate	*frac_rates;
-};
-
-#define	RK_CLK_PLL_HAVE_GATE	0x1
-
-int rk3066_clk_pll_register(struct clkdom *clkdom, struct rk_clk_pll_def *clkdef);
-int rk3328_clk_pll_register(struct clkdom *clkdom, struct rk_clk_pll_def *clkdef);
-int rk3399_clk_pll_register(struct clkdom *clkdom, struct rk_clk_pll_def *clkdef);
-
-#endif /* _RK_CLK_PLL_H_ */
+#endif /* _ACT8846_H_ */
