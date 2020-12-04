@@ -128,6 +128,9 @@ panfrost_gem_open(struct drm_gem_object *obj, struct drm_file *file_priv)
 
 	printf("%s: return 0\n", __func__);
 
+	/* TODO: Add lockings. */
+	TAILQ_INSERT_TAIL(&bo->mappings, mapping, next);
+
 	return (0);
 }
 
@@ -219,6 +222,7 @@ printf("%s\n", __func__);
 
 	obj = malloc(sizeof(*obj), M_DEVBUF, M_ZERO | M_WAITOK);
 	obj->base.funcs = &panfrost_gem_funcs;
+	TAILQ_INIT(&obj->mappings);
 
 	size = PAGE_ALIGN(size);
 
@@ -238,13 +242,23 @@ printf("%s\n", __func__);
 		return (NULL);
 	}
 
-	return (NULL);
+	return (obj);
 }
 
 struct panfrost_gem_mapping *
 panfrost_gem_mapping_get(struct panfrost_gem_object *bo,
-    struct panfrost_file *priv)
+    struct panfrost_file *file)
 {
+	struct panfrost_gem_mapping *mapping, *result;
 
-	return (NULL);
+	result = NULL;
+
+	TAILQ_FOREACH(mapping, &bo->mappings, next) {
+		if (mapping->mmu == &file->mmu) {
+			result = mapping;
+			break;
+		}
+	}
+
+	return (result);
 }

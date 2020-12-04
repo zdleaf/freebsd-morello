@@ -44,12 +44,14 @@ struct panfrost_gem_object {
 	vm_page_t pages;
 	bool noexec;
 	bool is_heap;
+	TAILQ_HEAD(, panfrost_gem_mapping)	mappings;
 };
 
 struct panfrost_gem_mapping {
 	struct panfrost_gem_object *obj;
 	struct drm_mm_node mmnode;
 	struct panfrost_mmu *mmu;
+	TAILQ_ENTRY(panfrost_gem_mapping)	next;
 	bool active;
 };
 

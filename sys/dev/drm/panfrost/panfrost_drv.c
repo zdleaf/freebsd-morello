@@ -194,6 +194,7 @@ panfrost_ioctl_create_bo(struct drm_device *dev, void *data,
     struct drm_file *file)
 {
 	struct drm_panfrost_create_bo *args;
+	struct panfrost_gem_object *bo;
 
 	args = data;
 
@@ -201,8 +202,20 @@ panfrost_ioctl_create_bo(struct drm_device *dev, void *data,
 	    __func__, args->size, args->flags, args->handle, args->pad,
 	    args->offset);
 
-	panfrost_gem_create_object(file, dev, args->size, args->flags,
+	bo = panfrost_gem_create_object(file, dev, args->size, args->flags,
 	    &args->handle);
+	if (bo == NULL) {
+		printf("%s: Failed to create object\n", __func__);
+		return (EINVAL);
+	}
+
+	struct panfrost_gem_mapping *mapping;
+
+	mapping = panfrost_gem_mapping_get(bo, file->driver_priv);
+	if (mapping == NULL)
+		panic("could not find mapping");
+
+	args->offset = mapping->mmnode.start << PAGE_SHIFT;
 
 	return (0);
 }
