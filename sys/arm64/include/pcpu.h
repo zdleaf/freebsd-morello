@@ -49,7 +49,8 @@ struct debug_monitor_state;
 	struct pmap *pc_curvmpmap;					\
 	void	*pc_vcpu;						\
 	u_int	pc_bcast_tlbi_workaround;				\
-	char __pad[205]
+	u_int	pc_mpidr;	/* stored MPIDR value */		\
+	char __pad[201]
 
 #ifdef _KERNEL
 
