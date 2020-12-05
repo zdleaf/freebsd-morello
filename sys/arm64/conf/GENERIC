@@ -370,4 +370,4 @@ device		acpi
 options 	VMM
 
 # DTBs
-makeoptions	MODULES_EXTRA="dtb/allwinner dtb/imx8 dtb/mv dtb/rockchip dtb/rpi"
+makeoptions	MODULES_EXTRA="dtb/allwinner dtb/freescale dtb/imx8 dtb/mv dtb/rockchip dtb/rpi"
