@@ -1,8 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
- *
- * Copyright (C) 2018 Turing Robotic Industries Inc.
- * Copyright (C) 2020 Andrew Turner <andrew@FreeBSD.org>
+ * Copyright 2020 Yuri Pankov <yuripv@FreeBSD.org>
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -28,40 +25,27 @@
  * $FreeBSD$
  */
 
-/*
- * arm64 Linux VDSO implementation.
- */
+#include <locale.h>
+#include <stdio.h>
 
-#include <machine/asm.h>
+#include <utf8proc.h>
 
-#include <arm64/linux/linux_syscall.h>
+int
+main(void)
+{
+	int32_t wc;
+	int i, wcw;
 
-	.data
+	setlocale(LC_CTYPE, "C.UTF-8");
 
-	.globl linux_platform
-linux_platform:
-	.asciz "arm64"
+	printf("%s\n", utf8proc_version());
 
-	.text
+	for (wc = 0; wc < 0x110000; wc++) {
+		wcw = utf8proc_charwidth(wc);
+		if (wcw == 1)
+			continue;
+		printf("%04X %d\n", wc, wcw);
+	}
 
-ENTRY(__kernel_rt_sigreturn)
-	brk #0 /* LINUXTODO: implement __kernel_rt_sigreturn */
-	ret
-END(__kernel_rt_sigreturn)
-
-ENTRY(__kernel_gettimeofday)
-	ldr	x8, =LINUX_SYS_gettimeofday
-	svc	#0
-	ret
-END(__kernel_gettimeofday)
-
-ENTRY(__kernel_clock_gettime)
-	ldr	x8, =LINUX_SYS_linux_clock_gettime
-	svc	#0
-	ret
-END(__kernel_clock_gettime)
-
-ENTRY(__kernel_clock_getres)
-	brk #0 /* LINUXTODO: implement __kernel_clock_getres */
-	ret
-END(__kernel_clock_getres)
+	return (0);
+}
