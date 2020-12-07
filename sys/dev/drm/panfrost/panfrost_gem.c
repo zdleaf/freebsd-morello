@@ -262,3 +262,39 @@ panfrost_gem_mapping_get(struct panfrost_gem_object *bo,
 
 	return (result);
 }
+
+int
+panfrost_gem_get_pages(struct panfrost_gem_object *bo)
+{
+	vm_paddr_t low, high, boundary;
+	struct drm_gem_object *obj;
+	vm_memattr_t memattr;
+	vm_page_t m;
+	int alignment;
+	int pflags;
+	int npages;
+
+	if (bo->pages != NULL)
+		return (0);
+
+	obj = &bo->base;
+	npages = obj->size / PAGE_SIZE;
+
+	alignment = PAGE_SIZE;
+	low = 0;
+	high = -1UL;
+	boundary = 0;
+	pflags = VM_ALLOC_NORMAL  | VM_ALLOC_NOOBJ | VM_ALLOC_NOBUSY |
+	    VM_ALLOC_WIRED | VM_ALLOC_ZERO;
+	memattr = VM_MEMATTR_DEFAULT;
+
+	m = vm_page_alloc_contig(NULL, 0, pflags, npages, low, high,
+	    alignment, boundary, memattr);
+	if (m == NULL)
+		panic("could not allocate %d physical pages\n", npages);
+
+	bo->pages = m;
+	bo->npages = npages;
+
+	return (0);
+}

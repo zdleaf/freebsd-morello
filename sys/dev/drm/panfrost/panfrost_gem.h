@@ -33,18 +33,13 @@
 #ifndef	_DEV_DRM_PANFROST_PANFROST_GEM_H_
 #define	_DEV_DRM_PANFROST_PANFROST_GEM_H_
 
-struct panfrost_gem_object *panfrost_gem_create_object(struct drm_file *file,
-    struct drm_device *dev, size_t size, uint32_t flags, uint32_t *handle);
-struct panfrost_gem_mapping *
-    panfrost_gem_mapping_get(struct panfrost_gem_object *bo,
-    struct panfrost_file *priv);
-
 struct panfrost_gem_object {
 	struct drm_gem_object base;	/* Must go first */
 	vm_page_t pages;
+	int npages;
+	TAILQ_HEAD(, panfrost_gem_mapping)	mappings;
 	bool noexec;
 	bool is_heap;
-	TAILQ_HEAD(, panfrost_gem_mapping)	mappings;
 };
 
 struct panfrost_gem_mapping {
@@ -54,5 +49,12 @@ struct panfrost_gem_mapping {
 	TAILQ_ENTRY(panfrost_gem_mapping)	next;
 	bool active;
 };
+
+struct panfrost_gem_object *panfrost_gem_create_object(struct drm_file *file,
+    struct drm_device *dev, size_t size, uint32_t flags, uint32_t *handle);
+struct panfrost_gem_mapping *
+    panfrost_gem_mapping_get(struct panfrost_gem_object *bo,
+    struct panfrost_file *priv);
+int panfrost_gem_get_pages(struct panfrost_gem_object *bo);
 
 #endif /* !_DEV_DRM_PANFROST_PANFROST_GEM_H_ */

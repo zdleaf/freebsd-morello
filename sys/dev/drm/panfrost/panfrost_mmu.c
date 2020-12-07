@@ -89,41 +89,23 @@ int
 panfrost_mmu_map(struct panfrost_gem_mapping *mapping)
 {
 	struct panfrost_gem_object *bo;
-	vm_paddr_t low, high, boundary;
-	struct drm_gem_object *obj;
 	struct panfrost_mmu *mmu;
-	vm_memattr_t memattr;
 	vm_prot_t prot;
 	vm_offset_t va;
-	vm_page_t m;
 	vm_page_t *ma;
-	int pflags;
-	int alignment;
-	int npages;
+	vm_page_t m;
 	vm_paddr_t pa;
 	int error;
 	int i;
 
 	bo = mapping->obj;
-	obj = &bo->base;
 	mmu = mapping->mmu;
 
-	alignment = PAGE_SIZE;
-	low = 0;
-	high = -1UL;
-	boundary = 0;
-	pflags = VM_ALLOC_NORMAL  | VM_ALLOC_NOOBJ | VM_ALLOC_NOBUSY |
-	    VM_ALLOC_WIRED | VM_ALLOC_ZERO;
-	memattr = VM_MEMATTR_DEFAULT;
+	error = panfrost_gem_get_pages(bo);
+	if (error != 0)
+		panic("could not get pages");
 
-	npages = obj->size / PAGE_SIZE;
-
-	m = vm_page_alloc_contig(NULL, 0, pflags, npages, low, high,
-	    alignment, boundary, memattr);
-	if (m == NULL)
-		panic("could not allocate %d physical pages\n", npages);
-	bo->pages = m;
-
+	m = bo->pages;
 	ma = &m;
 
 	va = mapping->mmnode.start << PAGE_SHIFT;
@@ -132,7 +114,7 @@ panfrost_mmu_map(struct panfrost_gem_mapping *mapping)
 		prot |= VM_PROT_EXECUTE;
 
 	/* map pages */
-	for (i = 0; i < npages; i++) {
+	for (i = 0; i < bo->npages; i++) {
 		pa = VM_PAGE_TO_PHYS(ma[i]);
 		error = pmap_senter(&mmu->p, va, pa, prot, 0);
 		va += PAGE_SIZE;
