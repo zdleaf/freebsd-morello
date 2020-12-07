@@ -379,7 +379,8 @@ static const struct drm_ioctl_desc panfrost_drm_driver_ioctls[] = {
 };
 
 static struct drm_driver panfrost_drm_driver = {
-	.driver_features = DRIVER_RENDER | DRIVER_GEM | DRIVER_SYNCOBJ,
+	.driver_features = DRIVER_RENDER | DRIVER_GEM | DRIVER_SYNCOBJ |
+	    DRIVER_PRIME,
 
 	.open			= panfrost_open,
 	.postclose		= panfrost_postclose,
