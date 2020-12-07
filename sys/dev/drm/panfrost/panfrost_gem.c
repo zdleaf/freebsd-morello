@@ -189,11 +189,114 @@ drm_gem_shmem_vunmap(struct drm_gem_object *obj, void *vaddr)
 	printf("%s\n", __func__);
 }
 
-int
-drm_gem_shmem_mmap(struct drm_gem_object *obj, struct vm_area_struct *vma)
+static vm_fault_t
+panfrost_gem_fault(struct vm_area_struct *vma, struct vm_fault *vmf)
+{
+	struct panfrost_gem_object *bo;
+	struct drm_gem_object *gem_obj;
+	vm_object_t obj;
+	vm_pindex_t pidx;
+	vm_page_t *ma;
+	vm_page_t m;
+	struct page *page;
+	int i;
+
+	obj = vma->vm_obj;
+	gem_obj = vma->vm_private_data;
+	bo = (struct panfrost_gem_object *)gem_obj;
+	m = bo->pages;
+	ma = &m;
+
+	pidx = OFF_TO_IDX(vmf->address - vma->vm_start);
+	if (pidx >= bo->npages) {
+		printf("%s: error: requested page is out of range (%d/%d)\n",
+		    __func__, pidx, bo->npages);
+		return (VM_FAULT_SIGBUS);
+	}
+
+printf("%s: pidx %d, ma %p\n", __func__, pidx, ma);
+
+	VM_OBJECT_WLOCK(obj);
+	for (i = 0; i < bo->npages; i++) {
+		page = &bo->pages[i];
+		printf("%s: busied page %d\n", __func__, i);
+		if (vm_page_busied(page))
+			goto fail_unlock;
+		printf("%s: insert page %d\n", __func__, i);
+		if (vm_page_insert(page, obj, i))
+			goto fail_unlock;
+		vm_page_xbusy(page);
+		page->valid = VM_PAGE_BITS_ALL;
+	}
+	VM_OBJECT_WUNLOCK(obj);
+
+	vma->vm_pfn_first = 0;
+	vma->vm_pfn_count = bo->npages;
+
+	printf("%s: pidx: %llu, start: 0x%08X, addr: 0x%08lX\n",
+	    __func__, pidx, vma->vm_start, vmf->address);
+
+	return (VM_FAULT_NOPAGE);
+
+fail_unlock:
+	VM_OBJECT_WUNLOCK(obj);
+	printf("%s: insert failed\n", __func__);
+
+	return (VM_FAULT_SIGBUS);
+}
+
+static void
+panfrost_gem_vm_open(struct vm_area_struct *vma)
 {
 
 	printf("%s\n", __func__);
+}
+
+static void
+panfrost_gem_vm_close(struct vm_area_struct *vma)
+{
+
+	printf("%s\n", __func__);
+}
+
+static const struct vm_operations_struct panfrost_gem_vm_ops = {
+	.fault = panfrost_gem_fault,
+	.open = panfrost_gem_vm_open,
+	.close = panfrost_gem_vm_close,
+};
+
+int
+drm_gem_shmem_mmap(struct drm_gem_object *obj, struct vm_area_struct *vma)
+{
+	struct panfrost_gem_object *bo;
+	int error;
+
+	printf("%s\n", __func__);
+
+	bo = (struct panfrost_gem_object *)obj;
+
+	vma->vm_pgoff -= drm_vma_node_start(&obj->vma_node);
+
+	if (obj->import_attach) {
+		drm_gem_object_put(obj);
+		vma->vm_private_data = NULL;
+		//return dma_buf_mmap(obj->dma_buf, vma, 0);
+		panic("implement me");
+	}
+
+	error = panfrost_gem_get_pages(bo);
+	if (error != 0) {
+		printf("failed to get pages\n");
+		return (-1);
+	}
+
+	vma->vm_flags |= VM_MIXEDMAP | VM_DONTEXPAND;
+	vma->vm_page_prot = vm_get_page_prot(vma->vm_flags);
+	if (!bo->map_cached)
+		vma->vm_page_prot = pgprot_writecombine(vma->vm_page_prot);
+	vma->vm_ops = &panfrost_gem_vm_ops;
+
+	printf("%s: return 0\n", __func__);
 
 	return (0);
 }
