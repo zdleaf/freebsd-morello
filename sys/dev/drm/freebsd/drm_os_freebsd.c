@@ -486,7 +486,7 @@ drm_fstub_do_mmap(struct file *file, const struct file_operations *fops,
 //	if (unlikely(down_write_killable(&vmap->vm_mm->mmap_sem))) {
 //		rv = EINTR;
 //	} else {
-		rv = -fops->mmap(file, vmap);
+//		rv = -fops->mmap(file, vmap);
 //		up_write(&vmap->vm_mm->mmap_sem);
 //	}
 	if (rv != 0) {
