@@ -80,6 +80,23 @@ static int rk_drm_probe(device_t dev);
 static int rk_drm_attach(device_t dev);
 static int rk_drm_detach(device_t dev);
 
+struct sg_table *
+rockchip_gem_prime_get_sg_table(struct drm_gem_object *obj)
+{
+
+	printf("%s\n", __func__);
+	return (NULL);
+}
+
+struct drm_gem_object *
+rockchip_gem_prime_import_sg_table(struct drm_device *drm,
+    struct dma_buf_attachment *attach, struct sg_table *sg)
+{
+
+	printf("%s\n", __func__);
+	return (NULL);
+}
+
 /* DRM driver fops */
 static const struct file_operations rk_drm_drv_fops = {
 	.owner = THIS_MODULE,
@@ -105,6 +122,11 @@ static struct drm_driver rk_drm_driver = {
 	.dumb_create = drm_gem_cma_dumb_create,
 	.gem_free_object = drm_gem_cma_free_object,
 	.gem_vm_ops = &drm_gem_cma_vm_ops,
+
+	.prime_handle_to_fd	= drm_gem_prime_handle_to_fd,
+	.prime_fd_to_handle	= drm_gem_prime_fd_to_handle,
+	.gem_prime_get_sg_table	= rockchip_gem_prime_get_sg_table,
+	.gem_prime_import_sg_table	= rockchip_gem_prime_import_sg_table,
 
 	.name			= "rockchip",
 	.desc			= "Rockchip Display Subsystem",
