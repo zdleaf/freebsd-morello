@@ -97,6 +97,28 @@ rockchip_gem_prime_import_sg_table(struct drm_device *drm,
 	return (NULL);
 }
 
+static int
+rockchip_drm_gem_object_mmap(struct drm_gem_object *obj,
+    struct vm_area_struct *vma)
+{
+
+	printf("%s: TODO\n", __func__);
+
+	return (0);
+}
+
+static int
+rockchip_gem_mmap_buf(struct drm_gem_object *obj, struct vm_area_struct *vma)
+{
+	int ret;
+
+	ret = drm_gem_mmap_obj(obj, obj->size, vma);
+	if (ret)
+		return (ret);
+
+	return rockchip_drm_gem_object_mmap(obj, vma);
+}
+
 /* DRM driver fops */
 static const struct file_operations rk_drm_drv_fops = {
 	.owner = THIS_MODULE,
@@ -127,6 +149,7 @@ static struct drm_driver rk_drm_driver = {
 	.prime_fd_to_handle	= drm_gem_prime_fd_to_handle,
 	.gem_prime_get_sg_table	= rockchip_gem_prime_get_sg_table,
 	.gem_prime_import_sg_table	= rockchip_gem_prime_import_sg_table,
+	.gem_prime_mmap		= rockchip_gem_mmap_buf,
 
 	.name			= "rockchip",
 	.desc			= "Rockchip Display Subsystem",
