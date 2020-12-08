@@ -51,11 +51,15 @@ struct panfrost_gem_mapping {
 	bool active;
 };
 
-struct panfrost_gem_object *panfrost_gem_create_object(struct drm_file *file,
+struct panfrost_gem_object *
+    panfrost_gem_create_object_with_handle(struct drm_file *file,
     struct drm_device *dev, size_t size, uint32_t flags, uint32_t *handle);
 struct panfrost_gem_mapping *
     panfrost_gem_mapping_get(struct panfrost_gem_object *bo,
     struct panfrost_file *priv);
 int panfrost_gem_get_pages(struct panfrost_gem_object *bo);
+struct drm_gem_object *
+    panfrost_gem_prime_import_sg_table(struct drm_device *dev,
+    struct dma_buf_attachment *attach, struct sg_table *sgt);
 
 #endif /* !_DEV_DRM_PANFROST_PANFROST_GEM_H_ */

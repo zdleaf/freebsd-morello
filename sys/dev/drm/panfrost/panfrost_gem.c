@@ -57,6 +57,8 @@ __FBSDID("$FreeBSD$");
 #include <drm/drm_ioctl.h>
 #include <drm/drm_vblank.h>
 
+#include <dev/drm/drmkpi/include/linux/dma-buf.h>
+
 #include "panfrost_drv.h"
 #include "panfrost_drm.h"
 #include "panfrost_device.h"
@@ -314,27 +316,44 @@ static const struct drm_gem_object_funcs panfrost_gem_funcs = {
 	.mmap = drm_gem_shmem_mmap,
 };
 
+static struct panfrost_gem_object *
+panfrost_gem_create_object0(struct drm_device *dev, size_t size, bool private)
+{
+	struct panfrost_gem_object *obj;
+	int error;
+
+	obj = malloc(sizeof(*obj), M_DEVBUF, M_ZERO | M_WAITOK);
+	obj->base.funcs = &panfrost_gem_funcs;
+	TAILQ_INIT(&obj->mappings);
+
+printf("%s\n", __func__);
+
+	if (private)
+		drm_gem_private_object_init(dev, &obj->base, size);
+	else
+		drm_gem_object_init(dev, &obj->base, size);
+
+	error = drm_gem_create_mmap_offset(&obj->base);
+	if (error != 0) {
+		printf("Failed to create mmap offset\n");
+		return (NULL);
+	}
+
+	return (obj);
+}
+
 struct panfrost_gem_object *
-panfrost_gem_create_object(struct drm_file *file, struct drm_device *dev,
-    size_t size, uint32_t flags, uint32_t *handle)
+panfrost_gem_create_object_with_handle(struct drm_file *file,
+    struct drm_device *dev, size_t size, uint32_t flags, uint32_t *handle)
 {
 	struct panfrost_gem_object *obj;
 	int error;
 
 printf("%s\n", __func__);
 
-	obj = malloc(sizeof(*obj), M_DEVBUF, M_ZERO | M_WAITOK);
-	obj->base.funcs = &panfrost_gem_funcs;
-	TAILQ_INIT(&obj->mappings);
-
 	size = PAGE_ALIGN(size);
 
-	drm_gem_object_init(dev, &obj->base, size);
-	error = drm_gem_create_mmap_offset(&obj->base);
-	if (error != 0) {
-		printf("Failed to create mmap offset\n");
-		return (NULL);
-	}
+	obj = panfrost_gem_create_object0(dev, size, false);
 	obj->noexec = !!(flags & PANFROST_BO_NOEXEC);
 	obj->is_heap = !!(flags & PANFROST_BO_HEAP);
 
@@ -400,4 +419,38 @@ panfrost_gem_get_pages(struct panfrost_gem_object *bo)
 	bo->npages = npages;
 
 	return (0);
+}
+
+#if 0
+static struct drm_gem_object *
+panfrost_gem_create_object(struct drm_device *dev, size_t size)
+{
+	struct panfrost_gem_object *obj;
+
+	obj = malloc(sizeof(*obj), M_DEVBUF, M_ZERO | M_WAITOK);
+	obj->base.funcs = &panfrost_gem_funcs;
+	TAILQ_INIT(&obj->mappings);
+
+	//mtx_init(&obj->mappings_lock);
+
+	return (&obj->base);
+}
+#endif
+
+struct drm_gem_object *
+panfrost_gem_prime_import_sg_table(struct drm_device *dev,
+    struct dma_buf_attachment *attach, struct sg_table *sgt)
+{
+	struct panfrost_gem_object *obj;
+	size_t size;
+
+	size = PAGE_ALIGN(attach->dmabuf->size);
+
+	printf("%s size %d\n", __func__, size);
+
+	obj = panfrost_gem_create_object0(dev, size, true);
+
+	/* TODO: assign sgt */
+
+	return (&obj->base);
 }

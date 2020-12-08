@@ -62,8 +62,6 @@ __FBSDID("$FreeBSD$");
 #include <drm/drm_ioctl.h>
 #include <drm/drm_vblank.h>
 
-#include <dev/drm/drmkpi/include/linux/dma-buf.h>
-
 #include "fb_if.h"
 #include "panfrost_drm.h"
 #include "panfrost_drv.h"
@@ -161,19 +159,6 @@ panfrost_postclose(struct drm_device *dev, struct drm_file *file)
 	printf("%s\n", __func__);
 }
 
-static struct drm_gem_object *
-panfrost_gem_prime_import_sg_table(struct drm_device *dev,
-    struct dma_buf_attachment *attach, struct sg_table *sgt)
-{
-	size_t size;
-
-	size = PAGE_ALIGN(attach->dmabuf->size);
-
-	printf("%s size %d\n", __func__, size);
-
-	return (NULL);
-}
-
 static int
 panfrost_ioctl_submit(struct drm_device *dev, void *data,
     struct drm_file *file)
@@ -207,8 +192,8 @@ panfrost_ioctl_create_bo(struct drm_device *dev, void *data,
 	    __func__, args->size, args->flags, args->handle, args->pad,
 	    args->offset);
 
-	bo = panfrost_gem_create_object(file, dev, args->size, args->flags,
-	    &args->handle);
+	bo = panfrost_gem_create_object_with_handle(file, dev, args->size,
+	    args->flags, &args->handle);
 	if (bo == NULL) {
 		printf("%s: Failed to create object\n", __func__);
 		return (EINVAL);
