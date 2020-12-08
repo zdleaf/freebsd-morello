@@ -661,6 +661,8 @@ static const struct drm_crtc_funcs rk_vop_funcs = {
 	.get_vblank_counter	= rk_vop_get_vblank_counter,
 	.enable_vblank		= rk_vop_enable_vblank,
 	.disable_vblank		= rk_vop_disable_vblank,
+
+	.gamma_set		= drm_atomic_helper_legacy_gamma_set,
 };
 
 static int
