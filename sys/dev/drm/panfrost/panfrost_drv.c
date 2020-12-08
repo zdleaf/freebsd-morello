@@ -62,6 +62,8 @@ __FBSDID("$FreeBSD$");
 #include <drm/drm_ioctl.h>
 #include <drm/drm_vblank.h>
 
+#include <dev/drm/drmkpi/include/linux/dma-buf.h>
+
 #include "fb_if.h"
 #include "panfrost_drm.h"
 #include "panfrost_drv.h"
@@ -163,8 +165,11 @@ static struct drm_gem_object *
 panfrost_gem_prime_import_sg_table(struct drm_device *dev,
     struct dma_buf_attachment *attach, struct sg_table *sgt)
 {
+	size_t size;
 
-	printf("%s\n", __func__);
+	size = PAGE_ALIGN(attach->dmabuf->size);
+
+	printf("%s size %d\n", __func__, size);
 
 	return (NULL);
 }
