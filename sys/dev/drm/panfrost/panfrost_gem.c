@@ -267,6 +267,31 @@ static const struct vm_operations_struct panfrost_gem_vm_ops = {
 	.close = panfrost_gem_vm_close,
 };
 
+static int
+dma_buf_mmap(struct dma_buf *dmabuf, struct vm_area_struct *vma,
+    unsigned long pgoff)
+{
+	int error;
+
+	if (dmabuf == NULL || vma == NULL)
+		return (EINVAL);
+
+	if (dmabuf->ops->mmap == NULL)
+		return (EINVAL);
+
+	if (pgoff + vma_pages(vma) < pgoff)
+		return (EOVERFLOW);
+
+	if (pgoff + vma_pages(vma) > dmabuf->size >> PAGE_SHIFT)
+		return (EINVAL);
+
+	error = dmabuf->ops->mmap(dmabuf, vma);
+
+	printf("%s: error %d\n", __func__, error);
+
+	return (error);
+}
+
 int
 drm_gem_shmem_mmap(struct drm_gem_object *obj, struct vm_area_struct *vma)
 {
@@ -277,20 +302,24 @@ drm_gem_shmem_mmap(struct drm_gem_object *obj, struct vm_area_struct *vma)
 
 	bo = (struct panfrost_gem_object *)obj;
 
+	printf("%s 1\n", __func__);
 	vma->vm_pgoff -= drm_vma_node_start(&obj->vma_node);
 
+	printf("%s 2\n", __func__);
 	if (obj->import_attach) {
-		drm_gem_object_put(obj);
+		printf("%s 3\n", __func__);
+		//drm_gem_object_put(obj);
 		vma->vm_private_data = NULL;
-		//return dma_buf_mmap(obj->dma_buf, vma, 0);
-		panic("implement me");
+		return dma_buf_mmap(obj->dma_buf, vma, 0);
 	}
 
+	printf("%s 4\n", __func__);
 	error = panfrost_gem_get_pages(bo);
 	if (error != 0) {
 		printf("failed to get pages\n");
 		return (-1);
 	}
+	printf("%s 5\n", __func__);
 
 	vma->vm_flags |= VM_MIXEDMAP | VM_DONTEXPAND;
 	vma->vm_page_prot = vm_get_page_prot(vma->vm_flags);
