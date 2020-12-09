@@ -300,3 +300,16 @@ panfrost_device_init(struct panfrost_softc *sc)
 
 	return (0);
 }
+
+uint32_t
+panfrost_device_get_latest_flush_id(struct panfrost_softc *sc)
+{
+	uint32_t flush_id;
+
+	flush_id = 0;
+
+	if (panfrost_has_hw_feature(sc, HW_FEATURE_FLUSH_REDUCTION))
+		flush_id = GPU_READ(sc, GPU_LATEST_FLUSH_ID);
+
+	return (flush_id);
+}

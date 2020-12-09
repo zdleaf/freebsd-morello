@@ -33,8 +33,6 @@
 #ifndef	_DEV_DRM_PANFROST_PANFROST_DEVICE_H_
 #define	_DEV_DRM_PANFROST_PANFROST_DEVICE_H_
 
-int panfrost_device_init(struct panfrost_softc *);
-
 struct panfrost_mmu {
 	struct pmap p;
 };
@@ -46,5 +44,8 @@ struct panfrost_file {
 	struct		drm_mm mm;
 	struct mtx	mm_lock;
 };
+
+int panfrost_device_init(struct panfrost_softc *);
+uint32_t panfrost_device_get_latest_flush_id(struct panfrost_softc *sc);
 
 #endif /* !_DEV_DRM_PANFROST_PANFROST_DEVICE_H_ */
