@@ -252,14 +252,12 @@ dma_buf_unmap_attachment(struct dma_buf_attachment *attach,
 static int
 dmabuf_fop_close(struct file *file, struct thread *td)
 {
-	struct dma_buf_file *dbf;
 	struct dma_buf *dmabuf;
 
 	if (!file_is_dmabuf(file))
 		return (EINVAL);
 
-	dbf = file->f_data;
- 	dmabuf = dbf->dbf_dmabuf;
+	dmabuf = file->f_data;
 
  	dmabuf->ops->release(dmabuf);
  	reservation_poll_fini(&dmabuf->db_resv_poll);
@@ -276,15 +274,14 @@ static int
 dmabuf_fop_poll(struct file *file, int events, struct ucred *active_cred,
     struct thread *td)
 {
-	struct dma_buf_file *dbf;
 	struct dma_buf *dmabuf;
 	struct reservation_poll *rpoll;
 
 	if (!file_is_dmabuf(file))
 		return (EINVAL);
 
-	dbf = file->f_data;
-	dmabuf = dbf->dbf_dmabuf;
+	dmabuf = file->f_data;
+
 	rpoll = &dmabuf->db_resv_poll;
 
 	return (reservation_object_poll(dmabuf->resv, events, rpoll));
@@ -293,15 +290,14 @@ dmabuf_fop_poll(struct file *file, int events, struct ucred *active_cred,
 static int
 dmabuf_fop_kqfilter(struct file *file, struct knote *kn)
 {
-	struct dma_buf_file *dbf;
 	struct dma_buf *dmabuf;
 	struct reservation_poll *rpoll;
 
 	if (!file_is_dmabuf(file))
 		return (EINVAL);
 
-	dbf = file->f_data;
-	dmabuf = dbf->dbf_dmabuf;
+	dmabuf = file->f_data;
+
 	rpoll = &dmabuf->db_resv_poll;
 
 	return (reservation_object_kqfilter(dmabuf->resv, kn, rpoll));
@@ -312,15 +308,14 @@ dmabuf_fop_mmap(struct file *file, vm_map_t map, vm_offset_t *addr,
 	     vm_size_t size, vm_prot_t prot, vm_prot_t cap_maxprot,
 	     int flags, vm_ooffset_t foff, struct thread *td)
 {
-	struct dma_buf_file *dbf;
 	struct dma_buf *dmabuf;
 	struct vm_area_struct vma;
 
 	if (!file_is_dmabuf(file))
 		return (EINVAL);
 
-	dbf = file->f_data;
-	dmabuf = dbf->dbf_dmabuf;
+	dmabuf = file->f_data;
+
 	if (foff + size  > dmabuf->size)
 		return (EINVAL);
 
@@ -334,15 +329,14 @@ dmabuf_fop_mmap(struct file *file, vm_map_t map, vm_offset_t *addr,
 static int
 dmabuf_fop_seek(struct file *file, off_t offset, int whence, struct thread *td)
 {
-	struct dma_buf_file *dbf;
 	struct dma_buf *dmabuf;
 	off_t base;
 
 	if (!file_is_dmabuf(file))
 		return (EINVAL);
 
-	dbf = file->f_data;
-	dmabuf = dbf->dbf_dmabuf;
+	dmabuf = file->f_data;
+
 	if (offset != 0)
 		return (EINVAL);
 
@@ -361,7 +355,6 @@ static int
 dmabuf_fop_ioctl(struct file *file, u_long com, void *data,
 	      struct ucred *active_cred, struct thread *td)
 {
-	struct dma_buf_file *dbf;
 	struct dma_buf *dmabuf;
 	struct dma_buf_sync *sync;
 	enum dma_data_direction dir;
@@ -370,8 +363,8 @@ dmabuf_fop_ioctl(struct file *file, u_long com, void *data,
 	if (!file_is_dmabuf(file))
 		return (EINVAL);
 
-	dbf = file->f_data;
-	dmabuf = dbf->dbf_dmabuf;
+	dmabuf = file->f_data;
+
 	sync = data;
 	rv = 0;
 
