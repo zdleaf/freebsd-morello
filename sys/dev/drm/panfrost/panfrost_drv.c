@@ -337,8 +337,28 @@ static int
 panfrost_ioctl_get_bo_offset(struct drm_device *dev, void *data,
     struct drm_file *file_priv)
 {
+	struct drm_panfrost_get_bo_offset *args;
+	struct panfrost_file *pfile;
+	struct drm_gem_object *obj;
+	struct panfrost_gem_object *bo;
+	struct panfrost_gem_mapping *mapping;
 
-	printf("%s\n", __func__);
+	pfile = file_priv->driver_priv;
+	args = data;
+
+	obj = drm_gem_object_lookup(file_priv, args->handle);
+	if (obj == NULL)
+		panic("gem obj not found");
+
+	bo = (struct panfrost_gem_object *)obj;
+
+	mapping = panfrost_gem_mapping_get(bo, pfile);
+	//drm_gem_object_put(obj);
+	if (mapping == NULL)
+		panic("could not find mapping");
+
+	args->offset = mapping->mmnode.start << PAGE_SHIFT;
+	//panfrost_gem_mapping_put(mapping);
 
 	return (0);
 }
