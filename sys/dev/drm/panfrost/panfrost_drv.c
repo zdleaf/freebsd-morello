@@ -61,6 +61,7 @@ __FBSDID("$FreeBSD$");
 #include <drm/drm_file.h>
 #include <drm/drm_ioctl.h>
 #include <drm/drm_vblank.h>
+#include <drm/drm_syncobj.h>
 
 #include "fb_if.h"
 #include "panfrost_drm.h"
@@ -69,6 +70,7 @@ __FBSDID("$FreeBSD$");
 #include "panfrost_regs.h"
 #include "panfrost_gem.h"
 #include "panfrost_mmu.h"
+#include "panfrost_job.h"
 
 static struct resource_spec mali_spec[] = {
 	{ SYS_RES_MEMORY,	0,	RF_ACTIVE },
@@ -163,8 +165,36 @@ static int
 panfrost_ioctl_submit(struct drm_device *dev, void *data,
     struct drm_file *file)
 {
+	struct panfrost_softc *sc;
+	struct drm_panfrost_submit *args;
+	struct panfrost_job *job;
+	struct drm_syncobj *sync_out;
 
-	printf("%s\n", __func__);
+	sc = dev->dev_private;
+	args = data;
+	sync_out = NULL;
+
+	printf("%s: count %d\n", __func__, args->jc);
+
+	if (args->jc == 0)
+		return (EINVAL);
+
+	if (args->requirements && args->requirements != PANFROST_JD_REQ_FS)
+		return (EINVAL);
+
+	if (args->out_sync > 0) {
+		sync_out = drm_syncobj_find(file, args->out_sync);
+		if (sync_out == NULL)
+			panic("sync_out is NULL");
+	}
+
+	job = malloc(sizeof(*job), M_DEVBUF, M_WAITOK | M_ZERO);
+	job->jc = args->jc;
+	job->requirements = args->requirements;
+	job->flush_id = panfrost_device_get_latest_flush_id(sc);
+
+	//if (sync_out)
+	//	drm_syncobj_replace_fence(sync_out, job->render_done_fence);
 
 	return (0);
 }
@@ -367,8 +397,33 @@ static int
 panfrost_ioctl_madvise(struct drm_device *dev, void *data,
     struct drm_file *file_priv)
 {
+	struct panfrost_file_priv *pfile;
+	struct drm_panfrost_madvise *args;
+	struct drm_gem_object *obj;
+	struct panfrost_gem_object *bo;
 
 	printf("%s\n", __func__);
+
+	pfile = file_priv->driver_priv;
+	args = data;
+
+	obj = drm_gem_object_lookup(file_priv, args->handle);
+	if (obj == NULL)
+		panic("obj not found");
+
+	bo = (struct panfrost_gem_object *)obj;
+	if (args->madv == PANFROST_MADV_DONTNEED) {
+	}
+
+	if (bo->madv >= 0) {
+		bo->madv = args->madv;
+		args->retained = 1;
+	} else
+		args->retained = 0;
+
+	if (args->retained) {
+		//panic("implement me");
+	}
 
 	return (0);
 }
