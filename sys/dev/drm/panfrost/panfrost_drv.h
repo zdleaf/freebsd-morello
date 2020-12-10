@@ -71,6 +71,9 @@ struct panfrost_softc {
 	void			*intrhand[4];
 	struct panfrost_features features;
 	clk_t			clk;
+
+	uint64_t		as_alloc_set;
+	struct mtx		as_mtx;
 };
 
 #define	GPU_READ(sc, reg)	bus_read_4((sc)->res[0], (reg))

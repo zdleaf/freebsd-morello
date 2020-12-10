@@ -235,7 +235,7 @@ panfrost_ioctl_submit(struct drm_device *dev, void *data,
 	args = data;
 	sync_out = NULL;
 
-	printf("%s: count %d\n", __func__, args->jc);
+	printf("%s: jc %d\n", __func__, args->jc);
 
 	if (args->jc == 0)
 		return (EINVAL);
@@ -264,12 +264,18 @@ panfrost_ioctl_submit(struct drm_device *dev, void *data,
 	if (error)
 		return (EINVAL);
 
+printf("%s: pushing job\n", __func__);
+
 	error = panfrost_job_push(job);
 	if (error)
 		return (EINVAL);
 
-	if (sync_out)
+	if (sync_out) {
+printf("%s: sync_out\n", __func__);
 		drm_syncobj_replace_fence(sync_out, job->render_done_fence);
+	}
+
+printf("%s: job submitted\n", __func__);
 
 	return (0);
 }
@@ -849,6 +855,8 @@ panfrost_attach(device_t dev)
 	clk_get_freq(sc->clk, &rate);
 
 	device_printf(dev, "Mali GPU clock rate %jd Hz\n", rate);
+
+	mtx_init(&sc->as_mtx, "asid set mtx", NULL, MTX_SPIN);
 
 	config_intrhook_oneshot(&panfrost_irq_hook, sc);
 

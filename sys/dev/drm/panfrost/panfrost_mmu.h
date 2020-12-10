@@ -35,5 +35,8 @@
 
 int panfrost_mmu_pgtable_alloc(struct panfrost_file *pfile);
 int panfrost_mmu_map(struct panfrost_gem_mapping *mapping);
+int panfrost_mmu_enable(struct panfrost_softc *sc, struct panfrost_mmu *mmu);
+uint32_t panfrost_mmu_as_get(struct panfrost_softc *sc,
+    struct panfrost_mmu *mmu);
 
 #endif /* !_DEV_DRM_PANFROST_PANFROST_MMU_H_ */

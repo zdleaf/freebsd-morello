@@ -82,7 +82,36 @@ panfrost_mmu_pgtable_alloc(struct panfrost_file *pfile)
 	pmap_pinit(p);
 	PMAP_LOCK_INIT(p);
 
+	mmu->as = -1;
+
 	return (0);
+}
+
+int
+panfrost_mmu_enable(struct panfrost_softc *sc, struct panfrost_mmu *mmu)
+{
+
+	return (0);
+}
+
+uint32_t
+panfrost_mmu_as_get(struct panfrost_softc *sc, struct panfrost_mmu *mmu)
+{
+	int as;
+
+	if (mmu->as >= 0) {
+		printf("mmu is running\n");
+		panic("mmu is running");
+	}
+
+	mtx_lock_spin(&sc->as_mtx);
+	as = ffz(sc->as_alloc_set);
+	sc->as_alloc_set |= (1 << as);
+	mtx_unlock_spin(&sc->as_mtx);
+
+	mmu->as = as;
+
+	return (as);
 }
 
 int

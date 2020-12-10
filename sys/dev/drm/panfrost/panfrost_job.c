@@ -78,11 +78,55 @@ panfrost_acquire_object_fences(struct drm_gem_object **bos,
 		    reservation_object_get_excl_rcu(bos[i]->resv);
 }
 
+static int
+panfrost_job_get_slot(struct panfrost_job *job)
+{
+
+	if (job->requirements & PANFROST_JD_REQ_FS)
+		return (0);	/* fragment job */
+
+	return (1); /* vertex job */
+}
+
+static void
+panfrost_job_hw_submit(struct panfrost_job *job, int slot)
+{
+	struct panfrost_softc *sc;
+	uint32_t cfg;
+	uint64_t jc_head;
+
+	sc = job->sc;
+	jc_head = job->jc;
+
+	cfg = panfrost_mmu_as_get(sc, &job->pfile->mmu);
+
+	GPU_WRITE(sc, JS_HEAD_NEXT_LO(slot), jc_head & 0xFFFFFFFF);
+	GPU_WRITE(sc, JS_HEAD_NEXT_HI(slot), jc_head >> 32);
+
+	cfg |= JS_CONFIG_THREAD_PRI(8) |
+	    JS_CONFIG_START_FLUSH_CLEAN_INVALIDATE |
+	    JS_CONFIG_END_FLUSH_CLEAN_INVALIDATE;
+
+	if (panfrost_has_hw_feature(sc, HW_FEATURE_FLUSH_REDUCTION))
+		cfg |= JS_CONFIG_ENABLE_FLUSH_REDUCTION;
+
+	if (panfrost_has_hw_issue(sc, HW_ISSUE_10649))
+		cfg |= JS_CONFIG_START_MMU;
+
+	GPU_WRITE(sc, JS_CONFIG_NEXT(slot), cfg);
+
+	if (panfrost_has_hw_feature(sc, HW_FEATURE_FLUSH_REDUCTION))
+		GPU_WRITE(sc, JS_FLUSH_ID_NEXT(slot), job->flush_id);
+
+	GPU_WRITE(sc, JS_COMMAND_NEXT(slot), JS_COMMAND_START);
+}
+
 int
 panfrost_job_push(struct panfrost_job *job)
 {
 	struct ww_acquire_ctx acquire_ctx;
 	struct panfrost_softc *sc;
+	int slot;
 	int error;
 
 	sc = job->sc;
@@ -99,6 +143,9 @@ panfrost_job_push(struct panfrost_job *job)
 	    job->implicit_fences);
 
 	drm_gem_unlock_reservations(job->bos, job->bo_count, &acquire_ctx);
+
+	slot = panfrost_job_get_slot(job);
+	panfrost_job_hw_submit(job, slot);
 
 	return (0);
 }

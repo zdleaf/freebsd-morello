@@ -35,6 +35,7 @@
 
 struct panfrost_mmu {
 	struct pmap p;
+	int as;		/* asid set */
 };
 
 struct panfrost_file {
