@@ -67,6 +67,15 @@ __FBSDID("$FreeBSD$");
 #include "panfrost_mmu.h"
 #include "panfrost_job.h"
 
+#define	NUM_JOB_SLOTS	3
+
+void
+panfrost_job_intr(void *arg)
+{
+
+	printf("%s\n", __func__);
+}
+
 static void
 panfrost_acquire_object_fences(struct drm_gem_object **bos,
     int bo_count, struct dma_fence **implicit_fences)
@@ -146,6 +155,30 @@ panfrost_job_push(struct panfrost_job *job)
 
 	slot = panfrost_job_get_slot(job);
 	panfrost_job_hw_submit(job, slot);
+
+	return (0);
+}
+
+static void
+panfrost_job_enable_interrupts(struct panfrost_softc *sc)
+{
+	uint32_t irq_msk;
+	int i;
+
+	irq_msk = 0;
+
+	for (i = 0; i < NUM_JOB_SLOTS; i++)
+		irq_msk |= MK_JS_MASK(i);
+
+	GPU_WRITE(sc, JOB_INT_CLEAR, irq_msk);
+	GPU_WRITE(sc, JOB_INT_MASK, irq_msk);
+}
+
+int
+panfrost_job_init(struct panfrost_softc *sc)
+{
+
+	panfrost_job_enable_interrupts(sc);
 
 	return (0);
 }
