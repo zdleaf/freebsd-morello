@@ -66,3 +66,10 @@ __FBSDID("$FreeBSD$");
 #include "panfrost_issues.h"
 #include "panfrost_mmu.h"
 #include "panfrost_job.h"
+
+int
+panfrost_job_push(struct panfrost_job *job)
+{
+
+	return (0);
+}

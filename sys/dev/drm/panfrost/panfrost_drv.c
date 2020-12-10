@@ -264,8 +264,12 @@ panfrost_ioctl_submit(struct drm_device *dev, void *data,
 	if (error)
 		return (EINVAL);
 
-	//if (sync_out)
-	//	drm_syncobj_replace_fence(sync_out, job->render_done_fence);
+	error = panfrost_job_push(job);
+	if (error)
+		return (EINVAL);
+
+	if (sync_out)
+		drm_syncobj_replace_fence(sync_out, job->render_done_fence);
 
 	return (0);
 }

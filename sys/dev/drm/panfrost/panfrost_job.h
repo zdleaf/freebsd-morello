@@ -53,4 +53,6 @@ struct panfrost_job {
 	struct dma_fence *render_done_fence;
 };
 
+int panfrost_job_push(struct panfrost_job *job);
+
 #endif /* !_DEV_DRM_PANFROST_PANFROST_JOB_H_ */
