@@ -162,6 +162,65 @@ panfrost_postclose(struct drm_device *dev, struct drm_file *file)
 }
 
 static int
+panfrost_copy_in_fences(struct drm_device *dev, struct drm_file *file_priv,
+    struct drm_panfrost_submit *args, struct panfrost_job *job)
+{
+
+	job->in_fence_count = args->in_sync_count;
+	if (job->in_fence_count == 0)
+		return (0);
+
+	panic("fence count %d\n", job->in_fence_count);
+
+	return (0);
+}
+
+static int
+panfrost_lookup_bos(struct drm_device *dev, struct drm_file *file_priv,
+    struct drm_panfrost_submit *args, struct panfrost_job *job)
+{
+	struct panfrost_file *pfile;
+	struct panfrost_gem_object *bo;
+	struct panfrost_gem_mapping *mapping;
+	int error;
+	int i;
+	int sz;
+
+	pfile = file_priv->driver_priv;
+
+	job->bo_count = args->bo_handle_count;
+	if (job->bo_count == 0)
+		return (0);
+
+printf("bo count %d\n", job->bo_count);
+
+	sz = job->bo_count * sizeof(struct dma_fence *);
+	job->implicit_fences = malloc(sz, M_DEVBUF, M_WAITOK | M_ZERO);
+
+	error = drm_gem_objects_lookup(file_priv,
+	    (void __user *)(uintptr_t)args->bo_handles, job->bo_count,
+	    &job->bos);
+	if (error)
+		return (error);
+
+	sz = job->bo_count * sizeof(struct panfrost_gem_mapping *);
+	job->mappings = malloc(sz, M_DEVBUF, M_WAITOK | M_ZERO);
+
+	for (i = 0; i < job->bo_count; i++) {
+		bo = (struct panfrost_gem_object *)job->bos[i];
+		mapping = panfrost_gem_mapping_get(bo, pfile);
+		if (mapping == NULL) {
+			printf("mapping not found\n");
+			panic("Err");
+		}
+		// TODO: increment gpu usecount
+		job->mappings[i] = mapping;
+	}
+
+	return (0);
+}
+
+static int
 panfrost_ioctl_submit(struct drm_device *dev, void *data,
     struct drm_file *file)
 {
@@ -169,8 +228,10 @@ panfrost_ioctl_submit(struct drm_device *dev, void *data,
 	struct drm_panfrost_submit *args;
 	struct panfrost_job *job;
 	struct drm_syncobj *sync_out;
+	int error;
 
 	sc = dev->dev_private;
+
 	args = data;
 	sync_out = NULL;
 
@@ -189,9 +250,19 @@ panfrost_ioctl_submit(struct drm_device *dev, void *data,
 	}
 
 	job = malloc(sizeof(*job), M_DEVBUF, M_WAITOK | M_ZERO);
+	job->sc = sc;
 	job->jc = args->jc;
 	job->requirements = args->requirements;
 	job->flush_id = panfrost_device_get_latest_flush_id(sc);
+	job->pfile = file->driver_priv;
+
+	error = panfrost_copy_in_fences(dev, file, args, job);
+	if (error)
+		return (EINVAL);
+
+	error = panfrost_lookup_bos(dev, file, args, job);
+	if (error)
+		return (EINVAL);
 
 	//if (sync_out)
 	//	drm_syncobj_replace_fence(sync_out, job->render_done_fence);

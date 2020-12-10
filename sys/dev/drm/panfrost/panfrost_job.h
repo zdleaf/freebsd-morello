@@ -34,9 +34,23 @@
 #define	_DEV_DRM_PANFROST_PANFROST_JOB_H_
 
 struct panfrost_job {
+	struct panfrost_softc *sc;
+	struct panfrost_file *pfile;
 	uint64_t jc;
 	uint32_t requirements;
 	uint32_t flush_id;
+
+	struct dma_fence **in_fences;
+	uint32_t in_fence_count;
+
+	struct dma_fence *done_fence;
+
+	struct dma_fence **implicit_fences;
+	struct panfrost_gem_mapping **mappings;
+	struct drm_gem_object **bos;
+	uint32_t bo_count;
+
+	struct dma_fence *render_done_fence;
 };
 
 #endif /* !_DEV_DRM_PANFROST_PANFROST_JOB_H_ */
