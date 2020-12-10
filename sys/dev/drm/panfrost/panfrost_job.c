@@ -67,9 +67,38 @@ __FBSDID("$FreeBSD$");
 #include "panfrost_mmu.h"
 #include "panfrost_job.h"
 
+static void
+panfrost_acquire_object_fences(struct drm_gem_object **bos,
+    int bo_count, struct dma_fence **implicit_fences)
+{
+	int i;
+
+	for (i = 0; i < bo_count; i++)
+		implicit_fences[i] =
+		    reservation_object_get_excl_rcu(bos[i]->resv);
+}
+
 int
 panfrost_job_push(struct panfrost_job *job)
 {
+	struct ww_acquire_ctx acquire_ctx;
+	struct panfrost_softc *sc;
+	int error;
+
+	sc = job->sc;
+
+	error = drm_gem_lock_reservations(job->bos, job->bo_count,
+	    &acquire_ctx);
+	if (error)
+		return (error);
+
+	/* Acquire a reference to fence. */
+	//job->render_done_fence = dma_fence_get(&job->base.s_fence->finished);
+
+	panfrost_acquire_object_fences(job->bos, job->bo_count,
+	    job->implicit_fences);
+
+	drm_gem_unlock_reservations(job->bos, job->bo_count, &acquire_ctx);
 
 	return (0);
 }
