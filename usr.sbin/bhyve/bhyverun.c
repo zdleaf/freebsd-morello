@@ -1266,6 +1266,7 @@ main(int argc, char *argv[])
 			acpi = 1;
 			break;
 		case 'b':
+			warnx("-b flag is deprecated and will be removed in FreeBSD 13.0");
 			bvmcons = 1;
 			break;
 #ifdef __aarch64__
@@ -1292,6 +1293,7 @@ main(int argc, char *argv[])
 			break;
 #ifdef __amd64__
 		case 'g':
+			warnx("-g flag is deprecated and will be removed in FreeBSD 13.0");
 			dbg_port = atoi(optarg);
 			break;
 		case 'G':
