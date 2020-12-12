@@ -38,5 +38,7 @@ int panfrost_mmu_map(struct panfrost_gem_mapping *mapping);
 int panfrost_mmu_enable(struct panfrost_softc *sc, struct panfrost_mmu *mmu);
 uint32_t panfrost_mmu_as_get(struct panfrost_softc *sc,
     struct panfrost_mmu *mmu);
+void panfrost_mmu_intr(void *arg);
+int panfrost_mmu_init(struct panfrost_softc *sc);
 
 #endif /* !_DEV_DRM_PANFROST_PANFROST_MMU_H_ */

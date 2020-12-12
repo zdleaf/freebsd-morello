@@ -66,6 +66,47 @@ __FBSDID("$FreeBSD$");
 #include "panfrost_issues.h"
 #include "panfrost_mmu.h"
 
+void
+panfrost_mmu_intr(void *arg)
+{
+	struct panfrost_softc *sc;
+	uint32_t fault_status;
+	uint32_t exception_type;
+	uint32_t access_type;
+	uint32_t source_id;
+	uint32_t status;
+	uint64_t addr;
+	int i;
+
+	sc = arg;
+
+	printf("%s\n", __func__);
+
+	status = GPU_READ(sc, MMU_INT_RAWSTAT);
+
+	printf("%s: status %x\n", __func__, status);
+
+	i = 0;
+
+	fault_status = GPU_READ(sc, AS_FAULTSTATUS(i));
+	printf("%s: fault status %x\n", __func__, fault_status);
+
+	addr = GPU_READ(sc, AS_FAULTADDRESS_LO(i));
+	addr |= (uint64_t)GPU_READ(sc, AS_FAULTADDRESS_HI(i)) << 32;
+
+	exception_type = fault_status & 0xFF;
+	access_type = (fault_status >> 8) & 0x3;
+	source_id = (fault_status >> 16);
+
+	if ((exception_type & 0xF8) == 0xC0)
+		printf("%s: page fault at %lx\n", __func__, addr);
+	else
+		printf("%s: fault at %lx\n", __func__, addr);
+
+	printf("%s: exception type %x, access type %x, source id %x \n",
+	    __func__, exception_type, access_type, source_id);
+}
+
 int
 panfrost_mmu_pgtable_alloc(struct panfrost_file *pfile)
 {
@@ -150,6 +191,17 @@ panfrost_mmu_map(struct panfrost_gem_mapping *mapping)
 	}
 
 	mapping->active = true;
+
+	return (0);
+}
+
+int
+panfrost_mmu_init(struct panfrost_softc *sc)
+{
+
+	/* Enable interrupts. */
+	GPU_WRITE(sc, MMU_INT_CLEAR, ~0);
+	GPU_WRITE(sc, MMU_INT_MASK, ~0);
 
 	return (0);
 }

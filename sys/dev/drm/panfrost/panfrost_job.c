@@ -72,8 +72,14 @@ __FBSDID("$FreeBSD$");
 void
 panfrost_job_intr(void *arg)
 {
+	struct panfrost_softc *sc;
+	uint32_t status;
 
-	printf("%s\n", __func__);
+	sc = arg;
+
+	status = GPU_READ(sc, JOB_INT_STAT);
+
+	printf("%s: status %x\n", __func__, status);
 }
 
 static void

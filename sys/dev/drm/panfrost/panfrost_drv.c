@@ -697,6 +697,7 @@ panfrost_irq_hook(void *arg)
 	}
 
 	panfrost_device_init(sc);
+	panfrost_mmu_init(sc);
 	panfrost_job_init(sc);
 
 	panfrost_fb_preinit(&sc->drm_dev);
@@ -725,13 +726,6 @@ fail:
 	device_printf(sc->dev, "drm_dev_register(): %d\n", rv);
 }
 #endif
-
-static void
-panfrost_mmu_intr(void *arg)
-{
-
-	printf("%s\n", __func__);
-}
 
 static void
 panfrost_gpu_intr(void *arg)
@@ -775,6 +769,7 @@ panfrost_irq_hook(void *arg)
 	sc->drm_dev.dev_private = sc;
 
 	panfrost_device_init(sc);
+	panfrost_mmu_init(sc);
 	panfrost_job_init(sc);
 
 	err = drm_dev_register(&sc->drm_dev, 0);
