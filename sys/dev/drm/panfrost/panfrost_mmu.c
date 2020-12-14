@@ -66,6 +66,55 @@ __FBSDID("$FreeBSD$");
 #include "panfrost_issues.h"
 #include "panfrost_mmu.h"
 
+#define	ARM_MALI_LPAE_TTBR_ADRMODE_TABLE	(3 << 0)
+#define	ARM_MALI_LPAE_TTBR_READ_INNER		(1 << 2)
+#define	ARM_MALI_LPAE_TTBR_SHARE_OUTER		(1 << 4)
+
+#define	ARM_LPAE_MAIR_ATTR_SHIFT(n)		((n) << 3)
+#define	ARM_LPAE_MAIR_ATTR_MASK			0xff
+#define	ARM_LPAE_MAIR_ATTR_DEVICE		0x04
+#define	ARM_LPAE_MAIR_ATTR_NC			0x44
+#define	ARM_LPAE_MAIR_ATTR_INC_OWBRWA		0xf4
+#define	ARM_LPAE_MAIR_ATTR_WBRWA		0xff
+#define	ARM_LPAE_MAIR_ATTR_IDX_NC		0
+#define	ARM_LPAE_MAIR_ATTR_IDX_CACHE		1
+#define	ARM_LPAE_MAIR_ATTR_IDX_DEV		2
+#define	ARM_LPAE_MAIR_ATTR_IDX_INC_OCACHE	3
+
+#define	ARM_MALI_LPAE_MEMATTR_IMP_DEF		0x88ULL
+#define	ARM_MALI_LPAE_MEMATTR_WRITE_ALLOC	0x8DULL
+
+static const char *
+panfrost_mmu_exception_name(uint32_t exc_code)
+{
+
+	switch (exc_code) {
+	case 0x00: return "NOT_STARTED/IDLE/OK";
+	case 0x01: return "DONE";
+	case 0x02: return "INTERRUPTED";
+	case 0x03: return "STOPPED";
+	case 0x04: return "TERMINATED";
+	case 0x08: return "ACTIVE";
+
+	case 0xC1: return "TRANSLATION_FAULT_LEVEL1";
+	case 0xC2: return "TRANSLATION_FAULT_LEVEL2";
+	case 0xC3: return "TRANSLATION_FAULT_LEVEL3";
+	case 0xC4: return "TRANSLATION_FAULT_LEVEL4";
+	case 0xC8: return "PERMISSION_FAULT";
+	case 0xC9 ... 0xCF: return "PERMISSION_FAULT";
+	case 0xD1: return "TRANSTAB_BUS_FAULT_LEVEL1";
+	case 0xD2: return "TRANSTAB_BUS_FAULT_LEVEL2";
+	case 0xD3: return "TRANSTAB_BUS_FAULT_LEVEL3";
+	case 0xD4: return "TRANSTAB_BUS_FAULT_LEVEL4";
+	case 0xD8: return "ACCESS_FLAG";
+	case 0xD9 ... 0xDF: return "ACCESS_FLAG";
+	case 0xE0 ... 0xE7: return "ADDRESS_SIZE_FAULT";
+	case 0xE8 ... 0xEF: return "MEMORY_ATTRIBUTES_FAULT";
+	}
+
+	return "UNKNOWN";
+}
+
 void
 panfrost_mmu_intr(void *arg)
 {
@@ -80,8 +129,6 @@ panfrost_mmu_intr(void *arg)
 
 	sc = arg;
 
-	printf("%s\n", __func__);
-
 	status = GPU_READ(sc, MMU_INT_RAWSTAT);
 
 	printf("%s: status %x\n", __func__, status);
@@ -89,7 +136,6 @@ panfrost_mmu_intr(void *arg)
 	i = 0;
 
 	fault_status = GPU_READ(sc, AS_FAULTSTATUS(i));
-	printf("%s: fault status %x\n", __func__, fault_status);
 
 	addr = GPU_READ(sc, AS_FAULTADDRESS_LO(i));
 	addr |= (uint64_t)GPU_READ(sc, AS_FAULTADDRESS_HI(i)) << 32;
@@ -101,7 +147,8 @@ panfrost_mmu_intr(void *arg)
 	if ((exception_type & 0xF8) == 0xC0)
 		printf("%s: page fault at %lx\n", __func__, addr);
 	else
-		printf("%s: fault at %lx\n", __func__, addr);
+		printf("%s: %s fault at %lx\n", __func__,
+		    panfrost_mmu_exception_name(exception_type), addr);
 
 	printf("%s: exception type %x, access type %x, source id %x \n",
 	    __func__, exception_type, access_type, source_id);
@@ -116,10 +163,6 @@ panfrost_mmu_pgtable_alloc(struct panfrost_file *pfile)
 	mmu = &pfile->mmu;
 	p = &mmu->p;
 
-	printf("p is %p\n", p);
-	p->pm_l0_paddr = 1;
-	printf("p is %p\n", p);
-
 	pmap_pinit(p);
 	PMAP_LOCK_INIT(p);
 
@@ -128,9 +171,117 @@ panfrost_mmu_pgtable_alloc(struct panfrost_file *pfile)
 	return (0);
 }
 
+static int
+wait_ready(struct panfrost_softc *sc, uint32_t as)
+{
+	uint32_t reg;
+	int timeout;
+
+	timeout = 1000;
+
+	do {
+		reg = GPU_READ(sc, AS_STATUS(as));
+		if ((reg & AS_STATUS_AS_ACTIVE) == 0)
+			break;
+	} while (timeout--);
+
+	if (timeout <= 0)
+		panic("failed to read");
+
+	return (0);
+}
+
+static int
+write_cmd(struct panfrost_softc *sc, uint32_t as, uint32_t cmd)
+{
+	int status;
+
+	status = wait_ready(sc, as);
+	if (status == 0)
+		GPU_WRITE(sc, AS_COMMAND(as), cmd);
+
+	return (status);
+}
+
+static void
+lock_region(struct panfrost_softc *sc, uint32_t as, vm_offset_t va,
+    size_t size)
+{
+	uint8_t region_width;
+	uint64_t region;
+
+	region = va & PAGE_MASK;
+
+	size = round_up(size, PAGE_SIZE);
+
+	region_width = 10 + fls(size >> PAGE_SHIFT);
+	if ((size >> PAGE_SHIFT) != (1ul << (region_width - 11)))
+		region_width += 1;
+	region |= region_width;
+
+	GPU_WRITE(sc, AS_LOCKADDR_LO(as), region & 0xFFFFFFFFUL);
+	GPU_WRITE(sc, AS_LOCKADDR_HI(as), (region >> 32) & 0xFFFFFFFFUL);
+	write_cmd(sc, as, AS_COMMAND_LOCK);
+}
+
+static int
+mmu_hw_do_operation_locked(struct panfrost_softc *sc, uint32_t as,
+    vm_offset_t va, size_t size, uint32_t op)
+{
+	int error;
+
+	if (op != AS_COMMAND_UNLOCK)
+		lock_region(sc, as, va, size);
+
+	write_cmd(sc, as, op);
+
+	error = wait_ready(sc, as);
+
+	return (0);
+}
+
+#if 0
+static int
+mmu_hw_do_operation(struct panfrost_softc *sc,
+    struct panfrost_mmu *mmu, vm_offset_t va, size_t size, uint32_t op)
+{
+
+	mtx_lock(sc->as_mtx);
+	mtx_unlock(sc->as_mtx);
+}
+#endif
+
 int
 panfrost_mmu_enable(struct panfrost_softc *sc, struct panfrost_mmu *mmu)
 {
+	vm_paddr_t paddr;
+	uint64_t memattr;
+	pmap_t p;
+	int as;
+
+	as = mmu->as;
+	p = &mmu->p;
+
+	paddr = p->pm_l0_paddr;
+	paddr |= ARM_MALI_LPAE_TTBR_READ_INNER;
+	paddr |= ARM_MALI_LPAE_TTBR_ADRMODE_TABLE;
+
+	memattr = (ARM_MALI_LPAE_MEMATTR_IMP_DEF
+	     << ARM_LPAE_MAIR_ATTR_SHIFT(ARM_LPAE_MAIR_ATTR_IDX_NC)) |
+	    (ARM_MALI_LPAE_MEMATTR_WRITE_ALLOC
+	     << ARM_LPAE_MAIR_ATTR_SHIFT(ARM_LPAE_MAIR_ATTR_IDX_CACHE)) |
+	    (ARM_MALI_LPAE_MEMATTR_IMP_DEF
+	     << ARM_LPAE_MAIR_ATTR_SHIFT(ARM_LPAE_MAIR_ATTR_IDX_DEV));
+
+	mmu_hw_do_operation_locked(sc, as, 0, ~0UL, AS_COMMAND_FLUSH_MEM);
+
+	GPU_WRITE(sc, AS_TRANSTAB_LO(as), paddr & 0xffffffffUL);
+	GPU_WRITE(sc, AS_TRANSTAB_HI(as), paddr >> 32);
+
+	GPU_WRITE(sc, AS_MEMATTR_LO(as), memattr & 0xffffffffUL);
+	GPU_WRITE(sc, AS_MEMATTR_HI(as), memattr >> 32);
+
+	write_cmd(sc, as, AS_COMMAND_UPDATE);
 
 	return (0);
 }
@@ -151,6 +302,8 @@ panfrost_mmu_as_get(struct panfrost_softc *sc, struct panfrost_mmu *mmu)
 	mtx_unlock_spin(&sc->as_mtx);
 
 	mmu->as = as;
+
+	panfrost_mmu_enable(sc, mmu);
 
 	return (as);
 }

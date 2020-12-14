@@ -235,7 +235,7 @@ panfrost_ioctl_submit(struct drm_device *dev, void *data,
 	args = data;
 	sync_out = NULL;
 
-	printf("%s: jc %d\n", __func__, args->jc);
+	printf("%s: jc %x\n", __func__, args->jc);
 
 	if (args->jc == 0)
 		return (EINVAL);
