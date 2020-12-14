@@ -115,6 +115,27 @@ panfrost_mmu_exception_name(uint32_t exc_code)
 	return "UNKNOWN";
 }
 
+static const char *
+access_type_name(struct panfrost_softc *sc, uint32_t fault_status)
+{
+
+	switch (fault_status & AS_FAULTSTATUS_ACCESS_TYPE_MASK) {
+	case AS_FAULTSTATUS_ACCESS_TYPE_ATOMIC:
+		if (panfrost_has_hw_feature(sc, HW_FEATURE_AARCH64_MMU))
+			return "ATOMIC";
+		else
+			return "UNKNOWN";
+	case AS_FAULTSTATUS_ACCESS_TYPE_READ:
+		return "READ";
+	case AS_FAULTSTATUS_ACCESS_TYPE_WRITE:
+		return "WRITE";
+	case AS_FAULTSTATUS_ACCESS_TYPE_EX:
+		return "EXECUTE";
+	default:
+		return NULL;
+	}
+}
+
 void
 panfrost_mmu_intr(void *arg)
 {
@@ -150,8 +171,9 @@ panfrost_mmu_intr(void *arg)
 		printf("%s: %s fault at %lx\n", __func__,
 		    panfrost_mmu_exception_name(exception_type), addr);
 
-	printf("%s: exception type %x, access type %x, source id %x \n",
-	    __func__, exception_type, access_type, source_id);
+	printf("%s: exception type %x, access type %x (%s), source id %x \n",
+	    __func__, exception_type, access_type,
+	    access_type_name(sc, fault_status), source_id);
 }
 
 int
@@ -315,9 +337,8 @@ panfrost_mmu_map(struct panfrost_gem_mapping *mapping)
 	struct panfrost_mmu *mmu;
 	vm_prot_t prot;
 	vm_offset_t va;
-	vm_page_t *ma;
-	vm_page_t m;
 	vm_paddr_t pa;
+	vm_page_t m;
 	int error;
 	int i;
 
@@ -329,7 +350,6 @@ panfrost_mmu_map(struct panfrost_gem_mapping *mapping)
 		panic("could not get pages");
 
 	m = bo->pages;
-	ma = &m;
 
 	va = mapping->mmnode.start << PAGE_SHIFT;
 	prot = VM_PROT_READ | VM_PROT_WRITE;
@@ -337,8 +357,9 @@ panfrost_mmu_map(struct panfrost_gem_mapping *mapping)
 		prot |= VM_PROT_EXECUTE;
 
 	/* map pages */
-	for (i = 0; i < bo->npages; i++) {
-		pa = VM_PAGE_TO_PHYS(ma[i]);
+	for (i = 0; i < bo->npages; i++, m++) {
+		pa = VM_PAGE_TO_PHYS(m);
+		printf("%s: mapping %lx -> %lx\n", __func__, va, pa);
 		error = pmap_senter(&mmu->p, va, pa, prot, 0);
 		va += PAGE_SIZE;
 	}
