@@ -447,6 +447,14 @@ panfrost_gem_get_pages(struct panfrost_gem_object *bo)
 	bo->pages = m;
 	bo->npages = npages;
 
+	int i;
+
+	for (i = 0; i < npages; i++, m++) {
+		if ((m->flags & PG_ZERO) == 0)
+			pmap_zero_page(m);
+		m->valid = VM_PAGE_BITS_ALL;
+	}
+
 	return (0);
 }
 
