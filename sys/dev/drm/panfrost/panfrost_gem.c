@@ -78,6 +78,7 @@ panfrost_gem_free_object(struct drm_gem_object *obj)
 int
 panfrost_gem_open(struct drm_gem_object *obj, struct drm_file *file_priv)
 {
+	struct panfrost_softc *sc;
 	struct panfrost_gem_mapping *mapping;
 	struct panfrost_gem_object *bo;
 	struct panfrost_file *pfile;
@@ -87,6 +88,7 @@ panfrost_gem_open(struct drm_gem_object *obj, struct drm_file *file_priv)
 
 	bo = (struct panfrost_gem_object *)obj;
 	pfile = file_priv->driver_priv;
+	sc = pfile->sc;
 
 	mapping = malloc(sizeof(*mapping), M_DEVBUF, M_ZERO | M_WAITOK);
 	mapping->obj = bo;
@@ -123,7 +125,7 @@ panfrost_gem_open(struct drm_gem_object *obj, struct drm_file *file_priv)
 #endif
 
 	if (!bo->is_heap) {
-		error = panfrost_mmu_map(mapping);
+		error = panfrost_mmu_map(sc, mapping);
 		if (error)
 			return (error);
 	}

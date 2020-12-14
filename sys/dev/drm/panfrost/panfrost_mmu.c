@@ -174,6 +174,8 @@ panfrost_mmu_intr(void *arg)
 	printf("%s: exception type %x, access type %x (%s), source id %x \n",
 	    __func__, exception_type, access_type,
 	    access_type_name(sc, fault_status), source_id);
+
+	panic("mmu intr\n");
 }
 
 int
@@ -262,16 +264,18 @@ mmu_hw_do_operation_locked(struct panfrost_softc *sc, uint32_t as,
 	return (0);
 }
 
-#if 0
 static int
 mmu_hw_do_operation(struct panfrost_softc *sc,
     struct panfrost_mmu *mmu, vm_offset_t va, size_t size, uint32_t op)
 {
+	int error;
 
-	mtx_lock(sc->as_mtx);
-	mtx_unlock(sc->as_mtx);
+	mtx_lock_spin(&sc->as_mtx);
+	error = mmu_hw_do_operation_locked(sc, mmu->as, va, size, op);
+	mtx_unlock_spin(&sc->as_mtx);
+
+	return (error);
 }
-#endif
 
 int
 panfrost_mmu_enable(struct panfrost_softc *sc, struct panfrost_mmu *mmu)
@@ -285,6 +289,7 @@ panfrost_mmu_enable(struct panfrost_softc *sc, struct panfrost_mmu *mmu)
 	p = &mmu->p;
 
 	paddr = p->pm_l0_paddr;
+printf("%s: paddr %lx\n", __func__, paddr);
 	paddr |= ARM_MALI_LPAE_TTBR_READ_INNER;
 	paddr |= ARM_MALI_LPAE_TTBR_ADRMODE_TABLE;
 
@@ -330,8 +335,17 @@ panfrost_mmu_as_get(struct panfrost_softc *sc, struct panfrost_mmu *mmu)
 	return (as);
 }
 
+static void
+panfrost_mmu_flush_range(struct panfrost_softc *sc, struct panfrost_mmu *mmu,
+    vm_offset_t va, size_t size)
+{
+
+	mmu_hw_do_operation(sc, mmu, va, size, AS_COMMAND_FLUSH_PT);
+}
+
 int
-panfrost_mmu_map(struct panfrost_gem_mapping *mapping)
+panfrost_mmu_map(struct panfrost_softc *sc,
+    struct panfrost_gem_mapping *mapping)
 {
 	struct panfrost_gem_object *bo;
 	struct panfrost_mmu *mmu;
@@ -340,6 +354,7 @@ panfrost_mmu_map(struct panfrost_gem_mapping *mapping)
 	vm_paddr_t pa;
 	vm_page_t m;
 	int error;
+	vm_offset_t sva;
 	int i;
 
 	bo = mapping->obj;
@@ -352,6 +367,7 @@ panfrost_mmu_map(struct panfrost_gem_mapping *mapping)
 	m = bo->pages;
 
 	va = mapping->mmnode.start << PAGE_SHIFT;
+	sva = va;
 	prot = VM_PROT_READ | VM_PROT_WRITE;
 	if (bo->noexec == 0)
 		prot |= VM_PROT_EXECUTE;
@@ -365,6 +381,8 @@ panfrost_mmu_map(struct panfrost_gem_mapping *mapping)
 	}
 
 	mapping->active = true;
+
+	panfrost_mmu_flush_range(sc, mmu, sva, va - sva);
 
 	return (0);
 }

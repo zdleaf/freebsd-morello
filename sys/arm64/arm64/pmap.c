@@ -3659,13 +3659,17 @@ pmap_senter(pmap_t pmap, vm_offset_t va, vm_paddr_t pa,
 	KASSERT(va < VM_MAXUSER_ADDRESS, ("wrong address space"));
 
 	va = trunc_page(va);
-	new_l3 = (pt_entry_t)(pa | ATTR_SH(ATTR_SH_IS) |
-	    ATTR_S1_IDX(VM_MEMATTR_DEVICE) | L3_BLOCK);
-	if ((prot & VM_PROT_WRITE) == 0)
-		new_l3 |= ATTR_S1_AP(ATTR_S1_AP_RO);
-	new_l3 |= ATTR_S1_XN; /* Execute never. */
-	new_l3 |= ATTR_S1_AP(ATTR_S1_AP_USER);
-	new_l3 |= ATTR_S1_nG; /* Non global. */
+	new_l3 = (pt_entry_t)(pa | ATTR_SH(ATTR_SH_OS) | L3_BLOCK);
+
+	//    ATTR_S1_IDX(VM_MEMATTR_DEVICE) | L3_BLOCK);
+	//if ((prot & VM_PROT_WRITE) == 0)
+	//	new_l3 |= ATTR_S1_AP(ATTR_S1_AP_RO);
+
+	new_l3 |= (1 << 6); //read
+	new_l3 |= (2 << 6); //write
+	//new_l3 |= ATTR_S1_XN; /* Execute never. */
+	//new_l3 |= ATTR_S1_AP(ATTR_S1_AP_USER);
+	//new_l3 |= ATTR_S1_nG; /* Non global. */
 
 	CTR2(KTR_PMAP, "pmap_senter: %.16lx -> %.16lx", va, pa);
 

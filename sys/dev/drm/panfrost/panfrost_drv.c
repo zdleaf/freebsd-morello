@@ -264,8 +264,6 @@ panfrost_ioctl_submit(struct drm_device *dev, void *data,
 	if (error)
 		return (EINVAL);
 
-printf("%s: pushing job\n", __func__);
-
 	error = panfrost_job_push(job);
 	if (error)
 		return (EINVAL);

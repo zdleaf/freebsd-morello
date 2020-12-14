@@ -73,13 +73,20 @@ void
 panfrost_job_intr(void *arg)
 {
 	struct panfrost_softc *sc;
+	uint32_t stat;
 	uint32_t status;
 
 	sc = arg;
 
-	status = GPU_READ(sc, JOB_INT_STAT);
+	stat = GPU_READ(sc, JOB_INT_STAT);
+	status = GPU_READ(sc, JS_STATUS(1));
 
-	printf("%s: status %x\n", __func__, status);
+	printf("%s: stat %x status %x\n", __func__, stat, status);
+	printf("%s: head %x tail %x\n", __func__,
+	    GPU_READ(sc, JS_HEAD_LO(1)),
+	    GPU_READ(sc, JS_TAIL_LO(1)));
+
+	panic("Error");
 }
 
 static void
@@ -136,6 +143,8 @@ panfrost_job_hw_submit(struct panfrost_job *job, int slot)
 	GPU_WRITE(sc, JS_COMMAND_NEXT(slot), JS_COMMAND_START);
 }
 
+int flag = 0;
+
 int
 panfrost_job_push(struct panfrost_job *job)
 {
@@ -145,6 +154,15 @@ panfrost_job_push(struct panfrost_job *job)
 	int error;
 
 	sc = job->sc;
+
+	slot = panfrost_job_get_slot(job);
+
+	if (flag++ >= 1) {
+		printf("%s: not pushing job\n", __func__);
+		return (0);
+	}
+
+printf("%s: pushing job to slot %d\n", __func__, slot);
 
 	error = drm_gem_lock_reservations(job->bos, job->bo_count,
 	    &acquire_ctx);
@@ -159,7 +177,6 @@ panfrost_job_push(struct panfrost_job *job)
 
 	drm_gem_unlock_reservations(job->bos, job->bo_count, &acquire_ctx);
 
-	slot = panfrost_job_get_slot(job);
 	panfrost_job_hw_submit(job, slot);
 
 	return (0);
