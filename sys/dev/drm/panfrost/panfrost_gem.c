@@ -200,7 +200,6 @@ panfrost_gem_fault(struct vm_area_struct *vma, struct vm_fault *vmf)
 	struct drm_gem_object *gem_obj;
 	vm_object_t obj;
 	vm_pindex_t pidx;
-	vm_page_t *ma;
 	vm_page_t m;
 	struct page *page;
 	int i;
@@ -209,7 +208,6 @@ panfrost_gem_fault(struct vm_area_struct *vma, struct vm_fault *vmf)
 	gem_obj = vma->vm_private_data;
 	bo = (struct panfrost_gem_object *)gem_obj;
 	m = bo->pages;
-	ma = &m;
 
 	pidx = OFF_TO_IDX(vmf->address - vma->vm_start);
 	if (pidx >= bo->npages) {
@@ -218,11 +216,11 @@ panfrost_gem_fault(struct vm_area_struct *vma, struct vm_fault *vmf)
 		return (VM_FAULT_SIGBUS);
 	}
 
-printf("%s: pidx %d, ma %p\n", __func__, pidx, ma);
+printf("%s: bo %p pidx %d, m %p\n", __func__, bo, pidx, m);
 
 	VM_OBJECT_WLOCK(obj);
 	for (i = 0; i < bo->npages; i++) {
-		page = &bo->pages[i];
+		page = m++;
 		printf("%s: busied page %d\n", __func__, i);
 		if (vm_page_busied(page))
 			goto fail_unlock;
@@ -254,6 +252,7 @@ panfrost_gem_vm_open(struct vm_area_struct *vma)
 {
 
 	printf("%s\n", __func__);
+	drm_gem_vm_open(vma);
 }
 
 static void
@@ -261,6 +260,7 @@ panfrost_gem_vm_close(struct vm_area_struct *vma)
 {
 
 	printf("%s\n", __func__);
+	drm_gem_vm_close(vma);
 }
 
 static const struct vm_operations_struct panfrost_gem_vm_ops = {
@@ -439,7 +439,7 @@ panfrost_gem_get_pages(struct panfrost_gem_object *bo)
 	boundary = 0;
 	pflags = VM_ALLOC_NORMAL  | VM_ALLOC_NOOBJ | VM_ALLOC_NOBUSY |
 	    VM_ALLOC_WIRED | VM_ALLOC_ZERO;
-	memattr = VM_MEMATTR_DEFAULT;
+	memattr = VM_MEMATTR_UNCACHEABLE; //DEFAULT;
 
 	m = vm_page_alloc_contig(NULL, 0, pflags, npages, low, high,
 	    alignment, boundary, memattr);

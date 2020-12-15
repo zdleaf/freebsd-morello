@@ -3659,7 +3659,7 @@ pmap_senter(pmap_t pmap, vm_offset_t va, vm_paddr_t pa,
 	KASSERT(va < VM_MAXUSER_ADDRESS, ("wrong address space"));
 
 	va = trunc_page(va);
-	new_l3 = (pt_entry_t)(pa | ATTR_SH(ATTR_SH_OS) | L3_BLOCK);
+	new_l3 = (pt_entry_t)(pa | ATTR_SH(ATTR_SH_IS) | L3_BLOCK);
 
 	//    ATTR_S1_IDX(VM_MEMATTR_DEVICE) | L3_BLOCK);
 	//if ((prot & VM_PROT_WRITE) == 0)

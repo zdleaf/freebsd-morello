@@ -355,7 +355,7 @@ panfrost_mmu_map(struct panfrost_softc *sc,
 	vm_page_t m;
 	int error;
 	vm_offset_t sva;
-	int i;
+	int i, j;
 
 	bo = mapping->obj;
 	mmu = mapping->mmu;
@@ -372,12 +372,26 @@ panfrost_mmu_map(struct panfrost_softc *sc,
 	if (bo->noexec == 0)
 		prot |= VM_PROT_EXECUTE;
 
+	printf("%s: bo %p mapping %lx -> %lx, %d pages\n",
+	    __func__, bo, sva, VM_PAGE_TO_PHYS(m), bo->npages);
+
+	vm_offset_t kva, *kvva;
+
 	/* map pages */
 	for (i = 0; i < bo->npages; i++, m++) {
+		//printf("%s: mapping %lx -> %lx\n", __func__, sva, pa);
 		pa = VM_PAGE_TO_PHYS(m);
-		printf("%s: mapping %lx -> %lx\n", __func__, va, pa);
 		error = pmap_senter(&mmu->p, va, pa, prot, 0);
 		va += PAGE_SIZE;
+
+		kva = kva_alloc(PAGE_SIZE);
+		kvva = (vm_offset_t *)kva;
+		pmap_kenter(kva, PAGE_SIZE, pa, VM_MEMATTR_UNCACHEABLE);
+		printf("words ");
+		for (j = 0; j < 3; j++) {
+			printf("%lx ", kvva[j]);
+		}
+		printf("\n");
 	}
 
 	mapping->active = true;
