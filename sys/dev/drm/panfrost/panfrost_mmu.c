@@ -136,6 +136,69 @@ access_type_name(struct panfrost_softc *sc, uint32_t fault_status)
 	}
 }
 
+struct panfrost_gem_mapping *
+panfrost_mmu_find_mapping(struct panfrost_softc *sc, int as, uint64_t addr)
+{
+	struct panfrost_gem_mapping *mapping;
+	struct panfrost_file *pfile;
+	struct panfrost_mmu *mmu;
+	struct drm_mm_node *node;
+	uint64_t offset;
+
+	mapping = NULL;
+
+	mtx_lock_spin(&sc->as_mtx);
+
+	/* Find mmu first */
+	TAILQ_FOREACH(mmu, &sc->mmu_in_use, next) {
+		if (mmu->as == as)
+			goto found;
+	};
+	goto out;
+
+found:
+	pfile = container_of(mmu, struct panfrost_file, mmu);
+
+	mtx_lock_spin(&pfile->mm_lock);
+
+	offset = addr >> PAGE_SHIFT;
+	drm_mm_for_each_node(node, &pfile->mm) {
+		if (offset >= node->start &&
+		    offset < (node->start + node->size)) {
+			mapping = container_of(node,
+			    struct panfrost_gem_mapping, mmnode);
+			/* TODO: take mapping ref */
+			break;
+		};
+	};
+
+	mtx_unlock_spin(&pfile->mm_lock);
+
+out:
+	mtx_unlock_spin(&sc->as_mtx);
+
+	return (mapping);
+}
+
+static int
+panfrost_mmu_page_fault(struct panfrost_softc *sc, int as, uint64_t addr)
+{
+	struct panfrost_gem_mapping *mapping;
+	struct panfrost_gem_object *bo;
+	vm_offset_t page_offset;
+
+	mapping = panfrost_mmu_find_mapping(sc, as, addr);
+	printf("%s: mapping %p\n", __func__, mapping);
+
+	bo = mapping->obj;
+
+	addr &= ~((uint64_t)2*1024*1024 - 1);
+	page_offset = addr >> PAGE_SHIFT;
+	page_offset -= mapping->mmnode.start;
+
+	return (0);
+}
+
 void
 panfrost_mmu_intr(void *arg)
 {
@@ -165,9 +228,10 @@ panfrost_mmu_intr(void *arg)
 	access_type = (fault_status >> 8) & 0x3;
 	source_id = (fault_status >> 16);
 
-	if ((exception_type & 0xF8) == 0xC0)
+	if ((exception_type & 0xF8) == 0xC0) {
 		printf("%s: page fault at %lx\n", __func__, addr);
-	else
+		panfrost_mmu_page_fault(sc, i, addr);
+	} else
 		printf("%s: %s fault at %lx\n", __func__,
 		    panfrost_mmu_exception_name(exception_type), addr);
 
@@ -329,6 +393,8 @@ panfrost_mmu_as_get(struct panfrost_softc *sc, struct panfrost_mmu *mmu)
 	mtx_unlock_spin(&sc->as_mtx);
 
 	mmu->as = as;
+
+	TAILQ_INSERT_TAIL(&sc->mmu_in_use, mmu, next);
 
 	panfrost_mmu_enable(sc, mmu);
 

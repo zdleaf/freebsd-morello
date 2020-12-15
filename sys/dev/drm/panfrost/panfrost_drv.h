@@ -74,6 +74,8 @@ struct panfrost_softc {
 
 	uint64_t		as_alloc_set;
 	struct mtx		as_mtx;
+
+	TAILQ_HEAD(, panfrost_mmu)	mmu_in_use;
 };
 
 #define	GPU_READ(sc, reg)	bus_read_4((sc)->res[0], (reg))

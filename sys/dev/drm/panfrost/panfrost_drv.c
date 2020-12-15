@@ -800,6 +800,8 @@ panfrost_attach(device_t dev)
 	sc = device_get_softc(dev);
 	sc->dev = dev;
 
+	TAILQ_INIT(&sc->mmu_in_use);
+
 	node = ofw_bus_get_node(sc->dev);
 
 	if (bus_alloc_resources(dev, mali_spec, sc->res) != 0) {

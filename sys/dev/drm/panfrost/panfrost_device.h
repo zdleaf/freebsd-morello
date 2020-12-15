@@ -36,6 +36,7 @@
 struct panfrost_mmu {
 	struct pmap p;
 	int as;		/* asid set */
+	TAILQ_ENTRY(panfrost_mmu)	next;	/* entry in mmu_in_use list */
 };
 
 struct panfrost_file {
