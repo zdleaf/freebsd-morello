@@ -220,33 +220,22 @@ panfrost_mmu_page_fault(struct panfrost_softc *sc, int as, uint64_t addr)
 	return (0);
 }
 
-void
-panfrost_mmu_intr(void *arg)
+static void
+panfrost_mmu_fault(struct panfrost_softc *sc, int as)
 {
-	struct panfrost_softc *sc;
 	uint32_t fault_status;
 	uint32_t exception_type;
 	uint32_t access_type;
 	uint32_t source_id;
-	uint32_t status;
 	uint64_t addr;
-	int i;
 
-	sc = arg;
-
-	status = GPU_READ(sc, MMU_INT_RAWSTAT);
-
-	printf("%s: status %x\n", __func__, status);
-
-	i = 0;
-
-	fault_status = GPU_READ(sc, AS_FAULTSTATUS(i));
+	fault_status = GPU_READ(sc, AS_FAULTSTATUS(as));
 	printf("%s: fault status %x\n", __func__, fault_status);
 	printf("%s: AS_TRANSTAB_LO %x AS_TRANSTAB_HI %x\n", __func__,
 	    GPU_READ(sc, AS_TRANSTAB_LO(0)), GPU_READ(sc, AS_TRANSTAB_HI(0)));
 
-	addr = GPU_READ(sc, AS_FAULTADDRESS_LO(i));
-	addr |= (uint64_t)GPU_READ(sc, AS_FAULTADDRESS_HI(i)) << 32;
+	addr = GPU_READ(sc, AS_FAULTADDRESS_LO(as));
+	addr |= (uint64_t)GPU_READ(sc, AS_FAULTADDRESS_HI(as)) << 32;
 
 	exception_type = fault_status & 0xFF;
 	access_type = (fault_status >> 8) & 0x3;
@@ -254,8 +243,7 @@ panfrost_mmu_intr(void *arg)
 
 	if ((exception_type & 0xF8) == 0xC0) {
 		printf("%s: page fault at %lx\n", __func__, addr);
-		panfrost_mmu_page_fault(sc, i, addr);
-		GPU_WRITE(sc, MMU_INT_CLEAR, 1 | (1 << 16));
+		panfrost_mmu_page_fault(sc, as, addr);
 	} else
 		printf("%s: %s fault at %lx\n", __func__,
 		    panfrost_mmu_exception_name(exception_type), addr);
@@ -263,10 +251,29 @@ panfrost_mmu_intr(void *arg)
 	printf("%s: exception type %x, access type %x (%s), source id %x \n",
 	    __func__, exception_type, access_type,
 	    access_type_name(sc, fault_status), source_id);
+}
 
-	//panic("mmu intr\n");
-	//panfrost_mmu_flush_range(sc, mmu, addr, 4096*2048);
-	//mmu_hw_do_operation_locked(sc, 0, addr, 4096*2048, AS_COMMAND_FLUSH_PT);
+void
+panfrost_mmu_intr(void *arg)
+{
+	struct panfrost_softc *sc;
+	uint32_t status;
+	int i;
+
+	sc = arg;
+
+	status = GPU_READ(sc, MMU_INT_RAWSTAT);
+	printf("%s: status %x\n", __func__, status);
+
+	for (i = 0; status != 0; i++) {
+		if (status & (1 << i)) {
+			panfrost_mmu_fault(sc, i);
+			status &= ~(1 << i);
+		}
+		if (status & (1 << (16 + i)))
+			panic("error");
+		GPU_WRITE(sc, MMU_INT_CLEAR, (1 << i) | (1 << (i + 16)));
+	}
 }
 
 int
