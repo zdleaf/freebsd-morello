@@ -3641,6 +3641,117 @@ restart:
 	return (KERN_SUCCESS);
 }
 
+void
+pmap_gfault(pmap_t pmap, vm_offset_t va)
+{
+	pd_entry_t *pde;
+	pt_entry_t pte;
+	int lvl;
+
+	va = trunc_page(va);
+	pde = pmap_pde(pmap, va, &lvl);
+	pte = pmap_load(pde);
+	printf("%s: va %lx pte %lx, lvl %d\n", __func__, va, pte, lvl);
+
+	pd_entry_t *l0p;
+	pd_entry_t *l1p;
+	pd_entry_t *l2p;
+	pd_entry_t *l3p;
+	pt_entry_t l0, l1, l2, l3;
+
+	l0p = pmap_l0(pmap, va);
+	l1p = pmap_l1(pmap, va);
+	l2p = pmap_l2(pmap, va);
+	l3p = pmap_l2_to_l3(l2p, va);
+
+	l0 = pmap_load(l0p);
+	l1 = pmap_load(l1p);
+	l2 = pmap_load(l2p);
+	l3 = pmap_load(l3p);
+
+	printf("%s: l0 %lx l1 %lx l2 %lx l3 %lx\n", __func__,
+	    l0, l1, l2, l3);
+
+	printf("%s: l0 ptr %p val %lx\n", __func__, l0p, l0);
+	printf("%s: l1 ptr %p val %lx\n", __func__, l1p, l1);
+	printf("%s: l2 ptr %p val %lx\n", __func__, l2p, l2);
+	printf("%s: l3 ptr %p val %lx\n", __func__, l3p, l3);
+}
+
+/*
+ * Add a single GPU entry. This function does not sleep.
+ */
+int
+pmap_genter(pmap_t pmap, vm_offset_t va, vm_paddr_t pa,
+    vm_prot_t prot, u_int flags)
+{
+	pd_entry_t *pde;
+	pt_entry_t new_l3, orig_l3;
+	pt_entry_t *l3;
+	vm_page_t mpte;
+	int lvl;
+	int rv;
+
+	PMAP_ASSERT_STAGE1(pmap);
+	KASSERT(va < VM_MAXUSER_ADDRESS, ("wrong address space"));
+
+	va = trunc_page(va);
+	new_l3 = (pt_entry_t)(pa | ATTR_SH(ATTR_SH_IS) | L3_BLOCK);
+
+	if (prot & VM_PROT_READ)
+		new_l3 |= (1 << 6);
+	if (prot & VM_PROT_WRITE)
+		new_l3 |= (1 << 7);
+	if ((prot & VM_PROT_EXECUTE) == 0)
+		new_l3 |= ATTR_S1_XN; /* Execute never. */
+
+	CTR2(KTR_PMAP, "pmap_genter: %.16lx -> %.16lx", va, pa);
+
+	PMAP_LOCK(pmap);
+
+	/*
+	 * In the case that a page table page is not
+	 * resident, we are creating it here.
+	 */
+	uint64_t val;
+retry:
+	pde = pmap_pde(pmap, va, &lvl);
+	if (pde) {
+		val = pmap_load(pde);
+		//printf("va %lx pde %p phys %lx val %lx, lv %d, l3 %lx\n",
+		//    va, pde, vtophys(pde), val, lvl, new_l3);
+	} //else
+		//printf("va %lx pde is %p lvl %d new_l3 %lx\n",
+		//    va, pde, lvl, new_l3);
+
+	if (pde != NULL && lvl == 2) {
+		l3 = pmap_l2_to_l3(pde, va);
+	} else {
+		mpte = _pmap_alloc_l3(pmap, pmap_l2_pindex(va), NULL);
+		if (mpte == NULL) {
+			CTR0(KTR_PMAP, "pmap_enter: mpte == NULL");
+			rv = KERN_RESOURCE_SHORTAGE;
+			goto out;
+		}
+		goto retry;
+	}
+
+	orig_l3 = pmap_load(l3);
+	KASSERT(!pmap_l3_valid(orig_l3), ("l3 is valid"));
+
+	/* New mapping */
+	pmap_store(l3, new_l3);
+	pmap_resident_count_inc(pmap, 1);
+	dsb(ishst);
+
+	rv = KERN_SUCCESS;
+out:
+	PMAP_UNLOCK(pmap);
+
+	return (rv);
+}
+
+
 /*
  * Add a single SMMU entry. This function does not sleep.
  */
@@ -3659,17 +3770,13 @@ pmap_senter(pmap_t pmap, vm_offset_t va, vm_paddr_t pa,
 	KASSERT(va < VM_MAXUSER_ADDRESS, ("wrong address space"));
 
 	va = trunc_page(va);
-	new_l3 = (pt_entry_t)(pa | ATTR_SH(ATTR_SH_IS) | L3_BLOCK);
-
-	//    ATTR_S1_IDX(VM_MEMATTR_DEVICE) | L3_BLOCK);
-	//if ((prot & VM_PROT_WRITE) == 0)
-	//	new_l3 |= ATTR_S1_AP(ATTR_S1_AP_RO);
-
-	new_l3 |= (1 << 6); //read
-	new_l3 |= (2 << 6); //write
-	//new_l3 |= ATTR_S1_XN; /* Execute never. */
-	//new_l3 |= ATTR_S1_AP(ATTR_S1_AP_USER);
-	//new_l3 |= ATTR_S1_nG; /* Non global. */
+	new_l3 = (pt_entry_t)(pa | ATTR_DEFAULT |
+	    ATTR_S1_IDX(VM_MEMATTR_DEVICE) | L3_PAGE);
+	if ((prot & VM_PROT_WRITE) == 0)
+		new_l3 |= ATTR_S1_AP(ATTR_S1_AP_RO);
+	new_l3 |= ATTR_S1_XN; /* Execute never. */
+	new_l3 |= ATTR_S1_AP(ATTR_S1_AP_USER);
+	new_l3 |= ATTR_S1_nG; /* Non global. */
 
 	CTR2(KTR_PMAP, "pmap_senter: %.16lx -> %.16lx", va, pa);
 
