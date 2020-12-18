@@ -78,6 +78,8 @@ panfrost_job_intr(void *arg)
 
 	sc = arg;
 
+	printf("%s\n", __func__);
+
 	stat = GPU_READ(sc, JOB_INT_STAT);
 	status = GPU_READ(sc, JS_STATUS(1));
 
@@ -85,8 +87,7 @@ panfrost_job_intr(void *arg)
 	printf("%s: head %x tail %x\n", __func__,
 	    GPU_READ(sc, JS_HEAD_LO(1)),
 	    GPU_READ(sc, JS_TAIL_LO(1)));
-
-	panic("Error");
+	//panic("Error");
 }
 
 static void
@@ -111,6 +112,18 @@ panfrost_job_get_slot(struct panfrost_job *job)
 }
 
 static void
+panfrost_job_write_affinity(struct panfrost_softc *sc, uint32_t requirements,
+    int js)
+{
+	uint64_t affinity;
+
+	affinity = sc->features.shader_present;
+
+	GPU_WRITE(sc, JS_AFFINITY_NEXT_LO(js), affinity & 0xFFFFFFFF);
+	GPU_WRITE(sc, JS_AFFINITY_NEXT_HI(js), affinity >> 32);
+}
+
+static void
 panfrost_job_hw_submit(struct panfrost_job *job, int slot)
 {
 	struct panfrost_softc *sc;
@@ -124,6 +137,8 @@ panfrost_job_hw_submit(struct panfrost_job *job, int slot)
 
 	GPU_WRITE(sc, JS_HEAD_NEXT_LO(slot), jc_head & 0xFFFFFFFF);
 	GPU_WRITE(sc, JS_HEAD_NEXT_HI(slot), jc_head >> 32);
+
+	panfrost_job_write_affinity(sc, job->requirements, slot);
 
 	cfg |= JS_CONFIG_THREAD_PRI(8) |
 	    JS_CONFIG_START_FLUSH_CLEAN_INVALIDATE |
