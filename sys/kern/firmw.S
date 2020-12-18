@@ -1,8 +1,12 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
- * Copyright (c) 2011, 2012 The FreeBSD Foundation
- * All rights reserved.
+ * Copyright (c) 2020 John Baldwin <jhb@FreeBSD.org>
+ *
+ * This software was developed by SRI International and the University of
+ * Cambridge Computer Laboratory (Department of Computer Science and
+ * Technology) under DARPA contract HR0011-18-C-0016 ("ECATS"), as part of the
+ * DARPA SSITH research programme.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -28,35 +32,18 @@
  * $FreeBSD$
  */
 
-#ifndef _LOCALE_T_DEFINED
-#define _LOCALE_T_DEFINED
-typedef struct	_xlocale *locale_t;
-#endif
+#include <sys/cdefs.h>
 
-/*
- * This file is included from both string.h and xlocale.h.  We need to expose
- * the declarations unconditionally if we are included from xlocale.h, but only
- * if we are in POSIX2008 mode if included from string.h.
- */
+#define	FIRMW_START(S)	__CONCAT(_binary_, __CONCAT(S, _start))
+#define	FIRMW_END(S)	__CONCAT(_binary_, __CONCAT(S, _end))
 
-#ifndef _XLOCALE_STRING1_H
-#define _XLOCALE_STRING1_H
-
-/*
- * POSIX2008 functions
- */
-int	 strcoll_l(const char *, const char *, locale_t);
-char	*strerror_l(int num, locale_t);
-size_t	 strxfrm_l(char *, const char *, size_t, locale_t);
-#endif /* _XLOCALE_STRING1_H */
-
-/*
- * xlocale extensions
- */
-#ifdef _XLOCALE_H_
-#ifndef _XLOCALE_STRING2_H
-#define _XLOCALE_STRING2_H
-char	*strcasestr_l(const char *, const char *, locale_t);
-
-#endif /* _XLOCALE_STRING2_H */
-#endif /* _XLOCALE_H_ */
+	.section rodata, "a", %progbits
+	.globl	FIRMW_START(FIRMW_SYMBOL)
+	.type	FIRMW_START(FIRMW_SYMBOL), %object
+FIRMW_START(FIRMW_SYMBOL):
+	.incbin	__XSTRING(FIRMW_FILE)
+	.size	FIRMW_START(FIRMW_SYMBOL), . - FIRMW_START(FIRMW_SYMBOL)
+	.globl	FIRMW_END(FIRMW_SYMBOL)
+	.type	FIRMW_END(FIRMW_SYMBOL), %object
+FIRMW_END(FIRMW_SYMBOL):
+	.size	FIRMW_END(FIRMW_SYMBOL), . - FIRMW_END(FIRMW_SYMBOL)
