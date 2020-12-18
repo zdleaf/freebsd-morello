@@ -63,6 +63,12 @@ struct panfrost_features {
 	uint64_t		hw_issues;
 };
 
+struct panfrost_slot {
+	int running;
+};
+
+struct panfrost_job;
+
 struct panfrost_softc {
 	device_t		dev;
 	struct drm_device	drm_dev;
@@ -76,6 +82,13 @@ struct panfrost_softc {
 	struct mtx		as_mtx;
 
 	TAILQ_HEAD(, panfrost_mmu)	mmu_in_use;
+	struct mtx			mmu_lock;
+
+	TAILQ_HEAD(, panfrost_job)	job_queue;
+	struct mtx			job_lock;
+	struct panfrost_slot		slot_status[3];
+	struct panfrost_job		*jobs[3];
+	int running;
 };
 
 #define	GPU_READ(sc, reg)	bus_read_4((sc)->res[0], (reg))

@@ -51,6 +51,8 @@ struct panfrost_job {
 	uint32_t bo_count;
 
 	struct dma_fence *render_done_fence;
+	int slot;
+	TAILQ_ENTRY(panfrost_job)	next;
 };
 
 int panfrost_job_push(struct panfrost_job *job);

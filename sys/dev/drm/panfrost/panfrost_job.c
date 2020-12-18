@@ -69,25 +69,52 @@ __FBSDID("$FreeBSD$");
 
 #define	NUM_JOB_SLOTS	3
 
+static void panfrost_job_wakeup(struct panfrost_softc *sc, int slot);
+
 void
 panfrost_job_intr(void *arg)
 {
 	struct panfrost_softc *sc;
 	uint32_t stat;
 	uint32_t status;
+	int mask;
+	int i;
 
 	sc = arg;
 
 	printf("%s\n", __func__);
 
 	stat = GPU_READ(sc, JOB_INT_STAT);
-	status = GPU_READ(sc, JS_STATUS(1));
 
-	printf("%s: stat %x status %x\n", __func__, stat, status);
-	printf("%s: head %x tail %x\n", __func__,
-	    GPU_READ(sc, JS_HEAD_LO(1)),
-	    GPU_READ(sc, JS_TAIL_LO(1)));
-	//panic("Error");
+	for (i = 0; stat; i++) {
+		mask = (1 << i) | (1 << (16 + i));
+		if ((stat & mask) == 0)
+			continue;
+
+		GPU_WRITE(sc, JOB_INT_CLEAR, mask);
+
+		if (stat & (1 << (16 + i))) {
+			status = GPU_READ(sc, JS_STATUS(i));
+			printf("%s: job error, status %x\n", __func__, status);
+			printf("%s: head %x tail %x\n", __func__,
+			    GPU_READ(sc, JS_HEAD_LO(i)),
+			    GPU_READ(sc, JS_TAIL_LO(i)));
+			panic("job error");
+
+			GPU_WRITE(sc, JS_COMMAND_NEXT(i), JS_COMMAND_NOP);
+		}
+
+		if (stat & (1 << i)) {
+			printf("%s: job at slot %d completed\n", __func__, i);
+			mtx_lock(&sc->job_lock);
+			sc->slot_status[i].running = 0;
+			mtx_unlock(&sc->job_lock);
+
+			panfrost_job_wakeup(sc, i);
+		}
+
+		stat &= ~mask;
+	}
 }
 
 static void
@@ -130,6 +157,8 @@ panfrost_job_hw_submit(struct panfrost_job *job, int slot)
 	uint32_t cfg;
 	uint64_t jc_head;
 
+	printf("%s: HW submitting new job to slot %d\n", __func__, slot);
+
 	sc = job->sc;
 	jc_head = job->jc;
 
@@ -158,7 +187,27 @@ panfrost_job_hw_submit(struct panfrost_job *job, int slot)
 	GPU_WRITE(sc, JS_COMMAND_NEXT(slot), JS_COMMAND_START);
 }
 
-int flag = 0;
+static void
+panfrost_job_wakeup(struct panfrost_softc *sc, int slot)
+{
+	struct panfrost_job *job, *job1;
+
+	mtx_lock(&sc->job_lock);
+
+	if (sc->slot_status[slot].running)
+		goto out;
+
+	TAILQ_FOREACH_SAFE(job, &sc->job_queue, next, job1) {
+		if (job->slot == slot) {
+			TAILQ_REMOVE(&sc->job_queue, job, next);
+			sc->slot_status[slot].running = 1;
+			panfrost_job_hw_submit(job, job->slot);
+		}
+	}
+
+out:
+	mtx_unlock(&sc->job_lock);
+}
 
 int
 panfrost_job_push(struct panfrost_job *job)
@@ -171,13 +220,9 @@ panfrost_job_push(struct panfrost_job *job)
 	sc = job->sc;
 
 	slot = panfrost_job_get_slot(job);
+	job->slot = slot;
 
-	if (flag++ >= 1) {
-		printf("%s: not pushing job\n", __func__);
-		return (0);
-	}
-
-printf("%s: pushing job to slot %d\n", __func__, slot);
+printf("%s: new job for slot %d\n", __func__, slot);
 
 	error = drm_gem_lock_reservations(job->bos, job->bo_count,
 	    &acquire_ctx);
@@ -192,7 +237,11 @@ printf("%s: pushing job to slot %d\n", __func__, slot);
 
 	drm_gem_unlock_reservations(job->bos, job->bo_count, &acquire_ctx);
 
-	panfrost_job_hw_submit(job, slot);
+	mtx_lock(&sc->job_lock);
+	TAILQ_INSERT_TAIL(&sc->job_queue, job, next);
+	mtx_unlock(&sc->job_lock);
+
+	panfrost_job_wakeup(sc, slot);
 
 	return (0);
 }

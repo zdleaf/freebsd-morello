@@ -193,6 +193,8 @@ panfrost_mmu_page_fault(struct panfrost_softc *sc, int as, uint64_t addr)
 	struct page *pages;
 	vm_object_t mapping;
 
+	return (0);
+
 	bomapping = panfrost_mmu_find_mapping(sc, as, addr);
 	printf("%s: bomapping %p\n", __func__, bomapping);
 
@@ -386,8 +388,6 @@ panfrost_mmu_flush_range(struct panfrost_softc *sc, struct panfrost_mmu *mmu,
 	mmu_hw_do_operation(sc, mmu, va, size, AS_COMMAND_FLUSH_PT);
 }
 
-int mflag = 0;
-
 int
 panfrost_mmu_enable(struct panfrost_softc *sc, struct panfrost_mmu *mmu)
 {
@@ -398,9 +398,6 @@ panfrost_mmu_enable(struct panfrost_softc *sc, struct panfrost_mmu *mmu)
 
 	as = mmu->as;
 	p = &mmu->p;
-
-	if (mflag++ > 0)
-		panic("remap");
 
 	paddr = p->pm_l0_paddr;
 printf("%s: l0 paddr %lx, mmu as %d\n", __func__, paddr, as);
@@ -444,7 +441,11 @@ panfrost_mmu_as_get(struct panfrost_softc *sc, struct panfrost_mmu *mmu)
 
 	mmu->as = as;
 
-	TAILQ_INSERT_TAIL(&sc->mmu_in_use, mmu, next);
+printf("%s: new as %d\n", __func__, as);
+
+	//mtx_lock_spin(&sc->as_mtx);
+	//TAILQ_INSERT_TAIL(&sc->mmu_in_use, mmu, next);
+	//mtx_unlock_spin(&sc->as_mtx);
 
 	panfrost_mmu_enable(sc, mmu);
 

@@ -273,7 +273,7 @@ printf("%s: sync_out\n", __func__);
 		drm_syncobj_replace_fence(sync_out, job->render_done_fence);
 	}
 
-printf("%s: job submitted\n", __func__);
+printf("%s: job enqueued\n", __func__);
 
 	return (0);
 }
@@ -801,6 +801,9 @@ panfrost_attach(device_t dev)
 	sc->dev = dev;
 
 	TAILQ_INIT(&sc->mmu_in_use);
+	TAILQ_INIT(&sc->job_queue);
+	mtx_init(&sc->mmu_lock, "mmu list", NULL, MTX_DEF);
+	mtx_init(&sc->job_lock, "job list", NULL, MTX_DEF);
 
 	node = ofw_bus_get_node(sc->dev);
 

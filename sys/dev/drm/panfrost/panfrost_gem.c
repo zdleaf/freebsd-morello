@@ -60,6 +60,7 @@ __FBSDID("$FreeBSD$");
 #include <dev/drm/drmkpi/include/linux/dma-buf.h>
 
 #include "panfrost_drv.h"
+#include "panfrost_job.h"
 #include "panfrost_drm.h"
 #include "panfrost_device.h"
 #include "panfrost_gem.h"
@@ -221,10 +222,10 @@ printf("%s: bo %p pidx %d, m %p\n", __func__, bo, pidx, m);
 	VM_OBJECT_WLOCK(obj);
 	for (i = 0; i < bo->npages; i++) {
 		page = m++;
-		printf("%s: busied page %d\n", __func__, i);
+		//printf("%s: busied page %d\n", __func__, i);
 		if (vm_page_busied(page))
 			goto fail_unlock;
-		printf("%s: insert page %d\n", __func__, i);
+		//printf("%s: insert page %d\n", __func__, i);
 		if (vm_page_insert(page, obj, i))
 			goto fail_unlock;
 		vm_page_xbusy(page);
@@ -304,10 +305,10 @@ drm_gem_shmem_mmap(struct drm_gem_object *obj, struct vm_area_struct *vma)
 
 	bo = (struct panfrost_gem_object *)obj;
 
-	printf("%s 1\n", __func__);
+	//printf("%s 1\n", __func__);
 	vma->vm_pgoff -= drm_vma_node_start(&obj->vma_node);
 
-	printf("%s 2\n", __func__);
+	//printf("%s 2\n", __func__);
 	if (obj->import_attach) {
 		printf("%s 3\n", __func__);
 		//drm_gem_object_put(obj);
@@ -315,13 +316,13 @@ drm_gem_shmem_mmap(struct drm_gem_object *obj, struct vm_area_struct *vma)
 		return dma_buf_mmap(obj->dma_buf, vma, 0);
 	}
 
-	printf("%s 4\n", __func__);
+	//printf("%s 4\n", __func__);
 	error = panfrost_gem_get_pages(bo);
 	if (error != 0) {
 		printf("failed to get pages\n");
 		return (-1);
 	}
-	printf("%s 5\n", __func__);
+	//printf("%s 5\n", __func__);
 
 	vma->vm_flags |= VM_MIXEDMAP | VM_DONTEXPAND;
 	vma->vm_page_prot = vm_get_page_prot(vma->vm_flags);
@@ -329,7 +330,7 @@ drm_gem_shmem_mmap(struct drm_gem_object *obj, struct vm_area_struct *vma)
 		vma->vm_page_prot = pgprot_writecombine(vma->vm_page_prot);
 	vma->vm_ops = &panfrost_gem_vm_ops;
 
-	printf("%s: return 0\n", __func__);
+	//printf("%s: return 0\n", __func__);
 
 	return (0);
 }

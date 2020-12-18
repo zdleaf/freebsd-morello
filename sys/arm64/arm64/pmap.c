@@ -3702,8 +3702,8 @@ pmap_genter(pmap_t pmap, vm_offset_t va, vm_paddr_t pa,
 		new_l3 |= (1 << 6);
 	if (prot & VM_PROT_WRITE)
 		new_l3 |= (1 << 7);
-	if ((prot & VM_PROT_EXECUTE) == 0)
-		new_l3 |= ATTR_S1_XN; /* Execute never. */
+	//if ((prot & VM_PROT_EXECUTE) == 0)
+	//	new_l3 |= ATTR_S1_XN; /* Execute never. */
 
 	CTR2(KTR_PMAP, "pmap_genter: %.16lx -> %.16lx", va, pa);
 
