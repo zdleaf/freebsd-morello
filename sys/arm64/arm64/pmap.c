@@ -3738,6 +3738,8 @@ retry:
 
 	orig_l3 = pmap_load(l3);
 	KASSERT(!pmap_l3_valid(orig_l3), ("l3 is valid"));
+	if ((orig_l3 & ATTR_DESCR_MASK) == L3_BLOCK)
+		panic("l3 is valid\n");
 
 	/* New mapping */
 	pmap_store(l3, new_l3);

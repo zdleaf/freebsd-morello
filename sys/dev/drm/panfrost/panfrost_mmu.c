@@ -160,6 +160,8 @@ panfrost_mmu_find_mapping(struct panfrost_softc *sc, int as, uint64_t addr)
 	};
 	goto out;
 
+printf("%s: mmu found\n", __func__);
+
 found:
 	pfile = container_of(mmu, struct panfrost_file, mmu);
 
@@ -193,10 +195,11 @@ panfrost_mmu_page_fault(struct panfrost_softc *sc, int as, uint64_t addr)
 	struct page *pages;
 	vm_object_t mapping;
 
-	return (0);
-
+printf("%s: as %d addr %lx\n", __func__, as, addr);
 	bomapping = panfrost_mmu_find_mapping(sc, as, addr);
 	printf("%s: bomapping %p\n", __func__, bomapping);
+	if (!bomapping)
+		panic("no bomapping");
 
 	bo = bomapping->obj;
 
@@ -290,7 +293,7 @@ panfrost_mmu_pgtable_alloc(struct panfrost_file *pfile)
 	pmap_pinit(p);
 	PMAP_LOCK_INIT(p);
 
-	mmu->as = 0; //-1;
+	mmu->as = -1;
 
 	return (0);
 }
@@ -429,10 +432,8 @@ panfrost_mmu_as_get(struct panfrost_softc *sc, struct panfrost_mmu *mmu)
 {
 	int as;
 
-	if (mmu->as >= 0) {
-		printf("mmu is running\n");
-		//panic("mmu is running");
-	}
+	if (mmu->as >= 0)
+		return (mmu->as);
 
 	mtx_lock_spin(&sc->as_mtx);
 	as = ffz(sc->as_alloc_set);
@@ -443,9 +444,9 @@ panfrost_mmu_as_get(struct panfrost_softc *sc, struct panfrost_mmu *mmu)
 
 printf("%s: new as %d\n", __func__, as);
 
-	//mtx_lock_spin(&sc->as_mtx);
-	//TAILQ_INSERT_TAIL(&sc->mmu_in_use, mmu, next);
-	//mtx_unlock_spin(&sc->as_mtx);
+	mtx_lock_spin(&sc->as_mtx);
+	TAILQ_INSERT_TAIL(&sc->mmu_in_use, mmu, next);
+	mtx_unlock_spin(&sc->as_mtx);
 
 	panfrost_mmu_enable(sc, mmu);
 
