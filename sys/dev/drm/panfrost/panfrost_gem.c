@@ -129,6 +129,9 @@ panfrost_gem_open(struct drm_gem_object *obj, struct drm_file *file_priv)
 		error = panfrost_mmu_map(sc, mapping);
 		if (error)
 			return (error);
+	} else {
+		printf("is heap\n");
+		panic("ok");
 	}
 
 	printf("%s: return 0\n", __func__);
