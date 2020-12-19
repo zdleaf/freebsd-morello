@@ -97,12 +97,12 @@ panfrost_gem_open(struct drm_gem_object *obj, struct drm_file *file_priv)
 
 	drm_gem_object_get(obj);
 
-	if (bo->noexec) {
-		align = obj->size >= 0x200000 ? 0x200000 >> PAGE_SHIFT : 0;
-		color = PANFROST_BO_NOEXEC;
-	} else {
+	if (!bo->noexec) {
 		align = obj->size >> PAGE_SHIFT;
 		color = 0;
+	} else {
+		align = obj->size >= 0x200000 ? 0x200000 >> PAGE_SHIFT : 0;
+		color = PANFROST_BO_NOEXEC;
 	}
 
 	printf("%s\n", __func__);
@@ -217,7 +217,8 @@ panfrost_gem_fault(struct vm_area_struct *vma, struct vm_fault *vmf)
 		return (VM_FAULT_SIGBUS);
 	}
 
-printf("%s: bo %p pidx %d, m %p\n", __func__, bo, pidx, m);
+	printf("%s: bo %p pidx %d, m %p, pgoff %d\n",
+	    __func__, bo, pidx, m, vmf->pgoff);
 
 	VM_OBJECT_WLOCK(obj);
 	for (i = 0; i < bo->npages; i++) {
@@ -236,7 +237,7 @@ printf("%s: bo %p pidx %d, m %p\n", __func__, bo, pidx, m);
 	vma->vm_pfn_first = 0;
 	vma->vm_pfn_count = bo->npages;
 
-	printf("%s: pidx: %llu, start: 0x%08X, addr: 0x%08lX\n",
+	printf("%s: pidx: %llu, start: 0x%08x, addr: 0x%08lx\n",
 	    __func__, pidx, vma->vm_start, vmf->address);
 
 	return (VM_FAULT_NOPAGE);
@@ -244,6 +245,7 @@ printf("%s: bo %p pidx %d, m %p\n", __func__, bo, pidx, m);
 fail_unlock:
 	VM_OBJECT_WUNLOCK(obj);
 	printf("%s: insert failed\n", __func__);
+	panic("failed");
 
 	return (VM_FAULT_SIGBUS);
 }
@@ -305,32 +307,25 @@ drm_gem_shmem_mmap(struct drm_gem_object *obj, struct vm_area_struct *vma)
 
 	bo = (struct panfrost_gem_object *)obj;
 
-	//printf("%s 1\n", __func__);
 	vma->vm_pgoff -= drm_vma_node_start(&obj->vma_node);
 
-	//printf("%s 2\n", __func__);
 	if (obj->import_attach) {
-		printf("%s 3\n", __func__);
 		//drm_gem_object_put(obj);
 		vma->vm_private_data = NULL;
 		return dma_buf_mmap(obj->dma_buf, vma, 0);
 	}
 
-	//printf("%s 4\n", __func__);
 	error = panfrost_gem_get_pages(bo);
 	if (error != 0) {
 		printf("failed to get pages\n");
 		return (-1);
 	}
-	//printf("%s 5\n", __func__);
 
 	vma->vm_flags |= VM_MIXEDMAP | VM_DONTEXPAND;
 	vma->vm_page_prot = vm_get_page_prot(vma->vm_flags);
 	if (!bo->map_cached)
 		vma->vm_page_prot = pgprot_writecombine(vma->vm_page_prot);
 	vma->vm_ops = &panfrost_gem_vm_ops;
-
-	//printf("%s: return 0\n", __func__);
 
 	return (0);
 }
@@ -440,7 +435,7 @@ panfrost_gem_get_pages(struct panfrost_gem_object *bo)
 	boundary = 0;
 	pflags = VM_ALLOC_NORMAL  | VM_ALLOC_NOOBJ | VM_ALLOC_NOBUSY |
 	    VM_ALLOC_WIRED | VM_ALLOC_ZERO;
-	memattr = VM_MEMATTR_UNCACHEABLE; //DEFAULT;
+	memattr = VM_MEMATTR_WRITE_COMBINING;
 
 	m = vm_page_alloc_contig(NULL, 0, pflags, npages, low, high,
 	    alignment, boundary, memattr);
@@ -457,6 +452,8 @@ panfrost_gem_get_pages(struct panfrost_gem_object *bo)
 			pmap_zero_page(m);
 		m->valid = VM_PAGE_BITS_ALL;
 	}
+
+	wmb();
 
 	return (0);
 }

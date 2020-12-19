@@ -62,6 +62,7 @@ __FBSDID("$FreeBSD$");
 #include <drm/drm_ioctl.h>
 #include <drm/drm_vblank.h>
 #include <drm/drm_syncobj.h>
+#include <drm/drm_utils.h>
 
 #include "fb_if.h"
 #include "panfrost_drm.h"
@@ -255,6 +256,7 @@ panfrost_ioctl_submit(struct drm_device *dev, void *data,
 	job->requirements = args->requirements;
 	job->flush_id = panfrost_device_get_latest_flush_id(sc);
 	job->pfile = file->driver_priv;
+	//job->s_fence = drm_sched_fence_create(entity, owner);
 
 	error = panfrost_copy_in_fences(dev, file, args, job);
 	if (error)
@@ -282,8 +284,29 @@ static int
 panfrost_ioctl_wait_bo(struct drm_device *dev, void *data,
     struct drm_file *file_priv)
 {
+	struct drm_panfrost_wait_bo *args;
+	struct drm_gem_object *gem_obj;
+	unsigned long timeout;
+	int error;
+
+	args = data;
+	if (args->pad)
+		return (EINVAL);
 
 	printf("%s\n", __func__);
+
+	timeout = drm_timeout_abs_to_jiffies(args->timeout_ns);
+
+	gem_obj = drm_gem_object_lookup(file_priv, args->handle);
+	if (!gem_obj)
+		return (ENOENT);
+
+	error = reservation_object_wait_timeout_rcu(gem_obj->resv, true,
+	    true, timeout);
+	if (!error)
+		error = timeout ? ETIMEDOUT : EBUSY;
+
+	printf("%s: error %d\n", __func__, error);
 
 	return (0);
 }

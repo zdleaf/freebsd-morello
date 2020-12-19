@@ -53,6 +53,8 @@ struct panfrost_job {
 	struct dma_fence *render_done_fence;
 	int slot;
 	TAILQ_ENTRY(panfrost_job)	next;
+
+	struct dma_fence		finished;
 };
 
 int panfrost_job_push(struct panfrost_job *job);

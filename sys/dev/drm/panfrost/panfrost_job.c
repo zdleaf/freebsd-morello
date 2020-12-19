@@ -101,7 +101,7 @@ panfrost_job_intr(void *arg)
 			printf("%s: head %x tail %x\n", __func__,
 			    GPU_READ(sc, JS_HEAD_LO(i)),
 			    GPU_READ(sc, JS_TAIL_LO(i)));
-			//panic("job error");
+			panic("job error");
 
 
 
@@ -109,7 +109,7 @@ panfrost_job_intr(void *arg)
 			    __func__, i);
 			mtx_lock(&sc->job_lock);
 			sc->slot_status[i].running = 0;
-			//sc->running = 0;
+			sc->running = 0;
 			mtx_unlock(&sc->job_lock);
 
 			panfrost_job_wakeup(sc, i);
@@ -120,7 +120,7 @@ panfrost_job_intr(void *arg)
 			printf("%s: job at slot %d completed\n", __func__, i);
 			mtx_lock(&sc->job_lock);
 			sc->slot_status[i].running = 0;
-			//sc->running = 0;
+			sc->running = 0;
 			mtx_unlock(&sc->job_lock);
 
 			panfrost_job_wakeup(sc, i);
@@ -208,17 +208,18 @@ panfrost_job_wakeup(struct panfrost_softc *sc, int slot)
 
 	mtx_lock(&sc->job_lock);
 
-	if (sc->slot_status[slot].running)
+	//if (sc->slot_status[slot].running)
+	if (sc->running)
 		goto out;
 
 	TAILQ_FOREACH_SAFE(job, &sc->job_queue, next, job1) {
-		if (job->slot == slot) {
+		//if (job->slot == slot) {
 			TAILQ_REMOVE(&sc->job_queue, job, next);
 			sc->slot_status[job->slot].running = 1;
-			//sc->running = 1;
+			sc->running = 1;
 			panfrost_job_hw_submit(job, job->slot);
 			break;
-		}
+		//}
 	}
 
 out:
