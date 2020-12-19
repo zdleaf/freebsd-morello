@@ -136,8 +136,9 @@ panfrost_gem_open(struct drm_gem_object *obj, struct drm_file *file_priv)
 
 	printf("%s: return 0\n", __func__);
 
-	/* TODO: Add lockings. */
+	mtx_lock(&bo->mappings_lock);
 	TAILQ_INSERT_TAIL(&bo->mappings, mapping, next);
+	mtx_unlock(&bo->mappings_lock);
 
 	return (0);
 }
@@ -355,6 +356,7 @@ panfrost_gem_create_object0(struct drm_device *dev, size_t size, bool private)
 	obj = malloc(sizeof(*obj), M_DEVBUF, M_ZERO | M_WAITOK);
 	obj->base.funcs = &panfrost_gem_funcs;
 	TAILQ_INIT(&obj->mappings);
+	mtx_init(&obj->mappings_lock, "mappings", NULL, MTX_DEF);
 
 printf("%s\n", __func__);
 
@@ -405,12 +407,14 @@ panfrost_gem_mapping_get(struct panfrost_gem_object *bo,
 
 	result = NULL;
 
+	mtx_lock(&bo->mappings_lock);
 	TAILQ_FOREACH(mapping, &bo->mappings, next) {
 		if (mapping->mmu == &file->mmu) {
 			result = mapping;
 			break;
 		}
 	}
+	mtx_unlock(&bo->mappings_lock);
 
 	return (result);
 }
@@ -470,8 +474,7 @@ panfrost_gem_create_object(struct drm_device *dev, size_t size)
 	obj = malloc(sizeof(*obj), M_DEVBUF, M_ZERO | M_WAITOK);
 	obj->base.funcs = &panfrost_gem_funcs;
 	TAILQ_INIT(&obj->mappings);
-
-	//mtx_init(&obj->mappings_lock);
+	mtx_init(&obj->mappings_lock, "mappings", NULL, MTX_DEF);
 
 	return (&obj->base);
 }

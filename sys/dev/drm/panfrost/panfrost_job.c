@@ -173,8 +173,8 @@ panfrost_job_hw_submit(struct panfrost_job *job, int slot)
 	sc = job->sc;
 	jc_head = job->jc;
 
-	printf("%s: HW submitting new job to slot %d, jc %lx\n",
-	    __func__, slot, jc_head);
+	printf("%s: HW submitting job %d to slot %d, jc %lx\n",
+	    __func__, sc->job_count++, slot, jc_head);
 
 	cfg = panfrost_mmu_as_get(sc, &job->pfile->mmu);
 

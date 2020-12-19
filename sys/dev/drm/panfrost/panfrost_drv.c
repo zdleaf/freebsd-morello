@@ -293,7 +293,7 @@ panfrost_ioctl_wait_bo(struct drm_device *dev, void *data,
 	if (args->pad)
 		return (EINVAL);
 
-	printf("%s\n", __func__);
+	//printf("%s\n", __func__);
 
 	timeout = drm_timeout_abs_to_jiffies(args->timeout_ns);
 
@@ -306,9 +306,9 @@ panfrost_ioctl_wait_bo(struct drm_device *dev, void *data,
 	if (!error)
 		error = timeout ? ETIMEDOUT : EBUSY;
 
-	printf("%s: error %d\n", __func__, error);
+	//printf("%s: error %d\n", __func__, error);
 
-	return (0);
+	return (-error);
 }
 
 static int

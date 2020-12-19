@@ -40,6 +40,7 @@ struct panfrost_gem_object {
 	int npages;
 	int madv;
 	TAILQ_HEAD(, panfrost_gem_mapping)	mappings;
+	struct mtx mappings_lock;
 	bool noexec;
 	bool is_heap;
 	bool map_cached;
