@@ -32,14 +32,12 @@
 #include <linux/hardirq.h>
 #include <linux/list.h>
 
-int drmkpi_in_atomic(void);
-
 #define	in_interrupt() \
 	(curthread->td_intr_nesting_level || curthread->td_critnest)
 
 #define	in_task() (curthread->td_priority >= PI_SOFT)
 
-#define	in_atomic()		drmkpi_in_atomic()
+#define	in_atomic()		((curthread->td_pflags & TDP_NOFAULTING) != 0)
 
 #define	preempt_disable()	critical_enter()
 #define	preempt_enable()	critical_exit()

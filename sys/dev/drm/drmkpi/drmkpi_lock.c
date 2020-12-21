@@ -27,16 +27,17 @@
  */
 
 #include <sys/param.h>
-
+#include <sys/proc.h>
 #include <sys/condvar.h>
 #include <sys/kernel.h>
+#include <sys/mutex.h>
 #include <sys/queue.h>
 #include <sys/sx.h>
 
-#include <linux/sched.h>
+#include <linux/compat.h>
 
 #include <drmkpi/mutex.h>
-#include <drmkpi/lock.h>
+#include <drmkpi/ww_mutex.h>
 
 struct ww_mutex_thread {
 	TAILQ_ENTRY(ww_mutex_thread) entry;
@@ -119,7 +120,6 @@ drmkpi_ww_mutex_lock_sub(struct ww_mutex *lock,
 			if (catch_signal) {
 				retval = -cv_wait_sig(&lock->condvar, &ww_mutex_global);
 				if (retval != 0) {
-					linux_schedule_save_interrupt_value(task, retval);
 					retval = -EINTR;
 					goto done;
 				}
@@ -160,7 +160,6 @@ drmkpi_mutex_lock_interruptible(mutex_t *m)
 
 	error = -sx_xlock_sig(&m->sx);
 	if (error != 0) {
-		linux_schedule_save_interrupt_value(current, error);
 		error = -EINTR;
 	}
 	return (error);

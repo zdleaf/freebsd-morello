@@ -33,17 +33,7 @@
 #ifndef	__DRMKPI_LINUX_UACCESS_H__
 #define	__DRMKPI_LINUX_UACCESS_H__
 
-#include <sys/param.h>
-#include <sys/lock.h>
-#include <sys/proc.h>
-
-#include <vm/vm.h>
-#include <vm/vm_extern.h>
-
-#include <linux/compiler.h>
-
-#define	VERIFY_READ	VM_PROT_READ
-#define	VERIFY_WRITE	VM_PROT_WRITE
+#include <drmkpi/uaccess.h>
 
 #define	__get_user(_x, _p) ({					\
 	int __err;						\
@@ -57,35 +47,10 @@
 	__typeof(*(_p)) __x = (_x);			\
 	drmkpi_copyout(&(__x), (_p), sizeof(*(_p)));	\
 })
+
 #define	get_user(_x, _p)	drmkpi_copyin((_p), &(_x), sizeof(*(_p)))
 #define	put_user(_x, _p)	__put_user(_x, _p)
 #define	clear_user(...)		drmkpi_clear_user(__VA_ARGS__)
 #define	access_ok(...)		drmkpi_access_ok(__VA_ARGS__)
-
-extern int drmkpi_copyin(const void *uaddr, void *kaddr, size_t len);
-extern int drmkpi_copyout(const void *kaddr, void *uaddr, size_t len);
-extern size_t drmkpi_clear_user(void *uaddr, size_t len);
-extern int drmkpi_access_ok(const void *uaddr, size_t len);
-
-/*
- * NOTE: Each pagefault_disable() call must have a corresponding
- * pagefault_enable() call in the same scope. The former creates a new
- * block and defines a temporary variable, and the latter uses the
- * temporary variable and closes the block. Failure to balance the
- * calls will result in a compile-time error.
- */
-#define	pagefault_disable(void) do {		\
-	int __saved_pflags =			\
-	    vm_fault_disable_pagefaults()
-
-#define	pagefault_enable(void)				\
-	vm_fault_enable_pagefaults(__saved_pflags);	\
-} while (0)
-
-static inline bool
-pagefault_disabled(void)
-{
-	return ((curthread->td_pflags & TDP_NOFAULTING) != 0);
-}
 
 #endif	/* __DRMKPI_LINUX_UACCESS_H__ */

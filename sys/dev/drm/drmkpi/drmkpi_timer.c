@@ -31,9 +31,9 @@ __FBSDID("$FreeBSD$");
 #include <sys/time.h>
 #include <sys/kernel.h>
 
-#include <drmkpi/timer.h>
-
 #include <linux/compat.h>	/* For linux_set_current */
+
+#include <drmkpi/timer.h>
 
 unsigned long drmkpi_timer_hz_mask;
 

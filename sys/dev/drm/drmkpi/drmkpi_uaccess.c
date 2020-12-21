@@ -33,11 +33,10 @@ __FBSDID("$FreeBSD$");
 #include <sys/param.h>
 #include <sys/conf.h>
 #include <sys/sysctl.h>
-#include <sys/vnode.h>
-#include <sys/file.h>
 
 #include <machine/vmparam.h>
 
+#include <drmkpi/fs.h>
 #include <drmkpi/uaccess.h>
 
 SYSCTL_NODE(_compat, OID_AUTO, drmkpi, CTLFLAG_RW, 0, "DRMKPI parameters");
@@ -125,7 +124,6 @@ drmkpi_access_ok(const void *uaddr, size_t len)
 	    (eaddr > saddr && eaddr <= VM_MAXUSER_ADDRESS));
 }
 
-struct inode;
 unsigned int
 drmkpi_iminor(struct inode *inode)
 {

@@ -1,8 +1,5 @@
 /*-
- * Copyright (c) 2010 Isilon Systems, Inc.
- * Copyright (c) 2010 iX Systems, Inc.
- * Copyright (c) 2010 Panasas, Inc.
- * Copyright (c) 2013-2017 Mellanox Technologies, Ltd.
+ * Copyright (c) 2017 Mellanox Technologies, Ltd.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -29,13 +26,19 @@
  * $FreeBSD$
  */
 
-#ifndef __DRMKPI_MUTEX_H__
-#define	__DRMKPI_MUTEX_H__
+#ifndef __DRMKPI_WW_MUTEX_H__
+#define	__DRMKPI_WW_MUTEX_H__
 
-typedef struct mutex {
-	struct sx sx;
-} mutex_t;
+#include <drmkpi/mutex.h>
 
-int drmkpi_mutex_lock_interruptible(mutex_t *m);
+struct ww_mutex {
+	struct mutex base;
+	struct cv condvar;
+	struct ww_acquire_ctx *ctx;
+};
 
-#endif
+int drmkpi_ww_mutex_lock_sub(struct ww_mutex *,
+    struct ww_acquire_ctx *, int catch_signal);
+void drmkpi_ww_mutex_unlock_sub(struct ww_mutex *);
+
+#endif	/* __DRMKPI_WW_MUTEX_H__ */

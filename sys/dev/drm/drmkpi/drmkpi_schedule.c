@@ -38,9 +38,9 @@ __FBSDID("$FreeBSD$");
 #include <linux/spinlock.h>
 
 #include <drmkpi/completion.h>
-#include <drmkpi/lock.h>
 #include <drmkpi/sched.h>
 #include <drmkpi/wait.h>
+#include <drmkpi/ww_mutex.h>
 
 static int
 drmkpi_add_to_sleepqueue(void *wchan, struct task_struct *task,
@@ -74,29 +74,9 @@ drmkpi_add_to_sleepqueue(void *wchan, struct task_struct *task,
 
 	/* filter return value */
 	if (ret != 0 && ret != -EWOULDBLOCK) {
-		linux_schedule_save_interrupt_value(task, ret);
 		ret = -ERESTARTSYS;
 	}
 	return (ret);
-}
-
-unsigned int
-drmkpi_msleep_interruptible(unsigned int ms)
-{
-	int ret;
-
-	/* guard against invalid values */
-	if (ms == 0)
-		ms = 1;
-	ret = -pause_sbt("lnxsleep", mstosbt(ms), 0, C_HARDCLOCK | C_CATCH);
-
-	switch (ret) {
-	case -EWOULDBLOCK:
-		return (0);
-	default:
-		linux_schedule_save_interrupt_value(current, ret);
-		return (ms);
-	}
 }
 
 static int
@@ -132,44 +112,8 @@ drmkpi_signal_pending(struct task_struct *task)
 	return (!SIGISEMPTY(pending));
 }
 
-bool
-drmkpi_fatal_signal_pending(struct task_struct *task)
-{
-	struct thread *td;
-	bool ret;
-
-	td = task->task_thread;
-	PROC_LOCK(td->td_proc);
-	ret = SIGISMEMBER(td->td_siglist, SIGKILL) ||
-	    SIGISMEMBER(td->td_proc->p_siglist, SIGKILL);
-	PROC_UNLOCK(td->td_proc);
-	return (ret);
-}
-
-bool
-drmkpi_signal_pending_state(long state, struct task_struct *task)
-{
-
-	MPASS((state & ~TASK_NORMAL) == 0);
-
-	if ((state & TASK_INTERRUPTIBLE) == 0)
-		return (false);
-	return (drmkpi_signal_pending(task));
-}
-
-void
-drmkpi_send_sig(int signo, struct task_struct *task)
-{
-	struct thread *td;
-
-	td = task->task_thread;
-	PROC_LOCK(td->td_proc);
-	tdsignal(td, signo);
-	PROC_UNLOCK(td->td_proc);
-}
-
 int
-drmkpi_autoremove_wake_function(wait_queue_t *wq, unsigned int state, int flags,
+drmkpi_autoremove_wake_function(wait_queue_entry_t *wq, unsigned int state, int flags,
     void *key __unused)
 {
 	struct task_struct *task;
@@ -177,36 +121,18 @@ drmkpi_autoremove_wake_function(wait_queue_t *wq, unsigned int state, int flags,
 
 	task = wq->private;
 	if ((ret = wake_up_task(task, state)) != 0)
-		list_del_init(&wq->task_list);
+		list_del_init(&wq->entry);
 	return (ret);
-}
-
-int
-drmkpi_default_wake_function(wait_queue_t *wq, unsigned int state, int flags,
-    void *key __unused)
-{
-	return (wake_up_task(wq->private, state));
-}
-
-void
-drmkpi_init_wait_entry(wait_queue_t *wq, int flags)
-{
-
-	memset(wq, 0, sizeof(*wq));
-	wq->flags = flags;
-	wq->private = current;
-	wq->func = drmkpi_autoremove_wake_function;
-	INIT_LIST_HEAD(&wq->task_list);
 }
 
 void
 drmkpi_wake_up(wait_queue_head_t *wqh, unsigned int state, int nr, bool locked)
 {
-	wait_queue_t *pos, *next;
+	wait_queue_entry_t *pos, *next;
 
 	if (!locked)
 		spin_lock(&wqh->lock);
-	list_for_each_entry_safe(pos, next, &wqh->task_list, task_list) {
+	list_for_each_entry_safe(pos, next, &wqh->head, entry) {
 		if (pos->func == NULL) {
 			if (wake_up_task(pos->private, state) != 0 && --nr == 0)
 				break;
@@ -220,42 +146,31 @@ drmkpi_wake_up(wait_queue_head_t *wqh, unsigned int state, int nr, bool locked)
 }
 
 void
-drmkpi_prepare_to_wait(wait_queue_head_t *wqh, wait_queue_t *wq, int state)
+drmkpi_prepare_to_wait(wait_queue_head_t *wqh, wait_queue_entry_t *wq, int state)
 {
 
 	spin_lock(&wqh->lock);
-	if (list_empty(&wq->task_list))
-		list_add(&wqh->task_list, &wq->task_list);
+	if (list_empty(&wq->entry))
+		list_add(&wqh->head, &wq->entry);
 	set_task_state(current, state);
 	spin_unlock(&wqh->lock);
 }
 
 void
-drmkpi_finish_wait(wait_queue_head_t *wqh, wait_queue_t *wq)
+drmkpi_finish_wait(wait_queue_head_t *wqh, wait_queue_entry_t *wq)
 {
 
 	spin_lock(&wqh->lock);
 	set_task_state(current, TASK_RUNNING);
-	if (!list_empty(&wq->task_list)) {
-		list_del(&wq->task_list);
-		INIT_LIST_HEAD(&wq->task_list);
+	if (!list_empty(&wq->entry)) {
+		list_del(&wq->entry);
+		INIT_LIST_HEAD(&wq->entry);
 	}
 	spin_unlock(&wqh->lock);
 }
 
-bool
-drmkpi_waitqueue_active(wait_queue_head_t *wqh)
-{
-	bool ret;
-
-	spin_lock(&wqh->lock);
-	ret = !list_empty(&wqh->task_list);
-	spin_unlock(&wqh->lock);
-	return (ret);
-}
-
 int
-drmkpi_wait_event_common(wait_queue_head_t *wqh, wait_queue_t *wq, int timeout,
+drmkpi_wait_event_common(wait_queue_head_t *wqh, wait_queue_entry_t *wq, int timeout,
     unsigned int state, spinlock_t *lock)
 {
 	struct task_struct *task;
@@ -335,94 +250,6 @@ drmkpi_schedule_timeout(int timeout)
 	else if (remainder > timeout)
 		remainder = timeout;
 	return (remainder);
-}
-
-static void
-wake_up_sleepers(void *wchan)
-{
-	int wakeup_swapper;
-
-	sleepq_lock(wchan);
-	wakeup_swapper = sleepq_signal(wchan, SLEEPQ_SLEEP, 0, 0);
-	sleepq_release(wchan);
-	if (wakeup_swapper)
-		kick_proc0();
-}
-
-#define	bit_to_wchan(word, bit)	((void *)(((uintptr_t)(word) << 6) | (bit)))
-
-void
-drmkpi_wake_up_bit(void *word, int bit)
-{
-
-	wake_up_sleepers(bit_to_wchan(word, bit));
-}
-
-int
-drmkpi_wait_on_bit_timeout(unsigned long *word, int bit, unsigned int state,
-    int timeout)
-{
-	struct task_struct *task;
-	void *wchan;
-	int ret;
-
-	/* range check timeout */
-	if (timeout < 1)
-		timeout = 1;
-	else if (timeout == MAX_SCHEDULE_TIMEOUT)
-		timeout = 0;
-
-	task = current;
-	wchan = bit_to_wchan(word, bit);
-	for (;;) {
-		sleepq_lock(wchan);
-		if ((*word & (1 << bit)) == 0) {
-			sleepq_release(wchan);
-			ret = 0;
-			break;
-		}
-		set_task_state(task, state);
-		ret = drmkpi_add_to_sleepqueue(wchan, task, "wbit", timeout,
-		    state);
-		if (ret != 0)
-			break;
-	}
-	set_task_state(task, TASK_RUNNING);
-
-	return (ret);
-}
-
-void
-drmkpi_wake_up_atomic_t(atomic_t *a)
-{
-
-	wake_up_sleepers(a);
-}
-
-int
-drmkpi_wait_on_atomic_t(atomic_t *a, unsigned int state)
-{
-	struct task_struct *task;
-	void *wchan;
-	int ret;
-
-	task = current;
-	wchan = a;
-	for (;;) {
-		sleepq_lock(wchan);
-		if (atomic_read(a) == 0) {
-			sleepq_release(wchan);
-			ret = 0;
-			break;
-		}
-		set_task_state(task, state);
-		ret = drmkpi_add_to_sleepqueue(wchan, task, "watomic", 0, state);
-		if (ret != 0)
-			break;
-	}
-	set_task_state(task, TASK_RUNNING);
-
-	return (ret);
 }
 
 bool

@@ -54,35 +54,33 @@
 } while (0)
 
 #define	DEFINE_WAIT_FUNC(name, function)				\
-	wait_queue_t name = {						\
+	wait_queue_entry_t name = {					\
 		.private = current,					\
 		.func = function,					\
-		.task_list = LINUX_LIST_HEAD_INIT(name.task_list)	\
+		.entry = LINUX_LIST_HEAD_INIT(name.entry)		\
 	}
 
 #define	DEFINE_WAIT(name) \
 	DEFINE_WAIT_FUNC(name, drmkpi_autoremove_wake_function)
 
 #define	DECLARE_WAITQUEUE(name, task)					\
-	wait_queue_t name = {						\
+	wait_queue_entry_t name = {					\
 		.private = task,					\
-		.task_list = LINUX_LIST_HEAD_INIT(name.task_list)	\
+		.entry = LINUX_LIST_HEAD_INIT(name.entry)		\
 	}
 
 #define	DECLARE_WAIT_QUEUE_HEAD(name)					\
 	wait_queue_head_t name = {					\
-		.task_list = LINUX_LIST_HEAD_INIT(name.task_list),	\
+		.entry = LINUX_LIST_HEAD_INIT(name.entry),		\
 	};								\
 	MTX_SYSINIT(name, &(name).lock.m, spin_lock_name("wqhead"), MTX_DEF)
 
 #define	init_waitqueue_head(wqh) do {					\
 	mtx_init(&(wqh)->lock.m, spin_lock_name("wqhead"),		\
 	    NULL, MTX_DEF | MTX_NEW | MTX_NOWITNESS);			\
-	INIT_LIST_HEAD(&(wqh)->task_list);				\
+	INIT_LIST_HEAD(&(wqh)->head);					\
 } while (0)
 
-#define	init_wait_entry(wq, flags)					\
-        drmkpi_init_wait_entry(wq, flags)
 #define	wake_up(wqh)							\
 	drmkpi_wake_up(wqh, TASK_NORMAL, 1, false)
 #define	wake_up_all(wqh)						\
@@ -142,11 +140,6 @@
 	    NULL);							\
 })
 
-#define	wait_event_killable(wqh, cond) ({				\
-	__wait_event_common(wqh, cond, MAX_SCHEDULE_TIMEOUT,		\
-	    TASK_INTERRUPTIBLE, NULL);					\
-})
-
 #define	wait_event_interruptible(wqh, cond) ({				\
 	__wait_event_common(wqh, cond, MAX_SCHEDULE_TIMEOUT,		\
 	    TASK_INTERRUPTIBLE, NULL);					\
@@ -157,95 +150,15 @@
 	    NULL);							\
 })
 
-/*
- * Wait queue is already locked.
- */
-#define	wait_event_interruptible_locked(wqh, cond) ({			\
-	int __ret;							\
-									\
-	spin_unlock(&(wqh).lock);					\
-	__ret = __wait_event_common(wqh, cond, MAX_SCHEDULE_TIMEOUT,	\
-	    TASK_INTERRUPTIBLE, NULL);					\
-	spin_lock(&(wqh).lock);						\
-	__ret;								\
-})
-
-/*
- * The passed spinlock is held when testing the condition.
- */
-#define	wait_event_interruptible_lock_irq(wqh, cond, lock) ({		\
-	__wait_event_common(wqh, cond, MAX_SCHEDULE_TIMEOUT,		\
-	    TASK_INTERRUPTIBLE, &(lock));				\
-})
-
-/*
- * The passed spinlock is held when testing the condition.
- */
-#define	wait_event_lock_irq(wqh, cond, lock) ({			\
-	__wait_event_common(wqh, cond, MAX_SCHEDULE_TIMEOUT,	\
-	    TASK_UNINTERRUPTIBLE, &(lock));			\
-})
-
-static inline void
-__add_wait_queue(wait_queue_head_t *wqh, wait_queue_t *wq)
-{
-	list_add(&wq->task_list, &wqh->task_list);
-}
-
-static inline void
-add_wait_queue(wait_queue_head_t *wqh, wait_queue_t *wq)
-{
-
-	spin_lock(&wqh->lock);
-	__add_wait_queue(wqh, wq);
-	spin_unlock(&wqh->lock);
-}
-
-static inline void
-__add_wait_queue_tail(wait_queue_head_t *wqh, wait_queue_t *wq)
-{
-	list_add_tail(&wq->task_list, &wqh->task_list);
-}
-
-static inline void
-__add_wait_queue_entry_tail(wait_queue_head_t *wqh, wait_queue_entry_t *wq)
-{
-        list_add_tail(&wq->entry, &wqh->head);
-}
-
-static inline void
-__remove_wait_queue(wait_queue_head_t *wqh, wait_queue_t *wq)
-{
-	list_del(&wq->task_list);
-}
-
-static inline void
-remove_wait_queue(wait_queue_head_t *wqh, wait_queue_t *wq)
-{
-
-	spin_lock(&wqh->lock);
-	__remove_wait_queue(wqh, wq);
-	spin_unlock(&wqh->lock);
-}
-
-#define	waitqueue_active(wqh)		linux_waitqueue_active(wqh)
-
 #define	prepare_to_wait(wqh, wq, state)	drmkpi_prepare_to_wait(wqh, wq, state)
 #define	finish_wait(wqh, wq)		drmkpi_finish_wait(wqh, wq)
 
-#define	wake_up_bit(word, bit)		drmkpi_wake_up_bit(word, bit)
-#define	wait_on_bit(word, bit, state)					\
-	drmkpi_wait_on_bit_timeout(word, bit, state, MAX_SCHEDULE_TIMEOUT)
-#define	wait_on_bit_timeout(word, bit, state, timeout)			\
-	drmkpi_wait_on_bit_timeout(word, bit, state, timeout)
-#define	wake_up_atomic_t(a)		linux_wake_up_atomic_t(a)
 /*
  * All existing callers have a cb that just schedule()s. To avoid adding
  * complexity, just emulate that internally. The prototype is different so that
  * callers must be manually modified; a cb that does something other than call
  * schedule() will require special treatment.
  */
-#define	wait_on_atomic_t(a, state)	drmkp_wait_on_atomic_t(a, state)
 
 #define	wake_up_process(task)		drmkpi_wake_up_state(task, TASK_NORMAL)
 #define	wake_up_state(task, state)	drmkpi_wake_up_state(task, state)

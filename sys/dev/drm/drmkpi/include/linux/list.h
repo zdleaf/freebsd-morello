@@ -474,9 +474,4 @@ static inline int list_is_last(const struct list_head *list,
 	     (pos) && ({ n = (pos)->member.next; 1; });			\
 	     pos = hlist_entry_safe(n, typeof(*(pos)), member))
 
-void drmkpi_list_sort(void *priv, struct list_head *head, int (*cmp)(void *priv,
-    struct list_head *a, struct list_head *b));
-
-#define	list_sort(priv, head, cmp)	drmkpi_list_sort(priv, head, cmp)
-
 #endif /* __DRMKPI_LINUX_LIST_H__ */

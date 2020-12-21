@@ -53,9 +53,9 @@
 #include <drmkpi/sched.h>
 
 #define	task_pid_group_leader(task) (task)->task_thread->td_proc->p_pid
-#define	task_pid(task)		((task)->pid)
-#define	task_pid_nr(task)	((task)->pid)
-#define	task_pid_vnr(task)	((task)->pid)
+#define	task_pid(task)		((task)->task_thread->td_tid)
+#define	task_pid_nr(task)	((task)->task_thread->td_tid)
+#define	task_pid_vnr(task)	((task)->task_thread->td_tid)
 #define	get_pid(x)		(x)
 #define	put_pid(x)		do { } while (0)
 #define	current_euid()	(curthread->td_ucred->cr_uid)
@@ -65,19 +65,6 @@
 #define	set_current_state(x)		set_task_state(current, x)
 #define	__set_current_state(x)		__set_task_state(current, x)
 
-static inline void
-get_task_struct(struct task_struct *task)
-{
-	atomic_inc(&task->usage);
-}
-
-static inline void
-put_task_struct(struct task_struct *task)
-{
-	if (atomic_dec_and_test(&task->usage))
-		drmkpi_free_current(task);
-}
-
 #define	cond_resched()	do { if (!cold) sched_relinquish(curthread); } while (0)
 
 #define	yield()		kern_yield(PRI_UNCHANGED)
@@ -86,13 +73,6 @@ put_task_struct(struct task_struct *task)
 #define	need_resched() (curthread->td_flags & TDF_NEEDRESCHED)
 
 #define	signal_pending(task)		drmkpi_signal_pending(task)
-#define	fatal_signal_pending(task)	drmkpi_fatal_signal_pending(task)
-#define	signal_pending_state(state, task)		\
-	drmkpi_signal_pending_state(state, task)
-#define	send_sig(signo, task, priv) do {		\
-	CTASSERT((priv) == 0);				\
-	drmkp_send_sig(signo, task);			\
-} while (0)
 
 #define	schedule()					\
 	(void)drmkpi_schedule_timeout(MAX_SCHEDULE_TIMEOUT)

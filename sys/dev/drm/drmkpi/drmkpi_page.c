@@ -30,15 +30,8 @@
 __FBSDID("$FreeBSD$");
 
 #include <sys/param.h>
-#include <sys/systm.h>
-#include <sys/malloc.h>
-#include <sys/kernel.h>
-#include <sys/sysctl.h>
-#include <sys/lock.h>
-#include <sys/mutex.h>
 #include <sys/rwlock.h>
 #include <sys/proc.h>
-#include <sys/sched.h>
 
 #include <machine/bus.h>
 
@@ -55,14 +48,11 @@ __FBSDID("$FreeBSD$");
 #include <vm/vm_reserv.h>
 #include <vm/vm_extern.h>
 
-#include <vm/uma.h>
-#include <vm/uma_int.h>
-
+#include <linux/err.h>	/* For ERR_PTR */
 #include <linux/gfp.h>
-#include <linux/mm.h>
-#include <linux/preempt.h>
-#include <linux/fs.h>
-#include <linux/shmem_fs.h>
+#include <linux/slab.h>	/* For kzalloc */
+
+#include <drmkpi/fs.h>
 
 vm_offset_t
 drmkpi_alloc_kmem(gfp_t flags, unsigned int order)
@@ -110,12 +100,6 @@ drmkpi_shmem_file_setup(const char *name, loff_t size, unsigned long flags)
 
 	filp->f_count = 1;
 	filp->f_vnode = vp;
-//	filp->f_shmem = vm_pager_allocate(OBJT_DEFAULT, NULL, size,
-//	    VM_PROT_READ | VM_PROT_WRITE, 0, curthread->td_ucred);
-//	if (filp->f_shmem == NULL) {
-//		error = -ENOMEM;
-//		goto err_1;
-//	}
 	obj = vm_pager_allocate(OBJT_DEFAULT, NULL, size,
 	    VM_PROT_READ | VM_PROT_WRITE, 0, curthread->td_ucred);
 	if (obj == NULL) {

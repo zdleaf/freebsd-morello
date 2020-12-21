@@ -35,7 +35,7 @@ __FBSDID("$FreeBSD$");
 
 #include <linux/sched.h>	/* Still needed for task* */
 
-#include <drmkpi/work.h>
+#include <drmkpi/workqueue.h>
 
 /* Redefined spin_lock_name here for now */
 #ifdef WITNESS_ALL
@@ -96,11 +96,11 @@ drmkpi_update_state(atomic_t *v, const uint8_t *pstate)
 }
 
 /*
- * A LinuxKPI task is allowed to free itself inside the callback function
+ * A DRMKPI task is allowed to free itself inside the callback function
  * and cannot safely be referred after the callback function has
  * completed. This function gives the drmkpi_work_fn() function a hint,
  * that the task is not going away and can have its state checked
- * again. Without this extra hint LinuxKPI tasks cannot be serialized
+ * again. Without this extra hint DRMKPI tasks cannot be serialized
  * accross multiple worker threads.
  */
 static bool
@@ -599,7 +599,7 @@ drmkpi_init_delayed_work(struct delayed_work *dwork, work_func_t func)
 	memset(dwork, 0, sizeof(*dwork));
 	dwork->work.func = func;
 	TASK_INIT(&dwork->work.work_task, 0, drmkpi_delayed_work_fn, dwork);
-	mtx_init(&dwork->timer.mtx, spin_lock_name("lkpi-dwork"), NULL,
+	mtx_init(&dwork->timer.mtx, spin_lock_name("drmkpi-dwork"), NULL,
 	    MTX_DEF | MTX_NOWITNESS);
 	callout_init_mtx(&dwork->timer.callout, &dwork->timer.mtx, 0);
 }
@@ -622,8 +622,8 @@ drmkpi_work_init(void *arg)
 	/* set default number of CPUs */
 	drmkpi_default_wq_cpus = max_wq_cpus;
 
-	drmkpi__system_short_wq = drmkpi_create_workqueue_common("linuxkpi_short_wq", max_wq_cpus);
-	drmkpi__system_long_wq = drmkpi_create_workqueue_common("linuxkpi_long_wq", max_wq_cpus);
+	drmkpi__system_short_wq = drmkpi_create_workqueue_common("drmkpi_short_wq", max_wq_cpus);
+	drmkpi__system_long_wq = drmkpi_create_workqueue_common("drmkpi_long_wq", max_wq_cpus);
 
 	/* populate the workqueue pointers */
 	drmkpi_system_long_wq = drmkpi__system_long_wq;

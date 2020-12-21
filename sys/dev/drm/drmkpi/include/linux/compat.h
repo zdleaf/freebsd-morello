@@ -34,10 +34,8 @@
 
 #include <sys/param.h>
 #include <sys/proc.h>
-#include <sys/malloc.h>
 
-struct thread;
-struct task_struct;
+#include <drmkpi/sched.h>
 
 extern int drmkpi_alloc_current(struct thread *, int flags);
 extern void drmkpi_free_current(struct task_struct *);
@@ -47,14 +45,6 @@ linux_set_current(struct thread *td)
 {
 	if (__predict_false(td->td_lkpi_task == NULL))
 		drmkpi_alloc_current(td, M_WAITOK);
-}
-
-static inline int
-linux_set_current_flags(struct thread *td, int flags)
-{
-	if (__predict_false(td->td_lkpi_task == NULL))
-		return (drmkpi_alloc_current(td, flags));
-	return (0);
 }
 
 #endif	/* __DRMKPI_LINUX_COMPAT_H__ */

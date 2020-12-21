@@ -826,8 +826,6 @@ static const struct dma_fence_ops dma_fence_stub_ops = {
 
 struct dma_fence *dma_fence_get_stub(void)
 {
-
-	spin_lock(&dma_fence_stub_lock);
 	if (!dma_fence_stub.ops) {
 		dma_fence_init(&dma_fence_stub,
 			       &dma_fence_stub_ops,

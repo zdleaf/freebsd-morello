@@ -49,15 +49,15 @@
 #include <linux/vmalloc.h>
 
 #if defined(__amd64__) || defined(__aarch64__) || defined(__riscv__)
-#define	LINUXKPI_HAVE_DMAP
+#define	DRMKPI_HAVE_DMAP
 #else
-#undef	LINUXKPI_HAVE_DMAP
+#undef	DRMKPI_HAVE_DMAP
 #endif
 
 void *
 kmap(vm_page_t page)
 {
-#ifdef LINUXKPI_HAVE_DMAP
+#ifdef DRMKPI_HAVE_DMAP
 	vm_offset_t daddr;
 
 	daddr = PHYS_TO_DMAP(VM_PAGE_TO_PHYS(page));
@@ -99,7 +99,7 @@ kmap_atomic(vm_page_t page)
 void
 kunmap(vm_page_t page)
 {
-#ifdef LINUXKPI_HAVE_DMAP
+#ifdef DRMKPI_HAVE_DMAP
 	/* NOP */
 #else
 	struct sf_buf *sf;
@@ -118,7 +118,7 @@ kunmap(vm_page_t page)
 void
 kunmap_atomic(void *vaddr)
 {
-#ifdef LINUXKPI_HAVE_DMAP
+#ifdef DRMKPI_HAVE_DMAP
 	/* NOP */
 #else
 	struct sf_buf *sf;
@@ -167,35 +167,3 @@ retry:
 		vm_object_deallocate(devobj);
 	}
 }
-
-#if defined(__i386__) || defined(__amd64__)
-int
-set_pages_array_wb(struct page **pages, int addrinarray)
-{
-	int i;
-
-	for (i = 0; i < addrinarray; i++)
-		set_pages_wb(pages[i], 1);
-	return (0);
-}
-
-int
-set_pages_array_wc(struct page **pages, int addrinarray)
-{
-	int i;
-
-	for (i = 0; i < addrinarray; i++)
-		set_pages_wc(pages[i], 1);
-	return (0);
-}
-
-int
-set_pages_array_uc(struct page **pages, int addrinarray)
-{
-	int i;
-
-	for (i = 0; i < addrinarray; i++)
-		set_pages_uc(pages[i], 1);
-	return (0);
-}
-#endif

@@ -25,6 +25,7 @@
  *
  * $FreeBSD$
  */
+
 #ifndef	__DRMKPI_LINUX_WW_MUTEX_H__
 #define	__DRMKPI_LINUX_WW_MUTEX_H__
 
@@ -34,7 +35,7 @@
 #include <sys/kernel.h>
 
 #include <linux/mutex.h>
-#include <drmkpi/lock.h>
+#include <drmkpi/ww_mutex.h>
 
 struct ww_class {
 	const char *mutex_name;

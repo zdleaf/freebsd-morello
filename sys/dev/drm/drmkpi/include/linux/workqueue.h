@@ -43,7 +43,7 @@
 #include <sys/taskqueue.h>
 #include <sys/mutex.h>
 
-#include <drmkpi/work.h>
+#include <drmkpi/workqueue.h>
 
 #define	WORK_CPU_UNBOUND MAXCPU
 #define	WQ_UNBOUND (1 << 0)

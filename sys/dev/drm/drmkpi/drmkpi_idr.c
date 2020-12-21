@@ -31,23 +31,13 @@
 __FBSDID("$FreeBSD$");
 
 #include <sys/param.h>
-#include <sys/systm.h>
-#include <sys/malloc.h>
 #include <sys/kernel.h>
-#include <sys/sysctl.h>
-#include <sys/lock.h>
-#include <sys/mutex.h>
 #include <sys/proc.h>
 #include <sys/sched.h>
 #include <sys/smp.h>
 
-#include <machine/stdarg.h>
-
-#include <vm/vm.h>
-#include <vm/pmap.h>
-
 #include <linux/bitmap.h>
-#include <linux/err.h>
+#include <linux/err.h>		/* For ERR_PTR */
 #include <linux/spinlock.h>
 
 #include <drmkpi/idr.h>
