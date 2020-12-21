@@ -1604,6 +1604,9 @@ dev/dcons/dcons_os.c		optional dcons
 dev/dme/if_dme.c		optional dme
 
 # DRM
+dev/drm/core/scheduler/sched_main.c		optional compat_drmkpi drm compile-with "${DRM_C}"
+dev/drm/core/scheduler/sched_entity.c		optional compat_drmkpi drm compile-with "${DRM_C}"
+dev/drm/core/scheduler/sched_fence.c		optional compat_drmkpi drm compile-with "${DRM_C}"
 dev/drm/core/drm_atomic.c			optional compat_drmkpi drm compile-with "${DRM_C}"
 dev/drm/core/drm_atomic_helper.c		optional compat_drmkpi drm compile-with "${DRM_C}"
 dev/drm/core/drm_atomic_state_helper.c		optional compat_drmkpi drm compile-with "${DRM_C}"
