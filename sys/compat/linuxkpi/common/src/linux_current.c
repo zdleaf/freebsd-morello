@@ -86,12 +86,14 @@ linux_alloc_current(struct thread *td, int flags)
 		if (mm_other == NULL)
 			continue;
 
+#if 0
 		/* try to share other mm_struct */
 		if (atomic_inc_not_zero(&mm_other->mm_users)) {
 			/* set mm_struct pointer */
 			ts->mm = mm_other;
 			break;
 		}
+#endif
 	}
 
 	/* use allocated mm_struct as a fallback */
