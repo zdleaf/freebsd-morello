@@ -305,11 +305,11 @@ dma_fence_ensure_signal_enabled(struct dma_fence *fence)
 		return 0;
 
 	/* Otherwise, note that we've called it and call it.  */
-	if (!(*fence->ops->enable_signaling)(fence)) {
-		/* If it failed, signal and return -ENOENT.  */
-		dma_fence_signal_locked(fence);
-		return -ENOENT;
-	}
+	//if (!(*fence->ops->enable_signaling)(fence)) {
+	//	/* If it failed, signal and return -ENOENT.  */
+	//	dma_fence_signal_locked(fence);
+	//	return -ENOENT;
+	//}
 
 	/* Success!  */
 	return 0;
@@ -826,6 +826,7 @@ static const struct dma_fence_ops dma_fence_stub_ops = {
 
 struct dma_fence *dma_fence_get_stub(void)
 {
+	spin_lock(&dma_fence_stub_lock);
 	if (!dma_fence_stub.ops) {
 		dma_fence_init(&dma_fence_stub,
 			       &dma_fence_stub_ops,
