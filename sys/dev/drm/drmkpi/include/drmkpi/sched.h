@@ -55,6 +55,7 @@ struct task_struct {
 	TAILQ_ENTRY(task_struct) rcu_entry[TS_RCU_TYPE_MAX];
 	int rcu_recurse[TS_RCU_TYPE_MAX];
 	struct work_struct *work;	/* current work struct, if set */
+	int flags;
 };
 
 #define	current	({ \

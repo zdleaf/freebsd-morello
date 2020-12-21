@@ -56,6 +56,7 @@ __FBSDID("$FreeBSD$");
 #include <drm/drm_file.h>
 #include <drm/drm_ioctl.h>
 #include <drm/drm_vblank.h>
+#include <drm/gpu_scheduler.h>
 
 #include "panfrost_drv.h"
 #include "panfrost_device.h"

@@ -56,6 +56,7 @@ __FBSDID("$FreeBSD$");
 #include <drm/drm_file.h>
 #include <drm/drm_ioctl.h>
 #include <drm/drm_vblank.h>
+#include <drm/gpu_scheduler.h>
 
 #include <dev/drm/drmkpi/include/linux/dma-buf.h>
 

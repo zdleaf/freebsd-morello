@@ -56,6 +56,9 @@ __FBSDID("$FreeBSD$");
 #include <drm/drm_file.h>
 #include <drm/drm_ioctl.h>
 #include <drm/drm_vblank.h>
+#include <drm/gpu_scheduler.h>
+
+#include <compat/linuxkpi/common/include/linux/jiffies.h>
 
 #include "panfrost_drv.h"
 #include "panfrost_drm.h"
@@ -68,8 +71,39 @@ __FBSDID("$FreeBSD$");
 #include "panfrost_job.h"
 
 #define	NUM_JOB_SLOTS	3
+#define	JOB_TIMEOUT_MS	500
 
 static void panfrost_job_wakeup(struct panfrost_softc *sc, int slot);
+static void panfrost_job_enable_interrupts(struct panfrost_softc *sc);
+
+struct panfrost_queue_state {
+	struct drm_gpu_scheduler sched;
+	atomic_t status;
+	struct mutex lock;
+	uint64_t fence_context;
+	uint64_t emit_seqno;
+};
+
+struct panfrost_job_slot {
+	struct panfrost_queue_state queue[NUM_JOB_SLOTS];
+	spinlock_t job_lock;
+};
+
+struct panfrost_fence {
+	struct dma_fence base;
+	struct drm_device *dev;
+	int queue;
+	uint64_t seqno;
+};
+
+int
+panfrost_job_intr_filter(void *arg)
+{
+
+	printf("%s\n", __func__);
+
+	return (FILTER_SCHEDULE_THREAD);
+}
 
 void
 panfrost_job_intr(void *arg)
@@ -79,6 +113,7 @@ panfrost_job_intr(void *arg)
 	uint32_t status;
 	int mask;
 	int i;
+	struct panfrost_job *job;
 
 	sc = arg;
 
@@ -103,8 +138,6 @@ panfrost_job_intr(void *arg)
 			    GPU_READ(sc, JS_TAIL_LO(i)));
 			panic("job error");
 
-
-
 			printf("%s: job at slot %d completed wih error\n",
 			    __func__, i);
 			mtx_lock(&sc->job_lock);
@@ -123,11 +156,39 @@ panfrost_job_intr(void *arg)
 			sc->running = 0;
 			mtx_unlock(&sc->job_lock);
 
-			panfrost_job_wakeup(sc, i);
+			job = sc->jobs[i];
+			dma_fence_signal_locked(job->done_fence);
+			//panfrost_job_wakeup(sc, i);
 		}
 
 		stat &= ~mask;
 	}
+
+	printf("%s: done\n", __func__);
+}
+
+int
+panfrost_job_open(struct panfrost_file *pfile)
+{
+	struct panfrost_job_slot *js;
+	struct panfrost_softc *sc;
+	struct drm_gpu_scheduler *sched;
+	int error;
+	int i;
+
+	sc = pfile->sc;
+
+	js = sc->js;
+
+	for (i = 0; i < NUM_JOB_SLOTS; i++) {
+		sched = &js->queue[i].sched;
+		error = drm_sched_entity_init(&pfile->sched_entity[i],
+		    DRM_SCHED_PRIORITY_NORMAL, &sched, 1, NULL);
+		if (error)
+			panic("error");
+	}
+
+	return (0);
 }
 
 static void
@@ -199,6 +260,10 @@ panfrost_job_hw_submit(struct panfrost_job *job, int slot)
 		GPU_WRITE(sc, JS_FLUSH_ID_NEXT(slot), job->flush_id);
 
 	GPU_WRITE(sc, JS_COMMAND_NEXT(slot), JS_COMMAND_START);
+
+	printf("%s: job %d submitted to HW\n", __func__, sc->job_count - 1);
+
+	panfrost_job_enable_interrupts(sc);
 }
 
 static void
@@ -208,22 +273,31 @@ panfrost_job_wakeup(struct panfrost_softc *sc, int slot)
 
 	mtx_lock(&sc->job_lock);
 
-	//if (sc->slot_status[slot].running)
-	if (sc->running)
+	if (sc->slot_status[slot].running)
 		goto out;
 
 	TAILQ_FOREACH_SAFE(job, &sc->job_queue, next, job1) {
-		//if (job->slot == slot) {
+		if (job->slot == slot) {
 			TAILQ_REMOVE(&sc->job_queue, job, next);
 			sc->slot_status[job->slot].running = 1;
 			sc->running = 1;
 			panfrost_job_hw_submit(job, job->slot);
 			break;
-		//}
+		}
 	}
 
 out:
 	mtx_unlock(&sc->job_lock);
+}
+
+static void
+panfrost_attach_object_fences(struct drm_gem_object **bos,
+    int bo_count, struct dma_fence *fence)
+{
+	int i;
+
+	for (i = 0; i < bo_count; i++)
+		reservation_object_add_excl_fence(bos[i]->resv, fence);
 }
 
 int
@@ -231,12 +305,15 @@ panfrost_job_push(struct panfrost_job *job)
 {
 	struct ww_acquire_ctx acquire_ctx;
 	struct panfrost_softc *sc;
+	struct drm_sched_entity *entity;
 	int slot;
 	int error;
 
 	sc = job->sc;
 
 	slot = panfrost_job_get_slot(job);
+	entity = &job->pfile->sched_entity[slot];
+
 	job->slot = slot;
 
 printf("%s: new job for slot %d\n", __func__, slot);
@@ -246,13 +323,24 @@ printf("%s: new job for slot %d\n", __func__, slot);
 	if (error)
 		return (error);
 
+	error = drm_sched_job_init(&job->base, entity, NULL);
+	if (error)
+		panic("coult not init job");
+
 	/* Acquire a reference to fence. */
-	//job->render_done_fence = dma_fence_get(&job->base.s_fence->finished);
+	job->render_done_fence = dma_fence_get(&job->base.s_fence->finished);
 
 	panfrost_acquire_object_fences(job->bos, job->bo_count,
 	    job->implicit_fences);
 
+	drm_sched_entity_push_job(&job->base, entity);
+
+	panfrost_attach_object_fences(job->bos, job->bo_count,
+	    job->render_done_fence);
+
 	drm_gem_unlock_reservations(job->bos, job->bo_count, &acquire_ctx);
+
+	return (0);
 
 	mtx_lock(&sc->job_lock);
 	TAILQ_INSERT_TAIL(&sc->job_queue, job, next);
@@ -278,9 +366,170 @@ panfrost_job_enable_interrupts(struct panfrost_softc *sc)
 	GPU_WRITE(sc, JOB_INT_MASK, irq_msk);
 }
 
+static struct dma_fence *
+panfrost_job_dependency(struct drm_sched_job *sched_job,
+    struct drm_sched_entity *s_entity)
+{
+	struct panfrost_job *job;
+	struct dma_fence *fence;
+	int i;
+
+	job = (struct panfrost_job *)sched_job;
+
+	printf("%s\n", __func__);
+
+	for (i = 0; i < job->in_fence_count; i++) {
+		if (job->in_fences[i]) {
+			fence = job->in_fences[i];
+			job->in_fences[i] = NULL;
+			return (fence);
+		}
+	}
+
+	for (i = 0; i < job->bo_count; i++) {
+		if (job->implicit_fences[i]) {
+			fence = job->implicit_fences[i];
+			job->implicit_fences[i] = NULL;
+			return (fence);
+		}
+	}
+
+	printf("%s: no more\n", __func__);
+
+	return (NULL);
+}
+
+static const char *
+panfrost_fence_get_driver_name(struct dma_fence *fence)
+{
+
+	return "panfrost";
+}
+
+static const char *
+panfrost_fence_get_timeline_name(struct dma_fence *fence)
+{
+	struct panfrost_fence *f;
+
+	f = (struct panfrost_fence *)fence;
+
+	switch (f->queue) {
+	case 0: return "panfrost-js-0";
+	case 1: return "panfrost-js-1";
+	case 2: return "panfrost-js-2";
+	default:
+		return NULL;
+	}
+}
+
+static bool
+dma_fence_chain_enable_signaling(struct dma_fence *fence)
+{
+
+	printf("%s\n", __func__);
+
+	return (true);
+}
+
+static const struct dma_fence_ops panfrost_fence_ops = {
+	.get_driver_name = panfrost_fence_get_driver_name,
+	.get_timeline_name = panfrost_fence_get_timeline_name,
+	.enable_signaling = dma_fence_chain_enable_signaling,
+};
+
+static struct dma_fence *
+panfrost_fence_create(struct panfrost_softc *sc, int js_num)
+{
+	struct panfrost_job_slot *js;
+	struct panfrost_fence *fence;
+
+	js = sc->js;
+
+	fence = malloc(sizeof(*fence), M_DEVBUF, M_ZERO | M_WAITOK);
+	if (!fence)
+		return (NULL);
+
+	fence->dev = &sc->drm_dev;
+	fence->queue = js_num;
+	fence->seqno = ++js->queue[js_num].emit_seqno;
+	dma_fence_init(&fence->base, &panfrost_fence_ops, &js->job_lock,
+	    js->queue[js_num].fence_context, fence->seqno);
+
+        return (&fence->base);
+}
+
+static struct dma_fence *
+panfrost_job_run(struct drm_sched_job *sched_job)
+{
+	struct panfrost_softc *sc;
+	struct panfrost_job *job;
+	struct dma_fence *fence;
+
+	printf("%s\n", __func__);
+
+	job = (struct panfrost_job *)sched_job;
+	sc = job->sc;
+
+	fence = panfrost_fence_create(sc, job->slot);
+	if (!fence)
+                return (NULL);
+
+	if (job->done_fence)
+		dma_fence_put(job->done_fence);
+	job->done_fence = dma_fence_get(fence);
+
+	//if (unlikely(job->base.s_fence->finished.error))
+	//	return (NULL);
+
+	sc->jobs[job->slot] = job;
+
+	panfrost_job_hw_submit(job, job->slot);
+
+	return (fence);
+}
+
+static void
+panfrost_job_timedout(struct drm_sched_job *sched_job)
+{
+
+	printf("%s\n", __func__);
+
+	//if (dma_fence_is_signaled(job->done_fence))
+	//	return;
+	//printf("%s: not signalled\n", __func__);
+}
+
+static void
+panfrost_job_free(struct drm_sched_job *sched_job)
+{
+
+	printf("%s\n", __func__);
+}
+
+static const struct drm_sched_backend_ops panfrost_sched_ops = {
+	.dependency = panfrost_job_dependency,
+	.run_job = panfrost_job_run,
+	.timedout_job = panfrost_job_timedout,
+	.free_job = panfrost_job_free
+};
+
 int
 panfrost_job_init(struct panfrost_softc *sc)
 {
+	struct panfrost_job_slot *js;
+	int error, i;
+
+	sc->js = js = malloc(sizeof(*js), M_DEVBUF, M_ZERO | M_WAITOK);
+
+	spin_lock_init(&js->job_lock);
+
+	for (i = 0; i < NUM_JOB_SLOTS; i++) {
+		js->queue[i].fence_context = dma_fence_context_alloc(1);
+		error = drm_sched_init(&js->queue[i].sched,
+		    &panfrost_sched_ops, 1, 0,
+		    msecs_to_jiffies(JOB_TIMEOUT_MS), "pan_js");
+		printf("drm_sched_init error %d\n", error);
+	}
 
 	panfrost_job_enable_interrupts(sc);
 

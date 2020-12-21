@@ -63,6 +63,7 @@ __FBSDID("$FreeBSD$");
 #include <drm/drm_vblank.h>
 #include <drm/drm_syncobj.h>
 #include <drm/drm_utils.h>
+#include <drm/gpu_scheduler.h>
 
 #include "fb_if.h"
 #include "panfrost_drm.h"
@@ -149,6 +150,12 @@ panfrost_open(struct drm_device *dev, struct drm_file *file)
 	if (error != 0) {
 		drm_mm_takedown(&pfile->mm);
 		free(pfile, M_DEVBUF);
+		return (error);
+	}
+
+	error = panfrost_job_open(pfile);
+	if (error != 0) {
+		printf("%s: can't open job\n", __func__);
 		return (error);
 	}
 
@@ -289,11 +296,11 @@ panfrost_ioctl_wait_bo(struct drm_device *dev, void *data,
 	unsigned long timeout;
 	int error;
 
+	//return (-1);
+
 	args = data;
 	if (args->pad)
 		return (EINVAL);
-
-	//printf("%s\n", __func__);
 
 	timeout = drm_timeout_abs_to_jiffies(args->timeout_ns);
 
@@ -306,9 +313,20 @@ panfrost_ioctl_wait_bo(struct drm_device *dev, void *data,
 	if (!error)
 		error = timeout ? ETIMEDOUT : EBUSY;
 
-	//printf("%s: error %d\n", __func__, error);
+	/*
+	 * error == 0 means not signaled,
+	 * error > 0 means signaled
+	 * error < 0 means interrupted before timeout
+	 */
 
-	return (-error);
+	//printf("%s: timeout %d, errno %d\n",
+	//__func__, args->timeout_ns, error);
+	printf("%s: error %d\n", __func__, error);
+
+	if (error > 0)
+		return (0);
+
+	return (error);
 }
 
 static int
@@ -836,7 +854,8 @@ panfrost_attach(device_t dev)
 	}
 
 	if (bus_setup_intr(dev, sc->res[1],
-	    INTR_TYPE_MISC | INTR_MPSAFE, NULL, panfrost_job_intr, sc,
+	    INTR_TYPE_MISC | INTR_MPSAFE, panfrost_job_intr_filter,
+	    panfrost_job_intr, sc,
 	    &sc->intrhand[0])) {
 		device_printf(dev, "cannot setup interrupt handler\n");
 		return (ENXIO);

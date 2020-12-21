@@ -90,6 +90,7 @@ struct panfrost_softc {
 	struct panfrost_job		*jobs[3];
 	int running;
 	int job_count;
+	struct panfrost_job_slot *js;
 };
 
 #define	GPU_READ(sc, reg)	bus_read_4((sc)->res[0], (reg))

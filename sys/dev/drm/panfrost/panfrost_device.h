@@ -33,6 +33,8 @@
 #ifndef	_DEV_DRM_PANFROST_PANFROST_DEVICE_H_
 #define	_DEV_DRM_PANFROST_PANFROST_DEVICE_H_
 
+#define	NUM_JOB_SLOTS	3
+
 struct panfrost_mmu {
 	struct pmap p;
 	int as;		/* asid set */
@@ -42,7 +44,7 @@ struct panfrost_mmu {
 struct panfrost_file {
 	struct		panfrost_softc *sc;
 	struct		panfrost_mmu mmu;
-
+	struct		drm_sched_entity sched_entity[NUM_JOB_SLOTS];
 	struct		drm_mm mm;
 	struct mtx	mm_lock;
 };
