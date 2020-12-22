@@ -693,7 +693,7 @@ static int drm_syncobj_export_sync_file(struct drm_file *file_private,
 		goto err_put_fd;
 	}
 
-	fd_install(fd, sync_file->file);
+	fd_install(fd, sync_file->sf_file);
 
 	*p_fd = fd;
 	return 0;

@@ -41,7 +41,6 @@
 
 #include <linux/fs.h>
 
-
 static inline void
 put_unused_fd(unsigned int fd)
 {
@@ -86,7 +85,6 @@ get_unused_fd_flags(int flags)
 	int rv;
 	int fd;
 
-	panic("%s: Not implemented yet.", __func__);
 	rv = falloc(curthread, &file, &fd, flags);
 	if (rv)
 		return (-rv);
@@ -96,9 +94,21 @@ get_unused_fd_flags(int flags)
 }
 
 static inline void
-fd_install(unsigned int fd, struct file *file)
+fd_install(unsigned int fd, struct file *filp)
 {
-	panic("%s: Not implemented yet.", __func__);
+	struct filedescent *fde;
+	struct fdescenttbl *fdt;
+	struct filedesc *fdp;
+	struct proc *p;
+
+	p = curthread->td_proc;
+	fdp = p->p_fd;
+
+	FILEDESC_XLOCK(fdp);
+	fdt = atomic_load_ptr(&fdp->fd_files);
+	fde = &fdt->fdt_ofiles[fd];
+	fde->fde_file = filp;
+	FILEDESC_XUNLOCK(fdp);
 }
 
 static inline void
