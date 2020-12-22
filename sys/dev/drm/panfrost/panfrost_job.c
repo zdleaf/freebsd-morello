@@ -117,9 +117,8 @@ panfrost_job_intr(void *arg)
 
 	sc = arg;
 
-	printf("%s\n", __func__);
-
 	stat = GPU_READ(sc, JOB_INT_STAT);
+	printf("%s: stat %x\n", __func__, stat);
 
 	for (i = 0; stat; i++) {
 		mask = (1 << i) | (1 << (16 + i));
