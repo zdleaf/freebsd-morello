@@ -136,16 +136,23 @@ panfrost_job_intr(void *arg)
 			printf("%s: head %x tail %x\n", __func__,
 			    GPU_READ(sc, JS_HEAD_LO(i)),
 			    GPU_READ(sc, JS_TAIL_LO(i)));
-			panic("job error");
+
+			//drm_sched_fault(&sc->js->queue[i].sched);
 
 			printf("%s: job at slot %d completed wih error\n",
 			    __func__, i);
+
+			panic("error");
+
 			mtx_lock(&sc->job_lock);
 			sc->slot_status[i].running = 0;
 			sc->running = 0;
 			mtx_unlock(&sc->job_lock);
 
-			panfrost_job_wakeup(sc, i);
+			//panfrost_job_wakeup(sc, i);
+
+			job = sc->jobs[i];
+			dma_fence_signal_locked(job->done_fence);
 		}
 
 		if (stat & (1 << i)) {
