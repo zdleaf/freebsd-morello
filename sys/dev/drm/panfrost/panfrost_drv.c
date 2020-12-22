@@ -173,12 +173,34 @@ static int
 panfrost_copy_in_fences(struct drm_device *dev, struct drm_file *file_priv,
     struct drm_panfrost_submit *args, struct panfrost_job *job)
 {
+	uint32_t *handles;
+	int error;
+	int sz;
+	int i;
 
 	job->in_fence_count = args->in_sync_count;
 	if (job->in_fence_count == 0)
 		return (0);
 
-	panic("fence count %d\n", job->in_fence_count);
+	printf("%s: fence count %d\n", __func__, job->in_fence_count);
+
+	sz = job->in_fence_count * sizeof(struct dma_fence *);
+	job->in_fences = malloc(sz, M_DEVBUF, M_WAITOK | M_ZERO);
+
+	sz = job->in_fence_count * sizeof(uint32_t);
+	handles = malloc(sz, M_DEVBUF, M_WAITOK | M_ZERO);
+
+	error = copyin((void *)args->in_syncs, handles, sz);
+	if (error)
+		panic("could not copy");
+
+	for (i = 0; i < job->in_fence_count; i++) {
+		error = drm_syncobj_find_fence(file_priv, handles[i], 0, 0,
+		    &job->in_fences[i]);
+		printf("%s: error %d\n", __func__, error);
+	}
+
+	free(handles, M_DEVBUF);
 
 	return (0);
 }
@@ -253,8 +275,10 @@ panfrost_ioctl_submit(struct drm_device *dev, void *data,
 
 	if (args->out_sync > 0) {
 		sync_out = drm_syncobj_find(file, args->out_sync);
-		if (sync_out == NULL)
-			panic("sync_out is NULL");
+		if (sync_out == NULL) {
+			printf("sync out is NULL\n");
+			return (-ENODEV);
+		}
 	}
 
 	job = malloc(sizeof(*job), M_DEVBUF, M_WAITOK | M_ZERO);
