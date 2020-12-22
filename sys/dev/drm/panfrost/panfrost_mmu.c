@@ -196,9 +196,9 @@ panfrost_mmu_page_fault(struct panfrost_softc *sc, int as, uint64_t addr)
 	struct page *pages;
 	vm_object_t mapping;
 
-printf("%s: as %d addr %lx\n", __func__, as, addr);
+	dprintf("%s: as %d addr %lx\n", __func__, as, addr);
 	bomapping = panfrost_mmu_find_mapping(sc, as, addr);
-	printf("%s: bomapping %p\n", __func__, bomapping);
+	dprintf("%s: bomapping %p\n", __func__, bomapping);
 	if (!bomapping)
 		panic("no bomapping");
 
@@ -221,7 +221,7 @@ printf("%s: as %d addr %lx\n", __func__, as, addr);
 
 	mapping = bo->base.filp->f_vnode->v_object;
 
-	printf("%s: mapping %p\n", __func__, mapping);
+	dprintf("%s: mapping %p\n", __func__, mapping);
 
 	return (0);
 }
@@ -236,8 +236,8 @@ panfrost_mmu_fault(struct panfrost_softc *sc, int as)
 	uint64_t addr;
 
 	fault_status = GPU_READ(sc, AS_FAULTSTATUS(as));
-	printf("%s: fault status %x\n", __func__, fault_status);
-	printf("%s: AS_TRANSTAB_LO %x AS_TRANSTAB_HI %x\n", __func__,
+	dprintf("%s: fault status %x\n", __func__, fault_status);
+	dprintf("%s: AS_TRANSTAB_LO %x AS_TRANSTAB_HI %x\n", __func__,
 	    GPU_READ(sc, AS_TRANSTAB_LO(0)), GPU_READ(sc, AS_TRANSTAB_HI(0)));
 
 	addr = GPU_READ(sc, AS_FAULTADDRESS_LO(as));
@@ -248,13 +248,13 @@ panfrost_mmu_fault(struct panfrost_softc *sc, int as)
 	source_id = (fault_status >> 16);
 
 	if ((exception_type & 0xF8) == 0xC0) {
-		printf("%s: page fault at %lx\n", __func__, addr);
+		dprintf("%s: page fault at %lx\n", __func__, addr);
 		panfrost_mmu_page_fault(sc, as, addr);
 	} else
-		printf("%s: %s fault at %lx\n", __func__,
+		dprintf("%s: %s fault at %lx\n", __func__,
 		    panfrost_mmu_exception_name(exception_type), addr);
 
-	printf("%s: exception type %x, access type %x (%s), source id %x \n",
+	dprintf("%s: exception type %x, access type %x (%s), source id %x \n",
 	    __func__, exception_type, access_type,
 	    access_type_name(sc, fault_status), source_id);
 }
@@ -269,7 +269,7 @@ panfrost_mmu_intr(void *arg)
 	sc = arg;
 
 	status = GPU_READ(sc, MMU_INT_RAWSTAT);
-	printf("%s: status %x\n", __func__, status);
+	dprintf("%s: status %x\n", __func__, status);
 
 	for (i = 0; status != 0; i++) {
 		if (status & (1 << i)) {
@@ -489,8 +489,8 @@ panfrost_mmu_map(struct panfrost_softc *sc,
 	/* map pages */
 	for (i = 0; i < bo->npages; i++, m++) {
 		pa = VM_PAGE_TO_PHYS(m);
-		//printf("%s: mapping %lx -> %lx, pgsize %d\n",
-		//    __func__, sva, pa, pgsize);
+		dprintf("%s: mapping %lx -> %lx, pgsize %d\n",
+		    __func__, sva, pa, pgsize);
 		error = pmap_genter(&mmu->p, va, pa, prot, 0);
 
 		va += PAGE_SIZE;

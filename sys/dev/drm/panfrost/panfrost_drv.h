@@ -93,6 +93,8 @@ struct panfrost_softc {
 	struct panfrost_job_slot *js;
 };
 
+#define	dprintf(fmt, ...)
+
 #define	GPU_READ(sc, reg)	bus_read_4((sc)->res[0], (reg))
 #define	GPU_WRITE(sc, reg, val)	bus_write_4((sc)->res[0], (reg), (val))
 
