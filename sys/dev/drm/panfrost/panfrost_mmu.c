@@ -223,6 +223,9 @@ panfrost_mmu_page_fault(struct panfrost_softc *sc, int as, uint64_t addr)
 
 	dprintf("%s: mapping %p\n", __func__, mapping);
 
+	struct panfrost_mmu *mmu;
+	mmu = bomapping->mmu;
+
 	return (0);
 }
 
@@ -254,9 +257,11 @@ panfrost_mmu_fault(struct panfrost_softc *sc, int as)
 		dprintf("%s: %s fault at %lx\n", __func__,
 		    panfrost_mmu_exception_name(exception_type), addr);
 
-	dprintf("%s: exception type %x, access type %x (%s), source id %x \n",
+	dprintf("%s: exception type %x, access type %x (%s), source id %x\n",
 	    __func__, exception_type, access_type,
 	    access_type_name(sc, fault_status), source_id);
+
+	//mmu_hw_do_operation_locked(sc, 0, addr, 8, AS_COMMAND_FLUSH_PT);
 }
 
 void
@@ -417,6 +422,8 @@ printf("%s: l0 paddr %lx, mmu as %d\n", __func__, paddr, as);
 
 	mmu_hw_do_operation_locked(sc, as, 0, ~0UL, AS_COMMAND_FLUSH_MEM);
 
+	wmb();
+
 	GPU_WRITE(sc, AS_TRANSTAB_LO(as), paddr & 0xffffffffUL);
 	GPU_WRITE(sc, AS_TRANSTAB_HI(as), paddr >> 32);
 
@@ -489,8 +496,7 @@ panfrost_mmu_map(struct panfrost_softc *sc,
 	/* map pages */
 	for (i = 0; i < bo->npages; i++, m++) {
 		pa = VM_PAGE_TO_PHYS(m);
-		dprintf("%s: mapping %lx -> %lx, pgsize %d\n",
-		    __func__, sva, pa, pgsize);
+		dprintf("%s: mapping %lx -> %lx\n", __func__, va, pa);
 		error = pmap_genter(&mmu->p, va, pa, prot, 0);
 
 		va += PAGE_SIZE;

@@ -138,7 +138,7 @@ panfrost_job_intr(void *arg)
 
 			//drm_sched_fault(&sc->js->queue[i].sched);
 
-			printf("%s: job at slot %d completed wih error\n",
+			printf("%s: job at slot %d completed with error\n",
 			    __func__, i);
 
 			panic("error");
@@ -317,6 +317,8 @@ panfrost_job_push(struct panfrost_job *job)
 
 	sc = job->sc;
 
+	mtx_lock(&sc->sched_lock);
+
 	slot = panfrost_job_get_slot(job);
 	entity = &job->pfile->sched_entity[slot];
 
@@ -326,8 +328,10 @@ printf("%s: new job for slot %d\n", __func__, slot);
 
 	error = drm_gem_lock_reservations(job->bos, job->bo_count,
 	    &acquire_ctx);
-	if (error)
-		return (error);
+	if (error) {
+		mtx_unlock(&sc->sched_lock);
+		panic("could not lock reserv");
+	}
 
 	error = drm_sched_job_init(&job->base, entity, NULL);
 	if (error)
@@ -340,6 +344,8 @@ printf("%s: new job for slot %d\n", __func__, slot);
 	    job->implicit_fences);
 
 	drm_sched_entity_push_job(&job->base, entity);
+
+	mtx_unlock(&sc->sched_lock);
 
 	panfrost_attach_object_fences(job->bos, job->bo_count,
 	    job->render_done_fence);
@@ -497,8 +503,15 @@ panfrost_job_run(struct drm_sched_job *sched_job)
 static void
 panfrost_job_timedout(struct drm_sched_job *sched_job)
 {
+	struct panfrost_softc *sc;
+	struct panfrost_job *job;
+	uint32_t stat;
 
-	printf("%s\n", __func__);
+	job = (struct panfrost_job *)sched_job;
+	sc = job->sc;
+
+	stat = GPU_READ(sc, JOB_INT_STAT);
+	printf("%s: stat %x\n", __func__, stat);
 
 	//if (dma_fence_is_signaled(job->done_fence))
 	//	return;
