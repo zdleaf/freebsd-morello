@@ -91,9 +91,17 @@ struct panfrost_softc {
 	int running;
 	int job_count;
 	struct panfrost_job_slot *js;
+	struct mtx			sched_lock;
 };
 
+#define	PAN_DEBUG
+#undef	PAN_DEBUG
+
+#ifdef	PAN_DEBUG
+#define	dprintf(fmt, ...)	printf(fmt, ##__VA_ARGS__)
+#else
 #define	dprintf(fmt, ...)
+#endif
 
 #define	GPU_READ(sc, reg)	bus_read_4((sc)->res[0], (reg))
 #define	GPU_WRITE(sc, reg, val)	bus_write_4((sc)->res[0], (reg), (val))
