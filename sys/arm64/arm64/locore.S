@@ -67,9 +67,7 @@
  *  We are loaded at a 2MiB aligned address
  */
 
-	.text
-	.globl _start
-_start:
+ENTRY(_start)
 #if defined(LINUX_BOOT_ABI)
 	/* U-boot image header */
 	b	1f			/* code 0 */
@@ -190,6 +188,7 @@ virtdone:
 	.quad	__bss_start
 .Lend:
 	.quad	__bss_end
+END(_start)
 
 #ifdef SMP
 /*
@@ -249,7 +248,7 @@ END(mpentry)
  * If we are started in EL2, configure the required hypervisor
  * registers and drop to EL1.
  */
-drop_to_el1:
+LENTRY(drop_to_el1)
 	mrs	x23, CurrentEL
 	lsr	x23, x23, #2
 	cmp	x23, #0x2
@@ -336,6 +335,7 @@ drop_to_el1:
 	.align 3
 .Lsctlr_res1:
 	.quad SCTLR_RES1
+LEND(drop_to_el1)
 
 hcr:
 	/* Make sure the HVC instruction is not disabled */
@@ -346,7 +346,7 @@ hcr:
  * virtual address we expect to run from. This is used when building the
  * initial page table.
  */
-get_virt_delta:
+LENTRY(get_virt_delta)
 	/* Load the physical address of virt_map */
 	adrp	x29, virt_map
 	add	x29, x29, :lo12:virt_map
@@ -362,6 +362,7 @@ get_virt_delta:
 	.align 3
 virt_map:
 	.quad	virt_map
+LEND(get_virt_delta)
 
 /*
  * This builds the page tables containing the identity map, and the kernel
@@ -382,7 +383,7 @@ virt_map:
  *    - The identity (PA = VA) L0 table (TTBR0)
  *    - The DMAP L1 tables
  */
-create_pagetables:
+LENTRY(create_pagetables)
 	/* Save the Link register */
 	mov	x5, x30
 
@@ -534,6 +535,7 @@ common:
 	/* Restore the Link register */
 	mov	x30, x5
 	ret
+LEND(create_pagetables)
 
 /*
  * Builds an L0 -> L1 table descriptor
@@ -547,7 +549,7 @@ common:
  *  x10 = Entry count
  *  x11, x12 and x13 are trashed
  */
-link_l0_pagetable:
+LENTRY(link_l0_pagetable)
 	/*
 	 * Link an L0 -> L1 table entry.
 	 */
@@ -571,6 +573,7 @@ link_l0_pagetable:
 	cbnz	x10, 1b
 
 	ret
+LEND(link_l0_pagetable)
 
 /*
  * Builds an L1 -> L2 table descriptor
@@ -583,7 +586,7 @@ link_l0_pagetable:
  *  x9  = L2 PA (trashed)
  *  x11, x12 and x13 are trashed
  */
-link_l1_pagetable:
+LENTRY(link_l1_pagetable)
 	/*
 	 * Link an L1 -> L2 table entry.
 	 */
@@ -602,6 +605,7 @@ link_l1_pagetable:
 	str	x13, [x6, x11, lsl #3]
 
 	ret
+LEND(link_l1_pagetable)
 
 /*
  * Builds count 1 GiB page table entry
@@ -612,7 +616,7 @@ link_l1_pagetable:
  *  x10 = Entry count
  *  x11, x12 and x13 are trashed
  */
-build_l1_block_pagetable:
+LENTRY(build_l1_block_pagetable)
 	/*
 	 * Build the L1 table entry.
 	 */
@@ -639,6 +643,7 @@ build_l1_block_pagetable:
 	cbnz	x10, 1b
 
 	ret
+LEND(build_l1_block_pagetable)
 
 /*
  * Builds count 2 MiB page table entry
@@ -649,7 +654,7 @@ build_l1_block_pagetable:
  *  x10 = Entry count
  *  x11, x12 and x13 are trashed
  */
-build_l2_block_pagetable:
+LENTRY(build_l2_block_pagetable)
 	/*
 	 * Build the L2 table entry.
 	 */
@@ -678,8 +683,9 @@ build_l2_block_pagetable:
 	cbnz	x10, 1b
 
 	ret
+LEND(build_l2_block_pagetable)
 
-start_mmu:
+LENTRY(start_mmu)
 	dsb	sy
 
 	/* Load the exception vectors */
@@ -771,10 +777,11 @@ sctlr_clear:
 	/* Bits to clear */
 	.quad (SCTLR_EE | SCTLR_EOE | SCTLR_IESB | SCTLR_WXN | SCTLR_UMA | \
 	    SCTLR_ITD | SCTLR_A)
+LEND(start_mmu)
 
-	.globl abort
-abort:
+ENTRY(abort)
 	b abort
+END(abort)
 
 	.align 3
 init_pt_va:
