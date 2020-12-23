@@ -236,6 +236,19 @@ drm_gem_cma_create_with_handle(struct drm_file *file, struct drm_device *drm,
  * Exported functions 
  */
 
+vm_page_t *
+drm_gem_cma_get_pages(struct drm_gem_object *gem_obj, int *npages)
+{
+	struct drm_gem_cma_object *bo;
+
+	bo = container_of(gem_obj, struct drm_gem_cma_object, gem_obj);
+
+	printf("%s: bo->m is %p, npages %d\n", __func__, bo->m, bo->npages);
+	*npages = bo->npages;
+
+	return (bo->m);
+}
+
 void
 drm_gem_cma_free_object(struct drm_gem_object *gem_obj)
 {

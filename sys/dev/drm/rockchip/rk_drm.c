@@ -83,9 +83,16 @@ static int rk_drm_detach(device_t dev);
 struct sg_table *
 rockchip_gem_prime_get_sg_table(struct drm_gem_object *obj)
 {
+	struct sg_table *sgt;
+	vm_page_t *m;
+	int npages;
 
 	printf("%s\n", __func__);
-	return (NULL);
+
+	m = drm_gem_cma_get_pages(obj, &npages);
+	sgt = drm_prime_pages_to_sg(m, npages);
+
+	return (sgt);
 }
 
 struct drm_gem_object *

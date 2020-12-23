@@ -359,14 +359,19 @@ panfrost_gem_create_object0(struct drm_device *dev, size_t size, bool private)
 	TAILQ_INIT(&obj->mappings);
 	mtx_init(&obj->mappings_lock, "mappings", NULL, MTX_DEF);
 
-printf("%s\n", __func__);
+printf("%s: private %d\n", __func__, private);
 
 	if (private)
 		drm_gem_private_object_init(dev, &obj->base, size);
 	else
 		drm_gem_object_init(dev, &obj->base, size);
 
+printf("%s: 1\n", __func__);
+
 	error = drm_gem_create_mmap_offset(&obj->base);
+
+printf("%s: 2\n", __func__);
+
 	if (error != 0) {
 		printf("Failed to create mmap offset\n");
 		return (NULL);
@@ -441,7 +446,7 @@ panfrost_gem_get_pages(struct panfrost_gem_object *bo)
 	low = 0;
 	high = -1UL;
 	boundary = 0;
-	pflags = VM_ALLOC_NORMAL  | VM_ALLOC_NOOBJ | VM_ALLOC_NOBUSY |
+	pflags = VM_ALLOC_NORMAL | VM_ALLOC_NOOBJ | VM_ALLOC_NOBUSY |
 	    VM_ALLOC_WIRED | VM_ALLOC_ZERO;
 	memattr = VM_MEMATTR_WRITE_COMBINING;
 
@@ -487,14 +492,20 @@ panfrost_gem_prime_import_sg_table(struct drm_device *dev,
 {
 	struct panfrost_gem_object *obj;
 	size_t size;
+	vm_page_t *m;
+	int error;
 
+	printf("%s size %d\n", __func__, attach->dmabuf->size);
 	size = PAGE_ALIGN(attach->dmabuf->size);
-
-	printf("%s size %d\n", __func__, size);
+	printf("%s aligned size %d\n", __func__, size);
 
 	obj = panfrost_gem_create_object0(dev, size, true);
 
-	/* TODO: assign sgt */
+	m = malloc(sizeof(vm_page_t) * 4096, M_DEVBUF, M_ZERO | M_WAITOK);
+
+	error = drm_prime_sg_to_page_addr_arrays(sgt, m, NULL, 4096);
+	obj->pages = m[0];
+	obj->npages = 2025;
 
 	return (&obj->base);
 }

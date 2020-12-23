@@ -572,7 +572,7 @@ rk_vop_plane_atomic_update(struct drm_plane *plane,
 
 	VOP_WRITE(sc, RK3399_REG_CFG_DONE, 1);
 
-	dprintf("buf paddr %x\n", paddr);
+	printf("%s: NEW buf paddr %x for plane %d\n", __func__, paddr, id);
 }
 
 static struct drm_plane_helper_funcs rk_vop_plane_helper_funcs = {

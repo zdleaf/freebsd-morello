@@ -194,7 +194,7 @@ panfrost_mmu_page_fault(struct panfrost_softc *sc, int as, uint64_t addr)
 	struct panfrost_gem_object *bo;
 	vm_offset_t page_offset;
 	struct page *pages;
-	vm_object_t mapping;
+	//vm_object_t mapping;
 
 	dprintf("%s: as %d addr %lx\n", __func__, as, addr);
 	bomapping = panfrost_mmu_find_mapping(sc, as, addr);
@@ -202,13 +202,17 @@ panfrost_mmu_page_fault(struct panfrost_softc *sc, int as, uint64_t addr)
 	if (!bomapping)
 		panic("no bomapping");
 
+	printf("%s 1\n", __func__);
 	bo = bomapping->obj;
+	printf("%s 2\n", __func__);
 
 	addr &= ~((uint64_t)2*1024*1024 - 1);
 	page_offset = addr >> PAGE_SHIFT;
 	page_offset -= bomapping->mmnode.start;
 
+	printf("%s 3\n", __func__);
 	if (bo->pages == NULL) {
+		printf("no pages\n");
 		panic("no pages");
 	}
 
@@ -217,14 +221,15 @@ panfrost_mmu_page_fault(struct panfrost_softc *sc, int as, uint64_t addr)
 	pmap_gfault(&bomapping->mmu->p, addr);
 #endif
 
+	printf("%s 4\n", __func__);
 	pages = bo->pages;
 
-	mapping = bo->base.filp->f_vnode->v_object;
-
-	dprintf("%s: mapping %p\n", __func__, mapping);
-
-	struct panfrost_mmu *mmu;
-	mmu = bomapping->mmu;
+	printf("%s 5\n", __func__);
+	//mapping = bo->base.filp->f_vnode->v_object;
+	//printf("%s 6\n", __func__);
+	//dprintf("%s: mapping %p\n", __func__, mapping);
+	//struct panfrost_mmu *mmu;
+	//mmu = bomapping->mmu;
 
 	return (0);
 }
