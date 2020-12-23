@@ -248,6 +248,8 @@ device		ukbd			# Keyboard
 device		umass			# Disks/Mass storage - Requires scbus and da
 device		uhid
 device		ums
+device		ucom
+device		umodem
 
 # USB ethernet support
 #device		muge
