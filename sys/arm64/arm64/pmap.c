@@ -3746,6 +3746,21 @@ retry:
 	pmap_resident_count_inc(pmap, 1);
 	dsb(ishst);
 
+	pd_entry_t *l0p;
+	pd_entry_t *l1p;
+	pd_entry_t *l2p;
+	pd_entry_t *l3p;
+
+	l0p = pmap_l0(pmap, va);
+	l1p = pmap_l1(pmap, va);
+	l2p = pmap_l2(pmap, va);
+	l3p = pmap_l2_to_l3(l2p, va);
+
+	cpu_dcache_wbinv_range((uint64_t)l0p, 8);
+	cpu_dcache_wbinv_range((uint64_t)l1p, 8);
+	cpu_dcache_wbinv_range((uint64_t)l2p, 8);
+	cpu_dcache_wbinv_range((uint64_t)l3p, 8);
+
 	rv = KERN_SUCCESS;
 out:
 	PMAP_UNLOCK(pmap);
