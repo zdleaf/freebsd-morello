@@ -100,7 +100,7 @@ int
 panfrost_job_intr_filter(void *arg)
 {
 
-	printf("%s\n", __func__);
+	dprintf("%s\n", __func__);
 
 	return (FILTER_SCHEDULE_THREAD);
 }
@@ -118,7 +118,7 @@ panfrost_job_intr(void *arg)
 	sc = arg;
 
 	stat = GPU_READ(sc, JOB_INT_STAT);
-	printf("%s: stat %x\n", __func__, stat);
+	dprintf("%s: stat %x\n", __func__, stat);
 
 	for (i = 0; stat; i++) {
 		mask = (1 << i) | (1 << (16 + i));
@@ -130,9 +130,9 @@ panfrost_job_intr(void *arg)
 		if (stat & (1 << (16 + i))) {
 			GPU_WRITE(sc, JS_COMMAND_NEXT(i), JS_COMMAND_NOP);
 			status = GPU_READ(sc, JS_STATUS(i));
-			printf("%s: job error, slot %d status %x\n",
+			dprintf("%s: job error, slot %d status %x\n",
 			    __func__, i, status);
-			printf("%s: head %x tail %x\n", __func__,
+			dprintf("%s: head %x tail %x\n", __func__,
 			    GPU_READ(sc, JS_HEAD_LO(i)),
 			    GPU_READ(sc, JS_TAIL_LO(i)));
 
@@ -156,7 +156,7 @@ panfrost_job_intr(void *arg)
 
 		if (stat & (1 << i)) {
 
-			printf("%s: job at slot %d completed\n", __func__, i);
+			dprintf("%s: job at slot %d completed\n", __func__, i);
 			mtx_lock(&sc->job_lock);
 			sc->slot_status[i].running = 0;
 			sc->running = 0;
@@ -170,7 +170,7 @@ panfrost_job_intr(void *arg)
 		stat &= ~mask;
 	}
 
-	printf("%s: done\n", __func__);
+	dprintf("%s: done\n", __func__);
 }
 
 int
@@ -236,12 +236,17 @@ panfrost_job_hw_submit(struct panfrost_job *job, int slot)
 	struct panfrost_softc *sc;
 	uint32_t cfg;
 	uint64_t jc_head;
+	int status;
 
 	sc = job->sc;
 	jc_head = job->jc;
 
-	printf("%s: HW submitting job %d to slot %d, jc %lx\n",
+	dprintf("%s: HW submitting job %d to slot %d, jc %lx\n",
 	    __func__, sc->job_count++, slot, jc_head);
+
+	status = GPU_READ(sc, JS_COMMAND_NEXT(slot));
+	if (status)
+		panic("fault");
 
 	cfg = panfrost_mmu_as_get(sc, &job->pfile->mmu);
 
@@ -265,11 +270,11 @@ panfrost_job_hw_submit(struct panfrost_job *job, int slot)
 	if (panfrost_has_hw_feature(sc, HW_FEATURE_FLUSH_REDUCTION))
 		GPU_WRITE(sc, JS_FLUSH_ID_NEXT(slot), job->flush_id);
 
+	wmb();
 	GPU_WRITE(sc, JS_COMMAND_NEXT(slot), JS_COMMAND_START);
+	wmb();
 
-	printf("%s: job %d submitted to HW\n", __func__, sc->job_count - 1);
-
-	panfrost_job_enable_interrupts(sc);
+	dprintf("%s: job %d submitted to HW\n", __func__, sc->job_count - 1);
 }
 
 static void
@@ -306,6 +311,8 @@ panfrost_attach_object_fences(struct drm_gem_object **bos,
 		reservation_object_add_excl_fence(bos[i]->resv, fence);
 }
 
+int flag = 0;
+
 int
 panfrost_job_push(struct panfrost_job *job)
 {
@@ -323,8 +330,6 @@ panfrost_job_push(struct panfrost_job *job)
 	entity = &job->pfile->sched_entity[slot];
 
 	job->slot = slot;
-
-printf("%s: new job for slot %d\n", __func__, slot);
 
 	error = drm_gem_lock_reservations(job->bos, job->bo_count,
 	    &acquire_ctx);
@@ -388,7 +393,7 @@ panfrost_job_dependency(struct drm_sched_job *sched_job,
 
 	job = (struct panfrost_job *)sched_job;
 
-	printf("%s\n", __func__);
+	dprintf("%s\n", __func__);
 
 	for (i = 0; i < job->in_fence_count; i++) {
 		if (job->in_fences[i]) {
@@ -406,7 +411,7 @@ panfrost_job_dependency(struct drm_sched_job *sched_job,
 		}
 	}
 
-	printf("%s: no more\n", __func__);
+	dprintf("%s: no more\n", __func__);
 
 	return (NULL);
 }
@@ -438,7 +443,7 @@ static bool
 dma_fence_chain_enable_signaling(struct dma_fence *fence)
 {
 
-	printf("%s\n", __func__);
+	dprintf("%s\n", __func__);
 
 	return (true);
 }
@@ -477,7 +482,7 @@ panfrost_job_run(struct drm_sched_job *sched_job)
 	struct panfrost_job *job;
 	struct dma_fence *fence;
 
-	printf("%s\n", __func__);
+	dprintf("%s\n", __func__);
 
 	job = (struct panfrost_job *)sched_job;
 	sc = job->sc;
@@ -512,7 +517,6 @@ panfrost_job_timedout(struct drm_sched_job *sched_job)
 
 	stat = GPU_READ(sc, JOB_INT_STAT);
 	printf("%s: stat %x\n", __func__, stat);
-
 	//if (dma_fence_is_signaled(job->done_fence))
 	//	return;
 	//printf("%s: not signalled\n", __func__);
@@ -522,7 +526,7 @@ static void
 panfrost_job_free(struct drm_sched_job *sched_job)
 {
 
-	printf("%s\n", __func__);
+	dprintf("%s\n", __func__);
 }
 
 static const struct drm_sched_backend_ops panfrost_sched_ops = {

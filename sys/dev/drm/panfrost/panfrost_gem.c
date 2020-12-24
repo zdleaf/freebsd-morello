@@ -74,7 +74,7 @@ static void
 panfrost_gem_free_object(struct drm_gem_object *obj)
 {
 
-	printf("%s\n", __func__);
+	dprintf("%s\n", __func__);
 }
 
 int
@@ -106,7 +106,7 @@ panfrost_gem_open(struct drm_gem_object *obj, struct drm_file *file_priv)
 		color = PANFROST_BO_NOEXEC;
 	}
 
-	printf("%s\n", __func__);
+	dprintf("%s\n", __func__);
 
 	mtx_lock_spin(&pfile->mm_lock);
 	error = drm_mm_insert_node_generic(&pfile->mm, &mapping->mmnode,
@@ -118,7 +118,7 @@ panfrost_gem_open(struct drm_gem_object *obj, struct drm_file *file_priv)
 		return (error);
 	}
 
-	printf("%s: mapping->mmnode.start page %lx va %lx\n", __func__,
+	dprintf("%s: mapping->mmnode.start page %lx va %lx\n", __func__,
 	    mapping->mmnode.start, mapping->mmnode.start << PAGE_SHIFT);
 
 #if 0
@@ -135,7 +135,7 @@ panfrost_gem_open(struct drm_gem_object *obj, struct drm_file *file_priv)
 		panic("ok");
 	}
 
-	printf("%s: return 0\n", __func__);
+	dprintf("%s: return 0\n", __func__);
 
 	mtx_lock(&bo->mappings_lock);
 	TAILQ_INSERT_TAIL(&bo->mappings, mapping, next);
@@ -148,7 +148,7 @@ void
 panfrost_gem_close(struct drm_gem_object *obj, struct drm_file *file_priv)
 {
 
-	printf("%s\n", __func__);
+	dprintf("%s\n", __func__);
 }
 
 void
@@ -222,7 +222,7 @@ panfrost_gem_fault(struct vm_area_struct *vma, struct vm_fault *vmf)
 		return (VM_FAULT_SIGBUS);
 	}
 
-	printf("%s: bo %p pidx %d, m %p, pgoff %d\n",
+	dprintf("%s: bo %p pidx %d, m %p, pgoff %d\n",
 	    __func__, bo, pidx, m, vmf->pgoff);
 
 	VM_OBJECT_WLOCK(obj);
@@ -242,7 +242,7 @@ panfrost_gem_fault(struct vm_area_struct *vma, struct vm_fault *vmf)
 	vma->vm_pfn_first = 0;
 	vma->vm_pfn_count = bo->npages;
 
-	printf("%s: pidx: %llu, start: 0x%08x, addr: 0x%08lx\n",
+	dprintf("%s: pidx: %llu, start: 0x%08x, addr: 0x%08lx\n",
 	    __func__, pidx, vma->vm_start, vmf->address);
 
 	return (VM_FAULT_NOPAGE);
@@ -259,7 +259,7 @@ static void
 panfrost_gem_vm_open(struct vm_area_struct *vma)
 {
 
-	printf("%s\n", __func__);
+	dprintf("%s\n", __func__);
 	drm_gem_vm_open(vma);
 }
 
@@ -267,7 +267,7 @@ static void
 panfrost_gem_vm_close(struct vm_area_struct *vma)
 {
 
-	printf("%s\n", __func__);
+	dprintf("%s\n", __func__);
 	drm_gem_vm_close(vma);
 }
 
@@ -308,7 +308,7 @@ drm_gem_shmem_mmap(struct drm_gem_object *obj, struct vm_area_struct *vma)
 	struct panfrost_gem_object *bo;
 	int error;
 
-	printf("%s\n", __func__);
+	dprintf("%s\n", __func__);
 
 	bo = (struct panfrost_gem_object *)obj;
 
@@ -359,19 +359,14 @@ panfrost_gem_create_object0(struct drm_device *dev, size_t size, bool private)
 	TAILQ_INIT(&obj->mappings);
 	mtx_init(&obj->mappings_lock, "mappings", NULL, MTX_DEF);
 
-printf("%s: private %d\n", __func__, private);
+dprintf("%s: private %d\n", __func__, private);
 
 	if (private)
 		drm_gem_private_object_init(dev, &obj->base, size);
 	else
 		drm_gem_object_init(dev, &obj->base, size);
 
-printf("%s: 1\n", __func__);
-
 	error = drm_gem_create_mmap_offset(&obj->base);
-
-printf("%s: 2\n", __func__);
-
 	if (error != 0) {
 		printf("Failed to create mmap offset\n");
 		return (NULL);
@@ -387,7 +382,7 @@ panfrost_gem_create_object_with_handle(struct drm_file *file,
 	struct panfrost_gem_object *obj;
 	int error;
 
-printf("%s\n", __func__);
+dprintf("%s\n", __func__);
 
 	size = PAGE_ALIGN(size);
 
@@ -464,6 +459,8 @@ panfrost_gem_get_pages(struct panfrost_gem_object *bo)
 		if ((m->flags & PG_ZERO) == 0)
 			pmap_zero_page(m);
 		m->valid = VM_PAGE_BITS_ALL;
+		m->oflags &= ~VPO_UNMANAGED;
+		m->flags |= PG_FICTITIOUS;
 	}
 
 	wmb();
@@ -495,9 +492,9 @@ panfrost_gem_prime_import_sg_table(struct drm_device *dev,
 	vm_page_t *m;
 	int error;
 
-	printf("%s size %d\n", __func__, attach->dmabuf->size);
+	dprintf("%s size %d\n", __func__, attach->dmabuf->size);
 	size = PAGE_ALIGN(attach->dmabuf->size);
-	printf("%s aligned size %d\n", __func__, size);
+	dprintf("%s aligned size %d\n", __func__, size);
 
 	obj = panfrost_gem_create_object0(dev, size, true);
 

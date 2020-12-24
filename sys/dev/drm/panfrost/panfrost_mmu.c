@@ -161,7 +161,7 @@ panfrost_mmu_find_mapping(struct panfrost_softc *sc, int as, uint64_t addr)
 	};
 	goto out;
 
-printf("%s: mmu found\n", __func__);
+dprintf("%s: mmu found\n", __func__);
 
 found:
 	pfile = container_of(mmu, struct panfrost_file, mmu);
@@ -193,7 +193,7 @@ panfrost_mmu_page_fault(struct panfrost_softc *sc, int as, uint64_t addr)
 	struct panfrost_gem_mapping *bomapping;
 	struct panfrost_gem_object *bo;
 	vm_offset_t page_offset;
-	struct page *pages;
+	//struct page *pages;
 	//vm_object_t mapping;
 
 	dprintf("%s: as %d addr %lx\n", __func__, as, addr);
@@ -202,15 +202,15 @@ panfrost_mmu_page_fault(struct panfrost_softc *sc, int as, uint64_t addr)
 	if (!bomapping)
 		panic("no bomapping");
 
-	printf("%s 1\n", __func__);
+	//printf("%s 1\n", __func__);
 	bo = bomapping->obj;
-	printf("%s 2\n", __func__);
+	//printf("%s 2\n", __func__);
 
 	addr &= ~((uint64_t)2*1024*1024 - 1);
 	page_offset = addr >> PAGE_SHIFT;
 	page_offset -= bomapping->mmnode.start;
 
-	printf("%s 3\n", __func__);
+	//printf("%s 3\n", __func__);
 	if (bo->pages == NULL) {
 		printf("no pages\n");
 		panic("no pages");
@@ -221,10 +221,8 @@ panfrost_mmu_page_fault(struct panfrost_softc *sc, int as, uint64_t addr)
 	pmap_gfault(&bomapping->mmu->p, addr);
 #endif
 
-	printf("%s 4\n", __func__);
-	pages = bo->pages;
-
-	printf("%s 5\n", __func__);
+	//pages = bo->pages;
+	//printf("%s 5\n", __func__);
 	//mapping = bo->base.filp->f_vnode->v_object;
 	//printf("%s 6\n", __func__);
 	//dprintf("%s: mapping %p\n", __func__, mapping);
@@ -256,7 +254,7 @@ panfrost_mmu_fault(struct panfrost_softc *sc, int as)
 	source_id = (fault_status >> 16);
 
 	if ((exception_type & 0xF8) == 0xC0) {
-		dprintf("%s: page fault at %lx\n", __func__, addr);
+		printf("%s: page fault at %lx\n", __func__, addr);
 		panfrost_mmu_page_fault(sc, as, addr);
 	} else
 		dprintf("%s: %s fault at %lx\n", __func__,
@@ -265,8 +263,23 @@ panfrost_mmu_fault(struct panfrost_softc *sc, int as)
 	dprintf("%s: exception type %x, access type %x (%s), source id %x\n",
 	    __func__, exception_type, access_type,
 	    access_type_name(sc, fault_status), source_id);
+}
 
-	//mmu_hw_do_operation_locked(sc, 0, addr, 8, AS_COMMAND_FLUSH_PT);
+int
+panfrost_mmu_intr_filter(void *arg)
+{
+	struct panfrost_softc *sc;
+	int stat;
+
+	sc = arg;
+
+	stat = GPU_READ(sc, MMU_INT_STAT);
+	if (stat == 0)
+		return (FILTER_HANDLED);
+
+	GPU_WRITE(sc, MMU_INT_MASK, 0);
+
+	return (FILTER_SCHEDULE_THREAD);
 }
 
 void
@@ -279,7 +292,8 @@ panfrost_mmu_intr(void *arg)
 	sc = arg;
 
 	status = GPU_READ(sc, MMU_INT_RAWSTAT);
-	dprintf("%s: status %x\n", __func__, status);
+	printf("%s: status %x\n", __func__, status);
+	panic("mmu intr");
 
 	for (i = 0; status != 0; i++) {
 		if (status & (1 << i)) {
@@ -290,6 +304,8 @@ panfrost_mmu_intr(void *arg)
 			panic("error");
 		GPU_WRITE(sc, MMU_INT_CLEAR, (1 << i) | (1 << (i + 16)));
 	}
+
+	GPU_WRITE(sc, MMU_INT_MASK, ~0);
 }
 
 int
@@ -348,7 +364,7 @@ lock_region(struct panfrost_softc *sc, uint32_t as, vm_offset_t va,
 	uint8_t region_width;
 	uint64_t region;
 
-	region = va & PAGE_MASK;
+	region = va & ~PAGE_MASK;
 
 	size = round_up(size, PAGE_SIZE);
 
@@ -427,6 +443,7 @@ printf("%s: l0 paddr %lx, mmu as %d\n", __func__, paddr, as);
 
 	mmu_hw_do_operation_locked(sc, as, 0, ~0UL, AS_COMMAND_FLUSH_MEM);
 
+	dmb(sy);
 	wmb();
 
 	GPU_WRITE(sc, AS_TRANSTAB_LO(as), paddr & 0xffffffffUL);
@@ -436,6 +453,8 @@ printf("%s: l0 paddr %lx, mmu as %d\n", __func__, paddr, as);
 	GPU_WRITE(sc, AS_MEMATTR_HI(as), memattr >> 32);
 
 	write_cmd(sc, as, AS_COMMAND_UPDATE);
+
+	wmb();
 
 	return (0);
 }
@@ -495,7 +514,7 @@ panfrost_mmu_map(struct panfrost_softc *sc,
 	if (bo->noexec == 0)
 		prot |= VM_PROT_EXECUTE;
 
-	printf("%s: bo %p mmu %p as %d mapping %lx -> %lx, %d pages\n",
+	dprintf("%s: bo %p mmu %p as %d mapping %lx -> %lx, %d pages\n",
 	    __func__, bo, mmu, mmu->as, sva, VM_PAGE_TO_PHYS(m), bo->npages);
 
 	/* map pages */
@@ -503,21 +522,7 @@ panfrost_mmu_map(struct panfrost_softc *sc,
 		pa = VM_PAGE_TO_PHYS(m);
 		dprintf("%s: mapping %lx -> %lx\n", __func__, va, pa);
 		error = pmap_genter(&mmu->p, va, pa, prot, 0);
-
 		va += PAGE_SIZE;
-
-#if 0
-		int j;
-		vm_offset_t kva, *kvva;
-		kva = kva_alloc(PAGE_SIZE);
-		kvva = (vm_offset_t *)kva;
-		pmap_kenter(kva, PAGE_SIZE, pa, VM_MEMATTR_UNCACHEABLE);
-		printf("words ");
-		for (j = 0; j < 3; j++) {
-			printf("%lx ", kvva[j]);
-		}
-		printf("\n");
-#endif
 	}
 
 	mapping->active = true;

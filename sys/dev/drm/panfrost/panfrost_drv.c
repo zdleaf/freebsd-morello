@@ -182,7 +182,7 @@ panfrost_copy_in_fences(struct drm_device *dev, struct drm_file *file_priv,
 	if (job->in_fence_count == 0)
 		return (0);
 
-	printf("%s: fence count %d\n", __func__, job->in_fence_count);
+	dprintf("%s: fence count %d\n", __func__, job->in_fence_count);
 
 	sz = job->in_fence_count * sizeof(struct dma_fence *);
 	job->in_fences = malloc(sz, M_DEVBUF, M_WAITOK | M_ZERO);
@@ -197,7 +197,8 @@ panfrost_copy_in_fences(struct drm_device *dev, struct drm_file *file_priv,
 	for (i = 0; i < job->in_fence_count; i++) {
 		error = drm_syncobj_find_fence(file_priv, handles[i], 0, 0,
 		    &job->in_fences[i]);
-		printf("%s: error %d\n", __func__, error);
+		if (error)
+			printf("%s: error %d\n", __func__, error);
 	}
 
 	free(handles, M_DEVBUF);
@@ -222,7 +223,7 @@ panfrost_lookup_bos(struct drm_device *dev, struct drm_file *file_priv,
 	if (job->bo_count == 0)
 		return (0);
 
-printf("bo count %d\n", job->bo_count);
+dprintf("bo count %d\n", job->bo_count);
 
 	sz = job->bo_count * sizeof(struct dma_fence *);
 	job->implicit_fences = malloc(sz, M_DEVBUF, M_WAITOK | M_ZERO);
@@ -265,7 +266,7 @@ panfrost_ioctl_submit(struct drm_device *dev, void *data,
 	args = data;
 	sync_out = NULL;
 
-	printf("%s: jc %x\n", __func__, args->jc);
+	dprintf("%s: jc %x\n", __func__, args->jc);
 
 	if (args->jc == 0)
 		return (EINVAL);
@@ -276,7 +277,7 @@ panfrost_ioctl_submit(struct drm_device *dev, void *data,
 	if (args->out_sync > 0) {
 		sync_out = drm_syncobj_find(file, args->out_sync);
 		if (sync_out == NULL) {
-			printf("sync out is NULL\n");
+			dprintf("sync out is NULL\n");
 			return (-ENODEV);
 		}
 	}
@@ -287,7 +288,6 @@ panfrost_ioctl_submit(struct drm_device *dev, void *data,
 	job->requirements = args->requirements;
 	job->flush_id = panfrost_device_get_latest_flush_id(sc);
 	job->pfile = file->driver_priv;
-	//job->s_fence = drm_sched_fence_create(entity, owner);
 
 	error = panfrost_copy_in_fences(dev, file, args, job);
 	if (error)
@@ -301,12 +301,10 @@ panfrost_ioctl_submit(struct drm_device *dev, void *data,
 	if (error)
 		return (EINVAL);
 
-	if (sync_out) {
-printf("%s: sync_out\n", __func__);
+	if (sync_out)
 		drm_syncobj_replace_fence(sync_out, job->render_done_fence);
-	}
 
-printf("%s: job enqueued\n", __func__);
+dprintf("%s: job enqueued\n", __func__);
 
 	return (0);
 }
@@ -345,7 +343,7 @@ panfrost_ioctl_wait_bo(struct drm_device *dev, void *data,
 
 	//printf("%s: timeout %d, errno %d\n",
 	//__func__, args->timeout_ns, error);
-	printf("%s: error %d\n", __func__, error);
+	dprintf("%s: error %d\n", __func__, error);
 
 	if (error > 0)
 		return (0);
@@ -362,7 +360,7 @@ panfrost_ioctl_create_bo(struct drm_device *dev, void *data,
 
 	args = data;
 
-	printf("%s: size %d flags %d handle %d pad %d offset %jd\n",
+	dprintf("%s: size %d flags %d handle %d pad %d offset %jd\n",
 	    __func__, args->size, args->flags, args->handle, args->pad,
 	    args->offset);
 
@@ -408,7 +406,7 @@ panfrost_ioctl_mmap_bo(struct drm_device *dev, void *data,
 	if (error == 0)
 		args->offset = drm_vma_node_offset_addr(&obj->vma_node);
 
-	printf("%s: error %d args->offset %lx\n", __func__, error,
+	dprintf("%s: error %d args->offset %lx\n", __func__, error,
 	    args->offset);
 
 	return (error);
@@ -427,7 +425,7 @@ panfrost_ioctl_get_param(struct drm_device *ddev, void *data,
 	if (param->pad != 0)
 		return (EINVAL);
 
-	printf("%s: param %d\n", __func__, param->param);
+	dprintf("%s: param %d\n", __func__, param->param);
 
 	switch (param->param) {
 	case DRM_PANFROST_PARAM_GPU_PROD_ID:
@@ -546,7 +544,7 @@ panfrost_ioctl_madvise(struct drm_device *dev, void *data,
 	struct drm_gem_object *obj;
 	struct panfrost_gem_object *bo;
 
-	printf("%s\n", __func__);
+	dprintf("%s\n", __func__);
 
 	pfile = file_priv->driver_priv;
 	args = data;
@@ -642,7 +640,7 @@ drm_fb_cma_helper_getinfo(device_t dev)
 {
 	struct panfrost_softc *sc;
 
-	printf("%s\n", __func__);
+	dprintf("%s\n", __func__);
 
 	sc = device_get_softc(dev);
 	if (sc->fb == NULL)
@@ -660,7 +658,7 @@ panfrost_fb_preinit(struct drm_device *drm_dev)
 	struct drm_fb_cma *fb;
 	struct panfrost_softc *sc;
 
-	printf("%s\n", __func__);
+	dprintf("%s\n", __func__);
 
 	sc = container_of(drm_dev, struct panfrost_softc, drm_dev);
 
@@ -677,7 +675,7 @@ panfrost_fb_init(struct drm_device *drm_dev)
 	struct panfrost_softc *sc;
 	int rv;
 
-	printf("%s\n", __func__);
+	dprintf("%s\n", __func__);
 
 	sc = container_of(drm_dev, struct panfrost_softc, drm_dev);
 
@@ -719,7 +717,7 @@ panfrost_fb_destroy(struct drm_device *drm_dev)
 	struct drm_fb_cma *fb;
 	struct panfrost_softc *sc;
 
-	printf("%s\n", __func__);
+	dprintf("%s\n", __func__);
 
 	sc = container_of(drm_dev, struct panfrost_softc, drm_dev);
 	fb = sc->fb;
@@ -746,7 +744,7 @@ panfrost_irq_hook(void *arg)
 
 	sc = arg;
 
-	printf("%s\n", __func__);
+	dprintf("%s\n", __func__);
 
 	node = ofw_bus_get_node(sc->dev);
 
@@ -887,7 +885,7 @@ panfrost_attach(device_t dev)
 	}
 
 	if (bus_setup_intr(dev, sc->res[2],
-	    INTR_TYPE_MISC | INTR_MPSAFE, NULL, panfrost_mmu_intr, sc,
+	    INTR_TYPE_MISC | INTR_MPSAFE, panfrost_mmu_intr_filter, panfrost_mmu_intr, sc,
 	    &sc->intrhand[1])) {
 		device_printf(dev, "cannot setup interrupt handler\n");
 		return (ENXIO);

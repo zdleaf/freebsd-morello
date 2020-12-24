@@ -95,7 +95,7 @@ struct panfrost_softc {
 };
 
 #define	PAN_DEBUG
-//#undef	PAN_DEBUG
+#undef	PAN_DEBUG
 
 #ifdef	PAN_DEBUG
 #define	dprintf(fmt, ...)	printf(fmt, ##__VA_ARGS__)

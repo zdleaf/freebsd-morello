@@ -293,11 +293,21 @@ panfrost_device_init(struct panfrost_softc *sc)
 	panfrost_device_init_features(sc);
 	panfrost_device_init_quirks(sc);
 
+	/* Disable perfc */
+	GPU_WRITE(sc, GPU_PERFCNT_CFG,
+	    GPU_PERFCNT_CFG_MODE(GPU_PERFCNT_CFG_MODE_OFF));
+	GPU_WRITE(sc, GPU_PRFCNT_JM_EN, 0);
+	GPU_WRITE(sc, GPU_PRFCNT_SHADER_EN, 0);
+	GPU_WRITE(sc, GPU_PRFCNT_MMU_L2_EN, 0);
+	GPU_WRITE(sc, GPU_PRFCNT_TILER_EN, 0);
+
 	error = panfrost_device_power_on(sc);
 	if (error != 0)
 		return (error);
 
 	device_printf(sc->dev, "GPU is powered on\n");
+
+	GPU_WRITE(sc, GPU_CMD, GPU_CMD_CLEAN_CACHES);
 
 	return (0);
 }
