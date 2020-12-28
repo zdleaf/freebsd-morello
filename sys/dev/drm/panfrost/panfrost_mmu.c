@@ -293,7 +293,6 @@ panfrost_mmu_intr(void *arg)
 
 	status = GPU_READ(sc, MMU_INT_RAWSTAT);
 	printf("%s: status %x\n", __func__, status);
-	panic("mmu intr");
 
 	for (i = 0; status != 0; i++) {
 		if (status & (1 << i)) {
@@ -503,8 +502,10 @@ panfrost_mmu_map(struct panfrost_softc *sc,
 	mmu = mapping->mmu;
 
 	error = panfrost_gem_get_pages(bo);
-	if (error != 0)
+	if (error != 0) {
+		printf("%s: no pages, bo->is_heap %d\n", __func__, bo->is_heap);
 		panic("could not get pages");
+	}
 
 	m = bo->pages;
 
@@ -520,7 +521,7 @@ panfrost_mmu_map(struct panfrost_softc *sc,
 	/* map pages */
 	for (i = 0; i < bo->npages; i++, m++) {
 		pa = VM_PAGE_TO_PHYS(m);
-		dprintf("%s: mapping %lx -> %lx\n", __func__, va, pa);
+		//dprintf("%s: mapping %lx -> %lx\n", __func__, va, pa);
 		error = pmap_genter(&mmu->p, va, pa, prot, 0);
 		va += PAGE_SIZE;
 	}

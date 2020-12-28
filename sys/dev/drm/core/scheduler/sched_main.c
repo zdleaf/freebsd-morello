@@ -182,8 +182,10 @@ bool drm_sched_dependency_optimized(struct dma_fence* fence,
 	struct drm_gpu_scheduler *sched = entity->rq->sched;
 	struct drm_sched_fence *s_fence;
 
-	if (!fence || dma_fence_is_signaled(fence))
+	if (!fence || dma_fence_is_signaled(fence)) {
+		printf("%s: no fence or not signalled\n", __func__);
 		return false;
+	}
 	if (fence->context == entity->fence_context)
 		return true;
 	s_fence = to_drm_sched_fence(fence);

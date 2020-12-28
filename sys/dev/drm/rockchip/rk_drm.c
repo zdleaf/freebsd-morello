@@ -61,6 +61,8 @@ __FBSDID("$FreeBSD$");
 #include <drm/drm_ioctl.h>
 #include <drm/drm_vblank.h>
 
+#include <dev/drm/drmkpi/include/linux/dma-buf.h>
+
 #include "fb_if.h"
 #include "rk_vop_if.h"
 
@@ -100,28 +102,98 @@ rockchip_gem_prime_import_sg_table(struct drm_device *drm,
     struct dma_buf_attachment *attach, struct sg_table *sg)
 {
 
-	printf("%s\n", __func__);
+	printf("%s: implement me\n", __func__);
+	panic("%s\n", __func__);
 	return (NULL);
 }
+
+#if 0
+static void
+rk_gem_vm_open(struct vm_area_struct *vma)
+{
+
+	printf("%s\n", __func__);
+	drm_gem_vm_open(vma);
+}
+
+static void
+rk_gem_vm_close(struct vm_area_struct *vma)
+{
+
+	printf("%s\n", __func__);
+	drm_gem_vm_close(vma);
+}
+
+static vm_fault_t
+rk_gem_fault(struct vm_area_struct *vma, struct vm_fault *vmf)
+{
+
+	printf("%s\n", __func__);
+	panic("ok");
+
+	return (0);
+}
+
+static const struct vm_operations_struct rk_gem_vm_ops = {
+	.fault = rk_gem_fault,
+	.open = rk_gem_vm_open,
+	.close = rk_gem_vm_close,
+};
+#endif
 
 static int
 rockchip_drm_gem_object_mmap(struct drm_gem_object *obj,
     struct vm_area_struct *vma)
 {
+	struct drm_gem_cma_object *bo;
+	vm_page_t *m;
+	int npages;
+	int error;
 
-	printf("%s: TODO\n", __func__);
+	printf("%s: obj size %d: TODO\n", __func__, obj->size);
 
-	return (0);
+	m = drm_gem_cma_get_pages(obj, &npages);
+	printf("%s: m %p\n", __func__, m);
+
+	bo = container_of(obj, struct drm_gem_cma_object, gem_obj);
+	if (bo->pbase == 0)
+		return (0);
+
+#if 1
+	error = drm_gem_mmap_obj(obj, npages * PAGE_SIZE, vma);
+	printf("%s: error %d\n", __func__, error);
+
+	vma->vm_pfn = OFF_TO_IDX(bo->pbase);
+#else
+
+	if (obj->import_attach) {
+		printf("%s: Implement me: import_attach\n", __func__);
+		panic("ok");
+	}
+
+	printf("%s: bo->pbase %lx\n", __func__, bo->pbase);
+
+	vma->vm_pgoff -= drm_vma_node_start(&obj->vma_node);
+	vma->vm_flags |= VM_MIXEDMAP | VM_DONTEXPAND;
+	vma->vm_page_prot = vm_get_page_prot(vma->vm_flags);
+	vma->vm_page_prot = pgprot_writecombine(vma->vm_page_prot);
+	vma->vm_ops = &rk_gem_vm_ops;
+	error = 0;
+#endif
+
+	return (error);
 }
 
 static int
 rockchip_gem_mmap_buf(struct drm_gem_object *obj, struct vm_area_struct *vma)
 {
+#if 1
 	int ret;
 
 	ret = drm_gem_mmap_obj(obj, obj->size, vma);
 	if (ret)
 		return (ret);
+#endif
 
 	return rockchip_drm_gem_object_mmap(obj, vma);
 }

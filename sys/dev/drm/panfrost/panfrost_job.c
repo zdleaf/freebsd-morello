@@ -156,6 +156,7 @@ panfrost_job_intr(void *arg)
 
 		if (stat & (1 << i)) {
 
+			//printf(".");
 			dprintf("%s: job at slot %d completed\n", __func__, i);
 			mtx_lock(&sc->job_lock);
 			sc->slot_status[i].running = 0;

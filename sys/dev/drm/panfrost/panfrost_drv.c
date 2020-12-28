@@ -343,7 +343,7 @@ panfrost_ioctl_wait_bo(struct drm_device *dev, void *data,
 
 	//printf("%s: timeout %d, errno %d\n",
 	//__func__, args->timeout_ns, error);
-	dprintf("%s: error %d\n", __func__, error);
+	//printf("%s: error %d\n", __func__, error);
 
 	if (error > 0)
 		return (0);

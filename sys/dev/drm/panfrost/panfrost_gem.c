@@ -74,7 +74,7 @@ static void
 panfrost_gem_free_object(struct drm_gem_object *obj)
 {
 
-	dprintf("%s\n", __func__);
+	printf("%s: TODO: unmap needed\n", __func__);
 }
 
 int
@@ -131,7 +131,7 @@ panfrost_gem_open(struct drm_gem_object *obj, struct drm_file *file_priv)
 		if (error)
 			return (error);
 	} else {
-		printf("is heap\n");
+		printf("%s: is heap\n", __func__);
 		panic("ok");
 	}
 
@@ -148,7 +148,7 @@ void
 panfrost_gem_close(struct drm_gem_object *obj, struct drm_file *file_priv)
 {
 
-	dprintf("%s\n", __func__);
+	//printf("%s: TODO unmap needed\n", __func__);
 }
 
 void
@@ -359,7 +359,7 @@ panfrost_gem_create_object0(struct drm_device *dev, size_t size, bool private)
 	TAILQ_INIT(&obj->mappings);
 	mtx_init(&obj->mappings_lock, "mappings", NULL, MTX_DEF);
 
-dprintf("%s: private %d\n", __func__, private);
+//printf("%s: private %d\n", __func__, private);
 
 	if (private)
 		drm_gem_private_object_init(dev, &obj->base, size);
@@ -487,22 +487,41 @@ struct drm_gem_object *
 panfrost_gem_prime_import_sg_table(struct drm_device *dev,
     struct dma_buf_attachment *attach, struct sg_table *sgt)
 {
-	struct panfrost_gem_object *obj;
+	struct panfrost_gem_object *bo;
 	size_t size;
 	vm_page_t *m;
 	int error;
 
-	dprintf("%s size %d\n", __func__, attach->dmabuf->size);
-	size = PAGE_ALIGN(attach->dmabuf->size);
-	dprintf("%s aligned size %d\n", __func__, size);
+	printf("%s size %d\n", __func__, attach->dmabuf->size);
 
-	obj = panfrost_gem_create_object0(dev, size, true);
+	size = PAGE_ALIGN(attach->dmabuf->size);
+
+	bo = panfrost_gem_create_object0(dev, size, true);
+	printf("%s: bo %p\n", __func__, bo);
 
 	m = malloc(sizeof(vm_page_t) * 4096, M_DEVBUF, M_ZERO | M_WAITOK);
 
 	error = drm_prime_sg_to_page_addr_arrays(sgt, m, NULL, 4096);
-	obj->pages = m[0];
-	obj->npages = 2025;
+	bo->pages = m[0];
 
-	return (&obj->base);
+	unsigned count;
+	struct scatterlist *sg;
+	u32 len, index;
+ 
+	index = 0;
+	for_each_sg(sgt->sgl, sg, sgt->nents, count) {
+		len = sg_dma_len(sg);
+		while (len > 0) {
+			len -= PAGE_SIZE;
+			index++;
+		}
+	}
+
+	bo->npages = index;
+
+	printf("npages %d\n", index);
+
+	bo->noexec = true;
+
+	return (&bo->base);
 }
