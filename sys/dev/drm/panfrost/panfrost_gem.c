@@ -500,38 +500,49 @@ panfrost_gem_prime_import_sg_table(struct drm_device *dev,
     struct dma_buf_attachment *attach, struct sg_table *sgt)
 {
 	struct panfrost_gem_object *bo;
-	size_t size;
+	struct scatterlist *sg;
+	struct page *page;
 	vm_page_t *m;
-	int error;
+	size_t size;
+	int max_entries;
+	int count;
+	int index;
+	int len;
 
-	printf("%s size %d\n", __func__, attach->dmabuf->size);
+	max_entries = 4096;
+
+	dprintf("%s size %d\n", __func__, attach->dmabuf->size);
 
 	size = PAGE_ALIGN(attach->dmabuf->size);
 
 	bo = panfrost_gem_create_object0(dev, size, true);
-	printf("%s: bo %p\n", __func__, bo);
 
-	m = malloc(sizeof(vm_page_t) * 4096, M_DEVBUF, M_ZERO | M_WAITOK);
+	dprintf("%s: bo %p\n", __func__, bo);
 
-	error = drm_prime_sg_to_page_addr_arrays(sgt, m, NULL, 4096);
-	bo->pages = m[0];
+	m = malloc(sizeof(vm_page_t) * max_entries, M_DEVBUF,
+	    M_ZERO | M_WAITOK);
 
-	unsigned count;
-	struct scatterlist *sg;
-	u32 len, index;
- 
 	index = 0;
+
 	for_each_sg(sgt->sgl, sg, sgt->nents, count) {
 		len = sg_dma_len(sg);
+		page = sg_page(sg);
+
 		while (len > 0) {
+			if (index > max_entries)
+				return (NULL);
+			m[index] = page;
+
+			page++;
 			len -= PAGE_SIZE;
 			index++;
 		}
 	}
 
+	bo->pages = m[0];
 	bo->npages = index;
 
-	printf("npages %d\n", index);
+	dprintf("npages %d\n", index);
 
 	bo->noexec = true;
 
