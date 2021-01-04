@@ -375,6 +375,18 @@ panfrost_gem_create_object0(struct drm_device *dev, size_t size, bool private)
 	return (obj);
 }
 
+static void
+panfrost_gem_object_put(struct panfrost_gem_object *bo)
+{
+	struct drm_gem_object *obj;
+
+	obj = &bo->base;
+
+	mutex_lock(&obj->dev->struct_mutex);
+	drm_gem_object_put(obj);
+	mutex_unlock(&obj->dev->struct_mutex);
+}
+
 struct panfrost_gem_object *
 panfrost_gem_create_object_with_handle(struct drm_file *file,
     struct drm_device *dev, size_t size, uint32_t flags, uint32_t *handle)
@@ -391,7 +403,7 @@ dprintf("%s\n", __func__);
 	obj->is_heap = !!(flags & PANFROST_BO_HEAP);
 
 	error = drm_gem_handle_create(file, &obj->base, handle);
-	drm_gem_object_put(&obj->base);
+	panfrost_gem_object_put(obj);
 	if (error) {
 		printf("Failed to create handle\n");
 		return (NULL);
