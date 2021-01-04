@@ -877,15 +877,14 @@ panfrost_attach(device_t dev)
 	}
 
 	if (bus_setup_intr(dev, sc->res[1],
-	    INTR_TYPE_MISC | INTR_MPSAFE, panfrost_job_intr_filter,
-	    panfrost_job_intr, sc,
+	    INTR_TYPE_MISC | INTR_MPSAFE, NULL, panfrost_job_intr, sc,
 	    &sc->intrhand[0])) {
 		device_printf(dev, "cannot setup interrupt handler\n");
 		return (ENXIO);
 	}
 
 	if (bus_setup_intr(dev, sc->res[2],
-	    INTR_TYPE_MISC | INTR_MPSAFE, panfrost_mmu_intr_filter, panfrost_mmu_intr, sc,
+	    INTR_TYPE_MISC | INTR_MPSAFE, NULL, panfrost_mmu_intr, sc,
 	    &sc->intrhand[1])) {
 		device_printf(dev, "cannot setup interrupt handler\n");
 		return (ENXIO);

@@ -265,23 +265,6 @@ panfrost_mmu_fault(struct panfrost_softc *sc, int as)
 	    access_type_name(sc, fault_status), source_id);
 }
 
-int
-panfrost_mmu_intr_filter(void *arg)
-{
-	struct panfrost_softc *sc;
-	int stat;
-
-	sc = arg;
-
-	stat = GPU_READ(sc, MMU_INT_STAT);
-	if (stat == 0)
-		return (FILTER_HANDLED);
-
-	GPU_WRITE(sc, MMU_INT_MASK, 0);
-
-	return (FILTER_SCHEDULE_THREAD);
-}
-
 void
 panfrost_mmu_intr(void *arg)
 {
@@ -303,8 +286,6 @@ panfrost_mmu_intr(void *arg)
 			panic("error");
 		GPU_WRITE(sc, MMU_INT_CLEAR, (1 << i) | (1 << (i + 16)));
 	}
-
-	GPU_WRITE(sc, MMU_INT_MASK, ~0);
 }
 
 int

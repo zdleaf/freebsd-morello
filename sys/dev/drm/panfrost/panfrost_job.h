@@ -61,7 +61,6 @@ struct panfrost_job {
 int panfrost_job_push(struct panfrost_job *job);
 int panfrost_job_init(struct panfrost_softc *sc);
 void panfrost_job_intr(void *arg);
-int panfrost_job_intr_filter(void *arg);
 int panfrost_job_open(struct panfrost_file *pfile);
 
 #endif /* !_DEV_DRM_PANFROST_PANFROST_JOB_H_ */

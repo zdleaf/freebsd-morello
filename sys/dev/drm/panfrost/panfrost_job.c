@@ -96,15 +96,6 @@ struct panfrost_fence {
 	uint64_t seqno;
 };
 
-int
-panfrost_job_intr_filter(void *arg)
-{
-
-	dprintf("%s\n", __func__);
-
-	return (FILTER_SCHEDULE_THREAD);
-}
-
 void
 panfrost_job_intr(void *arg)
 {
