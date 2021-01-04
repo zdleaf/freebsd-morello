@@ -184,8 +184,8 @@ drm_fstub_poll(struct file *file, int events, struct ucred *cred,
 	const struct file_operations *fops;
 	int ref, rv;
 
-	//if ((events & (POLLIN | POLLRDNORM)) != 0)
-	//	return (0);
+	if ((events & (POLLIN | POLLRDNORM)) == 0)
+		return (0);
 
 	rv = drm_fstub_file_check(file, &cdev, &ref, &minor);
 	if (rv != 0)
