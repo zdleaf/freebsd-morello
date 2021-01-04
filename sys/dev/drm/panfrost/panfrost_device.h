@@ -38,6 +38,7 @@
 struct panfrost_mmu {
 	struct pmap p;
 	int as;		/* asid set */
+	int as_count;	/* usage count */
 	TAILQ_ENTRY(panfrost_mmu)	next;	/* entry in mmu_in_use list */
 };
 

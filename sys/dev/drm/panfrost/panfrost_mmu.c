@@ -439,6 +439,13 @@ printf("%s: l0 paddr %lx, mmu as %d\n", __func__, paddr, as);
 	return (0);
 }
 
+void
+panfrost_mmu_as_put(struct panfrost_softc *sc, struct panfrost_mmu *mmu)
+{
+
+	atomic_add_int(&mmu->as_count, -1);
+}
+
 uint32_t
 panfrost_mmu_as_get(struct panfrost_softc *sc, struct panfrost_mmu *mmu)
 {
@@ -453,6 +460,7 @@ panfrost_mmu_as_get(struct panfrost_softc *sc, struct panfrost_mmu *mmu)
 	mtx_unlock_spin(&sc->as_mtx);
 
 	mmu->as = as;
+	mmu->as_count = 1;
 
 printf("%s: new as %d\n", __func__, as);
 
