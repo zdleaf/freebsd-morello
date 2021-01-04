@@ -84,7 +84,6 @@ struct panfrost_softc {
 	TAILQ_HEAD(, panfrost_mmu)	mmu_in_use;
 	struct mtx			mmu_lock;
 
-	TAILQ_HEAD(, panfrost_job)	job_queue;
 	struct mtx			job_lock;
 	struct panfrost_slot		slot_status[3];
 	struct panfrost_job		*jobs[3];

@@ -73,7 +73,6 @@ __FBSDID("$FreeBSD$");
 #define	NUM_JOB_SLOTS	3
 #define	JOB_TIMEOUT_MS	500
 
-static void panfrost_job_wakeup(struct panfrost_softc *sc, int slot);
 static void panfrost_job_enable_interrupts(struct panfrost_softc *sc);
 
 struct panfrost_queue_state {
@@ -139,8 +138,6 @@ panfrost_job_intr(void *arg)
 			sc->running = 0;
 			mtx_unlock(&sc->job_lock);
 
-			//panfrost_job_wakeup(sc, i);
-
 			job = sc->jobs[i];
 			dma_fence_signal_locked(job->done_fence);
 		}
@@ -156,7 +153,6 @@ panfrost_job_intr(void *arg)
 
 			job = sc->jobs[i];
 			dma_fence_signal_locked(job->done_fence);
-			//panfrost_job_wakeup(sc, i);
 		}
 
 		stat &= ~mask;
@@ -270,30 +266,6 @@ panfrost_job_hw_submit(struct panfrost_job *job, int slot)
 }
 
 static void
-panfrost_job_wakeup(struct panfrost_softc *sc, int slot)
-{
-	struct panfrost_job *job, *job1;
-
-	mtx_lock(&sc->job_lock);
-
-	if (sc->slot_status[slot].running)
-		goto out;
-
-	TAILQ_FOREACH_SAFE(job, &sc->job_queue, next, job1) {
-		if (job->slot == slot) {
-			TAILQ_REMOVE(&sc->job_queue, job, next);
-			sc->slot_status[job->slot].running = 1;
-			sc->running = 1;
-			panfrost_job_hw_submit(job, job->slot);
-			break;
-		}
-	}
-
-out:
-	mtx_unlock(&sc->job_lock);
-}
-
-static void
 panfrost_attach_object_fences(struct drm_gem_object **bos,
     int bo_count, struct dma_fence *fence)
 {
@@ -348,14 +320,6 @@ panfrost_job_push(struct panfrost_job *job)
 	    job->render_done_fence);
 
 	drm_gem_unlock_reservations(job->bos, job->bo_count, &acquire_ctx);
-
-	return (0);
-
-	mtx_lock(&sc->job_lock);
-	TAILQ_INSERT_TAIL(&sc->job_queue, job, next);
-	mtx_unlock(&sc->job_lock);
-
-	panfrost_job_wakeup(sc, slot);
 
 	return (0);
 }
