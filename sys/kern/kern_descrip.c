@@ -3672,16 +3672,6 @@ pwd_hold(struct thread *td)
 	return (pwd);
 }
 
-struct pwd *
-pwd_get_smr(void)
-{
-	struct pwd *pwd;
-
-	pwd = vfs_smr_entered_load(&curproc->p_pd->pd_pwd);
-	MPASS(pwd != NULL);
-	return (pwd);
-}
-
 static struct pwd *
 pwd_alloc(void)
 {
@@ -4609,8 +4599,8 @@ file_type_to_name(short type)
 		return ("dev");
 	case DTYPE_PROCDESC:
 		return ("proc");
-	case DTYPE_LINUXEFD:
-		return ("levent");
+	case DTYPE_EVENTFD:
+		return ("eventfd");
 	case DTYPE_LINUXTFD:
 		return ("ltimer");
 	default:

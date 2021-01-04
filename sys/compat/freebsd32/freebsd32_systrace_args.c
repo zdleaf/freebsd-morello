@@ -1284,6 +1284,20 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		*n_args = 4;
 		break;
 	}
+	/* freebsd32_aio_writev */
+	case 258: {
+		struct freebsd32_aio_writev_args *p = params;
+		uarg[0] = (intptr_t) p->aiocbp; /* struct aiocb32 * */
+		*n_args = 1;
+		break;
+	}
+	/* freebsd32_aio_readv */
+	case 259: {
+		struct freebsd32_aio_readv_args *p = params;
+		uarg[0] = (intptr_t) p->aiocbp; /* struct aiocb32 * */
+		*n_args = 1;
+		break;
+	}
 	/* lchmod */
 	case 274: {
 		struct lchmod_args *p = params;
@@ -3384,6 +3398,15 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		*n_args = 2;
 		break;
 	}
+	/* __specialfd */
+	case 577: {
+		struct __specialfd_args *p = params;
+		iarg[0] = p->type; /* int */
+		uarg[1] = (intptr_t) p->req; /* const void * */
+		uarg[2] = p->len; /* size_t */
+		*n_args = 3;
+		break;
+	}
 	default:
 		*n_args = 0;
 		break;
@@ -5406,6 +5429,26 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		case 3:
 			p = "userland struct sigevent32 *";
+			break;
+		default:
+			break;
+		};
+		break;
+	/* freebsd32_aio_writev */
+	case 258:
+		switch(ndx) {
+		case 0:
+			p = "userland struct aiocb32 *";
+			break;
+		default:
+			break;
+		};
+		break;
+	/* freebsd32_aio_readv */
+	case 259:
+		switch(ndx) {
+		case 0:
+			p = "userland struct aiocb32 *";
 			break;
 		default:
 			break;
@@ -9124,6 +9167,22 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
+	/* __specialfd */
+	case 577:
+		switch(ndx) {
+		case 0:
+			p = "int";
+			break;
+		case 1:
+			p = "userland const void *";
+			break;
+		case 2:
+			p = "size_t";
+			break;
+		default:
+			break;
+		};
+		break;
 	default:
 		break;
 	};
@@ -9865,6 +9924,16 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		break;
 	/* freebsd32_lio_listio */
 	case 257:
+		if (ndx == 0 || ndx == 1)
+			p = "int";
+		break;
+	/* freebsd32_aio_writev */
+	case 258:
+		if (ndx == 0 || ndx == 1)
+			p = "int";
+		break;
+	/* freebsd32_aio_readv */
+	case 259:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
@@ -11025,6 +11094,11 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		break;
 	/* rpctls_syscall */
 	case 576:
+		if (ndx == 0 || ndx == 1)
+			p = "int";
+		break;
+	/* __specialfd */
+	case 577:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;

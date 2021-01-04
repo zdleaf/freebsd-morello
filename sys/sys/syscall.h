@@ -234,6 +234,8 @@
 #define	SYS_aio_read	255
 #define	SYS_aio_write	256
 #define	SYS_lio_listio	257
+#define	SYS_aio_writev	258
+#define	SYS_aio_readv	259
 #define	SYS_freebsd11_getdents	272
 #define	SYS_lchmod	274
 				/* 275 is obsolete netbsd_lchown */
@@ -512,4 +514,5 @@
 #define	SYS___realpathat	574
 #define	SYS_close_range	575
 #define	SYS_rpctls_syscall	576
-#define	SYS_MAXSYSCALL	577
+#define	SYS___specialfd	577
+#define	SYS_MAXSYSCALL	578
