@@ -289,6 +289,8 @@ panfrost_ioctl_submit(struct drm_device *dev, void *data,
 	job->flush_id = panfrost_device_get_latest_flush_id(sc);
 	job->pfile = file->driver_priv;
 
+	refcount_init(&job->refcount.counter, 0);
+
 	error = panfrost_copy_in_fences(dev, file, args, job);
 	if (error)
 		return (EINVAL);

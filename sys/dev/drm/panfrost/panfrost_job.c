@@ -307,6 +307,8 @@ panfrost_job_push(struct panfrost_job *job)
 	if (error)
 		panic("coult not init job");
 
+	refcount_acquire(&job->refcount.counter);
+
 	/* Acquire a reference to fence. */
 	job->render_done_fence = dma_fence_get(&job->base.s_fence->finished);
 
@@ -480,10 +482,31 @@ panfrost_job_timedout(struct drm_sched_job *sched_job)
 }
 
 static void
-panfrost_job_free(struct drm_sched_job *sched_job)
+panfrost_job_cleanup(struct panfrost_job *job)
 {
 
+	printf("%s\n", __func__);
+}
+
+void
+panfrost_job_put(struct panfrost_job *job)
+{
+
+	if (refcount_release(&job->refcount.counter))
+		panfrost_job_cleanup(job);
+}
+
+static void
+panfrost_job_free(struct drm_sched_job *sched_job)
+{
+	struct panfrost_job *job;
+
 	dprintf("%s\n", __func__);
+
+	drm_sched_job_cleanup(sched_job);
+
+	job = (struct panfrost_job *)sched_job;
+	panfrost_job_put(job);
 }
 
 static const struct drm_sched_backend_ops panfrost_sched_ops = {
