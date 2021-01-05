@@ -484,8 +484,56 @@ panfrost_job_timedout(struct drm_sched_job *sched_job)
 static void
 panfrost_job_cleanup(struct panfrost_job *job)
 {
+	struct panfrost_gem_object *obj;
+	struct drm_gem_object *bo;
+	struct drm_device *dev;
+	int i;
 
-	printf("%s\n", __func__);
+	dprintf("%s\n", __func__);
+
+	if (job->in_fences) {
+		for (i = 0; i < job->in_fence_count; i++)
+			dma_fence_put(job->in_fences[i]);
+		free(job->in_fences, M_DEVBUF);
+	}
+
+	if (job->implicit_fences) {
+		for (i = 0; i < job->bo_count; i++)
+			dma_fence_put(job->implicit_fences[i]);
+		free(job->implicit_fences, M_DEVBUF);
+	}
+
+	dma_fence_put(job->done_fence);
+	dma_fence_put(job->render_done_fence);
+
+	if (job->mappings) {
+		for (i = 0; i < job->bo_count; i++) {
+			if (!job->mappings[i])
+				break;
+
+			obj = job->mappings[i]->obj;
+			atomic_add_int(&obj->gpu_usecount, -1);
+
+			panfrost_gem_mapping_put(job->mappings[i]);
+		}
+		free(job->mappings, M_DEVBUF);
+	}
+
+	if (job->bos) {
+		for (i = 0; i < job->bo_count; i++) {
+			bo = job->bos[i];
+			dev = bo->dev;
+			mutex_lock(&dev->struct_mutex);
+			drm_gem_object_put(bo);
+			mutex_unlock(&dev->struct_mutex);
+		}
+
+		free(job->bos, M_DEVBUF);
+	}
+
+	free(job, M_DEVBUF);
+
+	dprintf("%s done\n", __func__);
 }
 
 void

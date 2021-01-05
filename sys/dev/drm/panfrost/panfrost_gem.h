@@ -34,29 +34,32 @@
 #define	_DEV_DRM_PANFROST_PANFROST_GEM_H_
 
 struct panfrost_gem_object {
-	struct drm_gem_object base;	/* Must go first */
-	vm_page_t pages;
-	struct mtx pages_lock;
-	int npages;
-	int madv;
+	struct drm_gem_object			base;	/* Must go first */
+	vm_page_t				pages;
+	struct mtx				pages_lock;
+	int					npages;
+	int					madv;
 	TAILQ_HEAD(, panfrost_gem_mapping)	mappings;
-	struct mtx mappings_lock;
-	bool noexec;
-	bool is_heap;
-	bool map_cached;
+	struct mtx				mappings_lock;
+	bool					noexec;
+	bool					is_heap;
+	bool					map_cached;
+	int					gpu_usecount;
 };
 
 struct panfrost_gem_mapping {
-	struct panfrost_gem_object *obj;
-	struct drm_mm_node mmnode;
-	struct panfrost_mmu *mmu;
+	struct panfrost_gem_object		*obj;
+	struct drm_mm_node			mmnode;
+	struct panfrost_mmu			*mmu;
 	TAILQ_ENTRY(panfrost_gem_mapping)	next;
-	bool active;
+	bool					active;
+	atomic_t				refcount;
 };
 
 struct panfrost_gem_object *
     panfrost_gem_create_object_with_handle(struct drm_file *file,
     struct drm_device *dev, size_t size, uint32_t flags, uint32_t *handle);
+void panfrost_gem_mapping_put(struct panfrost_gem_mapping *mapping);
 struct panfrost_gem_mapping *
     panfrost_gem_mapping_get(struct panfrost_gem_object *bo,
     struct panfrost_file *priv);

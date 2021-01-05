@@ -95,6 +95,7 @@ panfrost_gem_open(struct drm_gem_object *obj, struct drm_file *file_priv)
 	mapping = malloc(sizeof(*mapping), M_DEVBUF, M_ZERO | M_WAITOK);
 	mapping->obj = bo;
 	mapping->mmu = &pfile->mmu;
+	refcount_init(&mapping->refcount.counter, 0);
 
 	drm_gem_object_get(obj);
 
@@ -358,6 +359,7 @@ panfrost_gem_create_object0(struct drm_device *dev, size_t size, bool private)
 	obj->base.funcs = &panfrost_gem_funcs;
 	TAILQ_INIT(&obj->mappings);
 	mtx_init(&obj->mappings_lock, "mappings", NULL, MTX_DEF);
+	obj->gpu_usecount = 0;
 
 //printf("%s: private %d\n", __func__, private);
 
@@ -412,6 +414,30 @@ dprintf("%s\n", __func__);
 	return (obj);
 }
 
+static void
+panfrost_gem_teardown_mapping(struct panfrost_gem_mapping *mapping)
+{
+
+	printf("%s\n", __func__);
+}
+
+static void
+panfrost_gem_mapping_release(struct panfrost_gem_mapping *mapping)
+{
+
+	panfrost_gem_teardown_mapping(mapping);
+	panfrost_gem_object_put(mapping->obj);
+	free(mapping, M_DEVBUF);
+}
+
+void
+panfrost_gem_mapping_put(struct panfrost_gem_mapping *mapping)
+{
+
+	if (mapping && refcount_release(&mapping->refcount.counter))
+		panfrost_gem_mapping_release(mapping);
+}
+
 struct panfrost_gem_mapping *
 panfrost_gem_mapping_get(struct panfrost_gem_object *bo,
     struct panfrost_file *file)
@@ -424,6 +450,7 @@ panfrost_gem_mapping_get(struct panfrost_gem_object *bo,
 	TAILQ_FOREACH(mapping, &bo->mappings, next) {
 		if (mapping->mmu == &file->mmu) {
 			result = mapping;
+			refcount_acquire(&mapping->refcount.counter);
 			break;
 		}
 	}

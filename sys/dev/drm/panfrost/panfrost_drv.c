@@ -244,7 +244,7 @@ dprintf("bo count %d\n", job->bo_count);
 			printf("mapping not found\n");
 			panic("Err");
 		}
-		// TODO: increment gpu usecount
+		atomic_add_int(&bo->gpu_usecount, 1);
 		job->mappings[i] = mapping;
 	}
 
