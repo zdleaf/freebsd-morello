@@ -95,7 +95,7 @@ panfrost_gem_open(struct drm_gem_object *obj, struct drm_file *file_priv)
 	mapping = malloc(sizeof(*mapping), M_DEVBUF, M_ZERO | M_WAITOK);
 	mapping->obj = bo;
 	mapping->mmu = &pfile->mmu;
-	refcount_init(&mapping->refcount.counter, 0);
+	refcount_init(&mapping->refcount, 0);
 
 	drm_gem_object_get(obj);
 
@@ -129,8 +129,10 @@ panfrost_gem_open(struct drm_gem_object *obj, struct drm_file *file_priv)
 
 	if (!bo->is_heap) {
 		error = panfrost_mmu_map(sc, mapping);
-		if (error)
+		if (error) {
+			printf("panic on map");
 			return (error);
+		}
 	} else {
 		printf("%s: is heap\n", __func__);
 		panic("ok");
@@ -148,8 +150,28 @@ panfrost_gem_open(struct drm_gem_object *obj, struct drm_file *file_priv)
 void
 panfrost_gem_close(struct drm_gem_object *obj, struct drm_file *file_priv)
 {
+	struct panfrost_file *pfile;
+	struct panfrost_gem_object *bo;
+	struct panfrost_gem_mapping *mapping;
+	struct panfrost_gem_mapping *tmp;
+	struct panfrost_gem_mapping *result;
 
-	//printf("%s: TODO unmap needed\n", __func__);
+	pfile = file_priv->driver_priv;
+	bo = (struct panfrost_gem_object *)obj;
+	result = NULL;
+
+	mtx_lock(&bo->mappings_lock);
+	TAILQ_FOREACH_SAFE(mapping, &bo->mappings, next, tmp) {
+		if (mapping->mmu == &pfile->mmu) {
+			result = mapping;
+			TAILQ_REMOVE(&bo->mappings, mapping, next);
+			break;
+		}
+	}
+	mtx_unlock(&bo->mappings_lock);
+
+	if (result)
+		panfrost_gem_mapping_put(result);
 }
 
 void
@@ -417,8 +439,18 @@ dprintf("%s\n", __func__);
 static void
 panfrost_gem_teardown_mapping(struct panfrost_gem_mapping *mapping)
 {
+	struct panfrost_file *pfile;
 
-	printf("%s\n", __func__);
+	//printf("%s\n", __func__);
+
+	//if (mapping->active)
+	//	panfrost_mmu_unmap(mapping);
+
+	pfile = container_of(mapping->mmu, struct panfrost_file, mmu);
+	mtx_lock_spin(&pfile->mm_lock);
+	if (drm_mm_node_allocated(&mapping->mmnode))
+		drm_mm_remove_node(&mapping->mmnode);
+	mtx_unlock_spin(&pfile->mm_lock);
 }
 
 static void
@@ -434,7 +466,10 @@ void
 panfrost_gem_mapping_put(struct panfrost_gem_mapping *mapping)
 {
 
-	if (mapping && refcount_release(&mapping->refcount.counter))
+	//printf("%s: mapping %p rc %d\n",
+	//    __func__, mapping, mapping->refcount);
+
+	if (mapping && refcount_release(&mapping->refcount))
 		panfrost_gem_mapping_release(mapping);
 }
 
@@ -450,7 +485,7 @@ panfrost_gem_mapping_get(struct panfrost_gem_object *bo,
 	TAILQ_FOREACH(mapping, &bo->mappings, next) {
 		if (mapping->mmu == &file->mmu) {
 			result = mapping;
-			refcount_acquire(&mapping->refcount.counter);
+			refcount_acquire(&mapping->refcount);
 			break;
 		}
 	}

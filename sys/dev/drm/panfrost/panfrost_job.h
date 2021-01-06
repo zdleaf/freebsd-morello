@@ -56,7 +56,7 @@ struct panfrost_job {
 	TAILQ_ENTRY(panfrost_job)	next;
 
 	struct dma_fence		finished;
-	atomic_t			refcount;
+	u_int				refcount;
 };
 
 int panfrost_job_push(struct panfrost_job *job);

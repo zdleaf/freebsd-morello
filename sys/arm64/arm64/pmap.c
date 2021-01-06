@@ -3737,9 +3737,9 @@ retry:
 	}
 
 	orig_l3 = pmap_load(l3);
-	KASSERT(!pmap_l3_valid(orig_l3), ("l3 is valid"));
-	if ((orig_l3 & ATTR_DESCR_MASK) == L3_BLOCK)
-		panic("l3 is valid\n");
+	//KASSERT(!pmap_l3_valid(orig_l3), ("l3 is valid"));
+	//if ((orig_l3 & ATTR_DESCR_MASK) == L3_BLOCK)
+	//	panic("l3 is valid\n");
 
 	/* New mapping */
 	pmap_store(l3, new_l3);
@@ -3756,10 +3756,10 @@ retry:
 	l2p = pmap_l2(pmap, va);
 	l3p = pmap_l2_to_l3(l2p, va);
 
-	cpu_dcache_wbinv_range((uint64_t)l0p, 8);
-	cpu_dcache_wbinv_range((uint64_t)l1p, 8);
-	cpu_dcache_wbinv_range((uint64_t)l2p, 8);
-	cpu_dcache_wbinv_range((uint64_t)l3p, 8);
+	cpu_dcache_wbinv_range((uint64_t)l0p, 4096);
+	cpu_dcache_wbinv_range((uint64_t)l1p, 4096);
+	cpu_dcache_wbinv_range((uint64_t)l2p, 4096);
+	cpu_dcache_wbinv_range((uint64_t)l3p, 4096);
 
 	rv = KERN_SUCCESS;
 out:

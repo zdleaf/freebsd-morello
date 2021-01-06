@@ -53,7 +53,7 @@ struct panfrost_gem_mapping {
 	struct panfrost_mmu			*mmu;
 	TAILQ_ENTRY(panfrost_gem_mapping)	next;
 	bool					active;
-	atomic_t				refcount;
+	u_int					refcount;
 };
 
 struct panfrost_gem_object *

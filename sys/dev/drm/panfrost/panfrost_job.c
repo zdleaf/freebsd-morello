@@ -307,7 +307,7 @@ panfrost_job_push(struct panfrost_job *job)
 	if (error)
 		panic("coult not init job");
 
-	refcount_acquire(&job->refcount.counter);
+	refcount_acquire(&job->refcount);
 
 	/* Acquire a reference to fence. */
 	job->render_done_fence = dma_fence_get(&job->base.s_fence->finished);
@@ -540,7 +540,7 @@ void
 panfrost_job_put(struct panfrost_job *job)
 {
 
-	if (refcount_release(&job->refcount.counter))
+	if (refcount_release(&job->refcount))
 		panfrost_job_cleanup(job);
 }
 
