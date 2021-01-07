@@ -73,8 +73,13 @@ __FBSDID("$FreeBSD$");
 static void
 panfrost_gem_free_object(struct drm_gem_object *obj)
 {
+	//struct panfrost_gem_object *bo;
+	//struct panfrost_softc *sc;
 
 	printf("%s: TODO: unmap needed\n", __func__);
+
+	//bo = (struct panfrost_gem_object *)obj;
+	//sc = obj->dev->dev_private;
 }
 
 int
@@ -251,10 +256,8 @@ panfrost_gem_fault(struct vm_area_struct *vma, struct vm_fault *vmf)
 	VM_OBJECT_WLOCK(obj);
 	for (i = 0; i < bo->npages; i++) {
 		page = m++;
-		//printf("%s: busied page %d\n", __func__, i);
 		if (vm_page_busied(page))
 			goto fail_unlock;
-		//printf("%s: insert page %d\n", __func__, i);
 		if (vm_page_insert(page, obj, i))
 			goto fail_unlock;
 		vm_page_xbusy(page);
