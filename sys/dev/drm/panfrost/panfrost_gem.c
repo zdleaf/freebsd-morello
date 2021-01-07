@@ -100,7 +100,7 @@ panfrost_gem_open(struct drm_gem_object *obj, struct drm_file *file_priv)
 	mapping = malloc(sizeof(*mapping), M_DEVBUF, M_ZERO | M_WAITOK);
 	mapping->obj = bo;
 	mapping->mmu = &pfile->mmu;
-	refcount_init(&mapping->refcount, 0);
+	refcount_init(&mapping->refcount, 1);
 
 	drm_gem_object_get(obj);
 

@@ -289,7 +289,7 @@ panfrost_ioctl_submit(struct drm_device *dev, void *data,
 	job->flush_id = panfrost_device_get_latest_flush_id(sc);
 	job->pfile = file->driver_priv;
 
-	refcount_init(&job->refcount, 0);
+	refcount_init(&job->refcount, 1);
 
 	error = panfrost_copy_in_fences(dev, file, args, job);
 	if (error)
@@ -302,6 +302,8 @@ panfrost_ioctl_submit(struct drm_device *dev, void *data,
 	error = panfrost_job_push(job);
 	if (error)
 		return (EINVAL);
+
+	panfrost_job_put(job);
 
 	if (sync_out)
 		drm_syncobj_replace_fence(sync_out, job->render_done_fence);
