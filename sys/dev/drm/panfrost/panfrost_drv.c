@@ -322,8 +322,6 @@ panfrost_ioctl_wait_bo(struct drm_device *dev, void *data,
 	unsigned long timeout;
 	int error;
 
-	//return (-1);
-
 	args = data;
 	if (args->pad)
 		return (EINVAL);
@@ -336,21 +334,20 @@ panfrost_ioctl_wait_bo(struct drm_device *dev, void *data,
 
 	error = reservation_object_wait_timeout_rcu(gem_obj->resv, true,
 	    true, timeout);
-	if (!error)
-		error = timeout ? ETIMEDOUT : EBUSY;
-
 	/*
 	 * error == 0 means not signaled,
 	 * error > 0 means signaled
 	 * error < 0 means interrupted before timeout
 	 */
 
+	if (error == 0)
+		error = timeout ? ETIMEDOUT : EBUSY;
+	else if (error > 0)
+		return (0);
+
 	//printf("%s: timeout %d, errno %d\n",
 	//__func__, args->timeout_ns, error);
 	//printf("%s: error %d\n", __func__, error);
-
-	if (error > 0)
-		return (0);
 
 	return (error);
 }
