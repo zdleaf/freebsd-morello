@@ -67,6 +67,7 @@ drm_gem_cma_destruct(struct drm_gem_cma_object *bo)
 	for (i = 0; i < bo->npages; i++) {
 		m = bo->m[i];
 		vm_page_lock(m);
+		pmap_remove_all(m);
 		m->flags &= ~PG_FICTITIOUS;
 		vm_page_unwire_noq(m);
 		vm_page_free(m);
