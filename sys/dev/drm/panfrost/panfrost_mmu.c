@@ -344,7 +344,8 @@ lock_region(struct panfrost_softc *sc, uint32_t as, vm_offset_t va,
 	uint8_t region_width;
 	uint64_t region;
 
-	region = va & ~PAGE_MASK;
+	/* Note: PAGE_PASK here includes ~ from linuxkpi */
+	region = va & PAGE_MASK;
 
 	size = round_up(size, PAGE_SIZE);
 
