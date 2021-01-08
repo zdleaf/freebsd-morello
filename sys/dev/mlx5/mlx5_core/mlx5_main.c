@@ -708,7 +708,7 @@ static int wait_fw_init(struct mlx5_core_dev *dev, u32 max_wait_mili,
 		if (warn_time_mili && time_after(jiffies, warn)) {
 			mlx5_core_warn(dev,
 			    "Waiting for FW initialization, timeout abort in %u s\n",
-			    (unsigned int)(jiffies_to_msecs(end - warn) / 1000));
+			    (unsigned)(jiffies_to_msecs(end - warn) / 1000));
 			warn = jiffies + msecs_to_jiffies(warn_time_mili);
 		}
 		msleep(FW_INIT_WAIT_MS);
@@ -937,7 +937,7 @@ static int mlx5_init_once(struct mlx5_core_dev *dev, struct mlx5_priv *priv)
 
 	err = mlx5_vsc_find_cap(dev);
 	if (err)
-		mlx5_core_err(dev, "Unable to find vendor specific capabilities\n");
+		mlx5_core_warn(dev, "Unable to find vendor specific capabilities\n");
 
 	err = mlx5_query_hca_caps(dev);
 	if (err) {
@@ -1664,6 +1664,11 @@ static void remove_one(struct pci_dev *pdev)
 	struct mlx5_core_dev *dev  = pci_get_drvdata(pdev);
 	struct mlx5_priv *priv = &dev->priv;
 
+#ifdef PCI_IOV
+	pci_iov_detach(pdev->dev.bsddev);
+	mlx5_eswitch_disable_sriov(priv->eswitch);
+#endif
+
 	if (mlx5_unload_one(dev, priv, true)) {
 		mlx5_core_err(dev, "mlx5_unload_one() failed, leaked %lld bytes\n",
 		    (long long)(dev->priv.fw_pages * MLX5_ADAPTER_PAGE_SIZE));
@@ -1975,15 +1980,15 @@ static const struct pci_device_id mlx5_core_pci_table[] = {
 	{ PCI_VDEVICE(MELLANOX, 4116) }, /* ConnectX-4 VF */
 	{ PCI_VDEVICE(MELLANOX, 4117) }, /* ConnectX-4LX */
 	{ PCI_VDEVICE(MELLANOX, 4118) }, /* ConnectX-4LX VF */
-	{ PCI_VDEVICE(MELLANOX, 4119) }, /* ConnectX-5 */
+	{ PCI_VDEVICE(MELLANOX, 4119) }, /* ConnectX-5, PCIe 3.0 */
 	{ PCI_VDEVICE(MELLANOX, 4120) }, /* ConnectX-5 VF */
-	{ PCI_VDEVICE(MELLANOX, 4121) },
-	{ PCI_VDEVICE(MELLANOX, 4122) },
-	{ PCI_VDEVICE(MELLANOX, 4123) },
-	{ PCI_VDEVICE(MELLANOX, 4124) },
-	{ PCI_VDEVICE(MELLANOX, 4125) },
-	{ PCI_VDEVICE(MELLANOX, 4126) },
-	{ PCI_VDEVICE(MELLANOX, 4127) },
+	{ PCI_VDEVICE(MELLANOX, 4121) }, /* ConnectX-5 Ex */
+	{ PCI_VDEVICE(MELLANOX, 4122) }, /* ConnectX-5 Ex VF */
+	{ PCI_VDEVICE(MELLANOX, 4123) }, /* ConnectX-6 */
+	{ PCI_VDEVICE(MELLANOX, 4124) }, /* ConnectX-6 VF */
+	{ PCI_VDEVICE(MELLANOX, 4125) }, /* ConnectX-6 Dx */
+	{ PCI_VDEVICE(MELLANOX, 4126) }, /* ConnectX Family mlx5Gen Virtual Function */
+	{ PCI_VDEVICE(MELLANOX, 4127) }, /* ConnectX-6 LX */
 	{ PCI_VDEVICE(MELLANOX, 4128) },
 	{ PCI_VDEVICE(MELLANOX, 4129) },
 	{ PCI_VDEVICE(MELLANOX, 4130) },
@@ -2001,7 +2006,10 @@ static const struct pci_device_id mlx5_core_pci_table[] = {
 	{ PCI_VDEVICE(MELLANOX, 4142) },
 	{ PCI_VDEVICE(MELLANOX, 4143) },
 	{ PCI_VDEVICE(MELLANOX, 4144) },
-	{ 0, }
+	{ PCI_VDEVICE(MELLANOX, 0xa2d2) }, /* BlueField integrated ConnectX-5 network controller */
+	{ PCI_VDEVICE(MELLANOX, 0xa2d3) }, /* BlueField integrated ConnectX-5 network controller VF */
+	{ PCI_VDEVICE(MELLANOX, 0xa2d6) }, /* BlueField-2 integrated ConnectX-6 Dx network controller */
+	{ }
 };
 
 MODULE_DEVICE_TABLE(pci, mlx5_core_pci_table);

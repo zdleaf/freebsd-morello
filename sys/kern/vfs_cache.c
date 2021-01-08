@@ -3614,33 +3614,51 @@ SYSCTL_PROC(_vfs, OID_AUTO, cache_fast_lookup, CTLTYPE_INT|CTLFLAG_RW|CTLFLAG_MP
  * Components of nameidata (or objects it can point to) which may
  * need restoring in case fast path lookup fails.
  */
-struct nameidata_saved {
-	char *cn_nameptr;
-	size_t ni_pathlen;
+struct nameidata_outer {
 	int cn_flags;
 };
+
+struct nameidata_saved {
+#ifdef INVARIANTS
+	char *cn_nameptr;
+	size_t ni_pathlen;
+#endif
+};
+
+#ifdef INVARIANTS
+struct cache_fpl_debug {
+	size_t ni_pathlen;
+};
+#endif
 
 struct cache_fpl {
 	struct nameidata *ndp;
 	struct componentname *cnp;
+	char *nulchar;
 	struct pwd **pwd;
 	struct vnode *dvp;
 	struct vnode *tvp;
 	seqc_t dvp_seqc;
 	seqc_t tvp_seqc;
 	struct nameidata_saved snd;
-	struct nameidata_saved snd_orig;
+	struct nameidata_outer snd_outer;
 	int line;
 	enum cache_fpl_status status:8;
 	bool in_smr;
 	bool fsearch;
 	bool savename;
+#ifdef INVARIANTS
+	struct cache_fpl_debug debug;
+#endif
 };
 
 static bool cache_fplookup_is_mp(struct cache_fpl *fpl);
 static int cache_fplookup_cross_mount(struct cache_fpl *fpl);
 static int cache_fplookup_partial_setup(struct cache_fpl *fpl);
 static int cache_fplookup_skip_slashes(struct cache_fpl *fpl);
+static void cache_fpl_pathlen_dec(struct cache_fpl *fpl);
+static void cache_fpl_pathlen_inc(struct cache_fpl *fpl);
+static void cache_fpl_pathlen_sub(struct cache_fpl *fpl, size_t n);
 
 static void
 cache_fpl_cleanup_cnp(struct componentname *cnp)
@@ -3664,12 +3682,12 @@ cache_fpl_handle_root(struct cache_fpl *fpl)
 
 	MPASS(*(cnp->cn_nameptr) == '/');
 	cnp->cn_nameptr++;
-	ndp->ni_pathlen--;
+	cache_fpl_pathlen_dec(fpl);
 
 	if (__predict_false(*(cnp->cn_nameptr) == '/')) {
 		do {
 			cnp->cn_nameptr++;
-			ndp->ni_pathlen--;
+			cache_fpl_pathlen_dec(fpl);
 		} while (*(cnp->cn_nameptr) == '/');
 	}
 
@@ -3677,32 +3695,42 @@ cache_fpl_handle_root(struct cache_fpl *fpl)
 }
 
 static void
-cache_fpl_checkpoint(struct cache_fpl *fpl, struct nameidata_saved *snd)
+cache_fpl_checkpoint_outer(struct cache_fpl *fpl)
 {
 
-	snd->cn_flags = fpl->ndp->ni_cnd.cn_flags;
-	snd->cn_nameptr = fpl->ndp->ni_cnd.cn_nameptr;
-	snd->ni_pathlen = fpl->ndp->ni_pathlen;
+	fpl->snd_outer.cn_flags = fpl->ndp->ni_cnd.cn_flags;
 }
 
 static void
-cache_fpl_restore_partial(struct cache_fpl *fpl, struct nameidata_saved *snd)
+cache_fpl_checkpoint(struct cache_fpl *fpl)
 {
 
-	fpl->ndp->ni_cnd.cn_flags = snd->cn_flags;
-	fpl->ndp->ni_cnd.cn_nameptr = snd->cn_nameptr;
-	fpl->ndp->ni_pathlen = snd->ni_pathlen;
+#ifdef INVARIANTS
+	fpl->snd.cn_nameptr = fpl->ndp->ni_cnd.cn_nameptr;
+	fpl->snd.ni_pathlen = fpl->debug.ni_pathlen;
+#endif
 }
 
 static void
-cache_fpl_restore_abort(struct cache_fpl *fpl, struct nameidata_saved *snd)
+cache_fpl_restore_partial(struct cache_fpl *fpl)
 {
 
-	cache_fpl_restore_partial(fpl, snd);
+	fpl->ndp->ni_cnd.cn_flags = fpl->snd_outer.cn_flags;
+#ifdef INVARIANTS
+	fpl->debug.ni_pathlen = fpl->snd.ni_pathlen;
+#endif
+}
+
+static void
+cache_fpl_restore_abort(struct cache_fpl *fpl)
+{
+
+	cache_fpl_restore_partial(fpl);
 	/*
 	 * It is 0 on entry by API contract.
 	 */
 	fpl->ndp->ni_resflags = 0;
+	fpl->ndp->ni_cnd.cn_nameptr = fpl->ndp->ni_cnd.cn_pnbuf;
 }
 
 #ifdef INVARIANTS
@@ -3786,7 +3814,7 @@ cache_fpl_aborted_impl(struct cache_fpl *fpl, int line)
 	fpl->line = line;
 	if (fpl->in_smr)
 		cache_fpl_smr_exit(fpl);
-	cache_fpl_restore_abort(fpl, &fpl->snd_orig);
+	cache_fpl_restore_abort(fpl);
 	return (CACHE_FPL_FAILED);
 }
 
@@ -3998,7 +4026,13 @@ cache_fplookup_partial_setup(struct cache_fpl *fpl)
 		return (cache_fpl_aborted(fpl));
 	}
 
-	cache_fpl_restore_partial(fpl, &fpl->snd);
+	cache_fpl_restore_partial(fpl);
+#ifdef INVARIANTS
+	if (cnp->cn_nameptr != fpl->snd.cn_nameptr) {
+		panic("%s: cn_nameptr mismatch (%p != %p) full [%s]\n", __func__,
+		    cnp->cn_nameptr, fpl->snd.cn_nameptr, cnp->cn_pnbuf);
+	}
+#endif
 
 	ndp->ni_startdir = dvp;
 	cnp->cn_flags |= MAKEENTRY;
@@ -4014,10 +4048,18 @@ cache_fplookup_partial_setup(struct cache_fpl *fpl)
 	if (__predict_false(*(cnp->cn_nameptr) == '/')) {
 		do {
 			cnp->cn_nameptr++;
-			ndp->ni_pathlen--;
+			cache_fpl_pathlen_dec(fpl);
 		} while (*(cnp->cn_nameptr) == '/');
 	}
 
+	ndp->ni_pathlen = fpl->nulchar - cnp->cn_nameptr + 1;
+#ifdef INVARIANTS
+	if (ndp->ni_pathlen != fpl->debug.ni_pathlen) {
+		panic("%s: mismatch (%zu != %zu) nulchar %p nameptr %p [%s] ; full string [%s]\n",
+		    __func__, ndp->ni_pathlen, fpl->debug.ni_pathlen, fpl->nulchar,
+		    cnp->cn_nameptr, cnp->cn_nameptr, cnp->cn_pnbuf);
+	}
+#endif
 	return (0);
 }
 
@@ -4876,6 +4918,50 @@ cache_fplookup_is_mp(struct cache_fpl *fpl)
  * must take into account that in case off fallback the resulting
  * nameidata state has to be compatible with the original.
  */
+
+/*
+ * Debug ni_pathlen tracking.
+ */
+#ifdef INVARIANTS
+static void
+cache_fpl_pathlen_dec(struct cache_fpl *fpl)
+{
+
+	cache_fpl_pathlen_sub(fpl, 1);
+}
+
+static void
+cache_fpl_pathlen_inc(struct cache_fpl *fpl)
+{
+
+	fpl->debug.ni_pathlen++;
+}
+
+static void
+cache_fpl_pathlen_sub(struct cache_fpl *fpl, size_t n)
+{
+
+	fpl->debug.ni_pathlen -= n;
+	KASSERT(fpl->debug.ni_pathlen <= PATH_MAX,
+	    ("%s: pathlen underflow to %zd\n", __func__, fpl->debug.ni_pathlen));
+}
+#else
+static void __always_inline
+cache_fpl_pathlen_dec(struct cache_fpl *fpl)
+{
+}
+
+static void __always_inline
+cache_fpl_pathlen_inc(struct cache_fpl *fpl)
+{
+}
+
+static void
+cache_fpl_pathlen_sub(struct cache_fpl *fpl, size_t n)
+{
+}
+#endif
+
 static int
 cache_fplookup_preparse(struct cache_fpl *fpl)
 {
@@ -4893,10 +4979,13 @@ cache_fplookup_preparse(struct cache_fpl *fpl)
 	 * By this point the shortest possible pathname is one character + nul
 	 * terminator, hence 2.
 	 */
-	KASSERT(ndp->ni_pathlen >= 2, ("%s: ni_pathlen %zu\n", __func__,
-	    ndp->ni_pathlen));
-
-	if (__predict_false(cnp->cn_nameptr[ndp->ni_pathlen - 2] == '/')) {
+	KASSERT(fpl->debug.ni_pathlen >= 2, ("%s: pathlen %zu\n", __func__,
+	    fpl->debug.ni_pathlen));
+	KASSERT(&cnp->cn_nameptr[fpl->debug.ni_pathlen - 2] == fpl->nulchar - 1,
+	    ("%s: mismatch on string (%p != %p) [%s]\n", __func__,
+	    &cnp->cn_nameptr[fpl->debug.ni_pathlen - 2], fpl->nulchar - 1,
+	    cnp->cn_pnbuf));
+	if (__predict_false(*(fpl->nulchar - 1) == '/')) {
 		/*
 		 * TODO
 		 * Regular lookup performs the following:
@@ -4931,22 +5020,24 @@ cache_fplookup_parse(struct cache_fpl *fpl)
 	 * to test for. Pathnames tend to be short so this should not be
 	 * resulting in cache misses.
 	 */
-	KASSERT(cnp->cn_nameptr[ndp->ni_pathlen - 1] == '\0',
-	    ("%s: expected nul at %p + %zu; string [%s]\n", __func__,
-	    cnp->cn_nameptr, ndp->ni_pathlen - 1, cnp->cn_nameptr));
-	cnp->cn_nameptr[ndp->ni_pathlen - 1] = '/';
+	KASSERT(&cnp->cn_nameptr[fpl->debug.ni_pathlen - 1] == fpl->nulchar,
+	    ("%s: mismatch between pathlen (%zu) and nulchar (%p != %p), string [%s]\n",
+	    __func__, fpl->debug.ni_pathlen, &cnp->cn_nameptr[fpl->debug.ni_pathlen - 1],
+	    fpl->nulchar, cnp->cn_pnbuf));
+	KASSERT(*fpl->nulchar == '\0',
+	    ("%s: expected nul at %p; string [%s]\n", __func__, fpl->nulchar,
+	    cnp->cn_pnbuf));
+	*fpl->nulchar = '/';
 	for (cp = cnp->cn_nameptr; *cp != '/'; cp++) {
 		KASSERT(*cp != '\0',
 		    ("%s: encountered unexpected nul; string [%s]\n", __func__,
 		    cnp->cn_nameptr));
 		continue;
 	}
-	cnp->cn_nameptr[ndp->ni_pathlen - 1] = '\0';
+	*fpl->nulchar = '\0';
 
 	cnp->cn_namelen = cp - cnp->cn_nameptr;
-	ndp->ni_pathlen -= cnp->cn_namelen;
-	KASSERT(ndp->ni_pathlen <= PATH_MAX,
-	    ("%s: ni_pathlen underflow to %zd\n", __func__, ndp->ni_pathlen));
+	cache_fpl_pathlen_sub(fpl, cnp->cn_namelen);
 	/*
 	 * Hack: we have to check if the found path component's length exceeds
 	 * NAME_MAX. However, the condition is very rarely true and check can
@@ -4992,7 +5083,7 @@ cache_fplookup_parse_advance(struct cache_fpl *fpl)
 	    ("%s: should have seen slash at %p ; buf %p [%s]\n", __func__,
 	    cnp->cn_nameptr, cnp->cn_pnbuf, cnp->cn_pnbuf));
 	cnp->cn_nameptr++;
-	ndp->ni_pathlen--;
+	cache_fpl_pathlen_dec(fpl);
 }
 
 /*
@@ -5016,7 +5107,7 @@ cache_fplookup_skip_slashes(struct cache_fpl *fpl)
 	MPASS(*(cnp->cn_nameptr) == '/');
 	do {
 		cnp->cn_nameptr++;
-		ndp->ni_pathlen--;
+		cache_fpl_pathlen_dec(fpl);
 	} while (*(cnp->cn_nameptr) == '/');
 
 	/*
@@ -5024,7 +5115,7 @@ cache_fplookup_skip_slashes(struct cache_fpl *fpl)
 	 * something to skip.
 	 */
 	cnp->cn_nameptr--;
-	ndp->ni_pathlen++;
+	cache_fpl_pathlen_inc(fpl);
 
 	/*
 	 * cache_fplookup_parse_advance starts from ndp->ni_next
@@ -5137,7 +5228,7 @@ cache_fplookup_impl(struct vnode *dvp, struct cache_fpl *fpl)
 	ndp = fpl->ndp;
 	cnp = fpl->cnp;
 
-	cache_fpl_checkpoint(fpl, &fpl->snd);
+	cache_fpl_checkpoint(fpl);
 
 	/*
 	 * The vnode at hand is almost always stable, skip checking for it.
@@ -5194,7 +5285,7 @@ cache_fplookup_impl(struct vnode *dvp, struct cache_fpl *fpl)
 		fpl->dvp_seqc = fpl->tvp_seqc;
 
 		cache_fplookup_parse_advance(fpl);
-		cache_fpl_checkpoint(fpl, &fpl->snd);
+		cache_fpl_checkpoint(fpl);
 	}
 
 	return (error);
@@ -5306,9 +5397,13 @@ cache_fplookup(struct nameidata *ndp, enum cache_fpl_status *status,
 		return (EOPNOTSUPP);
 	}
 
-	cache_fpl_checkpoint(&fpl, &fpl.snd_orig);
+	cache_fpl_checkpoint_outer(&fpl);
 
 	cache_fpl_smr_enter_initial(&fpl);
+#ifdef INVARIANTS
+	fpl.debug.ni_pathlen = ndp->ni_pathlen;
+#endif
+	fpl.nulchar = &cnp->cn_nameptr[ndp->ni_pathlen - 1];
 	fpl.fsearch = false;
 	fpl.savename = (cnp->cn_flags & SAVENAME) != 0;
 	fpl.pwd = pwdp;

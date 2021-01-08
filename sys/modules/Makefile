@@ -91,7 +91,6 @@ SUBDIR=	\
 	cloudabi \
 	${_cloudabi32} \
 	${_cloudabi64} \
-	${_cmx} \
 	${_coretemp} \
 	${_cp} \
 	${_cpsw} \
@@ -129,6 +128,7 @@ SUBDIR=	\
 	${_glxiic} \
 	${_glxsb} \
 	gpio \
+	hid \
 	hifn \
 	${_hpt27xx} \
 	${_hptiop} \
@@ -384,7 +384,6 @@ SUBDIR=	\
 	vr \
 	vte \
 	${_wbwd} \
-	${_wi} \
 	wlan \
 	wlan_acl \
 	wlan_amrr \
@@ -646,7 +645,6 @@ _speaker=	speaker
 _splash=	splash
 _sppp=		sppp
 _wbwd=		wbwd
-_wi=		wi
 
 _aac=		aac
 _aacraid=	aacraid
@@ -667,7 +665,6 @@ _bytgpio=	bytgpio
 _chvgpio=	chvgpio
 _ciss=		ciss
 _chromebook_platform=	chromebook_platform
-_cmx=		cmx
 _coretemp=	coretemp
 .if ${MK_SOURCELESS_HOST} != "no" && empty(KCSAN_ENABLED)
 _hpt27xx=	hpt27xx
@@ -785,7 +782,6 @@ _ffec=		ffec
 _nvd=		nvd
 _nvme=		nvme
 _pccard=	pccard
-_wi=		wi
 _virtio=	virtio
 .endif
 
