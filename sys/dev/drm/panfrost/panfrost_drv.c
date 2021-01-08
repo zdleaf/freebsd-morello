@@ -584,8 +584,6 @@ static const struct drm_ioctl_desc panfrost_drm_driver_ioctls[] = {
 	PANFROST_IOCTL(MMAP_BO,		mmap_bo,	DRM_RENDER_ALLOW),
 	PANFROST_IOCTL(GET_PARAM,	get_param,	DRM_RENDER_ALLOW),
 	PANFROST_IOCTL(GET_BO_OFFSET,	get_bo_offset,	DRM_RENDER_ALLOW),
-	//PANFROST_IOCTL(PERFCNT_ENABLE,perfcnt_enable,	DRM_RENDER_ALLOW),
-	//PANFROST_IOCTL(PERFCNT_DUMP,	perfcnt_dump,	DRM_RENDER_ALLOW),
 	PANFROST_IOCTL(MADVISE,		madvise,	DRM_RENDER_ALLOW),
 };
 
