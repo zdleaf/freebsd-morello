@@ -74,6 +74,13 @@ __FBSDID("$FreeBSD$");
 #include "panfrost_mmu.h"
 #include "panfrost_job.h"
 
+#define	PN_16M		0x1000
+#define	PN_4GB		0x100000
+#define	PN_4GB_MASK	(PN_4GB - 1)
+
+#define	SZ_32MB		(32 * 1024 * 1024)
+#define	SZ_4GB		(4 * 1024 * 1024 * 1024ULL)
+
 static struct resource_spec mali_spec[] = {
 	{ SYS_RES_MEMORY,	0,	RF_ACTIVE },
 	{ SYS_RES_IRQ,		0,	RF_ACTIVE | RF_SHAREABLE },
@@ -102,10 +109,6 @@ static const struct file_operations panfrost_drm_driver_fops = {
 	/*.llseek	= noop_llseek,*/
 	.mmap		= drm_gem_mmap,
 };
-
-#define	PN_16M		0x1000
-#define	PN_4GB		0x100000
-#define	PN_4GB_MASK	(PN_4GB - 1)
 
 static void
 panfrost_drm_mm_color_adjust(const struct drm_mm_node *node,
@@ -142,8 +145,8 @@ panfrost_open(struct drm_device *dev, struct drm_file *file)
 
 	mtx_init(&pfile->mm_lock, "mm", NULL, MTX_SPIN);
 
-	drm_mm_init(&pfile->mm, 32*1024*1024 >> PAGE_SHIFT,
-	    (4*1024*1024*1024ULL - 32*1024*1024) >> PAGE_SHIFT);
+	drm_mm_init(&pfile->mm, SZ_32MB >> PAGE_SHIFT,
+	    (SZ_4GB - SZ_32MB) >> PAGE_SHIFT);
 	pfile->mm.color_adjust = panfrost_drm_mm_color_adjust;
 
 	error = panfrost_mmu_pgtable_alloc(pfile);
