@@ -138,9 +138,6 @@ panfrost_gem_open(struct drm_gem_object *obj, struct drm_file *file_priv)
 			printf("panic on map");
 			return (error);
 		}
-	} else {
-		printf("%s: is heap\n", __func__);
-		panic("ok");
 	}
 
 	dprintf("%s: return 0\n", __func__);
@@ -423,11 +420,22 @@ panfrost_gem_create_object_with_handle(struct drm_file *file,
 
 dprintf("%s\n", __func__);
 
+	if (size != PAGE_ALIGN(size))
+		printf("%s: size %x size %x\n", __func__,
+		    size, PAGE_ALIGN(size));
+
 	size = PAGE_ALIGN(size);
 
+	if (flags & PANFROST_BO_HEAP)
+		size = roundup(size, SZ_2M);
+
 	obj = panfrost_gem_create_object0(dev, size, false);
-	obj->noexec = !!(flags & PANFROST_BO_NOEXEC);
-	obj->is_heap = !!(flags & PANFROST_BO_HEAP);
+
+	if (flags & PANFROST_BO_NOEXEC)
+		obj->noexec = true;
+
+	if (flags & PANFROST_BO_HEAP)
+		obj->is_heap = true;
 
 	error = drm_gem_handle_create(file, &obj->base, handle);
 	panfrost_gem_object_put(obj);
