@@ -250,6 +250,7 @@ device		uhid
 device		ums
 device		ucom
 device		umodem
+device		hid
 
 # USB ethernet support
 #device		muge
