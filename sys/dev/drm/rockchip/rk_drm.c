@@ -89,7 +89,7 @@ rockchip_gem_prime_get_sg_table(struct drm_gem_object *obj)
 	vm_page_t *m;
 	int npages;
 
-	printf("%s\n", __func__);
+	//printf("%s\n", __func__);
 
 	m = drm_gem_cma_get_pages(obj, &npages);
 	sgt = drm_prime_pages_to_sg(m, npages);
@@ -150,10 +150,10 @@ rockchip_drm_gem_object_mmap(struct drm_gem_object *obj,
 	int npages;
 	int error;
 
-	printf("%s: obj size %d: TODO\n", __func__, obj->size);
+	//printf("%s: obj size %d: TODO\n", __func__, obj->size);
 
 	m = drm_gem_cma_get_pages(obj, &npages);
-	printf("%s: m %p\n", __func__, m);
+	//printf("%s: m %p\n", __func__, m);
 
 	bo = container_of(obj, struct drm_gem_cma_object, gem_obj);
 	if (bo->pbase == 0)
@@ -161,7 +161,7 @@ rockchip_drm_gem_object_mmap(struct drm_gem_object *obj,
 
 #if 1
 	error = drm_gem_mmap_obj(obj, npages * PAGE_SIZE, vma);
-	printf("%s: error %d\n", __func__, error);
+	//printf("%s: error %d\n", __func__, error);
 
 	vma->vm_pfn = OFF_TO_IDX(bo->pbase);
 #else
@@ -208,6 +208,7 @@ static const struct file_operations rk_drm_drv_fops = {
 	.poll = drm_poll,
 	.read = drm_read,
 	.mmap = drm_gem_cma_mmap,
+	.kqfilter = drm_kqfilter,
 	/* .llseek = noop_llseek, */
 };
 

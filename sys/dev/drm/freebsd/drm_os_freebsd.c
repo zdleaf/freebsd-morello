@@ -162,9 +162,26 @@ out_release:
 static int
 drm_fstub_kqfilter(struct file *file, struct knote *kn)
 {
+	const struct file_operations *fops;
+	struct drm_minor *minor;
+	struct cdev *cdev;
+	int ref;
+	int rv;
 
-	printf("%s: Not implemented yet.", __func__);
-	return (ENXIO);
+	printf("%s: kn_filter %d, f->data %p\n",
+	    __func__, kn->kn_filter, file->f_data);
+
+	rv = drm_fstub_file_check(file, &cdev, &ref, &minor);
+	if (rv != 0)
+		return (ENXIO);
+
+	fops = minor->dev->driver->fops;
+	if (fops->kqfilter != NULL) {
+		rv = fops->kqfilter(file, kn);
+		return (rv);
+	}
+
+	return (EINVAL);
 }
 
 static int
