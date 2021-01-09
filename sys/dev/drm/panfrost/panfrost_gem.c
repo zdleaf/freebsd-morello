@@ -320,7 +320,7 @@ dma_buf_mmap(struct dma_buf *dmabuf, struct vm_area_struct *vma,
 
 	error = dmabuf->ops->mmap(dmabuf, vma);
 
-	printf("%s: error %d\n", __func__, error);
+	//printf("%s: error %d\n", __func__, error);
 
 	return (error);
 }

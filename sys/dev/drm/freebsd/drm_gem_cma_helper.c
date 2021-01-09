@@ -245,7 +245,7 @@ drm_gem_cma_get_pages(struct drm_gem_object *gem_obj, int *npages)
 
 	bo = container_of(gem_obj, struct drm_gem_cma_object, gem_obj);
 
-	printf("%s: bo->m is %p, npages %d\n", __func__, bo->m, bo->npages);
+	//printf("%s: bo->m is %p, npages %d\n", __func__, bo->m, bo->npages);
 	*npages = bo->npages;
 
 	return (bo->m);
