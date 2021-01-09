@@ -311,12 +311,13 @@ wait_ready(struct panfrost_softc *sc, uint32_t as)
 	uint32_t reg;
 	int timeout;
 
-	timeout = 1000;
+	timeout = 10000;
 
 	do {
 		reg = GPU_READ(sc, AS_STATUS(as));
 		if ((reg & AS_STATUS_AS_ACTIVE) == 0)
 			break;
+		DELAY(10);
 	} while (timeout--);
 
 	if (timeout <= 0)
