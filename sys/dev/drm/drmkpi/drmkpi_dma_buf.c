@@ -66,6 +66,15 @@ static fo_mmap_t dmabuf_fop_mmap;
 static fo_poll_t dmabuf_fop_poll;
 static fo_seek_t dmabuf_fop_seek;
 
+static int
+dmabuf_fop_stat(struct file *fp, struct stat *sb, struct ucred *cred,
+    struct thread *td)
+{
+
+	printf("%s\n", __func__);
+	return (EINVAL);
+}
+
 static struct fileops dmabuf_fileops = {
 	.fo_close = dmabuf_fop_close,
 	.fo_ioctl = dmabuf_fop_ioctl,
@@ -74,6 +83,7 @@ static struct fileops dmabuf_fileops = {
 	.fo_poll = dmabuf_fop_poll,
 	.fo_seek = dmabuf_fop_seek,
 	.fo_flags = DFLAG_PASSABLE | DFLAG_SEEKABLE,
+	.fo_stat = dmabuf_fop_stat,
 };
 
 #define	DTYPE_DMABUF		100	/* XXX */
