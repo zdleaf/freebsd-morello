@@ -106,6 +106,7 @@ static const struct file_operations panfrost_drm_driver_fops = {
 	.compat_ioctl	= drm_compat_ioctl,
 	.poll		= drm_poll,
 	.read		= drm_read,
+	.kqfilter	= drm_kqfilter,
 	/*.llseek	= noop_llseek,*/
 	.mmap		= drm_gem_mmap,
 };
@@ -306,12 +307,13 @@ panfrost_ioctl_submit(struct drm_device *dev, void *data,
 	if (error)
 		return (EINVAL);
 
-	panfrost_job_put(job);
-
 	if (sync_out)
 		drm_syncobj_replace_fence(sync_out, job->render_done_fence);
 
-dprintf("%s: job enqueued\n", __func__);
+	panfrost_job_put(job);
+
+	if (sync_out)
+		drm_syncobj_put(sync_out);
 
 	return (0);
 }
