@@ -119,10 +119,12 @@ panfrost_gem_open(struct drm_gem_object *obj, struct drm_file *file_priv)
 	    obj->size >> PAGE_SHIFT, align, color, 0 /* mode */);
 	mtx_unlock_spin(&pfile->mm_lock);
 	if (error) {
-		printf("Failed to insert node\n");
+		printf("Failed to insert: sz %d, align %d, color %d, err %d\n",
+		    obj->size >> PAGE_SHIFT, align, color, error);
 		/* put mapping */
 		return (error);
 	}
+	printf("%s: Inserted %d kbytes\n", __func__, obj->size / 1024);
 
 	dprintf("%s: mapping->mmnode.start page %lx va %lx\n", __func__,
 	    mapping->mmnode.start, mapping->mmnode.start << PAGE_SHIFT);
@@ -157,6 +159,8 @@ panfrost_gem_close(struct drm_gem_object *obj, struct drm_file *file_priv)
 	struct panfrost_gem_mapping *mapping;
 	struct panfrost_gem_mapping *tmp;
 	struct panfrost_gem_mapping *result;
+
+	printf("%s\n", __func__);
 
 	pfile = file_priv->driver_priv;
 	bo = (struct panfrost_gem_object *)obj;

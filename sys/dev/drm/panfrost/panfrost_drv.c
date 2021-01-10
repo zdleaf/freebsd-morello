@@ -169,8 +169,13 @@ panfrost_open(struct drm_device *dev, struct drm_file *file)
 static void
 panfrost_postclose(struct drm_device *dev, struct drm_file *file)
 {
+	struct panfrost_file *pfile;
 
 	printf("%s\n", __func__);
+
+	pfile = file->driver_priv;
+
+	drm_mm_takedown(&pfile->mm);
 }
 
 static int
@@ -354,6 +359,10 @@ panfrost_ioctl_wait_bo(struct drm_device *dev, void *data,
 	//__func__, args->timeout_ns, error);
 	//printf("%s: error %d\n", __func__, error);
 
+	mutex_lock(&dev->struct_mutex);
+	drm_gem_object_put(gem_obj);
+	mutex_unlock(&dev->struct_mutex);
+
 	return (error);
 }
 
@@ -384,6 +393,7 @@ panfrost_ioctl_create_bo(struct drm_device *dev, void *data,
 		panic("could not find mapping");
 
 	args->offset = mapping->mmnode.start << PAGE_SHIFT;
+	panfrost_gem_mapping_put(mapping);
 
 	return (0);
 }
@@ -414,6 +424,10 @@ panfrost_ioctl_mmap_bo(struct drm_device *dev, void *data,
 
 	dprintf("%s: error %d args->offset %lx\n", __func__, error,
 	    args->offset);
+
+	mutex_lock(&dev->struct_mutex);
+	drm_gem_object_put(obj);
+	mutex_unlock(&dev->struct_mutex);
 
 	return (error);
 }
@@ -531,12 +545,14 @@ panfrost_ioctl_get_bo_offset(struct drm_device *dev, void *data,
 	bo = (struct panfrost_gem_object *)obj;
 
 	mapping = panfrost_gem_mapping_get(bo, pfile);
-	//drm_gem_object_put(obj);
+	mutex_lock(&obj->dev->struct_mutex);
+	drm_gem_object_put(obj);
+	mutex_unlock(&obj->dev->struct_mutex);
 	if (mapping == NULL)
 		panic("could not find mapping");
 
 	args->offset = mapping->mmnode.start << PAGE_SHIFT;
-	//panfrost_gem_mapping_put(mapping);
+	panfrost_gem_mapping_put(mapping);
 
 	return (0);
 }
