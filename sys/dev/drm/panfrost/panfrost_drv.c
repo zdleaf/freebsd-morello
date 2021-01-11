@@ -180,9 +180,12 @@ panfrost_postclose(struct drm_device *dev, struct drm_file *file)
 
 	pfile = file->driver_priv;
 
+	panfrost_mmu_pgtable_free(pfile);
+	panfrost_job_close(pfile);
+
 	drm_mm_takedown(&pfile->mm);
 
-	//free(pfile, M_PANFROST);
+	free(pfile, M_PANFROST);
 }
 
 static int
@@ -201,7 +204,7 @@ panfrost_copy_in_fences(struct drm_device *dev, struct drm_file *file_priv,
 	dprintf("%s: fence count %d\n", __func__, job->in_fence_count);
 
 	sz = job->in_fence_count * sizeof(struct dma_fence *);
-	job->in_fences = malloc(sz, M_PANFROST2, M_WAITOK | M_ZERO);
+	job->in_fences = malloc(sz, M_PANFROST1, M_WAITOK | M_ZERO);
 
 	sz = job->in_fence_count * sizeof(uint32_t);
 	handles = malloc(sz, M_PANFROST1, M_WAITOK | M_ZERO);
@@ -242,7 +245,7 @@ panfrost_lookup_bos(struct drm_device *dev, struct drm_file *file_priv,
 dprintf("bo count %d\n", job->bo_count);
 
 	sz = job->bo_count * sizeof(struct dma_fence *);
-	job->implicit_fences = malloc(sz, M_PANFROST2, M_WAITOK | M_ZERO);
+	job->implicit_fences = malloc(sz, M_PANFROST1, M_WAITOK | M_ZERO);
 
 	error = drm_gem_objects_lookup(file_priv,
 	    (void __user *)(uintptr_t)args->bo_handles, job->bo_count,

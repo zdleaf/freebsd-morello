@@ -305,6 +305,23 @@ panfrost_mmu_pgtable_alloc(struct panfrost_file *pfile)
 	return (0);
 }
 
+void
+panfrost_mmu_pgtable_free(struct panfrost_file *pfile)
+{
+	struct panfrost_softc *sc;
+	struct panfrost_mmu *mmu;
+
+	sc = pfile->sc;
+	mmu = &pfile->mmu;
+
+	mtx_lock_spin(&sc->as_mtx);
+	if (mmu->as >= 0) {
+		sc->as_alloc_set &= ~(1 << mmu->as);
+		TAILQ_REMOVE(&sc->mmu_in_use, mmu, next);
+	}
+	mtx_unlock_spin(&sc->as_mtx);
+}
+
 static int
 wait_ready(struct panfrost_softc *sc, uint32_t as)
 {

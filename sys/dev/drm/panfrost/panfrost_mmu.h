@@ -42,5 +42,6 @@ uint32_t panfrost_mmu_as_get(struct panfrost_softc *sc,
     struct panfrost_mmu *mmu);
 void panfrost_mmu_intr(void *arg);
 int panfrost_mmu_init(struct panfrost_softc *sc);
+void panfrost_mmu_pgtable_free(struct panfrost_file *pfile);
 
 #endif /* !_DEV_DRM_PANFROST_PANFROST_MMU_H_ */

@@ -76,12 +76,12 @@ panfrost_gem_free_object(struct drm_gem_object *obj)
 	struct panfrost_gem_object *bo;
 	//struct panfrost_softc *sc;
 
-	drm_gem_object_release(obj);
-
-	bo = (struct panfrost_gem_object *)obj;
 	//sc = obj->dev->dev_private;
 
-	free(bo, M_PANFROST);
+	bo = (struct panfrost_gem_object *)obj;
+	drm_gem_object_release(obj);
+
+	free(bo, M_PANFROST2);
 }
 
 int
@@ -343,7 +343,10 @@ drm_gem_shmem_mmap(struct drm_gem_object *obj, struct vm_area_struct *vma)
 	vma->vm_pgoff -= drm_vma_node_start(&obj->vma_node);
 
 	if (obj->import_attach) {
+		mutex_lock(&obj->dev->struct_mutex);
 		//drm_gem_object_put(obj);
+		mutex_unlock(&obj->dev->struct_mutex);
+
 		vma->vm_private_data = NULL;
 		return dma_buf_mmap(obj->dma_buf, vma, 0);
 	}
@@ -382,7 +385,7 @@ panfrost_gem_create_object0(struct drm_device *dev, size_t size, bool private)
 	struct panfrost_gem_object *obj;
 	int error;
 
-	obj = malloc(sizeof(*obj), M_PANFROST, M_ZERO | M_WAITOK);
+	obj = malloc(sizeof(*obj), M_PANFROST2, M_ZERO | M_WAITOK);
 	obj->base.funcs = &panfrost_gem_funcs;
 	TAILQ_INIT(&obj->mappings);
 	mtx_init(&obj->mappings_lock, "mappings", NULL, MTX_DEF);

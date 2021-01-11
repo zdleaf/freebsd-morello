@@ -522,13 +522,13 @@ panfrost_job_cleanup(struct panfrost_job *job)
 	if (job->in_fences) {
 		for (i = 0; i < job->in_fence_count; i++)
 			dma_fence_put(job->in_fences[i]);
-		free(job->in_fences, M_PANFROST2);
+		free(job->in_fences, M_PANFROST1);
 	}
 
 	if (job->implicit_fences) {
 		for (i = 0; i < job->bo_count; i++)
 			dma_fence_put(job->implicit_fences[i]);
-		free(job->implicit_fences, M_PANFROST2);
+		free(job->implicit_fences, M_PANFROST1);
 	}
 
 	dma_fence_put(job->done_fence);
@@ -613,4 +613,13 @@ panfrost_job_init(struct panfrost_softc *sc)
 	panfrost_job_enable_interrupts(sc);
 
 	return (0);
+}
+
+void
+panfrost_job_close(struct panfrost_file *pfile)
+{
+	int i;
+
+	for (i = 0; i < NUM_JOB_SLOTS; i++)
+		drm_sched_entity_destroy(&pfile->sched_entity[i]);
 }
