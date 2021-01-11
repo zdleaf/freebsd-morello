@@ -73,13 +73,15 @@ __FBSDID("$FreeBSD$");
 static void
 panfrost_gem_free_object(struct drm_gem_object *obj)
 {
-	//struct panfrost_gem_object *bo;
+	struct panfrost_gem_object *bo;
 	//struct panfrost_softc *sc;
 
-	printf("%s: TODO: unmap needed\n", __func__);
+	drm_gem_object_release(obj);
 
-	//bo = (struct panfrost_gem_object *)obj;
+	bo = (struct panfrost_gem_object *)obj;
 	//sc = obj->dev->dev_private;
+
+	free(bo, M_PANFROST);
 }
 
 int
@@ -101,7 +103,6 @@ panfrost_gem_open(struct drm_gem_object *obj, struct drm_file *file_priv)
 	mapping->obj = bo;
 	mapping->mmu = &pfile->mmu;
 	refcount_init(&mapping->refcount, 1);
-
 	drm_gem_object_get(obj);
 
 	if (!bo->noexec) {

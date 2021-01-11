@@ -34,6 +34,9 @@
 #define	_DEV_DRM_PANFROST_PANFROST_DRV_H_
 
 MALLOC_DECLARE(M_PANFROST);
+MALLOC_DECLARE(M_PANFROST1);
+MALLOC_DECLARE(M_PANFROST2);
+MALLOC_DECLARE(M_PANFROST3); /* done fence leak */
 
 struct panfrost_features {
 	uint16_t		revision;

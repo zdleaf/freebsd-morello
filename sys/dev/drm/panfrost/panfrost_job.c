@@ -136,10 +136,10 @@ panfrost_job_intr(void *arg)
 			mtx_lock(&sc->job_lock);
 			sc->slot_status[i].running = 0;
 			sc->running = 0;
-			mtx_unlock(&sc->job_lock);
 
 			job = sc->jobs[i];
 			dma_fence_signal_locked(job->done_fence);
+			mtx_unlock(&sc->job_lock);
 		}
 
 		if (stat & (1 << i)) {
@@ -149,11 +149,11 @@ panfrost_job_intr(void *arg)
 			mtx_lock(&sc->job_lock);
 			sc->slot_status[i].running = 0;
 			sc->running = 0;
-			mtx_unlock(&sc->job_lock);
 
 			job = sc->jobs[i];
 			panfrost_mmu_as_put(sc, &job->pfile->mmu);
 			dma_fence_signal_locked(job->done_fence);
+			mtx_unlock(&sc->job_lock);
 		}
 
 		stat &= ~mask;
@@ -408,10 +408,29 @@ dma_fence_chain_enable_signaling(struct dma_fence *fence)
 }
 
 static void
+dma_fence_free_cb(struct rcu_head *rcu)
+{
+	struct panfrost_fence *pf_fence;
+	struct dma_fence *fence;
+
+	printf("%s\n", __func__);
+
+	fence = container_of(rcu, struct dma_fence, f_rcu);
+	pf_fence = (struct panfrost_fence *)fence;
+
+	//MPASS(!dma_fence_referenced_p(fence));
+
+	dma_fence_destroy(fence);
+
+	free(pf_fence, M_PANFROST3);
+}
+
+static void
 panfrost_fence_release(struct dma_fence *fence)
 {
 
-	printf("%s\n", __func__);
+	/* done_fence only */
+	call_rcu(&fence->f_rcu, &dma_fence_free_cb);
 }
 
 static const struct dma_fence_ops panfrost_fence_ops = {
@@ -429,7 +448,7 @@ panfrost_fence_create(struct panfrost_softc *sc, int js_num)
 
 	js = sc->js;
 
-	fence = malloc(sizeof(*fence), M_PANFROST, M_ZERO | M_WAITOK);
+	fence = malloc(sizeof(*fence), M_PANFROST3, M_ZERO | M_WAITOK);
 	if (!fence)
 		return (NULL);
 
@@ -503,13 +522,13 @@ panfrost_job_cleanup(struct panfrost_job *job)
 	if (job->in_fences) {
 		for (i = 0; i < job->in_fence_count; i++)
 			dma_fence_put(job->in_fences[i]);
-		free(job->in_fences, M_PANFROST);
+		free(job->in_fences, M_PANFROST2);
 	}
 
 	if (job->implicit_fences) {
 		for (i = 0; i < job->bo_count; i++)
 			dma_fence_put(job->implicit_fences[i]);
-		free(job->implicit_fences, M_PANFROST);
+		free(job->implicit_fences, M_PANFROST2);
 	}
 
 	dma_fence_put(job->done_fence);
@@ -540,7 +559,7 @@ panfrost_job_cleanup(struct panfrost_job *job)
 		free(job->bos, M_PANFROST);
 	}
 
-	free(job, M_PANFROST);
+	free(job, M_PANFROST1);
 
 	dprintf("%s done\n", __func__);
 }
