@@ -97,7 +97,7 @@ panfrost_gem_open(struct drm_gem_object *obj, struct drm_file *file_priv)
 	pfile = file_priv->driver_priv;
 	sc = pfile->sc;
 
-	mapping = malloc(sizeof(*mapping), M_DEVBUF, M_ZERO | M_WAITOK);
+	mapping = malloc(sizeof(*mapping), M_PANFROST, M_ZERO | M_WAITOK);
 	mapping->obj = bo;
 	mapping->mmu = &pfile->mmu;
 	refcount_init(&mapping->refcount, 1);
@@ -381,7 +381,7 @@ panfrost_gem_create_object0(struct drm_device *dev, size_t size, bool private)
 	struct panfrost_gem_object *obj;
 	int error;
 
-	obj = malloc(sizeof(*obj), M_DEVBUF, M_ZERO | M_WAITOK);
+	obj = malloc(sizeof(*obj), M_PANFROST, M_ZERO | M_WAITOK);
 	obj->base.funcs = &panfrost_gem_funcs;
 	TAILQ_INIT(&obj->mappings);
 	mtx_init(&obj->mappings_lock, "mappings", NULL, MTX_DEF);
@@ -474,7 +474,7 @@ panfrost_gem_mapping_release(struct panfrost_gem_mapping *mapping)
 
 	panfrost_gem_teardown_mapping(mapping);
 	panfrost_gem_object_put(mapping->obj);
-	free(mapping, M_DEVBUF);
+	free(mapping, M_PANFROST);
 }
 
 void
@@ -563,7 +563,7 @@ panfrost_gem_create_object(struct drm_device *dev, size_t size)
 {
 	struct panfrost_gem_object *obj;
 
-	obj = malloc(sizeof(*obj), M_DEVBUF, M_ZERO | M_WAITOK);
+	obj = malloc(sizeof(*obj), M_PANFROST, M_ZERO | M_WAITOK);
 	obj->base.funcs = &panfrost_gem_funcs;
 	TAILQ_INIT(&obj->mappings);
 	mtx_init(&obj->mappings_lock, "mappings", NULL, MTX_DEF);
@@ -596,7 +596,7 @@ panfrost_gem_prime_import_sg_table(struct drm_device *dev,
 
 	dprintf("%s: bo %p\n", __func__, bo);
 
-	m = malloc(sizeof(vm_page_t) * max_entries, M_DEVBUF,
+	m = malloc(sizeof(vm_page_t) * max_entries, M_PANFROST,
 	    M_ZERO | M_WAITOK);
 
 	index = 0;

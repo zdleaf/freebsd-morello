@@ -407,10 +407,18 @@ dma_fence_chain_enable_signaling(struct dma_fence *fence)
 	return (true);
 }
 
+static void
+panfrost_fence_release(struct dma_fence *fence)
+{
+
+	printf("%s\n", __func__);
+}
+
 static const struct dma_fence_ops panfrost_fence_ops = {
 	.get_driver_name = panfrost_fence_get_driver_name,
 	.get_timeline_name = panfrost_fence_get_timeline_name,
 	.enable_signaling = dma_fence_chain_enable_signaling,
+	.release = panfrost_fence_release,
 };
 
 static struct dma_fence *
@@ -421,7 +429,7 @@ panfrost_fence_create(struct panfrost_softc *sc, int js_num)
 
 	js = sc->js;
 
-	fence = malloc(sizeof(*fence), M_DEVBUF, M_ZERO | M_WAITOK);
+	fence = malloc(sizeof(*fence), M_PANFROST, M_ZERO | M_WAITOK);
 	if (!fence)
 		return (NULL);
 
@@ -476,6 +484,7 @@ panfrost_job_timedout(struct drm_sched_job *sched_job)
 
 	stat = GPU_READ(sc, JOB_INT_STAT);
 	printf("%s: stat %x\n", __func__, stat);
+	panic("timedout");
 	//if (dma_fence_is_signaled(job->done_fence))
 	//	return;
 	//printf("%s: not signalled\n", __func__);
@@ -494,13 +503,13 @@ panfrost_job_cleanup(struct panfrost_job *job)
 	if (job->in_fences) {
 		for (i = 0; i < job->in_fence_count; i++)
 			dma_fence_put(job->in_fences[i]);
-		free(job->in_fences, M_DEVBUF);
+		free(job->in_fences, M_PANFROST);
 	}
 
 	if (job->implicit_fences) {
 		for (i = 0; i < job->bo_count; i++)
 			dma_fence_put(job->implicit_fences[i]);
-		free(job->implicit_fences, M_DEVBUF);
+		free(job->implicit_fences, M_PANFROST);
 	}
 
 	dma_fence_put(job->done_fence);
@@ -516,7 +525,7 @@ panfrost_job_cleanup(struct panfrost_job *job)
 
 			panfrost_gem_mapping_put(job->mappings[i]);
 		}
-		free(job->mappings, M_DEVBUF);
+		free(job->mappings, M_PANFROST);
 	}
 
 	if (job->bos) {
@@ -528,10 +537,10 @@ panfrost_job_cleanup(struct panfrost_job *job)
 			mutex_unlock(&dev->struct_mutex);
 		}
 
-		free(job->bos, M_DEVBUF);
+		free(job->bos, M_PANFROST);
 	}
 
-	free(job, M_DEVBUF);
+	free(job, M_PANFROST);
 
 	dprintf("%s done\n", __func__);
 }
@@ -570,7 +579,7 @@ panfrost_job_init(struct panfrost_softc *sc)
 	struct panfrost_job_slot *js;
 	int error, i;
 
-	sc->js = js = malloc(sizeof(*js), M_DEVBUF, M_ZERO | M_WAITOK);
+	sc->js = js = malloc(sizeof(*js), M_PANFROST, M_ZERO | M_WAITOK);
 
 	spin_lock_init(&js->job_lock);
 

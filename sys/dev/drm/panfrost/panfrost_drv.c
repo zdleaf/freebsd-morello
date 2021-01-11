@@ -81,6 +81,8 @@ __FBSDID("$FreeBSD$");
 #define	SZ_32MB		(32 * 1024 * 1024)
 #define	SZ_4GB		(4 * 1024 * 1024 * 1024ULL)
 
+MALLOC_DEFINE(M_PANFROST, "panfrost", "Panfrost driver");
+
 static struct resource_spec mali_spec[] = {
 	{ SYS_RES_MEMORY,	0,	RF_ACTIVE },
 	{ SYS_RES_IRQ,		0,	RF_ACTIVE | RF_SHAREABLE },
@@ -140,7 +142,7 @@ panfrost_open(struct drm_device *dev, struct drm_file *file)
 
 	sc = dev->dev_private;
 
-	pfile = malloc(sizeof(*pfile), M_DEVBUF, M_WAITOK | M_ZERO);
+	pfile = malloc(sizeof(*pfile), M_PANFROST, M_WAITOK | M_ZERO);
 	pfile->sc = sc;
 	file->driver_priv = pfile;
 
@@ -153,7 +155,7 @@ panfrost_open(struct drm_device *dev, struct drm_file *file)
 	error = panfrost_mmu_pgtable_alloc(pfile);
 	if (error != 0) {
 		drm_mm_takedown(&pfile->mm);
-		free(pfile, M_DEVBUF);
+		free(pfile, M_PANFROST);
 		return (error);
 	}
 
@@ -194,10 +196,10 @@ panfrost_copy_in_fences(struct drm_device *dev, struct drm_file *file_priv,
 	dprintf("%s: fence count %d\n", __func__, job->in_fence_count);
 
 	sz = job->in_fence_count * sizeof(struct dma_fence *);
-	job->in_fences = malloc(sz, M_DEVBUF, M_WAITOK | M_ZERO);
+	job->in_fences = malloc(sz, M_PANFROST, M_WAITOK | M_ZERO);
 
 	sz = job->in_fence_count * sizeof(uint32_t);
-	handles = malloc(sz, M_DEVBUF, M_WAITOK | M_ZERO);
+	handles = malloc(sz, M_PANFROST, M_WAITOK | M_ZERO);
 
 	error = copyin((void *)args->in_syncs, handles, sz);
 	if (error)
@@ -210,7 +212,7 @@ panfrost_copy_in_fences(struct drm_device *dev, struct drm_file *file_priv,
 			printf("%s: error %d\n", __func__, error);
 	}
 
-	free(handles, M_DEVBUF);
+	free(handles, M_PANFROST);
 
 	return (0);
 }
@@ -235,7 +237,7 @@ panfrost_lookup_bos(struct drm_device *dev, struct drm_file *file_priv,
 dprintf("bo count %d\n", job->bo_count);
 
 	sz = job->bo_count * sizeof(struct dma_fence *);
-	job->implicit_fences = malloc(sz, M_DEVBUF, M_WAITOK | M_ZERO);
+	job->implicit_fences = malloc(sz, M_PANFROST, M_WAITOK | M_ZERO);
 
 	error = drm_gem_objects_lookup(file_priv,
 	    (void __user *)(uintptr_t)args->bo_handles, job->bo_count,
@@ -244,7 +246,7 @@ dprintf("bo count %d\n", job->bo_count);
 		return (error);
 
 	sz = job->bo_count * sizeof(struct panfrost_gem_mapping *);
-	job->mappings = malloc(sz, M_DEVBUF, M_WAITOK | M_ZERO);
+	job->mappings = malloc(sz, M_PANFROST, M_WAITOK | M_ZERO);
 
 	for (i = 0; i < job->bo_count; i++) {
 		bo = (struct panfrost_gem_object *)job->bos[i];
@@ -291,7 +293,7 @@ panfrost_ioctl_submit(struct drm_device *dev, void *data,
 		}
 	}
 
-	job = malloc(sizeof(*job), M_DEVBUF, M_WAITOK | M_ZERO);
+	job = malloc(sizeof(*job), M_PANFROST, M_WAITOK | M_ZERO);
 	job->sc = sc;
 	job->jc = args->jc;
 	job->requirements = args->requirements;

@@ -33,6 +33,8 @@
 #ifndef	_DEV_DRM_PANFROST_PANFROST_DRV_H_
 #define	_DEV_DRM_PANFROST_PANFROST_DRV_H_
 
+MALLOC_DECLARE(M_PANFROST);
+
 struct panfrost_features {
 	uint16_t		revision;
 	uint16_t		id;
