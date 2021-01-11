@@ -544,7 +544,7 @@ panfrost_job_cleanup(struct panfrost_job *job)
 
 			panfrost_gem_mapping_put(job->mappings[i]);
 		}
-		free(job->mappings, M_PANFROST);
+		free(job->mappings, M_PANFROST1);
 	}
 
 	if (job->bos) {

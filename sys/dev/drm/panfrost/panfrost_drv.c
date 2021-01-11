@@ -251,7 +251,7 @@ dprintf("bo count %d\n", job->bo_count);
 		return (error);
 
 	sz = job->bo_count * sizeof(struct panfrost_gem_mapping *);
-	job->mappings = malloc(sz, M_PANFROST, M_WAITOK | M_ZERO);
+	job->mappings = malloc(sz, M_PANFROST1, M_WAITOK | M_ZERO);
 
 	for (i = 0; i < job->bo_count; i++) {
 		bo = (struct panfrost_gem_object *)job->bos[i];
