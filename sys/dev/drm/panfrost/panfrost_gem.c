@@ -99,7 +99,7 @@ panfrost_gem_open(struct drm_gem_object *obj, struct drm_file *file_priv)
 	pfile = file_priv->driver_priv;
 	sc = pfile->sc;
 
-	mapping = malloc(sizeof(*mapping), M_PANFROST, M_ZERO | M_WAITOK);
+	mapping = malloc(sizeof(*mapping), M_PANFROST1, M_ZERO | M_WAITOK);
 	mapping->obj = bo;
 	mapping->mmu = &pfile->mmu;
 	refcount_init(&mapping->refcount, 1);
@@ -475,7 +475,7 @@ panfrost_gem_mapping_release(struct panfrost_gem_mapping *mapping)
 
 	panfrost_gem_teardown_mapping(mapping);
 	panfrost_gem_object_put(mapping->obj);
-	free(mapping, M_PANFROST);
+	free(mapping, M_PANFROST1);
 }
 
 void
