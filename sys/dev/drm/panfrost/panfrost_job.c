@@ -413,7 +413,7 @@ dma_fence_free_cb(struct rcu_head *rcu)
 	struct panfrost_fence *pf_fence;
 	struct dma_fence *fence;
 
-	printf("%s\n", __func__);
+	//printf("%s\n", __func__);
 
 	fence = container_of(rcu, struct dma_fence, f_rcu);
 	pf_fence = (struct panfrost_fence *)fence;

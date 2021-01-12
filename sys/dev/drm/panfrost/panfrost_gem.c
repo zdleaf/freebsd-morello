@@ -174,7 +174,7 @@ panfrost_gem_close(struct drm_gem_object *obj, struct drm_file *file_priv)
 	struct panfrost_gem_mapping *tmp;
 	struct panfrost_gem_mapping *result;
 
-	printf("%s\n", __func__);
+	//printf("%s\n", __func__);
 
 	pfile = file_priv->driver_priv;
 	bo = (struct panfrost_gem_object *)obj;
@@ -249,7 +249,6 @@ panfrost_gem_fault(struct vm_area_struct *vma, struct vm_fault *vmf)
 	struct drm_gem_object *gem_obj;
 	vm_object_t obj;
 	vm_pindex_t pidx;
-	vm_page_t m;
 	struct page *page;
 	int len;
 	int i;
@@ -257,41 +256,37 @@ panfrost_gem_fault(struct vm_area_struct *vma, struct vm_fault *vmf)
 	obj = vma->vm_obj;
 	gem_obj = vma->vm_private_data;
 	bo = (struct panfrost_gem_object *)gem_obj;
-	m = bo->pages;
 
 	pidx = OFF_TO_IDX(vmf->address - vma->vm_start);
 
-	if (bo->sgt) {
-		struct page *page;
-		struct scatterlist *sg;
-		struct sg_table *sgt;
-		int count;
+	struct scatterlist *sg;
+	struct sg_table *sgt;
+	int count;
 
-		sgt = bo->sgt;
+	sgt = bo->sgt;
 
-		i = 0;
-		VM_OBJECT_WLOCK(obj);
-		for_each_sg(sgt->sgl, sg, sgt->nents, count) {
-			len = sg_dma_len(sg);
-			page = sg_page(sg);
-			while (len > 0) {
-				if (vm_page_busied(page))
-					goto fail_unlock;
-				if (vm_page_insert(page, obj, i))
-					goto fail_unlock;
-				vm_page_xbusy(page);
-				page->valid = VM_PAGE_BITS_ALL;
-				page++;
-				len -= PAGE_SIZE;
-				i++;
-			}
+	i = 0;
+	VM_OBJECT_WLOCK(obj);
+	for_each_sg(sgt->sgl, sg, sgt->nents, count) {
+		len = sg_dma_len(sg);
+		page = sg_page(sg);
+		while (len > 0) {
+			if (vm_page_busied(page))
+				goto fail_unlock;
+			if (vm_page_insert(page, obj, i))
+				goto fail_unlock;
+			vm_page_xbusy(page);
+			page->valid = VM_PAGE_BITS_ALL;
+			page++;
+			len -= PAGE_SIZE;
+			i++;
 		}
-		VM_OBJECT_WUNLOCK(obj);
-		vma->vm_pfn_first = 0;
-		vma->vm_pfn_count = i;
-		goto done;
 	}
+	VM_OBJECT_WUNLOCK(obj);
+	vma->vm_pfn_first = 0;
+	vma->vm_pfn_count = i;
 
+#if 0
 	if (pidx >= bo->npages) {
 		printf("%s: error: requested page is out of range (%d/%d)\n",
 		    __func__, pidx, bo->npages);
@@ -301,25 +296,13 @@ panfrost_gem_fault(struct vm_area_struct *vma, struct vm_fault *vmf)
 	dprintf("%s: bo %p pidx %d, m %p, pgoff %d\n",
 	    __func__, bo, pidx, m, vmf->pgoff);
 
-	VM_OBJECT_WLOCK(obj);
-	for (i = 0; i < bo->npages; i++) {
-		page = m++;
-		if (vm_page_busied(page))
-			goto fail_unlock;
-		if (vm_page_insert(page, obj, i))
-			goto fail_unlock;
-		vm_page_xbusy(page);
-		page->valid = VM_PAGE_BITS_ALL;
-	}
-	VM_OBJECT_WUNLOCK(obj);
-
 	vma->vm_pfn_first = 0;
 	vma->vm_pfn_count = bo->npages;
 
 	dprintf("%s: pidx: %llu, start: 0x%08x, addr: 0x%08lx\n",
 	    __func__, pidx, vma->vm_start, vmf->address);
+#endif
 
-done:
 	return (VM_FAULT_NOPAGE);
 
 fail_unlock:
@@ -537,7 +520,7 @@ panfrost_gem_mapping_put(struct panfrost_gem_mapping *mapping)
 	//    __func__, mapping, mapping->refcount);
 
 	if (mapping && refcount_release(&mapping->refcount)) {
-		printf("release\n");
+		//printf("release\n");
 		panfrost_gem_mapping_release(mapping);
 	}
 }
@@ -573,6 +556,7 @@ panfrost_gem_get_pages(struct panfrost_gem_object *bo)
 	int alignment;
 	int pflags;
 	int npages;
+	vm_page_t *m0;
 
 	if (bo->sgt != NULL)
 		return (0);
@@ -595,11 +579,8 @@ panfrost_gem_get_pages(struct panfrost_gem_object *bo)
 
 	bo->npages = npages;
 
-	vm_page_t *m0;
 	m0 = malloc(sizeof(vm_page_t *) * bo->npages, M_PANFROST,
 	    M_WAITOK | M_ZERO);
-
-	bo->pages = m;
 
 	int i;
 
@@ -649,6 +630,7 @@ panfrost_gem_prime_import_sg_table(struct drm_device *dev,
 	bo->imported = 1;
 	bo->sgt = sgt;
 	bo->noexec = true;
+	/* TODO: bo->npages = ? */
 
 	return (&bo->base);
 }

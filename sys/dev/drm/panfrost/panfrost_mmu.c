@@ -211,7 +211,7 @@ panfrost_mmu_page_fault(struct panfrost_softc *sc, int as, uint64_t addr)
 	page_offset -= bomapping->mmnode.start;
 
 	//printf("%s 3\n", __func__);
-	if (bo->pages == NULL) {
+	if (bo->sgt == NULL) {
 		printf("no pages\n");
 		panic("no pages");
 	}
@@ -221,7 +221,6 @@ panfrost_mmu_page_fault(struct panfrost_softc *sc, int as, uint64_t addr)
 	pmap_gfault(&bomapping->mmu->p, addr);
 #endif
 
-	//pages = bo->pages;
 	//printf("%s 5\n", __func__);
 	//mapping = bo->base.filp->f_vnode->v_object;
 	//printf("%s 6\n", __func__);
@@ -501,10 +500,13 @@ panfrost_mmu_map(struct panfrost_softc *sc,
 	vm_prot_t prot;
 	vm_offset_t va;
 	vm_paddr_t pa;
-	vm_page_t m;
 	int error;
 	vm_offset_t sva;
-	int i;
+	struct scatterlist *sg;
+	struct page *page;
+	struct sg_table *sgt;
+	int count;
+	int len;
 
 	bo = mapping->obj;
 	mmu = mapping->mmu;
@@ -515,8 +517,6 @@ panfrost_mmu_map(struct panfrost_softc *sc,
 		panic("could not get pages");
 	}
 
-	m = bo->pages;
-
 	va = mapping->mmnode.start << PAGE_SHIFT;
 	sva = va;
 	prot = VM_PROT_READ | VM_PROT_WRITE;
@@ -526,37 +526,20 @@ panfrost_mmu_map(struct panfrost_softc *sc,
 	dprintf("%s: bo %p mmu %p as %d mapping %lx -> %lx, %d pages\n",
 	    __func__, bo, mmu, mmu->as, sva, VM_PAGE_TO_PHYS(m), bo->npages);
 
-	if (bo->sgt) {
-		struct scatterlist *sg;
-		struct page *page;
-		struct sg_table *sgt;
-		int count;
-		int len;
-		sgt = bo->sgt;
+	sgt = bo->sgt;
 
-		for_each_sg(sgt->sgl, sg, sgt->nents, count) {
-			len = sg_dma_len(sg);
-			page = sg_page(sg);
-			while (len > 0) {
-				pa = VM_PAGE_TO_PHYS(page);
-				error = pmap_genter(&mmu->p, va, pa, prot, 0);
-				va += PAGE_SIZE;
-				page++;
-				len -= PAGE_SIZE;
-			}
+	for_each_sg(sgt->sgl, sg, sgt->nents, count) {
+		len = sg_dma_len(sg);
+		page = sg_page(sg);
+		while (len > 0) {
+			pa = VM_PAGE_TO_PHYS(page);
+			error = pmap_genter(&mmu->p, va, pa, prot, 0);
+			va += PAGE_SIZE;
+			page++;
+			len -= PAGE_SIZE;
 		}
-		goto done;
 	}
 
-	/* map pages */
-	for (i = 0; i < bo->npages; i++, m++) {
-		pa = VM_PAGE_TO_PHYS(m);
-		//dprintf("%s: mapping %lx -> %lx\n", __func__, va, pa);
-		error = pmap_genter(&mmu->p, va, pa, prot, 0);
-		va += PAGE_SIZE;
-	}
-
-done:
 	mapping->active = true;
 
 	wmb();
