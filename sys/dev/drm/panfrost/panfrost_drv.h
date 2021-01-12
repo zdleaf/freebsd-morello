@@ -37,6 +37,7 @@ MALLOC_DECLARE(M_PANFROST); /* lots of leak */
 MALLOC_DECLARE(M_PANFROST1); /* no leak */
 MALLOC_DECLARE(M_PANFROST2); /* no leak */
 MALLOC_DECLARE(M_PANFROST3); /* done fence leak */
+MALLOC_DECLARE(M_PANFROST4); /* contig */
 
 struct panfrost_features {
 	uint16_t		revision;

@@ -85,6 +85,7 @@ MALLOC_DEFINE(M_PANFROST, "panfrost", "Panfrost driver");
 MALLOC_DEFINE(M_PANFROST1, "panfrost1", "Panfrost 1 driver");
 MALLOC_DEFINE(M_PANFROST2, "panfrost2", "Panfrost 2 driver");
 MALLOC_DEFINE(M_PANFROST3, "panfrost3", "Panfrost 3 driver");
+MALLOC_DEFINE(M_PANFROST4, "panfrost4", "Panfrost 4 driver");
 
 static struct resource_spec mali_spec[] = {
 	{ SYS_RES_MEMORY,	0,	RF_ACTIVE },

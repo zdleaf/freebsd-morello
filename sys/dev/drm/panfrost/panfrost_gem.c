@@ -74,6 +74,7 @@ static void
 panfrost_gem_free_object(struct drm_gem_object *obj)
 {
 	struct panfrost_gem_object *bo;
+	int i;
 	//struct panfrost_softc *sc;
 
 	//sc = obj->dev->dev_private;
@@ -84,6 +85,21 @@ panfrost_gem_free_object(struct drm_gem_object *obj)
 		drm_prime_gem_destroy(obj, bo->sgt);
 	else if (bo->sgt)
 		sg_free_table(bo->sgt);
+
+	if (bo->pages) {
+		vm_page_t m;
+		for (i = 0; i < bo->npages; i++) {
+			m = bo->pages[i];
+			vm_page_lock(m);
+			pmap_remove_all(m);
+			m->flags &= ~PG_FICTITIOUS;
+			vm_page_unwire_noq(m);
+			vm_page_free(m);
+			vm_page_unlock(m);
+		}
+
+		free(bo->pages, M_PANFROST);
+	}
 
 	drm_gem_object_release(obj);
 
@@ -131,7 +147,7 @@ panfrost_gem_open(struct drm_gem_object *obj, struct drm_file *file_priv)
 		/* put mapping */
 		return (error);
 	}
-	printf("%s: Inserted %d kbytes\n", __func__, obj->size / 1024);
+	//printf("%s: Inserted %d kbytes\n", __func__, obj->size / 1024);
 
 	dprintf("%s: mapping->mmnode.start page %lx va %lx\n", __func__,
 	    mapping->mmnode.start, mapping->mmnode.start << PAGE_SHIFT);
@@ -368,7 +384,7 @@ drm_gem_shmem_mmap(struct drm_gem_object *obj, struct vm_area_struct *vma)
 	if (obj->import_attach) {
 		mutex_lock(&obj->dev->struct_mutex);
 		//drm_gem_object_put(obj);
-		printf("refcount %d\n", kref_read(&obj->refcount));
+		//printf("refcount %d\n", kref_read(&obj->refcount));
 		mutex_unlock(&obj->dev->struct_mutex);
 
 		vma->vm_private_data = NULL;
@@ -574,6 +590,7 @@ panfrost_gem_get_pages(struct panfrost_gem_object *bo)
 
 	m0 = malloc(sizeof(vm_page_t *) * bo->npages, M_PANFROST,
 	    M_WAITOK | M_ZERO);
+	bo->pages = m0;
 
 	int i;
 
