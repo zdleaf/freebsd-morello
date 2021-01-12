@@ -526,6 +526,28 @@ panfrost_mmu_map(struct panfrost_softc *sc,
 	dprintf("%s: bo %p mmu %p as %d mapping %lx -> %lx, %d pages\n",
 	    __func__, bo, mmu, mmu->as, sva, VM_PAGE_TO_PHYS(m), bo->npages);
 
+	if (bo->sgt) {
+		struct scatterlist *sg;
+		struct page *page;
+		struct sg_table *sgt;
+		int count;
+		int len;
+		sgt = bo->sgt;
+
+		for_each_sg(sgt->sgl, sg, sgt->nents, count) {
+			len = sg_dma_len(sg);
+			page = sg_page(sg);
+			while (len > 0) {
+				pa = VM_PAGE_TO_PHYS(page);
+				error = pmap_genter(&mmu->p, va, pa, prot, 0);
+				va += PAGE_SIZE;
+				page++;
+				len -= PAGE_SIZE;
+			}
+		}
+		goto done;
+	}
+
 	/* map pages */
 	for (i = 0; i < bo->npages; i++, m++) {
 		pa = VM_PAGE_TO_PHYS(m);
@@ -534,6 +556,7 @@ panfrost_mmu_map(struct panfrost_softc *sc,
 		va += PAGE_SIZE;
 	}
 
+done:
 	mapping->active = true;
 
 	wmb();

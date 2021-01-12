@@ -79,6 +79,19 @@ panfrost_gem_free_object(struct drm_gem_object *obj)
 	//sc = obj->dev->dev_private;
 
 	bo = (struct panfrost_gem_object *)obj;
+#if 0
+	if (bo->imported) {
+		printf("%s: Freeing imported obj\n", __func__);
+		if (bo->pages)
+			free(bo->pages, M_PANFROST);
+	} else {
+		vm_page_free(bo->pages);
+	}
+
+	if (obj->import_attach)
+		drm_prime_gem_destroy(obj, NULL);
+#endif
+
 	drm_gem_object_release(obj);
 
 	free(bo, M_PANFROST2);
@@ -238,6 +251,7 @@ panfrost_gem_fault(struct vm_area_struct *vma, struct vm_fault *vmf)
 	vm_pindex_t pidx;
 	vm_page_t m;
 	struct page *page;
+	int len;
 	int i;
 
 	obj = vma->vm_obj;
@@ -246,6 +260,38 @@ panfrost_gem_fault(struct vm_area_struct *vma, struct vm_fault *vmf)
 	m = bo->pages;
 
 	pidx = OFF_TO_IDX(vmf->address - vma->vm_start);
+
+	if (bo->sgt) {
+		struct page *page;
+		struct scatterlist *sg;
+		struct sg_table *sgt;
+		int count;
+
+		sgt = bo->sgt;
+
+		i = 0;
+		VM_OBJECT_WLOCK(obj);
+		for_each_sg(sgt->sgl, sg, sgt->nents, count) {
+			len = sg_dma_len(sg);
+			page = sg_page(sg);
+			while (len > 0) {
+				if (vm_page_busied(page))
+					goto fail_unlock;
+				if (vm_page_insert(page, obj, i))
+					goto fail_unlock;
+				vm_page_xbusy(page);
+				page->valid = VM_PAGE_BITS_ALL;
+				page++;
+				len -= PAGE_SIZE;
+				i++;
+			}
+		}
+		VM_OBJECT_WUNLOCK(obj);
+		vma->vm_pfn_first = 0;
+		vma->vm_pfn_count = i;
+		goto done;
+	}
+
 	if (pidx >= bo->npages) {
 		printf("%s: error: requested page is out of range (%d/%d)\n",
 		    __func__, pidx, bo->npages);
@@ -273,6 +319,7 @@ panfrost_gem_fault(struct vm_area_struct *vma, struct vm_fault *vmf)
 	dprintf("%s: pidx: %llu, start: 0x%08x, addr: 0x%08lx\n",
 	    __func__, pidx, vma->vm_start, vmf->address);
 
+done:
 	return (VM_FAULT_NOPAGE);
 
 fail_unlock:
@@ -345,6 +392,7 @@ drm_gem_shmem_mmap(struct drm_gem_object *obj, struct vm_area_struct *vma)
 	if (obj->import_attach) {
 		mutex_lock(&obj->dev->struct_mutex);
 		//drm_gem_object_put(obj);
+		printf("refcount %d\n", kref_read(&obj->refcount));
 		mutex_unlock(&obj->dev->struct_mutex);
 
 		vma->vm_private_data = NULL;
@@ -488,8 +536,10 @@ panfrost_gem_mapping_put(struct panfrost_gem_mapping *mapping)
 	//printf("%s: mapping %p rc %d\n",
 	//    __func__, mapping, mapping->refcount);
 
-	if (mapping && refcount_release(&mapping->refcount))
+	if (mapping && refcount_release(&mapping->refcount)) {
+		printf("release\n");
 		panfrost_gem_mapping_release(mapping);
+	}
 }
 
 struct panfrost_gem_mapping *
@@ -524,7 +574,7 @@ panfrost_gem_get_pages(struct panfrost_gem_object *bo)
 	int pflags;
 	int npages;
 
-	if (bo->pages != NULL)
+	if (bo->sgt != NULL)
 		return (0);
 
 	obj = &bo->base;
@@ -543,8 +593,13 @@ panfrost_gem_get_pages(struct panfrost_gem_object *bo)
 	if (m == NULL)
 		panic("could not allocate %d physical pages\n", npages);
 
-	bo->pages = m;
 	bo->npages = npages;
+
+	vm_page_t *m0;
+	m0 = malloc(sizeof(vm_page_t *) * bo->npages, M_PANFROST,
+	    M_WAITOK | M_ZERO);
+
+	bo->pages = m;
 
 	int i;
 
@@ -554,7 +609,10 @@ panfrost_gem_get_pages(struct panfrost_gem_object *bo)
 		m->valid = VM_PAGE_BITS_ALL;
 		m->oflags &= ~VPO_UNMANAGED;
 		m->flags |= PG_FICTITIOUS;
+		m0[i] = m;
 	}
+
+	bo->sgt = drm_prime_pages_to_sg(m0, npages);
 
 	wmb();
 
@@ -581,50 +639,15 @@ panfrost_gem_prime_import_sg_table(struct drm_device *dev,
     struct dma_buf_attachment *attach, struct sg_table *sgt)
 {
 	struct panfrost_gem_object *bo;
-	struct scatterlist *sg;
-	struct page *page;
-	vm_page_t *m;
 	size_t size;
-	int max_entries;
-	int count;
-	int index;
-	int len;
-
-	max_entries = 4096;
 
 	dprintf("%s size %d\n", __func__, attach->dmabuf->size);
 
 	size = PAGE_ALIGN(attach->dmabuf->size);
 
 	bo = panfrost_gem_create_object0(dev, size, true);
-
-	dprintf("%s: bo %p\n", __func__, bo);
-
-	m = malloc(sizeof(vm_page_t) * max_entries, M_PANFROST,
-	    M_ZERO | M_WAITOK);
-
-	index = 0;
-
-	for_each_sg(sgt->sgl, sg, sgt->nents, count) {
-		len = sg_dma_len(sg);
-		page = sg_page(sg);
-
-		while (len > 0) {
-			if (index > max_entries)
-				return (NULL);
-			m[index] = page;
-
-			page++;
-			len -= PAGE_SIZE;
-			index++;
-		}
-	}
-
-	bo->pages = m[0];
-	bo->npages = index;
-
-	dprintf("npages %d\n", index);
-
+	bo->imported = 1;
+	bo->sgt = sgt;
 	bo->noexec = true;
 
 	return (&bo->base);
