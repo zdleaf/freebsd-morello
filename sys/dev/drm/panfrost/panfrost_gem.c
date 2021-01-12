@@ -79,18 +79,11 @@ panfrost_gem_free_object(struct drm_gem_object *obj)
 	//sc = obj->dev->dev_private;
 
 	bo = (struct panfrost_gem_object *)obj;
-#if 0
-	if (bo->imported) {
-		printf("%s: Freeing imported obj\n", __func__);
-		if (bo->pages)
-			free(bo->pages, M_PANFROST);
-	} else {
-		vm_page_free(bo->pages);
-	}
 
 	if (obj->import_attach)
-		drm_prime_gem_destroy(obj, NULL);
-#endif
+		drm_prime_gem_destroy(obj, bo->sgt);
+	else if (bo->sgt)
+		sg_free_table(bo->sgt);
 
 	drm_gem_object_release(obj);
 
