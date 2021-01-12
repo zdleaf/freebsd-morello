@@ -216,7 +216,6 @@ drm_gem_cma_create_with_handle(struct drm_file *file, struct drm_device *drm,
 	int rv;
 	struct drm_gem_cma_object *bo;
 
-printf("%s: size %d (npages %d)\n", __func__, size, size / PAGE_SIZE);
 	rv = drm_gem_cma_create(drm, size, &bo);
 	if (rv != 0)
 		return (rv);
