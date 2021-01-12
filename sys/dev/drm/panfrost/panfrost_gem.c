@@ -74,11 +74,11 @@ static void
 panfrost_gem_free_object(struct drm_gem_object *obj)
 {
 	struct panfrost_gem_object *bo;
+	struct panfrost_softc *sc;
+	vm_page_t m;
 	int i;
-	//struct panfrost_softc *sc;
 
-	//sc = obj->dev->dev_private;
-
+	sc = obj->dev->dev_private;
 	bo = (struct panfrost_gem_object *)obj;
 
 	if (obj->import_attach)
@@ -87,7 +87,6 @@ panfrost_gem_free_object(struct drm_gem_object *obj)
 		sg_free_table(bo->sgt);
 
 	if (bo->pages) {
-		vm_page_t m;
 		for (i = 0; i < bo->npages; i++) {
 			m = bo->pages[i];
 			vm_page_lock(m);
