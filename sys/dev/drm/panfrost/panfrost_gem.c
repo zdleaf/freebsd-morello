@@ -498,13 +498,16 @@ static void
 panfrost_gem_teardown_mapping(struct panfrost_gem_mapping *mapping)
 {
 	struct panfrost_file *pfile;
+	struct panfrost_softc *sc;
 
 	//printf("%s\n", __func__);
 
-	//if (mapping->active)
-	//	panfrost_mmu_unmap(mapping);
-
 	pfile = container_of(mapping->mmu, struct panfrost_file, mmu);
+	sc = pfile->sc;
+
+	if (mapping->active)
+		panfrost_mmu_unmap(sc, mapping);
+
 	mtx_lock_spin(&pfile->mm_lock);
 	if (drm_mm_node_allocated(&mapping->mmnode))
 		drm_mm_remove_node(&mapping->mmnode);

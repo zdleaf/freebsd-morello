@@ -549,6 +549,36 @@ panfrost_mmu_map(struct panfrost_softc *sc,
 	return (0);
 }
 
+void
+panfrost_mmu_unmap(struct panfrost_softc *sc,
+    struct panfrost_gem_mapping *mapping)
+{
+	struct panfrost_gem_object *bo;
+	struct panfrost_mmu *mmu;
+	vm_offset_t sva;
+	vm_offset_t va;
+	int unmapped_len;
+	int len;
+
+	bo = mapping->obj;
+	mmu = mapping->mmu;
+
+	len = mapping->mmnode.size << PAGE_SHIFT;
+	va = mapping->mmnode.start << PAGE_SHIFT;
+	sva = va;
+	unmapped_len = 0;
+
+	while (unmapped_len < len) {
+		pmap_gremove(&mmu->p, va);
+		va += PAGE_SIZE;
+		unmapped_len += PAGE_SIZE;
+	}
+
+	panfrost_mmu_flush_range(sc, mmu, sva, len);
+
+	mapping->active = false;
+}
+
 int
 panfrost_mmu_init(struct panfrost_softc *sc)
 {
