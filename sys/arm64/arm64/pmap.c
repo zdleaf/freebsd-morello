@@ -3737,9 +3737,10 @@ retry:
 	}
 
 	orig_l3 = pmap_load(l3);
-	//KASSERT(!pmap_l3_valid(orig_l3), ("l3 is valid"));
-	//if ((orig_l3 & ATTR_DESCR_MASK) == L3_BLOCK)
-	//	panic("l3 is valid\n");
+	if ((orig_l3 & ATTR_DESCR_MASK) == L3_BLOCK) {
+		printf("l3 is valid, va %lx\n", va);
+		panic("l3 is valid\n");
+	}
 
 	/* New mapping */
 	pmap_store(l3, new_l3);
@@ -3768,6 +3769,38 @@ out:
 	return (rv);
 }
 
+/*
+ * Remove a single GPU entry.
+ */
+int
+pmap_gremove(pmap_t pmap, vm_offset_t va)
+{
+	pd_entry_t *pde;
+	pt_entry_t *pte;
+	int lvl;
+	int rc;
+
+	PMAP_LOCK(pmap);
+
+	pde = pmap_pde(pmap, va, &lvl);
+	KASSERT(lvl == 2,
+	    ("Invalid GPU pagetable level: %d != 2", lvl));
+	pte = NULL;
+	if (pde != NULL && lvl == 2)
+		pte = pmap_l2_to_l3(pde, va);
+
+	if (pte != NULL) {
+		pmap_resident_count_dec(pmap, 1);
+		pmap_clear(pte);
+		cpu_dcache_wbinv_range((uint64_t)pte, 8);
+		rc = KERN_SUCCESS;
+	} else
+		rc = KERN_FAILURE;
+
+	PMAP_UNLOCK(pmap);
+
+	return (rc);
+}
 
 /*
  * Add a single SMMU entry. This function does not sleep.

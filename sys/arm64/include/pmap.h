@@ -199,6 +199,7 @@ void pmap_sremove_pages(pmap_t pmap);
 void pmap_gfault(pmap_t pmap, vm_offset_t va);
 int pmap_genter(pmap_t pmap, vm_offset_t va, vm_paddr_t pa,
     vm_prot_t prot, u_int flags);
+int pmap_gremove(pmap_t pmap, vm_offset_t va);
 
 struct pcb *pmap_switch(struct thread *, struct thread *);
 
