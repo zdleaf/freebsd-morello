@@ -289,20 +289,17 @@ panfrost_job_push(struct panfrost_job *job)
 
 	sc = job->sc;
 
-	mtx_lock(&sc->sched_lock);
-
 	slot = panfrost_job_get_slot(job);
-	entity = &job->pfile->sched_entity[slot];
-
 	job->slot = slot;
+
+	entity = &job->pfile->sched_entity[slot];
 
 	error = drm_gem_lock_reservations(job->bos, job->bo_count,
 	    &acquire_ctx);
-	if (error) {
-		mtx_unlock(&sc->sched_lock);
+	if (error)
 		panic("could not lock reserv");
-	}
 
+	mtx_lock(&sc->sched_lock);
 	error = drm_sched_job_init(&job->base, entity, NULL);
 	if (error)
 		panic("coult not init job");
@@ -316,7 +313,6 @@ panfrost_job_push(struct panfrost_job *job)
 	    job->implicit_fences);
 
 	drm_sched_entity_push_job(&job->base, entity);
-
 	mtx_unlock(&sc->sched_lock);
 
 	panfrost_attach_object_fences(job->bos, job->bo_count,

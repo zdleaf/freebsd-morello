@@ -305,6 +305,8 @@ panfrost_device_init(struct panfrost_softc *sc)
 	if (error != 0)
 		return (error);
 
+	panfrost_mmu_reset(sc);
+
 	device_printf(sc->dev, "GPU is powered on\n");
 
 	GPU_WRITE(sc, GPU_CMD, GPU_CMD_CLEAN_CACHES);

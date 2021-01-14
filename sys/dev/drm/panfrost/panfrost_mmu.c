@@ -428,7 +428,7 @@ panfrost_mmu_enable(struct panfrost_softc *sc, struct panfrost_mmu *mmu)
 	p = &mmu->p;
 
 	paddr = p->pm_l0_paddr;
-printf("%s: l0 paddr %lx, mmu as %d\n", __func__, paddr, as);
+	//printf("%s: l0 paddr %lx, mmu as %d\n", __func__, paddr, as);
 	paddr |= ARM_MALI_LPAE_TTBR_READ_INNER;
 	paddr |= ARM_MALI_LPAE_TTBR_ADRMODE_TABLE;
 
@@ -467,28 +467,65 @@ panfrost_mmu_as_put(struct panfrost_softc *sc, struct panfrost_mmu *mmu)
 uint32_t
 panfrost_mmu_as_get(struct panfrost_softc *sc, struct panfrost_mmu *mmu)
 {
+	struct panfrost_mmu *mmu1, *tmp;
+	bool found;
 	int as;
 
-	if (mmu->as >= 0)
+	if (mmu->as >= 0) {
+		atomic_add_int(&mmu->as_count, 1);
 		return (mmu->as);
+	}
 
 	mtx_lock_spin(&sc->as_mtx);
 	as = ffz(sc->as_alloc_set);
+
+	if ((sc->features.as_present & (1 << as)) == 0) {
+		found = false;
+		TAILQ_FOREACH_SAFE(mmu1, &sc->mmu_in_use, next, tmp) {
+			if (mmu1->as_count == 0) {
+				TAILQ_REMOVE(&sc->mmu_in_use, mmu1, next);
+				found = true;
+				break;
+			}
+		}
+		if (found == false)
+			printf("as not found\n");
+
+		as = mmu1->as;
+		mmu1->as = -1;
+	}
+
 	sc->as_alloc_set |= (1 << as);
-	mtx_unlock_spin(&sc->as_mtx);
 
 	mmu->as = as;
 	mmu->as_count = 1;
 
-printf("%s: new as %d\n", __func__, as);
+	//printf("%s: new as %d\n", __func__, as);
 
-	mtx_lock_spin(&sc->as_mtx);
 	TAILQ_INSERT_TAIL(&sc->mmu_in_use, mmu, next);
 	mtx_unlock_spin(&sc->as_mtx);
 
 	panfrost_mmu_enable(sc, mmu);
 
 	return (as);
+}
+
+void
+panfrost_mmu_reset(struct panfrost_softc *sc)
+{
+	struct panfrost_mmu *mmu, *tmp;
+
+	mtx_lock_spin(&sc->as_mtx);
+	TAILQ_FOREACH_SAFE(mmu, &sc->mmu_in_use, next, tmp) {
+		mmu->as = -1;
+		mmu->as_count = 0;
+		TAILQ_REMOVE(&sc->mmu_in_use, mmu, next);
+	}
+	sc->as_alloc_set = 0;
+	mtx_unlock_spin(&sc->as_mtx);
+
+	GPU_WRITE(sc, MMU_INT_CLEAR, ~0);
+	GPU_WRITE(sc, MMU_INT_MASK, ~0);
 }
 
 int
