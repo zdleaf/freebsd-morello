@@ -353,6 +353,7 @@ device		usb			# USB Bus (required)
 device		ukbd			# Keyboard
 device		umass			# Disks/Mass storage - Requires scbus and da
 device		tegra210_xusb_fw	# Tegra XUSB firmware
+device		ums
 
 # USB ethernet support
 device		muge
