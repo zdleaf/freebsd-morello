@@ -46,7 +46,6 @@ put_unused_fd(unsigned int fd)
 {
 	struct file *file;
 
-	panic("%s: Not implemented yet.", __func__);
 	if (fget_unlocked(curthread->td_proc->p_fd, fd,
 	    &cap_no_rights, &file) != 0) {
 		return;
