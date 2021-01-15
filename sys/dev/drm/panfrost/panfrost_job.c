@@ -299,11 +299,11 @@ panfrost_job_push(struct panfrost_job *job)
 	if (error)
 		panic("could not lock reserv");
 
-	mtx_lock(&sc->sched_lock);
 	error = drm_sched_job_init(&job->base, entity, NULL);
 	if (error)
-		panic("coult not init job");
+		panic("could not init job");
 
+	mtx_lock(&sc->sched_lock);
 	refcount_acquire(&job->refcount);
 
 	/* Acquire a reference to fence. */
