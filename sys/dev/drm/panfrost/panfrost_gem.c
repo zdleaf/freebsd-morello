@@ -159,7 +159,10 @@ panfrost_gem_open(struct drm_gem_object *obj, struct drm_file *file_priv)
 	if (!bo->is_heap) {
 		error = panfrost_mmu_map(sc, mapping);
 		if (error) {
-			printf("panic on map");
+			printf("%s: could not map, error %d\n",
+			    __func__, error);
+			panfrost_gem_mapping_put(mapping);
+			printf("%s: return %d\n", __func__, error);
 			return (error);
 		}
 	}
@@ -372,6 +375,7 @@ int
 drm_gem_shmem_mmap(struct drm_gem_object *obj, struct vm_area_struct *vma)
 {
 	struct panfrost_gem_object *bo;
+	struct drm_device *dev;
 	int error;
 
 	dprintf("%s\n", __func__);
@@ -381,10 +385,11 @@ drm_gem_shmem_mmap(struct drm_gem_object *obj, struct vm_area_struct *vma)
 	vma->vm_pgoff -= drm_vma_node_start(&obj->vma_node);
 
 	if (obj->import_attach) {
-		mutex_lock(&obj->dev->struct_mutex);
+		dev = obj->dev;
+		mutex_lock(&dev->struct_mutex);
 		//drm_gem_object_put(obj);
 		//printf("refcount %d\n", kref_read(&obj->refcount));
-		mutex_unlock(&obj->dev->struct_mutex);
+		mutex_unlock(&dev->struct_mutex);
 
 		vma->vm_private_data = NULL;
 		return dma_buf_mmap(obj->dma_buf, vma, 0);
@@ -450,12 +455,14 @@ static void
 panfrost_gem_object_put(struct panfrost_gem_object *bo)
 {
 	struct drm_gem_object *obj;
+	struct drm_device *dev;
 
 	obj = &bo->base;
+	dev = obj->dev;
 
-	mutex_lock(&obj->dev->struct_mutex);
+	mutex_lock(&dev->struct_mutex);
 	drm_gem_object_put(obj);
-	mutex_unlock(&obj->dev->struct_mutex);
+	mutex_unlock(&dev->struct_mutex);
 }
 
 struct panfrost_gem_object *
@@ -477,6 +484,10 @@ dprintf("%s\n", __func__);
 		size = roundup(size, SZ_2M);
 
 	obj = panfrost_gem_create_object0(dev, size, false);
+	if (obj == NULL) {
+		printf("%s: Failed to create obj 0\n", __func__);
+		return (NULL);
+	}
 
 	if (flags & PANFROST_BO_NOEXEC)
 		obj->noexec = true;
