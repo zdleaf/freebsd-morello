@@ -551,7 +551,7 @@ panfrost_mmu_map(struct panfrost_softc *sc,
 	error = panfrost_gem_get_pages(bo);
 	if (error != 0) {
 		printf("%s: no pages, bo->is_heap %d\n", __func__, bo->is_heap);
-		panic("could not get pages");
+		return (error);
 	}
 
 	va = mapping->mmnode.start << PAGE_SHIFT;
