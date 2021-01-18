@@ -51,7 +51,6 @@ static struct sync_file
 	finit(sf->sf_file, O_CLOEXEC, DTYPE_SYNCFILE, sf,
 	    &syncfile_fileops);
 
-
 	return (sf);
 
 }
