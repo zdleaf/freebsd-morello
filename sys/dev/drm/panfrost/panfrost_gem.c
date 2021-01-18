@@ -393,7 +393,7 @@ drm_gem_shmem_mmap(struct drm_gem_object *obj, struct vm_area_struct *vma)
 	error = panfrost_gem_get_pages(bo);
 	if (error != 0) {
 		printf("failed to get pages\n");
-		return (-1);
+		return (error);
 	}
 
 	vma->vm_flags |= VM_MIXEDMAP | VM_DONTEXPAND;
@@ -568,6 +568,7 @@ panfrost_gem_get_pages(struct panfrost_gem_object *bo)
 	int pflags;
 	int npages;
 	vm_page_t *m0;
+	int i;
 
 	if (bo->sgt != NULL)
 		return (0);
@@ -586,15 +587,13 @@ panfrost_gem_get_pages(struct panfrost_gem_object *bo)
 	m = vm_page_alloc_contig(NULL, 0, pflags, npages, low, high,
 	    alignment, boundary, memattr);
 	if (m == NULL)
-		panic("could not allocate %d physical pages\n", npages);
+		return (ENOMEM);
 
 	bo->npages = npages;
 
 	m0 = malloc(sizeof(vm_page_t *) * bo->npages, M_PANFROST,
 	    M_WAITOK | M_ZERO);
 	bo->pages = m0;
-
-	int i;
 
 	for (i = 0; i < npages; i++, m++) {
 		if ((m->flags & PG_ZERO) == 0)
