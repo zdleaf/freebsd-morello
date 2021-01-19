@@ -134,7 +134,7 @@ options 	SOC_XILINX_ZYNQ
 
 # DRM Support
 options		COMPAT_DRMKPI
-#options		COMPAT_LINUXKPI
+#options 	COMPAT_LINUXKPI
 
 device		drm
 device		aw_de2_drm

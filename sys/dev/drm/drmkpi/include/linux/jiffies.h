@@ -56,17 +56,17 @@
 
 #define	HZ	hz
 
-extern uint64_t lkpi_nsec2hz_rem;
-extern uint64_t lkpi_nsec2hz_div;
-extern uint64_t lkpi_nsec2hz_max;
+extern uint64_t drmkpi_nsec2hz_rem;
+extern uint64_t drmkpi_nsec2hz_div;
+extern uint64_t drmkpi_nsec2hz_max;
 
-extern uint64_t lkpi_usec2hz_rem;
-extern uint64_t lkpi_usec2hz_div;
-extern uint64_t lkpi_usec2hz_max;
+extern uint64_t drmkpi_usec2hz_rem;
+extern uint64_t drmkpi_usec2hz_div;
+extern uint64_t drmkpi_usec2hz_max;
 
-extern uint64_t lkpi_msec2hz_rem;
-extern uint64_t lkpi_msec2hz_div;
-extern uint64_t lkpi_msec2hz_max;
+extern uint64_t drmkpi_msec2hz_rem;
+extern uint64_t drmkpi_msec2hz_div;
+extern uint64_t drmkpi_msec2hz_max;
 
 static inline int
 timespec_to_jiffies(const struct timespec *ts)
@@ -86,9 +86,9 @@ msecs_to_jiffies(uint64_t msec)
 {
 	uint64_t result;
 
-	if (msec > lkpi_msec2hz_max)
-		msec = lkpi_msec2hz_max;
-	result = howmany(msec * lkpi_msec2hz_rem, lkpi_msec2hz_div);
+	if (msec > drmkpi_msec2hz_max)
+		msec = drmkpi_msec2hz_max;
+	result = howmany(msec * drmkpi_msec2hz_rem, drmkpi_msec2hz_div);
 	if (result > MAX_JIFFY_OFFSET)
 		result = MAX_JIFFY_OFFSET;
 
@@ -100,9 +100,9 @@ usecs_to_jiffies(uint64_t usec)
 {
 	uint64_t result;
 
-	if (usec > lkpi_usec2hz_max)
-		usec = lkpi_usec2hz_max;
-	result = howmany(usec * lkpi_usec2hz_rem, lkpi_usec2hz_div);
+	if (usec > drmkpi_usec2hz_max)
+		usec = drmkpi_usec2hz_max;
+	result = howmany(usec * drmkpi_usec2hz_rem, drmkpi_usec2hz_div);
 	if (result > MAX_JIFFY_OFFSET)
 		result = MAX_JIFFY_OFFSET;
 
@@ -113,9 +113,9 @@ static inline uint64_t
 nsecs_to_jiffies64(uint64_t nsec)
 {
 
-	if (nsec > lkpi_nsec2hz_max)
-		nsec = lkpi_nsec2hz_max;
-	return (howmany(nsec * lkpi_nsec2hz_rem, lkpi_nsec2hz_div));
+	if (nsec > drmkpi_nsec2hz_max)
+		nsec = drmkpi_nsec2hz_max;
+	return (howmany(nsec * drmkpi_nsec2hz_rem, drmkpi_nsec2hz_div));
 }
 
 static inline unsigned long
@@ -123,13 +123,13 @@ nsecs_to_jiffies(uint64_t nsec)
 {
 
 	if (sizeof(unsigned long) >= sizeof(uint64_t)) {
-		if (nsec > lkpi_nsec2hz_max)
-			nsec = lkpi_nsec2hz_max;
+		if (nsec > drmkpi_nsec2hz_max)
+			nsec = drmkpi_nsec2hz_max;
 	} else {
-		if (nsec > (lkpi_nsec2hz_max >> 32))
-			nsec = (lkpi_nsec2hz_max >> 32);
+		if (nsec > (drmkpi_nsec2hz_max >> 32))
+			nsec = (drmkpi_nsec2hz_max >> 32);
 	}
-	return (howmany(nsec * lkpi_nsec2hz_rem, lkpi_nsec2hz_div));
+	return (howmany(nsec * drmkpi_nsec2hz_rem, drmkpi_nsec2hz_div));
 }
 
 static inline uint64_t

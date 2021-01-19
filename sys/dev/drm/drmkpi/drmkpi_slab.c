@@ -31,26 +31,26 @@ __FBSDID("$FreeBSD$");
 #include <linux/rcupdate.h>
 #include <linux/kernel.h>
 
-struct linux_kmem_rcu {
+struct drmkpi_kmem_rcu {
 	struct rcu_head rcu_head;
-	struct linux_kmem_cache *cache;
+	struct drmkpi_kmem_cache *cache;
 };
 
 #define	LINUX_KMEM_TO_RCU(c, m)					\
-	((struct linux_kmem_rcu *)((char *)(m) +		\
-	(c)->cache_size - sizeof(struct linux_kmem_rcu)))
+	((struct drmkpi_kmem_rcu *)((char *)(m) +		\
+	(c)->cache_size - sizeof(struct drmkpi_kmem_rcu)))
 
 #define	LINUX_RCU_TO_KMEM(r)					\
-	((void *)((char *)(r) + sizeof(struct linux_kmem_rcu) - \
+	((void *)((char *)(r) + sizeof(struct drmkpi_kmem_rcu) - \
 	(r)->cache->cache_size))
 
 static int
-linux_kmem_ctor(void *mem, int size, void *arg, int flags)
+drmkpi_kmem_ctor(void *mem, int size, void *arg, int flags)
 {
-	struct linux_kmem_cache *c = arg;
+	struct drmkpi_kmem_cache *c = arg;
 
 	if (unlikely(c->cache_flags & SLAB_TYPESAFE_BY_RCU)) {
-		struct linux_kmem_rcu *rcu = LINUX_KMEM_TO_RCU(c, mem);
+		struct drmkpi_kmem_rcu *rcu = LINUX_KMEM_TO_RCU(c, mem);
 
 		/* duplicate cache pointer */
 		rcu->cache = c;
@@ -64,19 +64,19 @@ linux_kmem_ctor(void *mem, int size, void *arg, int flags)
 }
 
 static void
-linux_kmem_cache_free_rcu_callback(struct rcu_head *head)
+drmkpi_kmem_cache_free_rcu_callback(struct rcu_head *head)
 {
-	struct linux_kmem_rcu *rcu =
-	    container_of(head, struct linux_kmem_rcu, rcu_head);
+	struct drmkpi_kmem_rcu *rcu =
+	    container_of(head, struct drmkpi_kmem_rcu, rcu_head);
 
 	uma_zfree(rcu->cache->cache_zone, LINUX_RCU_TO_KMEM(rcu));
 }
 
-struct linux_kmem_cache *
-linux_kmem_cache_create(const char *name, size_t size, size_t align,
-    unsigned flags, linux_kmem_ctor_t *ctor)
+struct drmkpi_kmem_cache *
+drmkpi_kmem_cache_create(const char *name, size_t size, size_t align,
+    unsigned flags, drmkpi_kmem_ctor_t *ctor)
 {
-	struct linux_kmem_cache *c;
+	struct drmkpi_kmem_cache *c;
 
 	c = malloc(sizeof(*c), M_DRMKMALLOC, M_WAITOK);
 
@@ -88,16 +88,16 @@ linux_kmem_cache_create(const char *name, size_t size, size_t align,
 	if (flags & SLAB_TYPESAFE_BY_RCU) {
 		/* make room for RCU structure */
 		size = ALIGN(size, sizeof(void *));
-		size += sizeof(struct linux_kmem_rcu);
+		size += sizeof(struct drmkpi_kmem_rcu);
 
 		/* create cache_zone */
 		c->cache_zone = uma_zcreate(name, size,
-		    linux_kmem_ctor, NULL, NULL, NULL,
+		    drmkpi_kmem_ctor, NULL, NULL, NULL,
 		    align, UMA_ZONE_ZINIT);
 	} else {
 		/* create cache_zone */
 		c->cache_zone = uma_zcreate(name, size,
-		    ctor ? linux_kmem_ctor : NULL, NULL,
+		    ctor ? drmkpi_kmem_ctor : NULL, NULL,
 		    NULL, NULL, align, 0);
 	}
 
@@ -108,15 +108,15 @@ linux_kmem_cache_create(const char *name, size_t size, size_t align,
 }
 
 void
-linux_kmem_cache_free_rcu(struct linux_kmem_cache *c, void *m)
+drmkpi_kmem_cache_free_rcu(struct drmkpi_kmem_cache *c, void *m)
 {
-	struct linux_kmem_rcu *rcu = LINUX_KMEM_TO_RCU(c, m);
+	struct drmkpi_kmem_rcu *rcu = LINUX_KMEM_TO_RCU(c, m);
 
-	call_rcu(&rcu->rcu_head, linux_kmem_cache_free_rcu_callback);
+	call_rcu(&rcu->rcu_head, drmkpi_kmem_cache_free_rcu_callback);
 }
 
 void
-linux_kmem_cache_destroy(struct linux_kmem_cache *c)
+drmkpi_kmem_cache_destroy(struct drmkpi_kmem_cache *c)
 {
 	if (unlikely(c->cache_flags & SLAB_TYPESAFE_BY_RCU)) {
 		/* make sure all free callbacks have been called */

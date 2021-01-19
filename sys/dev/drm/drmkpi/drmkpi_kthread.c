@@ -43,21 +43,21 @@ enum {
 };
 
 bool
-linux_kthread_should_stop_task(struct task_struct *task)
+drmkpi_kthread_should_stop_task(struct task_struct *task)
 {
 
 	return (atomic_read(&task->kthread_flags) & KTHREAD_SHOULD_STOP_MASK);
 }
 
 bool
-linux_kthread_should_stop(void)
+drmkpi_kthread_should_stop(void)
 {
 
 	return (atomic_read(&current->kthread_flags) & KTHREAD_SHOULD_STOP_MASK);
 }
 
 int
-linux_kthread_stop(struct task_struct *task)
+drmkpi_kthread_stop(struct task_struct *task)
 {
 	int retval;
 
@@ -80,7 +80,7 @@ linux_kthread_stop(struct task_struct *task)
 }
 
 int
-linux_kthread_park(struct task_struct *task)
+drmkpi_kthread_park(struct task_struct *task)
 {
 
 	atomic_or(KTHREAD_SHOULD_PARK_MASK, &task->kthread_flags);
@@ -90,13 +90,13 @@ linux_kthread_park(struct task_struct *task)
 }
 
 void
-linux_kthread_parkme(void)
+drmkpi_kthread_parkme(void)
 {
 	struct task_struct *task;
 
 	task = current;
 	set_task_state(task, TASK_PARKED | TASK_UNINTERRUPTIBLE);
-	while (linux_kthread_should_park()) {
+	while (drmkpi_kthread_should_park()) {
 		while ((atomic_fetch_or(KTHREAD_IS_PARKED_MASK,
 		    &task->kthread_flags) & KTHREAD_IS_PARKED_MASK) == 0)
 			complete(&task->parked);
@@ -108,7 +108,7 @@ linux_kthread_parkme(void)
 }
 
 bool
-linux_kthread_should_park(void)
+drmkpi_kthread_should_park(void)
 {
 	struct task_struct *task;
 
@@ -117,7 +117,7 @@ linux_kthread_should_park(void)
 }
 
 void
-linux_kthread_unpark(struct task_struct *task)
+drmkpi_kthread_unpark(struct task_struct *task)
 {
 
 	atomic_andnot(KTHREAD_SHOULD_PARK_MASK, &task->kthread_flags);
@@ -127,7 +127,7 @@ linux_kthread_unpark(struct task_struct *task)
 }
 
 struct task_struct *
-linux_kthread_setup_and_run(struct thread *td, linux_task_fn_t *task_fn, void *arg)
+drmkpi_kthread_setup_and_run(struct thread *td, linux_task_fn_t *task_fn, void *arg)
 {
 	struct task_struct *task;
 
@@ -147,14 +147,14 @@ linux_kthread_setup_and_run(struct thread *td, linux_task_fn_t *task_fn, void *a
 }
 
 void
-linux_kthread_fn(void *arg __unused)
+drmkpi_kthread_fn(void *arg __unused)
 {
 	struct task_struct *task = current;
 
-	if (linux_kthread_should_stop_task(task) == 0)
+	if (drmkpi_kthread_should_stop_task(task) == 0)
 		task->task_ret = task->task_fn(task->task_data);
 
-	if (linux_kthread_should_stop_task(task) != 0) {
+	if (drmkpi_kthread_should_stop_task(task) != 0) {
 		struct thread *td = curthread;
 
 		/* let kthread_stop() free data */

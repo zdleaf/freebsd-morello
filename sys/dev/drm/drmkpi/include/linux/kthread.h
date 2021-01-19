@@ -40,33 +40,33 @@
 	struct task_struct *__task;					\
 	struct thread *__td;						\
 									\
-	if (kthread_add(linux_kthread_fn, NULL, NULL, &__td,		\
+	if (kthread_add(drmkpi_kthread_fn, NULL, NULL, &__td,		\
 	    RFSTOPPED, 0, fmt, ## __VA_ARGS__))				\
 		__task = NULL;						\
 	else								\
-		__task = linux_kthread_setup_and_run(__td, fn, data);	\
+		__task = drmkpi_kthread_setup_and_run(__td, fn, data);	\
 	__task;								\
 })
 
-int linux_kthread_stop(struct task_struct *);
-bool linux_kthread_should_stop_task(struct task_struct *);
-bool linux_kthread_should_stop(void);
-int linux_kthread_park(struct task_struct *);
-void linux_kthread_parkme(void);
-bool linux_kthread_should_park(void);
-void linux_kthread_unpark(struct task_struct *);
-void linux_kthread_fn(void *);
-struct task_struct *linux_kthread_setup_and_run(struct thread *,
+int drmkpi_kthread_stop(struct task_struct *);
+bool drmkpi_kthread_should_stop_task(struct task_struct *);
+bool drmkpi_kthread_should_stop(void);
+int drmkpi_kthread_park(struct task_struct *);
+void drmkpi_kthread_parkme(void);
+bool drmkpi_kthread_should_park(void);
+void drmkpi_kthread_unpark(struct task_struct *);
+void drmkpi_kthread_fn(void *);
+struct task_struct *drmkpi_kthread_setup_and_run(struct thread *,
     linux_task_fn_t *, void *arg);
 int linux_in_atomic(void);
 
-#define	kthread_stop(task)		linux_kthread_stop(task)
-#define	kthread_should_stop()		linux_kthread_should_stop()
-#define	kthread_should_stop_task(task)	linux_kthread_should_stop_task(task)
-#define	kthread_park(task)		linux_kthread_park(task)
-#define	kthread_parkme()		linux_kthread_parkme()
-#define	kthread_should_park()		linux_kthread_should_park()
-#define	kthread_unpark(task)		linux_kthread_unpark(task)
+#define	kthread_stop(task)		drmkpi_kthread_stop(task)
+#define	kthread_should_stop()		drmkpi_kthread_should_stop()
+#define	kthread_should_stop_task(task)	drmkpi_kthread_should_stop_task(task)
+#define	kthread_park(task)		drmkpi_kthread_park(task)
+#define	kthread_parkme()		drmkpi_kthread_parkme()
+#define	kthread_should_park()		drmkpi_kthread_should_park()
+#define	kthread_unpark(task)		drmkpi_kthread_unpark(task)
 
 //#define	in_atomic()			linux_in_atomic()
 
