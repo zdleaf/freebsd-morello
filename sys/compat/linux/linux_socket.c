@@ -846,7 +846,10 @@ linux_socket(struct thread *td, struct linux_socket_args *args)
 	if (domain == -1) {
 		/* Mask off SOCK_NONBLOCK / CLOEXEC for error messages. */
 		type = args->type & LINUX_SOCK_TYPE_MASK;
-		if (args->domain == LINUX_AF_NETLINK) {
+		if (args->domain == LINUX_AF_NETLINK &&
+		    args->protocol == LINUX_NETLINK_AUDIT) {
+			; /* Do nothing, quietly. */
+		} else if (args->domain == LINUX_AF_NETLINK) {
 			const char *nl_name;
 
 			if (args->protocol >= 0 &&
@@ -1175,7 +1178,7 @@ linux_send(struct thread *td, struct linux_send_args *args)
 	bsd_args.s = args->s;
 	bsd_args.buf = (caddr_t)PTRIN(args->msg);
 	bsd_args.len = args->len;
-	bsd_args.flags = args->flags;
+	bsd_args.flags = linux_to_bsd_msg_flags(args->flags);
 	bsd_args.to = NULL;
 	bsd_args.tolen = 0;
 	error = sys_sendto(td, &bsd_args);

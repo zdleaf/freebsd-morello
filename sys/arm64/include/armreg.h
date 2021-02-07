@@ -734,6 +734,7 @@
 #define	MAIR_ATTR_MASK(idx)	(0xff << ((n)* 8))
 #define	MAIR_ATTR(attr, idx) ((attr) << ((idx) * 8))
 #define	 MAIR_DEVICE_nGnRnE	0x00
+#define	 MAIR_DEVICE_nGnRE	0x04
 #define	 MAIR_NORMAL_NC		0x44
 #define	 MAIR_NORMAL_WT		0xbb
 #define	 MAIR_NORMAL_WB		0xff
@@ -743,6 +744,7 @@
 #define	PAR_F			(0x1 << PAR_F_SHIFT)
 #define	PAR_SUCCESS(x)		(((x) & PAR_F) == 0)
 /* When PAR_F == 0 (success) */
+#define	PAR_LOW_MASK		0xfff
 #define	PAR_SH_SHIFT		7
 #define	PAR_SH_MASK		(0x3 << PAR_SH_SHIFT)
 #define	PAR_NS_SHIFT		9
