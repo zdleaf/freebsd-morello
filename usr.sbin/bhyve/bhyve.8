@@ -24,7 +24,7 @@
 .\"
 .\" $FreeBSD$
 .\"
-.Dd Jun 25, 2020
+.Dd December 8, 2020
 .Dt BHYVE 8
 .Os
 .Sh NAME
@@ -104,7 +104,8 @@ Enable a low-level console device supported by
 .Fx
 kernels compiled with
 .Cd "device bvmconsole" .
-This option will be deprecated in a future version.
+This option is deprecated and will be removed in
+.Fx 13.0 .
 .It Fl c Op Ar setting ...
 Number of guest virtual CPUs
 and/or the CPU topology.
@@ -145,7 +146,8 @@ kernels compiled with
 .Cd "device bvmdebug" ,
 allow a remote kernel kgdb to be relayed to the guest kernel gdb stub
 via a local IPv4 address and this port.
-This option will be deprecated in a future version.
+This option is deprecated and will be removed in
+.Fx 13.0 .
 .It Fl G Ar port
 Start a debug server that uses the GDB protocol to export guest state to a
 debugger.
@@ -169,9 +171,11 @@ Allow devices behind the LPC PCI-ISA bridge to be configured.
 The only supported devices are the TTY-class devices
 .Ar com1
 and
-.Ar com2
-and the boot ROM device
-.Ar bootrom .
+.Ar com2 ,
+the boot ROM device
+.Ar bootrom ,
+and the debug/test device
+.Ar pc-testdev .
 .Pp
 .Ar help
 print a list of supported LPC devices.
@@ -277,7 +281,8 @@ Intel e82545 network interface.
 .It Li uart
 PCI 16550 serial device.
 .It Li lpc
-LPC PCI-ISA bridge with COM1 and COM2 16550 serial ports and a boot ROM.
+LPC PCI-ISA bridge with COM1 and COM2 16550 serial ports, a boot ROM, and,
+optionally, the debug/test device.
 The LPC bridge emulation can only be configured on bus 0.
 .It Li fbuf
 Raw framebuffer device attached to VNC server.
