@@ -4173,7 +4173,6 @@ libkern/strdup.c		standard
 libkern/strndup.c		standard
 libkern/strlcat.c		standard
 libkern/strlcpy.c		standard
-libkern/strlen.c		standard
 libkern/strncat.c		standard
 libkern/strncmp.c		standard
 libkern/strncpy.c		standard
@@ -4419,6 +4418,7 @@ netgraph/ng_tee.c		optional netgraph_tee
 netgraph/ng_tty.c		optional netgraph_tty
 netgraph/ng_vjc.c		optional netgraph_vjc
 netgraph/ng_vlan.c		optional netgraph_vlan
+netgraph/ng_vlan_rotate.c	optional netgraph_vlan_rotate
 netinet/accf_data.c		optional accept_filter_data inet
 netinet/accf_dns.c		optional accept_filter_dns inet
 netinet/accf_http.c		optional accept_filter_http inet
@@ -4644,7 +4644,11 @@ compat/linuxkpi/common/src/linux_compat.c	optional compat_linuxkpi \
 	compile-with "${LINUXKPI_C}"
 compat/linuxkpi/common/src/linux_current.c	optional compat_linuxkpi \
 	compile-with "${LINUXKPI_C}"
+compat/linuxkpi/common/src/linux_devres.c	optional compat_linuxkpi \
+	compile-with "${LINUXKPI_C}"
 compat/linuxkpi/common/src/linux_dmi.c		optional compat_linuxkpi \
+	compile-with "${LINUXKPI_C}"
+compat/linuxkpi/common/src/linux_firmware.c	optional compat_linuxkpi \
 	compile-with "${LINUXKPI_C}"
 compat/linuxkpi/common/src/linux_hrtimer.c	optional compat_linuxkpi \
 	compile-with "${LINUXKPI_C}"
