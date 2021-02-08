@@ -115,6 +115,7 @@ struct ng_bridge_link {
 					sendUnknown : 1;/* send unknown macs out */
 	struct ng_bridge_link_kernel_stats stats;	/* link stats */
 };
+typedef struct ng_bridge_link const *link_cp;	/* read only access */
 
 /* Per-node private data */
 struct ng_bridge_private {
@@ -130,6 +131,7 @@ struct ng_bridge_private {
 	struct callout		timer;		/* one second periodic timer */
 };
 typedef struct ng_bridge_private *priv_p;
+typedef struct ng_bridge_private const *priv_cp;	/* read only access */
 
 /* Information about a host, stored in a hash table entry */
 struct ng_bridge_hent {
@@ -149,12 +151,12 @@ static ng_rcvdata_t	ng_bridge_rcvdata;
 static ng_disconnect_t	ng_bridge_disconnect;
 
 /* Other internal functions */
-static struct	ng_bridge_host *ng_bridge_get(priv_p priv, const u_char *addr);
+static struct	ng_bridge_host *ng_bridge_get(priv_cp priv, const u_char *addr);
 static int	ng_bridge_put(priv_p priv, const u_char *addr, link_p link);
 static void	ng_bridge_rehash(priv_p priv);
 static void	ng_bridge_remove_hosts(priv_p priv, link_p link);
 static void	ng_bridge_timeout(node_p node, hook_p hook, void *arg1, int arg2);
-static const	char *ng_bridge_nodename(node_p node);
+static const	char *ng_bridge_nodename(node_cp node);
 
 /* Ethernet broadcast */
 static const u_char ng_bridge_bcast_addr[ETHER_ADDR_LEN] =
@@ -461,75 +463,6 @@ ng_bridge_rcvmsg(node_p node, item_p item, hook_p lasthook)
 
 	NGI_GET_MSG(item, msg);
 	switch (msg->header.typecookie) {
-#ifdef NGM_BRIDGE_TABLE_ABI
-	case NGM_BRIDGE_COOKIE_TBL:
-		switch (msg->header.cmd) {
-		case NGM_BRIDGE_GET_CONFIG:
-		    {
-			struct ng_bridge_config_tbl *conf;
-
-			NG_MKRESPONSE(resp, msg, sizeof(*conf),
-			    M_NOWAIT|M_ZERO);
-			if (resp == NULL) {
-				error = ENOMEM;
-				break;
-			}
-			conf = (struct ng_bridge_config_tbl *)resp->data;
-			conf->cfg = priv->conf;
-			break;
-		    }
-		case NGM_BRIDGE_SET_CONFIG:
-		    {
-			struct ng_bridge_config_tbl *conf;
-
-			if (msg->header.arglen != sizeof(*conf)) {
-				error = EINVAL;
-				break;
-			}
-			conf = (struct ng_bridge_config_tbl *)msg->data;
-			priv->conf = conf->cfg;
-			break;
-		    }
-		case NGM_BRIDGE_GET_TABLE:
-		    {
-			struct ng_bridge_host_tbl_ary *ary;
-			struct ng_bridge_hent *hent;
-			int i, bucket;
-
-			NG_MKRESPONSE(resp, msg, sizeof(*ary) +
-			    (priv->numHosts * sizeof(*ary->hosts)), M_NOWAIT);
-			if (resp == NULL) {
-				error = ENOMEM;
-				break;
-			}
-			ary = (struct ng_bridge_host_tbl_ary *)resp->data;
-			ary->numHosts = priv->numHosts;
-			i = 0;
-			for (bucket = 0; bucket < priv->numBuckets; bucket++) {
-				SLIST_FOREACH(hent, &priv->tab[bucket], next) {
-					const char *name = NG_HOOK_NAME(hent->host.link->hook);
-					const char *prefix = name[0] == 'u' ?
-					    NG_BRIDGE_HOOK_UPLINK_PREFIX :
-					    NG_BRIDGE_HOOK_LINK_PREFIX;
-
-					memcpy(ary->hosts[i].addr,
-					    hent->host.addr,
-					    sizeof(ary->hosts[i].addr));
-					ary->hosts[i].age = hent->host.age;
-					ary->hosts[i].staleness =
-					     hent->host.staleness;
-				        ary->hosts[i].linkNum = strtol(
-					    name + strlen(prefix), NULL, 10);
-					i++;
-				}
-			}
-			break;
-		    }
-		}
-		/* If already handled break, otherwise use new ABI. */
-		if (resp != NULL || error != 0)
-		    break;
-#endif /* NGM_BRIDGE_TABLE_ABI */
 	case NGM_BRIDGE_COOKIE:
 		switch (msg->header.cmd) {
 		case NGM_BRIDGE_GET_CONFIG:
@@ -989,7 +922,7 @@ ng_bridge_disconnect(hook_p hook)
  * Find a host entry in the table.
  */
 static struct ng_bridge_host *
-ng_bridge_get(priv_p priv, const u_char *addr)
+ng_bridge_get(priv_cp priv, const u_char *addr)
 {
 	const int bucket = HASH(addr, priv->hashMask);
 	struct ng_bridge_hent *hent;
@@ -1200,7 +1133,7 @@ ng_bridge_timeout(node_p node, hook_p hook, void *arg1, int arg2)
  * Return node's "name", even if it doesn't have one.
  */
 static const char *
-ng_bridge_nodename(node_p node)
+ng_bridge_nodename(node_cp node)
 {
 	static char name[NG_NODESIZ];
 
