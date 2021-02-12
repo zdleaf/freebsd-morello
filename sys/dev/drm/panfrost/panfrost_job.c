@@ -289,6 +289,8 @@ panfrost_job_push(struct panfrost_job *job)
 
 	sc = job->sc;
 
+	atomic_add_int(&sc->job_cnt, 1);
+
 	slot = panfrost_job_get_slot(job);
 	job->slot = slot;
 
@@ -508,22 +510,35 @@ panfrost_job_timedout(struct drm_sched_job *sched_job)
 static void
 panfrost_job_cleanup(struct panfrost_job *job)
 {
+	struct panfrost_softc *sc;
 	struct panfrost_gem_object *obj;
 	struct drm_gem_object *bo;
 	struct drm_device *dev;
+	struct dma_fence *fence;
 	int i;
+
+	sc = job->sc;
+	atomic_add_int(&sc->job_cnt, -1);
 
 	dprintf("%s\n", __func__);
 
 	if (job->in_fences) {
-		for (i = 0; i < job->in_fence_count; i++)
+		for (i = 0; i < job->in_fence_count; i++) {
+			fence =	job->in_fences[i];
+			if (!fence)
+				continue;
 			dma_fence_put(job->in_fences[i]);
+		}
 		free(job->in_fences, M_PANFROST1);
 	}
 
 	if (job->implicit_fences) {
-		for (i = 0; i < job->bo_count; i++)
+		for (i = 0; i < job->bo_count; i++) {
+			fence = job->implicit_fences[i];
+			if (!fence)
+				continue;
 			dma_fence_put(job->implicit_fences[i]);
+		}
 		free(job->implicit_fences, M_PANFROST1);
 	}
 
@@ -552,7 +567,7 @@ panfrost_job_cleanup(struct panfrost_job *job)
 			mutex_unlock(&dev->struct_mutex);
 		}
 
-		kvfree(job->bos);
+		kvfree1(job->bos);
 	}
 
 	free(job, M_PANFROST1);

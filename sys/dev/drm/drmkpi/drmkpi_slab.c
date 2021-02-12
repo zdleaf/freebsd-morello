@@ -78,7 +78,7 @@ drmkpi_kmem_cache_create(const char *name, size_t size, size_t align,
 {
 	struct drmkpi_kmem_cache *c;
 
-	c = malloc(sizeof(*c), M_DRMKMALLOC, M_WAITOK);
+	c = malloc(sizeof(*c), M_DRMKMALLOC1, M_WAITOK);
 
 	if (flags & SLAB_HWCACHE_ALIGN)
 		align = UMA_ALIGN_CACHE;
@@ -124,5 +124,5 @@ drmkpi_kmem_cache_destroy(struct drmkpi_kmem_cache *c)
 	}
 
 	uma_zdestroy(c->cache_zone);
-	free(c, M_DRMKMALLOC);
+	free(c, M_DRMKMALLOC1);
 }

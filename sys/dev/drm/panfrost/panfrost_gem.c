@@ -38,6 +38,9 @@ __FBSDID("$FreeBSD$");
 #include <sys/resource.h>
 #include <machine/bus.h>
 #include <vm/vm.h>
+#include <vm/vm_object.h>
+#include <vm/vm_page.h>
+#include <vm/vm_pageout.h>
 #include <vm/vm_extern.h>
 #include <vm/vm_kern.h>
 #include <vm/pmap.h>
@@ -70,6 +73,8 @@ __FBSDID("$FreeBSD$");
 #include "panfrost_issues.h"
 #include "panfrost_mmu.h"
 
+static int free_cnt = 0;
+
 static void
 panfrost_gem_free_object(struct drm_gem_object *obj)
 {
@@ -83,10 +88,16 @@ panfrost_gem_free_object(struct drm_gem_object *obj)
 
 	if (obj->import_attach)
 		drm_prime_gem_destroy(obj, bo->sgt);
-	else if (bo->sgt)
+
+	if (bo->sgt) {
 		sg_free_table(bo->sgt);
+		kfree(bo->sgt);
+		bo->sgt = NULL;
+	}
 
 	if (bo->pages) {
+		printf("%s: (cnt %d), free %d pages\n", __func__, free_cnt++, bo->npages);
+
 		for (i = 0; i < bo->npages; i++) {
 			m = bo->pages[i];
 			vm_page_lock(m);
@@ -124,6 +135,7 @@ panfrost_gem_open(struct drm_gem_object *obj, struct drm_file *file_priv)
 	mapping->obj = bo;
 	mapping->mmu = &pfile->mmu;
 	refcount_init(&mapping->refcount, 1);
+	//printf("%s: getting obj %p\n", __func__, obj);
 	drm_gem_object_get(obj);
 
 	if (!bo->noexec) {
@@ -190,6 +202,12 @@ panfrost_gem_close(struct drm_gem_object *obj, struct drm_file *file_priv)
 	pfile = file_priv->driver_priv;
 	bo = (struct panfrost_gem_object *)obj;
 	result = NULL;
+
+	if (bo->sgt) {
+		sg_free_table(bo->sgt);
+		kfree(bo->sgt);
+		bo->sgt = NULL;
+	}
 
 	mtx_lock(&bo->mappings_lock);
 	TAILQ_FOREACH_SAFE(mapping, &bo->mappings, next, tmp) {
@@ -335,6 +353,9 @@ panfrost_gem_vm_open(struct vm_area_struct *vma)
 static void
 panfrost_gem_vm_close(struct vm_area_struct *vma)
 {
+	struct drm_gem_object *obj;
+
+	obj = vma->vm_private_data;
 
 	dprintf("%s\n", __func__);
 	drm_gem_vm_close(vma);
@@ -366,8 +387,6 @@ dma_buf_mmap(struct dma_buf *dmabuf, struct vm_area_struct *vma,
 
 	error = dmabuf->ops->mmap(dmabuf, vma);
 
-	//printf("%s: error %d\n", __func__, error);
-
 	return (error);
 }
 
@@ -387,8 +406,8 @@ drm_gem_shmem_mmap(struct drm_gem_object *obj, struct vm_area_struct *vma)
 	if (obj->import_attach) {
 		dev = obj->dev;
 		mutex_lock(&dev->struct_mutex);
-		//drm_gem_object_put(obj);
-		//printf("refcount %d\n", kref_read(&obj->refcount));
+		//printf("%s: refcount %d\n", __func__, kref_read(&obj->refcount));
+		drm_gem_object_put(obj);
 		mutex_unlock(&dev->struct_mutex);
 
 		vma->vm_private_data = NULL;
@@ -475,7 +494,7 @@ panfrost_gem_create_object_with_handle(struct drm_file *file,
 dprintf("%s\n", __func__);
 
 	if (size != PAGE_ALIGN(size))
-		printf("%s: size %x size %x\n", __func__,
+		printf("%s: size %x new size %x\n", __func__,
 		    size, PAGE_ALIGN(size));
 
 	size = PAGE_ALIGN(size);
@@ -568,6 +587,8 @@ panfrost_gem_mapping_get(struct panfrost_gem_object *bo,
 	return (result);
 }
 
+static int get_cnt = 0;
+
 int
 panfrost_gem_get_pages(struct panfrost_gem_object *bo)
 {
@@ -579,13 +600,19 @@ panfrost_gem_get_pages(struct panfrost_gem_object *bo)
 	int pflags;
 	int npages;
 	vm_page_t *m0;
+	int tries;
 	int i;
 
-	if (bo->sgt != NULL)
+	if (bo->sgt != NULL || bo->pages != NULL)
 		return (0);
 
 	obj = &bo->base;
 	npages = obj->size / PAGE_SIZE;
+
+	if (npages == 0) {
+		printf("npages is 0");
+		panic("npages is 0");
+	}
 
 	alignment = PAGE_SIZE;
 	low = 0;
@@ -595,10 +622,22 @@ panfrost_gem_get_pages(struct panfrost_gem_object *bo)
 	    VM_ALLOC_WIRED | VM_ALLOC_ZERO;
 	memattr = VM_MEMATTR_WRITE_COMBINING;
 
+printf("%s npages %d (cnt %d)\n", __func__, npages, get_cnt++);
+
+	tries = 0;
+retry:
 	m = vm_page_alloc_contig(NULL, 0, pflags, npages, low, high,
 	    alignment, boundary, memattr);
-	if (m == NULL)
+	if (m == NULL) {
+		if (tries < 3) {
+			if (!vm_page_reclaim_contig(pflags, npages, low, high,
+			    alignment, boundary))
+				vm_wait(NULL);
+			tries++;
+			goto retry;
+		}
 		return (ENOMEM);
+	}
 
 	bo->npages = npages;
 
@@ -644,7 +683,7 @@ panfrost_gem_prime_import_sg_table(struct drm_device *dev,
 	struct panfrost_gem_object *bo;
 	size_t size;
 
-	dprintf("%s size %d\n", __func__, attach->dmabuf->size);
+	dprintf("%s: size %d\n", __func__, attach->dmabuf->size);
 
 	size = PAGE_ALIGN(attach->dmabuf->size);
 
@@ -653,6 +692,8 @@ panfrost_gem_prime_import_sg_table(struct drm_device *dev,
 	bo->sgt = sgt;
 	bo->noexec = true;
 	/* TODO: bo->npages = ? */
+
+	drm_gem_object_get(&bo->base);
 
 	return (&bo->base);
 }

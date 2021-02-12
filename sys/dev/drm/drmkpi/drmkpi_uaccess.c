@@ -41,7 +41,7 @@ __FBSDID("$FreeBSD$");
 
 SYSCTL_NODE(_compat, OID_AUTO, drmkpi, CTLFLAG_RW, 0, "DRMKPI parameters");
 
-MALLOC_DEFINE(M_DRMKMALLOC, "drmkpi", "DRM kmalloc compat");
+//MALLOC_DEFINE(M_DRMKMALLOC, "drmkpi", "DRM kmalloc compat");
 
 #include <linux/rbtree.h>
 /* Undo Linux compat changes. */

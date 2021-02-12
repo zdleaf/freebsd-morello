@@ -510,6 +510,22 @@ static int drm_syncobj_file_close(struct file *file, struct thread *td)
 	drm_syncobj_put(syncobj);
 	return 0;
 }
+static __inline int
+drm_syncobj_file_stat(struct file *fp, struct stat *sb,
+    struct ucred *active_cred, struct thread *td)
+{
+
+	return (0);
+}
+
+static __inline int
+drm_syncobj_fo_fill_kinfo(struct file *fp, struct kinfo_file *kif,
+    struct filedesc *fdp)
+{
+
+	return (0);
+}
+
 #endif
 
 #ifdef __linux__
@@ -519,9 +535,12 @@ static const struct file_operations drm_syncobj_file_fops = {
 #elif defined(__FreeBSD__)
 static struct fileops drm_syncobj_file_fops = {
 	.fo_close = drm_syncobj_file_close,
+	.fo_stat = drm_syncobj_file_stat,
+	.fo_fill_kinfo = drm_syncobj_fo_fill_kinfo,
 };
 #endif
 
+static int cnt = 0;
 /**
  * drm_syncobj_get_fd - get a file descriptor from a syncobj
  * @syncobj: Sync object to export
@@ -554,6 +573,7 @@ int drm_syncobj_get_fd(struct drm_syncobj *syncobj, int *p_fd)
 #else
 #define DTYPE_SYNCOBJ 104
 	int rv;
+	printf("SYNCOBJ %d\n", cnt++);
 	rv = falloc_noinstall(curthread, &file);
 	if (rv != 0) {
 		return (-rv);
@@ -675,6 +695,7 @@ static int drm_syncobj_export_sync_file(struct drm_file *file_private,
 	int ret;
 	struct dma_fence *fence;
 	struct sync_file *sync_file;
+
 	int fd = get_unused_fd_flags(O_CLOEXEC);
 
 	if (fd < 0)
@@ -1154,7 +1175,7 @@ static int drm_syncobj_array_find(struct drm_file *file_private,
 		goto err_free_handles;
 	}
 
-	syncobjs = kmalloc_array(count_handles, sizeof(*syncobjs), GFP_KERNEL);
+	syncobjs = kmalloc_array1(count_handles, sizeof(*syncobjs), GFP_KERNEL);
 	if (syncobjs == NULL) {
 		ret = -ENOMEM;
 		goto err_free_handles;
@@ -1188,7 +1209,7 @@ static void drm_syncobj_array_free(struct drm_syncobj **syncobjs,
 	uint32_t i;
 	for (i = 0; i < count; i++)
 		drm_syncobj_put(syncobjs[i]);
-	kfree(syncobjs);
+	kfree1(syncobjs);
 }
 
 int
@@ -1366,7 +1387,7 @@ drm_syncobj_timeline_signal_ioctl(struct drm_device *dev, void *data,
 		goto err_points;
 	}
 
-	chains = kmalloc_array(args->count_handles, sizeof(void *), GFP_KERNEL);
+	chains = kmalloc_array1(args->count_handles, sizeof(void *), GFP_KERNEL);
 	if (!chains) {
 		ret = -ENOMEM;
 		goto err_points;
