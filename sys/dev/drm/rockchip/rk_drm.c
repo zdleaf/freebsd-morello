@@ -92,6 +92,9 @@ rockchip_gem_prime_get_sg_table(struct drm_gem_object *obj)
 	//printf("%s\n", __func__);
 
 	m = drm_gem_cma_get_pages(obj, &npages);
+	if (m == NULL)
+		return (NULL);
+
 	sgt = drm_prime_pages_to_sg(m, npages);
 
 	return (sgt);
@@ -153,33 +156,18 @@ rockchip_drm_gem_object_mmap(struct drm_gem_object *obj,
 	//printf("%s: obj size %d: TODO\n", __func__, obj->size);
 
 	m = drm_gem_cma_get_pages(obj, &npages);
-	//printf("%s: m %p\n", __func__, m);
 
 	bo = container_of(obj, struct drm_gem_cma_object, gem_obj);
 	if (bo->pbase == 0)
 		return (0);
 
-#if 1
+	//printf("%s: m %p\n", __func__, m);
 	error = drm_gem_mmap_obj(obj, npages * PAGE_SIZE, vma);
-	//printf("%s: error %d\n", __func__, error);
+	drm_gem_object_put_unlocked(obj);
+	if (error)
+		printf("%s: error %d\n", __func__, error);
 
 	vma->vm_pfn = OFF_TO_IDX(bo->pbase);
-#else
-
-	if (obj->import_attach) {
-		printf("%s: Implement me: import_attach\n", __func__);
-		panic("ok");
-	}
-
-	printf("%s: bo->pbase %lx\n", __func__, bo->pbase);
-
-	vma->vm_pgoff -= drm_vma_node_start(&obj->vma_node);
-	vma->vm_flags |= VM_MIXEDMAP | VM_DONTEXPAND;
-	vma->vm_page_prot = vm_get_page_prot(vma->vm_flags);
-	vma->vm_page_prot = pgprot_writecombine(vma->vm_page_prot);
-	vma->vm_ops = &rk_gem_vm_ops;
-	error = 0;
-#endif
 
 	return (error);
 }
@@ -187,13 +175,6 @@ rockchip_drm_gem_object_mmap(struct drm_gem_object *obj,
 static int
 rockchip_gem_mmap_buf(struct drm_gem_object *obj, struct vm_area_struct *vma)
 {
-#if 1
-	int ret;
-
-	ret = drm_gem_mmap_obj(obj, obj->size, vma);
-	if (ret)
-		return (ret);
-#endif
 
 	return rockchip_drm_gem_object_mmap(obj, vma);
 }
