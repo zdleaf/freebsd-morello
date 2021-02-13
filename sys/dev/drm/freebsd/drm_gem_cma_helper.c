@@ -69,8 +69,8 @@ printf("%s\n", __func__);
 
 	for (i = 0; i < bo->npages; i++) {
 		m = bo->m[i];
-		//if (m == NULL)
-		//	continue;
+		if (m == NULL)
+			break;
 		vm_page_lock(m);
 		pmap_remove_all(m);
 		m->flags &= ~PG_FICTITIOUS;
