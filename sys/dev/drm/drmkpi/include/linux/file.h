@@ -89,6 +89,12 @@ get_unused_fd_flags(int flags)
 
 	p = curthread->td_proc;
 
+	/*
+	 * Not sure how to use flags here,
+	 * UF_EXCLOSE set later in fd_install().
+	 */
+	KASSERT(flags == UF_EXCLOSE, ("Unexpected flags"));
+
 	fdp = p->p_fd;
 
 	FILEDESC_XLOCK(fdp);
