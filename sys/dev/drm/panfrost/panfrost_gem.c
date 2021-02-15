@@ -159,7 +159,7 @@ panfrost_gem_open(struct drm_gem_object *obj, struct drm_file *file_priv)
 	if (error) {
 		printf("Failed to insert: sz %d, align %d, color %d, err %d\n",
 		    obj->size >> PAGE_SHIFT, align, color, error);
-		/* put mapping */
+		/* put mapping, and obj ?*/
 		return (error);
 	}
 	//printf("%s: Inserted %d kbytes\n", __func__, obj->size / 1024);
@@ -178,6 +178,7 @@ panfrost_gem_open(struct drm_gem_object *obj, struct drm_file *file_priv)
 			printf("%s: could not map, error %d\n",
 			    __func__, error);
 			panfrost_gem_mapping_put(mapping);
+			drm_gem_object_put(obj);
 			printf("%s: return %d\n", __func__, error);
 			return (error);
 		}
@@ -458,8 +459,6 @@ panfrost_gem_create_object0(struct drm_device *dev, size_t size, bool private)
 	mtx_init(&obj->mappings_lock, "mappings", NULL, MTX_DEF);
 	obj->gpu_usecount = 0;
 
-//printf("%s: private %d\n", __func__, private);
-
 	if (private)
 		drm_gem_private_object_init(dev, &obj->base, size);
 	else
@@ -678,8 +677,6 @@ panfrost_gem_prime_import_sg_table(struct drm_device *dev,
 	bo->sgt = sgt;
 	bo->noexec = true;
 	/* TODO: bo->npages = ? */
-
-	drm_gem_object_get(&bo->base);
 
 	return (&bo->base);
 }
