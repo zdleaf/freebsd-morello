@@ -673,7 +673,6 @@ panfrost_gem_prime_import_sg_table(struct drm_device *dev,
 	size = PAGE_ALIGN(attach->dmabuf->size);
 
 	bo = panfrost_gem_create_object0(dev, size, true);
-	bo->imported = 1;
 	bo->sgt = sgt;
 	bo->noexec = true;
 	/* TODO: bo->npages = ? */

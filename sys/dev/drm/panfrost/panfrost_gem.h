@@ -45,7 +45,6 @@ struct panfrost_gem_object {
 	bool					is_heap;
 	bool					map_cached;
 	int					gpu_usecount;
-	int					imported;
 	struct sg_table				*sgt;
 };
 
