@@ -608,10 +608,7 @@ panfrost_gem_get_pages(struct panfrost_gem_object *bo)
 	obj = &bo->base;
 	npages = obj->size / PAGE_SIZE;
 
-	if (npages == 0) {
-		printf("npages is 0");
-		panic("npages is 0");
-	}
+	KASSERT(npages != 0, ("npages is 0"));
 
 	alignment = PAGE_SIZE;
 	low = 0;
@@ -621,7 +618,7 @@ panfrost_gem_get_pages(struct panfrost_gem_object *bo)
 	    VM_ALLOC_WIRED | VM_ALLOC_ZERO;
 	memattr = VM_MEMATTR_WRITE_COMBINING;
 
-printf("%s npages %d (cnt %d)\n", __func__, npages, get_cnt++);
+printf("%s %d (cnt %d) alloc %d pages\n", __func__, get_cnt++, npages);
 
 	m0 = malloc(sizeof(vm_page_t *) * npages, M_PANFROST, M_WAITOK | M_ZERO);
 	bo->pages = m0;
@@ -644,8 +641,6 @@ retry:
 	}
 
 	bo->sgt = drm_prime_pages_to_sg(m0, npages);
-
-	wmb();
 
 	return (0);
 }
