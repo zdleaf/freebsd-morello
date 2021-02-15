@@ -73,7 +73,10 @@ __FBSDID("$FreeBSD$");
 #include "panfrost_issues.h"
 #include "panfrost_mmu.h"
 
+#if 0
 static int free_cnt = 0;
+static int get_cnt = 0;
+#endif
 
 static void
 panfrost_gem_free_object(struct drm_gem_object *obj)
@@ -96,7 +99,8 @@ panfrost_gem_free_object(struct drm_gem_object *obj)
 	}
 
 	if (bo->pages) {
-		printf("%s: (cnt %d), free %d pages\n", __func__, free_cnt++, bo->npages);
+		//printf("%s: (cnt %d), free %d pages\n", __func__, free_cnt++,
+		//    bo->npages);
 
 		for (i = 0; i < bo->npages; i++) {
 			m = bo->pages[i];
@@ -587,8 +591,6 @@ panfrost_gem_mapping_get(struct panfrost_gem_object *bo,
 	return (result);
 }
 
-static int get_cnt = 0;
-
 int
 panfrost_gem_get_pages(struct panfrost_gem_object *bo)
 {
@@ -618,7 +620,7 @@ panfrost_gem_get_pages(struct panfrost_gem_object *bo)
 	    VM_ALLOC_WIRED | VM_ALLOC_ZERO;
 	memattr = VM_MEMATTR_WRITE_COMBINING;
 
-printf("%s %d (cnt %d) alloc %d pages\n", __func__, get_cnt++, npages);
+//printf("%s %d (cnt %d) alloc %d pages\n", __func__, get_cnt++, npages);
 
 	m0 = malloc(sizeof(vm_page_t *) * npages, M_PANFROST, M_WAITOK | M_ZERO);
 	bo->pages = m0;
