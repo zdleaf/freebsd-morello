@@ -600,7 +600,6 @@ panfrost_gem_get_pages(struct panfrost_gem_object *bo)
 	int pflags;
 	int npages;
 	vm_page_t *m0;
-	int tries;
 	int i;
 
 	if (bo->sgt != NULL || bo->pages != NULL)
@@ -624,28 +623,18 @@ panfrost_gem_get_pages(struct panfrost_gem_object *bo)
 
 printf("%s npages %d (cnt %d)\n", __func__, npages, get_cnt++);
 
-	tries = 0;
-retry:
-	m = vm_page_alloc_contig(NULL, 0, pflags, npages, low, high,
-	    alignment, boundary, memattr);
-	if (m == NULL) {
-		if (tries < 3) {
-			if (!vm_page_reclaim_contig(pflags, npages, low, high,
-			    alignment, boundary))
-				vm_wait(NULL);
-			tries++;
-			goto retry;
-		}
-		return (ENOMEM);
-	}
-
+	m0 = malloc(sizeof(vm_page_t *) * npages, M_PANFROST, M_WAITOK | M_ZERO);
+	bo->pages = m0;
 	bo->npages = npages;
 
-	m0 = malloc(sizeof(vm_page_t *) * bo->npages, M_PANFROST,
-	    M_WAITOK | M_ZERO);
-	bo->pages = m0;
-
-	for (i = 0; i < npages; i++, m++) {
+	for (i = 0; i < npages; i++) {
+retry:
+		m = vm_page_alloc_contig(NULL, 0, pflags, 1, low, high, alignment,
+		    boundary, memattr);
+		if (m == NULL) {
+			vm_wait(NULL);
+			goto retry;
+		}
 		if ((m->flags & PG_ZERO) == 0)
 			pmap_zero_page(m);
 		m->valid = VM_PAGE_BITS_ALL;
