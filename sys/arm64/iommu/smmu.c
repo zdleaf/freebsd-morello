@@ -138,7 +138,7 @@ __FBSDID("$FreeBSD$");
 
 #define	SMMU_Q_ALIGN		(64 * 1024)
 
-#define	SMMU_POLL_TIMEOUT_US	1000000
+#define	SMMU_POLL_TIMEOUT	1000000
 
 static struct resource_spec smmu_spec[] = {
 	{ SYS_RES_MEMORY, 0, RF_ACTIVE },
@@ -281,7 +281,7 @@ smmu_write_ack(struct smmu_softc *sc, uint32_t reg,
 	uint32_t v;
 	int timeout;
 
-	timeout = SMMU_POLL_TIMEOUT_US;
+	timeout = SMMU_POLL_TIMEOUT;
 
 	bus_write_4(sc->res[0], reg, val);
 
@@ -289,7 +289,7 @@ smmu_write_ack(struct smmu_softc *sc, uint32_t reg,
 		v = bus_read_4(sc->res[0], reg_ack);
 		if (v == val)
 			break;
-		DELAY(1);
+		DELAY(10);
 	} while (timeout--);
 
 	if (timeout <= 0) {
