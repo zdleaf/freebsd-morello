@@ -254,7 +254,7 @@ static void drm_vm_shm_close(struct vm_area_struct *vma)
 			found_maps++;
 		if (pt->vma == vma) {
 			list_del(&pt->head);
-			kfree1(pt);
+			kfree(pt);
 		}
 	}
 
@@ -403,8 +403,7 @@ static void drm_vm_open_locked(struct drm_device *dev,
 	DRM_DEBUG("0x%08lx,0x%08lx\n",
 		  vma->vm_start, vma->vm_end - vma->vm_start);
 
-printf("%s\n", __func__);
-	vma_entry = kmalloc1(sizeof(*vma_entry), GFP_KERNEL);
+	vma_entry = kmalloc(sizeof(*vma_entry), GFP_KERNEL);
 	if (vma_entry) {
 		vma_entry->vma = vma;
 		vma_entry->pid = current->pid;
@@ -433,7 +432,7 @@ static void drm_vm_close_locked(struct drm_device *dev,
 	list_for_each_entry_safe(pt, temp, &dev->vmalist, head) {
 		if (pt->vma == vma) {
 			list_del(&pt->head);
-			kfree1(pt);
+			kfree(pt);
 			break;
 		}
 	}
@@ -669,7 +668,7 @@ void drm_legacy_vma_flush(struct drm_device *dev)
 	/* Clear vma list (only needed for legacy drivers) */
 	list_for_each_entry_safe(vma, vma_temp, &dev->vmalist, head) {
 		list_del(&vma->head);
-		kfree1(vma);
+		kfree(vma);
 	}
 }
 #endif

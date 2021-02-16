@@ -52,6 +52,7 @@ __FBSDID("$FreeBSD$");
 
 #include <uapi/linux/dma-buf.h>
 
+
 MALLOC_DEFINE(M_DMABUF, "dmabuf", "dmabuf allocator");
 
 struct dma_buf_file {
@@ -96,8 +97,6 @@ static struct fileops dmabuf_fileops = {
 #define	DTYPE_DMABUF		100	/* XXX */
 #define	file_is_dmabuf(file)	((file)->f_ops == &dmabuf_fileops)
 
-//static int cnt = 0;
-
 struct dma_buf *
 linux_dma_buf_export(struct dma_buf_export_info *info)
 {
@@ -123,9 +122,6 @@ linux_dma_buf_export(struct dma_buf_export_info *info)
 		reservation_object_init(dmabuf->resv);
 	}
 
-	//printf("%s: DMABUF %d (%p), pid %d\n", __func__, cnt++, dmabuf,
-	//	curthread->td_proc->p_pid);
-
 	rv = falloc_noinstall(curthread, &dmabuf->db_file);
 	if (rv != 0) {
 		free(dmabuf, M_DMABUF);
@@ -134,9 +130,6 @@ linux_dma_buf_export(struct dma_buf_export_info *info)
 
 	finit(dmabuf->db_file, info->flags & O_CLOEXEC, DTYPE_DMABUF, dmabuf,
 	    &dmabuf_fileops);
-
-	//printf("%s: dmabuf %p, rc %d\n", __func__, dmabuf,
-	//    refcount_load(&dmabuf->db_file->f_count));
 
 	return (dmabuf);
 }
@@ -155,9 +148,6 @@ dma_buf_fd(struct dma_buf *dmabuf, int flags)
 
 	/* drop extra reference added by finstall */
 	fdrop(dmabuf->db_file, curthread);
-
-	//printf("%s: dmabuf %p, pid %d, fd %d\n", __func__, dmabuf,
-	//	curthread->td_proc->p_pid, fd);
 
 	return (fd);
 }
@@ -181,25 +171,18 @@ dma_buf_get(int fd)
 	}
 
 	dmabuf = file->f_data;
-
-	//printf("%s: dmabuf %p, new rc %d\n",
-	//    __func__, dmabuf, refcount_load(&file->f_count));
 	return (dmabuf);
 }
+
 
 void
 dma_buf_put(struct dma_buf *dmabuf)
 {
-	//int rc;
 
 	MPASS(dmabuf != NULL);
 	MPASS(dmabuf->db_file != NULL);
 
-	//rc = refcount_load(&dmabuf->db_file->f_count);
-
 	fdrop(dmabuf->db_file, curthread);
-
-	//printf("%s: dmabuf %p, new rc %d\n", __func__, dmabuf, rc - 1);
 }
 
 void
@@ -211,9 +194,6 @@ get_dma_buf(struct dma_buf *dmabuf)
 
 	while (!fhold(dmabuf->db_file))
 		pause("fhold", hz);
-
-	//printf("%s: dmabuf %p, new rc %d\n", __func__,
-	//    dmabuf, refcount_load(&dmabuf->db_file->f_count));
 }
 
 struct dma_buf_attachment *

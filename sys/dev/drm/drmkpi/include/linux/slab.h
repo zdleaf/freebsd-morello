@@ -42,19 +42,16 @@
 #include <linux/gfp.h>
 
 MALLOC_DECLARE(M_DRMKMALLOC);
-MALLOC_DECLARE(M_DRMKMALLOC1);
 
 #define	kvmalloc(size)			kmalloc(size, 0)
 #define	kvzalloc(size, flags)		kmalloc(size, (flags) | __GFP_ZERO)
 #define	kvcalloc(n, size, flags)	kvmalloc_array(n, size, (flags) | __GFP_ZERO)
 #define	kzalloc(size, flags)		kmalloc(size, (flags) | __GFP_ZERO)
-#define	kzalloc1(size, flags)		kmalloc1(size, (flags) | __GFP_ZERO)
 #define	kzalloc_node(size, flags, node)	kmalloc(size, (flags) | __GFP_ZERO)
 #define	kfree_const(ptr)		kfree(ptr)
 #define	vzalloc(size)			__vmalloc(size, GFP_KERNEL | __GFP_NOWARN | __GFP_ZERO, 0)
 #define	vfree(arg)			kfree(arg)
 #define	kvfree(arg)			kfree(arg)
-#define	kvfree1(arg)			kfree1(arg)
 #define	vmalloc_node(size, node)	__vmalloc(size, GFP_KERNEL, 0)
 #define	vmalloc_user(size)		__vmalloc(size, GFP_KERNEL | __GFP_ZERO, 0)
 #define	vmalloc(size)			__vmalloc(size, GFP_KERNEL, 0)
@@ -116,12 +113,6 @@ kmalloc(size_t size, gfp_t flags)
 }
 
 static inline void *
-kmalloc1(size_t size, gfp_t flags)
-{
-	return (malloc(size, M_DRMKMALLOC1, linux_check_m_flags(flags)));
-}
-
-static inline void *
 kcalloc(size_t n, size_t size, gfp_t flags)
 {
 	flags |= __GFP_ZERO;
@@ -147,21 +138,9 @@ kmalloc_array(size_t n, size_t size, gfp_t flags)
 }
 
 static inline void *
-kmalloc_array1(size_t n, size_t size, gfp_t flags)
-{
-	return (mallocarray(n, size, M_DRMKMALLOC1, linux_check_m_flags(flags)));
-}
-
-static inline void *
 kvmalloc_array(size_t n, size_t size, gfp_t flags)
 {
 	return (mallocarray(n, size, M_DRMKMALLOC, linux_check_m_flags(flags)));
-}
-
-static inline void *
-kvmalloc_array1(size_t n, size_t size, gfp_t flags)
-{
-	return (mallocarray(n, size, M_DRMKMALLOC1, linux_check_m_flags(flags)));
 }
 
 static inline void *
@@ -174,12 +153,6 @@ static inline void
 kfree(const void *ptr)
 {
 	free(__DECONST(void *, ptr), M_DRMKMALLOC);
-}
-
-static inline void
-kfree1(const void *ptr)
-{
-	free(__DECONST(void *, ptr), M_DRMKMALLOC1);
 }
 
 static inline size_t

@@ -331,7 +331,6 @@ struct dma_buf *drm_gem_dmabuf_export(struct drm_device *dev,
 		return dma_buf;
 
 	drm_dev_get(dev);
-	//printf("%s: getting obj %p\n", __func__, exp_info->priv);
 	drm_gem_object_get(exp_info->priv);
 
 	return dma_buf;
@@ -649,7 +648,6 @@ int drm_gem_prime_mmap(struct drm_gem_object *obj, struct vm_area_struct *vma)
 		if (ret)
 			return ret;
 		vma->vm_private_data = obj;
-		//printf("%s: getting obj %p\n", __func__, obj);
 		drm_gem_object_get(obj);
 		return 0;
 	}
@@ -706,7 +704,6 @@ struct drm_gem_object *drm_gem_prime_import_dev(struct drm_device *dev,
 			 * Importing dmabuf exported from out own gem increases
 			 * refcount on gem itself instead of f_count of dmabuf.
 			 */
-			//printf("%s: getting obj %p\n", __func__, obj);
 			drm_gem_object_get(obj);
 			return obj;
 		}

@@ -31,7 +31,7 @@ __FBSDID("$FreeBSD$");
 
 #include <drmkpi/list_sort.h>
 
-MALLOC_DECLARE(M_DRMKMALLOC1);
+MALLOC_DECLARE(M_DRMKMALLOC);
 
 struct list_sort_thunk {
 	int (*cmp)(void *, struct list_head *, struct list_head *);
@@ -61,7 +61,7 @@ drmkpi_list_sort(void *priv, struct list_head *head, int (*cmp)(void *priv,
 	count = 0;
 	list_for_each(le, head)
 		count++;
-	ar = malloc(sizeof(struct list_head *) * count, M_DRMKMALLOC1, M_WAITOK);
+	ar = malloc(sizeof(struct list_head *) * count, M_DRMKMALLOC, M_WAITOK);
 	i = 0;
 	list_for_each(le, head)
 		ar[i++] = le;
@@ -71,5 +71,5 @@ drmkpi_list_sort(void *priv, struct list_head *head, int (*cmp)(void *priv,
 	INIT_LIST_HEAD(head);
 	for (i = 0; i < count; i++)
 		list_add_tail(ar[i], head);
-	free(ar, M_DRMKMALLOC1);
+	free(ar, M_DRMKMALLOC);
 }

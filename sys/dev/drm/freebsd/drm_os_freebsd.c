@@ -293,7 +293,7 @@ drm_vmap_free(struct vm_area_struct *vmap)
 	/* Drop reference on mm_struct */
 //	mmput(vmap->vm_mm);
 
-	kfree1(vmap);
+	kfree(vmap);
 }
 
 static void
@@ -487,7 +487,7 @@ drm_fstub_do_mmap(struct file *file, const struct file_operations *fops,
 	vm_memattr_t attr;
 	int rv;
 
-	vmap = kzalloc1(sizeof(*vmap), GFP_KERNEL);
+	vmap = kzalloc(sizeof(*vmap), GFP_KERNEL);
 	vmap->vm_start = 0;
 	vmap->vm_end = size;
 	vmap->vm_pgoff = *foff / PAGE_SIZE;

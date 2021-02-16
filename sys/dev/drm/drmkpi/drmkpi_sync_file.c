@@ -29,9 +29,7 @@ syncfile_fo_fill_kinfo(struct file *fp, struct kinfo_file *kif,
     struct filedesc *fdp)
 {
 
-	printf("%s\n", __func__);
-
-	return (EINVAL);
+	return (0);
 }
 
 static struct fileops syncfile_fileops = {
@@ -45,8 +43,6 @@ static struct fileops syncfile_fileops = {
 #define	DTYPE_SYNCFILE		101	/* XXX */
 #define	file_is_syncfile(file)	((file)->f_ops == &syncfile_fileops)
 
-static int cnt = 0;
-
 static struct sync_file 
 *sync_file_alloc(void)
 {
@@ -54,8 +50,6 @@ static struct sync_file
 	int rv;
 
 	sf = malloc(sizeof(struct sync_file), M_SYNCFILE, M_WAITOK | M_ZERO);
-
-	printf("SYNCfile %d\n", cnt++);
 
 	rv = falloc_noinstall(curthread, &sf->sf_file);
 	if (rv != 0) {
@@ -65,6 +59,7 @@ static struct sync_file
 
 	finit(sf->sf_file, O_CLOEXEC, DTYPE_SYNCFILE, sf,
 	    &syncfile_fileops);
+
 
 	return (sf);
 
@@ -131,8 +126,6 @@ syncfile_fop_close(struct file *file, struct thread *td)
 	if (test_bit(POLL_ENABLED, &sf->flags))
 		dma_fence_remove_callback(sf->fence, &sf->cb);
 	dma_fence_put(sf->fence);
-
-	cnt--;
 
 	free(sf, M_SYNCFILE);
 	return (0);

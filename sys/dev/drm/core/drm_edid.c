@@ -1964,8 +1964,6 @@ struct edid *drm_do_get_edid(struct drm_connector *connector,
 		edid = new;
 	}
 
-	printf("%s: edid is good\n", __func__);
-
 	return (struct edid *)edid;
 
 carp:

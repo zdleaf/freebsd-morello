@@ -384,10 +384,8 @@ drm_gem_handle_create_tail(struct drm_file *file_priv,
 	int ret;
 
 	WARN_ON(!mutex_is_locked(&dev->object_name_lock));
-	if (obj->handle_count++ == 0) {
-		//printf("%s: getting obj %p\n", __func__, obj);
+	if (obj->handle_count++ == 0)
 		drm_gem_object_get(obj);
-	}
 
 	/*
 	 * Get the user-visible handle using idr.  Preload and perform
@@ -677,7 +675,6 @@ static int objects_lookup(struct drm_file *filp, u32 *handle, int count,
 			ret = -ENOENT;
 			break;
 		}
-		//printf("%s: getting obj %p\n", __func__, obj);
 		drm_gem_object_get(obj);
 		objs[i] = obj;
 	}
@@ -715,12 +712,12 @@ int drm_gem_objects_lookup(struct drm_file *filp, void __user *bo_handles,
 	if (!count)
 		return 0;
 
-	objs = kvmalloc_array1(count, sizeof(struct drm_gem_object *),
+	objs = kvmalloc_array(count, sizeof(struct drm_gem_object *),
 			     GFP_KERNEL | __GFP_ZERO);
 	if (!objs)
 		return -ENOMEM;
 
-	handles = kvmalloc_array1(count, sizeof(u32), GFP_KERNEL);
+	handles = kvmalloc_array(count, sizeof(u32), GFP_KERNEL);
 	if (!handles) {
 		ret = -ENOMEM;
 		goto out;
@@ -736,7 +733,7 @@ int drm_gem_objects_lookup(struct drm_file *filp, void __user *bo_handles,
 	*objs_out = objs;
 
 out:
-	kvfree1(handles);
+	kvfree(handles);
 	return ret;
 
 }
@@ -901,7 +898,6 @@ drm_gem_open_ioctl(struct drm_device *dev, void *data,
 	mutex_lock(&dev->object_name_lock);
 	obj = idr_find(&dev->object_name_idr, (int) args->name);
 	if (obj) {
-		//printf("%s: getting obj %p\n", __func__, obj);
 		drm_gem_object_get(obj);
 	} else {
 		mutex_unlock(&dev->object_name_lock);
@@ -1019,9 +1015,6 @@ drm_gem_object_put_unlocked(struct drm_gem_object *obj)
 
 	dev = obj->dev;
 
-	//printf("%s: %p rc %d\n", __func__, obj,
-	//    kref_read(&obj->refcount));
-
 	if (dev->driver->gem_free_object) {
 		might_lock(&dev->struct_mutex);
 		if (kref_put_mutex(&obj->refcount, drm_gem_object_free,
@@ -1047,9 +1040,6 @@ EXPORT_SYMBOL(drm_gem_object_put_unlocked);
 void
 drm_gem_object_put(struct drm_gem_object *obj)
 {
-
-	//printf("%s: %p rc %d\n", __func__, obj, kref_read(&obj->refcount));
-
 	if (obj) {
 		WARN_ON(!mutex_is_locked(&obj->dev->struct_mutex));
 
@@ -1069,7 +1059,6 @@ void drm_gem_vm_open(struct vm_area_struct *vma)
 {
 	struct drm_gem_object *obj = vma->vm_private_data;
 
-	//printf("%s: getting obj %p\n", __func__, obj);
 	drm_gem_object_get(obj);
 }
 EXPORT_SYMBOL(drm_gem_vm_open);
@@ -1084,8 +1073,6 @@ EXPORT_SYMBOL(drm_gem_vm_open);
 void drm_gem_vm_close(struct vm_area_struct *vma)
 {
 	struct drm_gem_object *obj = vma->vm_private_data;
-
-	//printf("%s: obj %p\n", __func__, obj);
 
 	drm_gem_object_put_unlocked(obj);
 }
@@ -1131,7 +1118,6 @@ int drm_gem_mmap_obj(struct drm_gem_object *obj, unsigned long obj_size,
 	 * (which should happen whether the vma was created by this call, or
 	 * by a vm_open due to mremap or partial unmap or whatever).
 	 */
-	//printf("%s: getting obj %p\n", __func__, obj);
 	drm_gem_object_get(obj);
 
 	if (obj->funcs && obj->funcs->mmap) {

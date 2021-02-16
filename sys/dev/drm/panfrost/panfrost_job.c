@@ -567,7 +567,7 @@ panfrost_job_cleanup(struct panfrost_job *job)
 			mutex_unlock(&dev->struct_mutex);
 		}
 
-		kvfree1(job->bos);
+		kvfree(job->bos);
 	}
 
 	free(job, M_PANFROST1);

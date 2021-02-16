@@ -682,14 +682,10 @@ dma_fence_wait_timeout(struct dma_fence *fence, bool intr, long timeout)
 	MPASS(timeout >= 0);
 	MPASS(timeout < MAX_SCHEDULE_TIMEOUT);
 
-	//printf("%s: fence->ops->wait %p\n", __func__, fence->ops->wait);
-
 	if (fence->ops->wait)
 		rv = fence->ops->wait(fence, intr, timeout);
 	else
 		rv = dma_fence_default_wait(fence, intr, timeout);
-
-	//printf("%s: rv %d\n", __func__, rv);
 
 	return (rv);
 }
