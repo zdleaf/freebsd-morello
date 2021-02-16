@@ -168,9 +168,6 @@ drm_fstub_kqfilter(struct file *file, struct knote *kn)
 	int ref;
 	int rv;
 
-	printf("%s: kn_filter %d, f->data %p\n",
-	    __func__, kn->kn_filter, file->f_data);
-
 	rv = drm_fstub_file_check(file, &cdev, &ref, &minor);
 	if (rv != 0)
 		return (ENXIO);

@@ -47,7 +47,6 @@ __FBSDID("$FreeBSD$");
 
 #include <drm/drm_crtc_helper.h>
 #include <drm/drm_gem.h>
-#include <drm/drm_file.h>
 #include <drm/drm_gem_cma_helper.h>
 
 static int
@@ -60,8 +59,6 @@ drm_gem_cma_destruct(struct drm_gem_cma_object *bo)
 	vm_page_t m;
 	int i;
 
-printf("%s\n", __func__);
-
 	if (bo->vbase != 0) {
 		pmap_qremove(bo->vbase, bo->npages);
 		vmem_free(kmem_arena, bo->vbase, round_page(bo->gem_obj.size));
@@ -72,7 +69,6 @@ printf("%s\n", __func__);
 		if (m == NULL)
 			break;
 		vm_page_lock(m);
-		pmap_remove_all(m);
 		m->flags &= ~PG_FICTITIOUS;
 		vm_page_unwire_noq(m);
 		vm_page_free(m);
@@ -87,8 +83,6 @@ drm_gem_cma_alloc_contig(size_t npages, u_long alignment, vm_memattr_t memattr,
 	vm_page_t m;
 	int pflags, tries, i;
 	vm_paddr_t low, high, boundary;
-
-printf("%s\n", __func__);
 
 	low = 0;
 	high = -1UL;
@@ -251,7 +245,6 @@ drm_gem_cma_get_pages(struct drm_gem_object *gem_obj, int *npages)
 
 	bo = container_of(gem_obj, struct drm_gem_cma_object, gem_obj);
 
-	//printf("%s: bo->m is %p, npages %d\n", __func__, bo->m, bo->npages);
 	*npages = bo->npages;
 
 	return (bo->m);
@@ -261,8 +254,6 @@ void
 drm_gem_cma_free_object(struct drm_gem_object *gem_obj)
 {
 	struct drm_gem_cma_object *bo;
-
-//printf("%s\n", __func__);
 
 	bo = container_of(gem_obj, struct drm_gem_cma_object, gem_obj);
 	drm_gem_free_mmap_offset(gem_obj);
@@ -283,8 +274,6 @@ drm_gem_cma_dumb_create(struct drm_file *file, struct drm_device *drm_dev,
 {
 	struct drm_gem_cma_object *bo;
 	int rv;
-
-//printf("%s\n", __func__);
 
 	args->pitch = args->width * args->bpp / 8;
 	args->size = args->height * args->pitch;
@@ -326,16 +315,11 @@ drm_gem_cma_create(struct drm_device *drm, size_t size, struct drm_gem_cma_objec
 
 	size = round_page(size);
 	rv = drm_gem_object_init(drm, &bo->gem_obj, size);
-
-//printf("%s: gem obj %p\n", __func__, &bo->gem_obj);
-
-#if 1
 	if (rv != 0) {
 		DRM_ERROR("%s: drm_gem_object_init failed\n", __func__);
 		free(bo, DRM_MEM_DRIVER);
 		return (rv);
 	}
-#endif
 	rv = drm_gem_create_mmap_offset(&bo->gem_obj);
 	if (rv != 0) {
 		DRM_ERROR("%s: drm_gem_create_mmap_offset failed\n", __func__);
@@ -347,7 +331,6 @@ drm_gem_cma_create(struct drm_device *drm, size_t size, struct drm_gem_cma_objec
 	rv = drm_gem_cma_alloc(drm, bo);
 	if (rv != 0) {
 		DRM_ERROR("%s: drm_gem_cma_alloc failed\n", __func__);
-		printf("%s: drm_gem_cma_alloc failed\n", __func__);
 		drm_gem_cma_free_object(&bo->gem_obj);
 		return (rv);
 	}
