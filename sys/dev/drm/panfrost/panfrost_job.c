@@ -559,6 +559,7 @@ panfrost_job_cleanup(struct panfrost_job *job)
 	}
 
 	if (job->bos) {
+		/* Release references obtained in panfrost_lookup_bos(). */
 		for (i = 0; i < job->bo_count; i++) {
 			bo = job->bos[i];
 			dev = bo->dev;
