@@ -69,10 +69,6 @@ struct panfrost_features {
 	uint64_t		hw_issues;
 };
 
-struct panfrost_slot {
-	int running;
-};
-
 struct panfrost_job;
 
 struct panfrost_softc {
@@ -91,9 +87,7 @@ struct panfrost_softc {
 	struct mtx			mmu_lock;
 
 	struct mtx			job_lock;
-	struct panfrost_slot		slot_status[3];
 	struct panfrost_job		*jobs[3];
-	int running;
 	int job_count;
 	struct panfrost_job_slot *js;
 	struct mtx			sched_lock;
