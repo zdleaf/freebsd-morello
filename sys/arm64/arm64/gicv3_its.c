@@ -977,7 +977,6 @@ gicv3_its_pre_ithread(device_t dev, struct intr_irqsrc *isrc)
 
 	sc = device_get_softc(dev);
 	girq = (struct gicv3_its_irqsrc *)isrc;
-	gicv3_its_disable_intr(dev, isrc);
 	gic_icc_write(EOIR1, girq->gi_lpi + GIC_FIRST_LPI);
 }
 
@@ -985,7 +984,6 @@ static void
 gicv3_its_post_ithread(device_t dev, struct intr_irqsrc *isrc)
 {
 
-	gicv3_its_enable_intr(dev, isrc);
 }
 
 static void
