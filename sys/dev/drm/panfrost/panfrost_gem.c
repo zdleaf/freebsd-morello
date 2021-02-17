@@ -685,7 +685,7 @@ panfrost_gem_prime_import_sg_table(struct drm_device *dev,
 	/*
 	 * TODO (hack): take additional reference so DRM is happy.
 	 * Not sure where it should be.
-	 *
+	 */
 	drm_gem_object_get(obj);
 
 	//printf("%s: obj %p rc %d\n", __func__, obj, kref_read(&obj->refcount));
