@@ -117,6 +117,7 @@ panfrost_gem_free_object(struct drm_gem_object *obj)
 
 	drm_gem_object_release(obj);
 
+	//printf("%s: obj %p\n", __func__, &bo->base);
 	free(bo, M_PANFROST2);
 }
 
@@ -518,6 +519,7 @@ dprintf("%s\n", __func__);
 		obj->is_heap = true;
 
 	error = drm_gem_handle_create(file, &obj->base, handle);
+	/* Drop reference from object_init(), handle holds it now. */
 	panfrost_gem_object_put(obj);
 	if (error) {
 		printf("Failed to create handle\n");
@@ -666,6 +668,7 @@ panfrost_gem_prime_import_sg_table(struct drm_device *dev,
     struct dma_buf_attachment *attach, struct sg_table *sgt)
 {
 	struct panfrost_gem_object *bo;
+	struct drm_gem_object *obj;
 	size_t size;
 
 	dprintf("%s: size %d\n", __func__, attach->dmabuf->size);
@@ -677,5 +680,15 @@ panfrost_gem_prime_import_sg_table(struct drm_device *dev,
 	bo->noexec = true;
 	/* TODO: bo->npages = ? */
 
-	return (&bo->base);
+	obj = &bo->base;
+
+	/*
+	 * TODO (hack): take additional reference so DRM is happy.
+	 * Not sure where it should be.
+	 *
+	drm_gem_object_get(obj);
+
+	//printf("%s: obj %p rc %d\n", __func__, obj, kref_read(&obj->refcount));
+
+	return (obj);
 }
