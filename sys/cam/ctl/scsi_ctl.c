@@ -1491,6 +1491,7 @@ ctlfedone(struct cam_periph *periph, union ccb *done_ccb)
 			ctlfe_free_ccb(periph, done_ccb);
 			goto out;
 		}
+		mtx_unlock(mtx);
 		if (send_ctl_io != 0) {
 			ctl_queue(io);
 		} else {
@@ -1498,7 +1499,7 @@ ctlfedone(struct cam_periph *periph, union ccb *done_ccb)
 			done_ccb->ccb_h.func_code = XPT_NOTIFY_ACKNOWLEDGE;
 			xpt_action(done_ccb);
 		}
-		break;
+		return;
 	}
 	case XPT_NOTIFY_ACKNOWLEDGE:
 		/* Queue this back down to the SIM as an immediate notify. */
@@ -1909,7 +1910,7 @@ ctlfe_datamove(union ctl_io *io)
 	struct ctlfe_lun_softc *softc;
 
 	KASSERT(io->io_hdr.io_type == CTL_IO_SCSI,
-	    ("Unexpected io_type (%d) in ctlfe_datamove", io->io_hdr.io_type));
+	    ("%s: unexpected I/O type %x", __func__, io->io_hdr.io_type));
 
 	io->scsiio.ext_data_filled = 0;
 	ccb = PRIV_CCB(io);
