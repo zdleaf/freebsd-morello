@@ -36,6 +36,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/module.h>
 #include <sys/rman.h>
 #include <sys/resource.h>
+#include <sys/taskqueue.h>
 #include <machine/bus.h>
 #include <vm/vm.h>
 #include <vm/vm_object.h>
@@ -105,7 +106,6 @@ panfrost_gem_free_object(struct drm_gem_object *obj)
 		for (i = 0; i < bo->npages; i++) {
 			m = bo->pages[i];
 			vm_page_lock(m);
-			pmap_remove_all(m);
 			m->flags &= ~PG_FICTITIOUS;
 			vm_page_unwire_noq(m);
 			vm_page_free(m);
