@@ -36,6 +36,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/module.h>
 #include <sys/rman.h>
 #include <sys/resource.h>
+#include <sys/taskqueue.h>
 #include <machine/bus.h>
 #include <vm/vm.h>
 #include <vm/vm_extern.h>
@@ -65,9 +66,10 @@ __FBSDID("$FreeBSD$");
 #include "panfrost_features.h"
 #include "panfrost_issues.h"
 #include "panfrost_mmu.h"
+#include "panfrost_job.h"
 
 int
-panfrost_device_reset(struct panfrost_softc *sc)
+panfrost_device_soft_reset(struct panfrost_softc *sc)
 {
 	uint32_t reg;
 	int timeout;
@@ -86,6 +88,27 @@ panfrost_device_reset(struct panfrost_softc *sc)
 
 	if (timeout <= 0)
 		return (-1);
+
+	return (0);
+}
+
+int
+panfrost_device_reset(struct panfrost_softc *sc)
+{
+	int error;
+
+	error = panfrost_device_soft_reset(sc);
+	if (error != 0)
+		return (error);
+
+	GPU_WRITE(sc, GPU_CMD, GPU_CMD_CLEAN_CACHES);
+
+	error = panfrost_device_power_on(sc);
+	if (error != 0)
+		return (error);
+
+	panfrost_mmu_reset(sc);
+	panfrost_job_enable_interrupts(sc);
 
 	return (0);
 }
@@ -283,7 +306,7 @@ panfrost_device_init(struct panfrost_softc *sc)
 {
 	int error;
 
-	error = panfrost_device_reset(sc);
+	error = panfrost_device_soft_reset(sc);
 	if (error != 0)
 		return (error);
 

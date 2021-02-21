@@ -65,5 +65,6 @@ void panfrost_job_intr(void *arg);
 int panfrost_job_open(struct panfrost_file *pfile);
 void panfrost_job_put(struct panfrost_job *job);
 void panfrost_job_close(struct panfrost_file *pfile);
+void panfrost_job_enable_interrupts(struct panfrost_softc *sc);
 
 #endif /* !_DEV_DRM_PANFROST_PANFROST_JOB_H_ */

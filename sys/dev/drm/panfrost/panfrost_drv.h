@@ -92,6 +92,7 @@ struct panfrost_softc {
 	struct panfrost_job_slot *js;
 	struct mtx			sched_lock;
 	int job_cnt;
+	struct task			reset_work;
 };
 
 #define	PAN_DEBUG

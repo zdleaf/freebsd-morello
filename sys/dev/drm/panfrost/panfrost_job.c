@@ -36,6 +36,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/module.h>
 #include <sys/rman.h>
 #include <sys/resource.h>
+#include <sys/taskqueue.h>
 #include <machine/bus.h>
 #include <vm/vm.h>
 #include <vm/vm_extern.h>
@@ -72,8 +73,6 @@ __FBSDID("$FreeBSD$");
 
 #define	NUM_JOB_SLOTS	3
 #define	JOB_TIMEOUT_MS	500
-
-static void panfrost_job_enable_interrupts(struct panfrost_softc *sc);
 
 enum panfrost_queue_status {
 	PANFROST_QUEUE_STATUS_ACTIVE,
@@ -127,10 +126,11 @@ panfrost_job_intr(void *arg)
 
 		if (stat & (1 << (16 + i))) {
 			GPU_WRITE(sc, JS_COMMAND_NEXT(i), JS_COMMAND_NOP);
+
 			status = GPU_READ(sc, JS_STATUS(i));
-			dprintf("%s: job error, slot %d status %x\n",
+			printf("%s: job error, slot %d status %x\n",
 			    __func__, i, status);
-			dprintf("%s: head %x tail %x\n", __func__,
+			printf("%s: head %x tail %x\n", __func__,
 			    GPU_READ(sc, JS_HEAD_LO(i)),
 			    GPU_READ(sc, JS_TAIL_LO(i)));
 
@@ -150,8 +150,10 @@ panfrost_job_intr(void *arg)
 			old_status = atomic_cmpxchg(&sc->js->queue[i].status,
 			    PANFROST_QUEUE_STATUS_STARTING,
 			    PANFROST_QUEUE_STATUS_FAULT_PENDING);
-			if (old_status == PANFROST_QUEUE_STATUS_ACTIVE)
+			if (old_status == PANFROST_QUEUE_STATUS_ACTIVE) {
+				printf("%s: fault\n", __func__);
 				drm_sched_fault(&sc->js->queue[i].sched);
+			}
 		}
 
 		if (stat & (1 << i)) {
@@ -247,6 +249,8 @@ panfrost_job_hw_submit(struct panfrost_job *job, int slot)
 	dprintf("%s: HW submitting job %d to slot %d, jc %lx\n",
 	    __func__, sc->job_count++, slot, jc_head);
 
+	//printf(".%d", slot);
+
 	status = GPU_READ(sc, JS_COMMAND_NEXT(slot));
 	if (status)
 		panic("fault");
@@ -273,7 +277,6 @@ panfrost_job_hw_submit(struct panfrost_job *job, int slot)
 	if (panfrost_has_hw_feature(sc, HW_FEATURE_FLUSH_REDUCTION))
 		GPU_WRITE(sc, JS_FLUSH_ID_NEXT(slot), job->flush_id);
 
-	wmb();
 	GPU_WRITE(sc, JS_COMMAND_NEXT(slot), JS_COMMAND_START);
 	wmb();
 
@@ -339,7 +342,7 @@ panfrost_job_push(struct panfrost_job *job)
 	return (0);
 }
 
-static void
+void
 panfrost_job_enable_interrupts(struct panfrost_softc *sc)
 {
 	uint32_t irq_msk;
@@ -503,6 +506,23 @@ panfrost_job_run(struct drm_sched_job *sched_job)
 	return (fence);
 }
 
+static void
+panfrost_scheduler_start(struct panfrost_queue_state *queue)
+{
+	enum panfrost_queue_status old_status;
+
+	mtx_lock(&queue->lock);
+	old_status = atomic_xchg(&queue->status, PANFROST_QUEUE_STATUS_STARTING);
+
+	queue->sched.timeout = msecs_to_jiffies(JOB_TIMEOUT_MS);
+	drm_sched_resubmit_jobs(&queue->sched);
+	drm_sched_start(&queue->sched, true);
+	old_status = atomic_xchg(&queue->status, PANFROST_QUEUE_STATUS_ACTIVE);
+	if (old_status == PANFROST_QUEUE_STATUS_FAULT_PENDING)
+		drm_sched_fault(&queue->sched);
+	mtx_unlock(&queue->lock);
+}
+
 static int
 panfrost_scheduler_stop(struct panfrost_queue_state *queue,
     struct drm_sched_job *job)
@@ -537,15 +557,20 @@ panfrost_job_timedout(struct drm_sched_job *sched_job)
 	sc = job->sc;
 
 	stat = GPU_READ(sc, JOB_INT_STAT);
-	printf("%s: stat %x\n", __func__, stat);
+	printf("%s: job %d, stat %x\n", __func__, job->slot, stat);
 
-	if (dma_fence_is_signaled(job->done_fence))
+	if (dma_fence_is_signaled(job->done_fence)) {
+		printf("%s: done fence is signalled\n", __func__);
 		return;
+	}
 
-	if (!panfrost_scheduler_stop(&sc->js->queue[job->slot], sched_job))
+printf("%s: 1\n", __func__);
+	if (!panfrost_scheduler_stop(&sc->js->queue[job->slot], sched_job)) {
+		printf("%s: could not stop scheduler\n", __func__);
 		return;
+	}
 
-	/* reset GPU */
+	taskqueue_enqueue(taskqueue_thread, &sc->reset_work);
 }
 
 static void
@@ -645,6 +670,45 @@ static const struct drm_sched_backend_ops panfrost_sched_ops = {
 	.free_job = panfrost_job_free
 };
 
+static void
+panfrost_reset(void *arg, int pending)
+{
+	struct panfrost_softc *sc;
+	int error;
+	int i;
+
+	sc = arg;
+
+printf("%s: 2\n", __func__);
+	/* reset GPU */
+	for (i = 0; i < NUM_JOB_SLOTS; i++) {
+		sc->js->queue[i].sched.timeout = MAX_SCHEDULE_TIMEOUT - 1;
+printf("%s: 3\n", __func__);
+		cancel_delayed_work_sync(&sc->js->queue[i].sched.work_tdr);
+printf("%s: 4\n", __func__);
+		panfrost_scheduler_stop(&sc->js->queue[i], NULL);
+printf("%s: 5\n", __func__);
+	}
+
+	mtx_lock(&sc->job_lock);
+	for (i = 0; i < NUM_JOB_SLOTS; i++) {
+		if (sc->jobs[i])
+			sc->jobs[i] = NULL;
+	}
+	mtx_unlock(&sc->job_lock);
+
+printf("%s: 6\n", __func__);
+
+	error = panfrost_device_reset(sc);
+	if (error != 0)
+		printf("%s: could not reset device\n", __func__);
+
+	for (i = 0; i < NUM_JOB_SLOTS; i++) {
+		printf("%s: restarting scheduler %d\n", __func__, i);
+		panfrost_scheduler_start(&sc->js->queue[i]);
+	}
+}
+
 int
 panfrost_job_init(struct panfrost_softc *sc)
 {
@@ -652,6 +716,8 @@ panfrost_job_init(struct panfrost_softc *sc)
 	int error, i;
 
 	sc->js = js = malloc(sizeof(*js), M_PANFROST, M_ZERO | M_WAITOK);
+
+	TASK_INIT(&sc->reset_work, 0, panfrost_reset, sc);
 
 	spin_lock_init(&js->job_lock);
 
