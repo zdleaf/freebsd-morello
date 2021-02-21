@@ -3839,7 +3839,6 @@ pmap_gremove(pmap_t pmap, vm_offset_t va)
 	if (pte != NULL) {
 		pmap_resident_count_dec(pmap, 1);
 		pmap_clear(pte);
-		cpu_dcache_wbinv_range((uint64_t)pte, 8);
 		rc = KERN_SUCCESS;
 	} else
 		rc = KERN_FAILURE;
