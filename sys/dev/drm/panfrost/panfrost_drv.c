@@ -142,7 +142,7 @@ panfrost_open(struct drm_device *dev, struct drm_file *file)
 	struct panfrost_softc *sc;
 	int error;
 
-	printf("%s\n", __func__);
+	dprintf("%s\n", __func__);
 
 	sc = dev->dev_private;
 
@@ -177,7 +177,7 @@ panfrost_postclose(struct drm_device *dev, struct drm_file *file)
 {
 	struct panfrost_file *pfile;
 
-	printf("%s\n", __func__);
+	dprintf("%s\n", __func__);
 
 	pfile = file->driver_priv;
 

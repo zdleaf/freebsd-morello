@@ -498,7 +498,7 @@ panfrost_gem_create_object_with_handle(struct drm_file *file,
 dprintf("%s\n", __func__);
 
 	if (size != PAGE_ALIGN(size))
-		printf("%s: size %x new size %x\n", __func__,
+		dprintf("%s: size %x new size %x\n", __func__,
 		    size, PAGE_ALIGN(size));
 
 	size = PAGE_ALIGN(size);
