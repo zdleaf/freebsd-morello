@@ -36,6 +36,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/module.h>
 #include <sys/rman.h>
 #include <sys/resource.h>
+#include <sys/taskqueue.h>
 #include <machine/bus.h>
 #include <vm/vm.h>
 #include <vm/vm_extern.h>
@@ -254,7 +255,7 @@ panfrost_mmu_fault(struct panfrost_softc *sc, int as)
 
 	if ((exception_type & 0xF8) == 0xC0) {
 		printf("%s: page fault at %lx\n", __func__, addr);
-		panfrost_mmu_page_fault(sc, as, addr);
+		//panfrost_mmu_page_fault(sc, as, addr);
 	} else
 		dprintf("%s: %s fault at %lx\n", __func__,
 		    panfrost_mmu_exception_name(exception_type), addr);
@@ -441,9 +442,6 @@ panfrost_mmu_enable(struct panfrost_softc *sc, struct panfrost_mmu *mmu)
 
 	mmu_hw_do_operation_locked(sc, as, 0, ~0UL, AS_COMMAND_FLUSH_MEM);
 
-	dmb(sy);
-	wmb();
-
 	GPU_WRITE(sc, AS_TRANSTAB_LO(as), paddr & 0xffffffffUL);
 	GPU_WRITE(sc, AS_TRANSTAB_HI(as), paddr >> 32);
 
@@ -451,8 +449,6 @@ panfrost_mmu_enable(struct panfrost_softc *sc, struct panfrost_mmu *mmu)
 	GPU_WRITE(sc, AS_MEMATTR_HI(as), memattr >> 32);
 
 	write_cmd(sc, as, AS_COMMAND_UPDATE);
-
-	wmb();
 
 	return (0);
 }
@@ -471,12 +467,13 @@ panfrost_mmu_as_get(struct panfrost_softc *sc, struct panfrost_mmu *mmu)
 	bool found;
 	int as;
 
+	mtx_lock_spin(&sc->as_mtx);
 	if (mmu->as >= 0) {
 		atomic_add_int(&mmu->as_count, 1);
+		mtx_unlock_spin(&sc->as_mtx);
 		return (mmu->as);
 	}
 
-	mtx_lock_spin(&sc->as_mtx);
 	as = ffz(sc->as_alloc_set);
 
 	if ((sc->features.as_present & (1 << as)) == 0) {
@@ -503,9 +500,9 @@ panfrost_mmu_as_get(struct panfrost_softc *sc, struct panfrost_mmu *mmu)
 	//printf("%s: new as %d\n", __func__, as);
 
 	TAILQ_INSERT_TAIL(&sc->mmu_in_use, mmu, next);
-	mtx_unlock_spin(&sc->as_mtx);
 
 	panfrost_mmu_enable(sc, mmu);
+	mtx_unlock_spin(&sc->as_mtx);
 
 	return (as);
 }
@@ -578,8 +575,6 @@ panfrost_mmu_map(struct panfrost_softc *sc,
 	}
 
 	mapping->active = true;
-
-	wmb();
 
 	panfrost_mmu_flush_range(sc, mmu, sva, va - sva);
 
