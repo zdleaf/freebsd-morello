@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2020 Ruslan Bukin <br@bsdpad.com>
+ * Copyright (c) 2020-2021 Ruslan Bukin <br@bsdpad.com>
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -65,7 +65,6 @@ __FBSDID("$FreeBSD$");
 #include <drm/drm_utils.h>
 #include <drm/gpu_scheduler.h>
 
-#include "fb_if.h"
 #include "panfrost_drm.h"
 #include "panfrost_drv.h"
 #include "panfrost_device.h"
@@ -896,6 +895,7 @@ panfrost_attach(device_t dev)
 {
 	struct panfrost_softc *sc;
 	phandle_t node;
+	uint64_t rate;
 	int err;
 
 	sc = device_get_softc(dev);
@@ -945,7 +945,6 @@ panfrost_attach(device_t dev)
 		return (ENXIO);
 	}
 
-	uint64_t rate;
 	clk_get_freq(sc->clk, &rate);
 
 	device_printf(dev, "Mali GPU clock rate %jd Hz\n", rate);
@@ -989,11 +988,5 @@ static driver_t panfrost_driver = {
 
 static devclass_t panfrost_devclass;
 
-EARLY_DRIVER_MODULE(panfrost, simplebus, panfrost_driver, panfrost_devclass, 0, 0, BUS_PASS_INTERRUPT + BUS_PASS_ORDER_LAST);
-
-#if 0
-/* Bindings for fbd device. */
-extern devclass_t fbd_devclass;
-extern driver_t fbd_driver;
-DRIVER_MODULE(fbd, panfrost, fbd_driver, fbd_devclass, 0, 0);
-#endif
+EARLY_DRIVER_MODULE(panfrost, simplebus, panfrost_driver, panfrost_devclass, 0, 0,
+    BUS_PASS_INTERRUPT + BUS_PASS_ORDER_LAST);

@@ -1,7 +1,7 @@
 /*-
  * SPDX-License-Identifier: BSD-2-Clause
  *
- * Copyright (c) 2020 Ruslan Bukin <br@bsdpad.com>
+ * Copyright (c) 2020-2021 Ruslan Bukin <br@bsdpad.com>
  *
  * This work was supported by Innovate UK project 105694, "Digital Security
  * by Design (DSbD) Technology Platform Prototype".
@@ -59,10 +59,10 @@ struct panfrost_job {
 	u_int				refcount;
 };
 
+int panfrost_job_open(struct panfrost_file *pfile);
 int panfrost_job_push(struct panfrost_job *job);
 int panfrost_job_init(struct panfrost_softc *sc);
 void panfrost_job_intr(void *arg);
-int panfrost_job_open(struct panfrost_file *pfile);
 void panfrost_job_put(struct panfrost_job *job);
 void panfrost_job_close(struct panfrost_file *pfile);
 void panfrost_job_enable_interrupts(struct panfrost_softc *sc);
