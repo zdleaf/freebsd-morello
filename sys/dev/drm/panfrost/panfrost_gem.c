@@ -453,7 +453,7 @@ static const struct drm_gem_object_funcs panfrost_gem_funcs = {
 };
 
 static struct panfrost_gem_object *
-panfrost_gem_create_object0(struct drm_device *dev, size_t size, bool private)
+panfrost_gem_create_object(struct drm_device *dev, size_t size, bool private)
 {
 	struct panfrost_gem_object *obj;
 	int error;
@@ -510,7 +510,7 @@ dprintf("%s\n", __func__);
 	if (flags & PANFROST_BO_HEAP)
 		size = roundup(size, SZ_2M);
 
-	obj = panfrost_gem_create_object0(dev, size, false);
+	obj = panfrost_gem_create_object(dev, size, false);
 	if (obj == NULL) {
 		printf("%s: Failed to create obj 0\n", __func__);
 		return (NULL);
@@ -652,21 +652,6 @@ retry:
 	return (0);
 }
 
-#if 0
-static struct drm_gem_object *
-panfrost_gem_create_object(struct drm_device *dev, size_t size)
-{
-	struct panfrost_gem_object *obj;
-
-	obj = malloc(sizeof(*obj), M_PANFROST, M_ZERO | M_WAITOK);
-	obj->base.funcs = &panfrost_gem_funcs;
-	TAILQ_INIT(&obj->mappings);
-	mtx_init(&obj->mappings_lock, "mappings", NULL, MTX_DEF);
-
-	return (&obj->base);
-}
-#endif
-
 struct drm_gem_object *
 panfrost_gem_prime_import_sg_table(struct drm_device *dev,
     struct dma_buf_attachment *attach, struct sg_table *sgt)
@@ -679,7 +664,7 @@ panfrost_gem_prime_import_sg_table(struct drm_device *dev,
 
 	size = PAGE_ALIGN(attach->dmabuf->size);
 
-	bo = panfrost_gem_create_object0(dev, size, true);
+	bo = panfrost_gem_create_object(dev, size, true);
 	bo->sgt = sgt;
 	bo->noexec = true;
 	/* TODO: bo->npages = ? */

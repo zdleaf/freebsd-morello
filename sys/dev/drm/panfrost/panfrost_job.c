@@ -137,20 +137,9 @@ panfrost_job_intr(void *arg)
 			printf("%s: head %x tail %x\n", __func__,
 			    GPU_READ(sc, JS_HEAD_LO(i)),
 			    GPU_READ(sc, JS_TAIL_LO(i)));
-
-			//drm_sched_fault(&sc->js->queue[i].sched);
-
 			printf("%s: job at slot %d completed with error\n",
 			    __func__, i);
 
-#if 0
-			panic("error");
-
-			mtx_lock(&sc->job_lock);
-			job = sc->jobs[i];
-			dma_fence_signal_locked(job->done_fence);
-			mtx_unlock(&sc->job_lock);
-#endif
 			old_status = atomic_cmpxchg(&sc->js->queue[i].status,
 			    PANFROST_QUEUE_STATUS_STARTING,
 			    PANFROST_QUEUE_STATUS_FAULT_PENDING);
@@ -161,8 +150,6 @@ panfrost_job_intr(void *arg)
 		}
 
 		if (stat & (1 << i)) {
-
-			//printf(".");
 			dprintf("%s: job at slot %d completed\n", __func__, i);
 			mtx_lock(&sc->job_lock);
 
@@ -296,8 +283,6 @@ panfrost_attach_object_fences(struct drm_gem_object **bos,
 	for (i = 0; i < bo_count; i++)
 		reservation_object_add_excl_fence(bos[i]->resv, fence);
 }
-
-int flag = 0;
 
 int
 panfrost_job_push(struct panfrost_job *job)
