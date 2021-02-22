@@ -1,5 +1,10 @@
 /*-
- * Copyright (c) 2020 M. Warner Losh <imp@FreeBSD.org>
+ * SPDX-License-Identifier: BSD-2-Clause
+ *
+ * Copyright 2018-2020 Alex Richardson <arichardson@FreeBSD.org>
+ *
+ * This work was supported by Innovate UK project 105694, "Digital Security by
+ * Design (DSbD) Technology Platform Prototype".
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -21,25 +26,14 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
  */
-#include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
-/*
- * Small amount of shim code needed to get zfs_zstd.c to compile. These items
- * here should all be defined in the SPL or as part of libstand somewhere, but
- * aren't for reasons that haven't been tracked down yet. Ideally, they would
- * all go away and we'd compile zfs_zstd.c directly. Based on an original by
- * Matt Macey, but only the #include remains untouched from that.
- */
-
-#define ZFS_MODULE_PARAM_ARGS void
-typedef int boolean_t;	/* This one may be tough to get rid of */
-
-/* TODO: openzfs/include/sys/uio_impl.h must not be included */
-#ifndef _SYS_UIO_IMPL_H
-#define _SYS_UIO_IMPL_H
-#endif
-
-#include <contrib/openzfs/module/zstd/zfs_zstd.c>
+#pragma once
+/* Ensure that struct denode uses the local m_buf structure and not sys/buf.h */
+#define buf m_buf
+struct vn_clusterw {
+	/* Not interesting for msdosfs makefs. */
+};
+#include "../ffs/buf.h"
+/* struct direntry needs to be defined to included denode.h */
+#include "msdos/direntry.h"
+#include <fs/msdosfs/denode.h>
