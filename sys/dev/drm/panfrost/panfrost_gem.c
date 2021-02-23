@@ -78,11 +78,6 @@ __FBSDID("$FreeBSD$");
 #include "panfrost_issues.h"
 #include "panfrost_mmu.h"
 
-#if 0
-static int free_cnt = 0;
-static int get_cnt = 0;
-#endif
-
 static void
 panfrost_gem_free_object(struct drm_gem_object *obj)
 {
@@ -104,9 +99,6 @@ panfrost_gem_free_object(struct drm_gem_object *obj)
 	}
 
 	if (bo->pages) {
-		//printf("%s: (cnt %d), free %d pages\n", __func__, free_cnt++,
-		//    bo->npages);
-
 		for (i = 0; i < bo->npages; i++) {
 			m = bo->pages[i];
 			vm_page_lock(m);
@@ -121,7 +113,6 @@ panfrost_gem_free_object(struct drm_gem_object *obj)
 
 	drm_gem_object_release(obj);
 
-	//printf("%s: obj %p\n", __func__, &bo->base);
 	free(bo, M_PANFROST2);
 }
 
@@ -212,12 +203,6 @@ panfrost_gem_close(struct drm_gem_object *obj, struct drm_file *file_priv)
 	pfile = file_priv->driver_priv;
 	bo = (struct panfrost_gem_object *)obj;
 	result = NULL;
-
-	if (bo->sgt) {
-		sg_free_table(bo->sgt);
-		kfree(bo->sgt);
-		bo->sgt = NULL;
-	}
 
 	mtx_lock(&bo->mappings_lock);
 	TAILQ_FOREACH_SAFE(mapping, &bo->mappings, next, tmp) {
@@ -623,8 +608,6 @@ panfrost_gem_get_pages(struct panfrost_gem_object *bo)
 	pflags = VM_ALLOC_NORMAL | VM_ALLOC_NOOBJ | VM_ALLOC_NOBUSY |
 	    VM_ALLOC_WIRED | VM_ALLOC_ZERO;
 	memattr = VM_MEMATTR_WRITE_COMBINING;
-
-//printf("%s %d (cnt %d) alloc %d pages\n", __func__, get_cnt++, npages);
 
 	m0 = malloc(sizeof(vm_page_t *) * npages, M_PANFROST, M_WAITOK | M_ZERO);
 	bo->pages = m0;
