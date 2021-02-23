@@ -304,7 +304,7 @@ dma_fence_ensure_signal_enabled(struct dma_fence *fence)
 	if (test_and_set_bit(DMA_FENCE_FLAG_ENABLE_SIGNAL_BIT, &fence->flags))
 		return 0;
 
-	if (!fence->ops->enable_signaling)
+	if (fence->ops->enable_signaling == NULL)
 		return 0;
 
 	/* Otherwise, note that we've called it and call it.  */
