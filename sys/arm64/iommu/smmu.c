@@ -289,7 +289,7 @@ smmu_write_ack(struct smmu_softc *sc, uint32_t reg,
 		v = bus_read_4(sc->res[0], reg_ack);
 		if (v == val)
 			break;
-		DELAY(10);
+		DELAY(100);
 	} while (timeout--);
 
 	if (timeout <= 0) {
