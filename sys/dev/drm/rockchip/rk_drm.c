@@ -110,40 +110,6 @@ rockchip_gem_prime_import_sg_table(struct drm_device *drm,
 	return (NULL);
 }
 
-#if 0
-static void
-rk_gem_vm_open(struct vm_area_struct *vma)
-{
-
-	printf("%s\n", __func__);
-	drm_gem_vm_open(vma);
-}
-
-static void
-rk_gem_vm_close(struct vm_area_struct *vma)
-{
-
-	printf("%s\n", __func__);
-	drm_gem_vm_close(vma);
-}
-
-static vm_fault_t
-rk_gem_fault(struct vm_area_struct *vma, struct vm_fault *vmf)
-{
-
-	printf("%s\n", __func__);
-	panic("ok");
-
-	return (0);
-}
-
-static const struct vm_operations_struct rk_gem_vm_ops = {
-	.fault = rk_gem_fault,
-	.open = rk_gem_vm_open,
-	.close = rk_gem_vm_close,
-};
-#endif
-
 static int
 rockchip_drm_gem_object_mmap(struct drm_gem_object *obj,
     struct vm_area_struct *vma)
