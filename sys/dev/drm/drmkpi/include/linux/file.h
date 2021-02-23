@@ -118,8 +118,6 @@ fd_install(unsigned int fd, struct file *filp)
 	p = curthread->td_proc;
 	fdp = p->p_fd;
 
-//printf("%s installing fd %d for pid %d\n", __func__, fd, p->p_pid);
-
 	FILEDESC_XLOCK(fdp);
 	fdt = atomic_load_ptr(&fdp->fd_files);
 	fde = &fdt->fdt_ofiles[fd];
@@ -138,16 +136,9 @@ static inline void
 fput(struct file *file)
 {
 
-	//printf("%s\n", __func__);
-
 	if (refcount_release(&file->f_count)) {
-		if (file->f_ops != NULL) {
-			//printf("%s drop\n", __func__);
+		if (file->f_ops != NULL)
 			_fdrop(file, curthread);
-		} else {
-			//printf("no ops\n");
-			//panic("aa");
-		}
 //		else
 //			vm_object_deallocate(filp->f_shmem);
 	}
