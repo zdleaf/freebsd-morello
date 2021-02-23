@@ -286,9 +286,12 @@ panfrost_gem_fault(struct vm_area_struct *vma, struct vm_fault *vmf)
 {
 	struct panfrost_gem_object *bo;
 	struct drm_gem_object *gem_obj;
-	vm_object_t obj;
-	vm_pindex_t pidx;
+	struct scatterlist *sg;
+	struct sg_table *sgt;
 	struct page *page;
+	vm_pindex_t pidx;
+	vm_object_t obj;
+	int count;
 	int len;
 	int i;
 
@@ -297,10 +300,6 @@ panfrost_gem_fault(struct vm_area_struct *vma, struct vm_fault *vmf)
 	bo = (struct panfrost_gem_object *)gem_obj;
 
 	pidx = OFF_TO_IDX(vmf->address - vma->vm_start);
-
-	struct scatterlist *sg;
-	struct sg_table *sgt;
-	int count;
 
 	sgt = bo->sgt;
 
@@ -356,18 +355,18 @@ static void
 panfrost_gem_vm_open(struct vm_area_struct *vma)
 {
 
-	dprintf("%s\n", __func__);
 	drm_gem_vm_open(vma);
 }
 
 static void
 panfrost_gem_vm_close(struct vm_area_struct *vma)
 {
+#if 0
 	struct drm_gem_object *obj;
 
 	obj = vma->vm_private_data;
+#endif
 
-	dprintf("%s\n", __func__);
 	drm_gem_vm_close(vma);
 }
 
