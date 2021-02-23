@@ -210,7 +210,7 @@ panfrost_gem_close(struct drm_gem_object *obj, struct drm_file *file_priv)
 }
 
 void
-drm_gem_shmem_print_info(struct drm_printer *p, unsigned int indent,
+panfrost_gem_print_info(struct drm_printer *p, unsigned int indent,
     const struct drm_gem_object *obj)
 {
 
@@ -223,27 +223,28 @@ panfrost_gem_pin(struct drm_gem_object *obj)
 	return (0);
 }
 
-void drm_gem_shmem_unpin(struct drm_gem_object *obj)
+void
+panfrost_gem_unpin(struct drm_gem_object *obj)
 {
 
 }
 
 struct sg_table *
-drm_gem_shmem_get_sg_table(struct drm_gem_object *obj)
+panfrost_gem_get_sg_table(struct drm_gem_object *obj)
 {
 
 	return (NULL);
 }
 
 void *
-drm_gem_shmem_vmap(struct drm_gem_object *obj)
+panfrost_gem_vmap(struct drm_gem_object *obj)
 {
 
 	return (0);
 }
 
 void
-drm_gem_shmem_vunmap(struct drm_gem_object *obj, void *vaddr)
+panfrost_gem_vunmap(struct drm_gem_object *obj, void *vaddr)
 {
 
 }
@@ -352,7 +353,7 @@ dma_buf_mmap(struct dma_buf *dmabuf, struct vm_area_struct *vma,
 }
 
 int
-drm_gem_shmem_mmap(struct drm_gem_object *obj, struct vm_area_struct *vma)
+panfrost_gem_mmap(struct drm_gem_object *obj, struct vm_area_struct *vma)
 {
 	struct panfrost_gem_object *bo;
 	struct drm_device *dev;
@@ -393,13 +394,13 @@ static const struct drm_gem_object_funcs panfrost_gem_funcs = {
 	.free = panfrost_gem_free_object,
 	.open = panfrost_gem_open,
 	.close = panfrost_gem_close,
-	.print_info = drm_gem_shmem_print_info,
+	.print_info = panfrost_gem_print_info,
 	.pin = panfrost_gem_pin,
-	.unpin = drm_gem_shmem_unpin,
-	.get_sg_table = drm_gem_shmem_get_sg_table,
-	.vmap = drm_gem_shmem_vmap,
-	.vunmap = drm_gem_shmem_vunmap,
-	.mmap = drm_gem_shmem_mmap,
+	.unpin = panfrost_gem_unpin,
+	.get_sg_table = panfrost_gem_get_sg_table,
+	.vmap = panfrost_gem_vmap,
+	.vunmap = panfrost_gem_vunmap,
+	.mmap = panfrost_gem_mmap,
 };
 
 static struct panfrost_gem_object *
