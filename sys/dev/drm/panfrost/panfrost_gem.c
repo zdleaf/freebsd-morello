@@ -135,7 +135,6 @@ panfrost_gem_open(struct drm_gem_object *obj, struct drm_file *file_priv)
 	mapping->obj = bo;
 	mapping->mmu = &pfile->mmu;
 	refcount_init(&mapping->refcount, 1);
-	//printf("%s: getting obj %p\n", __func__, obj);
 	drm_gem_object_get(obj);
 
 	if (!bo->noexec) {
@@ -146,19 +145,16 @@ panfrost_gem_open(struct drm_gem_object *obj, struct drm_file *file_priv)
 		color = PANFROST_BO_NOEXEC;
 	}
 
-	dprintf("%s\n", __func__);
-
 	mtx_lock_spin(&pfile->mm_lock);
 	error = drm_mm_insert_node_generic(&pfile->mm, &mapping->mmnode,
 	    obj->size >> PAGE_SHIFT, align, color, 0 /* mode */);
 	mtx_unlock_spin(&pfile->mm_lock);
 	if (error) {
-		printf("Failed to insert: sz %d, align %d, color %d, err %d\n",
-		    obj->size >> PAGE_SHIFT, align, color, error);
-		/* put mapping, and obj ?*/
+		printf("%s: Failed to insert: sz %d, align %d, color %d, err %d\n",
+		    __func__, obj->size >> PAGE_SHIFT, align, color, error);
+		/* TODO: put mapping, and obj ?*/
 		return (error);
 	}
-	//printf("%s: Inserted %d kbytes\n", __func__, obj->size / 1024);
 
 	dprintf("%s: mapping->mmnode.start page %lx va %lx\n", __func__,
 	    mapping->mmnode.start, mapping->mmnode.start << PAGE_SHIFT);
@@ -171,16 +167,12 @@ panfrost_gem_open(struct drm_gem_object *obj, struct drm_file *file_priv)
 	if (!bo->is_heap) {
 		error = panfrost_mmu_map(sc, mapping);
 		if (error) {
-			printf("%s: could not map, error %d\n",
-			    __func__, error);
+			printf("%s: could not map, error %d\n", __func__, error);
 			panfrost_gem_mapping_put(mapping);
 			drm_gem_object_put(obj);
-			printf("%s: return %d\n", __func__, error);
 			return (error);
 		}
 	}
-
-	dprintf("%s: return 0\n", __func__);
 
 	mtx_lock(&bo->mappings_lock);
 	TAILQ_INSERT_TAIL(&bo->mappings, mapping, next);
@@ -198,10 +190,9 @@ panfrost_gem_close(struct drm_gem_object *obj, struct drm_file *file_priv)
 	struct panfrost_gem_mapping *tmp;
 	struct panfrost_gem_mapping *result;
 
-	//printf("%s\n", __func__);
-
 	pfile = file_priv->driver_priv;
 	bo = (struct panfrost_gem_object *)obj;
+
 	result = NULL;
 
 	mtx_lock(&bo->mappings_lock);
@@ -223,14 +214,11 @@ drm_gem_shmem_print_info(struct drm_printer *p, unsigned int indent,
     const struct drm_gem_object *obj)
 {
 
-	printf("%s\n", __func__);
 }
 
 static int
 panfrost_gem_pin(struct drm_gem_object *obj)
 {
-
-	printf("%s\n", __func__);
 
 	return (0);
 }
@@ -238,14 +226,11 @@ panfrost_gem_pin(struct drm_gem_object *obj)
 void drm_gem_shmem_unpin(struct drm_gem_object *obj)
 {
 
-	printf("%s\n", __func__);
 }
 
 struct sg_table *
 drm_gem_shmem_get_sg_table(struct drm_gem_object *obj)
 {
-
-	printf("%s\n", __func__);
 
 	return (NULL);
 }
@@ -254,8 +239,6 @@ void *
 drm_gem_shmem_vmap(struct drm_gem_object *obj)
 {
 
-	printf("%s\n", __func__);
-
 	return (0);
 }
 
@@ -263,7 +246,6 @@ void
 drm_gem_shmem_vunmap(struct drm_gem_object *obj, void *vaddr)
 {
 
-	printf("%s\n", __func__);
 }
 
 static vm_fault_t
@@ -318,9 +300,6 @@ panfrost_gem_fault(struct vm_area_struct *vma, struct vm_fault *vmf)
 
 fail_unlock:
 	VM_OBJECT_WUNLOCK(obj);
-	printf("%s: insert failed\n", __func__);
-	panic("failed");
-
 	return (VM_FAULT_SIGBUS);
 }
 
@@ -388,7 +367,6 @@ drm_gem_shmem_mmap(struct drm_gem_object *obj, struct vm_area_struct *vma)
 	if (obj->import_attach) {
 		dev = obj->dev;
 		mutex_lock(&dev->struct_mutex);
-		//printf("%s: refcount %d\n", __func__, kref_read(&obj->refcount));
 		drm_gem_object_put(obj);
 		mutex_unlock(&dev->struct_mutex);
 
@@ -471,7 +449,7 @@ panfrost_gem_create_object_with_handle(struct drm_file *file,
 	struct panfrost_gem_object *obj;
 	int error;
 
-dprintf("%s\n", __func__);
+	dprintf("%s\n", __func__);
 
 	if (size != PAGE_ALIGN(size))
 		dprintf("%s: size %x new size %x\n", __func__,
@@ -498,7 +476,7 @@ dprintf("%s\n", __func__);
 	/* Drop reference from object_init(), handle holds it now. */
 	panfrost_gem_object_put(obj);
 	if (error) {
-		printf("Failed to create handle\n");
+		printf("%s: Failed to create handle\n", __func__);
 		return (NULL);
 	}
 
@@ -622,8 +600,6 @@ panfrost_gem_prime_import_sg_table(struct drm_device *dev,
 	struct panfrost_gem_object *bo;
 	struct drm_gem_object *obj;
 	size_t size;
-
-	dprintf("%s: size %d\n", __func__, attach->dmabuf->size);
 
 	size = PAGE_ALIGN(attach->dmabuf->size);
 
