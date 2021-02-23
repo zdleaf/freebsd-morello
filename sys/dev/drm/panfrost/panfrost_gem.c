@@ -285,6 +285,11 @@ panfrost_gem_fault(struct vm_area_struct *vma, struct vm_fault *vmf)
 	bo = (struct panfrost_gem_object *)gem_obj;
 
 	pidx = OFF_TO_IDX(vmf->address - vma->vm_start);
+	if (pidx >= bo->npages) {
+		printf("%s: error: requested page is out of range (%d/%d)\n",
+		    __func__, pidx, bo->npages);
+		return (VM_FAULT_SIGBUS);
+	}
 
 	sgt = bo->sgt;
 
@@ -308,23 +313,6 @@ panfrost_gem_fault(struct vm_area_struct *vma, struct vm_fault *vmf)
 	VM_OBJECT_WUNLOCK(obj);
 	vma->vm_pfn_first = 0;
 	vma->vm_pfn_count = i;
-
-#if 0
-	if (pidx >= bo->npages) {
-		printf("%s: error: requested page is out of range (%d/%d)\n",
-		    __func__, pidx, bo->npages);
-		return (VM_FAULT_SIGBUS);
-	}
-
-	dprintf("%s: bo %p pidx %d, m %p, pgoff %d\n",
-	    __func__, bo, pidx, m, vmf->pgoff);
-
-	vma->vm_pfn_first = 0;
-	vma->vm_pfn_count = bo->npages;
-
-	dprintf("%s: pidx: %llu, start: 0x%08x, addr: 0x%08lx\n",
-	    __func__, pidx, vma->vm_start, vmf->address);
-#endif
 
 	return (VM_FAULT_NOPAGE);
 
@@ -523,8 +511,6 @@ panfrost_gem_teardown_mapping(struct panfrost_gem_mapping *mapping)
 	struct panfrost_file *pfile;
 	struct panfrost_softc *sc;
 
-	//printf("%s\n", __func__);
-
 	pfile = container_of(mapping->mmu, struct panfrost_file, mmu);
 	sc = pfile->sc;
 
@@ -550,13 +536,8 @@ void
 panfrost_gem_mapping_put(struct panfrost_gem_mapping *mapping)
 {
 
-	//printf("%s: mapping %p rc %d\n",
-	//    __func__, mapping, mapping->refcount);
-
-	if (mapping && refcount_release(&mapping->refcount)) {
-		//printf("release\n");
+	if (mapping && refcount_release(&mapping->refcount))
 		panfrost_gem_mapping_release(mapping);
-	}
 }
 
 struct panfrost_gem_mapping *
@@ -658,8 +639,6 @@ panfrost_gem_prime_import_sg_table(struct drm_device *dev,
 	 * Not sure where it should be.
 	 */
 	drm_gem_object_get(obj);
-
-	//printf("%s: obj %p rc %d\n", __func__, obj, kref_read(&obj->refcount));
 
 	return (obj);
 }
