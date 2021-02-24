@@ -77,8 +77,6 @@ get_unused_fd(void)
 	return (fd);
 }
 
-static int gcnt = 0;
-
 static inline int
 get_unused_fd_flags(int flags)
 {
