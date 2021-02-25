@@ -637,9 +637,6 @@ static struct drm_driver panfrost_drm_driver = {
 	.num_ioctls		= ARRAY_SIZE(panfrost_drm_driver_ioctls),
 	.fops			= &panfrost_drm_driver_fops,
 
-#if 0
-	.gem_create_object	= panfrost_gem_create_object,
-#endif
 	.prime_handle_to_fd	= drm_gem_prime_handle_to_fd,
 	.prime_fd_to_handle	= drm_gem_prime_fd_to_handle,
 	.gem_prime_import_sg_table = panfrost_gem_prime_import_sg_table,
