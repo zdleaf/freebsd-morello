@@ -269,7 +269,6 @@ panfrost_job_hw_submit(struct panfrost_job *job, int slot)
 		GPU_WRITE(sc, JS_FLUSH_ID_NEXT(slot), job->flush_id);
 
 	GPU_WRITE(sc, JS_COMMAND_NEXT(slot), JS_COMMAND_START);
-	wmb();
 
 	dprintf("%s: job %d submitted to HW\n", __func__, sc->job_count - 1);
 }
