@@ -472,10 +472,13 @@ panfrost_job_run(struct drm_sched_job *sched_job)
 	struct panfrost_job *job;
 	struct dma_fence *fence;
 
-	dprintf("%s\n", __func__);
-
 	job = (struct panfrost_job *)sched_job;
+	dprintf("%s: job %p (slot %d)\n", __func__, job, job->slot);
+
 	sc = job->sc;
+
+	if (unlikely(job->base.s_fence->finished.error))
+		return (NULL);
 
 	fence = panfrost_fence_create(sc, job->slot);
 	if (!fence)
@@ -484,9 +487,6 @@ panfrost_job_run(struct drm_sched_job *sched_job)
 	if (job->done_fence)
 		dma_fence_put(job->done_fence);
 	job->done_fence = dma_fence_get(fence);
-
-	//if (unlikely(job->base.s_fence->finished.error))
-	//	return (NULL);
 
 	sc->jobs[job->slot] = job;
 
@@ -546,7 +546,7 @@ panfrost_job_timedout(struct drm_sched_job *sched_job)
 	sc = job->sc;
 
 	stat = GPU_READ(sc, JOB_INT_STAT);
-	printf("%s: job %d, stat %x\n", __func__, job->slot, stat);
+	printf("%s: job %p (slot %d), stat %x\n", __func__, job, job->slot, stat);
 
 	if (dma_fence_is_signaled(job->done_fence)) {
 		printf("%s: done fence is signalled\n", __func__);
@@ -559,7 +559,8 @@ printf("%s: 1\n", __func__);
 		return;
 	}
 
-	taskqueue_enqueue(taskqueue_thread, &sc->reset_work);
+	if (!atomic_swap_int(&sc->reset_pending, 1))
+		taskqueue_enqueue(taskqueue_thread, &sc->reset_work);
 }
 
 static void
@@ -679,6 +680,8 @@ printf("%s: 4\n", __func__);
 printf("%s: 5\n", __func__);
 	}
 
+	sc->reset_pending = 0;
+
 	mtx_lock(&sc->job_lock);
 	for (i = 0; i < NUM_JOB_SLOTS; i++) {
 		if (sc->jobs[i])
@@ -696,6 +699,7 @@ printf("%s: 6\n", __func__);
 		printf("%s: restarting scheduler %d\n", __func__, i);
 		panfrost_scheduler_start(&sc->js->queue[i]);
 	}
+printf("%s: 7\n", __func__);
 }
 
 int

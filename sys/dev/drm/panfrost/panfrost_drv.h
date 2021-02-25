@@ -93,6 +93,7 @@ struct panfrost_softc {
 	struct mtx			sched_lock;
 	int job_cnt;
 	struct task			reset_work;
+	int				reset_pending;
 };
 
 #define	PAN_DEBUG
