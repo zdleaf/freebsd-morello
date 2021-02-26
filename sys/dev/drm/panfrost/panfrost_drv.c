@@ -583,6 +583,8 @@ panfrost_ioctl_madvise(struct drm_device *dev, void *data,
 	struct drm_panfrost_madvise *args;
 	struct drm_gem_object *obj;
 	struct panfrost_gem_object *bo;
+	vm_page_t m;
+	int i;
 
 	dprintf("%s\n", __func__);
 
@@ -594,17 +596,17 @@ panfrost_ioctl_madvise(struct drm_device *dev, void *data,
 		panic("obj not found");
 
 	bo = (struct panfrost_gem_object *)obj;
-	if (args->madv == PANFROST_MADV_DONTNEED) {
-	}
 
-	if (bo->madv >= 0) {
-		bo->madv = args->madv;
+	if (args->madv == PANFROST_MADV_WILLNEED) {
+		if (bo->pages) {
+			for (i = 0; i < bo->npages; i++) {
+				m = bo->pages[i];
+				vm_page_lock(m);
+				pmap_zero_page(m);
+				vm_page_unlock(m);
+			}
+		}
 		args->retained = 1;
-	} else
-		args->retained = 0;
-
-	if (args->retained) {
-		//panic("implement me");
 	}
 
 	mutex_lock(&dev->struct_mutex);
