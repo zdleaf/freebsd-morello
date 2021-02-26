@@ -502,6 +502,31 @@ panfrost_gem_teardown_mapping(struct panfrost_gem_mapping *mapping)
 	mtx_unlock_spin(&pfile->mm_lock);
 }
 
+void
+panfrost_gem_teardown_mappings_locked(struct panfrost_gem_object *bo)
+{
+	struct panfrost_gem_mapping *mapping, *mapping1;
+
+	TAILQ_FOREACH_SAFE(mapping, &bo->mappings, next, mapping1)
+		panfrost_gem_teardown_mapping(mapping);
+}
+
+int
+panfrost_gem_mappings_count(struct panfrost_gem_object *bo)
+{
+	struct panfrost_gem_mapping *mapping;
+	int cnt;
+
+	cnt = 0;
+
+	mtx_lock(&bo->mappings_lock);
+	TAILQ_FOREACH(mapping, &bo->mappings, next)
+		cnt++;
+	mtx_unlock(&bo->mappings_lock);
+
+	return (cnt);
+}
+
 static void
 panfrost_gem_mapping_release(struct panfrost_gem_mapping *mapping)
 {

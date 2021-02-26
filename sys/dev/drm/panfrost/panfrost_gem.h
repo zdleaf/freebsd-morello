@@ -68,5 +68,7 @@ int panfrost_gem_get_pages(struct panfrost_gem_object *bo);
 struct drm_gem_object *
     panfrost_gem_prime_import_sg_table(struct drm_device *dev,
     struct dma_buf_attachment *attach, struct sg_table *sgt);
+void panfrost_gem_teardown_mappings_locked(struct panfrost_gem_object *bo);
+int panfrost_gem_mappings_count(struct panfrost_gem_object *bo);
 
 #endif /* !_DEV_DRM_PANFROST_PANFROST_GEM_H_ */
