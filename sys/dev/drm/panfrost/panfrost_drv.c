@@ -215,19 +215,23 @@ panfrost_copy_in_fences(struct drm_device *dev, struct drm_file *file_priv,
 	handles = malloc(sz, M_PANFROST1, M_WAITOK | M_ZERO);
 
 	error = copyin((void *)args->in_syncs, handles, sz);
-	if (error)
-		panic("could not copy");
+	if (error) {
+		free(job->in_fences, M_PANFROST1);
+		goto done;
+	}
 
 	for (i = 0; i < job->in_fence_count; i++) {
 		error = drm_syncobj_find_fence(file_priv, handles[i], 0, 0,
 		    &job->in_fences[i]);
-		if (error)
-			printf("%s: error %d\n", __func__, error);
+		if (error) {
+			free(job->in_fences, M_PANFROST1);
+			goto done;
+		}
 	}
 
+done:
 	free(handles, M_PANFROST1);
-
-	return (0);
+	return (error);
 }
 
 static int
