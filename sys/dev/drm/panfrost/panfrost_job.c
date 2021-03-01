@@ -187,7 +187,7 @@ panfrost_job_open(struct panfrost_file *pfile)
 		error = drm_sched_entity_init(&pfile->sched_entity[i],
 		    DRM_SCHED_PRIORITY_NORMAL, &sched, 1, NULL);
 		if (error)
-			panic("error");
+			return (error);
 	}
 
 	return (0);
@@ -244,7 +244,7 @@ panfrost_job_hw_submit(struct panfrost_job *job, int slot)
 
 	status = GPU_READ(sc, JS_COMMAND_NEXT(slot));
 	if (status)
-		panic("fault");
+		return;
 
 	cfg = panfrost_mmu_as_get(sc, &job->pfile->mmu);
 
@@ -304,11 +304,11 @@ panfrost_job_push(struct panfrost_job *job)
 	error = drm_gem_lock_reservations(job->bos, job->bo_count,
 	    &acquire_ctx);
 	if (error)
-		panic("could not lock reserv");
+		return (error);
 
 	error = drm_sched_job_init(&job->base, entity, NULL);
 	if (error)
-		panic("could not init job");
+		return (error);
 
 	mtx_lock(&sc->sched_lock);
 	refcount_acquire(&job->refcount);

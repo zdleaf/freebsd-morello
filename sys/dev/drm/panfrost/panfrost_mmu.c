@@ -342,7 +342,7 @@ wait_ready(struct panfrost_softc *sc, uint32_t as)
 	} while (timeout--);
 
 	if (timeout <= 0)
-		panic("failed to read");
+		return (ETIMEDOUT);
 
 	return (0);
 }
@@ -394,7 +394,7 @@ mmu_hw_do_operation_locked(struct panfrost_softc *sc, uint32_t as,
 
 	error = wait_ready(sc, as);
 
-	return (0);
+	return (error);
 }
 
 static int
