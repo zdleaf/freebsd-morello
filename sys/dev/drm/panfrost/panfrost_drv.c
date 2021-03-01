@@ -653,7 +653,7 @@ static struct drm_driver panfrost_drm_driver = {
 	.desc			= "panfrost DRM",
 	.date			= "20201124",
 	.major			= 1,
-	.minor			= 0,
+	.minor			= 1,
 };
 
 static void

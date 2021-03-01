@@ -166,8 +166,6 @@ panfrost_mmu_find_mapping(struct panfrost_softc *sc, int as, uint64_t addr)
 	};
 	goto out;
 
-dprintf("%s: mmu found\n", __func__);
-
 found:
 	pfile = container_of(mmu, struct panfrost_file, mmu);
 
@@ -197,41 +195,48 @@ panfrost_mmu_page_fault(struct panfrost_softc *sc, int as, uint64_t addr)
 {
 	struct panfrost_gem_mapping *bomapping;
 	struct panfrost_gem_object *bo;
+	struct panfrost_mmu *mmu;
+	vm_page_t page;
 	vm_offset_t page_offset;
-	//struct page *pages;
-	//vm_object_t mapping;
+	vm_offset_t sva;
+	vm_offset_t va;
+	vm_paddr_t pa;
+	vm_prot_t prot;
+	int error;
+	int i;
 
-	dprintf("%s: as %d addr %lx\n", __func__, as, addr);
 	bomapping = panfrost_mmu_find_mapping(sc, as, addr);
-	dprintf("%s: bomapping %p\n", __func__, bomapping);
 	if (!bomapping)
 		panic("no bomapping");
 
-	//printf("%s 1\n", __func__);
 	bo = bomapping->obj;
-	//printf("%s 2\n", __func__);
 
 	addr &= ~((uint64_t)2*1024*1024 - 1);
 	page_offset = addr >> PAGE_SHIFT;
 	page_offset -= bomapping->mmnode.start;
 
-	//printf("%s 3\n", __func__);
-	if (bo->sgt == NULL) {
-		printf("no pages\n");
-		panic("no pages");
+	if (bo->pages == NULL) {
+		KASSERT(bo->sgt == NULL, ("pages is NULL, sgt is not NULL"));
+		error = panfrost_gem_get_pages(bo);
+		if (error)
+			return (error);
 	}
 
-#if 0
-	printf("%s: dump %lx\n", __func__, addr);
-	pmap_gfault(&bomapping->mmu->p, addr);
-#endif
+	page = bo->pages[page_offset];
 
-	//printf("%s 5\n", __func__);
-	//mapping = bo->base.filp->f_vnode->v_object;
-	//printf("%s 6\n", __func__);
-	//dprintf("%s: mapping %p\n", __func__, mapping);
-	//struct panfrost_mmu *mmu;
-	//mmu = bomapping->mmu;
+	mmu = bomapping->mmu;
+	prot = VM_PROT_READ | VM_PROT_WRITE;
+
+	va = addr;
+	sva = va;
+
+	for (i = 0; i < 512; i++, page++) {
+		pa = VM_PAGE_TO_PHYS(page);
+		error = pmap_genter(&mmu->p, va, pa, prot, 0);
+		va += PAGE_SIZE;
+	}
+
+	panfrost_mmu_flush_range(sc, mmu, sva, va - sva);
 
 	return (0);
 }
@@ -258,8 +263,8 @@ panfrost_mmu_fault(struct panfrost_softc *sc, int as)
 	source_id = (fault_status >> 16);
 
 	if ((exception_type & 0xF8) == 0xC0) {
-		printf("%s: page fault at %lx\n", __func__, addr);
-		//panfrost_mmu_page_fault(sc, as, addr);
+		//printf("%s: page fault at %lx\n", __func__, addr);
+		panfrost_mmu_page_fault(sc, as, addr);
 	} else
 		dprintf("%s: %s fault at %lx\n", __func__,
 		    panfrost_mmu_exception_name(exception_type), addr);
@@ -279,15 +284,17 @@ panfrost_mmu_intr(void *arg)
 	sc = arg;
 
 	status = GPU_READ(sc, MMU_INT_RAWSTAT);
-	printf("%s: status %x\n", __func__, status);
+	//printf("%s: status %x\n", __func__, status);
 
 	for (i = 0; status != 0; i++) {
 		if (status & (1 << i)) {
 			panfrost_mmu_fault(sc, i);
 			status &= ~(1 << i);
 		}
-		if (status & (1 << (16 + i)))
+		if (status & (1 << (16 + i))) {
+			printf("mmu error\n");
 			panic("error");
+		}
 		GPU_WRITE(sc, MMU_INT_CLEAR, (1 << i) | (1 << (i + 16)));
 	}
 }
