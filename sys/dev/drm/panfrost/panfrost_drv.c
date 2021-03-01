@@ -251,16 +251,16 @@ panfrost_lookup_bos(struct drm_device *dev, struct drm_file *file_priv,
 	if (job->bo_count == 0)
 		return (0);
 
-dprintf("bo count %d\n", job->bo_count);
-
 	sz = job->bo_count * sizeof(struct dma_fence *);
 	job->implicit_fences = malloc(sz, M_PANFROST1, M_WAITOK | M_ZERO);
 
 	error = drm_gem_objects_lookup(file_priv,
 	    (void __user *)(uintptr_t)args->bo_handles, job->bo_count,
 	    &job->bos);
-	if (error)
+	if (error) {
+		free(job->implicit_fences, M_PANFROST1);
 		return (error);
+	}
 
 	sz = job->bo_count * sizeof(struct panfrost_gem_mapping *);
 	job->mappings = malloc(sz, M_PANFROST1, M_WAITOK | M_ZERO);
@@ -269,14 +269,14 @@ dprintf("bo count %d\n", job->bo_count);
 		bo = (struct panfrost_gem_object *)job->bos[i];
 		mapping = panfrost_gem_mapping_get(bo, pfile);
 		if (mapping == NULL) {
-			printf("mapping not found\n");
-			panic("Err");
+			error = EINVAL;
+			break;
 		}
 		atomic_add_int(&bo->gpu_usecount, 1);
 		job->mappings[i] = mapping;
 	}
 
-	return (0);
+	return (error);
 }
 
 static int
