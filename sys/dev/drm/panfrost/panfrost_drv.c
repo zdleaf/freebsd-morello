@@ -432,11 +432,11 @@ panfrost_ioctl_mmap_bo(struct drm_device *dev, void *data,
 	args = data;
 
 	if (args->flags != 0)
-		panic("unknown flags");
+		return (EINVAL);
 
 	obj = drm_gem_object_lookup(file, args->handle);
 	if (obj == NULL)
-		panic("Object not found");
+		return (EINVAL);
 
 	bo = (struct panfrost_gem_object *)obj;
 
@@ -562,16 +562,17 @@ panfrost_ioctl_get_bo_offset(struct drm_device *dev, void *data,
 
 	obj = drm_gem_object_lookup(file_priv, args->handle);
 	if (obj == NULL)
-		panic("gem obj not found");
+		return (EINVAL);
 
 	bo = (struct panfrost_gem_object *)obj;
 
 	mapping = panfrost_gem_mapping_get(bo, pfile);
+	if (mapping == NULL)
+		return (EINVAL);
+
 	mutex_lock(&dev->struct_mutex);
 	drm_gem_object_put(obj);
 	mutex_unlock(&dev->struct_mutex);
-	if (mapping == NULL)
-		panic("could not find mapping");
 
 	args->offset = mapping->mmnode.start << PAGE_SHIFT;
 	panfrost_gem_mapping_put(mapping);
@@ -597,7 +598,7 @@ panfrost_ioctl_madvise(struct drm_device *dev, void *data,
 
 	obj = drm_gem_object_lookup(file_priv, args->handle);
 	if (obj == NULL)
-		panic("obj not found");
+		return (EINVAL);
 
 	bo = (struct panfrost_gem_object *)obj;
 
