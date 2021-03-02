@@ -103,6 +103,7 @@ panfrost_gem_free_object(struct drm_gem_object *obj)
 			m = bo->pages[i];
 			vm_page_lock(m);
 			m->flags &= ~PG_FICTITIOUS;
+			m->oflags |= VPO_UNMANAGED;
 			vm_page_unwire_noq(m);
 			vm_page_free(m);
 			vm_page_unlock(m);
