@@ -240,8 +240,6 @@ panfrost_job_hw_submit(struct panfrost_job *job, int slot)
 	dprintf("%s: HW submitting job %d to slot %d, jc %lx\n",
 	    __func__, sc->job_count++, slot, jc_head);
 
-	//printf(".%d", slot);
-
 	status = GPU_READ(sc, JS_COMMAND_NEXT(slot));
 	if (status)
 		return;
@@ -416,12 +414,10 @@ dma_fence_free_cb(struct rcu_head *rcu)
 	struct panfrost_fence *pf_fence;
 	struct dma_fence *fence;
 
-	//printf("%s\n", __func__);
-
 	fence = container_of(rcu, struct dma_fence, f_rcu);
 	pf_fence = (struct panfrost_fence *)fence;
 
-	//MPASS(!dma_fence_referenced_p(fence));
+	MPASS(!kref_referenced_p(&fence->refcount));
 
 	dma_fence_destroy(fence);
 
