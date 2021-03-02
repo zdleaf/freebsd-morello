@@ -374,10 +374,6 @@ panfrost_ioctl_wait_bo(struct drm_device *dev, void *data,
 	else if (error > 0)
 		error = 0;
 
-	//printf("%s: timeout %d, errno %d\n",
-	//__func__, args->timeout_ns, error);
-	//printf("%s: error %d\n", __func__, error);
-
 	mutex_lock(&dev->struct_mutex);
 	drm_gem_object_put(gem_obj);
 	mutex_unlock(&dev->struct_mutex);

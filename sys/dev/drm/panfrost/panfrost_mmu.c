@@ -263,10 +263,10 @@ panfrost_mmu_fault(struct panfrost_softc *sc, int as)
 	source_id = (fault_status >> 16);
 
 	if ((exception_type & 0xF8) == 0xC0) {
-		//printf("%s: page fault at %lx\n", __func__, addr);
+		dprintf("%s: page fault at %jx\n", __func__, addr);
 		panfrost_mmu_page_fault(sc, as, addr);
 	} else
-		dprintf("%s: %s fault at %lx\n", __func__,
+		dprintf("%s: %s fault at %jx\n", __func__,
 		    panfrost_mmu_exception_name(exception_type), addr);
 
 	dprintf("%s: exception type %x, access type %x (%s), source id %x\n",
@@ -284,7 +284,6 @@ panfrost_mmu_intr(void *arg)
 	sc = arg;
 
 	status = GPU_READ(sc, MMU_INT_RAWSTAT);
-	//printf("%s: status %x\n", __func__, status);
 
 	for (i = 0; status != 0; i++) {
 		if (status & (1 << i)) {
@@ -440,7 +439,6 @@ panfrost_mmu_enable(struct panfrost_softc *sc, struct panfrost_mmu *mmu)
 	p = &mmu->p;
 
 	paddr = p->pm_l0_paddr;
-	//printf("%s: l0 paddr %lx, mmu as %d\n", __func__, paddr, as);
 	paddr |= ARM_MALI_LPAE_TTBR_READ_INNER;
 	paddr |= ARM_MALI_LPAE_TTBR_ADRMODE_TABLE;
 
@@ -507,8 +505,6 @@ panfrost_mmu_as_get(struct panfrost_softc *sc, struct panfrost_mmu *mmu)
 
 	mmu->as = as;
 	mmu->as_count = 1;
-
-	//printf("%s: new as %d\n", __func__, as);
 
 	TAILQ_INSERT_TAIL(&sc->mmu_in_use, mmu, next);
 
