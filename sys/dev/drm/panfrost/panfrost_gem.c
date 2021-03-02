@@ -159,11 +159,6 @@ panfrost_gem_open(struct drm_gem_object *obj, struct drm_file *file_priv)
 	dprintf("%s: mapping->mmnode.start page %lx va %lx\n", __func__,
 	    mapping->mmnode.start, mapping->mmnode.start << PAGE_SHIFT);
 
-#if 0
-	struct page **pages;
-	pages = drm_gem_get_pages(obj);
-#endif
-
 	if (!bo->is_heap) {
 		error = panfrost_mmu_map(sc, mapping);
 		if (error) {
@@ -314,11 +309,6 @@ panfrost_gem_vm_open(struct vm_area_struct *vma)
 static void
 panfrost_gem_vm_close(struct vm_area_struct *vma)
 {
-#if 0
-	struct drm_gem_object *obj;
-
-	obj = vma->vm_private_data;
-#endif
 
 	drm_gem_vm_close(vma);
 }
