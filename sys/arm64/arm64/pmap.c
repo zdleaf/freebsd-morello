@@ -3688,43 +3688,6 @@ restart:
 	return (KERN_SUCCESS);
 }
 
-void
-pmap_gfault(pmap_t pmap, vm_offset_t va)
-{
-	pd_entry_t *pde;
-	pt_entry_t pte;
-	int lvl;
-
-	va = trunc_page(va);
-	pde = pmap_pde(pmap, va, &lvl);
-	pte = pmap_load(pde);
-	printf("%s: va %lx pte %lx, lvl %d\n", __func__, va, pte, lvl);
-
-	pd_entry_t *l0p;
-	pd_entry_t *l1p;
-	pd_entry_t *l2p;
-	pd_entry_t *l3p;
-	pt_entry_t l0, l1, l2, l3;
-
-	l0p = pmap_l0(pmap, va);
-	l1p = pmap_l1(pmap, va);
-	l2p = pmap_l2(pmap, va);
-	l3p = pmap_l2_to_l3(l2p, va);
-
-	l0 = pmap_load(l0p);
-	l1 = pmap_load(l1p);
-	l2 = pmap_load(l2p);
-	l3 = pmap_load(l3p);
-
-	printf("%s: l0 %lx l1 %lx l2 %lx l3 %lx\n", __func__,
-	    l0, l1, l2, l3);
-
-	printf("%s: l0 ptr %p val %lx\n", __func__, l0p, l0);
-	printf("%s: l1 ptr %p val %lx\n", __func__, l1p, l1);
-	printf("%s: l2 ptr %p val %lx\n", __func__, l2p, l2);
-	printf("%s: l3 ptr %p val %lx\n", __func__, l3p, l3);
-}
-
 /*
  * Add a single GPU entry. This function does not sleep.
  */
