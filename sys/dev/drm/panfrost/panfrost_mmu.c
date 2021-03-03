@@ -241,51 +241,18 @@ panfrost_mmu_page_fault(struct panfrost_softc *sc, int as, uint64_t addr)
 	return (0);
 }
 
-static void
-panfrost_mmu_fault(struct panfrost_softc *sc, int as)
+void
+panfrost_mmu_intr(void *arg)
 {
+	struct panfrost_softc *sc;
 	uint32_t fault_status;
 	uint32_t exception_type;
 	uint32_t access_type;
 	uint32_t source_id;
 	uint64_t addr;
 	int error;
-
-	fault_status = GPU_READ(sc, AS_FAULTSTATUS(as));
-	dprintf("%s: fault status %x\n", __func__, fault_status);
-	dprintf("%s: AS_TRANSTAB_LO %x AS_TRANSTAB_HI %x\n", __func__,
-	    GPU_READ(sc, AS_TRANSTAB_LO(0)), GPU_READ(sc, AS_TRANSTAB_HI(0)));
-
-	addr = GPU_READ(sc, AS_FAULTADDRESS_LO(as));
-	addr |= (uint64_t)GPU_READ(sc, AS_FAULTADDRESS_HI(as)) << 32;
-
-	exception_type = fault_status & 0xFF;
-	access_type = (fault_status >> 8) & 0x3;
-	source_id = (fault_status >> 16);
-
-	error = 1;
-
-	if ((exception_type & 0xF8) == 0xC0) {
-		dprintf("%s: page fault at %jx\n", __func__, addr);
-		error = panfrost_mmu_page_fault(sc, as, addr);
-	}
-
-	if (error)
-		device_printf(sc->dev, "%s: exception %x (%s), access %x (%s),"
-		    " source %d, fault at addr %jx\n", __func__,
-		    exception_type,
-		    panfrost_mmu_exception_name(exception_type),
-		    access_type,
-		    access_type_name(sc, fault_status),
-		    source_id,
-		    addr);
-}
-
-void
-panfrost_mmu_intr(void *arg)
-{
-	struct panfrost_softc *sc;
 	uint32_t status;
+	int mask;
 	int i;
 
 	sc = arg;
@@ -293,14 +260,37 @@ panfrost_mmu_intr(void *arg)
 	status = GPU_READ(sc, MMU_INT_RAWSTAT);
 
 	for (i = 0; status != 0; i++) {
-		if (status & (1 << i)) {
-			panfrost_mmu_fault(sc, i);
-			status &= ~(1 << i);
+		mask = (1 << i) | (1 << (i + 16)); /* fault | error */
+		fault_status = GPU_READ(sc, AS_FAULTSTATUS(i));
+
+		addr = GPU_READ(sc, AS_FAULTADDRESS_LO(i));
+		addr |= (uint64_t)GPU_READ(sc, AS_FAULTADDRESS_HI(i)) << 32;
+
+		exception_type = fault_status & 0xFF;
+		access_type = (fault_status >> 8) & 0x3;
+		source_id = (fault_status >> 16);
+
+		error = 1;
+
+		if ((status & mask) == (1 << i)) {
+			if ((exception_type & 0xF8) == 0xC0) {
+				dprintf("%s: page fault at %jx\n", __func__, addr);
+				error = panfrost_mmu_page_fault(sc, i, addr);
+			}
 		}
-		if (status & (1 << (16 + i))) {
-			printf("mmu error\n");
-			panic("error");
-		}
+
+		if (error)
+			device_printf(sc->dev, "MMU exception %x (%s), access %x (%s),"
+			    " source %d, fault at addr %jx\n",
+			    exception_type,
+			    panfrost_mmu_exception_name(exception_type),
+			    access_type,
+			    access_type_name(sc, fault_status),
+			    source_id,
+			    addr);
+
+		status &= ~mask;
+
 		GPU_WRITE(sc, MMU_INT_CLEAR, (1 << i) | (1 << (i + 16)));
 	}
 }
