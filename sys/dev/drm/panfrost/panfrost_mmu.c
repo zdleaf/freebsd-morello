@@ -207,7 +207,7 @@ panfrost_mmu_page_fault(struct panfrost_softc *sc, int as, uint64_t addr)
 
 	bomapping = panfrost_mmu_find_mapping(sc, as, addr);
 	if (!bomapping)
-		panic("no bomapping");
+		return (EINVAL);
 
 	bo = bomapping->obj;
 
@@ -249,6 +249,7 @@ panfrost_mmu_fault(struct panfrost_softc *sc, int as)
 	uint32_t access_type;
 	uint32_t source_id;
 	uint64_t addr;
+	int error;
 
 	fault_status = GPU_READ(sc, AS_FAULTSTATUS(as));
 	dprintf("%s: fault status %x\n", __func__, fault_status);
@@ -262,16 +263,22 @@ panfrost_mmu_fault(struct panfrost_softc *sc, int as)
 	access_type = (fault_status >> 8) & 0x3;
 	source_id = (fault_status >> 16);
 
+	error = 1;
+
 	if ((exception_type & 0xF8) == 0xC0) {
 		dprintf("%s: page fault at %jx\n", __func__, addr);
-		panfrost_mmu_page_fault(sc, as, addr);
-	} else
-		dprintf("%s: %s fault at %jx\n", __func__,
-		    panfrost_mmu_exception_name(exception_type), addr);
+		error = panfrost_mmu_page_fault(sc, as, addr);
+	}
 
-	dprintf("%s: exception type %x, access type %x (%s), source id %x\n",
-	    __func__, exception_type, access_type,
-	    access_type_name(sc, fault_status), source_id);
+	if (error)
+		device_printf(sc->dev, "%s: exception %x (%s), access %x (%s),"
+		    " source %d, fault at addr %jx\n", __func__,
+		    exception_type,
+		    panfrost_mmu_exception_name(exception_type),
+		    access_type,
+		    access_type_name(sc, fault_status),
+		    source_id,
+		    addr);
 }
 
 void
