@@ -261,14 +261,14 @@ panfrost_mmu_intr(void *arg)
 
 	for (i = 0; status != 0; i++) {
 		mask = (1 << i) | (1 << (i + 16)); /* fault | error */
+
 		fault_status = GPU_READ(sc, AS_FAULTSTATUS(i));
-
-		addr = GPU_READ(sc, AS_FAULTADDRESS_LO(i));
-		addr |= (uint64_t)GPU_READ(sc, AS_FAULTADDRESS_HI(i)) << 32;
-
 		exception_type = fault_status & 0xFF;
 		access_type = (fault_status >> 8) & 0x3;
 		source_id = (fault_status >> 16);
+
+		addr = GPU_READ(sc, AS_FAULTADDRESS_LO(i));
+		addr |= (uint64_t)GPU_READ(sc, AS_FAULTADDRESS_HI(i)) << 32;
 
 		error = 1;
 
@@ -280,8 +280,9 @@ panfrost_mmu_intr(void *arg)
 		}
 
 		if (error)
-			device_printf(sc->dev, "MMU exception %x (%s), access %x (%s),"
-			    " source %d, fault at addr %jx\n",
+			device_printf(sc->dev, "MMU fault %x: exception %x (%s), "
+			    "access %x (%s), source_id %d, addr %jx\n",
+			    fault_status,
 			    exception_type,
 			    panfrost_mmu_exception_name(exception_type),
 			    access_type,
@@ -290,8 +291,7 @@ panfrost_mmu_intr(void *arg)
 			    addr);
 
 		status &= ~mask;
-
-		GPU_WRITE(sc, MMU_INT_CLEAR, (1 << i) | (1 << (i + 16)));
+		GPU_WRITE(sc, MMU_INT_CLEAR, mask);
 	}
 }
 
