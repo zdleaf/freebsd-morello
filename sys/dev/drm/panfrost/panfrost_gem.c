@@ -153,8 +153,7 @@ panfrost_gem_open(struct drm_gem_object *obj, struct drm_file *file_priv)
 	if (error) {
 		printf("%s: Failed to insert: sz %d, align %d, color %d, err %d\n",
 		    __func__, obj->size >> PAGE_SHIFT, align, color, error);
-		/* TODO: put mapping, and obj ?*/
-		return (error);
+		goto error;
 	}
 
 	dprintf("%s: mapping->mmnode.start page %lx va %lx\n", __func__,
