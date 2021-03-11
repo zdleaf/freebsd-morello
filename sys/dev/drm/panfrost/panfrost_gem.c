@@ -164,9 +164,13 @@ panfrost_gem_open(struct drm_gem_object *obj, struct drm_file *file_priv)
 		error = panfrost_mmu_map(sc, mapping);
 		if (error) {
 			printf("%s: could not map, error %d\n", __func__, error);
-			panfrost_gem_mapping_put(mapping);
-			drm_gem_object_put(obj);
-			return (error);
+			goto error;
+		}
+	} else {
+		error = panfrost_gem_get_pages(bo);
+		if (error) {
+			printf("%s: could not alloc pages, error %d\n", __func__, error);
+			goto error;
 		}
 	}
 
@@ -175,6 +179,11 @@ panfrost_gem_open(struct drm_gem_object *obj, struct drm_file *file_priv)
 	mtx_unlock(&bo->mappings_lock);
 
 	return (0);
+
+error:
+	panfrost_gem_mapping_put(mapping);
+	drm_gem_object_put(obj);
+	return (error);
 }
 
 void

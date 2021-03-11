@@ -215,12 +215,7 @@ panfrost_mmu_page_fault(struct panfrost_softc *sc, int as, uint64_t addr)
 	page_offset = addr >> PAGE_SHIFT;
 	page_offset -= bomapping->mmnode.start;
 
-	if (bo->pages == NULL) {
-		KASSERT(bo->sgt == NULL, ("pages is NULL, sgt is not NULL"));
-		error = panfrost_gem_get_pages(bo);
-		if (error)
-			return (error);
-	}
+	KASSERT(bo->pages != NULL, ("pages is NULL"));
 
 	page = bo->pages[page_offset];
 
