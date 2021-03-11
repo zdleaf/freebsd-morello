@@ -177,7 +177,7 @@ found:
 		    offset < (node->start + node->size)) {
 			mapping = container_of(node,
 			    struct panfrost_gem_mapping, mmnode);
-			/* TODO: take mapping ref */
+			refcount_acquire(&mapping->refcount);
 			break;
 		};
 	};
