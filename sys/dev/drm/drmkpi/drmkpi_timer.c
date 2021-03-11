@@ -80,7 +80,9 @@ drmkpi_timer_callback_wrapper(void *context)
 {
 	struct timer_list *timer;
 
+	THREAD_SLEEPING_OK();
 	linux_set_current(curthread);
+	THREAD_NO_SLEEPING();
 
 	timer = context;
 	timer->function(timer->data);
