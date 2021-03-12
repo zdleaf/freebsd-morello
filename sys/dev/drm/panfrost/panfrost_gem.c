@@ -631,13 +631,14 @@ panfrost_gem_prime_import_sg_table(struct drm_device *dev,
 	bo = panfrost_gem_create_object(dev, size, true);
 	bo->sgt = sgt;
 	bo->noexec = true;
-	/* TODO: bo->npages = ? */
+	bo->npages = 0;
+	bo->pages = NULL;
 
 	obj = &bo->base;
 
 	/*
 	 * TODO (hack): take additional reference so DRM is happy.
-	 * Not sure where it should be.
+	 * Not sure where to place this line exactly.
 	 */
 	drm_gem_object_get(obj);
 
