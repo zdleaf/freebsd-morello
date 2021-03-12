@@ -168,6 +168,7 @@ panfrost_device_power_on(struct panfrost_softc *sc)
 void
 panfrost_device_init_features(struct panfrost_softc *sc)
 {
+	uint32_t major, minor, status;
 	uint32_t reg;
 	int num_js;
 	int i;
@@ -198,7 +199,7 @@ panfrost_device_init_features(struct panfrost_softc *sc)
 	for (i = 0; i < num_js; i++)
 		sc->features.js_features[i] = GPU_READ(sc, GPU_JS_FEATURES(i));
 
-	printf("GPU revision %x, id %x\n", sc->features.revision,
+	device_printf(sc->dev, "GPU revision %x, id %x\n", sc->features.revision,
 	    sc->features.id);
 
 	sc->features.nr_core_groups = hweight64(sc->features.l2_present);
@@ -219,8 +220,6 @@ panfrost_device_init_features(struct panfrost_softc *sc)
 	sc->features.stack_present = GPU_READ(sc, GPU_STACK_PRESENT_LO);
 	sc->features.stack_present |=
 	    (uint64_t)GPU_READ(sc, GPU_STACK_PRESENT_HI) << 32;
-
-	uint32_t major, minor, status;
 
 	major = (sc->features.revision >> 12) & 0xf;
 	minor = (sc->features.revision >> 4) & 0xff;
