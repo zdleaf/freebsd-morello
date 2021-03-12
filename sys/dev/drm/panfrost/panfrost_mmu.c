@@ -90,10 +90,6 @@ __FBSDID("$FreeBSD$");
 #define	ARM_MALI_LPAE_MEMATTR_IMP_DEF		0x88ULL
 #define	ARM_MALI_LPAE_MEMATTR_WRITE_ALLOC	0x8DULL
 
-static int mmu_hw_do_operation_locked(struct panfrost_softc *sc, uint32_t as,
-    vm_offset_t va, size_t size, uint32_t op);
-static void panfrost_mmu_flush_range(struct panfrost_softc *sc, struct panfrost_mmu *mmu, vm_offset_t va, size_t size);
-
 static const char *
 panfrost_mmu_exception_name(uint32_t exc_code)
 {
@@ -188,6 +184,102 @@ out:
 	mtx_unlock_spin(&sc->as_mtx);
 
 	return (mapping);
+}
+
+static int
+wait_ready(struct panfrost_softc *sc, uint32_t as)
+{
+	uint32_t reg;
+	int timeout;
+
+	timeout = 10000;
+
+	do {
+		reg = GPU_READ(sc, AS_STATUS(as));
+		if ((reg & AS_STATUS_AS_ACTIVE) == 0)
+			break;
+		DELAY(10);
+	} while (timeout--);
+
+	if (timeout <= 0)
+		return (ETIMEDOUT);
+
+	return (0);
+}
+
+static int
+write_cmd(struct panfrost_softc *sc, uint32_t as, uint32_t cmd)
+{
+	int status;
+
+	status = wait_ready(sc, as);
+	if (status == 0)
+		GPU_WRITE(sc, AS_COMMAND(as), cmd);
+
+	return (status);
+}
+
+static void
+lock_region(struct panfrost_softc *sc, uint32_t as, vm_offset_t va,
+    size_t size)
+{
+	uint8_t region_width;
+	uint64_t region;
+
+	/* Note: PAGE_PASK here includes ~ from linuxkpi */
+	region = va & PAGE_MASK;
+
+	size = round_up(size, PAGE_SIZE);
+
+	region_width = 10 + fls(size >> PAGE_SHIFT);
+	if ((size >> PAGE_SHIFT) != (1ul << (region_width - 11)))
+		region_width += 1;
+	region |= region_width;
+
+	GPU_WRITE(sc, AS_LOCKADDR_LO(as), region & 0xFFFFFFFFUL);
+	GPU_WRITE(sc, AS_LOCKADDR_HI(as), (region >> 32) & 0xFFFFFFFFUL);
+	write_cmd(sc, as, AS_COMMAND_LOCK);
+}
+
+
+static int
+mmu_hw_do_operation_locked(struct panfrost_softc *sc, uint32_t as,
+    vm_offset_t va, size_t size, uint32_t op)
+{
+	int error;
+
+	if (op != AS_COMMAND_UNLOCK)
+		lock_region(sc, as, va, size);
+
+	write_cmd(sc, as, op);
+
+	error = wait_ready(sc, as);
+
+	return (error);
+}
+
+static int
+mmu_hw_do_operation(struct panfrost_softc *sc,
+    struct panfrost_mmu *mmu, vm_offset_t va, size_t size, uint32_t op)
+{
+	int error;
+
+	mtx_lock_spin(&sc->as_mtx);
+	error = mmu_hw_do_operation_locked(sc, mmu->as, va, size, op);
+	mtx_unlock_spin(&sc->as_mtx);
+
+	return (error);
+}
+
+static void
+panfrost_mmu_flush_range(struct panfrost_softc *sc, struct panfrost_mmu *mmu,
+    vm_offset_t va, size_t size)
+{
+
+	if (mmu->as < 0)
+		return;
+
+	mmu_hw_do_operation(sc, mmu, va, size, AS_COMMAND_FLUSH_PT);
 }
 
 static int
@@ -322,101 +414,6 @@ panfrost_mmu_pgtable_free(struct panfrost_file *pfile)
 		TAILQ_REMOVE(&sc->mmu_in_use, mmu, next);
 	}
 	mtx_unlock_spin(&sc->as_mtx);
-}
-
-static int
-wait_ready(struct panfrost_softc *sc, uint32_t as)
-{
-	uint32_t reg;
-	int timeout;
-
-	timeout = 10000;
-
-	do {
-		reg = GPU_READ(sc, AS_STATUS(as));
-		if ((reg & AS_STATUS_AS_ACTIVE) == 0)
-			break;
-		DELAY(10);
-	} while (timeout--);
-
-	if (timeout <= 0)
-		return (ETIMEDOUT);
-
-	return (0);
-}
-
-static int
-write_cmd(struct panfrost_softc *sc, uint32_t as, uint32_t cmd)
-{
-	int status;
-
-	status = wait_ready(sc, as);
-	if (status == 0)
-		GPU_WRITE(sc, AS_COMMAND(as), cmd);
-
-	return (status);
-}
-
-static void
-lock_region(struct panfrost_softc *sc, uint32_t as, vm_offset_t va,
-    size_t size)
-{
-	uint8_t region_width;
-	uint64_t region;
-
-	/* Note: PAGE_PASK here includes ~ from linuxkpi */
-	region = va & PAGE_MASK;
-
-	size = round_up(size, PAGE_SIZE);
-
-	region_width = 10 + fls(size >> PAGE_SHIFT);
-	if ((size >> PAGE_SHIFT) != (1ul << (region_width - 11)))
-		region_width += 1;
-	region |= region_width;
-
-	GPU_WRITE(sc, AS_LOCKADDR_LO(as), region & 0xFFFFFFFFUL);
-	GPU_WRITE(sc, AS_LOCKADDR_HI(as), (region >> 32) & 0xFFFFFFFFUL);
-	write_cmd(sc, as, AS_COMMAND_LOCK);
-}
-
-static int
-mmu_hw_do_operation_locked(struct panfrost_softc *sc, uint32_t as,
-    vm_offset_t va, size_t size, uint32_t op)
-{
-	int error;
-
-	if (op != AS_COMMAND_UNLOCK)
-		lock_region(sc, as, va, size);
-
-	write_cmd(sc, as, op);
-
-	error = wait_ready(sc, as);
-
-	return (error);
-}
-
-static int
-mmu_hw_do_operation(struct panfrost_softc *sc,
-    struct panfrost_mmu *mmu, vm_offset_t va, size_t size, uint32_t op)
-{
-	int error;
-
-	mtx_lock_spin(&sc->as_mtx);
-	error = mmu_hw_do_operation_locked(sc, mmu->as, va, size, op);
-	mtx_unlock_spin(&sc->as_mtx);
-
-	return (error);
-}
-
-static void
-panfrost_mmu_flush_range(struct panfrost_softc *sc, struct panfrost_mmu *mmu,
-    vm_offset_t va, size_t size)
-{
-
-	if (mmu->as < 0)
-		return;
-
-	mmu_hw_do_operation(sc, mmu, va, size, AS_COMMAND_FLUSH_PT);
 }
 
 int
