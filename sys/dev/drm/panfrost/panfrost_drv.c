@@ -104,10 +104,6 @@ static struct ofw_compat_data compat_data[] = {
 	{ NULL,			0 }
 };
 
-static int panfrost_probe(device_t dev);
-static int panfrost_attach(device_t dev);
-static int panfrost_detach(device_t dev);
-
 static const struct file_operations panfrost_drm_driver_fops = {
 	.owner		= THIS_MODULE,
 	.open		= drm_open,
