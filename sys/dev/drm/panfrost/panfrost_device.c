@@ -307,12 +307,16 @@ panfrost_device_init_features(struct panfrost_softc *sc)
 	    sc->features.as_present,
 	    sc->features.js_present);
 
-	/* (TODO) use T860 for now */
-	sc->features.hw_features = hw_features_t860;
-	sc->features.hw_issues = hw_issues_all | hw_issues_t860;
-
 	for (i = 0; gpu_models[i].id; i++) {
 		model = &gpu_models[i];
+		if (sc->features.id == model->id) {
+			sc->features.hw_features = model->features;
+			sc->features.hw_issues = hw_issues_all | model->issues;
+			if (sc->features.revision == model->revision) {
+				sc->features.hw_issues |= model->issues_rev;
+				break;
+			}
+		}
 	}
 }
 
