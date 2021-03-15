@@ -165,9 +165,74 @@ panfrost_device_power_on(struct panfrost_softc *sc)
 	return (0);
 }
 
+struct panfrost_gpu_model {
+	const char *name;
+	uint32_t id;
+	uint32_t revision;
+	uint64_t features;
+	uint64_t issues;
+	uint64_t issues_rev;
+};
+
+#define	GPU_MOD(_name, _id)					\
+{								\
+	.name = __stringify(_name),				\
+	.id = _id,						\
+	.features = hw_features_##_name,			\
+	.issues = hw_issues_##_name,				\
+	.revision = 0,						\
+	.issues_rev = 0,					\
+}
+
+#define	GPU_REV(_name, _id, _rev, _p, _s, _stat)		\
+{								\
+	.name = __stringify(_name),				\
+	.id = _id,						\
+	.features = hw_features_##_name,			\
+	.issues = hw_issues_##_name,				\
+	.revision = (_rev) << 12 | (_p) << 4 | (_s),		\
+	.issues_rev = hw_issues_##_name##_r##_rev##p##_p##_stat,\
+}
+
+static const struct panfrost_gpu_model gpu_models[] = {
+	GPU_MOD(t600, 0x600),
+	GPU_REV(t600, 0x600, 0, 0, 1, _15dev0),
+
+	GPU_MOD(t620, 0x620),
+	GPU_REV(t620, 0x620, 0, 1, 0, ),
+	GPU_REV(t620, 0x620, 1, 0, 0, ),
+
+	GPU_MOD(t720, 0x720),
+
+	GPU_MOD(t760, 0x750),
+	GPU_REV(t760, 0x750, 0, 0, 0, ),
+	GPU_REV(t760, 0x750, 0, 1, 0, ),
+	GPU_REV(t760, 0x750, 0, 1, 0, _50rel0),
+	GPU_REV(t760, 0x750, 0, 2, 0, ),
+	GPU_REV(t760, 0x750, 0, 3, 0, ),
+
+	GPU_MOD(t820, 0x820),
+	GPU_MOD(t830, 0x830),
+	GPU_MOD(t860, 0x860),
+	GPU_MOD(t880, 0x880),
+
+	GPU_MOD(g71, 0x6000),
+	GPU_REV(g71, 0x6000, 0, 0, 1, _05dev0),
+
+	GPU_MOD(g72, 0x6001),
+	GPU_MOD(g51, 0x7000),
+	GPU_MOD(g76, 0x7001),
+	GPU_MOD(g52, 0x7002),
+
+	GPU_MOD(g31, 0x7003),
+	GPU_REV(g31, 0x7003, 1, 0, 0, ),
+	{},
+};
+
 void
 panfrost_device_init_features(struct panfrost_softc *sc)
 {
+	const struct panfrost_gpu_model *model;
 	uint32_t major, minor, status;
 	uint32_t reg;
 	int num_js;
@@ -221,6 +286,10 @@ panfrost_device_init_features(struct panfrost_softc *sc)
 	sc->features.stack_present |=
 	    (uint64_t)GPU_READ(sc, GPU_STACK_PRESENT_HI) << 32;
 
+	/* Patch T60x ID so userspace is happy. */
+	if (sc->features.id == 0x6956)
+		sc->features.id = 0x0600;
+
 	major = (sc->features.revision >> 12) & 0xf;
 	minor = (sc->features.revision >> 4) & 0xff;
 	status = sc->features.revision & 0xf;
@@ -241,6 +310,10 @@ panfrost_device_init_features(struct panfrost_softc *sc)
 	/* (TODO) use T860 for now */
 	sc->features.hw_features = hw_features_t860;
 	sc->features.hw_issues = hw_issues_all | hw_issues_t860;
+
+	for (i = 0; gpu_models[i].id; i++) {
+		model = &gpu_models[i];
+	}
 }
 
 void
