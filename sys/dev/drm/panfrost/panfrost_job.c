@@ -132,13 +132,10 @@ panfrost_job_intr(void *arg)
 			GPU_WRITE(sc, JS_COMMAND_NEXT(i), JS_COMMAND_NOP);
 
 			status = GPU_READ(sc, JS_STATUS(i));
-			printf("%s: job error, slot %d status %x\n",
-			    __func__, i, status);
-			printf("%s: head %x tail %x\n", __func__,
+			device_printf(sc->dev, "%s: job fault, slot %d status %x "
+			    "head %x tail %x\n", __func__, i, status,
 			    GPU_READ(sc, JS_HEAD_LO(i)),
 			    GPU_READ(sc, JS_TAIL_LO(i)));
-			printf("%s: job at slot %d completed with error\n",
-			    __func__, i);
 
 			old_status = atomic_cmpxchg(&sc->js->queue[i].status,
 			    PANFROST_QUEUE_STATUS_STARTING,
