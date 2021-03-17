@@ -141,12 +141,13 @@ panfrost_job_intr(void *arg)
 			    PANFROST_QUEUE_STATUS_STARTING,
 			    PANFROST_QUEUE_STATUS_FAULT_PENDING);
 			if (old_status == PANFROST_QUEUE_STATUS_ACTIVE) {
-				printf("%s: fault\n", __func__);
+				goto completed;
 				drm_sched_fault(&sc->js->queue[i].sched);
 			}
 		}
 
 		if (stat & (1 << i)) {
+completed:
 			dprintf("%s: job at slot %d completed\n", __func__, i);
 			mtx_lock(&sc->job_lock);
 
