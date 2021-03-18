@@ -25,6 +25,7 @@
 #include <linux/slab.h>
 #include <linux/completion.h>
 #include <linux/workqueue.h>
+#include <linux/wait.h>
 
 #include <drm/drm_print.h>
 #include <drm/gpu_scheduler.h>
@@ -190,10 +191,8 @@ long drm_sched_entity_flush(struct drm_sched_entity *entity, long timeout)
 					drm_sched_entity_is_idle(entity),
 					timeout);
 	} else {
-#if 0
 		wait_event_killable(sched->job_scheduled,
 				    drm_sched_entity_is_idle(entity));
-#endif
 	}
 
 #if 0
