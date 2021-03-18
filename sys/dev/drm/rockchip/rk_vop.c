@@ -67,7 +67,6 @@ __FBSDID("$FreeBSD$");
 
 #include <dev/extres/hwreset/hwreset.h>
 #include <dev/extres/clk/clk.h>
-#include <dev/extres/syscon/syscon.h>
 #include <dev/extres/phy/phy.h>
 
 #include <dev/videomode/videomode.h>
@@ -77,9 +76,6 @@ __FBSDID("$FreeBSD$");
 
 #include "rk_vop_if.h"
 #include "dw_hdmi_if.h"
-#if 0
-#include "syscon_if.h"
-#endif
 
 #define	VOP_READ(sc, reg)	bus_read_4((sc)->res[0], (reg))
 #define	VOP_WRITE(sc, reg, val)	bus_write_4((sc)->res[0], (reg), (val))
@@ -122,7 +118,6 @@ struct rk_vop_plane {
 
 struct rk_vop_softc {
 	device_t		dev;
-	struct syscon		*syscon;
 	struct rk_vop_conf	*phy_conf;
 	clk_t			clk[CLK_NENTRIES];
 	struct resource		*res[2];
