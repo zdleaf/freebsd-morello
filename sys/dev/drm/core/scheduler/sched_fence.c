@@ -26,7 +26,6 @@
 #include <linux/sched.h>
 #include <linux/slab.h>
 #include <linux/wait.h>
-
 #include <linux/dma-fence.h>
 #include <linux/workqueue.h>
 
@@ -104,7 +103,7 @@ static void drm_sched_fence_free(struct rcu_head *rcu)
 /**
  * drm_sched_fence_release_scheduled - callback that fence can be freed
  *
- * @f: fence
+ * @fence: fence
  *
  * This function is called when the reference count becomes zero.
  * It just RCU schedules freeing up the fence.

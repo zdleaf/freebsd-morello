@@ -24,7 +24,6 @@
 #include <linux/kthread.h>
 #include <linux/slab.h>
 #include <linux/completion.h>
-
 #include <linux/workqueue.h>
 
 #include <drm/drm_print.h>
@@ -78,9 +77,6 @@ int drm_sched_entity_init(struct drm_sched_entity *entity,
 
 	init_completion(&entity->entity_idle);
 
-	/* We start in an idle state. */
-	complete(&entity->entity_idle);
-
 	spin_lock_init(&entity->rq_lock);
 	spsc_queue_init(&entity->job_queue);
 
@@ -90,24 +86,6 @@ int drm_sched_entity_init(struct drm_sched_entity *entity,
 	return 0;
 }
 EXPORT_SYMBOL(drm_sched_entity_init);
-
-/**
- * drm_sched_entity_modify_sched - Modify sched of an entity
- * @entity: scheduler entity to init
- * @sched_list: the list of new drm scheds which will replace
- *		 existing entity->sched_list
- * @num_sched_list: number of drm sched in sched_list
- */
-void drm_sched_entity_modify_sched(struct drm_sched_entity *entity,
-				    struct drm_gpu_scheduler **sched_list,
-				    unsigned int num_sched_list)
-{
-	WARN_ON(!num_sched_list || !sched_list);
-
-	entity->sched_list = sched_list;
-	entity->num_sched_list = num_sched_list;
-}
-EXPORT_SYMBOL(drm_sched_entity_modify_sched);
 
 /**
  * drm_sched_entity_is_idle - Check if entity is idle
@@ -143,6 +121,38 @@ bool drm_sched_entity_is_ready(struct drm_sched_entity *entity)
 		return false;
 
 	return true;
+}
+
+/**
+ * drm_sched_entity_get_free_sched - Get the rq from rq_list with least load
+ *
+ * @entity: scheduler entity
+ *
+ * Return the pointer to the rq with least load.
+ */
+static struct drm_sched_rq *
+drm_sched_entity_get_free_sched(struct drm_sched_entity *entity)
+{
+	struct drm_sched_rq *rq = NULL;
+	unsigned int min_score = UINT_MAX, num_score;
+	int i;
+
+	for (i = 0; i < entity->num_sched_list; ++i) {
+		struct drm_gpu_scheduler *sched = entity->sched_list[i];
+
+		if (!entity->sched_list[i]->ready) {
+			DRM_WARN("sched%s is not ready, skipping", sched->name);
+			continue;
+		}
+
+		num_score = atomic_read(&sched->score);
+		if (num_score < min_score) {
+			min_score = num_score;
+			rq = &entity->sched_list[i]->sched_rq[entity->priority];
+		}
+	}
+
+	return rq;
 }
 
 /**
@@ -319,7 +329,7 @@ void drm_sched_entity_destroy(struct drm_sched_entity *entity)
 }
 EXPORT_SYMBOL(drm_sched_entity_destroy);
 
-/*
+/**
  * drm_sched_entity_clear_dep - callback to clear the entities dependency
  */
 static void drm_sched_entity_clear_dep(struct dma_fence *f,
@@ -332,7 +342,7 @@ static void drm_sched_entity_clear_dep(struct dma_fence *f,
 	dma_fence_put(f);
 }
 
-/*
+/**
  * drm_sched_entity_clear_dep - callback to clear the entities dependency and
  * wake up scheduler
  */
@@ -463,21 +473,17 @@ struct drm_sched_job *drm_sched_entity_pop_job(struct drm_sched_entity *entity)
 void drm_sched_entity_select_rq(struct drm_sched_entity *entity)
 {
 	struct dma_fence *fence;
-	struct drm_gpu_scheduler *sched;
 	struct drm_sched_rq *rq;
 
 	if (spsc_queue_count(&entity->job_queue) || entity->num_sched_list <= 1)
 		return;
 
 	fence = READ_ONCE(entity->last_scheduled);
-	if (fence && !dma_fence_is_signaled(fence)) {
-		printf("%s: no fence or not signalled\n", __func__);
+	if (fence && !dma_fence_is_signaled(fence))
 		return;
-	}
 
 	spin_lock(&entity->rq_lock);
-	sched = drm_sched_pick_best(entity->sched_list, entity->num_sched_list);
-	rq = sched ? &sched->sched_rq[entity->priority] : NULL;
+	rq = drm_sched_entity_get_free_sched(entity);
 	if (rq != entity->rq) {
 		drm_sched_rq_remove_entity(entity->rq, entity);
 		entity->rq = rq;
