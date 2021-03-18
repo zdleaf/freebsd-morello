@@ -100,6 +100,9 @@ static const u32 rk_vop_plane_formats[] = {
 	DRM_FORMAT_NV24,
 };
 
+#define	CLK_NENTRIES	3
+static char * clk_table[CLK_NENTRIES] = { "aclk_vop", "dclk_vop", "hclk_vop" };
+
 static struct ofw_compat_data compat_data[] = {
 	{ "rockchip,rk3399-vop-lit",	1 },
 	{ NULL,				0 }
@@ -117,7 +120,6 @@ struct rk_vop_plane {
 	int id;
 };
 
-#define	CLK_NENTRIES	3
 struct rk_vop_softc {
 	device_t		dev;
 	struct syscon		*syscon;
@@ -179,8 +181,6 @@ rk_vop_set_polarity(struct rk_vop_softc *sc, uint32_t pin_polarity)
 	VOP_WRITE(sc, RK3399_DSP_CTRL1, reg);
 }
 
-static char * clk_table[CLK_NENTRIES] = { "aclk_vop", "dclk_vop", "hclk_vop" };
-
 static int
 rk_vop_clk_enable(device_t dev)
 {
@@ -208,7 +208,6 @@ rk_vop_clk_enable(device_t dev)
 		return (ENXIO);
 	}
 
-#if 0
 	error = hwreset_assert(sc->hwreset_axi);
 	if (error != 0) {
 		device_printf(sc->dev, "Cannot assert 'axi' reset\n");
@@ -226,7 +225,6 @@ rk_vop_clk_enable(device_t dev)
 		device_printf(sc->dev, "Cannot assert 'dclk' reset\n");
 		return (error);
 	}
-#endif
 
 	for (i = 0; i < CLK_NENTRIES; i++) {
 		error = clk_get_by_ofw_name(dev, 0, clk_table[i], &sc->clk[i]);
@@ -237,25 +235,26 @@ rk_vop_clk_enable(device_t dev)
 		}
 	}
 
-#if 1
 	/* DCLK */
 	error = clk_set_freq(sc->clk[1], 148500000, 0);
 	if (error != 0) {
-		panic("dclk fail to set");
+		device_printf(sc->dev, "Failed to set dclk\n");
+		return (error);
 	}
 
 	/* ACLK */
 	error = clk_set_freq(sc->clk[0], 800000000, 0);
 	if (error != 0) {
-		panic("aclk fail to set");
+		device_printf(sc->dev, "Failed to set aclk\n");
+		return (error);
 	}
 
 	/* HCLK */
 	error = clk_set_freq(sc->clk[2], 400000000, 0);
 	if (error != 0) {
-		panic("hclk fail to set");
+		device_printf(sc->dev, "Failed to set hclk\n");
+		return (error);
 	}
-#endif
 
 	for (i = 0; i < CLK_NENTRIES; i++) {
 		error = clk_enable(sc->clk[i]);
@@ -275,7 +274,6 @@ rk_vop_clk_enable(device_t dev)
 		device_printf(dev, "%s rate is %ld Hz\n", clk_table[i], rate);
 	}
 
-#if 0
 	error = hwreset_deassert(sc->hwreset_axi);
 	if (error != 0) {
 		device_printf(sc->dev, "Cannot deassert 'axi' reset\n");
@@ -293,7 +291,6 @@ rk_vop_clk_enable(device_t dev)
 		device_printf(sc->dev, "Cannot deassert 'dclk' reset\n");
 		return (error);
 	}
-#endif
 
 	return (0);
 }
