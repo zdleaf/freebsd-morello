@@ -158,6 +158,7 @@ panfrost_open(struct drm_device *dev, struct drm_file *file)
 
 	error = panfrost_mmu_pgtable_alloc(pfile);
 	if (error != 0) {
+		device_printf(sc->dev, "%s: could not allocate pgtable\n", __func__);
 		drm_mm_takedown(&pfile->mm);
 		free(pfile, M_PANFROST);
 		return (error);
