@@ -896,10 +896,8 @@ rk_vop_create_pipeline(device_t dev, struct drm_device *drm)
 		sc->planes[i].id = i;
 	}
 
-	error = drm_crtc_init_with_planes(drm, &sc->crtc,
-	    &sc->planes[0].plane, &sc->planes[1].plane,
-	    &rk_vop_funcs,
-	    NULL);
+	error = drm_crtc_init_with_planes(drm, &sc->crtc, &sc->planes[0].plane,
+	    &sc->planes[1].plane, &rk_vop_funcs, NULL);
 	if (error != 0) {
 		device_printf(sc->dev,
 		    "%s: drm_crtc_init_with_planes failed\n", __func__);
