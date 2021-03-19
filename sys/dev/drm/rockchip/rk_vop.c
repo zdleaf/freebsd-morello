@@ -304,8 +304,8 @@ rk_vop_intr(void *arg)
 
 	status = VOP_READ(sc, RK3399_INTR_STATUS0);
 	dprintf("%s: status0 %x\n", __func__, status);
-	status = 0xffffffff;
-	VOP_WRITE(sc, RK3399_INTR_CLEAR0, status);
+
+	VOP_WRITE(sc, RK3399_INTR_CLEAR0, ~0);
 
 	atomic_add_32(&sc->vbl_counter, 1);
 	drm_crtc_handle_vblank(&sc->crtc);
@@ -850,7 +850,12 @@ static const struct drm_crtc_helper_funcs rk_vop_crtc_helper_funcs = {
 static int
 rk_vop_create_pipeline(device_t dev, struct drm_device *drm)
 {
+	enum drm_plane_type type;
 	struct rk_vop_softc *sc;
+	phandle_t node;
+	intptr_t xref;
+	int error;
+	int i;
 
 	sc = device_get_softc(dev);
 
@@ -868,11 +873,6 @@ rk_vop_create_pipeline(device_t dev, struct drm_device *drm)
 	AW_DE2_TCON_CREATE_CRTC(sc->tcon, drm,
 	    &sc->ui_planes[0].plane, &sc->vi_planes[0].plane);
 #endif
-
-	enum drm_plane_type type;
-	int error;
-	int i;
-
 
 	for (i = 0; i < 2; i++) {
 		if (i == 0)
@@ -909,9 +909,6 @@ rk_vop_create_pipeline(device_t dev, struct drm_device *drm)
 	drm_crtc_helper_add(&sc->crtc, &rk_vop_crtc_helper_funcs);
 
 	dprintf("%s: add encoder\n", __func__);
-
-	phandle_t node;
-	intptr_t xref;
 
 	if ((node = OF_finddevice("/hdmi")) == -1)
 		panic("could not find hdmi node");
