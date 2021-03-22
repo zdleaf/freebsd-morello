@@ -30,16 +30,16 @@
 #define	RK3399_WB_CBR_MST			0x002c
 
 #define	RK3399_WIN0_CTRL0			0x0030
-#define	 WIN0_CTRL0_LB_MODE_S	5
-#define	 WIN0_CTRL0_LB_MODE_M	(0x7 << WIN0_CTRL0_LB_MODE_S)
-#define	 WIN0_CTRL0_DATA_FMT_S	1
-#define	 WIN0_CTRL0_DATA_FMT_M	(0x7 << WIN0_CTRL0_DATA_FMT_S)
-#define	 WIN0_CTRL0_EN		(1 << 0)
+#define	 WIN0_CTRL0_LB_MODE_S			5
+#define	 WIN0_CTRL0_LB_MODE_M			(0x7 << WIN0_CTRL0_LB_MODE_S)
+#define	 WIN0_CTRL0_DATA_FMT_S			1
+#define	 WIN0_CTRL0_DATA_FMT_M			(0x7 << WIN0_CTRL0_DATA_FMT_S)
+#define	 WIN0_CTRL0_EN				(1 << 0)
 #define	RK3399_WIN0_CTRL1			0x0034
 #define	RK3399_WIN0_COLOR_KEY			0x0038
 #define	RK3399_WIN0_VIR				0x003c
-#define	 WIN0_VIR_WIDTH_RGB888(x) (((((x * 3) >> 2)+((x) % 3)) & 0x3fff) << 0)
-#define	 WIN0_VIR_WIDTH_ARGB888(x)   (((x) & 0x3fff) << 0)
+#define	 WIN0_VIR_WIDTH_RGB888(x)	((((((x) * 3) >> 2) + ((x) % 3)) & 0x3fff) << 0)
+#define	 WIN0_VIR_WIDTH_ARGB888(x)	(((x) & 0x3fff) << 0)
 #define	RK3399_WIN0_YRGB_MST			0x0040
 #define	RK3399_WIN0_CBR_MST			0x0044
 #define	RK3399_WIN0_ACT_INFO			0x0048
@@ -70,8 +70,8 @@
 #define	RK3399_WIN1_CTRL2			0x00ac
 
 #define	RK3399_WIN2_CTRL0			0x00b0
-#define	 WIN2_CTRL0_DATA_FMT_S	5
-#define	 WIN2_CTRL0_DATA_FMT_M	(0x3 << WIN0_CTRL0_DATA_FMT_S)
+#define	 WIN2_CTRL0_DATA_FMT_S			5
+#define	 WIN2_CTRL0_DATA_FMT_M			(0x3 << WIN0_CTRL0_DATA_FMT_S)
 #define	 WIN2_CTRL0_EN				(1 << 4)
 #define	RK3399_WIN2_CTRL1			0x00b4
 #define	RK3399_WIN2_VIR0_1			0x00b8
@@ -174,7 +174,7 @@
 #define	RK3399_AFBCD3_PIC_SIZE			0x0268
 #define	RK3399_AFBCD3_STATUS			0x026c
 #define	RK3399_INTR_EN0				0x0280
-#define	 INTR_EN0_FS_INTR	(1 << 5)
+#define	 INTR_EN0_FS_INTR			(1 << 5)
 #define	RK3399_INTR_CLEAR0			0x0284
 #define	RK3399_INTR_STATUS0			0x0288
 #define	RK3399_INTR_RAW_STATUS0			0x028c
@@ -253,44 +253,6 @@ enum vop_pol {
 	VSYNC_POSITIVE,
 	DEN_NEGATIVE,
 	DCLK_INVERT,
-};
-
-/* generic display timings */
-enum display_flags {
-	DISPLAY_FLAGS_HSYNC_LOW		= 1 << 0,
-	DISPLAY_FLAGS_HSYNC_HIGH	= 1 << 1,
-	DISPLAY_FLAGS_VSYNC_LOW		= 1 << 2,
-	DISPLAY_FLAGS_VSYNC_HIGH	= 1 << 3,
-	DISPLAY_FLAGS_DE_LOW		= 1 << 4,
-	DISPLAY_FLAGS_DE_HIGH		= 1 << 5,
-	DISPLAY_FLAGS_PIXDATA_POSEDGE	= 1 << 6,
-	DISPLAY_FLAGS_PIXDATA_NEGEDGE	= 1 << 7,
-	DISPLAY_FLAGS_INTERLACED	= 1 << 8,
-	DISPLAY_FLAGS_DOUBLESCAN	= 1 << 9,
-	DISPLAY_FLAGS_DOUBLECLK		= 1 << 10,
-};
-
-struct timing_entry {
-	uint32_t min;
-	uint32_t typ;
-	uint32_t max;
-};
-
-struct display_timing {
-	struct timing_entry pixelclock;
-
-	struct timing_entry hactive;		/* hor. active video */
-	struct timing_entry hfront_porch;	/* hor. front porch */
-	struct timing_entry hback_porch;	/* hor. back porch */
-	struct timing_entry hsync_len;		/* hor. sync len */
-
-	struct timing_entry vactive;		/* ver. active video */
-	struct timing_entry vfront_porch;	/* ver. front porch */
-	struct timing_entry vback_porch;	/* ver. back porch */
-	struct timing_entry vsync_len;		/* ver. sync len */
-
-	enum display_flags flags;		/* display flags */
-	bool hdmi_monitor;			/* is hdmi monitor? */
 };
 
 #endif /* !_ARM64_ROCKCHIP_RK3399_VOP_ */
