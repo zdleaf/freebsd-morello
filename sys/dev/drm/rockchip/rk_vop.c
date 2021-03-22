@@ -435,7 +435,10 @@ rk_vop_plane_atomic_update(struct drm_plane *plane,
 	struct drm_rect *src;
 	struct drm_rect *dst;
 	uint32_t dsp_stx, dsp_sty;
+	int rgb_mode;
+	int lb_mode;
 	int id;
+	int i;
 
 	state = plane->state;
 	dst = &state->dst;
@@ -492,13 +495,9 @@ rk_vop_plane_atomic_update(struct drm_plane *plane,
 	else
 		VOP_WRITE(sc, RK3399_WIN2_COLOR_KEY, reg);
 
-	int i;
 	for (i = 0; i < nitems(rk_vop_plane_formats); i++)
 		if (rk_vop_plane_formats[i] == state->fb->format->format)
 			break;
-
-	int rgb_mode;
-	int lb_mode;
 
 	rgb_mode = vop_convert_format(rk_vop_plane_formats[i]);
 	dprintf("fmt %d\n", rgb_mode);
@@ -585,14 +584,13 @@ static int
 rk_vop_enable_vblank(struct drm_crtc *crtc)
 {
 	struct rk_vop_softc *sc;
+	uint32_t reg;
 
 	dprintf("%s\n", __func__);
 
 	sc = container_of(crtc, struct rk_vop_softc, crtc);
 
 	DRM_DEBUG_DRIVER("%s: Enabling VBLANK\n", __func__);
-
-	uint32_t reg;
 
 	reg = VOP_READ(sc, RK3399_INTR_EN0);
 	reg |= INTR_EN0_FS_INTR;
@@ -721,18 +719,20 @@ rk_crtc_atomic_flush(struct drm_crtc *crtc,
 static void
 rk_crtc_atomic_enable(struct drm_crtc *crtc, struct drm_crtc_state *old_state)
 {
+	uint32_t hsync_len, vsync_len;
+	uint32_t hact_st, hact_end;
+	uint32_t vact_st, vact_end;
 	struct rk_vop_softc *sc;
 	struct drm_display_mode *adj;
 	uint32_t mode1;
 	uint32_t reg;
+	int pol;
 
 	adj = &crtc->state->adjusted_mode;
 
 	sc = container_of(crtc, struct rk_vop_softc, crtc);
 
 	dprintf("%s\n", __func__);
-
-	int pol;
 
 	pol = (1 << DCLK_INVERT);
 	if (adj->flags & DRM_MODE_FLAG_PHSYNC)
@@ -761,12 +761,12 @@ rk_crtc_atomic_enable(struct drm_crtc *crtc, struct drm_crtc_state *old_state)
 	reg |= (mode1 << DSP_CTRL0_OUT_MODE_S);
 	VOP_WRITE(sc, RK3399_DSP_CTRL0, reg);
 
-	uint32_t hsync_len = adj->hsync_end - adj->hsync_start;
-	uint32_t vsync_len = adj->vsync_end - adj->vsync_start;
-	uint32_t hact_st = adj->htotal - adj->hsync_start;
-	uint32_t hact_end = hact_st + adj->hdisplay;
-	uint32_t vact_st = adj->vtotal - adj->vsync_start;
-	uint32_t vact_end = vact_st + adj->vdisplay;
+	hsync_len = adj->hsync_end - adj->hsync_start;
+	vsync_len = adj->vsync_end - adj->vsync_start;
+	hact_st = adj->htotal - adj->hsync_start;
+	hact_end = hact_st + adj->hdisplay;
+	vact_st = adj->vtotal - adj->vsync_start;
+	vact_end = vact_st + adj->vdisplay;
 
 	reg = hsync_len;
 	reg |= adj->htotal << 16;
