@@ -192,11 +192,13 @@ rk_vop_clk_enable(device_t dev)
 		device_printf(sc->dev, "Cannot get 'axi' reset\n");
 		return (ENXIO);
 	}
+
 	error = hwreset_get_by_ofw_name(sc->dev, 0, "ahb", &sc->hwreset_ahb);
 	if (error != 0) {
 		device_printf(sc->dev, "Cannot get 'ahb' reset\n");
 		return (ENXIO);
 	}
+
 	error = hwreset_get_by_ofw_name(sc->dev, 0, "dclk", &sc->hwreset_dclk);
 	if (error != 0) {
 		device_printf(sc->dev, "Cannot get 'dclk' reset\n");
@@ -349,7 +351,7 @@ rk_vop_attach(device_t dev)
 	/* There is a single port node. */
 	node = ofw_bus_find_child(node, "port");
 	if (node != 0) {
-		printf("port node found, %d\n", node);
+		device_printf(sc->dev, "port node found, %d\n", node);
 		OF_device_register_xref(OF_xref_from_node(node), dev);
 	}
 
@@ -357,7 +359,7 @@ rk_vop_attach(device_t dev)
 	if (error != 0)
 		return (ENXIO);
 
-	printf("vop version: %x\n", VOP_READ(sc, RK3399_VERSION_INFO));
+	device_printf(sc->dev, "VOP version: %x\n", VOP_READ(sc, RK3399_VERSION_INFO));
 
 	return (0);
 }
