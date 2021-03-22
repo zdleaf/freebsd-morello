@@ -3743,8 +3743,8 @@ retry:
 	/* New mapping */
 	pmap_store(l3, new_l3);
 
-	cpu_dcache_wb_range((uint64_t)l3, 8);
-	cpu_dcache_wb_range((uint64_t)pde, 8);
+	cpu_dcache_wb_range((vm_offset_t)l3, sizeof(pt_entry_t));
+	cpu_dcache_wb_range((vm_offset_t)pde, sizeof(pd_entry_t));
 
 	pmap_resident_count_inc(pmap, 1);
 	dsb(ishst);
@@ -3779,7 +3779,7 @@ pmap_gremove(pmap_t pmap, vm_offset_t va)
 	if (pte != NULL) {
 		pmap_resident_count_dec(pmap, 1);
 		pmap_clear(pte);
-		cpu_dcache_wb_range((uint64_t)pte, 8);
+		cpu_dcache_wb_range((vm_offset_t)pte, sizeof(pt_entry_t));
 		rc = KERN_SUCCESS;
 	} else
 		rc = KERN_FAILURE;
