@@ -562,13 +562,7 @@ rk_vop_plane_atomic_update(struct drm_plane *plane,
 	else
 		VOP_WRITE(sc, RK3399_WIN2_MST0, paddr);
 
-	//reg = VOP_READ(sc, RK3399_WIN_CTRL0(id));
-	//reg |= WIN0_CTRL0_EN;
-	//VOP_WRITE(sc, RK3399_WIN_CTRL0(id), reg);
-
 	VOP_WRITE(sc, RK3399_REG_CFG_DONE, 1);
-
-	dprintf("%s: NEW buf paddr %x for plane %d\n", __func__, paddr, id);
 }
 
 static struct drm_plane_helper_funcs rk_vop_plane_helper_funcs = {
@@ -601,8 +595,7 @@ rk_vop_enable_vblank(struct drm_crtc *crtc)
 
 	DRM_DEBUG_DRIVER("%s: Enabling VBLANK\n", __func__);
 
-	reg = VOP_READ(sc, RK3399_INTR_EN0);
-	reg |= INTR_EN0_FS_INTR;
+	reg = INTR_EN0_FS_INTR;
 	reg |= 0xffff0000; /* Not sure why this is needed. */
 	VOP_WRITE(sc, RK3399_INTR_EN0, reg);
 
@@ -628,7 +621,8 @@ rk_vop_disable_vblank(struct drm_crtc *crtc)
 
 	dprintf("%s\n", __func__);
 
-	reg = 0xffff0000;
+	/* Disable all interrupts. */
+	reg = 0xffff0000; /* Not sure why this is needed. */
 	VOP_WRITE(sc, RK3399_INTR_EN0, reg);
 }
 
