@@ -884,8 +884,10 @@ rk_vop_create_pipeline(device_t dev, struct drm_device *drm)
 		    rk_vop_plane_formats,
 		    nitems(rk_vop_plane_formats),
 		    NULL, type, NULL);
-		if (error != 0)
-			panic("could not init plane");
+		if (error != 0) {
+			device_printf(sc->dev, "Could not init plane.");
+			return (error);
+		}
 		drm_plane_helper_add(&sc->planes[i].plane,
 		    &rk_vop_plane_helper_funcs);
 
