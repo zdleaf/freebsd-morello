@@ -299,9 +299,8 @@ rk_vop_intr(void *arg)
 	sc = arg;
 
 	status = VOP_READ(sc, RK3399_INTR_STATUS0);
-	dprintf("%s: status0 %x\n", __func__, status);
 
-	/* ack all the interrupts */
+	/* Ack all the interrupts. */
 	VOP_WRITE(sc, RK3399_INTR_CLEAR0, ~0);
 
 	if (status & INTR_STATUS0_FS_INTR) {
