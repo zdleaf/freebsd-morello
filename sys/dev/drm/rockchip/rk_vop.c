@@ -603,8 +603,7 @@ rk_vop_enable_vblank(struct drm_crtc *crtc)
 
 	reg = VOP_READ(sc, RK3399_INTR_EN0);
 	reg |= INTR_EN0_FS_INTR;
-	reg |= (1 << 0);
-	reg |= 0xffff0000;
+	reg |= 0xffff0000; /* Not sure why this is needed. */
 	VOP_WRITE(sc, RK3399_INTR_EN0, reg);
 
 	dprintf("%s: en0 %x\n", __func__,
