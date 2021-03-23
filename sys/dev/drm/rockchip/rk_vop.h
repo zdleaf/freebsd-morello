@@ -206,9 +206,10 @@
 #define	RK3399_AFBCD3_PIC_SIZE			0x0268
 #define	RK3399_AFBCD3_STATUS			0x026c
 #define	RK3399_INTR_EN0				0x0280
-#define	 INTR_EN0_FS_INTR			(1 << 5)
+#define	 INTR_EN0_FS_INTR			(1 << 5) /* Enable FS_INTR */
 #define	RK3399_INTR_CLEAR0			0x0284
 #define	RK3399_INTR_STATUS0			0x0288
+#define	 INTR_STATUS0_FS_INTR			(1 << 0) /* Frame sync intr */
 #define	RK3399_INTR_RAW_STATUS0			0x028c
 #define	RK3399_INTR_EN1				0x0290
 #define	RK3399_INTR_CLEAR1			0x0294

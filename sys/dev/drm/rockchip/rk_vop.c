@@ -301,10 +301,13 @@ rk_vop_intr(void *arg)
 	status = VOP_READ(sc, RK3399_INTR_STATUS0);
 	dprintf("%s: status0 %x\n", __func__, status);
 
+	/* ack all the interrupts */
 	VOP_WRITE(sc, RK3399_INTR_CLEAR0, ~0);
 
-	atomic_add_32(&sc->vbl_counter, 1);
-	drm_crtc_handle_vblank(&sc->crtc);
+	if (status & INTR_STATUS0_FS_INTR) {
+		atomic_add_32(&sc->vbl_counter, 1);
+		drm_crtc_handle_vblank(&sc->crtc);
+	}
 }
 
 static int
