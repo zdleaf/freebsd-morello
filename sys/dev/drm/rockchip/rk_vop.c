@@ -307,7 +307,11 @@ rk_vop_intr(void *arg)
 	if (status & INTR_STATUS0_FS_INTR) {
 		atomic_add_32(&sc->vbl_counter, 1);
 		drm_crtc_handle_vblank(&sc->crtc);
+		status &= ~INTR_STATUS0_FS_INTR;
 	}
+
+	if (status)
+		device_printf(sc->dev, "Unhandled intr %x\n", status);
 }
 
 static int
@@ -537,12 +541,14 @@ rk_vop_plane_atomic_update(struct drm_plane *plane,
 		VOP_WRITE(sc, RK3399_WIN2_CTRL0, reg);
 	}
 
+	/* Cursor plane alpha. */
 	if (state->fb->format->has_alpha && id > 0) {
-		VOP_WRITE(sc, RK3399_WIN2_DST_ALPHA_CTRL, (3 << 6));
-		reg = (1 << 0); //SRC_ALPHA_EN
-		reg |= (1 << 3); //SRC_BLEND_M0
-		reg |= (1 << 5); //SRC_ALPHA_CAL_M0
-		reg |= (1 << 6); //SRC_FACTOR_M0
+		VOP_WRITE(sc, RK3399_WIN2_DST_ALPHA_CTRL, DST_FACTOR_M0(3));
+
+		reg = SRC_ALPHA_EN;
+		reg |= 1 << SRC_BLEND_M0_S;
+		reg |= SRC_ALPHA_CAL_M0;
+		reg |= SRC_FACTOR_M0;
 		VOP_WRITE(sc, RK3399_WIN2_SRC_ALPHA_CTRL, reg);
 	}
 

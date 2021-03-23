@@ -116,10 +116,18 @@
 #define	RK3399_WIN2_DSP_INFO1			0x00d4
 #define	RK3399_WIN2_DSP_ST1			0x00d8
 #define	RK3399_WIN2_SRC_ALPHA_CTRL		0x00dc
+#define	 SRC_ALPHA_EN				(1 << 0)
+#define	 SRC_COLOR_M0				(1 << 1)
+#define	 SRC_ALPHA_M0				(1 << 2)
+#define	 SRC_BLEND_M0_S				3
+#define	 SRC_BLEND_M0_M				(0x3 << SRC_BLEND_M0_S)
+#define	 SRC_ALPHA_CAL_M0			(1 << 5)
+#define	 SRC_FACTOR_M0				(1 << 6)
 #define	RK3399_WIN2_MST2			0x00e0
 #define	RK3399_WIN2_DSP_INFO2			0x00e4
 #define	RK3399_WIN2_DSP_ST2			0x00e8
 #define	RK3399_WIN2_DST_ALPHA_CTRL		0x00ec
+#define	 DST_FACTOR_M0(x)			(((x) & 0x7) << 6)
 #define	RK3399_WIN2_MST3			0x00f0
 #define	RK3399_WIN2_DSP_INFO3			0x00f4
 #define	RK3399_WIN2_DSP_ST3			0x00f8
