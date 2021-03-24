@@ -153,7 +153,7 @@ dw_hdmi_connector_detect(struct drm_connector *connector, bool force)
 		if (DW_HDMI_PHY_DETECT_HPD(sc->phydev))
 			return (connector_status_connected);
 	} else {
-		/* Handle internal phy */
+		/* TODO: handle internal phy. */
 		return (connector_status_connected);
 	}
 
@@ -694,8 +694,10 @@ dw_hdmi_bridge_enable(struct drm_bridge *bridge)
 	    sc->mode.vsync_end - sc->mode.vsync_start);
 
 	/* Configure the PHY */
-	//DW_HDMI_PHY_CONFIG(sc->phydev, &sc->mode);
-	dw_hdmi_phy_init(sc);
+	if (sc->phydev != NULL)
+		DW_HDMI_PHY_CONFIG(sc->phydev, &sc->mode);
+	else /* Internal PHY. */
+		dw_hdmi_phy_init(sc);
 
 	/* 12 pixel clock cycles */
 	dw_hdmi_write(sc, DW_HDMI_FC_CTRLDUR, 12);
