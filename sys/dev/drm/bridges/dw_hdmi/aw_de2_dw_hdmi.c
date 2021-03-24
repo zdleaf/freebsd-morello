@@ -61,7 +61,7 @@ __FBSDID("$FreeBSD$");
 #include "syscon_if.h"
 #include "iicbus_if.h"
 
-/* Redefine msleep because of linuxkpi */
+/* Redefine msleep because of drmkpi */
 #undef msleep
 #define	msleep(chan, mtx, pri, wmesg, timo)				\
 	_sleep((chan), &(mtx)->lock_object, (pri), (wmesg),		\
@@ -93,6 +93,8 @@ struct dw_hdmi_softc {
 	uint8_t		i2cm_stat;
 	uint8_t		i2cm_addr;
 
+	uint32_t		reg_width;
+
 	struct drm_encoder	encoder;
 	struct drm_connector	connector;
 	struct drm_bridge	bridge;
@@ -120,12 +122,10 @@ static struct resource_spec dw_hdmi_spec[] = {
 	{ -1, 0 }
 };
 
-#define	DW_HDMI_READ_1(sc, reg)		bus_read_4((sc)->res[0], (reg << 2))
-#define	DW_HDMI_WRITE_1(sc, reg, val)	bus_write_4((sc)->res[0], (reg << 2), \
-    (val))
-#define	DW_HDMI_READ_4(sc, reg)		bus_read_4((sc)->res[0], (reg << 2))
-#define	DW_HDMI_WRITE_4(sc, reg, val)	bus_write_4((sc)->res[0], (reg << 2), \
-    (val))
+#define	DW_HDMI_READ_1(sc, reg)		bus_read_1((sc)->res[0], (reg))
+#define	DW_HDMI_WRITE_1(sc, reg, val)	bus_write_1((sc)->res[0], (reg), (val))
+#define	DW_HDMI_READ_4(sc, reg)		bus_read_4((sc)->res[0], (reg))
+#define	DW_HDMI_WRITE_4(sc, reg, val)	bus_write_4((sc)->res[0], (reg), (val))
 
 #define	DW_HDMI_LOCK(sc)		mtx_lock(&(sc)->mtx)
 #define	DW_HDMI_UNLOCK(sc)		mtx_unlock(&(sc)->mtx)
@@ -139,6 +139,9 @@ static int aw_de2_dw_hdmi_detach(device_t dev);
 static int rk_dw_hdmi_probe(device_t dev);
 static int rk_dw_hdmi_attach(device_t dev);
 static int rk_dw_hdmi_detach(device_t dev);
+
+static uint32_t dw_hdmi_read(struct dw_hdmi_softc *sc, uint32_t reg);
+static void dw_hdmi_write(struct dw_hdmi_softc *sc, uint32_t reg, uint32_t val);
 
 static enum drm_connector_status
 dw_hdmi_connector_detect(struct drm_connector *connector, bool force)
@@ -177,22 +180,22 @@ dw_hdmi_i2cm_init(struct dw_hdmi_softc *sc)
 printf("%s\n", __func__);
 
 	/* I2CM Setup */
-	DW_HDMI_WRITE_1(sc, DW_HDMI_PHY_I2CM_INT_ADDR, 0x08);
-	DW_HDMI_WRITE_1(sc, DW_HDMI_PHY_I2CM_CTLINT_ADDR, 0x88);
+	dw_hdmi_write(sc, DW_HDMI_PHY_I2CM_INT_ADDR, 0x08);
+	dw_hdmi_write(sc, DW_HDMI_PHY_I2CM_CTLINT_ADDR, 0x88);
 
 	/* Soft reset */
-	DW_HDMI_WRITE_1(sc, DW_HDMI_I2CM_SOFTRSTZ, 0);
+	dw_hdmi_write(sc, DW_HDMI_I2CM_SOFTRSTZ, 0);
 
 	/* standard speed mode */
-	DW_HDMI_WRITE_1(sc, DW_HDMI_I2CM_DIV, 0);
+	dw_hdmi_write(sc, DW_HDMI_I2CM_DIV, 0);
 
-	DW_HDMI_WRITE_1(sc, DW_HDMI_I2CM_INT,
+	dw_hdmi_write(sc, DW_HDMI_I2CM_INT,
 	    DW_HDMI_I2CM_INT_DONE_POL);
-	DW_HDMI_WRITE_1(sc, DW_HDMI_I2CM_CLINT,
+	dw_hdmi_write(sc, DW_HDMI_I2CM_CLINT,
 	    DW_HDMI_I2CM_CLINT_NACK_POL | DW_HDMI_I2CM_CLINT_ARB_POL);
 
 	/* Clear interrupts */
-	DW_HDMI_WRITE_1(sc, DW_HDMI_IH_I2CM_STAT0,
+	dw_hdmi_write(sc, DW_HDMI_IH_I2CM_STAT0,
 	  DW_HDMI_IH_I2CM_STAT0_ERROR |
 	  DW_HDMI_IH_I2CM_STAT0_DONE);
 }
@@ -205,9 +208,9 @@ dw_hdmi_i2c_write(struct dw_hdmi_softc *sc, uint8_t *buf, uint16_t len)
 printf("%s\n", __func__);
 
 	for (i = 0; i < len; i++) {
-		DW_HDMI_WRITE_1(sc, DW_HDMI_I2CM_DATAO, buf[i]);
-		DW_HDMI_WRITE_1(sc, DW_HDMI_I2CM_ADDRESS, i);
-		DW_HDMI_WRITE_1(sc, DW_HDMI_I2CM_OP, DW_HDMI_I2CM_OP_WR);
+		dw_hdmi_write(sc, DW_HDMI_I2CM_DATAO, buf[i]);
+		dw_hdmi_write(sc, DW_HDMI_I2CM_ADDRESS, i);
+		dw_hdmi_write(sc, DW_HDMI_I2CM_OP, DW_HDMI_I2CM_OP_WR);
 
 		while (err == 0 && sc->i2cm_stat == 0) {
 			err = msleep(sc, &sc->mtx, 0, "dw_hdmi_ddc", 10 * hz);
@@ -228,8 +231,8 @@ dw_hdmi_i2c_read(struct dw_hdmi_softc *sc, uint8_t *buf, uint16_t len)
 printf("%s\n", __func__);
 
 	for (i = 0; i < len; i++) {
-		DW_HDMI_WRITE_1(sc, DW_HDMI_I2CM_ADDRESS, sc->i2cm_addr++);
-		DW_HDMI_WRITE_1(sc, DW_HDMI_I2CM_OP, DW_HDMI_I2CM_OP_RD);
+		dw_hdmi_write(sc, DW_HDMI_I2CM_ADDRESS, sc->i2cm_addr++);
+		dw_hdmi_write(sc, DW_HDMI_I2CM_OP, DW_HDMI_I2CM_OP_RD);
 
 		while (err == 0 && sc->i2cm_stat == 0) {
 			err = msleep(sc, &sc->mtx, 0, "dw_hdmi_ddc", 10 * hz);
@@ -239,7 +242,7 @@ printf("%s\n", __func__);
 			return (ENXIO);
 		}
 
-		buf[i] = DW_HDMI_READ_1(sc, DW_HDMI_I2CM_DATAI);
+		buf[i] = dw_hdmi_read(sc, DW_HDMI_I2CM_DATAI);
 		sc->i2cm_stat = 0;
 	}
 
@@ -261,11 +264,11 @@ printf("%s\n", __func__);
 	for (i = 0; i < nmsgs; i++) {
 		sc->i2cm_stat = 0;
 		/* Unmute done and error interrups */
-		DW_HDMI_WRITE_1(sc, DW_HDMI_IH_MUTE_I2CM_STAT0, 0x00);
+		dw_hdmi_write(sc, DW_HDMI_IH_MUTE_I2CM_STAT0, 0x00);
 
 		/* Set DDC seg/addr */
-		DW_HDMI_WRITE_1(sc, DW_HDMI_I2CM_SLAVE, msgs[i].slave >> 1);
-		DW_HDMI_WRITE_1(sc, DW_HDMI_I2CM_SEGADDR, DDC_SEGMENT_ADDR);
+		dw_hdmi_write(sc, DW_HDMI_I2CM_SLAVE, msgs[i].slave >> 1);
+		dw_hdmi_write(sc, DW_HDMI_I2CM_SEGADDR, DDC_SEGMENT_ADDR);
 
 		if (msgs[i].flags & IIC_M_RD)
 			ret = dw_hdmi_i2c_read(sc, msgs[i].buf, msgs[i].len);
@@ -282,7 +285,7 @@ printf("%s\n", __func__);
 	}
 
 	/* mute done and error interrups */
-	DW_HDMI_WRITE_1(sc, DW_HDMI_IH_MUTE_I2CM_STAT0, 0xFF);
+	dw_hdmi_write(sc, DW_HDMI_IH_MUTE_I2CM_STAT0, 0xFF);
 
 	DW_HDMI_UNLOCK(sc);
 	return (0);
@@ -380,17 +383,17 @@ dw_hdmi_dump_vp_regs(struct dw_hdmi_softc *sc)
 printf("%s\n", __func__);
 
 	DRM_DEBUG_DRIVER("%s: DW_HDMI VP Registers\n", __func__);
-	reg = DW_HDMI_READ_1(sc, DW_HDMI_VP_STATUS);
+	reg = dw_hdmi_read(sc, DW_HDMI_VP_STATUS);
 	DRM_DEBUG_DRIVER("%s: DW_HDMI_VP_STATUS: %x\n", __func__, reg);
-	reg = DW_HDMI_READ_1(sc, DW_HDMI_VP_PR_CD);
+	reg = dw_hdmi_read(sc, DW_HDMI_VP_PR_CD);
 	DRM_DEBUG_DRIVER("%s: DW_HDMI_VP_PR_CD: %x\n", __func__, reg);
-	reg = DW_HDMI_READ_1(sc, DW_HDMI_VP_STUFF);
+	reg = dw_hdmi_read(sc, DW_HDMI_VP_STUFF);
 	DRM_DEBUG_DRIVER("%s: DW_HDMI_VP_STUFF: %x\n", __func__, reg);
-	reg = DW_HDMI_READ_1(sc, DW_HDMI_VP_REMAP);
+	reg = dw_hdmi_read(sc, DW_HDMI_VP_REMAP);
 	DRM_DEBUG_DRIVER("%s: DW_HDMI_VP_REMAP: %x\n", __func__, reg);
-	reg = DW_HDMI_READ_1(sc, DW_HDMI_VP_CONF);
+	reg = dw_hdmi_read(sc, DW_HDMI_VP_CONF);
 	DRM_DEBUG_DRIVER("%s: DW_HDMI_VP_CONF: %x\n", __func__, reg);
-	reg = DW_HDMI_READ_1(sc, DW_HDMI_VP_MASK);
+	reg = dw_hdmi_read(sc, DW_HDMI_VP_MASK);
 	DRM_DEBUG_DRIVER("%s: DW_HDMI_VP_MASK: %x\n", __func__, reg);
 }
 
@@ -402,41 +405,41 @@ dw_hdmi_dump_fc_regs(struct dw_hdmi_softc *sc)
 printf("%s\n", __func__);
 
 	DRM_DEBUG_DRIVER("%s: DW_HDMI FC Registers\n", __func__);
-	reg = DW_HDMI_READ_1(sc, DW_HDMI_FC_INVIDCONF);
+	reg = dw_hdmi_read(sc, DW_HDMI_FC_INVIDCONF);
 	DRM_DEBUG_DRIVER("%s: DW_HDMI_FC_INVIDCONF: %d\n", __func__, reg);
-	reg = DW_HDMI_READ_1(sc, DW_HDMI_FC_INHACTIV0);
+	reg = dw_hdmi_read(sc, DW_HDMI_FC_INHACTIV0);
 	DRM_DEBUG_DRIVER("%s: DW_HDMI_FC_INHACTIV0: %d\n", __func__, reg);
-	reg = DW_HDMI_READ_1(sc, DW_HDMI_FC_INHACTIV1);
+	reg = dw_hdmi_read(sc, DW_HDMI_FC_INHACTIV1);
 	DRM_DEBUG_DRIVER("%s: DW_HDMI_FC_INHACTIV1: %d\n", __func__, reg);
-	reg = DW_HDMI_READ_1(sc, DW_HDMI_FC_INHBLANK0);
+	reg = dw_hdmi_read(sc, DW_HDMI_FC_INHBLANK0);
 	DRM_DEBUG_DRIVER("%s: DW_HDMI_FC_INHBLANK0: %d\n", __func__, reg);
-	reg = DW_HDMI_READ_1(sc, DW_HDMI_FC_INHBLANK1);
+	reg = dw_hdmi_read(sc, DW_HDMI_FC_INHBLANK1);
 	DRM_DEBUG_DRIVER("%s: DW_HDMI_FC_INHBLANK1: %d\n", __func__, reg);
-	reg = DW_HDMI_READ_1(sc, DW_HDMI_FC_INVACTIV0);
+	reg = dw_hdmi_read(sc, DW_HDMI_FC_INVACTIV0);
 	DRM_DEBUG_DRIVER("%s: DW_HDMI_FC_INVACTIV1: %d\n", __func__, reg);
-	reg = DW_HDMI_READ_1(sc, DW_HDMI_FC_HSYNCINDELAY0);
+	reg = dw_hdmi_read(sc, DW_HDMI_FC_HSYNCINDELAY0);
 	DRM_DEBUG_DRIVER("%s: DW_HDMI_FC_HSYNCINDELAY0: %d\n", __func__, reg);
-	reg = DW_HDMI_READ_1(sc, DW_HDMI_FC_HSYNCINDELAY1);
+	reg = dw_hdmi_read(sc, DW_HDMI_FC_HSYNCINDELAY1);
 	DRM_DEBUG_DRIVER("%s: DW_HDMI_FC_HSYNCINDELAY1: %d\n", __func__, reg);
-	reg = DW_HDMI_READ_1(sc, DW_HDMI_FC_HSYNCINWIDTH0);
+	reg = dw_hdmi_read(sc, DW_HDMI_FC_HSYNCINWIDTH0);
 	DRM_DEBUG_DRIVER("%s: DW_HDMI_FC_HSYNCINWIDTH0: %d\n", __func__, reg);
-	reg = DW_HDMI_READ_1(sc, DW_HDMI_FC_HSYNCINWIDTH1);
+	reg = dw_hdmi_read(sc, DW_HDMI_FC_HSYNCINWIDTH1);
 	DRM_DEBUG_DRIVER("%s: DW_HDMI_FC_HSYNCINWIDTH1: %d\n", __func__, reg);
-	reg = DW_HDMI_READ_1(sc, DW_HDMI_FC_VSYNCINDELAY);
+	reg = dw_hdmi_read(sc, DW_HDMI_FC_VSYNCINDELAY);
 	DRM_DEBUG_DRIVER("%s: DW_HDMI_FC_VSYNCINDELAY: %d\n", __func__, reg);
-	reg = DW_HDMI_READ_1(sc, DW_HDMI_FC_VSYNCINWIDTH);
+	reg = dw_hdmi_read(sc, DW_HDMI_FC_VSYNCINWIDTH);
 	DRM_DEBUG_DRIVER("%s: DW_HDMI_FC_VSYNCINWIDTH: %d\n", __func__, reg);
-	reg = DW_HDMI_READ_1(sc, DW_HDMI_FC_CTRLDUR);
+	reg = dw_hdmi_read(sc, DW_HDMI_FC_CTRLDUR);
 	DRM_DEBUG_DRIVER("%s: DW_HDMI_FC_CTRLDUR: %d\n", __func__, reg);
-	reg = DW_HDMI_READ_1(sc, DW_HDMI_FC_EXCTRLDUR);
+	reg = dw_hdmi_read(sc, DW_HDMI_FC_EXCTRLDUR);
 	DRM_DEBUG_DRIVER("%s: DW_HDMI_FC_EXCTRLDUR: %d\n", __func__, reg);
-	reg = DW_HDMI_READ_1(sc, DW_HDMI_FC_EXCTRLSPAC);
+	reg = dw_hdmi_read(sc, DW_HDMI_FC_EXCTRLSPAC);
 	DRM_DEBUG_DRIVER("%s: DW_HDMI_FC_EXCTRLSPAC: %d\n", __func__, reg);
-	reg = DW_HDMI_READ_1(sc, DW_HDMI_FC_CH0PREAM);
+	reg = dw_hdmi_read(sc, DW_HDMI_FC_CH0PREAM);
 	DRM_DEBUG_DRIVER("%s: DW_HDMI_FC_CH0PREAM: %d\n", __func__, reg);
-	reg = DW_HDMI_READ_1(sc, DW_HDMI_FC_CH1PREAM);
+	reg = dw_hdmi_read(sc, DW_HDMI_FC_CH1PREAM);
 	DRM_DEBUG_DRIVER("%s: DW_HDMI_FC_CH1PREAM: %d\n", __func__, reg);
-	reg = DW_HDMI_READ_1(sc, DW_HDMI_FC_CH2PREAM);
+	reg = dw_hdmi_read(sc, DW_HDMI_FC_CH2PREAM);
 	DRM_DEBUG_DRIVER("%s: DW_HDMI_FC_CH2PREAM: %d\n", __func__, reg);
 }
 
@@ -445,10 +448,10 @@ dw_hdmi_phy_sel_data_en_pol(struct dw_hdmi_softc *sc, uint8_t enable)
 {
 	uint8_t reg;
 
-	reg = DW_HDMI_READ_1(sc, HDMI_PHY_CONF0);
+	reg = dw_hdmi_read(sc, HDMI_PHY_CONF0);
 	reg &= ~HDMI_PHY_CONF0_SELDATAENPOL_MASK;
 	reg |= (enable << HDMI_PHY_CONF0_SELDATAENPOL_OFFSET);
-	DW_HDMI_WRITE_1(sc, HDMI_PHY_CONF0, reg);
+	dw_hdmi_write(sc, HDMI_PHY_CONF0, reg);
 }
 
 static void
@@ -456,10 +459,10 @@ dw_hdmi_phy_sel_interface_control(struct dw_hdmi_softc *sc, uint8_t enable)
 {
 	uint8_t reg;
 
-	reg = DW_HDMI_READ_1(sc, HDMI_PHY_CONF0);
+	reg = dw_hdmi_read(sc, HDMI_PHY_CONF0);
 	reg &= ~HDMI_PHY_CONF0_SELDIPIF_MASK;
 	reg |= (enable << HDMI_PHY_CONF0_SELDIPIF_OFFSET);
-	DW_HDMI_WRITE_1(sc, HDMI_PHY_CONF0, reg);
+	dw_hdmi_write(sc, HDMI_PHY_CONF0, reg);
 }
 
 static void
@@ -467,10 +470,10 @@ dw_hdmi_phy_enable_tmds(struct dw_hdmi_softc *sc, uint8_t enable)
 {
 	uint8_t reg;
 
-	reg = DW_HDMI_READ_1(sc, HDMI_PHY_CONF0);
+	reg = dw_hdmi_read(sc, HDMI_PHY_CONF0);
 	reg &= ~HDMI_PHY_CONF0_ENTMDS_MASK;
 	reg |= (enable << HDMI_PHY_CONF0_ENTMDS_OFFSET);
-	DW_HDMI_WRITE_1(sc, HDMI_PHY_CONF0, reg);
+	dw_hdmi_write(sc, HDMI_PHY_CONF0, reg);
 }
 
 static void
@@ -478,10 +481,10 @@ dw_hdmi_phy_enable_power(struct dw_hdmi_softc *sc, uint8_t enable)
 {
 	uint8_t reg;
 
-	reg = DW_HDMI_READ_1(sc, HDMI_PHY_CONF0);
+	reg = dw_hdmi_read(sc, HDMI_PHY_CONF0);
 	reg &= ~HDMI_PHY_CONF0_PDZ_MASK;
 	reg |= (enable << HDMI_PHY_CONF0_PDZ_OFFSET);
-	DW_HDMI_WRITE_1(sc, HDMI_PHY_CONF0, reg);
+	dw_hdmi_write(sc, HDMI_PHY_CONF0, reg);
 }
 
 static void
@@ -489,10 +492,10 @@ dw_hdmi_phy_enable_spare(struct dw_hdmi_softc *sc, uint8_t enable)
 {
 	uint8_t reg;
 
-	reg = DW_HDMI_READ_1(sc, HDMI_PHY_CONF0);
+	reg = dw_hdmi_read(sc, HDMI_PHY_CONF0);
 	reg &= ~HDMI_PHY_CONF0_SPARECTRL_MASK;
 	reg |= (enable << HDMI_PHY_CONF0_SPARECTRL_OFFSET);
-	DW_HDMI_WRITE_1(sc, HDMI_PHY_CONF0, reg);
+	dw_hdmi_write(sc, HDMI_PHY_CONF0, reg);
 }
 
 static void
@@ -500,10 +503,10 @@ dw_hdmi_phy_gen2_txpwron(struct dw_hdmi_softc *sc, uint8_t enable)
 {
 	uint8_t reg;
 
-	reg = DW_HDMI_READ_1(sc, HDMI_PHY_CONF0);
+	reg = dw_hdmi_read(sc, HDMI_PHY_CONF0);
 	reg &= ~HDMI_PHY_CONF0_GEN2_TXPWRON_MASK;
 	reg |= (enable << HDMI_PHY_CONF0_GEN2_TXPWRON_OFFSET);
-	DW_HDMI_WRITE_1(sc, HDMI_PHY_CONF0, reg);
+	dw_hdmi_write(sc, HDMI_PHY_CONF0, reg);
 }
 
 static void
@@ -511,10 +514,10 @@ dw_hdmi_phy_gen2_pddq(struct dw_hdmi_softc *sc, uint8_t enable)
 {
 	uint8_t reg;
 
-	reg = DW_HDMI_READ_1(sc, HDMI_PHY_CONF0);
+	reg = dw_hdmi_read(sc, HDMI_PHY_CONF0);
 	reg &= ~HDMI_PHY_CONF0_GEN2_PDDQ_MASK;
 	reg |= (enable << HDMI_PHY_CONF0_GEN2_PDDQ_OFFSET);
-	DW_HDMI_WRITE_1(sc, HDMI_PHY_CONF0, reg);
+	dw_hdmi_write(sc, HDMI_PHY_CONF0, reg);
 }
 
 static inline void
@@ -522,11 +525,11 @@ dw_hdmi_phy_test_clear(struct dw_hdmi_softc *sc, unsigned char bit)
 {
 	uint8_t val;
 
-	val = DW_HDMI_READ_1(sc, HDMI_PHY_TST0);
+	val = dw_hdmi_read(sc, HDMI_PHY_TST0);
 	val &= ~HDMI_PHY_TST0_TSTCLR_MASK;
 	val |= (bit << HDMI_PHY_TST0_TSTCLR_OFFSET) &
 		HDMI_PHY_TST0_TSTCLR_MASK;
-	DW_HDMI_WRITE_1(sc, HDMI_PHY_TST0, val);
+	dw_hdmi_write(sc, HDMI_PHY_TST0, val);
 }
 
 static void
@@ -534,14 +537,14 @@ dw_hdmi_phy_wait_i2c_done(struct dw_hdmi_softc *sc, int msec)
 {
 	uint8_t val;
 
-	val = DW_HDMI_READ_1(sc, HDMI_IH_I2CMPHY_STAT0) &
+	val = dw_hdmi_read(sc, HDMI_IH_I2CMPHY_STAT0) &
 	    (HDMI_IH_I2CMPHY_STAT0_DONE | HDMI_IH_I2CMPHY_STAT0_ERROR);
 	while (val == 0) {
 		pause("HDMI_PHY", hz/100);
 		msec -= 10;
 		if (msec <= 0)
 			return;
-		val = DW_HDMI_READ_1(sc, HDMI_IH_I2CMPHY_STAT0) &
+		val = dw_hdmi_read(sc, HDMI_IH_I2CMPHY_STAT0) &
 		    (HDMI_IH_I2CMPHY_STAT0_DONE | HDMI_IH_I2CMPHY_STAT0_ERROR);
 	}
 }
@@ -552,12 +555,12 @@ dw_hdmi_phy_i2c_write(struct dw_hdmi_softc *sc, unsigned short data,
 {
 
 	/* clear DONE and ERROR flags */
-	DW_HDMI_WRITE_1(sc, HDMI_IH_I2CMPHY_STAT0,
+	dw_hdmi_write(sc, HDMI_IH_I2CMPHY_STAT0,
 	    HDMI_IH_I2CMPHY_STAT0_DONE | HDMI_IH_I2CMPHY_STAT0_ERROR);
-	DW_HDMI_WRITE_1(sc, HDMI_PHY_I2CM_ADDRESS_ADDR, addr);
-	DW_HDMI_WRITE_1(sc, HDMI_PHY_I2CM_DATAO_1_ADDR, ((data >> 8) & 0xff));
-	DW_HDMI_WRITE_1(sc, HDMI_PHY_I2CM_DATAO_0_ADDR, ((data >> 0) & 0xff));
-	DW_HDMI_WRITE_1(sc, HDMI_PHY_I2CM_OPERATION_ADDR, HDMI_PHY_I2CM_OPERATION_ADDR_WRITE);
+	dw_hdmi_write(sc, HDMI_PHY_I2CM_ADDRESS_ADDR, addr);
+	dw_hdmi_write(sc, HDMI_PHY_I2CM_DATAO_1_ADDR, ((data >> 8) & 0xff));
+	dw_hdmi_write(sc, HDMI_PHY_I2CM_DATAO_0_ADDR, ((data >> 0) & 0xff));
+	dw_hdmi_write(sc, HDMI_PHY_I2CM_OPERATION_ADDR, HDMI_PHY_I2CM_OPERATION_ADDR_WRITE);
 	dw_hdmi_phy_wait_i2c_done(sc, 1000);
 }
 
@@ -567,7 +570,7 @@ dw_hdmi_phy_configure(struct dw_hdmi_softc *sc)
 	uint8_t val;
 	uint8_t msec;
 
-	DW_HDMI_WRITE_1(sc, HDMI_MC_FLOWCTRL, HDMI_MC_FLOWCTRL_FEED_THROUGH_OFF_CSC_BYPASS);
+	dw_hdmi_write(sc, HDMI_MC_FLOWCTRL, HDMI_MC_FLOWCTRL_FEED_THROUGH_OFF_CSC_BYPASS);
 
 	/* gen2 tx power off */
 	dw_hdmi_phy_gen2_txpwron(sc, 0);
@@ -576,13 +579,13 @@ dw_hdmi_phy_configure(struct dw_hdmi_softc *sc)
 	dw_hdmi_phy_gen2_pddq(sc, 1);
 
 	/* PHY reset */
-	DW_HDMI_WRITE_1(sc, HDMI_MC_PHYRSTZ, HDMI_MC_PHYRSTZ_DEASSERT);
-	DW_HDMI_WRITE_1(sc, HDMI_MC_PHYRSTZ, HDMI_MC_PHYRSTZ_ASSERT);
+	dw_hdmi_write(sc, HDMI_MC_PHYRSTZ, HDMI_MC_PHYRSTZ_DEASSERT);
+	dw_hdmi_write(sc, HDMI_MC_PHYRSTZ, HDMI_MC_PHYRSTZ_ASSERT);
 
-	DW_HDMI_WRITE_1(sc, HDMI_MC_HEACPHY_RST, HDMI_MC_HEACPHY_RST_ASSERT);
+	dw_hdmi_write(sc, HDMI_MC_HEACPHY_RST, HDMI_MC_HEACPHY_RST_ASSERT);
 
 	dw_hdmi_phy_test_clear(sc, 1);
-	DW_HDMI_WRITE_1(sc, HDMI_PHY_I2CM_SLAVE_ADDR, HDMI_PHY_I2CM_SLAVE_ADDR_PHY_GEN2);
+	dw_hdmi_write(sc, HDMI_PHY_I2CM_SLAVE_ADDR, HDMI_PHY_I2CM_SLAVE_ADDR_PHY_GEN2);
 	dw_hdmi_phy_test_clear(sc, 0);
 
 	/*
@@ -620,14 +623,14 @@ dw_hdmi_phy_configure(struct dw_hdmi_softc *sc)
 
 	/* Wait for PHY PLL lock */
 	msec = 4;
-	val = DW_HDMI_READ_1(sc, HDMI_PHY_STAT0) & HDMI_PHY_TX_PHY_LOCK;
+	val = dw_hdmi_read(sc, HDMI_PHY_STAT0) & HDMI_PHY_TX_PHY_LOCK;
 	while (val == 0) {
 		DELAY(1000);
 		if (msec-- == 0) {
 			device_printf(sc->dev, "PHY PLL not locked\n");
 			return (-1);
 		}
-		val = DW_HDMI_READ_1(sc, HDMI_PHY_STAT0) & HDMI_PHY_TX_PHY_LOCK;
+		val = dw_hdmi_read(sc, HDMI_PHY_STAT0) & HDMI_PHY_TX_PHY_LOCK;
 	}
 
 	return true;
@@ -679,8 +682,8 @@ printf("%s: sc %p\n", __func__, sc);
 	    sc->mode.vsync_end);
 
 	/* VP stuff, need to find what's really needed */
-	DW_HDMI_WRITE_1(sc, DW_HDMI_VP_STUFF, 0x27);
-	DW_HDMI_WRITE_1(sc, DW_HDMI_VP_CONF, 0x47);
+	dw_hdmi_write(sc, DW_HDMI_VP_STUFF, 0x27);
+	dw_hdmi_write(sc, DW_HDMI_VP_CONF, 0x47);
 
 	/* AV composer setup */
 	reg = (sc->mode.flags & DRM_MODE_FLAG_PVSYNC) ?
@@ -694,30 +697,30 @@ printf("%s: sc %p\n", __func__, sc);
 
 	/* Will need to depend on drm_detect_hdmi_monitor return value */
 	reg |= DW_HDMI_FC_INVIDCONF_HDMI_MODE;
-	DW_HDMI_WRITE_1(sc, DW_HDMI_FC_INVIDCONF, reg);
+	dw_hdmi_write(sc, DW_HDMI_FC_INVIDCONF, reg);
 
 	/* Frame composer setup */
-	DW_HDMI_WRITE_1(sc, DW_HDMI_FC_INHACTIV0, sc->mode.hdisplay & 0xFF);
-	DW_HDMI_WRITE_1(sc, DW_HDMI_FC_INHACTIV1, sc->mode.hdisplay >> 8);
-	DW_HDMI_WRITE_1(sc, DW_HDMI_FC_INHBLANK0,
+	dw_hdmi_write(sc, DW_HDMI_FC_INHACTIV0, sc->mode.hdisplay & 0xFF);
+	dw_hdmi_write(sc, DW_HDMI_FC_INHACTIV1, sc->mode.hdisplay >> 8);
+	dw_hdmi_write(sc, DW_HDMI_FC_INHBLANK0,
 	    (sc->mode.htotal - sc->mode.hdisplay) & 0xFF);
-	DW_HDMI_WRITE_1(sc, DW_HDMI_FC_INHBLANK1,
+	dw_hdmi_write(sc, DW_HDMI_FC_INHBLANK1,
 	    (sc->mode.htotal - sc->mode.hdisplay) >> 8);
-	DW_HDMI_WRITE_1(sc, DW_HDMI_FC_INVACTIV0, sc->mode.vdisplay & 0xFF);
-	DW_HDMI_WRITE_1(sc, DW_HDMI_FC_INVACTIV1, sc->mode.vdisplay >> 8);
-	DW_HDMI_WRITE_1(sc, DW_HDMI_FC_INVBLANK,
+	dw_hdmi_write(sc, DW_HDMI_FC_INVACTIV0, sc->mode.vdisplay & 0xFF);
+	dw_hdmi_write(sc, DW_HDMI_FC_INVACTIV1, sc->mode.vdisplay >> 8);
+	dw_hdmi_write(sc, DW_HDMI_FC_INVBLANK,
 	    sc->mode.vtotal - sc->mode.vdisplay);
-	DW_HDMI_WRITE_1(sc, DW_HDMI_FC_HSYNCINDELAY0,
+	dw_hdmi_write(sc, DW_HDMI_FC_HSYNCINDELAY0,
 	    (sc->mode.hsync_start - sc->mode.hdisplay) & 0xFF);
-	DW_HDMI_WRITE_1(sc, DW_HDMI_FC_HSYNCINDELAY1,
+	dw_hdmi_write(sc, DW_HDMI_FC_HSYNCINDELAY1,
 	    (sc->mode.hsync_start - sc->mode.hdisplay) >> 8);
-	DW_HDMI_WRITE_1(sc, DW_HDMI_FC_HSYNCINWIDTH0,
+	dw_hdmi_write(sc, DW_HDMI_FC_HSYNCINWIDTH0,
 	    (sc->mode.hsync_end - sc->mode.hsync_start) & 0xFF);
-	DW_HDMI_WRITE_1(sc, DW_HDMI_FC_HSYNCINWIDTH1,
+	dw_hdmi_write(sc, DW_HDMI_FC_HSYNCINWIDTH1,
 	    (sc->mode.hsync_end - sc->mode.hsync_start) >> 8);
-	DW_HDMI_WRITE_1(sc, DW_HDMI_FC_VSYNCINDELAY,
+	dw_hdmi_write(sc, DW_HDMI_FC_VSYNCINDELAY,
 	    sc->mode.vsync_start - sc->mode.vdisplay);
-	DW_HDMI_WRITE_1(sc, DW_HDMI_FC_VSYNCINWIDTH,
+	dw_hdmi_write(sc, DW_HDMI_FC_VSYNCINWIDTH,
 	    sc->mode.vsync_end - sc->mode.vsync_start);
 
 	printf("conf phy\n");
@@ -727,16 +730,16 @@ printf("%s: sc %p\n", __func__, sc);
 	printf("conf phy done\n");
 
 	/* 12 pixel clock cycles */
-	DW_HDMI_WRITE_1(sc, DW_HDMI_FC_CTRLDUR, 12);
+	dw_hdmi_write(sc, DW_HDMI_FC_CTRLDUR, 12);
 	/* 32 pixel clock cycles */
-	DW_HDMI_WRITE_1(sc, DW_HDMI_FC_EXCTRLDUR, 32);
+	dw_hdmi_write(sc, DW_HDMI_FC_EXCTRLDUR, 32);
 	/* 1 50msec spacing */
-	DW_HDMI_WRITE_1(sc, DW_HDMI_FC_EXCTRLSPAC, 1);
+	dw_hdmi_write(sc, DW_HDMI_FC_EXCTRLSPAC, 1);
 
 	/* pream defaults */
-	DW_HDMI_WRITE_1(sc, DW_HDMI_FC_CH0PREAM, 11);
-	DW_HDMI_WRITE_1(sc, DW_HDMI_FC_CH1PREAM, 22);
-	DW_HDMI_WRITE_1(sc, DW_HDMI_FC_CH2PREAM, 33);
+	dw_hdmi_write(sc, DW_HDMI_FC_CH0PREAM, 11);
+	dw_hdmi_write(sc, DW_HDMI_FC_CH1PREAM, 22);
+	dw_hdmi_write(sc, DW_HDMI_FC_CH2PREAM, 33);
 
 	/* Enable pixel clock and TMDS clock */
 	reg = DW_HDMI_MC_CLKDIS_PREPCLK |
@@ -745,10 +748,10 @@ printf("%s: sc %p\n", __func__, sc);
 		DW_HDMI_MC_CLKDIS_CECCLK |
 		DW_HDMI_MC_CLKDIS_HDCPCLK;
 	reg &= ~DW_HDMI_MC_CLKDIS_PIXELCLK;
-	DW_HDMI_WRITE_1(sc, DW_HDMI_MC_CLKDIS, reg);
+	dw_hdmi_write(sc, DW_HDMI_MC_CLKDIS, reg);
 
 	reg &= ~DW_HDMI_MC_CLKDIS_TMDSCLK;
-	DW_HDMI_WRITE_1(sc, DW_HDMI_MC_CLKDIS, reg);
+	dw_hdmi_write(sc, DW_HDMI_MC_CLKDIS, reg);
 
 	if (__drm_debug & DRM_UT_DRIVER) {
 		dw_hdmi_dump_vp_regs(sc);
@@ -877,10 +880,10 @@ dw_hdmi_intr(void *arg)
 
 printf("%s\n", __func__);
 
-	sc->i2cm_stat = DW_HDMI_READ_1(sc, DW_HDMI_IH_I2CM_STAT0);
+	sc->i2cm_stat = dw_hdmi_read(sc, DW_HDMI_IH_I2CM_STAT0);
 	if (sc->i2cm_stat != 0) {
 		/* Ack interrupts */
-		DW_HDMI_WRITE_1(sc, DW_HDMI_IH_I2CM_STAT0, sc->i2cm_stat);
+		dw_hdmi_write(sc, DW_HDMI_IH_I2CM_STAT0, sc->i2cm_stat);
 	}
 
 	wakeup(sc);
@@ -889,6 +892,35 @@ printf("%s\n", __func__);
 /*
  * Driver routines
  */
+static uint32_t
+dw_hdmi_read(struct dw_hdmi_softc *sc, uint32_t reg)
+{
+
+	switch (sc->reg_width) {
+	case 4:
+		return (DW_HDMI_READ_4(sc, reg << 2));
+		break;
+	case 1:
+	default:
+		return (DW_HDMI_READ_1(sc, reg));
+		break;
+	}
+}
+
+static void
+dw_hdmi_write(struct dw_hdmi_softc *sc, uint32_t reg, uint32_t val)
+{
+
+	switch (sc->reg_width) {
+	case 4:
+		DW_HDMI_WRITE_4(sc, reg << 2, val);
+		break;
+	case 1:
+	default:
+		DW_HDMI_WRITE_1(sc, reg, val);
+		break;
+	}
+}
 
 static int
 dw_hdmi_attach(device_t dev)
@@ -938,6 +970,10 @@ dw_hdmi_attach(device_t dev)
 		goto fail;
 	}
 
+	/* Get the res-io-width */
+	if (OF_getencprop(node, "reg-io-width", &sc->reg_width, sizeof(uint32_t)) <= 0)
+		sc->reg_width = 1;
+
 	/* Get and init the phy */
 	if (OF_hasprop(node, "phys")) {
 		if (OF_getencprop(node, "phys", &phy, sizeof(phy)) == -1) {
@@ -960,54 +996,54 @@ dw_hdmi_attach(device_t dev)
 	OF_device_register_xref(OF_xref_from_node(node), dev);
 
 	if (bootverbose) {
-		version = DW_HDMI_READ_1(sc, DW_HDMI_DESIGN_ID) << 8;
-		version |= DW_HDMI_READ_1(sc, DW_HDMI_REVISION_ID);
+		version = dw_hdmi_read(sc, DW_HDMI_DESIGN_ID) << 8;
+		version |= dw_hdmi_read(sc, DW_HDMI_REVISION_ID);
 		if (bootverbose) {
 			device_printf(dev, "Version: %x\n", version);
 			device_printf(dev, "Product ID0: %x, Product ID1: %x\n",
-			    DW_HDMI_READ_1(sc, DW_HDMI_PRODUCT_ID0),
-			    DW_HDMI_READ_1(sc, DW_HDMI_PRODUCT_ID1));
+			    dw_hdmi_read(sc, DW_HDMI_PRODUCT_ID0),
+			    dw_hdmi_read(sc, DW_HDMI_PRODUCT_ID1));
 		}
 	}
 
 	dw_hdmi_i2cm_init(sc);
 
 	/* Disable interrupts */
-	DW_HDMI_WRITE_1(sc, DW_HDMI_IH_FC_STAT0, 0xFF);
-	DW_HDMI_WRITE_1(sc, DW_HDMI_IH_FC_STAT1, 0xFF);
-	DW_HDMI_WRITE_1(sc, DW_HDMI_IH_FC_STAT2, 0xFF);
-	DW_HDMI_WRITE_1(sc, DW_HDMI_IH_AS_STAT0, 0xFF);
-	DW_HDMI_WRITE_1(sc, DW_HDMI_IH_PHY_STAT0, 0xFF);
-	DW_HDMI_WRITE_1(sc, DW_HDMI_IH_I2CM_STAT0, 0xFF);
-	DW_HDMI_WRITE_1(sc, DW_HDMI_IH_CEC_STAT0, 0xFF);
-	DW_HDMI_WRITE_1(sc, DW_HDMI_IH_VP_STAT0, 0xFF);
-	DW_HDMI_WRITE_1(sc, DW_HDMI_IH_I2CMPHY_STAT0, 0xFF);
-	DW_HDMI_WRITE_1(sc, DW_HDMI_IH_AHBDMAAUD_STAT0, 0xFF);
+	dw_hdmi_write(sc, DW_HDMI_IH_FC_STAT0, 0xFF);
+	dw_hdmi_write(sc, DW_HDMI_IH_FC_STAT1, 0xFF);
+	dw_hdmi_write(sc, DW_HDMI_IH_FC_STAT2, 0xFF);
+	dw_hdmi_write(sc, DW_HDMI_IH_AS_STAT0, 0xFF);
+	dw_hdmi_write(sc, DW_HDMI_IH_PHY_STAT0, 0xFF);
+	dw_hdmi_write(sc, DW_HDMI_IH_I2CM_STAT0, 0xFF);
+	dw_hdmi_write(sc, DW_HDMI_IH_CEC_STAT0, 0xFF);
+	dw_hdmi_write(sc, DW_HDMI_IH_VP_STAT0, 0xFF);
+	dw_hdmi_write(sc, DW_HDMI_IH_I2CMPHY_STAT0, 0xFF);
+	dw_hdmi_write(sc, DW_HDMI_IH_AHBDMAAUD_STAT0, 0xFF);
 
 	/* Mute interrupts*/
-	DW_HDMI_WRITE_1(sc, DW_HDMI_IH_MUTE_FC_STAT0,
+	dw_hdmi_write(sc, DW_HDMI_IH_MUTE_FC_STAT0,
 	  0xFF);
-	DW_HDMI_WRITE_1(sc, DW_HDMI_IH_MUTE_FC_STAT1,
+	dw_hdmi_write(sc, DW_HDMI_IH_MUTE_FC_STAT1,
 	  0xFF);
-	DW_HDMI_WRITE_1(sc, DW_HDMI_IH_MUTE_FC_STAT2,
+	dw_hdmi_write(sc, DW_HDMI_IH_MUTE_FC_STAT2,
 	  0xFF);
-	DW_HDMI_WRITE_1(sc, DW_HDMI_IH_MUTE_AS_STAT0,
+	dw_hdmi_write(sc, DW_HDMI_IH_MUTE_AS_STAT0,
 	  0xFF);
-	DW_HDMI_WRITE_1(sc, DW_HDMI_IH_MUTE_PHY_STAT0,
+	dw_hdmi_write(sc, DW_HDMI_IH_MUTE_PHY_STAT0,
 	  0xFF);
-	DW_HDMI_WRITE_1(sc, DW_HDMI_IH_MUTE_I2CM_STAT0,
+	dw_hdmi_write(sc, DW_HDMI_IH_MUTE_I2CM_STAT0,
 	  0xFF);
-	DW_HDMI_WRITE_1(sc, DW_HDMI_IH_MUTE_CEC_STAT0,
+	dw_hdmi_write(sc, DW_HDMI_IH_MUTE_CEC_STAT0,
 	  0xFF);
-	DW_HDMI_WRITE_1(sc, DW_HDMI_IH_MUTE_VP_STAT0,
+	dw_hdmi_write(sc, DW_HDMI_IH_MUTE_VP_STAT0,
 	  0xFF);
-	DW_HDMI_WRITE_1(sc, DW_HDMI_IH_MUTE_I2CMPHY_STAT0,
+	dw_hdmi_write(sc, DW_HDMI_IH_MUTE_I2CMPHY_STAT0,
 	  0xFF);
-	DW_HDMI_WRITE_1(sc, DW_HDMI_IH_MUTE_AHBDMAAUD_STAT0,
+	dw_hdmi_write(sc, DW_HDMI_IH_MUTE_AHBDMAAUD_STAT0,
 	  0xFF);
 
 	/* Unmute global interrupts */
-	DW_HDMI_WRITE_1(sc, DW_HDMI_IH_MUTE,
+	dw_hdmi_write(sc, DW_HDMI_IH_MUTE,
 	  ~(DW_HDMI_IH_MUTE_ALL |
 	    DW_HDMI_IH_MUTE_WAKEUP));
 
