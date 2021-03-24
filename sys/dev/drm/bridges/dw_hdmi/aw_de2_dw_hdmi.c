@@ -107,12 +107,12 @@ struct aw_dw_hdmi_softc {
 	hwreset_t	reset_ctrl;	/* Allwinner specific */
 };
 
-#define	CLK_NENTRIES	5
+#define	RK_CLK_NENTRIES	5
 
 struct rk_dw_hdmi_softc {
 	struct dw_hdmi_softc base_sc;
 	struct syscon		*grf;
-	clk_t	clk[CLK_NENTRIES];
+	clk_t	clk[RK_CLK_NENTRIES];
 };
 
 static struct resource_spec dw_hdmi_spec[] = {
@@ -1141,7 +1141,7 @@ rk_hdmi_configure(struct rk_dw_hdmi_softc *sc)
 	SYSCON_WRITE_4(sc->grf, GRF_SOC_CON20, reg);
 }
 
-static char * clk_table[CLK_NENTRIES] = {
+static char * rk_clk_table[RK_CLK_NENTRIES] = {
 	"iahb",
 	"isfr",
 	"vpll",
@@ -1159,11 +1159,11 @@ rk_hdmi_clk_enable(device_t dev)
 
 	sc = device_get_softc(dev);
 
-	for (i = 0; i < CLK_NENTRIES; i++) {
-		error = clk_get_by_ofw_name(dev, 0, clk_table[i], &sc->clk[i]);
+	for (i = 0; i < RK_CLK_NENTRIES; i++) {
+		error = clk_get_by_ofw_name(dev, 0, rk_clk_table[i], &sc->clk[i]);
 		if (error != 0) {
 			device_printf(dev, "cannot get '%s' clock\n",
-			    clk_table[i]);
+			    rk_clk_table[i]);
 			return (ENXIO);
 		}
 	}
@@ -1173,22 +1173,22 @@ rk_hdmi_clk_enable(device_t dev)
 	if (error != 0)
 		panic("could not set freq\n");
 
-	for (i = 0; i < CLK_NENTRIES; i++) {
+	for (i = 0; i < RK_CLK_NENTRIES; i++) {
 		error = clk_enable(sc->clk[i]);
 		if (error != 0) {
 			device_printf(dev, "cannot enable '%s' clock\n",
-			    clk_table[i]);
+			    rk_clk_table[i]);
 			return (ENXIO);
 		}
 
 		error = clk_get_freq(sc->clk[i], &rate);
 		if (error != 0) {
 			device_printf(dev, "cannot get '%s' clock frequency\n",
-			    clk_table[i]);
+			    rk_clk_table[i]);
 			return (ENXIO);
 		}
 
-		device_printf(dev, "%s rate is %ld Hz\n", clk_table[i], rate);
+		device_printf(dev, "%s rate is %ld Hz\n", rk_clk_table[i], rate);
 	}
 
 	return (0);
