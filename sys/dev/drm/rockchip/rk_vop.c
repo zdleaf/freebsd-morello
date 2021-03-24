@@ -490,17 +490,6 @@ rk_vop_plane_atomic_update(struct drm_plane *plane,
 	else
 		VOP_WRITE(sc, RK3399_WIN2_DSP_INFO0, reg);
 
-	if (id == 0)
-		reg = VOP_READ(sc, RK3399_WIN0_COLOR_KEY);
-	else
-		reg = VOP_READ(sc, RK3399_WIN2_COLOR_KEY);
-	reg &= ~(1 << 31);
-	reg &= ~(0x3fffffff);
-	if (id == 0)
-		VOP_WRITE(sc, RK3399_WIN0_COLOR_KEY, reg);
-	else
-		VOP_WRITE(sc, RK3399_WIN2_COLOR_KEY, reg);
-
 	for (i = 0; i < nitems(rk_vop_plane_formats); i++)
 		if (rk_vop_plane_formats[i] == state->fb->format->format)
 			break;
@@ -536,7 +525,7 @@ rk_vop_plane_atomic_update(struct drm_plane *plane,
 		VOP_WRITE(sc, RK3399_WIN2_CTRL0, reg);
 		reg |= rgb_mode << WIN2_CTRL0_DATA_FMT_S;
 		reg |= WIN2_CTRL0_EN;
-		reg |= (1 << 0); //ungate
+		reg |= WIN2_CTRL0_GATE;
 		VOP_WRITE(sc, RK3399_WIN2_CTRL0, reg);
 	}
 

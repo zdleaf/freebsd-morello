@@ -105,6 +105,7 @@
 #define	 WIN2_CTRL0_DATA_FMT_S			5
 #define	 WIN2_CTRL0_DATA_FMT_M			(0x3 << WIN0_CTRL0_DATA_FMT_S)
 #define	 WIN2_CTRL0_EN				(1 << 4)
+#define	 WIN2_CTRL0_GATE			(1 << 0)
 #define	RK3399_WIN2_CTRL1			0x00b4
 #define	RK3399_WIN2_VIR0_1			0x00b8
 #define	RK3399_WIN2_VIR2_3			0x00bc
