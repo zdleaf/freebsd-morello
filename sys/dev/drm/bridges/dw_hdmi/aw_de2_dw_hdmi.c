@@ -636,10 +636,11 @@ dw_hdmi_bridge_enable(struct drm_bridge *bridge)
 
 	sc = container_of(bridge, struct dw_hdmi_softc, bridge);
 
-	printf("%s: Mode information:\n"
+	DRM_DEBUG_DRIVER("%s: Mode information:\n"
 	    "hdisplay: %d\n"
 	    "vdisplay: %d\n"
 	    "htotal: %d\n"
+	    "vtotal: %d\n"
 	    "hsync_start: %d\n"
 	    "hsync_end: %d\n"
 	    "vsync_start: %d\n"
