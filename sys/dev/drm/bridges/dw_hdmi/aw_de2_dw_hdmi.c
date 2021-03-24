@@ -566,11 +566,9 @@ dw_hdmi_phy_configure(struct dw_hdmi_softc *sc)
 	/*
 	 * Following initialization are for 8bit per color case
 	 */
-#if 1
 	dw_hdmi_phy_i2c_write(sc, 0x0051, HDMI_PHY_I2C_CPCE_CTRL);
 	dw_hdmi_phy_i2c_write(sc, 0x0003, HDMI_PHY_I2C_GMPCTRL);
 	dw_hdmi_phy_i2c_write(sc, 0x0000, HDMI_PHY_I2C_CURRCTRL);
-#endif
 
 	dw_hdmi_phy_i2c_write(sc, 0x0000, HDMI_PHY_I2C_PLLPHBYCTRL);
 	dw_hdmi_phy_i2c_write(sc, MSM_CTRL_FB_CLK, HDMI_PHY_I2C_MSM_CTRL);
@@ -578,11 +576,9 @@ dw_hdmi_phy_configure(struct dw_hdmi_softc *sc)
 	/* REMOVE CLK TERM */
 	dw_hdmi_phy_i2c_write(sc, CKCALCTRL_OVERRIDE, HDMI_PHY_I2C_CKCALCTRL);
 
-#if 1
 	dw_hdmi_phy_i2c_write(sc, 0x802b, HDMI_PHY_I2C_CKSYMTXCTRL);
 	dw_hdmi_phy_i2c_write(sc, 0x0004, HDMI_PHY_I2C_TXTERM);
 	dw_hdmi_phy_i2c_write(sc, 0x028d, HDMI_PHY_I2C_VLEVCTRL);
-#endif
 
 	dw_hdmi_phy_enable_power(sc, 1);
 
