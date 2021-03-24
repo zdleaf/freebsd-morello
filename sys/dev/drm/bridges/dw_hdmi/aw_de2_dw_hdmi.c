@@ -1139,11 +1139,7 @@ rk_hdmi_configure(struct rk_dw_hdmi_softc *sc)
 }
 
 static char * rk_clk_table[RK_CLK_NENTRIES] = {
-	"iahb",
-	"isfr",
-	"vpll",
-	"grf",
-	"cec",
+	"iahb", "isfr", "vpll", "grf", "cec",
 };
 
 static int
@@ -1165,7 +1161,7 @@ rk_hdmi_clk_enable(device_t dev)
 		}
 	}
 
-	/* vpll should be the same as vop dclk */
+	/* Note: vpll should be the same as vop dclk. */
 	error = clk_set_freq(sc->clk[2], 148500000, 0);
 	if (error != 0)
 		panic("could not set freq\n");
