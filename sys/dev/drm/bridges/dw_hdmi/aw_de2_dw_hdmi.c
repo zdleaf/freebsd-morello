@@ -53,7 +53,6 @@ __FBSDID("$FreeBSD$");
 #include <drm/drm_print.h>
 
 #include "dw_hdmireg.h"
-#include "dwc_hdmireg.h"
 
 #include "dw_hdmi_if.h"
 #include "dw_hdmi_phy_if.h"
@@ -512,15 +511,15 @@ dw_hdmi_phy_wait_i2c_done(struct dw_hdmi_softc *sc, int msec)
 {
 	uint8_t val;
 
-	val = dw_hdmi_read(sc, HDMI_IH_I2CMPHY_STAT0) &
-	    (HDMI_IH_I2CMPHY_STAT0_DONE | HDMI_IH_I2CMPHY_STAT0_ERROR);
+	val = dw_hdmi_read(sc, DW_HDMI_IH_I2CMPHY_STAT0) &
+	    (DW_HDMI_IH_I2CMPHY_STAT0_DONE | DW_HDMI_IH_I2CMPHY_STAT0_ERROR);
 	while (val == 0) {
 		pause("HDMI_PHY", hz/100);
 		msec -= 10;
 		if (msec <= 0)
 			return;
-		val = dw_hdmi_read(sc, HDMI_IH_I2CMPHY_STAT0) &
-		    (HDMI_IH_I2CMPHY_STAT0_DONE | HDMI_IH_I2CMPHY_STAT0_ERROR);
+		val = dw_hdmi_read(sc, DW_HDMI_IH_I2CMPHY_STAT0) &
+		    (DW_HDMI_IH_I2CMPHY_STAT0_DONE | DW_HDMI_IH_I2CMPHY_STAT0_ERROR);
 	}
 }
 
@@ -530,8 +529,8 @@ dw_hdmi_phy_i2c_write(struct dw_hdmi_softc *sc, unsigned short data,
 {
 
 	/* clear DONE and ERROR flags */
-	dw_hdmi_write(sc, HDMI_IH_I2CMPHY_STAT0,
-	    HDMI_IH_I2CMPHY_STAT0_DONE | HDMI_IH_I2CMPHY_STAT0_ERROR);
+	dw_hdmi_write(sc, DW_HDMI_IH_I2CMPHY_STAT0,
+	    DW_HDMI_IH_I2CMPHY_STAT0_DONE | DW_HDMI_IH_I2CMPHY_STAT0_ERROR);
 	dw_hdmi_write(sc, HDMI_PHY_I2CM_ADDRESS_ADDR, addr);
 	dw_hdmi_write(sc, HDMI_PHY_I2CM_DATAO_1_ADDR, ((data >> 8) & 0xff));
 	dw_hdmi_write(sc, HDMI_PHY_I2CM_DATAO_0_ADDR, ((data >> 0) & 0xff));
@@ -545,7 +544,8 @@ dw_hdmi_phy_configure(struct dw_hdmi_softc *sc)
 	uint8_t val;
 	uint8_t msec;
 
-	dw_hdmi_write(sc, HDMI_MC_FLOWCTRL, HDMI_MC_FLOWCTRL_FEED_THROUGH_OFF_CSC_BYPASS);
+	dw_hdmi_write(sc, DW_HDMI_MC_FLOWCTRL,
+	    HDMI_MC_FLOWCTRL_FEED_THROUGH_OFF_CSC_BYPASS);
 
 	/* gen2 tx power off */
 	dw_hdmi_phy_gen2_txpwron(sc, 0);
@@ -554,10 +554,10 @@ dw_hdmi_phy_configure(struct dw_hdmi_softc *sc)
 	dw_hdmi_phy_gen2_pddq(sc, 1);
 
 	/* PHY reset */
-	dw_hdmi_write(sc, HDMI_MC_PHYRSTZ, HDMI_MC_PHYRSTZ_DEASSERT);
-	dw_hdmi_write(sc, HDMI_MC_PHYRSTZ, HDMI_MC_PHYRSTZ_ASSERT);
+	dw_hdmi_write(sc, DW_HDMI_MC_PHYRSTZ, HDMI_MC_PHYRSTZ_DEASSERT);
+	dw_hdmi_write(sc, DW_HDMI_MC_PHYRSTZ, HDMI_MC_PHYRSTZ_ASSERT);
 
-	dw_hdmi_write(sc, HDMI_MC_HEACPHY_RST, HDMI_MC_HEACPHY_RST_ASSERT);
+	dw_hdmi_write(sc, DW_HDMI_MC_HEACPHY_RST, HDMI_MC_HEACPHY_RST_ASSERT);
 
 	dw_hdmi_phy_test_clear(sc, 1);
 	dw_hdmi_write(sc, HDMI_PHY_I2CM_SLAVE_ADDR, HDMI_PHY_I2CM_SLAVE_ADDR_PHY_GEN2);
