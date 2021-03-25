@@ -75,12 +75,12 @@ __FBSDID("$FreeBSD$");
 
 static struct ofw_compat_data aw_compat_data[] = {
 	{ "allwinner,sun50i-a64-dw-hdmi",	1 },
-	{ "allwinner,sun8i-h3-dw-hdmi",	1 },
+	{ "allwinner,sun8i-h3-dw-hdmi",		1 },
 	{ NULL,					0 }
 };
 
 static struct ofw_compat_data rk_compat_data[] = {
-	{ "rockchip,rk3399-dw-hdmi", 1},
+	{ "rockchip,rk3399-dw-hdmi",		1 },
 	{ NULL,					0 }
 };
 
@@ -95,9 +95,9 @@ struct dw_hdmi_softc {
 	clk_t		clk_isfr;
 
 	device_t		iicbus;
-	struct i2c_adapter *	ddc;
-	uint8_t		i2cm_stat;
-	uint8_t		i2cm_addr;
+	struct i2c_adapter	*ddc;
+	uint8_t			i2cm_stat;
+	uint8_t			i2cm_addr;
 
 	uint32_t		reg_width;
 
@@ -114,12 +114,11 @@ struct aw_dw_hdmi_softc {
 	hwreset_t	reset_ctrl;	/* Allwinner specific */
 };
 
-#define	RK_CLK_NENTRIES	5
-
 struct rk_dw_hdmi_softc {
 	struct dw_hdmi_softc base_sc;
 	struct syscon		*grf;
-	clk_t	clk[RK_CLK_NENTRIES];
+#define	RK_CLK_NENTRIES	5
+	clk_t clk[RK_CLK_NENTRIES];
 };
 
 static struct resource_spec dw_hdmi_spec[] = {
