@@ -78,6 +78,8 @@ __FBSDID("$FreeBSD$");
 #define	VOP_READ(sc, reg)	bus_read_4((sc)->res[0], (reg))
 #define	VOP_WRITE(sc, reg, val)	bus_write_4((sc)->res[0], (reg), (val))
 
+#define	RK_VOP_MAX_ENDPOINTS	32
+
 #define	dprintf(fmt, ...)
 
 static const u32 rk_vop_plane_formats[] = {
@@ -833,13 +835,47 @@ static const struct drm_crtc_helper_funcs rk_vop_crtc_helper_funcs = {
 	.mode_set_nofb	= rk_crtc_mode_set_nofb,
 };
 
+static void
+rk_vop_add_encoder(struct rk_vop_softc *sc, struct drm_device *drm)
+{
+	phandle_t child, port;
+	device_t dev;
+	phandle_t xref;
+	phandle_t node;
+	char s[16];
+	int ret;
+	int i;
+
+	node = ofw_bus_get_node(sc->dev);
+	port = ofw_bus_find_child(node, "port");
+
+	for (i = 0; i < RK_VOP_MAX_ENDPOINTS; i++) {
+		sprintf(s, "endpoint@%d", i);
+		child = ofw_bus_find_child(port, s);
+		if (child) {
+			if (OF_getencprop(child, "remote-endpoint", &xref,
+			    sizeof(xref)) == -1)
+				continue;
+
+			dev = OF_device_from_xref(xref);
+			if (dev == NULL)
+				continue;
+
+			ret = DW_HDMI_ADD_ENCODER(dev, &sc->crtc, drm);
+			if (ret != 0)
+				continue;
+
+			sc->outport = dev;
+			break;
+		}
+	}
+}
+
 static int
 rk_vop_create_pipeline(device_t dev, struct drm_device *drm)
 {
 	enum drm_plane_type type;
 	struct rk_vop_softc *sc;
-	phandle_t node;
-	intptr_t xref;
 	int error;
 	int i;
 
@@ -894,17 +930,7 @@ rk_vop_create_pipeline(device_t dev, struct drm_device *drm)
 
 	drm_crtc_helper_add(&sc->crtc, &rk_vop_crtc_helper_funcs);
 
-	dprintf("%s: add encoder\n", __func__);
-
-	if ((node = OF_finddevice("/hdmi")) == -1) {
-		device_printf(sc->dev, "Could not find /hdmi node.\n");
-		return (ENXIO);
-	}
-
-	xref = OF_xref_from_node(node);
-	sc->outport = OF_device_from_xref(xref);
-
-	DW_HDMI_ADD_ENCODER(sc->outport, &sc->crtc, drm);
+	rk_vop_add_encoder(sc, drm);
 
 	return (0);
 }
