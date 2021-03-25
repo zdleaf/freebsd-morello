@@ -121,6 +121,10 @@ struct rk_dw_hdmi_softc {
 	clk_t clk[RK_CLK_NENTRIES];
 };
 
+static char * rk_clk_table[RK_CLK_NENTRIES] = {
+	"iahb", "isfr", "vpll", "grf", "cec",
+};
+
 static struct resource_spec dw_hdmi_spec[] = {
 	{ SYS_RES_MEMORY,	0,	RF_ACTIVE },
 	{ SYS_RES_IRQ,		0,	RF_ACTIVE | RF_SHAREABLE },
@@ -1153,10 +1157,6 @@ rk_hdmi_configure(struct rk_dw_hdmi_softc *sc)
 	reg |= CON20_HDMI_VOP_SEL_L;
 	SYSCON_WRITE_4(sc->grf, GRF_SOC_CON20, reg);
 }
-
-static char * rk_clk_table[RK_CLK_NENTRIES] = {
-	"iahb", "isfr", "vpll", "grf", "cec",
-};
 
 static int
 rk_hdmi_clk_enable(device_t dev)
