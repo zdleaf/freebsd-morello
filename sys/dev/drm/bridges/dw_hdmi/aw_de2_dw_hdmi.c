@@ -547,6 +547,10 @@ dw_hdmi_phy_i2c_write(struct dw_hdmi_softc *sc, unsigned short data,
 	dw_hdmi_phy_wait_i2c_done(sc, 1000);
 }
 
+/*
+ * The phy configuration values here are for RK3399 and not tested
+ * on any other platform.
+ */
 static int
 dw_hdmi_phy_configure(struct dw_hdmi_softc *sc)
 {
