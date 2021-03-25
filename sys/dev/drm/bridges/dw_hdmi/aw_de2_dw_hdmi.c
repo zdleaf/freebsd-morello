@@ -67,6 +67,8 @@ __FBSDID("$FreeBSD$");
 #include "syscon_if.h"
 #include "iicbus_if.h"
 
+#define	DW_HDMI_MAX_PORTS	32
+
 /* Redefine msleep because of drmkpi */
 #undef msleep
 #define	msleep(chan, mtx, pri, wmesg, timo)				\
@@ -899,6 +901,27 @@ dw_hdmi_write(struct dw_hdmi_softc *sc, uint32_t reg, uint32_t val)
 	}
 }
 
+static void
+dw_hdmi_register_ports(device_t dev)
+{
+	phandle_t ports, port;
+	phandle_t node, child;
+	char endp[DW_HDMI_MAX_PORTS];
+	int i;
+
+	node = ofw_bus_get_node(dev);
+
+	ports = ofw_bus_find_child(node, "ports");
+	port = ofw_bus_find_child(ports, "port");
+
+	for (i = 0; i < 16; i++) {
+		sprintf(endp, "endpoint@%d", i);
+		child = ofw_bus_find_child(port, endp);
+		if (child)
+			OF_device_register_xref(OF_xref_from_node(child), dev);
+	}
+}
+
 static int
 dw_hdmi_attach(device_t dev)
 {
@@ -1034,6 +1057,8 @@ dw_hdmi_attach(device_t dev)
 		}
 		sc->ddc = i2c_bsd_adapter(sc->iicbus);
 	}
+
+	dw_hdmi_register_ports(dev);
 
 	return (0);
 fail:
