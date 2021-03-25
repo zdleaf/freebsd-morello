@@ -28,41 +28,45 @@
  *
  * $FreeBSD$
  */
-#ifndef	_LINUX_ERRNO_H_
-#define	_LINUX_ERRNO_H_
 
-#include <sys/errno.h>
+#ifndef	_LINUXKPI_LINUX_PCI_IDS_H
+#define	_LINUXKPI_LINUX_PCI_IDS_H
 
-#define	EBADRQC		56	/* Bad request code */
+#define	PCI_CLASS_NETWORK_OTHER		0x0280
 
-#define	ECHRNG		EDOM
-#define	ETIME		ETIMEDOUT
-#define	ECOMM		ESTALE
-#define	ENODATA		ECONNREFUSED
-#define	ENOIOCTLCMD     ENOIOCTL
-/* Use same value as Linux, because BSD's ERESTART is negative */
-#define	ERESTARTSYS     512
-#define	ENOTSUPP	EOPNOTSUPP
-#define	ENONET		EHOSTDOWN
+#define	PCI_BASE_CLASS_DISPLAY		0x03
+#define	PCI_CLASS_DISPLAY_VGA		0x0300
+#define	PCI_CLASS_DISPLAY_OTHER		0x0380
 
-/*
- * The error numbers below are arbitrary and do not resemble the numbers
- * used in Linux.  They should not be returned to user space.
- */
-#define	ERESTARTNOINTR	513
-#define	ERESTARTNOHAND	514
-#define	ERESTART_RESTARTBLOCK 516
-#define	EPROBE_DEFER	517
-#define	EOPENSTALE	518
-#define	EBADHANDLE	521
-#define	ENOTSYNC	522
-#define	EBADCOOKIE	523
-#define	ETOOSMALL	525
-#define	ESERVERFAULT	526
-#define	EBADTYPE	527
-#define	EJUKEBOX	528
-#define	EIOCBQUEUED	529
-#define	ERFKILL		530
-#define	EBADE		531
+#define	PCI_BASE_CLASS_BRIDGE		0x06
+#define	PCI_CLASS_BRIDGE_ISA		0x0601
 
-#endif					/* _LINUX_ERRNO_H_ */
+
+/* XXX We should really generate these and use them throughout the tree. */
+
+#define	PCI_VENDOR_ID_APPLE		0x106b
+#define	PCI_VENDOR_ID_ASUSTEK		0x1043
+#define	PCI_VENDOR_ID_ATI		0x1002
+#define	PCI_VENDOR_ID_BROADCOM			0x14e4
+#define	PCI_VENDOR_ID_DELL		0x1028
+#define	PCI_VENDOR_ID_HP		0x103c
+#define	PCI_VENDOR_ID_IBM		0x1014
+#define	PCI_VENDOR_ID_INTEL		0x8086
+#define	PCI_VENDOR_ID_MELLANOX			0x15b3
+#define	PCI_VENDOR_ID_REALTEK			0x10ec
+#define	PCI_VENDOR_ID_REDHAT_QUMRANET	0x1af4
+#define	PCI_VENDOR_ID_SERVERWORKS	0x1166
+#define	PCI_VENDOR_ID_SONY		0x104d
+#define	PCI_VENDOR_ID_TOPSPIN			0x1867
+#define	PCI_VENDOR_ID_VIA		0x1106
+#define	PCI_SUBVENDOR_ID_REDHAT_QUMRANET	0x1af4
+#define	PCI_DEVICE_ID_ATI_RADEON_QY	0x5159
+#define	PCI_DEVICE_ID_MELLANOX_TAVOR		0x5a44
+#define	PCI_DEVICE_ID_MELLANOX_TAVOR_BRIDGE	0x5a46
+#define	PCI_DEVICE_ID_MELLANOX_ARBEL_COMPAT	0x6278
+#define	PCI_DEVICE_ID_MELLANOX_ARBEL		0x6282
+#define	PCI_DEVICE_ID_MELLANOX_SINAI_OLD	0x5e8c
+#define	PCI_DEVICE_ID_MELLANOX_SINAI		0x6274
+#define	PCI_SUBDEVICE_ID_QEMU		0x1100
+
+#endif	/* _LINUXKPI_LINUX_PCI_IDS_H */

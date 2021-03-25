@@ -1,16 +1,13 @@
 /*-
- * Copyright (c) 2010 Isilon Systems, Inc.
- * Copyright (c) 2010 iX Systems, Inc.
- * Copyright (c) 2010 Panasas, Inc.
- * Copyright (c) 2013, 2014 Mellanox Technologies, Ltd.
- * All rights reserved.
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * Copyright 2014 Jonathan Anderson.
+ * Copyright 2021 Mariusz Zaborski <oshogbo@FreeBSD.org>
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
  * are met:
  * 1. Redistributions of source code must retain the above copyright
- *    notice unmodified, this list of conditions, and the following
- *    disclaimer.
+ *    notice, this list of conditions and the following disclaimer.
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
@@ -28,41 +25,57 @@
  *
  * $FreeBSD$
  */
-#ifndef _ASM_UACCESS_H_
-#define _ASM_UACCESS_H_
 
-#include <linux/uaccess.h>
+#include <atf-c.h>
+#include <fcntl.h>
+#include <stdio.h>
 
-static inline long
-copy_to_user(void *to, const void *from, unsigned long n)
+#include "common.h"
+
+void
+expect_success(int binary, char *senv)
 {
-	if (linux_copyout(from, to, n) != 0)
-		return n;
-	return 0;
-}
-#define	__copy_to_user(...)	copy_to_user(__VA_ARGS__)
+	char * const env[] = { senv, NULL };
 
-static inline long
-copy_from_user(void *to, const void *from, unsigned long n)
+	try_to_run(binary, 0, env, "the hypotenuse of 3 and 4 is 5\n", "");
+}
+
+void
+expect_missing_library(int binary, char *senv)
 {
-	if (linux_copyin(from, to, n) != 0)
-		return n;
-	return 0;
+	char * const env[] = { senv, NULL };
+
+	try_to_run(binary, 1, env, "",
+	   "ld-elf.so.1: Shared object \"libpythagoras.so.0\" not found,"
+	    " required by \"target\"\n");
 }
-#define	__copy_from_user(...)	copy_from_user(__VA_ARGS__)
-#define	__copy_in_user(...)	copy_from_user(__VA_ARGS__)
 
-#define	user_access_begin(ptr, len) access_ok(ptr, len)
-#define	user_access_end() do { } while (0)
+void
+try_to_run(int binary, int exit_status, char * const *env,
+        const char *expected_out, const char *expected_err)
+{
+	pid_t child = atf_utils_fork();
 
-#define	unsafe_get_user(x, ptr, err) do { \
-	if (unlikely(__get_user(x, ptr))) \
-		goto err; \
-} while (0)
+	if (child == 0) {
+		char * const args[] = { "target", NULL };
 
-#define	unsafe_put_user(x, ptr, err) do { \
-	if (unlikely(__put_user(x, ptr))) \
-		goto err; \
-} while (0)
+		fexecve(binary, args, env);
+		atf_tc_fail("fexecve() failed");
+	}
 
-#endif	/* _ASM_UACCESS_H_ */
+	atf_utils_wait(child, exit_status, expected_out, expected_err);
+}
+
+int
+opendir(const char *name)
+{
+
+	return open(name, O_RDONLY | O_DIRECTORY);
+}
+
+int
+opendirat(int parent, const char *name)
+{
+
+	return openat(parent, name, O_RDONLY | O_DIRECTORY);
+}

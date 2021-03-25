@@ -1,16 +1,13 @@
 /*-
- * Copyright (c) 2010 Isilon Systems, Inc.
- * Copyright (c) 2010 iX Systems, Inc.
- * Copyright (c) 2010 Panasas, Inc.
- * Copyright (c) 2013, 2014 Mellanox Technologies, Ltd.
- * All rights reserved.
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * Copyright 2014 Jonathan Anderson.
+ * Copyright 2021 Mariusz Zaborski <oshogbo@vexillium.org>
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
  * are met:
  * 1. Redistributions of source code must retain the above copyright
- *    notice unmodified, this list of conditions, and the following
- *    disclaimer.
+ *    notice, this list of conditions and the following disclaimer.
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
@@ -28,41 +25,19 @@
  *
  * $FreeBSD$
  */
-#ifndef _ASM_UACCESS_H_
-#define _ASM_UACCESS_H_
 
-#include <linux/uaccess.h>
+#ifndef _LD_COMMON_H_
+#define _LD_COMMON_H_
 
-static inline long
-copy_to_user(void *to, const void *from, unsigned long n)
-{
-	if (linux_copyout(from, to, n) != 0)
-		return n;
-	return 0;
-}
-#define	__copy_to_user(...)	copy_to_user(__VA_ARGS__)
+#define	TARGET_ELF_NAME	"target"
+#define	TARGET_LIBRARY	"libpythagoras.so.0"
 
-static inline long
-copy_from_user(void *to, const void *from, unsigned long n)
-{
-	if (linux_copyin(from, to, n) != 0)
-		return n;
-	return 0;
-}
-#define	__copy_from_user(...)	copy_from_user(__VA_ARGS__)
-#define	__copy_in_user(...)	copy_from_user(__VA_ARGS__)
+void	expect_success(int binary, char *senv);
+void	expect_missing_library(int binary, char *senv);
 
-#define	user_access_begin(ptr, len) access_ok(ptr, len)
-#define	user_access_end() do { } while (0)
+void	try_to_run(int binary, int expected_exit_status, char * const *env,
+	    const char *expected_out, const char *expected_err);
+int	opendir(const char *name);
+int	opendirat(int parent, const char *name);
 
-#define	unsafe_get_user(x, ptr, err) do { \
-	if (unlikely(__get_user(x, ptr))) \
-		goto err; \
-} while (0)
-
-#define	unsafe_put_user(x, ptr, err) do { \
-	if (unlikely(__put_user(x, ptr))) \
-		goto err; \
-} while (0)
-
-#endif	/* _ASM_UACCESS_H_ */
+#endif /* _LD_COMMON_H_ */
