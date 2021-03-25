@@ -363,7 +363,8 @@ rk_vop_attach(device_t dev)
 	if (error != 0)
 		return (ENXIO);
 
-	device_printf(sc->dev, "VOP version: %x\n", VOP_READ(sc, RK3399_VERSION_INFO));
+	device_printf(sc->dev, "VOP version: %x\n",
+	    VOP_READ(sc, RK3399_VERSION_INFO));
 
 	return (0);
 }
@@ -647,7 +648,6 @@ rk_crtc_atomic_check(struct drm_crtc *crtc, struct drm_crtc_state *state)
 
 	dprintf("%s\n", __func__);
 
-	/* Not sure we need to something here, should replace with an helper */
 	return (0);
 }
 

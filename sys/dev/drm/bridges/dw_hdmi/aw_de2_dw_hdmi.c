@@ -526,7 +526,8 @@ dw_hdmi_phy_wait_i2c_done(struct dw_hdmi_softc *sc, int msec)
 		if (msec <= 0)
 			return;
 		val = dw_hdmi_read(sc, DW_HDMI_IH_I2CMPHY_STAT0) &
-		    (DW_HDMI_IH_I2CMPHY_STAT0_DONE | DW_HDMI_IH_I2CMPHY_STAT0_ERROR);
+		    (DW_HDMI_IH_I2CMPHY_STAT0_DONE |
+		    DW_HDMI_IH_I2CMPHY_STAT0_ERROR);
 	}
 }
 
@@ -541,7 +542,8 @@ dw_hdmi_phy_i2c_write(struct dw_hdmi_softc *sc, unsigned short data,
 	dw_hdmi_write(sc, HDMI_PHY_I2CM_ADDRESS_ADDR, addr);
 	dw_hdmi_write(sc, HDMI_PHY_I2CM_DATAO_1_ADDR, ((data >> 8) & 0xff));
 	dw_hdmi_write(sc, HDMI_PHY_I2CM_DATAO_0_ADDR, ((data >> 0) & 0xff));
-	dw_hdmi_write(sc, HDMI_PHY_I2CM_OPERATION_ADDR, HDMI_PHY_I2CM_OPERATION_ADDR_WRITE);
+	dw_hdmi_write(sc, HDMI_PHY_I2CM_OPERATION_ADDR,
+	    HDMI_PHY_I2CM_OPERATION_ADDR_WRITE);
 	dw_hdmi_phy_wait_i2c_done(sc, 1000);
 }
 
@@ -567,7 +569,8 @@ dw_hdmi_phy_configure(struct dw_hdmi_softc *sc)
 	dw_hdmi_write(sc, DW_HDMI_MC_HEACPHY_RST, HDMI_MC_HEACPHY_RST_ASSERT);
 
 	dw_hdmi_phy_test_clear(sc, 1);
-	dw_hdmi_write(sc, HDMI_PHY_I2CM_SLAVE_ADDR, HDMI_PHY_I2CM_SLAVE_ADDR_PHY_GEN2);
+	dw_hdmi_write(sc, HDMI_PHY_I2CM_SLAVE_ADDR,
+	    HDMI_PHY_I2CM_SLAVE_ADDR_PHY_GEN2);
 	dw_hdmi_phy_test_clear(sc, 0);
 
 	/*
@@ -938,7 +941,8 @@ dw_hdmi_attach(device_t dev)
 	}
 
 	/* Get the res-io-width */
-	if (OF_getencprop(node, "reg-io-width", &sc->reg_width, sizeof(uint32_t)) <= 0)
+	if (OF_getencprop(node, "reg-io-width", &sc->reg_width,
+	    sizeof(uint32_t)) <= 0)
 		sc->reg_width = 1;
 
 	/* Get and init the phy */
@@ -1162,7 +1166,8 @@ rk_hdmi_clk_enable(device_t dev)
 	sc = device_get_softc(dev);
 
 	for (i = 0; i < RK_CLK_NENTRIES; i++) {
-		error = clk_get_by_ofw_name(dev, 0, rk_clk_table[i], &sc->clk[i]);
+		error = clk_get_by_ofw_name(dev, 0, rk_clk_table[i],
+		    &sc->clk[i]);
 		if (error != 0) {
 			device_printf(dev, "cannot get '%s' clock\n",
 			    rk_clk_table[i]);
@@ -1190,7 +1195,8 @@ rk_hdmi_clk_enable(device_t dev)
 			return (ENXIO);
 		}
 
-		device_printf(dev, "%s rate is %ld Hz\n", rk_clk_table[i], rate);
+		device_printf(dev, "%s rate is %ld Hz\n", rk_clk_table[i],
+		    rate);
 	}
 
 	return (0);
