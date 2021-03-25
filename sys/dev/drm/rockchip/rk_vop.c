@@ -835,7 +835,7 @@ static const struct drm_crtc_helper_funcs rk_vop_crtc_helper_funcs = {
 	.mode_set_nofb	= rk_crtc_mode_set_nofb,
 };
 
-static void
+static int
 rk_vop_add_encoder(struct rk_vop_softc *sc, struct drm_device *drm)
 {
 	phandle_t child, port;
@@ -847,7 +847,12 @@ rk_vop_add_encoder(struct rk_vop_softc *sc, struct drm_device *drm)
 	int i;
 
 	node = ofw_bus_get_node(sc->dev);
+	if (node == 0)
+		return (ENOENT);
+
 	port = ofw_bus_find_child(node, "port");
+	if (port == 0)
+		return (ENOENT);
 
 	for (i = 0; i < RK_VOP_MAX_ENDPOINTS; i++) {
 		sprintf(s, "endpoint@%d", i);
@@ -866,9 +871,11 @@ rk_vop_add_encoder(struct rk_vop_softc *sc, struct drm_device *drm)
 				continue;
 
 			sc->outport = dev;
-			break;
+			return (0);
 		}
 	}
+
+	return (ENODEV);
 }
 
 static int
@@ -930,9 +937,9 @@ rk_vop_create_pipeline(device_t dev, struct drm_device *drm)
 
 	drm_crtc_helper_add(&sc->crtc, &rk_vop_crtc_helper_funcs);
 
-	rk_vop_add_encoder(sc, drm);
+	error = rk_vop_add_encoder(sc, drm);
 
-	return (0);
+	return (error);
 }
 
 static device_method_t rk_vop_methods[] = {
