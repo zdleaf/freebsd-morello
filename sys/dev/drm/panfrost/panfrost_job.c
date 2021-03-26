@@ -545,17 +545,18 @@ panfrost_job_timedout(struct drm_sched_job *sched_job)
 	sc = job->sc;
 
 	stat = GPU_READ(sc, JOB_INT_STAT);
-	printf("%s: job %p (slot %d), stat %x\n", __func__,
+	device_printf(sc->dev, "%s: job %p (slot %d), stat %x\n", __func__,
 	    job, job->slot, stat);
 
 	if (dma_fence_is_signaled(job->done_fence)) {
-		printf("%s: done fence is signalled\n", __func__);
+		device_printf(sc->dev, "%s: done fence is signalled\n",
+		    __func__);
 		return;
 	}
 
 printf("%s: 1\n", __func__);
 	if (!panfrost_scheduler_stop(&sc->js->queue[job->slot], sched_job)) {
-		printf("%s: could not stop scheduler\n", __func__);
+		device_printf(sc->dev, "%s: could not stop scheduler\n",			    __func__);
 		return;
 	}
 
@@ -693,10 +694,12 @@ printf("%s: 6\n", __func__);
 
 	error = panfrost_device_reset(sc);
 	if (error != 0)
-		printf("%s: could not reset device\n", __func__);
+		device_printf(sc->dev, "%s: could not reset device\n",
+		    __func__);
 
 	for (i = 0; i < NUM_JOB_SLOTS; i++) {
-		printf("%s: restarting scheduler %d\n", __func__, i);
+		device_printf(sc->dev, "%s: restarting scheduler %d\n",
+		    __func__, i);
 		panfrost_scheduler_start(&sc->js->queue[i]);
 	}
 printf("%s: 7\n", __func__);
@@ -720,7 +723,10 @@ panfrost_job_init(struct panfrost_softc *sc)
 		error = drm_sched_init(&js->queue[i].sched,
 		    &panfrost_sched_ops, 1, 0,
 		    msecs_to_jiffies(JOB_TIMEOUT_MS), "pan_js");
-		printf("drm_sched_init error %d\n", error);
+		if (error) {
+			device_printf(sc->dev, "Could not init scheduler\n");
+			return (error);
+		}
 	}
 
 	panfrost_job_enable_interrupts(sc);

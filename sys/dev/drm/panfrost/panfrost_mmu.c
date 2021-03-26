@@ -486,7 +486,7 @@ panfrost_mmu_as_get(struct panfrost_softc *sc, struct panfrost_mmu *mmu)
 			}
 		}
 		if (found == false)
-			printf("as not found\n");
+			device_printf(sc->dev, "as not found\n");
 
 		as = mmu1->as;
 		mmu1->as = -1;
@@ -545,7 +545,8 @@ panfrost_mmu_map(struct panfrost_softc *sc,
 
 	error = panfrost_gem_get_pages(bo);
 	if (error != 0) {
-		printf("%s: no pages, bo->is_heap %d\n", __func__, bo->is_heap);
+		device_printf(sc->dev, "%s: no pages, bo->is_heap %d\n",
+		    __func__, bo->is_heap);
 		return (error);
 	}
 

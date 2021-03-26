@@ -167,7 +167,7 @@ panfrost_open(struct drm_device *dev, struct drm_file *file)
 
 	error = panfrost_job_open(pfile);
 	if (error != 0) {
-		printf("%s: can't open job\n", __func__);
+		device_printf(sc->dev, "%s: can't open job\n", __func__);
 		return (error);
 	}
 
@@ -386,8 +386,11 @@ panfrost_ioctl_create_bo(struct drm_device *dev, void *data,
 	struct panfrost_gem_mapping *mapping;
 	struct drm_panfrost_create_bo *args;
 	struct panfrost_gem_object *bo;
+	struct panfrost_softc *sc;
 
 	args = data;
+
+	sc = dev->dev_private;
 
 	dprintf("%s: size %d flags %d handle %d pad %d offset %jd\n",
 	    __func__, args->size, args->flags, args->handle, args->pad,
@@ -396,7 +399,8 @@ panfrost_ioctl_create_bo(struct drm_device *dev, void *data,
 	bo = panfrost_gem_create_object_with_handle(file, dev, args->size,
 	    args->flags, &args->handle);
 	if (bo == NULL) {
-		printf("%s: Failed to create object\n", __func__);
+		device_printf(sc->dev, "%s: Failed to create object\n",
+		    __func__);
 		return (EINVAL);
 	}
 
@@ -660,7 +664,7 @@ panfrost_gpu_intr(void *arg)
 
 	pending = GPU_READ(sc, GPU_INT_STAT);
 
-	printf("%s: pending %x\n", __func__, pending);
+	device_printf(sc->dev, "%s: pending %x\n", __func__, pending);
 
 	if (pending & GPU_IRQ_POWER_CHANGED ||
 	    pending & GPU_IRQ_POWER_CHANGED_ALL) {
@@ -677,8 +681,6 @@ panfrost_irq_hook(void *arg)
 	int err;
 
 	sc = arg;
-
-	printf("%s\n", __func__);
 
 	drm_mode_config_init(&sc->drm_dev);
 

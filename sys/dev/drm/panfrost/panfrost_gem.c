@@ -262,6 +262,7 @@ panfrost_gem_fault(struct vm_area_struct *vma, struct vm_fault *vmf)
 {
 	struct panfrost_gem_object *bo;
 	struct drm_gem_object *gem_obj;
+	struct panfrost_softc *sc;
 	struct scatterlist *sg;
 	struct sg_table *sgt;
 	struct page *page;
@@ -274,11 +275,12 @@ panfrost_gem_fault(struct vm_area_struct *vma, struct vm_fault *vmf)
 	obj = vma->vm_obj;
 	gem_obj = vma->vm_private_data;
 	bo = (struct panfrost_gem_object *)gem_obj;
+	sc = gem_obj->dev->dev_private;
 
 	pidx = OFF_TO_IDX(vmf->address - vma->vm_start);
 	if (pidx >= bo->npages) {
-		printf("%s: error: requested page is out of range (%d/%d)\n",
-		    __func__, pidx, bo->npages);
+		device_printf(sc->dev, "%s: error: requested page is "
+		    "out of range (%d/%d)\n", __func__, pidx, bo->npages);
 		return (VM_FAULT_SIGBUS);
 	}
 
@@ -359,6 +361,7 @@ int
 panfrost_gem_mmap(struct drm_gem_object *obj, struct vm_area_struct *vma)
 {
 	struct panfrost_gem_object *bo;
+	struct panfrost_softc *sc;
 	struct drm_device *dev;
 	int error;
 
@@ -367,6 +370,8 @@ panfrost_gem_mmap(struct drm_gem_object *obj, struct vm_area_struct *vma)
 	bo = (struct panfrost_gem_object *)obj;
 
 	vma->vm_pgoff -= drm_vma_node_start(&obj->vma_node);
+
+	sc = obj->dev->dev_private;
 
 	if (obj->import_attach) {
 		dev = obj->dev;
@@ -380,7 +385,7 @@ panfrost_gem_mmap(struct drm_gem_object *obj, struct vm_area_struct *vma)
 
 	error = panfrost_gem_get_pages(bo);
 	if (error != 0) {
-		printf("failed to get pages\n");
+		device_printf(sc->dev, "failed to get pages\n");
 		return (error);
 	}
 
@@ -410,7 +415,10 @@ static struct panfrost_gem_object *
 panfrost_gem_create_object(struct drm_device *dev, size_t size, bool private)
 {
 	struct panfrost_gem_object *obj;
+	struct panfrost_softc *sc;
 	int error;
+
+	sc = dev->dev_private;
 
 	obj = malloc(sizeof(*obj), M_PANFROST2, M_ZERO | M_WAITOK);
 	obj->base.funcs = &panfrost_gem_funcs;
@@ -425,7 +433,7 @@ panfrost_gem_create_object(struct drm_device *dev, size_t size, bool private)
 
 	error = drm_gem_create_mmap_offset(&obj->base);
 	if (error != 0) {
-		printf("Failed to create mmap offset\n");
+		device_printf(sc->dev, "Failed to create mmap offset.\n");
 		return (NULL);
 	}
 
@@ -451,7 +459,10 @@ panfrost_gem_create_object_with_handle(struct drm_file *file,
     struct drm_device *dev, size_t size, uint32_t flags, uint32_t *handle)
 {
 	struct panfrost_gem_object *obj;
+	struct panfrost_softc *sc;
 	int error;
+
+	sc = dev->dev_private;
 
 	dprintf("%s\n", __func__);
 
@@ -466,7 +477,8 @@ panfrost_gem_create_object_with_handle(struct drm_file *file,
 
 	obj = panfrost_gem_create_object(dev, size, false);
 	if (obj == NULL) {
-		printf("%s: Failed to create obj 0\n", __func__);
+		device_printf(sc->dev, "%s: Failed to create object\n",
+		    __func__);
 		return (NULL);
 	}
 
@@ -480,7 +492,8 @@ panfrost_gem_create_object_with_handle(struct drm_file *file,
 	/* Drop reference from object_init(), handle holds it now. */
 	panfrost_gem_object_put(obj);
 	if (error) {
-		printf("%s: Failed to create handle\n", __func__);
+		device_printf(sc->dev, "%s: Failed to create handle\n",
+		    __func__);
 		return (NULL);
 	}
 
