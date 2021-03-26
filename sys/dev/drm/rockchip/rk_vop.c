@@ -504,6 +504,10 @@ rk_vop_plane_atomic_update(struct drm_plane *plane,
 		lb_mode = LB_RGB_1280X8;
 	else if (dst_w <= 1920)
 		lb_mode = LB_RGB_1920X5;
+	else if (dst_w <= 2560)
+		lb_mode = LB_RGB_2560X4;
+	else if (dst_w <= 3840)
+		lb_mode = LB_RGB_3840X2;
 	else
 		panic("unknown lb_mode, dst_w %d", dst_w);
 
