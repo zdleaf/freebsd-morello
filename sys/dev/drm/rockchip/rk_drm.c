@@ -87,8 +87,6 @@ rockchip_gem_prime_get_sg_table(struct drm_gem_object *obj)
 	vm_page_t *m;
 	int npages;
 
-	//printf("%s\n", __func__);
-
 	m = drm_gem_cma_get_pages(obj, &npages);
 	if (m == NULL)
 		return (NULL);
@@ -117,15 +115,12 @@ rockchip_drm_gem_object_mmap(struct drm_gem_object *obj,
 	int npages;
 	int error;
 
-	//printf("%s: obj size %d: TODO\n", __func__, obj->size);
-
 	m = drm_gem_cma_get_pages(obj, &npages);
 
 	bo = container_of(obj, struct drm_gem_cma_object, gem_obj);
 	if (bo->pbase == 0)
 		return (0);
 
-	//printf("%s: m %p\n", __func__, m);
 	error = drm_gem_mmap_obj(obj, npages * PAGE_SIZE, vma);
 	drm_gem_object_put_unlocked(obj);
 	if (error)
@@ -188,8 +183,6 @@ rk_drm_output_poll_changed(struct drm_device *drm_dev)
 {
 	struct rk_drm_softc *sc;
 
-	printf("%s\n", __func__);
-
 	sc = container_of(drm_dev, struct rk_drm_softc, drm_dev);
 	if (sc->fb != NULL)
 		drm_fb_helper_hotplug_event(&sc->fb->fb_helper);
@@ -211,11 +204,10 @@ drm_fb_cma_helper_getinfo(device_t dev)
 {
 	struct rk_drm_softc *sc;
 
-	printf("%s\n", __func__);
-
 	sc = device_get_softc(dev);
 	if (sc->fb == NULL)
 		return (NULL);
+
 	return (sc->fb->fb_helper.fbdev);
 }
 
@@ -245,8 +237,6 @@ rk_drm_fb_init(struct drm_device *drm_dev)
 {
 	struct rk_drm_softc *sc;
 	int rv;
-
-	printf("%s\n", __func__);
 
 	sc = container_of(drm_dev, struct rk_drm_softc, drm_dev);
 
@@ -288,8 +278,6 @@ rk_drm_fb_destroy(struct drm_device *drm_dev)
 	struct drm_fb_cma *fb;
 	struct rk_drm_softc *sc;
 
-	printf("%s\n", __func__);
-
 	sc = container_of(drm_dev, struct rk_drm_softc, drm_dev);
 	fb = sc->fb;
 	if (fb == NULL)
@@ -316,8 +304,6 @@ rk_drm_irq_hook(void *arg)
 
 	sc = arg;
 
-	printf("%s\n", __func__);
-
 	node = ofw_bus_get_node(sc->dev);
 
 	drm_mode_config_init(&sc->drm_dev);
@@ -338,7 +324,7 @@ rk_drm_irq_hook(void *arg)
 
 	/* Attach the port(s) */
 	for (i = 0; i < nports; i++) {
-		//if (bootverbose)
+		if (bootverbose)
 			device_printf(sc->dev, "Lookup port with phandle %x\n",
 			    ports[i]);
 		portdev = OF_device_from_xref(ports[i]);
