@@ -264,8 +264,8 @@ panfrost_device_init_features(struct panfrost_softc *sc)
 	for (i = 0; i < num_js; i++)
 		sc->features.js_features[i] = GPU_READ(sc, GPU_JS_FEATURES(i));
 
-	device_printf(sc->dev, "GPU revision %x, id %x\n", sc->features.revision,
-	    sc->features.id);
+	device_printf(sc->dev, "GPU revision %x, id %x\n",
+	    sc->features.revision, sc->features.id);
 
 	sc->features.nr_core_groups = hweight64(sc->features.l2_present);
 	sc->features.thread_tls_alloc = GPU_READ(sc, GPU_THREAD_TLS_ALLOC);

@@ -158,7 +158,8 @@ panfrost_open(struct drm_device *dev, struct drm_file *file)
 
 	error = panfrost_mmu_pgtable_alloc(pfile);
 	if (error != 0) {
-		device_printf(sc->dev, "%s: could not allocate pgtable\n", __func__);
+		device_printf(sc->dev, "%s: could not allocate pgtable\n",
+		    __func__);
 		drm_mm_takedown(&pfile->mm);
 		free(pfile, M_PANFROST);
 		return (error);
@@ -812,5 +813,5 @@ static driver_t panfrost_driver = {
 
 static devclass_t panfrost_devclass;
 
-EARLY_DRIVER_MODULE(panfrost, simplebus, panfrost_driver, panfrost_devclass, 0, 0,
-    BUS_PASS_INTERRUPT + BUS_PASS_ORDER_LAST);
+EARLY_DRIVER_MODULE(panfrost, simplebus, panfrost_driver, panfrost_devclass,
+    0, 0, BUS_PASS_INTERRUPT + BUS_PASS_ORDER_LAST);

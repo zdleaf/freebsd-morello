@@ -361,13 +361,15 @@ panfrost_mmu_intr(void *arg)
 
 		if ((status & mask) == (1 << i)) {
 			if ((exception_type & 0xF8) == 0xC0) {
-				dprintf("%s: page fault at %jx\n", __func__, addr);
+				dprintf("%s: page fault at %jx\n",
+				    __func__, addr);
 				error = panfrost_mmu_page_fault(sc, i, addr);
 			}
 		}
 
 		if (error)
-			device_printf(sc->dev, "MMU fault %x: exception %x (%s), "
+			device_printf(sc->dev,
+			    "MMU fault %x: exception %x (%s), "
 			    "access %x (%s), source_id %d, addr %jx\n",
 			    fault_status,
 			    exception_type,

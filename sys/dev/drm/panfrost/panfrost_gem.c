@@ -151,7 +151,8 @@ panfrost_gem_open(struct drm_gem_object *obj, struct drm_file *file_priv)
 	    obj->size >> PAGE_SHIFT, align, color, 0 /* mode */);
 	mtx_unlock_spin(&pfile->mm_lock);
 	if (error) {
-		printf("%s: Failed to insert: sz %d, align %d, color %d, err %d\n",
+		device_printf(sc->dev,
+		    "%s: Failed to insert: sz %d, align %d, color %d, err %d\n",
 		    __func__, obj->size >> PAGE_SHIFT, align, color, error);
 		goto error;
 	}
@@ -162,13 +163,16 @@ panfrost_gem_open(struct drm_gem_object *obj, struct drm_file *file_priv)
 	if (!bo->is_heap) {
 		error = panfrost_mmu_map(sc, mapping);
 		if (error) {
-			printf("%s: could not map, error %d\n", __func__, error);
+			device_printf(sc->dev, "%s: could not map, error %d\n",
+			    __func__, error);
 			goto error;
 		}
 	} else {
 		error = panfrost_gem_get_pages(bo);
 		if (error) {
-			printf("%s: could not alloc pages, error %d\n", __func__, error);
+			device_printf(sc->dev,
+			    "%s: could not alloc pages, error %d\n",
+			    __func__, error);
 			goto error;
 		}
 	}
@@ -593,14 +597,15 @@ panfrost_gem_get_pages(struct panfrost_gem_object *bo)
 	    VM_ALLOC_WIRED | VM_ALLOC_ZERO;
 	memattr = VM_MEMATTR_WRITE_COMBINING;
 
-	m0 = malloc(sizeof(vm_page_t *) * npages, M_PANFROST, M_WAITOK | M_ZERO);
+	m0 = malloc(sizeof(vm_page_t *) * npages,
+	    M_PANFROST, M_WAITOK | M_ZERO);
 	bo->pages = m0;
 	bo->npages = npages;
 
 	for (i = 0; i < npages; i++) {
 retry:
-		m = vm_page_alloc_contig(NULL, 0, pflags, 1, low, high, alignment,
-		    boundary, memattr);
+		m = vm_page_alloc_contig(NULL, 0, pflags, 1, low, high,
+		    alignment, boundary, memattr);
 		if (m == NULL) {
 			vm_wait(NULL);
 			goto retry;

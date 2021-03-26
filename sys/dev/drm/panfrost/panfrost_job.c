@@ -132,7 +132,8 @@ panfrost_job_intr(void *arg)
 			GPU_WRITE(sc, JS_COMMAND_NEXT(i), JS_COMMAND_NOP);
 
 			status = GPU_READ(sc, JS_STATUS(i));
-			device_printf(sc->dev, "%s: job fault, slot %d status %x "
+			device_printf(sc->dev,
+			    "%s: job fault, slot %d status %x "
 			    "head %x tail %x\n", __func__, i, status,
 			    GPU_READ(sc, JS_HEAD_LO(i)),
 			    GPU_READ(sc, JS_TAIL_LO(i)));
@@ -141,6 +142,10 @@ panfrost_job_intr(void *arg)
 			    PANFROST_QUEUE_STATUS_STARTING,
 			    PANFROST_QUEUE_STATUS_FAULT_PENDING);
 			if (old_status == PANFROST_QUEUE_STATUS_ACTIVE) {
+				/*
+				 * TODO: could not restart scheduler,
+				 * so ignore the error for now.
+				 */
 				goto completed;
 				drm_sched_fault(&sc->js->queue[i].sched);
 			}
@@ -494,7 +499,8 @@ panfrost_scheduler_start(struct panfrost_queue_state *queue)
 	enum panfrost_queue_status old_status;
 
 	mtx_lock(&queue->lock);
-	old_status = atomic_xchg(&queue->status, PANFROST_QUEUE_STATUS_STARTING);
+	old_status = atomic_xchg(&queue->status,
+	    PANFROST_QUEUE_STATUS_STARTING);
 
 	queue->sched.timeout = msecs_to_jiffies(JOB_TIMEOUT_MS);
 	drm_sched_resubmit_jobs(&queue->sched);
@@ -539,7 +545,8 @@ panfrost_job_timedout(struct drm_sched_job *sched_job)
 	sc = job->sc;
 
 	stat = GPU_READ(sc, JOB_INT_STAT);
-	printf("%s: job %p (slot %d), stat %x\n", __func__, job, job->slot, stat);
+	printf("%s: job %p (slot %d), stat %x\n", __func__,
+	    job, job->slot, stat);
 
 	if (dma_fence_is_signaled(job->done_fence)) {
 		printf("%s: done fence is signalled\n", __func__);
