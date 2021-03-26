@@ -901,7 +901,7 @@ dw_hdmi_write(struct dw_hdmi_softc *sc, uint32_t reg, uint32_t val)
 	}
 }
 
-static void
+static int
 dw_hdmi_register_ports(device_t dev)
 {
 	phandle_t ports, port;
@@ -912,7 +912,12 @@ dw_hdmi_register_ports(device_t dev)
 	node = ofw_bus_get_node(dev);
 
 	ports = ofw_bus_find_child(node, "ports");
+	if (ports == 0)
+		return (ENOENT);
+
 	port = ofw_bus_find_child(ports, "port");
+	if (port == 0)
+		return (ENOENT);
 
 	for (i = 0; i < 16; i++) {
 		sprintf(endp, "endpoint@%d", i);
@@ -920,6 +925,8 @@ dw_hdmi_register_ports(device_t dev)
 		if (child)
 			OF_device_register_xref(OF_xref_from_node(child), dev);
 	}
+
+	return (0);
 }
 
 static int
@@ -1058,9 +1065,8 @@ dw_hdmi_attach(device_t dev)
 		sc->ddc = i2c_bsd_adapter(sc->iicbus);
 	}
 
-	dw_hdmi_register_ports(dev);
+	error = dw_hdmi_register_ports(dev);
 
-	return (0);
 fail:
 	return (error);
 }
