@@ -434,10 +434,10 @@ dw_hdmi_phy_sel_data_en_pol(struct dw_hdmi_softc *sc, uint8_t enable)
 {
 	uint8_t reg;
 
-	reg = dw_hdmi_read(sc, HDMI_PHY_CONF0);
+	reg = dw_hdmi_read(sc, DW_HDMI_PHY_CONF0);
 	reg &= ~HDMI_PHY_CONF0_SELDATAENPOL_MASK;
 	reg |= (enable << HDMI_PHY_CONF0_SELDATAENPOL_OFFSET);
-	dw_hdmi_write(sc, HDMI_PHY_CONF0, reg);
+	dw_hdmi_write(sc, DW_HDMI_PHY_CONF0, reg);
 }
 
 static void
@@ -445,10 +445,10 @@ dw_hdmi_phy_sel_interface_control(struct dw_hdmi_softc *sc, uint8_t enable)
 {
 	uint8_t reg;
 
-	reg = dw_hdmi_read(sc, HDMI_PHY_CONF0);
+	reg = dw_hdmi_read(sc, DW_HDMI_PHY_CONF0);
 	reg &= ~HDMI_PHY_CONF0_SELDIPIF_MASK;
 	reg |= (enable << HDMI_PHY_CONF0_SELDIPIF_OFFSET);
-	dw_hdmi_write(sc, HDMI_PHY_CONF0, reg);
+	dw_hdmi_write(sc, DW_HDMI_PHY_CONF0, reg);
 }
 
 static void
@@ -456,10 +456,10 @@ dw_hdmi_phy_enable_tmds(struct dw_hdmi_softc *sc, uint8_t enable)
 {
 	uint8_t reg;
 
-	reg = dw_hdmi_read(sc, HDMI_PHY_CONF0);
+	reg = dw_hdmi_read(sc, DW_HDMI_PHY_CONF0);
 	reg &= ~HDMI_PHY_CONF0_ENTMDS_MASK;
 	reg |= (enable << HDMI_PHY_CONF0_ENTMDS_OFFSET);
-	dw_hdmi_write(sc, HDMI_PHY_CONF0, reg);
+	dw_hdmi_write(sc, DW_HDMI_PHY_CONF0, reg);
 }
 
 static void
@@ -467,10 +467,10 @@ dw_hdmi_phy_enable_power(struct dw_hdmi_softc *sc, uint8_t enable)
 {
 	uint8_t reg;
 
-	reg = dw_hdmi_read(sc, HDMI_PHY_CONF0);
+	reg = dw_hdmi_read(sc, DW_HDMI_PHY_CONF0);
 	reg &= ~HDMI_PHY_CONF0_PDZ_MASK;
 	reg |= (enable << HDMI_PHY_CONF0_PDZ_OFFSET);
-	dw_hdmi_write(sc, HDMI_PHY_CONF0, reg);
+	dw_hdmi_write(sc, DW_HDMI_PHY_CONF0, reg);
 }
 
 static void
@@ -478,10 +478,10 @@ dw_hdmi_phy_enable_spare(struct dw_hdmi_softc *sc, uint8_t enable)
 {
 	uint8_t reg;
 
-	reg = dw_hdmi_read(sc, HDMI_PHY_CONF0);
+	reg = dw_hdmi_read(sc, DW_HDMI_PHY_CONF0);
 	reg &= ~HDMI_PHY_CONF0_SPARECTRL_MASK;
 	reg |= (enable << HDMI_PHY_CONF0_SPARECTRL_OFFSET);
-	dw_hdmi_write(sc, HDMI_PHY_CONF0, reg);
+	dw_hdmi_write(sc, DW_HDMI_PHY_CONF0, reg);
 }
 
 static void
@@ -489,10 +489,10 @@ dw_hdmi_phy_gen2_txpwron(struct dw_hdmi_softc *sc, uint8_t enable)
 {
 	uint8_t reg;
 
-	reg = dw_hdmi_read(sc, HDMI_PHY_CONF0);
+	reg = dw_hdmi_read(sc, DW_HDMI_PHY_CONF0);
 	reg &= ~HDMI_PHY_CONF0_GEN2_TXPWRON_MASK;
 	reg |= (enable << HDMI_PHY_CONF0_GEN2_TXPWRON_OFFSET);
-	dw_hdmi_write(sc, HDMI_PHY_CONF0, reg);
+	dw_hdmi_write(sc, DW_HDMI_PHY_CONF0, reg);
 }
 
 static void
@@ -500,10 +500,10 @@ dw_hdmi_phy_gen2_pddq(struct dw_hdmi_softc *sc, uint8_t enable)
 {
 	uint8_t reg;
 
-	reg = dw_hdmi_read(sc, HDMI_PHY_CONF0);
+	reg = dw_hdmi_read(sc, DW_HDMI_PHY_CONF0);
 	reg &= ~HDMI_PHY_CONF0_GEN2_PDDQ_MASK;
 	reg |= (enable << HDMI_PHY_CONF0_GEN2_PDDQ_OFFSET);
-	dw_hdmi_write(sc, HDMI_PHY_CONF0, reg);
+	dw_hdmi_write(sc, DW_HDMI_PHY_CONF0, reg);
 }
 
 static inline void
@@ -511,11 +511,11 @@ dw_hdmi_phy_test_clear(struct dw_hdmi_softc *sc, unsigned char bit)
 {
 	uint8_t val;
 
-	val = dw_hdmi_read(sc, HDMI_PHY_TST0);
+	val = dw_hdmi_read(sc, DW_HDMI_PHY_TST0);
 	val &= ~HDMI_PHY_TST0_TSTCLR_MASK;
 	val |= (bit << HDMI_PHY_TST0_TSTCLR_OFFSET) &
 		HDMI_PHY_TST0_TSTCLR_MASK;
-	dw_hdmi_write(sc, HDMI_PHY_TST0, val);
+	dw_hdmi_write(sc, DW_HDMI_PHY_TST0, val);
 }
 
 static void
@@ -526,7 +526,7 @@ dw_hdmi_phy_wait_i2c_done(struct dw_hdmi_softc *sc, int msec)
 	val = dw_hdmi_read(sc, DW_HDMI_IH_I2CMPHY_STAT0) &
 	    (DW_HDMI_IH_I2CMPHY_STAT0_DONE | DW_HDMI_IH_I2CMPHY_STAT0_ERROR);
 	while (val == 0) {
-		pause("HDMI_PHY", hz/100);
+		pause("DW_HDMI_PHY", hz/100);
 		msec -= 10;
 		if (msec <= 0)
 			return;
@@ -544,10 +544,10 @@ dw_hdmi_phy_i2c_write(struct dw_hdmi_softc *sc, unsigned short data,
 	/* clear DONE and ERROR flags */
 	dw_hdmi_write(sc, DW_HDMI_IH_I2CMPHY_STAT0,
 	    DW_HDMI_IH_I2CMPHY_STAT0_DONE | DW_HDMI_IH_I2CMPHY_STAT0_ERROR);
-	dw_hdmi_write(sc, HDMI_PHY_I2CM_ADDRESS_ADDR, addr);
-	dw_hdmi_write(sc, HDMI_PHY_I2CM_DATAO_1_ADDR, ((data >> 8) & 0xff));
-	dw_hdmi_write(sc, HDMI_PHY_I2CM_DATAO_0_ADDR, ((data >> 0) & 0xff));
-	dw_hdmi_write(sc, HDMI_PHY_I2CM_OPERATION_ADDR,
+	dw_hdmi_write(sc, DW_HDMI_PHY_I2CM_ADDRESS_ADDR, addr);
+	dw_hdmi_write(sc, DW_HDMI_PHY_I2CM_DATAO_1_ADDR, ((data >> 8) & 0xff));
+	dw_hdmi_write(sc, DW_HDMI_PHY_I2CM_DATAO_0_ADDR, ((data >> 0) & 0xff));
+	dw_hdmi_write(sc, DW_HDMI_PHY_I2CM_OPERATION_ADDR,
 	    HDMI_PHY_I2CM_OPERATION_ADDR_WRITE);
 	dw_hdmi_phy_wait_i2c_done(sc, 1000);
 }
@@ -578,26 +578,27 @@ dw_hdmi_phy_configure(struct dw_hdmi_softc *sc)
 	dw_hdmi_write(sc, DW_HDMI_MC_HEACPHY_RST, HDMI_MC_HEACPHY_RST_ASSERT);
 
 	dw_hdmi_phy_test_clear(sc, 1);
-	dw_hdmi_write(sc, HDMI_PHY_I2CM_SLAVE_ADDR,
+	dw_hdmi_write(sc, DW_HDMI_PHY_I2CM_SLAVE_ADDR,
 	    HDMI_PHY_I2CM_SLAVE_ADDR_PHY_GEN2);
 	dw_hdmi_phy_test_clear(sc, 0);
 
 	/*
 	 * Following initialization are for 8bit per color case
 	 */
-	dw_hdmi_phy_i2c_write(sc, 0x0051, HDMI_PHY_I2C_CPCE_CTRL);
-	dw_hdmi_phy_i2c_write(sc, 0x0003, HDMI_PHY_I2C_GMPCTRL);
-	dw_hdmi_phy_i2c_write(sc, 0x0000, HDMI_PHY_I2C_CURRCTRL);
+	dw_hdmi_phy_i2c_write(sc, 0x0051, DW_HDMI_PHY_I2C_CPCE_CTRL);
+	dw_hdmi_phy_i2c_write(sc, 0x0003, DW_HDMI_PHY_I2C_GMPCTRL);
+	dw_hdmi_phy_i2c_write(sc, 0x0000, DW_HDMI_PHY_I2C_CURRCTRL);
 
-	dw_hdmi_phy_i2c_write(sc, 0x0000, HDMI_PHY_I2C_PLLPHBYCTRL);
-	dw_hdmi_phy_i2c_write(sc, MSM_CTRL_FB_CLK, HDMI_PHY_I2C_MSM_CTRL);
+	dw_hdmi_phy_i2c_write(sc, 0x0000, DW_HDMI_PHY_I2C_PLLPHBYCTRL);
+	dw_hdmi_phy_i2c_write(sc, MSM_CTRL_FB_CLK, DW_HDMI_PHY_I2C_MSM_CTRL);
 
 	/* REMOVE CLK TERM */
-	dw_hdmi_phy_i2c_write(sc, CKCALCTRL_OVERRIDE, HDMI_PHY_I2C_CKCALCTRL);
+	dw_hdmi_phy_i2c_write(sc, CKCALCTRL_OVERRIDE,
+	    DW_HDMI_PHY_I2C_CKCALCTRL);
 
-	dw_hdmi_phy_i2c_write(sc, 0x802b, HDMI_PHY_I2C_CKSYMTXCTRL);
-	dw_hdmi_phy_i2c_write(sc, 0x0004, HDMI_PHY_I2C_TXTERM);
-	dw_hdmi_phy_i2c_write(sc, 0x028d, HDMI_PHY_I2C_VLEVCTRL);
+	dw_hdmi_phy_i2c_write(sc, 0x802b, DW_HDMI_PHY_I2C_CKSYMTXCTRL);
+	dw_hdmi_phy_i2c_write(sc, 0x0004, DW_HDMI_PHY_I2C_TXTERM);
+	dw_hdmi_phy_i2c_write(sc, 0x028d, DW_HDMI_PHY_I2C_VLEVCTRL);
 
 	dw_hdmi_phy_enable_power(sc, 1);
 
@@ -613,14 +614,15 @@ dw_hdmi_phy_configure(struct dw_hdmi_softc *sc)
 
 	/* Wait for PHY PLL lock */
 	msec = 4;
-	val = dw_hdmi_read(sc, HDMI_PHY_STAT0) & HDMI_PHY_TX_PHY_LOCK;
+	val = dw_hdmi_read(sc, DW_HDMI_PHY_STAT0) & HDMI_PHY_TX_PHY_LOCK;
 	while (val == 0) {
 		DELAY(1000);
 		if (msec-- == 0) {
 			device_printf(sc->dev, "PHY PLL not locked\n");
 			return (-1);
 		}
-		val = dw_hdmi_read(sc, HDMI_PHY_STAT0) & HDMI_PHY_TX_PHY_LOCK;
+		val = dw_hdmi_read(sc, DW_HDMI_PHY_STAT0) & \
+		    HDMI_PHY_TX_PHY_LOCK;
 	}
 
 	return true;
