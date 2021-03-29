@@ -3770,20 +3770,19 @@ pmap_gremove(pmap_t pmap, vm_offset_t va)
 	PMAP_LOCK(pmap);
 
 	pde = pmap_pde(pmap, va, &lvl);
-	KASSERT(lvl == 2,
-	    ("Invalid GPU pagetable level: %d != 2", lvl));
-	pte = NULL;
-	if (pde != NULL && lvl == 2)
-		pte = pmap_l2_to_l3(pde, va);
-
-	if (pte != NULL) {
-		pmap_resident_count_dec(pmap, 1);
-		pmap_clear(pte);
-		cpu_dcache_wb_range((vm_offset_t)pte, sizeof(pt_entry_t));
-		rc = KERN_SUCCESS;
-	} else
+	if (pde == NULL || lvl != 2) {
 		rc = KERN_FAILURE;
+		goto out;
+	}
 
+	pte = pmap_l2_to_l3(pde, va);
+
+	pmap_resident_count_dec(pmap, 1);
+	pmap_clear(pte);
+	cpu_dcache_wb_range((vm_offset_t)pte, sizeof(pt_entry_t));
+	rc = KERN_SUCCESS;
+
+out:
 	PMAP_UNLOCK(pmap);
 
 	return (rc);

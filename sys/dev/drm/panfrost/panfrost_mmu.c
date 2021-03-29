@@ -298,8 +298,10 @@ panfrost_mmu_page_fault(struct panfrost_softc *sc, int as, uint64_t addr)
 	int i;
 
 	bomapping = panfrost_mmu_find_mapping(sc, as, addr);
-	if (!bomapping)
+	if (!bomapping) {
+		device_printf(sc->dev, "no bo mapping found\n");
 		return (EINVAL);
+	}
 
 	bo = bomapping->obj;
 
@@ -309,7 +311,10 @@ panfrost_mmu_page_fault(struct panfrost_softc *sc, int as, uint64_t addr)
 
 	KASSERT(bo->pages != NULL, ("pages is NULL"));
 
-	page = bo->pages[page_offset];
+	va = bomapping->mmnode.start << PAGE_SHIFT;
+
+	device_printf(sc->dev, "addr %jx va %jx page_offset %d, npages %d\n",
+	    addr, va, page_offset, bo->npages);
 
 	mmu = bomapping->mmu;
 	prot = VM_PROT_READ | VM_PROT_WRITE;
@@ -317,13 +322,18 @@ panfrost_mmu_page_fault(struct panfrost_softc *sc, int as, uint64_t addr)
 	va = addr;
 	sva = va;
 
-	for (i = 0; i < 512; i++, page++) {
+	/* Map 2MiB. */
+	for (i = 0; i < 512; i++) {
+		page = bo->pages[page_offset + i];
 		pa = VM_PAGE_TO_PHYS(page);
 		error = pmap_genter(&mmu->p, va, pa, prot, 0);
 		va += PAGE_SIZE;
 	}
 
 	panfrost_mmu_flush_range(sc, mmu, sva, va - sva);
+
+	bomapping->active = true;
+	panfrost_gem_mapping_put(bomapping);
 
 	return (0);
 }
@@ -345,9 +355,13 @@ panfrost_mmu_intr(void *arg)
 	sc = arg;
 
 	status = GPU_READ(sc, MMU_INT_RAWSTAT);
+	device_printf(sc->dev, "%s: status %x\n", __func__, status);
 
 	for (i = 0; status != 0; i++) {
 		mask = (1 << i) | (1 << (i + 16)); /* fault | error */
+
+		if ((status & mask) == 0)
+			continue;
 
 		fault_status = GPU_READ(sc, AS_FAULTSTATUS(i));
 		exception_type = fault_status & 0xFF;
@@ -361,7 +375,7 @@ panfrost_mmu_intr(void *arg)
 
 		if ((status & mask) == (1 << i)) {
 			if ((exception_type & 0xF8) == 0xC0) {
-				dprintf("%s: page fault at %jx\n",
+				printf("%s: page fault at %jx\n",
 				    __func__, addr);
 				error = panfrost_mmu_page_fault(sc, i, addr);
 			}
@@ -369,8 +383,9 @@ panfrost_mmu_intr(void *arg)
 
 		if (error)
 			device_printf(sc->dev,
-			    "MMU fault %x: exception %x (%s), "
+			    "MMU as %d fault %x: exception %x (%s), "
 			    "access %x (%s), source_id %d, addr %jx\n",
+			    i,
 			    fault_status,
 			    exception_type,
 			    panfrost_mmu_exception_name(exception_type),
@@ -589,6 +604,7 @@ panfrost_mmu_unmap(struct panfrost_softc *sc,
 	vm_offset_t sva;
 	vm_offset_t va;
 	int unmapped_len;
+	int error;
 	int len;
 
 	bo = mapping->obj;
@@ -600,12 +616,20 @@ panfrost_mmu_unmap(struct panfrost_softc *sc,
 	unmapped_len = 0;
 
 	while (unmapped_len < len) {
-		pmap_gremove(&mmu->p, va);
+		error = pmap_gremove(&mmu->p, va);
+		if (error) {
+			/*
+			 * Possibly that only part of memory was mapped
+			 * due to tiling operation.
+			 * This could only be possible when driver minor > 0.
+			 */
+			break;
+		}
 		va += PAGE_SIZE;
 		unmapped_len += PAGE_SIZE;
 	}
 
-	panfrost_mmu_flush_range(sc, mmu, sva, len);
+	panfrost_mmu_flush_range(sc, mmu, sva, unmapped_len);
 
 	mapping->active = false;
 }
