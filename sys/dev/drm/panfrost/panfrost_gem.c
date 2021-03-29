@@ -587,6 +587,7 @@ panfrost_gem_get_pages(struct panfrost_gem_object *bo)
 	vm_paddr_t low, high, boundary;
 	struct drm_gem_object *obj;
 	vm_memattr_t memattr;
+	vm_offset_t va;
 	vm_page_t m;
 	int alignment;
 	int pflags;
@@ -625,6 +626,8 @@ retry:
 		}
 		if ((m->flags & PG_ZERO) == 0)
 			pmap_zero_page(m);
+		va = PHYS_TO_DMAP(VM_PAGE_TO_PHYS(m));
+		cpu_dcache_wb_range(va, PAGE_SIZE);
 		m->valid = VM_PAGE_BITS_ALL;
 		m->oflags &= ~VPO_UNMANAGED;
 		m->flags |= PG_FICTITIOUS;
