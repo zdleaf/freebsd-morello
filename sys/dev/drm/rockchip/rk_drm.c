@@ -52,6 +52,7 @@ __FBSDID("$FreeBSD$");
 #include <drm/drm_fb_helper.h>
 #include <drm/drm_fb_cma_helper.h>
 #include <drm/drm_crtc_helper.h>
+#include <drm/drm_gem_cma_helper.h>
 #include <drm/drm_probe_helper.h>
 #include <drm/drm_drv.h>
 #include <drm/drm_file.h>
@@ -106,7 +107,8 @@ rockchip_gem_prime_import_sg_table(struct drm_device *drm,
 }
 
 static int
-rockchip_gem_mmap_buf(struct drm_gem_object *obj, struct vm_area_struct *vma)
+rockchip_drm_gem_object_mmap(struct drm_gem_object *obj,
+    struct vm_area_struct *vma)
 {
 	struct drm_gem_cma_object *bo;
 	vm_page_t *m;
@@ -129,6 +131,13 @@ rockchip_gem_mmap_buf(struct drm_gem_object *obj, struct vm_area_struct *vma)
 	return (error);
 }
 
+static int
+rockchip_gem_mmap_buf(struct drm_gem_object *obj, struct vm_area_struct *vma)
+{
+
+	return rockchip_drm_gem_object_mmap(obj, vma);
+}
+
 /* DRM driver fops */
 static const struct file_operations rk_drm_drv_fops = {
 	.owner = THIS_MODULE,
@@ -143,12 +152,6 @@ static const struct file_operations rk_drm_drv_fops = {
 	/* .llseek = noop_llseek, */
 };
 
-const struct vm_operations_struct rk_drm_gem_vm_ops = {
-	.fault = NULL,
-	.open = drm_gem_vm_open,
-	.close = drm_gem_vm_close,
-};
-
 static struct drm_driver rk_drm_driver = {
 	.driver_features = DRIVER_GEM | DRIVER_MODESET | \
 	    DRIVER_ATOMIC | DRIVER_PRIME,
@@ -160,7 +163,7 @@ static struct drm_driver rk_drm_driver = {
 	/* GEM Opeations */
 	.dumb_create = drm_gem_cma_dumb_create,
 	.gem_free_object = drm_gem_cma_free_object,
-	.gem_vm_ops = &rk_drm_gem_vm_ops,
+	.gem_vm_ops = &drm_gem_cma_vm_ops,
 
 	.prime_handle_to_fd	= drm_gem_prime_handle_to_fd,
 	.prime_fd_to_handle	= drm_gem_prime_fd_to_handle,

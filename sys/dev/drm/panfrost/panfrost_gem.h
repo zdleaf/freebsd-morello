@@ -36,6 +36,7 @@
 struct panfrost_gem_object {
 	struct drm_gem_object			base;	/* Must go first */
 	vm_page_t				*pages;
+	struct mtx				pages_lock;
 	int					npages;
 	int					madv;
 	TAILQ_HEAD(, panfrost_gem_mapping)	mappings;
