@@ -331,35 +331,11 @@ static const struct vm_operations_struct panfrost_gem_vm_ops = {
 	.close = panfrost_gem_vm_close,
 };
 
-static int
-dma_buf_mmap(struct dma_buf *dmabuf, struct vm_area_struct *vma,
-    unsigned long pgoff)
-{
-	int error;
-
-	if (dmabuf == NULL || vma == NULL)
-		return (EINVAL);
-
-	if (dmabuf->ops->mmap == NULL)
-		return (EINVAL);
-
-	if (pgoff + vma_pages(vma) < pgoff)
-		return (EOVERFLOW);
-
-	if (pgoff + vma_pages(vma) > dmabuf->size >> PAGE_SHIFT)
-		return (EINVAL);
-
-	error = dmabuf->ops->mmap(dmabuf, vma);
-
-	return (error);
-}
-
 int
 panfrost_gem_mmap(struct drm_gem_object *obj, struct vm_area_struct *vma)
 {
 	struct panfrost_gem_object *bo;
 	struct panfrost_softc *sc;
-	struct drm_device *dev;
 	int error;
 
 	dprintf("%s\n", __func__);
@@ -369,16 +345,6 @@ panfrost_gem_mmap(struct drm_gem_object *obj, struct vm_area_struct *vma)
 	vma->vm_pgoff -= drm_vma_node_start(&obj->vma_node);
 
 	sc = obj->dev->dev_private;
-
-	if (obj->import_attach) {
-		dev = obj->dev;
-		mutex_lock(&dev->struct_mutex);
-		drm_gem_object_put(obj);
-		mutex_unlock(&dev->struct_mutex);
-
-		vma->vm_private_data = NULL;
-		return dma_buf_mmap(obj->dma_buf, vma, 0);
-	}
 
 	error = panfrost_gem_get_pages(bo);
 	if (error != 0) {
@@ -653,12 +619,6 @@ panfrost_gem_prime_import_sg_table(struct drm_device *dev,
 	bo->pages = NULL;
 
 	obj = &bo->base;
-
-	/*
-	 * TODO (hack): take additional reference so DRM is happy.
-	 * Not sure where to place this line exactly.
-	 */
-	drm_gem_object_get(obj);
 
 	return (obj);
 }
