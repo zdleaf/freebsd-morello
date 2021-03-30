@@ -74,7 +74,6 @@ struct panfrost_job;
 struct panfrost_softc {
 	device_t		dev;
 	struct drm_device	drm_dev;
-	struct drm_fb_cma	*fb;
 	struct resource		*res[4];
 	void			*intrhand[4];
 	struct panfrost_features features;
