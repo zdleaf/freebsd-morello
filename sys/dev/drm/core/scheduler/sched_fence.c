@@ -94,7 +94,7 @@ static const char *drm_sched_fence_get_timeline_name(struct dma_fence *f)
  */
 static void drm_sched_fence_free(struct rcu_head *rcu)
 {
-	struct dma_fence *f = container_of(rcu, struct dma_fence, rcu);
+	struct dma_fence *f = container_of(rcu, struct dma_fence, f_rcu);
 	struct drm_sched_fence *fence = to_drm_sched_fence(f);
 
 	kmem_cache_free(sched_fence_slab, fence);
@@ -113,7 +113,7 @@ static void drm_sched_fence_release_scheduled(struct dma_fence *f)
 	struct drm_sched_fence *fence = to_drm_sched_fence(f);
 
 	dma_fence_put(fence->parent);
-	call_rcu(&fence->finished.rcu, drm_sched_fence_free);
+	call_rcu(&fence->finished.f_rcu, drm_sched_fence_free);
 }
 
 /**
