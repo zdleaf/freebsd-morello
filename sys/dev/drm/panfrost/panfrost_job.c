@@ -306,7 +306,7 @@ panfrost_job_push(struct panfrost_job *job)
 
 	error = drm_sched_job_init(&job->base, entity, NULL);
 	if (error)
-		return (error);
+		goto done;
 
 	mtx_lock(&sc->sched_lock);
 	refcount_acquire(&job->refcount);
@@ -323,9 +323,10 @@ panfrost_job_push(struct panfrost_job *job)
 	panfrost_attach_object_fences(job->bos, job->bo_count,
 	    job->render_done_fence);
 
+done:
 	drm_gem_unlock_reservations(job->bos, job->bo_count, &acquire_ctx);
 
-	return (0);
+	return (error);
 }
 
 void
