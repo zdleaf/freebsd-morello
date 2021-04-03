@@ -569,31 +569,22 @@ panfrost_job_cleanup(struct panfrost_job *job)
 	struct panfrost_gem_object *obj;
 	struct drm_gem_object *bo;
 	struct drm_device *dev;
-	struct dma_fence *fence;
 	int i;
 
 	sc = job->sc;
 	atomic_add_int(&sc->job_cnt, -1);
 
-	dprintf("%s\n", __func__);
+	dprintf("%s: job cnt %d\n", __func__, sc->job_cnt);
 
 	if (job->in_fences) {
-		for (i = 0; i < job->in_fence_count; i++) {
-			fence =	job->in_fences[i];
-			if (!fence)
-				continue;
+		for (i = 0; i < job->in_fence_count; i++)
 			dma_fence_put(job->in_fences[i]);
-		}
 		free(job->in_fences, M_PANFROST1);
 	}
 
 	if (job->implicit_fences) {
-		for (i = 0; i < job->bo_count; i++) {
-			fence = job->implicit_fences[i];
-			if (!fence)
-				continue;
+		for (i = 0; i < job->bo_count; i++)
 			dma_fence_put(job->implicit_fences[i]);
-		}
 		free(job->implicit_fences, M_PANFROST1);
 	}
 
