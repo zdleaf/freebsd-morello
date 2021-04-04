@@ -562,12 +562,13 @@ panfrost_ioctl_get_bo_offset(struct drm_device *dev, void *data,
 	bo = (struct panfrost_gem_object *)obj;
 
 	mapping = panfrost_gem_mapping_get(bo, pfile);
-	if (mapping == NULL)
-		return (EINVAL);
 
 	mutex_lock(&dev->struct_mutex);
 	drm_gem_object_put(obj);
 	mutex_unlock(&dev->struct_mutex);
+
+	if (mapping == NULL)
+		return (EINVAL);
 
 	args->offset = mapping->mmnode.start << PAGE_SHIFT;
 	panfrost_gem_mapping_put(mapping);
