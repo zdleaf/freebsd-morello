@@ -193,17 +193,6 @@ panfrost_job_open(struct panfrost_file *pfile)
 	return (0);
 }
 
-static void
-panfrost_acquire_object_fences(struct drm_gem_object **bos,
-    int bo_count, struct dma_fence **implicit_fences)
-{
-	int i;
-
-	for (i = 0; i < bo_count; i++)
-		implicit_fences[i] =
-		    reservation_object_get_excl_rcu(bos[i]->resv);
-}
-
 static int
 panfrost_job_get_slot(struct panfrost_job *job)
 {
@@ -269,6 +258,17 @@ panfrost_job_hw_submit(struct panfrost_job *job, int slot)
 	GPU_WRITE(sc, JS_COMMAND_NEXT(slot), JS_COMMAND_START);
 
 	dprintf("%s: job %d submitted to HW\n", __func__, sc->job_count - 1);
+}
+
+static void
+panfrost_acquire_object_fences(struct drm_gem_object **bos,
+    int bo_count, struct dma_fence **implicit_fences)
+{
+	int i;
+
+	for (i = 0; i < bo_count; i++)
+		implicit_fences[i] =
+		    reservation_object_get_excl_rcu(bos[i]->resv);
 }
 
 static void
