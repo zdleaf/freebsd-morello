@@ -157,7 +157,7 @@ completed:
 			if (job) {
 				sc->jobs[i] = NULL;
 				panfrost_mmu_as_put(sc, &job->pfile->mmu);
-				dma_fence_signal_locked(job->done_fence);
+				dma_fence_signal(job->done_fence);
 			}
 
 			mtx_unlock(&sc->job_lock);
