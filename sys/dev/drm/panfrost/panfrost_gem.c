@@ -274,12 +274,11 @@ panfrost_gem_fault(struct vm_area_struct *vma, struct vm_fault *vmf)
 	bo = (struct panfrost_gem_object *)gem_obj;
 	sc = gem_obj->dev->dev_private;
 
-	pidx = OFF_TO_IDX(vmf->address - vma->vm_start);
-	if (pidx >= bo->npages) {
-		device_printf(sc->dev, "%s: error: requested page is "
-		    "out of range (%d/%d)\n", __func__, pidx, bo->npages);
+	/* TODO: not sure how to deal with imported objects. */
+	if (gem_obj->import_attach)
 		return (VM_FAULT_SIGBUS);
-	}
+
+	pidx = OFF_TO_IDX(vmf->address - vma->vm_start);
 
 	sgt = bo->sgt;
 
@@ -301,6 +300,13 @@ panfrost_gem_fault(struct vm_area_struct *vma, struct vm_fault *vmf)
 		}
 	}
 	VM_OBJECT_WUNLOCK(obj);
+
+	if (pidx >= i) {
+		device_printf(sc->dev, "%s: error: requested page is "
+		    "out of range (%d/%d)\n", __func__, pidx, i);
+		return (VM_FAULT_SIGBUS);
+	}
+
 	vma->vm_pfn_first = 0;
 	vma->vm_pfn_count = i;
 
