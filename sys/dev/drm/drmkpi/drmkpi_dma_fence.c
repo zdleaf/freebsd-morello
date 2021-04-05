@@ -291,7 +291,7 @@ dma_fence_ensure_signal_enabled(struct dma_fence *fence)
 {
 
 	MPASS(dma_fence_referenced_p(fence));
-//	MPASS(spin_is_locked(fence->lock));
+	assert_spin_locked(fence->lock);
 
 	/* If the fence was already signalled, fail with -ENOENT.  */
 	if (fence->flags & (1u << DMA_FENCE_FLAG_SIGNALED_BIT))
@@ -441,7 +441,7 @@ dma_fence_is_signaled_locked(struct dma_fence *fence)
 {
 
 	MPASS(dma_fence_referenced_p(fence));
-//	MPASS(spin_is_locked(fence->lock));
+	assert_spin_locked(fence->lock);
 
 	/* Check whether we already set the signalled bit.  */
 	if (fence->flags & (1u << DMA_FENCE_FLAG_SIGNALED_BIT))
@@ -516,7 +516,7 @@ dma_fence_signal_locked(struct dma_fence *fence)
 
 	MPASS(fence != NULL);
 	MPASS(dma_fence_referenced_p(fence));
-//	MPASS(spin_is_locked(fence->lock));
+	assert_spin_locked(fence->lock);
 
 	/* If it's been signalled, fail; otherwise set the signalled bit.  */
 	if (test_and_set_bit(DMA_FENCE_FLAG_SIGNALED_BIT, &fence->flags))
