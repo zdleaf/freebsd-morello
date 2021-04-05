@@ -151,16 +151,14 @@ panfrost_job_intr(void *arg)
 		if (stat & (1 << i)) {
 completed:
 			dprintf("%s: job at slot %d completed\n", __func__, i);
-			mtx_lock(&sc->job_lock);
-
+			spin_lock(&sc->js->job_lock);
 			job = sc->jobs[i];
 			if (job) {
 				sc->jobs[i] = NULL;
 				panfrost_mmu_as_put(sc, &job->pfile->mmu);
-				dma_fence_signal(job->done_fence);
+				dma_fence_signal_locked(job->done_fence);
 			}
-
-			mtx_unlock(&sc->job_lock);
+			spin_unlock(&sc->js->job_lock);
 		}
 
 		stat &= ~mask;
@@ -672,12 +670,12 @@ printf("%s: 5\n", __func__);
 
 	sc->reset_pending = 0;
 
-	mtx_lock(&sc->job_lock);
+	spin_lock(&sc->js->job_lock);
 	for (i = 0; i < NUM_JOB_SLOTS; i++) {
 		if (sc->jobs[i])
 			sc->jobs[i] = NULL;
 	}
-	mtx_unlock(&sc->job_lock);
+	spin_unlock(&sc->js->job_lock);
 
 printf("%s: 6\n", __func__);
 

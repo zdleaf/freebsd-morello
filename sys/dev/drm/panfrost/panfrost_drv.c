@@ -730,7 +730,6 @@ panfrost_attach(device_t dev)
 
 	TAILQ_INIT(&sc->mmu_in_use);
 	mtx_init(&sc->mmu_lock, "mmu list", NULL, MTX_DEF);
-	mtx_init(&sc->job_lock, "job list", NULL, MTX_DEF);
 	mtx_init(&sc->sched_lock, "sched", NULL, MTX_DEF);
 
 	node = ofw_bus_get_node(sc->dev);
