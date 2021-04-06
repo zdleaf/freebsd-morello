@@ -138,18 +138,11 @@ panfrost_job_intr(void *arg)
 			old_status = atomic_cmpxchg(&sc->js->queue[i].status,
 			    PANFROST_QUEUE_STATUS_STARTING,
 			    PANFROST_QUEUE_STATUS_FAULT_PENDING);
-			if (old_status == PANFROST_QUEUE_STATUS_ACTIVE) {
-				/*
-				 * TODO: could not restart scheduler,
-				 * so ignore the error for now.
-				 */
-				goto completed;
+			if (old_status == PANFROST_QUEUE_STATUS_ACTIVE)
 				drm_sched_fault(&sc->js->queue[i].sched);
-			}
 		}
 
 		if (stat & (1 << i)) {
-completed:
 			dprintf("%s: job at slot %d completed\n", __func__, i);
 			spin_lock(&sc->js->job_lock);
 			job = sc->jobs[i];
