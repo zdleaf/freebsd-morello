@@ -628,9 +628,9 @@ panfrost_job_free(struct drm_sched_job *sched_job)
 
 	dprintf("%s\n", __func__);
 
-	drm_sched_job_cleanup(sched_job);
-
 	job = (struct panfrost_job *)sched_job;
+
+	drm_sched_job_cleanup(sched_job);
 	panfrost_job_put(job);
 }
 
