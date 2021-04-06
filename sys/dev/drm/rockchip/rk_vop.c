@@ -469,6 +469,7 @@ rk_vop_plane_atomic_update(struct drm_plane *plane,
 	dprintf("%s: src w %d h %d, dst w %d h %d\n",
 	    __func__, src_w, src_h, dst_w, dst_h);
 
+	/* TODO */
 	if (!plane->state->visible)
 		panic("plane is not visible");
 
