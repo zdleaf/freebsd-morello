@@ -341,8 +341,11 @@ rk_drm_irq_hook(void *arg)
 	drm_vblank_init(&sc->drm_dev, sc->drm_dev.mode_config.num_crtc);
 
 	drm_mode_config_reset(&sc->drm_dev);
-	sc->drm_dev.mode_config.max_width = 1920;
-	sc->drm_dev.mode_config.max_height = 1080;
+	/*
+	 * These are VOP-little limitations. VOP-big has bigger resolution.
+	 */
+	sc->drm_dev.mode_config.max_width = 2560;
+	sc->drm_dev.mode_config.max_height = 1600;
 	sc->drm_dev.mode_config.funcs = &rk_drm_mode_config_funcs;
 	sc->drm_dev.mode_config.helper_private = &rk_drm_mode_config_helpers;
 
