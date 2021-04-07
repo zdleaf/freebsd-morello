@@ -232,6 +232,13 @@ rk_vop_clk_enable(device_t dev)
 		}
 	}
 
+	/* ACLK */
+	error = clk_set_freq(sc->clk[0], 400000000, 0);
+	if (error != 0) {
+		device_printf(sc->dev, "Failed to set aclk\n");
+		return (error);
+	}
+
 	/* DCLK */
 	error = clk_set_freq(sc->clk[1], 148500000, 0);
 	if (error != 0) {
@@ -239,15 +246,8 @@ rk_vop_clk_enable(device_t dev)
 		return (error);
 	}
 
-	/* ACLK */
-	error = clk_set_freq(sc->clk[0], 800000000, 0);
-	if (error != 0) {
-		device_printf(sc->dev, "Failed to set aclk\n");
-		return (error);
-	}
-
 	/* HCLK */
-	error = clk_set_freq(sc->clk[2], 400000000, 0);
+	error = clk_set_freq(sc->clk[2], 100000000, 0);
 	if (error != 0) {
 		device_printf(sc->dev, "Failed to set hclk\n");
 		return (error);
@@ -356,14 +356,16 @@ rk_vop_attach(device_t dev)
 
 	/* There is a single port node. */
 	node = ofw_bus_find_child(node, "port");
-	if (node != 0) {
-		device_printf(sc->dev, "port node found, %d\n", node);
-		OF_device_register_xref(OF_xref_from_node(node), dev);
+	if (node == 0) {
+		device_printf(sc->dev, "port node not found\n");
+		return (ENXIO);
 	}
 
 	error = rk_vop_clk_enable(dev);
 	if (error != 0)
 		return (ENXIO);
+
+	OF_device_register_xref(OF_xref_from_node(node), dev);
 
 	device_printf(sc->dev, "VOP version: %x\n",
 	    VOP_READ(sc, RK3399_VERSION_INFO));
@@ -753,6 +755,10 @@ rk_crtc_atomic_enable(struct drm_crtc *crtc, struct drm_crtc_state *old_state)
 
 	/* Set mode */
 	mode1 = 0; /* RGB888 */
+	/*
+	 * Note: for VOP big this should be RGBaaa:
+	 * mode1 = 15;
+	 */
 	reg = VOP_READ(sc, RK3399_DSP_CTRL0);
 	reg &= ~DSP_CTRL0_OUT_MODE_M;
 	reg |= (mode1 << DSP_CTRL0_OUT_MODE_S);
