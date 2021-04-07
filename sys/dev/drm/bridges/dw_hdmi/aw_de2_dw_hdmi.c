@@ -596,9 +596,17 @@ dw_hdmi_phy_configure(struct dw_hdmi_softc *sc)
 	dw_hdmi_phy_i2c_write(sc, CKCALCTRL_OVERRIDE,
 	    DW_HDMI_PHY_I2C_CKCALCTRL);
 
+#if 1
+	/* TODO: these values are for 148500000 HDMI pixel clock. */
 	dw_hdmi_phy_i2c_write(sc, 0x802b, DW_HDMI_PHY_I2C_CKSYMTXCTRL);
 	dw_hdmi_phy_i2c_write(sc, 0x0004, DW_HDMI_PHY_I2C_TXTERM);
 	dw_hdmi_phy_i2c_write(sc, 0x028d, DW_HDMI_PHY_I2C_VLEVCTRL);
+#else
+	/* TODO: these values are for 29700000 HDMI pixel clock. */
+	dw_hdmi_phy_i2c_write(sc, 0x8039, DW_HDMI_PHY_I2C_CKSYMTXCTRL);
+	dw_hdmi_phy_i2c_write(sc, 0x0005, DW_HDMI_PHY_I2C_TXTERM);
+	dw_hdmi_phy_i2c_write(sc, 0x028d, DW_HDMI_PHY_I2C_VLEVCTRL);
+#endif
 
 	dw_hdmi_phy_enable_power(sc, 1);
 
@@ -1213,8 +1221,10 @@ rk_hdmi_clk_enable(device_t dev)
 
 	/* Note: vpll should be the same as vop dclk. */
 	error = clk_set_freq(sc->clk[2], 148500000, 0);
-	if (error != 0)
-		panic("could not set freq\n");
+	if (error != 0) {
+		device_printf(dev, "%s: could not set freq\n", __func__);
+		return (ENXIO);
+	}
 
 	for (i = 0; i < RK_CLK_NENTRIES; i++) {
 		error = clk_enable(sc->clk[i]);
