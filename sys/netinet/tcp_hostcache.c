@@ -71,6 +71,7 @@ __FBSDID("$FreeBSD$");
 
 #include <sys/param.h>
 #include <sys/systm.h>
+#include <sys/hash.h>
 #include <sys/jail.h>
 #include <sys/kernel.h>
 #include <sys/lock.h>
@@ -82,29 +83,59 @@ __FBSDID("$FreeBSD$");
 #include <sys/socketvar.h>
 #include <sys/sysctl.h>
 
-#include <net/if.h>
-#include <net/if_var.h>
-#include <net/route.h>
 #include <net/vnet.h>
 
 #include <netinet/in.h>
-#include <netinet/in_systm.h>
-#include <netinet/ip.h>
-#include <netinet/in_var.h>
 #include <netinet/in_pcb.h>
-#include <netinet/ip_var.h>
-#ifdef INET6
-#include <netinet/ip6.h>
-#include <netinet6/ip6_var.h>
-#endif
 #include <netinet/tcp.h>
 #include <netinet/tcp_var.h>
-#include <netinet/tcp_hostcache.h>
-#ifdef INET6
-#include <netinet6/tcp6_var.h>
-#endif
 
 #include <vm/uma.h>
+
+TAILQ_HEAD(hc_qhead, hc_metrics);
+
+struct hc_head {
+	struct hc_qhead	hch_bucket;
+	u_int		hch_length;
+	struct mtx	hch_mtx;
+};
+
+struct hc_metrics {
+	/* housekeeping */
+	TAILQ_ENTRY(hc_metrics) rmx_q;
+	struct		hc_head *rmx_head; /* head of bucket tail queue */
+	struct		in_addr ip4;	/* IP address */
+	struct		in6_addr ip6;	/* IP6 address */
+	uint32_t	ip6_zoneid;	/* IPv6 scope zone id */
+	/* endpoint specific values for tcp */
+	uint32_t	rmx_mtu;	/* MTU for this path */
+	uint32_t	rmx_ssthresh;	/* outbound gateway buffer limit */
+	uint32_t	rmx_rtt;	/* estimated round trip time */
+	uint32_t	rmx_rttvar;	/* estimated rtt variance */
+	uint32_t	rmx_cwnd;	/* congestion window */
+	uint32_t	rmx_sendpipe;	/* outbound delay-bandwidth product */
+	uint32_t	rmx_recvpipe;	/* inbound delay-bandwidth product */
+	/* TCP hostcache internal data */
+	int		rmx_expire;	/* lifetime for object */
+#ifdef	TCP_HC_COUNTERS
+	u_long		rmx_hits;	/* number of hits */
+	u_long		rmx_updates;	/* number of updates */
+#endif
+};
+
+struct tcp_hostcache {
+	struct hc_head	*hashbase;
+	uma_zone_t	zone;
+	u_int		hashsize;
+	u_int		hashmask;
+	u_int		hashsalt;
+	u_int		bucket_limit;
+	u_int		cache_count;
+	u_int		cache_limit;
+	int		expire;
+	int		prune;
+	int		purgeall;
+};
 
 /* Arbitrary values */
 #define TCP_HOSTCACHE_HASHSIZE		512
@@ -118,7 +149,7 @@ VNET_DEFINE_STATIC(struct tcp_hostcache, tcp_hostcache);
 VNET_DEFINE_STATIC(struct callout, tcp_hc_callout);
 #define	V_tcp_hc_callout	VNET(tcp_hc_callout)
 
-static struct hc_metrics *tcp_hc_lookup(struct in_conninfo *);
+static struct hc_metrics *tcp_hc_lookup(struct in_conninfo *, bool);
 static struct hc_metrics *tcp_hc_insert(struct in_conninfo *);
 static int sysctl_tcp_hc_list(SYSCTL_HANDLER_ARGS);
 static int sysctl_tcp_hc_histo(SYSCTL_HANDLER_ARGS);
@@ -181,16 +212,14 @@ SYSCTL_PROC(_net_inet_tcp_hostcache, OID_AUTO, purgenow,
 
 static MALLOC_DEFINE(M_HOSTCACHE, "hostcache", "TCP hostcache");
 
+/* Use jenkins_hash32(), as in other parts of the tcp stack */
 #define HOSTCACHE_HASH(ip) \
-	(((ip)->s_addr ^ ((ip)->s_addr >> 7) ^ ((ip)->s_addr >> 17)) &	\
-	  V_tcp_hostcache.hashmask)
+	(jenkins_hash32((uint32_t *)(ip), 1, V_tcp_hostcache.hashsalt) & \
+	 V_tcp_hostcache.hashmask)
 
-/* XXX: What is the recommended hash to get good entropy for IPv6 addresses? */
 #define HOSTCACHE_HASH6(ip6)				\
-	(((ip6)->s6_addr32[0] ^				\
-	  (ip6)->s6_addr32[1] ^				\
-	  (ip6)->s6_addr32[2] ^				\
-	  (ip6)->s6_addr32[3]) &			\
+	(jenkins_hash32((uint32_t *)&((ip6)->s6_addr32[0]), 4, \
+	 V_tcp_hostcache.hashsalt) & \
 	 V_tcp_hostcache.hashmask)
 
 #define THC_LOCK(lp)		mtx_lock(lp)
@@ -210,6 +239,7 @@ tcp_hc_init(void)
 	V_tcp_hostcache.bucket_limit = TCP_HOSTCACHE_BUCKETLIMIT;
 	V_tcp_hostcache.expire = TCP_HOSTCACHE_EXPIRE;
 	V_tcp_hostcache.prune = TCP_HOSTCACHE_PRUNE;
+	V_tcp_hostcache.hashsalt = arc4random();
 
 	TUNABLE_INT_FETCH("net.inet.tcp.hostcache.hashsize",
 	    &V_tcp_hostcache.hashsize);
@@ -289,7 +319,7 @@ tcp_hc_destroy(void)
  * unlocking the bucket row after he is done reading/modifying the entry.
  */
 static struct hc_metrics *
-tcp_hc_lookup(struct in_conninfo *inc)
+tcp_hc_lookup(struct in_conninfo *inc, bool update)
 {
 	int hash;
 	struct hc_head *hc_head;
@@ -325,11 +355,11 @@ tcp_hc_lookup(struct in_conninfo *inc)
 			/* XXX: check ip6_zoneid */
 			if (memcmp(&inc->inc6_faddr, &hc_entry->ip6,
 			    sizeof(inc->inc6_faddr)) == 0)
-				return hc_entry;
+				goto found;
 		} else {
 			if (memcmp(&inc->inc_faddr, &hc_entry->ip4,
 			    sizeof(inc->inc_faddr)) == 0)
-				return hc_entry;
+				goto found;
 		}
 	}
 
@@ -337,7 +367,18 @@ tcp_hc_lookup(struct in_conninfo *inc)
 	 * We were unsuccessful and didn't find anything.
 	 */
 	THC_UNLOCK(&hc_head->hch_mtx);
-	return NULL;
+	return (NULL);
+
+found:
+#ifdef	TCP_HC_COUNTERS
+	if (update)
+		hc_entry->rmx_updates++;
+	else
+		hc_entry->rmx_hits++;
+#endif
+	hc_entry->rmx_expire = V_tcp_hostcache.expire;
+
+	return (hc_entry);
 }
 
 /*
@@ -463,7 +504,7 @@ tcp_hc_get(struct in_conninfo *inc, struct hc_metrics_lite *hc_metrics_lite)
 	/*
 	 * Find the right bucket.
 	 */
-	hc_entry = tcp_hc_lookup(inc);
+	hc_entry = tcp_hc_lookup(inc, false);
 
 	/*
 	 * If we don't have an existing object.
@@ -472,8 +513,6 @@ tcp_hc_get(struct in_conninfo *inc, struct hc_metrics_lite *hc_metrics_lite)
 		bzero(hc_metrics_lite, sizeof(*hc_metrics_lite));
 		return;
 	}
-	hc_entry->rmx_hits++;
-	hc_entry->rmx_expire = V_tcp_hostcache.expire; /* start over again */
 
 	hc_metrics_lite->rmx_mtu = hc_entry->rmx_mtu;
 	hc_metrics_lite->rmx_ssthresh = hc_entry->rmx_ssthresh;
@@ -503,12 +542,10 @@ tcp_hc_getmtu(struct in_conninfo *inc)
 	if (!V_tcp_use_hostcache)
 		return 0;
 
-	hc_entry = tcp_hc_lookup(inc);
+	hc_entry = tcp_hc_lookup(inc, false);
 	if (hc_entry == NULL) {
 		return 0;
 	}
-	hc_entry->rmx_hits++;
-	hc_entry->rmx_expire = V_tcp_hostcache.expire; /* start over again */
 
 	mtu = hc_entry->rmx_mtu;
 	THC_UNLOCK(&hc_entry->rmx_head->hch_mtx);
@@ -530,7 +567,7 @@ tcp_hc_updatemtu(struct in_conninfo *inc, uint32_t mtu)
 	/*
 	 * Find the right bucket.
 	 */
-	hc_entry = tcp_hc_lookup(inc);
+	hc_entry = tcp_hc_lookup(inc, true);
 
 	/*
 	 * If we don't have an existing object, try to insert a new one.
@@ -540,8 +577,6 @@ tcp_hc_updatemtu(struct in_conninfo *inc, uint32_t mtu)
 		if (hc_entry == NULL)
 			return;
 	}
-	hc_entry->rmx_updates++;
-	hc_entry->rmx_expire = V_tcp_hostcache.expire; /* start over again */
 
 	hc_entry->rmx_mtu = mtu;
 
@@ -569,14 +604,12 @@ tcp_hc_update(struct in_conninfo *inc, struct hc_metrics_lite *hcml)
 	if (!V_tcp_use_hostcache)
 		return;
 
-	hc_entry = tcp_hc_lookup(inc);
+	hc_entry = tcp_hc_lookup(inc, true);
 	if (hc_entry == NULL) {
 		hc_entry = tcp_hc_insert(inc);
 		if (hc_entry == NULL)
 			return;
 	}
-	hc_entry->rmx_updates++;
-	hc_entry->rmx_expire = V_tcp_hostcache.expire; /* start over again */
 
 	if (hcml->rmx_rtt != 0) {
 		if (hc_entry->rmx_rtt == 0)
@@ -671,7 +704,11 @@ sysctl_tcp_hc_list(SYSCTL_HANDLER_ARGS)
 
 	sbuf_printf(&sb,
 		"\nIP address        MTU  SSTRESH      RTT   RTTVAR "
-		"    CWND SENDPIPE RECVPIPE HITS  UPD  EXP\n");
+		"    CWND SENDPIPE RECVPIPE "
+#ifdef	TCP_HC_COUNTERS
+		"HITS  UPD  "
+#endif
+		"EXP\n");
 	sbuf_drain(&sb);
 
 #define msec(u) (((u) + 500) / 1000)
@@ -680,8 +717,11 @@ sysctl_tcp_hc_list(SYSCTL_HANDLER_ARGS)
 		TAILQ_FOREACH(hc_entry, &V_tcp_hostcache.hashbase[i].hch_bucket,
 			      rmx_q) {
 			sbuf_printf(&sb,
-			    "%-15s %5u %8u %6lums %6lums %8u %8u %8u %4lu "
-			    "%4lu %4i\n",
+			    "%-15s %5u %8u %6lums %6lums %8u %8u %8u "
+#ifdef	TCP_HC_COUNTERS
+			    "%4lu %4lu "
+#endif
+			    "%4i\n",
 			    hc_entry->ip4.s_addr ?
 			        inet_ntoa_r(hc_entry->ip4, ip4buf) :
 #ifdef INET6
@@ -698,8 +738,10 @@ sysctl_tcp_hc_list(SYSCTL_HANDLER_ARGS)
 			    hc_entry->rmx_cwnd,
 			    hc_entry->rmx_sendpipe,
 			    hc_entry->rmx_recvpipe,
+#ifdef	TCP_HC_COUNTERS
 			    hc_entry->rmx_hits,
 			    hc_entry->rmx_updates,
+#endif
 			    hc_entry->rmx_expire);
 		}
 		THC_UNLOCK(&V_tcp_hostcache.hashbase[i].hch_mtx);
@@ -795,6 +837,8 @@ tcp_hc_purge(void *arg)
 	int all = 0;
 
 	if (V_tcp_hostcache.purgeall) {
+		if (V_tcp_hostcache.purgeall == 2)
+			V_tcp_hostcache.hashsalt = arc4random();
 		all = 1;
 		V_tcp_hostcache.purgeall = 0;
 	}
@@ -819,6 +863,8 @@ sysctl_tcp_hc_purgenow(SYSCTL_HANDLER_ARGS)
 	if (error || !req->newptr)
 		return (error);
 
+	if (val == 2)
+		V_tcp_hostcache.hashsalt = arc4random();
 	tcp_hc_purge_internal(1);
 
 	callout_reset(&V_tcp_hc_callout, V_tcp_hostcache.prune * hz,
