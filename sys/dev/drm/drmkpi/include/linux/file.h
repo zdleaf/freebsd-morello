@@ -91,7 +91,7 @@ get_unused_fd_flags(int flags)
 	 * Not sure how to use flags here,
 	 * UF_EXCLOSE set later in fd_install().
 	 */
-	KASSERT(flags == UF_EXCLOSE, ("Unexpected flags"));
+	KASSERT(flags == O_CLOEXEC, ("Unexpected flags"));
 
 	fdp = p->p_fd;
 
