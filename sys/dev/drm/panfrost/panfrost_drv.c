@@ -97,7 +97,16 @@ static struct resource_spec mali_spec[] = {
 };
 
 static struct ofw_compat_data compat_data[] = {
+	{ "arm,mali-t604",	1 },
+	{ "arm,mali-t624",	1 },
+	{ "arm,mali-t628",	1 },
+	{ "arm,mali-t720",	1 },
+	{ "arm,mali-t760",	1 },
+	{ "arm,mali-t820",	1 },
+	{ "arm,mali-t830",	1 },
 	{ "arm,mali-t860",	1 },
+	{ "arm,mali-t880",	1 },
+	{ "arm,mali-bifrost",	1 },
 	{ NULL,			0 }
 };
 
