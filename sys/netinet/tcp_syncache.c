@@ -1322,24 +1322,25 @@ failed:
 	return (0);
 }
 
-static void
-syncache_tfo_expand(struct syncache *sc, struct socket **lsop, struct mbuf *m,
+static struct socket *
+syncache_tfo_expand(struct syncache *sc, struct socket *lso, struct mbuf *m,
     uint64_t response_cookie)
 {
 	struct inpcb *inp;
 	struct tcpcb *tp;
 	unsigned int *pending_counter;
+	struct socket *so;
 
 	NET_EPOCH_ASSERT();
 
-	pending_counter = intotcpcb(sotoinpcb(*lsop))->t_tfo_pending;
-	*lsop = syncache_socket(sc, *lsop, m);
-	if (*lsop == NULL) {
+	pending_counter = intotcpcb(sotoinpcb(lso))->t_tfo_pending;
+	so = syncache_socket(sc, lso, m);
+	if (so == NULL) {
 		TCPSTAT_INC(tcps_sc_aborted);
 		atomic_subtract_int(pending_counter, 1);
 	} else {
-		soisconnected(*lsop);
-		inp = sotoinpcb(*lsop);
+		soisconnected(so);
+		inp = sotoinpcb(so);
 		tp = intotcpcb(inp);
 		tp->t_flags |= TF_FASTOPEN;
 		tp->t_tfo_cookie.server = response_cookie;
@@ -1348,6 +1349,8 @@ syncache_tfo_expand(struct syncache *sc, struct socket **lsop, struct mbuf *m,
 		tp->t_tfo_pending = pending_counter;
 		TCPSTAT_INC(tcps_sc_completed);
 	}
+
+	return (so);
 }
 
 /*
@@ -1369,20 +1372,19 @@ syncache_tfo_expand(struct syncache *sc, struct socket **lsop, struct mbuf *m,
  * be ACKed either when the application sends response data or the delayed
  * ACK timer expires, whichever comes first.
  */
-int
+struct socket *
 syncache_add(struct in_conninfo *inc, struct tcpopt *to, struct tcphdr *th,
-    struct inpcb *inp, struct socket **lsop, struct mbuf *m, void *tod,
+    struct inpcb *inp, struct socket *so, struct mbuf *m, void *tod,
     void *todctx, uint8_t iptos)
 {
 	struct tcpcb *tp;
-	struct socket *so;
+	struct socket *rv = NULL;
 	struct syncache *sc = NULL;
 	struct syncache_head *sch;
 	struct mbuf *ipopts = NULL;
 	u_int ltflags;
 	int win, ip_ttl, ip_tos;
 	char *s;
-	int rv = 0;
 #ifdef INET6
 	int autoflowlabel = 0;
 #endif
@@ -1397,7 +1399,7 @@ syncache_add(struct in_conninfo *inc, struct tcpopt *to, struct tcphdr *th,
 	int tfo_response_cookie_valid = 0;
 	bool locked;
 
-	INP_WLOCK_ASSERT(inp);			/* listen socket */
+	INP_RLOCK_ASSERT(inp);			/* listen socket */
 	KASSERT((th->th_flags & (TH_RST|TH_ACK|TH_SYN)) == TH_SYN,
 	    ("%s: unexpected tcp flags", __func__));
 
@@ -1405,7 +1407,6 @@ syncache_add(struct in_conninfo *inc, struct tcpopt *to, struct tcphdr *th,
 	 * Combine all so/tp operations very early to drop the INP lock as
 	 * soon as possible.
 	 */
-	so = *lsop;
 	KASSERT(SOLISTENING(so), ("%s: %p not listening", __func__, so));
 	tp = sototcpcb(so);
 	cred = crhold(so->so_cred);
@@ -1469,13 +1470,13 @@ syncache_add(struct in_conninfo *inc, struct tcpopt *to, struct tcphdr *th,
 
 #ifdef MAC
 	if (mac_syncache_init(&maclabel) != 0) {
-		INP_WUNLOCK(inp);
+		INP_RUNLOCK(inp);
 		goto done;
 	} else
 		mac_syncache_create(maclabel, inp);
 #endif
 	if (!tfo_cookie_valid)
-		INP_WUNLOCK(inp);
+		INP_RUNLOCK(inp);
 
 	/*
 	 * Remember the IP options, if any.
@@ -1528,7 +1529,7 @@ syncache_add(struct in_conninfo *inc, struct tcpopt *to, struct tcphdr *th,
 	}
 	if (sc != NULL) {
 		if (tfo_cookie_valid)
-			INP_WUNLOCK(inp);
+			INP_RUNLOCK(inp);
 		TCPSTAT_INC(tcps_sc_dupsyn);
 		if (ipopts) {
 			/*
@@ -1734,9 +1735,8 @@ skip_alloc:
 		SCH_UNLOCK(sch);
 
 	if (tfo_cookie_valid) {
-		syncache_tfo_expand(sc, lsop, m, tfo_response_cookie);
-		/* INP_WUNLOCK(inp) will be performed by the caller */
-		rv = 1;
+		rv = syncache_tfo_expand(sc, so, m, tfo_response_cookie);
+		/* INP_RUNLOCK(inp) will be performed by the caller */
 		goto tfo_expanded;
 	}
 
@@ -1761,10 +1761,8 @@ skip_alloc:
 done:
 	TCP_PROBE5(receive, NULL, NULL, m, NULL, th);
 donenoprobe:
-	if (m) {
-		*lsop = NULL;
+	if (m)
 		m_freem(m);
-	}
 	/*
 	 * If tfo_pending is not NULL here, then a TFO SYN that did not
 	 * result in a new socket was processed and the associated pending
