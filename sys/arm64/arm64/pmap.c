@@ -3710,12 +3710,12 @@ pmap_genter(pmap_t pmap, vm_offset_t va, vm_paddr_t pa,
 	va = trunc_page(va);
 	new_l3 = (pt_entry_t)(pa | ATTR_SH(ATTR_SH_IS) | L3_BLOCK);
 
-	if (prot & VM_PROT_READ)
-		new_l3 |= ATTR_S2_S2AP(ATTR_S2_S2AP_READ);
-	if (prot & VM_PROT_WRITE)
+	if ((prot & VM_PROT_WRITE) != 0)
 		new_l3 |= ATTR_S2_S2AP(ATTR_S2_S2AP_WRITE);
-	if (!(prot & VM_PROT_EXECUTE))
-		new_l3 |= ATTR_S1_XN; /* Execute never. */
+	if ((prot & VM_PROT_READ) != 0)
+		new_l3 |= ATTR_S2_S2AP(ATTR_S2_S2AP_READ);
+	if ((prot & VM_PROT_EXECUTE) == 0)
+		new_l3 |= ATTR_S2_XN(ATTR_S2_XN_ALL);
 
 	CTR2(KTR_PMAP, "pmap_genter: %.16lx -> %.16lx", va, pa);
 
