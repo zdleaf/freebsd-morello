@@ -408,6 +408,9 @@ panfrost_mmu_pgtable_alloc(struct panfrost_file *pfile)
 	pmap_pinit(p);
 	PMAP_LOCK_INIT(p);
 
+	/* Ensure root directory is visible to GPU. */
+	cpu_dcache_wbinv_range((uint64_t)p->pm_l0, sizeof(pd_entry_t));
+
 	mmu->as = -1;
 
 	return (0);
