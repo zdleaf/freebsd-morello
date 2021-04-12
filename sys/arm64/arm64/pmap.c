@@ -3711,9 +3711,9 @@ pmap_genter(pmap_t pmap, vm_offset_t va, vm_paddr_t pa,
 	new_l3 = (pt_entry_t)(pa | ATTR_SH(ATTR_SH_IS) | L3_BLOCK);
 
 	if (prot & VM_PROT_READ)
-		new_l3 |= (1 << 6);
+		new_l3 |= ATTR_S2_S2AP(ATTR_S2_S2AP_READ);
 	if (prot & VM_PROT_WRITE)
-		new_l3 |= (1 << 7);
+		new_l3 |= ATTR_S2_S2AP(ATTR_S2_S2AP_WRITE);
 	if (!(prot & VM_PROT_EXECUTE))
 		new_l3 |= ATTR_S1_XN; /* Execute never. */
 
