@@ -3699,6 +3699,8 @@ pmap_genter(pmap_t pmap, vm_offset_t va, vm_paddr_t pa,
 	pt_entry_t new_l3, orig_l3;
 	pt_entry_t *l3;
 	vm_page_t mpte;
+	pd_entry_t *l1p;
+	pd_entry_t *l2p;
 	int lvl;
 	int rv;
 
@@ -3734,6 +3736,18 @@ retry:
 			rv = KERN_RESOURCE_SHORTAGE;
 			goto out;
 		}
+
+		/*
+		 * Ensure newly created l1, l2 are visible to GPU.
+		 * l0 is already visible by similar call in panfrost driver.
+		 * The cache entry for l3 handled below.
+		 */
+
+		l1p = pmap_l1(pmap, va);
+		l2p = pmap_l2(pmap, va);
+		cpu_dcache_wbinv_range((uint64_t)l1p, sizeof(pd_entry_t));
+		cpu_dcache_wbinv_range((uint64_t)l2p, sizeof(pd_entry_t));
+
 		goto retry;
 	}
 
@@ -3744,7 +3758,6 @@ retry:
 	pmap_store(l3, new_l3);
 
 	cpu_dcache_wb_range((vm_offset_t)l3, sizeof(pt_entry_t));
-	cpu_dcache_wb_range((vm_offset_t)pde, sizeof(pd_entry_t));
 
 	pmap_resident_count_inc(pmap, 1);
 	dsb(ishst);
