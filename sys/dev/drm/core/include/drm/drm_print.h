@@ -205,12 +205,12 @@ static inline struct drm_printer drm_seq_file_printer(struct seq_file *f)
 
 /**
  * drm_info_printer - construct a &drm_printer that outputs to dev_printk()
- * @dev: the &struct device pointer
+ * @dev: the &struct _device pointer
  *
  * RETURNS:
  * The &drm_printer object
  */
-static inline struct drm_printer drm_info_printer(struct device *dev)
+static inline struct drm_printer drm_info_printer(struct _device *dev)
 {
 	struct drm_printer p = {
 		.printfn = __drm_printfn_info,
@@ -323,16 +323,16 @@ static inline bool drm_debug_enabled(enum drm_debug_category category)
 }
 
 /*
- * struct device based logging
+ * struct _device based logging
  *
  * Prefer drm_device based logging over device or prink based logging.
  */
 
 __printf(3, 4)
-void drm_dev_printk(const struct device *dev, const char *level,
+void drm_dev_printk(const struct _device *dev, const char *level,
 		    const char *format, ...);
 __printf(3, 4)
-void drm_dev_dbg(const struct device *dev, enum drm_debug_category category,
+void drm_dev_dbg(const struct _device *dev, enum drm_debug_category category,
 		 const char *format, ...);
 
 /**

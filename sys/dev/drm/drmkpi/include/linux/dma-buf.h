@@ -38,7 +38,7 @@
 #include <linux/dma-mapping.h>
 #include <linux/reservation.h>
 
-struct device;
+struct _device;
 struct dma_buf;
 struct dma_buf_attachment;
 struct dma_buf_export_info;
@@ -83,7 +83,7 @@ struct dma_buf {
 struct dma_buf_attachment {
 	void				*priv;
 	struct dma_buf			*dmabuf;
-	struct device			*dev;
+	struct _device			*dev;
 };
 
 struct dma_buf_export_info {
@@ -109,7 +109,7 @@ struct dma_buf_export_info {
 #define	dma_buf_unmap_attachment linux_dma_buf_unmap_attachment
 #define	get_dma_buf		linux_get_dma_buf
 
-struct dma_buf_attachment *dma_buf_attach(struct dma_buf *, struct device *);
+struct dma_buf_attachment *dma_buf_attach(struct dma_buf *, struct _device *);
 void dma_buf_detach(struct dma_buf *, struct dma_buf_attachment *);
 struct dma_buf *dma_buf_export(struct dma_buf_export_info *);
 int dma_buf_fd(struct dma_buf *, int);

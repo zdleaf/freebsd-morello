@@ -1095,7 +1095,7 @@ struct drm_connector {
 	/** @dev: parent DRM device */
 	struct drm_device *dev;
 	/** @kdev: kernel device for sysfs attributes */
-	struct device *kdev;
+	struct _device *kdev;
 	/** @attr: sysfs attributes */
 	struct device_attribute *attr;
 

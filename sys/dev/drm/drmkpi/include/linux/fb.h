@@ -29,7 +29,7 @@ struct fb_var_screeninfo;
 
 /* FBSD implementation in drm_fb_helper.c */
 int fb_get_options(const char *name, char **option);
-struct fb_info *framebuffer_alloc(size_t size, struct device *dev);
+struct fb_info *framebuffer_alloc(size_t size, struct _device *dev);
 void framebuffer_release(struct fb_info *info);
 
 struct fb_fillrect;

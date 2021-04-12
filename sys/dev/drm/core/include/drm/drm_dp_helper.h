@@ -1355,7 +1355,7 @@ struct drm_dp_aux_cec {
  * struct drm_dp_aux - DisplayPort AUX channel
  * @name: user-visible name of this AUX channel and the I2C-over-AUX adapter
  * @ddc: I2C adapter that can be used for I2C-over-AUX communication
- * @dev: pointer to struct device that is the parent for this AUX channel
+ * @dev: pointer to struct _device that is the parent for this AUX channel
  * @crtc: backpointer to the crtc that is currently using this AUX channel
  * @hw_mutex: internal mutex used for locking transfers
  * @crc_work: worker that captures CRCs for each frame
@@ -1394,7 +1394,7 @@ struct drm_dp_aux_cec {
 struct drm_dp_aux {
 	const char *name;
 	struct i2c_adapter ddc;
-	struct device *dev;
+	struct _device *dev;
 	struct drm_crtc *crtc;
 	struct mutex hw_mutex;
 	struct work_struct crc_work;

@@ -45,7 +45,7 @@
 struct drm_dp_aux_dev {
 	unsigned index;
 	struct drm_dp_aux *aux;
-	struct device *dev;
+	struct _device *dev;
 	struct kref refcount;
 	atomic_t usecount;
 };
@@ -102,7 +102,7 @@ static void release_drm_dp_aux_dev(struct kref *ref)
 	kfree(aux_dev);
 }
 
-static ssize_t name_show(struct device *dev,
+static ssize_t name_show(struct _device *dev,
 			 struct device_attribute *attr, char *buf)
 {
 	ssize_t res;

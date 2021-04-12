@@ -134,7 +134,7 @@ struct drm_panel {
 	 *
 	 * Parent device of the panel.
 	 */
-	struct device *dev;
+	struct _device *dev;
 
 	/**
 	 * @backlight:
@@ -171,7 +171,7 @@ struct drm_panel {
 	struct list_head list;
 };
 
-void drm_panel_init(struct drm_panel *panel, struct device *dev,
+void drm_panel_init(struct drm_panel *panel, struct _device *dev,
 		    const struct drm_panel_funcs *funcs,
 		    int connector_type);
 

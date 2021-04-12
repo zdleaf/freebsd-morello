@@ -496,9 +496,9 @@ struct drm_bridge *drm_panel_bridge_add(struct drm_panel *panel);
 struct drm_bridge *drm_panel_bridge_add_typed(struct drm_panel *panel,
 					      u32 connector_type);
 void drm_panel_bridge_remove(struct drm_bridge *bridge);
-struct drm_bridge *devm_drm_panel_bridge_add(struct device *dev,
+struct drm_bridge *devm_drm_panel_bridge_add(struct _device *dev,
 					     struct drm_panel *panel);
-struct drm_bridge *devm_drm_panel_bridge_add_typed(struct device *dev,
+struct drm_bridge *devm_drm_panel_bridge_add_typed(struct _device *dev,
 						   struct drm_panel *panel,
 						   u32 connector_type);
 struct drm_connector *drm_panel_bridge_connector(struct drm_bridge *bridge);

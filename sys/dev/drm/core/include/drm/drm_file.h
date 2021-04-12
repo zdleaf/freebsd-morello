@@ -41,7 +41,7 @@
 struct dma_fence;
 struct drm_file;
 struct drm_device;
-struct device;
+struct _device;
 #ifdef __linux__
 struct file;
 #endif
@@ -74,7 +74,7 @@ struct drm_minor {
 	int index;			/* Minor device number */
 	int type;                       /* Control or render */
 #ifdef __linux__
-	struct device *kdev;		/* Linux device */
+	struct _device *kdev;		/* Linux device */
 #elif defined(__FreeBSD__)
 	struct cdev *kdev;		/* Linux device */
 #endif

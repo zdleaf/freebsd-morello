@@ -239,7 +239,7 @@ void drm_print_bits(struct drm_printer *p, unsigned long value,
 }
 EXPORT_SYMBOL(drm_print_bits);
 
-void drm_dev_printk(const struct device *dev, const char *level,
+void drm_dev_printk(const struct _device *dev, const char *level,
 		    const char *format, ...)
 {
 	struct va_format vaf;
@@ -265,7 +265,7 @@ void drm_dev_printk(const struct device *dev, const char *level,
 }
 EXPORT_SYMBOL(drm_dev_printk);
 
-void drm_dev_dbg(const struct device *dev, enum drm_debug_category category,
+void drm_dev_dbg(const struct _device *dev, enum drm_debug_category category,
 		 const char *format, ...)
 {
 	struct va_format vaf;

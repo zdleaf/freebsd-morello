@@ -54,7 +54,7 @@ static LIST_HEAD(panel_list);
  * Initialize the panel structure for subsequent registration with
  * drm_panel_add().
  */
-void drm_panel_init(struct drm_panel *panel, struct device *dev,
+void drm_panel_init(struct drm_panel *panel, struct _device *dev,
 		    const struct drm_panel_funcs *funcs, int connector_type)
 {
 	INIT_LIST_HEAD(&panel->list);

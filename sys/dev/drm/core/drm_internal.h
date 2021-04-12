@@ -132,7 +132,7 @@ extern struct class *drm_class;
 int drm_sysfs_init(void);
 void drm_sysfs_destroy(void);
 #ifdef __linux__
-struct device *drm_sysfs_minor_alloc(struct drm_minor *minor);
+struct _device *drm_sysfs_minor_alloc(struct drm_minor *minor);
 #elif defined(__FreeBSD__)
 struct cdev *drm_sysfs_minor_alloc(struct drm_minor *minor);
 #endif

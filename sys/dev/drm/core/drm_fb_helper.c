@@ -972,7 +972,7 @@ EXPORT_SYMBOL(drm_fb_helper_init);
  */
 struct fb_info *drm_fb_helper_alloc_fbi(struct drm_fb_helper *fb_helper)
 {
-	struct device *dev = fb_helper->dev->dev;
+	struct _device *dev = fb_helper->dev->dev;
 	struct fb_info *info;
 #ifdef __linux__
 	int ret;

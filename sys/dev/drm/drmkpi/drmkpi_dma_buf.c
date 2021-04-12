@@ -197,7 +197,7 @@ get_dma_buf(struct dma_buf *dmabuf)
 }
 
 struct dma_buf_attachment *
-dma_buf_attach(struct dma_buf *dmabuf, struct device *dev)
+dma_buf_attach(struct dma_buf *dmabuf, struct _device *dev)
 {
 	struct dma_buf_attachment *attach;
 	int rv;

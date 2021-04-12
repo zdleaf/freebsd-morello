@@ -5,7 +5,7 @@
 #define _DRM_AUDIO_COMPONENT_H_
 
 struct drm_audio_component;
-struct device;
+struct _device;
 
 /**
  * struct drm_audio_component_ops - Ops implemented by DRM driver, called by hda driver
@@ -23,28 +23,28 @@ struct drm_audio_component_ops {
 	 * Returns a wakeref cookie to be passed back to the corresponding
 	 * call to @put_power.
 	 */
-	unsigned long (*get_power)(struct device *);
+	unsigned long (*get_power)(struct _device *);
 	/**
 	 * @put_power: put the POWER_DOMAIN_AUDIO power well
 	 *
 	 * Allow the power well to be turned off.
 	 */
-	void (*put_power)(struct device *, unsigned long);
+	void (*put_power)(struct _device *, unsigned long);
 	/**
 	 * @codec_wake_override: Enable/disable codec wake signal
 	 */
-	void (*codec_wake_override)(struct device *, bool enable);
+	void (*codec_wake_override)(struct _device *, bool enable);
 	/**
 	 * @get_cdclk_freq: Get the Core Display Clock in kHz
 	 */
-	int (*get_cdclk_freq)(struct device *);
+	int (*get_cdclk_freq)(struct _device *);
 	/**
 	 * @sync_audio_rate: set n/cts based on the sample rate
 	 *
 	 * Called from audio driver. After audio driver sets the
 	 * sample rate, it will call this function to set n/cts
 	 */
-	int (*sync_audio_rate)(struct device *, int port, int pipe, int rate);
+	int (*sync_audio_rate)(struct _device *, int port, int pipe, int rate);
 	/**
 	 * @get_eld: fill the audio state and ELD bytes for the given port
 	 *
@@ -57,7 +57,7 @@ struct drm_audio_component_ops {
 	 * Note that the returned size may be over @max_bytes.  Then it
 	 * implies that only a part of ELD has been copied to the buffer.
 	 */
-	int (*get_eld)(struct device *, int port, int pipe, bool *enabled,
+	int (*get_eld)(struct _device *, int port, int pipe, bool *enabled,
 		       unsigned char *buf, int max_bytes);
 };
 
@@ -91,14 +91,14 @@ struct drm_audio_component_audio_ops {
 	 * Called at binding master component, for HDA codec-specific
 	 * handling of dynamic binding.
 	 */
-	int (*master_bind)(struct device *dev, struct drm_audio_component *);
+	int (*master_bind)(struct _device *dev, struct drm_audio_component *);
 	/**
 	 * @master_unbind: (Optional) component master unbind callback
 	 *
 	 * Called at unbinding master component, for HDA codec-specific
 	 * handling of dynamic unbinding.
 	 */
-	void (*master_unbind)(struct device *dev, struct drm_audio_component *);
+	void (*master_unbind)(struct _device *dev, struct drm_audio_component *);
 };
 
 /**
@@ -108,7 +108,7 @@ struct drm_audio_component {
 	/**
 	 * @dev: DRM device, used as parameter for ops
 	 */
-	struct device *dev;
+	struct _device *dev;
 	/**
 	 * @ops: Ops implemented by DRM driver, called by hda driver
 	 */

@@ -682,7 +682,7 @@ EXPORT_SYMBOL(drm_gem_prime_mmap);
  * drm_gem_prime_import_dev - core implementation of the import callback
  * @dev: drm_device to import into
  * @dma_buf: dma-buf object to import
- * @attach_dev: struct device to dma_buf attach
+ * @attach_dev: struct _device to dma_buf attach
  *
  * This is the core of drm_gem_prime_import. It's designed to be called by
  * drivers who want to use a different device structure than dev->dev for
@@ -690,7 +690,7 @@ EXPORT_SYMBOL(drm_gem_prime_mmap);
  */
 struct drm_gem_object *drm_gem_prime_import_dev(struct drm_device *dev,
 					    struct dma_buf *dma_buf,
-					    struct device *attach_dev)
+					    struct _device *attach_dev)
 {
 	struct dma_buf_attachment *attach;
 	struct sg_table *sgt;

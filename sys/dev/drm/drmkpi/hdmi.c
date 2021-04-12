@@ -1001,7 +1001,7 @@ static const char *hdmi_infoframe_type_get_name(enum hdmi_infoframe_type type)
 }
 
 static void hdmi_infoframe_log_header(const char *level,
-				      struct device *dev,
+				      struct _device *dev,
 				      const struct hdmi_any_infoframe *frame)
 {
 	hdmi_log("HDMI infoframe: %s, version %u, length %u\n",
@@ -1197,7 +1197,7 @@ hdmi_content_type_get_name(enum hdmi_content_type content_type)
 }
 
 static void hdmi_avi_infoframe_log(const char *level,
-				   struct device *dev,
+				   struct _device *dev,
 				   const struct hdmi_avi_infoframe *frame)
 {
 	hdmi_infoframe_log_header(level, dev,
@@ -1268,7 +1268,7 @@ static const char *hdmi_spd_sdi_get_name(enum hdmi_spd_sdi sdi)
 }
 
 static void hdmi_spd_infoframe_log(const char *level,
-				   struct device *dev,
+				   struct _device *dev,
 				   const struct hdmi_spd_infoframe *frame)
 {
 	u8 buf[17];
@@ -1398,7 +1398,7 @@ hdmi_audio_coding_type_ext_get_name(enum hdmi_audio_coding_type_ext ctx)
 }
 
 static void hdmi_audio_infoframe_log(const char *level,
-				     struct device *dev,
+				     struct _device *dev,
 				     const struct hdmi_audio_infoframe *frame)
 {
 	hdmi_infoframe_log_header(level, dev,
@@ -1425,7 +1425,7 @@ static void hdmi_audio_infoframe_log(const char *level,
 }
 
 static void hdmi_drm_infoframe_log(const char *level,
-				   struct device *dev,
+				   struct _device *dev,
 				   const struct hdmi_drm_infoframe *frame)
 {
 	int i;
@@ -1483,7 +1483,7 @@ hdmi_3d_structure_get_name(enum hdmi_3d_structure s3d_struct)
 
 static void
 hdmi_vendor_any_infoframe_log(const char *level,
-			      struct device *dev,
+			      struct _device *dev,
 			      const union hdmi_vendor_any_infoframe *frame)
 {
 	const struct hdmi_vendor_infoframe *hvf = &frame->hdmi;
@@ -1518,7 +1518,7 @@ hdmi_vendor_any_infoframe_log(const char *level,
  * @frame: HDMI infoframe
  */
 void hdmi_infoframe_log(const char *level,
-			struct device *dev,
+			struct _device *dev,
 			const union hdmi_infoframe *frame)
 {
 	switch (frame->any.type) {

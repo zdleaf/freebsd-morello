@@ -49,7 +49,7 @@ struct drm_prime_file_private {
 	struct rb_root handles;
 };
 
-struct device;
+struct _device;
 
 struct dma_buf_export_info;
 struct dma_buf;
@@ -61,7 +61,7 @@ struct drm_device;
 struct drm_gem_object;
 struct drm_file;
 
-struct device;
+struct _device;
 
 struct dma_buf *drm_gem_prime_export(struct drm_device *dev,
 				     struct drm_gem_object *obj,
@@ -75,7 +75,7 @@ struct drm_gem_object *drm_gem_prime_import(struct drm_device *dev,
 
 struct drm_gem_object *drm_gem_prime_import_dev(struct drm_device *dev,
 						struct dma_buf *dma_buf,
-						struct device *attach_dev);
+						struct _device *attach_dev);
 
 int drm_gem_prime_fd_to_handle(struct drm_device *dev,
 			       struct drm_file *file_priv, int prime_fd, uint32_t *handle);
