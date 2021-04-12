@@ -3745,8 +3745,8 @@ retry:
 
 		l1p = pmap_l1(pmap, va);
 		l2p = pmap_l2(pmap, va);
-		cpu_dcache_wb_range((uint64_t)l1p, sizeof(pd_entry_t));
-		cpu_dcache_wb_range((uint64_t)l2p, sizeof(pd_entry_t));
+		cpu_dcache_wb_range((vm_offset_t)l1p, sizeof(pd_entry_t));
+		cpu_dcache_wb_range((vm_offset_t)l2p, sizeof(pd_entry_t));
 
 		goto retry;
 	}
