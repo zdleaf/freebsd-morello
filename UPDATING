@@ -27,6 +27,14 @@ NOTE TO PEOPLE WHO THINK THAT FreeBSD 14.x IS SLOW:
 	world, or to merely disable the most expensive debugging functionality
 	at runtime, run "ln -s 'abort:false,junk:false' /etc/malloc.conf".)
 
+20210411:
+	Commit 7763814fc9c2 changed the internal KAPI between
+	the krpc and NFS.  As such, the krpc, nfscommon and
+	nfscl modules must all be rebuilt from sources.
+	Without this patch, NFSv4.1/4.2 mounts should not
+	be done with the nfscbd(8) daemon running, to avoid
+	needing a working back channel for server->client RPCs.
+
 20210330:
 	Commit 01ae8969a9ee fixed the NFSv4.1/4.2 server so that it
 	handles binding of the back channel as required by RFC5661.
@@ -84,6 +92,7 @@ NOTE TO PEOPLE WHO THINK THAT FreeBSD 14.x IS SLOW:
 	Default value of net.add_addr_allfibs has been changed to 0.
 	If you have multi-fib configuration and rely on existence of all
 	interface routes in every fib, you need to set the above sysctl to 1.
+
 20201030:
 	The internal pre-processor in the calendar(1) program has been
 	extended to support more C pre-processor commands (e.g. #ifdef, #else,

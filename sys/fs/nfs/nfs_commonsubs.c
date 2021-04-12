@@ -98,6 +98,11 @@ int nfs_maxcopyrange = 10 * 1024 * 1024;
 SYSCTL_INT(_vfs_nfs, OID_AUTO, maxcopyrange, CTLFLAG_RW,
     &nfs_maxcopyrange, 0, "Max size of a Copy so RPC times reasonable");
 
+static int nfs_allowskip_sessionseq = 1;
+SYSCTL_INT(_vfs_nfs, OID_AUTO, linuxseqsesshack, CTLFLAG_RW,
+    &nfs_allowskip_sessionseq, 0, "Allow client to skip ahead one seq# for"
+    " session slot");
+
 /*
  * This array of structures indicates, for V4:
  * retfh - which of 3 types of calling args are used
@@ -218,7 +223,7 @@ static struct nfsrv_lughash	*nfsgroupnamehash;
 static int nfs_bigreply[NFSV42_NPROCS] = { 0, 0, 0, 1, 0, 1, 1, 0, 0, 0, 0,
     0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0,
-    1, 0, 0, 1 };
+    1, 0, 0, 1, 0 };
 
 /* local functions */
 static int nfsrv_skipace(struct nfsrv_descript *nd, int *acesizep);
@@ -301,6 +306,7 @@ static struct {
 	{ NFSV4OP_SETXATTR, 2, "Setxattr", 8, },
 	{ NFSV4OP_REMOVEXATTR, 2, "Rmxattr", 7, },
 	{ NFSV4OP_LISTXATTRS, 2, "Listxattr", 9, },
+	{ NFSV4OP_BINDCONNTOSESS, 1, "BindConSess", 11, },
 };
 
 /*
@@ -309,7 +315,7 @@ static struct {
 static int nfs_bigrequest[NFSV42_NPROCS] = {
 	0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-	0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0
+	0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0
 };
 
 /*
@@ -4613,12 +4619,13 @@ nfsmout:
  * Handle an NFSv4.1 Sequence request for the session.
  * If reply != NULL, use it to return the cached reply, as required.
  * The client gets a cached reply via this call for callbacks, however the
- * server gets a cached reply via the nfsv4_seqsess_cachereply() call.
+ * server gets a cached reply via the nfsv4_seqsess_cacherep() call.
  */
 int
 nfsv4_seqsession(uint32_t seqid, uint32_t slotid, uint32_t highslot,
     struct nfsslot *slots, struct mbuf **reply, uint16_t maxslot)
 {
+	struct mbuf *m;
 	int error;
 
 	error = 0;
@@ -4632,20 +4639,38 @@ nfsv4_seqsession(uint32_t seqid, uint32_t slotid, uint32_t highslot,
 			error = NFSERR_DELAY;
 		else if (slots[slotid].nfssl_reply != NULL) {
 			if (reply != NULL) {
-				*reply = slots[slotid].nfssl_reply;
-				slots[slotid].nfssl_reply = NULL;
+				m = m_copym(slots[slotid].nfssl_reply, 0,
+				    M_COPYALL, M_NOWAIT);
+				if (m != NULL)
+					*reply = m;
+				else {
+					*reply = slots[slotid].nfssl_reply;
+					slots[slotid].nfssl_reply = NULL;
+				}
 			}
 			slots[slotid].nfssl_inprog = 1;
 			error = NFSERR_REPLYFROMCACHE;
 		} else
 			/* No reply cached, so just do it. */
 			slots[slotid].nfssl_inprog = 1;
-	} else if ((slots[slotid].nfssl_seq + 1) == seqid) {
+	} else if (slots[slotid].nfssl_seq + 1 == seqid ||
+	    (slots[slotid].nfssl_seq + 2 == seqid &&
+	     nfs_allowskip_sessionseq != 0)) {
+		/*
+		 * Allowing the seqid to be ahead by 2 is technically
+		 * a violation of RFC5661, but it seems harmless to do
+		 * and avoids returning NFSERR_SEQMISORDERED to a
+		 * slightly broken Linux NFSv4.1/4.2 client.
+		 * If the RPCs are really out of order, one with a
+		 * lower seqid will be subsequently received and that
+		 * one will get a NFSERR_SEQMISORDERED reply.
+		 * Can be disabled by setting vfs.nfs.linuxseqsesshack to 0.
+		 */
 		if (slots[slotid].nfssl_reply != NULL)
 			m_freem(slots[slotid].nfssl_reply);
 		slots[slotid].nfssl_reply = NULL;
 		slots[slotid].nfssl_inprog = 1;
-		slots[slotid].nfssl_seq++;
+		slots[slotid].nfssl_seq = seqid;
 	} else
 		error = NFSERR_SEQMISORDERED;
 	return (error);
@@ -4660,10 +4685,29 @@ void
 nfsv4_seqsess_cacherep(uint32_t slotid, struct nfsslot *slots, int repstat,
    struct mbuf **rep)
 {
+	struct mbuf *m;
 
 	if (repstat == NFSERR_REPLYFROMCACHE) {
-		*rep = slots[slotid].nfssl_reply;
-		slots[slotid].nfssl_reply = NULL;
+		if (slots[slotid].nfssl_reply != NULL) {
+			/*
+			 * We cannot sleep here, but copy will usually
+			 * succeed.
+			 */
+			m = m_copym(slots[slotid].nfssl_reply, 0, M_COPYALL,
+			    M_NOWAIT);
+			if (m != NULL)
+				*rep = m;
+			else {
+				/*
+				 * Multiple retries would be extremely rare,
+				 * so using the cached reply will likely
+				 * be ok.
+				 */
+				*rep = slots[slotid].nfssl_reply;
+				slots[slotid].nfssl_reply = NULL;
+			}
+		} else
+			*rep = NULL;
 	} else {
 		if (slots[slotid].nfssl_reply != NULL)
 			m_freem(slots[slotid].nfssl_reply);

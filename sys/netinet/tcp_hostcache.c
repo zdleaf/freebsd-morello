@@ -180,7 +180,7 @@ SYSCTL_UINT(_net_inet_tcp_hostcache, OID_AUTO, bucketlimit,
     "Per-bucket hash limit for hostcache");
 
 SYSCTL_UINT(_net_inet_tcp_hostcache, OID_AUTO, count, CTLFLAG_VNET | CTLFLAG_RD,
-     &VNET_NAME(tcp_hostcache.cache_count), 0,
+    &VNET_NAME(tcp_hostcache.cache_count), 0,
     "Current number of entries in hostcache");
 
 SYSCTL_INT(_net_inet_tcp_hostcache, OID_AUTO, expire, CTLFLAG_VNET | CTLFLAG_RW,
@@ -222,8 +222,8 @@ static MALLOC_DEFINE(M_HOSTCACHE, "hostcache", "TCP hostcache");
 	 V_tcp_hostcache.hashsalt) & \
 	 V_tcp_hostcache.hashmask)
 
-#define THC_LOCK(lp)		mtx_lock(lp)
-#define THC_UNLOCK(lp)		mtx_unlock(lp)
+#define THC_LOCK(h)		mtx_lock(&(h)->hch_mtx)
+#define THC_UNLOCK(h)		mtx_unlock(&(h)->hch_mtx)
 
 void
 tcp_hc_init(void)
@@ -325,10 +325,7 @@ tcp_hc_lookup(struct in_conninfo *inc, bool update)
 	struct hc_head *hc_head;
 	struct hc_metrics *hc_entry;
 
-	if (!V_tcp_use_hostcache)
-		return NULL;
-
-	KASSERT(inc != NULL, ("tcp_hc_lookup with NULL in_conninfo pointer"));
+	KASSERT(inc != NULL, ("%s: NULL in_conninfo", __func__));
 
 	/*
 	 * Hash the foreign ip address.
@@ -345,7 +342,7 @@ tcp_hc_lookup(struct in_conninfo *inc, bool update)
 	 * find an entry, otherwise the caller has to unlock after he is
 	 * done.
 	 */
-	THC_LOCK(&hc_head->hch_mtx);
+	THC_LOCK(hc_head);
 
 	/*
 	 * Iterate through entries in bucket row looking for a match.
@@ -366,7 +363,7 @@ tcp_hc_lookup(struct in_conninfo *inc, bool update)
 	/*
 	 * We were unsuccessful and didn't find anything.
 	 */
-	THC_UNLOCK(&hc_head->hch_mtx);
+	THC_UNLOCK(hc_head);
 	return (NULL);
 
 found:
@@ -395,10 +392,7 @@ tcp_hc_insert(struct in_conninfo *inc)
 	struct hc_head *hc_head;
 	struct hc_metrics *hc_entry;
 
-	if (!V_tcp_use_hostcache)
-		return NULL;
-
-	KASSERT(inc != NULL, ("tcp_hc_insert with NULL in_conninfo pointer"));
+	KASSERT(inc != NULL, ("%s: NULL in_conninfo", __func__));
 
 	/*
 	 * Hash the foreign ip address.
@@ -415,7 +409,7 @@ tcp_hc_insert(struct in_conninfo *inc)
 	 * find an entry, otherwise the caller has to unlock after he is
 	 * done.
 	 */
-	THC_LOCK(&hc_head->hch_mtx);
+	THC_LOCK(hc_head);
 
 	/*
 	 * If the bucket limit is reached, reuse the least-used element.
@@ -433,15 +427,15 @@ tcp_hc_insert(struct in_conninfo *inc)
 		 * anything to replace.
 		 */
 		if (hc_entry == NULL) {
-			THC_UNLOCK(&hc_head->hch_mtx);
-			return NULL;
+			THC_UNLOCK(hc_head);
+			return (NULL);
 		}
 		TAILQ_REMOVE(&hc_head->hch_bucket, hc_entry, rmx_q);
 		KASSERT(V_tcp_hostcache.hashbase[hash].hch_length > 0 &&
-			V_tcp_hostcache.hashbase[hash].hch_length <=
-			V_tcp_hostcache.bucket_limit,
-			("tcp_hostcache: bucket length range violated at %u: %u",
-			hash, V_tcp_hostcache.hashbase[hash].hch_length));
+		    V_tcp_hostcache.hashbase[hash].hch_length <=
+		    V_tcp_hostcache.bucket_limit,
+		    ("tcp_hostcache: bucket length range violated at %u: %u",
+		    hash, V_tcp_hostcache.hashbase[hash].hch_length));
 		V_tcp_hostcache.hashbase[hash].hch_length--;
 		atomic_subtract_int(&V_tcp_hostcache.cache_count, 1);
 		TCPSTAT_INC(tcps_hc_bucketoverflow);
@@ -454,8 +448,8 @@ tcp_hc_insert(struct in_conninfo *inc)
 		 */
 		hc_entry = uma_zalloc(V_tcp_hostcache.zone, M_NOWAIT);
 		if (hc_entry == NULL) {
-			THC_UNLOCK(&hc_head->hch_mtx);
-			return NULL;
+			THC_UNLOCK(hc_head);
+			return (NULL);
 		}
 	}
 
@@ -477,13 +471,13 @@ tcp_hc_insert(struct in_conninfo *inc)
 	TAILQ_INSERT_HEAD(&hc_head->hch_bucket, hc_entry, rmx_q);
 	V_tcp_hostcache.hashbase[hash].hch_length++;
 	KASSERT(V_tcp_hostcache.hashbase[hash].hch_length <
-		V_tcp_hostcache.bucket_limit,
-		("tcp_hostcache: bucket length too high at %u: %u",
-		hash, V_tcp_hostcache.hashbase[hash].hch_length));
+	    V_tcp_hostcache.bucket_limit,
+	    ("tcp_hostcache: bucket length too high at %u: %u",
+	    hash, V_tcp_hostcache.hashbase[hash].hch_length));
 	atomic_add_int(&V_tcp_hostcache.cache_count, 1);
 	TCPSTAT_INC(tcps_hc_added);
 
-	return hc_entry;
+	return (hc_entry);
 }
 
 /*
@@ -525,7 +519,7 @@ tcp_hc_get(struct in_conninfo *inc, struct hc_metrics_lite *hc_metrics_lite)
 	/*
 	 * Unlock bucket row.
 	 */
-	THC_UNLOCK(&hc_entry->rmx_head->hch_mtx);
+	THC_UNLOCK(hc_entry->rmx_head);
 }
 
 /*
@@ -540,16 +534,16 @@ tcp_hc_getmtu(struct in_conninfo *inc)
 	uint32_t mtu;
 
 	if (!V_tcp_use_hostcache)
-		return 0;
+		return (0);
 
 	hc_entry = tcp_hc_lookup(inc, false);
 	if (hc_entry == NULL) {
-		return 0;
+		return (0);
 	}
 
 	mtu = hc_entry->rmx_mtu;
-	THC_UNLOCK(&hc_entry->rmx_head->hch_mtx);
-	return mtu;
+	THC_UNLOCK(hc_entry->rmx_head);
+	return (mtu);
 }
 
 /*
@@ -559,37 +553,9 @@ tcp_hc_getmtu(struct in_conninfo *inc)
 void
 tcp_hc_updatemtu(struct in_conninfo *inc, uint32_t mtu)
 {
-	struct hc_metrics *hc_entry;
+	struct hc_metrics_lite hcml = { .rmx_mtu = mtu };
 
-	if (!V_tcp_use_hostcache)
-		return;
-
-	/*
-	 * Find the right bucket.
-	 */
-	hc_entry = tcp_hc_lookup(inc, true);
-
-	/*
-	 * If we don't have an existing object, try to insert a new one.
-	 */
-	if (hc_entry == NULL) {
-		hc_entry = tcp_hc_insert(inc);
-		if (hc_entry == NULL)
-			return;
-	}
-
-	hc_entry->rmx_mtu = mtu;
-
-	/*
-	 * Put it upfront so we find it faster next time.
-	 */
-	TAILQ_REMOVE(&hc_entry->rmx_head->hch_bucket, hc_entry, rmx_q);
-	TAILQ_INSERT_HEAD(&hc_entry->rmx_head->hch_bucket, hc_entry, rmx_q);
-
-	/*
-	 * Unlock bucket row.
-	 */
-	THC_UNLOCK(&hc_entry->rmx_head->hch_mtx);
+	return (tcp_hc_update(inc, &hcml));
 }
 
 /*
@@ -611,6 +577,9 @@ tcp_hc_update(struct in_conninfo *inc, struct hc_metrics_lite *hcml)
 			return;
 	}
 
+	if (hcml->rmx_mtu != 0) {
+		hc_entry->rmx_mtu = hcml->rmx_mtu;
+	}
 	if (hcml->rmx_rtt != 0) {
 		if (hc_entry->rmx_rtt == 0)
 			hc_entry->rmx_rtt = hcml->rmx_rtt;
@@ -620,7 +589,7 @@ tcp_hc_update(struct in_conninfo *inc, struct hc_metrics_lite *hcml)
 		TCPSTAT_INC(tcps_cachedrtt);
 	}
 	if (hcml->rmx_rttvar != 0) {
-	        if (hc_entry->rmx_rttvar == 0)
+		if (hc_entry->rmx_rttvar == 0)
 			hc_entry->rmx_rttvar = hcml->rmx_rttvar;
 		else
 			hc_entry->rmx_rttvar = ((uint64_t)hc_entry->rmx_rttvar +
@@ -664,7 +633,7 @@ tcp_hc_update(struct in_conninfo *inc, struct hc_metrics_lite *hcml)
 
 	TAILQ_REMOVE(&hc_entry->rmx_head->hch_bucket, hc_entry, rmx_q);
 	TAILQ_INSERT_HEAD(&hc_entry->rmx_head->hch_bucket, hc_entry, rmx_q);
-	THC_UNLOCK(&hc_entry->rmx_head->hch_mtx);
+	THC_UNLOCK(hc_entry->rmx_head);
 }
 
 /*
@@ -713,9 +682,9 @@ sysctl_tcp_hc_list(SYSCTL_HANDLER_ARGS)
 
 #define msec(u) (((u) + 500) / 1000)
 	for (i = 0; i < V_tcp_hostcache.hashsize; i++) {
-		THC_LOCK(&V_tcp_hostcache.hashbase[i].hch_mtx);
+		THC_LOCK(&V_tcp_hostcache.hashbase[i]);
 		TAILQ_FOREACH(hc_entry, &V_tcp_hostcache.hashbase[i].hch_bucket,
-			      rmx_q) {
+		    rmx_q) {
 			sbuf_printf(&sb,
 			    "%-15s %5u %8u %6lums %6lums %8u %8u %8u "
 #ifdef	TCP_HC_COUNTERS
@@ -744,7 +713,7 @@ sysctl_tcp_hc_list(SYSCTL_HANDLER_ARGS)
 #endif
 			    hc_entry->rmx_expire);
 		}
-		THC_UNLOCK(&V_tcp_hostcache.hashbase[i].hch_mtx);
+		THC_UNLOCK(&V_tcp_hostcache.hashbase[i]);
 		sbuf_drain(&sb);
 	}
 #undef msec
@@ -777,8 +746,8 @@ sysctl_tcp_hc_histo(SYSCTL_HANDLER_ARGS)
 	for (i = 0; i < V_tcp_hostcache.hashsize; i++) {
 		hch_length = V_tcp_hostcache.hashbase[i].hch_length;
 		KASSERT(hch_length <= V_tcp_hostcache.bucket_limit,
-			("tcp_hostcache: bucket limit exceeded at %u: %u",
-			i, hch_length));
+		    ("tcp_hostcache: bucket limit exceeded at %u: %u",
+		    i, hch_length));
 		histo[hch_length]++;
 	}
 
@@ -805,24 +774,25 @@ tcp_hc_purge_internal(int all)
 	int i;
 
 	for (i = 0; i < V_tcp_hostcache.hashsize; i++) {
-		THC_LOCK(&V_tcp_hostcache.hashbase[i].hch_mtx);
+		THC_LOCK(&V_tcp_hostcache.hashbase[i]);
 		TAILQ_FOREACH_SAFE(hc_entry,
 		    &V_tcp_hostcache.hashbase[i].hch_bucket, rmx_q, hc_next) {
 			KASSERT(V_tcp_hostcache.hashbase[i].hch_length > 0 &&
-				V_tcp_hostcache.hashbase[i].hch_length <=
-				V_tcp_hostcache.bucket_limit,
-				("tcp_hostcache: bucket length out of range at %u: %u",
-				i, V_tcp_hostcache.hashbase[i].hch_length));
+			    V_tcp_hostcache.hashbase[i].hch_length <=
+			    V_tcp_hostcache.bucket_limit, ("tcp_hostcache: "
+			    "bucket length out of range at %u: %u",
+			    i, V_tcp_hostcache.hashbase[i].hch_length));
 			if (all || hc_entry->rmx_expire <= 0) {
-				TAILQ_REMOVE(&V_tcp_hostcache.hashbase[i].hch_bucket,
-					      hc_entry, rmx_q);
+				TAILQ_REMOVE(
+				    &V_tcp_hostcache.hashbase[i].hch_bucket,
+				    hc_entry, rmx_q);
 				uma_zfree(V_tcp_hostcache.zone, hc_entry);
 				V_tcp_hostcache.hashbase[i].hch_length--;
 				atomic_subtract_int(&V_tcp_hostcache.cache_count, 1);
 			} else
 				hc_entry->rmx_expire -= V_tcp_hostcache.prune;
 		}
-		THC_UNLOCK(&V_tcp_hostcache.hashbase[i].hch_mtx);
+		THC_UNLOCK(&V_tcp_hostcache.hashbase[i]);
 	}
 }
 
