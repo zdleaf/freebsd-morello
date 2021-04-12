@@ -3689,7 +3689,7 @@ restart:
 }
 
 /*
- * Add a single GPU entry. This function does not sleep.
+ * Add a single Mali GPU entry. This function does not sleep.
  */
 int
 pmap_genter(pmap_t pmap, vm_offset_t va, vm_paddr_t pa,
@@ -3770,7 +3770,7 @@ out:
 }
 
 /*
- * Remove a single GPU entry.
+ * Remove a single Mali GPU entry.
  */
 int
 pmap_gremove(pmap_t pmap, vm_offset_t va)
