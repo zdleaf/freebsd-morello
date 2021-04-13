@@ -178,7 +178,7 @@ rk_vop_set_polarity(struct rk_vop_softc *sc, uint32_t pin_polarity)
 }
 
 static int
-rk_vop_clk_enable(device_t dev)
+rk_vop_clk_enable(device_t dev, struct drm_display_mode *mode)
 {
 	struct rk_vop_softc *sc;
 	phandle_t node;
@@ -252,11 +252,7 @@ rk_vop_clk_enable(device_t dev)
 	}
 
 	/* DCLK */
-	error = clk_set_freq(sc->clk[1], 148500000, 0);
-	if (error != 0) {
-		device_printf(sc->dev, "Failed to set dclk\n");
-		return (error);
-	}
+	clk_set_freq(sc->clk[1], mode->crtc_clock * 1000, CLK_SET_ROUND_ANY);
 
 	for (i = 0; i < CLK_NENTRIES; i++) {
 		error = clk_enable(sc->clk[i]);
@@ -272,8 +268,9 @@ rk_vop_clk_enable(device_t dev)
 			    clk_table[i]);
 			return (ENXIO);
 		}
-
-		device_printf(dev, "%s rate is %ld Hz\n", clk_table[i], rate);
+		if (bootverbose)
+			device_printf(dev, "%s rate is %ld Hz\n", clk_table[i],
+			    rate);
 	}
 
 	error = hwreset_deassert(sc->hwreset_axi);
@@ -339,7 +336,6 @@ rk_vop_attach(device_t dev)
 {
 	struct rk_vop_softc *sc;
 	phandle_t node;
-	int error;
 
 	sc = device_get_softc(dev);
 	sc->dev = dev;
@@ -365,10 +361,6 @@ rk_vop_attach(device_t dev)
 		device_printf(sc->dev, "port node not found\n");
 		return (ENXIO);
 	}
-
-	error = rk_vop_clk_enable(dev);
-	if (error != 0)
-		return (ENXIO);
 
 	OF_device_register_xref(OF_xref_from_node(node), dev);
 
@@ -838,8 +830,13 @@ rk_crtc_atomic_disable(struct drm_crtc *crtc, struct drm_crtc_state *old_state)
 static void
 rk_crtc_mode_set_nofb(struct drm_crtc *crtc)
 {
+	struct drm_display_mode *mode;
+	struct rk_vop_softc *sc;
 
-	dprintf("%s\n", __func__);
+	sc = container_of(crtc, struct rk_vop_softc, crtc);
+	mode = &crtc->state->adjusted_mode;
+
+	rk_vop_clk_enable(sc->dev, mode);
 }
 
 static const struct drm_crtc_helper_funcs rk_vop_crtc_helper_funcs = {
