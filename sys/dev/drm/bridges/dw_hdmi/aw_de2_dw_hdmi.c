@@ -596,17 +596,22 @@ dw_hdmi_phy_configure(struct dw_hdmi_softc *sc)
 	dw_hdmi_phy_i2c_write(sc, CKCALCTRL_OVERRIDE,
 	    DW_HDMI_PHY_I2C_CKCALCTRL);
 
-#if 1
-	/* TODO: these values are for 148500000 HDMI pixel clock. */
-	dw_hdmi_phy_i2c_write(sc, 0x802b, DW_HDMI_PHY_I2C_CKSYMTXCTRL);
-	dw_hdmi_phy_i2c_write(sc, 0x0004, DW_HDMI_PHY_I2C_TXTERM);
-	dw_hdmi_phy_i2c_write(sc, 0x028d, DW_HDMI_PHY_I2C_VLEVCTRL);
-#else
-	/* TODO: these values are for 29700000 HDMI pixel clock. */
-	dw_hdmi_phy_i2c_write(sc, 0x8039, DW_HDMI_PHY_I2C_CKSYMTXCTRL);
-	dw_hdmi_phy_i2c_write(sc, 0x0005, DW_HDMI_PHY_I2C_TXTERM);
-	dw_hdmi_phy_i2c_write(sc, 0x028d, DW_HDMI_PHY_I2C_VLEVCTRL);
-#endif
+	switch (sc->mode.crtc_clock) {
+	case 148500:
+		dw_hdmi_phy_i2c_write(sc, 0x802b, DW_HDMI_PHY_I2C_CKSYMTXCTRL);
+		dw_hdmi_phy_i2c_write(sc, 0x0004, DW_HDMI_PHY_I2C_TXTERM);
+		dw_hdmi_phy_i2c_write(sc, 0x028d, DW_HDMI_PHY_I2C_VLEVCTRL);
+		break;
+	case 297000:
+		dw_hdmi_phy_i2c_write(sc, 0x8039, DW_HDMI_PHY_I2C_CKSYMTXCTRL);
+		dw_hdmi_phy_i2c_write(sc, 0x0005, DW_HDMI_PHY_I2C_TXTERM);
+		dw_hdmi_phy_i2c_write(sc, 0x028d, DW_HDMI_PHY_I2C_VLEVCTRL);
+		break;
+	default:
+		device_printf(sc->dev, "unknown clock %d\n",
+		    sc->mode.crtc_clock);
+		return (ENXIO);
+	}
 
 	dw_hdmi_phy_enable_power(sc, 1);
 
@@ -831,6 +836,11 @@ static void rk_dw_hdmi_encoder_mode_set(struct drm_encoder *encoder,
 
 	base_sc = container_of(encoder, struct dw_hdmi_softc, encoder);
 	sc = container_of(base_sc, struct rk_dw_hdmi_softc, base_sc);
+
+	/*
+	 * Note: we are setting vpll, which should be the same as vop dclk.
+	 */
+	clk_set_freq(sc->clk[2], mode->crtc_clock * 1000, 0);
 }
 
 static const struct drm_encoder_helper_funcs rk_dw_hdmi_encoder_helper_funcs = {
@@ -1217,13 +1227,6 @@ rk_hdmi_clk_enable(device_t dev)
 			    rk_clk_table[i]);
 			return (ENXIO);
 		}
-	}
-
-	/* Note: vpll should be the same as vop dclk. */
-	error = clk_set_freq(sc->clk[2], 148500000, 0);
-	if (error != 0) {
-		device_printf(dev, "%s: could not set freq\n", __func__);
-		return (ENXIO);
 	}
 
 	for (i = 0; i < RK_CLK_NENTRIES; i++) {
