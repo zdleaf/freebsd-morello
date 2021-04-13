@@ -99,6 +99,7 @@ static const u32 rk_vop_plane_formats[] = {
 #define	CLK_NENTRIES	3
 static char * clk_table[CLK_NENTRIES] = { "aclk_vop", "dclk_vop", "hclk_vop" };
 
+/* Note: vop-big is not supported by this driver. */
 static struct ofw_compat_data compat_data[] = {
 	{ "rockchip,rk3399-vop-lit",	1 },
 	{ NULL,				0 }
