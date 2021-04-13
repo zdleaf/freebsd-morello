@@ -180,11 +180,13 @@ static int
 rk_vop_clk_enable(device_t dev)
 {
 	struct rk_vop_softc *sc;
+	phandle_t node;
 	uint64_t rate;
 	int error;
 	int i;
 
 	sc = device_get_softc(dev);
+	node = ofw_bus_get_node(dev);
 
 	/* Resets. */
 	error = hwreset_get_by_ofw_name(sc->dev, 0, "axi", &sc->hwreset_axi);
@@ -232,10 +234,19 @@ rk_vop_clk_enable(device_t dev)
 		}
 	}
 
-	/* ACLK */
-	error = clk_set_freq(sc->clk[0], 400000000, 0);
+	/*
+	 * Set ACLK, HCLK based on entires in DTS.
+	 * If some of them is not present in DTS nothing will work, so give up.
+	 */
+	if (!OF_hasprop(node, "assigned-clocks")) {
+		device_printf(sc->dev,
+		    "Failed to find assigned-clocks property.\n");
+		return (error);
+	}
+
+	error = clk_set_assigned(sc->dev, node);
 	if (error != 0) {
-		device_printf(sc->dev, "Failed to set aclk\n");
+		device_printf(dev, "Cannot set assigned clocks\n");
 		return (error);
 	}
 
@@ -243,13 +254,6 @@ rk_vop_clk_enable(device_t dev)
 	error = clk_set_freq(sc->clk[1], 148500000, 0);
 	if (error != 0) {
 		device_printf(sc->dev, "Failed to set dclk\n");
-		return (error);
-	}
-
-	/* HCLK */
-	error = clk_set_freq(sc->clk[2], 100000000, 0);
-	if (error != 0) {
-		device_printf(sc->dev, "Failed to set hclk\n");
 		return (error);
 	}
 
