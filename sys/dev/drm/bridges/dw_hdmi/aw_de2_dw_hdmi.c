@@ -157,6 +157,7 @@ static enum drm_connector_status
 dw_hdmi_connector_detect(struct drm_connector *connector, bool force)
 {
 	struct dw_hdmi_softc *sc;
+	uint32_t reg;
 
 	sc = container_of(connector, struct dw_hdmi_softc, connector);
 
@@ -164,8 +165,9 @@ dw_hdmi_connector_detect(struct drm_connector *connector, bool force)
 		if (DW_HDMI_PHY_DETECT_HPD(sc->phydev))
 			return (connector_status_connected);
 	} else {
-		/* TODO: handle internal phy. */
-		return (connector_status_connected);
+		reg = dw_hdmi_read(sc, DW_HDMI_PHY_STAT0);
+		if (reg & HDMI_PHY_STAT0_HPD)
+			return (connector_status_connected);
 	}
 
 	return (connector_status_disconnected);
