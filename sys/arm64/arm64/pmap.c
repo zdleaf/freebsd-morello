@@ -3705,6 +3705,7 @@ pmap_gpu_enter(pmap_t pmap, vm_offset_t va, vm_paddr_t pa,
 	int rv;
 
 	PMAP_ASSERT_STAGE1(pmap);
+	KASSERT(pmap != kernel_pmap, ("kernel pmap used for GPU"));
 	KASSERT(va < VM_MAXUSER_ADDRESS, ("wrong address space"));
 	KASSERT((va & PAGE_MASK) == 0, ("va is misaligned"));
 	KASSERT((pa & PAGE_MASK) == 0, ("pa is misaligned"));
@@ -3782,6 +3783,7 @@ pmap_gpu_remove(pmap_t pmap, vm_offset_t va)
 	int rc;
 
 	KASSERT((va & PAGE_MASK) == 0, ("va is misaligned"));
+	KASSERT(pmap != kernel_pmap, ("kernel pmap used for GPU"));
 
 	PMAP_LOCK(pmap);
 
