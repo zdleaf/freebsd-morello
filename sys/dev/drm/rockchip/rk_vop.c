@@ -99,7 +99,10 @@ static const u32 rk_vop_plane_formats[] = {
 #define	CLK_NENTRIES	3
 static char * clk_table[CLK_NENTRIES] = { "aclk_vop", "dclk_vop", "hclk_vop" };
 
-/* Note: vop-big is not supported by this driver. */
+/*
+ * Note: vop-big is not supported by this driver: it has different registers
+ * for planes configuration.
+ */
 static struct ofw_compat_data compat_data[] = {
 	{ "rockchip,rk3399-vop-lit",	1 },
 	{ NULL,				0 }
@@ -379,13 +382,6 @@ rk_vop_commit(device_t dev)
 
 	dprintf("%s\n", __func__);
 
-#if 0
-	AW_DE2_MIXER_WRITE_4(sc, 0x08, 1);
-
-	if (__drm_debug & DRM_UT_DRIVER)
-		rk_vop_mixer_dump_regs(sc);
-#endif
-
 	return (0);
 }
 
@@ -416,15 +412,7 @@ static void
 rk_vop_plane_atomic_disable(struct drm_plane *plane,
     struct drm_plane_state *old_state)
 {
-	//struct rk_vop_plane *plane;
-	//struct rk_vop_softc *sc;
 
-	//plane = container_of(plane, struct rk_vop_plane, plane);
-	//sc = plane->sc;
-
-	//reg = AW_DE2_MIXER_READ_4(sc, OVL_UI_ATTR_CTL(mixer_plane->id));
-	//reg &= ~OVL_UI_ATTR_EN;
-	//AW_DE2_MIXER_WRITE_4(sc, OVL_UI_ATTR_CTL(mixer_plane->id), reg);
 }
 
 static void
@@ -694,8 +682,6 @@ rk_crtc_atomic_flush(struct drm_crtc *crtc,
 
 	sc = container_of(crtc, struct rk_vop_softc, crtc);
 
-	//AW_DE2_MIXER_COMMIT(sc->mixer);
-
 	if (event) {
 		crtc->state->event = NULL;
 
@@ -803,17 +789,6 @@ rk_crtc_atomic_disable(struct drm_crtc *crtc, struct drm_crtc_state *old_state)
 
 	sc = container_of(crtc, struct rk_vop_softc, crtc);
 
-#if 0
-	uint32_t reg;
-
-	/* Disable TCON */
-	AW_DE2_TCON_LOCK(sc);
-	reg = AW_DE2_TCON_READ_4(sc, TCON_CTL);
-	reg &= ~TCON_CTL_EN;
-	AW_DE2_TCON_WRITE_4(sc, TCON_CTL, reg);
-	AW_DE2_TCON_UNLOCK(sc);
-#endif
-
 	/* Disable VBLANK events */
 	drm_crtc_vblank_off(crtc);
 
@@ -902,19 +877,6 @@ rk_vop_create_pipeline(device_t dev, struct drm_device *drm)
 	sc = device_get_softc(dev);
 
 	dprintf("%s\n", __func__);
-
-#if 0
-	/* Create the different planes available */
-	rk_vop_ui_plane_create(sc, drm);
-	rk_vop_vi_plane_create(sc, drm);
-
-	/* 
-	 * Init the crtc
-	 * UI 0 and VI are the only plane available in both mixers
-	 */
-	AW_DE2_TCON_CREATE_CRTC(sc->tcon, drm,
-	    &sc->ui_planes[0].plane, &sc->vi_planes[0].plane);
-#endif
 
 	for (i = 0; i < 2; i++) {
 		if (i == 0)
