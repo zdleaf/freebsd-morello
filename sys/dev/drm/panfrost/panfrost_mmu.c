@@ -323,7 +323,7 @@ panfrost_mmu_page_fault(struct panfrost_softc *sc, int as, uint64_t addr)
 	for (i = 0; i < 512; i++) {
 		page = bo->pages[page_offset + i];
 		pa = VM_PAGE_TO_PHYS(page);
-		error = pmap_genter(&mmu->p, va, pa, prot, 0);
+		error = pmap_gpu_enter(&mmu->p, va, pa, prot, 0);
 		va += PAGE_SIZE;
 	}
 
@@ -581,7 +581,7 @@ panfrost_mmu_map(struct panfrost_softc *sc,
 		page = sg_page(sg);
 		while (len > 0) {
 			pa = VM_PAGE_TO_PHYS(page);
-			error = pmap_genter(&mmu->p, va, pa, prot, 0);
+			error = pmap_gpu_enter(&mmu->p, va, pa, prot, 0);
 			va += PAGE_SIZE;
 			page++;
 			len -= PAGE_SIZE;
@@ -616,14 +616,13 @@ panfrost_mmu_unmap(struct panfrost_softc *sc,
 	unmapped_len = 0;
 
 	while (unmapped_len < len) {
-		error = pmap_gremove(&mmu->p, va);
+		error = pmap_gpu_remove(&mmu->p, va);
 		if (error) {
 			/*
-			 * Possibly that only part of memory was mapped
-			 * due to tiling operation.
+			 * It is possible that a part of memory was mapped
+			 * only due to tiling operation.
 			 * This could only be possible when driver minor > 0.
 			 */
-			break;
 		}
 		va += PAGE_SIZE;
 		unmapped_len += PAGE_SIZE;

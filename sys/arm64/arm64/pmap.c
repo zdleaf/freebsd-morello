@@ -3692,7 +3692,7 @@ restart:
  * Add a single Mali GPU entry. This function does not sleep.
  */
 int
-pmap_genter(pmap_t pmap, vm_offset_t va, vm_paddr_t pa,
+pmap_gpu_enter(pmap_t pmap, vm_offset_t va, vm_paddr_t pa,
     vm_prot_t prot, u_int flags)
 {
 	pd_entry_t *pde;
@@ -3773,7 +3773,7 @@ out:
  * Remove a single Mali GPU entry.
  */
 int
-pmap_gremove(pmap_t pmap, vm_offset_t va)
+pmap_gpu_remove(pmap_t pmap, vm_offset_t va)
 {
 	pd_entry_t *pde;
 	pt_entry_t *pte;
