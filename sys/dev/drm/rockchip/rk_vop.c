@@ -374,18 +374,6 @@ rk_vop_attach(device_t dev)
 }
 
 static int
-rk_vop_commit(device_t dev)
-{
-	struct rk_vop_softc *sc;
-
-	sc = device_get_softc(dev);
-
-	dprintf("%s\n", __func__);
-
-	return (0);
-}
-
-static int
 rk_vop_plane_atomic_check(struct drm_plane *plane,
     struct drm_plane_state *state)
 {
@@ -924,7 +912,6 @@ static device_method_t rk_vop_methods[] = {
 
 	/* VOP interface */
 	DEVMETHOD(rk_vop_create_pipeline,	rk_vop_create_pipeline),
-	DEVMETHOD(rk_vop_commit,		rk_vop_commit),
 
 	DEVMETHOD_END
 };
