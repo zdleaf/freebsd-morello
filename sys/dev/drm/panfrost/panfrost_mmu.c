@@ -425,6 +425,9 @@ panfrost_mmu_pgtable_free(struct panfrost_file *pfile)
 	sc = pfile->sc;
 	mmu = &pfile->mmu;
 
+	pmap_sremove_pages(&mmu->p);
+	pmap_release(&mmu->p);
+
 	mtx_lock_spin(&sc->as_mtx);
 	if (mmu->as >= 0) {
 		sc->as_alloc_set &= ~(1 << mmu->as);
