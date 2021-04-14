@@ -3706,8 +3706,9 @@ pmap_gpu_enter(pmap_t pmap, vm_offset_t va, vm_paddr_t pa,
 
 	PMAP_ASSERT_STAGE1(pmap);
 	KASSERT(va < VM_MAXUSER_ADDRESS, ("wrong address space"));
+	KASSERT((va & PAGE_MASK) == 0, ("va is misaligned"));
+	KASSERT((pa & PAGE_MASK) == 0, ("pa is misaligned"));
 
-	va = trunc_page(va);
 	new_l3 = (pt_entry_t)(pa | ATTR_SH(ATTR_SH_IS) | L3_BLOCK);
 
 	if ((prot & VM_PROT_WRITE) != 0)
