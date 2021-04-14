@@ -3717,7 +3717,7 @@ pmap_gpu_enter(pmap_t pmap, vm_offset_t va, vm_paddr_t pa,
 	if ((prot & VM_PROT_EXECUTE) == 0)
 		new_l3 |= ATTR_S2_XN(ATTR_S2_XN_ALL);
 
-	CTR2(KTR_PMAP, "pmap_genter: %.16lx -> %.16lx", va, pa);
+	CTR2(KTR_PMAP, "pmap_gpu_enter: %.16lx -> %.16lx", va, pa);
 
 	PMAP_LOCK(pmap);
 
