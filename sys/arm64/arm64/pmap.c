@@ -3780,6 +3780,8 @@ pmap_gpu_remove(pmap_t pmap, vm_offset_t va)
 	int lvl;
 	int rc;
 
+	KASSERT((va & PAGE_MASK) == 0, ("va is misaligned"));
+
 	PMAP_LOCK(pmap);
 
 	pde = pmap_pde(pmap, va, &lvl);
