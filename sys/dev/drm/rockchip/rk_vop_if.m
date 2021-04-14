@@ -39,10 +39,3 @@ METHOD int create_pipeline {
 	device_t		dev;
 	struct drm_device	*drm_dev;
 };
-
-#
-# Commit changes to the mixer
-#
-METHOD int commit {
-	device_t		dev;
-};
