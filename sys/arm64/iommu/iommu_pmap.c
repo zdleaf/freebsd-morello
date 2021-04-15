@@ -212,8 +212,7 @@ static struct asid_set vmids;
 
 static void pmap_alloc_asid(pmap_t pmap);
 
-static vm_page_t _pmap_alloc_l3(pmap_t pmap, vm_pindex_t ptepindex,
-		struct rwlock **lockp);
+static vm_page_t _pmap_alloc_l3(pmap_t pmap, vm_pindex_t ptepindex);
 
 static void _pmap_unwire_l3(pmap_t pmap, vm_offset_t va, vm_page_t m,
     struct spglist *free);
@@ -630,7 +629,7 @@ iommu_pmap_pinit_stage(pmap_t pmap, enum pmap_stage stage, int levels)
 	 */
 	if (pmap->pm_levels == 3) {
 		PMAP_LOCK(pmap);
-		m = _pmap_alloc_l3(pmap, NUL2E + NUL1E, NULL);
+		m = _pmap_alloc_l3(pmap, NUL2E + NUL1E);
 		PMAP_UNLOCK(pmap);
 	}
 	pmap->pm_ttbr = VM_PAGE_TO_PHYS(m);
@@ -657,7 +656,7 @@ iommu_pmap_pinit(pmap_t pmap)
  * race conditions.
  */
 static vm_page_t
-_pmap_alloc_l3(pmap_t pmap, vm_pindex_t ptepindex, struct rwlock **lockp)
+_pmap_alloc_l3(pmap_t pmap, vm_pindex_t ptepindex)
 {
 	vm_page_t m, l1pg, l2pg;
 
@@ -668,12 +667,6 @@ _pmap_alloc_l3(pmap_t pmap, vm_pindex_t ptepindex, struct rwlock **lockp)
 	 */
 	if ((m = vm_page_alloc(NULL, ptepindex, VM_ALLOC_NOOBJ |
 	    VM_ALLOC_WIRED | VM_ALLOC_ZERO)) == NULL) {
-		if (lockp != NULL) {
-			PMAP_UNLOCK(pmap);
-			vm_wait(NULL);
-			PMAP_LOCK(pmap);
-		}
-
 		/*
 		 * Indicate the need to retry.  While waiting, the page table
 		 * page may have been allocated.
@@ -717,8 +710,8 @@ _pmap_alloc_l3(pmap_t pmap, vm_pindex_t ptepindex, struct rwlock **lockp)
 		tl0 = pmap_load(l0);
 		if (tl0 == 0) {
 			/* recurse for allocating page dir */
-			if (_pmap_alloc_l3(pmap, NUL2E + NUL1E + l0index,
-			    lockp) == NULL) {
+			if (_pmap_alloc_l3(pmap, NUL2E + NUL1E + l0index)
+			    == NULL) {
 				vm_page_unwire_noq(m);
 				vm_page_free_zero(m);
 				return (NULL);
@@ -743,8 +736,7 @@ _pmap_alloc_l3(pmap_t pmap, vm_pindex_t ptepindex, struct rwlock **lockp)
 		tl0 = pmap_load(l0);
 		if (tl0 == 0) {
 			/* recurse for allocating page dir */
-			if (_pmap_alloc_l3(pmap, NUL2E + l1index,
-			    lockp) == NULL) {
+			if (_pmap_alloc_l3(pmap, NUL2E + l1index) == NULL) {
 				vm_page_unwire_noq(m);
 				vm_page_free_zero(m);
 				return (NULL);
@@ -758,8 +750,8 @@ _pmap_alloc_l3(pmap_t pmap, vm_pindex_t ptepindex, struct rwlock **lockp)
 			tl1 = pmap_load(l1);
 			if (tl1 == 0) {
 				/* recurse for allocating page dir */
-				if (_pmap_alloc_l3(pmap, NUL2E + l1index,
-				    lockp) == NULL) {
+				if (_pmap_alloc_l3(pmap, NUL2E + l1index)
+				    == NULL) {
 					vm_page_unwire_noq(m);
 					vm_page_free_zero(m);
 					return (NULL);
@@ -895,7 +887,7 @@ retry:
 	if (pde != NULL && lvl == 2) {
 		l3 = pmap_l2_to_l3(pde, va);
 	} else {
-		mpte = _pmap_alloc_l3(pmap, pmap_l2_pindex(va), NULL);
+		mpte = _pmap_alloc_l3(pmap, pmap_l2_pindex(va));
 		if (mpte == NULL) {
 			CTR0(KTR_PMAP, "pmap_enter: mpte == NULL");
 			rv = KERN_RESOURCE_SHORTAGE;
@@ -1008,7 +1000,7 @@ retry:
 	if (pde != NULL && lvl == 2) {
 		l3 = pmap_l2_to_l3(pde, va);
 	} else {
-		mpte = _pmap_alloc_l3(pmap, pmap_l2_pindex(va), NULL);
+		mpte = _pmap_alloc_l3(pmap, pmap_l2_pindex(va));
 		if (mpte == NULL) {
 			CTR0(KTR_PMAP, "pmap_enter: mpte == NULL");
 			rv = KERN_RESOURCE_SHORTAGE;
