@@ -669,9 +669,6 @@ _pmap_alloc_l3(pmap_t pmap, vm_pindex_t ptepindex, struct rwlock **lockp)
 	if ((m = vm_page_alloc(NULL, ptepindex, VM_ALLOC_NOOBJ |
 	    VM_ALLOC_WIRED | VM_ALLOC_ZERO)) == NULL) {
 		if (lockp != NULL) {
-#if 0
-			RELEASE_PV_LIST_LOCK(lockp);
-#endif
 			PMAP_UNLOCK(pmap);
 			vm_wait(NULL);
 			PMAP_LOCK(pmap);
@@ -779,108 +776,6 @@ _pmap_alloc_l3(pmap_t pmap, vm_pindex_t ptepindex, struct rwlock **lockp)
 	}
 
 	pmap_resident_count_inc(pmap, 1);
-
-	return (m);
-}
-
-static pd_entry_t *
-pmap_alloc_l2(pmap_t pmap, vm_offset_t va, vm_page_t *l2pgp,
-    struct rwlock **lockp)
-{
-	pd_entry_t *l1, *l2;
-	vm_page_t l2pg;
-	vm_pindex_t l2pindex;
-
-retry:
-	l1 = pmap_l1(pmap, va);
-	if (l1 != NULL && (pmap_load(l1) & ATTR_DESCR_MASK) == L1_TABLE) {
-		l2 = pmap_l1_to_l2(l1, va);
-		if (va < VM_MAXUSER_ADDRESS) {
-			/* Add a reference to the L2 page. */
-			l2pg = PHYS_TO_VM_PAGE(pmap_load(l1) & ~ATTR_MASK);
-			l2pg->ref_count++;
-		} else
-			l2pg = NULL;
-	} else if (va < VM_MAXUSER_ADDRESS) {
-		/* Allocate a L2 page. */
-		l2pindex = pmap_l2_pindex(va) >> Ln_ENTRIES_SHIFT;
-		l2pg = _pmap_alloc_l3(pmap, NUL2E + l2pindex, lockp);
-		if (l2pg == NULL) {
-			if (lockp != NULL)
-				goto retry;
-			else
-				return (NULL);
-		}
-		l2 = (pd_entry_t *)PHYS_TO_DMAP(VM_PAGE_TO_PHYS(l2pg));
-		l2 = &l2[pmap_l2_index(va)];
-	} else
-		panic("pmap_alloc_l2: missing page table page for va %#lx",
-		    va);
-	*l2pgp = l2pg;
-	return (l2);
-}
-
-static vm_page_t
-pmap_alloc_l3(pmap_t pmap, vm_offset_t va, struct rwlock **lockp)
-{
-	vm_pindex_t ptepindex;
-	pd_entry_t *pde, tpde;
-#ifdef INVARIANTS
-	pt_entry_t *pte;
-#endif
-	vm_page_t m;
-	int lvl;
-
-	/*
-	 * Calculate pagetable page index
-	 */
-	ptepindex = pmap_l2_pindex(va);
-retry:
-	/*
-	 * Get the page directory entry
-	 */
-	pde = pmap_pde(pmap, va, &lvl);
-
-	/*
-	 * If the page table page is mapped, we just increment the hold count,
-	 * and activate it. If we get a level 2 pde it will point to a level 3
-	 * table.
-	 */
-	switch (lvl) {
-	case -1:
-		break;
-	case 0:
-#ifdef INVARIANTS
-		pte = pmap_l0_to_l1(pde, va);
-		KASSERT(pmap_load(pte) == 0,
-		    ("pmap_alloc_l3: TODO: l0 superpages"));
-#endif
-		break;
-	case 1:
-#ifdef INVARIANTS
-		pte = pmap_l1_to_l2(pde, va);
-		KASSERT(pmap_load(pte) == 0,
-		    ("pmap_alloc_l3: TODO: l1 superpages"));
-#endif
-		break;
-	case 2:
-		tpde = pmap_load(pde);
-		if (tpde != 0) {
-			m = PHYS_TO_VM_PAGE(tpde & ~ATTR_MASK);
-			m->ref_count++;
-			return (m);
-		}
-		break;
-	default:
-		panic("pmap_alloc_l3: Invalid level %d", lvl);
-	}
-
-	/*
-	 * Here if the pte page isn't mapped, or if it has been deallocated.
-	 */
-	m = _pmap_alloc_l3(pmap, ptepindex, lockp);
-	if (m == NULL && lockp != NULL)
-		goto retry;
 
 	return (m);
 }
