@@ -405,7 +405,7 @@ panfrost_mmu_pgtable_alloc(struct panfrost_file *pfile)
 	mmu = &pfile->mmu;
 	p = &mmu->p;
 
-	pmap_pinit(p);
+	iommu_pmap_pinit(p);
 	PMAP_LOCK_INIT(p);
 
 	/* Ensure root directory is visible to GPU. */
@@ -426,7 +426,7 @@ panfrost_mmu_pgtable_free(struct panfrost_file *pfile)
 	mmu = &pfile->mmu;
 
 	pmap_sremove_pages(&mmu->p);
-	pmap_release(&mmu->p);
+	iommu_pmap_release(&mmu->p);
 
 	mtx_lock_spin(&sc->as_mtx);
 	if (mmu->as >= 0) {
