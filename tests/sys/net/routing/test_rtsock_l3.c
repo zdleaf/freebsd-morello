@@ -383,6 +383,9 @@ ATF_TC_BODY(rtm_get_v4_hostbits_failure, tc)
 {
 	DECLARE_TEST_VARS;
 
+	if (atf_tc_get_config_var_as_bool_wd(tc, "ci", false))
+		atf_tc_expect_fail("Needs https://reviews.freebsd.org/D28886");
+
 	c = presetup_ipv4(tc);
 
 	/* Q the same prefix */
@@ -446,6 +449,9 @@ RTM_DECLARE_ROOT_TEST(rtm_add_v4_no_rtf_host_failure,
 ATF_TC_BODY(rtm_add_v4_no_rtf_host_failure, tc)
 {
 	DECLARE_TEST_VARS;
+
+	if (atf_tc_get_config_var_as_bool_wd(tc, "ci", false))
+		atf_tc_expect_fail("Needs https://reviews.freebsd.org/D28886");
 
 	c = presetup_ipv4(tc);
 
@@ -1127,8 +1133,7 @@ ATF_TC_BODY(rtm_add_v6_gu_ifa_prefixroute_success, tc)
 	/* gateway should be link sdl with ifindex of an address interface */
 	verify_link_gateway(rtm, c->ifindex);
 
-	/* TODO: PINNED? */
-	int expected_rt_flags = RTF_UP | RTF_DONE;
+	int expected_rt_flags = RTF_UP | RTF_DONE | RTF_PINNED;
 	verify_route_message_extra(rtm, c->ifindex, expected_rt_flags);
 }
 
@@ -1257,7 +1262,7 @@ ATF_TC_BODY(rtm_del_v6_gu_ifa_prefixroute_success, tc)
 	/* gateway should be link sdl with ifindex of an address interface */
 	verify_link_gateway(rtm, c->ifindex);
 
-	int expected_rt_flags = RTF_DONE;
+	int expected_rt_flags = RTF_DONE | RTF_PINNED;
 	verify_route_message_extra(rtm, c->ifindex, expected_rt_flags);
 }
 
