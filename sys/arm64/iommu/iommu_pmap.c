@@ -153,10 +153,12 @@ __FBSDID("$FreeBSD$");
 #define	PMAP_ASSERT_STAGE1(pmap)	MPASS((pmap)->pm_stage == PM_STAGE1)
 #define	PMAP_ASSERT_STAGE2(pmap)	MPASS((pmap)->pm_stage == PM_STAGE2)
 
-#define	NL0PG		(PAGE_SIZE/(sizeof (pd_entry_t)))
-#define	NL1PG		(PAGE_SIZE/(sizeof (pd_entry_t)))
-#define	NL2PG		(PAGE_SIZE/(sizeof (pd_entry_t)))
-#define	NL3PG		(PAGE_SIZE/(sizeof (pt_entry_t)))
+#define	IOMMU_PAGE_SIZE		4096
+
+#define	NL0PG		(IOMMU_PAGE_SIZE/(sizeof (pd_entry_t)))
+#define	NL1PG		(IOMMU_PAGE_SIZE/(sizeof (pd_entry_t)))
+#define	NL2PG		(IOMMU_PAGE_SIZE/(sizeof (pd_entry_t)))
+#define	NL3PG		(IOMMU_PAGE_SIZE/(sizeof (pt_entry_t)))
 
 #define	NUL0E		L0_ENTRIES
 #define	NUL1E		(NUL0E * NL1PG)
@@ -234,13 +236,6 @@ static __inline vm_page_t pmap_remove_pt_page(pmap_t pmap, vm_offset_t va);
 /********************/
 /* Inline functions */
 /********************/
-
-static __inline void
-pagecopy(void *s, void *d)
-{
-
-	memcpy(d, s, PAGE_SIZE);
-}
 
 static __inline pd_entry_t *
 pmap_l0(pmap_t pmap, vm_offset_t va)
