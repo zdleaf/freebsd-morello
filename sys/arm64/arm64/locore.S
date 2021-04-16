@@ -34,6 +34,7 @@
 #include <machine/hypervisor.h>
 #include <machine/param.h>
 #include <machine/pte.h>
+#include <machine/pte4k.h>
 #include <machine/vm.h>
 #include <machine/vmparam.h>
 
