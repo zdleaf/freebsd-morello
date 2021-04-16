@@ -149,6 +149,7 @@ __FBSDID("$FreeBSD$");
 #include <machine/machdep.h>
 #include <machine/md_var.h>
 #include <machine/pcb.h>
+#include <machine/pte4k.h>
 
 #define	PMAP_ASSERT_STAGE1(pmap)	MPASS((pmap)->pm_stage == PM_STAGE1)
 #define	PMAP_ASSERT_STAGE2(pmap)	MPASS((pmap)->pm_stage == PM_STAGE2)
@@ -172,6 +173,7 @@ __FBSDID("$FreeBSD$");
 CTASSERT((DMAP_MIN_ADDRESS  & ~L0_OFFSET) == DMAP_MIN_ADDRESS);
 CTASSERT((DMAP_MAX_ADDRESS  & ~L0_OFFSET) == DMAP_MAX_ADDRESS);
 
+#if 0
 /*
  * This ASID allocator uses a bit vector ("asid_set") to remember which ASIDs
  * that it has currently allocated to a pmap, a cursor ("asid_next") to
@@ -194,6 +196,7 @@ struct asid_set {
 
 static struct asid_set asids;
 static struct asid_set vmids;
+#endif
 
 /*
  * A pmap's cookie encodes an ASID and epoch number.  Cookies for reserved
@@ -436,11 +439,9 @@ pmap_init(void)
 {
 	struct vm_phys_seg *seg, *next_seg;
 	vm_size_t s;
-#if 0
 	struct md_page *pvh;
 	uint64_t mmfr1;
 	int i, pv_npg, vmid_bits;
-#endif
 
 	/*
 	 * Are large page mappings enabled?
@@ -455,7 +456,6 @@ pmap_init(void)
 		pagesizes[2] = L1_SIZE;
 	}
 
-#if 0
 	/*
 	 * Initialize the ASID allocator.
 	 */
@@ -471,7 +471,6 @@ pmap_init(void)
 			vmid_bits = 16;
 		pmap_init_asids(&vmids, vmid_bits);
 	}
-#endif
 }
 #endif
 
@@ -599,6 +598,7 @@ iommu_pmap_pinit_stage(pmap_t pmap, enum pmap_stage stage, int levels)
 
 	MPASS(levels == 3 || levels == 4);
 	pmap->pm_levels = levels;
+#if 0
 	pmap->pm_stage = stage;
 	switch (stage) {
 	case PM_STAGE1:
@@ -612,7 +612,6 @@ iommu_pmap_pinit_stage(pmap_t pmap, enum pmap_stage stage, int levels)
 		break;
 	}
 
-#if 0
 	/* XXX Temporarily disable deferred ASID allocation. */
 	pmap_alloc_asid(pmap);
 #endif
@@ -781,9 +780,13 @@ iommu_pmap_release(pmap_t pmap)
 {
 	boolean_t rv;
 	struct spglist free;
+#if 0
 	struct asid_set *set;
+#endif
 	vm_page_t m;
+#if 0
 	int asid;
+#endif
 
 	if (pmap->pm_levels != 4) {
 		PMAP_ASSERT_STAGE2(pmap);
@@ -808,6 +811,7 @@ iommu_pmap_release(pmap_t pmap)
 	KASSERT(vm_radix_is_empty(&pmap->pm_root),
 	    ("pmap_release: pmap has reserved page table page(s)"));
 
+#if 0
 	set = pmap->pm_asid_set;
 	KASSERT(set != NULL, ("%s: NULL asid set", __func__));
 
@@ -828,6 +832,7 @@ iommu_pmap_release(pmap_t pmap)
 		}
 		mtx_unlock_spin(&set->asid_set_mutex);
 	}
+#endif
 
 	m = PHYS_TO_VM_PAGE(pmap->pm_l0_paddr);
 	vm_page_unwire_noq(m);
