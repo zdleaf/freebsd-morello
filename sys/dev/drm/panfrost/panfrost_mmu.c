@@ -47,6 +47,7 @@ __FBSDID("$FreeBSD$");
 #include <vm/vm_kern.h>
 #include <vm/pmap.h>
 
+#include <arm64/iommu/iommu_pmap.h>
 #include <dev/extres/clk/clk.h>
 
 #include <drm/drm_gem.h>
@@ -425,7 +426,7 @@ panfrost_mmu_pgtable_free(struct panfrost_file *pfile)
 	sc = pfile->sc;
 	mmu = &pfile->mmu;
 
-	pmap_sremove_pages(&mmu->p);
+	iommu_pmap_remove_pages(&mmu->p);
 	iommu_pmap_release(&mmu->p);
 
 	mtx_lock_spin(&sc->as_mtx);

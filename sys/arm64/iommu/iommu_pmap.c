@@ -151,6 +151,8 @@ __FBSDID("$FreeBSD$");
 #include <machine/pcb.h>
 #include <machine/pte4k.h>
 
+#include <arm64/iommu/iommu_pmap.h>
+
 #define	PMAP_ASSERT_STAGE1(pmap)	MPASS((pmap)->pm_stage == PM_STAGE1)
 #define	PMAP_ASSERT_STAGE2(pmap)	MPASS((pmap)->pm_stage == PM_STAGE2)
 
@@ -965,7 +967,7 @@ out:
  * Add a single SMMU entry. This function does not sleep.
  */
 int
-pmap_senter(pmap_t pmap, vm_offset_t va, vm_paddr_t pa,
+pmap_smmu_enter(pmap_t pmap, vm_offset_t va, vm_paddr_t pa,
     vm_prot_t prot, u_int flags)
 {
 	pd_entry_t *pde;
@@ -1028,7 +1030,7 @@ out:
  * Remove a single SMMU entry.
  */
 int
-pmap_sremove(pmap_t pmap, vm_offset_t va)
+pmap_smmu_remove(pmap_t pmap, vm_offset_t va)
 {
 	pt_entry_t *pte;
 	int lvl;
@@ -1058,7 +1060,7 @@ pmap_sremove(pmap_t pmap, vm_offset_t va)
  * this function panics.
  */
 void
-pmap_sremove_pages(pmap_t pmap)
+iommu_pmap_remove_pages(pmap_t pmap)
 {
 	pd_entry_t l0e, *l1, l1e, *l2, l2e;
 	pt_entry_t *l3, l3e;
