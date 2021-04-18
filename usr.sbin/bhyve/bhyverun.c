@@ -242,11 +242,11 @@ usage(int code)
 {
 
         fprintf(stderr,
-		"Usage: %s [-aehuwxACDHPSWY]\n"
+		"Usage: %s [-AaCDeHhPSuWwxY]\n"
 		"       %*s [-c [[cpus=]numcpus][,sockets=n][,cores=n][,threads=n]]\n"
+#ifdef __amd64__
 		"       %*s [-k <file>] [-l <lpc>] [-m mem] [-o <var>=<value>]\n"
 		"       %*s [-p vcpu:hostcpu] [-s <pci>] [-U uuid] [<vm>]\n"
-#ifdef __amd64__
 		"       -a: local apic is in xAPIC mode (deprecated)\n"
 #endif
 		"       -A: create ACPI tables\n"
