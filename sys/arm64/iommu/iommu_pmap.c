@@ -151,6 +151,7 @@ __FBSDID("$FreeBSD$");
 #include <machine/pcb.h>
 
 #include <arm64/iommu/iommu_pmap.h>
+#include <arm64/iommu/iommu_pte.h>
 
 #define	IOMMU_PAGE_SIZE		4096
 
@@ -242,7 +243,7 @@ static __inline pd_entry_t *
 pmap_l0(pmap_t pmap, vm_offset_t va)
 {
 
-	return (&pmap->pm_l0[pmap_l0_index(va)]);
+	return (&pmap->pm_l0[iommu_l0_index(va)]);
 }
 
 static __inline pd_entry_t *
@@ -251,7 +252,7 @@ pmap_l0_to_l1(pd_entry_t *l0, vm_offset_t va)
 	pd_entry_t *l1;
 
 	l1 = (pd_entry_t *)PHYS_TO_DMAP(pmap_load(l0) & ~ATTR_MASK);
-	return (&l1[pmap_l1_index(va)]);
+	return (&l1[iommu_l1_index(va)]);
 }
 
 static __inline pd_entry_t *
@@ -282,7 +283,7 @@ pmap_l1_to_l2(pd_entry_t *l1p, vm_offset_t va)
 	KASSERT((l1 & ATTR_DESCR_TYPE_MASK) == ATTR_DESCR_TYPE_TABLE,
 	    ("%s: L1 entry %#lx for %#lx is a leaf", __func__, l1, va));
 	l2p = (pd_entry_t *)PHYS_TO_DMAP(l1 & ~ATTR_MASK);
-	return (&l2p[pmap_l2_index(va)]);
+	return (&l2p[iommu_l2_index(va)]);
 }
 
 static __inline pd_entry_t *
@@ -314,7 +315,7 @@ pmap_l2_to_l3(pd_entry_t *l2p, vm_offset_t va)
 	KASSERT((l2 & ATTR_DESCR_TYPE_MASK) == ATTR_DESCR_TYPE_TABLE,
 	    ("%s: L2 entry %#lx for %#lx is a leaf", __func__, l2, va));
 	l3p = (pt_entry_t *)PHYS_TO_DMAP(l2 & ~ATTR_MASK);
-	return (&l3p[pmap_l3_index(va)]);
+	return (&l3p[iommu_l3_index(va)]);
 }
 
 /*
@@ -1066,7 +1067,7 @@ iommu_pmap_remove_pages(pmap_t pmap)
 
 	PMAP_LOCK(pmap);
 
-	for (sva = VM_MINUSER_ADDRESS, i = pmap_l0_index(sva);
+	for (sva = VM_MINUSER_ADDRESS, i = iommu_l0_index(sva);
 	    (i < Ln_ENTRIES && sva < VM_MAXUSER_ADDRESS); i++) {
 		l0e = pmap->pm_l0[i];
 		if ((l0e & ATTR_DESCR_VALID) == 0) {
@@ -1077,7 +1078,7 @@ iommu_pmap_remove_pages(pmap_t pmap)
 		m0 = PHYS_TO_VM_PAGE(pa0);
 		l1 = (pd_entry_t *)PHYS_TO_DMAP(pa0);
 
-		for (j = pmap_l1_index(sva); j < Ln_ENTRIES; j++) {
+		for (j = iommu_l1_index(sva); j < Ln_ENTRIES; j++) {
 			l1e = l1[j];
 			if ((l1e & ATTR_DESCR_VALID) == 0) {
 				sva += L1_SIZE;
@@ -1091,7 +1092,7 @@ iommu_pmap_remove_pages(pmap_t pmap)
 			m1 = PHYS_TO_VM_PAGE(pa1);
 			l2 = (pd_entry_t *)PHYS_TO_DMAP(pa1);
 
-			for (k = pmap_l2_index(sva); k < Ln_ENTRIES; k++) {
+			for (k = iommu_l2_index(sva); k < Ln_ENTRIES; k++) {
 				l2e = l2[k];
 				if ((l2e & ATTR_DESCR_VALID) == 0) {
 					sva += L2_SIZE;
@@ -1101,7 +1102,7 @@ iommu_pmap_remove_pages(pmap_t pmap)
 				m = PHYS_TO_VM_PAGE(pa);
 				l3 = (pt_entry_t *)PHYS_TO_DMAP(pa);
 
-				for (l = pmap_l3_index(sva); l < Ln_ENTRIES;
+				for (l = iommu_l3_index(sva); l < Ln_ENTRIES;
 				    l++, sva += L3_SIZE) {
 					l3e = l3[l];
 					if ((l3e & ATTR_DESCR_VALID) == 0)
