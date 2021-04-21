@@ -125,6 +125,7 @@ memmmap(struct cdev *dev, vm_ooffset_t offset, vm_paddr_t *paddr,
 {
 	if (dev2unit(dev) == CDEV_MINOR_MEM) {
 		*paddr = offset;
+		*memattr = VM_MEMATTR_WRITE_COMBINING;
 		return (0);
 	}
 	return (-1);
