@@ -43,47 +43,19 @@ __FBSDID("$FreeBSD$");
 #include "opt_vm.h"
 
 #include <sys/param.h>
-#include <sys/bitstring.h>
-#include <sys/bus.h>
-#include <sys/systm.h>
-#include <sys/kernel.h>
 #include <sys/ktr.h>
-#include <sys/limits.h>
-#include <sys/lock.h>
-#include <sys/malloc.h>
-#include <sys/mman.h>
-#include <sys/msgbuf.h>
 #include <sys/mutex.h>
-#include <sys/physmem.h>
-#include <sys/proc.h>
 #include <sys/rwlock.h>
-#include <sys/sbuf.h>
-#include <sys/sx.h>
-#include <sys/vmem.h>
-#include <sys/vmmeter.h>
-#include <sys/sched.h>
-#include <sys/sysctl.h>
-#include <sys/_unrhdr.h>
-#include <sys/smp.h>
 
 #include <vm/vm.h>
 #include <vm/vm_param.h>
-#include <vm/vm_kern.h>
 #include <vm/vm_page.h>
 #include <vm/vm_map.h>
 #include <vm/vm_object.h>
-#include <vm/vm_extern.h>
 #include <vm/vm_pageout.h>
-#include <vm/vm_pager.h>
-#include <vm/vm_phys.h>
 #include <vm/vm_radix.h>
-#include <vm/vm_reserv.h>
-#include <vm/vm_dumpset.h>
-#include <vm/uma.h>
 
 #include <machine/machdep.h>
-#include <machine/md_var.h>
-#include <machine/pcb.h>
 
 #include <arm64/iommu/iommu_pmap.h>
 #include <arm64/iommu/iommu_pte.h>
@@ -116,12 +88,8 @@ static void _pmap_unwire_l3(pmap_t pmap, vm_offset_t va, vm_page_t m,
  * They need to be atomic as the System MMU may write to the table at
  * the same time as the CPU.
  */
-#define	pmap_clear(table)		atomic_store_64(table, 0)
-#define	pmap_clear_bits(table, bits)	atomic_clear_64(table, bits)
 #define	pmap_load(table)		(*table)
-#define	pmap_load_clear(table)		atomic_swap_64(table, 0)
-#define	pmap_load_store(table, entry)	atomic_swap_64(table, entry)
-#define	pmap_set_bits(table, bits)	atomic_set_64(table, bits)
+#define	pmap_clear(table)		atomic_store_64(table, 0)
 #define	pmap_store(table, entry)	atomic_store_64(table, entry)
 
 /********************/
