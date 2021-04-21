@@ -172,55 +172,9 @@ __FBSDID("$FreeBSD$");
 CTASSERT((DMAP_MIN_ADDRESS  & ~IOMMU_L0_OFFSET) == DMAP_MIN_ADDRESS);
 CTASSERT((DMAP_MAX_ADDRESS  & ~IOMMU_L0_OFFSET) == DMAP_MAX_ADDRESS);
 
-#if 0
-/*
- * This ASID allocator uses a bit vector ("asid_set") to remember which ASIDs
- * that it has currently allocated to a pmap, a cursor ("asid_next") to
- * optimize its search for a free ASID in the bit vector, and an epoch number
- * ("asid_epoch") to indicate when it has reclaimed all previously allocated
- * ASIDs that are not currently active on a processor.
- *
- * The current epoch number is always in the range [0, INT_MAX).  Negative
- * numbers and INT_MAX are reserved for special cases that are described
- * below.
- */
-struct asid_set {
-	int asid_bits;
-	bitstr_t *asid_set;
-	int asid_set_size;
-	int asid_next;
-	int asid_epoch;
-	struct mtx asid_set_mutex;
-};
-
-static struct asid_set asids;
-static struct asid_set vmids;
-#endif
-
-/*
- * A pmap's cookie encodes an ASID and epoch number.  Cookies for reserved
- * ASIDs have a negative epoch number, specifically, INT_MIN.  Cookies for
- * dynamically allocated ASIDs have a non-negative epoch number.
- *
- * An invalid ASID is represented by -1.
- *
- * There are two special-case cookie values: (1) COOKIE_FROM(-1, INT_MIN),
- * which indicates that an ASID should never be allocated to the pmap, and
- * (2) COOKIE_FROM(-1, INT_MAX), which indicates that an ASID should be
- * allocated when the pmap is next activated.
- */
-#define	COOKIE_FROM(asid, epoch)	((long)((u_int)(asid) |	\
-					    ((u_long)(epoch) << 32)))
-#define	COOKIE_TO_ASID(cookie)		((int)(cookie))
-#define	COOKIE_TO_EPOCH(cookie)		((int)((u_long)(cookie) >> 32))
-
-static void pmap_alloc_asid(pmap_t pmap);
-
 static vm_page_t _pmap_alloc_l3(pmap_t pmap, vm_pindex_t ptepindex);
-
 static void _pmap_unwire_l3(pmap_t pmap, vm_offset_t va, vm_page_t m,
     struct spglist *free);
-static __inline vm_page_t pmap_remove_pt_page(pmap_t pmap, vm_offset_t va);
 
 /*
  * These load the old table data and store the new value.
@@ -427,52 +381,6 @@ pmap_resident_count_dec(pmap_t pmap, int count)
 	pmap->pm_stats.resident_count -= count;
 }
 
-#if 0
-/*
- *	Initialize the pmap module.
- *	Called by vm_init, to initialize any structures that the pmap
- *	system needs to map virtual memory.
- */
-void
-pmap_init(void)
-{
-	struct vm_phys_seg *seg, *next_seg;
-	vm_size_t s;
-	struct md_page *pvh;
-	uint64_t mmfr1;
-	int i, pv_npg, vmid_bits;
-
-	/*
-	 * Are large page mappings enabled?
-	 */
-	TUNABLE_INT_FETCH("vm.pmap.superpages_enabled", &superpages_enabled);
-	if (superpages_enabled) {
-		KASSERT(MAXPAGESIZES > 1 && pagesizes[1] == 0,
-		    ("pmap_init: can't assign to pagesizes[1]"));
-		pagesizes[1] = IOMMU_L2_SIZE;
-		KASSERT(MAXPAGESIZES > 2 && pagesizes[2] == 0,
-		    ("pmap_init: can't assign to pagesizes[2]"));
-		pagesizes[2] = IOMMU_L1_SIZE;
-	}
-
-	/*
-	 * Initialize the ASID allocator.
-	 */
-	pmap_init_asids(&asids,
-	    (READ_SPECIALREG(tcr_el1) & TCR_ASID_16) != 0 ? 16 : 8);
-
-	if (has_hyp()) {
-		mmfr1 = READ_SPECIALREG(id_aa64mmfr1_el1);
-		vmid_bits = 8;
-
-		if (ID_AA64MMFR1_VMIDBits_VAL(mmfr1) ==
-		    ID_AA64MMFR1_VMIDBits_16)
-			vmid_bits = 16;
-		pmap_init_asids(&vmids, vmid_bits);
-	}
-}
-#endif
-
 /***************************************************
  * Page table page management routines.....
  ***************************************************/
@@ -562,9 +470,6 @@ _pmap_unwire_l3(pmap_t pmap, vm_offset_t va, vm_page_t m, struct spglist *free)
 		l1pg = PHYS_TO_VM_PAGE(tl0 & ~ATTR_MASK);
 		pmap_unwire_l3(pmap, va, l1pg, free);
 	}
-#if 0
-	pmap_invalidate_page(pmap, va);
-#endif
 
 	/*
 	 * Put page on a list so that it is released after
@@ -593,27 +498,9 @@ iommu_pmap_pinit_stage(pmap_t pmap, enum pmap_stage stage, int levels)
 
 	pmap->pm_root.rt_root = 0;
 	bzero(&pmap->pm_stats, sizeof(pmap->pm_stats));
-	pmap->pm_cookie = COOKIE_FROM(-1, INT_MAX);
 
 	MPASS(levels == 3 || levels == 4);
 	pmap->pm_levels = levels;
-#if 0
-	pmap->pm_stage = stage;
-	switch (stage) {
-	case PM_STAGE1:
-		pmap->pm_asid_set = &asids;
-		break;
-	case PM_STAGE2:
-		pmap->pm_asid_set = &vmids;
-		break;
-	default:
-		panic("%s: Invalid pmap type %d", __func__, stage);
-		break;
-	}
-
-	/* XXX Temporarily disable deferred ASID allocation. */
-	pmap_alloc_asid(pmap);
-#endif
 
 	/*
 	 * Allocate the level 1 entry to use as the root. This will increase
@@ -779,13 +666,7 @@ iommu_pmap_release(pmap_t pmap)
 {
 	boolean_t rv;
 	struct spglist free;
-#if 0
-	struct asid_set *set;
-#endif
 	vm_page_t m;
-#if 0
-	int asid;
-#endif
 
 	if (pmap->pm_levels != 4) {
 		KASSERT(pmap->pm_stats.resident_count == 1,
@@ -808,29 +689,6 @@ iommu_pmap_release(pmap_t pmap)
 	    pmap->pm_stats.resident_count));
 	KASSERT(vm_radix_is_empty(&pmap->pm_root),
 	    ("pmap_release: pmap has reserved page table page(s)"));
-
-#if 0
-	set = pmap->pm_asid_set;
-	KASSERT(set != NULL, ("%s: NULL asid set", __func__));
-
-	/*
-	 * Allow the ASID to be reused. In stage 2 VMIDs we don't invalidate
-	 * the entries when removing them so rely on a later tlb invalidation.
-	 * this will happen when updating the VMID generation. Because of this
-	 * we don't reuse VMIDs within a generation.
-	 */
-	if (pmap->pm_stage == PM_STAGE1) {
-		mtx_lock_spin(&set->asid_set_mutex);
-		if (COOKIE_TO_EPOCH(pmap->pm_cookie) == set->asid_epoch) {
-			asid = COOKIE_TO_ASID(pmap->pm_cookie);
-			KASSERT(asid >= ASID_FIRST_AVAILABLE &&
-			    asid < set->asid_set_size,
-			    ("pmap_release: pmap cookie has out-of-range asid"));
-			bit_clear(set->asid_set, asid);
-		}
-		mtx_unlock_spin(&set->asid_set_mutex);
-	}
-#endif
 
 	m = PHYS_TO_VM_PAGE(pmap->pm_l0_paddr);
 	vm_page_unwire_noq(m);
@@ -1134,17 +992,3 @@ iommu_pmap_remove_pages(pmap_t pmap)
 
 	PMAP_UNLOCK(pmap);
 }
-
-#if 0
-/*
- *	pmap_zero_page zeros the specified hardware page by mapping
- *	the page into KVM and using bzero to clear its contents.
- */
-void
-pmap_zero_page(vm_page_t m)
-{
-	vm_offset_t va = PHYS_TO_DMAP(VM_PAGE_TO_PHYS(m));
-
-	pagezero((void *)va);
-}
-#endif
