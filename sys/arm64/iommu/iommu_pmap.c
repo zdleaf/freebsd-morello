@@ -164,9 +164,9 @@ __FBSDID("$FreeBSD$");
 #define	NUL1E		(NUL0E * NL1PG)
 #define	NUL2E		(NUL1E * NL2PG)
 
-#define	pmap_l0_pindex(v)	(NUL2E + NUL1E + ((v) >> L0_SHIFT))
-#define	pmap_l1_pindex(v)	(NUL2E + ((v) >> L1_SHIFT))
-#define	pmap_l2_pindex(v)	((v) >> L2_SHIFT)
+#define	iommu_l0_pindex(v)	(NUL2E + NUL1E + ((v) >> L0_SHIFT))
+#define	iommu_l1_pindex(v)	(NUL2E + ((v) >> L1_SHIFT))
+#define	iommu_l2_pindex(v)	((v) >> L2_SHIFT)
 
 /* This code assumes all L1 DMAP entries will be used */
 CTASSERT((DMAP_MIN_ADDRESS  & ~L0_OFFSET) == DMAP_MIN_ADDRESS);
@@ -884,7 +884,7 @@ retry:
 	if (pde != NULL && lvl == 2) {
 		l3 = pmap_l2_to_l3(pde, va);
 	} else {
-		mpte = _pmap_alloc_l3(pmap, pmap_l2_pindex(va));
+		mpte = _pmap_alloc_l3(pmap, iommu_l2_pindex(va));
 		if (mpte == NULL) {
 			CTR0(KTR_PMAP, "pmap_enter: mpte == NULL");
 			rv = KERN_RESOURCE_SHORTAGE;
@@ -996,7 +996,7 @@ retry:
 	if (pde != NULL && lvl == 2) {
 		l3 = pmap_l2_to_l3(pde, va);
 	} else {
-		mpte = _pmap_alloc_l3(pmap, pmap_l2_pindex(va));
+		mpte = _pmap_alloc_l3(pmap, iommu_l2_pindex(va));
 		if (mpte == NULL) {
 			CTR0(KTR_PMAP, "pmap_enter: mpte == NULL");
 			rv = KERN_RESOURCE_SHORTAGE;
