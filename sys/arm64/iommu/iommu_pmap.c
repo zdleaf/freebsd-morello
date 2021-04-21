@@ -87,22 +87,7 @@
 __FBSDID("$FreeBSD$");
 
 /*
- *	Manages physical address maps.
- *
- *	Since the information managed by this module is
- *	also stored by the logical address mapping module,
- *	this module may throw away valid virtual-to-physical
- *	mappings at almost any time.  However, invalidations
- *	of virtual-to-physical mappings must be done as
- *	requested.
- *
- *	In order to cope with hardware architectures which
- *	make virtual-to-physical map invalidates expensive,
- *	this module may delay invalidate or reduced protection
- *	operations until such time as they are actually
- *	necessary.  This module is given full information as
- *	to which processors are currently using which maps,
- *	and to when physical maps must be made correct.
+ *	Manages physical address maps for ARM SMMUv3 and ARM Mali GPU.
  */
 
 #include "opt_vm.h"
