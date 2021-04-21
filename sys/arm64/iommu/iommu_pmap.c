@@ -149,7 +149,6 @@ __FBSDID("$FreeBSD$");
 #include <machine/machdep.h>
 #include <machine/md_var.h>
 #include <machine/pcb.h>
-#include <machine/pte4k.h>
 
 #include <arm64/iommu/iommu_pmap.h>
 
