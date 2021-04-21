@@ -45,5 +45,7 @@ int pmap_gpu_remove(pmap_t pmap, vm_offset_t va);
 
 /* Common */
 void iommu_pmap_remove_pages(pmap_t pmap);
+void iommu_pmap_release(pmap_t pmap);
+int iommu_pmap_pinit(pmap_t);
 
 #endif /* !_ARM64_IOMMU_IOMMU_PMAP_H_ */
