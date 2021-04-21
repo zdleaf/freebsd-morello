@@ -100,6 +100,60 @@ typedef	uint64_t	pt_entry_t;		/* page table entry */
 #define	ATTR_DESCR_TYPE_PAGE	2
 #define	ATTR_DESCR_TYPE_BLOCK	0
 
+/* Level 0 table, 512GiB per entry */
+#define	L0_SHIFT	39
+#define	L0_SIZE		(1ul << L0_SHIFT)
+#define	L0_OFFSET	(L0_SIZE - 1ul)
+#define	L0_INVAL	0x0 /* An invalid address */
+	/* 0x1 Level 0 doesn't support block translation */
+	/* 0x2 also marks an invalid address */
+#define	L0_TABLE	0x3 /* A next-level table */
+
+/* Level 1 table, 1GiB per entry */
+#define	L1_SHIFT	30
+#define	L1_SIZE 	(1 << L1_SHIFT)
+#define	L1_OFFSET 	(L1_SIZE - 1)
+#define	L1_INVAL	L0_INVAL
+#define	L1_BLOCK	0x1
+#define	L1_TABLE	L0_TABLE
+
+/* Level 2 table, 2MiB per entry */
+#define	L2_SHIFT	21
+#define	L2_SIZE 	(1 << L2_SHIFT)
+#define	L2_OFFSET 	(L2_SIZE - 1)
+#define	L2_INVAL	L1_INVAL
+#define	L2_BLOCK	L1_BLOCK
+#define	L2_TABLE	L1_TABLE
+
+#define	L2_BLOCK_MASK	UINT64_C(0xffffffe00000)
+
+/* Level 3 table, 4KiB per entry */
+#define	L3_SHIFT	12
+#define	L3_SIZE 	(1 << L3_SHIFT)
+#define	L3_OFFSET 	(L3_SIZE - 1)
+#define	L3_SHIFT	12
+#define	L3_INVAL	0x0
+	/* 0x1 is reserved */
+	/* 0x2 also marks an invalid address */
+#define	L3_PAGE		0x3
+#define	L3_BLOCK	L2_BLOCK	/* Mali GPU only. */
+
+#define	PMAP_MAPDEV_EARLY_SIZE	(L2_SIZE * 8)
+
+#define	L0_ENTRIES_SHIFT 9
+#define	L0_ENTRIES	(1 << L0_ENTRIES_SHIFT)
+#define	L0_ADDR_MASK	(L0_ENTRIES - 1)
+
+#define	Ln_ENTRIES_SHIFT 9
+#define	Ln_ENTRIES	(1 << Ln_ENTRIES_SHIFT)
+#define	Ln_ADDR_MASK	(Ln_ENTRIES - 1)
+#define	Ln_TABLE_MASK	((1 << 12) - 1)
+
+#define	pmap_l0_index(va)	(((va) >> L0_SHIFT) & L0_ADDR_MASK)
+#define	pmap_l1_index(va)	(((va) >> L1_SHIFT) & Ln_ADDR_MASK)
+#define	pmap_l2_index(va)	(((va) >> L2_SHIFT) & Ln_ADDR_MASK)
+#define	pmap_l3_index(va)	(((va) >> L3_SHIFT) & Ln_ADDR_MASK)
+
 #endif /* !_MACHINE_PTE_H_ */
 
 /* End of pte.h */

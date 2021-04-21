@@ -37,7 +37,6 @@
 #define	_MACHINE_PMAP_H_
 
 #include <machine/pte.h>
-#include <machine/pte4k.h>
 
 #ifndef LOCORE
 
