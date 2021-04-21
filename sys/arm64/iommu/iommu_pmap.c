@@ -153,9 +153,6 @@ __FBSDID("$FreeBSD$");
 
 #include <arm64/iommu/iommu_pmap.h>
 
-#define	PMAP_ASSERT_STAGE1(pmap)	MPASS((pmap)->pm_stage == PM_STAGE1)
-#define	PMAP_ASSERT_STAGE2(pmap)	MPASS((pmap)->pm_stage == PM_STAGE2)
-
 #define	IOMMU_PAGE_SIZE		4096
 
 #define	NL0PG		(IOMMU_PAGE_SIZE/(sizeof (pd_entry_t)))
@@ -791,7 +788,6 @@ iommu_pmap_release(pmap_t pmap)
 #endif
 
 	if (pmap->pm_levels != 4) {
-		PMAP_ASSERT_STAGE2(pmap);
 		KASSERT(pmap->pm_stats.resident_count == 1,
 		    ("pmap_release: pmap resident count %ld != 0",
 		    pmap->pm_stats.resident_count));
@@ -861,7 +857,6 @@ pmap_gpu_enter(pmap_t pmap, vm_offset_t va, vm_paddr_t pa,
 	int lvl;
 	int rv;
 
-	PMAP_ASSERT_STAGE1(pmap);
 	KASSERT(pmap != kernel_pmap, ("kernel pmap used for GPU"));
 	KASSERT(va < VM_MAXUSER_ADDRESS, ("wrong address space"));
 	KASSERT((va & PAGE_MASK) == 0, ("va is misaligned"));
@@ -977,7 +972,6 @@ pmap_smmu_enter(pmap_t pmap, vm_offset_t va, vm_paddr_t pa,
 	int lvl;
 	int rv;
 
-	PMAP_ASSERT_STAGE1(pmap);
 	KASSERT(va < VM_MAXUSER_ADDRESS, ("wrong address space"));
 
 	va = trunc_page(va);
