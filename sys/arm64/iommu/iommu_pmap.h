@@ -43,7 +43,7 @@ int pmap_gpu_enter(pmap_t pmap, vm_offset_t va, vm_paddr_t pa,
     vm_prot_t prot, u_int flags);
 int pmap_gpu_remove(pmap_t pmap, vm_offset_t va);
 
-/* Mali / SMMU */
+/* Common */
 void iommu_pmap_remove_pages(pmap_t pmap);
 
 #endif /* !_ARM64_IOMMU_IOMMU_PMAP_H_ */
