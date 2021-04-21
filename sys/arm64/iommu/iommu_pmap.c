@@ -479,7 +479,7 @@ _pmap_unwire_l3(pmap_t pmap, vm_offset_t va, vm_page_t m, struct spglist *free)
 }
 
 static int
-iommu_pmap_pinit_stage(pmap_t pmap, enum pmap_stage stage, int levels)
+iommu_pmap_pinit_levels(pmap_t pmap, int levels)
 {
 	vm_page_t m;
 
@@ -521,7 +521,7 @@ int
 iommu_pmap_pinit(pmap_t pmap)
 {
 
-	return (iommu_pmap_pinit_stage(pmap, PM_STAGE1, 4));
+	return (iommu_pmap_pinit_levels(pmap, 4));
 }
 
 /*
