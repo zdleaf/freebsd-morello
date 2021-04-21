@@ -160,17 +160,17 @@ __FBSDID("$FreeBSD$");
 #define	NL2PG		(IOMMU_PAGE_SIZE/(sizeof (pd_entry_t)))
 #define	NL3PG		(IOMMU_PAGE_SIZE/(sizeof (pt_entry_t)))
 
-#define	NUL0E		L0_ENTRIES
+#define	NUL0E		IOMMU_L0_ENTRIES
 #define	NUL1E		(NUL0E * NL1PG)
 #define	NUL2E		(NUL1E * NL2PG)
 
-#define	iommu_l0_pindex(v)	(NUL2E + NUL1E + ((v) >> L0_SHIFT))
-#define	iommu_l1_pindex(v)	(NUL2E + ((v) >> L1_SHIFT))
-#define	iommu_l2_pindex(v)	((v) >> L2_SHIFT)
+#define	iommu_l0_pindex(v)	(NUL2E + NUL1E + ((v) >> IOMMU_L0_SHIFT))
+#define	iommu_l1_pindex(v)	(NUL2E + ((v) >> IOMMU_L1_SHIFT))
+#define	iommu_l2_pindex(v)	((v) >> IOMMU_L2_SHIFT)
 
 /* This code assumes all L1 DMAP entries will be used */
-CTASSERT((DMAP_MIN_ADDRESS  & ~L0_OFFSET) == DMAP_MIN_ADDRESS);
-CTASSERT((DMAP_MAX_ADDRESS  & ~L0_OFFSET) == DMAP_MAX_ADDRESS);
+CTASSERT((DMAP_MIN_ADDRESS  & ~IOMMU_L0_OFFSET) == DMAP_MIN_ADDRESS);
+CTASSERT((DMAP_MAX_ADDRESS  & ~IOMMU_L0_OFFSET) == DMAP_MAX_ADDRESS);
 
 #if 0
 /*
@@ -261,7 +261,7 @@ pmap_l1(pmap_t pmap, vm_offset_t va)
 	pd_entry_t *l0;
 
 	l0 = pmap_l0(pmap, va);
-	if ((pmap_load(l0) & ATTR_DESCR_MASK) != L0_TABLE)
+	if ((pmap_load(l0) & ATTR_DESCR_MASK) != IOMMU_L0_TABLE)
 		return (NULL);
 
 	return (pmap_l0_to_l1(l0, va));
@@ -292,7 +292,7 @@ pmap_l2(pmap_t pmap, vm_offset_t va)
 	pd_entry_t *l1;
 
 	l1 = pmap_l1(pmap, va);
-	if ((pmap_load(l1) & ATTR_DESCR_MASK) != L1_TABLE)
+	if ((pmap_load(l1) & ATTR_DESCR_MASK) != IOMMU_L1_TABLE)
 		return (NULL);
 
 	return (pmap_l1_to_l2(l1, va));
@@ -329,21 +329,21 @@ pmap_pde(pmap_t pmap, vm_offset_t va, int *level)
 
 	l0 = pmap_l0(pmap, va);
 	desc = pmap_load(l0) & ATTR_DESCR_MASK;
-	if (desc != L0_TABLE) {
+	if (desc != IOMMU_L0_TABLE) {
 		*level = -1;
 		return (NULL);
 	}
 
 	l1 = pmap_l0_to_l1(l0, va);
 	desc = pmap_load(l1) & ATTR_DESCR_MASK;
-	if (desc != L1_TABLE) {
+	if (desc != IOMMU_L1_TABLE) {
 		*level = 0;
 		return (l0);
 	}
 
 	l2 = pmap_l1_to_l2(l1, va);
 	desc = pmap_load(l2) & ATTR_DESCR_MASK;
-	if (desc != L2_TABLE) {
+	if (desc != IOMMU_L2_TABLE) {
 		*level = 1;
 		return (l1);
 	}
@@ -369,31 +369,31 @@ pmap_pte(pmap_t pmap, vm_offset_t va, int *level)
 		return (NULL);
 	}
 	desc = pmap_load(l1) & ATTR_DESCR_MASK;
-	if (desc == L1_BLOCK) {
+	if (desc == IOMMU_L1_BLOCK) {
 		*level = 1;
 		return (l1);
 	}
 
-	if (desc != L1_TABLE) {
+	if (desc != IOMMU_L1_TABLE) {
 		*level = 1;
 		return (NULL);
 	}
 
 	l2 = pmap_l1_to_l2(l1, va);
 	desc = pmap_load(l2) & ATTR_DESCR_MASK;
-	if (desc == L2_BLOCK) {
+	if (desc == IOMMU_L2_BLOCK) {
 		*level = 2;
 		return (l2);
 	}
 
-	if (desc != L2_TABLE) {
+	if (desc != IOMMU_L2_TABLE) {
 		*level = 2;
 		return (NULL);
 	}
 
 	*level = 3;
 	l3 = pmap_l2_to_l3(l2, va);
-	if ((pmap_load(l3) & ATTR_DESCR_MASK) != L3_PAGE)
+	if ((pmap_load(l3) & ATTR_DESCR_MASK) != IOMMU_L3_PAGE)
 		return (NULL);
 
 	return (l3);
@@ -403,10 +403,10 @@ static __inline int
 pmap_l3_valid(pt_entry_t l3)
 {
 
-	return ((l3 & ATTR_DESCR_MASK) == L3_PAGE);
+	return ((l3 & ATTR_DESCR_MASK) == IOMMU_L3_PAGE);
 }
 
-CTASSERT(L1_BLOCK == L2_BLOCK);
+CTASSERT(IOMMU_L1_BLOCK == IOMMU_L2_BLOCK);
 
 static __inline void
 pmap_resident_count_inc(pmap_t pmap, int count)
@@ -449,10 +449,10 @@ pmap_init(void)
 	if (superpages_enabled) {
 		KASSERT(MAXPAGESIZES > 1 && pagesizes[1] == 0,
 		    ("pmap_init: can't assign to pagesizes[1]"));
-		pagesizes[1] = L2_SIZE;
+		pagesizes[1] = IOMMU_L2_SIZE;
 		KASSERT(MAXPAGESIZES > 2 && pagesizes[2] == 0,
 		    ("pmap_init: can't assign to pagesizes[2]"));
-		pagesizes[2] = L1_SIZE;
+		pagesizes[2] = IOMMU_L1_SIZE;
 	}
 
 	/*
@@ -690,14 +690,14 @@ _pmap_alloc_l3(pmap_t pmap, vm_pindex_t ptepindex)
 
 		l0index = ptepindex - (NUL2E + NUL1E);
 		l0 = &pmap->pm_l0[l0index];
-		pmap_store(l0, VM_PAGE_TO_PHYS(m) | L0_TABLE);
+		pmap_store(l0, VM_PAGE_TO_PHYS(m) | IOMMU_L0_TABLE);
 	} else if (ptepindex >= NUL2E) {
 		vm_pindex_t l0index, l1index;
 		pd_entry_t *l0, *l1;
 		pd_entry_t tl0;
 
 		l1index = ptepindex - NUL2E;
-		l0index = l1index >> L0_ENTRIES_SHIFT;
+		l0index = l1index >> IOMMU_L0_ENTRIES_SHIFT;
 
 		l0 = &pmap->pm_l0[l0index];
 		tl0 = pmap_load(l0);
@@ -716,14 +716,14 @@ _pmap_alloc_l3(pmap_t pmap, vm_pindex_t ptepindex)
 
 		l1 = (pd_entry_t *)PHYS_TO_DMAP(pmap_load(l0) & ~ATTR_MASK);
 		l1 = &l1[ptepindex & Ln_ADDR_MASK];
-		pmap_store(l1, VM_PAGE_TO_PHYS(m) | L1_TABLE);
+		pmap_store(l1, VM_PAGE_TO_PHYS(m) | IOMMU_L1_TABLE);
 	} else {
 		vm_pindex_t l0index, l1index;
 		pd_entry_t *l0, *l1, *l2;
 		pd_entry_t tl0, tl1;
 
 		l1index = ptepindex >> Ln_ENTRIES_SHIFT;
-		l0index = l1index >> L0_ENTRIES_SHIFT;
+		l0index = l1index >> IOMMU_L0_ENTRIES_SHIFT;
 
 		l0 = &pmap->pm_l0[l0index];
 		tl0 = pmap_load(l0);
@@ -757,7 +757,7 @@ _pmap_alloc_l3(pmap_t pmap, vm_pindex_t ptepindex)
 
 		l2 = (pd_entry_t *)PHYS_TO_DMAP(pmap_load(l1) & ~ATTR_MASK);
 		l2 = &l2[ptepindex & Ln_ADDR_MASK];
-		pmap_store(l2, VM_PAGE_TO_PHYS(m) | L2_TABLE);
+		pmap_store(l2, VM_PAGE_TO_PHYS(m) | IOMMU_L2_TABLE);
 	}
 
 	pmap_resident_count_inc(pmap, 1);
@@ -862,7 +862,7 @@ pmap_gpu_enter(pmap_t pmap, vm_offset_t va, vm_paddr_t pa,
 	KASSERT((va & PAGE_MASK) == 0, ("va is misaligned"));
 	KASSERT((pa & PAGE_MASK) == 0, ("pa is misaligned"));
 
-	new_l3 = (pt_entry_t)(pa | ATTR_SH(ATTR_SH_IS) | L3_BLOCK);
+	new_l3 = (pt_entry_t)(pa | ATTR_SH(ATTR_SH_IS) | IOMMU_L3_BLOCK);
 
 	if ((prot & VM_PROT_WRITE) != 0)
 		new_l3 |= ATTR_S2_S2AP(ATTR_S2_S2AP_WRITE);
@@ -976,7 +976,7 @@ pmap_smmu_enter(pmap_t pmap, vm_offset_t va, vm_paddr_t pa,
 
 	va = trunc_page(va);
 	new_l3 = (pt_entry_t)(pa | ATTR_DEFAULT |
-	    ATTR_S1_IDX(VM_MEMATTR_DEVICE) | L3_PAGE);
+	    ATTR_S1_IDX(VM_MEMATTR_DEVICE) | IOMMU_L3_PAGE);
 	if ((prot & VM_PROT_WRITE) == 0)
 		new_l3 |= ATTR_S1_AP(ATTR_S1_AP_RO);
 	new_l3 |= ATTR_S1_XN; /* Execute never. */
@@ -1071,7 +1071,7 @@ iommu_pmap_remove_pages(pmap_t pmap)
 	    (i < Ln_ENTRIES && sva < VM_MAXUSER_ADDRESS); i++) {
 		l0e = pmap->pm_l0[i];
 		if ((l0e & ATTR_DESCR_VALID) == 0) {
-			sva += L0_SIZE;
+			sva += IOMMU_L0_SIZE;
 			continue;
 		}
 		pa0 = l0e & ~ATTR_MASK;
@@ -1081,11 +1081,11 @@ iommu_pmap_remove_pages(pmap_t pmap)
 		for (j = iommu_l1_index(sva); j < Ln_ENTRIES; j++) {
 			l1e = l1[j];
 			if ((l1e & ATTR_DESCR_VALID) == 0) {
-				sva += L1_SIZE;
+				sva += IOMMU_L1_SIZE;
 				continue;
 			}
-			if ((l1e & ATTR_DESCR_MASK) == L1_BLOCK) {
-				sva += L1_SIZE;
+			if ((l1e & ATTR_DESCR_MASK) == IOMMU_L1_BLOCK) {
+				sva += IOMMU_L1_SIZE;
 				continue;
 			}
 			pa1 = l1e & ~ATTR_MASK;
@@ -1095,7 +1095,7 @@ iommu_pmap_remove_pages(pmap_t pmap)
 			for (k = iommu_l2_index(sva); k < Ln_ENTRIES; k++) {
 				l2e = l2[k];
 				if ((l2e & ATTR_DESCR_VALID) == 0) {
-					sva += L2_SIZE;
+					sva += IOMMU_L2_SIZE;
 					continue;
 				}
 				pa = l2e & ~ATTR_MASK;
@@ -1103,7 +1103,7 @@ iommu_pmap_remove_pages(pmap_t pmap)
 				l3 = (pt_entry_t *)PHYS_TO_DMAP(pa);
 
 				for (l = iommu_l3_index(sva); l < Ln_ENTRIES;
-				    l++, sva += L3_SIZE) {
+				    l++, sva += IOMMU_L3_SIZE) {
 					l3e = l3[l];
 					if ((l3e & ATTR_DESCR_VALID) == 0)
 						continue;
