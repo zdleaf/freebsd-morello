@@ -108,19 +108,19 @@ SYSCTL_NODE(_net_route, OID_AUTO, algo, CTLFLAG_RW | CTLFLAG_MPSAFE, 0,
 /* Algorithm sync policy */
 
 /* Time interval to bucket updates */
-VNET_DEFINE(unsigned int, bucket_time_ms) = 50;
-#define	V_bucket_time_ms	VNET(bucket_time_ms)
+VNET_DEFINE_STATIC(unsigned int, update_bucket_time_ms) = 50;
+#define	V_update_bucket_time_ms	VNET(update_bucket_time_ms)
 SYSCTL_UINT(_net_route_algo, OID_AUTO, bucket_time_ms, CTLFLAG_RW | CTLFLAG_VNET,
-    &VNET_NAME(bucket_time_ms), 0, "Time interval to calculate update rate");
+    &VNET_NAME(update_bucket_time_ms), 0, "Time interval to calculate update rate");
 
 /* Minimum update rate to delay sync */
-VNET_DEFINE(unsigned int, bucket_change_threshold_rate) = 500;
+VNET_DEFINE_STATIC(unsigned int, bucket_change_threshold_rate) = 500;
 #define	V_bucket_change_threshold_rate	VNET(bucket_change_threshold_rate)
 SYSCTL_UINT(_net_route_algo, OID_AUTO, bucket_change_threshold_rate, CTLFLAG_RW | CTLFLAG_VNET,
     &VNET_NAME(bucket_change_threshold_rate), 0, "Minimum update rate to delay sync");
 
 /* Max allowed delay to sync */
-VNET_DEFINE(unsigned int, fib_max_sync_delay_ms) = 1000;
+VNET_DEFINE_STATIC(unsigned int, fib_max_sync_delay_ms) = 1000;
 #define	V_fib_max_sync_delay_ms	VNET(fib_max_sync_delay_ms)
 SYSCTL_UINT(_net_route_algo, OID_AUTO, fib_max_sync_delay_ms, CTLFLAG_RW | CTLFLAG_VNET,
     &VNET_NAME(fib_max_sync_delay_ms), 0, "Maximum time to delay sync (ms)");
@@ -239,7 +239,9 @@ SYSCTL_INT(_net_route_algo, OID_AUTO, debug_level, CTLFLAG_RW | CTLFLAG_RWTUN,
 #endif
 
 #define	_PASS_MSG(_l)	(flm_debug_level >= (_l))
-#define	ALGO_PRINTF(_fmt, ...)	printf("[fib_algo] %s: " _fmt "\n", __func__, ##__VA_ARGS__)
+#define	ALGO_PRINTF(_l, _fmt, ...)	if (_PASS_MSG(_l)) {		\
+	printf("[fib_algo] %s: " _fmt "\n", __func__, ##__VA_ARGS__);	\
+}
 #define	_ALGO_PRINTF(_fib, _fam, _aname, _gen, _func, _fmt, ...) \
     printf("[fib_algo] %s.%u (%s#%u) %s: " _fmt "\n",\
     print_family(_fam), _fib, _aname, _gen, _func, ## __VA_ARGS__)
@@ -365,7 +367,7 @@ fib_error_clear_flm(struct fib_lookup_module *flm)
  * Clears all errors in current VNET.
  */
 static void
-fib_error_clear()
+fib_error_clear(void)
 {
 	struct fib_error *fe, *fe_tmp;
 
@@ -587,7 +589,7 @@ update_rebuild_delay(struct fib_data *fd, enum fib_callout_action action)
 	struct timeval tv;
 
 	/* Fetch all variables at once to ensure consistent reads */
-	uint32_t bucket_time_ms = V_bucket_time_ms;
+	uint32_t bucket_time_ms = V_update_bucket_time_ms;
 	uint32_t threshold_rate = V_bucket_change_threshold_rate;
 	uint32_t max_delay_ms = V_fib_max_sync_delay_ms;
 
@@ -704,12 +706,16 @@ fill_change_entry(struct fib_data *fd, struct fib_change_entry *ce, struct rib_c
 	int plen = 0;
 
 	switch (fd->fd_family) {
+#ifdef INET
 	case AF_INET:
 		rt_get_inet_prefix_plen(rc->rc_rt, &ce->addr4, &plen, &ce->scopeid);
 		break;
+#endif
+#ifdef INET6
 	case AF_INET6:
 		rt_get_inet6_prefix_plen(rc->rc_rt, &ce->addr6, &plen, &ce->scopeid);
 		break;
+#endif
 	}
 
 	ce->plen = plen;
@@ -1612,10 +1618,14 @@ static struct fib_dp **
 get_family_dp_ptr(int family)
 {
 	switch (family) {
+#ifdef INET
 	case AF_INET:
 		return (&V_inet_dp);
+#endif
+#ifdef INET6
 	case AF_INET6:
 		return (&V_inet6_dp);
+#endif
 	}
 	return (NULL);
 }
@@ -1971,7 +1981,7 @@ fib_module_register(struct fib_lookup_module *flm)
 {
 
 	FIB_MOD_LOCK();
-	ALGO_PRINTF("attaching %s to %s", flm->flm_name,
+	ALGO_PRINTF(LOG_INFO, "attaching %s to %s", flm->flm_name,
 	    print_family(flm->flm_family));
 	TAILQ_INSERT_TAIL(&all_algo_list, flm, entries);
 	FIB_MOD_UNLOCK();
@@ -1995,7 +2005,7 @@ fib_module_unregister(struct fib_lookup_module *flm)
 		return (EBUSY);
 	}
 	fib_error_clear_flm(flm);
-	ALGO_PRINTF("detaching %s from %s", flm->flm_name,
+	ALGO_PRINTF(LOG_INFO, "detaching %s from %s", flm->flm_name,
 	    print_family(flm->flm_family));
 	TAILQ_REMOVE(&all_algo_list, flm, entries);
 	FIB_MOD_UNLOCK();
