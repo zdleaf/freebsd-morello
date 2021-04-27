@@ -84,7 +84,6 @@ MAN=	aac.4 \
 	bnxt.4 \
 	bpf.4 \
 	bridge.4 \
-	bt.4 \
 	bwi.4 \
 	bwn.4 \
 	${_bytgpio.4} \
@@ -307,7 +306,6 @@ MAN=	aac.4 \
 	mly.4 \
 	mmc.4 \
 	mmcsd.4 \
-	mn.4 \
 	mod_cc.4 \
 	mos.4 \
 	mouse.4 \
@@ -526,6 +524,7 @@ MAN=	aac.4 \
 	snd_via8233.4 \
 	snd_via82c686.4 \
 	snd_vibes.4 \
+	sndstat.4 \
 	snp.4 \
 	spigen.4 \
 	${_spkr.4} \
@@ -584,7 +583,6 @@ MAN=	aac.4 \
 	vtnet.4 \
 	watchdog.4 \
 	${_wbwd.4} \
-	wg.4 \
 	witness.4 \
 	wlan.4 \
 	wlan_acl.4 \
@@ -710,7 +708,6 @@ MLINKS+=mem.4 kmem.4
 MLINKS+=mfi.4 mfi_linux.4 \
 	mfi.4 mfip.4
 MLINKS+=mlx5en.4 mce.4
-MLINKS+=mn.4 if_mn.4
 MLINKS+=mos.4 if_mos.4
 MLINKS+=msk.4 if_msk.4
 MLINKS+=mwl.4 if_mwl.4
@@ -836,7 +833,6 @@ _ntb_transport.4=ntb_transport.4
 _nvd.4=		nvd.4
 _nvme.4=	nvme.4
 _nvram.4=	nvram.4
-_ossl.4=	ossl.4
 _padlock.4=	padlock.4
 _pchtherm.4=	pchtherm.4
 _qat.4=		qat.4
@@ -888,6 +884,11 @@ _nvram2env.4=	nvram2env.4
 .if ${MACHINE_CPUARCH} == "powerpc"
 _nvd.4= 	nvd.4
 _nvme.4=	nvme.4
+.endif
+
+.if ${MACHINE_CPUARCH} == "amd64" || ${MACHINE_CPUARCH} == "i386" || \
+	 ${MACHINE_CPUARCH} == "aarch64"
+_ossl.4=	ossl.4
 .endif
 
 .if ${MACHINE_CPUARCH} == "arm" || ${MACHINE_CPUARCH} == "aarch64" || \

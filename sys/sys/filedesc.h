@@ -265,6 +265,8 @@ struct filedesc_to_leader *
 	    struct filedesc *fdp, struct proc *leader);
 int	getvnode(struct thread *td, int fd, cap_rights_t *rightsp,
 	    struct file **fpp);
+int	getvnode_path(struct thread *td, int fd, cap_rights_t *rightsp,
+	    struct file **fpp);
 void	mountcheckdirs(struct vnode *olddp, struct vnode *newdp);
 
 int	fget_cap_locked(struct filedesc *fdp, int fd, cap_rights_t *needrightsp,
@@ -333,6 +335,7 @@ void	pdunshare(struct thread *td);
 
 void	pwd_chdir(struct thread *td, struct vnode *vp);
 int	pwd_chroot(struct thread *td, struct vnode *vp);
+int	pwd_chroot_chdir(struct thread *td, struct vnode *vp);
 void	pwd_ensure_dirs(void);
 void	pwd_set_rootvnode(void);
 

@@ -253,7 +253,7 @@ replace_ext() {
 	_replace_ext_ext1="$2"
 	_replace_ext_ext2="$3"
 
-	_replace_ext_result=${_replace_ext_file%.$_replace_ext_ext1}.$_replace_ext_ext2
+	_replace_ext_result="${_replace_ext_file%.$_replace_ext_ext1}.$_replace_ext_ext2"
 
 	printf '%s\n' "$_replace_ext_result"
 }
@@ -1199,16 +1199,11 @@ SRC_TARGETS=""
 
 src_files=$(find_src_files $unneeded)
 
-temp_ifs="$IFS"
-IFS=$'\n'
-
 for f in $src_files; do
 	o=$(replace_ext "$f" "c" "o")
 	SRC_TARGETS=$(printf '%s\n\n%s: %s %s\n\t$(CC) $(CFLAGS) -o %s -c %s\n' \
 		"$SRC_TARGETS" "$o" "$headers" "$f" "$o" "$f")
 done
-
-IFS="$temp_ifs"
 
 contents=$(replace "$contents" "HEADERS" "$headers")
 
@@ -1225,6 +1220,8 @@ contents=$(replace "$contents" "DC_ALL_TESTS" "$dc_test")
 contents=$(replace "$contents" "DC_TESTS" "$dc_tests")
 contents=$(replace "$contents" "DC_SCRIPT_TESTS" "$dc_script_tests")
 contents=$(replace "$contents" "DC_TEST_EXEC" "$dc_test_exec")
+
+contents=$(replace "$contents" "BUILD_TYPE" "$manpage_args")
 
 contents=$(replace "$contents" "LIBRARY" "$library")
 contents=$(replace "$contents" "HISTORY" "$hist")

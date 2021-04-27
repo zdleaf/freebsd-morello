@@ -413,6 +413,8 @@ ixl_link_event(struct ixl_pf *pf, struct i40e_arq_event_info *e)
 	/* Print out message if an unqualified module is found */
 	if ((status->link_info & I40E_AQ_MEDIA_AVAILABLE) &&
 	    (pf->advertised_speed) &&
+	    (atomic_load_32(&pf->state) &
+	     IXL_PF_STATE_LINK_ACTIVE_ON_DOWN) != 0 &&
 	    (!(status->an_info & I40E_AQ_QUALIFIED_MODULE)) &&
 	    (!(status->link_info & I40E_AQ_LINK_UP)))
 		device_printf(dev, "Link failed because "
@@ -1092,7 +1094,7 @@ ixl_sysctl_set_flowcntl(SYSCTL_HANDLER_ARGS)
 	aq_error = i40e_set_fc(hw, &fc_aq_err, TRUE);
 	if (aq_error) {
 		device_printf(dev,
-		    "%s: Error setting new fc mode %d; fc_err %#x\n",
+		    "%s: Error setting Flow Control mode %d; fc_err %#x\n",
 		    __func__, aq_error, fc_aq_err);
 		return (EIO);
 	}

@@ -55,8 +55,6 @@ __FBSDID("$FreeBSD$");
 #include <machine/vfp.h>
 #endif
 
-uint32_t initial_fpcr = VFPCR_DN | VFPCR_FZ;
-
 #include <dev/psci/psci.h>
 
 /*
@@ -93,6 +91,9 @@ cpu_fork(struct thread *td1, struct proc *p2, struct thread *td2, int flags)
 	td2->td_pcb = pcb2;
 	bcopy(td1->td_pcb, pcb2, sizeof(*pcb2));
 
+	/* Clear the debug register state. */
+	bzero(&pcb2->pcb_dbg_regs, sizeof(pcb2->pcb_dbg_regs));
+
 	tf = (struct trapframe *)STACKALIGN((struct trapframe *)pcb2 - 1);
 	bcopy(td1->td_frame, tf, sizeof(*tf));
 	tf->tf_x[0] = 0;
@@ -108,7 +109,6 @@ cpu_fork(struct thread *td1, struct proc *p2, struct thread *td2, int flags)
 	td2->td_pcb->pcb_sp = (uintptr_t)td2->td_frame;
 	td2->td_pcb->pcb_fpusaved = &td2->td_pcb->pcb_fpustate;
 	td2->td_pcb->pcb_vfpcpu = UINT_MAX;
-	td2->td_pcb->pcb_fpusaved->vfp_fpcr = initial_fpcr;
 
 	/* Setup to release spin count in fork_exit(). */
 	td2->td_md.md_spinlock_count = 1;

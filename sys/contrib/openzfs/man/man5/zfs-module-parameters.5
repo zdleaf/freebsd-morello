@@ -1,6 +1,6 @@
 '\" te
 .\" Copyright (c) 2013 by Turbo Fredriksson <turbo@bayour.com>. All rights reserved.
-.\" Copyright (c) 2019, 2020 by Delphix. All rights reserved.
+.\" Copyright (c) 2019, 2021 by Delphix. All rights reserved.
 .\" Copyright (c) 2019 Datto Inc.
 .\" The contents of this file are subject to the terms of the Common Development
 .\" and Distribution License (the "License").  You may not use this file except
@@ -694,6 +694,29 @@ Default value: \fB600000\fR (ten minutes).
 .sp
 .ne 2
 .na
+\fBreference_history\fR (int)
+.ad
+.RS 12n
+Maximum reference holders being tracked when reference_tracking_enable is
+active.
+.sp
+Default value: \fB3\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fBreference_tracking_enable\fR (int)
+.ad
+.RS 12n
+Track reference holders to refcount_t objects (debug builds only).
+.sp
+Use \fB1\fR for yes and \fB0\fR for no (default).
+.RE
+
+.sp
+.ne 2
+.na
 \fBsend_holes_without_birth_time\fR (int)
 .ad
 .RS 12n
@@ -1238,7 +1261,7 @@ amount of memory. When the limit is exceeded, the ioctl fails with EINVAL and a
 description of the error is sent to the zfs-dbgmsg log. This parameter should
 not need to be touched under normal circumstances. On FreeBSD, the default is
 based on the system limit on user wired memory. On Linux, the default is
-\fBKMALLOC_MAX_SIZE\fR .
+\fB128MB\fR.
 .sp
 Default value: \fB0\fR (kernel decides)
 .RE

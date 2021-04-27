@@ -1,5 +1,90 @@
 # News
 
+## 4.0.1
+
+This is a production release that only adds one thing: flushing output when it
+is printed with a print statement.
+
+## 4.0.0
+
+This is a production release with many fixes, a new command-line option, and a
+big surprise:
+
+* A bug was fixed in `dc`'s `P` command where the item on the stack was *not*
+  popped.
+* Various bugs in the manuals have been fixed.
+* A known bug was fixed where history did not interact well with prompts printed
+  by user code without newlines.
+* A new command-line option, `-R` and `--no-read-prompt` was added to disable
+  just the prompt when using `read()` (`bc`) or `?` (`dc`).
+* And finally, **official support for Windows was added**.
+
+The last item is why this is a major version bump.
+
+Currently, only one set of build options (extra math and prompt enabled, history
+and NLS/locale support disabled, both calculators enabled) is supported on
+Windows. However, both debug and release builds are supported.
+
+In addition, Windows builds are supported for the the library (`bcl`).
+
+For more details about how to build on Windows, see the [README][5] or the
+[build manual][13].
+
+## 3.3.4
+
+This is a production release that fixes a small bug.
+
+The bug was that output was not flushed before a `read()` call, so prompts
+without a newline on the end were not flushed before the `read()` call.
+
+This is such a tiny bug that users only need to upgrade if they are affected.
+
+## 3.3.3
+
+This is a production release with one tweak and fixes for manuals.
+
+The tweak is that `length(0)` returns `1` instead of `0`. In `3.3.1`, I changed
+it so `length(0.x)`, where `x` could be any number of digits, returned the
+`scale`, but `length(0)` still returned `0` because I believe that `0` has `0`
+significant digits.
+
+After request of FreeBSD and considering the arguments of a mathematician,
+compatibility with other `bc`'s, and the expectations of users, I decided to
+make the change.
+
+The fixes for manuals fixed a bug where `--` was rendered as `-`.
+
+## 3.3.2
+
+This is a production release that fixes a divide-by-zero bug in `root()` in the
+[extended math library][16]. All previous versions with `root()` have the bug.
+
+## 3.3.1
+
+This is a production release that fixes a bug.
+
+The bug was in the reporting of number length when the value was 0.
+
+## 3.3.0
+
+This is a production release that changes one behavior and fixes documentation
+bugs.
+
+The changed behavior is the treatment of `-e` and `-f` when given through
+`BC_ENV_ARGS` or `DC_ENV_ARGS`. Now `bc` and `dc` do not exit when those options
+(or their equivalents) are given through those environment variables. However,
+`bc` and `dc` still exit when they or their equivalents are given on the
+command-line.
+
+## 3.2.7
+
+This is a production release that removes a small non-portable shell operation
+in `configure.sh`. This problem was only noticed on OpenBSD, not FreeBSD or
+Linux.
+
+Non-OpenBSD users do ***NOT*** need to upgrade, although NetBSD users may also
+need to upgrade.
+
 ## 3.2.6
 
 This is a production release that fixes the build on FreeBSD.

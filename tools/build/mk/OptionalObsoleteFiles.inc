@@ -1684,11 +1684,6 @@ OLD_FILES+=usr/sbin/uefisign
 OLD_FILES+=usr/share/examples/uefisign/uefikeys
 .endif
 
-.if ${MK_FMTREE} == no
-OLD_FILES+=usr/sbin/fmtree
-OLD_FILES+=usr/share/man/man8/fmtree.8.gz
-.endif
-
 .if ${MK_FTP} == no
 OLD_FILES+=etc/ftpusers
 OLD_FILES+=etc/newsyslog.conf.d/ftp.conf
@@ -2142,6 +2137,14 @@ OLD_FILES+=usr/bin/llvm-cov
 OLD_FILES+=usr/bin/llvm-profdata
 OLD_FILES+=usr/share/man/man1/llvm-cov.1.gz
 OLD_FILES+=usr/share/man/man1/llvm-profdata.1.gz
+.endif
+
+.if ${MK_GH_BC} == no
+OLD_FILES+=usr/share/misc/bc.library
+OLD_FILES+=usr/tests/usr.bin/dc/Kyuafile
+OLD_FILES+=usr/tests/usr.bin/dc/bcode
+OLD_FILES+=usr/tests/usr.bin/dc/inout
+OLD_DIRS+=usr/tests/usr.bin/dc
 .endif
 
 .if ${MK_GOOGLETEST} == no
@@ -9169,6 +9172,7 @@ OLD_FILES+=usr/tests/usr.bin/yacc/yacc/varsyntax_calc1.output
 OLD_FILES+=usr/tests/usr.bin/yacc/yacc/varsyntax_calc1.tab.c
 OLD_FILES+=usr/tests/usr.bin/yacc/yacc/varsyntax_calc1.tab.h
 OLD_FILES+=usr/tests/usr.bin/yacc/yacc_tests
+OLD_DIRS+=usr/tests/usr.bin/yacc/yacc
 OLD_DIRS+=usr/tests/usr.bin/yacc
 .endif
 

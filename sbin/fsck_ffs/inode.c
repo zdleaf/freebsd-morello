@@ -600,6 +600,9 @@ setinodebuf(int cg, ino_t inosused)
 	nextino = inum;
 	lastinum = inum;
 	readcount = 0;
+	/* Flush old contents in case they have been updated */
+	flush(fswritefd, &inobuf);
+	inobuf.b_bno = 0;
 	if (inobuf.b_un.b_buf == NULL) {
 		inobufsize = blkroundup(&sblock,
 		    MAX(INOBUFSIZE, sblock.fs_bsize));
@@ -899,22 +902,29 @@ allocino(ino_t request, int type)
 	union dinode *dp;
 	struct bufarea *cgbp;
 	struct cg *cgp;
-	int cg;
+	int cg, anyino;
 
-	if (request == 0)
+	anyino = 0;
+	if (request == 0) {
 		request = UFS_ROOTINO;
-	else if (inoinfo(request)->ino_state != USTATE)
+		anyino = 1;
+	} else if (inoinfo(request)->ino_state != USTATE)
 		return (0);
+retry:
 	for (ino = request; ino < maxino; ino++)
 		if (inoinfo(ino)->ino_state == USTATE)
 			break;
-	if (ino == maxino)
+	if (ino >= maxino)
 		return (0);
 	cg = ino_to_cg(&sblock, ino);
 	cgbp = cglookup(cg);
 	cgp = cgbp->b_un.b_cg;
-	if (!check_cgmagic(cg, cgbp, 0))
-		return (0);
+	if (!check_cgmagic(cg, cgbp, 0)) {
+		if (anyino == 0)
+			return (0);
+		request = (cg + 1) * sblock.fs_ipg;
+		goto retry;
+	}
 	setbit(cg_inosused(cgp), ino % sblock.fs_ipg);
 	cgp->cg_cs.cs_nifree--;
 	switch (type & IFMT) {

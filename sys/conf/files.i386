@@ -77,6 +77,8 @@ compat/linux/linux_vdso.c	optional compat_linux
 compat/linux/linux.c		optional compat_linux
 crypto/aesni/aeskeys_i386.S	optional aesni
 crypto/des/arch/i386/des_enc.S	optional netsmb
+crypto/openssl/i386/chacha-x86.S	optional ossl
+crypto/openssl/i386/poly1305-x86.S	optional ossl
 crypto/openssl/i386/sha1-586.S	optional ossl
 crypto/openssl/i386/sha256-586.S	optional ossl
 crypto/openssl/i386/sha512-586.S	optional ossl
@@ -188,7 +190,6 @@ i386/i386/perfmon.c		optional perfmon
 i386/i386/pmap_base.c		standard
 i386/i386/pmap_nopae.c		standard
 i386/i386/pmap_pae.c		standard
-i386/i386/prof_machdep.c	optional profiling-routine
 i386/i386/ptrace_machdep.c	standard
 i386/i386/sigtramp.s		standard
 i386/i386/support.s		standard

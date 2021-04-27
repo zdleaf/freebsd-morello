@@ -121,20 +121,20 @@ else:
 
 p = run([ "make", "clean" ])
 
-print("Testing \"make -j4\"")
+print("Testing \"make -j16\"")
 
 if p.returncode != 0:
 	print("make returned an error ({}); exiting...".format(p.returncode))
 	sys.exit(p.returncode)
 
-p = run([ "make", "-j4" ])
+p = run([ "make", "-j16" ])
 
 if p.returncode == 0:
-	makecmd = [ "make", "-j4" ]
-	print("Using \"make -j4\"")
+	makecmd = [ "make", "-j16" ]
+	print("Using \"make -j16\"")
 else:
 	makecmd = [ "make" ]
-	print("Not using \"make -j4\"")
+	print("Not using \"make -j16\"")
 
 if test_num != 0:
 	mx2 = test_num
