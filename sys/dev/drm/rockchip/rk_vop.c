@@ -49,6 +49,7 @@ __FBSDID("$FreeBSD$");
 #include <dev/fdt/fdt_common.h>
 #include <dev/ofw/ofw_bus.h>
 #include <dev/ofw/ofw_bus_subr.h>
+#include <dev/ofw/ofw_graph.h>
 
 #include <drm/drm_drv.h>
 #include <drm/drm_atomic.h>
@@ -814,44 +815,27 @@ static const struct drm_crtc_helper_funcs rk_vop_crtc_helper_funcs = {
 static int
 rk_vop_add_encoder(struct rk_vop_softc *sc, struct drm_device *drm)
 {
-	phandle_t child, port;
-	device_t dev;
-	phandle_t xref;
 	phandle_t node;
-	char s[16];
+	device_t dev;
 	int ret;
-	int i;
 
 	node = ofw_bus_get_node(sc->dev);
 	if (node == 0)
 		return (ENOENT);
 
-	port = ofw_bus_find_child(node, "port");
-	if (port == 0)
+	dev = ofw_graph_get_device_by_port_ep(ofw_bus_get_node(sc->dev),
+	    0, 2 /* HDMI */);
+	if (dev == NULL)
 		return (ENOENT);
 
-	for (i = 0; i < RK_VOP_MAX_ENDPOINTS; i++) {
-		sprintf(s, "endpoint@%d", i);
-		child = ofw_bus_find_child(port, s);
-		if (child) {
-			if (OF_getencprop(child, "remote-endpoint", &xref,
-			    sizeof(xref)) == -1)
-				continue;
+	ret = DW_HDMI_ADD_ENCODER(dev, &sc->crtc, drm);
+	if (ret == 0)
+		return (ENODEV);
 
-			dev = OF_device_from_xref(xref);
-			if (dev == NULL)
-				continue;
+	sc->outport = dev;
 
-			ret = DW_HDMI_ADD_ENCODER(dev, &sc->crtc, drm);
-			if (ret != 0)
-				continue;
+	return (0);
 
-			sc->outport = dev;
-			return (0);
-		}
-	}
-
-	return (ENODEV);
 }
 
 static int
