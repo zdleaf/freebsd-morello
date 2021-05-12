@@ -93,6 +93,7 @@ dev/drm/allwinner/aw_de2_tcon_if.m	optional drm fdt aw_de2_drm
 # Rockchip Display Subsystem
 dev/drm/rockchip/rk_drm.c		optional drm fdt aw_de2_drm compile-with "${DRM_C}"
 dev/drm/rockchip/rk_gem.c		optional drm fdt aw_de2_drm compile-with "${DRM_C}"
+dev/drm/rockchip/rk_plane.c		optional drm fdt aw_de2_drm compile-with "${DRM_C}"
 dev/drm/rockchip/rk_vop.c		optional drm fdt aw_de2_drm compile-with "${DRM_C}"
 dev/drm/rockchip/rk_vop_if.m		optional drm fdt aw_de2_drm
 dev/drm/panfrost/panfrost_drv.c		optional drm fdt aw_de2_drm compile-with "${DRM_C}"

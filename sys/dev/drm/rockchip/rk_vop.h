@@ -300,4 +300,27 @@ enum vop_pol {
 	DCLK_INVERT,
 };
 
+#define	CLK_NENTRIES	3
+
+struct rk_vop_softc {
+	device_t		dev;
+	struct rk_vop_conf	*phy_conf;
+	clk_t			clk[CLK_NENTRIES];
+	struct resource		*res[2];
+	eventhandler_tag        sc_hdmi_evh;
+	const struct videomode	*sc_mode;
+	hwreset_t		hwreset_axi;
+	hwreset_t		hwreset_ahb;
+	hwreset_t		hwreset_dclk;
+	struct rk_vop_plane	planes[2];
+
+	struct drm_pending_vblank_event	*event;
+	struct drm_device		*drm;
+	struct drm_crtc			crtc;
+	struct drm_encoder		encoder;
+	uint32_t			vbl_counter;
+	device_t			outport;
+	void				*intrhand;
+};
+
 #endif /* !_ARM64_ROCKCHIP_RK3399_VOP_ */
