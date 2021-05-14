@@ -207,7 +207,7 @@ struct vm_object {
 #define	OBJ_COLORED	0x1000		/* pg_color is defined */
 #define	OBJ_ONEMAPPING	0x2000		/* One USE (a single, non-forked) mapping flag */
 #define	OBJ_SHADOWLIST	0x4000		/* Object is on the shadow list. */
-#define	OBJ_TMPFS	0x8000		/* has tmpfs vnode allocated */
+#define	OBJ_PAGERPRIV	0x8000		/* Pager private */
 
 /*
  * Helpers to perform conversion between vm_object page indexes and offsets.
@@ -356,6 +356,7 @@ extern int umtx_shm_vnobj_persistent;
 vm_object_t vm_object_allocate (objtype_t, vm_pindex_t);
 vm_object_t vm_object_allocate_anon(vm_pindex_t, vm_object_t, struct ucred *,
    vm_size_t);
+vm_object_t vm_object_allocate_dyn(objtype_t, vm_pindex_t, u_short);
 boolean_t vm_object_coalesce(vm_object_t, vm_ooffset_t, vm_size_t, vm_size_t,
    boolean_t);
 void vm_object_collapse (vm_object_t);
