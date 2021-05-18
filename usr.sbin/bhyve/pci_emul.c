@@ -50,7 +50,9 @@ __FBSDID("$FreeBSD$");
 #include <machine/vmm.h>
 #include <machine/vmm_snapshot.h>
 #include <machine/cpufunc.h>
+#ifdef __amd64__
 #include <machine/specialreg.h>
+#endif
 #include <vmmapi.h>
 
 #include "acpi.h"
@@ -1204,8 +1206,10 @@ init_pci(struct vmctx *ctx)
 	nvlist_t *nvl;
 	const char *emul;
 	size_t lowmem;
+#ifdef __amd64__
 	uint64_t cpu_maxphysaddr, pci_emul_memresv64;
 	u_int regs[4];
+#endif
 	int bus, slot, func, error;
 
 	pci_emul_iobase = PCI_EMUL_IOBASE;

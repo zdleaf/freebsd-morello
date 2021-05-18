@@ -278,9 +278,13 @@ usage(int code)
 		"       -w: ignore unimplemented MSRs\n"
 #ifdef __amd64__
 		"       -x: local APIC is in x2APIC mode\n"
-		"       -Y: disable MPtable generation\n",
+		"       -Y: disable MPtable generation\n"
 #endif
-		progname, (int)strlen(progname), "", (int)strlen(progname), "",
+		"",
+		progname,
+#ifdef __amd64__
+		(int)strlen(progname), "", (int)strlen(progname), "",
+#endif
 		(int)strlen(progname), "");
 
 	exit(code);
@@ -1398,6 +1402,7 @@ main(int argc, char *argv[])
 		case 'k':
 			parse_simple_config_file(optarg);
 			break;
+#ifdef __amd64__
 		case 'l':
 			if (strncmp(optarg, "help", strlen(optarg)) == 0) {
 				lpc_print_supported_devices();
@@ -1596,6 +1601,7 @@ main(int argc, char *argv[])
 	if (get_config_bool("acpi_tables"))
 		vmgenc_init(ctx);
 
+#ifdef __amd64__
 	value = get_config_value("gdb.port");
 	if (value != NULL)
 		init_gdb(ctx, atoi(value), get_config_bool_default("gdb.wait",

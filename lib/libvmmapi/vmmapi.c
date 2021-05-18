@@ -271,6 +271,7 @@ vm_get_guestmem_from_ctx(struct vmctx *ctx, char **guest_baseaddr,
 	return (0);
 }
 
+#if 0
 int
 vm_munmap_memseg(struct vmctx *ctx, vm_paddr_t gpa, size_t len)
 {
@@ -283,6 +284,7 @@ vm_munmap_memseg(struct vmctx *ctx, vm_paddr_t gpa, size_t len)
 	error = ioctl(ctx->fd, VM_MUNMAP_MEMSEG, &munmap);
 	return (error);
 }
+#endif
 
 int
 vm_mmap_getnext(struct vmctx *ctx, vm_paddr_t *gpa, int *segid,
@@ -1125,7 +1127,6 @@ vm_setup_pptdev_msix(struct vmctx *ctx, int vcpu, int bus, int slot, int func,
 
 	return ioctl(ctx->fd, VM_PPTDEV_MSIX, &pptmsix);
 }
-#endif
 
 int
 vm_disable_pptdev_msix(struct vmctx *ctx, int bus, int slot, int func)
@@ -1139,6 +1140,7 @@ vm_disable_pptdev_msix(struct vmctx *ctx, int bus, int slot, int func)
 
 	return ioctl(ctx->fd, VM_PPTDEV_DISABLE_MSIX, &ppt);
 }
+#endif
 
 uint64_t *
 vm_get_stats(struct vmctx *ctx, int vcpu, struct timeval *ret_tv,
