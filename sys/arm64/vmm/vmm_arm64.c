@@ -481,8 +481,6 @@ arm64_gen_reg_emul_data(uint32_t esr_iss, struct vm_exit *vme_ret)
 	vre->reg = get_vm_reg_name(reg_num, UNUSED);
 }
 
-//static bool print_stuff = false;
-
 static int
 handle_el1_sync_excp(struct hyp *hyp, int vcpu, struct vm_exit *vme_ret,
     pmap_t pmap)
@@ -614,9 +612,10 @@ arm_vmrun(void *arg, int vcpu, register_t pc, pmap_t pmap,
 		 * here, but for the previous VM?
 		 */
 		arm64_set_active_vcpu(hypctx);
-		vgic_v3_sync_hwstate(hypctx);
+		vgic_v3_flush_hwstate(hypctx);
 		excp_type = vmm_call_hyp((void *)ktohyp(vmm_enter_guest),
 		    ktohyp(hypctx));
+		vgic_v3_sync_hwstate(hypctx);
 
 		/* Deactivate the stage2 pmap */
 		PCPU_SET(curvmpmap, NULL);

@@ -68,7 +68,12 @@
  * Registers (v3)
  */
 #define	GICD_IROUTER(n)		(0x6000 + ((n) * 8))
-#define	 GICD_IROUTER_IRM	(1u << 31)
+#define	 GICD_AFF3		(0xfful << 32)
+#define	 GICD_IROUTER_IRM	(1ul << 31)
+#define	 GICD_AFF2		(0xfful << 16)
+#define	 GICD_AFF1		(0xfful << 8)
+#define	 GICD_AFF0		(0xfful << 0)
+#define	 GICD_AFF		(GICD_AFF0 | GICD_AFF1 | GICD_AFF1 | GICD_AFF3)
 
 #define	GICD_PIDR4		0xFFD0
 #define	GICD_PIDR5		0xFFD4

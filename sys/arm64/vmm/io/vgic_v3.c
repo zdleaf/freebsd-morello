@@ -41,6 +41,7 @@
 
 #include <dev/ofw/openfirm.h>
 
+#include <machine/atomic.h>
 #include <machine/bus.h>
 #include <machine/cpufunc.h>
 #include <machine/cpu.h>
@@ -101,13 +102,6 @@ struct vgic_v3_ro_regs {
 	uint32_t gicd_typer;
 };
 
-struct vgic_v3_irq {
-	uint32_t irq;
-	enum vgic_v3_irqtype irqtype;
-	uint8_t enabled;
-	uint8_t priority;
-};
-
 #define	vip_to_lr(vip, lr)						\
 do {									\
 	lr = ICH_LR_EL2_STATE_PENDING;					\
@@ -128,14 +122,18 @@ static struct vgic_v3_ro_regs ro_regs;
 
 static struct gic_v3_softc *gic_sc;
 
+static struct vgic_v3_irq *vgic_v3_get_irq(struct hyp *, int, uint32_t);
+static void vgic_v3_release_irq(struct vgic_v3_irq *);
+
 void
 vgic_v3_cpuinit(void *arg, bool last_vcpu)
 {
 	struct hypctx *hypctx = arg;
 	struct vgic_v3_cpu_if *cpu_if = &hypctx->vgic_cpu_if;
 	struct vgic_v3_redist *redist = &hypctx->vgic_redist;
+	struct vgic_v3_irq *irq;
 	uint64_t aff, vmpidr_el2;
-	int i;
+	int i, irqid;
 
 	vmpidr_el2 = hypctx->vmpidr_el2;
 	KASSERT(vmpidr_el2 != 0,
@@ -175,7 +173,29 @@ vgic_v3_cpuinit(void *arg, bool last_vcpu)
 	    (GICR_PENDBASER_SHARE_OS << GICR_PENDBASER_SHARE_SHIFT) |
 	    (GICR_PENDBASER_CACHE_NIWAWB << GICR_PENDBASER_CACHE_SHIFT);
 
+	/* TODO: We need a call to mtx_destroy */
 	mtx_init(&cpu_if->lr_mtx, "VGICv3 ICH_LR_EL2 lock", NULL, MTX_SPIN);
+
+	/* Set the SGI and PPI state */
+	for (irqid = 0; irqid < VGIC_PRV_I_NUM; irqid++) {
+		irq = &cpu_if->private_irqs[irqid];
+
+		/* TODO: We need a call to mtx_destroy */
+		mtx_init(&irq->irq_spinmtx, "VGIC IRQ spinlock", NULL,
+		    MTX_SPIN);
+		irq->irq = irqid;
+		irq->mpidr = hypctx->vmpidr_el2 & GICD_AFF;
+		irq->irqtype = VGIC_IRQ_MISC;
+		if (irqid < VGIC_SGI_NUM) {
+			/* SGIs */
+			irq->enabled = 1;
+			irq->config = VGIC_CONFIG_EDGE;
+		} else {
+			/* PPIs */
+			irq->config = VGIC_CONFIG_LEVEL;
+		}
+		irq->priority = 0;
+	}
 
 	/*
 	 * Configure the Interrupt Controller Hyp Control Register.
@@ -208,14 +228,11 @@ vgic_v3_cpuinit(void *arg, bool last_vcpu)
 	cpu_if->ich_lr_num = virt_features.ich_lr_num;
 	for (i = 0; i < cpu_if->ich_lr_num; i++)
 		cpu_if->ich_lr_el2[i] = 0UL;
+	cpu_if->ich_lr_used = 0;
+	TAILQ_INIT(&cpu_if->irq_act_pend);
 
 	cpu_if->ich_ap0r_num = virt_features.ich_ap0r_num;
 	cpu_if->ich_ap1r_num = virt_features.ich_ap1r_num;
-
-	cpu_if->irqbuf = malloc(IRQBUF_SIZE_MIN * sizeof(*cpu_if->irqbuf),
-	    M_VGIC_V3, M_WAITOK | M_ZERO);
-	cpu_if->irqbuf_size = IRQBUF_SIZE_MIN;
-	cpu_if->irqbuf_num = 0;
 }
 
 void
@@ -233,7 +250,7 @@ vgic_v3_vminit(void *arg)
 	 * supports one security state (ARM GIC Architecture Specification for
 	 * GICv3 and GICv4, p. 4-464)
 	 */
-	dist->gicd_ctlr = 0; //GICD_CTLR_DS;
+	dist->gicd_ctlr = 0;
 
 	dist->gicd_typer = ro_regs.gicd_typer;
 	dist->nirqs = GICD_TYPER_I_NUM(dist->gicd_typer);
@@ -243,77 +260,171 @@ vgic_v3_vminit(void *arg)
 }
 
 static uint64_t
-dist_read_gicd_ixenabler(struct vgic_v3_dist *dist, int n)
+read_enabler(struct hyp *hyp, int vcpuid, int n)
 {
+	struct vgic_v3_irq *irq;
 	uint64_t ret;
+	uint32_t irq_base;
+	int i;
 
-	/*
-	 * GIC Architecture specification, p 8-471: "When ARE is 1 for the
-	 * Security state of an interrupt, the field for that interrupt is RES0
-	 * and an implementation is permitted to* make the field RAZ/WI in this
-	 * case".
-	 */
-	if (n == 0 && aff_routing_en(dist)) {
-		return (0);
+	ret = 0;
+	irq_base = n * 32;
+	for (i = 0; i < 32; i++) {
+		irq = vgic_v3_get_irq(hyp, vcpuid, irq_base + i);
+		if (irq == NULL)
+			continue;
+
+		if (irq->enabled != 0)
+			ret |= 1u << i;
+		vgic_v3_release_irq(irq);
 	}
-
-	/* Ensure the register is valid */
-	if ((n * sizeof(*dist->gicd_ixenabler)) > dist->gicd_ixenable_size)
-		return (0);
-
-	mtx_lock_spin(&dist->dist_mtx);
-	ret = dist->gicd_ixenabler[n];
-	mtx_unlock_spin(&dist->dist_mtx);
 
 	return (ret);
 }
 
 static void
-vgic_update_interrupts(struct hyp *hyp, int vcpuid, int irq,
-    uint64_t old_ixenabler, uint64_t new_ixenabler, bool set)
+write_enabler(struct hyp *hyp, int vcpuid, int n, bool set, uint64_t val)
 {
-	uint32_t updates;
+	struct vgic_v3_irq *irq;
+	uint32_t irq_base;
 	int i;
 
-	i = 0;
-	updates = old_ixenabler ^ new_ixenabler;
-	for (; updates != 0; updates >>= 1) {
-		if ((updates & 1) == 1) {
-			vgic_v3_irq_toggle_enabled(irq + i, set, hyp, vcpuid);
-		}
-		i++;
+	irq_base = n * 32;
+	for (i = 0; i < 32; i++) {
+		/* We only change interrupts when the appropriate bit is set */
+		if ((val & (1u << i)) == 0)
+			continue;
+
+		/* Find the interrupt this bit represents */
+		irq = vgic_v3_get_irq(hyp, vcpuid, irq_base + i);
+		if (irq == NULL)
+			continue;
+
+		/* TODO: Clear from lr if set == false? */
+		/* TODO: Manage when irq is a level interrupt */
+		irq->enabled = set ? 1 : 0;
+		vgic_v3_release_irq(irq);
 	}
 }
 
-static void
-dist_write_gicd_ixenabler(struct hyp *hyp, int vcpuid,
-    struct vgic_v3_dist *dist, int idx, uint64_t val, bool set)
+static uint64_t
+read_priorityr(struct hyp *hyp, int vcpuid, int n)
 {
-	uint32_t old_ixenabler;
+	struct vgic_v3_irq *irq;
+	uint64_t ret;
+	uint32_t irq_base;
+	int i;
 
-	/* TODO: Handle LPIs */
-	if ((idx * sizeof(*dist->gicd_ixenabler)) > dist->gicd_ixenable_size)
-		panic("Invalid reg: %x %zx\n", idx, dist->gicd_ixenable_size);
+	ret = 0;
+	irq_base = n * 4;
+	for (i = 0; i < 4; i++) {
+		irq = vgic_v3_get_irq(hyp, vcpuid, irq_base + i);
+		if (irq == NULL)
+			continue;
 
-	/*
-	 * GIC Architecture specification, p 8-471: "When ARE is 1 for the
-	 * Security state of an interrupt, the field for that interrupt is RES0
-	 * and an implementation is permitted to* make the field RAZ/WI in this
-	 * case".
-	 */
-	if (idx == 0 && aff_routing_en(dist)) {
-		return;
+		ret |= ((uint64_t)irq->priority) << (i * 8);
+		vgic_v3_release_irq(irq);
 	}
 
-	mtx_lock_spin(&dist->dist_mtx);
-	old_ixenabler = dist->gicd_ixenabler[idx];
-	if (set)
-		dist->gicd_ixenabler[idx] |= val;
-	else
-		dist->gicd_ixenabler[idx] &= ~val;
-	vgic_update_interrupts(hyp, vcpuid, idx * 32, old_ixenabler,
-	    dist->gicd_ixenabler[idx], set);
-	mtx_unlock_spin(&dist->dist_mtx);
+	return (ret);
+}
+
+static void
+write_priorityr(struct hyp *hyp, int vcpuid, int n, uint64_t val)
+{
+	struct vgic_v3_irq *irq;
+	uint32_t irq_base;
+	int i;
+
+	irq_base = n * 4;
+	for (i = 0; i < 4; i++) {
+		irq = vgic_v3_get_irq(hyp, vcpuid, irq_base + i);
+		if (irq == NULL)
+			continue;
+
+		/* Set the priority. We support 32 priority steps (5 bits) */
+		irq->priority = (val >> (i * 8)) & 0xf8;
+		vgic_v3_release_irq(irq);
+	}
+}
+
+static uint64_t
+read_config(struct hyp *hyp, int vcpuid, int n)
+{
+	struct vgic_v3_irq *irq;
+	uint64_t ret;
+	uint32_t irq_base;
+	int i;
+
+	ret = 0;
+	irq_base = n * 16;
+	for (i = 0; i < 16; i++) {
+		irq = vgic_v3_get_irq(hyp, vcpuid, irq_base + i);
+		if (irq == NULL)
+			continue;
+
+		ret |= ((uint64_t)irq->config) << (i * 2);
+		vgic_v3_release_irq(irq);
+	}
+
+	return (ret);
+}
+
+static void
+write_config(struct hyp *hyp, int vcpuid, int n, uint64_t val)
+{
+	struct vgic_v3_irq *irq;
+	uint32_t irq_base;
+	int i;
+
+	irq_base = n * 16;
+	for (i = 0; i < 16; i++) {
+		/*
+		 * The config can't be changed for SGIs and PPIs. SGIs have
+		 * an edge-triggered behaviour, and the register is
+		 * implementation defined to be read-only for PPIs.
+		 */
+		if (irq_base + i < VGIC_PRV_I_NUM)
+			continue;
+
+		irq = vgic_v3_get_irq(hyp, vcpuid, irq_base + i);
+		if (irq == NULL)
+			continue;
+
+		/* Bit 0 is RES0 */
+		irq->config = (val >> (i * 2)) & VGIC_CONFIG_MASK;
+		vgic_v3_release_irq(irq);
+	}
+}
+
+static uint64_t
+read_route(struct hyp *hyp, int vcpuid, int n)
+{
+	struct vgic_v3_irq *irq;
+	uint64_t mpidr;
+
+	irq = vgic_v3_get_irq(hyp, vcpuid, n);
+	if (irq == NULL)
+		return (0);
+
+	mpidr = irq->mpidr;
+	vgic_v3_release_irq(irq);
+
+	return (mpidr);
+}
+
+static void
+write_route(struct hyp *hyp, int vcpuid, int n, uint64_t val)
+{
+	struct vgic_v3_irq *irq;
+
+	irq = vgic_v3_get_irq(hyp, vcpuid, n);
+	if (irq == NULL)
+		return;
+
+	/* TODO: Support Interrupt Routing Mode */
+	irq->mpidr = val & GICD_AFF;
+	vgic_v3_release_irq(irq);
 }
 
 static int
@@ -361,7 +472,7 @@ dist_read(void *vm, int vcpuid, uint64_t fault_ipa, uint64_t *rval,
 	}
 
 	if (reg >= GICD_IGROUPR(0) && /* 0x0080 */
-	    reg < (GICD_IGROUPR(0) + dist->gicd_igroup_size)) {
+	    reg < GICD_IGROUPR(1024)) {
 
 		/*
 		 * GIC Architecture specification, p 8-477: "For SGIs and PPIs:
@@ -377,18 +488,26 @@ dist_read(void *vm, int vcpuid, uint64_t fault_ipa, uint64_t *rval,
 		return (0);
 	}
 
-	if (reg >= GICD_ISENABLER(0) && /* 0x0100 */
-	    reg < GICD_ISENABLER(0) + dist->gicd_ixenable_size) {
+	if (reg >= GICD_ISENABLER(0) &&   /* 0x0100 */
+	    reg < GICD_ISENABLER(1024)) { /* 0x0180 */
 		n = (reg - GICD_ISENABLER(0)) / 4;
-		*rval = dist_read_gicd_ixenabler(dist, n);
+		/* The first register is RAZ as affinity routing is on */
+		if (n == 0)
+			*rval = 0;
+		else
+			*rval = read_enabler(hyp, vcpuid, n);
 		*retu = false;
 		return (0);
 	}
 
-	if (reg >= GICD_ICENABLER(0) && /* 0x0180 */
-	    reg < GICD_ICENABLER(0) + dist->gicd_ixenable_size) {
+	if (reg >= GICD_ICENABLER(0) &&   /* 0x0180 */
+	    reg < GICD_ICENABLER(1024)) { /* 0x0200 */
 		n = (reg - GICD_ICENABLER(0)) / 4;
-		*rval = dist_read_gicd_ixenabler(dist, n);
+		/* The first register is RAZ as affinity routing is on */
+		if (n == 0)
+			*rval = 0;
+		else
+			*rval = read_enabler(hyp, vcpuid, n);
 		*retu = false;
 		return (0);
 	}
@@ -397,22 +516,15 @@ dist_read(void *vm, int vcpuid, uint64_t fault_ipa, uint64_t *rval,
 	/* TODO: GICD_ICPENDR 0x0280 */
 	/* TODO: GICD_ICACTIVER 0x0380 */
 
-	if (reg >= GICD_IPRIORITYR(0) && /* 0x0400 */
-	    reg < GICD_IPRIORITYR(0) + dist->gicd_ipriority_size) {
+	if (reg >= GICD_IPRIORITYR(0) &&   /* 0x0400 */
+	    reg < GICD_IPRIORITYR(1024)) { /* 0x0800 */
 		n = (reg - GICD_IPRIORITYR(0)) / 4;
-		/*
-		 * GIC Architecture specification, p 8-483: when affinity
-		 * routing is enabled, GICD_IPRIORITYR<n> is RAZ/WI for
-		 * n = 0 to 7.
-		 */
-		if (aff_routing_en(dist) && n <= 7) {
+		/* The first 8 registers are RAZ as affinity routing is on */
+		if (n <= 7) {
 			*rval = 0;
 		} else {
-			mtx_lock_spin(&dist->dist_mtx);
-			*rval = dist->gicd_ipriorityr[n];
-			mtx_unlock_spin(&dist->dist_mtx);
+			*rval = read_priorityr(hyp, vcpuid, n);
 		}
-
 		*retu = false;
 		return (0);
 	}
@@ -420,27 +532,25 @@ dist_read(void *vm, int vcpuid, uint64_t fault_ipa, uint64_t *rval,
 	/* TODO: GICD_ITARGETSR 0x0800 */
 
 	if (reg >= GICD_ICFGR(0) && /* 0x0C00 */
-	    reg < (GICD_ICFGR(0) + dist->gicd_icfg_size)) {
-		if (reg == GICD_ICFGR(0)) {
+	    reg < (GICD_ICFGR(1024))) {
+		n = (reg - GICD_ICFGR(0)) / 4;
+		/* The first 2 registers are RAZ as affinity routing is on */
+		if (n <= 1) {
 			*rval = 0;
 		} else {
-			mtx_lock_spin(&dist->dist_mtx);
-			*rval = dist->gicd_icfgr[(reg - GICD_ICFGR(0)) / 4];
-			mtx_unlock_spin(&dist->dist_mtx);
+			*rval = read_config(hyp, vcpuid, n);
 		}
 		*retu = false;
 		return (0);
 	}
 
 	if (reg >= GICD_IROUTER(0) && /* 0x6000 */
-	    reg < GICD_IROUTER(0) + dist->gicd_iroute_size) {
+	    reg < GICD_IROUTER(1024)) {
 		n = (reg - GICD_IROUTER(0)) / 8;
-		if (n <= 31 || !aff_routing_en(dist)) {
+		if (n <= 31) {
 			*rval = 0;
 		} else {
-			mtx_lock_spin(&dist->dist_mtx);
-			*rval = dist->gicd_irouter[n];
-			mtx_unlock_spin(&dist->dist_mtx);
+			*rval = read_route(hyp, vcpuid, n);
 		}
 		*retu = false;
 		return (0);
@@ -478,16 +588,11 @@ dist_write(void *vm, int vcpuid, uint64_t fault_ipa, uint64_t wval,
 		 * GICD_CTLR.DS is RAO/WI when only one security
 		 * state is supported.
 		 */
-		//wval |= GICD_CTLR_DS;
+		/* TODO: Add the GICD_CTLR_DS macro */
+		wval |= GICD_CTLR_ARE_NS;
 		mtx_lock_spin(&dist->dist_mtx);
-#define	reg_changed(new, old, mask)	(((new) & (mask)) != ((old) & (mask)))
-		if (reg_changed(wval, dist->gicd_ctlr, GICD_CTLR_G1A)) {
-			if (!(wval & GICD_CTLR_G1A))
-				vgic_v3_group_toggle_enabled(false, hyp);
-			else
-				vgic_v3_group_toggle_enabled(true, hyp);
-		}
 		dist->gicd_ctlr = wval;
+		/* TODO: Wake any vcpus that have interrupts pending */
 		mtx_unlock_spin(&dist->dist_mtx);
 
 		*retu = false;
@@ -502,23 +607,23 @@ dist_write(void *vm, int vcpuid, uint64_t fault_ipa, uint64_t wval,
 
 	/* Only group 1 interrupts are supported. Treat IGROUPR as RA0/WI. */
 	if (reg >= GICD_IGROUPR(0) && /* 0x0080 */
-	    reg < (GICD_IGROUPR(0) + dist->gicd_igroup_size)) {
+	    reg < (GICD_IGROUPR(1024))) {
 		*retu = false;
 		return (0);
 	}
 
 	if (reg >= GICD_ISENABLER(0) && /* 0x0100 */
-	    reg < GICD_ISENABLER(0) + dist->gicd_ixenable_size) {
+	    reg < GICD_ISENABLER(1024)) {
 		n = (reg - GICD_ISENABLER(0)) / 4;
-		dist_write_gicd_ixenabler(hyp, vcpuid, dist, n, wval, true);
+		write_enabler(hyp, vcpuid, n, true, wval);
 		*retu = false;
 		return (0);
 	}
 
 	if (reg >= GICD_ICENABLER(0) && /* 0x0180 */
-	    reg < GICD_ICENABLER(0) + dist->gicd_ixenable_size) {
+	    reg < GICD_ICENABLER(1024)) {
 		n = (reg - GICD_ICENABLER(0)) / 4;
-		dist_write_gicd_ixenabler(hyp, vcpuid, dist, n, wval, false);
+		write_enabler(hyp, vcpuid, n, false, wval);
 		*retu = false;
 		return (0);
 	}
@@ -528,48 +633,39 @@ dist_write(void *vm, int vcpuid, uint64_t fault_ipa, uint64_t wval,
 
 	/* TODO: GICD_ICACTIVER 0x0380 */
 	if (reg >= GICD_ICACTIVER(0) && /* 0x0380 */
-	    reg < GICD_ICACTIVER(0) + 0x80) {
+	    reg < GICD_ICACTIVER(1024)) {
 		/* TODO: Implement */
 		*retu = false;
 		return (0);
 	}
 
-	if (reg >= GICD_IPRIORITYR(0) && /* 0x0400 */
-	    reg < GICD_IPRIORITYR(0) + dist->gicd_ipriority_size) {
+	if (reg >= GICD_IPRIORITYR(0) &&   /* 0x0400 */
+	    reg < GICD_IPRIORITYR(1024)) { /* 0x0800 */
 		n = (reg - GICD_IPRIORITYR(0)) / 4;
-		/*
-		 * GIC Architecture specification, p 8-483: when affinity
-		 * routing is enabled, GICD_IPRIORITYR<n> is RAZ/WI for
-		 * n = 0 to 7.
-		 */
-		if (!(aff_routing_en(dist) && n <= 7)) {
-			mtx_lock_spin(&dist->dist_mtx);
-			dist->gicd_ipriorityr[n] = wval;
-			mtx_unlock_spin(&dist->dist_mtx);
+		/* The first 8 registers are WI as affinity routing is on */
+		if (n > 7) {
+			write_priorityr(hyp, vcpuid, n, wval);
 		}
-
 		*retu = false;
 		return (0);
 	}
 
 	if (reg >= GICD_ICFGR(0) &&
-	    reg < (GICD_ICFGR(0) + dist->gicd_icfg_size)) {
-		if (reg != GICD_ICFGR(0)) {
-			mtx_lock_spin(&dist->dist_mtx);
-			dist->gicd_icfgr[(reg - GICD_ICFGR(0)) / 4] = wval;
-			mtx_unlock_spin(&dist->dist_mtx);
+	    reg < GICD_ICFGR(1024)) {
+		n = (reg - GICD_ICFGR(0)) / 4;
+		/* XXX */
+		if (n > 1) {
+			write_config(hyp, vcpuid, n, wval);
 		}
 		*retu = false;
 		return (0);
 	}
 
 	if (reg >= GICD_IROUTER(0) && /* 0x6000 */
-	    reg < GICD_IROUTER(0) + dist->gicd_iroute_size) {
+	    reg < GICD_IROUTER(1024)) {
 		n = (reg - GICD_IROUTER(0)) / 8;
-		if (n > 31 && aff_routing_en(dist)) {
-			mtx_lock_spin(&dist->dist_mtx);
-			dist->gicd_irouter[n] = wval;
-			mtx_unlock_spin(&dist->dist_mtx);
+		if (n > 31) {
+			write_route(hyp, vcpuid, n, wval);
 		}
 		*retu = false;
 		return (0);
@@ -609,7 +705,7 @@ redist_read(void *vm, int vcpuid, uint64_t fault_ipa, uint64_t *rval,
 		*retu = false;
 		return (0);
 	case GICR_WAKER:
-		*rval = 0; // & ~GICR_WAKER_PS & ~GICR_WAKER_CA;
+		*rval = 0;
 		*retu = false;
 		return (0);
 	case GICR_PROPBASER:
@@ -630,15 +726,15 @@ redist_read(void *vm, int vcpuid, uint64_t fault_ipa, uint64_t *rval,
 		return (0);
 	case GICR_SGI_BASE_SIZE + GICR_ISENABLER0:
 	case GICR_SGI_BASE_SIZE + GICR_ICENABLER0:
-		*rval = redist->gicr_ixenabler0;
+		*rval = read_enabler(hyp, vcpuid, 0);
 		*retu = false;
 		return (0);
 	case GICR_SGI_BASE_SIZE + GICR_ICFGR0_BASE:
-		*rval = redist->gicr_icfgr0;
+		*rval = read_config(hyp, vcpuid, 0);
 		*retu = false;
 		return (0);
 	case GICR_SGI_BASE_SIZE + GICR_ICFGR1_BASE:
-		*rval = redist->gicr_icfgr1;
+		*rval = read_config(hyp, vcpuid, 1);
 		*retu = false;
 		return (0);
 	default:
@@ -646,31 +742,14 @@ redist_read(void *vm, int vcpuid, uint64_t fault_ipa, uint64_t *rval,
 	}
 
 	if (reg >= (GICR_SGI_BASE_SIZE + GICR_IPRIORITYR_BASE) &&
-	    reg < (GICR_SGI_BASE_SIZE + GICR_IPRIORITYR_BASE +
-	    sizeof(redist->gicr_ipriorityr))) {
+	    reg < (GICR_SGI_BASE_SIZE + GICR_IPRIORITYR_BASE + VGIC_PRV_I_NUM)){
 		n = (reg - GICR_SGI_BASE_SIZE + GICR_IPRIORITYR_BASE) / 4;
-		*rval = redist->gicr_ipriorityr[n];
+		*rval = read_priorityr(hyp, vcpuid, n);
 		*retu = false;
 		return (0);
 	}
 
 	panic("%s: %lx", __func__, reg);
-}
-
-static void
-redist_write_gicr_ixenabler0(struct hyp *hyp, int vcpuid,
-    struct vgic_v3_redist *redist, uint64_t wval, bool set)
-{
-	uint32_t old_ixenabler0, new_ixenabler0;
-
-	old_ixenabler0 = redist->gicr_ixenabler0;
-	if (set)
-		new_ixenabler0 = old_ixenabler0 | wval;
-	else
-		new_ixenabler0 = old_ixenabler0 & ~wval;
-	vgic_update_interrupts(hyp, vcpuid, 0, old_ixenabler0, new_ixenabler0,
-	    set);
-	redist->gicr_ixenabler0 = new_ixenabler0;
 }
 
 static int
@@ -726,22 +805,20 @@ redist_write(void *vm, int vcpuid, uint64_t fault_ipa, uint64_t wval,
 		return (0);
 	case GICR_SGI_BASE_SIZE + GICR_ISENABLER0:
 	case GICR_SGI_BASE_SIZE + GICR_ICENABLER0:
-		redist_write_gicr_ixenabler0(hyp, vcpuid, redist, wval,
-		    reg == (GICR_SGI_BASE_SIZE + GICR_ISENABLER0));
+		write_enabler(hyp, vcpuid, 0,
+		    reg == (GICR_SGI_BASE_SIZE + GICR_ISENABLER0), wval);
 		*retu = false;
 		return (0);
-	case GICR_SGI_BASE_SIZE + GICR_IPRIORITYR_BASE:
-		break;
 	case GICR_SGI_BASE_SIZE + GICR_ICACTIVER0:
 		/* TODO: Implement */
 		*retu = false;
 		return (0);
 	case GICR_SGI_BASE_SIZE + GICR_ICFGR0_BASE:
-		redist->gicr_icfgr0 = wval;
+		write_config(hyp, vcpuid, 0, wval);
 		*retu = false;
 		return (0);
 	case GICR_SGI_BASE_SIZE + GICR_ICFGR1_BASE:
-		redist->gicr_icfgr1 = wval;
+		write_config(hyp, vcpuid, 1, wval);
 		*retu = false;
 		return (0);
 	default:
@@ -749,10 +826,9 @@ redist_write(void *vm, int vcpuid, uint64_t fault_ipa, uint64_t wval,
 	}
 
 	if (reg >= (GICR_SGI_BASE_SIZE + GICR_IPRIORITYR_BASE) &&
-	    reg < (GICR_SGI_BASE_SIZE + GICR_IPRIORITYR_BASE +
-	    sizeof(redist->gicr_ipriorityr))) {
+	    reg < (GICR_SGI_BASE_SIZE + GICR_IPRIORITYR_BASE + VGIC_PRV_I_NUM)){
 		n = (reg - GICR_SGI_BASE_SIZE + GICR_IPRIORITYR_BASE) / 4;
-		redist->gicr_ipriorityr[n] = wval;
+		write_priorityr(hyp, vcpuid, n, wval);
 		*retu = false;
 		return (0);
 	}
@@ -778,7 +854,8 @@ vgic_v3_icc_sgi1r_write(void *vm, int vcpuid, uint64_t rval, void *arg)
 {
 	struct hyp *hyp;
 	cpuset_t active_cpus;
-	int cpus, irq, vcpu;
+	uint32_t irqid;
+	int cpus, vcpu;
 	bool *retu = arg;
 
 	hyp = vm_get_cookie(vm);
@@ -790,13 +867,13 @@ vgic_v3_icc_sgi1r_write(void *vm, int vcpuid, uint64_t rval, void *arg)
 		 */
 		if ((rval & 0xff00ff00ff000ul) != 0)
 			return (0);
-		irq = (rval >> ICC_SGI1R_EL1_SGIID_SHIFT) &
+		irqid = (rval >> ICC_SGI1R_EL1_SGIID_SHIFT) &
 		    ICC_SGI1R_EL1_SGIID_MASK;
 		cpus = rval & 0xff;
 		vcpu = 0;
 		while (cpus > 0) {
 			if (CPU_ISSET(vcpu, &active_cpus) && vcpu != vcpuid) {
-				vgic_v3_inject_irq(&hyp->ctx[vcpu], irq,
+				vgic_v3_inject_irq(hyp, vcpuid, irqid, true,
 				    VGIC_IRQ_MISC);
 			}
 			vcpu++;
@@ -812,38 +889,25 @@ vgic_v3_icc_sgi1r_write(void *vm, int vcpuid, uint64_t rval, void *arg)
 static void
 vgic_v3_mmio_init(struct hyp *hyp)
 {
-	struct vgic_v3_dist *dist = &hyp->vgic_dist;
+	struct vgic_v3_dist *dist;
+	struct vgic_v3_irq *irq;
+	int i;
 
-	/* GICD_IGROUPR */
-	dist->gicd_igroup_size = howmany(dist->nirqs, 32) *
-	    sizeof(uint32_t);
+	/* Allocate memory for the SPIs */
+	dist = &hyp->vgic_dist;
+	dist->irqs = malloc((dist->nirqs - VGIC_PRV_I_NUM) *
+	    sizeof(*dist->irqs), M_VGIC_V3, M_WAITOK | M_ZERO);
 
-	/* GICD_ISENABLER & GICD_ICENABLER */
-	dist->gicd_ixenable_size =
-	    ((dist->gicd_typer & GICD_TYPER_ITLINESNUM_MASK) + 1) *
-	    sizeof(*dist->gicd_ixenabler);
-	dist->gicd_ixenabler = malloc(dist->gicd_ixenable_size, M_VGIC_V3,
-	    M_WAITOK | M_ZERO);
+	for (i = 0; i < dist->nirqs - VGIC_PRV_I_NUM; i++) {
+		irq = &dist->irqs[i];
 
-	/* GICD_IPRIORITYR */
-	dist->gicd_ipriority_size =
-	    (8 * ((dist->gicd_typer & GICD_TYPER_ITLINESNUM_MASK) + 1)) *
-	    sizeof(*dist->gicd_ipriorityr);
-	dist->gicd_ipriorityr = malloc(dist->gicd_ipriority_size,
-	    M_VGIC_V3, M_WAITOK | M_ZERO);
+		/* TODO: We need a call to mtx_destroy */
+		mtx_init(&irq->irq_spinmtx, "VGIC IRQ spinlock", NULL,
+		    MTX_SPIN);
 
-	/* GICD_ICFGR */
-	dist->gicd_icfg_size = howmany(dist->nirqs, 16) *
-	    sizeof(*dist->gicd_icfgr);
-	dist->gicd_icfgr = malloc(dist->gicd_icfg_size,
-	    M_VGIC_V3, M_WAITOK | M_ZERO);
-
-	/* GICD_IROUTER */
-	dist->gicd_iroute_size =
-	    (32 * ((dist->gicd_typer & GICD_TYPER_ITLINESNUM_MASK) + 1)) *
-	    sizeof(*dist->gicd_irouter);
-	dist->gicd_irouter = malloc(dist->gicd_iroute_size, M_VGIC_V3,
-	    M_WAITOK | M_ZERO);
+		irq->irq = i + VGIC_PRV_I_NUM;
+		irq->irqtype = VGIC_IRQ_MISC;
+	}
 }
 
 static void
@@ -851,10 +915,7 @@ vgic_v3_mmio_destroy(struct hyp *hyp)
 {
 	struct vgic_v3_dist *dist = &hyp->vgic_dist;
 
-	free(dist->gicd_ixenabler, M_VGIC_V3);
-	free(dist->gicd_ipriorityr, M_VGIC_V3);
-	free(dist->gicd_icfgr, M_VGIC_V3);
-	free(dist->gicd_irouter, M_VGIC_V3);
+	free(dist->irqs, M_VGIC_V3);
 }
 
 int
@@ -900,549 +961,128 @@ vgic_v3_detach_from_vm(struct vm *vm)
 	for (i = 0; i < VM_MAXCPU; i++) {
 		hypctx = & hyp->ctx[i];
 		cpu_if = &hypctx->vgic_cpu_if;
-		free(cpu_if->irqbuf, M_VGIC_V3);
 	}
 
 	vgic_v3_mmio_destroy(hyp);
 }
 
+static struct vgic_v3_irq *
+vgic_v3_get_irq(struct hyp *hyp, int vcpuid, uint32_t irqid)
+{
+	struct vgic_v3_cpu_if *cpu_if;
+	struct vgic_v3_dist *dist;
+	struct vgic_v3_irq *irq;
+
+	if (irqid < VGIC_PRV_I_NUM) {
+		if (vcpuid < 0 || vcpuid >= nitems(hyp->ctx))
+			return (NULL);
+
+		cpu_if = &hyp->ctx[vcpuid].vgic_cpu_if;
+		irq = &cpu_if->private_irqs[irqid];
+	} else if (irqid <= GIC_LAST_SPI) {
+		dist = &hyp->vgic_dist;
+		irqid -= VGIC_PRV_I_NUM;
+		if (irqid >= dist->nirqs)
+			return (NULL);
+		irq = &dist->irqs[irqid];
+	} else if (irqid < GIC_FIRST_LPI) {
+		return (NULL);
+	} else {
+		panic("TODO: %s: Support LPIs (irq = %x)", __func__, irqid);
+	}
+
+	mtx_lock_spin(&irq->irq_spinmtx);
+	return (irq);
+}
+
+static void
+vgic_v3_release_irq(struct vgic_v3_irq *irq)
+{
+
+	mtx_unlock_spin(&irq->irq_spinmtx);
+}
+
 int
 vgic_v3_vcpu_pending_irq(void *arg)
 {
-	struct hypctx *hypctx = arg;
-	struct vgic_v3_cpu_if *cpu_if = &hypctx->vgic_cpu_if;
-
-	return (cpu_if->irqbuf_num);
-}
-
-/* Removes ALL instances of interrupt 'irq' */
-static int
-vgic_v3_irqbuf_remove_nolock(uint32_t irq, struct vgic_v3_cpu_if *cpu_if)
-{
-	size_t dest = 0;
-	size_t from = cpu_if->irqbuf_num;
-
-	while (dest < cpu_if->irqbuf_num) {
-		if (cpu_if->irqbuf[dest].irq == irq) {
-			for (from = dest + 1; from < cpu_if->irqbuf_num; from++) {
-				if (cpu_if->irqbuf[from].irq == irq)
-					continue;
-				cpu_if->irqbuf[dest++] = cpu_if->irqbuf[from];
-			}
-			cpu_if->irqbuf_num = dest;
-		} else {
-			dest++;
-		}
-	}
-
-	return (from - dest);
+	panic("vgic_v3_vcpu_pending_irq");
 }
 
 int
-vgic_v3_remove_irq(void *arg, uint32_t irq, bool ignore_state)
+vgic_v3_inject_irq(struct hyp *hyp, int vcpuid, uint32_t irqid, bool level,
+    enum vgic_v3_irqtype irqtype)
 {
-        struct hypctx *hypctx = arg;
-	struct vgic_v3_cpu_if *cpu_if = &hypctx->vgic_cpu_if;
-	struct vgic_v3_dist *dist = &hypctx->hyp->vgic_dist;
-	size_t i;
 
-	if (irq >= dist->nirqs) {
-		eprintf("Malformed IRQ %u.\n", irq);
+	struct vgic_v3_cpu_if *cpu_if;
+	struct vgic_v3_irq *irq;
+	uint64_t irouter;
+
+
+	KASSERT(vcpuid == -1 || irqid < VGIC_PRV_I_NUM,
+	    ("%s: SPI/LPI with vcpuid set: irq %u vcpuid %u", __func__, irqid,
+	    vcpuid));
+
+	irq = vgic_v3_get_irq(hyp, vcpuid, irqid);
+	if (irq == NULL) {
+		eprintf("Malformed IRQ %u.\n", irqid);
 		return (1);
 	}
 
+	/* Ignore already pending IRQs */
+	if (irq->pending || irq->active) {
+		vgic_v3_release_irq(irq);
+		return (0);
+	}
+
+	irouter = irq->mpidr;
+	KASSERT(vcpuid == -1 || vcpuid == irouter,
+	    ("%s: Interrupt %u has bad cpu affinity: vcpuid %u affinity %#lx",
+	    __func__, irqid, vcpuid, irouter));
+	KASSERT(irouter < VM_MAXCPU,
+	    ("%s: Interrupt %u sent to invalid vcpu %lu", __func__, irqid,
+	    irouter));
+
+	if (vcpuid == -1)
+		vcpuid = irouter;
+	if (vcpuid >= VM_MAXCPU) {
+		vgic_v3_release_irq(irq);
+		return (1);
+	}
+
+	cpu_if = &hyp->ctx[vcpuid].vgic_cpu_if;
+
 	mtx_lock_spin(&cpu_if->lr_mtx);
 
-	for (i = 0; i < cpu_if->ich_lr_num; i++) {
-		if (ICH_LR_EL2_VINTID(cpu_if->ich_lr_el2[i]) == irq &&
-		    (lr_not_active(cpu_if->ich_lr_el2[i]) || ignore_state))
-			lr_clear_irq(cpu_if->ich_lr_el2[i]);
+	/*
+	 * TODO: Only inject if:
+	 *  - Level-triggered IRQ: level changes low -> high
+	 *  -  Edge-triggered IRQ: level is high
+	 */
+
+	if (level) {
+		/* TODO: Insert in the correct place */
+		TAILQ_INSERT_TAIL(&cpu_if->irq_act_pend, irq, act_pend_list);
+		irq->pending = 1;
 	}
-	vgic_v3_irqbuf_remove_nolock(irq, cpu_if);
 
 	mtx_unlock_spin(&cpu_if->lr_mtx);
 
 	return (0);
-}
-
-static struct vgic_v3_irq *
-vgic_v3_irqbuf_add_nolock(struct vgic_v3_cpu_if *cpu_if)
-{
-	struct vgic_v3_irq *new_irqbuf, *old_irqbuf;
-	size_t new_size;
-
-	if (cpu_if->irqbuf_num == cpu_if->irqbuf_size) {
-		/* Double the size of the buffered interrupts list */
-		new_size = cpu_if->irqbuf_size << 1;
-		if (new_size > IRQBUF_SIZE_MAX)
-			return (NULL);
-
-		new_irqbuf = NULL;
-		/* TODO: malloc sleeps here and causes a panic */
-		while (new_irqbuf == NULL)
-			new_irqbuf = malloc(new_size * sizeof(*cpu_if->irqbuf),
-			    M_VGIC_V3, M_NOWAIT | M_ZERO);
-		memcpy(new_irqbuf, cpu_if->irqbuf,
-		    cpu_if->irqbuf_size * sizeof(*cpu_if->irqbuf));
-
-		old_irqbuf = cpu_if->irqbuf;
-		cpu_if->irqbuf = new_irqbuf;
-		cpu_if->irqbuf_size = new_size;
-		free(old_irqbuf, M_VGIC_V3);
-	}
-
-	cpu_if->irqbuf_num++;
-
-	return (&cpu_if->irqbuf[cpu_if->irqbuf_num - 1]);
-}
-
-static bool
-vgic_v3_int_target(uint32_t irq, struct hypctx *hypctx)
-{
-	struct vgic_v3_dist *dist = &hypctx->hyp->vgic_dist;
-	struct vgic_v3_redist *redist = &hypctx->vgic_redist;
-	uint64_t irouter;
-	uint64_t aff;
-	uint32_t irq_off, irq_mask;
-	int n;
-
-	if (irq <= GIC_LAST_PPI)
-		return (true);
-
-	/* XXX Affinity routing disabled not implemented */
-	if (!aff_routing_en(dist))
-		return (true);
-
-	irq_off = irq % 32;
-	irq_mask = 1 << irq_off;
-	n = irq / 32;
-
-	irouter = dist->gicd_irouter[irq];
-	/* Check if 1-of-N routing is active */
-	if (irouter & GICD_IROUTER_IRM)
-		/* Check if the VCPU is participating */
-		return (redist->gicr_ctlr & GICR_CTLR_DPG1NS ? true : false);
-
-	aff = redist->gicr_typer >> GICR_TYPER_AFF_SHIFT;
-	/* Affinity in format for comparison with irouter */
-	aff = GICR_TYPER_AFF(redist->gicr_typer);
-	if ((irouter & aff) == aff)
-		return (true);
-	else
-		return (false);
-}
-
-static uint8_t
-vgic_v3_get_priority(uint32_t irq, struct hypctx *hypctx)
-{
-	struct vgic_v3_dist *dist = &hypctx->hyp->vgic_dist;
-	struct vgic_v3_redist *redist = &hypctx->vgic_redist;
-	size_t n;
-	uint32_t off, mask;
-	uint8_t priority;
-
-	n = irq / 4;
-	off = n % 4;
-	mask = 0xff << off;
-	/*
-	 * When affinity routing is enabled, the Redistributor is used for
-	 * SGIs and PPIs and the Distributor for SPIs. When affinity routing
-	 * is not enabled, the Distributor registers are used for all
-	 * interrupts.
-	 */
-	if (aff_routing_en(dist) && (n <= 7))
-		priority = (redist->gicr_ipriorityr[n] & mask) >> off;
-	else
-		priority = (dist->gicd_ipriorityr[n] & mask) >> off;
-
-	return (priority);
-}
-
-static bool
-vgic_v3_intid_enabled(uint32_t irq, struct hypctx *hypctx)
-{
-	struct vgic_v3_dist *dist;
-	struct vgic_v3_redist *redist;
-	uint32_t irq_off, irq_mask;
-	int n;
-
-	irq_off = irq % 32;
-	irq_mask = 1 << irq_off;
-	n = irq / 32;
-
-	if (irq <= GIC_LAST_PPI) {
-		redist = &hypctx->vgic_redist;
-		if (!(redist->gicr_ixenabler0 & irq_mask))
-			return (false);
-	} else {
-		dist = &hypctx->hyp->vgic_dist;
-		if (!(dist->gicd_ixenabler[n] & irq_mask))
-			return (false);
-	}
-
-	return (true);
-}
-
-static inline bool
-dist_group_enabled(struct vgic_v3_dist *dist)
-{
-	return ((dist->gicd_ctlr & GICD_CTLR_G1A) != 0);
-}
-
-int
-vgic_v3_inject_irq(void *arg, uint32_t irq, enum vgic_v3_irqtype irqtype)
-{
-        struct hypctx *hypctx = arg;
-	struct vgic_v3_dist *dist = &hypctx->hyp->vgic_dist;
-	struct vgic_v3_cpu_if *cpu_if = &hypctx->vgic_cpu_if;
-	struct vgic_v3_irq *vip;
-	int error;
-	int i;
-	uint8_t priority;
-	bool enabled;
-
-
-	if (irq >= dist->nirqs || irqtype >= VGIC_IRQ_INVALID) {
-		eprintf("Malformed IRQ %u.\n", irq);
-		return (1);
-	}
-
-	error = 0;
-	mtx_lock_spin(&dist->dist_mtx);
-
-	enabled = dist_group_enabled(&hypctx->hyp->vgic_dist) &&
-	    vgic_v3_intid_enabled(irq, hypctx) &&
-	    vgic_v3_int_target(irq, hypctx);
-	priority = vgic_v3_get_priority(irq, hypctx);
-
-	mtx_lock_spin(&cpu_if->lr_mtx);
-
-	/*
-	 * If the guest is running behind timer interrupts, don't swamp it with
-	 * one interrupt after another. However, if the timer interrupt is being
-	 * serviced by the guest (it is in a state other than pending, either
-	 * active or pending and active), then add it to the buffer to be
-	 * injected later. Otherwise, the timer would stop working because we
-	 * disable the timer in the host interrupt handler.
-	 */
-	if (irqtype == VGIC_IRQ_CLK) {
-		for (i = 0; i < cpu_if->ich_lr_num; i++)
-			if (ICH_LR_EL2_VINTID(cpu_if->ich_lr_el2[i]) == irq &&
-			    lr_pending(cpu_if->ich_lr_el2[i]))
-				goto out;
-		for (i = 0; i < cpu_if->irqbuf_num; i++)
-			if (cpu_if->irqbuf[i].irq == irq)
-				goto out;
-	}
-
-	vip = vgic_v3_irqbuf_add_nolock(cpu_if);
-	if (!vip) {
-		eprintf("Error adding IRQ %u to the IRQ buffer.\n", irq);
-		error = 1;
-		goto out;
-	}
-	vip->irq = irq;
-	vip->irqtype = irqtype;
-	vip->enabled = enabled;
-	vip->priority = priority;
-
-out:
-	mtx_unlock_spin(&cpu_if->lr_mtx);
-	mtx_unlock_spin(&dist->dist_mtx);
-
-	return (error);
 }
 
 int
 vgic_v3_inject_lpi(void *arg, uint32_t lpi)
 {
-        struct hypctx *hypctx = arg;
-	struct vgic_v3_dist *dist = &hypctx->hyp->vgic_dist;
-	struct vgic_v3_cpu_if *cpu_if = &hypctx->vgic_cpu_if;
-	struct vgic_v3_irq *vip;
-	int error;
-
-	KASSERT(lpi >= GIC_FIRST_LPI, ("%s: Invalid LPI %u", __func__, lpi));
-
-	error = 0;
-
-	mtx_lock_spin(&dist->dist_mtx);
-	mtx_lock_spin(&cpu_if->lr_mtx);
-	vip = vgic_v3_irqbuf_add_nolock(cpu_if);
-	if (!vip) {
-		eprintf("Error adding LPI %u to the IRQ buffer.\n", lpi);
-		error = ENXIO;
-		goto out;
-	}
-	vip->irq = lpi;
-	vip->irqtype = VGIC_IRQ_MISC;
-	vip->enabled = 1;
-	vip->priority = 1;
-
-out:
-	mtx_unlock_spin(&cpu_if->lr_mtx);
-	mtx_unlock_spin(&dist->dist_mtx);
-
-	return (error);
+	panic("vgic_v3_inject_lpi");
 }
 
 void
-vgic_v3_group_toggle_enabled(bool enabled, struct hyp *hyp)
+vgic_v3_flush_hwstate(void *arg)
 {
 	struct hypctx *hypctx;
 	struct vgic_v3_cpu_if *cpu_if;
-	struct vgic_v3_irq *vip;
-	int i, j;
-
-	for (i = 0; i < VM_MAXCPU; i++) {
-		hypctx = &hyp->ctx[i];
-		cpu_if = &hypctx->vgic_cpu_if;
-
-		mtx_lock_spin(&cpu_if->lr_mtx);
-
-		for (j = 0; j < cpu_if->irqbuf_num; j++) {
-			vip = &cpu_if->irqbuf[j];
-			if (!enabled)
-				vip->enabled = 0;
-			else if (vgic_v3_intid_enabled(vip->irq, hypctx))
-				vip->enabled = 1;
-		}
-
-		mtx_unlock_spin(&cpu_if->lr_mtx);
-	}
-}
-
-static int
-vgic_v3_irq_toggle_enabled_vcpu(uint32_t irq, bool enabled,
-    struct vgic_v3_cpu_if *cpu_if)
-{
+	struct vgic_v3_irq *irq;
 	int i;
-
-	mtx_lock_spin(&cpu_if->lr_mtx);
-
-	if (enabled) {
-		/*
-		 * Enable IRQs that were injected when the interrupt ID was
-		 * disabled
-		 */
-		for (i = 0; i < cpu_if->irqbuf_num; i++)
-			if (cpu_if->irqbuf[i].irq == irq)
-				cpu_if->irqbuf[i].enabled = true;
-	} else {
-		/* Remove the disabled IRQ from the LR regs if it is pending */
-		for (i = 0; i < cpu_if->ich_lr_num; i++)
-			if (lr_pending(cpu_if->ich_lr_el2[i]) &&
-			    ICH_LR_EL2_VINTID(cpu_if->ich_lr_el2[i]) == irq)
-				lr_clear_irq(cpu_if->ich_lr_el2[i]);
-
-		/* Remove the IRQ from the interrupt buffer */
-		vgic_v3_irqbuf_remove_nolock(irq, cpu_if);
-	}
-
-	mtx_unlock_spin(&cpu_if->lr_mtx);
-
-	return (0);
-}
-
-int
-vgic_v3_irq_toggle_enabled(uint32_t irq, bool enabled,
-    struct hyp *hyp, int vcpuid)
-{
-	struct vgic_v3_cpu_if *cpu_if;
-	int error;
-	int i;
-
-	if (irq <= GIC_LAST_PPI) {
-		cpu_if = &hyp->ctx[vcpuid].vgic_cpu_if;
-		return (vgic_v3_irq_toggle_enabled_vcpu(irq, enabled, cpu_if));
-	} else {
-		/* TODO: Update irqbuf for all VCPUs, not just VCPU 0 */
-		for (i = 0; i < 1; i++) {
-			cpu_if = &hyp->ctx[i].vgic_cpu_if;
-			error = vgic_v3_irq_toggle_enabled_vcpu(irq, enabled, cpu_if);
-			if (error)
-				return (error);
-		}
-	}
-
-	return (0);
-}
-
-static int
-irqbuf_highest_priority(struct vgic_v3_cpu_if *cpu_if, int start, int end,
-    struct hypctx *hypctx)
-{
-	uint32_t irq;
-	int i, max_idx;
-	uint8_t priority, max_priority;
-	uint8_t vpmr;
-
-	vpmr = (cpu_if->ich_vmcr_el2 & ICH_VMCR_EL2_VPMR_MASK) >> \
-	    ICH_VMCR_EL2_VPMR_SHIFT;
-
-	max_idx = -1;
-	max_priority = 0xff;
-	for (i = start; i < end; i++) {
-		irq = cpu_if->irqbuf[i].irq;
-		/* Check that the interrupt hasn't been already scheduled */
-		if (irq == IRQ_SCHEDULED)
-			continue;
-
-		if (!dist_group_enabled(&hypctx->hyp->vgic_dist))
-			continue;
-		if (irq < GIC_FIRST_LPI && !vgic_v3_int_target(irq, hypctx))
-			continue;
-
-		priority = cpu_if->irqbuf[i].priority;
-		if (priority >= vpmr)
-			continue;
-
-		if (max_idx == -1) {
-			max_idx = i;
-			max_priority = priority;
-		} else if (priority > max_priority) {
-			max_idx = i;
-			max_priority = priority;
-		} else if (priority == max_priority &&
-		    cpu_if->irqbuf[i].irqtype < cpu_if->irqbuf[max_idx].irqtype) {
-			max_idx = i;
-			max_priority = priority;
-		}
-	}
-
-	return (max_idx);
-}
-
-static inline bool
-cpu_if_group_enabled(struct vgic_v3_cpu_if *cpu_if)
-{
-	return ((cpu_if->ich_vmcr_el2 & ICH_VMCR_EL2_VENG1) != 0);
-}
-
-static inline int
-irqbuf_next_enabled(struct vgic_v3_irq *irqbuf, int start, int end,
-    struct hypctx *hypctx, struct vgic_v3_cpu_if *cpu_if)
-{
-	int i;
-
-	if (!cpu_if_group_enabled(cpu_if))
-		return (-1);
-
-	for (i = start; i < end; i++)
-		if (irqbuf[i].enabled)
-			break;
-
-	if (i < end)
-		return (i);
-	else
-		return (-1);
-}
-
-static inline int
-vgic_v3_lr_next_empty(uint32_t ich_elrsr_el2, int start, int end)
-{
-	int i;
-
-	for (i = start; i < end; i++)
-		if (ich_elrsr_el2 & (1U << i))
-			break;
-
-	if (i < end)
-		return (i);
-	else
-		return (-1);
-}
-
-/*
- * There are two cases in which the virtual timer interrupt is in the list
- * registers:
- *
- * 1. The virtual interrupt is active. The guest is executing the interrupt
- * handler, and the timer fired after it programmed the new alarm time but
- * before the guest had the chance to write to the EOIR1 register.
- *
- * 2. The virtual interrupt is pending and active. The timer interrupt is level
- * sensitive. The guest wrote to the EOR1 register, but the write hasn't yet
- * propagated to the timer.
- *
- * Injecting the interrupt in these cases would mean that another timer
- * interrupt is asserted as soon as the guest writes to the EOIR1 register (or
- * very shortly thereafter, in the pending and active scenario). This can lead
- * to the guest servicing timer interrupts one after the other and doing
- * nothing else. So do not inject a timer interrupt while one is active pending.
- * The buffered timer interrupts will be injected after the next world switch in
- * this case.
- */
-static bool
-clk_irq_in_lr(struct vgic_v3_cpu_if *cpu_if)
-{
-	uint64_t lr;
-	int i;
-
-	for (i = 0; i < cpu_if->ich_lr_num; i++) {
-		lr = cpu_if->ich_lr_el2[i];
-		if (ICH_LR_EL2_VINTID(lr) == GT_VIRT_IRQ &&
-		    (lr_active(lr) || lr_pending_active(lr)))
-			return (true);
-	}
-
-	return (false);
-}
-
-static void
-vgic_v3_irqbuf_to_lr(struct hypctx *hypctx, struct vgic_v3_cpu_if *cpu_if,
-    bool by_priority)
-{
-	struct vgic_v3_irq *vip;
-	int irqbuf_idx;
-	int lr_idx;
-	bool clk_present;
-
-	clk_present = clk_irq_in_lr(cpu_if);
-
-	irqbuf_idx = 0;
-	lr_idx = 0;
-	for (;;) {
-		if (by_priority)
-			irqbuf_idx = irqbuf_highest_priority(cpu_if,
-			    irqbuf_idx, cpu_if->irqbuf_num, hypctx);
-		else
-			irqbuf_idx = irqbuf_next_enabled(cpu_if->irqbuf,
-			    irqbuf_idx, cpu_if->irqbuf_num, hypctx, cpu_if);
-		if (irqbuf_idx == -1)
-			break;
-
-		lr_idx = vgic_v3_lr_next_empty(cpu_if->ich_elrsr_el2,
-		    lr_idx, cpu_if->ich_lr_num);
-		if (lr_idx == -1)
-			break;
-
-		vip = &cpu_if->irqbuf[irqbuf_idx];
-		if (vip->irqtype == VGIC_IRQ_CLK && clk_present) {
-			/* Skip injecting timer interrupt. */
-			irqbuf_idx++;
-			continue;
-		}
-
-		vip_to_lr(vip, cpu_if->ich_lr_el2[lr_idx]);
-		vip->irq = IRQ_SCHEDULED;
-		irqbuf_idx++;
-		lr_idx++;
-	}
-
-	/* Remove all interrupts that were just scheduled. */
-	vgic_v3_irqbuf_remove_nolock(IRQ_SCHEDULED, cpu_if);
-}
-
-void
-vgic_v3_sync_hwstate(void *arg)
-{
-	struct hypctx *hypctx;
-	struct vgic_v3_cpu_if *cpu_if;
-	int lr_free;
-	int i;
-	bool by_priority;
-	bool en_underflow_intr;
 
 	hypctx = arg;
 	cpu_if = &hypctx->vgic_cpu_if;
@@ -1456,41 +1096,93 @@ vgic_v3_sync_hwstate(void *arg)
 	 */
 	mtx_lock_spin(&cpu_if->lr_mtx);
 
+	cpu_if->ich_hcr_el2 &= ~ICH_HCR_EL2_UIE;
+
 	/* Exit early if there are no buffered interrupts */
-	if (cpu_if->irqbuf_num == 0) {
-		cpu_if->ich_hcr_el2 &= ~ICH_HCR_EL2_UIE;
+	if (TAILQ_EMPTY(&cpu_if->irq_act_pend))
 		goto out;
+
+	KASSERT(cpu_if->ich_lr_used == 0, ("%s: Used LR count not zero %u",
+	    __func__, cpu_if->ich_lr_used));
+
+	i = 0;
+	cpu_if->ich_elrsr_el2 = (1 << cpu_if->ich_lr_num) - 1;
+	TAILQ_FOREACH(irq, &cpu_if->irq_act_pend, act_pend_list) {
+		/* No free list register, stop searching for IRQs */
+		if (i == cpu_if->ich_lr_num)
+			break;
+
+		if (!irq->enabled)
+			continue;
+
+		cpu_if->ich_lr_el2[i] = ICH_LR_EL2_GROUP1 |
+		    ((uint64_t)irq->priority << ICH_LR_EL2_PRIO_SHIFT) |
+		    irq->irq;
+		if (irq->pending)
+			cpu_if->ich_lr_el2[i] |= ICH_LR_EL2_STATE_PENDING;
+		if (irq->active)
+			cpu_if->ich_lr_el2[i] |= ICH_LR_EL2_STATE_ACTIVE;
+
+		i++;
 	}
-
-	/* Test if all buffered interrupts can fit in the LR regs */
-	lr_free = 0;
-	for (i = 0; i < cpu_if->ich_lr_num; i++)
-		if (cpu_if->ich_elrsr_el2 & (1U << i))
-			lr_free++;
-
-	by_priority = (lr_free <= cpu_if->ich_lr_num);
-	vgic_v3_irqbuf_to_lr(hypctx, cpu_if, by_priority);
-
-	lr_free = 0;
-	for (i = 0; i < cpu_if->ich_lr_num; i++)
-		if (cpu_if->ich_elrsr_el2 & (1U << i))
-			lr_free++;
-
-	en_underflow_intr = false;
-	if (cpu_if->irqbuf_num > 0)
-		for (i = 0; i < cpu_if->irqbuf_num; i++)
-			if (cpu_if->irqbuf[i].irqtype != VGIC_IRQ_CLK) {
-				en_underflow_intr = true;
-				break;
-			}
-	if (en_underflow_intr) {
-		cpu_if->ich_hcr_el2 |= ICH_HCR_EL2_UIE;
-	} else {
-		cpu_if->ich_hcr_el2 &= ~ICH_HCR_EL2_UIE;
-	}
+	cpu_if->ich_lr_used = i;
 
 out:
 	mtx_unlock_spin(&cpu_if->lr_mtx);
+}
+
+void
+vgic_v3_sync_hwstate(void *arg)
+{
+	struct hypctx *hypctx;
+	struct vgic_v3_cpu_if *cpu_if;
+	struct vgic_v3_irq *irq;
+	uint64_t lr;
+	int i;
+
+	hypctx = arg;
+	cpu_if = &hypctx->vgic_cpu_if;
+
+	/* Exit early if there are no buffered interrupts */
+	if (cpu_if->ich_lr_used == 0)
+		return;
+
+	/*
+	 * Check on the IRQ state after running the guest. ich_lr_used and
+	 * ich_lr_el2 are only ever used within this thread so is safe to
+	 * access unlocked.
+	 */
+	for (i = 0; i < cpu_if->ich_lr_used; i++) {
+		lr = cpu_if->ich_lr_el2[i];
+		cpu_if->ich_lr_el2[i] = 0;
+
+		irq = vgic_v3_get_irq(hypctx->hyp, hypctx->vcpu,
+		    ICH_LR_EL2_VINTID(lr));
+		if (irq == NULL)
+			continue;
+
+		irq->active = (lr & ICH_LR_EL2_STATE_ACTIVE) != 0;
+		irq->pending = !irq->active &&
+		    (lr & ICH_LR_EL2_STATE_PENDING) != 0;
+
+		/* Lock to update irq_act_pend */
+		mtx_lock_spin(&cpu_if->lr_mtx);
+		if (irq->active) {
+			MPASS(!irq->pending);
+			/* Ensure the active IRQ is at the head of the list */
+			TAILQ_REMOVE(&cpu_if->irq_act_pend, irq, act_pend_list);
+			TAILQ_INSERT_HEAD(&cpu_if->irq_act_pend, irq,
+			    act_pend_list);
+		} else if (!irq->pending) {
+			/* If pending or active remove from the list */
+			TAILQ_REMOVE(&cpu_if->irq_act_pend, irq, act_pend_list);
+		}
+		mtx_unlock_spin(&cpu_if->lr_mtx);
+		vgic_v3_release_irq(irq);
+	}
+
+	cpu_if->ich_hcr_el2 &= ~ICH_HCR_EL2_EOICOUNT_MASK;
+	cpu_if->ich_lr_used = 0;
 }
 
 static void

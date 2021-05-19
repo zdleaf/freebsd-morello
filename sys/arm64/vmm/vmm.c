@@ -1320,8 +1320,7 @@ vm_assert_irq(struct vm *vm, uint32_t irq)
 	struct hyp *hyp = (struct hyp *)vm->cookie;
 	int error;
 
-	/* TODO: this is crap, send the vcpuid as an argument to vm_assert_irq */
-	error = vgic_v3_inject_irq(&hyp->ctx[0], irq, VGIC_IRQ_VIRTIO);
+	error = vgic_v3_inject_irq(hyp, -1, irq, true, VGIC_IRQ_MISC);
 
 	return (error);
 }
@@ -1329,9 +1328,10 @@ vm_assert_irq(struct vm *vm, uint32_t irq)
 int
 vm_deassert_irq(struct vm *vm, uint32_t irq)
 {
+	struct hyp *hyp = (struct hyp *)vm->cookie;
 	int error;
 
-	error = vgic_v3_remove_irq(vm->cookie, irq, false);
+	error = vgic_v3_inject_irq(hyp, -1, irq, false, VGIC_IRQ_MISC);
 
 	return (error);
 }

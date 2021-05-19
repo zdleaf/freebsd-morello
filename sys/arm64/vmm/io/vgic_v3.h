@@ -73,6 +73,28 @@ enum vgic_v3_irqtype {
 	VGIC_IRQ_INVALID,
 };
 
+struct vgic_v3_irq {
+	/* List of IRQs that are active or pending */
+	TAILQ_ENTRY(vgic_v3_irq) act_pend_list;
+	struct mtx irq_spinmtx;
+	uint64_t mpidr;
+	uint32_t irq;
+	enum vgic_v3_irqtype irqtype;
+	uint8_t enabled;
+	uint8_t pending;
+	uint8_t active;
+	uint8_t priority;
+	uint8_t config;
+#define	VGIC_CONFIG_MASK	0x2
+#define	VGIC_CONFIG_LEVEL	0x0
+#define	VGIC_CONFIG_EDGE	0x2
+};
+
+struct vgic_v3_lpi {
+	struct vgic_v3_irq	irq;
+	SLIST_ENTRY(vgic_v3_lpi) next;
+};
+
 struct vgic_mmio_region {
 	vm_offset_t start;
 	vm_offset_t end;
@@ -94,21 +116,8 @@ struct vgic_v3_dist {
 	uint32_t 	gicd_ctlr;	/* Distributor Control Register */
 	uint32_t 	gicd_typer;	/* Interrupt Controller Type Register */
 	uint32_t 	gicd_pidr2;	/* Distributor Peripheral ID2 Register */
-
-	size_t		gicd_igroup_size;
-
-	/* Interrupt Configuration Registers. */
-	size_t		gicd_icfg_size;
-	uint32_t	*gicd_icfgr;
-	/* Interrupt Priority Registers. */
-	size_t		gicd_ipriority_size;
-	uint32_t	*gicd_ipriorityr;
-	/* Interrupt Routing Registers. */
-	size_t		gicd_iroute_size;
-	uint64_t	*gicd_irouter;
-	/* Interrupt Clear-Enable and Set-Enable Registers. */
-	size_t		gicd_ixenable_size;
-	uint32_t	*gicd_ixenabler;
+	struct vgic_v3_irq *irqs;
+	SLIST_HEAD(, vgic_v3_lpi) lpis;
 };
 
 #define	aff_routing_en(distp)	(distp->gicd_ctlr & GICD_CTLR_ARE_NS)
@@ -121,9 +130,6 @@ struct vgic_v3_redist {
 	uint32_t	gicr_ctlr;	/* Redistributor Control Regiser */
 	uint32_t	gicr_propbaser;	/* Redistributor Properties Base Addr */
 	uint32_t	gicr_pendbaser;	/* Redistributor LPI Pending Base Addr*/
-	uint32_t	gicr_ixenabler0;
-	/* Interrupt Priority Registers. */
-	uint32_t	gicr_ipriorityr[VGIC_PRV_I_NUM / 4];
 	/* Interupt Configuration Registers */
 	uint32_t	gicr_icfgr0, gicr_icfgr1;
 };
@@ -167,6 +173,7 @@ struct vgic_its {
 };
 
 struct vgic_v3_irq;
+
 struct vgic_v3_cpu_if {
 	uint32_t	ich_eisr_el2;	/* End of Interrupt Status Register */
 	uint32_t	ich_elrsr_el2;	/* Empty List register Status Register (ICH_ELRSR_EL2) */
@@ -198,9 +205,9 @@ struct vgic_v3_cpu_if {
 	uint32_t	ich_ap1r_el2[VGIC_ICH_AP1R_NUM_MAX];
 	size_t		ich_ap1r_num;
 
-	struct vgic_v3_irq *irqbuf;
-	size_t		irqbuf_size;
-	size_t		irqbuf_num;
+	struct vgic_v3_irq private_irqs[VGIC_PRV_I_NUM];
+	TAILQ_HEAD(, vgic_v3_irq) irq_act_pend;
+	u_int		ich_lr_used;
 };
 
 int 	vgic_v3_attach_to_vm(struct vm *vm, uint64_t dist_start,
@@ -211,13 +218,13 @@ bool	vgic_attach(void);
 void	vgic_v3_init(uint64_t ich_vtr_el2);
 void	vgic_v3_vminit(void *arg);
 void	vgic_v3_cpuinit(void *arg, bool last_vcpu);
+void 	vgic_v3_flush_hwstate(void *arg);
 void 	vgic_v3_sync_hwstate(void *arg);
 
 int 	vgic_v3_vcpu_pending_irq(void *arg);
-int 	vgic_v3_inject_irq(void *arg, uint32_t irq,
-			   enum vgic_v3_irqtype irqtype);
+int	vgic_v3_inject_irq(struct hyp *hyp, int vcpuid, uint32_t irqid,
+	   bool level, enum vgic_v3_irqtype irqtype);
 int	vgic_v3_inject_lpi(void *arg, uint32_t lpi);
-int 	vgic_v3_remove_irq(void *arg, uint32_t irq, bool ignore_state);
 
 void	vgic_v3_group_toggle_enabled(bool enabled, struct hyp *hyp);
 int	vgic_v3_irq_toggle_enabled(uint32_t irq, bool enabled,
