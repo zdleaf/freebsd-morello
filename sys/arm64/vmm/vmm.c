@@ -349,7 +349,6 @@ vm_cleanup(struct vm *vm, bool destroy)
 
 	vtimer_vmcleanup(vm);
 	vgic_v3_detach_from_vm(vm);
-	vgic_its_detach_from_vm(vm);
 
 	for (i = 0; i < vm->maxcpus; i++)
 		vcpu_cleanup(vm, i, destroy);
@@ -1301,15 +1300,12 @@ vm_get_cookie(struct vm *vm)
 
 int
 vm_attach_vgic(struct vm *vm, uint64_t dist_start, size_t dist_size,
-    uint64_t redist_start, size_t redist_size, uint64_t its_start,
-    size_t its_size)
+    uint64_t redist_start, size_t redist_size)
 {
 	int error;
 
 	error = vgic_v3_attach_to_vm(vm, dist_start, dist_size, redist_start,
 	    redist_size);
-	if (error == 0 && its_size > 0)
-		error = vgic_its_attach_to_vm(vm, its_start, its_size);
 
 	return (error);
 }
@@ -1342,7 +1338,8 @@ vm_raise_msi(struct vm *vm, uint64_t msg, uint64_t addr, int bus, int slot,
 {
 	int error;
 
-	error = vgic_its_raise_msi(vm, msg, addr, PCI_RID(bus, slot, func));
+	/* TODO */
+	error = ENOTSUP;
 	return (error);
 }
 

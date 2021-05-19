@@ -134,44 +134,6 @@ struct vgic_v3_redist {
 	uint32_t	gicr_icfgr0, gicr_icfgr1;
 };
 
-struct vgic_its_table {
-	vm_offset_t	vaddr;
-	vm_page_t	*ma;
-	uint64_t	pbase;
-	size_t		size;
-	int		valid;
-	int		pad;
-};
-
-struct vgic_its_msi {
-	SLIST_ENTRY(vgic_its_msi) next;
-	uint32_t	devid;
-	uint32_t	eventid;
-	uint32_t	pintr;
-	int32_t		col_idx;
-};
-
-struct vgic_its {
-	uint64_t 	start;
-	uint64_t 	end;
-
-	struct sx	its_mtx;
-
-	uint64_t	gits_cbaser;
-	uint64_t	gits_creadr;
-	uint64_t	gits_cwriter;
-
-	struct vgic_its_table cmd_tab;
-	struct vgic_its_table dev_tab;
-	int		dev_tab_valid;
-	int		dev_tab_pages;
-	int 		dev_tab_entries;
-
-	u_int		col_entries;
-	int32_t		*collection;
-	SLIST_HEAD(its_msi, vgic_its_msi) its_msi;
-};
-
 struct vgic_v3_irq;
 
 struct vgic_v3_cpu_if {
@@ -229,12 +191,6 @@ int	vgic_v3_inject_lpi(void *arg, uint32_t lpi);
 void	vgic_v3_group_toggle_enabled(bool enabled, struct hyp *hyp);
 int	vgic_v3_irq_toggle_enabled(uint32_t irq, bool enabled,
 				   struct hyp *hyp, int vcpuid);
-
-void	vgic_its_vminit(void *arg);
-int	vgic_its_attach_to_vm(struct vm *vm, uint64_t start, uint64_t size);
-void	vgic_its_detach_from_vm(struct vm *vm);
-int	vgic_its_raise_msi(struct vm *vm, uint64_t msg, uint64_t addr,
-    uint32_t eventid);
 
 DECLARE_CLASS(arm_vgic_driver);
 

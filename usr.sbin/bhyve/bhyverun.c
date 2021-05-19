@@ -1571,8 +1571,7 @@ main(int argc, char *argv[])
 #ifdef __aarch64__
 	error = bootcode_load(ctx, "/root/u-boot.bin", &rip);
 	assert(error == 0);
-	vm_attach_vgic(ctx, 0x2f000000UL, 0x10000UL, 0x2f100000UL, 0x200000UL,
-	    0x2f300000UL, 0x10000UL);
+	vm_attach_vgic(ctx, 0x2f000000UL, 0x10000UL, 0x2f100000UL, 0x200000UL);
 #endif
 #ifdef __amd64__
 	init_inout();

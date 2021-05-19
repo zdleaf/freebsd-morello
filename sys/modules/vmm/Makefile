@@ -28,8 +28,7 @@ SRCS+=	vmm_arm64.c \
 	vmm_mmu.c
 
 .PATH: ${SRCTOP}/sys/${MACHINE}/vmm/io
-SRCS+=	vgic_its.c \
-	vgic_v3.c \
+SRCS+=	vgic_v3.c \
 	vtimer.c
 
 CLEANFILES=	hyp_assym.h hyp_genassym.o

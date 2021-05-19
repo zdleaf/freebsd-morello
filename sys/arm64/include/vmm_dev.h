@@ -134,8 +134,6 @@ struct vm_attach_vgic {
 	size_t		dist_size;
 	uint64_t	redist_start;
 	size_t		redist_size;
-	uint64_t	its_start;
-	size_t		its_size;
 };
 
 struct vm_irq {

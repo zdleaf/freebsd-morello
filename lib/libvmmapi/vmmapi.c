@@ -733,8 +733,7 @@ vm_reinit(struct vmctx *ctx)
 #if defined(__aarch64__)
 int
 vm_attach_vgic(struct vmctx *ctx, uint64_t dist_start, size_t dist_size,
-    uint64_t redist_start, size_t redist_size, uint64_t its_start,
-    size_t its_size)
+    uint64_t redist_start, size_t redist_size)
 {
 	struct vm_attach_vgic vav;
 
@@ -743,8 +742,6 @@ vm_attach_vgic(struct vmctx *ctx, uint64_t dist_start, size_t dist_size,
 	vav.dist_size = dist_size;
 	vav.redist_start = redist_start;
 	vav.redist_size = redist_size;
-	vav.its_start = its_start;
-	vav.its_size = its_size;
 
 	return (ioctl(ctx->fd, VM_ATTACH_VGIC, &vav));
 }

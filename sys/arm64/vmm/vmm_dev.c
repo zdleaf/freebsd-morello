@@ -567,8 +567,7 @@ vmmdev_ioctl(struct cdev *cdev, u_long cmd, caddr_t data, int fflag,
 	case VM_ATTACH_VGIC:
 		vav = (struct vm_attach_vgic *)data;
 		error = vm_attach_vgic(sc->vm, vav->dist_start, vav->dist_size,
-		    vav->redist_start, vav->redist_size, vav->its_start,
-		    vav->its_size);
+		    vav->redist_start, vav->redist_size);
 		break;
 	case VM_RAISE_MSI:
 		vmsi = (struct vm_msi *)data;

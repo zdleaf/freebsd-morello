@@ -89,7 +89,6 @@ struct hypctx {
 struct hyp {
 	struct hypctx	ctx[VM_MAXCPU];
 	struct vgic_v3_dist vgic_dist;
-	struct vgic_its vgic_its;
 	struct vm	*vm;
 	struct vtimer	vtimer;
 	uint64_t	vmid_generation;

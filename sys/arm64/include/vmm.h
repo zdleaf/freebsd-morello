@@ -198,8 +198,7 @@ int vm_activate_cpu(struct vm *vm, int vcpu);
 int vm_suspend_cpu(struct vm *vm, int vcpu);
 int vm_resume_cpu(struct vm *vm, int vcpu);
 int vm_attach_vgic(struct vm *vm, uint64_t dist_start, size_t dist_size,
-    uint64_t redist_start, size_t redist_size, uint64_t its_start,
-    size_t its_size);
+    uint64_t redist_start, size_t redist_size);
 int vm_assert_irq(struct vm *vm, uint32_t irq);
 int vm_deassert_irq(struct vm *vm, uint32_t irq);
 int vm_raise_msi(struct vm *vm, uint64_t msg, uint64_t addr, int bus, int slot,
