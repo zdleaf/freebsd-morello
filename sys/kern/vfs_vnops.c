@@ -200,6 +200,8 @@ open2nameif(int fmode, u_int vn_open_flags)
 	res = ISOPEN | LOCKLEAF;
 	if ((fmode & O_RESOLVE_BENEATH) != 0)
 		res |= RBENEATH;
+	if ((fmode & O_EMPTY_PATH) != 0)
+		res |= EMPTYPATH;
 	if ((vn_open_flags & VN_OPEN_NOAUDIT) == 0)
 		res |= AUDITVNODE1;
 	if ((vn_open_flags & VN_OPEN_NOCAPCHECK) != 0)
@@ -231,7 +233,8 @@ restart:
 	first_open = false;
 	fmode = *flagp;
 	if ((fmode & (O_CREAT | O_EXCL | O_DIRECTORY)) == (O_CREAT |
-	    O_EXCL | O_DIRECTORY))
+	    O_EXCL | O_DIRECTORY) ||
+	    (fmode & (O_CREAT | O_EMPTY_PATH)) == (O_CREAT | O_EMPTY_PATH))
 		return (EINVAL);
 	else if ((fmode & (O_CREAT | O_DIRECTORY)) == O_CREAT) {
 		ndp->ni_cnd.cn_nameiop = CREATE;
@@ -427,7 +430,10 @@ vn_open_vnode(struct vnode *vp, int fmode, struct ucred *cred,
 			return (error);
 	}
 	if ((fmode & O_PATH) != 0) {
-		error = VOP_ACCESS(vp, VREAD, cred, td);
+		if (vp->v_type == VFIFO)
+			error = EPIPE;
+		else
+			error = VOP_ACCESS(vp, VREAD, cred, td);
 		if (error == 0)
 			fp->f_flag |= FKQALLOWED;
 		return (0);
@@ -1101,6 +1107,7 @@ vn_write(struct file *fp, struct uio *uio, struct ucred *active_cred, int flags,
 	off_t orig_offset;
 	int error, ioflag, lock_flags;
 	int advice;
+	bool need_finished_write;
 
 	KASSERT(uio->uio_td == td, ("uio_td %p is not td %p",
 	    uio->uio_td, td));
@@ -1115,9 +1122,11 @@ vn_write(struct file *fp, struct uio *uio, struct ucred *active_cred, int flags,
 		ioflag |= IO_NDELAY;
 	if (fp->f_flag & O_DIRECT)
 		ioflag |= IO_DIRECT;
-	if ((fp->f_flag & O_FSYNC) ||
-	    (vp->v_mount && (vp->v_mount->mnt_flag & MNT_SYNCHRONOUS)))
-		ioflag |= IO_SYNC;
+	if (fp->f_flag & O_FSYNC) {
+		mp = atomic_load_ptr(&vp->v_mount);
+		if (mp != NULL && mp->mnt_flag & MNT_SYNCHRONOUS)
+			ioflag |= IO_SYNC;
+	}
 	/*
 	 * For O_DSYNC we set both IO_SYNC and IO_DATASYNC, so that VOP_WRITE()
 	 * implementations that don't understand IO_DATASYNC fall back to full
@@ -1126,9 +1135,13 @@ vn_write(struct file *fp, struct uio *uio, struct ucred *active_cred, int flags,
 	if (fp->f_flag & O_DSYNC)
 		ioflag |= IO_SYNC | IO_DATASYNC;
 	mp = NULL;
-	if (vp->v_type != VCHR &&
-	    (error = vn_start_write(vp, &mp, V_WAIT | PCATCH)) != 0)
-		goto unlock;
+	need_finished_write = false;
+	if (vp->v_type != VCHR) {
+		error = vn_start_write(vp, &mp, V_WAIT | PCATCH);
+		if (error != 0)
+			goto unlock;
+		need_finished_write = true;
+	}
 
 	advice = get_advice(fp, uio);
 
@@ -1159,7 +1172,7 @@ vn_write(struct file *fp, struct uio *uio, struct ucred *active_cred, int flags,
 		error = VOP_WRITE(vp, uio, ioflag, fp->f_cred);
 	fp->f_nextoff[UIO_WRITE] = uio->uio_offset;
 	VOP_UNLOCK(vp);
-	if (vp->v_type != VCHR)
+	if (need_finished_write)
 		vn_finished_write(mp);
 	if (error == 0 && advice == POSIX_FADV_NOREUSE &&
 	    orig_offset != uio->uio_offset)
@@ -3096,13 +3109,13 @@ vn_generic_copy_file_range(struct vnode *invp, off_t *inoffp,
     struct vnode *outvp, off_t *outoffp, size_t *lenp, unsigned int flags,
     struct ucred *incred, struct ucred *outcred, struct thread *fsize_td)
 {
-	struct vattr va;
+	struct vattr va, inva;
 	struct mount *mp;
 	struct uio io;
 	off_t startoff, endoff, xfer, xfer2;
 	u_long blksize;
 	int error, interrupted;
-	bool cantseek, readzeros, eof, lastblock;
+	bool cantseek, readzeros, eof, lastblock, holetoeof;
 	ssize_t aresid;
 	size_t copylen, len, rem, savlen;
 	char *dat;
@@ -3119,7 +3132,11 @@ vn_generic_copy_file_range(struct vnode *invp, off_t *inoffp,
 		goto out;
 	if (VOP_PATHCONF(invp, _PC_MIN_HOLE_SIZE, &holein) != 0)
 		holein = 0;
+	if (holein > 0)
+		error = VOP_GETATTR(invp, &inva, incred);
 	VOP_UNLOCK(invp);
+	if (error != 0)
+		goto out;
 
 	mp = NULL;
 	error = vn_start_write(outvp, &mp, V_WAIT);
@@ -3200,7 +3217,7 @@ vn_generic_copy_file_range(struct vnode *invp, off_t *inoffp,
 	 * Note that some file systems such as NFSv3, NFSv4.0 and NFSv4.1 may
 	 * support holes on the server, but do not support FIOSEEKHOLE.
 	 */
-	eof = false;
+	holetoeof = eof = false;
 	while (len > 0 && error == 0 && !eof && interrupted == 0) {
 		endoff = 0;			/* To shut up compilers. */
 		cantseek = true;
@@ -3209,8 +3226,7 @@ vn_generic_copy_file_range(struct vnode *invp, off_t *inoffp,
 
 		/*
 		 * Find the next data area.  If there is just a hole to EOF,
-		 * FIOSEEKDATA should fail and then we drop down into the
-		 * inner loop and create the hole on the outvp file.
+		 * FIOSEEKDATA should fail with ENXIO.
 		 * (I do not know if any file system will report a hole to
 		 *  EOF via FIOSEEKHOLE, but I am pretty sure FIOSEEKDATA
 		 *  will fail for those file systems.)
@@ -3219,10 +3235,16 @@ vn_generic_copy_file_range(struct vnode *invp, off_t *inoffp,
 		 * the code just falls through to the inner copy loop.
 		 */
 		error = EINVAL;
-		if (holein > 0)
+		if (holein > 0) {
 			error = VOP_IOCTL(invp, FIOSEEKDATA, &startoff, 0,
 			    incred, curthread);
-		if (error == 0) {
+			if (error == ENXIO) {
+				startoff = endoff = inva.va_size;
+				eof = holetoeof = true;
+				error = 0;
+			}
+		}
+		if (error == 0 && !holetoeof) {
 			endoff = startoff;
 			error = VOP_IOCTL(invp, FIOSEEKHOLE, &endoff, 0,
 			    incred, curthread);
@@ -3253,11 +3275,12 @@ vn_generic_copy_file_range(struct vnode *invp, off_t *inoffp,
 				}
 
 				if (error == 0 && *outoffp + xfer >
-				    va.va_size && xfer == len)
-					/* Grow last block. */
+				    va.va_size && (xfer == len || holetoeof)) {
+					/* Grow output file (hole at end). */
 					error = vn_write_outvp(outvp, dat,
 					    *outoffp, xfer, blksize, true,
 					    false, outcred);
+				}
 				if (error == 0) {
 					*inoffp += xfer;
 					*outoffp += xfer;
