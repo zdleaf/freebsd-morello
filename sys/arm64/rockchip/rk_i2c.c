@@ -325,10 +325,10 @@ rk_i2c_intr_locked(struct rk_i2c_softc *sc)
 			RK_I2C_WRITE(sc, RK_I2C_IEN, RK_I2C_IEN_MBRFIEN |
 			    RK_I2C_IEN_NAKRCVIEN);
 
-			if (sc->msg->len > 32)
+			if ((sc->msg->len - sc->cnt) > 32)
 				transfer_len = 32;
 			else {
-				transfer_len = sc->msg->len;
+				transfer_len = sc->msg->len - sc->cnt;
 				reg = RK_I2C_READ(sc, RK_I2C_CON);
 				reg |= RK_I2C_CON_LASTACK;
 				RK_I2C_WRITE(sc, RK_I2C_CON, reg);
@@ -357,10 +357,10 @@ rk_i2c_intr_locked(struct rk_i2c_softc *sc)
 			reg |= sc->mode << RK_I2C_CON_MODE_SHIFT;
 			reg |= RK_I2C_CON_EN;
 
-			if (sc->msg->len > 32)
+			if ((sc->msg->len - sc->cnt) > 32)
 				transfer_len = 32;
 			else {
-				transfer_len = sc->msg->len;
+				transfer_len = sc->msg->len - sc->cnt;
 				reg |= RK_I2C_CON_LASTACK;
 			}
 
@@ -465,8 +465,6 @@ rk_i2c_transfer(device_t dev, struct iic_msg *msgs, uint32_t nmsgs)
 
 	sc = device_get_softc(dev);
 
-	printf("%s: nmsgs %d\n", __func__, nmsgs);
-
 	RK_I2C_LOCK(sc);
 
 	while (sc->busy)
@@ -482,7 +480,6 @@ rk_i2c_transfer(device_t dev, struct iic_msg *msgs, uint32_t nmsgs)
 
 	err = 0;
 	for (i = 0; i < nmsgs; i++) {
-		printf("%s: msg len %d\n", __func__, msgs[i].len);
 		/* Validate parameters. */
 		if (msgs == NULL || msgs[i].buf == NULL ||
 		    msgs[i].len == 0) {
