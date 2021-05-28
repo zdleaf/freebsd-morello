@@ -68,6 +68,8 @@
 /*
  * Registers (v3)
  */
+#define	GICD_SETSPI_NSR		0x0040
+
 #define	GICD_IROUTER(n)		(0x6000 + ((n) * 8))
 #define	 GICD_AFF3		(0xfful << 32)
 #define	 GICD_IROUTER_IRM	(1ul << 31)
