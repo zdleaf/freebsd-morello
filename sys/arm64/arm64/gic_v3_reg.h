@@ -60,6 +60,7 @@
 
 /* GICD_TYPER */
 #define	 GICD_TYPER_SECURITYEXTN (1 << 10)
+#define	 GICD_TYPER_MBIS	(1 << 16)
 #define	 GICD_TYPER_LPIS	(1 << 17)
 #define	 GICD_TYPER_DVIS	(1 << 18)
 #define	 GICD_TYPER_IDBITS(n)	((((n) >> 19) & 0x1F) + 1)

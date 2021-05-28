@@ -1060,20 +1060,34 @@ vgic_v3_inject_irq(struct hyp *hyp, int vcpuid, uint32_t irqid, bool level,
 	 */
 
 	if (level) {
+		MPASS(!irq->active);
 		/* TODO: Insert in the correct place */
 		TAILQ_INSERT_TAIL(&cpu_if->irq_act_pend, irq, act_pend_list);
 		irq->pending = 1;
 	}
 
 	mtx_unlock_spin(&cpu_if->lr_mtx);
+	vgic_v3_release_irq(irq);
 
 	return (0);
 }
 
 int
-vgic_v3_inject_lpi(void *arg, uint32_t lpi)
+vgic_v3_inject_msi(struct hyp *hyp, uint64_t msg, uint64_t addr)
 {
-	panic("vgic_v3_inject_lpi");
+	struct vgic_v3_dist *dist = &hyp->vgic_dist;
+	uint64_t reg;
+
+	/* This is a 4 byte register */
+	if (addr < dist->start || addr + 4 > dist->end) {
+		return (EINVAL);
+	}
+
+	reg = addr - dist->start;
+	if (reg != GICD_SETSPI_NSR)
+		return (EINVAL);
+
+	return (vgic_v3_inject_irq(hyp, -1, msg, true, VGIC_IRQ_MISC));
 }
 
 void
@@ -1197,7 +1211,7 @@ vgic_v3_get_ro_regs()
 	 */
 	ro_regs.gicd_typer = 31;
 	ro_regs.gicd_typer |= 16ul << 19;
-	ro_regs.gicd_typer |= GICD_TYPER_LPIS;
+	ro_regs.gicd_typer |= GICD_TYPER_MBIS;
 
 	/*
 	 * XXX. Guest reads of GICD_PIDR2 should return the same ArchRev as

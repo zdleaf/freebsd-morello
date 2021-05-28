@@ -1336,11 +1336,17 @@ int
 vm_raise_msi(struct vm *vm, uint64_t msg, uint64_t addr, int bus, int slot,
     int func)
 {
+	struct hyp *hyp = (struct hyp *)vm->cookie;
 	int error;
 
-	/* TODO */
-	error = ENOTSUP;
-	return (error);
+	if (addr >= hyp->vgic_dist.start && addr < hyp->vgic_dist.end) {
+		error = vgic_v3_inject_msi(hyp, msg, addr);
+		if (error == 0)
+			return (0);
+	}
+
+	/* TODO: Should we raise an SError? */
+	return (EINVAL);
 }
 
 static int

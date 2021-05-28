@@ -186,7 +186,7 @@ void 	vgic_v3_sync_hwstate(void *arg);
 int 	vgic_v3_vcpu_pending_irq(void *arg);
 int	vgic_v3_inject_irq(struct hyp *hyp, int vcpuid, uint32_t irqid,
 	   bool level, enum vgic_v3_irqtype irqtype);
-int	vgic_v3_inject_lpi(void *arg, uint32_t lpi);
+int	vgic_v3_inject_msi(struct hyp *hyp, uint64_t msg, uint64_t addr);
 
 void	vgic_v3_group_toggle_enabled(bool enabled, struct hyp *hyp);
 int	vgic_v3_irq_toggle_enabled(uint32_t irq, bool enabled,
