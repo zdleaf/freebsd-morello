@@ -308,6 +308,29 @@ write_enabler(struct hyp *hyp, int vcpuid, int n, bool set, uint64_t val)
 }
 
 static uint64_t
+read_activer(struct hyp *hyp, int vcpuid, int n)
+{
+	struct vgic_v3_irq *irq;
+	uint64_t ret;
+	uint32_t irq_base;
+	int i;
+
+	ret = 0;
+	irq_base = n * 32;
+	for (i = 0; i < 32; i++) {
+		irq = vgic_v3_get_irq(hyp, vcpuid, irq_base + i);
+		if (irq == NULL)
+			continue;
+
+		if (irq->active)
+			ret |= 1u << i;
+		vgic_v3_release_irq(irq);
+	}
+
+	return (ret);
+}
+
+static uint64_t
 read_priorityr(struct hyp *hyp, int vcpuid, int n)
 {
 	struct vgic_v3_irq *irq;
@@ -514,7 +537,20 @@ dist_read(void *vm, int vcpuid, uint64_t fault_ipa, uint64_t *rval,
 
 	/* TODO: GICD_ISPENDR 0x0200 */
 	/* TODO: GICD_ICPENDR 0x0280 */
-	/* TODO: GICD_ICACTIVER 0x0380 */
+
+	if (reg >= GICD_ISACTIVER(0) &&   /* 0x0300 */
+	    reg < GICD_ISACTIVER(1024)) { /* 0x0380 */
+		n = (reg - GICD_ISACTIVER(0)) / 4;
+		*rval = read_activer(hyp, vcpuid, n);
+		return (0);
+	}
+
+	if (reg >= GICD_ICACTIVER(0) &&   /* 0x0380 */
+	    reg < GICD_ICACTIVER(1024)) { /* 0x0400 */
+		n = (reg - GICD_ICACTIVER(0)) / 4;
+		*rval = read_activer(hyp, vcpuid, n);
+		return (0);
+	}
 
 	if (reg >= GICD_IPRIORITYR(0) &&   /* 0x0400 */
 	    reg < GICD_IPRIORITYR(1024)) { /* 0x0800 */
