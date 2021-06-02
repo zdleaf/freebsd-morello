@@ -271,6 +271,29 @@ write_enabler(struct hyp *hyp, int vcpuid, int n, bool set, uint64_t val)
 }
 
 static uint64_t
+read_pendr(struct hyp *hyp, int vcpuid, int n)
+{
+	struct vgic_v3_irq *irq;
+	uint64_t ret;
+	uint32_t irq_base;
+	int i;
+
+	ret = 0;
+	irq_base = n * 32;
+	for (i = 0; i < 32; i++) {
+		irq = vgic_v3_get_irq(hyp, vcpuid, irq_base + i);
+		if (irq == NULL)
+			continue;
+
+		if (irq->pending)
+			ret |= 1u << i;
+		vgic_v3_release_irq(irq);
+	}
+
+	return (ret);
+}
+
+static uint64_t
 read_activer(struct hyp *hyp, int vcpuid, int n)
 {
 	struct vgic_v3_irq *irq;
@@ -498,8 +521,19 @@ dist_read(void *vm, int vcpuid, uint64_t fault_ipa, uint64_t *rval,
 		return (0);
 	}
 
-	/* TODO: GICD_ISPENDR 0x0200 */
-	/* TODO: GICD_ICPENDR 0x0280 */
+	if (reg >= GICD_ISPENDR(0) &&   /* 0x0200 */
+	    reg < GICD_ISPENDR(1024)) { /* 0x0280 */
+		n = (reg - GICD_ISPENDR(0)) / 4;
+		*rval = read_pendr(hyp, vcpuid, n);
+		return (0);
+	}
+
+	if (reg >= GICD_ICPENDR(0) &&   /* 0x0280 */
+	    reg < GICD_ICPENDR(1024)) { /* 0x0300 */
+		n = (reg - GICD_ICPENDR(0)) / 4;
+		*rval = read_pendr(hyp, vcpuid, n);
+		return (0);
+	}
 
 	if (reg >= GICD_ISACTIVER(0) &&   /* 0x0300 */
 	    reg < GICD_ISACTIVER(1024)) { /* 0x0380 */
@@ -528,7 +562,11 @@ dist_read(void *vm, int vcpuid, uint64_t fault_ipa, uint64_t *rval,
 		return (0);
 	}
 
-	/* TODO: GICD_ITARGETSR 0x0800 */
+	if (reg >= GICD_ITARGETSR(0) &&   /* 0x0800 */
+	    reg < GICD_ITARGETSR(1024)) { /* 0x0C00 */
+		/* TODO: Implement */
+		return (1);
+	}
 
 	if (reg >= GICD_ICFGR(0) && /* 0x0C00 */
 	    reg < (GICD_ICFGR(1024))) {
