@@ -24,7 +24,7 @@ mmio_uart_intr_assert(void *arg)
 {
 	struct vmctx *ctx = arg;
 
-	vm_assert_irq(ctx, 33);
+	vm_assert_irq(ctx, 32);
 }
 
 static void
