@@ -148,7 +148,6 @@ vgic_v3_cpuinit(void *arg, bool last_vcpu)
 		    MTX_SPIN);
 		irq->irq = irqid;
 		irq->mpidr = hypctx->vmpidr_el2 & GICD_AFF;
-		irq->irqtype = VGIC_IRQ_MISC;
 		if (irqid < VGIC_SGI_NUM) {
 			/* SGIs */
 			irq->enabled = 1;
@@ -910,8 +909,7 @@ vgic_v3_icc_sgi1r_write(void *vm, int vcpuid, uint64_t rval, void *arg)
 		vcpu = 0;
 		while (cpus > 0) {
 			if (CPU_ISSET(vcpu, &active_cpus) && vcpu != vcpuid) {
-				vgic_v3_inject_irq(hyp, vcpuid, irqid, true,
-				    VGIC_IRQ_MISC);
+				vgic_v3_inject_irq(hyp, vcpuid, irqid, true);
 			}
 			vcpu++;
 			cpus >>= 1;
@@ -943,7 +941,6 @@ vgic_v3_mmio_init(struct hyp *hyp)
 		    MTX_SPIN);
 
 		irq->irq = i + VGIC_PRV_I_NUM;
-		irq->irqtype = VGIC_IRQ_MISC;
 	}
 }
 
@@ -1046,8 +1043,7 @@ vgic_v3_vcpu_pending_irq(void *arg)
 }
 
 int
-vgic_v3_inject_irq(struct hyp *hyp, int vcpuid, uint32_t irqid, bool level,
-    enum vgic_v3_irqtype irqtype)
+vgic_v3_inject_irq(struct hyp *hyp, int vcpuid, uint32_t irqid, bool level)
 {
 
 	struct vgic_v3_cpu_if *cpu_if;
@@ -1124,7 +1120,7 @@ vgic_v3_inject_msi(struct hyp *hyp, uint64_t msg, uint64_t addr)
 	if (reg != GICD_SETSPI_NSR)
 		return (EINVAL);
 
-	return (vgic_v3_inject_irq(hyp, -1, msg, true, VGIC_IRQ_MISC));
+	return (vgic_v3_inject_irq(hyp, -1, msg, true));
 }
 
 void

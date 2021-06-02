@@ -64,22 +64,12 @@ int vgic_v3_icc_sgi1r_write(void *vm, int vcpuid, uint64_t rval, void *arg);
 #define	VGIC_ICH_AP0R_NUM_MAX	4
 #define	VGIC_ICH_AP1R_NUM_MAX	VGIC_ICH_AP0R_NUM_MAX
 
-/* Order matters, a lower value means a higher precedence */
-enum vgic_v3_irqtype {
-	VGIC_IRQ_MAXPRIO,
-	VGIC_IRQ_CLK,
-	VGIC_IRQ_VIRTIO,
-	VGIC_IRQ_MISC,
-	VGIC_IRQ_INVALID,
-};
-
 struct vgic_v3_irq {
 	/* List of IRQs that are active or pending */
 	TAILQ_ENTRY(vgic_v3_irq) act_pend_list;
 	struct mtx irq_spinmtx;
 	uint64_t mpidr;
 	uint32_t irq;
-	enum vgic_v3_irqtype irqtype;
 	uint8_t enabled;
 	uint8_t pending;
 	uint8_t active;
@@ -185,7 +175,7 @@ void 	vgic_v3_sync_hwstate(void *arg);
 
 int 	vgic_v3_vcpu_pending_irq(void *arg);
 int	vgic_v3_inject_irq(struct hyp *hyp, int vcpuid, uint32_t irqid,
-	   bool level, enum vgic_v3_irqtype irqtype);
+	   bool level);
 int	vgic_v3_inject_msi(struct hyp *hyp, uint64_t msg, uint64_t addr);
 
 void	vgic_v3_group_toggle_enabled(bool enabled, struct hyp *hyp);

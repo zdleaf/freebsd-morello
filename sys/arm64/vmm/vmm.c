@@ -1316,7 +1316,7 @@ vm_assert_irq(struct vm *vm, uint32_t irq)
 	struct hyp *hyp = (struct hyp *)vm->cookie;
 	int error;
 
-	error = vgic_v3_inject_irq(hyp, -1, irq, true, VGIC_IRQ_MISC);
+	error = vgic_v3_inject_irq(hyp, -1, irq, true);
 
 	return (error);
 }
@@ -1327,7 +1327,7 @@ vm_deassert_irq(struct vm *vm, uint32_t irq)
 	struct hyp *hyp = (struct hyp *)vm->cookie;
 	int error;
 
-	error = vgic_v3_inject_irq(hyp, -1, irq, false, VGIC_IRQ_MISC);
+	error = vgic_v3_inject_irq(hyp, -1, irq, false);
 
 	return (error);
 }
