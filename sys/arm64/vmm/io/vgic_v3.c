@@ -65,28 +65,6 @@
 #include "vgic_v3.h"
 #include "vgic_v3_reg.h"
 
-#define VGIC_V3_DEVNAME		"vgic"
-#define VGIC_V3_DEVSTR		"ARM Virtual Generic Interrupt Controller v3"
-
-#define	RES0			0UL
-
-#define	IRQBUF_SIZE_MIN		32
-#define	IRQBUF_SIZE_MAX		(1 << 10)
-
-#define	IRQ_SCHEDULED		(GIC_LAST_SPI + 1)
-
-#define	lr_pending(lr)		\
-    (ICH_LR_EL2_STATE(lr) == ICH_LR_EL2_STATE_PENDING)
-#define	lr_inactive(lr)		\
-    (ICH_LR_EL2_STATE(lr) == ICH_LR_EL2_STATE_INACTIVE)
-#define lr_active(lr)		\
-    (ICH_LR_EL2_STATE(lr) == ICH_LR_EL2_STATE_ACTIVE)
-#define lr_pending_active(lr)	\
-    (ICH_LR_EL2_STATE(lr) == ICH_LR_EL2_STATE_PENDING_ACTIVE)
-#define	lr_not_active(lr) (!lr_active(lr) && !lr_pending_active(lr))
-
-#define	lr_clear_irq(lr) ((lr) &= ~ICH_LR_EL2_STATE_MASK)
-
 MALLOC_DEFINE(M_VGIC_V3, "ARM VMM VGIC V3", "ARM VMM VGIC V3");
 
 struct vgic_v3_virt_features {
@@ -101,21 +79,6 @@ struct vgic_v3_ro_regs {
 	uint32_t gicd_pidr2;
 	uint32_t gicd_typer;
 };
-
-#define	vip_to_lr(vip, lr)						\
-do {									\
-	lr = ICH_LR_EL2_STATE_PENDING;					\
-	lr |= ICH_LR_EL2_GROUP1;					\
-	lr |= (uint64_t)vip->priority << ICH_LR_EL2_PRIO_SHIFT;		\
-	lr |= vip->irq;							\
-} while (0)
-
-#define	lr_to_vip(lr, vip)						\
-do {									\
-	(vip)->irq = ICH_LR_EL2_VINTID(lr);				\
-	(vip)->priority = \
-	    (uint8_t)(((lr) & ICH_LR_EL2_PRIO_MASK) >> ICH_LR_EL2_PRIO_SHIFT); \
-} while (0)
 
 static struct vgic_v3_virt_features virt_features;
 static struct vgic_v3_ro_regs ro_regs;
