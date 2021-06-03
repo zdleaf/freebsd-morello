@@ -1,6 +1,6 @@
 # $FreeBSD$
 hyp_genassym.o			optional	vmm			\
-	dependency	"$S/arm64/vmm/hyp_genassym.c offset.inc"	\
+	dependency	"$S/arm64/vmm/hyp_genassym.c offset.inc device_if.h"	\
 	compile-with	"${CC} ${CFLAGS:N-flto:N-fno-common} -fcommon -c ${.IMPSRC}" \
 	no-obj no-implicit-rule						\
 	clean		"hyp_genassym.o"

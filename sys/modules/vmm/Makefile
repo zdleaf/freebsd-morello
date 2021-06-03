@@ -34,7 +34,7 @@ SRCS+=	vgic_v3.c \
 CLEANFILES=	hyp_assym.h hyp_genassym.o
 OBJS_DEPEND_GUESS.vmm_hyp.o+= hyp_assym.h
 
-.else if ${MACHINE_CPUARCH} == "amd64"
+.elif ${MACHINE_CPUARCH} == "amd64"
 DPSRCS+=	vmx_assym.h svm_assym.h
 DPSRCS+=	vmx_genassym.c svm_genassym.c offset.inc
 
