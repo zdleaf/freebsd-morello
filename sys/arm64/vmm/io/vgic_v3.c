@@ -293,6 +293,50 @@ read_pendr(struct hyp *hyp, int vcpuid, int n)
 }
 
 static uint64_t
+write_pendr(struct hyp *hyp, int vcpuid, int n, bool set, uint64_t val)
+{
+	struct vgic_v3_cpu_if *cpu_if;
+	struct vgic_v3_irq *irq;
+	uint64_t ret;
+	uint32_t irq_base;
+	int mpidr, i;
+
+	ret = 0;
+	irq_base = n * 32;
+	for (i = 0; i < 32; i++) {
+		/* We only change interrupts when the appropriate bit is set */
+		if ((val & (1u << i)) == 0)
+			continue;
+
+		irq = vgic_v3_get_irq(hyp, vcpuid, irq_base + i);
+		if (irq == NULL)
+			continue;
+
+		/*
+		 * TODO: The target CPU could have changed, we need to know
+		 * on which CPU the interrupt is pending.
+		 */
+		mpidr = irq->mpidr;
+		cpu_if = &hyp->ctx[mpidr].vgic_cpu_if;
+
+		mtx_lock_spin(&cpu_if->lr_mtx);
+		if (irq->pending && !set) {
+			/* pending -> not pending */
+			TAILQ_REMOVE(&cpu_if->irq_act_pend, irq, act_pend_list);
+		} else if (!irq->pending && set) {
+			/* not pending -> pending */
+			TAILQ_INSERT_TAIL(&cpu_if->irq_act_pend, irq,
+			    act_pend_list);
+		}
+		irq->pending = set ? 1 : 0;
+		mtx_unlock_spin(&cpu_if->lr_mtx);
+		vgic_v3_release_irq(irq);
+	}
+
+	return (ret);
+}
+
+static uint64_t
 read_activer(struct hyp *hyp, int vcpuid, int n)
 {
 	struct vgic_v3_irq *irq;
@@ -430,7 +474,7 @@ write_route(struct hyp *hyp, int vcpuid, int n, uint64_t val)
 	if (irq == NULL)
 		return;
 
-	/* TODO: Support Interrupt Routing Mode */
+	/* TODO: Move the interrupt to the correct pending list */
 	irq->mpidr = val & GICD_AFF;
 	vgic_v3_release_irq(irq);
 }
@@ -580,6 +624,7 @@ dist_read(void *vm, int vcpuid, uint64_t fault_ipa, uint64_t *rval,
 		return (0);
 	}
 
+	/* 64-bit registers */
 	if (reg >= GICD_IROUTER(0) && /* 0x6000 */
 	    reg < GICD_IROUTER(1024)) {
 		n = (reg - GICD_IROUTER(0)) / 8;
@@ -604,6 +649,7 @@ dist_write(void *vm, int vcpuid, uint64_t fault_ipa, uint64_t wval,
 	struct vgic_v3_dist *dist = &hyp->vgic_dist;
 	bool *retu = arg;
 	uint64_t reg;
+	uint32_t irqid;
 	int n;
 
 	/* Check the register is one of ours and is the correct size */
@@ -621,10 +667,16 @@ dist_write(void *vm, int vcpuid, uint64_t fault_ipa, uint64_t wval,
 		break;
 	case GICD_CTLR:
 		/*
-		 * GICD_CTLR.DS is RAO/WI when only one security
-		 * state is supported.
+		 * GICv2 backwards compatibility is not implemented so
+		 * ARE_NS is RAO/WI. This means EnableGrp1 is RES0.
+		 *
+		 * EnableGrp1A is supported, and RWP is read-only.
+		 *
+		 * All other bits are RES0 from non-secure mode as we
+		 * implement as if we are in a system with two security
+		 * states.
 		 */
-		/* TODO: Add the GICD_CTLR_DS macro */
+		wval &= GICD_CTLR_G1A;
 		wval |= GICD_CTLR_ARE_NS;
 		mtx_lock_spin(&dist->dist_mtx);
 		dist->gicd_ctlr = wval;
@@ -633,10 +685,22 @@ dist_write(void *vm, int vcpuid, uint64_t fault_ipa, uint64_t wval,
 
 		*retu = false;
 		return (0);
-	case GICD_TYPER:
+	case GICD_SETSPI_NSR:
+	case GICD_CLRSPI_NSR:
+		irqid = wval & GICD_SPI_INTID_MASK;
+		vgic_v3_inject_irq(hyp, vcpuid, irqid, reg == GICD_SETSPI_NSR);
 		*retu = false;
 		return (0);
-	case GICD_PIDR2:
+
+	/* Read-only registers: */
+	case GICD_TYPER:
+	case GICD_IIDR:
+	case GICD_SGIR:
+	/* Secure registers, write ignored from non-secure mode: */
+	case GICD_SETSPI_SR:
+	case GICD_CLRSPI_SR:
+	/* We don't report any issues from GICD_STATUSR: */
+	case GICD_STATUSR:
 		*retu = false;
 		return (0);
 	}
@@ -664,10 +728,22 @@ dist_write(void *vm, int vcpuid, uint64_t fault_ipa, uint64_t wval,
 		return (0);
 	}
 
-	/* TODO: GICD_ISPENDR 0x0200 */
-	/* TODO: GICD_ICPENDR 0x0280 */
+	if (reg >= GICD_ISPENDR(0) &&   /* 0x0200 */
+	    reg < GICD_ISPENDR(1024)) { /* 0x0280 */
+		n = (reg - GICD_ISPENDR(0)) / 4;
+		write_pendr(hyp, vcpuid, n, true, wval);
+		*retu = false;
+		return (0);
+	}
 
-	/* TODO: GICD_ICACTIVER 0x0380 */
+	if (reg >= GICD_ICPENDR(0) &&   /* 0x0280 */
+	    reg < GICD_ICPENDR(1024)) { /* 0x0300 */
+		n = (reg - GICD_ICPENDR(0)) / 4;
+		write_pendr(hyp, vcpuid, n, false, wval);
+		*retu = false;
+		return (0);
+	}
+
 	if (reg >= GICD_ICACTIVER(0) && /* 0x0380 */
 	    reg < GICD_ICACTIVER(1024)) {
 		/* TODO: Implement */
@@ -703,6 +779,12 @@ dist_write(void *vm, int vcpuid, uint64_t fault_ipa, uint64_t wval,
 		if (n > 31) {
 			write_route(hyp, vcpuid, n, wval);
 		}
+		*retu = false;
+		return (0);
+	}
+
+	if (reg >= GICD_PIDR4) { /* 0xFFD0 */
+		/* ID registers, read-only */
 		*retu = false;
 		return (0);
 	}
