@@ -76,7 +76,6 @@ struct vgic_v3_virt_features {
 
 struct vgic_v3_ro_regs {
 	uint32_t gicd_icfgr0;
-	uint32_t gicd_pidr2;
 	uint32_t gicd_typer;
 };
 
@@ -391,7 +390,6 @@ vgic_v3_vminit(void *arg)
 
 	dist->gicd_typer = ro_regs.gicd_typer;
 	dist->nirqs = GICD_TYPER_I_NUM(dist->gicd_typer);
-	dist->gicd_pidr2 = ro_regs.gicd_pidr2;
 
 	mtx_init(&dist->dist_mtx, "VGICv3 Distributor lock", NULL, MTX_SPIN);
 }
@@ -1155,7 +1153,7 @@ redist_read(void *vm, int vcpuid, uint64_t fault_ipa, uint64_t *rval,
 		*retu = false;
 		return (0);
 	case GICR_PIDR2:
-		*rval = hyp->vgic_dist.gicd_pidr2;
+		*rval = GICR_PIDR2_ARCH_GICv3 << GICR_PIDR2_ARCH_SHIFT;
 		*retu = false;
 		return (0);
 	case GICR_SGI_BASE_SIZE + GICR_IGROUPR0:
@@ -1647,12 +1645,6 @@ vgic_v3_get_ro_regs()
 	ro_regs.gicd_typer = 31;
 	ro_regs.gicd_typer |= 16ul << 19;
 	ro_regs.gicd_typer |= GICD_TYPER_MBIS;
-
-	/*
-	 * XXX. Guest reads of GICD_PIDR2 should return the same ArchRev as
-	 * specified in the guest FDT.
-	 */
-	ro_regs.gicd_pidr2 = gic_d_read(gic_sc, 4, GICD_PIDR2);
 }
 
 bool
