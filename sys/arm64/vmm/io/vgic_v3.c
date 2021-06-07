@@ -80,6 +80,181 @@ struct vgic_v3_ro_regs {
 	uint32_t gicd_typer;
 };
 
+typedef void (register_read)(struct hyp *, int, u_int, u_int, u_int,
+    uint64_t *, void *);
+typedef void (register_write)(struct hyp *, int, u_int, u_int, u_int, uint64_t,
+    void *);
+
+#define	VGIC_8_BIT	(1 << 0)
+/* (1 << 1) is reserved for 16 bit accesses */
+#define	VGIC_32_BIT	(1 << 2)
+#define	VGIC_64_BIT	(1 << 3)
+
+struct vgic_register {
+	u_int start;	/* Start within a memory region */
+	u_int end;
+	u_int size;
+	u_int flags;
+	register_read *read;
+	register_write *write;
+};
+
+#define	VGIC_REGISTER_RANGE(reg_start, reg_end, reg_size, reg_flags, readf, \
+    writef)								\
+{									\
+	.start = (reg_start),						\
+	.end = (reg_end),						\
+	.size = (reg_size),						\
+	.flags = (reg_flags),						\
+	.read = (readf),						\
+	.write = (writef),						\
+}
+
+#define	VGIC_REGISTER_RANGE_RAZ_WI(reg_start, reg_end, reg_size, reg_flags) \
+	VGIC_REGISTER_RANGE(reg_start, reg_end, reg_size, reg_flags,	\
+	    gic_zero_read, gic_ignore_write)
+
+#define	VGIC_REGISTER(start_addr, reg_size, reg_flags, readf, writef)	\
+	VGIC_REGISTER_RANGE(start_addr, (start_addr) + (reg_size),	\
+	    reg_size, reg_flags, readf, writef)
+
+#define	VGIC_REGISTER_RAZ_WI(start_addr, reg_size, reg_flags)		\
+	VGIC_REGISTER_RANGE_RAZ_WI(start_addr,				\
+	    (start_addr) + (reg_size), reg_size, reg_flags)
+
+static register_read gic_pidr2_read;
+static register_read gic_zero_read;
+static register_write gic_ignore_write;
+
+/* GICD_CTLR */
+static register_read dist_ctlr_read;
+static register_write dist_ctlr_write;
+/* GICD_TYPER */
+static register_read dist_typer_read;
+/* GICD_IIDR */
+static register_read dist_iidr_read;
+/* GICD_STATUSR */
+static register_read dist_statusr_read;
+static register_write dist_statusr_write;
+/* GICD_SETSPI_NSR & GICD_CLRSPI_NSR */
+static register_write dist_setclrspi_nsr_write;
+/* GICD_SETSPI_SR - RAZ/WI */
+/* GICD_CLRSPI_SR - RAZ/WI */
+/* GICD_IGROUPR - RAZ/WI as GICD_CTLR.ARE == 1 */
+/* GICD_ISENABLER */
+static register_read dist_isenabler_read;
+static register_write dist_isenabler_write;
+/* GICD_ICENABLER */
+static register_read dist_icenabler_read;
+static register_write dist_icenabler_write;
+/* GICD_ISPENDR */
+static register_read dist_ispendr_read;
+static register_write dist_ispendr_write;
+/* GICD_ICPENDR */
+static register_read dist_icpendr_read;
+static register_write dist_icpendr_write;
+/* GICD_ISACTIVER */
+static register_read dist_isactiver_read;
+static register_write dist_isactiver_write;
+/* GICD_ICACTIVER */
+static register_read dist_icactiver_read;
+static register_write dist_icactiver_write;
+/* GICD_IPRIORITYR */
+static register_read dist_ipriorityr_read;
+static register_write dist_ipriorityr_write;
+/* GICD_ITARGETSR - RAZ/WI as GICD_CTLR.ARE == 1 */
+/* GICD_ICFGR */
+static register_read dist_icfgr_read;
+static register_write dist_icfgr_write;
+/* GICD_IGRPMODR - RAZ/WI from non-secure mode */
+/* GICD_NSACR - RAZ/WI from non-secure mode */
+/* GICD_SGIR - RAZ/WI as GICD_CTLR.ARE == 1 */
+/* GICD_CPENDSGIR - RAZ/WI as GICD_CTLR.ARE == 1 */
+/* GICD_SPENDSGIR - RAZ/WI as GICD_CTLR.ARE == 1 */
+/* GICD_IROUTER */
+static register_read dist_irouter_read;
+static register_write dist_irouter_write;
+/*
+static register_read 
+static register_write 
+*/
+
+static struct vgic_register dist_registers[] = {
+	VGIC_REGISTER(GICD_CTLR, 4, VGIC_32_BIT, dist_ctlr_read,
+	    dist_ctlr_write),
+	VGIC_REGISTER(GICD_TYPER, 4, VGIC_32_BIT, dist_typer_read,
+	    gic_ignore_write),
+	VGIC_REGISTER(GICD_IIDR, 4, VGIC_32_BIT, dist_iidr_read,
+	    gic_ignore_write),
+	VGIC_REGISTER(GICD_STATUSR, 4, VGIC_32_BIT, dist_statusr_read,
+	    dist_statusr_write),
+	VGIC_REGISTER(GICD_SETSPI_NSR, 4, VGIC_32_BIT, gic_zero_read,
+	    dist_setclrspi_nsr_write),
+	VGIC_REGISTER(GICD_CLRSPI_NSR, 4, VGIC_32_BIT, gic_zero_read,
+	    dist_setclrspi_nsr_write),
+	VGIC_REGISTER_RAZ_WI(GICD_SETSPI_SR, 4, VGIC_32_BIT),
+	VGIC_REGISTER_RAZ_WI(GICD_CLRSPI_SR, 4, VGIC_32_BIT),
+	VGIC_REGISTER_RANGE_RAZ_WI(GICD_IGROUPR(0), GICD_IGROUPR(1024), 4,
+	    VGIC_32_BIT),
+
+	VGIC_REGISTER_RAZ_WI(GICD_ISENABLER(0), 4, VGIC_32_BIT),
+	VGIC_REGISTER_RANGE(GICD_ISENABLER(32), GICD_ISENABLER(1024), 4,
+	    VGIC_32_BIT, dist_isenabler_read, dist_isenabler_write),
+
+	VGIC_REGISTER_RAZ_WI(GICD_ICENABLER(0), 4, VGIC_32_BIT),
+	VGIC_REGISTER_RANGE(GICD_ICENABLER(32), GICD_ICENABLER(1024), 4,
+	    VGIC_32_BIT, dist_icenabler_read, dist_icenabler_write),
+
+	VGIC_REGISTER_RAZ_WI(GICD_ISPENDR(0), 4, VGIC_32_BIT),
+	VGIC_REGISTER_RANGE(GICD_ISPENDR(32), GICD_ISPENDR(1024), 4,
+	    VGIC_32_BIT, dist_ispendr_read, dist_ispendr_write),
+
+	VGIC_REGISTER_RAZ_WI(GICD_ICPENDR(0), 4, VGIC_32_BIT),
+	VGIC_REGISTER_RANGE(GICD_ICPENDR(32), GICD_ICPENDR(1024), 4,
+	    VGIC_32_BIT, dist_icpendr_read, dist_icpendr_write),
+
+	VGIC_REGISTER_RAZ_WI(GICD_ISACTIVER(0), 4, VGIC_32_BIT),
+	VGIC_REGISTER_RANGE(GICD_ISACTIVER(32), GICD_ISACTIVER(1024), 4,
+	    VGIC_32_BIT, dist_isactiver_read, dist_isactiver_write),
+
+	VGIC_REGISTER_RAZ_WI(GICD_ICACTIVER(0), 4, VGIC_32_BIT),
+	VGIC_REGISTER_RANGE(GICD_ICACTIVER(32), GICD_ICACTIVER(1024), 4,
+	    VGIC_32_BIT, dist_icactiver_read, dist_icactiver_write),
+
+	VGIC_REGISTER_RANGE_RAZ_WI(GICD_IPRIORITYR(0), GICD_IPRIORITYR(32), 4,
+	    VGIC_32_BIT),
+	VGIC_REGISTER_RANGE(GICD_IPRIORITYR(32), GICD_IPRIORITYR(1024), 4,
+	    VGIC_32_BIT, dist_ipriorityr_read, dist_ipriorityr_write),
+
+	VGIC_REGISTER_RANGE_RAZ_WI(GICD_ITARGETSR(0), GICD_ITARGETSR(1024), 4,
+	    VGIC_32_BIT),
+
+	VGIC_REGISTER_RANGE_RAZ_WI(GICD_ICFGR(0), GICD_ICFGR(32), 4,
+	    VGIC_32_BIT),
+	VGIC_REGISTER_RANGE(GICD_ICFGR(32), GICD_ICFGR(1024), 4,
+	    VGIC_32_BIT, dist_icfgr_read, dist_icfgr_write),
+/*
+	VGIC_REGISTER_RANGE(GICD_IGRPMODR(0), GICD_IGRPMODR(1024), 4,
+	    VGIC_32_BIT, dist_igrpmodr_read, dist_igrpmodr_write),
+	VGIC_REGISTER_RANGE(GICD_NSACR(0), GICD_NSACR(1024), 4,
+	    VGIC_32_BIT, dist_nsacr_read, dist_nsacr_write),
+*/
+	VGIC_REGISTER_RAZ_WI(GICD_SGIR, 4, VGIC_32_BIT),
+/*
+	VGIC_REGISTER_RANGE(GICD_CPENDSGIR(0), GICD_CPENDSGIR(1024), 4,
+	    VGIC_32_BIT, dist_cpendsgir_read, dist_cpendsgir_write),
+	VGIC_REGISTER_RANGE(GICD_SPENDSGIR(0), GICD_SPENDSGIR(1024), 4,
+	    VGIC_32_BIT, dist_spendsgir_read, dist_spendsgir_write),
+*/
+	VGIC_REGISTER_RANGE(GICD_IROUTER(32), GICD_IROUTER(1024), 8,
+	    VGIC_64_BIT, dist_irouter_read, dist_irouter_write),
+
+	VGIC_REGISTER_RANGE_RAZ_WI(GICD_PIDR4, GICD_PIDR2, 4, VGIC_32_BIT),
+	VGIC_REGISTER(GICD_PIDR2, 4, VGIC_32_BIT, gic_pidr2_read,
+	    gic_ignore_write),
+	VGIC_REGISTER_RANGE_RAZ_WI(GICD_PIDR2 + 4, GICD_SIZE, 4, VGIC_32_BIT),
+};
+
 static struct vgic_v3_virt_features virt_features;
 static struct vgic_v3_ro_regs ro_regs;
 
@@ -219,6 +394,28 @@ vgic_v3_vminit(void *arg)
 	dist->gicd_pidr2 = ro_regs.gicd_pidr2;
 
 	mtx_init(&dist->dist_mtx, "VGICv3 Distributor lock", NULL, MTX_SPIN);
+}
+
+static void
+gic_pidr2_read(struct hyp *hyp, int vcpuid, u_int reg, u_int offset, u_int size,
+    uint64_t *rval, void *arg)
+{
+	*rval = GICR_PIDR2_ARCH_GICv3 << GICR_PIDR2_ARCH_SHIFT;
+}
+
+/* Common read-only/write-ignored helpers */
+static void
+gic_zero_read(struct hyp *hyp, int vcpuid, u_int reg, u_int offset, u_int size,
+    uint64_t *rval, void *arg)
+{
+	*rval = 0;
+}
+
+static void
+gic_ignore_write(struct hyp *hyp, int vcpuid, u_int reg, u_int offset,
+    u_int size, uint64_t wval, void *arg)
+{
+	/* Nothing to do */
 }
 
 static uint64_t
@@ -479,6 +676,385 @@ write_route(struct hyp *hyp, int vcpuid, int n, uint64_t val)
 	vgic_v3_release_irq(irq);
 }
 
+/*
+ * Distributor register handlers.
+ */
+/* GICD_CTLR */
+static void
+dist_ctlr_read(struct hyp *hyp, int vcpuid, u_int reg, u_int offset,
+    u_int size, uint64_t *rval, void *arg)
+{
+	struct vgic_v3_dist *dist;
+
+	dist = &hyp->vgic_dist;
+	mtx_lock_spin(&dist->dist_mtx);
+	*rval = dist->gicd_ctlr;
+	mtx_unlock_spin(&dist->dist_mtx);
+
+	/* Writes are never pending */
+	*rval &= ~GICD_CTLR_RWP;
+}
+
+static void
+dist_ctlr_write(struct hyp *hyp, int vcpuid, u_int reg, u_int offset,
+    u_int size, uint64_t wval, void *arg)
+{
+	struct vgic_v3_dist *dist;
+
+	dist = &hyp->vgic_dist;
+
+	/*
+	 * GICv2 backwards compatibility is not implemented so
+	 * ARE_NS is RAO/WI. This means EnableGrp1 is RES0.
+	 *
+	 * EnableGrp1A is supported, and RWP is read-only.
+	 *
+	 * All other bits are RES0 from non-secure mode as we
+	 * implement as if we are in a system with two security
+	 * states.
+	 */
+	wval &= GICD_CTLR_G1A;
+	wval |= GICD_CTLR_ARE_NS;
+	mtx_lock_spin(&dist->dist_mtx);
+	dist->gicd_ctlr = wval;
+	/* TODO: Wake any vcpus that have interrupts pending */
+	mtx_unlock_spin(&dist->dist_mtx);
+}
+
+/* GICD_TYPER */
+static void
+dist_typer_read(struct hyp *hyp, int vcpuid, u_int reg, u_int offset,
+    u_int size, uint64_t *rval, void *arg)
+{
+	struct vgic_v3_dist *dist;
+
+	dist = &hyp->vgic_dist;
+	*rval = dist->gicd_typer;
+}
+
+/* GICD_IIDR */
+static void
+dist_iidr_read(struct hyp *hyp, int vcpuid, u_int reg, u_int offset,
+    u_int size, uint64_t *rval, void *arg)
+{
+	panic("%s", __func__);
+}
+
+/* GICD_STATUSR */
+static void
+dist_statusr_read(struct hyp *hyp, int vcpuid, u_int reg, u_int offset,
+    u_int size, uint64_t *rval, void *arg)
+{
+	panic("%s", __func__);
+}
+
+static void
+dist_statusr_write(struct hyp *hyp, int vcpuid, u_int reg, u_int offset,
+    u_int size, uint64_t wval, void *arg)
+{
+	panic("%s", __func__);
+}
+
+/* GICD_SETSPI_NSR & GICD_CLRSPI_NSR */
+static void
+dist_setclrspi_nsr_write(struct hyp *hyp, int vcpuid, u_int reg, u_int offset,
+    u_int size, uint64_t wval, void *arg)
+{
+	uint32_t irqid;
+
+	irqid = wval & GICD_SPI_INTID_MASK;
+	vgic_v3_inject_irq(hyp, vcpuid, irqid, reg == GICD_SETSPI_NSR);
+}
+
+/* GICD_ISENABLER */
+static void
+dist_isenabler_read(struct hyp *hyp, int vcpuid, u_int reg, u_int offset,
+    u_int size, uint64_t *rval, void *arg)
+{
+	int n;
+
+	n = (reg - GICD_ISENABLER(0)) / 4;
+	/* GICD_ISENABLER0 is RAZ/WI so handled separately */
+	MPASS(n > 0);
+	*rval = read_enabler(hyp, vcpuid, n);
+}
+
+static void
+dist_isenabler_write(struct hyp *hyp, int vcpuid, u_int reg, u_int offset,
+    u_int size, uint64_t wval, void *arg)
+{
+	int n;
+
+	n = (reg - GICD_ISENABLER(0)) / 4;
+	/* GICD_ISENABLER0 is RAZ/WI so handled separately */
+	MPASS(n > 0);
+	write_enabler(hyp, vcpuid, n, true, wval);
+}
+
+/* GICD_ICENABLER */
+static void
+dist_icenabler_read(struct hyp *hyp, int vcpuid, u_int reg, u_int offset,
+    u_int size, uint64_t *rval, void *arg)
+{
+	int n;
+
+	n = (reg - GICD_ICENABLER(0)) / 4;
+	/* GICD_ICENABLER0 is RAZ/WI so handled separately */
+	MPASS(n > 0);
+	*rval = read_enabler(hyp, vcpuid, n);
+}
+
+static void
+dist_icenabler_write(struct hyp *hyp, int vcpuid, u_int reg, u_int offset,
+    u_int size, uint64_t wval, void *arg)
+{
+	int n;
+
+	n = (reg - GICD_ISENABLER(0)) / 4;
+	/* GICD_ICENABLER0 is RAZ/WI so handled separately */
+	MPASS(n > 0);
+	write_enabler(hyp, vcpuid, n, false, wval);
+}
+
+/* GICD_ISPENDR */
+static void
+dist_ispendr_read(struct hyp *hyp, int vcpuid, u_int reg, u_int offset,
+    u_int size, uint64_t *rval, void *arg)
+{
+	int n;
+
+	n = (reg - GICD_ISPENDR(0)) / 4;
+	/* GICD_ISPENDR0 is RAZ/WI so handled separately */
+	MPASS(n > 0);
+	*rval = read_pendr(hyp, vcpuid, n);
+}
+
+static void
+dist_ispendr_write(struct hyp *hyp, int vcpuid, u_int reg, u_int offset,
+    u_int size, uint64_t wval, void *arg)
+{
+	int n;
+
+	n = (reg - GICD_ISPENDR(0)) / 4;
+	/* GICD_ISPENDR0 is RAZ/WI so handled separately */
+	MPASS(n > 0);
+	write_pendr(hyp, vcpuid, n, true, wval);
+}
+
+/* GICD_ICPENDR */
+static void
+dist_icpendr_read(struct hyp *hyp, int vcpuid, u_int reg, u_int offset,
+    u_int size, uint64_t *rval, void *arg)
+{
+	int n;
+
+	n = (reg - GICD_ICPENDR(0)) / 4;
+	/* GICD_ICPENDR0 is RAZ/WI so handled separately */
+	MPASS(n > 0);
+	*rval = read_pendr(hyp, vcpuid, n);
+}
+
+static void
+dist_icpendr_write(struct hyp *hyp, int vcpuid, u_int reg, u_int offset,
+    u_int size, uint64_t wval, void *arg)
+{
+	int n;
+
+	n = (reg - GICD_ICPENDR(0)) / 4;
+	/* GICD_ICPENDR0 is RAZ/WI so handled separately */
+	MPASS(n > 0);
+	write_pendr(hyp, vcpuid, n, false, wval);
+}
+
+/* GICD_ISACTIVER */
+/* Affinity routing is enabled so isactiver0 is RAZ/WI */
+static void
+dist_isactiver_read(struct hyp *hyp, int vcpuid, u_int reg, u_int offset,
+    u_int size, uint64_t *rval, void *arg)
+{
+	int n;
+
+	n = (reg - GICD_ISACTIVER(0)) / 4;
+	/* GICD_ISACTIVER0 is RAZ/WI so handled separately */
+	MPASS(n > 0);
+	*rval = read_activer(hyp, vcpuid, n);
+}
+
+static void
+dist_isactiver_write(struct hyp *hyp, int vcpuid, u_int reg, u_int offset,
+    u_int size, uint64_t wval, void *arg)
+{
+	int n;
+
+	n = (reg - GICD_ISACTIVER(0)) / 4;
+	/* GICD_ISACTIVE0 is RAZ/WI so handled separately */
+	MPASS(n > 0);
+	panic("%s", __func__);
+}
+
+/* GICD_ICACTIVER */
+static void
+dist_icactiver_read(struct hyp *hyp, int vcpuid, u_int reg, u_int offset,
+    u_int size, uint64_t *rval, void *arg)
+{
+	int n;
+
+	n = (reg - GICD_ICACTIVER(0)) / 4;
+	/* GICD_ICACTIVE0 is RAZ/WI so handled separately */
+	MPASS(n > 0);
+	*rval = read_activer(hyp, vcpuid, n);
+}
+
+static void
+dist_icactiver_write(struct hyp *hyp, int vcpuid, u_int reg, u_int offset,
+    u_int size, uint64_t wval, void *arg)
+{
+	int n;
+
+	n = (reg - GICD_ICACTIVER(0)) / 4;
+	/* GICD_ICACTIVE0 is RAZ/WI so handled separately */
+	MPASS(n > 0);
+	panic("%s", __func__);
+}
+
+/* GICD_IPRIORITYR */
+/* Affinity routing is enabled so ipriorityr0-7 is RAZ/WI */
+static void
+dist_ipriorityr_read(struct hyp *hyp, int vcpuid, u_int reg, u_int offset,
+    u_int size, uint64_t *rval, void *arg)
+{
+	int n;
+
+	n = (reg - GICD_IPRIORITYR(0)) / 4;
+	/* GICD_IPRIORITY0-7 is RAZ/WI so handled separately */
+	MPASS(n > 7);
+	panic("%s", __func__);
+}
+
+static void
+dist_ipriorityr_write(struct hyp *hyp, int vcpuid, u_int reg, u_int offset,
+    u_int size, uint64_t wval, void *arg)
+{
+	int n;
+
+	n = (reg - GICD_IPRIORITYR(0)) / 4;
+	/* GICD_IPRIORITY0-7 is RAZ/WI so handled separately */
+	MPASS(n > 7);
+	write_priorityr(hyp, vcpuid, n, wval);
+}
+
+/* GICD_ICFGR */
+static void
+dist_icfgr_read(struct hyp *hyp, int vcpuid, u_int reg, u_int offset,
+    u_int size, uint64_t *rval, void *arg)
+{
+	int n;
+
+	n = (reg - GICD_ICFGR(0)) / 4;
+	/* GICD_ICFGR0-1 are RAZ/WI so handled separately */
+	MPASS(n > 1);
+	*rval = read_config(hyp, vcpuid, n);
+}
+
+static void
+dist_icfgr_write(struct hyp *hyp, int vcpuid, u_int reg, u_int offset,
+    u_int size, uint64_t wval, void *arg)
+{
+	int n;
+
+	n = (reg - GICD_ICFGR(0)) / 4;
+	/* GICD_ICFGR0-1 are RAZ/WI so handled separately */
+	MPASS(n > 1);
+	write_config(hyp, vcpuid, n, wval);
+}
+
+/* GICD_IROUTER */
+static void
+dist_irouter_read(struct hyp *hyp, int vcpuid, u_int reg, u_int offset,
+    u_int size, uint64_t *rval, void *arg)
+{
+	int n;
+
+	n = (reg - GICD_IROUTER(0)) / 8;
+	/* GICD_IROUTER0-31 don't exist */
+	MPASS(n > 31);
+	*rval = read_route(hyp, vcpuid, n);
+}
+
+static void
+dist_irouter_write(struct hyp *hyp, int vcpuid, u_int reg, u_int offset,
+    u_int size, uint64_t wval, void *arg)
+{
+	int n;
+
+	n = (reg - GICD_IROUTER(0)) / 8;
+	/* GICD_IROUTER0-31 don't exist */
+	MPASS(n > 31);
+	write_route(hyp, vcpuid, n, wval);
+}
+
+/*
+static void
+(struct hyp *hyp, int vcpuid, u_int reg, u_int offset, u_int size,
+    uint64_t *rval, void *arg)
+{
+	panic("%s", __func__);
+}
+
+static void
+(struct hyp *hyp, int vcpuid, u_int reg, u_int offset, u_int size,
+    uint64_t wval, void *arg)
+{
+	panic("%s", __func__);
+}
+*/
+
+static bool
+vgic_register_read(struct hyp *hyp, struct vgic_register *reg_list,
+    u_int reg_list_size, int vcpuid, u_int reg, u_int size,
+    uint64_t *rval, void *arg)
+{
+	u_int i, offset;
+
+	for (i = 0; i < reg_list_size; i++) {
+		if (reg_list[i].start <= reg && reg_list[i].end >= reg + size) {
+			offset = 0; /* TODO */
+			if ((reg_list[i].flags & size) != 0) {
+				reg_list[i].read(hyp, vcpuid, reg, offset,
+				    size, rval, NULL);
+			} else {
+				panic("TODO: Handle invalid register size: "
+				    "reg %x size %d", reg, size);
+			}
+			return (true);
+		}
+	}
+	return (false);
+}
+
+static bool
+vgic_register_write(struct hyp *hyp, struct vgic_register *reg_list,
+    u_int reg_list_size, int vcpuid, u_int reg, u_int size,
+    uint64_t wval, void *arg)
+{
+	u_int i, offset;
+
+	for (i = 0; i < reg_list_size; i++) {
+		if (reg_list[i].start <= reg && reg_list[i].end >= reg + size) {
+			offset = 0; /* TODO */
+			if ((reg_list[i].flags & size) != 0) {
+				reg_list[i].write(hyp, vcpuid, reg, offset,
+				    size, wval, NULL);
+			} else {
+				panic("TODO: Handle invalid register size: "
+				    "reg %x size %d", reg, size);
+			}
+			return (true);
+		}
+	}
+	return (false);
+}
+
 static int
 dist_read(void *vm, int vcpuid, uint64_t fault_ipa, uint64_t *rval,
     int size, void *arg)
@@ -487,11 +1063,9 @@ dist_read(void *vm, int vcpuid, uint64_t fault_ipa, uint64_t *rval,
 	struct vgic_v3_dist *dist = &hyp->vgic_dist;
 	bool *retu = arg;
 	uint64_t reg;
-	int n;
 
 	/* Check the register is one of ours and is the correct size */
-	if (fault_ipa < dist->start || fault_ipa + size > dist->end ||
-	    size != 4) {
+	if (fault_ipa < dist->start || fault_ipa + size > dist->end) {
 		return (EINVAL);
 	}
 
@@ -500,139 +1074,8 @@ dist_read(void *vm, int vcpuid, uint64_t fault_ipa, uint64_t *rval,
 	if ((reg & (size - 1)) != 0)
 		return (EINVAL);
 
-	switch(reg) {
-	default:
-		break;
-	case GICD_CTLR:
-		mtx_lock_spin(&dist->dist_mtx);
-		*rval = dist->gicd_ctlr;
-		mtx_unlock_spin(&dist->dist_mtx);
-
-		/* Writes are never pending */
-		*rval &= ~GICD_CTLR_RWP;
-
-		*retu = false;
-		return (0);
-	case GICD_TYPER:
-		*rval = dist->gicd_typer;
-		*retu = false;
-		return (0);
-	case GICD_PIDR2:
-		*rval = dist->gicd_pidr2;
-		*retu = false;
-		return (0);
-	}
-
-	if (reg >= GICD_IGROUPR(0) && /* 0x0080 */
-	    reg < GICD_IGROUPR(1024)) {
-
-		/*
-		 * GIC Architecture specification, p 8-477: "For SGIs and PPIs:
-		 * When ARE is 1 for the Security state of an interrupt, the
-		 * field for that interrupt is RES0 and an implementation is
-		 * permitted to make the field RAZ/WI in this case".
-		 */
-		if (reg == GICD_IGROUPR(0) && aff_routing_en(dist))
-			*rval = 0;
-		else
-			*rval = 0xffffffff;
-		*retu = false;
-		return (0);
-	}
-
-	if (reg >= GICD_ISENABLER(0) &&   /* 0x0100 */
-	    reg < GICD_ISENABLER(1024)) { /* 0x0180 */
-		n = (reg - GICD_ISENABLER(0)) / 4;
-		/* The first register is RAZ as affinity routing is on */
-		if (n == 0)
-			*rval = 0;
-		else
-			*rval = read_enabler(hyp, vcpuid, n);
-		*retu = false;
-		return (0);
-	}
-
-	if (reg >= GICD_ICENABLER(0) &&   /* 0x0180 */
-	    reg < GICD_ICENABLER(1024)) { /* 0x0200 */
-		n = (reg - GICD_ICENABLER(0)) / 4;
-		/* The first register is RAZ as affinity routing is on */
-		if (n == 0)
-			*rval = 0;
-		else
-			*rval = read_enabler(hyp, vcpuid, n);
-		*retu = false;
-		return (0);
-	}
-
-	if (reg >= GICD_ISPENDR(0) &&   /* 0x0200 */
-	    reg < GICD_ISPENDR(1024)) { /* 0x0280 */
-		n = (reg - GICD_ISPENDR(0)) / 4;
-		*rval = read_pendr(hyp, vcpuid, n);
-		return (0);
-	}
-
-	if (reg >= GICD_ICPENDR(0) &&   /* 0x0280 */
-	    reg < GICD_ICPENDR(1024)) { /* 0x0300 */
-		n = (reg - GICD_ICPENDR(0)) / 4;
-		*rval = read_pendr(hyp, vcpuid, n);
-		return (0);
-	}
-
-	if (reg >= GICD_ISACTIVER(0) &&   /* 0x0300 */
-	    reg < GICD_ISACTIVER(1024)) { /* 0x0380 */
-		n = (reg - GICD_ISACTIVER(0)) / 4;
-		*rval = read_activer(hyp, vcpuid, n);
-		return (0);
-	}
-
-	if (reg >= GICD_ICACTIVER(0) &&   /* 0x0380 */
-	    reg < GICD_ICACTIVER(1024)) { /* 0x0400 */
-		n = (reg - GICD_ICACTIVER(0)) / 4;
-		*rval = read_activer(hyp, vcpuid, n);
-		return (0);
-	}
-
-	if (reg >= GICD_IPRIORITYR(0) &&   /* 0x0400 */
-	    reg < GICD_IPRIORITYR(1024)) { /* 0x0800 */
-		n = (reg - GICD_IPRIORITYR(0)) / 4;
-		/* The first 8 registers are RAZ as affinity routing is on */
-		if (n <= 7) {
-			*rval = 0;
-		} else {
-			*rval = read_priorityr(hyp, vcpuid, n);
-		}
-		*retu = false;
-		return (0);
-	}
-
-	if (reg >= GICD_ITARGETSR(0) &&   /* 0x0800 */
-	    reg < GICD_ITARGETSR(1024)) { /* 0x0C00 */
-		/* TODO: Implement */
-		return (1);
-	}
-
-	if (reg >= GICD_ICFGR(0) && /* 0x0C00 */
-	    reg < (GICD_ICFGR(1024))) {
-		n = (reg - GICD_ICFGR(0)) / 4;
-		/* The first 2 registers are RAZ as affinity routing is on */
-		if (n <= 1) {
-			*rval = 0;
-		} else {
-			*rval = read_config(hyp, vcpuid, n);
-		}
-		*retu = false;
-		return (0);
-	}
-
-	/* 64-bit registers */
-	if (reg >= GICD_IROUTER(0) && /* 0x6000 */
-	    reg < GICD_IROUTER(1024)) {
-		n = (reg - GICD_IROUTER(0)) / 8;
-		if (n <= 31) {
-			*rval = 0;
-		} else {
-			*rval = read_route(hyp, vcpuid, n);
-		}
+	if (vgic_register_read(hyp, dist_registers, nitems(dist_registers),
+	    vcpuid, reg, size, rval, NULL)) {
 		*retu = false;
 		return (0);
 	}
@@ -649,8 +1092,6 @@ dist_write(void *vm, int vcpuid, uint64_t fault_ipa, uint64_t wval,
 	struct vgic_v3_dist *dist = &hyp->vgic_dist;
 	bool *retu = arg;
 	uint64_t reg;
-	uint32_t irqid;
-	int n;
 
 	/* Check the register is one of ours and is the correct size */
 	if (fault_ipa < dist->start || fault_ipa + size > dist->end) {
@@ -662,129 +1103,8 @@ dist_write(void *vm, int vcpuid, uint64_t fault_ipa, uint64_t wval,
 	if ((reg & (size - 1)) != 0)
 		return (EINVAL);
 
-	switch(reg) {
-	default:
-		break;
-	case GICD_CTLR:
-		/*
-		 * GICv2 backwards compatibility is not implemented so
-		 * ARE_NS is RAO/WI. This means EnableGrp1 is RES0.
-		 *
-		 * EnableGrp1A is supported, and RWP is read-only.
-		 *
-		 * All other bits are RES0 from non-secure mode as we
-		 * implement as if we are in a system with two security
-		 * states.
-		 */
-		wval &= GICD_CTLR_G1A;
-		wval |= GICD_CTLR_ARE_NS;
-		mtx_lock_spin(&dist->dist_mtx);
-		dist->gicd_ctlr = wval;
-		/* TODO: Wake any vcpus that have interrupts pending */
-		mtx_unlock_spin(&dist->dist_mtx);
-
-		*retu = false;
-		return (0);
-	case GICD_SETSPI_NSR:
-	case GICD_CLRSPI_NSR:
-		irqid = wval & GICD_SPI_INTID_MASK;
-		vgic_v3_inject_irq(hyp, vcpuid, irqid, reg == GICD_SETSPI_NSR);
-		*retu = false;
-		return (0);
-
-	/* Read-only registers: */
-	case GICD_TYPER:
-	case GICD_IIDR:
-	case GICD_SGIR:
-	/* Secure registers, write ignored from non-secure mode: */
-	case GICD_SETSPI_SR:
-	case GICD_CLRSPI_SR:
-	/* We don't report any issues from GICD_STATUSR: */
-	case GICD_STATUSR:
-		*retu = false;
-		return (0);
-	}
-
-	/* Only group 1 interrupts are supported. Treat IGROUPR as RA0/WI. */
-	if (reg >= GICD_IGROUPR(0) && /* 0x0080 */
-	    reg < (GICD_IGROUPR(1024))) {
-		*retu = false;
-		return (0);
-	}
-
-	if (reg >= GICD_ISENABLER(0) && /* 0x0100 */
-	    reg < GICD_ISENABLER(1024)) {
-		n = (reg - GICD_ISENABLER(0)) / 4;
-		write_enabler(hyp, vcpuid, n, true, wval);
-		*retu = false;
-		return (0);
-	}
-
-	if (reg >= GICD_ICENABLER(0) && /* 0x0180 */
-	    reg < GICD_ICENABLER(1024)) {
-		n = (reg - GICD_ICENABLER(0)) / 4;
-		write_enabler(hyp, vcpuid, n, false, wval);
-		*retu = false;
-		return (0);
-	}
-
-	if (reg >= GICD_ISPENDR(0) &&   /* 0x0200 */
-	    reg < GICD_ISPENDR(1024)) { /* 0x0280 */
-		n = (reg - GICD_ISPENDR(0)) / 4;
-		write_pendr(hyp, vcpuid, n, true, wval);
-		*retu = false;
-		return (0);
-	}
-
-	if (reg >= GICD_ICPENDR(0) &&   /* 0x0280 */
-	    reg < GICD_ICPENDR(1024)) { /* 0x0300 */
-		n = (reg - GICD_ICPENDR(0)) / 4;
-		write_pendr(hyp, vcpuid, n, false, wval);
-		*retu = false;
-		return (0);
-	}
-
-	if (reg >= GICD_ICACTIVER(0) && /* 0x0380 */
-	    reg < GICD_ICACTIVER(1024)) {
-		/* TODO: Implement */
-		*retu = false;
-		return (0);
-	}
-
-	if (reg >= GICD_IPRIORITYR(0) &&   /* 0x0400 */
-	    reg < GICD_IPRIORITYR(1024)) { /* 0x0800 */
-		n = (reg - GICD_IPRIORITYR(0)) / 4;
-		/* The first 8 registers are WI as affinity routing is on */
-		if (n > 7) {
-			write_priorityr(hyp, vcpuid, n, wval);
-		}
-		*retu = false;
-		return (0);
-	}
-
-	if (reg >= GICD_ICFGR(0) &&
-	    reg < GICD_ICFGR(1024)) {
-		n = (reg - GICD_ICFGR(0)) / 4;
-		/* XXX */
-		if (n > 1) {
-			write_config(hyp, vcpuid, n, wval);
-		}
-		*retu = false;
-		return (0);
-	}
-
-	if (reg >= GICD_IROUTER(0) && /* 0x6000 */
-	    reg < GICD_IROUTER(1024)) {
-		n = (reg - GICD_IROUTER(0)) / 8;
-		if (n > 31) {
-			write_route(hyp, vcpuid, n, wval);
-		}
-		*retu = false;
-		return (0);
-	}
-
-	if (reg >= GICD_PIDR4) { /* 0xFFD0 */
-		/* ID registers, read-only */
+	if (vgic_register_write(hyp, dist_registers, nitems(dist_registers),
+	    vcpuid, reg, size, wval, NULL)) {
 		*retu = false;
 		return (0);
 	}
