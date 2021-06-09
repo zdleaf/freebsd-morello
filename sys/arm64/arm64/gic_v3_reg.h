@@ -63,6 +63,7 @@
 #define	 GICD_TYPER_MBIS	(1 << 16)
 #define	 GICD_TYPER_LPIS	(1 << 17)
 #define	 GICD_TYPER_DVIS	(1 << 18)
+#define	 GICD_TYPER_IDBITS_SHIFT 19
 #define	 GICD_TYPER_IDBITS(n)	((((n) >> 19) & 0x1F) + 1)
 
 /*
@@ -91,6 +92,8 @@
 #define	GICD_PIDR0		0xFFE0
 #define	GICD_PIDR1		0xFFE4
 #define	GICD_PIDR2		0xFFE8
+
+#define	GICD_SIZE		0x10000
 
 #define	GICR_PIDR2_ARCH_SHIFT	4
 #define	GICR_PIDR2_ARCH_MASK	0xF0

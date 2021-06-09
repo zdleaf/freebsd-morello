@@ -74,10 +74,8 @@ struct vgic_v3_virt_features {
 	size_t ich_ap1r_num;
 };
 
-struct vgic_v3_ro_regs {
-	uint32_t gicd_icfgr0;
-	uint32_t gicd_typer;
-};
+/* How many IRQs we support (SGIs + PPIs + SPIs). Not including LPIs */
+#define	VGIC_NIRQS	1023
 
 typedef void (register_read)(struct hyp *, int, u_int, u_int, u_int,
     uint64_t *, void *);
@@ -255,7 +253,6 @@ static struct vgic_register dist_registers[] = {
 };
 
 static struct vgic_v3_virt_features virt_features;
-static struct vgic_v3_ro_regs ro_regs;
 
 static struct gic_v3_softc *gic_sc;
 
@@ -387,9 +384,6 @@ vgic_v3_vminit(void *arg)
 	 * GICv3 and GICv4, p. 4-464)
 	 */
 	dist->gicd_ctlr = 0;
-
-	dist->gicd_typer = ro_regs.gicd_typer;
-	dist->nirqs = GICD_TYPER_I_NUM(dist->gicd_typer);
 
 	mtx_init(&dist->dist_mtx, "VGICv3 Distributor lock", NULL, MTX_SPIN);
 }
@@ -724,10 +718,14 @@ static void
 dist_typer_read(struct hyp *hyp, int vcpuid, u_int reg, u_int offset,
     u_int size, uint64_t *rval, void *arg)
 {
-	struct vgic_v3_dist *dist;
+	uint32_t typer;
 
-	dist = &hyp->vgic_dist;
-	*rval = dist->gicd_typer;
+	typer = (10 - 1) << GICD_TYPER_IDBITS_SHIFT;
+	typer |= GICD_TYPER_MBIS;
+	/* ITLinesNumber: */
+	typer |= howmany(VGIC_NIRQS + 1, 32) - 1;
+
+	*rval = typer;
 }
 
 /* GICD_IIDR */
@@ -1330,10 +1328,10 @@ vgic_v3_mmio_init(struct hyp *hyp)
 
 	/* Allocate memory for the SPIs */
 	dist = &hyp->vgic_dist;
-	dist->irqs = malloc((dist->nirqs - VGIC_PRV_I_NUM) *
+	dist->irqs = malloc((VGIC_NIRQS - VGIC_PRV_I_NUM) *
 	    sizeof(*dist->irqs), M_VGIC_V3, M_WAITOK | M_ZERO);
 
-	for (i = 0; i < dist->nirqs - VGIC_PRV_I_NUM; i++) {
+	for (i = 0; i < VGIC_NIRQS - VGIC_PRV_I_NUM; i++) {
 		irq = &dist->irqs[i];
 
 		/* TODO: We need a call to mtx_destroy */
@@ -1416,7 +1414,7 @@ vgic_v3_get_irq(struct hyp *hyp, int vcpuid, uint32_t irqid)
 	} else if (irqid <= GIC_LAST_SPI) {
 		dist = &hyp->vgic_dist;
 		irqid -= VGIC_PRV_I_NUM;
-		if (irqid >= dist->nirqs)
+		if (irqid >= VGIC_NIRQS)
 			return (NULL);
 		irq = &dist->irqs[irqid];
 	} else if (irqid < GIC_FIRST_LPI) {
@@ -1632,21 +1630,6 @@ vgic_v3_sync_hwstate(void *arg)
 	cpu_if->ich_lr_used = 0;
 }
 
-static void
-vgic_v3_get_ro_regs()
-{
-	/* GICD_ICFGR0 configures SGIs and it is read-only. */
-	ro_regs.gicd_icfgr0 = gic_d_read(gic_sc, 4, GICD_ICFGR(0));
-
-	/*
-	 * Configure the GIC type register for the guest.
-	 * All SPIs and max LPI of 64k - 1.
-	 */
-	ro_regs.gicd_typer = 31;
-	ro_regs.gicd_typer |= 16ul << 19;
-	ro_regs.gicd_typer |= GICD_TYPER_MBIS;
-}
-
 bool
 vgic_attach(void)
 {
@@ -1675,8 +1658,6 @@ vgic_v3_init(uint64_t ich_vtr_el2)
 	uint32_t pribits, prebits;
 
 	KASSERT(gic_sc != NULL, ("GIC softc is NULL"));
-
-	vgic_v3_get_ro_regs();
 
 	pribits = ICH_VTR_EL2_PRIBITS(ich_vtr_el2);
 	switch (pribits) {

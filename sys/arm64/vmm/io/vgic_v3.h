@@ -101,10 +101,8 @@ struct vgic_v3_dist {
 
 	uint64_t 	start;
 	size_t   	end;
-	size_t		nirqs;
 
 	uint32_t 	gicd_ctlr;	/* Distributor Control Register */
-	uint32_t 	gicd_typer;	/* Interrupt Controller Type Register */
 
 	struct vgic_v3_irq *irqs;
 	SLIST_HEAD(, vgic_v3_lpi) lpis;
