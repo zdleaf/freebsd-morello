@@ -115,11 +115,8 @@ struct vgic_v3_redist {
 	uint64_t 	end;
 
 	uint64_t	gicr_typer;	/* Redistributor Type Register */
-	uint32_t	gicr_ctlr;	/* Redistributor Control Regiser */
-	uint32_t	gicr_propbaser;	/* Redistributor Properties Base Addr */
-	uint32_t	gicr_pendbaser;	/* Redistributor LPI Pending Base Addr*/
-	/* Interupt Configuration Registers */
-	uint32_t	gicr_icfgr0, gicr_icfgr1;
+	uint64_t	gicr_propbaser;	/* Redistributor Properties Base Addr */
+	uint64_t	gicr_pendbaser;	/* Redistributor LPI Pending Base Addr*/
 };
 
 struct vgic_v3_irq;

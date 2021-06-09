@@ -104,17 +104,22 @@
 
 #define	GICD_PIDR3		0xFFEC
 
-/* Redistributor registers */
-#define	GICR_CTLR		GICD_CTLR
+/*
+ * Redistributor registers
+ */
+
+/* RD_base registers */
+#define	GICR_CTLR		0x0000
 #define	 GICR_CTLR_LPI_ENABLE	(1 << 0)
 #define	 GICR_CTLR_RWP		(1 << 3)
 #define	 GICR_CTLR_DPG0		(1 << 24)
 #define	 GICR_CTLR_DPG1NS	(1 << 25)
+#define	 GICR_CTLR_DPG1S	(1 << 26)
 #define	 GICR_CTLR_UWP		(1 << 31)
 
-#define	GICR_PIDR2		GICD_PIDR2
+#define	GICR_IIDR		0x0004
 
-#define	GICR_TYPER		(0x0008)
+#define	GICR_TYPER		0x0008
 #define	 GICR_TYPER_PLPIS	(1 << 0)
 #define	 GICR_TYPER_VLPIS	(1 << 1)
 #define	 GICR_TYPER_LAST	(1 << 4)
@@ -127,11 +132,16 @@
 #define	GICR_TYPER_AFF(x)					\
     (((x) & GICR_TYPER_AFF_MASK) >> GICR_TYPER_AFF_SHIFT)
 
-#define	GICR_WAKER		(0x0014)
+#define	GICR_STATUSR		0x0010
+
+#define	GICR_WAKER		0x0014
 #define	GICR_WAKER_PS		(1 << 1) /* Processor sleep */
 #define	GICR_WAKER_CA		(1 << 2) /* Children asleep */
 
-#define	GICR_PROPBASER		(0x0070)
+#define	GICR_SETLPIR		0x0040
+#define	GICR_CLRLPIR		0x0048
+
+#define	GICR_PROPBASER		0x0070
 #define		GICR_PROPBASER_IDBITS_MASK	0x1FUL
 /*
  * Cacheability
@@ -175,7 +185,7 @@
 #define		GICR_PROPBASER_OUTER_CACHE_MASK		\
 		    (0x7UL << GICR_PROPBASER_OUTER_CACHE_SHIFT)
 
-#define	GICR_PENDBASER		(0x0078)
+#define	GICR_PENDBASER		0x0078
 /*
  * Cacheability
  * 0x0 - Device-nGnRnE
@@ -218,12 +228,13 @@
 #define		GICR_PENDBASER_OUTER_CACHE_MASK		\
 		    (0x7UL << GICR_PENDBASER_OUTER_CACHE_SHIFT)
 
-/* Re-distributor registers for SGIs and PPIs */
-#define	GICR_RD_BASE_SIZE	PAGE_SIZE_64K
-#define	GICR_SGI_BASE_SIZE	PAGE_SIZE_64K
-#define	GICR_VLPI_BASE_SIZE	PAGE_SIZE_64K
-#define	GICR_RESERVED_SIZE	PAGE_SIZE_64K
+#define	GICR_INVLPIR		0x00a0
+#define	GICR_INVALLR		0x00b0
+#define	GICR_SYNCR		0x00c0
 
+#define	GICR_PIDR2		GICD_PIDR2
+
+/* SGI_base registers */
 #define	GICR_IGROUPR0				(0x0080)
 #define	GICR_ISENABLER0				(0x0100)
 #define	GICR_ICENABLER0				(0x0180)
@@ -232,12 +243,28 @@
 
 #define		GICR_I_PER_IPRIORITYn		(GICD_I_PER_IPRIORITYn)
 
+#define	GICR_ISPENDR0				0x0200
+#define	GICR_ICPENDR0				0x0280
+#define	GICR_ISACTIVER0				0x0300
 #define	GICR_ICACTIVER0				0x0380
-#define	GICR_IPRIORITYR_BASE			0x0400
-#define	GICR_ICFGR0_BASE			0x0c00
-#define	GICR_ICFGR1_BASE			0x0c04
+#define	GICR_IPRIORITYR(n)			(0x0400 + (((n) >> 2) * 4))
+#define	GICR_ICFGR0				0x0c00
+#define	GICR_ICFGR1				0x0c04
+#define	GICR_IGRPMODR0				0x0d00
+#define	GICR_NSACR				0x0e00
 
-/* ITS registers */
+/* Re-distributor registers for SGIs and PPIs */
+#define	GICR_RD_BASE		0
+#define	GICR_RD_BASE_SIZE	PAGE_SIZE_64K
+#define	GICR_SGI_BASE		(1 * PAGE_SIZE_64K)
+#define	GICR_SGI_BASE_SIZE	PAGE_SIZE_64K
+#define	GICR_VLPI_BASE		(2 * PAGE_SIZE_64K)
+#define	GICR_VLPI_BASE_SIZE	PAGE_SIZE_64K
+#define	GICR_RESERVED_SIZE	PAGE_SIZE_64K
+
+/*
+ * ITS registers
+ */
 #define	GITS_PIDR2		GICR_PIDR2
 #define	GITS_PIDR2_ARCH_MASK	GICR_PIDR2_ARCH_MASK
 #define	GITS_PIDR2_ARCH_GICv3	GICR_PIDR2_ARCH_GICv3

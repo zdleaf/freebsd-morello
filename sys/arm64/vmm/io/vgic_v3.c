@@ -252,6 +252,105 @@ static struct vgic_register dist_registers[] = {
 	VGIC_REGISTER_RANGE_RAZ_WI(GICD_PIDR2 + 4, GICD_SIZE, 4, VGIC_32_BIT),
 };
 
+/* GICR_CTLR - Ignore writes as no bits can be set */
+static register_read redist_ctlr_read;
+/* GICR_IIDR */
+static register_read redist_iidr_read;
+/* GICR_TYPER */
+static register_read redist_typer_read;
+/* GICR_STATUSR */
+static register_read redist_statusr_read;
+static register_write redist_statusr_write;
+/* GICR_WAKER - RAZ/WI from non-secure mode */
+/* GICR_SETLPIR - RAZ/WI as no LPIs are supported */
+/* GICR_CLRLPIR - RAZ/WI as no LPIs are supported */
+/* GICR_PROPBASER */
+static register_read redist_propbaser_read;
+static register_write redist_propbaser_write;
+/* GICR_PENDBASER */
+static register_read redist_pendbaser_read;
+static register_write redist_pendbaser_write;
+/* GICR_INVLPIR - RAZ/WI as no LPIs are supported */
+/* GICR_INVALLR - RAZ/WI as no LPIs are supported */
+/* GICR_SYNCR - RAZ/WI as no LPIs are supported */
+
+static struct vgic_register redist_rd_registers[] = {
+	VGIC_REGISTER(GICR_CTLR, 4, VGIC_32_BIT, redist_ctlr_read,
+	    gic_ignore_write),
+	VGIC_REGISTER(GICR_IIDR, 4, VGIC_32_BIT, redist_iidr_read,
+	    gic_ignore_write),
+	VGIC_REGISTER(GICR_TYPER, 8, VGIC_64_BIT, redist_typer_read,
+	    gic_ignore_write),
+	VGIC_REGISTER(GICR_STATUSR, 4, VGIC_32_BIT, redist_statusr_read,
+	    redist_statusr_write),
+	VGIC_REGISTER_RAZ_WI(GICR_WAKER, 4, VGIC_32_BIT),
+	VGIC_REGISTER_RAZ_WI(GICR_SETLPIR, 8, VGIC_64_BIT),
+	VGIC_REGISTER_RAZ_WI(GICR_CLRLPIR, 8, VGIC_64_BIT),
+	VGIC_REGISTER(GICR_PROPBASER, 8, VGIC_32_BIT, redist_propbaser_read,
+	    redist_propbaser_write),
+	VGIC_REGISTER(GICR_PENDBASER, 8, VGIC_32_BIT, redist_pendbaser_read,
+	    redist_pendbaser_write),
+	VGIC_REGISTER_RAZ_WI(GICR_INVLPIR, 8, VGIC_64_BIT),
+	VGIC_REGISTER_RAZ_WI(GICR_INVALLR, 8, VGIC_64_BIT),
+	VGIC_REGISTER_RAZ_WI(GICR_SYNCR, 4, VGIC_32_BIT),
+
+	/* These are identical to the dist registers */
+	VGIC_REGISTER_RANGE_RAZ_WI(GICD_PIDR4, GICD_PIDR2, 4, VGIC_32_BIT),
+	VGIC_REGISTER(GICD_PIDR2, 4, VGIC_32_BIT, gic_pidr2_read,
+	    gic_ignore_write),
+	VGIC_REGISTER_RANGE_RAZ_WI(GICD_PIDR2 + 4, GICD_SIZE, 4,
+	    VGIC_32_BIT),
+};
+
+/* GICR_IGROUPR0 - RAZ/WI from non-secure mode */
+/* GICR_ISENABLER0 */
+static register_read redist_ienabler0_read;
+static register_write redist_isenabler0_write;
+/* GICR_ICENABLER0 */
+static register_write redist_icenabler0_write;
+/* GICR_ISPENDR0 */
+static register_read redist_ipendr0_read;
+static register_write redist_ispendr0_write;
+/* GICR_ICPENDR0 */
+static register_write redist_icpendr0_write;
+/* GICR_ISACTIVER0 */
+static register_read redist_iactiver0_read;
+static register_write redist_isactiver0_write;
+/* GICR_ICACTIVER0 */
+static register_write redist_icactiver0_write;
+/* GICR_IPRIORITYR */
+static register_read redist_ipriorityr_read;
+static register_write redist_ipriorityr_write;
+/* GICR_ICFGR0 - RAZ/WI from non-secure mode */
+/* GICR_ICFGR1 */
+static register_read redist_icfgr1_read;
+static register_write redist_icfgr1_write;
+/* GICR_IGRPMODR0 - RAZ/WI from non-secure mode */
+/* GICR_NSCAR - RAZ/WI from non-secure mode */
+
+static struct vgic_register redist_sgi_registers[] = {
+	VGIC_REGISTER_RAZ_WI(GICR_IGROUPR0, 4, VGIC_32_BIT),
+	VGIC_REGISTER(GICR_ISENABLER0, 4, VGIC_32_BIT, redist_ienabler0_read,
+	    redist_isenabler0_write),
+	VGIC_REGISTER(GICR_ICENABLER0, 4, VGIC_32_BIT, redist_ienabler0_read,
+	    redist_icenabler0_write),
+	VGIC_REGISTER(GICR_ISPENDR0, 4, VGIC_32_BIT, redist_ipendr0_read,
+	    redist_ispendr0_write),
+	VGIC_REGISTER(GICR_ICPENDR0, 4, VGIC_32_BIT, redist_ipendr0_read,
+	    redist_icpendr0_write),
+	VGIC_REGISTER(GICR_ISACTIVER0, 4, VGIC_32_BIT, redist_iactiver0_read,
+	    redist_isactiver0_write),
+	VGIC_REGISTER(GICR_ICACTIVER0, 4, VGIC_32_BIT, redist_iactiver0_read,
+	    redist_icactiver0_write),
+	VGIC_REGISTER_RANGE(GICR_IPRIORITYR(0), GICR_IPRIORITYR(32), 4,
+	    VGIC_32_BIT, redist_ipriorityr_read, redist_ipriorityr_write),
+	VGIC_REGISTER_RAZ_WI(GICR_ICFGR0, 4, VGIC_32_BIT),
+	VGIC_REGISTER(GICR_ICFGR1, 4, VGIC_32_BIT, redist_icfgr1_read,
+	    redist_icfgr1_write),
+	VGIC_REGISTER_RAZ_WI(GICR_IGRPMODR0, 4, VGIC_32_BIT),
+	VGIC_REGISTER_RAZ_WI(GICR_NSACR, 4, VGIC_32_BIT),
+};
+
 static struct vgic_v3_virt_features virt_features;
 
 static struct gic_v3_softc *gic_sc;
@@ -284,21 +383,10 @@ vgic_v3_cpuinit(void *arg, bool last_vcpu)
 	redist->gicr_typer = aff << GICR_TYPER_AFF_SHIFT;
 	/* Set the vcpu as the processsor ID */
 	redist->gicr_typer |= hypctx->vcpu << GICR_TYPER_CPUNUM_SHIFT;
-	/* Redistributor doesn't support virtual LPIS. */
-	redist->gicr_typer &= ~GICR_TYPER_VLPIS;
-	redist->gicr_typer |= GICR_TYPER_PLPIS;
 
 	if (last_vcpu)
 		/* Mark the last Redistributor */
 		redist->gicr_typer |= GICR_TYPER_LAST;
-
-	/*
-	 * Configure the Redistributor Control Register.
-	 *
-	 * ~GICR_CTLR_LPI_ENABLE: LPIs are disabled
-	 */
-	redist->gicr_ctlr = 0 & ~GICR_CTLR_LPI_ENABLE;
-
 
 	redist->gicr_propbaser =
 	    (GICR_PROPBASER_SHARE_OS << GICR_PROPBASER_SHARE_SHIFT) |
@@ -1109,6 +1197,216 @@ dist_write(void *vm, int vcpuid, uint64_t fault_ipa, uint64_t wval,
 	return (0);
 }
 
+/*
+ * Redistributor register handlers.
+ *
+ * RD_base:
+ */
+/* GICR_CTLR */
+static void
+redist_ctlr_read(struct hyp *hyp, int vcpuid, u_int reg, u_int offset,
+    u_int size, uint64_t *rval, void *arg)
+{
+	struct vgic_v3_redist *redist;
+
+	redist = &hyp->ctx[vcpuid].vgic_redist;
+	*rval = 0;
+}
+
+/* GICR_IIDR */
+static void
+redist_iidr_read(struct hyp *hyp, int vcpuid, u_int reg, u_int offset,
+    u_int size, uint64_t *rval, void *arg)
+{
+	panic("%s", __func__);
+}
+
+/* GICR_TYPER */
+static void
+redist_typer_read(struct hyp *hyp, int vcpuid, u_int reg, u_int offset,
+    u_int size, uint64_t *rval, void *arg)
+{
+	struct vgic_v3_redist *redist;
+
+	redist = &hyp->ctx[vcpuid].vgic_redist;
+	*rval = redist->gicr_typer;
+}
+
+/* GICR_STATUSR */
+static void
+redist_statusr_read(struct hyp *hyp, int vcpuid, u_int reg, u_int offset,
+    u_int size, uint64_t *rval, void *arg)
+{
+	panic("%s", __func__);
+}
+
+static void
+redist_statusr_write(struct hyp *hyp, int vcpuid, u_int reg, u_int offset,
+    u_int size, uint64_t wval, void *arg)
+{
+	panic("%s", __func__);
+}
+
+/* GICR_PROPBASER */
+static void
+redist_propbaser_read(struct hyp *hyp, int vcpuid, u_int reg, u_int offset,
+    u_int size, uint64_t *rval, void *arg)
+{
+	struct vgic_v3_redist *redist;
+
+	redist = &hyp->ctx[vcpuid].vgic_redist;
+	*rval = atomic_load_32(&redist->gicr_propbaser);
+}
+
+static void
+redist_propbaser_write(struct hyp *hyp, int vcpuid, u_int reg, u_int offset,
+    u_int size, uint64_t wval, void *arg)
+{
+	struct vgic_v3_redist *redist;
+
+	redist = &hyp->ctx[vcpuid].vgic_redist;
+	wval &= ~(GICR_PROPBASER_OUTER_CACHE_MASK |
+	    GICR_PROPBASER_SHARE_MASK | GICR_PROPBASER_CACHE_MASK);
+	wval |=
+	    (GICR_PROPBASER_SHARE_OS << GICR_PROPBASER_SHARE_SHIFT) |
+	    (GICR_PROPBASER_CACHE_NIWAWB << GICR_PROPBASER_CACHE_SHIFT);
+	redist->gicr_propbaser = wval;
+}
+
+/* GICR_PENDBASER */
+static void
+redist_pendbaser_read(struct hyp *hyp, int vcpuid, u_int reg, u_int offset,
+    u_int size, uint64_t *rval, void *arg)
+{
+	struct vgic_v3_redist *redist;
+
+	redist = &hyp->ctx[vcpuid].vgic_redist;
+	*rval = redist->gicr_pendbaser;
+}
+
+static void
+redist_pendbaser_write(struct hyp *hyp, int vcpuid, u_int reg, u_int offset,
+    u_int size, uint64_t wval, void *arg)
+{
+	struct vgic_v3_redist *redist;
+
+	redist = &hyp->ctx[vcpuid].vgic_redist;
+	wval &= ~(GICR_PENDBASER_OUTER_CACHE_MASK |
+	    GICR_PENDBASER_SHARE_MASK | GICR_PENDBASER_CACHE_MASK);
+	wval |=
+	    (GICR_PENDBASER_SHARE_OS << GICR_PENDBASER_SHARE_SHIFT) |
+	    (GICR_PENDBASER_CACHE_NIWAWB << GICR_PENDBASER_CACHE_SHIFT);
+	atomic_store_32(&redist->gicr_pendbaser, wval);
+}
+
+/*
+ * SGI_base:
+ */
+/* GICR_ISENABLER0 */
+static void
+redist_ienabler0_read(struct hyp *hyp, int vcpuid, u_int reg, u_int offset,
+    u_int size, uint64_t *rval, void *arg)
+{
+	*rval = read_enabler(hyp, vcpuid, 0);
+}
+
+static void
+redist_isenabler0_write(struct hyp *hyp, int vcpuid, u_int reg, u_int offset,
+    u_int size, uint64_t wval, void *arg)
+{
+	write_enabler(hyp, vcpuid, 0, true, wval);
+}
+
+/* GICR_ICENABLER0 */
+static void
+redist_icenabler0_write(struct hyp *hyp, int vcpuid, u_int reg, u_int offset,
+    u_int size, uint64_t wval, void *arg)
+{
+	write_enabler(hyp, vcpuid, 0, false, wval);
+}
+
+/* GICR_ISPENDR0 */
+static void
+redist_ipendr0_read(struct hyp *hyp, int vcpuid, u_int reg, u_int offset,
+    u_int size, uint64_t *rval, void *arg)
+{
+	*rval = read_pendr(hyp, vcpuid, 0);
+}
+
+static void
+redist_ispendr0_write(struct hyp *hyp, int vcpuid, u_int reg, u_int offset,
+    u_int size, uint64_t wval, void *arg)
+{
+	write_pendr(hyp, vcpuid, 0, true, wval);
+}
+
+/* GICR_ICPENDR0 */
+static void
+redist_icpendr0_write(struct hyp *hyp, int vcpuid, u_int reg, u_int offset,
+    u_int size, uint64_t wval, void *arg)
+{
+	write_pendr(hyp, vcpuid, 0, false, wval);
+}
+
+/* GICR_ISACTIVER0 */
+static void
+redist_iactiver0_read(struct hyp *hyp, int vcpuid, u_int reg, u_int offset,
+    u_int size, uint64_t *rval, void *arg)
+{
+	*rval = read_activer(hyp, vcpuid, 0);
+}
+
+static void
+redist_isactiver0_write(struct hyp *hyp, int vcpuid, u_int reg, u_int offset,
+    u_int size, uint64_t wval, void *arg)
+{
+	panic("%s", __func__);
+}
+
+/* GICR_ICACTIVER0 */
+static void
+redist_icactiver0_write(struct hyp *hyp, int vcpuid, u_int reg, u_int offset,
+    u_int size, uint64_t wval, void *arg)
+{
+	panic("%s", __func__);
+}
+
+/* GICR_IPRIORITYR */
+static void
+redist_ipriorityr_read(struct hyp *hyp, int vcpuid, u_int reg, u_int offset,
+    u_int size, uint64_t *rval, void *arg)
+{
+	int n;
+
+	n = (reg - GICR_IPRIORITYR(0)) / 4;
+	*rval = read_priorityr(hyp, vcpuid, n);
+}
+
+static void
+redist_ipriorityr_write(struct hyp *hyp, int vcpuid, u_int reg, u_int offset,
+    u_int size, uint64_t wval, void *arg)
+{
+	int n;
+
+	n = (reg - GICR_IPRIORITYR(0)) / 4;
+	write_priorityr(hyp, vcpuid, n, wval);
+}
+
+/* GICR_ICFGR1 */
+static void
+redist_icfgr1_read(struct hyp *hyp, int vcpuid, u_int reg, u_int offset,
+    u_int size, uint64_t *rval, void *arg)
+{
+	*rval = read_config(hyp, vcpuid, 0);
+}
+
+static void
+redist_icfgr1_write(struct hyp *hyp, int vcpuid, u_int reg, u_int offset,
+    u_int size, uint64_t wval, void *arg)
+{
+	write_config(hyp, vcpuid, 0, wval);
+}
+
 static int
 redist_read(void *vm, int vcpuid, uint64_t fault_ipa, uint64_t *rval,
     int size, void *arg)
@@ -1117,7 +1415,6 @@ redist_read(void *vm, int vcpuid, uint64_t fault_ipa, uint64_t *rval,
 	struct vgic_v3_redist *redist = &hyp->ctx[vcpuid].vgic_redist;
 	bool *retu = arg;
 	uint64_t reg;
-	int n;
 
 	/* Check the register is one of ours and is the correct size */
 	if (fault_ipa < redist->start || fault_ipa + size > redist->end) {
@@ -1129,58 +1426,20 @@ redist_read(void *vm, int vcpuid, uint64_t fault_ipa, uint64_t *rval,
 	if ((reg & (size - 1)) != 0)
 		return (EINVAL);
 
-	switch (reg) {
-	case GICR_CTLR:
-		*rval = redist->gicr_ctlr;
-		*retu = false;
-		return (0);
-	case GICR_TYPER:
-		*rval = redist->gicr_typer;
-		*retu = false;
-		return (0);
-	case GICR_WAKER:
-		*rval = 0;
-		*retu = false;
-		return (0);
-	case GICR_PROPBASER:
-		*rval = redist->gicr_propbaser;
-		*retu = false;
-		return (0);
-	case GICR_PENDBASER:
-		*rval = redist->gicr_pendbaser;
-		*retu = false;
-		return (0);
-	case GICR_PIDR2:
-		*rval = GICR_PIDR2_ARCH_GICv3 << GICR_PIDR2_ARCH_SHIFT;
-		*retu = false;
-		return (0);
-	case GICR_SGI_BASE_SIZE + GICR_IGROUPR0:
-		*rval = ~0ul;
-		*retu = false;
-		return (0);
-	case GICR_SGI_BASE_SIZE + GICR_ISENABLER0:
-	case GICR_SGI_BASE_SIZE + GICR_ICENABLER0:
-		*rval = read_enabler(hyp, vcpuid, 0);
-		*retu = false;
-		return (0);
-	case GICR_SGI_BASE_SIZE + GICR_ICFGR0_BASE:
-		*rval = read_config(hyp, vcpuid, 0);
-		*retu = false;
-		return (0);
-	case GICR_SGI_BASE_SIZE + GICR_ICFGR1_BASE:
-		*rval = read_config(hyp, vcpuid, 1);
-		*retu = false;
-		return (0);
-	default:
-		break;
-	}
-
-	if (reg >= (GICR_SGI_BASE_SIZE + GICR_IPRIORITYR_BASE) &&
-	    reg < (GICR_SGI_BASE_SIZE + GICR_IPRIORITYR_BASE + VGIC_PRV_I_NUM)){
-		n = (reg - GICR_SGI_BASE_SIZE + GICR_IPRIORITYR_BASE) / 4;
-		*rval = read_priorityr(hyp, vcpuid, n);
-		*retu = false;
-		return (0);
+	if (reg < GICR_RD_BASE_SIZE) {
+		if (vgic_register_read(hyp, redist_rd_registers,
+		    nitems(redist_rd_registers), vcpuid, reg, size, rval,
+		    NULL)) {
+			*retu = false;
+			return (0);
+		}
+	} else if (reg < (GICR_SGI_BASE + GICR_SGI_BASE_SIZE)) {
+		if (vgic_register_read(hyp, redist_sgi_registers,
+		    nitems(redist_sgi_registers), vcpuid,
+		    reg - GICR_SGI_BASE, size, rval, NULL)) {
+			*retu = false;
+			return (0);
+		}
 	}
 
 	panic("%s: %lx", __func__, reg);
@@ -1194,8 +1453,6 @@ redist_write(void *vm, int vcpuid, uint64_t fault_ipa, uint64_t wval,
 	struct vgic_v3_redist *redist = &hyp->ctx[vcpuid].vgic_redist;
 	bool *retu = arg;
 	uint64_t reg;
-	int n;
-
 
 	/* Check the register is one of ours and is the correct size */
 	if (fault_ipa < redist->start || fault_ipa + size > redist->end) {
@@ -1207,64 +1464,20 @@ redist_write(void *vm, int vcpuid, uint64_t fault_ipa, uint64_t wval,
 	if ((reg & (size - 1)) != 0)
 		return (EINVAL);
 
-	switch (reg) {
-	case GICR_CTLR:
-		redist->gicr_ctlr = wval;
-		*retu = false;
-		return (0);
-	case GICR_PROPBASER:
-		wval &= ~(GICR_PROPBASER_OUTER_CACHE_MASK |
-		    GICR_PROPBASER_SHARE_MASK | GICR_PROPBASER_CACHE_MASK);
-		wval |=
-		    (GICR_PROPBASER_SHARE_OS << GICR_PROPBASER_SHARE_SHIFT) |
-		    (GICR_PROPBASER_CACHE_NIWAWB << GICR_PROPBASER_CACHE_SHIFT);
-		redist->gicr_propbaser = wval;
-		*retu = false;
-		return (0);
-	case GICR_PENDBASER:
-		wval &= ~(GICR_PENDBASER_OUTER_CACHE_MASK |
-		    GICR_PENDBASER_SHARE_MASK | GICR_PENDBASER_CACHE_MASK);
-		wval |=
-		    (GICR_PENDBASER_SHARE_OS << GICR_PENDBASER_SHARE_SHIFT) |
-		    (GICR_PENDBASER_CACHE_NIWAWB << GICR_PENDBASER_CACHE_SHIFT);
-		redist->gicr_pendbaser = wval;
-		*retu = false;
-		return (0);
-	case GICR_TYPER:
-	case GICR_WAKER:
-	case GICR_PIDR2:
-	case GICR_SGI_BASE_SIZE + GICR_IGROUPR0:
-		/* Ignore writes */
-		*retu = false;
-		return (0);
-	case GICR_SGI_BASE_SIZE + GICR_ISENABLER0:
-	case GICR_SGI_BASE_SIZE + GICR_ICENABLER0:
-		write_enabler(hyp, vcpuid, 0,
-		    reg == (GICR_SGI_BASE_SIZE + GICR_ISENABLER0), wval);
-		*retu = false;
-		return (0);
-	case GICR_SGI_BASE_SIZE + GICR_ICACTIVER0:
-		/* TODO: Implement */
-		*retu = false;
-		return (0);
-	case GICR_SGI_BASE_SIZE + GICR_ICFGR0_BASE:
-		write_config(hyp, vcpuid, 0, wval);
-		*retu = false;
-		return (0);
-	case GICR_SGI_BASE_SIZE + GICR_ICFGR1_BASE:
-		write_config(hyp, vcpuid, 1, wval);
-		*retu = false;
-		return (0);
-	default:
-		break;
-	}
-
-	if (reg >= (GICR_SGI_BASE_SIZE + GICR_IPRIORITYR_BASE) &&
-	    reg < (GICR_SGI_BASE_SIZE + GICR_IPRIORITYR_BASE + VGIC_PRV_I_NUM)){
-		n = (reg - GICR_SGI_BASE_SIZE + GICR_IPRIORITYR_BASE) / 4;
-		write_priorityr(hyp, vcpuid, n, wval);
-		*retu = false;
-		return (0);
+	if (reg < GICR_RD_BASE_SIZE) {
+		if (vgic_register_write(hyp, redist_rd_registers,
+		    nitems(redist_rd_registers), vcpuid, reg, size, wval,
+		    NULL)) {
+			*retu = false;
+			return (0);
+		}
+	} else if (reg < (GICR_SGI_BASE + GICR_SGI_BASE_SIZE)) {
+		if (vgic_register_write(hyp, redist_sgi_registers,
+		    nitems(redist_sgi_registers), vcpuid,
+		    reg - GICR_SGI_BASE, size, wval, NULL)) {
+			*retu = false;
+			return (0);
+		}
 	}
 
 	panic("%s: %lx", __func__, reg);
