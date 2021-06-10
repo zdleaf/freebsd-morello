@@ -79,8 +79,7 @@ struct vgic_v3_virt_features {
 /* Pretend to be an Arm design */
 #define	VGIC_IIDR	0x43b
 
-typedef void (register_read)(struct hyp *, int, u_int, u_int, u_int,
-    uint64_t *, void *);
+typedef void (register_read)(struct hyp *, int, u_int, uint64_t *, void *);
 typedef void (register_write)(struct hyp *, int, u_int, u_int, u_int, uint64_t,
     void *);
 
@@ -171,10 +170,6 @@ static register_write dist_icfgr_write;
 /* GICD_IROUTER */
 static register_read dist_irouter_read;
 static register_write dist_irouter_write;
-/*
-static register_read 
-static register_write 
-*/
 
 static struct vgic_register dist_registers[] = {
 	VGIC_REGISTER(GICD_CTLR, 4, VGIC_32_BIT, dist_ctlr_read,
@@ -218,12 +213,13 @@ static struct vgic_register dist_registers[] = {
 	    VGIC_32_BIT, dist_icactiver_read, dist_icactiver_write),
 
 	VGIC_REGISTER_RANGE_RAZ_WI(GICD_IPRIORITYR(0), GICD_IPRIORITYR(32), 4,
-	    VGIC_32_BIT),
+	    VGIC_32_BIT | VGIC_8_BIT),
 	VGIC_REGISTER_RANGE(GICD_IPRIORITYR(32), GICD_IPRIORITYR(1024), 4,
-	    VGIC_32_BIT, dist_ipriorityr_read, dist_ipriorityr_write),
+	    VGIC_32_BIT | VGIC_8_BIT, dist_ipriorityr_read,
+	    dist_ipriorityr_write),
 
 	VGIC_REGISTER_RANGE_RAZ_WI(GICD_ITARGETSR(0), GICD_ITARGETSR(1024), 4,
-	    VGIC_32_BIT),
+	    VGIC_32_BIT | VGIC_8_BIT),
 
 	VGIC_REGISTER_RANGE_RAZ_WI(GICD_ICFGR(0), GICD_ICFGR(32), 4,
 	    VGIC_32_BIT),
@@ -238,12 +234,14 @@ static struct vgic_register dist_registers[] = {
 	VGIC_REGISTER_RAZ_WI(GICD_SGIR, 4, VGIC_32_BIT),
 /*
 	VGIC_REGISTER_RANGE(GICD_CPENDSGIR(0), GICD_CPENDSGIR(1024), 4,
-	    VGIC_32_BIT, dist_cpendsgir_read, dist_cpendsgir_write),
+	    VGIC_32_BIT | VGIC_8_BIT, dist_cpendsgir_read,
+	    dist_cpendsgir_write),
 	VGIC_REGISTER_RANGE(GICD_SPENDSGIR(0), GICD_SPENDSGIR(1024), 4,
-	    VGIC_32_BIT, dist_spendsgir_read, dist_spendsgir_write),
+	    VGIC_32_BIT | VGIC_8_BIT, dist_spendsgir_read,
+	    dist_spendsgir_write),
 */
 	VGIC_REGISTER_RANGE(GICD_IROUTER(32), GICD_IROUTER(1024), 8,
-	    VGIC_64_BIT, dist_irouter_read, dist_irouter_write),
+	    VGIC_64_BIT | VGIC_32_BIT, dist_irouter_read, dist_irouter_write),
 
 	VGIC_REGISTER_RANGE_RAZ_WI(GICD_PIDR4, GICD_PIDR2, 4, VGIC_32_BIT),
 	VGIC_REGISTER(GICD_PIDR2, 4, VGIC_32_BIT, gic_pidr2_read,
@@ -276,18 +274,18 @@ static struct vgic_register redist_rd_registers[] = {
 	    gic_ignore_write),
 	VGIC_REGISTER(GICR_IIDR, 4, VGIC_32_BIT, redist_iidr_read,
 	    gic_ignore_write),
-	VGIC_REGISTER(GICR_TYPER, 8, VGIC_64_BIT, redist_typer_read,
-	    gic_ignore_write),
+	VGIC_REGISTER(GICR_TYPER, 8, VGIC_64_BIT | VGIC_32_BIT,
+	    redist_typer_read, gic_ignore_write),
 	VGIC_REGISTER_RAZ_WI(GICR_STATUSR, 4, VGIC_32_BIT),
 	VGIC_REGISTER_RAZ_WI(GICR_WAKER, 4, VGIC_32_BIT),
-	VGIC_REGISTER_RAZ_WI(GICR_SETLPIR, 8, VGIC_64_BIT),
-	VGIC_REGISTER_RAZ_WI(GICR_CLRLPIR, 8, VGIC_64_BIT),
-	VGIC_REGISTER(GICR_PROPBASER, 8, VGIC_32_BIT, redist_propbaser_read,
-	    redist_propbaser_write),
-	VGIC_REGISTER(GICR_PENDBASER, 8, VGIC_32_BIT, redist_pendbaser_read,
-	    redist_pendbaser_write),
-	VGIC_REGISTER_RAZ_WI(GICR_INVLPIR, 8, VGIC_64_BIT),
-	VGIC_REGISTER_RAZ_WI(GICR_INVALLR, 8, VGIC_64_BIT),
+	VGIC_REGISTER_RAZ_WI(GICR_SETLPIR, 8, VGIC_64_BIT | VGIC_32_BIT),
+	VGIC_REGISTER_RAZ_WI(GICR_CLRLPIR, 8, VGIC_64_BIT | VGIC_32_BIT),
+	VGIC_REGISTER(GICR_PROPBASER, 8, VGIC_64_BIT | VGIC_32_BIT,
+	    redist_propbaser_read, redist_propbaser_write),
+	VGIC_REGISTER(GICR_PENDBASER, 8, VGIC_64_BIT | VGIC_32_BIT,
+	    redist_pendbaser_read, redist_pendbaser_write),
+	VGIC_REGISTER_RAZ_WI(GICR_INVLPIR, 8, VGIC_64_BIT | VGIC_32_BIT),
+	VGIC_REGISTER_RAZ_WI(GICR_INVALLR, 8, VGIC_64_BIT | VGIC_32_BIT),
 	VGIC_REGISTER_RAZ_WI(GICR_SYNCR, 4, VGIC_32_BIT),
 
 	/* These are identical to the dist registers */
@@ -339,7 +337,8 @@ static struct vgic_register redist_sgi_registers[] = {
 	VGIC_REGISTER(GICR_ICACTIVER0, 4, VGIC_32_BIT, redist_iactiver0_read,
 	    redist_icactiver0_write),
 	VGIC_REGISTER_RANGE(GICR_IPRIORITYR(0), GICR_IPRIORITYR(32), 4,
-	    VGIC_32_BIT, redist_ipriorityr_read, redist_ipriorityr_write),
+	    VGIC_32_BIT | VGIC_8_BIT, redist_ipriorityr_read,
+	    redist_ipriorityr_write),
 	VGIC_REGISTER_RAZ_WI(GICR_ICFGR0, 4, VGIC_32_BIT),
 	VGIC_REGISTER(GICR_ICFGR1, 4, VGIC_32_BIT, redist_icfgr1_read,
 	    redist_icfgr1_write),
@@ -472,17 +471,35 @@ vgic_v3_vminit(void *arg)
 	mtx_init(&dist->dist_mtx, "VGICv3 Distributor lock", NULL, MTX_SPIN);
 }
 
+static uint64_t
+gic_reg_value_64(uint64_t field, uint64_t val, u_int offset, u_int size)
+{
+	uint32_t mask;
+
+	if (offset != 0 || size != 8) {
+		mask = ((1ul << (size * 8)) - 1) << (offset * 8);
+		/* Shift the new bits to the correct place */
+		val <<= (offset * 8);
+		/* Keep only the interesting bits */
+		val &= mask;
+		/* Add the bits we are keeping from the old value */
+		val |= field & ~mask;
+	}
+
+	return (val);
+}
+
 static void
-gic_pidr2_read(struct hyp *hyp, int vcpuid, u_int reg, u_int offset, u_int size,
-    uint64_t *rval, void *arg)
+gic_pidr2_read(struct hyp *hyp, int vcpuid, u_int reg, uint64_t *rval,
+    void *arg)
 {
 	*rval = GICR_PIDR2_ARCH_GICv3 << GICR_PIDR2_ARCH_SHIFT;
 }
 
 /* Common read-only/write-ignored helpers */
 static void
-gic_zero_read(struct hyp *hyp, int vcpuid, u_int reg, u_int offset, u_int size,
-    uint64_t *rval, void *arg)
+gic_zero_read(struct hyp *hyp, int vcpuid, u_int reg, uint64_t *rval,
+    void *arg)
 {
 	*rval = 0;
 }
@@ -632,16 +649,14 @@ read_activer(struct hyp *hyp, int vcpuid, int n)
 	return (ret);
 }
 
-static uint64_t
-write_activer(struct hyp *hyp, int vcpuid, int n, bool set, uint64_t val)
+static void
+write_activer(struct hyp *hyp, int vcpuid, u_int n, bool set, uint64_t val)
 {
 	struct vgic_v3_cpu_if *cpu_if;
 	struct vgic_v3_irq *irq;
-	uint64_t ret;
 	uint32_t irq_base;
 	int mpidr, i;
 
-	ret = 0;
 	irq_base = n * 32;
 	for (i = 0; i < 32; i++) {
 		/* We only change interrupts when the appropriate bit is set */
@@ -661,10 +676,10 @@ write_activer(struct hyp *hyp, int vcpuid, int n, bool set, uint64_t val)
 
 		mtx_lock_spin(&cpu_if->lr_mtx);
 		if (irq->active && !set) {
-			/* pending -> not pending */
+			/* active -> not active */
 			TAILQ_REMOVE(&cpu_if->irq_act_pend, irq, act_pend_list);
 		} else if (!irq->active && set) {
-			/* not pending -> pending */
+			/* not active -> active */
 			TAILQ_INSERT_TAIL(&cpu_if->irq_act_pend, irq,
 			    act_pend_list);
 		}
@@ -672,8 +687,6 @@ write_activer(struct hyp *hyp, int vcpuid, int n, bool set, uint64_t val)
 		mtx_unlock_spin(&cpu_if->lr_mtx);
 		vgic_v3_release_irq(irq);
 	}
-
-	return (ret);
 }
 
 static uint64_t
@@ -699,14 +712,13 @@ read_priorityr(struct hyp *hyp, int vcpuid, int n)
 }
 
 static void
-write_priorityr(struct hyp *hyp, int vcpuid, int n, uint64_t val)
+write_priorityr(struct hyp *hyp, int vcpuid, u_int irq_base, u_int size,
+    uint64_t val)
 {
 	struct vgic_v3_irq *irq;
-	uint32_t irq_base;
 	int i;
 
-	irq_base = n * 4;
-	for (i = 0; i < 4; i++) {
+	for (i = 0; i < size; i++) {
 		irq = vgic_v3_get_irq(hyp, vcpuid, irq_base + i);
 		if (irq == NULL)
 			continue;
@@ -783,7 +795,8 @@ read_route(struct hyp *hyp, int vcpuid, int n)
 }
 
 static void
-write_route(struct hyp *hyp, int vcpuid, int n, uint64_t val)
+write_route(struct hyp *hyp, int vcpuid, int n, uint64_t val, u_int offset,
+    u_int size)
 {
 	struct vgic_v3_irq *irq;
 
@@ -792,7 +805,7 @@ write_route(struct hyp *hyp, int vcpuid, int n, uint64_t val)
 		return;
 
 	/* TODO: Move the interrupt to the correct pending list */
-	irq->mpidr = val & GICD_AFF;
+	irq->mpidr = gic_reg_value_64(irq->mpidr, val, offset, size) & GICD_AFF;
 	vgic_v3_release_irq(irq);
 }
 
@@ -801,8 +814,8 @@ write_route(struct hyp *hyp, int vcpuid, int n, uint64_t val)
  */
 /* GICD_CTLR */
 static void
-dist_ctlr_read(struct hyp *hyp, int vcpuid, u_int reg, u_int offset,
-    u_int size, uint64_t *rval, void *arg)
+dist_ctlr_read(struct hyp *hyp, int vcpuid, u_int reg, uint64_t *rval,
+    void *arg)
 {
 	struct vgic_v3_dist *dist;
 
@@ -821,6 +834,8 @@ dist_ctlr_write(struct hyp *hyp, int vcpuid, u_int reg, u_int offset,
 {
 	struct vgic_v3_dist *dist;
 
+	MPASS(offset == 0);
+	MPASS(size == 4);
 	dist = &hyp->vgic_dist;
 
 	/*
@@ -843,8 +858,8 @@ dist_ctlr_write(struct hyp *hyp, int vcpuid, u_int reg, u_int offset,
 
 /* GICD_TYPER */
 static void
-dist_typer_read(struct hyp *hyp, int vcpuid, u_int reg, u_int offset,
-    u_int size, uint64_t *rval, void *arg)
+dist_typer_read(struct hyp *hyp, int vcpuid, u_int reg, uint64_t *rval,
+    void *arg)
 {
 	uint32_t typer;
 
@@ -858,8 +873,8 @@ dist_typer_read(struct hyp *hyp, int vcpuid, u_int reg, u_int offset,
 
 /* GICD_IIDR */
 static void
-dist_iidr_read(struct hyp *hyp, int vcpuid, u_int reg, u_int offset,
-    u_int size, uint64_t *rval, void *arg)
+dist_iidr_read(struct hyp *hyp, int vcpuid, u_int reg, uint64_t *rval,
+    void *arg)
 {
 	*rval = VGIC_IIDR;
 }
@@ -871,14 +886,16 @@ dist_setclrspi_nsr_write(struct hyp *hyp, int vcpuid, u_int reg, u_int offset,
 {
 	uint32_t irqid;
 
+	MPASS(offset == 0);
+	MPASS(size == 4);
 	irqid = wval & GICD_SPI_INTID_MASK;
 	vgic_v3_inject_irq(hyp, vcpuid, irqid, reg == GICD_SETSPI_NSR);
 }
 
 /* GICD_ISENABLER */
 static void
-dist_isenabler_read(struct hyp *hyp, int vcpuid, u_int reg, u_int offset,
-    u_int size, uint64_t *rval, void *arg)
+dist_isenabler_read(struct hyp *hyp, int vcpuid, u_int reg, uint64_t *rval,
+    void *arg)
 {
 	int n;
 
@@ -894,6 +911,8 @@ dist_isenabler_write(struct hyp *hyp, int vcpuid, u_int reg, u_int offset,
 {
 	int n;
 
+	MPASS(offset == 0);
+	MPASS(size == 4);
 	n = (reg - GICD_ISENABLER(0)) / 4;
 	/* GICD_ISENABLER0 is RAZ/WI so handled separately */
 	MPASS(n > 0);
@@ -902,8 +921,8 @@ dist_isenabler_write(struct hyp *hyp, int vcpuid, u_int reg, u_int offset,
 
 /* GICD_ICENABLER */
 static void
-dist_icenabler_read(struct hyp *hyp, int vcpuid, u_int reg, u_int offset,
-    u_int size, uint64_t *rval, void *arg)
+dist_icenabler_read(struct hyp *hyp, int vcpuid, u_int reg, uint64_t *rval,
+    void *arg)
 {
 	int n;
 
@@ -919,6 +938,8 @@ dist_icenabler_write(struct hyp *hyp, int vcpuid, u_int reg, u_int offset,
 {
 	int n;
 
+	MPASS(offset == 0);
+	MPASS(size == 4);
 	n = (reg - GICD_ISENABLER(0)) / 4;
 	/* GICD_ICENABLER0 is RAZ/WI so handled separately */
 	MPASS(n > 0);
@@ -927,8 +948,8 @@ dist_icenabler_write(struct hyp *hyp, int vcpuid, u_int reg, u_int offset,
 
 /* GICD_ISPENDR */
 static void
-dist_ispendr_read(struct hyp *hyp, int vcpuid, u_int reg, u_int offset,
-    u_int size, uint64_t *rval, void *arg)
+dist_ispendr_read(struct hyp *hyp, int vcpuid, u_int reg, uint64_t *rval,
+    void *arg)
 {
 	int n;
 
@@ -944,6 +965,8 @@ dist_ispendr_write(struct hyp *hyp, int vcpuid, u_int reg, u_int offset,
 {
 	int n;
 
+	MPASS(offset == 0);
+	MPASS(size == 4);
 	n = (reg - GICD_ISPENDR(0)) / 4;
 	/* GICD_ISPENDR0 is RAZ/WI so handled separately */
 	MPASS(n > 0);
@@ -952,8 +975,8 @@ dist_ispendr_write(struct hyp *hyp, int vcpuid, u_int reg, u_int offset,
 
 /* GICD_ICPENDR */
 static void
-dist_icpendr_read(struct hyp *hyp, int vcpuid, u_int reg, u_int offset,
-    u_int size, uint64_t *rval, void *arg)
+dist_icpendr_read(struct hyp *hyp, int vcpuid, u_int reg, uint64_t *rval,
+    void *arg)
 {
 	int n;
 
@@ -969,6 +992,8 @@ dist_icpendr_write(struct hyp *hyp, int vcpuid, u_int reg, u_int offset,
 {
 	int n;
 
+	MPASS(offset == 0);
+	MPASS(size == 4);
 	n = (reg - GICD_ICPENDR(0)) / 4;
 	/* GICD_ICPENDR0 is RAZ/WI so handled separately */
 	MPASS(n > 0);
@@ -978,8 +1003,8 @@ dist_icpendr_write(struct hyp *hyp, int vcpuid, u_int reg, u_int offset,
 /* GICD_ISACTIVER */
 /* Affinity routing is enabled so isactiver0 is RAZ/WI */
 static void
-dist_isactiver_read(struct hyp *hyp, int vcpuid, u_int reg, u_int offset,
-    u_int size, uint64_t *rval, void *arg)
+dist_isactiver_read(struct hyp *hyp, int vcpuid, u_int reg, uint64_t *rval,
+    void *arg)
 {
 	int n;
 
@@ -995,6 +1020,8 @@ dist_isactiver_write(struct hyp *hyp, int vcpuid, u_int reg, u_int offset,
 {
 	int n;
 
+	MPASS(offset == 0);
+	MPASS(size == 4);
 	n = (reg - GICD_ISACTIVER(0)) / 4;
 	/* GICD_ISACTIVE0 is RAZ/WI so handled separately */
 	MPASS(n > 0);
@@ -1003,8 +1030,8 @@ dist_isactiver_write(struct hyp *hyp, int vcpuid, u_int reg, u_int offset,
 
 /* GICD_ICACTIVER */
 static void
-dist_icactiver_read(struct hyp *hyp, int vcpuid, u_int reg, u_int offset,
-    u_int size, uint64_t *rval, void *arg)
+dist_icactiver_read(struct hyp *hyp, int vcpuid, u_int reg, uint64_t *rval,
+    void *arg)
 {
 	int n;
 
@@ -1020,6 +1047,8 @@ dist_icactiver_write(struct hyp *hyp, int vcpuid, u_int reg, u_int offset,
 {
 	int n;
 
+	MPASS(offset == 0);
+	MPASS(size == 4);
 	n = (reg - GICD_ICACTIVER(0)) / 4;
 	/* GICD_ICACTIVE0 is RAZ/WI so handled separately */
 	MPASS(n > 0);
@@ -1029,8 +1058,8 @@ dist_icactiver_write(struct hyp *hyp, int vcpuid, u_int reg, u_int offset,
 /* GICD_IPRIORITYR */
 /* Affinity routing is enabled so ipriorityr0-7 is RAZ/WI */
 static void
-dist_ipriorityr_read(struct hyp *hyp, int vcpuid, u_int reg, u_int offset,
-    u_int size, uint64_t *rval, void *arg)
+dist_ipriorityr_read(struct hyp *hyp, int vcpuid, u_int reg, uint64_t *rval,
+    void *arg)
 {
 	int n;
 
@@ -1044,18 +1073,18 @@ static void
 dist_ipriorityr_write(struct hyp *hyp, int vcpuid, u_int reg, u_int offset,
     u_int size, uint64_t wval, void *arg)
 {
-	int n;
+	u_int irq_base;
 
-	n = (reg - GICD_IPRIORITYR(0)) / 4;
+	irq_base = (reg - GICD_IPRIORITYR(0)) + offset;
 	/* GICD_IPRIORITY0-7 is RAZ/WI so handled separately */
-	MPASS(n > 7);
-	write_priorityr(hyp, vcpuid, n, wval);
+	MPASS(irq_base > 31);
+	write_priorityr(hyp, vcpuid, irq_base, size, wval);
 }
 
 /* GICD_ICFGR */
 static void
-dist_icfgr_read(struct hyp *hyp, int vcpuid, u_int reg, u_int offset,
-    u_int size, uint64_t *rval, void *arg)
+dist_icfgr_read(struct hyp *hyp, int vcpuid, u_int reg, uint64_t *rval,
+    void *arg)
 {
 	int n;
 
@@ -1071,6 +1100,8 @@ dist_icfgr_write(struct hyp *hyp, int vcpuid, u_int reg, u_int offset,
 {
 	int n;
 
+	MPASS(offset == 0);
+	MPASS(size == 4);
 	n = (reg - GICD_ICFGR(0)) / 4;
 	/* GICD_ICFGR0-1 are RAZ/WI so handled separately */
 	MPASS(n > 1);
@@ -1079,8 +1110,8 @@ dist_icfgr_write(struct hyp *hyp, int vcpuid, u_int reg, u_int offset,
 
 /* GICD_IROUTER */
 static void
-dist_irouter_read(struct hyp *hyp, int vcpuid, u_int reg, u_int offset,
-    u_int size, uint64_t *rval, void *arg)
+dist_irouter_read(struct hyp *hyp, int vcpuid, u_int reg, uint64_t *rval,
+    void *arg)
 {
 	int n;
 
@@ -1099,7 +1130,7 @@ dist_irouter_write(struct hyp *hyp, int vcpuid, u_int reg, u_int offset,
 	n = (reg - GICD_IROUTER(0)) / 8;
 	/* GICD_IROUTER0-31 don't exist */
 	MPASS(n > 31);
-	write_route(hyp, vcpuid, n, wval);
+	write_route(hyp, vcpuid, n, wval, offset, size);
 }
 
 static bool
@@ -1111,10 +1142,16 @@ vgic_register_read(struct hyp *hyp, struct vgic_register *reg_list,
 
 	for (i = 0; i < reg_list_size; i++) {
 		if (reg_list[i].start <= reg && reg_list[i].end >= reg + size) {
-			offset = 0; /* TODO */
+			offset = reg & reg_list[i].size - 1;
+			reg -= offset;
 			if ((reg_list[i].flags & size) != 0) {
-				reg_list[i].read(hyp, vcpuid, reg, offset,
-				    size, rval, NULL);
+				reg_list[i].read(hyp, vcpuid, reg, rval, NULL);
+
+				/* Move the bits into the correct place */
+				*rval >>= (offset * 8);
+				if (size < 8) {
+					*rval &= (1ul << (size * 8)) - 1;
+				}
 			} else {
 				panic("TODO: Handle invalid register size: "
 				    "reg %x size %d", reg, size);
@@ -1134,7 +1171,8 @@ vgic_register_write(struct hyp *hyp, struct vgic_register *reg_list,
 
 	for (i = 0; i < reg_list_size; i++) {
 		if (reg_list[i].start <= reg && reg_list[i].end >= reg + size) {
-			offset = 0; /* TODO */
+			offset = reg & reg_list[i].size - 1;
+			reg -= offset;
 			if ((reg_list[i].flags & size) != 0) {
 				reg_list[i].write(hyp, vcpuid, reg, offset,
 				    size, wval, NULL);
@@ -1213,8 +1251,8 @@ dist_write(void *vm, int vcpuid, uint64_t fault_ipa, uint64_t wval,
  */
 /* GICR_CTLR */
 static void
-redist_ctlr_read(struct hyp *hyp, int vcpuid, u_int reg, u_int offset,
-    u_int size, uint64_t *rval, void *arg)
+redist_ctlr_read(struct hyp *hyp, int vcpuid, u_int reg, uint64_t *rval,
+    void *arg)
 {
 	struct vgic_v3_redist *redist;
 
@@ -1224,16 +1262,16 @@ redist_ctlr_read(struct hyp *hyp, int vcpuid, u_int reg, u_int offset,
 
 /* GICR_IIDR */
 static void
-redist_iidr_read(struct hyp *hyp, int vcpuid, u_int reg, u_int offset,
-    u_int size, uint64_t *rval, void *arg)
+redist_iidr_read(struct hyp *hyp, int vcpuid, u_int reg, uint64_t *rval,
+    void *arg)
 {
 	*rval = VGIC_IIDR;
 }
 
 /* GICR_TYPER */
 static void
-redist_typer_read(struct hyp *hyp, int vcpuid, u_int reg, u_int offset,
-    u_int size, uint64_t *rval, void *arg)
+redist_typer_read(struct hyp *hyp, int vcpuid, u_int reg, uint64_t *rval,
+    void *arg)
 {
 	struct vgic_v3_redist *redist;
 
@@ -1243,8 +1281,8 @@ redist_typer_read(struct hyp *hyp, int vcpuid, u_int reg, u_int offset,
 
 /* GICR_PROPBASER */
 static void
-redist_propbaser_read(struct hyp *hyp, int vcpuid, u_int reg, u_int offset,
-    u_int size, uint64_t *rval, void *arg)
+redist_propbaser_read(struct hyp *hyp, int vcpuid, u_int reg, uint64_t *rval,
+    void *arg)
 {
 	struct vgic_v3_redist *redist;
 
@@ -1259,6 +1297,8 @@ redist_propbaser_write(struct hyp *hyp, int vcpuid, u_int reg, u_int offset,
 	struct vgic_v3_redist *redist;
 
 	redist = &hyp->ctx[vcpuid].vgic_redist;
+	/* Update the new value to include any non-overridden data */
+	wval = gic_reg_value_64(redist->gicr_propbaser, wval, offset, size);
 	wval &= ~(GICR_PROPBASER_OUTER_CACHE_MASK |
 	    GICR_PROPBASER_SHARE_MASK | GICR_PROPBASER_CACHE_MASK);
 	wval |=
@@ -1269,8 +1309,8 @@ redist_propbaser_write(struct hyp *hyp, int vcpuid, u_int reg, u_int offset,
 
 /* GICR_PENDBASER */
 static void
-redist_pendbaser_read(struct hyp *hyp, int vcpuid, u_int reg, u_int offset,
-    u_int size, uint64_t *rval, void *arg)
+redist_pendbaser_read(struct hyp *hyp, int vcpuid, u_int reg, uint64_t *rval,
+    void *arg)
 {
 	struct vgic_v3_redist *redist;
 
@@ -1285,12 +1325,14 @@ redist_pendbaser_write(struct hyp *hyp, int vcpuid, u_int reg, u_int offset,
 	struct vgic_v3_redist *redist;
 
 	redist = &hyp->ctx[vcpuid].vgic_redist;
+	/* Update the new value to include any non-overridden data */
+	wval = gic_reg_value_64(redist->gicr_pendbaser, wval, offset, size);
 	wval &= ~(GICR_PENDBASER_OUTER_CACHE_MASK |
 	    GICR_PENDBASER_SHARE_MASK | GICR_PENDBASER_CACHE_MASK);
 	wval |=
 	    (GICR_PENDBASER_SHARE_OS << GICR_PENDBASER_SHARE_SHIFT) |
 	    (GICR_PENDBASER_CACHE_NIWAWB << GICR_PENDBASER_CACHE_SHIFT);
-	atomic_store_32(&redist->gicr_pendbaser, wval);
+	redist->gicr_pendbaser = wval;
 }
 
 /*
@@ -1298,8 +1340,8 @@ redist_pendbaser_write(struct hyp *hyp, int vcpuid, u_int reg, u_int offset,
  */
 /* GICR_ISENABLER0 */
 static void
-redist_ienabler0_read(struct hyp *hyp, int vcpuid, u_int reg, u_int offset,
-    u_int size, uint64_t *rval, void *arg)
+redist_ienabler0_read(struct hyp *hyp, int vcpuid, u_int reg, uint64_t *rval,
+    void *arg)
 {
 	*rval = read_enabler(hyp, vcpuid, 0);
 }
@@ -1308,6 +1350,8 @@ static void
 redist_isenabler0_write(struct hyp *hyp, int vcpuid, u_int reg, u_int offset,
     u_int size, uint64_t wval, void *arg)
 {
+	MPASS(offset == 0);
+	MPASS(size == 4);
 	write_enabler(hyp, vcpuid, 0, true, wval);
 }
 
@@ -1316,13 +1360,15 @@ static void
 redist_icenabler0_write(struct hyp *hyp, int vcpuid, u_int reg, u_int offset,
     u_int size, uint64_t wval, void *arg)
 {
+	MPASS(offset == 0);
+	MPASS(size == 4);
 	write_enabler(hyp, vcpuid, 0, false, wval);
 }
 
 /* GICR_ISPENDR0 */
 static void
-redist_ipendr0_read(struct hyp *hyp, int vcpuid, u_int reg, u_int offset,
-    u_int size, uint64_t *rval, void *arg)
+redist_ipendr0_read(struct hyp *hyp, int vcpuid, u_int reg, uint64_t *rval,
+    void *arg)
 {
 	*rval = read_pendr(hyp, vcpuid, 0);
 }
@@ -1331,6 +1377,8 @@ static void
 redist_ispendr0_write(struct hyp *hyp, int vcpuid, u_int reg, u_int offset,
     u_int size, uint64_t wval, void *arg)
 {
+	MPASS(offset == 0);
+	MPASS(size == 4);
 	write_pendr(hyp, vcpuid, 0, true, wval);
 }
 
@@ -1339,13 +1387,15 @@ static void
 redist_icpendr0_write(struct hyp *hyp, int vcpuid, u_int reg, u_int offset,
     u_int size, uint64_t wval, void *arg)
 {
+	MPASS(offset == 0);
+	MPASS(size == 4);
 	write_pendr(hyp, vcpuid, 0, false, wval);
 }
 
 /* GICR_ISACTIVER0 */
 static void
-redist_iactiver0_read(struct hyp *hyp, int vcpuid, u_int reg, u_int offset,
-    u_int size, uint64_t *rval, void *arg)
+redist_iactiver0_read(struct hyp *hyp, int vcpuid, u_int reg, uint64_t *rval,
+    void *arg)
 {
 	*rval = read_activer(hyp, vcpuid, 0);
 }
@@ -1367,8 +1417,8 @@ redist_icactiver0_write(struct hyp *hyp, int vcpuid, u_int reg, u_int offset,
 
 /* GICR_IPRIORITYR */
 static void
-redist_ipriorityr_read(struct hyp *hyp, int vcpuid, u_int reg, u_int offset,
-    u_int size, uint64_t *rval, void *arg)
+redist_ipriorityr_read(struct hyp *hyp, int vcpuid, u_int reg, uint64_t *rval,
+    void *arg)
 {
 	int n;
 
@@ -1380,16 +1430,16 @@ static void
 redist_ipriorityr_write(struct hyp *hyp, int vcpuid, u_int reg, u_int offset,
     u_int size, uint64_t wval, void *arg)
 {
-	int n;
+	u_int irq_base;
 
-	n = (reg - GICR_IPRIORITYR(0)) / 4;
-	write_priorityr(hyp, vcpuid, n, wval);
+	irq_base = (reg - GICR_IPRIORITYR(0)) + offset;
+	write_priorityr(hyp, vcpuid, irq_base, size, wval);
 }
 
 /* GICR_ICFGR1 */
 static void
-redist_icfgr1_read(struct hyp *hyp, int vcpuid, u_int reg, u_int offset,
-    u_int size, uint64_t *rval, void *arg)
+redist_icfgr1_read(struct hyp *hyp, int vcpuid, u_int reg, uint64_t *rval,
+    void *arg)
 {
 	*rval = read_config(hyp, vcpuid, 0);
 }
@@ -1398,6 +1448,8 @@ static void
 redist_icfgr1_write(struct hyp *hyp, int vcpuid, u_int reg, u_int offset,
     u_int size, uint64_t wval, void *arg)
 {
+	MPASS(offset == 0);
+	MPASS(size == 4);
 	write_config(hyp, vcpuid, 0, wval);
 }
 
