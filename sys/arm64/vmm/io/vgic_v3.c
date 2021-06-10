@@ -76,6 +76,8 @@ struct vgic_v3_virt_features {
 
 /* How many IRQs we support (SGIs + PPIs + SPIs). Not including LPIs */
 #define	VGIC_NIRQS	1023
+/* Pretend to be an Arm design */
+#define	VGIC_IIDR	0x43b
 
 typedef void (register_read)(struct hyp *, int, u_int, u_int, u_int,
     uint64_t *, void *);
@@ -130,9 +132,7 @@ static register_write dist_ctlr_write;
 static register_read dist_typer_read;
 /* GICD_IIDR */
 static register_read dist_iidr_read;
-/* GICD_STATUSR */
-static register_read dist_statusr_read;
-static register_write dist_statusr_write;
+/* GICD_STATUSR - RAZ/WI as we don't report errors (yet) */
 /* GICD_SETSPI_NSR & GICD_CLRSPI_NSR */
 static register_write dist_setclrspi_nsr_write;
 /* GICD_SETSPI_SR - RAZ/WI */
@@ -183,8 +183,7 @@ static struct vgic_register dist_registers[] = {
 	    gic_ignore_write),
 	VGIC_REGISTER(GICD_IIDR, 4, VGIC_32_BIT, dist_iidr_read,
 	    gic_ignore_write),
-	VGIC_REGISTER(GICD_STATUSR, 4, VGIC_32_BIT, dist_statusr_read,
-	    dist_statusr_write),
+	VGIC_REGISTER_RAZ_WI(GICD_STATUSR, 4, VGIC_32_BIT),
 	VGIC_REGISTER(GICD_SETSPI_NSR, 4, VGIC_32_BIT, gic_zero_read,
 	    dist_setclrspi_nsr_write),
 	VGIC_REGISTER(GICD_CLRSPI_NSR, 4, VGIC_32_BIT, gic_zero_read,
@@ -258,9 +257,7 @@ static register_read redist_ctlr_read;
 static register_read redist_iidr_read;
 /* GICR_TYPER */
 static register_read redist_typer_read;
-/* GICR_STATUSR */
-static register_read redist_statusr_read;
-static register_write redist_statusr_write;
+/* GICR_STATUSR - RAZ/WI as we don't report errors (yet) */
 /* GICR_WAKER - RAZ/WI from non-secure mode */
 /* GICR_SETLPIR - RAZ/WI as no LPIs are supported */
 /* GICR_CLRLPIR - RAZ/WI as no LPIs are supported */
@@ -281,8 +278,7 @@ static struct vgic_register redist_rd_registers[] = {
 	    gic_ignore_write),
 	VGIC_REGISTER(GICR_TYPER, 8, VGIC_64_BIT, redist_typer_read,
 	    gic_ignore_write),
-	VGIC_REGISTER(GICR_STATUSR, 4, VGIC_32_BIT, redist_statusr_read,
-	    redist_statusr_write),
+	VGIC_REGISTER_RAZ_WI(GICR_STATUSR, 4, VGIC_32_BIT),
 	VGIC_REGISTER_RAZ_WI(GICR_WAKER, 4, VGIC_32_BIT),
 	VGIC_REGISTER_RAZ_WI(GICR_SETLPIR, 8, VGIC_64_BIT),
 	VGIC_REGISTER_RAZ_WI(GICR_CLRLPIR, 8, VGIC_64_BIT),
@@ -637,6 +633,50 @@ read_activer(struct hyp *hyp, int vcpuid, int n)
 }
 
 static uint64_t
+write_activer(struct hyp *hyp, int vcpuid, int n, bool set, uint64_t val)
+{
+	struct vgic_v3_cpu_if *cpu_if;
+	struct vgic_v3_irq *irq;
+	uint64_t ret;
+	uint32_t irq_base;
+	int mpidr, i;
+
+	ret = 0;
+	irq_base = n * 32;
+	for (i = 0; i < 32; i++) {
+		/* We only change interrupts when the appropriate bit is set */
+		if ((val & (1u << i)) == 0)
+			continue;
+
+		irq = vgic_v3_get_irq(hyp, vcpuid, irq_base + i);
+		if (irq == NULL)
+			continue;
+
+		/*
+		 * TODO: The target CPU could have changed, we need to know
+		 * on which CPU the interrupt is pending.
+		 */
+		mpidr = irq->mpidr;
+		cpu_if = &hyp->ctx[mpidr].vgic_cpu_if;
+
+		mtx_lock_spin(&cpu_if->lr_mtx);
+		if (irq->active && !set) {
+			/* pending -> not pending */
+			TAILQ_REMOVE(&cpu_if->irq_act_pend, irq, act_pend_list);
+		} else if (!irq->active && set) {
+			/* not pending -> pending */
+			TAILQ_INSERT_TAIL(&cpu_if->irq_act_pend, irq,
+			    act_pend_list);
+		}
+		irq->active = set ? 1 : 0;
+		mtx_unlock_spin(&cpu_if->lr_mtx);
+		vgic_v3_release_irq(irq);
+	}
+
+	return (ret);
+}
+
+static uint64_t
 read_priorityr(struct hyp *hyp, int vcpuid, int n)
 {
 	struct vgic_v3_irq *irq;
@@ -821,22 +861,7 @@ static void
 dist_iidr_read(struct hyp *hyp, int vcpuid, u_int reg, u_int offset,
     u_int size, uint64_t *rval, void *arg)
 {
-	panic("%s", __func__);
-}
-
-/* GICD_STATUSR */
-static void
-dist_statusr_read(struct hyp *hyp, int vcpuid, u_int reg, u_int offset,
-    u_int size, uint64_t *rval, void *arg)
-{
-	panic("%s", __func__);
-}
-
-static void
-dist_statusr_write(struct hyp *hyp, int vcpuid, u_int reg, u_int offset,
-    u_int size, uint64_t wval, void *arg)
-{
-	panic("%s", __func__);
+	*rval = VGIC_IIDR;
 }
 
 /* GICD_SETSPI_NSR & GICD_CLRSPI_NSR */
@@ -973,7 +998,7 @@ dist_isactiver_write(struct hyp *hyp, int vcpuid, u_int reg, u_int offset,
 	n = (reg - GICD_ISACTIVER(0)) / 4;
 	/* GICD_ISACTIVE0 is RAZ/WI so handled separately */
 	MPASS(n > 0);
-	panic("%s", __func__);
+	write_activer(hyp, vcpuid, n, true, wval);
 }
 
 /* GICD_ICACTIVER */
@@ -998,7 +1023,7 @@ dist_icactiver_write(struct hyp *hyp, int vcpuid, u_int reg, u_int offset,
 	n = (reg - GICD_ICACTIVER(0)) / 4;
 	/* GICD_ICACTIVE0 is RAZ/WI so handled separately */
 	MPASS(n > 0);
-	panic("%s", __func__);
+	write_activer(hyp, vcpuid, n, false, wval);
 }
 
 /* GICD_IPRIORITYR */
@@ -1012,7 +1037,7 @@ dist_ipriorityr_read(struct hyp *hyp, int vcpuid, u_int reg, u_int offset,
 	n = (reg - GICD_IPRIORITYR(0)) / 4;
 	/* GICD_IPRIORITY0-7 is RAZ/WI so handled separately */
 	MPASS(n > 7);
-	panic("%s", __func__);
+	*rval = read_priorityr(hyp, vcpuid, n);
 }
 
 static void
@@ -1076,22 +1101,6 @@ dist_irouter_write(struct hyp *hyp, int vcpuid, u_int reg, u_int offset,
 	MPASS(n > 31);
 	write_route(hyp, vcpuid, n, wval);
 }
-
-/*
-static void
-(struct hyp *hyp, int vcpuid, u_int reg, u_int offset, u_int size,
-    uint64_t *rval, void *arg)
-{
-	panic("%s", __func__);
-}
-
-static void
-(struct hyp *hyp, int vcpuid, u_int reg, u_int offset, u_int size,
-    uint64_t wval, void *arg)
-{
-	panic("%s", __func__);
-}
-*/
 
 static bool
 vgic_register_read(struct hyp *hyp, struct vgic_register *reg_list,
@@ -1218,7 +1227,7 @@ static void
 redist_iidr_read(struct hyp *hyp, int vcpuid, u_int reg, u_int offset,
     u_int size, uint64_t *rval, void *arg)
 {
-	panic("%s", __func__);
+	*rval = VGIC_IIDR;
 }
 
 /* GICR_TYPER */
@@ -1230,21 +1239,6 @@ redist_typer_read(struct hyp *hyp, int vcpuid, u_int reg, u_int offset,
 
 	redist = &hyp->ctx[vcpuid].vgic_redist;
 	*rval = redist->gicr_typer;
-}
-
-/* GICR_STATUSR */
-static void
-redist_statusr_read(struct hyp *hyp, int vcpuid, u_int reg, u_int offset,
-    u_int size, uint64_t *rval, void *arg)
-{
-	panic("%s", __func__);
-}
-
-static void
-redist_statusr_write(struct hyp *hyp, int vcpuid, u_int reg, u_int offset,
-    u_int size, uint64_t wval, void *arg)
-{
-	panic("%s", __func__);
 }
 
 /* GICR_PROPBASER */
@@ -1360,7 +1354,7 @@ static void
 redist_isactiver0_write(struct hyp *hyp, int vcpuid, u_int reg, u_int offset,
     u_int size, uint64_t wval, void *arg)
 {
-	panic("%s", __func__);
+	write_activer(hyp, vcpuid, 0, true, wval);
 }
 
 /* GICR_ICACTIVER0 */
@@ -1368,7 +1362,7 @@ static void
 redist_icactiver0_write(struct hyp *hyp, int vcpuid, u_int reg, u_int offset,
     u_int size, uint64_t wval, void *arg)
 {
-	panic("%s", __func__);
+	write_activer(hyp, vcpuid, 0, false, wval);
 }
 
 /* GICR_IPRIORITYR */
