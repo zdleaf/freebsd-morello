@@ -168,7 +168,7 @@ struct nfsv4_opflag nfsv4_opflag[NFSV42_NOPS] = {
 	{ 0, 1, 0, 1, LK_EXCLUSIVE, 1, 1 },		/* Layout Commit */
 	{ 0, 1, 0, 0, LK_EXCLUSIVE, 1, 1 },		/* Layout Get */
 	{ 0, 1, 0, 1, LK_EXCLUSIVE, 1, 0 },		/* Layout Return */
-	{ 0, 0, 0, 0, LK_EXCLUSIVE, 1, 1 },		/* Secinfo No name */
+	{ 0, 1, 0, 0, LK_EXCLUSIVE, 1, 1 },		/* Secinfo No name */
 	{ 0, 0, 0, 0, LK_EXCLUSIVE, 1, 0 },		/* Sequence */
 	{ 0, 0, 0, 0, LK_EXCLUSIVE, 1, 1 },		/* Set SSV */
 	{ 0, 0, 0, 0, LK_EXCLUSIVE, 1, 1 },		/* Test StateID */
@@ -1248,6 +1248,8 @@ nfsv4_loadattr(struct nfsrv_descript *nd, vnode_t vp,
 			nap->na_rdev = (NFSDEV_T)0;
 			nap->na_mtime.tv_sec = 0;
 			nap->na_mtime.tv_nsec = 0;
+			nap->na_btime.tv_sec = -1;
+			nap->na_btime.tv_nsec = 0;
 			nap->na_gen = 0;
 			nap->na_flags = 0;
 			nap->na_blocksize = NFS_FABLKSIZE;

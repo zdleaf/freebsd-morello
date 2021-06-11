@@ -50,6 +50,7 @@
 #include <machine/bus.h>
 #include <sys/socket.h>
 #include <sys/sysctl.h>
+#include <sys/taskqueue.h>
 #include <net/ethernet.h>
 #include <net/if.h>
 #include <net/if_var.h>
@@ -68,15 +69,14 @@ MALLOC_DECLARE(M_CXGBE);
 #define CXGBE_UNIMPLEMENTED(s) \
     panic("%s (%s, line %d) not implemented yet.", s, __FILE__, __LINE__)
 
-#if defined(__i386__) || defined(__amd64__)
-static __inline void
-prefetch(void *x)
-{
-	__asm volatile("prefetcht0 %0" :: "m" (*(unsigned long *)x));
+/*
+ * Same as LIST_HEAD from queue.h.  This is to avoid conflict with LinuxKPI's
+ * LIST_HEAD when building iw_cxgbe.
+ */
+#define	CXGBE_LIST_HEAD(name, type)					\
+struct name {								\
+	struct type *lh_first;	/* first element */			\
 }
-#else
-#define prefetch(x) __builtin_prefetch(x)
-#endif
 
 #ifndef SYSCTL_ADD_UQUAD
 #define SYSCTL_ADD_UQUAD SYSCTL_ADD_QUAD
@@ -165,6 +165,7 @@ enum {
 	IS_VF		= (1 << 7),
 	KERN_TLS_ON	= (1 << 8),	/* HW is configured for KERN_TLS */
 	CXGBE_BUSY	= (1 << 9),
+	HW_OFF_LIMITS	= (1 << 10),	/* off limits to all except reset_thread */
 
 	/* port flags */
 	HAS_TRACEQ	= (1 << 3),
@@ -655,11 +656,16 @@ iq_to_rxq(struct sge_iq *iq)
 	return (__containerof(iq, struct sge_rxq, iq));
 }
 
-
 /* ofld_rxq: SGE ingress queue + SGE free list + miscellaneous items */
 struct sge_ofld_rxq {
 	struct sge_iq iq;	/* MUST be first */
 	struct sge_fl fl;	/* MUST follow iq */
+	counter_u64_t rx_iscsi_ddp_setup_ok;
+	counter_u64_t rx_iscsi_ddp_setup_error;
+	uint64_t rx_iscsi_ddp_pdus;
+	uint64_t rx_iscsi_ddp_octets;
+	uint64_t rx_iscsi_fl_pdus;
+	uint64_t rx_iscsi_fl_octets;
 	u_long	rx_toe_tls_records;
 	u_long	rx_toe_tls_octets;
 } __aligned(CACHE_LINE_SIZE);
@@ -890,9 +896,11 @@ struct adapter {
 	struct port_info *port[MAX_NPORTS];
 	uint8_t chan_map[MAX_NCHAN];		/* channel -> port */
 
-	struct mtx clip_table_lock;
-	TAILQ_HEAD(, clip_entry) clip_table;
+	CXGBE_LIST_HEAD(, clip_entry) *clip_table;
+	TAILQ_HEAD(, clip_entry) clip_pending;	/* these need hw update. */
+	u_long clip_mask;
 	int clip_gen;
+	struct timeout_task clip_task;
 
 	void *tom_softc;	/* (struct tom_data *) */
 	struct tom_tunables tt;
@@ -955,12 +963,25 @@ struct adapter {
 	TAILQ_HEAD(, sge_fl) sfl;
 	struct callout sfl_callout;
 
-	struct mtx reg_lock;	/* for indirect register access */
+	/*
+	 * Driver code that can run when the adapter is suspended must use this
+	 * lock or a synchronized_op and check for HW_OFF_LIMITS before
+	 * accessing hardware.
+	 *
+	 * XXX: could be changed to rwlock.  wlock in suspend/resume and for
+	 * indirect register access, rlock everywhere else.
+	 */
+	struct mtx reg_lock;
 
 	struct memwin memwin[NUM_MEMWIN];	/* memory windows */
 
 	struct mtx tc_lock;
 	struct task tc_task;
+
+	struct task reset_task;
+	const void *reset_thread;
+	int num_resets;
+	int incarnation;
 
 	const char *last_op;
 	const void *last_op_thr;
@@ -1051,24 +1072,34 @@ forwarding_intr_to_fwq(struct adapter *sc)
 	return (sc->intr_count == 1);
 }
 
+/* Works reliably inside a sync_op or with reg_lock held. */
+static inline bool
+hw_off_limits(struct adapter *sc)
+{
+	return (__predict_false(sc->flags & HW_OFF_LIMITS));
+}
+
 static inline uint32_t
 t4_read_reg(struct adapter *sc, uint32_t reg)
 {
-
+	if (hw_off_limits(sc))
+		MPASS(curthread == sc->reset_thread);
 	return bus_space_read_4(sc->bt, sc->bh, reg);
 }
 
 static inline void
 t4_write_reg(struct adapter *sc, uint32_t reg, uint32_t val)
 {
-
+	if (hw_off_limits(sc))
+		MPASS(curthread == sc->reset_thread);
 	bus_space_write_4(sc->bt, sc->bh, reg, val);
 }
 
 static inline uint64_t
 t4_read_reg64(struct adapter *sc, uint32_t reg)
 {
-
+	if (hw_off_limits(sc))
+		MPASS(curthread == sc->reset_thread);
 #ifdef __LP64__
 	return bus_space_read_8(sc->bt, sc->bh, reg);
 #else
@@ -1081,7 +1112,8 @@ t4_read_reg64(struct adapter *sc, uint32_t reg)
 static inline void
 t4_write_reg64(struct adapter *sc, uint32_t reg, uint64_t val)
 {
-
+	if (hw_off_limits(sc))
+		MPASS(curthread == sc->reset_thread);
 #ifdef __LP64__
 	bus_space_write_8(sc->bt, sc->bh, reg, val);
 #else
@@ -1093,14 +1125,16 @@ t4_write_reg64(struct adapter *sc, uint32_t reg, uint64_t val)
 static inline void
 t4_os_pci_read_cfg1(struct adapter *sc, int reg, uint8_t *val)
 {
-
+	if (hw_off_limits(sc))
+		MPASS(curthread == sc->reset_thread);
 	*val = pci_read_config(sc->dev, reg, 1);
 }
 
 static inline void
 t4_os_pci_write_cfg1(struct adapter *sc, int reg, uint8_t val)
 {
-
+	if (hw_off_limits(sc))
+		MPASS(curthread == sc->reset_thread);
 	pci_write_config(sc->dev, reg, val, 1);
 }
 
@@ -1108,27 +1142,32 @@ static inline void
 t4_os_pci_read_cfg2(struct adapter *sc, int reg, uint16_t *val)
 {
 
+	if (hw_off_limits(sc))
+		MPASS(curthread == sc->reset_thread);
 	*val = pci_read_config(sc->dev, reg, 2);
 }
 
 static inline void
 t4_os_pci_write_cfg2(struct adapter *sc, int reg, uint16_t val)
 {
-
+	if (hw_off_limits(sc))
+		MPASS(curthread == sc->reset_thread);
 	pci_write_config(sc->dev, reg, val, 2);
 }
 
 static inline void
 t4_os_pci_read_cfg4(struct adapter *sc, int reg, uint32_t *val)
 {
-
+	if (hw_off_limits(sc))
+		MPASS(curthread == sc->reset_thread);
 	*val = pci_read_config(sc->dev, reg, 4);
 }
 
 static inline void
 t4_os_pci_write_cfg4(struct adapter *sc, int reg, uint32_t val)
 {
-
+	if (hw_off_limits(sc))
+		MPASS(curthread == sc->reset_thread);
 	pci_write_config(sc->dev, reg, val, 4);
 }
 

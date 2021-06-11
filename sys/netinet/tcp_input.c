@@ -164,6 +164,11 @@ SYSCTL_INT(_net_inet_tcp, OID_AUTO, do_prr, CTLFLAG_VNET | CTLFLAG_RW,
     &VNET_NAME(tcp_do_prr), 1,
     "Enable Proportional Rate Reduction per RFC 6937");
 
+VNET_DEFINE(int, tcp_do_lrd) = 0;
+SYSCTL_INT(_net_inet_tcp, OID_AUTO, do_lrd, CTLFLAG_VNET | CTLFLAG_RW,
+    &VNET_NAME(tcp_do_lrd), 1,
+    "Perform Lost Retransmission Detection");
+
 VNET_DEFINE(int, tcp_do_newcwv) = 0;
 SYSCTL_INT(_net_inet_tcp, OID_AUTO, newcwv, CTLFLAG_VNET | CTLFLAG_RW,
     &VNET_NAME(tcp_do_newcwv), 0,
@@ -506,6 +511,7 @@ cc_post_recovery(struct tcpcb *tp, struct tcphdr *th)
 	}
 	/* XXXLAS: EXIT_RECOVERY ? */
 	tp->t_bytes_acked = 0;
+	tp->sackhint.delivered_data = 0;
 	tp->sackhint.prr_out = 0;
 }
 
@@ -525,7 +531,7 @@ cc_post_recovery(struct tcpcb *tp, struct tcphdr *th)
 	    (V_tcp_delack_enabled || (tp->t_flags & TF_NEEDSYN)))
 
 void inline
-cc_ecnpkt_handler(struct tcpcb *tp, struct tcphdr *th, uint8_t iptos)
+cc_ecnpkt_handler_flags(struct tcpcb *tp, uint16_t flags, uint8_t iptos)
 {
 	INP_WLOCK_ASSERT(tp->t_inpcb);
 
@@ -543,7 +549,7 @@ cc_ecnpkt_handler(struct tcpcb *tp, struct tcphdr *th, uint8_t iptos)
 			break;
 		}
 
-		if (th->th_flags & TH_CWR)
+		if (flags & TH_CWR)
 			tp->ccv->flags |= CCF_TCPHDR_CWR;
 		else
 			tp->ccv->flags &= ~CCF_TCPHDR_CWR;
@@ -555,6 +561,12 @@ cc_ecnpkt_handler(struct tcpcb *tp, struct tcphdr *th, uint8_t iptos)
 			tp->t_flags |= TF_ACKNOW;
 		}
 	}
+}
+
+void inline
+cc_ecnpkt_handler(struct tcpcb *tp, struct tcphdr *th, uint8_t iptos)
+{
+	cc_ecnpkt_handler_flags(tp, th->th_flags, iptos);
 }
 
 /*
@@ -1497,18 +1509,17 @@ tcp_handle_wakeup(struct tcpcb *tp, struct socket *so)
 	 * the TIME_WAIT state before coming here, we need
 	 * to check if the socket is still connected.
 	 */
-	if ((so->so_state & SS_ISCONNECTED) == 0)
+	if (tp == NULL) {
 		return;
+	}
+	if (so == NULL) {
+		return;
+	}
 	INP_LOCK_ASSERT(tp->t_inpcb);
 	if (tp->t_flags & TF_WAKESOR) {
 		tp->t_flags &= ~TF_WAKESOR;
-		SOCKBUF_UNLOCK_ASSERT(&so->so_rcv);
-		sorwakeup(so);
-	}
-	if (tp->t_flags & TF_WAKESOW) {
-		tp->t_flags &= ~TF_WAKESOW;
-		SOCKBUF_UNLOCK_ASSERT(&so->so_snd);
-		sowwakeup(so);
+		SOCKBUF_LOCK_ASSERT(&so->so_rcv);
+		sorwakeup_locked(so);
 	}
 }
 
@@ -1886,7 +1897,7 @@ tcp_do_segment(struct mbuf *m, struct tcphdr *th, struct socket *so,
 				else if (!tcp_timer_active(tp, TT_PERSIST))
 					tcp_timer_activate(tp, TT_REXMT,
 						      tp->t_rxtcur);
-				tp->t_flags |= TF_WAKESOW;
+				sowwakeup(so);
 				if (sbavail(&so->so_snd))
 					(void) tp->t_fb->tfb_tcp_output(tp);
 				goto check_delack;
@@ -1951,8 +1962,8 @@ tcp_do_segment(struct mbuf *m, struct tcphdr *th, struct socket *so,
 				m_adj(m, drop_hdrlen);	/* delayed header drop */
 				sbappendstream_locked(&so->so_rcv, m, 0);
 			}
-			SOCKBUF_UNLOCK(&so->so_rcv);
-			tp->t_flags |= TF_WAKESOR;
+			/* NB: sorwakeup_locked() does an implicit unlock. */
+			sorwakeup_locked(so);
 			if (DELAY_ACK(tp, tlen)) {
 				tp->t_flags |= TF_DELACK;
 			} else {
@@ -2490,9 +2501,11 @@ tcp_do_segment(struct mbuf *m, struct tcphdr *th, struct socket *so,
 		 * If segment contains data or ACK, will call tcp_reass()
 		 * later; if not, do so now to pass queued data to user.
 		 */
-		if (tlen == 0 && (thflags & TH_FIN) == 0)
+		if (tlen == 0 && (thflags & TH_FIN) == 0) {
 			(void) tcp_reass(tp, (struct tcphdr *)0, NULL, 0,
 			    (struct mbuf *)0);
+			tcp_handle_wakeup(tp, so);
+		}
 		tp->snd_wl1 = th->th_seq - 1;
 		/* FALLTHROUGH */
 
@@ -2516,9 +2529,12 @@ tcp_do_segment(struct mbuf *m, struct tcphdr *th, struct socket *so,
 		}
 		if ((tp->t_flags & TF_SACK_PERMIT) &&
 		    ((to.to_flags & TOF_SACK) ||
-		     !TAILQ_EMPTY(&tp->snd_holes)))
-			sack_changed = tcp_sack_doack(tp, &to, th->th_ack);
-		else
+		     !TAILQ_EMPTY(&tp->snd_holes))) {
+			if (((sack_changed = tcp_sack_doack(tp, &to, th->th_ack)) != 0) &&
+			    (tp->t_flags & TF_LRD)) {
+				tcp_sack_lost_retransmission(tp, th);
+			}
+		} else
 			/*
 			 * Reset the value so that previous (valid) value
 			 * from the last ack with SACK doesn't get used.
@@ -2944,8 +2960,8 @@ process_ACK:
 				tp->snd_wnd = 0;
 			ourfinisacked = 0;
 		}
-		SOCKBUF_UNLOCK(&so->so_snd);
-		tp->t_flags |= TF_WAKESOW;
+		/* NB: sowwakeup_locked() does an implicit unlock. */
+		sowwakeup_locked(so);
 		m_freem(mfree);
 		/* Detect una wraparound. */
 		if (!IN_RECOVERY(tp->t_flags) &&
@@ -3166,7 +3182,6 @@ dodata:							/* XXX */
 				m_freem(m);
 			else
 				sbappendstream_locked(&so->so_rcv, m, 0);
-			SOCKBUF_UNLOCK(&so->so_rcv);
 			tp->t_flags |= TF_WAKESOR;
 		} else {
 			/*
@@ -3176,6 +3191,7 @@ dodata:							/* XXX */
 			 * when trimming from the head.
 			 */
 			tcp_seq temp = save_start;
+
 			thflags = tcp_reass(tp, th, &temp, &tlen, m);
 			tp->t_flags |= TF_ACKNOW;
 		}
@@ -3212,6 +3228,7 @@ dodata:							/* XXX */
 				    save_start + tlen);
 			}
 		}
+		tcp_handle_wakeup(tp, so);
 #if 0
 		/*
 		 * Note the amount of data that peer has sent into
@@ -3235,9 +3252,8 @@ dodata:							/* XXX */
 	 */
 	if (thflags & TH_FIN) {
 		if (TCPS_HAVERCVDFIN(tp->t_state) == 0) {
-			socantrcvmore(so);
 			/* The socket upcall is handled by socantrcvmore. */
-			tp->t_flags &= ~TF_WAKESOR;
+			socantrcvmore(so);
 			/*
 			 * If connection is half-synchronized
 			 * (ie NEEDSYN flag on) then delay ACK,
@@ -3301,7 +3317,6 @@ check_delack:
 		tp->t_flags &= ~TF_DELACK;
 		tcp_timer_activate(tp, TT_DELACK, tcp_delacktime);
 	}
-	tcp_handle_wakeup(tp, so);
 	INP_WUNLOCK(tp->t_inpcb);
 	return;
 
@@ -3335,7 +3350,6 @@ dropafterack:
 	TCP_PROBE3(debug__input, tp, th, m);
 	tp->t_flags |= TF_ACKNOW;
 	(void) tp->t_fb->tfb_tcp_output(tp);
-	tcp_handle_wakeup(tp, so);
 	INP_WUNLOCK(tp->t_inpcb);
 	m_freem(m);
 	return;
@@ -3343,7 +3357,6 @@ dropafterack:
 dropwithreset:
 	if (tp != NULL) {
 		tcp_dropwithreset(m, th, tp, tlen, rstreason);
-		tcp_handle_wakeup(tp, so);
 		INP_WUNLOCK(tp->t_inpcb);
 	} else
 		tcp_dropwithreset(m, th, NULL, tlen, rstreason);
@@ -3360,7 +3373,6 @@ drop:
 #endif
 	TCP_PROBE3(debug__input, tp, th, m);
 	if (tp != NULL) {
-		tcp_handle_wakeup(tp, so);
 		INP_WUNLOCK(tp->t_inpcb);
 	}
 	m_freem(m);
