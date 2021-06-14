@@ -83,8 +83,8 @@ __BUS_ACCESSOR(gic, bus, GIC, BUS, u_int);
 #define	GICD_ICENABLER(n)	(0x0180 + (((n) >> 5) * 4))	/* v1 ICDICER */
 #define	GICD_ISPENDR(n)		(0x0200 + (((n) >> 5) * 4))	/* v1 ICDISPR */
 #define	GICD_ICPENDR(n)		(0x0280 + (((n) >> 5) * 4))	/* v1 ICDICPR */
-#define	GICD_ISACTIVER(n)	(0x0300 + (((n) >> 5) * 4))
-#define	GICD_ICACTIVER(n)	(0x0380 + (((n) >> 5) * 4))	/* v1 ICDABR */
+#define	GICD_ISACTIVER(n)	(0x0300 + (((n) >> 5) * 4))	/* v1 ICDABR */
+#define	GICD_ICACTIVER(n)	(0x0380 + (((n) >> 5) * 4))
 #define	GICD_IPRIORITYR(n)	(0x0400 + (((n) >> 2) * 4))	/* v1 ICDIPR */
 #define	 GICD_I_PER_IPRIORITYn	4
 #define	GICD_ITARGETSR(n)	(0x0800 + (((n) >> 2) * 4))	/* v1 ICDIPTR */
