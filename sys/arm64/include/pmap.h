@@ -94,6 +94,7 @@ struct pmap {
 	struct asid_set		*pm_asid_set;	/* The ASID/VMID set to use */
 	enum pmap_stage		pm_stage;
 	int			pm_levels;
+	int			pm_dead;
 };
 typedef struct pmap *pmap_t;
 
@@ -174,6 +175,7 @@ void	pmap_kremove_device(vm_offset_t, vm_size_t);
 void	*pmap_mapdev_attr(vm_offset_t pa, vm_size_t size, vm_memattr_t ma);
 bool	pmap_page_is_mapped(vm_page_t m);
 int	pmap_pinit_stage(pmap_t, enum pmap_stage, int);
+void	pmap_pre_destroy(pmap_t pmap);
 bool	pmap_ps_enabled(pmap_t pmap);
 uint64_t pmap_to_ttbr0(pmap_t pmap);
 

@@ -345,7 +345,13 @@ static void
 vm_cleanup(struct vm *vm, bool destroy)
 {
 	struct mem_map *mm;
+	pmap_t pmap;
 	int i;
+
+	if (destroy) {
+		pmap = vmspace_pmap(vm->vmspace);
+		pmap_pre_destroy(pmap);
+	}
 
 	vtimer_vmcleanup(vm);
 	vgic_v3_detach_from_vm(vm);
