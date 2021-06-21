@@ -589,8 +589,6 @@ rack_set_cc_pacing(struct tcp_rack *rack)
 	rack->rc_pacing_cc_set = 1;
 	if (strcmp(tp->cc_algo->name, CCALGONAME_NEWRENO) != 0) {
 		/* Not new-reno we can't play games with beta! */
-		printf("cc_algo:%s is not NEWRENO:%s\n",
-		       tp->cc_algo->name, CCALGONAME_NEWRENO);
 		goto out;
 	}
 	ptr = ((struct newreno *)tp->ccv->cc_data);
@@ -13454,6 +13452,7 @@ rack_do_segment_nounlock(struct mbuf *m, struct tcphdr *th, struct socket *so,
 #ifdef TCP_ACCOUNTING
 	int ack_val_set = 0xf;
 #endif
+	int nsegs;
 	uint32_t us_cts;
 	/*
 	 * tv passed from common code is from either M_TSTMP_LRO or
@@ -13465,6 +13464,7 @@ rack_do_segment_nounlock(struct mbuf *m, struct tcphdr *th, struct socket *so,
 	if (m->m_flags & M_ACKCMP) {
 		panic("Impossible reach m has ackcmp? m:%p tp:%p", m, tp);
 	}
+	nsegs = m->m_pkthdr.lro_nsegs;
 	counter_u64_add(rack_proc_non_comp_ack, 1);
 	thflags = th->th_flags;
 #ifdef TCP_ACCOUNTING
@@ -13607,6 +13607,7 @@ rack_do_segment_nounlock(struct mbuf *m, struct tcphdr *th, struct socket *so,
 	if ((thflags & TH_SYN) && (thflags & TH_FIN) && V_drop_synfin) {
 		way_out = 4;
 		retval = 0;
+		m_freem(m);
 		goto done_with_input;
 	}
 	/*
@@ -13641,6 +13642,7 @@ rack_do_segment_nounlock(struct mbuf *m, struct tcphdr *th, struct socket *so,
 	    ((thflags & TH_RST) == 0) && (V_tcp_tolerate_missing_ts == 0)) {
 		way_out = 5;
 		retval = 0;
+		m_freem(m);
 		goto done_with_input;
 	}
 
@@ -13944,7 +13946,7 @@ do_output_now:
 			way_out = 2;
 		}
 	done_with_input:
-		rack_log_doseg_done(rack, cts, nxt_pkt, did_out, way_out, max(1, m->m_pkthdr.lro_nsegs));
+		rack_log_doseg_done(rack, cts, nxt_pkt, did_out, way_out, max(1, nsegs));
 		if (did_out)
 			rack->r_wanted_output = 0;
 #ifdef INVARIANTS
