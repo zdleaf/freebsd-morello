@@ -63,50 +63,10 @@
 	PUSH_SYS_REG(CNTVOFF_EL2);
 
 
-#define	SAVE_HOST_VFP_REGS()				\
-	stp	q0, q1, [sp, #-16 * 2]!;		\
-	stp	q2, q3, [sp, #-16 * 2]!;		\
-	stp	q4, q5, [sp, #-16 * 2]!;		\
-	stp	q6, q7, [sp, #-16 * 2]!;		\
-	stp	q8, q9, [sp, #-16 * 2]!;		\
-	stp	q10, q11, [sp, #-16 * 2]!;		\
-	stp	q12, q13, [sp, #-16 * 2]!;		\
-	stp	q14, q15, [sp, #-16 * 2]!;		\
-	stp	q16, q17, [sp, #-16 * 2]!;		\
-	stp	q18, q19, [sp, #-16 * 2]!;		\
-	stp	q20, q21, [sp, #-16 * 2]!;		\
-	stp	q22, q23, [sp, #-16 * 2]!;		\
-	stp	q24, q25, [sp, #-16 * 2]!;		\
-	stp	q26, q27, [sp, #-16 * 2]!;		\
-	stp	q28, q29, [sp, #-16 * 2]!;		\
-	stp	q30, q31, [sp, #-16 * 2]!;		\
-	PUSH_SYS_REG_PAIR(FPCR, FPSR);
-
-
 #define POP_SYS_REG_PAIR(reg0, reg1)			\
 	ldp	x2, x1, [sp], #16;			\
 	msr	reg1, x2;				\
 	msr	reg0, x1;
-
-
-#define LOAD_HOST_VFP_REGS()				\
-	POP_SYS_REG_PAIR(FPCR, FPSR);			\
-	ldp	q30, q31, [sp], #16 * 2;		\
-	ldp	q28, q29, [sp], #16 * 2;		\
-	ldp	q26, q27, [sp], #16 * 2;		\
-	ldp	q24, q25, [sp], #16 * 2;		\
-	ldp	q22, q23, [sp], #16 * 2;		\
-	ldp	q20, q21, [sp], #16 * 2;		\
-	ldp	q18, q19, [sp], #16 * 2;		\
-	ldp	q16, q17, [sp], #16 * 2;		\
-	ldp	q14, q15, [sp], #16 * 2;		\
-	ldp	q12, q13, [sp], #16 * 2;		\
-	ldp	q10, q11, [sp], #16 * 2;		\
-	ldp	q8, q9, [sp], #16 * 2;			\
-	ldp	q6, q7, [sp], #16 * 2;			\
-	ldp	q4, q5, [sp], #16 * 2;			\
-	ldp	q2, q3, [sp], #16 * 2;			\
-	ldp	q0, q1, [sp], #16 * 2;			\
 
 
 #define POP_SYS_REG(reg)				\

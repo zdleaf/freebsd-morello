@@ -63,9 +63,65 @@ hyp_code_start:
 	stp	x4,  x5,  [sp, #(4  * 8)]
 	stp	x2,  x3,  [sp, #(2  * 8)]
 	stp	x0,  x1,  [sp, #(0  * 8)]
+
+#ifdef VFP
+
+	/* Store the host VFP special registers */
+	mrs	x27, fpcr
+	mrs	x28, fpsr
+	sub	sp, sp, #32
+	stp	x27, x28, [sp]
+
+	/* Store the host VFP registers */
+	sub	sp, sp, #(32 * 16)
+	stp	q30, q31, [sp, #(30 * 16)]
+	stp	q28, q29, [sp, #(28 * 16)]
+	stp	q26, q27, [sp, #(26 * 16)]
+	stp	q24, q25, [sp, #(24 * 16)]
+	stp	q22, q23, [sp, #(22 * 16)]
+	stp	q20, q21, [sp, #(20 * 16)]
+	stp	q18, q19, [sp, #(18 * 16)]
+	stp	q16, q17, [sp, #(16 * 16)]
+	stp	q14, q15, [sp, #(14 * 16)]
+	stp	q12, q13, [sp, #(12 * 16)]
+	stp	q10, q11, [sp, #(10 * 16)]
+	stp	q8,  q9,  [sp, #(8  * 16)]
+	stp	q6,  q7,  [sp, #(6  * 16)]
+	stp	q4,  q5,  [sp, #(4  * 16)]
+	stp	q2,  q3,  [sp, #(2  * 16)]
+	stp	q0,  q1,  [sp, #(0  * 16)]
+#endif
+
 .endm
 
 .macro	restore_host_registers
+#ifdef VFP
+	/* Restore the host VFP registers */
+	ldp	q0,  q1,  [sp, #(0  * 16)]
+	ldp	q2,  q3,  [sp, #(2  * 16)]
+	ldp	q4,  q5,  [sp, #(4  * 16)]
+	ldp	q6,  q7,  [sp, #(6  * 16)]
+	ldp	q8,  q9,  [sp, #(8  * 16)]
+	ldp	q10, q11, [sp, #(10 * 16)]
+	ldp	q12, q13, [sp, #(12 * 16)]
+	ldp	q14, q15, [sp, #(14 * 16)]
+	ldp	q16, q17, [sp, #(16 * 16)]
+	ldp	q18, q19, [sp, #(18 * 16)]
+	ldp	q20, q21, [sp, #(20 * 16)]
+	ldp	q22, q23, [sp, #(22 * 16)]
+	ldp	q24, q25, [sp, #(24 * 16)]
+	ldp	q26, q27, [sp, #(26 * 16)]
+	ldp	q28, q29, [sp, #(28 * 16)]
+	ldp	q30, q31, [sp, #(30 * 16)]
+	add	sp, sp, #(32 * 16)
+
+	/* Restore the host VFP special registers */
+	ldp	x0, x1, [sp]
+	add	sp, sp, #32
+	msr	fpcr, x0
+	msr	fpsr, x1
+#endif
+
 	ldp	x0,  x1,  [sp, #(0  * 8)]
 	ldp	x2,  x3,  [sp, #(2  * 8)]
 	ldp	x4,  x5,  [sp, #(4  * 8)]
@@ -199,7 +255,6 @@ hyp_vectors:
 	 * the registers because the process dirties the regular registers.
 	 */
 	SAVE_GUEST_VFP_REGS()
-	LOAD_HOST_VFP_REGS()
 #endif
 	LOAD_HOST_REGS()
 	restore_host_registers
@@ -356,7 +411,6 @@ ENTRY(vmm_enter_guest)
 	save_host_registers
 	SAVE_HOST_REGS();
 #ifdef VFP
-	SAVE_HOST_VFP_REGS()
 	/*
 	 * Loading the guest VFP registers needs to come before loading the
 	 * rest of the registers because this process dirties the regular
