@@ -64,8 +64,73 @@ hyp_code_start:
 	stp	x2,  x3,  [sp, #(2  * 8)]
 	stp	x0,  x1,  [sp, #(0  * 8)]
 
-#ifdef VFP
+	/* Store the special registers */
+	mrs	x20, sp_el0
+	mrs	x21, sp_el1
+	mrs	x22, elr_el1
+	mrs	x23, elr_el2
+	mrs	x24, tpidr_el0
+	mrs	x25, tpidrro_el0
+	mrs	x26, tpidr_el1
+	mrs	x27, vbar_el1
 
+	sub	sp, sp, #(8 * 8)
+	stp	x26, x27, [sp, #(6 * 8)]
+	stp	x24, x25, [sp, #(4 * 8)]
+	stp	x22, x23, [sp, #(2 * 8)]
+	stp	x20, x21, [sp, #(0 * 8)]
+
+	mrs	x20, actlr_el1
+	mrs	x21, amair_el1
+	mrs	x22, par_el1
+	mrs	x23, mair_el1
+	mrs	x24, tcr_el1
+	mrs	x25, ttbr0_el1
+	mrs	x26, ttbr1_el1
+	mrs	x27, afsr0_el1
+
+	sub	sp, sp, #(8 * 8)
+	stp	x26, x27, [sp, #(6 * 8)]
+	stp	x24, x25, [sp, #(4 * 8)]
+	stp	x22, x23, [sp, #(2 * 8)]
+	stp	x20, x21, [sp, #(0 * 8)]
+
+	mrs	x20, afsr1_el1
+	mrs	x21, contextidr_el1
+	mrs	x22, cpacr_el1
+	mrs	x23, esr_el1
+	mrs	x24, far_el1
+	mrs	x25, sctlr_el1
+	mrs	x26, spsr_el1
+	mrs	x27, hcr_el2
+
+	sub	sp, sp, #(8 * 8)
+	stp	x26, x27, [sp, #(6 * 8)]
+	stp	x24, x25, [sp, #(4 * 8)]
+	stp	x22, x23, [sp, #(2 * 8)]
+	stp	x20, x21, [sp, #(0 * 8)]
+
+	mrs	x20, vpidr_el2
+	mrs	x21, vmpidr_el2
+	mrs	x22, cptr_el2
+	mrs	x23, spsr_el2
+	mrs	x24, ich_hcr_el2
+	mrs	x25, ich_vmcr_el2
+	mrs	x26, cnthctl_el2
+	mrs	x27, cntkctl_el1
+
+	sub	sp, sp, #(8 * 8)
+	stp	x26, x27, [sp, #(6 * 8)]
+	stp	x24, x25, [sp, #(4 * 8)]
+	stp	x22, x23, [sp, #(2 * 8)]
+	stp	x20, x21, [sp, #(0 * 8)]
+
+	mrs	x20, cntvoff_el2
+
+	sub	sp, sp, #(2 * 8)
+	str	x20, [sp]
+
+#ifdef VFP
 	/* Store the host VFP special registers */
 	mrs	x27, fpcr
 	mrs	x28, fpsr
@@ -121,6 +186,71 @@ hyp_code_start:
 	msr	fpcr, x0
 	msr	fpsr, x1
 #endif
+
+	ldr	x0, [sp]
+	add	sp, sp, #(2 * 8)
+
+	msr	cntvoff_el2, x0
+
+	ldp	x6, x7, [sp, #(6 * 8)]
+	ldp	x4, x5, [sp, #(4 * 8)]
+	ldp	x2, x3, [sp, #(2 * 8)]
+	ldp	x0, x1, [sp, #(0 * 8)]
+	add	sp, sp, #(8 * 8)
+
+	msr	vpidr_el2, x0
+	msr	vmpidr_el2, x1
+	msr	cptr_el2, x2
+	msr	spsr_el2, x3
+	msr	ich_hcr_el2, x4
+	msr	ich_vmcr_el2, x5
+	msr	cnthctl_el2, x6
+	msr	cntkctl_el1, x7
+
+	ldp	x6, x7, [sp, #(6 * 8)]
+	ldp	x4, x5, [sp, #(4 * 8)]
+	ldp	x2, x3, [sp, #(2 * 8)]
+	ldp	x0, x1, [sp, #(0 * 8)]
+	add	sp, sp, #(8 * 8)
+
+	msr	afsr1_el1, x0
+	msr	contextidr_el1, x1
+	msr	cpacr_el1, x2
+	msr	esr_el1, x3
+	msr	far_el1, x4
+	msr	sctlr_el1, x5
+	msr	spsr_el1, x6
+	msr	hcr_el2, x7
+
+	ldp	x6, x7, [sp, #(6 * 8)]
+	ldp	x4, x5, [sp, #(4 * 8)]
+	ldp	x2, x3, [sp, #(2 * 8)]
+	ldp	x0, x1, [sp, #(0 * 8)]
+	add	sp, sp, #(8 * 8)
+
+	msr	actlr_el1, x0
+	msr	amair_el1, x1
+	msr	par_el1, x2
+	msr	mair_el1, x3
+	msr	tcr_el1, x4
+	msr	ttbr0_el1, x5
+	msr	ttbr1_el1, x6
+	msr	afsr0_el1, x7
+
+	ldp	x6, x7, [sp, #(6 * 8)]
+	ldp	x4, x5, [sp, #(4 * 8)]
+	ldp	x2, x3, [sp, #(2 * 8)]
+	ldp	x0, x1, [sp, #(0 * 8)]
+	add	sp, sp, #(8 * 8)
+
+	msr	sp_el0, x0
+	msr	sp_el1, x1
+	msr	elr_el1, x2
+	msr	elr_el2, x3
+	msr	tpidr_el0, x4
+	msr	tpidrro_el0, x5
+	msr	tpidr_el1, x6
+	msr	vbar_el1, x7
 
 	ldp	x0,  x1,  [sp, #(0  * 8)]
 	ldp	x2,  x3,  [sp, #(2  * 8)]
@@ -256,7 +386,6 @@ hyp_vectors:
 	 */
 	SAVE_GUEST_VFP_REGS()
 #endif
-	LOAD_HOST_REGS()
 	restore_host_registers
 	SAVE_EXIT_INFO()
 
@@ -409,7 +538,6 @@ ENTRY(vmm_enter_guest)
 	msr	tpidr_el2, x0
 
 	save_host_registers
-	SAVE_HOST_REGS();
 #ifdef VFP
 	/*
 	 * Loading the guest VFP registers needs to come before loading the
