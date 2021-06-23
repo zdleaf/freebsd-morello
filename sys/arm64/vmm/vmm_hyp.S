@@ -300,10 +300,108 @@ hyp_code_start:
 	/* Restore the saved x0 & x1 and save them */
 	ldp	x2,  x3,  [sp], #(2 * 8)
 	stp	x2,  x3,  [x0, #(0  * 8)]
+
+	mrs	x20, actlr_el1
+	mrs	x21, afsr0_el1
+	mrs	x22, afsr1_el1
+	mrs	x23, amair_el1
+	mrs	x24, contextidr_el1
+	mrs	x25, cpacr_el1
+	mrs	x26, elr_el1
+	mrs	x27, esr_el1
+
+	stp	x20, x21, [x0, #(HYPCTX_ACTLR_EL1)]
+	stp	x22, x23, [x0, #(HYPCTX_AFSR1_EL1)]
+	stp	x24, x25, [x0, #(HYPCTX_CONTEXTIDR_EL1)]
+	stp	x26, x27, [x0, #(HYPCTX_ELR_EL1)]
+
+	mrs	x20, far_el1
+	mrs	x21, mair_el1
+	mrs	x22, par_el1
+	mrs	x23, sctlr_el1
+	mrs	x24, sp_el0
+	mrs	x25, tcr_el1
+	mrs	x26, tpidr_el0
+	mrs	x27, tpidrro_el0
+
+	stp	x20, x21, [x0, #(HYPCTX_FAR_EL1)]
+	stp	x22, x23, [x0, #(HYPCTX_PAR_EL1)]
+	stp	x24, x25, [x0, #(HYPCTX_SP_EL0)]
+	stp	x26, x27, [x0, #(HYPCTX_TPIDR_EL0)]
+
+	mrs	x20, tpidr_el1
+	mrs	x21, ttbr0_el1
+	mrs	x22, ttbr1_el1
+	mrs	x23, vbar_el1
+	mrs	x24, spsr_el1
+	mrs	x25, cptr_el2
+	mrs	x26, elr_el2
+	mrs	x27, hcr_el2
+
+	stp	x20, x21, [x0, #(HYPCTX_TPIDR_EL1)]
+	stp	x22, x23, [x0, #(HYPCTX_TTBR1_EL1)]
+	stp	x24, x25, [x0, #(HYPCTX_SPSR_EL1)]
+	stp	x26, x27, [x0, #(HYPCTX_ELR_EL2)]
+
+	mrs	x20, vpidr_el2
+	mrs	x21, vmpidr_el2
+	mrs	x22, spsr_el2
+
+	stp	x20, x21, [x0, #(HYPCTX_VPIDR_EL2)]
+	str	w22,      [x0, #(HYPCTX_SPSR_EL2)]
 .endm
 
 .macro	restore_guest_registers
 	/* x0 contains the hypctx pointer */
+
+	ldp	x20, x21, [x0, #(HYPCTX_ACTLR_EL1)]
+	ldp	x22, x23, [x0, #(HYPCTX_AFSR1_EL1)]
+	ldp	x24, x25, [x0, #(HYPCTX_CONTEXTIDR_EL1)]
+	ldp	x26, x27, [x0, #(HYPCTX_ELR_EL1)]
+
+	msr	actlr_el1, x20
+	msr	afsr0_el1, x21
+	msr	afsr1_el1, x22
+	msr	amair_el1, x23
+	msr	contextidr_el1, x24
+	msr	cpacr_el1, x25
+	msr	elr_el1, x26
+	msr	esr_el1, x27
+
+	ldp	x20, x21, [x0, #(HYPCTX_FAR_EL1)]
+	ldp	x22, x23, [x0, #(HYPCTX_PAR_EL1)]
+	ldp	x24, x25, [x0, #(HYPCTX_SP_EL0)]
+	ldp	x26, x27, [x0, #(HYPCTX_TPIDR_EL0)]
+
+	msr	far_el1, x20
+	msr	mair_el1, x21
+	msr	par_el1, x22
+	msr	sctlr_el1, x23
+	msr	sp_el0, x24
+	msr	tcr_el1, x25
+	msr	tpidr_el0, x26
+	msr	tpidrro_el0, x27
+
+	ldp	x20, x21, [x0, #(HYPCTX_TPIDR_EL1)]
+	ldp	x22, x23, [x0, #(HYPCTX_TTBR1_EL1)]
+	ldp	x24, x25, [x0, #(HYPCTX_SPSR_EL1)]
+	ldp	x26, x27, [x0, #(HYPCTX_ELR_EL2)]
+
+	msr	tpidr_el1, x20
+	msr	ttbr0_el1, x21
+	msr	ttbr1_el1, x22
+	msr	vbar_el1, x23
+	msr	spsr_el1, x24
+	msr	cptr_el2, x25
+	msr	elr_el2, x26
+	msr	hcr_el2, x27
+
+	ldp	x20, x21, [x0, #(HYPCTX_VPIDR_EL2)]
+	ldr	w22,      [x0, #(HYPCTX_SPSR_EL2)]
+
+	msr	vpidr_el2, x20
+	msr	vmpidr_el2, x21
+	msr	spsr_el2, x22
 
 	/*
 	 * Copy the guest x0 and x1 to the stack so we can restore them

@@ -38,7 +38,11 @@
 struct hypctx {
 	struct reg	regs;
 
-	/* EL1 control registers */
+	/*
+	 * EL1 control registers.
+	 * Be careful changing the layout of these as we access them from
+	 * assembly when switching between the host and guest.
+	 */
 	uint64_t	actlr_el1;	/* Auxiliary Control Register */
 	uint64_t	afsr0_el1;	/* Auxiliary Fault Status Register 0 */
 	uint64_t	afsr1_el1;	/* Auxiliary Fault Status Register 1 */
