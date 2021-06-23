@@ -27,29 +27,6 @@
 #ifndef _VMM_HYP_MACROS_H_
 #define	_VMM_HYP_MACROS_H_
 
-
-#define PUSH_SYS_REG_PAIR(reg0, reg1)			\
-	mrs	x1, reg0;				\
-	mrs	x2, reg1;				\
-	stp	x2, x1, [sp, #-16]!;
-
-
-#define PUSH_SYS_REG(reg)				\
-	mrs 	x1, reg;				\
-	str	x1, [sp, #-16]!;
-
-
-#define POP_SYS_REG_PAIR(reg0, reg1)			\
-	ldp	x2, x1, [sp], #16;			\
-	msr	reg1, x2;				\
-	msr	reg0, x1;
-
-
-#define POP_SYS_REG(reg)				\
-	ldr	x1, [sp], #16;				\
-	msr	reg, x1;
-
-
 #define	SAVE_ARRAY_REG64(reg, dest, remaining)		\
 	cmp	remaining, #0;				\
 	beq	9f;					\
