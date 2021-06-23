@@ -174,11 +174,6 @@
 	SAVE_AP0R_REGS();				\
 	SAVE_AP1R_REGS();				\
 							\
-	/* Save the stack pointer. */			\
-	mrs	x1, sp_el1;				\
-	mov	x2, #HYPCTX_REGS_SP;			\
-	str	x1, [x0, x2];				\
-							\
 	SAVE_SYS_REG64(HYPCTX, ACTLR_EL1);		\
 	SAVE_SYS_REG64(HYPCTX, AFSR0_EL1);		\
 	SAVE_SYS_REG64(HYPCTX, AFSR1_EL1);		\
@@ -435,12 +430,6 @@
 	LOAD_LR_REGS();					\
 	LOAD_AP0R_REGS();				\
 	LOAD_AP1R_REGS();				\
-							\
-	/* Load the guest EL1 stack pointer */		\
-	mov	x1, #HYPCTX_REGS_SP;			\
-	add	x1, x1, x0;				\
-	ldr	x2, [x1];				\
-	msr	sp_el1, x2;				\
 
 
 /*

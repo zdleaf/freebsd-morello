@@ -292,7 +292,10 @@ hyp_code_start:
 	stp	x24, x25, [x0, #(24 * 8)]
 	stp	x26, x27, [x0, #(26 * 8)]
 	stp	x28, x29, [x0, #(28 * 8)]
-	str	x30,      [x0, #(30 * 8)]
+
+	/* Load the guest stack pointer to save */
+	mrs	x18, sp_el1
+	stp	x30, x18, [x0, #(30 * 8)]
 
 	/* Restore the saved x0 & x1 and save them */
 	ldp	x2,  x3,  [sp], #(2 * 8)
@@ -309,7 +312,10 @@ hyp_code_start:
 	ldp	x2,  x3,  [x0, #(0  * 8)]
 	stp	x2,  x3,  [sp, #-(2 * 8)]!
 
-	ldr	x30,      [x0, #(30 * 8)]
+	/* Load the guest link register anmd stack pointer */
+	ldp	x30, x18, [x0, #(30 * 8)]
+	msr	sp_el1, x18
+
 	ldp	x28, x29, [x0, #(28 * 8)]
 	ldp	x26, x27, [x0, #(26 * 8)]
 	ldp	x24, x25, [x0, #(24 * 8)]
