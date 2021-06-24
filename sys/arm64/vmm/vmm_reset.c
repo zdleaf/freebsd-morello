@@ -49,7 +49,7 @@ reset_vm_el01_regs(void *vcpu)
 
 	el2ctx = vcpu;
 
-	set_arch_unknown(el2ctx->regs);
+	set_arch_unknown(el2ctx->tf);
 
 	set_arch_unknown(el2ctx->actlr_el1);
 	set_arch_unknown(el2ctx->afsr0_el1);
@@ -133,7 +133,7 @@ reset_vm_el2_regs(void *vcpu)
 	 * Disable interrupts in the guest. The guest OS will re-enable
 	 * them.
 	 */
-	el2ctx->spsr_el2 = PSR_D | PSR_A | PSR_I | PSR_F;
+	el2ctx->tf.tf_spsr = PSR_D | PSR_A | PSR_I | PSR_F;
 	/* Use the EL1 stack when taking exceptions to EL1 */
-	el2ctx->spsr_el2 |= PSR_M_EL1h;
+	el2ctx->tf.tf_spsr |= PSR_M_EL1h;
 }

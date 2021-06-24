@@ -1364,7 +1364,7 @@ vm_handle_wfi(struct vm *vm, int vcpuid, struct vm_exit *vme, bool *retu)
 
 	vcpu = &vm->vcpu[vcpuid];
 	hypctx = vme->u.wfi.hypctx;
-	intr_disabled = !(hypctx->regs.spsr & PSR_I);
+	intr_disabled = !(hypctx->tf.tf_spsr & PSR_I);
 
 	vcpu_lock(vcpu);
 	while (1) {

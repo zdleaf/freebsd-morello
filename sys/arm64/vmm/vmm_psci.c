@@ -40,7 +40,7 @@ static int
 psci_version(struct hypctx *hypctx, bool *retu)
 {
 
-	hypctx->regs.x[0] = PSCI_VERSION_0_2;
+	hypctx->tf.tf_x[0] = PSCI_VERSION_0_2;
 
 	*retu = false;
 	return (0);
@@ -68,7 +68,7 @@ psci_handle_call(struct vm *vm, int vcpuid, struct vm_exit *vme, bool *retu)
 	hyp = vm_get_cookie(vm);
 	hypctx = &hyp->ctx[vcpuid];
 
-	esr_el2 = hypctx->exit_info.esr_el2;
+	esr_el2 = hypctx->tf.tf_esr;
 	esr_iss = esr_el2 & ESR_ELx_ISS_MASK;
 
 	if (esr_iss != 0) {
@@ -78,7 +78,7 @@ psci_handle_call(struct vm *vm, int vcpuid, struct vm_exit *vme, bool *retu)
 		goto out;
 	}
 
-	func_id = hypctx->regs.x[0];
+	func_id = hypctx->tf.tf_x[0];
 	switch (func_id) {
 	case PSCI_FNID_VERSION:
 		error = psci_version(hypctx, retu);
@@ -90,7 +90,7 @@ psci_handle_call(struct vm *vm, int vcpuid, struct vm_exit *vme, bool *retu)
 		vme->exitcode = VM_EXITCODE_SMCCC;
 		vme->u.smccc_call.func_id = func_id;
 		for (i = 0; i < nitems(vme->u.smccc_call.args); i++)
-			vme->u.smccc_call.args[i] = hypctx->regs.x[i + 1];
+			vme->u.smccc_call.args[i] = hypctx->tf.tf_x[i + 1];
 		*retu = true;
 		error = 0;
 		break;

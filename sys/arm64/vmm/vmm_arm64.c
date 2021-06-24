@@ -459,7 +459,7 @@ arm64_gen_inst_emul_data(struct hypctx *hypctx, uint32_t esr_iss,
 	paging->far = hypctx->exit_info.far_el2;
 	paging->ttbr0_el1 = hypctx->ttbr0_el1;
 	paging->ttbr1_el1 = hypctx->ttbr1_el1;
-	paging->flags = hypctx->spsr_el2 & (PSR_M_MASK | PSR_M_32);
+	paging->flags = hypctx->tf.tf_spsr & (PSR_M_MASK | PSR_M_32);
 	if ((hypctx->sctlr_el1 & SCTLR_M) != 0)
 		paging->flags |= VM_GP_MMU_ENABLED;
 }
@@ -489,8 +489,8 @@ handle_el1_sync_excp(struct hyp *hyp, int vcpu, struct vm_exit *vme_ret,
 	uint32_t esr_ec, esr_iss;
 
 	hypctx = &hyp->ctx[vcpu];
-	esr_ec = ESR_ELx_EXCEPTION(hypctx->exit_info.esr_el2);
-	esr_iss = hypctx->exit_info.esr_el2 & ESR_ELx_ISS_MASK;
+	esr_ec = ESR_ELx_EXCEPTION(hypctx->tf.tf_esr);
+	esr_iss = hypctx->tf.tf_esr & ESR_ELx_ISS_MASK;
 
 	switch(esr_ec) {
 	case EXCP_UNKNOWN:
@@ -513,7 +513,7 @@ handle_el1_sync_excp(struct hyp *hyp, int vcpu, struct vm_exit *vme_ret,
 		if (vm_mem_allocated(hyp->vm, vcpu, gpa)) {
 			vme_ret->exitcode = VM_EXITCODE_PAGING;
 			vme_ret->inst_length = 0;
-			vme_ret->u.paging.esr = hypctx->exit_info.esr_el2;
+			vme_ret->u.paging.esr = hypctx->tf.tf_esr;
 			vme_ret->u.paging.gpa = gpa;
 			break;
 		}
@@ -597,7 +597,7 @@ arm_vmrun(void *arg, int vcpu, register_t pc, pmap_t pmap,
 	vme = vm_exitinfo(vm, vcpu);
 
 	hypctx = &hyp->ctx[vcpu];
-	hypctx->elr_el2 = (uint64_t)pc;
+	hypctx->tf.tf_elr = (uint64_t)pc;
 
 	for (;;) {
 		daif = intr_disable();
@@ -623,10 +623,10 @@ arm_vmrun(void *arg, int vcpu, register_t pc, pmap_t pmap,
 		if (excp_type == EXCP_TYPE_MAINT_IRQ)
 			continue;
 
-		vme->pc = hypctx->elr_el2;
+		vme->pc = hypctx->tf.tf_elr;
 		vme->inst_length = INSN_SIZE;
 		vme->u.hyp.exception_nr = excp_type;
-		vme->u.hyp.esr_el2 = hypctx->exit_info.esr_el2;
+		vme->u.hyp.esr_el2 = hypctx->tf.tf_esr;
 		vme->u.hyp.far_el2 = hypctx->exit_info.far_el2;
 		vme->u.hyp.hpfar_el2 = hypctx->exit_info.hpfar_el2;
 
@@ -637,7 +637,7 @@ arm_vmrun(void *arg, int vcpu, register_t pc, pmap_t pmap,
 			break;
 		else
 			/* Resume guest execution from the next instruction. */
-			hypctx->elr_el2 += vme->inst_length;
+			hypctx->tf.tf_elr += vme->inst_length;
 	}
 
 	return (0);
@@ -681,75 +681,75 @@ hypctx_regptr(struct hypctx *hypctx, int reg)
 {
 	switch (reg) {
 	case VM_REG_GUEST_X0:
-		return (&hypctx->regs.x[0]);
+		return (&hypctx->tf.tf_x[0]);
 	case VM_REG_GUEST_X1:
-		return (&hypctx->regs.x[1]);
+		return (&hypctx->tf.tf_x[1]);
 	case VM_REG_GUEST_X2:
-		return (&hypctx->regs.x[2]);
+		return (&hypctx->tf.tf_x[2]);
 	case VM_REG_GUEST_X3:
-		return (&hypctx->regs.x[3]);
+		return (&hypctx->tf.tf_x[3]);
 	case VM_REG_GUEST_X4:
-		return (&hypctx->regs.x[4]);
+		return (&hypctx->tf.tf_x[4]);
 	case VM_REG_GUEST_X5:
-		return (&hypctx->regs.x[5]);
+		return (&hypctx->tf.tf_x[5]);
 	case VM_REG_GUEST_X6:
-		return (&hypctx->regs.x[6]);
+		return (&hypctx->tf.tf_x[6]);
 	case VM_REG_GUEST_X7:
-		return (&hypctx->regs.x[7]);
+		return (&hypctx->tf.tf_x[7]);
 	case VM_REG_GUEST_X8:
-		return (&hypctx->regs.x[8]);
+		return (&hypctx->tf.tf_x[8]);
 	case VM_REG_GUEST_X9:
-		return (&hypctx->regs.x[9]);
+		return (&hypctx->tf.tf_x[9]);
 	case VM_REG_GUEST_X10:
-		return (&hypctx->regs.x[10]);
+		return (&hypctx->tf.tf_x[10]);
 	case VM_REG_GUEST_X11:
-		return (&hypctx->regs.x[11]);
+		return (&hypctx->tf.tf_x[11]);
 	case VM_REG_GUEST_X12:
-		return (&hypctx->regs.x[12]);
+		return (&hypctx->tf.tf_x[12]);
 	case VM_REG_GUEST_X13:
-		return (&hypctx->regs.x[13]);
+		return (&hypctx->tf.tf_x[13]);
 	case VM_REG_GUEST_X14:
-		return (&hypctx->regs.x[14]);
+		return (&hypctx->tf.tf_x[14]);
 	case VM_REG_GUEST_X15:
-		return (&hypctx->regs.x[15]);
+		return (&hypctx->tf.tf_x[15]);
 	case VM_REG_GUEST_X16:
-		return (&hypctx->regs.x[16]);
+		return (&hypctx->tf.tf_x[16]);
 	case VM_REG_GUEST_X17:
-		return (&hypctx->regs.x[17]);
+		return (&hypctx->tf.tf_x[17]);
 	case VM_REG_GUEST_X18:
-		return (&hypctx->regs.x[18]);
+		return (&hypctx->tf.tf_x[18]);
 	case VM_REG_GUEST_X19:
-		return (&hypctx->regs.x[19]);
+		return (&hypctx->tf.tf_x[19]);
 	case VM_REG_GUEST_X20:
-		return (&hypctx->regs.x[20]);
+		return (&hypctx->tf.tf_x[20]);
 	case VM_REG_GUEST_X21:
-		return (&hypctx->regs.x[21]);
+		return (&hypctx->tf.tf_x[21]);
 	case VM_REG_GUEST_X22:
-		return (&hypctx->regs.x[22]);
+		return (&hypctx->tf.tf_x[22]);
 	case VM_REG_GUEST_X23:
-		return (&hypctx->regs.x[23]);
+		return (&hypctx->tf.tf_x[23]);
 	case VM_REG_GUEST_X24:
-		return (&hypctx->regs.x[24]);
+		return (&hypctx->tf.tf_x[24]);
 	case VM_REG_GUEST_X25:
-		return (&hypctx->regs.x[25]);
+		return (&hypctx->tf.tf_x[25]);
 	case VM_REG_GUEST_X26:
-		return (&hypctx->regs.x[26]);
+		return (&hypctx->tf.tf_x[26]);
 	case VM_REG_GUEST_X27:
-		return (&hypctx->regs.x[27]);
+		return (&hypctx->tf.tf_x[27]);
 	case VM_REG_GUEST_X28:
-		return (&hypctx->regs.x[28]);
+		return (&hypctx->tf.tf_x[28]);
 	case VM_REG_GUEST_X29:
-		return (&hypctx->regs.x[29]);
+		return (&hypctx->tf.tf_x[29]);
 	case VM_REG_GUEST_LR:
-		return (&hypctx->regs.lr);
+		return (&hypctx->tf.tf_lr);
 	case VM_REG_GUEST_SP:
-		return (&hypctx->regs.sp);
-	case VM_REG_GUEST_ELR:
-		return (&hypctx->regs.elr);
-	case VM_REG_GUEST_SPSR:
-		return (&hypctx->regs.spsr);
+		return (&hypctx->tf.tf_sp);
+	case VM_REG_GUEST_ELR: /* This is bogus */
+		return (&hypctx->tf.tf_elr);
+	case VM_REG_GUEST_SPSR: /* This is bogus */
+		return (&hypctx->tf.tf_spsr);
 	case VM_REG_ELR_EL2:
-		return (&hypctx->elr_el2);
+		return (&hypctx->tf.tf_elr);
 	default:
 		break;
 	}

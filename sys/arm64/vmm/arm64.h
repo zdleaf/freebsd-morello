@@ -36,7 +36,7 @@
 #include "io/vtimer.h"
 
 struct hypctx {
-	struct reg	regs;
+	struct trapframe tf;
 
 	/*
 	 * EL1 control registers.
@@ -67,16 +67,12 @@ struct hypctx {
 
 	/* EL2 control registers */
 	uint64_t	cptr_el2;	/* Architectural Feature Trap Register */
-	uint64_t	elr_el2;	/* Exception Link Register */
 	uint64_t	hcr_el2;	/* Hypervisor Configuration Register */
 	uint64_t	vpidr_el2;	/* Virtualization Processor ID Register */
 	uint64_t	vmpidr_el2;	/* Virtualization Multiprocessor ID Register */
-	uint32_t	spsr_el2;	/* Saved Program Status Register */
-
 	uint32_t	vcpu;
 	struct hyp	*hyp;
 	struct {
-		uint64_t	esr_el2;	/* Exception Syndrome Register */
 		uint64_t	far_el2;	/* Fault Address Register */
 		uint64_t	hpfar_el2;	/* Hypervisor IPA Fault Address Register */
 	} exit_info;

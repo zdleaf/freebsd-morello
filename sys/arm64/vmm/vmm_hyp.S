@@ -33,6 +33,7 @@
 #include <machine/asm.h>
 #include <machine/hypervisor.h>
 
+#include "assym.inc"
 #include "hyp_macros.h"
 #include "hyp.h"
 #include "hyp_assym.h"
@@ -278,28 +279,36 @@ hyp_code_start:
 	/* Restore the hypctx pointer */
 	mrs	x0, tpidr_el2
 
-	stp	x2,  x3,  [x0, #(2  * 8)]
-	stp	x4,  x5,  [x0, #(4  * 8)]
-	stp	x6,  x7,  [x0, #(6  * 8)]
-	stp	x8,  x9,  [x0, #(8  * 8)]
-	stp	x10, x11, [x0, #(10 * 8)]
-	stp	x12, x13, [x0, #(12 * 8)]
-	stp	x14, x15, [x0, #(14 * 8)]
-	stp	x16, x17, [x0, #(16 * 8)]
-	stp	x18, x19, [x0, #(18 * 8)]
-	stp	x20, x21, [x0, #(20 * 8)]
-	stp	x22, x23, [x0, #(22 * 8)]
-	stp	x24, x25, [x0, #(24 * 8)]
-	stp	x26, x27, [x0, #(26 * 8)]
-	stp	x28, x29, [x0, #(28 * 8)]
+	stp	x2,  x3,  [x0, #(TF_X + 2  * 8)]
+	stp	x4,  x5,  [x0, #(TF_X + 4  * 8)]
+	stp	x6,  x7,  [x0, #(TF_X + 6  * 8)]
+	stp	x8,  x9,  [x0, #(TF_X + 8  * 8)]
+	stp	x10, x11, [x0, #(TF_X + 10 * 8)]
+	stp	x12, x13, [x0, #(TF_X + 12 * 8)]
+	stp	x14, x15, [x0, #(TF_X + 14 * 8)]
+	stp	x16, x17, [x0, #(TF_X + 16 * 8)]
+	stp	x18, x19, [x0, #(TF_X + 18 * 8)]
+	stp	x20, x21, [x0, #(TF_X + 20 * 8)]
+	stp	x22, x23, [x0, #(TF_X + 22 * 8)]
+	stp	x24, x25, [x0, #(TF_X + 24 * 8)]
+	stp	x26, x27, [x0, #(TF_X + 26 * 8)]
+	stp	x28, x29, [x0, #(TF_X + 28 * 8)]
 
 	/* Load the guest stack pointer to save */
 	mrs	x18, sp_el1
-	stp	x30, x18, [x0, #(30 * 8)]
+	stp	x18, x30, [x0, #(TF_SP)]
+
+	/* Store the address to return to */
+	mrs	x10, elr_el2
+	mrs	x11, spsr_el2
+	mrs	x12, esr_el2
+
+	str	x10,      [x0, #(TF_ELR)]
+	stp	w11, w12, [x0, #(TF_SPSR)]
 
 	/* Restore the saved x0 & x1 and save them */
 	ldp	x2,  x3,  [sp], #(2 * 8)
-	stp	x2,  x3,  [x0, #(0  * 8)]
+	stp	x2,  x3,  [x0, #(TF_X + 0  * 8)]
 
 	mrs	x20, actlr_el1
 	mrs	x21, afsr0_el1
@@ -335,20 +344,17 @@ hyp_code_start:
 	mrs	x23, vbar_el1
 	mrs	x24, spsr_el1
 	mrs	x25, cptr_el2
-	mrs	x26, elr_el2
-	mrs	x27, hcr_el2
+	mrs	x26, hcr_el2
 
 	stp	x20, x21, [x0, #(HYPCTX_TPIDR_EL1)]
 	stp	x22, x23, [x0, #(HYPCTX_TTBR1_EL1)]
 	stp	x24, x25, [x0, #(HYPCTX_SPSR_EL1)]
-	stp	x26, x27, [x0, #(HYPCTX_ELR_EL2)]
+	str	x26,      [x0, #(HYPCTX_HCR_EL2)]
 
 	mrs	x20, vpidr_el2
 	mrs	x21, vmpidr_el2
-	mrs	x22, spsr_el2
 
 	stp	x20, x21, [x0, #(HYPCTX_VPIDR_EL2)]
-	str	w22,      [x0, #(HYPCTX_SPSR_EL2)]
 .endm
 
 .macro	restore_guest_registers
@@ -385,7 +391,7 @@ hyp_code_start:
 	ldp	x20, x21, [x0, #(HYPCTX_TPIDR_EL1)]
 	ldp	x22, x23, [x0, #(HYPCTX_TTBR1_EL1)]
 	ldp	x24, x25, [x0, #(HYPCTX_SPSR_EL1)]
-	ldp	x26, x27, [x0, #(HYPCTX_ELR_EL2)]
+	ldr	     x26, [x0, #(HYPCTX_HCR_EL2)]
 
 	msr	tpidr_el1, x20
 	msr	ttbr0_el1, x21
@@ -393,41 +399,45 @@ hyp_code_start:
 	msr	vbar_el1, x23
 	msr	spsr_el1, x24
 	msr	cptr_el2, x25
-	msr	elr_el2, x26
-	msr	hcr_el2, x27
+	msr	hcr_el2, x26
 
 	ldp	x20, x21, [x0, #(HYPCTX_VPIDR_EL2)]
-	ldr	w22,      [x0, #(HYPCTX_SPSR_EL2)]
 
 	msr	vpidr_el2, x20
 	msr	vmpidr_el2, x21
-	msr	spsr_el2, x22
 
 	/*
 	 * Copy the guest x0 and x1 to the stack so we can restore them
 	 * after loading the other registers.
 	 */
-	ldp	x2,  x3,  [x0, #(0  * 8)]
+	ldp	x2,  x3,  [x0, #(TF_X + 0  * 8)]
 	stp	x2,  x3,  [sp, #-(2 * 8)]!
 
+	/* Load the address to return to */
+	ldr	w11, [x0, #(TF_SPSR)]
+	ldr	x10, [x0, #(TF_ELR)]
+
+	msr	spsr_el2, x11
+	msr	elr_el2, x10
+
 	/* Load the guest link register anmd stack pointer */
-	ldp	x30, x18, [x0, #(30 * 8)]
+	ldp	x18, x30, [x0, #(TF_SP)]
 	msr	sp_el1, x18
 
-	ldp	x28, x29, [x0, #(28 * 8)]
-	ldp	x26, x27, [x0, #(26 * 8)]
-	ldp	x24, x25, [x0, #(24 * 8)]
-	ldp	x22, x23, [x0, #(22 * 8)]
-	ldp	x20, x21, [x0, #(20 * 8)]
-	ldp	x18, x19, [x0, #(18 * 8)]
-	ldp	x16, x17, [x0, #(16 * 8)]
-	ldp	x14, x15, [x0, #(14 * 8)]
-	ldp	x12, x13, [x0, #(12 * 8)]
-	ldp	x10, x11, [x0, #(10 * 8)]
-	ldp	x8,  x9,  [x0, #(8  * 8)]
-	ldp	x6,  x7,  [x0, #(6  * 8)]
-	ldp	x4,  x5,  [x0, #(4  * 8)]
-	ldp	x2,  x3,  [x0, #(2  * 8)]
+	ldp	x28, x29, [x0, #(TF_X + 28 * 8)]
+	ldp	x26, x27, [x0, #(TF_X + 26 * 8)]
+	ldp	x24, x25, [x0, #(TF_X + 24 * 8)]
+	ldp	x22, x23, [x0, #(TF_X + 22 * 8)]
+	ldp	x20, x21, [x0, #(TF_X + 20 * 8)]
+	ldp	x18, x19, [x0, #(TF_X + 18 * 8)]
+	ldp	x16, x17, [x0, #(TF_X + 16 * 8)]
+	ldp	x14, x15, [x0, #(TF_X + 14 * 8)]
+	ldp	x12, x13, [x0, #(TF_X + 12 * 8)]
+	ldp	x10, x11, [x0, #(TF_X + 10 * 8)]
+	ldp	x8,  x9,  [x0, #(TF_X + 8  * 8)]
+	ldp	x6,  x7,  [x0, #(TF_X + 6  * 8)]
+	ldp	x4,  x5,  [x0, #(TF_X + 4  * 8)]
+	ldp	x2,  x3,  [x0, #(TF_X + 2  * 8)]
 
 	ldp	x0,  x1,  [sp], #(2 * 8)
 .endm
