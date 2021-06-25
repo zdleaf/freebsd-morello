@@ -550,6 +550,7 @@ hyp_vectors:
 .macro do_world_switch_to_host
 	save_guest_registers
 	SAVE_GUEST_REGS()
+	SAVE_EXIT_INFO()
 #ifdef VFP
 	/*
 	 * Saving the guest VFP registers needs to come after saving the rest of
@@ -558,7 +559,6 @@ hyp_vectors:
 	SAVE_GUEST_VFP_REGS()
 #endif
 	restore_host_registers
-	SAVE_EXIT_INFO()
 
 	/* Restore host VTTBR */
 	mov	x9, #VTTBR_HOST
