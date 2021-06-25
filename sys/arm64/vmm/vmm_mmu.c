@@ -100,8 +100,8 @@ hypmap_map_identity(pmap_t map, vm_offset_t va, size_t len,
 	va = trunc_page(va);
 	while (va < va_end) {
 		dummy_page->phys_addr = vtophys(va);
-		pmap_enter(map, dummy_page->phys_addr, dummy_page,
-				prot, PMAP_ENTER_WIRED, 0);
+		pmap_enter(map, dummy_page->phys_addr, dummy_page, prot,
+		    PMAP_ENTER_WIRED, 0);
 		va += PAGE_SIZE;
 	}
 
