@@ -548,7 +548,6 @@ hyp_vectors:
 
 
 .macro do_world_switch_to_host
-	.align	7
 	save_guest_registers
 	SAVE_GUEST_REGS()
 #ifdef VFP
@@ -568,7 +567,6 @@ hyp_vectors:
 
 
 .macro handle_el2_excp type
-	.align	7
 	/* Save registers before modifying so we can restore them */
 	str	x9, [sp, #-16]!
 
