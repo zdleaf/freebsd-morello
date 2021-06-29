@@ -536,8 +536,8 @@ struct pf_state {
 	struct pfi_kkif		*rt_kif;
 	struct pf_ksrc_node	*src_node;
 	struct pf_ksrc_node	*nat_src_node;
-	counter_u64_t		 packets[2];
-	counter_u64_t		 bytes[2];
+	u_int64_t		 packets[2];
+	u_int64_t		 bytes[2];
 	u_int32_t		 creation;
 	u_int32_t	 	 expire;
 	u_int32_t		 pfsync_time;
@@ -1495,6 +1495,7 @@ extern int			 pf_state_insert(struct pfi_kkif *,
 				    struct pf_state_key *,
 				    struct pf_state_key *,
 				    struct pf_state *);
+extern struct pf_state		*pf_alloc_state(int);
 extern void			 pf_free_state(struct pf_state *);
 
 static __inline void
