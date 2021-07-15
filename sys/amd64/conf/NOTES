@@ -261,11 +261,8 @@ device		s3pci
 # linked to /dev/3dfx and /dev/voodoo.  Note that this is not the same as
 # the tdfx DRI module from XFree86 and is completely unrelated.
 #
-# To enable Linuxulator support, one must also include COMPAT_LINUX in the
-# config as well.  The other option is to load both as modules.
 
 device		tdfx			# Enable 3Dfx Voodoo support
-#XXX#device 	tdfx_linux		# Enable Linuxulator support
 
 #
 # ACPI support using the Intel ACPI Component Architecture reference
@@ -290,6 +287,7 @@ device		cpufreq
 #       adapters.
 # ice:	Intel 800 Series Physical Function
 #	Requires the ice_ddp module for full functionality
+# igc:	Intel I225 2.5Gb Ethernet adapter
 # ipw:	Intel PRO/Wireless 2100 IEEE 802.11 adapter
 #	Requires the ipw firmware module
 # iwi:	Intel PRO/Wireless 2200BG/2225BG/2915ABG IEEE 802.11 adapters
@@ -312,6 +310,7 @@ device		bxe		# Broadcom NetXtreme II BCM5771X/BCM578XX 10GbE
 options 	ED_3C503
 options 	ED_HPP
 options 	ED_SIC
+device		igc		# Intel I225 2.5G Ethernet
 device		ipw		# Intel 2100 wireless NICs.
 device		iwi		# Intel 2200BG/2225BG/2915ABG wireless NICs.
 device		iwn		# Intel 4965/1000/5000/6000 wireless NICs.
@@ -629,20 +628,6 @@ options 	COMPAT_CLOUDABI32
 
 # Enable 64-bit runtime support for CloudABI binaries.
 options 	COMPAT_CLOUDABI64
-
-# Enable Linux ABI emulation
-#XXX#options 	COMPAT_LINUX
-
-# Enable 32-bit Linux ABI emulation (requires COMPAT_FREEBSD32).
-options 	COMPAT_LINUX32
-
-# Enable the linux-like proc filesystem support (requires COMPAT_LINUX32
-# and PSEUDOFS)
-options 	LINPROCFS
-
-#Enable the linux-like sys filesystem support (requires COMPAT_LINUX32
-# and PSEUDOFS)
-options 	LINSYSFS
 
 #####################################################################
 # ZFS support

@@ -1320,12 +1320,11 @@ linux_mount(struct thread *td, struct linux_mount_args *args)
 		strcpy(fstypename, "linprocfs");
 	} else if (strcmp(fstypename, "vfat") == 0) {
 		strcpy(fstypename, "msdosfs");
-	} else if (strcmp(fstypename, "fuse") == 0) {
+	} else if (strcmp(fstypename, "fuse") == 0 ||
+	    strncmp(fstypename, "fuse.", 5) == 0) {
 		char *fuse_options, *fuse_option, *fuse_name;
 
-		if (strcmp(mntfromname, "fuse") == 0)
-			strcpy(mntfromname, "/dev/fuse");
-
+		strcpy(mntfromname, "/dev/fuse");
 		strcpy(fstypename, "fusefs");
 		data = malloc(MNAMELEN, M_TEMP, M_WAITOK);
 		error = copyinstr(args->data, data, MNAMELEN - 1, NULL);
@@ -1758,10 +1757,11 @@ int
 linux_fchownat(struct thread *td, struct linux_fchownat_args *args)
 {
 	char *path;
-	int error, dfd, flag;
+	int error, dfd, flag, unsupported;
 
-	if (args->flag & ~(LINUX_AT_SYMLINK_NOFOLLOW | LINUX_AT_EMPTY_PATH)) {
-		linux_msg(td, "fchownat unsupported flag 0x%x", args->flag);
+	unsupported = args->flag & ~(LINUX_AT_SYMLINK_NOFOLLOW | LINUX_AT_EMPTY_PATH);
+	if (unsupported != 0) {
+		linux_msg(td, "fchownat unsupported flag 0x%x", unsupported);
 		return (EINVAL);
 	}
 
