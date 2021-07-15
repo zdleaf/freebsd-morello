@@ -134,6 +134,8 @@ options 	SOC_ROCKCHIP_RK3328
 options 	SOC_ROCKCHIP_RK3399
 options 	SOC_XILINX_ZYNQ
 
+options		ROOTDEVNAME=\"ufs:mmcsd0s2\"
+
 # Timer drivers
 device		a10_timer
 
