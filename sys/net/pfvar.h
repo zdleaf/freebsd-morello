@@ -332,6 +332,11 @@ struct pf_kpool {
 	u_int8_t		 opts;
 };
 
+struct pf_rule_actions {
+	u_int32_t       qid;
+	u_int32_t       pqid;
+};
+
 union pf_krule_ptr {
 	struct pf_krule		*ptr;
 	u_int32_t		 nr;
@@ -581,11 +586,21 @@ _Static_assert(sizeof(struct pf_state_export) == 384, "size incorrect");
 
 #ifdef _KERNEL
 struct pf_kstate {
+	/*
+	 * Area shared with pf_state_cmp
+	 */
 	u_int64_t		 id;
 	u_int32_t		 creatorid;
 	u_int8_t		 direction;
 	u_int8_t		 pad[3];
+	/*
+	 * end of the area
+	 */
 
+	u_int8_t		 state_flags;
+	u_int8_t		 timeout;
+	u_int8_t		 sync_state; /* PFSYNC_S_x */
+	u_int8_t		 sync_updates; /* XXX */
 	u_int			 refs;
 	TAILQ_ENTRY(pf_kstate)	 sync_list;
 	TAILQ_ENTRY(pf_kstate)	 key_list[2];
@@ -607,15 +622,10 @@ struct pf_kstate {
 	u_int32_t		 creation;
 	u_int32_t	 	 expire;
 	u_int32_t		 pfsync_time;
+	u_int32_t                qid;
+	u_int32_t                pqid;
 	u_int16_t		 tag;
 	u_int8_t		 log;
-	u_int8_t		 state_flags;
-	u_int8_t		 timeout;
-	u_int8_t		 sync_state; /* PFSYNC_S_x */
-
-	/* XXX */
-	u_int8_t		 sync_updates;
-	u_int8_t		_tail[3];
 };
 
 /*
@@ -1057,6 +1067,7 @@ struct pf_pdesc {
 	u_int16_t *sport;
 	u_int16_t *dport;
 	struct pf_mtag	*pf_mtag;
+	struct pf_rule_actions	act;
 
 	u_int32_t	 p_len;		/* total length of payload */
 
