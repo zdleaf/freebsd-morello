@@ -38,7 +38,6 @@
 #include <drmkpi/sched.h>
 
 extern int drmkpi_alloc_current(struct thread *, int flags);
-extern void drmkpi_free_current(struct task_struct *);
 
 static inline void
 linux_set_current(struct thread *td)
