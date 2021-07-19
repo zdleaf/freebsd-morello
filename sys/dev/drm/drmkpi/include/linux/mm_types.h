@@ -38,7 +38,6 @@
 typedef int vm_fault_t;
 
 struct vm_area_struct;
-struct task_struct;
 
 struct mm_struct {
 	struct vm_area_struct *mmap;
