@@ -96,7 +96,9 @@ struct drm_sched_entity {
 	struct dma_fence_cb		cb;
 	atomic_t			*guilty;
 	struct dma_fence                *last_scheduled;
+#if 0
 	struct task_struct		*last_user;
+#endif
 	bool 				stopped;
 	struct completion		entity_idle;
 };
