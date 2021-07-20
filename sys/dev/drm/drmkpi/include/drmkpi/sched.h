@@ -57,13 +57,6 @@ struct task_struct {
 	struct work_struct *work;	/* current work struct, if set */
 };
 
-static inline void
-put_task_struct(struct task_struct *task)
-{
-
-	/* TODO */
-}
-
 #define	current	({ \
 	struct thread *__td = curthread; \
 	linux_set_current(__td); \
