@@ -1,7 +1,10 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * Copyright (c) 2012 Konstantin Belousov <kib@FreeBSD.org>
+ * Copyright (c) 2016, 2017, 2019 The FreeBSD Foundation
+ * Copyright (c) 2021 Dmitry Chagin <dchagin@FreeBSD.org>
  *
- * Copyright (c) 2013 Dmitry Chagin <dchagin@FreeBSD.org>
+ * Portions of this software were developed by Konstantin Belousov
+ * under sponsorship from the FreeBSD Foundation.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -28,36 +31,27 @@
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
-#include "opt_compat.h"
-
 #include <sys/param.h>
-#include <sys/kernel.h>
-#include <sys/sdt.h>
-#include <sys/systm.h>
-#include <sys/proc.h>
+#include <x86/cputypes.h>
+#include <x86/x86_var.h>
+#include <x86/specialreg.h>
 
-#include <arm64/linux/linux.h>
-#include <arm64/linux/linux_proto.h>
-#include <compat/linux/linux_dtrace.h>
-#include <compat/linux/linux_util.h>
+#include <x86/linux/linux_x86.h>
 
-/* DTrace init */
-LIN_SDT_PROVIDER_DECLARE(LINUX_DTRACE);
+int
+linux_vdso_tsc_selector_idx()
+{
+	bool amd_cpu;
 
-/*
- * Before adding new stubs to this file, please check if a stub can be added to
- * the machine-independent code in sys/compat/linux/linux_dummy.c.
- */
+	if (cpu_feature == 0)
+		return (2);	/* should not happen due to RDTSC */
 
-UNIMPLEMENTED(get_thread_area);
-UNIMPLEMENTED(set_thread_area);
-UNIMPLEMENTED(uselib);
+	amd_cpu = (cpu_vendor_id == CPU_VENDOR_AMD ||
+	    cpu_vendor_id == CPU_VENDOR_HYGON);
 
-DUMMY(mq_open);
-DUMMY(mq_unlink);
-DUMMY(mq_timedsend);
-DUMMY(mq_timedreceive);
-DUMMY(mq_notify);
-DUMMY(mq_getsetattr);
-DUMMY(semtimedop);
-DUMMY(kexec_file_load);
+	if ((amd_feature & AMDID_RDTSCP) != 0)
+		return (3);
+	if ((cpu_feature & CPUID_SSE2) == 0)
+		return (2);
+	return (amd_cpu ? 1 : 0);
+}

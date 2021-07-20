@@ -1,7 +1,7 @@
 /*-
  * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
  *
- * Copyright (c) 2013 Dmitry Chagin <dchagin@FreeBSD.org>
+ * Copyright (c) 2021 Dmitry Chagin <dchagin@FreeBSD.org>
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -25,39 +25,9 @@
  * SUCH DAMAGE.
  */
 
-#include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
+#ifndef _X86_INCLUDE_LINUX_LINUX_X86_H_
+#define _X86_INCLUDE_LINUX_LINUX_X86_H_
 
-#include "opt_compat.h"
+int	linux_vdso_tsc_selector_idx(void);
 
-#include <sys/param.h>
-#include <sys/kernel.h>
-#include <sys/sdt.h>
-#include <sys/systm.h>
-#include <sys/proc.h>
-
-#include <arm64/linux/linux.h>
-#include <arm64/linux/linux_proto.h>
-#include <compat/linux/linux_dtrace.h>
-#include <compat/linux/linux_util.h>
-
-/* DTrace init */
-LIN_SDT_PROVIDER_DECLARE(LINUX_DTRACE);
-
-/*
- * Before adding new stubs to this file, please check if a stub can be added to
- * the machine-independent code in sys/compat/linux/linux_dummy.c.
- */
-
-UNIMPLEMENTED(get_thread_area);
-UNIMPLEMENTED(set_thread_area);
-UNIMPLEMENTED(uselib);
-
-DUMMY(mq_open);
-DUMMY(mq_unlink);
-DUMMY(mq_timedsend);
-DUMMY(mq_timedreceive);
-DUMMY(mq_notify);
-DUMMY(mq_getsetattr);
-DUMMY(semtimedop);
-DUMMY(kexec_file_load);
+#endif /* _X86_INCLUDE_LINUX_LINUX_X86_H_ */
