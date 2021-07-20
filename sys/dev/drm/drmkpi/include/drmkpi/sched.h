@@ -50,13 +50,7 @@
 struct work_struct;
 struct task_struct {
 	struct thread *task_thread;
-	int task_ret;
-	linux_task_fn_t *task_fn;
-	void *task_data;
 	atomic_t state;
-	atomic_t kthread_flags;
-	struct completion parked;
-	struct completion exited;
 #define	TS_RCU_TYPE_MAX 2
 	TAILQ_ENTRY(task_struct) rcu_entry[TS_RCU_TYPE_MAX];
 	int rcu_recurse[TS_RCU_TYPE_MAX];
