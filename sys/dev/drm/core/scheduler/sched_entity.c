@@ -33,7 +33,6 @@
 #if 0
 #include "gpu_scheduler_trace.h"
 #endif
-#define	PF_EXITING	1
 
 #define to_drm_sched_job(sched_job)		\
 		container_of((sched_job), struct drm_sched_job, queue_node)
@@ -184,7 +183,11 @@ long drm_sched_entity_flush(struct drm_sched_entity *entity, long timeout)
 	 * The client will not queue more IBs during this fini, consume existing
 	 * queued IBs or discard them on SIGKILL
 	 */
+#if 0
 	if (current->flags & PF_EXITING) {
+#else
+	if (0) {
+#endif
 		if (timeout)
 			ret = wait_event_timeout(
 					sched->job_scheduled,
