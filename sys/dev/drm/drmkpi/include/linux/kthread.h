@@ -36,29 +36,37 @@
 #include <sys/unistd.h>
 #include <sys/kthread.h>
 
+struct kthr_wrap {
+	int (*func)(void *);
+	void *arg;
+};
+
 #define	kthread_run(fn, data, fmt, ...)	({				\
-	struct task_struct *__task;					\
 	struct thread *__td;						\
+	struct kthr_wrap *w;						\
 									\
-	if (kthread_add(drmkpi_kthread_fn, NULL, NULL, &__td,		\
-	    RFSTOPPED, 0, fmt, ## __VA_ARGS__))				\
-		__task = NULL;						\
-	else								\
-		__task = drmkpi_kthread_setup_and_run(__td, fn, data);	\
-	__task;								\
+	w = malloc(sizeof(struct kthr_wrap), M_DRMKMALLOC, 0);		\
+	w->func = fn;							\
+	w->arg = data;							\
+									\
+	if (kthread_add(drmkpi_kthread_fn, w, NULL, &__td,		\
+	    RFSTOPPED, 0, fmt, ## __VA_ARGS__)) {			\
+		__td = NULL;						\
+		free(w, M_DRMKMALLOC);					\
+	} else								\
+		__td = drmkpi_kthread_setup_and_run(__td);		\
+	__td;								\
 })
 
-int drmkpi_kthread_stop(struct task_struct *);
-bool drmkpi_kthread_should_stop_task(struct task_struct *);
+int drmkpi_kthread_stop(struct thread *);
+bool drmkpi_kthread_should_stop_task(struct thread *td);
 bool drmkpi_kthread_should_stop(void);
-int drmkpi_kthread_park(struct task_struct *);
+int drmkpi_kthread_park(struct thread *);
 void drmkpi_kthread_parkme(void);
 bool drmkpi_kthread_should_park(void);
-void drmkpi_kthread_unpark(struct task_struct *);
+void drmkpi_kthread_unpark(struct thread *);
 void drmkpi_kthread_fn(void *);
-struct task_struct *drmkpi_kthread_setup_and_run(struct thread *,
-    linux_task_fn_t *, void *arg);
-int linux_in_atomic(void);
+struct thread *drmkpi_kthread_setup_and_run(struct thread *);
 
 #define	kthread_stop(task)		drmkpi_kthread_stop(task)
 #define	kthread_should_stop()		drmkpi_kthread_should_stop()
@@ -67,7 +75,5 @@ int linux_in_atomic(void);
 #define	kthread_parkme()		drmkpi_kthread_parkme()
 #define	kthread_should_park()		drmkpi_kthread_should_park()
 #define	kthread_unpark(task)		drmkpi_kthread_unpark(task)
-
-//#define	in_atomic()			linux_in_atomic()
 
 #endif /* _LINUX_KTHREAD_H_ */
