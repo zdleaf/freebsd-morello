@@ -28,6 +28,7 @@
  *
  * $FreeBSD$
  */
+
 #ifndef	_LINUX_KTHREAD_H_
 #define	_LINUX_KTHREAD_H_
 
