@@ -648,15 +648,13 @@ panfrost_reset(void *arg, int pending)
 
 	sc = arg;
 
-printf("%s: 2\n", __func__);
+	dprintf("%s\n", __func__);
+
 	/* reset GPU */
 	for (i = 0; i < NUM_JOB_SLOTS; i++) {
 		sc->js->queue[i].sched.timeout = MAX_SCHEDULE_TIMEOUT - 1;
-printf("%s: 3\n", __func__);
 		cancel_delayed_work_sync(&sc->js->queue[i].sched.work_tdr);
-printf("%s: 4\n", __func__);
 		panfrost_scheduler_stop(&sc->js->queue[i], NULL);
-printf("%s: 5\n", __func__);
 	}
 
 	sc->reset_pending = 0;
@@ -668,8 +666,6 @@ printf("%s: 5\n", __func__);
 	}
 	spin_unlock(&sc->js->job_lock);
 
-printf("%s: 6\n", __func__);
-
 	error = panfrost_device_reset(sc);
 	if (error != 0)
 		device_printf(sc->dev, "%s: could not reset device\n",
@@ -680,7 +676,6 @@ printf("%s: 6\n", __func__);
 		    __func__, i);
 		panfrost_scheduler_start(&sc->js->queue[i]);
 	}
-printf("%s: 7\n", __func__);
 }
 
 int
