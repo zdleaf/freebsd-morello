@@ -9,8 +9,6 @@ INCS=	vmmapi.h
 SRCS+=	vmmapi_freebsd.c
 .endif
 
-WARNS?=	2
-
 LIBADD=	util
 
 CFLAGS+= -I${.CURDIR}
