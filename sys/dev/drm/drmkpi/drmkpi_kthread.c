@@ -57,10 +57,7 @@ drmkpi_kthread_should_stop(void)
 
 	td = curthread;
 
-	if (td->td_flags & TDF_KTH_SUSP)
-		return (true);
-
-	return (false);
+	return (drmkpi_kthread_should_stop_task(td));
 }
 
 int
@@ -97,10 +94,7 @@ drmkpi_kthread_should_park(void)
 
 	td = curthread;
 
-	if (td->td_flags & TDF_KTH_SUSP)
-		return (true);
-
-	return (false);
+	return (drmkpi_kthread_should_stop_task(td));
 }
 
 void
