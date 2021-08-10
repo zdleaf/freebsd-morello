@@ -589,7 +589,6 @@ rk_vop_add_encoder(struct rk_vop_softc *sc, struct drm_device *drm)
 	sc->outport = dev;
 
 	return (0);
-
 }
 
 static int
