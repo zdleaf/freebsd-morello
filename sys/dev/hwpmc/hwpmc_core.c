@@ -236,10 +236,7 @@ iaf_allocate_pmc(int cpu, int ri, struct pmc *pm,
 	if (ri < 0 || ri > core_iaf_npmc)
 		return (EINVAL);
 
-	caps = a->pm_caps;
-
-	if (a->pm_class != PMC_CLASS_IAF ||
-	    (caps & IAF_PMC_CAPS) != caps)
+	if (a->pm_class != PMC_CLASS_IAF)
 		return (EINVAL);
 
 	iap = &a->pm_md.pm_iap;
@@ -261,8 +258,8 @@ iaf_allocate_pmc(int cpu, int ri, struct pmc *pm,
 	if ((cpu_stdext_feature3 & CPUID_STDEXT3_TSXFA) != 0 &&
 	    !pmc_tsx_force_abort_set) {
 		pmc_tsx_force_abort_set = true;
-		x86_msr_op(MSR_TSX_FORCE_ABORT, MSR_OP_RENDEZVOUS |
-		    MSR_OP_WRITE, 1);
+		x86_msr_op(MSR_TSX_FORCE_ABORT, MSR_OP_RENDEZVOUS_ALL |
+		    MSR_OP_WRITE, 1, NULL);
 	}
 
 	flags = 0;
@@ -275,6 +272,7 @@ iaf_allocate_pmc(int cpu, int ri, struct pmc *pm,
 	if (config & IAP_INT)
 		flags |= IAF_PMI;
 
+	caps = a->pm_caps;
 	if (caps & PMC_CAP_INTERRUPT)
 		flags |= IAF_PMI;
 	if (caps & PMC_CAP_SYSTEM)
@@ -403,8 +401,8 @@ iaf_release_pmc(int cpu, int ri, struct pmc *pmc)
 	MPASS(pmc_alloc_refs > 0);
 	if (pmc_alloc_refs-- == 1 && pmc_tsx_force_abort_set) {
 		pmc_tsx_force_abort_set = false;
-		x86_msr_op(MSR_TSX_FORCE_ABORT, MSR_OP_RENDEZVOUS |
-		    MSR_OP_WRITE, 0);
+		x86_msr_op(MSR_TSX_FORCE_ABORT, MSR_OP_RENDEZVOUS_ALL |
+		    MSR_OP_WRITE, 0, NULL);
 	}
 
 	return (0);
@@ -742,7 +740,6 @@ iap_allocate_pmc(int cpu, int ri, struct pmc *pm,
     const struct pmc_op_pmcallocate *a)
 {
 	uint8_t ev;
-	uint32_t caps;
 	const struct pmc_md_iap_op_pmcallocate *iap;
 
 	KASSERT(cpu >= 0 && cpu < pmc_cpu_max(),
@@ -750,10 +747,9 @@ iap_allocate_pmc(int cpu, int ri, struct pmc *pm,
 	KASSERT(ri >= 0 && ri < core_iap_npmc,
 	    ("[core,%d] illegal row-index value %d", __LINE__, ri));
 
-	/* check requested capabilities */
-	caps = a->pm_caps;
-	if ((IAP_PMC_CAPS & caps) != caps)
-		return (EPERM);
+	if (a->pm_class != PMC_CLASS_IAP)
+		return (EINVAL);
+
 	iap = &a->pm_md.pm_iap;
 	ev = IAP_EVSEL_GET(iap->pm_iap_config);
 

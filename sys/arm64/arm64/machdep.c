@@ -54,6 +54,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/proc.h>
 #include <sys/ptrace.h>
 #include <sys/reboot.h>
+#include <sys/reg.h>
 #include <sys/rwlock.h>
 #include <sys/sched.h>
 #include <sys/signalvar.h>
@@ -82,7 +83,6 @@ __FBSDID("$FreeBSD$");
 #include <machine/metadata.h>
 #include <machine/md_var.h>
 #include <machine/pcb.h>
-#include <machine/reg.h>
 #include <machine/undefined.h>
 #include <machine/vmparam.h>
 
@@ -931,6 +931,12 @@ init_proc0(vm_offset_t kstack)
 	thread0.td_pcb->pcb_vfpcpu = UINT_MAX;
 	thread0.td_frame = &proc0_tf;
 	pcpup->pc_curpcb = thread0.td_pcb;
+
+	/*
+	 * Unmask SError exceptions. They are used to signal a RAS failure,
+	 * or other hardware error.
+	 */
+	serror_enable();
 }
 
 typedef struct {

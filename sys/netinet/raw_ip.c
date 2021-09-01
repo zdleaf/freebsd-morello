@@ -263,11 +263,10 @@ rip_append(struct inpcb *last, struct ip *ip, struct mbuf *n,
 		SOCKBUF_LOCK(&so->so_rcv);
 		if (sbappendaddr_locked(&so->so_rcv,
 		    (struct sockaddr *)ripsrc, n, opts) == 0) {
-			/* should notify about lost packet */
+			soroverflow_locked(so);
 			m_freem(n);
 			if (opts)
 				m_freem(opts);
-			SOCKBUF_UNLOCK(&so->so_rcv);
 		} else
 			sorwakeup_locked(so);
 	} else
@@ -881,6 +880,12 @@ rip_ctlinput(int cmd, struct sockaddr *sa, void *vip)
 
 		ifa_free(&ia->ia_ifa);
 		break;
+#if defined(IPSEC) || defined(IPSEC_SUPPORT)
+	case PRC_MSGSIZE:
+		if (IPSEC_ENABLED(ipv4))
+			IPSEC_CTLINPUT(ipv4, cmd, sa, vip);
+		break;
+#endif
 	}
 }
 

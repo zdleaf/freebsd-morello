@@ -111,6 +111,8 @@ SUBDIR=	\
 	${_efirt} \
 	${_em} \
 	${_ena} \
+	${_enetc} \
+	${_enetc_mdio} \
 	esp \
 	${_et} \
 	evdev \
@@ -118,6 +120,7 @@ SUBDIR=	\
 	ext2fs \
 	fdc \
 	fdescfs \
+	${_felix} \
 	${_ffec} \
 	${_fib_dxr} \
 	filemon \
@@ -228,6 +231,7 @@ SUBDIR=	\
 	mac_stub \
 	mac_test \
 	${_malo} \
+	${_mana} \
 	md \
 	mdio \
 	mem \
@@ -354,6 +358,7 @@ SUBDIR=	\
 	stge \
 	${_sume} \
 	${_superio} \
+	${_p2sb} \
 	${_sym} \
 	${_syscons} \
 	sysvipc \
@@ -611,6 +616,9 @@ _allwinner=	allwinner
 _armv8crypto=	armv8crypto
 _dwwdt=		dwwdt
 _em=		em
+_enetc=		enetc
+_enetc_mdio=	enetc_mdio
+_felix=		felix
 _rockchip=	rockchip
 .endif
 
@@ -642,6 +650,7 @@ _ixv=		ixv
 .if ${MK_SOURCELESS_UCODE} != "no"
 _lio=		lio
 .endif
+_mana=		mana
 _nctgpio=	nctgpio
 _ntb=		ntb
 _ocs_fc=	ocs_fc
@@ -654,6 +663,7 @@ _safe=		safe
 _speaker=	speaker
 _splash=	splash
 _sppp=		sppp
+_p2sb=		p2sb
 _wbwd=		wbwd
 
 _aac=		aac
@@ -747,6 +757,7 @@ _sfxge=		sfxge
 _sgx=		sgx
 _sgx_linux=	sgx_linux
 _smartpqi=	smartpqi
+_p2sb=		p2sb
 
 .if ${MK_BHYVE} != "no" || defined(ALL_MODULES)
 .if ${KERN_OPTS:MSMP}

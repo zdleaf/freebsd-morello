@@ -394,6 +394,9 @@ tcp_lro_parser(struct mbuf *m, struct lro_parser *po, struct lro_parser *pi, boo
 			po->data.vlan_id =
 			    htons(m->m_pkthdr.ether_vtag) & htons(EVL_VLID_MASK);
 		}
+		/* Store decrypted flag, if any. */
+		if (__predict_false(m->m_flags & M_DECRYPTED))
+			po->data.lro_flags |= LRO_FLAG_DECRYPTED;
 	}
 
 	switch (po->data.lro_type) {
@@ -595,6 +598,7 @@ tcp_lro_flush_inactive(struct lro_ctrl *lc, const struct timeval *timeout)
 	uint64_t now, tov;
 	struct bintime bt;
 
+	NET_EPOCH_ASSERT();
 	if (LIST_EMPTY(&lc->lro_active))
 		return;
 
@@ -1174,8 +1178,6 @@ tcp_lro_lookup(struct ifnet *ifp, struct lro_parser *pa)
 {
 	struct inpcb *inp;
 
-	NET_EPOCH_ASSERT();
-
 	switch (pa->data.lro_type) {
 #ifdef INET6
 	case LRO_TYPE_IPV6_TCP:
@@ -1365,7 +1367,10 @@ tcp_lro_flush(struct lro_ctrl *lc, struct lro_entry *le)
 	/* Only optimise if there are multiple packets waiting. */
 #ifdef TCPHPTS
 	int error;
+#endif
 
+	NET_EPOCH_ASSERT();
+#ifdef TCPHPTS
 	CURVNET_SET(lc->ifp->if_vnet);
 	error = tcp_lro_flush_tcphpts(lc, le);
 	CURVNET_RESTORE();
@@ -1476,6 +1481,7 @@ tcp_lro_flush_all(struct lro_ctrl *lc)
 	uint64_t nseq;
 	unsigned x;
 
+	NET_EPOCH_ASSERT();
 	/* check if no mbufs to flush */
 	if (lc->lro_mbuf_count == 0)
 		goto done;
@@ -1583,7 +1589,7 @@ do_bpf_strip_and_compress(struct inpcb *inp, struct lro_ctrl *lc,
 	uint32_t *ts_ptr;
 	int32_t n_mbuf;
 	bool other_opts, can_compress;
-	uint16_t lro_type;
+	uint8_t lro_type;
 	uint16_t iptos;
 	int tcp_hdr_offset;
 	int idx;
@@ -1916,6 +1922,7 @@ tcp_lro_rx(struct lro_ctrl *lc, struct mbuf *m, uint32_t csum)
 void
 tcp_lro_queue_mbuf(struct lro_ctrl *lc, struct mbuf *mb)
 {
+	NET_EPOCH_ASSERT();
 	/* sanity checks */
 	if (__predict_false(lc->ifp == NULL || lc->lro_mbuf_data == NULL ||
 	    lc->lro_mbuf_max == 0)) {

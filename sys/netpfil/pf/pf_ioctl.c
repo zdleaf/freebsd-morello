@@ -208,7 +208,7 @@ static int		 pf_killstates_row(struct pf_kstate_kill *,
 static int		 pf_killstates_nv(struct pfioc_nv *);
 static int		 pf_clearstates_nv(struct pfioc_nv *);
 static int		 pf_getstate(struct pfioc_nv *);
-static int		 pf_getstates(struct pfioc_nv *);
+static int		 pf_getstatus(struct pfioc_nv *);
 static int		 pf_clear_tables(void);
 static void		 pf_clear_srcnodes(struct pf_ksrc_node *);
 static void		 pf_kill_srcnodes(struct pfioc_src_node_kill *);
@@ -368,7 +368,7 @@ pfattach_vnet(void)
 
 	for (int i = 0; i < PFRES_MAX; i++)
 		V_pf_status.counters[i] = counter_u64_alloc(M_WAITOK);
-	for (int i = 0; i < LCNT_MAX; i++)
+	for (int i = 0; i < KLCNT_MAX; i++)
 		V_pf_status.lcounters[i] = counter_u64_alloc(M_WAITOK);
 	for (int i = 0; i < FCNT_MAX; i++)
 		pf_counter_u64_init(&V_pf_status.fcounters[i], M_WAITOK);
@@ -2180,12 +2180,12 @@ pfioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags, struct thread *td
 		case DIOCGETSTATENV:
 		case DIOCSETSTATUSIF:
 		case DIOCGETSTATUS:
+		case DIOCGETSTATUSNV:
 		case DIOCCLRSTATUS:
 		case DIOCNATLOOK:
 		case DIOCSETDEBUG:
 		case DIOCGETSTATES:
 		case DIOCGETSTATESV2:
-		case DIOCGETSTATESNV:
 		case DIOCGETTIMEOUT:
 		case DIOCCLRRULECTRS:
 		case DIOCGETLIMIT:
@@ -2238,9 +2238,9 @@ pfioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags, struct thread *td
 		case DIOCGETSTATE:
 		case DIOCGETSTATENV:
 		case DIOCGETSTATUS:
+		case DIOCGETSTATUSNV:
 		case DIOCGETSTATES:
 		case DIOCGETSTATESV2:
-		case DIOCGETSTATESNV:
 		case DIOCGETTIMEOUT:
 		case DIOCGETLIMIT:
 		case DIOCGETALTQSV0:
@@ -2919,7 +2919,9 @@ DIOCCHANGERULE_error:
 		struct pfioc_states	*ps = (struct pfioc_states *)addr;
 		struct pf_kstate	*s;
 		struct pfsync_state	*pstore, *p;
-		int i, nr;
+		int			 i, nr;
+		size_t			 slice_count = 16, count;
+		void			*out;
 
 		if (ps->ps_len <= 0) {
 			nr = uma_zone_get_cur(V_pf_state_z);
@@ -2927,34 +2929,59 @@ DIOCCHANGERULE_error:
 			break;
 		}
 
-		p = pstore = malloc(ps->ps_len, M_TEMP, M_WAITOK | M_ZERO);
+		out = ps->ps_states;
+		pstore = mallocarray(slice_count,
+		    sizeof(struct pfsync_state), M_TEMP, M_WAITOK | M_ZERO);
 		nr = 0;
 
 		for (i = 0; i <= pf_hashmask; i++) {
 			struct pf_idhash *ih = &V_pf_idhash[i];
 
+DIOCGETSTATES_retry:
+			p = pstore;
+
+			if (LIST_EMPTY(&ih->states))
+				continue;
+
 			PF_HASHROW_LOCK(ih);
+			count = 0;
+			LIST_FOREACH(s, &ih->states, entry) {
+				if (s->timeout == PFTM_UNLINKED)
+					continue;
+				count++;
+			}
+
+			if (count > slice_count) {
+				PF_HASHROW_UNLOCK(ih);
+				free(pstore, M_TEMP);
+				slice_count = count * 2;
+				pstore = mallocarray(slice_count,
+				    sizeof(struct pfsync_state), M_TEMP,
+				    M_WAITOK | M_ZERO);
+				goto DIOCGETSTATES_retry;
+			}
+
+			if ((nr+count) * sizeof(*p) > ps->ps_len) {
+				PF_HASHROW_UNLOCK(ih);
+				goto DIOCGETSTATES_full;
+			}
+
 			LIST_FOREACH(s, &ih->states, entry) {
 				if (s->timeout == PFTM_UNLINKED)
 					continue;
 
-				if ((nr+1) * sizeof(*p) > ps->ps_len) {
-					PF_HASHROW_UNLOCK(ih);
-					goto DIOCGETSTATES_full;
-				}
 				pfsync_state_export(p, s);
 				p++;
 				nr++;
 			}
 			PF_HASHROW_UNLOCK(ih);
+			error = copyout(pstore, out,
+			    sizeof(struct pfsync_state) * count);
+			if (error)
+				break;
+			out = ps->ps_states + nr;
 		}
 DIOCGETSTATES_full:
-		error = copyout(pstore, ps->ps_states,
-		    sizeof(struct pfsync_state) * nr);
-		if (error) {
-			free(pstore, M_TEMP);
-			break;
-		}
 		ps->ps_len = sizeof(struct pfsync_state) * nr;
 		free(pstore, M_TEMP);
 
@@ -3039,11 +3066,6 @@ DIOCGETSTATESV2_full:
 		break;
 	}
 
-	case DIOCGETSTATESNV: {
-		error = pf_getstates((struct pfioc_nv *)addr);
-		break;
-	}
-
 	case DIOCGETSTATUS: {
 		struct pf_status *s = (struct pf_status *)addr;
 
@@ -3077,6 +3099,11 @@ DIOCGETSTATESV2_full:
 		break;
 	}
 
+	case DIOCGETSTATUSNV: {
+		error = pf_getstatus((struct pfioc_nv *)addr);
+		break;
+	}
+
 	case DIOCSETSTATUSIF: {
 		struct pfioc_if	*pi = (struct pfioc_if *)addr;
 
@@ -3098,7 +3125,7 @@ DIOCGETSTATESV2_full:
 			pf_counter_u64_zero(&V_pf_status.fcounters[i]);
 		for (int i = 0; i < SCNT_MAX; i++)
 			counter_u64_zero(V_pf_status.scounters[i]);
-		for (int i = 0; i < LCNT_MAX; i++)
+		for (int i = 0; i < KLCNT_MAX; i++)
 			counter_u64_zero(V_pf_status.lcounters[i]);
 		V_pf_status.since = time_second;
 		if (*V_pf_status.ifname)
@@ -4868,6 +4895,131 @@ pf_tbladdr_copyout(struct pf_addr_wrap *aw)
 		kt->pfrkt_cnt : -1;
 }
 
+static int
+pf_add_status_counters(nvlist_t *nvl, const char *name, counter_u64_t *counters,
+    size_t number, char **names)
+{
+	nvlist_t        *nvc;
+
+	nvc = nvlist_create(0);
+	if (nvc == NULL)
+		return (ENOMEM);
+
+	for (int i = 0; i < number; i++) {
+		nvlist_append_number_array(nvc, "counters",
+		    counter_u64_fetch(counters[i]));
+		nvlist_append_string_array(nvc, "names",
+		    names[i]);
+		nvlist_append_number_array(nvc, "ids",
+		    i);
+	}
+	nvlist_add_nvlist(nvl, name, nvc);
+	nvlist_destroy(nvc);
+
+	return (0);
+}
+
+static int
+pf_getstatus(struct pfioc_nv *nv)
+{
+	nvlist_t        *nvl = NULL, *nvc = NULL;
+	void            *nvlpacked = NULL;
+	int              error;
+	struct pf_status s;
+	char *pf_reasons[PFRES_MAX+1] = PFRES_NAMES;
+	char *pf_lcounter[KLCNT_MAX+1] = KLCNT_NAMES;
+	char *pf_fcounter[FCNT_MAX+1] = FCNT_NAMES;
+	PF_RULES_RLOCK_TRACKER;
+
+#define ERROUT(x)      ERROUT_FUNCTION(errout, x)
+
+	PF_RULES_RLOCK();
+
+	nvl = nvlist_create(0);
+	if (nvl == NULL)
+		ERROUT(ENOMEM);
+
+	nvlist_add_bool(nvl, "running", V_pf_status.running);
+	nvlist_add_number(nvl, "since", V_pf_status.since);
+	nvlist_add_number(nvl, "debug", V_pf_status.debug);
+	nvlist_add_number(nvl, "hostid", V_pf_status.hostid);
+	nvlist_add_number(nvl, "states", V_pf_status.states);
+	nvlist_add_number(nvl, "src_nodes", V_pf_status.src_nodes);
+
+	/* counters */
+	error = pf_add_status_counters(nvl, "counters", V_pf_status.counters,
+	    PFRES_MAX, pf_reasons);
+	if (error != 0)
+		ERROUT(error);
+
+	/* lcounters */
+	error = pf_add_status_counters(nvl, "lcounters", V_pf_status.lcounters,
+	    KLCNT_MAX, pf_lcounter);
+	if (error != 0)
+		ERROUT(error);
+
+	/* fcounters */
+	nvc = nvlist_create(0);
+	if (nvc == NULL)
+		ERROUT(ENOMEM);
+
+	for (int i = 0; i < FCNT_MAX; i++) {
+		nvlist_append_number_array(nvc, "counters",
+		    pf_counter_u64_fetch(&V_pf_status.fcounters[i]));
+		nvlist_append_string_array(nvc, "names",
+		    pf_fcounter[i]);
+		nvlist_append_number_array(nvc, "ids",
+		    i);
+	}
+	nvlist_add_nvlist(nvl, "fcounters", nvc);
+	nvlist_destroy(nvc);
+	nvc = NULL;
+
+	/* scounters */
+	error = pf_add_status_counters(nvl, "scounters", V_pf_status.scounters,
+	    SCNT_MAX, pf_fcounter);
+	if (error != 0)
+		ERROUT(error);
+
+	nvlist_add_string(nvl, "ifname", V_pf_status.ifname);
+	nvlist_add_binary(nvl, "chksum", V_pf_status.pf_chksum,
+	    PF_MD5_DIGEST_LENGTH);
+
+	pfi_update_status(V_pf_status.ifname, &s);
+
+	/* pcounters / bcounters */
+	for (int i = 0; i < 2; i++) {
+		for (int j = 0; j < 2; j++) {
+			for (int k = 0; k < 2; k++) {
+				nvlist_append_number_array(nvl, "pcounters",
+				    s.pcounters[i][j][k]);
+			}
+			nvlist_append_number_array(nvl, "bcounters",
+			    s.bcounters[i][j]);
+		}
+	}
+
+	nvlpacked = nvlist_pack(nvl, &nv->len);
+	if (nvlpacked == NULL)
+		ERROUT(ENOMEM);
+
+	if (nv->size == 0)
+		ERROUT(0);
+	else if (nv->size < nv->len)
+		ERROUT(ENOSPC);
+
+	error = copyout(nvlpacked, nv->data, nv->len);
+
+#undef ERROUT
+errout:
+	PF_RULES_RUNLOCK();
+	free(nvlpacked, M_NVLIST);
+	nvlist_destroy(nvc);
+	nvlist_destroy(nvl);
+
+	return (error);
+}
+
 /*
  * XXX - Check for version missmatch!!!
  */
@@ -5296,84 +5448,6 @@ errout:
 	return (error);
 }
 
-static int
-pf_getstates(struct pfioc_nv *nv)
-{
-	nvlist_t		*nvl = NULL, *nvls;
-	void			*nvlpacked = NULL;
-	struct pf_kstate	*s = NULL;
-	int			 error = 0;
-	uint64_t		 count = 0;
-
-#define ERROUT(x)	ERROUT_FUNCTION(errout, x)
-
-	nvl = nvlist_create(0);
-	if (nvl == NULL)
-		ERROUT(ENOMEM);
-
-	nvlist_add_number(nvl, "count", uma_zone_get_cur(V_pf_state_z));
-
-	for (int i = 0; i < pf_hashmask; i++) {
-		struct pf_idhash *ih = &V_pf_idhash[i];
-
-		/* Avoid taking the lock if there are no states in the row. */
-		if (LIST_EMPTY(&ih->states))
-			continue;
-
-		PF_HASHROW_LOCK(ih);
-		LIST_FOREACH(s, &ih->states, entry) {
-			if (s->timeout == PFTM_UNLINKED)
-				continue;
-
-			if (SIGPENDING(curthread)) {
-				PF_HASHROW_UNLOCK(ih);
-				ERROUT(EINTR);
-			}
-
-			nvls = pf_state_to_nvstate(s);
-			if (nvls == NULL) {
-				PF_HASHROW_UNLOCK(ih);
-				ERROUT(ENOMEM);
-			}
-			if ((nvlist_size(nvl) + nvlist_size(nvls)) > nv->size) {
-				/* We've run out of room for more states. */
-				nvlist_destroy(nvls);
-				PF_HASHROW_UNLOCK(ih);
-				goto DIOCGETSTATESNV_full;
-			}
-			nvlist_append_nvlist_array(nvl, "states", nvls);
-			nvlist_destroy(nvls);
-			count++;
-		}
-		PF_HASHROW_UNLOCK(ih);
-	}
-
-	/* We've managed to put them all the available space. Let's make sure
-	 * 'count' matches our array (that's racy, because we don't hold a lock
-	 * over all states, only over each row individually. */
-	(void)nvlist_take_number(nvl, "count");
-	nvlist_add_number(nvl, "count", count);
-
-DIOCGETSTATESNV_full:
-
-	nvlpacked = nvlist_pack(nvl, &nv->len);
-	if (nvlpacked == NULL)
-		ERROUT(ENOMEM);
-
-	if (nv->size == 0)
-		ERROUT(0);
-	else if (nv->size < nv->len)
-		ERROUT(ENOSPC);
-
-	error = copyout(nvlpacked, nv->data, nv->len);
-
-#undef ERROUT
-errout:
-	free(nvlpacked, M_NVLIST);
-	nvlist_destroy(nvl);
-	return (error);
-}
-
 /*
  * XXX - Check for version missmatch!!!
  */
@@ -5731,7 +5805,7 @@ pf_unload_vnet(void)
 
 	for (int i = 0; i < PFRES_MAX; i++)
 		counter_u64_free(V_pf_status.counters[i]);
-	for (int i = 0; i < LCNT_MAX; i++)
+	for (int i = 0; i < KLCNT_MAX; i++)
 		counter_u64_free(V_pf_status.lcounters[i]);
 	for (int i = 0; i < FCNT_MAX; i++)
 		pf_counter_u64_deinit(&V_pf_status.fcounters[i]);

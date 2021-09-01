@@ -36,16 +36,16 @@ __FBSDID("$FreeBSD$");
 #include <sys/imgact.h>
 #include <sys/ktr.h>
 #include <sys/proc.h>
+#include <sys/reg.h>
 #include <sys/sdt.h>
 
 #include <security/audit/audit.h>
-
-#include <machine/reg.h>
 
 #include <arm64/linux/linux.h>
 #include <arm64/linux/linux_proto.h>
 #include <compat/linux/linux_dtrace.h>
 #include <compat/linux/linux_emul.h>
+#include <compat/linux/linux_fork.h>
 #include <compat/linux/linux_misc.h>
 #include <compat/linux/linux_mmap.h>
 #include <compat/linux/linux_util.h>

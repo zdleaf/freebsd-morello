@@ -137,7 +137,6 @@ int zfs_nocacheflush = 0;
 uint64_t zfs_vdev_max_auto_ashift = ASHIFT_MAX;
 uint64_t zfs_vdev_min_auto_ashift = ASHIFT_MIN;
 
-/*PRINTFLIKE2*/
 void
 vdev_dbgmsg(vdev_t *vd, const char *fmt, ...)
 {
@@ -3457,7 +3456,8 @@ vdev_load(vdev_t *vd)
 			vdev_set_state(vd, B_FALSE, VDEV_STATE_CANT_OPEN,
 			    VDEV_AUX_CORRUPT_DATA);
 			vdev_dbgmsg(vd, "vdev_load: zap_lookup(top_zap=%llu) "
-			    "failed [error=%d]", vd->vdev_top_zap, error);
+			    "failed [error=%d]",
+			    (u_longlong_t)vd->vdev_top_zap, error);
 			return (error);
 		}
 	}
@@ -4583,13 +4583,10 @@ vdev_stat_update(zio_t *zio, uint64_t psize)
 			 *   ZIO_PRIORITY_ASYNC_READ,
 			 *   ZIO_PRIORITY_ASYNC_WRITE,
 			 *   ZIO_PRIORITY_SCRUB,
-			 *   ZIO_PRIORITY_TRIM.
+			 *   ZIO_PRIORITY_TRIM,
+			 *   ZIO_PRIORITY_REBUILD.
 			 */
-			if (priority == ZIO_PRIORITY_REBUILD) {
-				priority = ((type == ZIO_TYPE_WRITE) ?
-				    ZIO_PRIORITY_ASYNC_WRITE :
-				    ZIO_PRIORITY_SCRUB);
-			} else if (priority == ZIO_PRIORITY_INITIALIZING) {
+			if (priority == ZIO_PRIORITY_INITIALIZING) {
 				ASSERT3U(type, ==, ZIO_TYPE_WRITE);
 				priority = ZIO_PRIORITY_ASYNC_WRITE;
 			} else if (priority == ZIO_PRIORITY_REMOVAL) {

@@ -3629,14 +3629,15 @@ dev/xdma/xdma_sglist.c		optional xdma
 dev/xen/balloon/balloon.c	optional xenhvm
 dev/xen/blkfront/blkfront.c	optional xenhvm
 dev/xen/blkback/blkback.c	optional xenhvm
+dev/xen/bus/xenpv.c		optional xenhvm
 dev/xen/console/xen_console.c	optional xenhvm
 dev/xen/control/control.c	optional xenhvm
 dev/xen/efi/pvefi.c		optional xenhvm efirt
 dev/xen/grant_table/grant_table.c	optional xenhvm
 dev/xen/netback/netback.c	optional xenhvm
 dev/xen/netfront/netfront.c	optional xenhvm
+dev/xen/timer/timer.c		optional xenhvm xentimer
 dev/xen/xenpci/xenpci.c		optional xenpci
-dev/xen/timer/timer.c		optional xenhvm
 dev/xen/xenstore/xenstore.c	optional xenhvm
 dev/xen/xenstore/xenstore_dev.c	optional xenhvm
 dev/xen/xenstore/xenstored_dev.c	optional xenhvm
@@ -4012,6 +4013,8 @@ kern/subr_lock.c		standard
 kern/subr_log.c			standard
 kern/subr_mchain.c		optional libmchain
 kern/subr_module.c		standard
+kern/subr_msan.c		optional kmsan \
+	compile-with "${NORMAL_C:N-fsanitize*}"
 kern/subr_msgbuf.c		standard
 kern/subr_param.c		standard
 kern/subr_pcpu.c		standard
@@ -4664,6 +4667,8 @@ compat/linuxkpi/common/src/linux_dmi.c		optional compat_linuxkpi \
 compat/linuxkpi/common/src/linux_domain.c	optional compat_linuxkpi \
 	compile-with "${LINUXKPI_C}"
 compat/linuxkpi/common/src/linux_firmware.c	optional compat_linuxkpi \
+	compile-with "${LINUXKPI_C}"
+compat/linuxkpi/common/src/linux_fpu.c		optional compat_linuxkpi \
 	compile-with "${LINUXKPI_C}"
 compat/linuxkpi/common/src/linux_hrtimer.c	optional compat_linuxkpi \
 	compile-with "${LINUXKPI_C}"

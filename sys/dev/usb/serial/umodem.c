@@ -146,6 +146,8 @@ static const STRUCT_USB_HOST_ID umodem_host_devs[] = {
 	{USB_VENDOR(USB_VENDOR_HUAWEI),USB_IFACE_CLASS(UICLASS_CDC),
 		USB_IFACE_SUBCLASS(UISUBCLASS_ABSTRACT_CONTROL_MODEL),
 		USB_IFACE_PROTOCOL(0xFF)},
+	{USB_VENDOR(USB_VENDOR_HUAWEI), USB_IFACE_CLASS(0xFF),
+		USB_IFACE_SUBCLASS(0xF), USB_IFACE_PROTOCOL(0xFF)},
 	/* Kyocera AH-K3001V */
 	{USB_VPI(USB_VENDOR_KYOCERA, USB_PRODUCT_KYOCERA_AHK3001V, 1)},
 	{USB_VPI(USB_VENDOR_SIERRA, USB_PRODUCT_SIERRA_MC5720, 1)},
@@ -447,10 +449,13 @@ umodem_attach(device_t dev)
 		goto detach;
 	}
 
-	/* send a ZLP at first run */
-	mtx_lock(&sc->sc_mtx);
-	usbd_xfer_set_zlp(sc->sc_xfer[UMODEM_BULK_WR]);
-	mtx_unlock(&sc->sc_mtx);
+	/* clear stall at first run, if USB host mode */
+	if (uaa->usb_mode == USB_MODE_HOST) {
+		mtx_lock(&sc->sc_mtx);
+		usbd_xfer_set_stall(sc->sc_xfer[UMODEM_BULK_WR]);
+		usbd_xfer_set_stall(sc->sc_xfer[UMODEM_BULK_RD]);
+		mtx_unlock(&sc->sc_mtx);
+	}
 
 	ucom_set_usb_mode(&sc->sc_super_ucom, uaa->usb_mode);
 
@@ -860,16 +865,13 @@ umodem_write_callback(struct usb_xfer *xfer, usb_error_t error)
 	case USB_ST_SETUP:
 	case USB_ST_TRANSFERRED:
 tr_setup:
-		if (usbd_xfer_get_and_clr_zlp(xfer))
-			break;
-
 		pc = usbd_xfer_get_frame(xfer, 0);
 		if (ucom_get_data(&sc->sc_ucom, pc, 0,
 		    UMODEM_BUF_SIZE, &actlen)) {
 			usbd_xfer_set_frame_len(xfer, 0, actlen);
 			usbd_transfer_submit(xfer);
 		}
-		break;
+		return;
 
 	default:			/* Error */
 		if (error != USB_ERR_CANCELLED) {
@@ -877,7 +879,7 @@ tr_setup:
 			usbd_xfer_set_stall(xfer);
 			goto tr_setup;
 		}
-		break;
+		return;
 	}
 }
 

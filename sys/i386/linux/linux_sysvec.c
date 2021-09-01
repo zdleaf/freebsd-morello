@@ -37,10 +37,8 @@ __FBSDID("$FreeBSD$");
 #include <sys/imgact_aout.h>
 #include <sys/imgact_elf.h>
 #include <sys/kernel.h>
-#include <sys/lock.h>
 #include <sys/malloc.h>
 #include <sys/module.h>
-#include <sys/mutex.h>
 #include <sys/proc.h>
 #include <sys/stddef.h>
 #include <sys/signalvar.h>
@@ -68,6 +66,7 @@ __FBSDID("$FreeBSD$");
 #include <i386/linux/linux.h>
 #include <i386/linux/linux_proto.h>
 #include <compat/linux/linux_emul.h>
+#include <compat/linux/linux_fork.h>
 #include <compat/linux/linux_ioctl.h>
 #include <compat/linux/linux_mib.h>
 #include <compat/linux/linux_misc.h>
@@ -110,6 +109,7 @@ static int	linux_on_exec_vmspace(struct proc *p,
 		    struct image_params *imgp);
 static int	linux_copyout_strings(struct image_params *imgp,
 		    uintptr_t *stack_base);
+static void	linux_set_fork_retval(struct thread *td);
 static bool	linux_trans_osrel(const Elf_Note *note, int32_t *osrel);
 static void	linux_vdso_install(const void *param);
 static void	linux_vdso_deinstall(const void *param);
@@ -805,6 +805,14 @@ linux_set_syscall_retval(struct thread *td, int error)
 	}
 }
 
+static void
+linux_set_fork_retval(struct thread *td)
+{
+	struct trapframe *frame = td->td_frame;
+
+	frame->tf_eax = 0;
+}
+
 /*
  * exec_setregs may initialize some registers differently than Linux
  * does, thus potentially confusing Linux binaries. If necessary, we
@@ -858,6 +866,7 @@ struct sysentvec linux_sysvec = {
 	.sv_onexit	= linux_on_exit,
 	.sv_ontdexit	= linux_thread_dtor,
 	.sv_setid_allowed = &linux_setid_allowed_query,
+	.sv_set_fork_retval = linux_set_fork_retval,
 };
 INIT_SYSENTVEC(aout_sysvec, &linux_sysvec);
 
@@ -900,6 +909,7 @@ struct sysentvec elf_linux_sysvec = {
 	.sv_onexit	= linux_on_exit,
 	.sv_ontdexit	= linux_thread_dtor,
 	.sv_setid_allowed = &linux_setid_allowed_query,
+	.sv_set_fork_retval = linux_set_fork_retval,
 };
 
 static int
@@ -1128,8 +1138,6 @@ linux_elf_modevent(module_t mod, int type, void *data)
 		if (error == 0) {
 			SET_FOREACH(lihp, linux_ioctl_handler_set)
 				linux_ioctl_register_handler(*lihp);
-			LIST_INIT(&futex_list);
-			mtx_init(&futex_mtx, "ftllk", NULL, MTX_DEF);
 			linux_dev_shm_create();
 			linux_osd_jail_register();
 			stclohz = (stathz ? stathz : hz);
@@ -1152,7 +1160,6 @@ linux_elf_modevent(module_t mod, int type, void *data)
 		if (error == 0) {
 			SET_FOREACH(lihp, linux_ioctl_handler_set)
 				linux_ioctl_unregister_handler(*lihp);
-			mtx_destroy(&futex_mtx);
 			linux_dev_shm_destroy();
 			linux_osd_jail_deregister();
 			if (bootverbose)
@@ -1174,8 +1181,3 @@ static moduledata_t linux_elf_mod = {
 
 DECLARE_MODULE_TIED(linuxelf, linux_elf_mod, SI_SUB_EXEC, SI_ORDER_ANY);
 FEATURE(linux, "Linux 32bit support");
-
-/*
- * linux_vdso_install() and linux_exec_sysvec_init() must be called
- * after exec_sysvec_init() which is SI_SUB_EXEC (SI_ORDER_ANY).
- */

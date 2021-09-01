@@ -56,6 +56,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/priv.h>
 #include <sys/proc.h>
 #include <sys/ptrace.h>
+#include <sys/reg.h>
 #include <sys/resourcevar.h>
 #include <sys/rwlock.h>
 #include <sys/sched.h>
@@ -70,7 +71,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/sysent.h>
 #include <sys/sysproto.h>
 #include <sys/timers.h>
-#include <sys/umtx.h>
+#include <sys/umtxvar.h>
 #include <sys/vnode.h>
 #include <sys/wait.h>
 #ifdef KTRACE
@@ -90,8 +91,6 @@ __FBSDID("$FreeBSD$");
 #ifdef	HWPMC_HOOKS
 #include <sys/pmckern.h>
 #endif
-
-#include <machine/reg.h>
 
 #include <security/audit/audit.h>
 #include <security/mac/mac_framework.h>

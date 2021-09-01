@@ -233,7 +233,7 @@ void	*malloc(size_t size, struct malloc_type *type, int flags) __malloc_like
 		_malloc_item = malloc(_size, type, (flags) &~ M_ZERO);	\
 		if (((flags) & M_WAITOK) != 0 ||			\
 		    __predict_true(_malloc_item != NULL))		\
-			bzero(_malloc_item, _size);			\
+			memset(_malloc_item, 0, _size);			\
 	} else {							\
 		_malloc_item = malloc(_size, type, flags);		\
 	}								\
@@ -265,6 +265,8 @@ void	*realloc(void *addr, size_t size, struct malloc_type *type, int flags)
 	    __result_use_check __alloc_size(2);
 void	*reallocf(void *addr, size_t size, struct malloc_type *type, int flags)
 	    __result_use_check __alloc_size(2);
+void	*malloc_aligned(size_t size, size_t align, struct malloc_type *type,
+	    int flags) __malloc_like __result_use_check __alloc_size(1);
 void	*malloc_domainset_aligned(size_t size, size_t align,
 	    struct malloc_type *mtp, struct domainset *ds, int flags)
 	    __malloc_like __result_use_check __alloc_size(1);
