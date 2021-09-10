@@ -70,8 +70,7 @@ MALLOC_DEFINE(M_VGIC_V3, "ARM VMM VGIC V3", "ARM VMM VGIC V3");
 struct vgic_v3_virt_features {
 	uint8_t min_prio;
 	size_t ich_lr_num;
-	size_t ich_ap0r_num;
-	size_t ich_ap1r_num;
+	size_t ich_apr_num;
 };
 
 /* How many IRQs we support (SGIs + PPIs + SPIs). Not including LPIs */
@@ -447,8 +446,8 @@ vgic_v3_cpuinit(void *arg, bool last_vcpu)
 	cpu_if->ich_lr_used = 0;
 	TAILQ_INIT(&cpu_if->irq_act_pend);
 
-	cpu_if->ich_ap0r_num = virt_features.ich_ap0r_num;
-	cpu_if->ich_ap1r_num = virt_features.ich_ap1r_num;
+	cpu_if->ich_ap0r_num = virt_features.ich_apr_num;
+	cpu_if->ich_ap1r_num = virt_features.ich_apr_num;
 }
 
 void
@@ -1933,14 +1932,11 @@ vgic_v3_init(uint64_t ich_vtr_el2)
 	prebits = ICH_VTR_EL2_PREBITS(ich_vtr_el2);
 	switch (prebits) {
 	case 5:
-		virt_features.ich_ap0r_num = 1;
-		virt_features.ich_ap1r_num = 1;
+		virt_features.ich_apr_num = 1;
 	case 6:
-		virt_features.ich_ap0r_num = 2;
-		virt_features.ich_ap1r_num = 2;
+		virt_features.ich_apr_num = 2;
 	case 7:
-		virt_features.ich_ap0r_num = 4;
-		virt_features.ich_ap1r_num = 4;
+		virt_features.ich_apr_num = 4;
 	}
 
 	virt_features.ich_lr_num = ICH_VTR_EL2_LISTREGS(ich_vtr_el2);

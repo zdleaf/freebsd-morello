@@ -69,10 +69,17 @@
  * addresses.
  */
 #define	HYP_VM_MIN_ADDRESS	0x0000000000000000
-#define	HYP_VM_MAX_ADDRESS	0x0000ffffffffffff
+#define	HYP_VM_MAX_ADDRESS	0x0001000000000000
 
-#define	HYP_KVA_OFFSET		0x0000800000000000
-#define	HYP_KVA_MASK		0x0000ffffffffffff
+/*
+ * When the vmm code is installed the following handles can be used by
+ * the host to call into EL2.
+ */
+#define	HYP_CLEANUP		0x00000001
+#define	HYP_ENTER_GUEST		0x00000002
+#define	HYP_READ_REGISTER	0x00000003
+#define	 HYP_REG_ICH_VTR	0x1
+#define	 HYP_REG_CNTHCTL	0x2
 
 /*
  * When taking asynchronous exceptions, or interrupts, with the exception of the

@@ -80,6 +80,7 @@ enum pmap_stage {
 	PM_INVALID,
 	PM_STAGE1,
 	PM_STAGE2,
+	PM_STAGE1_EL2,
 };
 
 struct pmap {

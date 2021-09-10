@@ -35,6 +35,7 @@
 #include <sys/sysctl.h>
 #include <sys/lock.h>
 #include <sys/mutex.h>
+#include <sys/vmem.h>
 
 #include <vm/vm.h>
 #include <vm/pmap.h>
@@ -69,12 +70,12 @@ MALLOC_DEFINE(M_HYP, "ARM VMM HYP", "ARM VMM HYP");
 
 extern char hyp_init_vectors[];
 extern char hyp_vectors[];
-extern char hyp_code_start[];
-extern char hyp_code_end[];
 extern char hyp_stub_vectors[];
 
 char *stack[MAXCPU];
-pmap_t hyp_pmap;
+static vm_offset_t stack_hyp_va[MAXCPU];
+
+static vmem_t *el2_mem_alloc;
 
 static void arm_setup_vectors(void *arg);
 
@@ -108,10 +109,10 @@ arm_setup_vectors(void *arg)
 	 * x0: the exception vector table responsible for hypervisor
 	 * initialization on the next call.
 	 */
-	vmm_call_hyp((void *)vtophys(hyp_init_vectors));
+	vmm_call_hyp((void *)vtophys(&vmm_hyp_code));
 
 	/* Create and map the hypervisor stack */
-	stack_top = stack[PCPU_GET(cpuid)] + PAGE_SIZE;
+	stack_top = (char *)stack_hyp_va[PCPU_GET(cpuid)] + PAGE_SIZE;
 
 	/* Configure address translation at EL2 */
 	tcr_el1 = READ_SPECIALREG(tcr_el1);
@@ -182,8 +183,8 @@ arm_setup_vectors(void *arg)
 		panic("Invalid t0sz: %u", t0sz);
 
 	/* Special call to initialize EL2 */
-	vmm_call_hyp((void *)vtophys(hyp_vectors), vtophys(hyp_pmap->pm_l0),
-	    ktohyp(stack_top), tcr_el2, sctlr_el2, vtcr_el2);
+	vmm_call_hyp((void *)NULL, vmmpmap_to_ttbr0(), stack_top, tcr_el2,
+	    sctlr_el2, vtcr_el2);
 
 	intr_restore(daif);
 }
@@ -208,7 +209,10 @@ arm_teardown_vectors(void *arg)
 	 * address.
 	 */
 	daif = intr_disable();
+#if 0
+	/* TODO */
 	vmm_call_hyp((void *)vtophys(vmm_cleanup), vtophys(hyp_stub_vectors));
+#endif
 	intr_restore(daif);
 
 	arm64_set_active_vcpu(NULL);
@@ -217,6 +221,8 @@ arm_teardown_vectors(void *arg)
 static int
 arm_init(int ipinum)
 {
+	vm_offset_t next_hyp_va;
+	vm_paddr_t vmm_base;
 	uint64_t ich_vtr_el2;
 	uint64_t cnthctl_el2;
 	size_t hyp_code_len;
@@ -233,29 +239,66 @@ arm_init(int ipinum)
 		return (ENODEV);
 	}
 
-	/* Create the mappings for the hypervisor translation table. */
-	hyp_pmap = malloc(sizeof(*hyp_pmap), M_HYP, M_WAITOK | M_ZERO);
-	hypmap_init(hyp_pmap, PM_STAGE1);
-	hyp_code_len = (size_t)hyp_code_end - (size_t)hyp_code_start;
-	hypmap_map(hyp_pmap, (vm_offset_t)hyp_code_start, hyp_code_len,
-	    VM_PROT_EXECUTE);
+	/* Create the vmem allocator */
+	el2_mem_alloc = vmem_create("VMM EL2", 0, 0, PAGE_SIZE, 0, M_WAITOK);
 
-	/* We need an identity mapping for when we activate the MMU */
-	hypmap_map_identity(hyp_pmap, (vm_offset_t)hyp_code_start, hyp_code_len,
-	    VM_PROT_EXECUTE);
+	/* Create the mappings for the hypervisor translation table. */
+	vmmpmap_init();
+	hyp_code_len = roundup2(&vmm_hyp_code_end - &vmm_hyp_code, PAGE_SIZE);
+
+	/* We need an physical identity mapping for when we activate the MMU */
+	vmm_base = vtophys(&vmm_hyp_code);
+	vmmpmap_enter(vmm_base, hyp_code_len, vtophys(&vmm_hyp_code),
+	    VM_PROT_READ | VM_PROT_EXECUTE);
+
+	next_hyp_va = roundup2(vtophys(&vmm_hyp_code) + hyp_code_len, L2_SIZE);
 
 	/* Create a per-CPU hypervisor stack */
 	CPU_FOREACH(cpu) {
 		stack[cpu] = malloc(PAGE_SIZE, M_HYP, M_WAITOK | M_ZERO);
-		hypmap_map(hyp_pmap, (vm_offset_t)stack[cpu], PAGE_SIZE,
+		stack_hyp_va[cpu] = next_hyp_va;
+
+		vmmpmap_enter(stack_hyp_va[cpu], PAGE_SIZE, vtophys(stack[cpu]),
 		    VM_PROT_READ | VM_PROT_WRITE);
+		next_hyp_va += L2_SIZE;
 	}
 
 	smp_rendezvous(NULL, arm_setup_vectors, NULL, NULL);
 
+	/* Add memory to the vmem allocator (checking there is space) */
+	if (vmm_base > L2_SIZE) {
+		/*
+		 * Ensure there is an L2 block before the vmm code to check
+		 * for buffer overflows on earlier data. Include the PAGE_SIZE
+		 * of the minimum we can allocate.
+		 */
+		vmm_base -= L2_SIZE + PAGE_SIZE;
+		vmm_base = rounddown2(vmm_base, L2_SIZE);
+
+		/*
+		 * Check there is memory before the vmm code to add.
+		 *
+		 * Reserve the L2 block at address 0 so NULL dereference will
+		 * raise an exception
+		 */
+		if (vmm_base > L2_SIZE)
+			vmem_add(el2_mem_alloc, L2_SIZE, next_hyp_va - L2_SIZE,
+			    M_WAITOK);
+	}
+
+	/*
+	 * Add the memory after the stacks. There is most of an L2 block
+	 * between the last stack and the first allocation so this should
+	 * be safe without adding more padding.
+	 */
+	if (next_hyp_va < HYP_VM_MAX_ADDRESS - PAGE_SIZE)
+		vmem_add(el2_mem_alloc, next_hyp_va,
+		    HYP_VM_MAX_ADDRESS - next_hyp_va, M_WAITOK);
+
+
 	daif = intr_disable();
-	ich_vtr_el2 = vmm_call_hyp((void *)ktohyp(vmm_read_ich_vtr_el2));
-	cnthctl_el2 = vmm_call_hyp((void *)ktohyp(vmm_read_cnthctl_el2));
+	ich_vtr_el2 = vmm_call_hyp((void *)HYP_READ_REGISTER, HYP_REG_ICH_VTR);
+	cnthctl_el2 = vmm_call_hyp((void *)HYP_READ_REGISTER, HYP_REG_CNTHCTL);
 	intr_restore(daif);
 
 	vgic_v3_init(ich_vtr_el2);
@@ -273,8 +316,7 @@ arm_cleanup(void)
 
 	vtimer_cleanup();
 
-	hypmap_cleanup(hyp_pmap);
-	free(hyp_pmap, M_HYP);
+	vmmpmap_fini();
 	for (cpu = 0; cpu < nitems(stack); cpu++)
 		free(stack[cpu], M_HYP);
 
@@ -286,10 +328,16 @@ arm_vminit(struct vm *vm, pmap_t pmap)
 {
 	struct hyp *hyp;
 	struct hypctx *hypctx;
+	vmem_addr_t vm_addr;
+	vm_size_t size;
 	bool last_vcpu;
-	int i, maxcpus;
+	int err, i, maxcpus;
 
-	hyp = malloc(sizeof(struct hyp), M_HYP, M_WAITOK | M_ZERO);
+	/* Ensure this is the only data on the page */
+	size = roundup2(sizeof(struct hyp), PAGE_SIZE);
+	hyp = malloc(size, M_HYP, M_WAITOK | M_ZERO);
+	MPASS(((vm_offset_t)hyp & PAGE_MASK) == 0);
+
 	hyp->vm = vm;
 	hyp->vgic_attached = false;
 
@@ -312,7 +360,14 @@ arm_vminit(struct vm *vm, pmap_t pmap)
 		vgic_v3_cpuinit(hypctx, last_vcpu);
 	}
 
-	hypmap_map(hyp_pmap, (vm_offset_t)hyp, sizeof(struct hyp),
+	/* XXX: Can this fail? */
+	err = vmem_alloc(el2_mem_alloc, size, M_NEXTFIT | M_WAITOK,
+	    &vm_addr);
+	MPASS(err == 0);
+	MPASS((vm_addr & PAGE_MASK) == 0);
+	hyp->el2_addr = vm_addr;
+
+	vmmpmap_enter(hyp->el2_addr, size, vtophys(hyp),
 	    VM_PROT_READ | VM_PROT_WRITE);
 
 	return (hyp);
@@ -612,8 +667,11 @@ arm_vmrun(void *arg, int vcpu, register_t pc, pmap_t pmap,
 		 */
 		arm64_set_active_vcpu(hypctx);
 		vgic_v3_flush_hwstate(hypctx);
-		excp_type = vmm_call_hyp((void *)ktohyp(vmm_enter_guest),
-		    ktohyp(hypctx));
+
+		/* Call into EL2 to switch to the guest */
+		excp_type = vmm_call_hyp((void *)HYP_ENTER_GUEST,
+		    hyp->el2_addr, vcpu);
+
 		vgic_v3_sync_hwstate(hypctx);
 
 		/* Deactivate the stage2 pmap */
@@ -667,8 +725,8 @@ arm_vmcleanup(void *arg)
 	smp_rendezvous(NULL, arm_pcpu_vmcleanup, NULL, hyp);
 
 	/* Unmap the VM hyp struct from the hyp mode translation table */
-	hypmap_map(hyp_pmap, (vm_offset_t)hyp, sizeof(struct hyp),
-	    VM_PROT_NONE);
+	vmmpmap_remove(hyp->el2_addr, roundup2(sizeof(*hyp), PAGE_SIZE));
+
 	free(hyp, M_HYP);
 }
 

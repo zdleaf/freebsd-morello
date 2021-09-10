@@ -93,6 +93,7 @@ struct hyp {
 	struct vtimer	vtimer;
 	uint64_t	vmid_generation;
 	uint64_t	vttbr_el2;
+	uint64_t	el2_addr;	/* The address of this in el2 space */
 	bool		vgic_attached;
 };
 

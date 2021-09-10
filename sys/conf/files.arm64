@@ -1,15 +1,4 @@
 # $FreeBSD$
-hyp_genassym.o			optional	vmm			\
-	dependency	"$S/arm64/vmm/hyp_genassym.c offset.inc device_if.h"	\
-	compile-with	"${CC} ${CFLAGS:N-flto:N-fno-common} -fcommon -c ${.IMPSRC}" \
-	no-obj no-implicit-rule						\
-	clean		"hyp_genassym.o"
-#
-hyp_assym.h			optional	vmm			\
-	dependency	"$S/kern/genassym.sh hyp_genassym.o"		\
-	compile-with	"NM='${NM}' NMFLAGS='${NMFLAGS}' sh $S/kern/genassym.sh hyp_genassym.o > ${.TARGET}" \
-	no-obj no-implicit-rule before-depend				\
-	clean		"hyp_assym.h"
 
 ##
 ## Kernel
@@ -127,7 +116,27 @@ arm64/vmm/vmm_stat.c				optional vmm
 arm64/vmm/vmm_arm64.c				optional vmm
 arm64/vmm/vmm_psci.c				optional vmm
 arm64/vmm/vmm_reset.c				optional vmm
-arm64/vmm/vmm_hyp.S				optional vmm
+arm64/vmm/vmm_call.S				optional vmm
+arm64/vmm/vmm_hyp_exception.S			optional vmm		\
+	compile-with	"${NORMAL_C} -fpie"				\
+	no-obj
+arm64/vmm/vmm_hyp.c				optional vmm		\
+	compile-with	"${NORMAL_C} -fpie"				\
+	no-obj
+vmm_hyp_blob.elf.full				optional vmm		\
+	dependency	"vmm_hyp.o vmm_hyp_exception.o"			\
+	compile-with	"${CC} -o ${.TARGET} ${.ALLSRC} -fPIE -nostdlib -T ${LDSCRIPT} -Wl,--defsym=text_start='0x0'"	\
+	no-obj no-implicit-rule
+vmm_hyp_blob.elf				optional vmm		\
+	dependency	"vmm_hyp_blob.elf.full"				\
+	compile-with	"${OBJCOPY} --strip-debug ${.ALLSRC} ${.TARGET}" \
+	no-obj no-implicit-rule
+vmm_hyp_blob.bin				optional vmm		\
+	dependency	vmm_hyp_blob.elf				\
+	compile-with	"${OBJCOPY} --output-target=binary ${.ALLSRC} ${.TARGET}" \
+	no-obj no-implicit-rule
+arm64/vmm/vmm_hyp_el2.S				optional vmm		\
+	dependency	vmm_hyp_blob.bin
 arm64/vmm/vmm_mmu.c				optional vmm
 arm64/vmm/io/vgic_v3.c				optional vmm
 arm64/vmm/io/vtimer.c				optional vmm

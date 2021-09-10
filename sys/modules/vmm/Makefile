@@ -21,10 +21,11 @@ SRCS+=	vmm.c		\
 .if ${MACHINE_CPUARCH} == "aarch64"
 DPSRCS+=	hyp_assym.h
 
+# TODO: Add the new EL2 code
 SRCS+=	vmm_arm64.c \
 	vmm_psci.c \
 	vmm_reset.c \
-	vmm_hyp.S \
+	vmm_call.S \
 	vmm_mmu.c
 
 .PATH: ${SRCTOP}/sys/${MACHINE}/vmm/io

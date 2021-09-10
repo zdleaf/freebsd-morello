@@ -34,6 +34,7 @@
 #include <vm/pmap.h>
 #include <vm/vm_page.h>
 #include <vm/vm_param.h>
+#include <vm/vm_phys.h>
 
 #include <machine/machdep.h>
 #include <machine/vm.h>
@@ -46,75 +47,64 @@
 
 MALLOC_DECLARE(M_HYP);
 
+struct pmap		hyp_pmap_store;
+#define	hyp_pmap	(&hyp_pmap_store)
+
 void
-hypmap_init(pmap_t map, enum pmap_stage pm_stage)
+vmmpmap_init(void)
 {
-	mtx_init(&map->pm_mtx, "hypmap_pm_mtx", NULL, MTX_DEF);
-	pmap_pinit_stage(map, pm_stage, 4);
+	pmap_pinit_stage(hyp_pmap, PM_STAGE1_EL2, 4);
+	PMAP_LOCK_INIT(hyp_pmap);
 }
 
 void
-hypmap_map(pmap_t map, vm_offset_t va, size_t len, vm_prot_t prot)
+vmmpmap_fini(void)
 {
-	vm_offset_t va_end, hypva;
-	vm_page_t dummy_page;
-
-	dummy_page = malloc(sizeof(*dummy_page), M_HYP, M_WAITOK | M_ZERO);
-	dummy_page->oflags = VPO_UNMANAGED;
-	dummy_page->md.pv_memattr = VM_MEMATTR_DEFAULT;
-
-	/*
-	 * Add the physical pages which correspond to the specified virtual
-	 * addresses.The virtual addresses span contiguous virtual pages, but
-	 * they might not reside in contiguous physical pages.
-	 */
-	va_end = va + len - 1;
-	va = trunc_page(va);
-	while (va < va_end) {
-		dummy_page->phys_addr = vtophys(va);
-		hypva = (va >= VM_MIN_KERNEL_ADDRESS) ? ktohyp(va) : va;
-		pmap_enter(map, hypva, dummy_page, prot, PMAP_ENTER_WIRED, 0);
-		va += PAGE_SIZE;
-	}
-
-	free(dummy_page, M_HYP);
+	/* TODO */
 }
 
-void
-hypmap_map_identity(pmap_t map, vm_offset_t va, size_t len,
-		vm_prot_t prot)
+uint64_t
+vmmpmap_to_ttbr0(void)
 {
-	vm_offset_t va_end;
-	vm_page_t dummy_page;
 
-	dummy_page = malloc(sizeof(*dummy_page), M_HYP, M_WAITOK | M_ZERO);
-	dummy_page->oflags = VPO_UNMANAGED;
-	dummy_page->md.pv_memattr = VM_MEMATTR_DEFAULT;
-
-	/*
-	 * The virtual addresses span contiguous virtual pages, but they might
-	 * not reside in contiguous physical pages. For each virtual page we
-	 * get the physical page address and use that for the mapping.
-	 */
-	va_end = va + len - 1;
-	va = trunc_page(va);
-	while (va < va_end) {
-		dummy_page->phys_addr = vtophys(va);
-		pmap_enter(map, dummy_page->phys_addr, dummy_page, prot,
-		    PMAP_ENTER_WIRED, 0);
-		va += PAGE_SIZE;
-	}
-
-	free(dummy_page, M_HYP);
+	return (hyp_pmap->pm_ttbr);
 }
 
 /*
- * Remove all the mappings from the hyp translation tables
+ * Creates an EL2 entry in the hyp_pmap. Similar to pmap_kenter.
  */
 void
-hypmap_cleanup(pmap_t map)
+vmmpmap_enter(vm_offset_t va, vm_size_t size, vm_paddr_t pa, vm_prot_t prot)
 {
-	pmap_remove(map, HYP_VM_MIN_ADDRESS, HYP_VM_MAX_ADDRESS);
-	mtx_destroy(&map->pm_mtx);
-	pmap_release(map);
+	struct vm_page m;
+
+	KASSERT((pa & L3_OFFSET) == 0,
+	   ("%s: Invalid physical address", __func__));
+	KASSERT((va & L3_OFFSET) == 0,
+	   ("%s: Invalid virtual address", __func__));
+	KASSERT((size & PAGE_MASK) == 0,
+	    ("%s: Mapping is not page-sized", __func__));
+
+	memset(&m, 0, sizeof(m));
+	m.oflags = VPO_UNMANAGED;
+	m.md.pv_memattr = VM_MEMATTR_DEFAULT;
+	while (size > 0) {
+		m.phys_addr = pa;
+		pmap_enter(hyp_pmap, va, &m, prot, PMAP_ENTER_WIRED, prot);
+		size -= PAGE_SIZE;
+		pa += PAGE_SIZE;
+		va += PAGE_SIZE;
+	}
+}
+
+void
+vmmpmap_remove(vm_offset_t va, vm_size_t size)
+{
+	KASSERT((va & L3_OFFSET) == 0,
+	   ("%s: Invalid virtual address", __func__));
+	KASSERT((size & PAGE_MASK) == 0,
+	    ("%s: Mapping is not page-sized", __func__));
+
+	pmap_remove(hyp_pmap, va, va + size);
+	/* TODO: Invalidate the EL2 TLB */
 }

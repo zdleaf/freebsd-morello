@@ -657,7 +657,7 @@ pmap_pte_memattr(pmap_t pmap, vm_memattr_t memattr)
 {
 	pt_entry_t val;
 
-	if (pmap->pm_stage == PM_STAGE1) {
+	if (pmap->pm_stage == PM_STAGE1 || pmap->pm_stage == PM_STAGE1_EL2) {
 		val = ATTR_S1_IDX(memattr);
 		if (memattr == VM_MEMATTR_DEVICE)
 			val |= ATTR_S1_XN;
@@ -687,11 +687,13 @@ pmap_pte_prot(pmap_t pmap, vm_prot_t prot)
 	pt_entry_t val;
 
 	val = 0;
-	if (pmap->pm_stage == PM_STAGE1) {
+	if (pmap->pm_stage == PM_STAGE1 || pmap->pm_stage == PM_STAGE1_EL2) {
 		if ((prot & VM_PROT_EXECUTE) == 0)
 			val |= ATTR_S1_XN;
 		if ((prot & VM_PROT_WRITE) == 0)
 			val |= ATTR_S1_AP(ATTR_S1_AP_RO);
+		if (pmap->pm_stage == PM_STAGE1_EL2)
+			val |= ATTR_S1_AP(ATTR_S1_AP_USER);
 	} else {
 		if ((prot & VM_PROT_WRITE) != 0)
 			val |= ATTR_S2_S2AP(ATTR_S2_S2AP_WRITE);
@@ -1692,7 +1694,8 @@ _pmap_unwire_l3(pmap_t pmap, vm_offset_t va, vm_page_t m, struct spglist *free)
 		l1pg = PHYS_TO_VM_PAGE(tl0 & ~ATTR_MASK);
 		pmap_unwire_l3(pmap, va, l1pg, free);
 	}
-	pmap_invalidate_page(pmap, va);
+	if (pmap->pm_stage != PM_STAGE1_EL2)
+		pmap_invalidate_page(pmap, va);
 
 	/*
 	 * Put page on a list so that it is released after
@@ -1789,6 +1792,7 @@ pmap_pinit_stage(pmap_t pmap, enum pmap_stage stage, int levels)
 	pmap->pm_stage = stage;
 	switch (stage) {
 	case PM_STAGE1:
+	case PM_STAGE1_EL2: /* XXX: No asid needed */
 		pmap->pm_asid_set = &asids;
 		break;
 	case PM_STAGE2:
@@ -3017,7 +3021,7 @@ pmap_remove_l3_range(pmap_t pmap, pd_entry_t l2e, vm_offset_t sva,
 			break;
 		}
 	}
-	if (va != eva)
+	if (va != eva && pmap->pm_stage != PM_STAGE1_EL2)
 		pmap_invalidate_range(pmap, va, sva);
 }
 
@@ -3745,6 +3749,7 @@ pmap_enter(pmap_t pmap, vm_offset_t va, vm_page_t m, vm_prot_t prot,
 			new_l3 |= ATTR_S1_UXN;
 		if (pmap != kernel_pmap)
 			new_l3 |= ATTR_S1_nG;
+	} else if (pmap->pm_stage == PM_STAGE1_EL2) {
 	} else {
 		/*
 		 * Clear the access flag on executable mappings, this will be
@@ -6393,6 +6398,10 @@ pmap_alloc_asid(pmap_t pmap)
 {
 	struct asid_set *set;
 	int new_asid;
+
+	/* No need for an asid set in the hypervisor */
+	if (pmap->pm_stage == PM_STAGE1_EL2)
+		return;
 
 	set = pmap->pm_asid_set;
 	KASSERT(set != NULL, ("%s: NULL asid set", __func__));

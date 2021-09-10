@@ -150,7 +150,7 @@ struct vgic_v3_cpu_if {
 	uint32_t	ich_ap0r_el2[VGIC_ICH_AP0R_NUM_MAX];
 	size_t		ich_ap0r_num;
 	uint32_t	ich_ap1r_el2[VGIC_ICH_AP1R_NUM_MAX];
-	size_t		ich_ap1r_num;
+	size_t		ich_ap1r_num; /* TODO: Remove as it's identical to ich_ap0r_num */
 
 	struct vgic_v3_irq private_irqs[VGIC_PRV_I_NUM];
 	TAILQ_HEAD(, vgic_v3_irq) irq_act_pend;

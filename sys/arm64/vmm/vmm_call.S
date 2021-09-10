@@ -27,25 +27,12 @@
  * SUCH DAMAGE.
  */
 
-#ifndef _VMM_MMU_H_
-#define	_VMM_MMU_H_
 
-#include <machine/machdep.h>
-#include <machine/vmparam.h>
-#include <machine/vmm.h>
+#include <machine/asm.h>
 
-#include "hyp.h"
+	.text
 
-extern char vmm_hyp_code;
-extern char vmm_hyp_code_end;
-
-extern char _vmm_start;
-extern char _vmm_end;
-
-void	vmmpmap_init(void);
-void	vmmpmap_fini(void);
-uint64_t vmmpmap_to_ttbr0(void);
-void	vmmpmap_enter(vm_offset_t, vm_size_t, vm_paddr_t, vm_prot_t);
-void	vmmpmap_remove(vm_offset_t, vm_size_t);
-
-#endif
+ENTRY(vmm_call_hyp)
+	hvc	#0
+	ret
+END(vmm_call_hyp)
