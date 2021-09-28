@@ -69,6 +69,7 @@ SUBDIR=	${SUBDIR_BOOTSTRAP} \
 	liblzma \
 	libmemstat \
 	libmd \
+	libmixer \
 	libmt \
 	lib80211 \
 	libnetbsd \
@@ -157,7 +158,10 @@ SUBDIR.${MK_BLUETOOTH}+=libbluetooth libsdp
 SUBDIR.${MK_BSNMP}+=	libbsnmp
 
 .if !defined(COMPAT_32BIT) && !defined(COMPAT_SOFTFP)
-SUBDIR.${MK_CLANG}+=	clang
+.if ${MK_CLANG} != "no" || ${MK_LLD} != "no" || \
+    ${MK_LLDB} != "no" || ${MK_LLVM_BINUTILS} != "no"
+SUBDIR+=	clang
+.endif
 .endif
 
 SUBDIR.${MK_CUSE}+= 	libcuse
@@ -180,6 +184,8 @@ SUBDIR.${MK_STATS}+=	libstats
     ${MACHINE_CPUARCH} == "arm" || ${MACHINE_CPUARCH} == "i386" || \
     ${MACHINE_CPUARCH} == "powerpc")
 _libclang_rt=	libclang_rt
+.elif ${MK_ASAN} != "no" || ${MK_UBSAN} != "no"
+.error "Requested build with sanitizers but cannot build runtime libraries!"
 .endif
 
 .if ${MK_CXX} != "no"
@@ -216,7 +222,6 @@ SUBDIR.${MK_RADIUS_SUPPORT}+=	libradius
 SUBDIR.${MK_SENDMAIL}+=	libmilter libsm libsmdb libsmutil
 SUBDIR.${MK_TELNET}+=	libtelnet
 SUBDIR.${MK_TESTS_SUPPORT}+=	atf
-SUBDIR.${MK_TESTS_SUPPORT}.${MK_CXX}+=	kyua
 SUBDIR.${MK_TESTS_SUPPORT}.${MK_CXX}+=	liblutok
 SUBDIR.${MK_TESTS}+=	tests
 SUBDIR.${MK_UNBOUND}+=	libunbound

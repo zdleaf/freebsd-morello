@@ -4627,7 +4627,7 @@ xpt_done(union ccb *done_ccb)
 	STAILQ_INSERT_TAIL(&queue->cam_doneq, &done_ccb->ccb_h, sim_links.stqe);
 	done_ccb->ccb_h.pinfo.index = CAM_DONEQ_INDEX;
 	mtx_unlock(&queue->cam_doneq_mtx);
-	if (run)
+	if (run && !dumping)
 		wakeup(&queue->cam_doneq);
 }
 
@@ -4642,6 +4642,7 @@ xpt_done_direct(union ccb *done_ccb)
 
 	/* Store the time the ccb was in the sim */
 	done_ccb->ccb_h.qos.periph_data = cam_iosched_delta_t(done_ccb->ccb_h.qos.periph_data);
+	done_ccb->ccb_h.status |= CAM_QOS_VALID;
 	xpt_done_process(&done_ccb->ccb_h);
 }
 

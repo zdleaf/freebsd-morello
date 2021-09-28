@@ -39,8 +39,10 @@
 #include <netinet/tcp_fsm.h>
 
 #ifdef _KERNEL
+#include "opt_kern_tls.h"
 #include <net/vnet.h>
 #include <sys/mbuf.h>
+#include <sys/ktls.h>
 #endif
 
 #define TCP_END_BYTE_INFO 8	/* Bytes that makeup the "end information array" */
@@ -1020,6 +1022,7 @@ extern counter_u64_t tcp_extra_mbuf;
 extern counter_u64_t tcp_would_have_but;
 extern counter_u64_t tcp_comp_total;
 extern counter_u64_t tcp_uncomp_total;
+extern counter_u64_t tcp_bad_csums;
 
 #ifdef NETFLIX_EXP_DETECTION
 /* Various SACK attack thresholds */
@@ -1139,7 +1142,7 @@ tcp_fields_to_net(struct tcphdr *th)
 
 static inline void
 tcp_account_for_send(struct tcpcb *tp, uint32_t len, uint8_t is_rxt,
-    uint8_t is_tlp, int hw_tls __unused)
+    uint8_t is_tlp, int hw_tls)
 {
 	if (is_tlp) {
 		tp->t_sndtlppack++;
@@ -1150,6 +1153,15 @@ tcp_account_for_send(struct tcpcb *tp, uint32_t len, uint8_t is_rxt,
 		tp->t_snd_rxt_bytes += len;
 	else
 		tp->t_sndbytes += len;
+
+#ifdef KERN_TLS
+	if (hw_tls && is_rxt && len != 0) {
+		uint64_t rexmit_percent = (1000ULL * tp->t_snd_rxt_bytes) / (10ULL * (tp->t_snd_rxt_bytes + tp->t_sndbytes));
+		if (rexmit_percent > ktls_ifnet_max_rexmit_pct)
+			ktls_disable_ifnet(tp);
+	}
+#endif
+
 }
 #endif /* _KERNEL */
 

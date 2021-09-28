@@ -54,6 +54,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/procfs.h>
 #include <sys/ptrace.h>
 #include <sys/racct.h>
+#include <sys/reg.h>
 #include <sys/resourcevar.h>
 #include <sys/rwlock.h>
 #include <sys/sbuf.h>
@@ -1215,7 +1216,8 @@ __CONCAT(exec_, __elfN(imgact))(struct image_params *imgp)
 	 */
 	if (imgp->credential_setid) {
 		PROC_LOCK(imgp->proc);
-		imgp->proc->p_flag2 &= ~(P2_ASLR_ENABLE | P2_ASLR_DISABLE);
+		imgp->proc->p_flag2 &= ~(P2_ASLR_ENABLE | P2_ASLR_DISABLE |
+		    P2_WXORX_DISABLE | P2_WXORX_ENABLE_EXEC);
 		PROC_UNLOCK(imgp->proc);
 	}
 	if ((sv->sv_flags & SV_ASLR) == 0 ||
@@ -1238,7 +1240,9 @@ __CONCAT(exec_, __elfN(imgact))(struct image_params *imgp)
 			imgp->map_flags |= MAP_ASLR_IGNSTART;
 	}
 
-	if (!__elfN(allow_wx) && (fctl0 & NT_FREEBSD_FCTL_WXNEEDED) == 0)
+	if ((!__elfN(allow_wx) && (fctl0 & NT_FREEBSD_FCTL_WXNEEDED) == 0 &&
+	    (imgp->proc->p_flag2 & P2_WXORX_DISABLE) == 0) ||
+	    (imgp->proc->p_flag2 & P2_WXORX_ENABLE_EXEC) != 0)
 		imgp->map_flags |= MAP_WXORX;
 
 	error = exec_new_vmspace(imgp, sv);
@@ -1341,7 +1345,7 @@ ret:
 	return (error);
 }
 
-#define	suword __CONCAT(suword, __ELF_WORD_SIZE)
+#define	elf_suword __CONCAT(suword, __ELF_WORD_SIZE)
 
 int
 __elfN(freebsd_copyout_auxargs)(struct image_params *imgp, uintptr_t base)
@@ -1414,7 +1418,7 @@ __elfN(freebsd_fixup)(uintptr_t *stack_base, struct image_params *imgp)
 
 	base = (Elf_Addr *)*stack_base;
 	base--;
-	if (suword(base, imgp->args->argc) == -1)
+	if (elf_suword(base, imgp->args->argc) == -1)
 		return (EFAULT);
 	*stack_base = (uintptr_t)base;
 	return (0);

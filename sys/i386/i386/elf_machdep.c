@@ -86,6 +86,9 @@ struct sysentvec elf32_freebsd_sysvec = {
 	.sv_schedtail	= NULL,
 	.sv_thread_detach = NULL,
 	.sv_trap	= NULL,
+	.sv_onexec_old	= exec_onexec_old,
+	.sv_onexit	= exit_onexit,
+	.sv_set_fork_retval = x86_set_fork_retval,
 };
 INIT_SYSENTVEC(elf32_sysvec, &elf32_freebsd_sysvec);
 
@@ -258,6 +261,7 @@ elf_reloc_internal(linker_file_t lf, Elf_Addr relocbase, const void *data,
 			if (*where != addr)
 				*where = addr;
 			break;
+
 		default:
 			printf("kldload: unexpected relocation type %d, "
 			    "symbol index %d\n", rtype, symidx);

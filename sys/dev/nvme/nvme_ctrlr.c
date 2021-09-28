@@ -232,7 +232,8 @@ nvme_ctrlr_post_failed_request(struct nvme_controller *ctrlr,
 	mtx_lock(&ctrlr->lock);
 	STAILQ_INSERT_TAIL(&ctrlr->fail_req, req, stailq);
 	mtx_unlock(&ctrlr->lock);
-	taskqueue_enqueue(ctrlr->taskqueue, &ctrlr->fail_req_task);
+	if (!ctrlr->is_dying)
+		taskqueue_enqueue(ctrlr->taskqueue, &ctrlr->fail_req_task);
 }
 
 static void
@@ -407,6 +408,7 @@ nvme_ctrlr_hw_reset(struct nvme_controller *ctrlr)
 {
 	int err;
 
+	TSENTER();
 	nvme_ctrlr_disable_qpairs(ctrlr);
 
 	pause("nvmehwreset", hz / 10);
@@ -414,7 +416,9 @@ nvme_ctrlr_hw_reset(struct nvme_controller *ctrlr)
 	err = nvme_ctrlr_disable(ctrlr);
 	if (err != 0)
 		return err;
-	return (nvme_ctrlr_enable(ctrlr));
+	err = nvme_ctrlr_enable(ctrlr);
+	TSEXIT();
+	return (err);
 }
 
 void
@@ -432,7 +436,8 @@ nvme_ctrlr_reset(struct nvme_controller *ctrlr)
 		 */
 		return;
 
-	taskqueue_enqueue(ctrlr->taskqueue, &ctrlr->reset_task);
+	if (!ctrlr->is_dying)
+		taskqueue_enqueue(ctrlr->taskqueue, &ctrlr->reset_task);
 }
 
 static int
@@ -1045,6 +1050,8 @@ nvme_ctrlr_start(void *ctrlr_arg, bool resetting)
 	uint32_t old_num_io_queues;
 	int i;
 
+	TSENTER();
+
 	/*
 	 * Only reset adminq here when we are restarting the
 	 *  controller after a reset.  During initialization,
@@ -1117,12 +1124,15 @@ nvme_ctrlr_start(void *ctrlr_arg, bool resetting)
 
 	for (i = 0; i < ctrlr->num_io_queues; i++)
 		nvme_io_qpair_enable(&ctrlr->ioq[i]);
+	TSEXIT();
 }
 
 void
 nvme_ctrlr_start_config_hook(void *arg)
 {
 	struct nvme_controller *ctrlr = arg;
+
+	TSENTER();
 
 	/*
 	 * Reset controller twice to ensure we do a transition from cc.en==1 to
@@ -1155,6 +1165,7 @@ fail:
 
 	ctrlr->is_initialized = 1;
 	nvme_notify_new_controller(ctrlr);
+	TSEXIT();
 }
 
 static void
@@ -1203,7 +1214,7 @@ nvme_ctrlr_poll(struct nvme_controller *ctrlr)
  * interrupts in the controller.
  */
 void
-nvme_ctrlr_intx_handler(void *arg)
+nvme_ctrlr_shared_handler(void *arg)
 {
 	struct nvme_controller *ctrlr = arg;
 
@@ -1472,8 +1483,12 @@ nvme_ctrlr_destruct(struct nvme_controller *ctrlr, device_t dev)
 {
 	int	gone, i;
 
+	ctrlr->is_dying = true;
+
 	if (ctrlr->resource == NULL)
 		goto nores;
+	if (!mtx_initialized(&ctrlr->adminq.lock))
+		goto noadminq;
 
 	/*
 	 * Check whether it is a hot unplug or a clean driver detach.
@@ -1519,6 +1534,7 @@ nvme_ctrlr_destruct(struct nvme_controller *ctrlr, device_t dev)
 	if (!gone)
 		nvme_ctrlr_disable(ctrlr);
 
+noadminq:
 	if (ctrlr->taskqueue)
 		taskqueue_free(ctrlr->taskqueue);
 

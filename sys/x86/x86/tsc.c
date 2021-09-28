@@ -511,6 +511,7 @@ test_tsc(int adj_max_count)
 	if (vm_guest == VM_GUEST_VBOX)
 		return (0);
 
+	TSENTER();
 	size = (mp_maxid + 1) * 3;
 	data = malloc(sizeof(*data) * size * N, M_TEMP, M_WAITOK);
 	adj = 0;
@@ -531,6 +532,7 @@ retry:
 		printf("SMP: %sed TSC synchronization test%s\n",
 		    smp_tsc ? "pass" : "fail", 
 		    adj > 0 ? " after adjustment" : "");
+	TSEXIT();
 	if (smp_tsc && tsc_is_invariant) {
 		switch (cpu_vendor_id) {
 		case CPU_VENDOR_AMD:
@@ -870,6 +872,8 @@ x86_tsc_vdso_timehands(struct vdso_timehands *vdso_th, struct timecounter *tc)
 	vdso_th->th_algo = VDSO_TH_ALGO_X86_TSC;
 	vdso_th->th_x86_shift = (int)(intptr_t)tc->tc_priv;
 	vdso_th->th_x86_hpet_idx = 0xffffffff;
+	vdso_th->th_x86_pvc_last_systime = 0;
+	vdso_th->th_x86_pvc_stable_mask = 0;
 	bzero(vdso_th->th_res, sizeof(vdso_th->th_res));
 	return (1);
 }
@@ -883,6 +887,8 @@ x86_tsc_vdso_timehands32(struct vdso_timehands32 *vdso_th32,
 	vdso_th32->th_algo = VDSO_TH_ALGO_X86_TSC;
 	vdso_th32->th_x86_shift = (int)(intptr_t)tc->tc_priv;
 	vdso_th32->th_x86_hpet_idx = 0xffffffff;
+	vdso_th32->th_x86_pvc_last_systime = 0;
+	vdso_th32->th_x86_pvc_stable_mask = 0;
 	bzero(vdso_th32->th_res, sizeof(vdso_th32->th_res));
 	return (1);
 }

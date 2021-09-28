@@ -248,6 +248,9 @@ static struct filter_opts {
 	char			*tag;
 	char			*match_tag;
 	u_int8_t		 match_tag_not;
+	u_int16_t		 dnpipe;
+	u_int16_t		 dnrpipe;
+	u_int32_t		 free_flags;
 	u_int			 rtableid;
 	u_int8_t		 prio;
 	u_int8_t		 set_prio[2];
@@ -456,7 +459,7 @@ int	parseport(char *, struct range *r, int);
 
 %}
 
-%token	PASS BLOCK SCRUB RETURN IN OS OUT LOG QUICK ON FROM TO FLAGS
+%token	PASS BLOCK MATCH SCRUB RETURN IN OS OUT LOG QUICK ON FROM TO FLAGS
 %token	RETURNRST RETURNICMP RETURNICMP6 PROTO INET INET6 ALL ANY ICMPTYPE
 %token	ICMP6TYPE CODE KEEP MODULATE STATE PORT RDR NAT BINAT ARROW NODF
 %token	MINTTL ERROR ALLOWOPTS FASTROUTE FILENAME ROUTETO DUPTO REPLYTO NO LABEL
@@ -464,10 +467,11 @@ int	parseport(char *, struct range *r, int);
 %token	REASSEMBLE FRAGDROP FRAGCROP ANCHOR NATANCHOR RDRANCHOR BINATANCHOR
 %token	SET OPTIMIZATION TIMEOUT LIMIT LOGINTERFACE BLOCKPOLICY FAILPOLICY
 %token	RANDOMID REQUIREORDER SYNPROXY FINGERPRINTS NOSYNC DEBUG SKIP HOSTID
-%token	ANTISPOOF FOR INCLUDE KEEPCOUNTERS
+%token	ANTISPOOF FOR INCLUDE KEEPCOUNTERS SYNCOOKIES
 %token	BITMASK RANDOM SOURCEHASH ROUNDROBIN STATICPORT PROBABILITY MAPEPORTSET
 %token	ALTQ CBQ CODEL PRIQ HFSC FAIRQ BANDWIDTH TBRSIZE LINKSHARE REALTIME
 %token	UPPERLIMIT QUEUE PRIORITY QLIMIT HOGS BUCKETS RTABLE TARGET INTERVAL
+%token	DNPIPE DNQUEUE
 %token	LOAD RULESET_OPTIMIZATION PRIO
 %token	STICKYADDRESS MAXSRCSTATES MAXSRCNODES SOURCETRACK GLOBAL RULE
 %token	MAXSRCCONN MAXSRCCONNRATE OVERLOAD FLUSH SLOPPY
@@ -480,7 +484,7 @@ int	parseport(char *, struct range *r, int);
 %type	<v.number>		number icmptype icmp6type uid gid
 %type	<v.number>		tos not yesno
 %type	<v.probability>		probability
-%type	<v.i>			no dir af fragcache optimizer
+%type	<v.i>			no dir af fragcache optimizer syncookie_val
 %type	<v.i>			sourcetrack flush unaryop statelock
 %type	<v.b>			action nataction natpasslog scrubaction
 %type	<v.b>			flags flag blockspec prio
@@ -724,6 +728,21 @@ option		: SET OPTIMIZATION STRING		{
 		}
 		| SET KEEPCOUNTERS {
 			pf->keep_counters = true;
+		}
+		| SET SYNCOOKIES syncookie_val {
+			pf->syncookies = $3;
+		}
+		;
+
+syncookie_val  : STRING        {
+			if (!strcmp($1, "never"))
+				$$ = PFCTL_SYNCOOKIES_NEVER;
+			else if (!strcmp($1, "always"))
+				$$ = PFCTL_SYNCOOKIES_ALWAYS;
+			else {
+				yyerror("illegal value for syncookies");
+				YYERROR;
+			}
 		}
 		;
 
@@ -2449,6 +2468,15 @@ pfrule		: action dir logquick interface route af proto fromto
 			}
 #endif
 
+			if ($9.dnpipe || $9.dnrpipe) {
+				r.dnpipe = $9.dnpipe;
+				r.dnrpipe = $9.dnrpipe;
+				if ($9.free_flags & PFRULE_DN_IS_PIPE)
+					r.free_flags |= PFRULE_DN_IS_PIPE;
+				else
+					r.free_flags |= PFRULE_DN_IS_QUEUE;
+			}
+
 			expand_rule(&r, $4, $5.host, $7, $8.src_os,
 			    $8.src.host, $8.src.port, $8.dst.host, $8.dst.port,
 			    $9.uid, $9.gid, $9.icmpspec, "");
@@ -2549,6 +2577,32 @@ filter_opt	: USER uids {
 				YYERROR;
 			}
 			filter_opts.queues = $1;
+		}
+		| DNPIPE number {
+			filter_opts.dnpipe = $2;
+			filter_opts.free_flags |= PFRULE_DN_IS_PIPE;
+		}
+		| DNPIPE '(' number ')' {
+			filter_opts.dnpipe = $3;
+			filter_opts.free_flags |= PFRULE_DN_IS_PIPE;
+		}
+		| DNPIPE '(' number comma number ')' {
+			filter_opts.dnrpipe = $5;
+			filter_opts.dnpipe = $3;
+			filter_opts.free_flags |= PFRULE_DN_IS_PIPE;
+		}
+		| DNQUEUE number {
+			filter_opts.dnpipe = $2;
+			filter_opts.free_flags |= PFRULE_DN_IS_QUEUE;
+		}
+		| DNQUEUE '(' number comma number ')' {
+			filter_opts.dnrpipe = $5;
+			filter_opts.dnpipe = $3;
+			filter_opts.free_flags |= PFRULE_DN_IS_QUEUE;
+		}
+		| DNQUEUE '(' number ')' {
+			filter_opts.dnpipe = $3;
+			filter_opts.free_flags |= PFRULE_DN_IS_QUEUE;
 		}
 		| TAG string				{
 			filter_opts.tag = $2;
@@ -2677,6 +2731,7 @@ action		: PASS 			{
 			$$.w = returnicmpdefault;
 			$$.w2 = returnicmp6default;
 		}
+		| MATCH			{ $$.b1 = PF_MATCH; $$.b2 = $$.w = 0; }
 		| BLOCK blockspec	{ $$ = $2; $$.b1 = PF_DROP; }
 		;
 
@@ -5017,13 +5072,13 @@ expand_label_port(const char *name, char *label, size_t len,
 void
 expand_label_proto(const char *name, char *label, size_t len, u_int8_t proto)
 {
-	struct protoent *pe;
+	const char *protoname;
 	char n[4];
 
 	if (strstr(label, name) != NULL) {
-		pe = getprotobynumber(proto);
-		if (pe != NULL)
-			expand_label_str(label, len, name, pe->p_name);
+		protoname = pfctl_proto2name(proto);
+		if (protoname != NULL)
+			expand_label_str(label, len, name, protoname);
 		else {
 			snprintf(n, sizeof(n), "%u", proto);
 			expand_label_str(label, len, name, n);
@@ -5576,6 +5631,8 @@ lookup(char *s)
 		{ "debug",		DEBUG},
 		{ "divert-reply",	DIVERTREPLY},
 		{ "divert-to",		DIVERTTO},
+		{ "dnpipe",		DNPIPE},
+		{ "dnqueue",		DNQUEUE},
 		{ "drop",		DROP},
 		{ "drop-ovl",		FRAGDROP},
 		{ "dup-to",		DUPTO},
@@ -5612,6 +5669,7 @@ lookup(char *s)
 		{ "log",		LOG},
 		{ "loginterface",	LOGINTERFACE},
 		{ "map-e-portset",	MAPEPORTSET},
+		{ "match",		MATCH},
 		{ "max",		MAXIMUM},
 		{ "max-mss",		MAXMSS},
 		{ "max-src-conn",	MAXSRCCONN},
@@ -5671,6 +5729,7 @@ lookup(char *s)
 		{ "state-policy",	STATEPOLICY},
 		{ "static-port",	STATICPORT},
 		{ "sticky-address",	STICKYADDRESS},
+		{ "syncookies",         SYNCOOKIES},
 		{ "synproxy",		SYNPROXY},
 		{ "table",		TABLE},
 		{ "tag",		TAG},

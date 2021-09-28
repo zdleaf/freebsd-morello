@@ -859,14 +859,24 @@ filt_timerdetach(struct knote *kn)
 {
 	struct kq_timer_cb_data *kc;
 	unsigned int old __unused;
+	bool pending;
 
 	kc = kn->kn_ptr.p_v;
-	callout_drain(&kc->c);
-	if ((kc->flags & KQ_TIMER_CB_ENQUEUED) != 0) {
+	do {
+		callout_drain(&kc->c);
+
+		/*
+		 * kqtimer_proc_continue() might have rescheduled this callout.
+		 * Double-check, using the process mutex as an interlock.
+		 */
 		PROC_LOCK(kc->p);
-		TAILQ_REMOVE(&kc->p->p_kqtim_stop, kc, link);
+		if ((kc->flags & KQ_TIMER_CB_ENQUEUED) != 0) {
+			kc->flags &= ~KQ_TIMER_CB_ENQUEUED;
+			TAILQ_REMOVE(&kc->p->p_kqtim_stop, kc, link);
+		}
+		pending = callout_pending(&kc->c);
 		PROC_UNLOCK(kc->p);
-	}
+	} while (pending);
 	free(kc, M_KQUEUE);
 	old = atomic_fetchadd_int(&kq_ncallouts, -1);
 	KASSERT(old > 0, ("Number of callouts cannot become negative"));
@@ -1486,6 +1496,13 @@ kqueue_register(struct kqueue *kq, struct kevent *kev, struct thread *td,
 		return EINVAL;
 
 	if (kev->flags & EV_ADD) {
+		/* Reject an invalid flag pair early */
+		if (kev->flags & EV_KEEPUDATA) {
+			tkn = NULL;
+			error = EINVAL;
+			goto done;
+		}
+
 		/*
 		 * Prevent waiting with locks.  Non-sleepable
 		 * allocation failures are handled in the loop, only
@@ -1674,7 +1691,8 @@ findkn:
 	kn_enter_flux(kn);
 	KQ_UNLOCK(kq);
 	knl = kn_list_lock(kn);
-	kn->kn_kevent.udata = kev->udata;
+	if ((kev->flags & EV_KEEPUDATA) == 0)
+		kn->kn_kevent.udata = kev->udata;
 	if (!fops->f_isfd && fops->f_touch != NULL) {
 		fops->f_touch(kn, kev, EVENT_REGISTER);
 	} else {
@@ -1758,9 +1776,16 @@ kqueue_release(struct kqueue *kq, int locked)
 		KQ_UNLOCK(kq);
 }
 
+void
+kqueue_drain_schedtask(void)
+{
+	taskqueue_quiesce(taskqueue_kqueue_ctx);
+}
+
 static void
 kqueue_schedtask(struct kqueue *kq)
 {
+	struct thread *td;
 
 	KQ_OWNED(kq);
 	KASSERT(((kq->kq_state & KQ_TASKDRAIN) != KQ_TASKDRAIN),
@@ -1769,6 +1794,10 @@ kqueue_schedtask(struct kqueue *kq)
 	if ((kq->kq_state & KQ_TASKSCHED) != KQ_TASKSCHED) {
 		taskqueue_enqueue(taskqueue_kqueue_ctx, &kq->kq_task);
 		kq->kq_state |= KQ_TASKSCHED;
+		td = curthread;
+		thread_lock(td);
+		td->td_flags |= TDF_ASTPENDING | TDF_KQTICKLED;
+		thread_unlock(td);
 	}
 }
 

@@ -76,7 +76,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/sem.h>
 #include <sys/sysent.h>
 #include <sys/timers.h>
-#include <sys/umtx.h>
+#include <sys/umtxvar.h>
 #ifdef KTRACE
 #include <sys/ktrace.h>
 #endif
@@ -193,6 +193,13 @@ proc_clear_orphan(struct proc *p)
 	}
 	LIST_REMOVE(p, p_orphan);
 	p->p_treeflag &= ~P_TREE_ORPHANED;
+}
+
+void
+exit_onexit(struct proc *p)
+{
+	MPASS(p->p_numthreads == 1);
+	umtx_thread_exit(FIRST_THREAD_IN_PROC(p));
 }
 
 /*
@@ -340,9 +347,6 @@ exit1(struct thread *td, int rval, int signo)
 
 	itimers_exit(p);
 
-	if (p->p_sysent->sv_onexit != NULL)
-		p->p_sysent->sv_onexit(p);
-
 	/*
 	 * Check if any loadable modules need anything done at process exit.
 	 * E.g. SYSV IPC stuff.
@@ -373,7 +377,8 @@ exit1(struct thread *td, int rval, int signo)
 
 	PROC_UNLOCK(p);
 
-	umtx_thread_exit(td);
+	if (p->p_sysent->sv_onexit != NULL)
+		p->p_sysent->sv_onexit(p);
 	seltdfini(td);
 
 	/*

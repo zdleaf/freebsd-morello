@@ -150,11 +150,14 @@ struct sysentvec {
 	u_long		*sv_hwcap2;	/* Value passed in AT_HWCAP2. */
 	const char	*(*sv_machine_arch)(struct proc *);
 	vm_offset_t	sv_fxrng_gen_base;
-	void		(*sv_onexec)(struct proc *, struct image_params *);
+	void		(*sv_onexec_old)(struct thread *td);
+	int		(*sv_onexec)(struct proc *, struct image_params *);
 	void		(*sv_onexit)(struct proc *);
 	void		(*sv_ontdexit)(struct thread *td);
 	int		(*sv_setid_allowed)(struct thread *td,
 			    struct image_params *imgp);
+	void		(*sv_set_fork_retval)(struct thread *);
+					/* Only used on x86 */
 };
 
 #define	SV_ILP32	0x000100	/* 32-bit executable. */
@@ -162,7 +165,7 @@ struct sysentvec {
 #define	SV_IA32		0x004000	/* Intel 32-bit executable. */
 #define	SV_AOUT		0x008000	/* a.out executable. */
 #define	SV_SHP		0x010000	/* Shared page. */
-#define	SV_CAPSICUM	0x020000	/* Force cap_enter() on startup. */
+#define	SV_AVAIL1	0x020000	/* Unused */
 #define	SV_TIMEKEEP	0x040000	/* Shared page timehands. */
 #define	SV_ASLR		0x080000	/* ASLR allowed. */
 #define	SV_RNG_SEED_VER	0x100000	/* random(4) reseed generation. */
@@ -177,7 +180,6 @@ struct sysentvec {
 /* same as ELFOSABI_XXX, to prevent header pollution */
 #define	SV_ABI_LINUX	3
 #define	SV_ABI_FREEBSD 	9
-#define	SV_ABI_CLOUDABI	17
 #define	SV_ABI_UNDEF	255
 
 /* sv_coredump flags */
@@ -320,6 +322,9 @@ void shared_page_write(int base, int size, const void *data);
 void exec_sysvec_init(void *param);
 void exec_sysvec_init_secondary(struct sysentvec *sv, struct sysentvec *sv2);
 void exec_inittk(void);
+
+void exit_onexit(struct proc *p);
+void exec_onexec_old(struct thread *td);
 
 #define INIT_SYSENTVEC(name, sv)					\
     SYSINIT(name, SI_SUB_EXEC, SI_ORDER_ANY,				\

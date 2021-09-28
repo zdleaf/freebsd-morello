@@ -59,6 +59,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/proc.h>
 #include <sys/ptrace.h>
 #include <sys/reboot.h>
+#include <sys/reg.h>
 #include <sys/rwlock.h>
 #include <sys/sched.h>
 #include <sys/signalvar.h>
@@ -86,7 +87,6 @@ __FBSDID("$FreeBSD$");
 #include <machine/metadata.h>
 #include <machine/pcb.h>
 #include <machine/pte.h>
-#include <machine/reg.h>
 #include <machine/riscvreg.h>
 #include <machine/sbi.h>
 #include <machine/trap.h>
@@ -978,15 +978,4 @@ initriscv(struct riscv_bootparams *rvbp)
 	early_boot = 0;
 
 	TSEXIT();
-}
-
-#undef bzero
-void
-bzero(void *buf, size_t len)
-{
-	uint8_t *p;
-
-	p = buf;
-	while(len-- > 0)
-		*p++ = 0;
 }

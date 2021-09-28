@@ -189,11 +189,11 @@ SYSCTL_INT(_kern, OID_AUTO, crypto_workers_num, CTLFLAG_RDTUN,
 static	uma_zone_t cryptop_zone;
 
 int	crypto_devallowsoft = 0;
-SYSCTL_INT(_kern_crypto, OID_AUTO, allow_soft, CTLFLAG_RW,
+SYSCTL_INT(_kern_crypto, OID_AUTO, allow_soft, CTLFLAG_RWTUN,
 	   &crypto_devallowsoft, 0,
 	   "Enable use of software crypto by /dev/crypto");
 #ifdef COMPAT_FREEBSD12
-SYSCTL_INT(_kern, OID_AUTO, cryptodevallowsoft, CTLFLAG_RW,
+SYSCTL_INT(_kern, OID_AUTO, cryptodevallowsoft, CTLFLAG_RWTUN,
 	   &crypto_devallowsoft, 0,
 	   "Enable/disable use of software crypto by /dev/crypto");
 #endif
@@ -489,7 +489,7 @@ crypto_get_params(crypto_session_t crypto_session)
 	return (&crypto_session->csp);
 }
 
-struct auth_hash *
+const struct auth_hash *
 crypto_auth_hash(const struct crypto_session_params *csp)
 {
 
@@ -551,7 +551,7 @@ crypto_auth_hash(const struct crypto_session_params *csp)
 	}
 }
 
-struct enc_xform *
+const struct enc_xform *
 crypto_cipher(const struct crypto_session_params *csp)
 {
 
@@ -719,7 +719,7 @@ alg_is_aead(int alg)
 static bool
 check_csp(const struct crypto_session_params *csp)
 {
-	struct auth_hash *axf;
+	const struct auth_hash *axf;
 
 	/* Mode-independent checks. */
 	if ((csp->csp_flags & ~(SUPPORTED_SES)) != 0)

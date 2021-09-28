@@ -55,6 +55,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/sysctl.h>
 #include <sys/lock.h>
 #include <sys/malloc.h>
+#include <sys/msan.h>
 #include <sys/mutex.h>
 #include <sys/priv.h>
 #include <sys/proc.h>
@@ -492,7 +493,8 @@ do_fork(struct thread *td, struct fork_req *fr, struct proc *p2, struct thread *
 	p2->p_flag2 = p1->p_flag2 & (P2_ASLR_DISABLE | P2_ASLR_ENABLE |
 	    P2_ASLR_IGNSTART | P2_NOTRACE | P2_NOTRACE_EXEC |
 	    P2_PROTMAX_ENABLE | P2_PROTMAX_DISABLE | P2_TRAPCAP |
-	    P2_STKGAP_DISABLE | P2_STKGAP_DISABLE_EXEC);
+	    P2_STKGAP_DISABLE | P2_STKGAP_DISABLE_EXEC | P2_NO_NEW_PRIVS |
+	    P2_WXORX_DISABLE | P2_WXORX_ENABLE_EXEC);
 	p2->p_swtick = ticks;
 	if (p1->p_flag & P_PROFIL)
 		startprofclock(p2);
@@ -744,7 +746,7 @@ do_fork(struct thread *td, struct fork_req *fr, struct proc *p2, struct thread *
 	if ((p1->p_ptevents & PTRACE_FORK) != 0) {
 		sx_xlock(&proctree_lock);
 		PROC_LOCK(p2);
-		
+
 		/*
 		 * p1->p_ptevents & p1->p_pptr are protected by both
 		 * process and proctree locks for modifications,
@@ -958,6 +960,7 @@ fork1(struct thread *td, struct fork_req *fr)
 		}
 		proc_linkup(newproc, td2);
 	} else {
+		kmsan_thread_alloc(td2);
 		if (td2->td_kstack == 0 || td2->td_kstack_pages != pages) {
 			if (td2->td_kstack != 0)
 				vm_thread_dispose(td2);
@@ -1054,6 +1057,8 @@ fork_exit(void (*callout)(void *, struct trapframe *), void *arg,
 	struct proc *p;
 	struct thread *td;
 	struct thread *dtd;
+
+	kmsan_mark(frame, sizeof(*frame), KMSAN_STATE_INITED);
 
 	td = curthread;
 	p = td->td_proc;

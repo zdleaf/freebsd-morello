@@ -183,6 +183,7 @@ struct kaudit_record;
 struct kcov_info;
 struct kdtrace_proc;
 struct kdtrace_thread;
+struct kmsan_td;
 struct kq_timer_cb_data;
 struct mqueue_notifier;
 struct p_sched;
@@ -250,6 +251,7 @@ struct thread {
 #define	td_siglist	td_sigqueue.sq_signals
 	u_char		td_lend_user_pri; /* (t) Lend user pri. */
 	u_char		td_allocdomain;	/* (b) NUMA domain backing this struct thread. */
+	struct kmsan_td	*td_kmsan;	/* (k) KMSAN state */
 
 /* Cleared during fork1() */
 #define	td_startzero td_flags
@@ -449,7 +451,7 @@ do {									\
 #define	TDF_ALLPROCSUSP	0x00000200 /* suspended by SINGLE_ALLPROC */
 #define	TDF_BOUNDARY	0x00000400 /* Thread suspended at user boundary */
 #define	TDF_ASTPENDING	0x00000800 /* Thread has some asynchronous events. */
-#define	TDF_UNUSED12	0x00001000 /* --available-- */
+#define	TDF_KQTICKLED	0x00001000 /* AST drain kqueue taskqueue */
 #define	TDF_SBDRY	0x00002000 /* Stop only on usermode boundary. */
 #define	TDF_UPIBLOCKED	0x00004000 /* Thread blocked on user PI mutex. */
 #define	TDF_NEEDSUSPCHK	0x00008000 /* Thread may need to suspend. */
@@ -835,6 +837,9 @@ struct proc {
 						   after exec */
 #define	P2_ITSTOPPED		0x00002000
 #define	P2_PTRACEREQ		0x00004000	/* Active ptrace req */
+#define	P2_NO_NEW_PRIVS		0x00008000	/* Ignore setuid */
+#define	P2_WXORX_DISABLE	0x00010000	/* WX mappings enabled */
+#define	P2_WXORX_ENABLE_EXEC	0x00020000	/* WXORX enabled after exec */
 
 /* Flags protected by proctree_lock, kept in p_treeflags. */
 #define	P_TREE_ORPHANED		0x00000001	/* Reparented, on orphan list */
