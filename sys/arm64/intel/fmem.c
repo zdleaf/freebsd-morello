@@ -62,6 +62,7 @@ static struct cdev *fmemdev;
 struct fmem_request {
 	uint32_t addr;
 	uint32_t data;
+	uint32_t access_width;
 };
 
 #define	FMEM_READ	_IOWR('X', 1, struct fmem_request)
@@ -93,11 +94,30 @@ fmemioctl(struct cdev *dev, u_long cmd, caddr_t data, int flags,
 
 	switch (cmd) {
 	case FMEM_READ:
-		req->data = *(volatile uint32_t *)(vaddr + offset);
+		switch (req->access_width) {
+		case 1:
+			req->data = *(volatile uint8_t *)(vaddr + offset);
+			break;
+		case 2:
+			req->data = *(volatile uint16_t *)(vaddr + offset);
+			break;
+		case 4:
+			req->data = *(volatile uint32_t *)(vaddr + offset);
+			break;
+		}
 		break;
 	case FMEM_WRITE:
-		*(volatile uint32_t *)(vaddr + offset) = req->data;
-		break;
+		switch (req->access_width) {
+		case 1:
+			*(volatile uint8_t *)(vaddr + offset) = req->data;
+			break;
+		case 2:
+			*(volatile uint16_t *)(vaddr + offset) = req->data;
+			break;
+		case 4:
+			*(volatile uint32_t *)(vaddr + offset) = req->data;
+			break;
+		}
 	}
 
 	pmap_kremove(vaddr);
