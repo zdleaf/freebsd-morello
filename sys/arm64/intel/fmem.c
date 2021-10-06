@@ -58,10 +58,9 @@ __FBSDID("$FreeBSD$");
 #include <vm/vm_extern.h>
 
 static struct cdev *fmemdev;
-static uint64_t vaddr;
 
 struct fmem_request {
-	uint32_t offset;
+	uint32_t addr;
 	uint32_t data;
 };
 
@@ -81,13 +80,16 @@ fmemioctl(struct cdev *dev, u_long cmd, caddr_t data, int flags,
     struct thread *td)
 {
 	struct fmem_request *req;
+	uint64_t vaddr;
 	uint32_t offset;
+	uint32_t base;
 
 	req = (struct fmem_request *)data;
+	base = trunc_page(req->addr);
+	offset = req->addr & (PAGE_SIZE - 1);
 
-	offset = req->offset;
-	if (offset > 0xff)
-		return (ERANGE);
+	vaddr = kva_alloc(PAGE_SIZE);
+	pmap_kenter(vaddr, PAGE_SIZE, base, VM_MEMATTR_DEVICE);
 
 	switch (cmd) {
 	case FMEM_READ:
@@ -97,6 +99,9 @@ fmemioctl(struct cdev *dev, u_long cmd, caddr_t data, int flags,
 		*(volatile uint32_t *)(vaddr + offset) = req->data;
 		break;
 	}
+
+	pmap_kremove(vaddr);
+	kva_free(vaddr, PAGE_SIZE);
 
 	return (0);
 }
@@ -112,28 +117,14 @@ static struct cdevsw fmem_cdevsw = {
 	.d_name =	"fmem",
 };
 
-static void
-fmem_init(void)
-{
-	uint32_t addr;
-
-	fmemdev = make_dev(&fmem_cdevsw, 0, UID_ROOT, GID_KMEM, 0640,
-	    "fmem");
-
-	addr = 0xf9000000;
-
-	vaddr = kva_alloc(PAGE_SIZE);
-
-	pmap_kenter(vaddr, PAGE_SIZE, addr, VM_MEMATTR_DEVICE);
-}
-
 static int
 fmem_modevent(module_t mod __unused, int type, void *data __unused)
 {
 
 	switch(type) {
 	case MOD_LOAD:
-		fmem_init();
+		fmemdev = make_dev(&fmem_cdevsw, 0, UID_ROOT, GID_KMEM, 0640,
+		    "fmem");
 		break;
 	case MOD_UNLOAD:
 		destroy_dev(fmemdev);
