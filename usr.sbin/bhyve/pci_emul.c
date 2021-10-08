@@ -1709,7 +1709,7 @@ pci_lintr_route(struct pci_devinst *pi)
 #ifdef __amd64__
 		ii->ii_ioapic_irq = ioapic_pci_alloc_irq(pi);
 #else
-		ii->ii_ioapic_irq = 32;
+		ii->ii_ioapic_irq = 33;
 #endif
 	}
 	assert(ii->ii_ioapic_irq > 0);
