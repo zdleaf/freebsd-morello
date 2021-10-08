@@ -57,10 +57,14 @@ __FBSDID("$FreeBSD$");
 #include <vm/vm_phys.h>
 #include <vm/vm_extern.h>
 
-static struct cdev *fmemdev;
+#define	FMEM_BASE	0xf9000000
+#define	FMEM_NUNITS	8
+
+static struct cdev *fmemdev[FMEM_NUNITS];
+static uint64_t vaddr[FMEM_NUNITS];
 
 struct fmem_request {
-	uint32_t addr;
+	uint32_t offset;
 	uint32_t data;
 	uint32_t access_width;
 };
@@ -81,47 +85,43 @@ fmemioctl(struct cdev *dev, u_long cmd, caddr_t data, int flags,
     struct thread *td)
 {
 	struct fmem_request *req;
-	uint64_t vaddr;
-	uint32_t offset;
-	uint32_t base;
+	uint64_t addr;
+	int unit;
 
 	req = (struct fmem_request *)data;
-	base = trunc_page(req->addr);
-	offset = req->addr & (PAGE_SIZE - 1);
+	if ((req->offset + req->access_width) > PAGE_SIZE)
+		return (ERANGE);
 
-	vaddr = kva_alloc(PAGE_SIZE);
-	pmap_kenter(vaddr, PAGE_SIZE, base, VM_MEMATTR_DEVICE);
+	unit = dev2unit(dev);
+	addr = vaddr[unit] + req->offset;
 
 	switch (cmd) {
 	case FMEM_READ:
 		switch (req->access_width) {
 		case 1:
-			req->data = *(volatile uint8_t *)(vaddr + offset);
+			req->data = *(volatile uint8_t *)addr;
 			break;
 		case 2:
-			req->data = *(volatile uint16_t *)(vaddr + offset);
+			req->data = *(volatile uint16_t *)addr;
 			break;
 		case 4:
-			req->data = *(volatile uint32_t *)(vaddr + offset);
+			req->data = *(volatile uint32_t *)addr;
 			break;
 		}
 		break;
 	case FMEM_WRITE:
 		switch (req->access_width) {
 		case 1:
-			*(volatile uint8_t *)(vaddr + offset) = req->data;
+			*(volatile uint8_t *)addr = req->data;
 			break;
 		case 2:
-			*(volatile uint16_t *)(vaddr + offset) = req->data;
+			*(volatile uint16_t *)addr = req->data;
 			break;
 		case 4:
-			*(volatile uint32_t *)(vaddr + offset) = req->data;
+			*(volatile uint32_t *)addr = req->data;
 			break;
 		}
 	}
-
-	pmap_kremove(vaddr);
-	kva_free(vaddr, PAGE_SIZE);
 
 	return (0);
 }
@@ -137,17 +137,43 @@ static struct cdevsw fmem_cdevsw = {
 	.d_name =	"fmem",
 };
 
+static void
+fmem_init(void)
+{
+	uint32_t base;
+	int i;
+
+	for (i = 0; i < FMEM_NUNITS; i++) {
+		fmemdev[i] = make_dev(&fmem_cdevsw, i, UID_ROOT,
+		    GID_KMEM, 0640, "fmem%d", i);
+		vaddr[i] = kva_alloc(PAGE_SIZE);
+		base = FMEM_BASE + PAGE_SIZE * i;
+		pmap_kenter(vaddr[i], PAGE_SIZE, base, VM_MEMATTR_DEVICE);
+	}
+}
+
+static void
+fmem_uninit(void)
+{
+	int i;
+
+	for (i = 0; i < FMEM_NUNITS; i++) {
+		pmap_kremove(vaddr[i]);
+		kva_free(vaddr[i], PAGE_SIZE);
+		destroy_dev(fmemdev[i]);
+	}
+}
+
 static int
 fmem_modevent(module_t mod __unused, int type, void *data __unused)
 {
 
 	switch(type) {
 	case MOD_LOAD:
-		fmemdev = make_dev(&fmem_cdevsw, 0, UID_ROOT, GID_KMEM, 0640,
-		    "fmem");
+		fmem_init();
 		break;
 	case MOD_UNLOAD:
-		destroy_dev(fmemdev);
+		fmem_uninit();
 		break;
 	case MOD_SHUTDOWN:
 		break;
