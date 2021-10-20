@@ -214,6 +214,7 @@ rip6_input(struct mbuf **mp, int *offp, int proto)
 				if (sbappendaddr(&last->inp_socket->so_rcv,
 						(struct sockaddr *)&fromsa,
 						 n, opts) == 0) {
+					soroverflow(last->inp_socket);
 					m_freem(n);
 					if (opts)
 						m_freem(opts);
@@ -325,6 +326,7 @@ skip_2:
 		m_adj(m, *offp);
 		if (sbappendaddr(&last->inp_socket->so_rcv,
 		    (struct sockaddr *)&fromsa, m, opts) == 0) {
+			soroverflow(last->inp_socket);
 			m_freem(m);
 			if (opts)
 				m_freem(opts);
@@ -417,9 +419,13 @@ rip6_output(struct mbuf *m, struct socket *so, ...)
 	INP_WLOCK(inp);
 
 	if (control != NULL) {
-		if ((error = ip6_setpktopts(control, &opt,
+		NET_EPOCH_ENTER(et);
+		error = ip6_setpktopts(control, &opt,
 		    inp->in6p_outputopts, so->so_cred,
-		    so->so_proto->pr_protocol)) != 0) {
+		    so->so_proto->pr_protocol);
+		NET_EPOCH_EXIT(et);
+
+		if (error != 0) {
 			goto bad;
 		}
 		optp = &opt;

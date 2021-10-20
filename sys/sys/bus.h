@@ -90,7 +90,6 @@ struct u_device {
 #define	DF_QUIET	0x10		/* don't print verbose attach message */
 #define	DF_DONENOMATCH	0x20		/* don't execute DEVICE_NOMATCH again */
 #define	DF_EXTERNALSOFTC 0x40		/* softc not allocated by us */
-#define	DF_REBID	0x80		/* Can rebid after attach */
 #define	DF_SUSPENDED	0x100		/* Device is suspended. */
 #define	DF_QUIET_CHILDREN 0x200		/* Default to quiet for all my children */
 #define	DF_ATTACHED_ONCE 0x400		/* Has been attached at least once */
@@ -426,6 +425,8 @@ int	bus_generic_translate_resource(device_t dev, int type, rman_res_t start,
 int	bus_generic_attach(device_t dev);
 int	bus_generic_bind_intr(device_t dev, device_t child,
 			      struct resource *irq, int cpu);
+int	bus_generic_child_location(device_t dev, device_t child, struct sbuf *sb);
+int	bus_generic_child_pnpinfo(device_t dev, device_t child, struct sbuf *sb);
 int	bus_generic_child_present(device_t dev, device_t child);
 int	bus_generic_config_intr(device_t, int, enum intr_trigger,
 				enum intr_polarity);
@@ -551,8 +552,8 @@ rman_res_t	bus_get_resource_start(device_t dev, int type, int rid);
 rman_res_t	bus_get_resource_count(device_t dev, int type, int rid);
 void	bus_delete_resource(device_t dev, int type, int rid);
 int	bus_child_present(device_t child);
-int	bus_child_pnpinfo_str(device_t child, char *buf, size_t buflen);
-int	bus_child_location_str(device_t child, char *buf, size_t buflen);
+int	bus_child_pnpinfo(device_t child, struct sbuf *sb);
+int	bus_child_location(device_t child, struct sbuf *sb);
 void	bus_enumerate_hinted_children(device_t bus);
 int	bus_delayed_attach_children(device_t bus);
 
@@ -629,6 +630,8 @@ int	device_set_unit(device_t dev, int unit);	/* XXX DONT USE XXX */
 int	device_shutdown(device_t dev);
 void	device_unbusy(device_t dev);
 void	device_verbose(device_t dev);
+ssize_t	device_get_property(device_t dev, const char *prop, void *val, size_t sz);
+bool device_has_property(device_t dev, const char *prop);
 
 /*
  * Access functions for devclass.

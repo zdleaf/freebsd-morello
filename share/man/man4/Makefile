@@ -47,7 +47,6 @@ MAN=	aac.4 \
 	${_amdtemp.4} \
 	${_bxe.4} \
 	amr.4 \
-	an.4 \
 	${_aout.4} \
 	${_apic.4} \
 	arcmsr.4 \
@@ -111,7 +110,6 @@ MAN=	aac.4 \
 	chromebook_platform.4 \
 	${_chvgpio.4} \
 	ciss.4 \
-	cloudabi.4 \
 	${_coretemp.4} \
 	cp2112.4 \
 	${_cpuctl.4} \
@@ -225,6 +223,7 @@ MAN=	aac.4 \
 	iicmux.4 \
 	iicsmb.4 \
 	iir.4 \
+	${_igc.4} \
 	${_imcsmb.4} \
 	inet.4 \
 	inet6.4 \
@@ -298,6 +297,7 @@ MAN=	aac.4 \
 	mem.4 \
 	meteor.4 \
 	mfi.4 \
+	${_mgb.4} \
 	miibus.4 \
 	mld.4 \
 	mlx.4 \
@@ -353,7 +353,6 @@ MAN=	aac.4 \
 	ng_frame_relay.4 \
 	ng_gif.4 \
 	ng_gif_demux.4 \
-	ng_h4.4 \
 	ng_hci.4 \
 	ng_hole.4 \
 	ng_hub.4 \
@@ -618,7 +617,6 @@ MLINKS+=altera_sdcard.4 altera_sdcardc.4
 MLINKS+=altq.4 ALTQ.4
 MLINKS+=ath.4 if_ath.4
 MLINKS+=ath_pci.4 if_ath_pci.4
-MLINKS+=an.4 if_an.4
 MLINKS+=aue.4 if_aue.4
 MLINKS+=axe.4 if_axe.4
 MLINKS+=bce.4 if_bce.4
@@ -632,8 +630,6 @@ MLINKS+=${_bxe.4} ${_if_bxe.4}
 MLINKS+=cas.4 if_cas.4
 MLINKS+=cdce.4 if_cdce.4
 MLINKS+=cfi.4 cfid.4
-MLINKS+=cloudabi.4 cloudabi32.4 \
-	cloudabi.4 cloudabi64.4
 MLINKS+=crypto.4 cryptodev.4
 MLINKS+=cue.4 if_cue.4
 MLINKS+=cxgb.4 if_cxgb.4
@@ -816,11 +812,11 @@ _if_nfe.4=	if_nfe.4
 _if_urtw.4=	if_urtw.4
 _if_vmx.4=	if_vmx.4
 _if_wpi.4=	if_wpi.4
+_igc.4=		igc.4
 _imcsmb.4=	imcsmb.4
-_ipmi.4=	ipmi.4
 _io.4=		io.4
 _itwd.4=	itwd.4
-_linux.4=	linux.4
+_mgb.4=		mgb.4
 _nda.4=		nda.4
 _nfe.4=		nfe.4
 _nfsmb.4=	nfsmb.4
@@ -844,6 +840,7 @@ _tpm.4=		tpm.4
 _urtw.4=	urtw.4
 _viawd.4=	viawd.4
 _vmci.4=	vmci.4
+_vmd.4=		vmd.4
 _vmx.4=		vmx.4
 _wbwd.4=	wbwd.4
 _wpi.4=		wpi.4
@@ -862,7 +859,6 @@ _qlnxe.4=	qlnxe.4
 _sfxge.4=	sfxge.4
 _smartpqi.4=	smartpqi.4
 _sume.4=	sume.4
-_vmd.4=		vmd.4
 
 MLINKS+=qlxge.4 if_qlxge.4
 MLINKS+=qlxgb.4 if_qlxgb.4
@@ -888,6 +884,8 @@ _nvme.4=	nvme.4
 
 .if ${MACHINE_CPUARCH} == "amd64" || ${MACHINE_CPUARCH} == "i386" || \
 	 ${MACHINE_CPUARCH} == "aarch64"
+_ipmi.4=	ipmi.4
+_linux.4=	linux.4
 _ossl.4=	ossl.4
 .endif
 
@@ -897,9 +895,7 @@ _cgem.4=	cgem.4
 MLINKS+=cgem.4 if_cgem.4
 .endif
 
-.if empty(MAN_ARCH)
-__arches=	${MACHINE} ${MACHINE_ARCH} ${MACHINE_CPUARCH}
-.elif ${MAN_ARCH} == "all"
+.if empty(MAN_ARCH) || ${MAN_ARCH} == "all"
 __arches=	${:!/bin/sh -c "/bin/ls -d ${.CURDIR}/man4.*"!:E}
 .else
 __arches=	${MAN_ARCH}

@@ -894,6 +894,7 @@ ng_btsocket_rfcomm_listen(struct socket *so, int backlog, struct thread *td)
 		 * from socreate()
 		 */
 		if (l2so == NULL) {
+			solisten_proto_abort(so);
 			error = socreate_error;
 			goto out;
 		}
@@ -907,8 +908,10 @@ ng_btsocket_rfcomm_listen(struct socket *so, int backlog, struct thread *td)
 		 */
 		error = ng_btsocket_rfcomm_session_create(&s, l2so,
 					NG_HCI_BDADDR_ANY, NULL, td);
-		if (error != 0)
+		if (error != 0) {
+			solisten_proto_abort(so);
 			goto out;
+		}
 		l2so = NULL;
 	}
 	SOCK_LOCK(so);
@@ -3398,8 +3401,7 @@ ng_btsocket_rfcomm_pcb_listener(bdaddr_p src, int channel)
 	mtx_lock(&ng_btsocket_rfcomm_sockets_mtx);
 
 	LIST_FOREACH(pcb, &ng_btsocket_rfcomm_sockets, next) {
-		if (pcb->channel != channel ||
-		    !(pcb->so->so_options & SO_ACCEPTCONN))
+		if (pcb->channel != channel || !SOLISTENING(pcb->so))
 			continue;
 
 		if (bcmp(&pcb->src, src, sizeof(*src)) == 0)

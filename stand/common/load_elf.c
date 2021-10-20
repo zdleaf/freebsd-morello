@@ -207,6 +207,18 @@ static int elf_section_header_convert(const Elf_Ehdr *ehdr, Elf_Shdr *shdr)
 #undef CONVERT_SWITCH
 #undef CONVERT_FIELD
 
+
+#ifdef __amd64__
+static bool
+is_kernphys_relocatable(elf_file_t ef)
+{
+	Elf_Sym sym;
+
+	return (__elfN(lookup_symbol)(ef, "kernphys", &sym, STT_OBJECT) == 0 &&
+	    sym.st_size == 8);
+}
+#endif
+
 static int
 __elfN(load_elf_header)(char *filename, elf_file_t ef)
 {
@@ -434,6 +446,9 @@ __elfN(loadfile_raw)(char *filename, uint64_t dest,
 	/* Load OK, return module pointer */
 	*result = (struct preloaded_file *)fp;
 	err = 0;
+#ifdef __amd64__
+	fp->f_kernphys_relocatable = multiboot || is_kernphys_relocatable(&ef);
+#endif
 	goto out;
 
 ioerr:
@@ -893,7 +908,7 @@ nosyms:
 	p_start = sym.st_value + ef->off;
 	if (__elfN(lookup_symbol)(ef, "__stop_set_modmetadata_set", &sym,
 	    STT_NOTYPE) != 0)
-		return ENOENT;
+		return 0;
 	p_end = sym.st_value + ef->off;
 
 	if (__elfN(parse_modmetadata)(fp, ef, p_start, p_end) == 0)
@@ -1237,6 +1252,11 @@ __elfN(lookup_symbol)(elf_file_t ef, const char* name, Elf_Sym *symp,
 	Elf_Sym sym;
 	char *strp;
 	unsigned long hash;
+
+	if (ef->nbuckets == 0) {
+		printf(__elfN(bad_symtable));
+		return ENOENT;
+	}
 
 	hash = elf_hash(name);
 	COPYOUT(&ef->buckets[hash % ef->nbuckets], &symnum, sizeof(symnum));

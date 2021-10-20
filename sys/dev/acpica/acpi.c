@@ -52,6 +52,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/sched.h>
 #include <sys/smp.h>
 #include <sys/timetc.h>
+#include <sys/uuid.h>
 
 #if defined(__i386__) || defined(__amd64__)
 #include <machine/clock.h>
@@ -143,14 +144,19 @@ static void	acpi_delete_resource(device_t bus, device_t child, int type,
 		    int rid);
 static uint32_t	acpi_isa_get_logicalid(device_t dev);
 static int	acpi_isa_get_compatid(device_t dev, uint32_t *cids, int count);
+static ssize_t acpi_bus_get_prop(device_t bus, device_t child, const char *propname,
+		    void *propvalue, size_t size);
 static int	acpi_device_id_probe(device_t bus, device_t dev, char **ids, char **match);
 static ACPI_STATUS acpi_device_eval_obj(device_t bus, device_t dev,
 		    ACPI_STRING pathname, ACPI_OBJECT_LIST *parameters,
 		    ACPI_BUFFER *ret);
+static ACPI_STATUS acpi_device_get_prop(device_t bus, device_t dev,
+		    ACPI_STRING propname, const ACPI_OBJECT **value);
 static ACPI_STATUS acpi_device_scan_cb(ACPI_HANDLE h, UINT32 level,
 		    void *context, void **retval);
 static ACPI_STATUS acpi_device_scan_children(device_t bus, device_t dev,
 		    int max_depth, acpi_scan_cb_t user_fn, void *arg);
+static ACPI_STATUS acpi_find_dsd(device_t bus, device_t dev);
 static int	acpi_isa_pnp_probe(device_t bus, device_t child,
 		    struct isa_pnp_id *ids);
 static void	acpi_platform_osc(device_t dev);
@@ -177,10 +183,10 @@ static int	acpi_supported_sleep_state_sysctl(SYSCTL_HANDLER_ARGS);
 static int	acpi_sleep_state_sysctl(SYSCTL_HANDLER_ARGS);
 static int	acpi_debug_objects_sysctl(SYSCTL_HANDLER_ARGS);
 static int	acpi_pm_func(u_long cmd, void *arg, ...);
-static int	acpi_child_location_str_method(device_t acdev, device_t child,
-					       char *buf, size_t buflen);
-static int	acpi_child_pnpinfo_str_method(device_t acdev, device_t child,
-					      char *buf, size_t buflen);
+static int	acpi_child_location_method(device_t acdev, device_t child,
+		    struct sbuf *sb);
+static int	acpi_child_pnpinfo_method(device_t acdev, device_t child,
+		    struct sbuf *sb);
 static void	acpi_enable_pcie(void);
 static void	acpi_hint_device_unit(device_t acdev, device_t child,
 		    const char *name, int *unitp);
@@ -210,8 +216,8 @@ static device_method_t acpi_methods[] = {
     DEVMETHOD(bus_adjust_resource,	acpi_adjust_resource),
     DEVMETHOD(bus_release_resource,	acpi_release_resource),
     DEVMETHOD(bus_delete_resource,	acpi_delete_resource),
-    DEVMETHOD(bus_child_pnpinfo_str,	acpi_child_pnpinfo_str_method),
-    DEVMETHOD(bus_child_location_str,	acpi_child_location_str_method),
+    DEVMETHOD(bus_child_pnpinfo,	acpi_child_pnpinfo_method),
+    DEVMETHOD(bus_child_location,	acpi_child_location_method),
     DEVMETHOD(bus_activate_resource,	bus_generic_activate_resource),
     DEVMETHOD(bus_deactivate_resource,	bus_generic_deactivate_resource),
     DEVMETHOD(bus_setup_intr,		bus_generic_setup_intr),
@@ -219,10 +225,12 @@ static device_method_t acpi_methods[] = {
     DEVMETHOD(bus_hint_device_unit,	acpi_hint_device_unit),
     DEVMETHOD(bus_get_cpus,		acpi_get_cpus),
     DEVMETHOD(bus_get_domain,		acpi_get_domain),
+    DEVMETHOD(bus_get_property,		acpi_bus_get_prop),
 
     /* ACPI bus */
     DEVMETHOD(acpi_id_probe,		acpi_device_id_probe),
     DEVMETHOD(acpi_evaluate_object,	acpi_device_eval_obj),
+    DEVMETHOD(acpi_get_property,	acpi_device_get_prop),
     DEVMETHOD(acpi_pwr_for_sleep,	acpi_device_pwr_for_sleep),
     DEVMETHOD(acpi_scan_children,	acpi_device_scan_children),
 
@@ -295,6 +303,15 @@ TUNABLE_INT("debug.acpi.quirks", &acpi_quirks);
 int acpi_susp_bounce;
 SYSCTL_INT(_debug_acpi, OID_AUTO, suspend_bounce, CTLFLAG_RW,
     &acpi_susp_bounce, 0, "Don't actually suspend, just test devices.");
+
+/*
+ * ACPI standard UUID for Device Specific Data Package
+ * "Device Properties UUID for _DSD" Rev. 2.0
+ */
+static const struct uuid acpi_dsd_uuid = {
+	0xdaffd814, 0x6eba, 0x4d8c, 0x8a, 0x91,
+	{ 0xbc, 0x9b, 0xbf, 0x4a, 0xa3, 0x01 }
+};
 
 /*
  * ACPI can only be loaded as a module by the loader; activating it after
@@ -865,37 +882,32 @@ acpi_driver_added(device_t dev, driver_t *driver)
 
 /* Location hint for devctl(8) */
 static int
-acpi_child_location_str_method(device_t cbdev, device_t child, char *buf,
-    size_t buflen)
+acpi_child_location_method(device_t cbdev, device_t child, struct sbuf *sb)
 {
     struct acpi_device *dinfo = device_get_ivars(child);
-    char buf2[32];
     int pxm;
 
     if (dinfo->ad_handle) {
-        snprintf(buf, buflen, "handle=%s", acpi_name(dinfo->ad_handle));
+        sbuf_printf(sb, "handle=%s", acpi_name(dinfo->ad_handle));
         if (ACPI_SUCCESS(acpi_GetInteger(dinfo->ad_handle, "_PXM", &pxm))) {
-                snprintf(buf2, 32, " _PXM=%d", pxm);
-                strlcat(buf, buf2, buflen);
-        }
-    } else {
-        snprintf(buf, buflen, "");
+            sbuf_printf(sb, " _PXM=%d", pxm);
+	}
     }
     return (0);
 }
 
 /* PnP information for devctl(8) */
 int
-acpi_pnpinfo_str(ACPI_HANDLE handle, char *buf, size_t buflen)
+acpi_pnpinfo(ACPI_HANDLE handle, struct sbuf *sb)
 {
     ACPI_DEVICE_INFO *adinfo;
 
     if (ACPI_FAILURE(AcpiGetObjectInfo(handle, &adinfo))) {
-	snprintf(buf, buflen, "unknown");
+	sbuf_printf(sb, "unknown");
 	return (0);
     }
 
-    snprintf(buf, buflen, "_HID=%s _UID=%lu _CID=%s",
+    sbuf_printf(sb, "_HID=%s _UID=%lu _CID=%s",
 	(adinfo->Valid & ACPI_VALID_HID) ?
 	adinfo->HardwareId.String : "none",
 	(adinfo->Valid & ACPI_VALID_UID) ?
@@ -909,12 +921,11 @@ acpi_pnpinfo_str(ACPI_HANDLE handle, char *buf, size_t buflen)
 }
 
 static int
-acpi_child_pnpinfo_str_method(device_t cbdev, device_t child, char *buf,
-    size_t buflen)
+acpi_child_pnpinfo_method(device_t cbdev, device_t child, struct sbuf *sb)
 {
     struct acpi_device *dinfo = device_get_ivars(child);
 
-    return (acpi_pnpinfo_str(dinfo->ad_handle, buf, buflen));
+    return (acpi_pnpinfo(dinfo->ad_handle, sb));
 }
 
 /*
@@ -1733,6 +1744,116 @@ acpi_device_eval_obj(device_t bus, device_t dev, ACPI_STRING pathname,
     return (AcpiEvaluateObject(h, pathname, parameters, ret));
 }
 
+static ACPI_STATUS
+acpi_device_get_prop(device_t bus, device_t dev, ACPI_STRING propname,
+    const ACPI_OBJECT **value)
+{
+	const ACPI_OBJECT *pkg, *name, *val;
+	struct acpi_device *ad;
+	ACPI_STATUS status;
+	int i;
+
+	ad = device_get_ivars(dev);
+
+	if (ad == NULL || propname == NULL)
+		return (AE_BAD_PARAMETER);
+	if (ad->dsd_pkg == NULL) {
+		if (ad->dsd.Pointer == NULL) {
+			status = acpi_find_dsd(bus, dev);
+			if (ACPI_FAILURE(status))
+				return (status);
+		} else {
+			return (AE_NOT_FOUND);
+		}
+	}
+
+	for (i = 0; i < ad->dsd_pkg->Package.Count; i ++) {
+		pkg = &ad->dsd_pkg->Package.Elements[i];
+		if (pkg->Type != ACPI_TYPE_PACKAGE || pkg->Package.Count != 2)
+			continue;
+
+		name = &pkg->Package.Elements[0];
+		val = &pkg->Package.Elements[1];
+		if (name->Type != ACPI_TYPE_STRING)
+			continue;
+		if (strncmp(propname, name->String.Pointer, name->String.Length) == 0) {
+			if (value != NULL)
+				*value = val;
+
+			return (AE_OK);
+		}
+	}
+
+	return (AE_NOT_FOUND);
+}
+
+static ACPI_STATUS
+acpi_find_dsd(device_t bus, device_t dev)
+{
+	const ACPI_OBJECT *dsd, *guid, *pkg;
+	struct acpi_device *ad;
+	ACPI_STATUS status;
+
+	ad = device_get_ivars(dev);
+	ad->dsd.Length = ACPI_ALLOCATE_BUFFER;
+	ad->dsd.Pointer = NULL;
+	ad->dsd_pkg = NULL;
+
+	status = ACPI_EVALUATE_OBJECT(bus, dev, "_DSD", NULL, &ad->dsd);
+	if (ACPI_FAILURE(status))
+		return (status);
+
+	dsd = ad->dsd.Pointer;
+	guid = &dsd->Package.Elements[0];
+	pkg = &dsd->Package.Elements[1];
+
+	if (guid->Type != ACPI_TYPE_BUFFER || pkg->Type != ACPI_TYPE_PACKAGE ||
+		guid->Buffer.Length != sizeof(acpi_dsd_uuid))
+		return (AE_NOT_FOUND);
+	if (memcmp(guid->Buffer.Pointer, &acpi_dsd_uuid,
+		sizeof(acpi_dsd_uuid)) == 0) {
+
+		ad->dsd_pkg = pkg;
+		return (AE_OK);
+	}
+
+	return (AE_NOT_FOUND);
+}
+
+static ssize_t
+acpi_bus_get_prop(device_t bus, device_t child, const char *propname,
+    void *propvalue, size_t size)
+{
+	ACPI_STATUS status;
+	const ACPI_OBJECT *obj;
+
+	status = acpi_device_get_prop(bus, child, __DECONST(char *, propname),
+		&obj);
+	if (ACPI_FAILURE(status))
+		return (-1);
+
+	switch (obj->Type) {
+	case ACPI_TYPE_INTEGER:
+		if (propvalue != NULL && size >= sizeof(uint64_t))
+			*((uint64_t *) propvalue) = obj->Integer.Value;
+		return (sizeof(uint64_t));
+
+	case ACPI_TYPE_STRING:
+		if (propvalue != NULL && size > 0)
+			memcpy(propvalue, obj->String.Pointer,
+			    MIN(size, obj->String.Length));
+		return (obj->String.Length);
+
+	case ACPI_TYPE_BUFFER:
+		if (propvalue != NULL && size > 0)
+			memcpy(propvalue, obj->Buffer.Pointer,
+			    MIN(size, obj->Buffer.Length));
+		return (obj->Buffer.Length);
+	}
+
+	return (-1);
+}
+
 int
 acpi_device_pwr_for_sleep(device_t bus, device_t dev, int *dstate)
 {
@@ -2403,6 +2524,15 @@ acpi_GetHandleInScope(ACPI_HANDLE parent, char *path, ACPI_HANDLE *result)
 	    return (AE_NOT_FOUND);
 	parent = r;
     }
+}
+
+ACPI_STATUS
+acpi_GetProperty(device_t dev, ACPI_STRING propname,
+    const ACPI_OBJECT **value)
+{
+	device_t bus = device_get_parent(dev);
+
+	return (ACPI_GET_PROPERTY(bus, dev, propname, value));
 }
 
 /*

@@ -73,8 +73,6 @@ __FBSDID("$FreeBSD$");
 
 int (*dtrace_invop_jump_addr)(struct trapframe *);
 
-extern register_t fsu_intr_fault;
-
 /* Called from exception.S */
 void do_trap_supervisor(struct trapframe *);
 void do_trap_user(struct trapframe *);
@@ -105,6 +103,7 @@ cpu_fetch_syscall_args(struct thread *td)
 	dst_ap = &sa->args[0];
 
 	sa->code = td->td_frame->tf_t[0];
+	sa->original_code = sa->code;
 
 	if (__predict_false(sa->code == SYS_syscall || sa->code == SYS___syscall)) {
 		sa->code = *ap++;
@@ -201,6 +200,11 @@ page_fault_handler(struct trapframe *frame, int usermode)
 		goto fatal;
 
 	if (usermode) {
+		if (!VIRT_IS_VALID(stval)) {
+			call_trapsignal(td, SIGSEGV, SEGV_MAPERR, (void *)stval,
+			    frame->tf_scause & SCAUSE_CODE);
+			goto done;
+		}
 		map = &td->td_proc->p_vmspace->vm_map;
 	} else {
 		/*
@@ -208,6 +212,9 @@ page_fault_handler(struct trapframe *frame, int usermode)
 		 * user faults this was done already in do_trap_user().
 		 */
 		intr_enable();
+
+		if (!VIRT_IS_VALID(stval))
+			goto fatal;
 
 		if (stval >= VM_MAX_USER_ADDRESS) {
 			map = kernel_map;
@@ -228,7 +235,7 @@ page_fault_handler(struct trapframe *frame, int usermode)
 		ftype = VM_PROT_READ;
 	}
 
-	if (pmap_fault_fixup(map->pmap, va, ftype))
+	if (pmap_fault(map->pmap, va, ftype))
 		goto done;
 
 	error = vm_fault_trap(map, va, ftype, VM_FAULT_NORMAL, &sig, &ucode);

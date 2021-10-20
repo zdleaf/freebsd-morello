@@ -69,7 +69,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/malloc.h>
 #include <sys/ktr.h>
 #include <sys/lock.h>
-#include <sys/sysctl.h>
+#include <sys/msan.h>
 #include <sys/mutex.h>
 #include <sys/proc.h>
 #include <sys/random.h>
@@ -79,6 +79,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/sleepqueue.h>
 #include <sys/smp.h>
 #include <sys/smr.h>
+#include <sys/sysctl.h>
 #include <sys/taskqueue.h>
 #include <sys/vmmeter.h>
 
@@ -556,11 +557,12 @@ kasan_mark_item_valid(uma_zone_t zone, void *item)
 	sz = zone->uz_size;
 	rsz = roundup2(sz, KASAN_SHADOW_SCALE);
 	if ((zone->uz_flags & UMA_ZONE_PCPU) == 0) {
-		kasan_mark(item, sz, rsz, 0);
+		kasan_mark(item, sz, rsz, KASAN_GENERIC_REDZONE);
 	} else {
 		pcpu_item = zpcpu_base_to_offset(item);
 		for (i = 0; i <= mp_maxid; i++)
-			kasan_mark(zpcpu_get_cpu(pcpu_item, i), sz, rsz, 0);
+			kasan_mark(zpcpu_get_cpu(pcpu_item, i), sz, rsz,
+			    KASAN_GENERIC_REDZONE);
 	}
 }
 
@@ -580,7 +582,8 @@ kasan_mark_item_invalid(uma_zone_t zone, void *item)
 	} else {
 		pcpu_item = zpcpu_base_to_offset(item);
 		for (i = 0; i <= mp_maxid; i++)
-			kasan_mark(zpcpu_get_cpu(pcpu_item, i), 0, sz, 0);
+			kasan_mark(zpcpu_get_cpu(pcpu_item, i), 0, sz,
+			    KASAN_UMA_FREED);
 	}
 }
 
@@ -629,6 +632,60 @@ kasan_mark_slab_invalid(uma_keg_t keg __unused, void *mem __unused)
 {
 }
 #endif /* KASAN */
+
+#ifdef KMSAN
+static inline void
+kmsan_mark_item_uninitialized(uma_zone_t zone, void *item)
+{
+	void *pcpu_item;
+	size_t sz;
+	int i;
+
+	if ((zone->uz_flags &
+	    (UMA_ZFLAG_CACHE | UMA_ZONE_SECONDARY | UMA_ZONE_MALLOC)) != 0) {
+		/*
+		 * Cache zones should not be instrumented by default, as UMA
+		 * does not have enough information to do so correctly.
+		 * Consumers can mark items themselves if it makes sense to do
+		 * so.
+		 *
+		 * Items from secondary zones are initialized by the parent
+		 * zone and thus cannot safely be marked by UMA.
+		 *
+		 * malloc zones are handled directly by malloc(9) and friends,
+		 * since they can provide more precise origin tracking.
+		 */
+		return;
+	}
+	if (zone->uz_keg->uk_init != NULL) {
+		/*
+		 * By definition, initialized items cannot be marked.  The
+		 * best we can do is mark items from these zones after they
+		 * are freed to the keg.
+		 */
+		return;
+	}
+
+	sz = zone->uz_size;
+	if ((zone->uz_flags & UMA_ZONE_PCPU) == 0) {
+		kmsan_orig(item, sz, KMSAN_TYPE_UMA, KMSAN_RET_ADDR);
+		kmsan_mark(item, sz, KMSAN_STATE_UNINIT);
+	} else {
+		pcpu_item = zpcpu_base_to_offset(item);
+		for (i = 0; i <= mp_maxid; i++) {
+			kmsan_orig(zpcpu_get_cpu(pcpu_item, i), sz,
+			    KMSAN_TYPE_UMA, KMSAN_RET_ADDR);
+			kmsan_mark(zpcpu_get_cpu(pcpu_item, i), sz,
+			    KMSAN_STATE_INITED);
+		}
+	}
+}
+#else /* !KMSAN */
+static inline void
+kmsan_mark_item_uninitialized(uma_zone_t zone __unused, void *item __unused)
+{
+}
+#endif /* KMSAN */
 
 /*
  * Acquire the domain lock and record contention.
@@ -1828,17 +1885,15 @@ startup_alloc(uma_zone_t zone, vm_size_t bytes, int domain, uint8_t *pflag,
 {
 	vm_paddr_t pa;
 	vm_page_t m;
-	void *mem;
-	int pages;
-	int i;
+	int i, pages;
 
 	pages = howmany(bytes, PAGE_SIZE);
 	KASSERT(pages > 0, ("%s can't reserve 0 pages", __func__));
 
 	*pflag = UMA_SLAB_BOOT;
-	m = vm_page_alloc_contig_domain(NULL, 0, domain,
-	    malloc2vm_flags(wait) | VM_ALLOC_NOOBJ | VM_ALLOC_WIRED, pages, 
-	    (vm_paddr_t)0, ~(vm_paddr_t)0, 1, 0, VM_MEMATTR_DEFAULT);
+	m = vm_page_alloc_noobj_contig_domain(domain, malloc2vm_flags(wait) |
+	    VM_ALLOC_WIRED, pages, (vm_paddr_t)0, ~(vm_paddr_t)0, 1, 0,
+	    VM_MEMATTR_DEFAULT);
 	if (m == NULL)
 		return (NULL);
 
@@ -1850,13 +1905,10 @@ startup_alloc(uma_zone_t zone, vm_size_t bytes, int domain, uint8_t *pflag,
 			dump_add_page(pa);
 #endif
 	}
-	/* Allocate KVA and indirectly advance bootmem. */
-	mem = (void *)pmap_map(&bootmem, m->phys_addr,
-	    m->phys_addr + (pages * PAGE_SIZE), VM_PROT_READ | VM_PROT_WRITE);
-        if ((wait & M_ZERO) != 0)
-                bzero(mem, pages * PAGE_SIZE);
 
-        return (mem);
+	/* Allocate KVA and indirectly advance bootmem. */
+	return ((void *)pmap_map(&bootmem, m->phys_addr,
+	    m->phys_addr + (pages * PAGE_SIZE), VM_PROT_READ | VM_PROT_WRITE));
 }
 
 static void
@@ -1922,24 +1974,23 @@ pcpu_page_alloc(uma_zone_t zone, vm_size_t bytes, int domain, uint8_t *pflag,
 	MPASS(bytes == (mp_maxid + 1) * PAGE_SIZE);
 
 	TAILQ_INIT(&alloctail);
-	flags = VM_ALLOC_SYSTEM | VM_ALLOC_WIRED | VM_ALLOC_NOOBJ |
-	    malloc2vm_flags(wait);
+	flags = VM_ALLOC_SYSTEM | VM_ALLOC_WIRED | malloc2vm_flags(wait);
 	*pflag = UMA_SLAB_KERNEL;
 	for (cpu = 0; cpu <= mp_maxid; cpu++) {
 		if (CPU_ABSENT(cpu)) {
-			p = vm_page_alloc(NULL, 0, flags);
+			p = vm_page_alloc_noobj(flags);
 		} else {
 #ifndef NUMA
-			p = vm_page_alloc(NULL, 0, flags);
+			p = vm_page_alloc_noobj(flags);
 #else
 			pc = pcpu_find(cpu);
 			if (__predict_false(VM_DOMAIN_EMPTY(pc->pc_domain)))
 				p = NULL;
 			else
-				p = vm_page_alloc_domain(NULL, 0,
-				    pc->pc_domain, flags);
+				p = vm_page_alloc_noobj_domain(pc->pc_domain,
+				    flags);
 			if (__predict_false(p == NULL))
-				p = vm_page_alloc(NULL, 0, flags);
+				p = vm_page_alloc_noobj(flags);
 #endif
 		}
 		if (__predict_false(p == NULL))
@@ -1963,7 +2014,7 @@ fail:
 }
 
 /*
- * Allocates a number of pages from within an object
+ * Allocates a number of pages not belonging to a VM object
  *
  * Arguments:
  *	bytes  The number of bytes requested
@@ -1982,16 +2033,17 @@ noobj_alloc(uma_zone_t zone, vm_size_t bytes, int domain, uint8_t *flags,
 	vm_offset_t retkva, zkva;
 	vm_page_t p, p_next;
 	uma_keg_t keg;
+	int req;
 
 	TAILQ_INIT(&alloctail);
 	keg = zone->uz_keg;
+	req = VM_ALLOC_INTERRUPT | VM_ALLOC_WIRED;
+	if ((wait & M_WAITOK) != 0)
+		req |= VM_ALLOC_WAITOK;
 
 	npages = howmany(bytes, PAGE_SIZE);
 	while (npages > 0) {
-		p = vm_page_alloc_domain(NULL, 0, domain, VM_ALLOC_INTERRUPT |
-		    VM_ALLOC_WIRED | VM_ALLOC_NOOBJ |
-		    ((wait & M_WAITOK) != 0 ? VM_ALLOC_WAITOK :
-		    VM_ALLOC_NOWAIT));
+		p = vm_page_alloc_noobj_domain(domain, req);
 		if (p != NULL) {
 			/*
 			 * Since the page does not belong to an object, its
@@ -2238,6 +2290,14 @@ keg_layout(uma_keg_t keg)
 	     PRINT_UMA_ZFLAGS));
 
 	alignsize = keg->uk_align + 1;
+#ifdef KASAN
+	/*
+	 * ASAN requires that each allocation be aligned to the shadow map
+	 * scale factor.
+	 */
+	if (alignsize < KASAN_SHADOW_SCALE)
+		alignsize = KASAN_SHADOW_SCALE;
+#endif
 
 	/*
 	 * Calculate the size of each allocation (rsize) according to
@@ -2625,7 +2685,10 @@ zone_alloc_sysctl(uma_zone_t zone, void *unused)
 			    "Total pages currently allocated from VM");
 			SYSCTL_ADD_U32(NULL, SYSCTL_CHILDREN(oid), OID_AUTO,
 			    "free_items", CTLFLAG_RD, &dom->ud_free_items, 0,
-			    "items free in the slab layer");
+			    "Items free in the slab layer");
+			SYSCTL_ADD_U32(NULL, SYSCTL_CHILDREN(oid), OID_AUTO,
+			    "free_slabs", CTLFLAG_RD, &dom->ud_free_slabs, 0,
+			    "Unused slabs");
 		}
 	} else
 		SYSCTL_ADD_CONST_STRING(NULL, SYSCTL_CHILDREN(oid), OID_AUTO,
@@ -2789,7 +2852,7 @@ zone_ctor(void *mem, int size, void *udata, int flags)
 		STAILQ_INIT(&zdom->uzd_buckets);
 	}
 
-#if defined(INVARIANTS) && !defined(KASAN)
+#if defined(INVARIANTS) && !defined(KASAN) && !defined(KMSAN)
 	if (arg->uminit == trash_init && arg->fini == trash_fini)
 		zone->uz_flags |= UMA_ZFLAG_TRASH | UMA_ZFLAG_CTORDTOR;
 #elif defined(KASAN)
@@ -3217,7 +3280,7 @@ uma_zcreate(const char *name, size_t size, uma_ctor ctor, uma_dtor dtor,
 	args.dtor = dtor;
 	args.uminit = uminit;
 	args.fini = fini;
-#if defined(INVARIANTS) && !defined(KASAN)
+#if defined(INVARIANTS) && !defined(KASAN) && !defined(KMSAN)
 	/*
 	 * Inject procedures which check for memory use after free if we are
 	 * allowed to scramble the memory while it is not allocated.  This
@@ -3377,6 +3440,7 @@ item_ctor(uma_zone_t zone, int uz_flags, int size, void *udata, int flags,
 #endif
 
 	kasan_mark_item_valid(zone, item);
+	kmsan_mark_item_uninitialized(zone, item);
 
 #ifdef INVARIANTS
 	skipdbg = uma_dbg_zskip(zone, item);

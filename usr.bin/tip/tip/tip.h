@@ -153,17 +153,15 @@ typedef
  */
 
 #define value(v)	vtable[v].v_value
-#define lvalue(v)	(long)vtable[v].v_value
+#define lvalue(v)	(long)(intptr_t)vtable[v].v_value
 
-#define	number(v)	((long)(v))
-#define	boolean(v)      ((short)(long)(v))
-#define	character(v)    ((char)(long)(v))
-#define	address(v)      ((long *)(v))
+#define	number(v)	((long)(intptr_t)(v))
+#define	boolean(v)	((short)(intptr_t)(v))
+#define	character(v)	((char)(intptr_t)(v))
 
-#define	setnumber(v,n)		do { (v) = (char *)(long)(n); } while (0)
-#define	setboolean(v,n)		do { (v) = (char *)(long)(n); } while (0)
-#define	setcharacter(v,n)	do { (v) = (char *)(long)(n); } while (0)
-#define	setaddress(v,n)		do { (v) = (char *)(n); } while (0)
+#define	setnumber(v,n)		do { (v) = (char *)(intptr_t)(n); } while (0)
+#define	setboolean(v,n)		do { (v) = (char *)(intptr_t)(n); } while (0)
+#define	setcharacter(v,n)	do { (v) = (char *)(intptr_t)(n); } while (0)
 
 /*
  * Escape command table definitions --
@@ -249,7 +247,7 @@ EXTERN int	gotdefterm;
 EXTERN FILE	*fscript;		/* FILE for scripting */
 
 EXTERN int	fildes[2];		/* file transfer synchronization channel */
-EXTERN int	repdes[2];		/* read process sychronization channel */
+EXTERN int	repdes[2];		/* read process synchronization channel */
 EXTERN int	FD;			/* open file descriptor to remote host */
 EXTERN int	AC;			/* open file descriptor to dialer (v831 only) */
 EXTERN int	vflag;			/* print .tiprc initialization sequence */

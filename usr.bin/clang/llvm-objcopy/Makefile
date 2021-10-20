@@ -1,5 +1,7 @@
 # $FreeBSD$
 
+.include <src.opts.mk>
+
 PROG_CXX=	llvm-objcopy
 
 SRCDIR=		llvm/tools/llvm-objcopy
@@ -28,9 +30,7 @@ SRCS+=		wasm/Writer.cpp
 CFLAGS+=	-I${.OBJDIR}
 CFLAGS+=	-I${LLVM_BASE}/${SRCDIR}
 
-.include "${SRCTOP}/lib/clang/llvm.build.mk"
-
-.for hdr in InstallNameToolOpts ObjcopyOpts StripOpts
+.for hdr in BitcodeStripOpts InstallNameToolOpts ObjcopyOpts StripOpts
 ${hdr}.inc: ${LLVM_BASE}/${SRCDIR}/${hdr}.td
 	${LLVM_TBLGEN} -gen-opt-parser-defs \
 	    -I ${LLVM_SRCS}/tools/llvm-objcopy -I ${LLVM_SRCS}/include \
@@ -42,18 +42,14 @@ DEPENDFILES+=	${TGHDRS:C/$/.d/}
 DPSRCS+=	${TGHDRS}
 CLEANFILES+=	${TGHDRS} ${TGHDRS:C/$/.d/}
 
-LIBDEPS+=	llvm
-
-.for lib in ${LIBDEPS}
-DPADD+=		${OBJTOP}/lib/clang/lib${lib}/lib${lib}.a
-LDADD+=		${OBJTOP}/lib/clang/lib${lib}/lib${lib}.a
-.endfor
-
-PACKAGE=	clang
-
-LIBADD+=	execinfo
-LIBADD+=	ncursesw
-LIBADD+=	pthread
 LIBADD+=	z
 
-.include <bsd.prog.mk>
+LINKS=		${BINDIR}/llvm-objcopy ${BINDIR}/llvm-strip
+
+.if ${MK_LLVM_BINUTILS} != "no"
+LINKS+=		${BINDIR}/llvm-objcopy ${BINDIR}/objcopy \
+		${BINDIR}/llvm-strip ${BINDIR}/strip
+MLINKS=		llvm-objcopy.1 objcopy.1
+.endif
+
+.include "../llvm.prog.mk"

@@ -88,6 +88,13 @@ CODE {
 		*newstart = start;
 		return (0);
 	}
+
+	static ssize_t
+	null_get_property(device_t dev, device_t child, const char *propname,
+	    void *propvalue, size_t size)
+	{
+		return (-1);
+	}
 };
 
 /**
@@ -654,8 +661,7 @@ METHOD int child_present {
 /**
  * @brief Returns the pnp info for this device.
  *
- * Return it as a string.  If the storage is insufficient for the
- * string, then return EOVERFLOW.
+ * Return it as a string, appended to @p _sb
  *
  * The string must be formatted as a space-separated list of
  * name=value pairs.  Names may only contain alphanumeric characters,
@@ -666,22 +672,18 @@ METHOD int child_present {
  *
  * @param _dev		the parent device of @p _child
  * @param _child	the device which is being examined
- * @param _buf		the address of a buffer to receive the pnp
- *			string
- * @param _buflen	the size of the buffer pointed to by @p _buf
+ * @param _sb		sbuf for results string
  */
-METHOD int child_pnpinfo_str {
+METHOD int child_pnpinfo {
 	device_t	_dev;
 	device_t	_child;
-	char		*_buf;
-	size_t		_buflen;
-};
+	struct sbuf	*_sb;
+} DEFAULT bus_generic_child_pnpinfo;
 
 /**
  * @brief Returns the location for this device.
  *
- * Return it as a string.  If the storage is insufficient for the
- * string, then return EOVERFLOW.
+ * Return it as a string, appended to @p _sb
  *
  * The string must be formatted as a space-separated list of
  * name=value pairs.  Names may only contain alphanumeric characters,
@@ -692,16 +694,13 @@ METHOD int child_pnpinfo_str {
  *
  * @param _dev		the parent device of @p _child
  * @param _child	the device which is being examined
- * @param _buf		the address of a buffer to receive the location
- *			string
- * @param _buflen	the size of the buffer pointed to by @p _buf
+ * @param _sb		sbuf for results string
  */
-METHOD int child_location_str {
+METHOD int child_location {
 	device_t	_dev;
 	device_t	_child;
-	char		*_buf;
-	size_t		_buflen;
-};
+	struct sbuf	*_sb;
+} DEFAULT bus_generic_child_location;
 
 /**
  * @brief Allow drivers to request that an interrupt be bound to a specific
@@ -932,3 +931,27 @@ METHOD int reset_child {
 	device_t _child;
 	int _flags;
 };
+
+/**
+ * @brief Gets child's specific property
+ *
+ * The bus_get_property can be used to access device
+ * specific properties stored on the bus. If _propvalue
+ * is NULL or _size is 0, then method only returns size
+ * of the property.
+ *
+ * @param _dev			the bus device
+ * @param _child		the child device
+ * @param _propname		property name
+ * @param _propvalue	property value destination
+ * @param _size			property value size
+ *
+ * @returns size of property if successful otherwise -1
+ */
+METHOD ssize_t get_property {
+	device_t _dev;
+	device_t _child;
+	const char *_propname;
+	void *_propvalue;
+	size_t _size;
+} DEFAULT null_get_property;

@@ -70,9 +70,9 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		*n_args = 2;
 		break;
 	}
-	/* poll */
+	/* linux_poll */
 	case 7: {
-		struct poll_args *p = params;
+		struct linux_poll_args *p = params;
 		uarg[0] = (intptr_t)p->fds; /* struct pollfd * */
 		uarg[1] = p->nfds; /* u_int */
 		iarg[2] = p->timeout; /* int */
@@ -509,10 +509,10 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	case 56: {
 		struct linux_clone_args *p = params;
 		iarg[0] = p->flags; /* l_ulong */
-		uarg[1] = (intptr_t)p->stack; /* void * */
-		uarg[2] = (intptr_t)p->parent_tidptr; /* void * */
-		uarg[3] = (intptr_t)p->child_tidptr; /* void * */
-		uarg[4] = (intptr_t)p->tls; /* void * */
+		iarg[1] = p->stack; /* l_ulong */
+		uarg[2] = (intptr_t)p->parent_tidptr; /* l_int * */
+		uarg[3] = (intptr_t)p->child_tidptr; /* l_int * */
+		iarg[4] = p->tls; /* l_ulong */
 		*n_args = 5;
 		break;
 	}
@@ -1070,7 +1070,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		struct linux_rt_sigtimedwait_args *p = params;
 		uarg[0] = (intptr_t)p->mask; /* l_sigset_t * */
 		uarg[1] = (intptr_t)p->ptr; /* l_siginfo_t * */
-		uarg[2] = (intptr_t)p->timeout; /* struct l_timeval * */
+		uarg[2] = (intptr_t)p->timeout; /* struct l_timespec * */
 		iarg[3] = p->sigsetsize; /* l_size_t */
 		*n_args = 4;
 		break;
@@ -1563,12 +1563,12 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	/* linux_sys_futex */
 	case 202: {
 		struct linux_sys_futex_args *p = params;
-		uarg[0] = (intptr_t)p->uaddr; /* void * */
+		uarg[0] = (intptr_t)p->uaddr; /* uint32_t * */
 		iarg[1] = p->op; /* l_int */
-		iarg[2] = p->val; /* l_int */
+		uarg[2] = p->val; /* uint32_t */
 		uarg[3] = (intptr_t)p->timeout; /* struct l_timespec * */
-		uarg[4] = (intptr_t)p->uaddr2; /* void * */
-		iarg[5] = p->val3; /* l_int */
+		uarg[4] = (intptr_t)p->uaddr2; /* uint32_t * */
+		uarg[5] = p->val3; /* uint32_t */
 		*n_args = 6;
 		break;
 	}
@@ -2640,6 +2640,89 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		*n_args = 0;
 		break;
 	}
+	/* linux_open_tree */
+	case 428: {
+		*n_args = 0;
+		break;
+	}
+	/* linux_move_mount */
+	case 429: {
+		*n_args = 0;
+		break;
+	}
+	/* linux_fsopen */
+	case 430: {
+		*n_args = 0;
+		break;
+	}
+	/* linux_fsconfig */
+	case 431: {
+		*n_args = 0;
+		break;
+	}
+	/* linux_fsmount */
+	case 432: {
+		*n_args = 0;
+		break;
+	}
+	/* linux_fspick */
+	case 433: {
+		*n_args = 0;
+		break;
+	}
+	/* linux_pidfd_open */
+	case 434: {
+		*n_args = 0;
+		break;
+	}
+	/* linux_clone3 */
+	case 435: {
+		struct linux_clone3_args *p = params;
+		uarg[0] = (intptr_t)p->uargs; /* struct l_user_clone_args * */
+		iarg[1] = p->usize; /* l_size_t */
+		*n_args = 2;
+		break;
+	}
+	/* linux_close_range */
+	case 436: {
+		*n_args = 0;
+		break;
+	}
+	/* linux_openat2 */
+	case 437: {
+		*n_args = 0;
+		break;
+	}
+	/* linux_pidfd_getfd */
+	case 438: {
+		*n_args = 0;
+		break;
+	}
+	/* linux_faccessat2 */
+	case 439: {
+		struct linux_faccessat2_args *p = params;
+		iarg[0] = p->dfd; /* l_int */
+		uarg[1] = (intptr_t)p->filename; /* const char * */
+		iarg[2] = p->amode; /* l_int */
+		iarg[3] = p->flags; /* l_int */
+		*n_args = 4;
+		break;
+	}
+	/* linux_process_madvise */
+	case 440: {
+		*n_args = 0;
+		break;
+	}
+	/* linux_epoll_pwait2 */
+	case 441: {
+		*n_args = 0;
+		break;
+	}
+	/* linux_mount_setattr */
+	case 442: {
+		*n_args = 0;
+		break;
+	}
 	default:
 		*n_args = 0;
 		break;
@@ -2748,7 +2831,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
-	/* poll */
+	/* linux_poll */
 	case 7:
 		switch (ndx) {
 		case 0:
@@ -3518,16 +3601,16 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "l_ulong";
 			break;
 		case 1:
-			p = "userland void *";
+			p = "l_ulong";
 			break;
 		case 2:
-			p = "userland void *";
+			p = "userland l_int *";
 			break;
 		case 3:
-			p = "userland void *";
+			p = "userland l_int *";
 			break;
 		case 4:
-			p = "userland void *";
+			p = "l_ulong";
 			break;
 		default:
 			break;
@@ -4400,7 +4483,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "userland l_siginfo_t *";
 			break;
 		case 2:
-			p = "userland struct l_timeval *";
+			p = "userland struct l_timespec *";
 			break;
 		case 3:
 			p = "l_size_t";
@@ -5162,22 +5245,22 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 202:
 		switch (ndx) {
 		case 0:
-			p = "userland void *";
+			p = "userland uint32_t *";
 			break;
 		case 1:
 			p = "l_int";
 			break;
 		case 2:
-			p = "l_int";
+			p = "uint32_t";
 			break;
 		case 3:
 			p = "userland struct l_timespec *";
 			break;
 		case 4:
-			p = "userland void *";
+			p = "userland uint32_t *";
 			break;
 		case 5:
-			p = "l_int";
+			p = "uint32_t";
 			break;
 		default:
 			break;
@@ -6909,6 +6992,77 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	/* linux_io_uring_register */
 	case 427:
 		break;
+	/* linux_open_tree */
+	case 428:
+		break;
+	/* linux_move_mount */
+	case 429:
+		break;
+	/* linux_fsopen */
+	case 430:
+		break;
+	/* linux_fsconfig */
+	case 431:
+		break;
+	/* linux_fsmount */
+	case 432:
+		break;
+	/* linux_fspick */
+	case 433:
+		break;
+	/* linux_pidfd_open */
+	case 434:
+		break;
+	/* linux_clone3 */
+	case 435:
+		switch (ndx) {
+		case 0:
+			p = "userland struct l_user_clone_args *";
+			break;
+		case 1:
+			p = "l_size_t";
+			break;
+		default:
+			break;
+		};
+		break;
+	/* linux_close_range */
+	case 436:
+		break;
+	/* linux_openat2 */
+	case 437:
+		break;
+	/* linux_pidfd_getfd */
+	case 438:
+		break;
+	/* linux_faccessat2 */
+	case 439:
+		switch (ndx) {
+		case 0:
+			p = "l_int";
+			break;
+		case 1:
+			p = "userland const char *";
+			break;
+		case 2:
+			p = "l_int";
+			break;
+		case 3:
+			p = "l_int";
+			break;
+		default:
+			break;
+		};
+		break;
+	/* linux_process_madvise */
+	case 440:
+		break;
+	/* linux_epoll_pwait2 */
+	case 441:
+		break;
+	/* linux_mount_setattr */
+	case 442:
+		break;
 	default:
 		break;
 	};
@@ -6956,7 +7110,7 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* poll */
+	/* linux_poll */
 	case 7:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
@@ -8355,6 +8509,42 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 426:
 	/* linux_io_uring_register */
 	case 427:
+	/* linux_open_tree */
+	case 428:
+	/* linux_move_mount */
+	case 429:
+	/* linux_fsopen */
+	case 430:
+	/* linux_fsconfig */
+	case 431:
+	/* linux_fsmount */
+	case 432:
+	/* linux_fspick */
+	case 433:
+	/* linux_pidfd_open */
+	case 434:
+	/* linux_clone3 */
+	case 435:
+		if (ndx == 0 || ndx == 1)
+			p = "int";
+		break;
+	/* linux_close_range */
+	case 436:
+	/* linux_openat2 */
+	case 437:
+	/* linux_pidfd_getfd */
+	case 438:
+	/* linux_faccessat2 */
+	case 439:
+		if (ndx == 0 || ndx == 1)
+			p = "int";
+		break;
+	/* linux_process_madvise */
+	case 440:
+	/* linux_epoll_pwait2 */
+	case 441:
+	/* linux_mount_setattr */
+	case 442:
 	default:
 		break;
 	};

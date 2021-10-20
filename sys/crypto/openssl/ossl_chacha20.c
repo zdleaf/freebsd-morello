@@ -65,15 +65,13 @@ ossl_chacha20(struct cryptop *crp, const struct crypto_session_params *csp)
 	resid = crp->crp_payload_length;
 	crypto_cursor_init(&cc_in, &crp->crp_buf);
 	crypto_cursor_advance(&cc_in, crp->crp_payload_start);
-	inseg = crypto_cursor_segbase(&cc_in);
-	inlen = crypto_cursor_seglen(&cc_in);
+	inseg = crypto_cursor_segment(&cc_in, &inlen);
 	if (CRYPTO_HAS_OUTPUT_BUFFER(crp)) {
 		crypto_cursor_init(&cc_out, &crp->crp_obuf);
 		crypto_cursor_advance(&cc_out, crp->crp_payload_output_start);
 	} else
 		cc_out = cc_in;
-	outseg = crypto_cursor_segbase(&cc_out);
-	outlen = crypto_cursor_seglen(&cc_out);
+	outseg = crypto_cursor_segment(&cc_out, &outlen);
 	while (resid >= CHACHA_BLK_SIZE) {
 		if (inlen < CHACHA_BLK_SIZE) {
 			crypto_cursor_copydata(&cc_in, CHACHA_BLK_SIZE, block);
@@ -111,16 +109,14 @@ ossl_chacha20(struct cryptop *crp, const struct crypto_session_params *csp)
 
 		if (out == block) {
 			crypto_cursor_copyback(&cc_out, CHACHA_BLK_SIZE, block);
-			outseg = crypto_cursor_segbase(&cc_out);
-			outlen = crypto_cursor_seglen(&cc_out);
+			outseg = crypto_cursor_segment(&cc_out, &outlen);
 		} else {
 			crypto_cursor_advance(&cc_out, todo);
 			outseg += todo;
 			outlen -= todo;
 		}
 		if (in == block) {
-			inseg = crypto_cursor_segbase(&cc_in);
-			inlen = crypto_cursor_seglen(&cc_in);
+			inseg = crypto_cursor_segment(&cc_in, &inlen);
 		} else {
 			crypto_cursor_advance(&cc_in, todo);
 			inseg += todo;
@@ -165,7 +161,8 @@ ossl_chacha20_poly1305_encrypt(struct cryptop *crp,
 	for (i = 0; i < nitems(key); i++)
 		key[i] = CHACHA_U8TOU32(cipher_key + i * 4);
 
-	crypto_read_iv(crp, counter + 1);
+	memset(counter, 0, sizeof(counter));
+	crypto_read_iv(crp, counter + (CHACHA_CTR_SIZE - csp->csp_ivlen) / 4);
 	for (i = 1; i < nitems(counter); i++)
 		counter[i] = le32toh(counter[i]);
 
@@ -196,15 +193,13 @@ ossl_chacha20_poly1305_encrypt(struct cryptop *crp,
 	resid = crp->crp_payload_length;
 	crypto_cursor_init(&cc_in, &crp->crp_buf);
 	crypto_cursor_advance(&cc_in, crp->crp_payload_start);
-	inseg = crypto_cursor_segbase(&cc_in);
-	inlen = crypto_cursor_seglen(&cc_in);
+	inseg = crypto_cursor_segment(&cc_in, &inlen);
 	if (CRYPTO_HAS_OUTPUT_BUFFER(crp)) {
 		crypto_cursor_init(&cc_out, &crp->crp_obuf);
 		crypto_cursor_advance(&cc_out, crp->crp_payload_output_start);
 	} else
 		cc_out = cc_in;
-	outseg = crypto_cursor_segbase(&cc_out);
-	outlen = crypto_cursor_seglen(&cc_out);
+	outseg = crypto_cursor_segment(&cc_out, &outlen);
 	while (resid >= CHACHA_BLK_SIZE) {
 		if (inlen < CHACHA_BLK_SIZE) {
 			crypto_cursor_copydata(&cc_in, CHACHA_BLK_SIZE, block);
@@ -229,7 +224,7 @@ ossl_chacha20_poly1305_encrypt(struct cryptop *crp,
 
 		/* Truncate if the 32-bit counter would roll over. */
 		next_counter = counter[0] + todo / CHACHA_BLK_SIZE;
-		if (next_counter < counter[0]) {
+		if (csp->csp_ivlen == 8 && next_counter < counter[0]) {
 			todo -= next_counter * CHACHA_BLK_SIZE;
 			next_counter = 0;
 		}
@@ -238,21 +233,19 @@ ossl_chacha20_poly1305_encrypt(struct cryptop *crp,
 		Poly1305_Update(&auth_ctx, out, todo);
 
 		counter[0] = next_counter;
-		if (counter[0] == 0)
+		if (csp->csp_ivlen == 8 && counter[0] == 0)
 			counter[1]++;
 
 		if (out == block) {
 			crypto_cursor_copyback(&cc_out, CHACHA_BLK_SIZE, block);
-			outseg = crypto_cursor_segbase(&cc_out);
-			outlen = crypto_cursor_seglen(&cc_out);
+			outseg = crypto_cursor_segment(&cc_out, &outlen);
 		} else {
 			crypto_cursor_advance(&cc_out, todo);
 			outseg += todo;
 			outlen -= todo;
 		}
 		if (in == block) {
-			inseg = crypto_cursor_segbase(&cc_in);
-			inlen = crypto_cursor_seglen(&cc_in);
+			inseg = crypto_cursor_segment(&cc_in, &inlen);
 		} else {
 			crypto_cursor_advance(&cc_in, todo);
 			inseg += todo;
@@ -315,7 +308,8 @@ ossl_chacha20_poly1305_decrypt(struct cryptop *crp,
 	for (i = 0; i < nitems(key); i++)
 		key[i] = CHACHA_U8TOU32(cipher_key + i * 4);
 
-	crypto_read_iv(crp, counter + 1);
+	memset(counter, 0, sizeof(counter));
+	crypto_read_iv(crp, counter + (CHACHA_CTR_SIZE - csp->csp_ivlen) / 4);
 	for (i = 1; i < nitems(counter); i++)
 		counter[i] = le32toh(counter[i]);
 
@@ -368,15 +362,13 @@ ossl_chacha20_poly1305_decrypt(struct cryptop *crp,
 	resid = crp->crp_payload_length;
 	crypto_cursor_init(&cc_in, &crp->crp_buf);
 	crypto_cursor_advance(&cc_in, crp->crp_payload_start);
-	inseg = crypto_cursor_segbase(&cc_in);
-	inlen = crypto_cursor_seglen(&cc_in);
+	inseg = crypto_cursor_segment(&cc_in, &inlen);
 	if (CRYPTO_HAS_OUTPUT_BUFFER(crp)) {
 		crypto_cursor_init(&cc_out, &crp->crp_obuf);
 		crypto_cursor_advance(&cc_out, crp->crp_payload_output_start);
 	} else
 		cc_out = cc_in;
-	outseg = crypto_cursor_segbase(&cc_out);
-	outlen = crypto_cursor_seglen(&cc_out);
+	outseg = crypto_cursor_segment(&cc_out, &outlen);
 	while (resid >= CHACHA_BLK_SIZE) {
 		if (inlen < CHACHA_BLK_SIZE) {
 			crypto_cursor_copydata(&cc_in, CHACHA_BLK_SIZE, block);
@@ -401,7 +393,7 @@ ossl_chacha20_poly1305_decrypt(struct cryptop *crp,
 
 		/* Truncate if the 32-bit counter would roll over. */
 		next_counter = counter[0] + todo / CHACHA_BLK_SIZE;
-		if (next_counter < counter[0]) {
+		if (csp->csp_ivlen == 8 && next_counter < counter[0]) {
 			todo -= next_counter * CHACHA_BLK_SIZE;
 			next_counter = 0;
 		}
@@ -409,21 +401,19 @@ ossl_chacha20_poly1305_decrypt(struct cryptop *crp,
 		ChaCha20_ctr32(out, in, todo, key, counter);
 
 		counter[0] = next_counter;
-		if (counter[0] == 0)
+		if (csp->csp_ivlen == 8 && counter[0] == 0)
 			counter[1]++;
 
 		if (out == block) {
 			crypto_cursor_copyback(&cc_out, CHACHA_BLK_SIZE, block);
-			outseg = crypto_cursor_segbase(&cc_out);
-			outlen = crypto_cursor_seglen(&cc_out);
+			outseg = crypto_cursor_segment(&cc_out, &outlen);
 		} else {
 			crypto_cursor_advance(&cc_out, todo);
 			outseg += todo;
 			outlen -= todo;
 		}
 		if (in == block) {
-			inseg = crypto_cursor_segbase(&cc_in);
-			inlen = crypto_cursor_seglen(&cc_in);
+			inseg = crypto_cursor_segment(&cc_in, &inlen);
 		} else {
 			crypto_cursor_advance(&cc_in, todo);
 			inseg += todo;

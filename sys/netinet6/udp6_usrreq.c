@@ -197,7 +197,7 @@ udp6_append(struct inpcb *inp, struct mbuf *n, int off,
 	SOCKBUF_LOCK(&so->so_rcv);
 	if (sbappendaddr_locked(&so->so_rcv, (struct sockaddr *)&fromsa[0], n,
 	    opts) == 0) {
-		SOCKBUF_UNLOCK(&so->so_rcv);
+		soroverflow_locked(so);
 		m_freem(n);
 		if (opts)
 			m_freem(opts);
@@ -810,21 +810,16 @@ udp6_output(struct socket *so, int flags_arg, struct mbuf *m,
 		return (EINVAL);
 	}
 
+	NET_EPOCH_ENTER(et);
 	if (control) {
 		if ((error = ip6_setpktopts(control, &opt,
 		    inp->in6p_outputopts, td->td_ucred, nxt)) != 0) {
-			INP_UNLOCK(inp);
-			ip6_clearpktopts(&opt, -1);
-			if (control)
-				m_freem(control);
-			m_freem(m);
-			return (error);
+			goto release;
 		}
 		optp = &opt;
 	} else
 		optp = inp->in6p_outputopts;
 
-	NET_EPOCH_ENTER(et);
 	if (sin6) {
 		/*
 		 * Since we saw no essential reason for calling in_pcbconnect,

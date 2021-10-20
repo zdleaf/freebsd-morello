@@ -470,7 +470,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	/* getgroups */
 	case 79: {
 		struct getgroups_args *p = params;
-		uarg[0] = p->gidsetsize; /* u_int */
+		iarg[0] = p->gidsetsize; /* int */
 		uarg[1] = (intptr_t)p->gidset; /* gid_t * */
 		*n_args = 2;
 		break;
@@ -478,7 +478,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	/* setgroups */
 	case 80: {
 		struct setgroups_args *p = params;
-		uarg[0] = p->gidsetsize; /* u_int */
+		iarg[0] = p->gidsetsize; /* int */
 		uarg[1] = (intptr_t)p->gidset; /* gid_t * */
 		*n_args = 2;
 		break;
@@ -3399,6 +3399,17 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		*n_args = 1;
 		break;
 	}
+	/* fspacectl */
+	case 580: {
+		struct fspacectl_args *p = params;
+		iarg[0] = p->fd; /* int */
+		iarg[1] = p->cmd; /* int */
+		uarg[2] = (intptr_t)p->rqsr; /* const struct spacectl_range * */
+		iarg[3] = p->flags; /* int */
+		uarg[4] = (intptr_t)p->rmsr; /* struct spacectl_range * */
+		*n_args = 5;
+		break;
+	}
 	default:
 		*n_args = 0;
 		break;
@@ -4122,7 +4133,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 79:
 		switch (ndx) {
 		case 0:
-			p = "u_int";
+			p = "int";
 			break;
 		case 1:
 			p = "userland gid_t *";
@@ -4135,7 +4146,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 80:
 		switch (ndx) {
 		case 0:
-			p = "u_int";
+			p = "int";
 			break;
 		case 1:
 			p = "userland gid_t *";
@@ -9088,6 +9099,28 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
+	/* fspacectl */
+	case 580:
+		switch (ndx) {
+		case 0:
+			p = "int";
+			break;
+		case 1:
+			p = "int";
+			break;
+		case 2:
+			p = "userland const struct spacectl_range *";
+			break;
+		case 3:
+			p = "int";
+			break;
+		case 4:
+			p = "userland struct spacectl_range *";
+			break;
+		default:
+			break;
+		};
+		break;
 	default:
 		break;
 	};
@@ -11031,6 +11064,11 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		break;
 	/* aio_readv */
 	case 579:
+		if (ndx == 0 || ndx == 1)
+			p = "int";
+		break;
+	/* fspacectl */
+	case 580:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;

@@ -173,6 +173,27 @@ _bus_dmamap_load_mbuf_epg(bus_dma_tag_t dmat, bus_dmamap_t map,
 }
 
 /*
+ * Load a single mbuf.
+ */
+static int
+_bus_dmamap_load_single_mbuf(bus_dma_tag_t dmat, bus_dmamap_t map,
+    struct mbuf *m, bus_dma_segment_t *segs, int *nsegs, int flags)
+{
+	int error;
+
+	error = 0;
+	if ((m->m_flags & M_EXTPG) != 0)
+		error = _bus_dmamap_load_mbuf_epg(dmat, map, m, segs, nsegs,
+		    flags);
+	else
+		error = _bus_dmamap_load_buffer(dmat, map, m->m_data, m->m_len,
+		    kernel_pmap, flags | BUS_DMA_LOAD_MBUF, segs, nsegs);
+	CTR5(KTR_BUSDMA, "%s: tag %p tag flags 0x%x error %d nsegs %d",
+	    __func__, dmat, flags, error, *nsegs);
+	return (error);
+}
+
+/*
  * Load an mbuf chain.
  */
 static int
@@ -387,6 +408,11 @@ bus_dmamap_load(bus_dma_tag_t dmat, bus_dmamap_t map, void *buf,
 	int error;
 	int nsegs;
 
+#ifdef KMSAN
+	mem = memdesc_vaddr(buf, buflen);
+	_bus_dmamap_load_kmsan(dmat, map, &mem);
+#endif
+
 	if ((flags & BUS_DMA_NOWAIT) == 0) {
 		mem = memdesc_vaddr(buf, buflen);
 		_bus_dmamap_waitok(dmat, map, &mem, callback, callback_arg);
@@ -428,6 +454,11 @@ bus_dmamap_load_mbuf(bus_dma_tag_t dmat, bus_dmamap_t map, struct mbuf *m0,
 
 	M_ASSERTPKTHDR(m0);
 
+#ifdef KMSAN
+	struct memdesc mem = memdesc_mbuf(m0);
+	_bus_dmamap_load_kmsan(dmat, map, &mem);
+#endif
+
 	flags |= BUS_DMA_NOWAIT;
 	nsegs = -1;
 	error = _bus_dmamap_load_mbuf_sg(dmat, map, m0, NULL, &nsegs, flags);
@@ -450,6 +481,11 @@ bus_dmamap_load_mbuf_sg(bus_dma_tag_t dmat, bus_dmamap_t map, struct mbuf *m0,
 {
 	int error;
 
+#ifdef KMSAN
+	struct memdesc mem = memdesc_mbuf(m0);
+	_bus_dmamap_load_kmsan(dmat, map, &mem);
+#endif
+
 	flags |= BUS_DMA_NOWAIT;
 	*nsegs = -1;
 	error = _bus_dmamap_load_mbuf_sg(dmat, map, m0, segs, nsegs, flags);
@@ -464,6 +500,11 @@ bus_dmamap_load_uio(bus_dma_tag_t dmat, bus_dmamap_t map, struct uio *uio,
 {
 	bus_dma_segment_t *segs;
 	int nsegs, error;
+
+#ifdef KMSAN
+	struct memdesc mem = memdesc_uio(uio);
+	_bus_dmamap_load_kmsan(dmat, map, &mem);
+#endif
 
 	flags |= BUS_DMA_NOWAIT;
 	nsegs = -1;
@@ -491,6 +532,11 @@ bus_dmamap_load_ccb(bus_dma_tag_t dmat, bus_dmamap_t map, union ccb *ccb,
 	struct memdesc mem;
 	int error;
 	int nsegs;
+
+#ifdef KMSAN
+	mem = memdesc_ccb(ccb);
+	_bus_dmamap_load_kmsan(dmat, map, &mem);
+#endif
 
 	ccb_h = &ccb->ccb_h;
 	if ((ccb_h->flags & CAM_DIR_MASK) == CAM_DIR_NONE) {
@@ -536,6 +582,11 @@ bus_dmamap_load_bio(bus_dma_tag_t dmat, bus_dmamap_t map, struct bio *bio,
 	int error;
 	int nsegs;
 
+#ifdef KMSAN
+	mem = memdesc_bio(bio);
+	_bus_dmamap_load_kmsan(dmat, map, &mem);
+#endif
+
 	if ((flags & BUS_DMA_NOWAIT) == 0) {
 		mem = memdesc_bio(bio);
 		_bus_dmamap_waitok(dmat, map, &mem, callback, callback_arg);
@@ -573,6 +624,10 @@ bus_dmamap_load_mem(bus_dma_tag_t dmat, bus_dmamap_t map,
 	bus_dma_segment_t *segs;
 	int error;
 	int nsegs;
+
+#ifdef KMSAN
+	_bus_dmamap_load_kmsan(dmat, map, mem);
+#endif
 
 	if ((flags & BUS_DMA_NOWAIT) == 0)
 		_bus_dmamap_waitok(dmat, map, mem, callback, callback_arg);
@@ -656,6 +711,10 @@ bus_dmamap_load_crp_buffer(bus_dma_tag_t dmat, bus_dmamap_t map,
 		break;
 	case CRYPTO_BUF_MBUF:
 		error = _bus_dmamap_load_mbuf_sg(dmat, map, cb->cb_mbuf,
+		    NULL, &nsegs, flags);
+		break;
+	case CRYPTO_BUF_SINGLE_MBUF:
+		error = _bus_dmamap_load_single_mbuf(dmat, map, cb->cb_mbuf,
 		    NULL, &nsegs, flags);
 		break;
 	case CRYPTO_BUF_UIO:

@@ -1044,13 +1044,22 @@ kern_vfs_bio_buffer_alloc(caddr_t v, long physmem_est)
 	int tuned_nbuf;
 	long maxbuf, maxbuf_sz, buf_sz,	biotmap_sz;
 
-#ifdef KASAN
 	/*
-	 * With KASAN enabled, the kernel map is shadowed.  Account for this
-	 * when sizing maps based on the amount of physical memory available.
+	 * With KASAN or KMSAN enabled, the kernel map is shadowed.  Account for
+	 * this when sizing maps based on the amount of physical memory
+	 * available.
 	 */
+#if defined(KASAN)
 	physmem_est = (physmem_est * KASAN_SHADOW_SCALE) /
 	    (KASAN_SHADOW_SCALE + 1);
+#elif defined(KMSAN)
+	physmem_est /= 3;
+
+	/*
+	 * KMSAN cannot reliably determine whether buffer data is initialized
+	 * unless it is updated through a KVA mapping.
+	 */
+	unmapped_buf_allowed = 0;
 #endif
 
 	/*
@@ -4917,9 +4926,8 @@ vm_hold_load_pages(struct buf *bp, vm_offset_t from, vm_offset_t to)
 		 * could interfere with paging I/O, no matter which
 		 * process we are.
 		 */
-		p = vm_page_alloc(NULL, 0, VM_ALLOC_SYSTEM | VM_ALLOC_NOOBJ |
-		    VM_ALLOC_WIRED | VM_ALLOC_COUNT((to - pg) >> PAGE_SHIFT) |
-		    VM_ALLOC_WAITOK);
+		p = vm_page_alloc_noobj(VM_ALLOC_SYSTEM | VM_ALLOC_WIRED |
+		    VM_ALLOC_COUNT((to - pg) >> PAGE_SHIFT) | VM_ALLOC_WAITOK);
 		pmap_qenter(pg, &p, 1);
 		bp->b_pages[index] = p;
 	}
@@ -5194,8 +5202,8 @@ vfs_bio_getpages(struct vnode *vp, vm_page_t *ma, int count,
 	struct mount *mp;
 	daddr_t lbn, lbnp;
 	vm_ooffset_t la, lb, poff, poffe;
-	long bsize;
-	int bo_bs, br_flags, error, i, pgsin, pgsin_a, pgsin_b;
+	long bo_bs, bsize;
+	int br_flags, error, i, pgsin, pgsin_a, pgsin_b;
 	bool redo, lpart;
 
 	object = vp->v_object;
@@ -5212,7 +5220,10 @@ vfs_bio_getpages(struct vnode *vp, vm_page_t *ma, int count,
 	 */
 	la += PAGE_SIZE;
 	lpart = la > object->un_pager.vnp.vnp_size;
-	bo_bs = get_blksize(vp, get_lblkno(vp, IDX_TO_OFF(ma[0]->pindex)));
+	error = get_blksize(vp, get_lblkno(vp, IDX_TO_OFF(ma[0]->pindex)),
+	    &bo_bs);
+	if (error != 0)
+		return (VM_PAGER_ERROR);
 
 	/*
 	 * Calculate read-ahead, behind and total pages.
@@ -5268,9 +5279,10 @@ again:
 				goto next_page;
 			lbnp = lbn;
 
-			bsize = get_blksize(vp, lbn);
-			error = bread_gb(vp, lbn, bsize, curthread->td_ucred,
-			    br_flags, &bp);
+			error = get_blksize(vp, lbn, &bsize);
+			if (error == 0)
+				error = bread_gb(vp, lbn, bsize,
+				    curthread->td_ucred, br_flags, &bp);
 			if (error != 0)
 				goto end_pages;
 			if (bp->b_rcred == curthread->td_ucred) {

@@ -130,7 +130,6 @@ __DEFAULT_YES_OPTIONS = \
     LLVM_ASSERTIONS \
     LLVM_COV \
     LLVM_CXXFILT \
-    LLVM_TARGET_ALL \
     LOADER_GELI \
     LOADER_LUA \
     LOADER_OFW \
@@ -139,7 +138,6 @@ __DEFAULT_YES_OPTIONS = \
     LOCATE \
     LPR \
     LS_COLORS \
-    LZMA_SUPPORT \
     MAIL \
     MAILWRAPPER \
     MAKE \
@@ -198,6 +196,7 @@ __DEFAULT_NO_OPTIONS = \
     BHYVE_SNAPSHOT \
     CLANG_EXTRAS \
     CLANG_FORMAT \
+    DETECT_TZ_CHANGES \
     DTRACE_TESTS \
     EXPERIMENTAL \
     HESIOD \
@@ -205,20 +204,20 @@ __DEFAULT_NO_OPTIONS = \
     LOADER_FIREWIRE \
     LOADER_VERBOSE \
     LOADER_VERIEXEC_PASS_MANIFEST \
+    LLVM_BINUTILS \
     MALLOC_PRODUCTION \
     OFED_EXTRA \
     OPENLDAP \
     REPRODUCIBLE_BUILD \
     RPCBIND_WARMSTART_SUPPORT \
     SORT_THREADS \
-    SVN \
-    SVNLITE \
     ZONEINFO_LEAPSECONDS_SUPPORT \
 
 # LEFT/RIGHT. Left options which default to "yes" unless their corresponding
 # RIGHT option is disabled.
 __DEFAULT_DEPENDENT_OPTIONS= \
 	CLANG_FULL/CLANG \
+	LLVM_TARGET_ALL/CLANG \
 	LOADER_VERIEXEC/BEARSSL \
 	LOADER_EFI_SECUREBOOT/LOADER_VERIEXEC \
 	LOADER_VERIEXEC_VECTX/LOADER_VERIEXEC \
@@ -357,18 +356,10 @@ BROKEN_OPTIONS+=NVME
 .endif
 
 .if ${__T} == "aarch64" || ${__T} == "amd64" || ${__T} == "i386" || \
-    ${__T:Mpowerpc64*} != ""
+    ${__T:Mpowerpc64*} != "" || ${__T:Mriscv64*} != ""
 __DEFAULT_YES_OPTIONS+=OPENMP
 .else
 __DEFAULT_NO_OPTIONS+=OPENMP
-.endif
-
-.if ${.MAKE.OS} != "FreeBSD"
-# Building the target compiler requires building tablegen on the host
-# which is (currently) not possible on non-FreeBSD.
-BROKEN_OPTIONS+=CLANG LLD LLDB
-# The same also applies to the bootstrap LLVM.
-BROKEN_OPTIONS+=CLANG_BOOTSTRAP LLD_BOOTSTRAP
 .endif
 
 .include <bsd.mkopt.mk>
@@ -409,10 +400,6 @@ MK_TESTS:=	no
 MK_BSDINSTALL:=	no
 .endif
 
-.if ${MK_FILE} == "no"
-MK_SVNLITE:=	no
-.endif
-
 .if ${MK_MAIL} == "no"
 MK_MAILWRAPPER:= no
 MK_SENDMAIL:=	no
@@ -435,8 +422,6 @@ MK_KERBEROS:=	no
 MK_KERBEROS_SUPPORT:=	no
 MK_LDNS:=	no
 MK_PKGBOOTSTRAP:=	no
-MK_SVN:=		no
-MK_SVNLITE:=		no
 MK_ZFS:=	no
 .endif
 
@@ -476,6 +461,7 @@ MK_CLANG:=	no
 MK_INCLUDES:=	no
 MK_LLD:=	no
 MK_LLDB:=	no
+MK_LLVM_BINUTILS:=	no
 .endif
 
 .if ${MK_CLANG} == "no"
@@ -483,6 +469,18 @@ MK_CLANG_EXTRAS:= no
 MK_CLANG_FORMAT:= no
 MK_CLANG_FULL:= no
 MK_LLVM_COV:= no
+.endif
+
+.if ${MK_ASAN} == "yes"
+# In order to get sensible backtraces from ASAN we have to install
+# llvm-symbolizer as /usr/bin/addr2line instead of the elftoolchain version.
+MK_LLVM_BINUTILS:=	yes
+.endif
+
+.if ${MK_LLVM_BINUTILS} == "yes"
+# MK_LLVM_CXXFILT is a subset of MK_LLVM_BINUTILS and should therefore be
+# enabled if MK_LLVM_BINUTILS is set.
+MK_LLVM_CXXFILT:=	yes
 .endif
 
 .if ${MK_LOADER_VERIEXEC} == "no"

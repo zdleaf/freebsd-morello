@@ -159,8 +159,6 @@ EVENTHANDLER_LIST_DEFINE(device_attach);
 EVENTHANDLER_LIST_DEFINE(device_detach);
 EVENTHANDLER_LIST_DEFINE(dev_lookup);
 
-static int bus_child_location_sb(device_t child, struct sbuf *sb);
-static int bus_child_pnpinfo_sb(device_t child, struct sbuf *sb);
 static void devctl2_init(void);
 static bool device_frozen;
 
@@ -276,10 +274,10 @@ device_sysctl_handler(SYSCTL_HANDLER_ARGS)
 		sbuf_cat(&sb, dev->driver ? dev->driver->name : "");
 		break;
 	case DEVICE_SYSCTL_LOCATION:
-		bus_child_location_sb(dev, &sb);
+		bus_child_location(dev, &sb);
 		break;
 	case DEVICE_SYSCTL_PNPINFO:
-		bus_child_pnpinfo_sb(dev, &sb);
+		bus_child_pnpinfo(dev, &sb);
 		break;
 	case DEVICE_SYSCTL_PARENT:
 		sbuf_cat(&sb, dev->parent ? dev->parent->nameunit : "");
@@ -736,11 +734,11 @@ devaddq(const char *type, const char *what, device_t dev)
 	sbuf_cat(&sb, " at ");
 
 	/* Add in the location */
-	bus_child_location_sb(dev, &sb);
+	bus_child_location(dev, &sb);
 	sbuf_putc(&sb, ' ');
 
 	/* Add in pnpinfo */
-	bus_child_pnpinfo_sb(dev, &sb);
+	bus_child_pnpinfo(dev, &sb);
 
 	/* Get the parent of this device, or / if high enough in the tree. */
 	if (device_get_parent(dev) == NULL)
@@ -1640,13 +1638,13 @@ devclass_alloc_unit(devclass_t dc, device_t dev, int *unitp)
 		/* Unwired device, find the next available slot for it */
 		unit = 0;
 		for (unit = 0;; unit++) {
+			/* If this device slot is already in use, skip it. */
+			if (unit < dc->maxunit && dc->devices[unit] != NULL)
+				continue;
+
 			/* If there is an "at" hint for a unit then skip it. */
 			if (resource_string_value(dc->name, unit, "at", &s) ==
 			    0)
-				continue;
-
-			/* If this device slot is already in use, skip it. */
-			if (unit < dc->maxunit && dc->devices[unit] != NULL)
 				continue;
 
 			break;
@@ -2076,6 +2074,7 @@ device_probe_child(device_t dev, device_t child)
 	driverlink_t best = NULL;
 	driverlink_t dl;
 	int result, pri = 0;
+	/* We should preserve the devclass (or lack of) set by the bus. */
 	int hasclass = (child->devclass != NULL);
 
 	GIANT_REQUIRED;
@@ -2085,10 +2084,9 @@ device_probe_child(device_t dev, device_t child)
 		panic("device_probe_child: parent device has no devclass");
 
 	/*
-	 * If the state is already probed, then return.  However, don't
-	 * return if we can rebid this object.
+	 * If the state is already probed, then return.
 	 */
-	if (child->state == DS_ALIVE && (child->flags & DF_REBID) == 0)
+	if (child->state == DS_ALIVE)
 		return (0);
 
 	for (; dc; dc = dc->parent) {
@@ -2128,11 +2126,6 @@ device_probe_child(device_t dev, device_t child)
 
 			result = DEVICE_PROBE(child);
 
-			/* Reset flags and devclass before the next probe. */
-			child->devflags = 0;
-			if (!hasclass)
-				(void)device_set_devclass(child, NULL);
-
 			/*
 			 * If the driver returns SUCCESS, there can be
 			 * no higher match for this device.
@@ -2142,6 +2135,11 @@ device_probe_child(device_t dev, device_t child)
 				pri = 0;
 				break;
 			}
+
+			/* Reset flags and devclass before the next probe. */
+			child->devflags = 0;
+			if (!hasclass)
+				(void)device_set_devclass(child, NULL);
 
 			/*
 			 * Reset DF_QUIET in case this driver doesn't
@@ -2187,62 +2185,43 @@ device_probe_child(device_t dev, device_t child)
 			break;
 	}
 
+	if (best == NULL)
+		return (ENXIO);
+
 	/*
 	 * If we found a driver, change state and initialise the devclass.
 	 */
-	/* XXX What happens if we rebid and got no best? */
-	if (best) {
-		/*
-		 * If this device was attached, and we were asked to
-		 * rescan, and it is a different driver, then we have
-		 * to detach the old driver and reattach this new one.
-		 * Note, we don't have to check for DF_REBID here
-		 * because if the state is > DS_ALIVE, we know it must
-		 * be.
-		 *
-		 * This assumes that all DF_REBID drivers can have
-		 * their probe routine called at any time and that
-		 * they are idempotent as well as completely benign in
-		 * normal operations.
-		 *
-		 * We also have to make sure that the detach
-		 * succeeded, otherwise we fail the operation (or
-		 * maybe it should just fail silently?  I'm torn).
-		 */
-		if (child->state > DS_ALIVE && best->driver != child->driver)
-			if ((result = device_detach(dev)) != 0)
-				return (result);
-
+	if (pri < 0) {
 		/* Set the winning driver, devclass, and flags. */
-		if (!child->devclass) {
-			result = device_set_devclass(child, best->driver->name);
-			if (result != 0)
-				return (result);
-		}
 		result = device_set_driver(child, best->driver);
 		if (result != 0)
 			return (result);
+		if (!child->devclass) {
+			result = device_set_devclass(child, best->driver->name);
+			if (result != 0) {
+				(void)device_set_driver(child, NULL);
+				return (result);
+			}
+		}
 		resource_int_value(best->driver->name, child->unit,
 		    "flags", &child->devflags);
 
-		if (pri < 0) {
-			/*
-			 * A bit bogus. Call the probe method again to make
-			 * sure that we have the right description.
-			 */
-			DEVICE_PROBE(child);
-#if 0
-			child->flags |= DF_REBID;
-#endif
-		} else
-			child->flags &= ~DF_REBID;
-		child->state = DS_ALIVE;
-
-		bus_data_generation_update();
-		return (0);
+		/*
+		 * A bit bogus. Call the probe method again to make sure
+		 * that we have the right description.
+		 */
+		result = DEVICE_PROBE(child);
+		if (result > 0) {
+			if (!hasclass)
+				(void)device_set_devclass(child, NULL);
+			(void)device_set_driver(child, NULL);
+			return (result);
+		}
 	}
 
-	return (ENXIO);
+	child->state = DS_ALIVE;
+	bus_data_generation_update();
+	return (0);
 }
 
 /**
@@ -2710,6 +2689,20 @@ device_verbose(device_t dev)
 	dev->flags &= ~DF_QUIET;
 }
 
+ssize_t
+device_get_property(device_t dev, const char *prop, void *val, size_t sz)
+{
+	device_t bus = device_get_parent(dev);
+
+	return (BUS_GET_PROPERTY(bus, dev, prop, val, sz));
+}
+
+bool
+device_has_property(device_t dev, const char *prop)
+{
+	return (device_get_property(dev, prop, NULL, 0) >= 0);
+}
+
 /**
  * @brief Return non-zero if the DF_QUIET_CHIDLREN flag is set on the device
  */
@@ -2909,7 +2902,7 @@ device_probe(device_t dev)
 
 	GIANT_REQUIRED;
 
-	if (dev->state >= DS_ALIVE && (dev->flags & DF_REBID) == 0)
+	if (dev->state >= DS_ALIVE)
 		return (-1);
 
 	if (!(dev->flags & DF_ENABLED)) {
@@ -3133,6 +3126,8 @@ device_set_unit(device_t dev, int unit)
 	devclass_t dc;
 	int err;
 
+	if (unit == dev->unit)
+		return (0);
 	dc = device_get_devclass(dev);
 	if (unit < dc->maxunit && dc->devices[unit])
 		return (EBUSY);
@@ -4131,8 +4126,7 @@ bus_generic_driver_added(device_t dev, driver_t *driver)
 
 	DEVICE_IDENTIFY(driver, dev);
 	TAILQ_FOREACH(child, &dev->children, link) {
-		if (child->state == DS_NOTPRESENT ||
-		    (child->flags & DF_REBID))
+		if (child->state == DS_NOTPRESENT)
 			device_probe_and_attach(child);
 	}
 }
@@ -4947,108 +4941,62 @@ bus_child_present(device_t child)
 }
 
 /**
- * @brief Wrapper function for BUS_CHILD_PNPINFO_STR().
+ * @brief Wrapper function for BUS_CHILD_PNPINFO().
  *
- * This function simply calls the BUS_CHILD_PNPINFO_STR() method of the
- * parent of @p dev.
+ * This function simply calls the BUS_CHILD_PNPINFO() method of the parent of @p
+ * dev.
  */
 int
-bus_child_pnpinfo_str(device_t child, char *buf, size_t buflen)
+bus_child_pnpinfo(device_t child, struct sbuf *sb)
 {
 	device_t parent;
 
 	parent = device_get_parent(child);
-	if (parent == NULL) {
-		*buf = '\0';
+	if (parent == NULL)
 		return (0);
-	}
-	return (BUS_CHILD_PNPINFO_STR(parent, child, buf, buflen));
+	return (BUS_CHILD_PNPINFO(parent, child, sb));
 }
 
 /**
- * @brief Wrapper function for BUS_CHILD_LOCATION_STR().
+ * @brief Generic implementation that does nothing for bus_child_pnpinfo
  *
- * This function simply calls the BUS_CHILD_LOCATION_STR() method of the
- * parent of @p dev.
+ * This function has the right signature and returns 0 since the sbuf is passed
+ * to us to append to.
  */
 int
-bus_child_location_str(device_t child, char *buf, size_t buflen)
+bus_generic_child_pnpinfo(device_t dev, device_t child, struct sbuf *sb)
+{
+	return (0);
+}
+
+/**
+ * @brief Wrapper function for BUS_CHILD_LOCATION().
+ *
+ * This function simply calls the BUS_CHILD_LOCATION() method of the parent of
+ * @p dev.
+ */
+int
+bus_child_location(device_t child, struct sbuf *sb)
 {
 	device_t parent;
 
 	parent = device_get_parent(child);
-	if (parent == NULL) {
-		*buf = '\0';
+	if (parent == NULL)
 		return (0);
-	}
-	return (BUS_CHILD_LOCATION_STR(parent, child, buf, buflen));
+	return (BUS_CHILD_LOCATION(parent, child, sb));
 }
 
 /**
- * @brief Wrapper function for bus_child_pnpinfo_str using sbuf
+ * @brief Generic implementation that does nothing for bus_child_location
  *
- * A convenient wrapper frunction for bus_child_pnpinfo_str that allows
- * us to splat that into an sbuf. It uses unholy knowledge of sbuf to
- * accomplish this, however. It is an interim function until we can convert
- * this interface more fully.
+ * This function has the right signature and returns 0 since the sbuf is passed
+ * to us to append to.
  */
-/* Note: we reach inside of sbuf because it's API isn't rich enough to do this */
-#define	SPACE(s)	((s)->s_size - (s)->s_len)
-#define EOB(s)		((s)->s_buf + (s)->s_len)
-
-static int
-bus_child_pnpinfo_sb(device_t dev, struct sbuf *sb)
+int
+bus_generic_child_location(device_t dev, device_t child, struct sbuf *sb)
 {
-	char *p;
-	ssize_t space;
-
-	MPASS((sb->s_flags & SBUF_INCLUDENUL) == 0);
-	MPASS(sb->s_size >= sb->s_len);
-	if (sb->s_error != 0)
-		return (-1);
-	space = SPACE(sb);
-	if (space <= 1) {
-		sb->s_error = ENOMEM;
-		return (-1);
-	}
-	p = EOB(sb);
-	*p = '\0';	/* sbuf buffer isn't NUL terminated until sbuf_finish() */
-	bus_child_pnpinfo_str(dev, p, space);
-	sb->s_len += strlen(p);
 	return (0);
 }
-
-/**
- * @brief Wrapper function for bus_child_pnpinfo_str using sbuf
- *
- * A convenient wrapper frunction for bus_child_pnpinfo_str that allows
- * us to splat that into an sbuf. It uses unholy knowledge of sbuf to
- * accomplish this, however. It is an interim function until we can convert
- * this interface more fully.
- */
-static int
-bus_child_location_sb(device_t dev, struct sbuf *sb)
-{
-	char *p;
-	ssize_t space;
-
-	MPASS((sb->s_flags & SBUF_INCLUDENUL) == 0);
-	MPASS(sb->s_size >= sb->s_len);
-	if (sb->s_error != 0)
-		return (-1);
-	space = SPACE(sb);
-	if (space <= 1) {
-		sb->s_error = ENOMEM;
-		return (-1);
-	}
-	p = EOB(sb);
-	*p = '\0';	/* sbuf buffer isn't NUL terminated until sbuf_finish() */
-	bus_child_location_str(dev, p, space);
-	sb->s_len += strlen(p);
-	return (0);
-}
-#undef SPACE
-#undef EOB
 
 /**
  * @brief Wrapper function for BUS_GET_CPUS().
@@ -5358,7 +5306,7 @@ print_device_short(device_t dev, int indent)
 	if (!dev)
 		return;
 
-	indentprintf(("device %d: <%s> %sparent,%schildren,%s%s%s%s%s%s,%sivars,%ssoftc,busy=%d\n",
+	indentprintf(("device %d: <%s> %sparent,%schildren,%s%s%s%s%s,%sivars,%ssoftc,busy=%d\n",
 	    dev->unit, dev->desc,
 	    (dev->parent? "":"no "),
 	    (TAILQ_EMPTY(&dev->children)? "no ":""),
@@ -5366,7 +5314,6 @@ print_device_short(device_t dev, int indent)
 	    (dev->flags&DF_FIXEDCLASS? "fixed,":""),
 	    (dev->flags&DF_WILDCARD? "wildcard,":""),
 	    (dev->flags&DF_DESCMALLOCED? "descmalloced,":""),
-	    (dev->flags&DF_REBID? "rebiddable,":""),
 	    (dev->flags&DF_SUSPENDED? "suspended,":""),
 	    (dev->ivars? "":"no "),
 	    (dev->softc? "":"no "),
@@ -5579,9 +5526,9 @@ sysctl_devices(SYSCTL_HANDLER_ARGS)
 	if (dev->driver != NULL)
 		sbuf_cat(&sb, dev->driver->name);
 	sbuf_putc(&sb, '\0');
-	bus_child_pnpinfo_sb(dev, &sb);
+	bus_child_pnpinfo(dev, &sb);
 	sbuf_putc(&sb, '\0');
-	bus_child_location_sb(dev, &sb);
+	bus_child_location(dev, &sb);
 	sbuf_putc(&sb, '\0');
 	error = sbuf_finish(&sb);
 	if (error == 0)
@@ -5768,7 +5715,7 @@ devctl2_ioctl(struct cdev *cdev, u_long cmd, caddr_t data, int fflag,
 	/* Perform the requested operation. */
 	switch (cmd) {
 	case DEV_ATTACH:
-		if (device_is_attached(dev) && (dev->flags & DF_REBID) == 0)
+		if (device_is_attached(dev))
 			error = EBUSY;
 		else if (!device_is_enabled(dev))
 			error = ENXIO;

@@ -34,7 +34,6 @@ CONFS=	DAEMON \
 	geli2 \
 	gptboot \
 	growfs \
-	gssd \
 	hostid \
 	hostid_save \
 	hostname \
@@ -78,6 +77,7 @@ CONFS=	DAEMON \
 	pf \
 	pflog \
 	pfsync \
+	powerd \
 	ppp \
 	pppoed \
 	pwcheck \
@@ -135,10 +135,6 @@ ACPI=		power_profile
 ACPIPACKAGE=	acpi
 .endif
 
-.if ${MK_ACPI} != "no" || ${MK_APM} != "no"
-CONFS+=		powerd
-.endif
-
 .if ${MK_APM} != "no"
 CONFGROUPS+=	APM
 APM+=		apm
@@ -192,6 +188,12 @@ CONFS+=		ccd
 
 .if ${MK_FTP} != "no"
 CONFS+=		ftpd
+.endif
+
+.if ${MK_GSSAPI} != "no"
+CONFGROUPS+=	GSSD
+GSSD=		gssd
+GSSDPACKAGE=	kerberos
 .endif
 
 .if ${MK_HAST} != "no"

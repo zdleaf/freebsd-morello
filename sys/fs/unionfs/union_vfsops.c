@@ -74,7 +74,7 @@ static struct vfsops unionfs_vfsops;
 static int
 unionfs_domount(struct mount *mp)
 {
-	int		error;
+	struct mount   *lowermp, *uppermp;
 	struct vnode   *lowerrootvp;
 	struct vnode   *upperrootvp;
 	struct unionfs_mount *ump;
@@ -82,18 +82,19 @@ unionfs_domount(struct mount *mp)
 	char           *target;
 	char           *tmp;
 	char           *ep;
-	int		len;
+	struct nameidata nd, *ndp;
+	struct vattr	va;
+	unionfs_copymode copymode;
+	unionfs_whitemode whitemode;
 	int		below;
+	int		error;
+	int		len;
 	uid_t		uid;
 	gid_t		gid;
 	u_short		udir;
 	u_short		ufile;
-	unionfs_copymode copymode;
-	unionfs_whitemode whitemode;
-	struct nameidata nd, *ndp;
-	struct vattr	va;
 
-	UNIONFSDEBUG("unionfs_mount(mp = %p)\n", (void *)mp);
+	UNIONFSDEBUG("unionfs_mount(mp = %p)\n", mp);
 
 	error = 0;
 	below = 0;
@@ -244,8 +245,8 @@ unionfs_domount(struct mount *mp)
 	upperrootvp = ndp->ni_vp;
 
 	/* create unionfs_mount */
-	ump = (struct unionfs_mount *)malloc(sizeof(struct unionfs_mount),
-	    M_UNIONFSMNT, M_WAITOK | M_ZERO);
+	ump = malloc(sizeof(struct unionfs_mount), M_UNIONFSMNT,
+	    M_WAITOK | M_ZERO);
 
 	/*
 	 * Save reference
@@ -285,15 +286,30 @@ unionfs_domount(struct mount *mp)
 	error = unionfs_nodeget(mp, ump->um_uppervp, ump->um_lowervp,
 	    NULLVP, &(ump->um_rootvp), NULL, td);
 	vrele(upperrootvp);
-	if (error) {
+	if (error != 0) {
 		free(ump, M_UNIONFSMNT);
 		mp->mnt_data = NULL;
 		return (error);
 	}
 
+	lowermp = vfs_register_upper_from_vp(ump->um_lowervp, mp,
+	    &ump->um_lower_link);
+	uppermp = vfs_register_upper_from_vp(ump->um_uppervp, mp,
+	    &ump->um_upper_link);
+
+	if (lowermp == NULL || uppermp == NULL) {
+		if (lowermp != NULL)
+			vfs_unregister_upper(lowermp, &ump->um_lower_link);
+		if (uppermp != NULL)
+			vfs_unregister_upper(uppermp, &ump->um_upper_link);
+		free(ump, M_UNIONFSMNT);
+		mp->mnt_data = NULL;
+		return (ENOENT);
+	}
+
 	MNT_ILOCK(mp);
-	if ((ump->um_lowervp->v_mount->mnt_flag & MNT_LOCAL) &&
-	    (ump->um_uppervp->v_mount->mnt_flag & MNT_LOCAL))
+	if ((lowermp->mnt_flag & MNT_LOCAL) != 0 &&
+	    (uppermp->mnt_flag & MNT_LOCAL) != 0)
 		mp->mnt_flag |= MNT_LOCAL;
 	mp->mnt_kern_flag |= MNTK_NOMSYNC | MNTK_UNIONFS;
 	MNT_IUNLOCK(mp);
@@ -324,7 +340,7 @@ unionfs_unmount(struct mount *mp, int mntflags)
 	int		freeing;
 	int		flags;
 
-	UNIONFSDEBUG("unionfs_unmount: mp = %p\n", (void *)mp);
+	UNIONFSDEBUG("unionfs_unmount: mp = %p\n", mp);
 
 	ump = MOUNTTOUNIONFSMOUNT(mp);
 	flags = 0;
@@ -343,6 +359,8 @@ unionfs_unmount(struct mount *mp, int mntflags)
 	if (error)
 		return (error);
 
+	vfs_unregister_upper(ump->um_lowervp->v_mount, &ump->um_lower_link);
+	vfs_unregister_upper(ump->um_uppervp->v_mount, &ump->um_upper_link);
 	free(ump, M_UNIONFSMNT);
 	mp->mnt_data = NULL;
 
@@ -353,7 +371,7 @@ static int
 unionfs_root(struct mount *mp, int flags, struct vnode **vpp)
 {
 	struct unionfs_mount *ump;
-	struct vnode   *vp;
+	struct vnode *vp;
 
 	ump = MOUNTTOUNIONFSMOUNT(mp);
 	vp = ump->um_rootvp;
@@ -371,30 +389,52 @@ unionfs_root(struct mount *mp, int flags, struct vnode **vpp)
 }
 
 static int
-unionfs_quotactl(struct mount *mp, int cmd, uid_t uid, void *arg)
+unionfs_quotactl(struct mount *mp, int cmd, uid_t uid, void *arg,
+    bool *mp_busy)
 {
+	struct mount *uppermp;
 	struct unionfs_mount *ump;
+	int error;
+	bool unbusy;
 
 	ump = MOUNTTOUNIONFSMOUNT(mp);
-
+	uppermp = atomic_load_ptr(&ump->um_uppervp->v_mount);
+	KASSERT(*mp_busy == true, ("upper mount not busy"));
+	/*
+	 * See comment in sys_quotactl() for an explanation of why the
+	 * lower mount needs to be busied by the caller of VFS_QUOTACTL()
+	 * but may be unbusied by the implementation.  We must unbusy
+	 * the upper mount for the same reason; otherwise a namei lookup
+	 * issued by the VFS_QUOTACTL() implementation could traverse the
+	 * upper mount and deadlock.
+	 */
+	vfs_unbusy(mp);
+	*mp_busy = false;
+	unbusy = true;
+	error = vfs_busy(uppermp, 0);
 	/*
 	 * Writing is always performed to upper vnode.
 	 */
-	return (VFS_QUOTACTL(ump->um_uppervp->v_mount, cmd, uid, arg));
+	if (error == 0)
+		error = VFS_QUOTACTL(uppermp, cmd, uid, arg, &unbusy);
+	if (unbusy)
+		vfs_unbusy(uppermp);
+
+	return (error);
 }
 
 static int
 unionfs_statfs(struct mount *mp, struct statfs *sbp)
 {
 	struct unionfs_mount *ump;
-	int		error;
 	struct statfs	*mstat;
 	uint64_t	lbsize;
+	int		error;
 
 	ump = MOUNTTOUNIONFSMOUNT(mp);
 
 	UNIONFSDEBUG("unionfs_statfs(mp = %p, lvp = %p, uvp = %p)\n",
-	    (void *)mp, (void *)ump->um_lowervp, (void *)ump->um_uppervp);
+	    mp, ump->um_lowervp, ump->um_uppervp);
 
 	mstat = malloc(sizeof(struct statfs), M_STATFS, M_WAITOK | M_ZERO);
 

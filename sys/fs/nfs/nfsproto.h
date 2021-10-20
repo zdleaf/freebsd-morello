@@ -73,7 +73,6 @@
  */
 #define	NFS_MAXPKTHDR	404
 #define	NFS_MAXXDR	4096
-#define	NFS_MAXPACKET	(NFS_SRVMAXIO + NFS_MAXXDR)
 #define	NFS_MINPACKET	20
 #define	NFS_FABLKSIZE	512	/* Size in bytes of a block wrt fa_blocks */
 #define	NFSV4_MINORVERSION	0	/* V4 Minor version */
@@ -397,10 +396,16 @@
 /* BindConnectionToSession, done by the krpc for a new connection. */
 #define	NFSPROC_BINDCONNTOSESS	65
 
+/* Do a Lookup+Open for "oneopenown". */
+#define	NFSPROC_LOOKUPOPEN	66
+
+/* Do an NFSv4.2 Deallocate. */
+#define	NFSPROC_DEALLOCATE	67
+
 /*
  * Must be defined as one higher than the last NFSv4.2 Proc# above.
  */
-#define	NFSV42_NPROCS		66
+#define	NFSV42_NPROCS		68
 
 #endif	/* NFS_V3NPROCS */
 
@@ -725,6 +730,10 @@
 #define	NFSCDFS4_FORE		0x1
 #define	NFSCDFS4_BACK		0x2
 #define	NFSCDFS4_BOTH		0x3
+
+/* Enum values for Secinfo_no_name. */
+#define	NFSSECINFONONAME_CURFH	0
+#define	NFSSECINFONONAME_PARENT	1
 
 #if defined(_KERNEL) || defined(KERNEL)
 /* Conversion macros */

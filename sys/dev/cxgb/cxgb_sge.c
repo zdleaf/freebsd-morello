@@ -727,7 +727,7 @@ refill_fl(adapter_t *sc, struct sge_fl *q, int n)
 		} else {
 			if ((cl = m_cljget(NULL, M_NOWAIT, q->buf_size)) == NULL)
 				break;
-			if ((m = m_gethdr(M_NOWAIT, MT_NOINIT)) == NULL) {
+			if ((m = m_gethdr_raw(M_NOWAIT, 0)) == NULL) {
 				uma_zfree(q->zone, cl);
 				break;
 			}
@@ -806,7 +806,7 @@ free_rx_bufs(adapter_t *sc, struct sge_fl *q)
 				uma_zfree(zone_pack, d->m);
 			} else {
 				m_init(d->m, M_NOWAIT, MT_DATA, 0);
-				uma_zfree(zone_mbuf, d->m);
+				m_free_raw(d->m);
 				uma_zfree(q->zone, d->rxsd_cl);
 			}			
 		}
@@ -2773,6 +2773,7 @@ get_packet(adapter_t *adap, unsigned int drop_thres, struct sge_qset *qs,
 		if (mh->mh_tail == NULL) {
 			log(LOG_ERR, "discarding intermediate descriptor entry\n");
 			m_freem(m);
+			m = NULL;
 			break;
 		}
 		mh->mh_tail->m_next = m;
@@ -2780,7 +2781,7 @@ get_packet(adapter_t *adap, unsigned int drop_thres, struct sge_qset *qs,
 		mh->mh_head->m_pkthdr.len += len;
 		break;
 	}
-	if (cxgb_debug)
+	if (cxgb_debug && m != NULL)
 		printf("len=%d pktlen=%d\n", m->m_len, m->m_pkthdr.len);
 done:
 	if (++fl->cidx == fl->size)

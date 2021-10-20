@@ -40,6 +40,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/limits.h>
 #include <sys/lock.h>
 #include <sys/mutex.h>
+#include <sys/reg.h>
 #include <sys/syscallsubr.h>
 #include <sys/sysent.h>
 #include <sys/sysproto.h>
@@ -53,8 +54,6 @@ __FBSDID("$FreeBSD$");
 #include <sys/signalvar.h>
 #include <sys/caprights.h>
 #include <sys/filedesc.h>
-
-#include <machine/reg.h>
 
 #include <security/audit/audit.h>
 
@@ -610,6 +609,19 @@ proc_set_traced(struct proc *p, bool stop)
 	p->p_ptevents = PTRACE_DEFAULT;
 }
 
+void
+ptrace_unsuspend(struct proc *p)
+{
+	PROC_LOCK_ASSERT(p, MA_OWNED);
+
+	PROC_SLOCK(p);
+	p->p_flag &= ~(P_STOPPED_TRACE | P_STOPPED_SIG | P_WAITED);
+	thread_unsuspend(p);
+	PROC_SUNLOCK(p);
+	itimer_proc_continue(p);
+	kqtimer_proc_continue(p);
+}
+
 static int
 proc_can_ptrace(struct thread *td, struct proc *p)
 {
@@ -995,8 +1007,10 @@ kern_ptrace(struct thread *td, int req, pid_t pid, void *addr, int data)
 			break;
 		}
 		bzero(addr, sizeof(td2->td_sa.args));
-		bcopy(td2->td_sa.args, addr, td2->td_sa.callp->sy_narg *
-		    sizeof(register_t));
+		/* See the explanation in linux_ptrace_get_syscall_info(). */
+		bcopy(td2->td_sa.args, addr, SV_PROC_ABI(td->td_proc) ==
+		    SV_ABI_LINUX ? sizeof(td2->td_sa.args) :
+		    td2->td_sa.callp->sy_narg * sizeof(register_t));
 		break;
 
 	case PT_GET_SC_RET:
@@ -1164,12 +1178,7 @@ kern_ptrace(struct thread *td, int req, pid_t pid, void *addr, int data)
 		 * suspended, use PT_SUSPEND to suspend it before
 		 * continuing the process.
 		 */
-		PROC_SLOCK(p);
-		p->p_flag &= ~(P_STOPPED_TRACE | P_STOPPED_SIG | P_WAITED);
-		thread_unsuspend(p);
-		PROC_SUNLOCK(p);
-		itimer_proc_continue(p);
-		kqtimer_proc_continue(p);
+		ptrace_unsuspend(p);
 		break;
 
 	case PT_WRITE_I:
