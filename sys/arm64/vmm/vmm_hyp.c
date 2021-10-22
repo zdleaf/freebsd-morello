@@ -391,6 +391,31 @@ vmm_hyp_read_reg(uint64_t reg)
 	return (0);
 }
 
+static bool
+vmm_is_vpipt_cache(void)
+{
+	/* TODO: Implement */
+	return (0);
+}
+
+static int
+vmm_clean_s2_tlbi(void)
+{
+	dsb(ishst);
+	__asm __volatile("tlbi alle1is");
+
+	/*
+	 * If we have a VPIPT icache it will use the VMID to tag cachelines.
+	 * As we are changing the allocated VMIDs we need to invalidate the
+	 * icache lines containing all old values.
+	 */
+	if (vmm_is_vpipt_cache())
+		__asm __volatile("ic ialluis");
+	dsb(ish);
+
+	return (0);
+}
+
 uint64_t
 vmm_hyp_enter(uint64_t handle, uint64_t x1, uint64_t x2, uint64_t x3,
     uint64_t x4, uint64_t x5, uint64_t x6, uint64_t x7)
@@ -405,6 +430,8 @@ vmm_hyp_enter(uint64_t handle, uint64_t x1, uint64_t x2, uint64_t x3,
 		return (vmm_hyp_call_guest((struct hyp *)x1, x2));
 	case HYP_READ_REGISTER:
 		return (vmm_hyp_read_reg(x1));
+	case HYP_CLEAN_S2_TLBI:
+		return (vmm_clean_s2_tlbi());
 	default:
 		break;
 	}

@@ -78,6 +78,7 @@ static vm_offset_t stack_hyp_va[MAXCPU];
 static vmem_t *el2_mem_alloc;
 
 static void arm_setup_vectors(void *arg);
+static void vmm_pmap_clean_stage2_tlbi(void);
 
 static inline void
 arm64_set_active_vcpu(struct hypctx *hypctx)
@@ -239,6 +240,10 @@ arm_init(int ipinum)
 		return (ENODEV);
 	}
 
+	/* Set up the stage 2 pmap callbacks */
+	MPASS(pmap_clean_stage2_tlbi == NULL);
+	pmap_clean_stage2_tlbi = vmm_pmap_clean_stage2_tlbi;
+
 	/* Create the vmem allocator */
 	el2_mem_alloc = vmem_create("VMM EL2", 0, 0, PAGE_SIZE, 0, M_WAITOK);
 
@@ -392,6 +397,22 @@ arm_vmspace_free(struct vmspace *vmspace)
 {
 
 	vmspace_free(vmspace);
+}
+
+static void
+vmm_pmap_clean_stage2_tlbi(void)
+{
+	/*
+	 * Force all VMs to exit. As the pmap code has changed the vmid
+	 * generation and is holding the vmid lock we don't re-enter
+	 * the VM.
+	 *
+	 * XXX: Unsure if this is needed if running VMs keep the same vmid.
+	 */
+	smp_rendezvous(NULL, NULL, NULL, NULL);
+
+	/* TODO: disable irqs */
+	vmm_call_hyp((void *)HYP_CLEAN_S2_TLBI);
 }
 
 static enum vm_reg_name
@@ -674,7 +695,11 @@ arm_vmrun(void *arg, int vcpu, register_t pc, pmap_t pmap,
 
 		vgic_v3_sync_hwstate(hypctx);
 
-		/* Deactivate the stage2 pmap */
+		/*
+		 * Deactivate the stage2 pmap. vmm_pmap_clean_stage2_tlbi
+		 * depends on this meaning we activate the VM before entering
+		 * the vm again
+		 */
 		PCPU_SET(curvmpmap, NULL);
 		intr_restore(daif);
 
