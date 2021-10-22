@@ -343,7 +343,6 @@ SYSCTL_INT(_vm_pmap_vmid, OID_AUTO, epoch, CTLFLAG_RD, &vmids.asid_epoch, 0,
     "The current epoch number");
 
 void (*pmap_clean_stage2_tlbi)(void);
-void (*pmap_invalidate_vpipt_icache)(void);
 
 /*
  * A pmap's cookie encodes an ASID and epoch number.  Cookies for reserved
@@ -6585,7 +6584,6 @@ pmap_sync_icache(pmap_t pmap, vm_offset_t va, vm_size_t sz)
 static int
 pmap_stage2_fault(pmap_t pmap, uint64_t esr, uint64_t far)
 {
-	pd_entry_t *pdep;
 	pt_entry_t *ptep, pte;
 	int rv, lvl, dfsc;
 
@@ -6595,58 +6593,23 @@ pmap_stage2_fault(pmap_t pmap, uint64_t esr, uint64_t far)
 	/* Data and insn aborts use same encoding for FSC field. */
 	dfsc = esr & ISS_DATA_DFSC_MASK;
 	switch (dfsc) {
-	case ISS_DATA_DFSC_TF_L0:
-	case ISS_DATA_DFSC_TF_L1:
-	case ISS_DATA_DFSC_TF_L2:
-	case ISS_DATA_DFSC_TF_L3:
-		PMAP_LOCK(pmap);
-		pdep = pmap_pde(pmap, far, &lvl);
-		if (pdep == NULL || lvl != (dfsc - ISS_DATA_DFSC_TF_L1)) {
-			PMAP_LOCK(pmap);
-			break;
-		}
-
-		switch (lvl) {
-		case 0:
-			ptep = pmap_l0_to_l1(pdep, far);
-			break;
-		case 1:
-			ptep = pmap_l1_to_l2(pdep, far);
-			break;
-		case 2:
-			ptep = pmap_l2_to_l3(pdep, far);
-			break;
-		default:
-			panic("%s: Invalid pde level %d", __func__,lvl);
-		}
-		goto fault_exec;
-
 	case ISS_DATA_DFSC_AFF_L1:
 	case ISS_DATA_DFSC_AFF_L2:
 	case ISS_DATA_DFSC_AFF_L3:
+		/*
+		 * The access flag is unset. There was no valid map so the
+		 * icache isn't able to be in an inconsistent state.
+		 */
 		PMAP_LOCK(pmap);
 		ptep = pmap_pte(pmap, far, &lvl);
-fault_exec:
 		if (ptep != NULL && (pte = pmap_load(ptep)) != 0) {
-			if (icache_vmid) {
-				pmap_invalidate_vpipt_icache();
-			} else {
-				/*
-				 * If accessing an executable page invalidate
-				 * the I-cache so it will be valid when we
-				 * continue execution in the guest. The D-cache
-				 * is assumed to already be clean to the Point
-				 * of Coherency.
-				 */
-				if ((pte & ATTR_S2_XN_MASK) !=
-				    ATTR_S2_XN(ATTR_S2_XN_NONE)) {
-					invalidate_icache();
-				}
-			}
 			pmap_set_bits(ptep, ATTR_AF | ATTR_DESCR_VALID);
 			rv = KERN_SUCCESS;
 		}
 		PMAP_UNLOCK(pmap);
+		break;
+
+	default:
 		break;
 	}
 
