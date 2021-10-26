@@ -23,6 +23,7 @@ arm/arm/gic_fdt.c				optional fdt
 arm/arm/gic_if.m				standard
 arm/arm/pmu.c					standard
 arm/arm/pmu_fdt.c				optional fdt
+arm/arm/pmu_acpi.c				optional acpi
 arm64/acpica/acpi_iort.c			optional acpi
 arm64/acpica/acpi_machdep.c			optional acpi
 arm64/acpica/OsdEnvironment.c			optional acpi
