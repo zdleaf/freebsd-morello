@@ -1,8 +1,8 @@
 /*-
  * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
  *
- * Copyright (c) 2021 Ruslan Bukin <br@bsdpad.com>
  * Copyright (c) 2020 Greg V <greg@unrelenting.technology>
+ * Copyright (c) 2021 Ruslan Bukin <br@bsdpad.com>
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -43,6 +43,7 @@
 
 struct madt_ctx {
 	struct pmu_softc *sc;
+	int error;
 	int i;
 };
 
@@ -64,6 +65,9 @@ madt_handler(ACPI_SUBTABLE_HEADER *entry, void *arg)
 	rid = ctx->i;
 	cpuid = -1;
 
+	if (ctx->error)
+		return;
+
 	if (entry->Type != ACPI_MADT_TYPE_GENERIC_INTERRUPT)
 		return;
 	intr = (ACPI_MADT_GENERIC_INTERRUPT *)entry;
@@ -76,6 +80,14 @@ madt_handler(ACPI_SUBTABLE_HEADER *entry, void *arg)
 		}
 	}
 
+	if (cpuid == -1) {
+		/* pcpu not found. */
+		device_printf(sc->dev, "MADT: cound not find pcpu, "
+		    "ArmMpidr %lx\n", intr->ArmMpidr);
+		ctx->error = ENODEV;
+		return;
+	}
+
 	if (bootverbose)
 		device_printf(sc->dev, "MADT: cpu %d (mpidr %lu) irq %d "
 		    "%s-triggered\n", cpuid, intr->ArmMpidr,
@@ -83,30 +95,30 @@ madt_handler(ACPI_SUBTABLE_HEADER *entry, void *arg)
 		    (intr->Flags & ACPI_MADT_PERFORMANCE_IRQ_MODE) ?
 		    "edge" : "level");
 
-	BUS_SET_RESOURCE(device_get_parent(sc->dev), sc->dev, SYS_RES_IRQ,
-	    ctx->i, intr->PerformanceInterrupt, 1);
+	bus_set_resource(sc->dev, SYS_RES_IRQ, ctx->i,
+	    intr->PerformanceInterrupt, 1);
 
 	sc->irq[ctx->i].res = bus_alloc_resource_any(sc->dev, SYS_RES_IRQ,
 	    &rid, RF_ACTIVE | RF_SHAREABLE);
-	if (sc->irq[ctx->i].res == NULL)
-		device_printf(sc->dev, "failed to allocate IRQ %d\n", ctx->i);
+	if (sc->irq[ctx->i].res == NULL) {
+		device_printf(sc->dev, "Failed to allocate IRQ %d\n", ctx->i);
+		ctx->error = ENXIO;
+		return;
+	}
 
 	/*
 	 * BUS_CONFIG_INTR does nothing on arm64, so we manually set trigger
 	 * mode.
 	 */
 	data = rman_get_virtual(sc->irq[ctx->i].res);
-	if (data->type == INTR_MAP_DATA_ACPI) {
-		ad = (struct intr_map_data_acpi *)data;
-		ad->trig = (intr->Flags & ACPI_MADT_PERFORMANCE_IRQ_MODE) ?
-			INTR_TRIGGER_EDGE : INTR_TRIGGER_LEVEL;
-		ad->pol = INTR_POLARITY_HIGH;
-	}
+	KASSERT(data->type == INTR_MAP_DATA_ACPI, ("Wrong data type"));
+	ad = (struct intr_map_data_acpi *)data;
+	ad->trig = (intr->Flags & ACPI_MADT_PERFORMANCE_IRQ_MODE) ?
+		INTR_TRIGGER_EDGE : INTR_TRIGGER_LEVEL;
+	ad->pol = INTR_POLARITY_HIGH;
 
-	/*
-	 * NOTE: AArch64 ACPI systems always use the GIC.
-	 */
-	if (intr->PerformanceInterrupt >= GIC_FIRST_SPI)
+	/* AArch64 ACPI systems always use the GIC. */
+	if (GIC_IS_SPI(intr->PerformanceInterrupt))
 		sc->irq[ctx->i].cpuid = cpuid;
 
 	ctx->i++;
@@ -154,10 +166,14 @@ pmu_acpi_attach(device_t dev)
 
 	ctx.sc = sc;
 	ctx.i = 0;
+	ctx.error = 0;
 	acpi_walk_subtables(madt + 1, (char *)madt + madt->Header.Length,
 	    madt_handler, &ctx);
 
 	acpi_unmap_table(madt);
+
+	if (ctx.error)
+		return (ctx.error);
 
 	return (pmu_attach(dev));
 }
@@ -169,11 +185,16 @@ static device_method_t pmu_acpi_methods[] = {
 	DEVMETHOD_END,
 };
 
+#if 0
 static driver_t pmu_acpi_driver = {
 	"pmu",
 	pmu_acpi_methods,
 	sizeof(struct pmu_softc),
 };
+#endif
+
+DEFINE_CLASS_0(pmu, pmu_acpi_driver, pmu_acpi_methods,
+    sizeof(struct pmu_softc));
 
 static devclass_t pmu_acpi_devclass;
 
