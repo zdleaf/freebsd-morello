@@ -45,4 +45,9 @@ fi
 
 if [ $(hostname) = "pooh.bsdpad.com" ]; then
 	sudo cp /usr/obj/usr/home/br/dev/freebsd-head/arm64.aarch64/sys/GENERIC/kernel /mnt/tftpboot/root
+	scp /usr/obj/usr/home/br/dev/freebsd-head/arm64.aarch64/sys/GENERIC/kernel 10.8.0.1:/tftpboot/root/
 fi
+
+echo sysctl kern.bootfile=/kernel
+echo kldload pmc
+echo pmcstat -T -S INST_RETIRED
