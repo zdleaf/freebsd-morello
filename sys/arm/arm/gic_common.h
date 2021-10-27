@@ -50,7 +50,24 @@ __BUS_ACCESSOR(gic, bus, GIC, BUS, u_int);
 #define	GIC_FIRST_PPI		16	/* Irqs 16-31 are private (per */
 #define	GIC_LAST_PPI		31	/* core) peripheral interrupts. */
 /* Shared Peripheral Interrupts */
-#define	GIC_FIRST_SPI		32	/* Irqs 32+ are shared peripherals. */
+#define	GIC_FIRST_SPI		32
+#define	GIC_LAST_SPI		1019
+/* Special interrupt number */
+#define	GIC_FIRST_SPECIAL	1020
+#define	GIC_LAST_SPECIAL	1023
+/* Extended PPI */
+#define	GIC_FIRST_EPPI		1056
+#define	GIC_LAST_EPPI		1119
+/* Extended SPI */
+#define	GIC_FIRST_ESPI		4096
+#define	GIC_LAST_ESPI		5119
+/* Local peripheral interrupts. */
+#define	GIC_FIRST_LPI		8192
+
+#define	GIC_IS_SPI(id)		((((id) >= GIC_FIRST_SPI) && \
+				  ((id) <= GIC_LAST_SPI)) || \
+				 (((id) >= GIC_FIRST_ESPI) && \
+				  ((id) <= GIC_LAST_ESPI)))
 
 /* Common register values */
 #define	GICD_CTLR		0x0000				/* v1 ICDDCR */
