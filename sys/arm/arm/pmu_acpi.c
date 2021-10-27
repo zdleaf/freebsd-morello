@@ -36,8 +36,6 @@
 #include <contrib/dev/acpica/include/acpi.h>
 #include <dev/acpica/acpivar.h>
 
-#include <arm/arm/gic_common.h>
-
 #include "acpi_bus_if.h"
 #include "pmu.h"
 
@@ -117,8 +115,7 @@ madt_handler(ACPI_SUBTABLE_HEADER *entry, void *arg)
 		INTR_TRIGGER_EDGE : INTR_TRIGGER_LEVEL;
 	ad->pol = INTR_POLARITY_HIGH;
 
-	/* AArch64 ACPI systems always use the GIC. */
-	if (GIC_IS_SPI(intr->PerformanceInterrupt))
+	if (!intr_is_per_cpu(sc->irq[ctx->i].res))
 		sc->irq[ctx->i].cpuid = cpuid;
 
 	ctx->i++;
@@ -184,14 +181,6 @@ static device_method_t pmu_acpi_methods[] = {
 	DEVMETHOD(device_attach,	pmu_acpi_attach),
 	DEVMETHOD_END,
 };
-
-#if 0
-static driver_t pmu_acpi_driver = {
-	"pmu",
-	pmu_acpi_methods,
-	sizeof(struct pmu_softc),
-};
-#endif
 
 DEFINE_CLASS_0(pmu, pmu_acpi_driver, pmu_acpi_methods,
     sizeof(struct pmu_softc));
