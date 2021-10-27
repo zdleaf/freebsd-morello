@@ -151,6 +151,7 @@ pmu_acpi_attach(device_t dev)
 	struct pmu_softc *sc;
 	struct madt_ctx ctx;
 	ACPI_TABLE_MADT *madt;
+	int i;
 
 	sc = device_get_softc(dev);
 	sc->dev = dev;
@@ -160,6 +161,10 @@ pmu_acpi_attach(device_t dev)
 		device_printf(dev, "Unable to map the MADT table\n");
 		return (ENXIO);
 	}
+
+	/* We have to initialize cpuid to -1. */
+	for (i = 0; i < MAX_RLEN; i++)
+		sc->irq[i].cpuid = -1;
 
 	ctx.sc = sc;
 	ctx.i = 0;
