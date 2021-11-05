@@ -1406,11 +1406,8 @@ vm_handle_paging(struct vm *vm, int vcpuid, bool *retu)
 
 	switch (ESR_ELx_EXCEPTION(vme->u.paging.esr)) {
 	case EXCP_INSN_ABORT_L:
-		ftype = VM_PROT_EXECUTE;
-		break;
 	case EXCP_DATA_ABORT_L:
-		ftype = (esr & ISS_DATA_WnR) == 0 ? VM_PROT_READ :
-		    VM_PROT_READ | VM_PROT_WRITE;
+		ftype = VM_PROT_EXECUTE | VM_PROT_READ | VM_PROT_WRITE;
 		break;
 	default:
 		panic("%s: Invalid exception (esr = %lx)", __func__,
