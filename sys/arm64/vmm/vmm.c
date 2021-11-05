@@ -435,41 +435,6 @@ vm_unmap_mmio(struct vm *vm, vm_paddr_t gpa, size_t len)
 	return (0);
 }
 
-int
-vmm_map_gpa(struct vm *vm, vm_offset_t va, vm_paddr_t gpa, int pages,
-    vm_page_t *ma)
-{
-	size_t len;
-	int cnt;
-
-	KASSERT((gpa & PAGE_MASK) == 0, ("%s: Misaligned guest address %lx",
-	    __func__, gpa));
-	KASSERT((va & PAGE_MASK) == 0, ("%s: Misaligned address %lx", __func__,
-	    va));
-
-	len = pages * PAGE_SIZE;
-	cnt = vm_fault_quick_hold_pages(&vm->vmspace->vm_map, gpa, len,
-	    VM_PROT_READ, ma, pages);
-	if (cnt == -1)
-		return (-1);
-
-	KASSERT(cnt == pages, ("%s: Invalid page count %d != %d", __func__,
-	   cnt, pages));
-	pmap_qenter(va, ma, pages);
-	return (cnt);
-}
-
-void
-vmm_unmap_gpa(struct vm *vm, vm_offset_t va, size_t pages, vm_page_t *ma)
-{
-
-	KASSERT((va & PAGE_MASK) == 0, ("%s: Misaligned address %lx", __func__,
-	    va));
-	pmap_qremove(va, pages);
-	vm_page_unhold_pages(ma, pages);
-}
-
-
 /*
  * Return 'true' if 'gpa' is allocated in the guest address space.
  *
@@ -801,20 +766,6 @@ vm_deregister_inst_handler(struct vm *vm, uint64_t start, uint64_t size)
 }
 
 static int
-vm_mmio_region_match(const void *key, const void *memb)
-{
-	const uint64_t *addr = key;
-	const struct vgic_mmio_region *vmr = memb;
-
-	if (*addr < vmr->start)
-		return (-1);
-	else if (*addr >= vmr->start && *addr < vmr->end)
-		return (0);
-	else
-		return (1);
-}
-
-static int
 vm_handle_inst_emul(struct vm *vm, int vcpuid, bool *retu)
 {
 	struct vm_exit *vme;
@@ -852,41 +803,6 @@ vm_handle_inst_emul(struct vm *vm, int vcpuid, bool *retu)
 out_user:
 	*retu = true;
 	return (0);
-}
-
-static int
-vm_handle_poweroff(struct vm *vm, int vcpuid)
-{
-	return (0);
-}
-
-static int
-vm_handle_psci_call(struct vm *vm, int vcpuid, bool *retu)
-{
-	struct vm_exit *vme;
-	enum vm_suspend_how how;
-	int error;
-
-	vme = vm_exitinfo(vm, vcpuid);
-
-	error = psci_handle_call(vm, vcpuid, vme, retu);
-	if (error)
-		goto out;
-
-	if (vme->exitcode == VM_EXITCODE_SUSPENDED) {
-		how = vme->u.suspended.how;
-		switch (how) {
-		case VM_SUSPEND_POWEROFF:
-			vm_handle_poweroff(vm, vcpuid);
-			break;
-		default:
-			/* Nothing to do */
-			;
-		}
-	}
-
-out:
-	return (error);
 }
 
 int
