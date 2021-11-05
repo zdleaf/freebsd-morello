@@ -100,6 +100,17 @@ __FBSDID("$FreeBSD$");
 	}
 
 int
+pf_nvbool(const nvlist_t *nvl, const char *name, bool *val)
+{
+	if (! nvlist_exists_bool(nvl, name))
+		return (EINVAL);
+
+	*val = nvlist_get_bool(nvl, name);
+
+	return (0);
+}
+
+int
 pf_nvbinary(const nvlist_t *nvl, const char *name, void *data,
     size_t expected_size)
 {
@@ -520,6 +531,7 @@ pf_nvrule_to_krule(const nvlist_t *nvl, struct pf_krule *rule)
 		}
 	}
 
+	PFNV_CHK(pf_nvuint32_opt(nvl, "ridentifier", &rule->ridentifier, 0));
 	PFNV_CHK(pf_nvstring(nvl, "ifname", rule->ifname,
 	    sizeof(rule->ifname)));
 	PFNV_CHK(pf_nvstring(nvl, "qname", rule->qname, sizeof(rule->qname)));
@@ -527,6 +539,9 @@ pf_nvrule_to_krule(const nvlist_t *nvl, struct pf_krule *rule)
 	    sizeof(rule->pqname)));
 	PFNV_CHK(pf_nvstring(nvl, "tagname", rule->tagname,
 	    sizeof(rule->tagname)));
+	PFNV_CHK(pf_nvuint16_opt(nvl, "dnpipe", &rule->dnpipe, 0));
+	PFNV_CHK(pf_nvuint16_opt(nvl, "dnrpipe", &rule->dnrpipe, 0));
+	PFNV_CHK(pf_nvuint32_opt(nvl, "dnflags", &rule->free_flags, 0));
 	PFNV_CHK(pf_nvstring(nvl, "match_tagname", rule->match_tagname,
 	    sizeof(rule->match_tagname)));
 	PFNV_CHK(pf_nvstring(nvl, "overload_tblname", rule->overload_tblname,
@@ -592,8 +607,6 @@ pf_nvrule_to_krule(const nvlist_t *nvl, struct pf_krule *rule)
 	PFNV_CHK(pf_nvuint8(nvl, "return_ttl", &rule->return_ttl));
 	PFNV_CHK(pf_nvuint8(nvl, "tos", &rule->tos));
 	PFNV_CHK(pf_nvuint8(nvl, "set_tos", &rule->set_tos));
-	PFNV_CHK(pf_nvuint8(nvl, "anchor_relative", &rule->anchor_relative));
-	PFNV_CHK(pf_nvuint8(nvl, "anchor_wildcard", &rule->anchor_wildcard));
 
 	PFNV_CHK(pf_nvuint8(nvl, "flush", &rule->flush));
 	PFNV_CHK(pf_nvuint8(nvl, "prio", &rule->prio));
@@ -684,9 +697,13 @@ pf_krule_to_nvrule(struct pf_krule *rule)
 		nvlist_append_string_array(nvl, "labels", rule->label[i]);
 	}
 	nvlist_add_string(nvl, "label", rule->label[0]);
+	nvlist_add_number(nvl, "ridentifier", rule->ridentifier);
 	nvlist_add_string(nvl, "ifname", rule->ifname);
 	nvlist_add_string(nvl, "qname", rule->qname);
 	nvlist_add_string(nvl, "pqname", rule->pqname);
+	nvlist_add_number(nvl, "dnpipe", rule->dnpipe);
+	nvlist_add_number(nvl, "dnrpipe", rule->dnrpipe);
+	nvlist_add_number(nvl, "dnflags", rule->free_flags);
 	nvlist_add_string(nvl, "tagname", rule->tagname);
 	nvlist_add_string(nvl, "match_tagname", rule->match_tagname);
 	nvlist_add_string(nvl, "overload_tblname", rule->overload_tblname);
@@ -840,8 +857,7 @@ pf_nvstate_kill_to_kstate_kill(const nvlist_t *nvl,
 	    sizeof(kill->psk_ifname)));
 	PFNV_CHK(pf_nvstring(nvl, "label", kill->psk_label,
 	    sizeof(kill->psk_label)));
-	if (nvlist_exists_bool(nvl, "kill_match"))
-		kill->psk_kill_match = nvlist_get_bool(nvl, "kill_match");
+	PFNV_CHK(pf_nvbool(nvl, "kill_match", &kill->psk_kill_match));
 
 errout:
 	return (error);

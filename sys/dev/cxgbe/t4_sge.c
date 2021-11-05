@@ -42,6 +42,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/kernel.h>
 #include <sys/ktls.h>
 #include <sys/malloc.h>
+#include <sys/msan.h>
 #include <sys/queue.h>
 #include <sys/sbuf.h>
 #include <sys/taskqueue.h>
@@ -1754,6 +1755,7 @@ get_scatter_segment(struct adapter *sc, struct sge_fl *fl, int fr_offset,
 			return (NULL);
 	}
 	m->m_len = len;
+	kmsan_mark(payload, len, KMSAN_STATE_INITED);
 
 	if (sc->sc_do_rxcopy && len < RX_COPY_THRESHOLD) {
 		/* copy data to mbuf */
@@ -2369,7 +2371,7 @@ static inline int
 needs_eo(struct m_snd_tag *mst)
 {
 
-	return (mst != NULL && mst->type == IF_SND_TAG_TYPE_RATE_LIMIT);
+	return (mst != NULL && mst->sw->type == IF_SND_TAG_TYPE_RATE_LIMIT);
 }
 #endif
 
@@ -2712,7 +2714,7 @@ restart:
 		mst = NULL;
 #endif
 #ifdef KERN_TLS
-	if (mst != NULL && mst->type == IF_SND_TAG_TYPE_TLS) {
+	if (mst != NULL && mst->sw->type == IF_SND_TAG_TYPE_TLS) {
 		int len16;
 
 		cflags |= MC_TLS;
@@ -4163,6 +4165,15 @@ add_ofld_rxq_sysctls(struct sysctl_ctx_list *ctx, struct sysctl_oid *oid,
 	SYSCTL_ADD_U64(ctx, children, OID_AUTO, "fl_pdus",
 	    CTLFLAG_RD, &ofld_rxq->rx_iscsi_fl_pdus, 0,
 	    "# of PDUs with data delivered in freelist");
+	SYSCTL_ADD_U64(ctx, children, OID_AUTO, "padding_errors",
+	    CTLFLAG_RD, &ofld_rxq->rx_iscsi_padding_errors, 0,
+	    "# of PDUs with invalid padding");
+	SYSCTL_ADD_U64(ctx, children, OID_AUTO, "header_digest_errors",
+	    CTLFLAG_RD, &ofld_rxq->rx_iscsi_header_digest_errors, 0,
+	    "# of PDUs with invalid header digests");
+	SYSCTL_ADD_U64(ctx, children, OID_AUTO, "data_digest_errors",
+	    CTLFLAG_RD, &ofld_rxq->rx_iscsi_data_digest_errors, 0,
+	    "# of PDUs with invalid data digests");
 }
 #endif
 

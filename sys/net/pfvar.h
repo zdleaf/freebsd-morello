@@ -561,8 +561,11 @@ struct pf_kpool {
 };
 
 struct pf_rule_actions {
-	u_int32_t       qid;
-	u_int32_t       pqid;
+	uint16_t	 qid;
+	uint16_t	 pqid;
+	uint16_t	 dnpipe;
+	uint16_t	 dnrpipe;	/* Reverse direction pipe */
+	uint32_t	 flags;
 };
 
 union pf_krule_ptr {
@@ -575,6 +578,7 @@ struct pf_krule {
 	struct pf_rule_addr	 dst;
 	union pf_krule_ptr	 skip[PF_SKIP_COUNT];
 	char			 label[PF_RULE_MAX_LABEL_COUNT][PF_RULE_LABEL_SIZE];
+	uint32_t		 ridentifier;
 	char			 ifname[IFNAMSIZ];
 	char			 qname[PF_QNAME_SIZE];
 	char			 pqname[PF_QNAME_SIZE];
@@ -606,8 +610,11 @@ struct pf_krule {
 		u_int32_t		limit;
 		u_int32_t		seconds;
 	}			 max_src_conn_rate;
-	u_int32_t		 qid;
-	u_int32_t		 pqid;
+	u_int16_t		 qid;
+	u_int16_t		 pqid;
+	u_int16_t		 dnpipe;
+	u_int16_t		 dnrpipe;
+	u_int32_t		 free_flags;
 	u_int32_t		 nr;
 	u_int32_t		 prob;
 	uid_t			 cuid;
@@ -755,6 +762,8 @@ struct pf_state_cmp {
 /*  was	PFSTATE_PFLOW		0x04 */
 #define	PFSTATE_NOSYNC		0x08
 #define	PFSTATE_ACK		0x10
+#define	PFRULE_DN_IS_PIPE	0x40
+#define	PFRULE_DN_IS_QUEUE	0x80
 #define	PFSTATE_SETPRIO		0x0200
 #define	PFSTATE_SETMASK   (PFSTATE_SETPRIO)
 
@@ -856,8 +865,10 @@ struct pf_kstate {
 	u_int32_t		 creation;
 	u_int32_t	 	 expire;
 	u_int32_t		 pfsync_time;
-	u_int32_t                qid;
-	u_int32_t                pqid;
+	u_int16_t                qid;
+	u_int16_t                pqid;
+	u_int16_t		 dnpipe;
+	u_int16_t		 dnrpipe;
 	u_int16_t		 tag;
 	u_int8_t		 log;
 };
@@ -1047,7 +1058,6 @@ struct pf_kanchor {
 	char			 path[MAXPATHLEN];
 	struct pf_kruleset	 ruleset;
 	int			 refcnt;	/* anchor rules */
-	int			 match;	/* XXX: used for pfctl black magic */
 };
 RB_PROTOTYPE(pf_kanchor_global, pf_kanchor, entry_global, pf_anchor_compare);
 RB_PROTOTYPE(pf_kanchor_node, pf_kanchor, entry_node, pf_kanchor_compare);
@@ -1372,8 +1382,12 @@ struct pf_pdesc {
 enum pf_syncookies_mode {
 	PF_SYNCOOKIES_NEVER = 0,
 	PF_SYNCOOKIES_ALWAYS = 1,
-	PF_SYNCOOKIES_MODE_MAX = PF_SYNCOOKIES_ALWAYS
+	PF_SYNCOOKIES_ADAPTIVE = 2,
+	PF_SYNCOOKIES_MODE_MAX = PF_SYNCOOKIES_ADAPTIVE
 };
+
+#define	PF_SYNCOOKIES_HIWATPCT	25
+#define	PF_SYNCOOKIES_LOWATPCT	(PF_SYNCOOKIES_HIWATPCT / 2)
 
 #ifdef _KERNEL
 struct pf_kstatus {
@@ -1392,6 +1406,8 @@ struct pf_kstatus {
 	bool		keep_counters;
 	enum pf_syncookies_mode	syncookies_mode;
 	bool		syncookies_active;
+	uint64_t	syncookies_inflight[2];
+	uint32_t	states_halfopen;
 };
 #endif
 
@@ -1900,9 +1916,7 @@ extern void			 pf_unload_vnet_purge(void);
 extern void			 pf_intr(void *);
 extern void			 pf_purge_expired_src_nodes(void);
 
-extern int			 pf_unlink_state(struct pf_kstate *, u_int);
-#define	PF_ENTER_LOCKED		0x00000001
-#define	PF_RETURN_LOCKED	0x00000002
+extern int			 pf_unlink_state(struct pf_kstate *);
 extern int			 pf_state_insert(struct pfi_kkif *,
 				    struct pfi_kkif *,
 				    struct pf_state_key *,
@@ -2082,7 +2096,6 @@ int		 pf_match_tag(struct mbuf *, struct pf_krule *, int *, int);
 int		 pf_tag_packet(struct mbuf *, struct pf_pdesc *, int);
 int		 pf_addr_cmp(struct pf_addr *, struct pf_addr *,
 		    sa_family_t);
-void		 pf_qid2qname(u_int32_t, char *);
 
 u_int16_t	 pf_get_mss(struct mbuf *, int, u_int16_t, sa_family_t);
 u_int8_t	 pf_get_wscale(struct mbuf *, int, u_int16_t, sa_family_t);

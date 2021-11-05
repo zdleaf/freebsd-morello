@@ -50,6 +50,7 @@ __FBSDID("$FreeBSD$");
 #include <net/pfvar.h>
 #include <arpa/inet.h>
 
+#include <assert.h>
 #include <search.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -60,7 +61,6 @@ __FBSDID("$FreeBSD$");
 #include <errno.h>
 #include <err.h>
 #include <ifaddrs.h>
-#include <inttypes.h>
 #include <unistd.h>
 
 #include "pfctl_parser.h"
@@ -576,9 +576,9 @@ print_status(struct pfctl_status *s, struct pfctl_syncookies *cookies, int opts)
 		    (unsigned long long)s->pcounters[1][1][PF_DROP]);
 	}
 	printf("%-27s %14s %16s\n", "State Table", "Total", "Rate");
-	printf("  %-25s %14" PRIu64 " %14s\n", "current entries", s->states, "");
+	printf("  %-25s %14ju %14s\n", "current entries", s->states, "");
 	TAILQ_FOREACH(c, &s->fcounters, entry) {
-		printf("  %-25s %14" PRIu64 " ", c->name, c->counter);
+		printf("  %-25s %14ju ", c->name, c->counter);
 		if (runtime > 0)
 			printf("%14.1f/s\n",
 			    (double)c->counter / (double)runtime);
@@ -587,10 +587,10 @@ print_status(struct pfctl_status *s, struct pfctl_syncookies *cookies, int opts)
 	}
 	if (opts & PF_OPT_VERBOSE) {
 		printf("Source Tracking Table\n");
-		printf("  %-25s %14" PRIu64 " %14s\n", "current entries",
+		printf("  %-25s %14ju %14s\n", "current entries",
 		    s->src_nodes, "");
 		TAILQ_FOREACH(c, &s->scounters, entry) {
-			printf("  %-25s %14" PRIu64 " ", c->name, c->counter);
+			printf("  %-25s %14ju ", c->name, c->counter);
 			if (runtime > 0)
 				printf("%14.1f/s\n",
 				    (double)c->counter / (double)runtime);
@@ -600,7 +600,7 @@ print_status(struct pfctl_status *s, struct pfctl_syncookies *cookies, int opts)
 	}
 	printf("Counters\n");
 	TAILQ_FOREACH(c, &s->counters, entry) {
-		printf("  %-25s %14" PRIu64 " ", c->name, c->counter);
+		printf("  %-25s %14ju ", c->name, c->counter);
 		if (runtime > 0)
 			printf("%14.1f/s\n",
 			    (double)c->counter / (double)runtime);
@@ -610,7 +610,7 @@ print_status(struct pfctl_status *s, struct pfctl_syncookies *cookies, int opts)
 	if (opts & PF_OPT_VERBOSE) {
 		printf("Limit Counters\n");
 		TAILQ_FOREACH(c, &s->lcounters, entry) {
-			printf("  %-25s %14" PRIu64 " ", c->name, c->counter);
+			printf("  %-25s %14ju ", c->name, c->counter);
 			if (runtime > 0)
 				printf("%14.1f/s\n",
 				    (double)c->counter / (double)runtime);
@@ -619,9 +619,9 @@ print_status(struct pfctl_status *s, struct pfctl_syncookies *cookies, int opts)
 		}
 
 		printf("Syncookies\n");
+		assert(cookies->mode <= PFCTL_SYNCOOKIES_ADAPTIVE);
 		printf("  %-25s %s\n", "mode",
-		    cookies->mode == PFCTL_SYNCOOKIES_NEVER ?
-		    "never" : "always");
+		    PFCTL_SYNCOOKIES_MODE_NAMES[cookies->mode]);
 	}
 }
 
@@ -1019,6 +1019,17 @@ print_rule(struct pfctl_rule *r, const char *anchor_call, int verbose, int numer
 	i = 0;
 	while (r->label[i][0])
 		printf(" label \"%s\"", r->label[i++]);
+	if (r->ridentifier)
+		printf(" ridentifier %u", r->ridentifier);
+	/* Only dnrpipe as we might do (0, 42) to only queue return traffic. */
+	if (r->dnrpipe)
+		printf(" %s(%d, %d)",
+		    r->free_flags & PFRULE_DN_IS_PIPE ? "dnpipe" : "dnqueue",
+		    r->dnpipe, r->dnrpipe);
+	else if (r->dnpipe)
+		printf(" %s %d",
+		    r->free_flags & PFRULE_DN_IS_PIPE ? "dnpipe" : "dnqueue",
+		    r->dnpipe);
 	if (r->qname[0] && r->pqname[0])
 		printf(" queue(%s, %s)", r->qname, r->pqname);
 	else if (r->qname[0])

@@ -1216,7 +1216,8 @@ __CONCAT(exec_, __elfN(imgact))(struct image_params *imgp)
 	 */
 	if (imgp->credential_setid) {
 		PROC_LOCK(imgp->proc);
-		imgp->proc->p_flag2 &= ~(P2_ASLR_ENABLE | P2_ASLR_DISABLE);
+		imgp->proc->p_flag2 &= ~(P2_ASLR_ENABLE | P2_ASLR_DISABLE |
+		    P2_WXORX_DISABLE | P2_WXORX_ENABLE_EXEC);
 		PROC_UNLOCK(imgp->proc);
 	}
 	if ((sv->sv_flags & SV_ASLR) == 0 ||
@@ -1239,7 +1240,9 @@ __CONCAT(exec_, __elfN(imgact))(struct image_params *imgp)
 			imgp->map_flags |= MAP_ASLR_IGNSTART;
 	}
 
-	if (!__elfN(allow_wx) && (fctl0 & NT_FREEBSD_FCTL_WXNEEDED) == 0)
+	if ((!__elfN(allow_wx) && (fctl0 & NT_FREEBSD_FCTL_WXNEEDED) == 0 &&
+	    (imgp->proc->p_flag2 & P2_WXORX_DISABLE) == 0) ||
+	    (imgp->proc->p_flag2 & P2_WXORX_ENABLE_EXEC) != 0)
 		imgp->map_flags |= MAP_WXORX;
 
 	error = exec_new_vmspace(imgp, sv);
@@ -2681,7 +2684,7 @@ __elfN(untrans_prot)(vm_prot_t prot)
 	return (flags);
 }
 
-void
+vm_size_t
 __elfN(stackgap)(struct image_params *imgp, uintptr_t *stack_base)
 {
 	uintptr_t range, rbase, gap;
@@ -2689,7 +2692,7 @@ __elfN(stackgap)(struct image_params *imgp, uintptr_t *stack_base)
 
 	pct = __elfN(aslr_stack_gap);
 	if (pct == 0)
-		return;
+		return (0);
 	if (pct > 50)
 		pct = 50;
 	range = imgp->eff_stack_sz * pct / 100;
@@ -2697,4 +2700,5 @@ __elfN(stackgap)(struct image_params *imgp, uintptr_t *stack_base)
 	gap = rbase % range;
 	gap &= ~(sizeof(u_long) - 1);
 	*stack_base -= gap;
+	return (gap);
 }

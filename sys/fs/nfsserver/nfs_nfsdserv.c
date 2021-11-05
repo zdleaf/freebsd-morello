@@ -65,7 +65,6 @@ extern int nfsd_debuglevel;
 extern u_long sb_max_adj;
 extern int nfsrv_pnfsatime;
 extern int nfsrv_maxpnfsmirror;
-extern int nfs_maxcopyrange;
 extern uint32_t nfs_srvmaxio;
 
 static int	nfs_async = 0;
@@ -83,6 +82,23 @@ static bool	nfsrv_openaccess = true;
 SYSCTL_BOOL(_vfs_nfsd, OID_AUTO, v4openaccess, CTLFLAG_RW,
     &nfsrv_openaccess, 0,
     "Enable Linux style NFSv4 Open access check");
+static char nfsrv_scope[NFSV4_OPAQUELIMIT];
+SYSCTL_STRING(_vfs_nfsd, OID_AUTO, scope, CTLFLAG_RWTUN,
+    &nfsrv_scope, NFSV4_OPAQUELIMIT, "Server scope");
+static char nfsrv_owner_major[NFSV4_OPAQUELIMIT];
+SYSCTL_STRING(_vfs_nfsd, OID_AUTO, owner_major, CTLFLAG_RWTUN,
+    &nfsrv_owner_major, NFSV4_OPAQUELIMIT, "Server owner major");
+static uint64_t nfsrv_owner_minor;
+SYSCTL_U64(_vfs_nfsd, OID_AUTO, owner_minor, CTLFLAG_RWTUN,
+    &nfsrv_owner_minor, 0, "Server owner minor");
+/*
+ * Only enable this if all your exported file systems
+ * (or pNFS DSs for the pNFS case) support VOP_ALLOCATE.
+ */
+static bool	nfsrv_doallocate = false;
+SYSCTL_BOOL(_vfs_nfsd, OID_AUTO, enable_v42allocate, CTLFLAG_RW,
+    &nfsrv_doallocate, 0,
+    "Enable NFSv4.2 Allocate operation");
 
 /*
  * This list defines the GSS mechanisms supported.
@@ -604,7 +620,7 @@ nfsrvd_lookup(struct nfsrv_descript *nd, __unused int isdgram,
 		goto out;
 	}
 	if (!nd->nd_repstat) {
-		nd->nd_repstat = nfsvno_namei(nd, &named, dp, 0, exp, p, &dirp);
+		nd->nd_repstat = nfsvno_namei(nd, &named, dp, 0, exp, &dirp);
 	} else {
 		vrele(dp);
 		nfsvno_relpathbuf(&named);
@@ -1206,7 +1222,7 @@ nfsrvd_create(struct nfsrv_descript *nd, __unused int isdgram,
 		goto out;
 	}
 
-	nd->nd_repstat = nfsvno_namei(nd, &named, dp, 1, exp, p, &dirp);
+	nd->nd_repstat = nfsvno_namei(nd, &named, dp, 1, exp, &dirp);
 	if (dirp) {
 		if (nd->nd_flag & ND_NFSV2) {
 			vrele(dirp);
@@ -1412,7 +1428,7 @@ nfsrvd_mknod(struct nfsrv_descript *nd, __unused int isdgram,
 
 	if (vtyp == VDIR)
 		named.ni_cnd.cn_flags |= WILLBEDIR;
-	nd->nd_repstat = nfsvno_namei(nd, &named, dp, 0, exp, p, &dirp);
+	nd->nd_repstat = nfsvno_namei(nd, &named, dp, 0, exp, &dirp);
 	if (nd->nd_repstat) {
 		if (dirp) {
 			if (nd->nd_flag & ND_NFSV3)
@@ -1535,7 +1551,7 @@ nfsrvd_remove(struct nfsrv_descript *nd, __unused int isdgram,
 		goto out;
 	}
 	if (!nd->nd_repstat) {
-		nd->nd_repstat = nfsvno_namei(nd, &named, dp, 1, exp, p, &dirp);
+		nd->nd_repstat = nfsvno_namei(nd, &named, dp, 1, exp, &dirp);
 	} else {
 		vput(dp);
 		nfsvno_relpathbuf(&named);
@@ -1709,7 +1725,7 @@ nfsrvd_rename(struct nfsrv_descript *nd, int isdgram,
 	/*
 	 * Done parsing, now down to business.
 	 */
-	nd->nd_repstat = nfsvno_namei(nd, &fromnd, dp, 0, exp, p, &fdirp);
+	nd->nd_repstat = nfsvno_namei(nd, &fromnd, dp, 0, exp, &fdirp);
 	if (nd->nd_repstat) {
 		if (nd->nd_flag & ND_NFSV3) {
 			nfsrv_wcc(nd, fdirfor_ret, &fdirfor, fdiraft_ret,
@@ -1726,7 +1742,7 @@ nfsrvd_rename(struct nfsrv_descript *nd, int isdgram,
 	}
 	if (vnode_vtype(fromnd.ni_vp) == VDIR)
 		tond.ni_cnd.cn_flags |= WILLBEDIR;
-	nd->nd_repstat = nfsvno_namei(nd, &tond, tdp, 0, &tnes, p, &tdirp);
+	nd->nd_repstat = nfsvno_namei(nd, &tond, tdp, 0, &tnes, &tdirp);
 	nd->nd_repstat = nfsvno_rename(&fromnd, &tond, nd->nd_repstat,
 	    nd->nd_flag, nd->nd_cred, p);
 	if (fdirp)
@@ -1821,7 +1837,7 @@ nfsrvd_link(struct nfsrv_descript *nd, int isdgram,
 		}
 		if (!nd->nd_repstat) {
 			nd->nd_repstat = nfsvno_namei(nd, &named, dp, 0, &tnes,
-			    p, &dirp);
+			    &dirp);
 		} else {
 			if (dp)
 				vrele(dp);
@@ -1896,7 +1912,7 @@ nfsrvd_symlink(struct nfsrv_descript *nd, __unused int isdgram,
 		goto out;
 	}
 	if (!nd->nd_repstat) {
-		nd->nd_repstat = nfsvno_namei(nd, &named, dp, 0, exp, p, &dirp);
+		nd->nd_repstat = nfsvno_namei(nd, &named, dp, 0, exp, &dirp);
 	} else {
 		vrele(dp);
 		nfsvno_relpathbuf(&named);
@@ -2020,7 +2036,7 @@ nfsrvd_mkdir(struct nfsrv_descript *nd, __unused int isdgram,
 		}
 	}
 	if (!nd->nd_repstat) {
-		nd->nd_repstat = nfsvno_namei(nd, &named, dp, 0, exp, p, &dirp);
+		nd->nd_repstat = nfsvno_namei(nd, &named, dp, 0, exp, &dirp);
 	} else {
 		vrele(dp);
 		nfsvno_relpathbuf(&named);
@@ -3022,7 +3038,7 @@ nfsrvd_open(struct nfsrv_descript *nd, __unused int isdgram,
 		}
 		if (!nd->nd_repstat) {
 			nd->nd_repstat = nfsvno_namei(nd, &named, dp, 0, exp,
-			    p, &dirp);
+			    &dirp);
 		} else {
 			vrele(dp);
 			nfsvno_relpathbuf(&named);
@@ -3680,7 +3696,7 @@ nfsrvd_secinfo(struct nfsrv_descript *nd, int isdgram,
 		goto out;
 	}
 	if (!nd->nd_repstat) {
-		nd->nd_repstat = nfsvno_namei(nd, &named, dp, 1, exp, p, &dirp);
+		nd->nd_repstat = nfsvno_namei(nd, &named, dp, 1, exp, &dirp);
 	} else {
 		vput(dp);
 		nfsvno_relpathbuf(&named);
@@ -3814,7 +3830,7 @@ nfsrvd_secinfononame(struct nfsrv_descript *nd, int isdgram,
 			goto nfsmout;
 		}
 		if (nd->nd_repstat == 0)
-			nd->nd_repstat = nfsvno_namei(nd, &named, dp, 1, exp, p, &dirp);
+			nd->nd_repstat = nfsvno_namei(nd, &named, dp, 1, exp, &dirp);
 		else
 			vput(dp);
 		if (dirp != NULL)
@@ -4254,7 +4270,6 @@ nfsrvd_exchangeid(struct nfsrv_descript *nd, __unused int isdgram,
 	nfsquad_t clientid, confirm;
 	uint8_t *verf;
 	uint32_t sp4type, v41flags;
-	uint64_t owner_minor;
 	struct timespec verstime;
 #ifdef INET
 	struct sockaddr_in *sin, *rin;
@@ -4263,6 +4278,7 @@ nfsrvd_exchangeid(struct nfsrv_descript *nd, __unused int isdgram,
 	struct sockaddr_in6 *sin6, *rin6;
 #endif
 	struct thread *p = curthread;
+	char *s;
 
 	if ((nd->nd_repstat = nfsd_checkrootexp(nd)) != 0)
 		goto nfsmout;
@@ -4377,12 +4393,17 @@ nfsrvd_exchangeid(struct nfsrv_descript *nd, __unused int isdgram,
 		*tl++ = txdr_unsigned(confirm.lval[0]);		/* SequenceID */
 		*tl++ = txdr_unsigned(v41flags);		/* Exch flags */
 		*tl++ = txdr_unsigned(NFSV4EXCH_SP4NONE);	/* No SSV */
-		owner_minor = 0;				/* Owner */
-		txdr_hyper(owner_minor, tl);			/* Minor */
-		(void)nfsm_strtom(nd, nd->nd_cred->cr_prison->pr_hostuuid,
-		    strlen(nd->nd_cred->cr_prison->pr_hostuuid)); /* Major */
-		(void)nfsm_strtom(nd, nd->nd_cred->cr_prison->pr_hostuuid,
-		    strlen(nd->nd_cred->cr_prison->pr_hostuuid)); /* Scope */
+		txdr_hyper(nfsrv_owner_minor, tl);	/* Owner Minor */
+		if (nfsrv_owner_major[0] != 0)
+			s = nfsrv_owner_major;
+		else
+			s = nd->nd_cred->cr_prison->pr_hostuuid;
+		nfsm_strtom(nd, s, strlen(s));		/* Owner Major */
+		if (nfsrv_scope[0] != 0)
+			s = nfsrv_scope;
+		else
+			s = nd->nd_cred->cr_prison->pr_hostuuid;
+		nfsm_strtom(nd, s, strlen(s)	);		/* Scope */
 		NFSM_BUILD(tl, uint32_t *, NFSX_UNSIGNED);
 		*tl = txdr_unsigned(1);
 		(void)nfsm_strtom(nd, "freebsd.org", strlen("freebsd.org"));
@@ -5311,6 +5332,16 @@ nfsrvd_allocate(struct nfsrv_descript *nd, __unused int isdgram,
 	nfsquad_t clientid;
 	nfsattrbit_t attrbits;
 
+	if (!nfsrv_doallocate) {
+		/*
+		 * If any exported file system, such as a ZFS one, cannot
+		 * do VOP_ALLOCATE(), this operation cannot be supported
+		 * for NFSv4.2.  This cannot be done 'per filesystem', but
+		 * must be for the entire nfsd NFSv4.2 service.
+		 */
+		nd->nd_repstat = NFSERR_NOTSUPP;
+		goto nfsmout;
+	}
 	gotproxystateid = 0;
 	NFSM_DISSECT(tl, uint32_t *, NFSX_STATEID + 2 * NFSX_HYPER);
 	stp->ls_flags = (NFSLCK_CHECK | NFSLCK_WRITEACCESS);
@@ -5377,9 +5408,13 @@ nfsrvd_allocate(struct nfsrv_descript *nd, __unused int isdgram,
 		nd->nd_repstat = nfsrv_lockctrl(vp, &stp, &lop, NULL, clientid,
 		    &stateid, exp, nd, curthread);
 
+	NFSD_DEBUG(4, "nfsrvd_allocate: off=%jd len=%jd stat=%d\n",
+	    (intmax_t)off, (intmax_t)len, nd->nd_repstat);
 	if (nd->nd_repstat == 0)
 		nd->nd_repstat = nfsvno_allocate(vp, off, len, nd->nd_cred,
 		    curthread);
+	NFSD_DEBUG(4, "nfsrvd_allocate: aft nfsvno_allocate=%d\n",
+	    nd->nd_repstat);
 	vput(vp);
 	NFSEXITCODE2(0, nd);
 	return (0);
@@ -5681,18 +5716,11 @@ nfsrvd_copy_file_range(struct nfsrv_descript *nd, __unused int isdgram,
 			nd->nd_repstat = error;
 	}
 
-	/*
-	 * Do the actual copy to an upper limit of vfs.nfs.maxcopyrange.
-	 * This limit is applied to ensure that the RPC replies in a
-	 * reasonable time.
-	 */
-	if (len > nfs_maxcopyrange)
-		xfer = nfs_maxcopyrange;
-	else
-		xfer = len;
+	xfer = len;
 	if (nd->nd_repstat == 0) {
 		nd->nd_repstat = vn_copy_file_range(vp, &inoff, tovp, &outoff,
-		    &xfer, 0, nd->nd_cred, nd->nd_cred, NULL);
+		    &xfer, COPY_FILE_RANGE_TIMEO1SEC, nd->nd_cred, nd->nd_cred,
+		    NULL);
 		if (nd->nd_repstat == 0)
 			len = xfer;
 	}

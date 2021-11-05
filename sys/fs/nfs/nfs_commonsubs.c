@@ -95,10 +95,6 @@ int nfsrv_maxpnfsmirror = 1;
 SYSCTL_INT(_vfs_nfs, OID_AUTO, pnfsmirror, CTLFLAG_RD,
     &nfsrv_maxpnfsmirror, 0, "Mirror level for pNFS service");
 
-int nfs_maxcopyrange = 10 * 1024 * 1024;
-SYSCTL_INT(_vfs_nfs, OID_AUTO, maxcopyrange, CTLFLAG_RW,
-    &nfs_maxcopyrange, 0, "Max size of a Copy so RPC times reasonable");
-
 /*
  * This array of structures indicates, for V4:
  * retfh - which of 3 types of calling args are used
@@ -4917,13 +4913,8 @@ nfsm_add_ext_pgs(struct mbuf *m, int maxextsiz, int *bextpg)
 		*bextpg = 0;
 		m->m_next = mp;
 	} else {
-		do {
-			pg = vm_page_alloc(NULL, 0, VM_ALLOC_NORMAL |
-			    VM_ALLOC_NOOBJ | VM_ALLOC_NODUMP |
-			    VM_ALLOC_WIRED);
-			if (pg == NULL)
-				vm_wait(NULL);
-		} while (pg == NULL);
+		pg = vm_page_alloc_noobj(VM_ALLOC_WAITOK | VM_ALLOC_NODUMP |
+		    VM_ALLOC_WIRED);
 		m->m_epg_pa[m->m_epg_npgs] = VM_PAGE_TO_PHYS(pg);
 		*bextpg = m->m_epg_npgs;
 		m->m_epg_npgs++;

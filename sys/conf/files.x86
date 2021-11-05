@@ -79,6 +79,9 @@ dev/bxe/57710_init_values.c     optional	bxe pci
 dev/bxe/57711_init_values.c     optional	bxe pci
 dev/bxe/57712_init_values.c     optional	bxe pci
 dev/coretemp/coretemp.c		optional	coretemp
+dev/cp/cpddk.c			optional	cp \
+	compile-with "${NORMAL_C} ${NO_WMISLEADING_INDENTATION}"
+dev/cp/if_cp.c			optional	cp
 dev/cpuctl/cpuctl.c		optional	cpuctl
 dev/dpms/dpms.c			optional	dpms
 dev/fb/fb.c			optional	fb | vga
@@ -285,7 +288,6 @@ libkern/x86/crc32_sse42.c	standard
 #
 x86/acpica/OsdEnvironment.c	optional	acpi
 x86/acpica/acpi_apm.c		optional	acpi
-x86/acpica/acpi_wakeup.c	optional	acpi
 x86/acpica/srat.c		optional	acpi
 x86/bios/vpd.c			optional	vpd
 x86/cpufreq/est.c		optional	cpufreq

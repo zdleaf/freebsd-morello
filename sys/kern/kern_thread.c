@@ -97,11 +97,11 @@ _Static_assert(offsetof(struct proc, p_flag) == 0xb8,
     "struct proc KBI p_flag");
 _Static_assert(offsetof(struct proc, p_pid) == 0xc4,
     "struct proc KBI p_pid");
-_Static_assert(offsetof(struct proc, p_filemon) == 0x3b8,
+_Static_assert(offsetof(struct proc, p_filemon) == 0x3c8,
     "struct proc KBI p_filemon");
-_Static_assert(offsetof(struct proc, p_comm) == 0x3d0,
+_Static_assert(offsetof(struct proc, p_comm) == 0x3e0,
     "struct proc KBI p_comm");
-_Static_assert(offsetof(struct proc, p_emuldata) == 0x4b8,
+_Static_assert(offsetof(struct proc, p_emuldata) == 0x4c8,
     "struct proc KBI p_emuldata");
 #endif
 #ifdef __i386__
@@ -117,11 +117,11 @@ _Static_assert(offsetof(struct proc, p_flag) == 0x6c,
     "struct proc KBI p_flag");
 _Static_assert(offsetof(struct proc, p_pid) == 0x78,
     "struct proc KBI p_pid");
-_Static_assert(offsetof(struct proc, p_filemon) == 0x268,
+_Static_assert(offsetof(struct proc, p_filemon) == 0x270,
     "struct proc KBI p_filemon");
-_Static_assert(offsetof(struct proc, p_comm) == 0x27c,
+_Static_assert(offsetof(struct proc, p_comm) == 0x284,
     "struct proc KBI p_comm");
-_Static_assert(offsetof(struct proc, p_emuldata) == 0x308,
+_Static_assert(offsetof(struct proc, p_emuldata) == 0x310,
     "struct proc KBI p_emuldata");
 #endif
 
@@ -762,6 +762,7 @@ thread_alloc(int pages)
 		return (NULL);
 	}
 	td->td_tid = tid;
+	bzero(&td->td_sa.args, sizeof(td->td_sa.args));
 	kmsan_thread_alloc(td);
 	cpu_thread_alloc(td);
 	EVENTHANDLER_DIRECT_INVOKE(thread_ctor, td);

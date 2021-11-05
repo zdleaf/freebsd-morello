@@ -49,7 +49,7 @@ typedef void (evdev_keycode_t)(struct evdev_dev *,
  * Keyboard and mouse events recipient mask.
  * evdev_rcpt_mask variable should be respected by keyboard and mouse drivers
  * that are able to send events through both evdev and sysmouse/kbdmux
- * interfaces so user can choose prefered one to not receive one event twice.
+ * interfaces so user can choose preferred one to not receive one event twice.
  */
 #define	EVDEV_RCPT_SYSMOUSE	(1<<0)
 #define	EVDEV_RCPT_KBDMUX	(1<<1)
@@ -156,19 +156,12 @@ void evdev_set_flag(struct evdev_dev *, uint16_t);
 void *evdev_get_softc(struct evdev_dev *);
 
 /* Multitouch related functions: */
-int evdev_get_mt_slot_by_tracking_id(struct evdev_dev *, int32_t);
-void evdev_support_mt_compat(struct evdev_dev *);
-void evdev_push_mt_compat(struct evdev_dev *);
+int evdev_mt_id_to_slot(struct evdev_dev *, int32_t);
 int evdev_mt_push_slot(struct evdev_dev *, int, union evdev_mt_slot *);
 int evdev_mt_push_frame(struct evdev_dev *, union evdev_mt_slot *, int);
 void evdev_mt_match_frame(struct evdev_dev *, union evdev_mt_slot *, int);
 union evdev_mt_slot *evdev_mt_get_match_slots(struct evdev_dev *);
 void evdev_mt_push_autorel(struct evdev_dev *);
-static inline int
-evdev_mt_id_to_slot(struct evdev_dev *evdev, int32_t id)
-{
-	return (evdev_get_mt_slot_by_tracking_id(evdev, id));
-}
 
 /* Utility functions: */
 uint16_t evdev_hid2key(int);

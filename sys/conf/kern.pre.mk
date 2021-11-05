@@ -100,7 +100,8 @@ SAN_CFLAGS+=	-DSAN_NEEDS_INTERCEPTORS -DSAN_INTERCEPTOR_PREFIX=kasan \
 		-mllvm -asan-instrument-dynamic-allocas=true \
 		-mllvm -asan-globals=true \
 		-mllvm -asan-use-after-scope=true \
-		-mllvm -asan-instrumentation-with-call-threshold=0
+		-mllvm -asan-instrumentation-with-call-threshold=0 \
+		-mllvm -asan-instrument-byval=false
 .endif
 
 KCSAN_ENABLED!=	grep KCSAN opt_global.h || true ; echo
@@ -297,7 +298,7 @@ LINUXKPI_C=		${NORMAL_C} ${LINUXKPI_INCLUDES}
 # Infiniband C flags.  Correct include paths and omit errors that linux
 # does not honor.
 OFEDINCLUDES=	-I$S/ofed/include -I$S/ofed/include/uapi ${LINUXKPI_INCLUDES}
-OFEDNOERR=	-Wno-cast-qual -Wno-pointer-arith
+OFEDNOERR=	-Wno-cast-qual -Wno-pointer-arith -Wno-redundant-decls
 OFEDCFLAGS=	${CFLAGS:N-I*} -DCONFIG_INFINIBAND_USER_MEM \
 		${OFEDINCLUDES} ${CFLAGS:M-I*} ${OFEDNOERR}
 OFED_C_NOIMP=	${CC} -c -o ${.TARGET} ${OFEDCFLAGS} ${WERROR}

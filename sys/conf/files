@@ -375,31 +375,6 @@ cddl/dev/fbt/fbt.c			optional dtrace_fbt      | dtraceall compile-with "${FBT_C}
 cddl/dev/systrace/systrace.c		optional dtrace_systrace | dtraceall compile-with "${CDDL_C}"
 cddl/dev/prototype.c			optional dtrace_prototype | dtraceall compile-with "${CDDL_C}"
 fs/nfsclient/nfs_clkdtrace.c		optional dtnfscl nfscl   | dtraceall nfscl compile-with "${CDDL_C}"
-compat/cloudabi/cloudabi_clock.c	optional compat_cloudabi32 | compat_cloudabi64
-compat/cloudabi/cloudabi_errno.c	optional compat_cloudabi32 | compat_cloudabi64
-compat/cloudabi/cloudabi_fd.c		optional compat_cloudabi32 | compat_cloudabi64
-compat/cloudabi/cloudabi_file.c		optional compat_cloudabi32 | compat_cloudabi64
-compat/cloudabi/cloudabi_futex.c	optional compat_cloudabi32 | compat_cloudabi64
-compat/cloudabi/cloudabi_mem.c		optional compat_cloudabi32 | compat_cloudabi64
-compat/cloudabi/cloudabi_proc.c		optional compat_cloudabi32 | compat_cloudabi64
-compat/cloudabi/cloudabi_random.c	optional compat_cloudabi32 | compat_cloudabi64
-compat/cloudabi/cloudabi_sock.c		optional compat_cloudabi32 | compat_cloudabi64
-compat/cloudabi/cloudabi_thread.c	optional compat_cloudabi32 | compat_cloudabi64
-compat/cloudabi/cloudabi_vdso.c		optional compat_cloudabi32 | compat_cloudabi64
-compat/cloudabi32/cloudabi32_fd.c	optional compat_cloudabi32
-compat/cloudabi32/cloudabi32_module.c	optional compat_cloudabi32
-compat/cloudabi32/cloudabi32_poll.c	optional compat_cloudabi32
-compat/cloudabi32/cloudabi32_sock.c	optional compat_cloudabi32
-compat/cloudabi32/cloudabi32_syscalls.c	optional compat_cloudabi32
-compat/cloudabi32/cloudabi32_sysent.c	optional compat_cloudabi32
-compat/cloudabi32/cloudabi32_thread.c	optional compat_cloudabi32
-compat/cloudabi64/cloudabi64_fd.c	optional compat_cloudabi64
-compat/cloudabi64/cloudabi64_module.c	optional compat_cloudabi64
-compat/cloudabi64/cloudabi64_poll.c	optional compat_cloudabi64
-compat/cloudabi64/cloudabi64_sock.c	optional compat_cloudabi64
-compat/cloudabi64/cloudabi64_syscalls.c	optional compat_cloudabi64
-compat/cloudabi64/cloudabi64_sysent.c	optional compat_cloudabi64
-compat/cloudabi64/cloudabi64_thread.c	optional compat_cloudabi64
 compat/freebsd32/freebsd32_capability.c	optional compat_freebsd32
 compat/freebsd32/freebsd32_ioctl.c	optional compat_freebsd32
 compat/freebsd32/freebsd32_misc.c	optional compat_freebsd32
@@ -1520,7 +1495,7 @@ t4fw.fwo		optional cxgbe					\
 	no-implicit-rule						\
 	clean		"t4fw.fwo"
 t4fw.fw			optional cxgbe					\
-	dependency	"$S/dev/cxgbe/firmware/t4fw-1.26.0.0.bin"	\
+	dependency	"$S/dev/cxgbe/firmware/t4fw-1.26.2.0.bin"	\
 	compile-with	"${CP} ${.ALLSRC} ${.TARGET}"			\
 	no-obj no-implicit-rule						\
 	clean		"t4fw.fw"
@@ -1554,7 +1529,7 @@ t5fw.fwo		optional cxgbe					\
 	no-implicit-rule						\
 	clean		"t5fw.fwo"
 t5fw.fw			optional cxgbe					\
-	dependency	"$S/dev/cxgbe/firmware/t5fw-1.26.0.0.bin"	\
+	dependency	"$S/dev/cxgbe/firmware/t5fw-1.26.2.0.bin"	\
 	compile-with	"${CP} ${.ALLSRC} ${.TARGET}"			\
 	no-obj no-implicit-rule						\
 	clean		"t5fw.fw"
@@ -1588,7 +1563,7 @@ t6fw.fwo		optional cxgbe					\
 	no-implicit-rule						\
 	clean		"t6fw.fwo"
 t6fw.fw			optional cxgbe					\
-	dependency	"$S/dev/cxgbe/firmware/t6fw-1.26.0.0.bin"	\
+	dependency	"$S/dev/cxgbe/firmware/t6fw-1.26.2.0.bin"	\
 	compile-with	"${CP} ${.ALLSRC} ${.TARGET}"			\
 	no-obj no-implicit-rule						\
 	clean		"t6fw.fw"
@@ -1762,6 +1737,8 @@ dev/e1000/e1000_i210.c		optional em \
 	compile-with "${NORMAL_C} -I$S/dev/e1000"
 dev/e1000/e1000_api.c		optional em \
 	compile-with "${NORMAL_C} -I$S/dev/e1000"
+dev/e1000/e1000_base.c		optional em \
+	compile-with "${NORMAL_C} -I$S/dev/e1000"
 dev/e1000/e1000_mac.c		optional em \
 	compile-with "${NORMAL_C} -I$S/dev/e1000"
 dev/e1000/e1000_manage.c	optional em \
@@ -1782,6 +1759,8 @@ dev/ena/ena.c			optional ena \
 dev/ena/ena_datapath.c		optional ena \
 	compile-with "${NORMAL_C} -I$S/contrib"
 dev/ena/ena_netmap.c		optional ena \
+	compile-with "${NORMAL_C} -I$S/contrib"
+dev/ena/ena_rss.c		optional ena \
 	compile-with "${NORMAL_C} -I$S/contrib"
 dev/ena/ena_sysctl.c 		optional ena \
 	compile-with "${NORMAL_C} -I$S/contrib"
@@ -2038,12 +2017,6 @@ dev/iscsi/icl_conn_if.m		optional cfiscsi | iscsi
 dev/iscsi/icl_soft.c		optional iscsi
 dev/iscsi/icl_soft_proxy.c	optional iscsi
 dev/iscsi/iscsi.c		optional iscsi scbus
-dev/iscsi_initiator/iscsi.c	optional iscsi_initiator scbus
-dev/iscsi_initiator/iscsi_subr.c	optional iscsi_initiator scbus
-dev/iscsi_initiator/isc_cam.c	optional iscsi_initiator scbus
-dev/iscsi_initiator/isc_soc.c	optional iscsi_initiator scbus
-dev/iscsi_initiator/isc_sm.c	optional iscsi_initiator scbus
-dev/iscsi_initiator/isc_subr.c	optional iscsi_initiator scbus
 dev/ismt/ismt.c			optional ismt
 dev/isl/isl.c			optional isl iicbus
 dev/isp/isp.c			optional isp
@@ -2567,6 +2540,7 @@ dev/mmc/mmcbr_if.m		standard
 dev/mmc/mmcbus_if.m		standard
 dev/mmc/mmcsd.c			optional mmcsd !mmccam
 dev/mmc/mmc_fdt_helpers.c	optional ext_resources mmc fdt | ext_resources mmccam fdt
+dev/mmc/mmc_helpers.c		optional ext_resources mmc | ext_resources mmccam
 dev/mmc/mmc_pwrseq.c		optional ext_resources mmc fdt | ext_resources mmccam fdt
 dev/mmc/mmc_pwrseq_if.m		optional ext_resources mmc fdt | ext_resources mmccam fdt
 dev/mmcnull/mmcnull.c		optional mmcnull
@@ -3914,7 +3888,7 @@ kern/kern_idle.c		standard
 kern/kern_intr.c		standard
 kern/kern_jail.c		standard
 kern/kern_kcov.c		optional kcov			\
-	compile-with "${NORMAL_C:N-fsanitize*}"
+	compile-with "${NORMAL_C:N-fsanitize*} ${NORMAL_C:M-fsanitize=kernel-memory}"
 kern/kern_khelp.c		standard
 kern/kern_kthread.c		standard
 kern/kern_ktr.c			optional ktr
@@ -4265,8 +4239,6 @@ net/if_llatbl.c			standard
 net/if_me.c			optional me inet
 net/if_media.c			standard
 net/if_mib.c			standard
-net/if_spppfr.c			optional sppp | netgraph_sppp
-net/if_spppsubr.c		optional sppp | netgraph_sppp
 net/if_stf.c			optional stf inet inet6
 net/if_tuntap.c			optional tuntap
 net/if_vlan.c			optional vlan
@@ -4300,8 +4272,7 @@ net/route/route_tables.c	standard
 net/route/route_temporal.c	standard
 net/rss_config.c		optional inet rss | inet6 rss
 net/rtsock.c			standard
-net/slcompress.c		optional netgraph_vjc | sppp | \
-					 netgraph_sppp
+net/slcompress.c		optional netgraph_vjc
 net/toeplitz.c			optional inet rss | inet6 rss | route_mpath
 net/vnet.c			optional vimage
 net80211/ieee80211.c		optional wlan
@@ -4361,7 +4332,6 @@ netgraph/atm/sscop/ng_sscop.c optional ngatm_sscop \
 netgraph/atm/uni/ng_uni.c	optional ngatm_uni \
 	compile-with "${NORMAL_C} -I$S/contrib/ngatm"
 netgraph/bluetooth/common/ng_bluetooth.c optional netgraph_bluetooth
-netgraph/bluetooth/drivers/h4/ng_h4.c optional netgraph_bluetooth_h4
 netgraph/bluetooth/drivers/ubt/ng_ubt.c optional netgraph_bluetooth_ubt usb
 netgraph/bluetooth/drivers/ubt/ng_ubt_intel.c optional netgraph_bluetooth_ubt usb
 netgraph/bluetooth/drivers/ubtbcmfw/ubtbcmfw.c optional netgraph_bluetooth_ubtbcmfw usb
@@ -4425,7 +4395,6 @@ netgraph/ng_pred1.c		optional netgraph_pred1
 netgraph/ng_rfc1490.c		optional netgraph_rfc1490
 netgraph/ng_socket.c		optional netgraph_socket
 netgraph/ng_split.c		optional netgraph_split
-netgraph/ng_sppp.c		optional netgraph_sppp
 netgraph/ng_tag.c		optional netgraph_tag
 netgraph/ng_tcpmss.c		optional netgraph_tcpmss
 netgraph/ng_tee.c		optional netgraph_tee
@@ -4671,6 +4640,8 @@ compat/linuxkpi/common/src/linux_firmware.c	optional compat_linuxkpi \
 compat/linuxkpi/common/src/linux_fpu.c		optional compat_linuxkpi \
 	compile-with "${LINUXKPI_C}"
 compat/linuxkpi/common/src/linux_hrtimer.c	optional compat_linuxkpi \
+	compile-with "${LINUXKPI_C}"
+compat/linuxkpi/common/src/linux_interrupt.c	optional compat_linuxkpi \
 	compile-with "${LINUXKPI_C}"
 compat/linuxkpi/common/src/linux_kthread.c	optional compat_linuxkpi \
 	compile-with "${LINUXKPI_C}"

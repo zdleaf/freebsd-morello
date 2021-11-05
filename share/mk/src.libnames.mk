@@ -17,8 +17,10 @@ _PRIVATELIBS=	\
 		atf_cxx \
 		auditd \
 		bsdstat \
+		cbor \
 		devdctl \
 		event1 \
+		fido2 \
 		gmock \
 		gtest \
 		gmock_main \
@@ -193,6 +195,7 @@ _LIBRARIES=	\
 		sysdecode \
 		tacplus \
 		termcapw \
+		tinfow \
 		tpool \
 		ufs \
 		ugidfw \
@@ -273,7 +276,7 @@ _DP_ssh=	crypto crypt z
 .if ${MK_LDNS} != "no"
 _DP_ssh+=	ldns
 .endif
-_DP_edit=	ncursesw
+_DP_edit=	tinfow
 .if ${MK_OPENSSL} != "no"
 _DP_bsnmp=	crypto
 .endif
@@ -323,8 +326,8 @@ _DP_fetch=	md
 .endif
 _DP_execinfo=	elf
 _DP_dwarf=	elf
-_DP_dpv=	dialog figpar util ncursesw
-_DP_dialog=	ncursesw m
+_DP_dpv=	dialog figpar util tinfow ncursesw
+_DP_dialog=	tinfow ncursesw m
 _DP_cuse=	pthread
 _DP_atf_cxx=	atf_c
 _DP_gtest=	pthread regex
@@ -337,6 +340,7 @@ _DP_pam=	radius tacplus opie md util
 _DP_pam+=	krb5
 .endif
 .if ${MK_OPENSSH} != "no"
+_DP_fido2+=	crypto z
 _DP_pam+=	ssh
 .endif
 .if ${MK_NIS} != "no"
@@ -375,6 +379,7 @@ _DP_c+=		ssp_nonshared
 _DP_stats=	sbuf pthread
 _DP_stdthreads=	pthread
 _DP_tacplus=	md
+_DP_ncursesw=	tinfow
 _DP_panelw=	ncursesw
 _DP_rpcsec_gss=	gssapi
 _DP_smb=	kiconv
@@ -685,13 +690,16 @@ LIBCAP_NETDIR=	${OBJTOP}/lib/libcasper/services/cap_net
 LIBCAP_PWDDIR=	${OBJTOP}/lib/libcasper/services/cap_pwd
 LIBCAP_SYSCTLDIR=	${OBJTOP}/lib/libcasper/services/cap_sysctl
 LIBCAP_SYSLOGDIR=	${OBJTOP}/lib/libcasper/services/cap_syslog
+LIBCBORDIR=	${OBJTOP}/lib/libcbor
 LIBBSDXMLDIR=	${OBJTOP}/lib/libexpat
+LIBFIDO2DIR=	${OBJTOP}/lib/libfido2
 LIBKVMDIR=	${OBJTOP}/lib/libkvm
 LIBPTHREADDIR=	${OBJTOP}/lib/libthr
 LIBMDIR=	${OBJTOP}/lib/msun
 LIBFORMWDIR=	${OBJTOP}/lib/ncurses/form
 LIBMENUWDIR=	${OBJTOP}/lib/ncurses/menu
 LIBNCURSESWDIR=	${OBJTOP}/lib/ncurses/ncurses
+LIBTINFOWDIR=	${OBJTOP}/lib/ncurses/tinfo
 LIBPANELWDIR=	${OBJTOP}/lib/ncurses/panel
 LIBCRYPTODIR=	${OBJTOP}/secure/lib/libcrypto
 LIBSPLDIR=	${OBJTOP}/cddl/lib/libspl
@@ -701,7 +709,7 @@ LIBTEKENDIR=	${OBJTOP}/sys/teken/libteken
 LIBEGACYDIR=	${OBJTOP}/tools/build
 LIBLNDIR=	${OBJTOP}/usr.bin/lex/lib
 
-LIBTERMCAPWDIR=	${LIBNCURSESWDIR}
+LIBTERMCAPWDIR=	${LIBTINFOWDIR}
 
 # Default other library directories to lib/libNAME.
 .for lib in ${_LIBRARIES}

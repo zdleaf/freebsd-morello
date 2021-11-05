@@ -119,7 +119,7 @@ struct sysentvec {
 	void		(*sv_elf_core_prepare_notes)(struct thread *,
 			    struct note_info_list *, size_t *);
 	int		(*sv_imgact_try)(struct image_params *);
-	void		(*sv_stackgap)(struct image_params *, uintptr_t *);
+	vm_size_t	(*sv_stackgap)(struct image_params *, uintptr_t *);
 	int		(*sv_copyout_auxargs)(struct image_params *,
 			    uintptr_t);
 	int		sv_minsigstksz;	/* minimum signal stack size */
@@ -165,7 +165,7 @@ struct sysentvec {
 #define	SV_IA32		0x004000	/* Intel 32-bit executable. */
 #define	SV_AOUT		0x008000	/* a.out executable. */
 #define	SV_SHP		0x010000	/* Shared page. */
-#define	SV_CAPSICUM	0x020000	/* Force cap_enter() on startup. */
+#define	SV_AVAIL1	0x020000	/* Unused */
 #define	SV_TIMEKEEP	0x040000	/* Shared page timehands. */
 #define	SV_ASLR		0x080000	/* ASLR allowed. */
 #define	SV_RNG_SEED_VER	0x100000	/* random(4) reseed generation. */
@@ -180,7 +180,6 @@ struct sysentvec {
 /* same as ELFOSABI_XXX, to prevent header pollution */
 #define	SV_ABI_LINUX	3
 #define	SV_ABI_FREEBSD 	9
-#define	SV_ABI_CLOUDABI	17
 #define	SV_ABI_UNDEF	255
 
 /* sv_coredump flags */
@@ -325,6 +324,7 @@ void exec_sysvec_init_secondary(struct sysentvec *sv, struct sysentvec *sv2);
 void exec_inittk(void);
 
 void exit_onexit(struct proc *p);
+void exec_free_abi_mappings(struct proc *p);
 void exec_onexec_old(struct thread *td);
 
 #define INIT_SYSENTVEC(name, sv)					\

@@ -751,12 +751,17 @@ gfxfb_blt(void *BltBuffer, GFXFB_BLT_OPERATION BltOperation,
 #if defined(EFI)
 	EFI_STATUS status;
 	EFI_GRAPHICS_OUTPUT *gop = gfx_state.tg_private;
+	EFI_TPL tpl;
 
 	/*
-	 * We assume Blt() does work, if not, we will need to build
-	 * exception list case by case.
+	 * We assume Blt() does work, if not, we will need to build exception
+	 * list case by case. We only have boot services during part of our
+	 * exectution. Once terminate boot services, these operations cannot be
+	 * done as they are provided by protocols that disappear when exit
+	 * boot services.
 	 */
-	if (gop != NULL) {
+	if (gop != NULL && boot_services_active) {
+		tpl = BS->RaiseTPL(TPL_NOTIFY);
 		switch (BltOperation) {
 		case GfxFbBltVideoFill:
 			status = gop->Blt(gop, BltBuffer, EfiBltVideoFill,
@@ -803,6 +808,7 @@ gfxfb_blt(void *BltBuffer, GFXFB_BLT_OPERATION BltOperation,
 			break;
 		}
 
+		BS->RestoreTPL(tpl);
 		return (rv);
 	}
 #endif
@@ -1040,20 +1046,12 @@ void
 gfx_fb_cursor(void *arg, const teken_pos_t *p)
 {
 	teken_gfx_t *state = arg;
-#if defined(EFI)
-	EFI_TPL tpl;
-
-	tpl = BS->RaiseTPL(TPL_NOTIFY);
-#endif
 
 	/* Switch cursor off in old location and back on in new. */
 	if (state->tg_cursor_visible) {
 		gfx_fb_cursor_draw(state, &state->tg_cursor, false);
 		gfx_fb_cursor_draw(state, p, true);
 	}
-#if defined(EFI)
-	BS->RestoreTPL(tpl);
-#endif
 }
 
 void

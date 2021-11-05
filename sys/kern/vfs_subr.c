@@ -122,22 +122,6 @@ static int	v_inval_buf_range_locked(struct vnode *vp, struct bufobj *bo,
 static void	vnlru_recalc(void);
 
 /*
- * These fences are intended for cases where some synchronization is
- * needed between access of v_iflags and lockless vnode refcount (v_holdcnt
- * and v_usecount) updates.  Access to v_iflags is generally synchronized
- * by the interlock, but we have some internal assertions that check vnode
- * flags without acquiring the lock.  Thus, these fences are INVARIANTS-only
- * for now.
- */
-#ifdef INVARIANTS
-#define	VNODE_REFCOUNT_FENCE_ACQ()	atomic_thread_fence_acq()
-#define	VNODE_REFCOUNT_FENCE_REL()	atomic_thread_fence_rel()
-#else
-#define	VNODE_REFCOUNT_FENCE_ACQ()
-#define	VNODE_REFCOUNT_FENCE_REL()
-#endif
-
-/*
  * Number of vnodes in existence.  Increased whenever getnewvnode()
  * allocates a new vnode, decreased in vdropl() for VIRF_DOOMED vnode.
  */
@@ -6188,6 +6172,9 @@ vfs_kqfilter(struct vop_kqfilter_args *ap)
 	struct knote *kn = ap->a_kn;
 	struct knlist *knl;
 
+	KASSERT(vp->v_type != VFIFO || (kn->kn_filter != EVFILT_READ &&
+	    kn->kn_filter != EVFILT_WRITE),
+	    ("READ/WRITE filter on a FIFO leaked through"));
 	switch (kn->kn_filter) {
 	case EVFILT_READ:
 		kn->kn_fop = &vfsread_filtops;
@@ -6313,6 +6300,7 @@ vfs_emptydir(struct vnode *vp)
 	eof = 0;
 
 	ASSERT_VOP_LOCKED(vp, "vfs_emptydir");
+	VNASSERT(vp->v_type == VDIR, vp, ("vp is not a directory"));
 
 	dirent = malloc(sizeof(struct dirent), M_TEMP, M_WAITOK);
 	iov.iov_base = dirent;
@@ -6837,7 +6825,7 @@ vn_dir_check_exec(struct vnode *vp, struct componentname *cnp)
 		return (0);
 	}
 
-	return (VOP_ACCESS(vp, VEXEC, cnp->cn_cred, cnp->cn_thread));
+	return (VOP_ACCESS(vp, VEXEC, cnp->cn_cred, curthread));
 }
 
 /*

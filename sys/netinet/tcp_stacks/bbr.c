@@ -1666,7 +1666,7 @@ bbr_init_sysctls(void)
 	    SYSCTL_CHILDREN(bbr_timeout),
 	    OID_AUTO, "maxrto", CTLFLAG_RW,
 	    &bbr_rto_max_sec, 4,
-	    "Maxiumum RTO in seconds -- should be at least as large as min_rto");
+	    "Maximum RTO in seconds -- should be at least as large as min_rto");
 	SYSCTL_ADD_S32(&bbr_sysctl_ctx,
 	    SYSCTL_CHILDREN(bbr_timeout),
 	    OID_AUTO, "tlp_retry", CTLFLAG_RW,
@@ -7593,14 +7593,12 @@ proc_sack:
 			}
 			sack_blocks[num_sack_blks] = sack;
 			num_sack_blks++;
-#ifdef NETFLIX_STATS
 		} else if (SEQ_LEQ(sack.start, th_ack) &&
 		    SEQ_LEQ(sack.end, th_ack)) {
 			/*
 			 * Its a D-SACK block.
 			 */
-			tcp_record_dsack(sack.start, sack.end);
-#endif
+			tcp_record_dsack(tp, sack.start, sack.end, 0);
 		}
 	}
 	if (num_sack_blks == 0)
@@ -14254,6 +14252,12 @@ bbr_set_sockopt(struct socket *so, struct sockopt *sopt,
 {
 	struct epoch_tracker et;
 	int32_t error = 0, optval;
+
+	switch (sopt->sopt_level) {
+	case IPPROTO_IPV6:
+	case IPPROTO_IP:
+		return (tcp_default_ctloutput(so, sopt, inp, tp));
+	}
 
 	switch (sopt->sopt_name) {
 	case TCP_RACK_PACE_MAX_SEG:

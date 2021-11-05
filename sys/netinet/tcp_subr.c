@@ -390,6 +390,30 @@ static int tcp_fb_cnt = 0;
 struct tcp_funchead t_functions;
 static struct tcp_function_block *tcp_func_set_ptr = &tcp_def_funcblk;
 
+void
+tcp_record_dsack(struct tcpcb *tp, tcp_seq start, tcp_seq end, int tlp)
+{
+	TCPSTAT_INC(tcps_dsack_count);
+	tp->t_dsack_pack++;
+	if (tlp == 0) {
+		if (SEQ_GT(end, start)) {
+			tp->t_dsack_bytes += (end - start);
+			TCPSTAT_ADD(tcps_dsack_bytes, (end - start));
+		} else {
+			tp->t_dsack_tlp_bytes += (start - end);
+			TCPSTAT_ADD(tcps_dsack_bytes, (start - end));
+		}
+	} else {
+		if (SEQ_GT(end, start)) {
+			tp->t_dsack_bytes += (end - start);
+			TCPSTAT_ADD(tcps_dsack_tlp_bytes, (end - start));
+		} else {
+			tp->t_dsack_tlp_bytes += (start - end);
+			TCPSTAT_ADD(tcps_dsack_tlp_bytes, (start - end));
+		}
+	}
+}
+
 static struct tcp_function_block *
 find_tcp_functions_locked(struct tcp_function_set *fs)
 {
@@ -447,6 +471,37 @@ find_and_ref_tcp_fb(struct tcp_function_block *blk)
 		refcount_acquire(&rblk->tfb_refcnt);
 	rw_runlock(&tcp_function_lock);
 	return(rblk);
+}
+
+/* Find a matching alias for the given tcp_function_block. */
+int
+find_tcp_function_alias(struct tcp_function_block *blk,
+    struct tcp_function_set *fs)
+{
+	struct tcp_function *f;
+	int found;
+
+	found = 0;
+	rw_rlock(&tcp_function_lock);
+	TAILQ_FOREACH(f, &t_functions, tf_next) {
+		if ((f->tf_fb == blk) &&
+		    (strncmp(f->tf_name, blk->tfb_tcp_block_name,
+		        TCP_FUNCTION_NAME_LEN_MAX) != 0)) {
+			/* Matching function block with different name. */
+			strncpy(fs->function_set_name, f->tf_name,
+			    TCP_FUNCTION_NAME_LEN_MAX);
+			found = 1;
+			break;
+		}
+	}
+	/* Null terminate the string appropriately. */
+	if (found) {
+		fs->function_set_name[TCP_FUNCTION_NAME_LEN_MAX - 1] = '\0';
+	} else {
+		fs->function_set_name[0] = '\0';
+	}
+	rw_runlock(&tcp_function_lock);
+	return (found);
 }
 
 static struct tcp_function_block *
@@ -719,7 +774,7 @@ tcp_over_udp_stop(void)
 {
 	/*
 	 * This function assumes sysctl caller holds inp_rinfo_lock()
-	 * for writting!
+	 * for writing!
 	 */
 #ifdef INET
 	if (V_udp4_tun_socket != NULL) {
@@ -748,7 +803,7 @@ tcp_over_udp_start(void)
 #endif
 	/*
 	 * This function assumes sysctl caller holds inp_info_rlock()
-	 * for writting!
+	 * for writing!
 	 */
 	port = V_tcp_udp_tunneling_port;
 	if (ntohs(port) == 0) {
@@ -3504,6 +3559,41 @@ tcp_maxmtu6(struct in_conninfo *inc, struct tcp_ifcap *cap)
 
 	return (maxmtu);
 }
+
+/*
+ * Handle setsockopt(IPV6_USE_MIN_MTU) by a TCP stack.
+ *
+ * XXXGL: we are updating inpcb here with INC_IPV6MINMTU flag.
+ * The right place to do that is ip6_setpktopt() that has just been
+ * executed.  By the way it just filled ip6po_minmtu for us.
+ */
+void
+tcp6_use_min_mtu(struct tcpcb *tp)
+{
+	struct inpcb *inp = tp->t_inpcb;
+
+	INP_WLOCK_ASSERT(inp);
+	/*
+	 * In case of the IPV6_USE_MIN_MTU socket
+	 * option, the INC_IPV6MINMTU flag to announce
+	 * a corresponding MSS during the initial
+	 * handshake.  If the TCP connection is not in
+	 * the front states, just reduce the MSS being
+	 * used.  This avoids the sending of TCP
+	 * segments which will be fragmented at the
+	 * IPv6 layer.
+	 */
+	inp->inp_inc.inc_flags |= INC_IPV6MINMTU;
+	if ((tp->t_state >= TCPS_SYN_SENT) &&
+	    (inp->inp_inc.inc_flags & INC_ISIPV6)) {
+		struct ip6_pktopts *opt;
+
+		opt = inp->in6p_outputopts;
+		if (opt != NULL && opt->ip6po_minmtu == IP6PO_MINMTU_ALL &&
+		    tp->t_maxseg > TCP6_MSS)
+			tp->t_maxseg = TCP6_MSS;
+	}
+}
 #endif /* INET6 */
 
 /*
@@ -4003,6 +4093,9 @@ tcp_inptoxtp(const struct inpcb *inp, struct xtcpcb *xt)
 		xt->t_snd_wnd = tp->snd_wnd;
 		xt->t_snd_cwnd = tp->snd_cwnd;
 		xt->t_snd_ssthresh = tp->snd_ssthresh;
+		xt->t_dsack_bytes = tp->t_dsack_bytes;
+		xt->t_dsack_tlp_bytes = tp->t_dsack_tlp_bytes;
+		xt->t_dsack_pack = tp->t_dsack_pack;
 		xt->t_maxseg = tp->t_maxseg;
 		xt->xt_ecn = (tp->t_flags2 & TF2_ECN_PERMIT) ? 1 : 0 +
 			     (tp->t_flags2 & TF2_ACE_PERMIT) ? 2 : 0;

@@ -966,6 +966,12 @@ vfs_donmount(struct thread *td, uint64_t fsflags, struct uio *fsoptions)
 	}
 
 	error = vfs_domount(td, fstype, fspath, fsflags, &optlist);
+	if (error == ENOENT) {
+		error = EINVAL;
+		if (errmsg != NULL)
+			strncpy(errmsg, "Invalid fstype", errmsg_len);
+		goto bail;
+	}
 
 	/*
 	 * See if we can mount in the read-only mode if the error code suggests
@@ -1089,14 +1095,6 @@ vfs_domount_first(
 	ASSERT_VOP_ELOCKED(vp, __func__);
 	KASSERT((fsflags & MNT_UPDATE) == 0, ("MNT_UPDATE shouldn't be here"));
 
-	if ((fsflags & MNT_EMPTYDIR) != 0) {
-		error = vfs_emptydir(vp);
-		if (error != 0) {
-			vput(vp);
-			return (error);
-		}
-	}
-
 	/*
 	 * If the jail of the calling thread lacks permission for this type of
 	 * file system, or is trying to cover its own root, deny immediately.
@@ -1118,6 +1116,8 @@ vfs_domount_first(
 		error = vinvalbuf(vp, V_SAVE, 0, 0);
 	if (error == 0 && vp->v_type != VDIR)
 		error = ENOTDIR;
+	if (error == 0 && (fsflags & MNT_EMPTYDIR) != 0)
+		error = vfs_emptydir(vp);
 	if (error == 0) {
 		VI_LOCK(vp);
 		if ((vp->v_iflag & VI_MOUNT) == 0 && vp->v_mountedhere == NULL)
@@ -1525,12 +1525,13 @@ vfs_domount(
 	vfsp = NULL;
 	if ((fsflags & MNT_UPDATE) == 0) {
 		/* Don't try to load KLDs if we're mounting the root. */
-		if (fsflags & MNT_ROOTFS)
-			vfsp = vfs_byname(fstype);
-		else
-			vfsp = vfs_byname_kld(fstype, td, &error);
-		if (vfsp == NULL)
-			return (ENODEV);
+		if (fsflags & MNT_ROOTFS) {
+			if ((vfsp = vfs_byname(fstype)) == NULL)
+				return (ENODEV);
+		} else {
+			if ((vfsp = vfs_byname_kld(fstype, td, &error)) == NULL)
+				return (error);
+		}
 	}
 
 	/*

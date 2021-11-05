@@ -1585,13 +1585,14 @@ m_snd_tag_alloc(struct ifnet *ifp, union if_snd_tag_alloc_params *params,
 }
 
 void
-m_snd_tag_init(struct m_snd_tag *mst, struct ifnet *ifp, u_int type)
+m_snd_tag_init(struct m_snd_tag *mst, struct ifnet *ifp,
+    const struct if_snd_tag_sw *sw)
 {
 
 	if_ref(ifp);
 	mst->ifp = ifp;
 	refcount_init(&mst->refcount, 1);
-	mst->type = type;
+	mst->sw = sw;
 	counter_u64_add(snd_tag_count, 1);
 }
 
@@ -1601,7 +1602,7 @@ m_snd_tag_destroy(struct m_snd_tag *mst)
 	struct ifnet *ifp;
 
 	ifp = mst->ifp;
-	ifp->if_snd_tag_free(mst);
+	mst->sw->snd_tag_free(mst);
 	if_rele(ifp);
 	counter_u64_add(snd_tag_count, -1);
 }
@@ -1623,8 +1624,8 @@ mb_alloc_ext_plus_pages(int len, int how)
 	npgs = howmany(len, PAGE_SIZE);
 	for (i = 0; i < npgs; i++) {
 		do {
-			pg = vm_page_alloc(NULL, 0, VM_ALLOC_NORMAL |
-			    VM_ALLOC_NOOBJ | VM_ALLOC_NODUMP | VM_ALLOC_WIRED);
+			pg = vm_page_alloc_noobj(VM_ALLOC_NODUMP |
+			    VM_ALLOC_WIRED);
 			if (pg == NULL) {
 				if (how == M_NOWAIT) {
 					m->m_epg_npgs = i;

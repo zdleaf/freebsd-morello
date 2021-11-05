@@ -112,8 +112,8 @@ static int		 pf_rollback_altq(u_int32_t);
 static int		 pf_commit_altq(u_int32_t);
 static int		 pf_enable_altq(struct pf_altq *);
 static int		 pf_disable_altq(struct pf_altq *);
-static u_int32_t	 pf_qname2qid(const char *);
-static void		 pf_qid_unref(u_int32_t);
+static uint16_t		 pf_qname2qid(const char *);
+static void		 pf_qid_unref(uint16_t);
 #endif /* ALTQ */
 static int		 pf_begin_rules(u_int32_t *, int, const char *);
 static int		 pf_rollback_rules(u_int32_t, int, char *);
@@ -272,8 +272,6 @@ pfsync_detach_ifnet_t *pfsync_detach_ifnet_ptr;
 
 /* pflog */
 pflog_packet_t			*pflog_packet_ptr = NULL;
-
-extern u_long	pf_ioctl_maxcount;
 
 /*
  * Copy a user-provided string, returning an error if truncation would occur.
@@ -653,23 +651,23 @@ tag_unref(struct pf_tagset *ts, u_int16_t tag)
 		}
 }
 
-static u_int16_t
+static uint16_t
 pf_tagname2tag(const char *tagname)
 {
 	return (tagname2tag(&V_pf_tags, tagname));
 }
 
 #ifdef ALTQ
-static u_int32_t
+static uint16_t
 pf_qname2qid(const char *qname)
 {
-	return ((u_int32_t)tagname2tag(&V_pf_qids, qname));
+	return (tagname2tag(&V_pf_qids, qname));
 }
 
 static void
-pf_qid_unref(u_int32_t qid)
+pf_qid_unref(uint16_t qid)
 {
-	tag_unref(&V_pf_qids, (u_int16_t)qid);
+	tag_unref(&V_pf_qids, qid);
 }
 
 static int
@@ -1814,8 +1812,6 @@ pf_rule_to_krule(const struct pf_rule *rule, struct pf_krule *krule)
 	krule->return_ttl = rule->return_ttl;
 	krule->tos = rule->tos;
 	krule->set_tos = rule->set_tos;
-	krule->anchor_relative = rule->anchor_relative;
-	krule->anchor_wildcard = rule->anchor_wildcard;
 
 	krule->flush = rule->flush;
 	krule->prio = rule->prio;
@@ -2033,19 +2029,20 @@ pf_label_match(const struct pf_krule *rule, const char *label)
 static unsigned int
 pf_kill_matching_state(struct pf_state_key_cmp *key, int dir)
 {
-	struct pf_kstate *match;
+	struct pf_kstate *s;
 	int more = 0;
-	unsigned int killed = 0;
 
-	/* Call with unlocked hashrow */
+	s = pf_find_state_all(key, dir, &more);
+	if (s == NULL)
+		return (0);
 
-	match = pf_find_state_all(key, dir, &more);
-	if (match && !more) {
-		pf_unlink_state(match, 0);
-		killed++;
+	if (more) {
+		PF_STATE_UNLOCK(s);
+		return (0);
 	}
 
-	return (killed);
+	pf_unlink_state(s);
+	return (1);
 }
 
 static int
@@ -2141,7 +2138,7 @@ relock_DIOCKILLSTATES:
 			match_key.port[1] = s->key[idx]->port[0];
 		}
 
-		pf_unlink_state(s, PF_ENTER_LOCKED);
+		pf_unlink_state(s);
 		killed++;
 
 		if (psk->psk_kill_match)
@@ -3163,18 +3160,21 @@ DIOCGETSTATESV2_full:
 			key.port[didx] = pnl->dport;
 
 			state = pf_find_state_all(&key, direction, &m);
-
-			if (m > 1)
-				error = E2BIG;	/* more than one state */
-			else if (state != NULL) {
-				/* XXXGL: not locked read */
-				sk = state->key[sidx];
-				PF_ACPY(&pnl->rsaddr, &sk->addr[sidx], sk->af);
-				pnl->rsport = sk->port[sidx];
-				PF_ACPY(&pnl->rdaddr, &sk->addr[didx], sk->af);
-				pnl->rdport = sk->port[didx];
-			} else
+			if (state == NULL) {
 				error = ENOENT;
+			} else {
+				if (m > 1) {
+					PF_STATE_UNLOCK(state);
+					error = E2BIG;	/* more than one state */
+				} else {
+					sk = state->key[sidx];
+					PF_ACPY(&pnl->rsaddr, &sk->addr[sidx], sk->af);
+					pnl->rsport = sk->port[sidx];
+					PF_ACPY(&pnl->rdaddr, &sk->addr[didx], sk->af);
+					pnl->rdport = sk->port[didx];
+					PF_STATE_UNLOCK(state);
+				}
+			}
 		}
 		break;
 	}
@@ -5008,11 +5008,14 @@ pf_getstatus(struct pfioc_nv *nv)
 	else if (nv->size < nv->len)
 		ERROUT(ENOSPC);
 
+	PF_RULES_RUNLOCK();
 	error = copyout(nvlpacked, nv->data, nv->len);
+	goto done;
 
 #undef ERROUT
 errout:
 	PF_RULES_RUNLOCK();
+done:
 	free(nvlpacked, M_NVLIST);
 	nvlist_destroy(nvc);
 	nvlist_destroy(nvl);
@@ -5037,7 +5040,7 @@ relock:
 			s->timeout = PFTM_PURGE;
 			/* Don't send out individual delete messages. */
 			s->state_flags |= PFSTATE_NOSYNC;
-			pf_unlink_state(s, PF_ENTER_LOCKED);
+			pf_unlink_state(s);
 			goto relock;
 		}
 		PF_HASHROW_UNLOCK(ih);
@@ -5224,7 +5227,7 @@ relock_DIOCCLRSTATES:
 			 * delete messages.
 			 */
 			s->state_flags |= PFSTATE_NOSYNC;
-			pf_unlink_state(s, PF_ENTER_LOCKED);
+			pf_unlink_state(s);
 			killed++;
 
 			if (kill->psk_kill_match)
@@ -5252,7 +5255,7 @@ pf_killstates(struct pf_kstate_kill *kill, unsigned int *killed)
 			kill->psk_pfcmp.creatorid = V_pf_status.hostid;
 		if ((s = pf_find_state_byid(kill->psk_pfcmp.id,
 		    kill->psk_pfcmp.creatorid))) {
-			pf_unlink_state(s, PF_ENTER_LOCKED);
+			pf_unlink_state(s);
 			*killed = 1;
 		}
 		return;
@@ -5613,7 +5616,7 @@ hook_pf(void)
 {
 	struct pfil_hook_args pha;
 	struct pfil_link_args pla;
-	int ret;
+	int ret __diagused;
 
 	if (V_pf_pfil_hooked)
 		return;

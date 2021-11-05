@@ -15,7 +15,6 @@ MAN=	accept_filter.9 \
 	bhnd_erom.9 \
 	bios.9 \
 	bitset.9 \
-	boot.9 \
 	bpf.9 \
 	buf.9 \
 	buf_ring.9 \
@@ -47,6 +46,7 @@ MAN=	accept_filter.9 \
 	bus_generic_read_ivar.9 \
 	bus_generic_shutdown.9 \
 	BUS_GET_CPUS.9 \
+	BUS_GET_PROPERTY.9 \
 	bus_get_resource.9 \
 	bus_map_resource.9 \
 	BUS_NEW_PASS.9 \
@@ -108,6 +108,7 @@ MAN=	accept_filter.9 \
 	device_get_ivars.9 \
 	device_get_name.9 \
 	device_get_parent.9 \
+	device_get_property.9 \
 	device_get_softc.9 \
 	device_get_state.9 \
 	device_get_sysctl.9 \
@@ -193,6 +194,7 @@ MAN=	accept_filter.9 \
 	ithread.9 \
 	kasan.9 \
 	KASSERT.9 \
+	kern_reboot.9 \
 	kern_testfrwk.9 \
 	kernacc.9 \
 	kernel_mount.9 \
@@ -621,6 +623,8 @@ MLINKS+=bitset.9 BITSET_DEFINE.9 \
 	bitset.9 BIT_FFS.9 \
 	bitset.9 BIT_FFS_AT.9 \
 	bitset.9 BIT_FLS.9 \
+	bitset.9 BIT_FOREACH_ISSET.9 \
+	bitset.9 BIT_FOREACH_ISCLR.9 \
 	bitset.9 BIT_COUNT.9 \
 	bitset.9 BIT_SUBSET.9 \
 	bitset.9 BIT_OVERLAP.9 \
@@ -2311,7 +2315,7 @@ MLINKS+=vmem.9 vmem_add.9 \
 	vmem.9 vmem_destroy.9 \
 	vmem.9 vmem_free.9 \
 	vmem.9 vmem_xalloc.9 \
-	vmem.9 vmem_xfree.9  
+	vmem.9 vmem_xfree.9
 MLINKS+=vm_map_lock.9 vm_map_lock_downgrade.9 \
 	vm_map_lock.9 vm_map_lock_read.9 \
 	vm_map_lock.9 vm_map_lock_upgrade.9 \
@@ -2326,6 +2330,17 @@ MLINKS+=vm_map_stack.9 vm_map_growstack.9
 MLINKS+=vm_map_wire.9 vm_map_wire_mapped.9 \
 	vm_page_wire.9 vm_page_unwire.9 \
 	vm_page_wire.9 vm_page_unwire_noq.9
+MLINKS+=vm_page_alloc.9 vm_page_alloc_after.9 \
+	vm_page_alloc.9 vm_page_alloc_contig.9 \
+	vm_page_alloc.9 vm_page_alloc_contig_domain.9 \
+	vm_page_alloc.9 vm_page_alloc_domain.9 \
+	vm_page_alloc.9 vm_page_alloc_domain_after.9 \
+	vm_page_alloc.9 vm_page_alloc_freelist.9 \
+	vm_page_alloc.9 vm_page_alloc_freelist_domain.9 \
+	vm_page_alloc.9 vm_page_alloc_noobj.9 \
+	vm_page_alloc.9 vm_page_alloc_noobj_contig.9 \
+	vm_page_alloc.9 vm_page_alloc_noobj_contig_domain.9 \
+	vm_page_alloc.9 vm_page_alloc_noobj_domain.9
 MLINKS+=vm_page_bits.9 vm_page_clear_dirty.9 \
 	vm_page_bits.9 vm_page_dirty.9 \
 	vm_page_bits.9 vm_page_is_valid.9 \

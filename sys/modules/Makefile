@@ -87,9 +87,6 @@ SUBDIR=	\
 	${_cfi} \
 	${_chromebook_platform} \
 	${_ciss} \
-	cloudabi \
-	${_cloudabi32} \
-	${_cloudabi64} \
 	${_coretemp} \
 	${_cp} \
 	${_cpsw} \
@@ -108,11 +105,11 @@ SUBDIR=	\
 	${_dpms} \
 	dummynet \
 	${_dwwdt} \
+	${_e6000sw} \
 	${_efirt} \
 	${_em} \
 	${_ena} \
 	${_enetc} \
-	${_enetc_mdio} \
 	esp \
 	${_et} \
 	evdev \
@@ -234,6 +231,7 @@ SUBDIR=	\
 	${_mana} \
 	md \
 	mdio \
+	${_mgb} \
 	mem \
 	mfi \
 	mii \
@@ -263,6 +261,7 @@ SUBDIR=	\
 	mxge \
 	my \
 	${_nctgpio} \
+	${_neta} \
 	${_netgraph} \
 	${_nfe} \
 	nfscl \
@@ -353,7 +352,6 @@ SUBDIR=	\
 	${_speaker} \
 	spi \
 	${_splash} \
-	${_sppp} \
 	ste \
 	stge \
 	${_sume} \
@@ -488,7 +486,6 @@ _dpdk_lpm6=	dpdk_lpm6
 .if ${MK_ISCSI} != "no" || defined(ALL_MODULES)
 SUBDIR+=	cfiscsi
 SUBDIR+=	iscsi
-SUBDIR+=	iscsi_initiator
 .endif
 
 .if !empty(OPT_FDT)
@@ -617,13 +614,14 @@ _armv8crypto=	armv8crypto
 _dwwdt=		dwwdt
 _em=		em
 _enetc=		enetc
-_enetc_mdio=	enetc_mdio
 _felix=		felix
 _rockchip=	rockchip
 .endif
 
 .if ${MACHINE_CPUARCH} == "aarch64" || ${MACHINE_CPUARCH} == "arm"
 _sdhci_fdt=	sdhci_fdt
+_e6000sw=	e6000sw
+_neta=		neta
 .endif
 
 .if ${MACHINE_CPUARCH} == "i386" || ${MACHINE_CPUARCH} == "amd64"
@@ -651,6 +649,7 @@ _ixv=		ixv
 _lio=		lio
 .endif
 _mana=		mana
+_mgb=		mgb
 _nctgpio=	nctgpio
 _ntb=		ntb
 _ocs_fc=	ocs_fc
@@ -662,7 +661,6 @@ _rdma=		rdma
 _safe=		safe
 _speaker=	speaker
 _splash=	splash
-_sppp=		sppp
 _p2sb=		p2sb
 _wbwd=		wbwd
 
@@ -730,6 +728,7 @@ _tpm=		tpm
 _twa=		twa
 _vesa=		vesa
 _viawd=		viawd
+_vmd=		vmd
 _wpi=		wpi
 .if ${MK_SOURCELESS_UCODE} != "no"
 _wpifw=		wpifw
@@ -748,7 +747,6 @@ _pms=		pms
 _qlxge=		qlxge
 _qlxgb=		qlxgb
 _sume=		sume
-_vmd=		vmd
 .if ${MK_SOURCELESS_UCODE} != "no"
 _qlxgbe=	qlxgbe
 _qlnx=		qlnx
@@ -811,14 +809,6 @@ _nvram=		opal_nvram
 .if ${MACHINE_CPUARCH} == "powerpc" && ${MACHINE_ARCH} != "powerpcspe"
 # Don't build powermac_nvram for powerpcspe, it's never supported.
 _nvram+=	powermac_nvram
-.endif
-
-.if (${MACHINE_CPUARCH} == "aarch64" || ${MACHINE_CPUARCH} == "amd64" || \
-     ${MACHINE_ARCH:Marmv[67]*} != "" || ${MACHINE_CPUARCH} == "i386")
-_cloudabi32=	cloudabi32
-.endif
-.if ${MACHINE_CPUARCH} == "aarch64" || ${MACHINE_CPUARCH} == "amd64"
-_cloudabi64=	cloudabi64
 .endif
 
 .endif

@@ -50,6 +50,7 @@ MAN=	aac.4 \
 	${_aout.4} \
 	${_apic.4} \
 	arcmsr.4 \
+	arswitch.4 \
 	${_asmc.4} \
 	at45d.4 \
 	ata.4 \
@@ -110,7 +111,6 @@ MAN=	aac.4 \
 	chromebook_platform.4 \
 	${_chvgpio.4} \
 	ciss.4 \
-	cloudabi.4 \
 	${_coretemp.4} \
 	cp2112.4 \
 	${_cpuctl.4} \
@@ -298,6 +298,7 @@ MAN=	aac.4 \
 	mem.4 \
 	meteor.4 \
 	mfi.4 \
+	${_mgb.4} \
 	miibus.4 \
 	mld.4 \
 	mlx.4 \
@@ -353,7 +354,6 @@ MAN=	aac.4 \
 	ng_frame_relay.4 \
 	ng_gif.4 \
 	ng_gif_demux.4 \
-	ng_h4.4 \
 	ng_hci.4 \
 	ng_hole.4 \
 	ng_hub.4 \
@@ -379,7 +379,6 @@ MAN=	aac.4 \
 	ng_socket.4 \
 	ng_source.4 \
 	ng_split.4 \
-	ng_sppp.4 \
 	ng_sscfu.4 \
 	ng_sscop.4 \
 	ng_tag.4 \
@@ -529,7 +528,6 @@ MAN=	aac.4 \
 	spigen.4 \
 	${_spkr.4} \
 	splash.4 \
-	sppp.4 \
 	ste.4 \
 	stf.4 \
 	stge.4 \
@@ -631,8 +629,6 @@ MLINKS+=${_bxe.4} ${_if_bxe.4}
 MLINKS+=cas.4 if_cas.4
 MLINKS+=cdce.4 if_cdce.4
 MLINKS+=cfi.4 cfid.4
-MLINKS+=cloudabi.4 cloudabi32.4 \
-	cloudabi.4 cloudabi64.4
 MLINKS+=crypto.4 cryptodev.4
 MLINKS+=cue.4 if_cue.4
 MLINKS+=cxgb.4 if_cxgb.4
@@ -819,6 +815,7 @@ _igc.4=		igc.4
 _imcsmb.4=	imcsmb.4
 _io.4=		io.4
 _itwd.4=	itwd.4
+_mgb.4=		mgb.4
 _nda.4=		nda.4
 _nfe.4=		nfe.4
 _nfsmb.4=	nfsmb.4
@@ -842,6 +839,7 @@ _tpm.4=		tpm.4
 _urtw.4=	urtw.4
 _viawd.4=	viawd.4
 _vmci.4=	vmci.4
+_vmd.4=		vmd.4
 _vmx.4=		vmx.4
 _wbwd.4=	wbwd.4
 _wpi.4=		wpi.4
@@ -860,7 +858,6 @@ _qlnxe.4=	qlnxe.4
 _sfxge.4=	sfxge.4
 _smartpqi.4=	smartpqi.4
 _sume.4=	sume.4
-_vmd.4=		vmd.4
 
 MLINKS+=qlxge.4 if_qlxge.4
 MLINKS+=qlxgb.4 if_qlxgb.4
@@ -940,7 +937,6 @@ MLINKS+=	efidev.4 efirtc.4
 .if ${MK_ISCSI} != "no"
 MAN+=		cfiscsi.4
 MAN+=		iscsi.4
-MAN+=		iscsi_initiator.4
 MAN+=		iser.4
 .endif
 
