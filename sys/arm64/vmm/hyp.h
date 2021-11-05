@@ -99,6 +99,8 @@
 #define EXCP_TYPE_EL2_ERROR	7
 
 #define	EXCP_TYPE_MAINT_IRQ	8
+/* Used internally in vmm_hyp.c */
+#define	EXCP_TYPE_REENTER	9
 
 #define	HYP_GET_VECTOR_TABLE	-1
 

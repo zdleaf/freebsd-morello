@@ -119,6 +119,8 @@ vmm_hyp_call_guest(struct hyp *hyp, int vcpu)
 	uint64_t tcr_el1, ttbr0_el1, ttbr1_el1, afsr0_el1, sp_el0, sp_el1;
 	uint64_t elr_el1, elr_el2, tpidr_el0, tpidrro_el0, tpidr_el1, vbar_el1;
 	uint64_t ret;
+	uint64_t s1e1r, hpfar_el2;
+	bool hpfar_valid;
 
 	/* TODO: Check cpuid is valid */
 	hypctx = &hyp->ctx[vcpu];
@@ -253,10 +255,6 @@ vmm_hyp_call_guest(struct hyp *hyp, int vcpu)
 	/* Store the guest VFP registers */
 	vfp_store(&hypctx->vfpstate);
 
-	/* Store the exit info */
-	hypctx->exit_info.far_el2 = READ_SPECIALREG(far_el2);
-	hypctx->exit_info.hpfar_el2 = READ_SPECIALREG(hpfar_el2);
-
 	/* Store the special to from the trapframe */
 	hypctx->tf.tf_sp = READ_SPECIALREG(sp_el1);
 	hypctx->tf.tf_elr = READ_SPECIALREG(elr_el2);
@@ -289,6 +287,56 @@ vmm_hyp_call_guest(struct hyp *hyp, int vcpu)
 	hypctx->hcr_el2 = READ_SPECIALREG(hcr_el2);
 	hypctx->vpidr_el2 = READ_SPECIALREG(vpidr_el2);
 	hypctx->vmpidr_el2 = READ_SPECIALREG(vmpidr_el2);
+
+	/* Store the exit info */
+	hypctx->exit_info.far_el2 = READ_SPECIALREG(far_el2);
+	hpfar_valid = true;
+	if (ret == EXCP_TYPE_EL1_SYNC) {
+		switch(ESR_ELx_EXCEPTION(hypctx->tf.tf_esr)) {
+		case EXCP_INSN_ABORT_L:
+		case EXCP_DATA_ABORT_L:
+			/*
+			 * The hpfar_el2 register is valid for:
+			 *  - Translaation and Access faults.
+			 *  - Translaation, Access, and permission faults on
+			 *    the translation table walk on the stage 1 tables.
+			 *  - A stage 2 Address size fault.
+			 *
+			 * As we only need it in the first 2 cases we can just
+			 * exclude it on permission faults that are not from
+			 * the stage 1 table walk.
+			 *
+			 * TODO: Add a case for Arm erratum 834220.
+			 */
+			if ((hypctx->tf.tf_esr & ISS_DATA_S1PTW) != 0)
+				break;
+			switch(hypctx->tf.tf_esr & ISS_DATA_DFSC_MASK) {
+			case ISS_DATA_DFSC_PF_L1:
+			case ISS_DATA_DFSC_PF_L2:
+			case ISS_DATA_DFSC_PF_L3:
+				hpfar_valid = false;
+				break;
+			}
+			break;
+		}
+	}
+	if (hpfar_valid) {
+		hypctx->exit_info.hpfar_el2 = READ_SPECIALREG(hpfar_el2);
+	} else {
+		/*
+		 * TODO: There is a risk the at instruction could cause an
+		 * exception here. We should handle it & return a failure.
+		 */
+		s1e1r =
+		    arm64_address_translate_s1e1r(hypctx->exit_info.far_el2);
+		if (PAR_SUCCESS(s1e1r)) {
+			hpfar_el2 = (s1e1r & PAR_PA_MASK) >> PAR_PA_SHIFT;
+			hpfar_el2 <<= HPFAR_EL2_FIPA_SHIFT;
+			hypctx->exit_info.hpfar_el2 = hpfar_el2;
+		} else {
+			ret = EXCP_TYPE_REENTER;
+		}
+	}
 
 	/* Store the timer registers */
 	hypctx->vtimer_cpu.cntkctl_el1 = READ_SPECIALREG(cntkctl_el1);
@@ -420,6 +468,7 @@ uint64_t
 vmm_hyp_enter(uint64_t handle, uint64_t x1, uint64_t x2, uint64_t x3,
     uint64_t x4, uint64_t x5, uint64_t x6, uint64_t x7)
 {
+	uint64_t ret;
 
 	switch (handle) {
 	case HYP_CLEANUP:
@@ -427,7 +476,10 @@ vmm_hyp_enter(uint64_t handle, uint64_t x1, uint64_t x2, uint64_t x3,
 		/* NOTREACHED */
 		break;
 	case HYP_ENTER_GUEST:
-		return (vmm_hyp_call_guest((struct hyp *)x1, x2));
+		do {
+			ret = vmm_hyp_call_guest((struct hyp *)x1, x2);
+		} while (ret == EXCP_TYPE_REENTER);
+		return (ret);
 	case HYP_READ_REGISTER:
 		return (vmm_hyp_read_reg(x1));
 	case HYP_CLEAN_S2_TLBI:
