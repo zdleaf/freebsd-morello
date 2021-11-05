@@ -19,8 +19,6 @@ SRCS+=	vmm.c		\
 	vmm_stat.c
 
 .if ${MACHINE_CPUARCH} == "aarch64"
-DPSRCS+=	hyp_assym.h
-
 # TODO: Add the new EL2 code
 SRCS+=	vmm_arm64.c \
 	vmm_psci.c \
@@ -31,9 +29,6 @@ SRCS+=	vmm_arm64.c \
 .PATH: ${SRCTOP}/sys/${MACHINE}/vmm/io
 SRCS+=	vgic_v3.c \
 	vtimer.c
-
-CLEANFILES=	hyp_assym.h hyp_genassym.o
-OBJS_DEPEND_GUESS.vmm_hyp.o+= hyp_assym.h
 
 .elif ${MACHINE_CPUARCH} == "amd64"
 DPSRCS+=	vmx_assym.h svm_assym.h
@@ -90,9 +85,6 @@ CLEANFILES=	vmx_assym.h vmx_genassym.o svm_assym.h svm_genassym.o
 OBJS_DEPEND_GUESS.vmx_support.o+= vmx_assym.h
 OBJS_DEPEND_GUESS.svm_support.o+= svm_assym.h
 .endif
-
-hyp_assym.h:    hyp_genassym.o
-	sh ${SYSDIR}/kern/genassym.sh hyp_genassym.o > ${.TARGET}
 
 vmx_assym.h:    vmx_genassym.o
 	sh ${SYSDIR}/kern/genassym.sh vmx_genassym.o > ${.TARGET}
