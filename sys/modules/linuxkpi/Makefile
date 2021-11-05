@@ -14,9 +14,7 @@ SRCS=	linux_compat.c \
 	linux_interrupt.c \
 	linux_kmod.c \
 	linux_kthread.c \
-	linux_kobject.c \
 	linux_lock.c \
-	linux_netdevice.c \
 	linux_page.c \
 	linux_pci.c \
 	linux_radix.c \
@@ -27,7 +25,6 @@ SRCS=	linux_compat.c \
 	linux_shrinker.c \
 	linux_slab.c \
 	linux_tasklet.c \
-	linux_timer.c \
 	linux_usb.c \
 	linux_work.c \
 	linux_xarray.c
