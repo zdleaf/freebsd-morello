@@ -5425,7 +5425,8 @@ retry:
 			 * since the superpage is wired, the current state of
 			 * its reference bit won't affect page replacement.
 			 */
-			if ((((pa >> PAGE_SHIFT) ^ (pv->pv_va >> L2_SHIFT) ^
+			if (pmap->pm_stage == PM_STAGE1 &&
+			    (((pa >> PAGE_SHIFT) ^ (pv->pv_va >> L2_SHIFT) ^
 			    (uintptr_t)pmap) & (Ln_ENTRIES - 1)) == 0 &&
 			    (tpte & ATTR_SW_WIRED) == 0) {
 				pmap_clear_bits(pte, ATTR_AF);
@@ -5475,7 +5476,8 @@ small_mappings:
 		if (pmap_pte_dirty(pmap, tpte))
 			vm_page_dirty(m);
 		if ((tpte & ATTR_AF) != 0) {
-			if ((tpte & ATTR_SW_WIRED) == 0) {
+			if (pmap->pm_stage == PM_STAGE1 &&
+			    (tpte & ATTR_SW_WIRED) == 0) {
 				pmap_clear_bits(pte, ATTR_AF);
 				pmap_invalidate_page(pmap, pv->pv_va);
 				cleared++;
