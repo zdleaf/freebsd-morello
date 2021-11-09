@@ -3528,6 +3528,7 @@ dev/virtio/virtio.c			optional	virtio
 dev/virtio/virtqueue.c			optional	virtio
 dev/virtio/virtio_bus_if.m		optional	virtio
 dev/virtio/virtio_if.m			optional	virtio
+dev/virtio/gpu/virtio_gpu.c		optional	compat_drmkpi drm compile-with "${DRM_C}"
 dev/virtio/pci/virtio_pci.c		optional	virtio_pci
 dev/virtio/pci/virtio_pci_if.m		optional	virtio_pci
 dev/virtio/pci/virtio_pci_legacy.c	optional	virtio_pci
