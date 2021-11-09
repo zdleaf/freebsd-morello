@@ -23,3 +23,5 @@ cp /usr/obj/usr/home/br/dev/freebsd-head/arm64.aarch64/sys/EDGE/kernel /mnt/tftp
 #echo "set currdev=disk0p3"
 #echo "load disk0p1:kernel"
 #echo "boot"
+
+scp /usr/obj/usr/home/br/dev/freebsd-head/arm64.aarch64/sys/EDGE/kernel 10.8.0.1:/tftpboot/edge/
