@@ -576,8 +576,8 @@ panfrost_gem_get_pages(struct panfrost_gem_object *bo)
 	low = 0;
 	high = -1UL;
 	boundary = 0;
-	pflags = VM_ALLOC_NORMAL | VM_ALLOC_NOOBJ | VM_ALLOC_NOBUSY |
-	    VM_ALLOC_WIRED | VM_ALLOC_ZERO;
+	pflags = VM_ALLOC_NORMAL | VM_ALLOC_NOBUSY | VM_ALLOC_WIRED |
+	    VM_ALLOC_ZERO;
 	memattr = VM_MEMATTR_WRITE_COMBINING;
 
 	m0 = malloc(sizeof(vm_page_t *) * npages,
@@ -587,8 +587,8 @@ panfrost_gem_get_pages(struct panfrost_gem_object *bo)
 
 	for (i = 0; i < npages; i++) {
 retry:
-		m = vm_page_alloc_contig(NULL, 0, pflags, 1, low, high,
-		    alignment, boundary, memattr);
+		m = vm_page_alloc_noobj_contig(pflags, 1, low, high, alignment,
+		    boundary, memattr);
 		if (m == NULL) {
 			vm_wait(NULL);
 			goto retry;
