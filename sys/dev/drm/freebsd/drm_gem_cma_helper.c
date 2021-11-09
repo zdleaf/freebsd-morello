@@ -87,8 +87,8 @@ drm_gem_cma_alloc_contig(size_t npages, u_long alignment, vm_memattr_t memattr,
 	low = 0;
 	high = -1UL;
 	boundary = 0;
-	pflags = VM_ALLOC_NORMAL  | VM_ALLOC_NOOBJ | VM_ALLOC_NOBUSY |
-	    VM_ALLOC_WIRED | VM_ALLOC_ZERO;
+	pflags = VM_ALLOC_NORMAL | VM_ALLOC_NOBUSY | VM_ALLOC_WIRED |
+	    VM_ALLOC_ZERO | VM_ALLOC_WAITOK;
 	tries = 0;
 retry:
 	m = vm_page_alloc_contig(NULL, 0, pflags, npages, low, high, alignment,
