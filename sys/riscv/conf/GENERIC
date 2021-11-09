@@ -23,6 +23,7 @@ ident		GENERIC
 
 makeoptions	DEBUG=-g		# Build kernel with gdb(1) debug symbols
 makeoptions	WITH_CTF=1		# Run ctfconvert(1) for DTrace support
+makeoptions	NO_MODULES
 
 options 	SCHED_ULE		# ULE scheduler
 options 	PREEMPTION		# Enable kernel thread preemption
@@ -75,6 +76,10 @@ options 	RACCT_DEFAULT_TO_DISABLED # Set kern.racct.enable=0 by default
 options 	RCTL			# Resource limits
 options 	SMP
 options 	INTRNG
+
+# DRM Support
+options		COMPAT_DRMKPI
+device		drm
 
 # RISC-V SBI console
 device		rcons
@@ -158,10 +163,10 @@ device		spibus
 device		spigen
 
 # Uncomment for memory disk
-# options 	MD_ROOT
-# options 	MD_ROOT_SIZE=32768	# 32MB ram disk
-# makeoptions	MFS_IMAGE=/path/to/img
-# options 	ROOTDEVNAME=\"ufs:/dev/md0\"
+options 	MD_ROOT
+options 	MD_ROOT_SIZE=32768	# 32MB ram disk
+makeoptions	MFS_IMAGE=/home/br/dev/freebsd-head/riscv.img
+options 	ROOTDEVNAME=\"ufs:/dev/md0\"
 
 # Uncomment for virtio block device
 # options 	ROOTDEVNAME=\"ufs:/dev/vtbd0\"
