@@ -2514,6 +2514,17 @@ nfsv4_fillattr(struct nfsrv_descript *nd, struct mount *mp, vnode_t vp,
 			}
 			NFSCLRSTATFS_ATTRBIT(retbitp);
 		}
+		/*
+		 * Since NFS handles these values as unsigned on the
+		 * wire, there is no way to represent negative values,
+		 * so set them to 0. Without this, they will appear
+		 * to be very large positive values for clients like
+		 * Solaris10.
+		 */
+		if (fs->f_bavail < 0)
+			fs->f_bavail = 0;
+		if (fs->f_ffree < 0)
+			fs->f_ffree = 0;
 	}
 #endif
 
@@ -4913,13 +4924,8 @@ nfsm_add_ext_pgs(struct mbuf *m, int maxextsiz, int *bextpg)
 		*bextpg = 0;
 		m->m_next = mp;
 	} else {
-		do {
-			pg = vm_page_alloc(NULL, 0, VM_ALLOC_NORMAL |
-			    VM_ALLOC_NOOBJ | VM_ALLOC_NODUMP |
-			    VM_ALLOC_WIRED);
-			if (pg == NULL)
-				vm_wait(NULL);
-		} while (pg == NULL);
+		pg = vm_page_alloc_noobj(VM_ALLOC_WAITOK | VM_ALLOC_NODUMP |
+		    VM_ALLOC_WIRED);
 		m->m_epg_pa[m->m_epg_npgs] = VM_PAGE_TO_PHYS(pg);
 		*bextpg = m->m_epg_npgs;
 		m->m_epg_npgs++;

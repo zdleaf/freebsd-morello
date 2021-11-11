@@ -1524,15 +1524,9 @@ struct linkat_args {
 int
 sys_linkat(struct thread *td, struct linkat_args *uap)
 {
-	int flag;
-
-	flag = uap->flag;
-	if ((flag & ~(AT_SYMLINK_FOLLOW | AT_RESOLVE_BENEATH |
-	    AT_EMPTY_PATH)) != 0)
-		return (EINVAL);
 
 	return (kern_linkat(td, uap->fd1, uap->fd2, uap->path1, uap->path2,
-	    UIO_USERSPACE, flag));
+	    UIO_USERSPACE, uap->flag));
 }
 
 int hardlink_check_uid = 0;
@@ -1580,6 +1574,10 @@ kern_linkat(struct thread *td, int fd1, int fd2, const char *path1,
 {
 	struct nameidata nd;
 	int error;
+
+	if ((flag & ~(AT_SYMLINK_FOLLOW | AT_RESOLVE_BENEATH |
+	    AT_EMPTY_PATH)) != 0)
+		return (EINVAL);
 
 	NDPREINIT(&nd);
 	do {
@@ -1924,7 +1922,7 @@ restart:
 	if (vp->v_type == VDIR && oldinum == 0) {
 		error = EPERM;		/* POSIX */
 	} else if (oldinum != 0 &&
-	    ((error = VOP_STAT(vp, &sb, td->td_ucred, NOCRED, td)) == 0) &&
+	    ((error = VOP_STAT(vp, &sb, td->td_ucred, NOCRED)) == 0) &&
 	    sb.st_ino != oldinum) {
 		error = EIDRM;	/* Identifier removed */
 	} else if (fp != NULL && fp->f_vnode != vp) {
@@ -2444,7 +2442,7 @@ kern_statat(struct thread *td, int flag, int fd, const char *path,
 			error = kern_fstat(td, fd, sbp);
 		return (error);
 	}
-	error = VOP_STAT(nd.ni_vp, sbp, td->td_ucred, NOCRED, td);
+	error = VOP_STAT(nd.ni_vp, sbp, td->td_ucred, NOCRED);
 	if (error == 0) {
 		if (__predict_false(hook != NULL))
 			hook(nd.ni_vp, sbp);
@@ -2640,8 +2638,8 @@ kern_readlinkat(struct thread *td, int fd, const char *path,
 	if (count > IOSIZE_MAX)
 		return (EINVAL);
 
-	NDINIT_AT(&nd, LOOKUP, NOFOLLOW | LOCKSHARED | LOCKLEAF | AUDITVNODE1,
-	    pathseg, path, fd, td);
+	NDINIT_AT(&nd, LOOKUP, NOFOLLOW | LOCKSHARED | LOCKLEAF | AUDITVNODE1 |
+	    EMPTYPATH, pathseg, path, fd, td);
 
 	if ((error = namei(&nd)) != 0)
 		return (error);
@@ -2758,10 +2756,6 @@ int
 sys_chflagsat(struct thread *td, struct chflagsat_args *uap)
 {
 
-	if ((uap->atflag & ~(AT_SYMLINK_NOFOLLOW | AT_RESOLVE_BENEATH |
-	    AT_EMPTY_PATH)) != 0)
-		return (EINVAL);
-
 	return (kern_chflagsat(td, uap->fd, uap->path, UIO_USERSPACE,
 	    uap->flags, uap->atflag));
 }
@@ -2789,6 +2783,10 @@ kern_chflagsat(struct thread *td, int fd, const char *path,
 {
 	struct nameidata nd;
 	int error;
+
+	if ((atflag & ~(AT_SYMLINK_NOFOLLOW | AT_RESOLVE_BENEATH |
+	    AT_EMPTY_PATH)) != 0)
+		return (EINVAL);
 
 	AUDIT_ARG_FFLAGS(flags);
 	NDINIT_ATRIGHTS(&nd, LOOKUP, at2cnpflags(atflag, AT_SYMLINK_NOFOLLOW |
@@ -2889,10 +2887,6 @@ int
 sys_fchmodat(struct thread *td, struct fchmodat_args *uap)
 {
 
-	if ((uap->flag & ~(AT_SYMLINK_NOFOLLOW | AT_RESOLVE_BENEATH |
-	    AT_EMPTY_PATH)) != 0)
-		return (EINVAL);
-
 	return (kern_fchmodat(td, uap->fd, uap->path, UIO_USERSPACE,
 	    uap->mode, uap->flag));
 }
@@ -2920,6 +2914,10 @@ kern_fchmodat(struct thread *td, int fd, const char *path,
 {
 	struct nameidata nd;
 	int error;
+
+	if ((flag & ~(AT_SYMLINK_NOFOLLOW | AT_RESOLVE_BENEATH |
+	    AT_EMPTY_PATH)) != 0)
+		return (EINVAL);
 
 	AUDIT_ARG_MODE(mode);
 	NDINIT_ATRIGHTS(&nd, LOOKUP, at2cnpflags(flag, AT_SYMLINK_NOFOLLOW |
@@ -3018,10 +3016,6 @@ int
 sys_fchownat(struct thread *td, struct fchownat_args *uap)
 {
 
-	if ((uap->flag & ~(AT_SYMLINK_NOFOLLOW | AT_RESOLVE_BENEATH |
-	    AT_EMPTY_PATH)) != 0)
-		return (EINVAL);
-
 	return (kern_fchownat(td, uap->fd, uap->path, UIO_USERSPACE, uap->uid,
 	    uap->gid, uap->flag));
 }
@@ -3032,6 +3026,10 @@ kern_fchownat(struct thread *td, int fd, const char *path,
 {
 	struct nameidata nd;
 	int error;
+
+	if ((flag & ~(AT_SYMLINK_NOFOLLOW | AT_RESOLVE_BENEATH |
+	    AT_EMPTY_PATH)) != 0)
+		return (EINVAL);
 
 	AUDIT_ARG_OWNER(uid, gid);
 	NDINIT_ATRIGHTS(&nd, LOOKUP, at2cnpflags(flag, AT_SYMLINK_NOFOLLOW |
@@ -4316,7 +4314,7 @@ getvnode_path(struct thread *td, int fd, cap_rights_t *rightsp,
 	 * other thread to dereference it. Guard against the race by
 	 * checking f_ops.
 	 */
-	if (fp->f_vnode == NULL || fp->f_ops == &badfileops) {
+	if (__predict_false(fp->f_vnode == NULL || fp->f_ops == &badfileops)) {
 		fdrop(fp, td);
 		return (EINVAL);
 	}
@@ -4336,12 +4334,14 @@ getvnode(struct thread *td, int fd, cap_rights_t *rightsp, struct file **fpp)
 	int error;
 
 	error = getvnode_path(td, fd, rightsp, fpp);
+	if (__predict_false(error != 0))
+		return (error);
 
 	/*
 	 * Filter out O_PATH file descriptors, most getvnode() callers
 	 * do not call fo_ methods.
 	 */
-	if (error == 0 && (*fpp)->f_ops == &path_fileops) {
+	if (__predict_false((*fpp)->f_ops == &path_fileops)) {
 		fdrop(*fpp, td);
 		error = EBADF;
 	}
@@ -4399,8 +4399,6 @@ int
 sys_getfhat(struct thread *td, struct getfhat_args *uap)
 {
 
-	if ((uap->flags & ~(AT_SYMLINK_NOFOLLOW | AT_RESOLVE_BENEATH)) != 0)
-		return (EINVAL);
 	return (kern_getfhat(td, uap->flags, uap->fd, uap->path, UIO_USERSPACE,
 	    uap->fhp, UIO_USERSPACE));
 }
@@ -4414,6 +4412,8 @@ kern_getfhat(struct thread *td, int flags, int fd, const char *path,
 	struct vnode *vp;
 	int error;
 
+	if ((flags & ~(AT_SYMLINK_NOFOLLOW | AT_RESOLVE_BENEATH)) != 0)
+		return (EINVAL);
 	error = priv_check(td, PRIV_VFS_GETFH);
 	if (error != 0)
 		return (error);
@@ -4661,7 +4661,7 @@ kern_fhstat(struct thread *td, struct fhandle fh, struct stat *sb)
 	vfs_unbusy(mp);
 	if (error != 0)
 		return (error);
-	error = VOP_STAT(vp, sb, td->td_ucred, NOCRED, td);
+	error = VOP_STAT(vp, sb, td->td_ucred, NOCRED);
 	vput(vp);
 	return (error);
 }

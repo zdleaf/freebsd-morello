@@ -11,6 +11,8 @@ options 	PREEMPTION		# Enable kernel thread preemption
 options 	VIMAGE			# Subsystem virtualization, e.g. VNET
 options 	INET			# InterNETworking
 options 	INET6			# IPv6 communications protocols
+options		CC_NEWRENO		# include newreno congestion control
+options		CC_DEFAULT=\"newreno\"	# define our default CC module it should be compiled in.
 options 	IPSEC_SUPPORT		# Allow kldload of ipsec and tcpmd5
 options 	ROUTE_MPATH		# Multipath routing support
 options 	FIB_ALGO		# Modular fib lookups
@@ -96,3 +98,9 @@ options 	NETDUMP			# netdump(4) client support
 
 # Make an SMP-capable kernel by default
 options 	SMP			# Symmetric MultiProcessor Kernel
+
+# Enable support for the kernel PLL to use an external PPS signal,
+# under supervision of [x]ntpd(8)
+# More info in ntpd documentation: http://www.eecis.udel.edu/~ntp
+
+options 	PPS_SYNC

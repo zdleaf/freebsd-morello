@@ -697,6 +697,9 @@ int	vn_vptocnp(struct vnode **vp, char *buf, size_t *buflen);
 int	vn_getcwd(char *buf, char **retbuf, size_t *buflen);
 int	vn_fullpath(struct vnode *vp, char **retbuf, char **freebuf);
 int	vn_fullpath_global(struct vnode *vp, char **retbuf, char **freebuf);
+int	vn_fullpath_hardlink(struct vnode *vp, struct vnode *dvp,
+	    const char *hdrl_name, size_t hrdl_name_length, char **retbuf,
+	    char **freebuf, size_t *buflen);
 struct vnode *
 	vn_dir_dd_ino(struct vnode *vp);
 int	vn_commname(struct vnode *vn, char *buf, u_int buflen);
@@ -962,7 +965,7 @@ void	vop_rename_fail(struct vop_rename_args *ap);
 
 #define	vop_stat_helper_post(ap, error)	({					\
 	int _error = (error);							\
-	if (priv_check_cred_vfs_generation(ap->a_td->td_ucred))			\
+	if (priv_check_cred_vfs_generation(ap->a_active_cred))			\
 		ap->a_sb->st_gen = 0;						\
 	_error;									\
 })
