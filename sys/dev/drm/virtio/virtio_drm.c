@@ -63,18 +63,12 @@ __FBSDID("$FreeBSD$");
 #include <drm/drm_ioctl.h>
 #include <drm/drm_vblank.h>
 
-//#include <dev/drm/virtio/rk_gem.h>
+#include <dev/drm/virtio/virtio_plane.h>
+#include <dev/drm/virtio/virtio_drm.h>
+
 #include <dev/drm/drmkpi/include/linux/dma-buf.h>
 
 #include "virtio_gpu.h"
-
-struct virtio_drm_softc {
-	device_t		dev;
-	uint64_t		vtgpu_features;
-	struct virtqueue	*vtgpu_vq;
-	struct drm_device	drm_dev;
-	struct drm_fb_cma	*fb;
-};
 
 static int	vtgpu_modevent(module_t, int, void *);
 
@@ -328,6 +322,8 @@ virtio_drm_irq_hook(void *arg)
 		return;
 	}
 
+	//virtio_plane_create(sc, &sc->drm_dev);
+
 	virtio_drm_fb_preinit(&sc->drm_dev);
  
 	drm_vblank_init(&sc->drm_dev, sc->drm_dev.mode_config.num_crtc);
@@ -413,8 +409,8 @@ vtgpu_detach(device_t dev)
 
 	sc = device_get_softc(dev);
 	KASSERT(
-	    atomic_load_explicit(&g_virtio_drm_softc, memory_order_acquire) == sc,
-	    ("only one global instance at a time"));
+	    atomic_load_explicit(&g_virtio_drm_softc, memory_order_acquire) ==
+		sc, ("only one global instance at a time"));
 
 	atomic_store_explicit(&g_virtio_drm_softc, NULL, memory_order_release);
 	return (0);
