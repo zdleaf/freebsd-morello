@@ -64,10 +64,6 @@ __FBSDID("$FreeBSD$");
 
 #include <net/vnet.h>
 
-#include <net/route.h>
-#include <net/route/nhop.h>
-
-#include <netinet/in_pcb.h>
 #include <netinet/tcp.h>
 #include <netinet/tcp_seq.h>
 #include <netinet/tcp_timer.h>
@@ -141,7 +137,7 @@ __FBSDID("$FreeBSD$");
 
 static void	htcp_ack_received(struct cc_var *ccv, uint16_t type);
 static void	htcp_cb_destroy(struct cc_var *ccv);
-static int	htcp_cb_init(struct cc_var *ccv, void *ptr);
+static int	htcp_cb_init(struct cc_var *ccv);
 static void	htcp_cong_signal(struct cc_var *ccv, uint32_t type);
 static int	htcp_mod_init(void);
 static void	htcp_post_recovery(struct cc_var *ccv);
@@ -149,7 +145,6 @@ static void	htcp_recalc_alpha(struct cc_var *ccv);
 static void	htcp_recalc_beta(struct cc_var *ccv);
 static void	htcp_record_rtt(struct cc_var *ccv);
 static void	htcp_ssthresh_update(struct cc_var *ccv);
-static size_t	htcp_data_sz(void);
 
 struct htcp {
 	/* cwnd before entering cong recovery. */
@@ -180,6 +175,9 @@ VNET_DEFINE_STATIC(u_int, htcp_rtt_scaling) = 0;
 #define	V_htcp_adaptive_backoff    VNET(htcp_adaptive_backoff)
 #define	V_htcp_rtt_scaling    VNET(htcp_rtt_scaling)
 
+static MALLOC_DEFINE(M_HTCP, "htcp data",
+    "Per connection data required for the HTCP congestion control algorithm");
+
 struct cc_algo htcp_cc_algo = {
 	.name = "htcp",
 	.ack_received = htcp_ack_received,
@@ -188,8 +186,6 @@ struct cc_algo htcp_cc_algo = {
 	.cong_signal = htcp_cong_signal,
 	.mod_init = htcp_mod_init,
 	.post_recovery = htcp_post_recovery,
-	.cc_data_sz = htcp_data_sz,
-	.after_idle = newreno_cc_after_idle,
 };
 
 static void
@@ -218,7 +214,7 @@ htcp_ack_received(struct cc_var *ccv, uint16_t type)
 		 */
 		if (htcp_data->alpha == 1 ||
 		    CCV(ccv, snd_cwnd) <= CCV(ccv, snd_ssthresh))
-			newreno_cc_ack_received(ccv, type);
+			newreno_cc_algo.ack_received(ccv, type);
 		else {
 			if (V_tcp_do_rfc3465) {
 				/* Increment cwnd by alpha segments. */
@@ -242,27 +238,18 @@ htcp_ack_received(struct cc_var *ccv, uint16_t type)
 static void
 htcp_cb_destroy(struct cc_var *ccv)
 {
-	free(ccv->cc_data, M_CC_MEM);
-}
-
-static size_t
-htcp_data_sz(void)
-{
-	return(sizeof(struct htcp));
+	free(ccv->cc_data, M_HTCP);
 }
 
 static int
-htcp_cb_init(struct cc_var *ccv, void *ptr)
+htcp_cb_init(struct cc_var *ccv)
 {
 	struct htcp *htcp_data;
 
-	INP_WLOCK_ASSERT(ccv->ccvc.tcp->t_inpcb);
-	if (ptr == NULL) {
-		htcp_data = malloc(sizeof(struct htcp), M_CC_MEM, M_NOWAIT);
-		if (htcp_data == NULL)
-			return (ENOMEM);
-	} else
-		htcp_data = ptr;
+	htcp_data = malloc(sizeof(struct htcp), M_HTCP, M_NOWAIT);
+
+	if (htcp_data == NULL)
+		return (ENOMEM);
 
 	/* Init some key variables with sensible defaults. */
 	htcp_data->alpha = HTCP_INIT_ALPHA;
@@ -346,12 +333,16 @@ htcp_cong_signal(struct cc_var *ccv, uint32_t type)
 static int
 htcp_mod_init(void)
 {
+
+	htcp_cc_algo.after_idle = newreno_cc_algo.after_idle;
+
 	/*
 	 * HTCP_RTT_REF is defined in ms, and t_srtt in the tcpcb is stored in
 	 * units of TCP_RTT_SCALE*hz. Scale HTCP_RTT_REF to be in the same units
 	 * as t_srtt.
 	 */
 	htcp_rtt_ref = (HTCP_RTT_REF * TCP_RTT_SCALE * hz) / 1000;
+
 	return (0);
 }
 
@@ -544,4 +535,4 @@ SYSCTL_UINT(_net_inet_tcp_cc_htcp, OID_AUTO, rtt_scaling,
     "enable H-TCP RTT scaling");
 
 DECLARE_CC_MODULE(htcp, &htcp_cc_algo);
-MODULE_VERSION(htcp, 2);
+MODULE_VERSION(htcp, 1);
