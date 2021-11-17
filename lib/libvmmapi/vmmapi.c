@@ -412,10 +412,10 @@ setup_memory_segment(struct vmctx *ctx, vm_paddr_t gpa, size_t len, char *base)
 int
 vm_setup_memory(struct vmctx *ctx, size_t memsize, enum vm_mmap_style vms)
 {
-	size_t objsize, len;
+	size_t objsize, len, i;
 	vm_paddr_t gpa;
 	char *baseaddr, *ptr;
-	int i, error;
+	int error;
 
 	assert(vms == VM_MMAP_ALL);
 
@@ -424,8 +424,6 @@ vm_setup_memory(struct vmctx *ctx, size_t memsize, enum vm_mmap_style vms)
 	 * create another 'highmem' segment above 4GB for the remainder.
 	 */
 	for (i = 0; i < nitems(ctx->regions); i++) {
-		size_t len;
-
 		len = ctx->regions[i].limit - ctx->regions[i].base;
 		if (len > memsize)
 			len = memsize;
@@ -476,7 +474,7 @@ vm_setup_memory(struct vmctx *ctx, size_t memsize, enum vm_mmap_style vms)
 void *
 vm_map_gpa(struct vmctx *ctx, vm_paddr_t gaddr, size_t len)
 {
-	int i;
+	size_t i;
 
 	for (i = 0; i < nitems(ctx->regions); i++) {
 		if (gaddr >= ctx->regions[i].base &&

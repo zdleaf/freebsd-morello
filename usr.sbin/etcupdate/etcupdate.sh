@@ -1490,7 +1490,7 @@ update_cmd()
 
 	if [ `id -u` -ne 0 ]; then
 		echo "Must be root to update a tree."
-		exit 1
+		#exit 1
 	fi
 
 	# Enforce a sane umask
