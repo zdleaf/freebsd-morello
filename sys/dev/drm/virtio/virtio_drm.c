@@ -51,6 +51,7 @@ __FBSDID("$FreeBSD$");
 #include <dev/ofw/ofw_bus_subr.h>
 
 #include <drm/drm_atomic_helper.h>
+#include <drm/drm_bridge.h>
 #include <drm/drm_gem_cma_helper.h>
 #include <drm/drm_gem_framebuffer_helper.h>
 #include <drm/drm_fb_helper.h>
@@ -307,6 +308,7 @@ virtio_drm_irq_hook(void *arg)
 {
 	struct virtio_drm_softc *sc;
 	phandle_t node;
+	int error;
 	int rv;
 
 	sc = arg;
@@ -323,6 +325,13 @@ virtio_drm_irq_hook(void *arg)
 	}
 
 	//virtio_plane_create(sc, &sc->drm_dev);
+	error = virtio_add_encoder(sc->dev, &sc->crtc, &sc->drm_dev);
+
+	if (error != 0) {
+		device_printf(sc->dev, "%s: could not add encoder\n",
+		    __func__);
+		return;
+	}
 
 	virtio_drm_fb_preinit(&sc->drm_dev);
  

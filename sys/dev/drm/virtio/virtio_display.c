@@ -57,13 +57,20 @@ __FBSDID("$FreeBSD$");
 #include <drm/drm_edid.h>
 #include <drm/drm_print.h>
 
-struct virtio_softc {
+#include <dev/drm/virtio/virtio_plane.h>
+#include <dev/drm/virtio/virtio_drm.h>
+
+#if 0
+struct virtio_drm_softc {
 	struct drm_encoder	encoder;
 	struct drm_connector	connector;
 	struct drm_bridge	bridge;
 	struct drm_display_mode	mode;
 	struct i2c_adapter	*ddc;
+	struct drm_crtc		crtc;
+	struct virtio_plane	planes[2];
 };
+#endif
 
 static enum drm_connector_status
 virtio_connector_detect(struct drm_connector *connector, bool force)
@@ -86,11 +93,11 @@ static const struct drm_connector_funcs virtio_connector_funcs = {
 static int
 virtio_connector_get_modes(struct drm_connector *connector)
 {
-	struct virtio_softc *sc;
+	struct virtio_drm_softc *sc;
 	struct edid *edid = NULL;
 	int ret = 0;
 
-	sc = container_of(connector, struct virtio_softc, connector);
+	sc = container_of(connector, struct virtio_drm_softc, connector);
 
 	edid = drm_get_edid(connector, sc->ddc);
 	drm_connector_update_edid_property(connector, edid);
@@ -107,9 +114,9 @@ static const struct drm_connector_helper_funcs
 static int
 virtio_bridge_attach(struct drm_bridge *bridge)
 {
-	struct virtio_softc *sc;
+	struct virtio_drm_softc *sc;
 
-	sc = container_of(bridge, struct virtio_softc, bridge);
+	sc = container_of(bridge, struct virtio_drm_softc, bridge);
 
 	sc->connector.polled = DRM_CONNECTOR_POLL_HPD;
 	drm_connector_helper_add(&sc->connector,
@@ -127,9 +134,11 @@ static enum drm_mode_status
 virtio_bridge_mode_valid(struct drm_bridge *bridge,
     const struct drm_display_mode *mode)
 {
-	struct virtio_softc *sc;
+	struct virtio_drm_softc *sc;
 
-	sc = container_of(bridge, struct virtio_softc, bridge);
+	printf("%s\n", __func__);
+
+	sc = container_of(bridge, struct virtio_drm_softc, bridge);
 
 	return (MODE_OK);
 }
@@ -139,9 +148,11 @@ virtio_bridge_mode_set(struct drm_bridge *bridge,
     const struct drm_display_mode *orig_mode,
     const struct drm_display_mode *mode)
 {
-	struct virtio_softc *sc;
+	struct virtio_drm_softc *sc;
 
-	sc = container_of(bridge, struct virtio_softc, bridge);
+	printf("%s\n", __func__);
+
+	sc = container_of(bridge, struct virtio_drm_softc, bridge);
 
 	/* Copy the mode, this will be set in bridge_enable function */
 	memcpy(&sc->mode, mode, sizeof(struct drm_display_mode));
@@ -157,9 +168,11 @@ virtio_bridge_enable(struct drm_bridge *bridge)
 static void
 virtio_bridge_disable(struct drm_bridge *bridge)
 {
-	struct virtio_softc *sc;
+	struct virtio_drm_softc *sc;
 
-	sc = container_of(bridge, struct virtio_softc, bridge);
+	sc = container_of(bridge, struct virtio_drm_softc, bridge);
+
+	printf("%s\n", __func__);
 }
 
 static const struct drm_bridge_funcs virtio_bridge_funcs = {
@@ -176,11 +189,11 @@ virtio_encoder_mode_set(struct drm_encoder *encoder,
     struct drm_display_mode *adj_mode)
 {
 #if 0
-	struct virtio_softc *sc;
-	struct virtio_softc *base_sc;
+	struct virtio_drm_softc *sc;
+	struct virtio_drm_softc *base_sc;
 
-	base_sc = container_of(encoder, struct virtio_softc, encoder);
-	sc = container_of(base_sc, struct virtio_softc, base_sc);
+	base_sc = container_of(encoder, struct virtio_drm_softc, encoder);
+	sc = container_of(base_sc, struct virtio_drm_softc, base_sc);
 
 	/*
 	 * Note: we are setting vpll, which should be the same as vop dclk.
@@ -198,12 +211,119 @@ static const struct drm_encoder_funcs virtio_encoder_funcs = {
 };
 
 static int
-virtio_add_encoder(device_t dev, struct drm_crtc *crtc,
-    struct drm_device *drm)
+rk_crtc_atomic_check(struct drm_crtc *crtc, struct drm_crtc_state *state)
 {
-	struct virtio_softc *sc;
+
+	printf("%s\n", __func__);
+
+	return (0);
+}
+
+static void
+rk_crtc_atomic_begin(struct drm_crtc *crtc, struct drm_crtc_state *old_state)
+{
+
+	printf("%s\n", __func__);
+}
+
+static void
+rk_crtc_atomic_flush(struct drm_crtc *crtc,
+    struct drm_crtc_state *old_state)
+{
+
+	printf("%s\n", __func__);
+}
+
+static void
+rk_crtc_atomic_enable(struct drm_crtc *crtc, struct drm_crtc_state *old_state)
+{
+
+	printf("%s\n", __func__);
+}
+
+static void
+rk_crtc_atomic_disable(struct drm_crtc *crtc, struct drm_crtc_state *old_state)
+{
+
+	printf("%s\n", __func__);
+}
+
+static void
+rk_crtc_mode_set_nofb(struct drm_crtc *crtc)
+{
+
+	printf("%s\n", __func__);
+}
+
+static const struct drm_crtc_helper_funcs rk_vop_crtc_helper_funcs = {
+	.atomic_check   = rk_crtc_atomic_check,
+	.atomic_begin   = rk_crtc_atomic_begin,
+	.atomic_flush   = rk_crtc_atomic_flush,
+	.atomic_enable  = rk_crtc_atomic_enable,
+	.atomic_disable = rk_crtc_atomic_disable,
+	.mode_set_nofb  = rk_crtc_mode_set_nofb,
+};
+
+static uint32_t
+rk_vop_get_vblank_counter(struct drm_crtc *crtc)
+{
+
+	printf("%s\n", __func__);
+
+	return (0);
+}
+
+static int
+rk_vop_enable_vblank(struct drm_crtc *crtc)
+{
+
+	printf("%s\n", __func__);
+
+	return (0);
+}
+
+static void
+rk_vop_disable_vblank(struct drm_crtc *crtc)
+{
+
+	printf("%s\n", __func__);
+}
+
+static const struct drm_crtc_funcs rk_vop_funcs = {
+	.atomic_destroy_state	= drm_atomic_helper_crtc_destroy_state,
+	.atomic_duplicate_state	= drm_atomic_helper_crtc_duplicate_state,
+	.destroy		= drm_crtc_cleanup,
+	.page_flip		= drm_atomic_helper_page_flip,
+	.reset			= drm_atomic_helper_crtc_reset,
+	.set_config		= drm_atomic_helper_set_config,
+
+	.get_vblank_counter	= rk_vop_get_vblank_counter,
+	.enable_vblank		= rk_vop_enable_vblank,
+	.disable_vblank		= rk_vop_disable_vblank,
+
+	.gamma_set		= drm_atomic_helper_legacy_gamma_set,
+};
+
+int
+virtio_add_encoder(device_t dev, struct drm_crtc *crtc, struct drm_device *drm)
+{
+	struct virtio_drm_softc *sc;
+	int error;
 
 	sc = device_get_softc(dev);
+
+	virtio_plane_create(sc, drm);
+
+	error = drm_crtc_init_with_planes(drm, &sc->crtc, &sc->planes[0].plane,
+	    &sc->planes[1].plane, &rk_vop_funcs, NULL);
+	if (error != 0) {
+		device_printf(dev, "%s: drm_crtc_init_with_planes failed\n",
+		    __func__);
+		return (error);
+	}
+
+	drm_crtc_helper_add(&sc->crtc, &rk_vop_crtc_helper_funcs);
+
 
 	drm_encoder_helper_add(&sc->encoder, &virtio_encoder_helper_funcs);
 	sc->encoder.possible_crtcs = drm_crtc_mask(crtc);
