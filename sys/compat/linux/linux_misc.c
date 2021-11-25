@@ -1024,7 +1024,7 @@ linux_common_wait(struct thread *td, int pid, int *statusp,
 		} else if (WIFSTOPPED(tmpstat)) {
 			tmpstat = (tmpstat & 0xffff00ff) |
 			    (bsd_to_linux_signal(WSTOPSIG(tmpstat)) << 8);
-#if defined(__amd64__) && !defined(COMPAT_LINUX32)
+#if defined(__aarch64__) || (defined(__amd64__) && !defined(COMPAT_LINUX32))
 			if (WSTOPSIG(status) == SIGTRAP) {
 				tmpstat = linux_ptrace_status(td,
 				    siginfo.si_pid, tmpstat);
@@ -1087,7 +1087,6 @@ linux_waitid(struct thread *td, struct linux_waitid_args *args)
 	siginfo_t siginfo;
 	l_siginfo_t lsi;
 	idtype_t idtype;
-	struct proc *p;
 	int error;
 
 	options = 0;
@@ -1127,7 +1126,6 @@ linux_waitid(struct thread *td, struct linux_waitid_args *args)
 			return (error);
 	}
 	if (args->info != NULL) {
-		p = td->td_proc;
 		bzero(&lsi, sizeof(lsi));
 		if (td->td_retval[0] != 0) {
 			sig = bsd_to_linux_signal(siginfo.si_signo);
