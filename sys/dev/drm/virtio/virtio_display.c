@@ -1,8 +1,7 @@
 /*-
  * SPDX-License-Identifier: BSD-2-Clause
  *
- * Copyright (c) 2020-2021 Ruslan Bukin <br@bsdpad.com>
- * Copyright (c) 2019 Emmanuel Vadot <manu@FreeBSD.org>
+ * Copyright (c) 2021 Ruslan Bukin <br@bsdpad.com>
  *
  * Portions of this work were supported by Innovate UK project 105694,
  * "Digital Security by Design (DSbD) Technology Platform Prototype".
@@ -58,15 +57,16 @@ __FBSDID("$FreeBSD$");
 #include <drm/drm_edid.h>
 #include <drm/drm_print.h>
 
-struct dw_hdmi_softc {
+struct virtio_softc {
 	struct drm_encoder	encoder;
 	struct drm_connector	connector;
 	struct drm_bridge	bridge;
 	struct drm_display_mode	mode;
+	struct i2c_adapter	*ddc;
 };
 
 static enum drm_connector_status
-dw_hdmi_connector_detect(struct drm_connector *connector, bool force)
+virtio_connector_detect(struct drm_connector *connector, bool force)
 {
 
 	//return (connector_status_disconnected);
@@ -74,9 +74,9 @@ dw_hdmi_connector_detect(struct drm_connector *connector, bool force)
 	return (connector_status_connected);
 }
 
-static const struct drm_connector_funcs dw_hdmi_connector_funcs = {
+static const struct drm_connector_funcs virtio_connector_funcs = {
 	.fill_modes = drm_helper_probe_single_connector_modes,
-	.detect = dw_hdmi_connector_detect,
+	.detect = virtio_connector_detect,
 	.destroy = drm_connector_cleanup,
 	.reset = drm_atomic_helper_connector_reset,
 	.atomic_duplicate_state = drm_atomic_helper_connector_duplicate_state,
@@ -84,13 +84,13 @@ static const struct drm_connector_funcs dw_hdmi_connector_funcs = {
 };
 
 static int
-dw_hdmi_connector_get_modes(struct drm_connector *connector)
+virtio_connector_get_modes(struct drm_connector *connector)
 {
-	struct dw_hdmi_softc *sc;
+	struct virtio_softc *sc;
 	struct edid *edid = NULL;
 	int ret = 0;
 
-	sc = container_of(connector, struct dw_hdmi_softc, connector);
+	sc = container_of(connector, struct virtio_softc, connector);
 
 	edid = drm_get_edid(connector, sc->ddc);
 	drm_connector_update_edid_property(connector, edid);
@@ -100,23 +100,23 @@ dw_hdmi_connector_get_modes(struct drm_connector *connector)
 }
 
 static const struct drm_connector_helper_funcs
-    dw_hdmi_connector_helper_funcs = {
-	.get_modes = dw_hdmi_connector_get_modes,
+    virtio_connector_helper_funcs = {
+	.get_modes = virtio_connector_get_modes,
 };
 
 static int
-dw_hdmi_bridge_attach(struct drm_bridge *bridge)
+virtio_bridge_attach(struct drm_bridge *bridge)
 {
-	struct dw_hdmi_softc *sc;
+	struct virtio_softc *sc;
 
-	sc = container_of(bridge, struct dw_hdmi_softc, bridge);
+	sc = container_of(bridge, struct virtio_softc, bridge);
 
 	sc->connector.polled = DRM_CONNECTOR_POLL_HPD;
 	drm_connector_helper_add(&sc->connector,
-	    &dw_hdmi_connector_helper_funcs);
+	    &virtio_connector_helper_funcs);
 
 	drm_connector_init(bridge->dev, &sc->connector,
-	    &dw_hdmi_connector_funcs, DRM_MODE_CONNECTOR_HDMIA);
+	    &virtio_connector_funcs, DRM_MODE_CONNECTOR_HDMIA);
 
 	drm_connector_attach_encoder(&sc->connector, &sc->encoder);
 
@@ -124,142 +124,94 @@ dw_hdmi_bridge_attach(struct drm_bridge *bridge)
 }
 
 static enum drm_mode_status
-dw_hdmi_bridge_mode_valid(struct drm_bridge *bridge,
+virtio_bridge_mode_valid(struct drm_bridge *bridge,
     const struct drm_display_mode *mode)
 {
-	struct dw_hdmi_softc *sc;
+	struct virtio_softc *sc;
 
-	sc = container_of(bridge, struct dw_hdmi_softc, bridge);
+	sc = container_of(bridge, struct virtio_softc, bridge);
 
 	return (MODE_OK);
 }
 
 static void
-dw_hdmi_bridge_mode_set(struct drm_bridge *bridge,
+virtio_bridge_mode_set(struct drm_bridge *bridge,
     const struct drm_display_mode *orig_mode,
     const struct drm_display_mode *mode)
 {
-	struct dw_hdmi_softc *sc;
+	struct virtio_softc *sc;
 
-	sc = container_of(bridge, struct dw_hdmi_softc, bridge);
+	sc = container_of(bridge, struct virtio_softc, bridge);
 
 	/* Copy the mode, this will be set in bridge_enable function */
 	memcpy(&sc->mode, mode, sizeof(struct drm_display_mode));
 }
 
 static void
-dw_hdmi_bridge_disable(struct drm_bridge *bridge)
+virtio_bridge_enable(struct drm_bridge *bridge)
 {
-	struct dw_hdmi_softc *sc;
 
-	sc = container_of(bridge, struct dw_hdmi_softc, bridge);
+	printf("%s\n", __func__);
 }
 
-static const struct drm_bridge_funcs dw_hdmi_bridge_funcs = {
-	.attach = dw_hdmi_bridge_attach,
-	.enable = dw_hdmi_bridge_enable,
-	.disable = dw_hdmi_bridge_disable,
-	.mode_set = dw_hdmi_bridge_mode_set,
-	.mode_valid = dw_hdmi_bridge_mode_valid,
+static void
+virtio_bridge_disable(struct drm_bridge *bridge)
+{
+	struct virtio_softc *sc;
+
+	sc = container_of(bridge, struct virtio_softc, bridge);
+}
+
+static const struct drm_bridge_funcs virtio_bridge_funcs = {
+	.attach = virtio_bridge_attach,
+	.enable = virtio_bridge_enable,
+	.disable = virtio_bridge_disable,
+	.mode_set = virtio_bridge_mode_set,
+	.mode_valid = virtio_bridge_mode_valid,
 };
 
-/* Encoder funcs, belongs here */
-static void aw_de2_dw_hdmi_encoder_mode_set(struct drm_encoder *encoder,
+static void
+virtio_encoder_mode_set(struct drm_encoder *encoder,
     struct drm_display_mode *mode,
     struct drm_display_mode *adj_mode)
 {
-	struct aw_dw_hdmi_softc *sc;
-	struct dw_hdmi_softc *base_sc;
-	uint64_t freq;
+#if 0
+	struct virtio_softc *sc;
+	struct virtio_softc *base_sc;
 
-	base_sc = container_of(encoder, struct dw_hdmi_softc, encoder);
-	sc = container_of(base_sc, struct aw_dw_hdmi_softc, base_sc);
-
-	clk_get_freq(sc->clk_tmds, &freq);
-	DRM_DEBUG_DRIVER("%s: Setting clock %s from %ju to %ju\n",
-	    __func__,
-	    clk_get_name(sc->clk_tmds),
-	    freq,
-	    (uintmax_t)mode->crtc_clock * 1000);
-	clk_set_freq(sc->clk_tmds, mode->crtc_clock * 1000, CLK_SET_ROUND_ANY);
-	clk_get_freq(sc->clk_tmds, &freq);
-	DRM_DEBUG_DRIVER("%s: New clock %s is %ju\n",
-	    __func__,
-	    clk_get_name(sc->clk_tmds),
-	    freq);
-}
-
-static const struct drm_encoder_helper_funcs
-    aw_de2_dw_hdmi_encoder_helper_funcs = {
-	.mode_set = aw_de2_dw_hdmi_encoder_mode_set,
-};
-
-static const struct drm_encoder_funcs aw_dw_hdmi_encoder_funcs = {
-	.destroy = drm_encoder_cleanup,
-};
-
-static int
-aw_dw_hdmi_add_encoder(device_t dev, struct drm_crtc *crtc,
-    struct drm_device *drm)
-{
-	struct aw_dw_hdmi_softc *sc;
-
-	sc = device_get_softc(dev);
-
-	drm_encoder_helper_add(&sc->base_sc.encoder,
-	    &aw_de2_dw_hdmi_encoder_helper_funcs);
-	sc->base_sc.encoder.possible_crtcs = drm_crtc_mask(crtc);
-	drm_encoder_init(drm, &sc->base_sc.encoder, &aw_dw_hdmi_encoder_funcs,
-	  DRM_MODE_ENCODER_TMDS, NULL);
-
-	/* This part should be in dw_hdmi */
-	sc->base_sc.bridge.funcs = &dw_hdmi_bridge_funcs;
-	drm_bridge_attach(&sc->base_sc.encoder, &sc->base_sc.bridge, NULL);
-
-	return (0);
-}
-
-static void rk_dw_hdmi_encoder_mode_set(struct drm_encoder *encoder,
-    struct drm_display_mode *mode,
-    struct drm_display_mode *adj_mode)
-{
-	struct rk_dw_hdmi_softc *sc;
-	struct dw_hdmi_softc *base_sc;
-
-	base_sc = container_of(encoder, struct dw_hdmi_softc, encoder);
-	sc = container_of(base_sc, struct rk_dw_hdmi_softc, base_sc);
+	base_sc = container_of(encoder, struct virtio_softc, encoder);
+	sc = container_of(base_sc, struct virtio_softc, base_sc);
 
 	/*
 	 * Note: we are setting vpll, which should be the same as vop dclk.
 	 */
 	clk_set_freq(sc->clk[2], mode->crtc_clock * 1000, 0);
+#endif
 }
 
-static const struct drm_encoder_helper_funcs rk_dw_hdmi_encoder_helper_funcs = {
-	.mode_set = rk_dw_hdmi_encoder_mode_set,
+static const struct drm_encoder_helper_funcs virtio_encoder_helper_funcs = {
+	.mode_set = virtio_encoder_mode_set,
 };
 
-static const struct drm_encoder_funcs rk_dw_hdmi_encoder_funcs = {
+static const struct drm_encoder_funcs virtio_encoder_funcs = {
 	.destroy = drm_encoder_cleanup,
 };
 
 static int
-rk_dw_hdmi_add_encoder(device_t dev, struct drm_crtc *crtc,
+virtio_add_encoder(device_t dev, struct drm_crtc *crtc,
     struct drm_device *drm)
 {
-	struct rk_dw_hdmi_softc *sc;
+	struct virtio_softc *sc;
 
 	sc = device_get_softc(dev);
 
-	drm_encoder_helper_add(&sc->base_sc.encoder,
-	    &rk_dw_hdmi_encoder_helper_funcs);
-	sc->base_sc.encoder.possible_crtcs = drm_crtc_mask(crtc);
-	drm_encoder_init(drm, &sc->base_sc.encoder, &rk_dw_hdmi_encoder_funcs,
-	  DRM_MODE_ENCODER_TMDS, NULL);
+	drm_encoder_helper_add(&sc->encoder, &virtio_encoder_helper_funcs);
+	sc->encoder.possible_crtcs = drm_crtc_mask(crtc);
+	drm_encoder_init(drm, &sc->encoder, &virtio_encoder_funcs,
+	    DRM_MODE_ENCODER_TMDS, NULL);
 
-	/* This part should be in dw_hdmi */
-	sc->base_sc.bridge.funcs = &dw_hdmi_bridge_funcs;
-	drm_bridge_attach(&sc->base_sc.encoder, &sc->base_sc.bridge, NULL);
+	sc->bridge.funcs = &virtio_bridge_funcs;
+	drm_bridge_attach(&sc->encoder, &sc->bridge, NULL);
 
 	return (0);
 }
