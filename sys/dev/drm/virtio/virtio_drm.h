@@ -36,7 +36,8 @@
 struct virtio_drm_softc {
 	device_t		dev;
 	uint64_t		vtgpu_features;
-	struct virtqueue	*vtgpu_vq;
+	struct virtqueue	*ctrlq;
+	struct virtqueue	*cursorq;
 	struct drm_device	drm_dev;
 	struct drm_fb_cma	*fb;
 

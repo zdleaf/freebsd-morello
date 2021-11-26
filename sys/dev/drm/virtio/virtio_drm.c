@@ -453,13 +453,19 @@ vtgpu_setup_features(struct virtio_drm_softc *sc)
 static int
 vtgpu_alloc_virtqueue(struct virtio_drm_softc *sc)
 {
+	struct vq_alloc_info vq_info[2];
 	device_t dev;
-	struct vq_alloc_info vq_info;
+	int nvqs;
 
 	dev = sc->dev;
 
-	VQ_ALLOC_INFO_INIT(&vq_info, 0, NULL, sc, &sc->vtgpu_vq,
-	    "%s request", device_get_nameunit(dev));
+	nvqs = 2;
 
-	return (virtio_alloc_virtqueues(dev, 0, 1, &vq_info));
+	VQ_ALLOC_INFO_INIT(&vq_info[0], 0, NULL, sc, &sc->ctrlq,
+	    "%s control", device_get_nameunit(dev));
+
+	VQ_ALLOC_INFO_INIT(&vq_info[1], 0, NULL, sc, &sc->cursorq,
+	    "%s cursor", device_get_nameunit(dev));
+
+	return (virtio_alloc_virtqueues(dev, 0, nvqs, vq_info));
 }
