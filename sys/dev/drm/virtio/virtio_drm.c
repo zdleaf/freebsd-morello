@@ -361,6 +361,29 @@ fail:
 	device_printf(sc->dev, "drm_dev_register(): %d\n", rv);
 }
 
+#define VTGPU_GET_CONFIG(_dev, _field, _cfg)		\
+	virtio_read_device_config(_dev,			\
+	    offsetof(struct virtio_gpu_config, _field),	\
+	    &(_cfg)->_field, sizeof((_cfg)->_field));
+
+static void
+vtgpu_read_config(struct virtio_drm_softc *sc,
+    struct virtio_gpu_config *gpucfg)
+{
+	device_t dev;
+
+	dev = sc->dev;
+
+	bzero(gpucfg, sizeof(struct virtio_gpu_config));
+
+	VTGPU_GET_CONFIG(dev, events_read, gpucfg);
+	VTGPU_GET_CONFIG(dev, events_clear, gpucfg);
+	VTGPU_GET_CONFIG(dev, num_scanouts, gpucfg);
+	VTGPU_GET_CONFIG(dev, num_capsets, gpucfg);
+}
+
+#undef VTGPU_GET_CONFIG
+
 static int
 vtgpu_probe(device_t dev)
 {
@@ -394,6 +417,10 @@ printf("%s\n", __func__);
 		device_printf(dev, "cannot allocate virtqueue\n");
 		goto fail;
 	}
+
+	struct virtio_gpu_config gpucfg;
+	vtgpu_read_config(sc, &gpucfg);
+	printf("%s: num_scanouts %d\n", __func__, gpucfg.num_scanouts);
 
 	exp = NULL;
 	if (!atomic_compare_exchange_strong_explicit(&g_virtio_drm_softc, &exp, sc,
