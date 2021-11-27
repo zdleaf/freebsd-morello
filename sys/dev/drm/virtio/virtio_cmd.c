@@ -37,6 +37,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/rman.h>
 #include <sys/kernel.h>
 #include <sys/module.h>
+#include <sys/sglist.h>
 #include <sys/eventhandler.h>
 #include <sys/gpio.h>
 #include <vm/vm.h>
@@ -83,10 +84,60 @@ __FBSDID("$FreeBSD$");
 int
 virtio_cmd_get_edids(struct virtio_drm_softc *sc)
 {
+	struct virtio_gpu_cmd_get_edid cmd;
+	struct virtqueue *vq;
+	struct sglist_seg segs[3];
+	struct virtio_gpu_resp_edid resp;
+	struct sglist *sg;
+	int rdlen;
+	int error;
 	int i;
+	int j;
+
+	vq = sc->ctrlq;
+	virtqueue_enable_intr(vq);
+
+	//bzero(&sg, sizeof(struct sglist));
+	sg = sglist_alloc(2, M_NOWAIT);
 
 	for (i = 0; i < sc->gpucfg.num_scanouts; i++) {
 		printf("%s: getting edid for scanout %d\n", __func__, i);
+		bzero(&cmd, sizeof(struct virtio_gpu_cmd_get_edid));
+		bzero(&resp, sizeof(struct virtio_gpu_resp_edid));
+
+		cmd.hdr.type = VIRTIO_GPU_CMD_GET_EDID;
+		cmd.hdr.flags = VIRTIO_GPU_FLAG_FENCE;
+		cmd.hdr.flags |= VIRTIO_GPU_FLAG_INFO_RING_IDX;
+		cmd.hdr.fence_id = 0;
+		cmd.hdr.ring_idx = 0;
+		cmd.scanout = i;
+
+		sglist_init(sg, 3, segs);
+
+		error = sglist_append(sg, &cmd,
+		    sizeof(struct virtio_gpu_cmd_get_edid));
+
+		printf("%s: error %d, sg->sg_nseg %d\n", __func__, error, sg->sg_nseg);
+
+		error = sglist_append(sg, &resp,
+		    sizeof(struct virtio_gpu_resp_edid));
+		error = sglist_append(sg, &resp,
+		    sizeof(struct virtio_gpu_resp_edid));
+
+		printf("%s: error %d, sg->sg_nseg %d\n", __func__, error, sg->sg_nseg);
+
+		error = virtqueue_enqueue(vq, &cmd, sg, 1, 1);
+		if (error) {
+		}
+		printf("%s: error %d\n", __func__, error);
+
+		virtqueue_notify(vq);
+
+		virtqueue_poll(vq, &rdlen);
+		printf("%s: rdlen %d\n", __func__, rdlen);
+
+		for (j = 0; j < 1024; j++)
+			printf("%d ", resp.edid[j]);
 	}
 
 	return (0);

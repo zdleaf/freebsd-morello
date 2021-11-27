@@ -324,6 +324,8 @@ virtio_drm_irq_hook(void *arg)
 		return;
 	}
 
+	virtio_cmd_get_edids(sc);
+
 	//virtio_plane_create(sc, &sc->drm_dev);
 	error = virtio_add_encoder(sc->dev, &sc->crtc, &sc->drm_dev);
 
@@ -418,10 +420,15 @@ printf("%s\n", __func__);
 		goto fail;
 	}
 
+	error = virtio_setup_intr(dev, INTR_TYPE_MISC);
+	if (error) {
+		device_printf(dev, "cannot setup virtqueue interrupts\n");
+		goto fail;
+	}
+
+
 	vtgpu_read_config(sc, &sc->gpucfg);
 	printf("%s: num_scanouts %d\n", __func__, sc->gpucfg.num_scanouts);
-
-	virtio_cmd_get_edids(sc);
 
 	exp = NULL;
 	if (!atomic_compare_exchange_strong_explicit(&g_virtio_drm_softc, &exp, sc,
@@ -478,6 +485,20 @@ vtgpu_setup_features(struct virtio_drm_softc *sc)
 	return (0);
 }
 
+static void
+vtgpu_ctrlq_intr(void *arg)
+{
+
+	printf("%s\n", __func__);
+}
+
+static void
+vtgpu_cursor_intr(void *arg)
+{
+
+	printf("%s\n", __func__);
+}
+
 static int
 vtgpu_alloc_virtqueue(struct virtio_drm_softc *sc)
 {
@@ -489,10 +510,10 @@ vtgpu_alloc_virtqueue(struct virtio_drm_softc *sc)
 
 	nvqs = 2;
 
-	VQ_ALLOC_INFO_INIT(&vq_info[0], 0, NULL, sc, &sc->ctrlq,
+	VQ_ALLOC_INFO_INIT(&vq_info[0], 0, vtgpu_ctrlq_intr, sc, &sc->ctrlq,
 	    "%s control", device_get_nameunit(dev));
 
-	VQ_ALLOC_INFO_INIT(&vq_info[1], 0, NULL, sc, &sc->cursorq,
+	VQ_ALLOC_INFO_INIT(&vq_info[1], 0, vtgpu_cursor_intr, sc, &sc->cursorq,
 	    "%s cursor", device_get_nameunit(dev));
 
 	return (virtio_alloc_virtqueues(dev, 0, nvqs, vq_info));
