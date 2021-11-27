@@ -30,27 +30,9 @@
  * $FreeBSD$
  */
 
-#ifndef _DEV_DRM_VIRTIO_VIRTIO_DRM_H
-#define	_DEV_DRM_VIRTIO_VIRTIO_DRM_H
+#ifndef _DEV_DRM_VIRTIO_VIRTIO_CMD_H_
+#define	_DEV_DRM_VIRTIO_VIRTIO_CMD_H_
 
-struct virtio_drm_softc {
-	device_t		dev;
-	uint64_t		vtgpu_features;
-	struct virtqueue	*ctrlq;
-	struct virtqueue	*cursorq;
-	struct drm_device	drm_dev;
-	struct drm_fb_cma	*fb;
+int virtio_cmd_get_edids(struct virtio_drm_softc *sc);
 
-	struct drm_encoder	encoder;
-	struct drm_connector	connector;
-	struct drm_bridge	bridge;
-	struct drm_display_mode	mode;
-	struct i2c_adapter	*ddc;
-	struct drm_crtc		crtc;
-	struct virtio_plane	planes[2];
-	struct virtio_gpu_config gpucfg;
-};
-
-int virtio_add_encoder(device_t dev, struct drm_crtc *crtc, struct drm_device *drm);
-
-#endif /* !_DEV_DRM_VIRTIO_VIRTIO_DRM_H */
+#endif /* !_DEV_DRM_VIRTIO_VIRTIO_CMD_H_ */

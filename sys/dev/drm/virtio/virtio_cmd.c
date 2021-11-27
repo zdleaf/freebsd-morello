@@ -26,31 +26,68 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
-#ifndef _DEV_DRM_VIRTIO_VIRTIO_DRM_H
-#define	_DEV_DRM_VIRTIO_VIRTIO_DRM_H
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD$");
 
-struct virtio_drm_softc {
-	device_t		dev;
-	uint64_t		vtgpu_features;
-	struct virtqueue	*ctrlq;
-	struct virtqueue	*cursorq;
-	struct drm_device	drm_dev;
-	struct drm_fb_cma	*fb;
+#include <sys/param.h>
+#include <sys/systm.h>
+#include <sys/bus.h>
+#include <sys/rman.h>
+#include <sys/kernel.h>
+#include <sys/module.h>
+#include <sys/eventhandler.h>
+#include <sys/gpio.h>
+#include <vm/vm.h>
+#include <vm/vm_extern.h>
+#include <vm/vm_kern.h>
+#include <vm/pmap.h>
 
-	struct drm_encoder	encoder;
-	struct drm_connector	connector;
-	struct drm_bridge	bridge;
-	struct drm_display_mode	mode;
-	struct i2c_adapter	*ddc;
-	struct drm_crtc		crtc;
-	struct virtio_plane	planes[2];
-	struct virtio_gpu_config gpucfg;
-};
+#include <machine/bus.h>
 
-int virtio_add_encoder(device_t dev, struct drm_crtc *crtc, struct drm_device *drm);
+#include <dev/fdt/fdt_common.h>
+#include <dev/ofw/ofw_bus.h>
+#include <dev/ofw/ofw_bus_subr.h>
+#include <dev/ofw/ofw_graph.h>
 
-#endif /* !_DEV_DRM_VIRTIO_VIRTIO_DRM_H */
+#include <drm/drm_drv.h>
+#include <drm/drm_atomic.h>
+#include <drm/drm_atomic_helper.h>
+#include <drm/drm_bridge.h>
+#include <drm/drm_gem_framebuffer_helper.h>
+#include <drm/drm_plane_helper.h>
+#include <drm/drm_fb_cma_helper.h>
+#include <drm/drm_fb_helper.h>
+#include <drm/drm_fb_cma_helper.h>
+#include <drm/drm_gem_cma_helper.h>
+#include <drm/drm_fourcc.h>
+#include <drm/drm_print.h>
+#include <drm/drm_vblank.h>
+
+#include <dev/virtio/virtio.h>
+#include <dev/virtio/virtqueue.h>
+
+#include <dev/fdt/simplebus.h>
+
+#include <dev/drm/virtio/virtio_gpu.h>
+#include <dev/drm/virtio/virtio_plane.h>
+#include <dev/drm/virtio/virtio_drm.h>
+#include <dev/drm/virtio/virtio_cmd.h>
+
+#include <dev/videomode/videomode.h>
+#include <dev/videomode/edidvar.h>
+
+#define	dprintf(fmt, ...)	printf(fmt, ##__VA_ARGS__)
+
+int
+virtio_cmd_get_edids(struct virtio_drm_softc *sc)
+{
+	int i;
+
+	for (i = 0; i < sc->gpucfg.num_scanouts; i++) {
+		printf("%s: getting edid for scanout %d\n", __func__, i);
+	}
+
+	return (0);
+}

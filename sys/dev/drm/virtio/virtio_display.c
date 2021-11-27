@@ -57,6 +57,7 @@ __FBSDID("$FreeBSD$");
 #include <drm/drm_edid.h>
 #include <drm/drm_print.h>
 
+#include <dev/drm/virtio/virtio_gpu.h>
 #include <dev/drm/virtio/virtio_plane.h>
 #include <dev/drm/virtio/virtio_drm.h>
 

@@ -70,6 +70,7 @@ __FBSDID("$FreeBSD$");
 
 #include <dev/fdt/simplebus.h>
 
+#include <dev/drm/virtio/virtio_gpu.h>
 #include <dev/drm/virtio/virtio_plane.h>
 #include <dev/drm/virtio/virtio_drm.h>
 

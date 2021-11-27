@@ -65,11 +65,11 @@ __FBSDID("$FreeBSD$");
 #include <drm/drm_vblank.h>
 
 #include <dev/drm/virtio/virtio_plane.h>
+#include <dev/drm/virtio/virtio_gpu.h>
 #include <dev/drm/virtio/virtio_drm.h>
+#include <dev/drm/virtio/virtio_cmd.h>
 
 #include <dev/drm/drmkpi/include/linux/dma-buf.h>
-
-#include "virtio_gpu.h"
 
 static int	vtgpu_modevent(module_t, int, void *);
 
@@ -418,9 +418,10 @@ printf("%s\n", __func__);
 		goto fail;
 	}
 
-	struct virtio_gpu_config gpucfg;
-	vtgpu_read_config(sc, &gpucfg);
-	printf("%s: num_scanouts %d\n", __func__, gpucfg.num_scanouts);
+	vtgpu_read_config(sc, &sc->gpucfg);
+	printf("%s: num_scanouts %d\n", __func__, sc->gpucfg.num_scanouts);
+
+	virtio_cmd_get_edids(sc);
 
 	exp = NULL;
 	if (!atomic_compare_exchange_strong_explicit(&g_virtio_drm_softc, &exp, sc,
