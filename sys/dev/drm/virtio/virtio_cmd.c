@@ -155,6 +155,7 @@ virtio_gpu_cmd_get_display_info(struct virtio_drm_softc *sc)
 	struct virtqueue *vq;
 	int rdlen;
 	int error;
+	int i;
 
 	sg = sglist_alloc(2, M_NOWAIT);
 
@@ -181,6 +182,17 @@ virtio_gpu_cmd_get_display_info(struct virtio_drm_softc *sc)
 
 	virtqueue_poll(vq, &rdlen);
 	printf("%s: rdlen %d\n", __func__, rdlen);
+
+	for (i = 0; i < sc->gpucfg.num_scanouts; i++) {
+		if (resp.pmodes[i].enabled) {
+			printf("output %d: %dx%d+%d+%d\n", i,
+			    resp.pmodes[i].r.width,
+			    resp.pmodes[i].r.height,
+			    resp.pmodes[i].r.x,
+			    resp.pmodes[i].r.y);
+		} else
+			printf("output %d disabled\n", i);
+	}
 
 	return (0);
 }
