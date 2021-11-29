@@ -81,6 +81,23 @@ __FBSDID("$FreeBSD$");
 
 #define	dprintf(fmt, ...)	printf(fmt, ##__VA_ARGS__)
 
+static int
+virtio_get_edid_block(void *data, u8 *buf, unsigned int block, size_t len)
+{
+	struct virtio_gpu_resp_edid *resp;
+	size_t start;
+
+	resp = data;
+
+	start = block * EDID_LENGTH;
+	if (start + len > resp->size)
+		return (-1);
+
+	memcpy(buf, resp->edid + start, len);
+
+	return 0;
+}
+
 int
 virtio_cmd_get_edids(struct virtio_drm_softc *sc)
 {
@@ -140,6 +157,14 @@ virtio_cmd_get_edids(struct virtio_drm_softc *sc)
 
 		for (j = 0; j < 1024; j++)
 			printf("%d ", resp.edid[j]);
+
+#if 1
+		struct edid *new_edid;
+		new_edid = drm_do_get_edid(&sc->connector,
+		    virtio_get_edid_block, &resp);
+		drm_connector_update_edid_property(&sc->connector, new_edid);
+		sc->edids[i] = new_edid;
+#endif
 	}
 
 	return (0);

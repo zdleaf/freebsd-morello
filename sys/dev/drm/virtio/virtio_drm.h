@@ -49,6 +49,7 @@ struct virtio_drm_softc {
 	struct drm_crtc		crtc;
 	struct virtio_plane	planes[2];
 	struct virtio_gpu_config gpucfg;
+	struct edid		*edids[32];
 };
 
 int virtio_add_encoder(device_t dev, struct drm_crtc *crtc, struct drm_device *drm);

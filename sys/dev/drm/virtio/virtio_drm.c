@@ -324,11 +324,12 @@ virtio_drm_irq_hook(void *arg)
 		return;
 	}
 
+	error = virtio_add_encoder(sc->dev, &sc->crtc, &sc->drm_dev);
+
 	virtio_cmd_get_edids(sc);
 	virtio_gpu_cmd_get_display_info(sc);
 
 	//virtio_plane_create(sc, &sc->drm_dev);
-	error = virtio_add_encoder(sc->dev, &sc->crtc, &sc->drm_dev);
 
 	if (error != 0) {
 		device_printf(sc->dev, "%s: could not add encoder\n",

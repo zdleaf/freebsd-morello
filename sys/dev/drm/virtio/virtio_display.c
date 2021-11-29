@@ -94,9 +94,8 @@ static const struct drm_connector_funcs virtio_connector_funcs = {
 static int
 virtio_connector_get_modes(struct drm_connector *connector)
 {
-	struct virtio_drm_softc *sc;
+#if 0
 	struct edid *edid = NULL;
-	int ret = 0;
 
 	sc = container_of(connector, struct virtio_drm_softc, connector);
 
@@ -105,6 +104,17 @@ virtio_connector_get_modes(struct drm_connector *connector)
 	ret = drm_add_edid_modes(connector, edid);
 
 	return (ret);
+#endif
+
+	struct virtio_drm_softc *sc;
+	int error;
+
+	sc = container_of(connector, struct virtio_drm_softc, connector);
+
+	error = drm_add_edid_modes(connector, sc->edids[0]);
+printf("error %d\n", error);
+
+	return (error);
 }
 
 static const struct drm_connector_helper_funcs
@@ -117,9 +127,11 @@ virtio_bridge_attach(struct drm_bridge *bridge)
 {
 	struct virtio_drm_softc *sc;
 
+printf("%s\n", __func__);
 	sc = container_of(bridge, struct virtio_drm_softc, bridge);
 
 	sc->connector.polled = DRM_CONNECTOR_POLL_HPD;
+
 	drm_connector_helper_add(&sc->connector,
 	    &virtio_connector_helper_funcs);
 
@@ -324,7 +336,6 @@ virtio_add_encoder(device_t dev, struct drm_crtc *crtc, struct drm_device *drm)
 	}
 
 	drm_crtc_helper_add(&sc->crtc, &rk_vop_crtc_helper_funcs);
-
 
 	drm_encoder_helper_add(&sc->encoder, &virtio_encoder_helper_funcs);
 	sc->encoder.possible_crtcs = drm_crtc_mask(crtc);

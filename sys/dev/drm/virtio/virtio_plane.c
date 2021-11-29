@@ -201,7 +201,7 @@ virtio_plane_atomic_update(struct drm_plane *plane,
 	paddr += (state->src.x1 >> 16) * fb->drm_fb.format->cpp[0];
 	paddr += (state->src.y1 >> 16) * fb->drm_fb.pitches[0];
 
-	printf("%s: paddr %lx\n", paddr);
+	printf("%s: paddr %lx\n", __func__, paddr);
 }
 
 static struct drm_plane_helper_funcs virtio_plane_helper_funcs = {
