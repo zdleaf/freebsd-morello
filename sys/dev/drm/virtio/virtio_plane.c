@@ -73,6 +73,7 @@ __FBSDID("$FreeBSD$");
 #include <dev/drm/virtio/virtio_gpu.h>
 #include <dev/drm/virtio/virtio_plane.h>
 #include <dev/drm/virtio/virtio_drm.h>
+#include <dev/drm/virtio/virtio_cmd.h>
 
 #include <dev/extres/hwreset/hwreset.h>
 #include <dev/extres/clk/clk.h>
@@ -86,45 +87,27 @@ __FBSDID("$FreeBSD$");
 static const u32 virtio_plane_formats[] = {
 	DRM_FORMAT_XRGB8888,
 	DRM_FORMAT_ARGB8888,
-	DRM_FORMAT_XBGR8888,
-	DRM_FORMAT_ABGR8888,
-	DRM_FORMAT_RGB888,
-	DRM_FORMAT_BGR888,
-	DRM_FORMAT_RGB565,
-	DRM_FORMAT_BGR565,
-	DRM_FORMAT_NV12,
-	DRM_FORMAT_NV16,
-	DRM_FORMAT_NV24,
+	DRM_FORMAT_BGRX8888,
+	DRM_FORMAT_BGRA8888,
 };
 
-#if 0
-static enum rockchip_data_format
+enum virtio_gpu_formats
 virtio_convert_format(uint32_t format)
 {
 
 	switch (format) {
 	case DRM_FORMAT_XRGB8888:
+		return (VIRTIO_GPU_FORMAT_B8G8R8X8_UNORM);
 	case DRM_FORMAT_ARGB8888:
-	case DRM_FORMAT_XBGR8888:
-	case DRM_FORMAT_ABGR8888:
-		return VOP_FMT_ARGB8888;
-	case DRM_FORMAT_RGB888:
-	case DRM_FORMAT_BGR888:
-		return VOP_FMT_RGB888;
-	case DRM_FORMAT_RGB565:
-	case DRM_FORMAT_BGR565:
-		return VOP_FMT_RGB565;
-	case DRM_FORMAT_NV12:
-		return VOP_FMT_YUV420SP;
-	case DRM_FORMAT_NV16:
-		return VOP_FMT_YUV422SP;
-	case DRM_FORMAT_NV24:
-		return VOP_FMT_YUV444SP;
+		return (VIRTIO_GPU_FORMAT_B8G8R8A8_UNORM);
+	case DRM_FORMAT_BGRX8888:
+		return (VIRTIO_GPU_FORMAT_X8R8G8B8_UNORM);
+	case DRM_FORMAT_BGRA8888:
+		return (VIRTIO_GPU_FORMAT_A8R8G8B8_UNORM);
 	default:
-		return (-1);
+		return (0);
 	}
 }
-#endif
 
 static int
 virtio_plane_atomic_check(struct drm_plane *plane,
@@ -202,6 +185,9 @@ virtio_plane_atomic_update(struct drm_plane *plane,
 	paddr += (state->src.y1 >> 16) * fb->drm_fb.pitches[0];
 
 	printf("%s: paddr %lx\n", __func__, paddr);
+
+	virtio_gpu_cmd_create_resource(sc);
+	virtio_gpu_cmd_attach_backing(sc);
 }
 
 static struct drm_plane_helper_funcs virtio_plane_helper_funcs = {

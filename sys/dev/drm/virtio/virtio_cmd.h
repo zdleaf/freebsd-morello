@@ -35,5 +35,7 @@
 
 int virtio_cmd_get_edids(struct virtio_drm_softc *sc);
 int virtio_gpu_cmd_get_display_info(struct virtio_drm_softc *sc);
+int virtio_gpu_cmd_create_resource(struct virtio_drm_softc *sc);
+int virtio_gpu_cmd_attach_backing(struct virtio_drm_softc *sc);
 
 #endif /* !_DEV_DRM_VIRTIO_VIRTIO_CMD_H_ */

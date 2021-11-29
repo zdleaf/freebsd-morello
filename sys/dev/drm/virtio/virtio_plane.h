@@ -40,5 +40,6 @@ struct virtio_plane {
 };
 
 int virtio_plane_create(struct virtio_drm_softc *sc, struct drm_device *drm);
+enum virtio_gpu_formats virtio_convert_format(uint32_t format);
 
 #endif /* !_DEV_DRM_ROCKCHIP_RK_PLANE_H_ */

@@ -246,9 +246,9 @@ virtio_gpu_cmd_create_resource(struct virtio_drm_softc *sc)
 
 	cmd.hdr.type = VIRTIO_GPU_CMD_RESOURCE_CREATE_2D;
 	cmd.resource_id = 0;
-	cmd.format = 0;
-	cmd.width = 0;
-	cmd.height = 0;
+	cmd.format = virtio_convert_format(DRM_FORMAT_XRGB8888);
+	cmd.width = 1024;
+	cmd.height = 768;
 
 	sg = sglist_alloc(1, M_NOWAIT);
 	sglist_init(sg, 1, segs);
@@ -269,6 +269,13 @@ virtio_gpu_cmd_create_resource(struct virtio_drm_softc *sc)
 	printf("%s: rdlen %d\n", __func__, rdlen);
 
 	sglist_free(sg);
+
+	return (0);
+}
+
+int
+virtio_gpu_cmd_attach_backing(struct virtio_drm_softc *sc)
+{
 
 	return (0);
 }
