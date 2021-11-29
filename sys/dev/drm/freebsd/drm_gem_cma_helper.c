@@ -308,6 +308,8 @@ drm_gem_cma_create(struct drm_device *drm, size_t size, struct drm_gem_cma_objec
 	struct drm_gem_cma_object *bo;
 	int rv;
 
+printf("%s: size %d\n", __func__, size);
+
 	if (size <= 0)
 		return (-EINVAL);
 

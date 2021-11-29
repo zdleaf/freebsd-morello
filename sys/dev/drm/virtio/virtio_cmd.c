@@ -167,6 +167,8 @@ virtio_cmd_get_edids(struct virtio_drm_softc *sc)
 #endif
 	}
 
+	sglist_free(sg);
+
 	return (0);
 }
 
@@ -182,8 +184,6 @@ virtio_gpu_cmd_get_display_info(struct virtio_drm_softc *sc)
 	int error;
 	int i;
 
-	sg = sglist_alloc(2, M_NOWAIT);
-
 	bzero(&hdr, sizeof(struct virtio_gpu_ctrl_hdr));
 	bzero(&resp, sizeof(struct virtio_gpu_resp_display_info));
 
@@ -191,21 +191,27 @@ virtio_gpu_cmd_get_display_info(struct virtio_drm_softc *sc)
 
 	hdr.type = VIRTIO_GPU_CMD_GET_DISPLAY_INFO;
 
+	sg = sglist_alloc(2, M_NOWAIT);
 	sglist_init(sg, 2, segs);
-	error = sglist_append(sg, &hdr,
-	    sizeof(struct virtio_gpu_cmd_get_edid)+10000);
 
-	printf("%s: error %d\n", __func__, error);
+	error = sglist_append(sg, &hdr,
+	    sizeof(struct virtio_gpu_cmd_get_edid));
+	if (error)
+		return (error);
+
 	error = sglist_append(sg, &resp,
 	    sizeof(struct virtio_gpu_resp_display_info));
-	printf("%s: error %d\n", __func__, error);
+	if (error)
+		return (error);
 
 	error = virtqueue_enqueue(vq, &hdr, sg, 1, 1);
-	printf("%s: error %d\n", __func__, error);
+	if (error)
+		return (error);
 
 	virtqueue_notify(vq);
 
 	virtqueue_poll(vq, &rdlen);
+
 	printf("%s: rdlen %d\n", __func__, rdlen);
 
 	for (i = 0; i < sc->gpucfg.num_scanouts; i++) {
@@ -218,6 +224,51 @@ virtio_gpu_cmd_get_display_info(struct virtio_drm_softc *sc)
 		} else
 			printf("output %d disabled\n", i);
 	}
+
+	sglist_free(sg);
+
+	return (0);
+}
+
+int
+virtio_gpu_cmd_create_resource(struct virtio_drm_softc *sc)
+{
+	struct virtio_gpu_resource_create_2d cmd;
+	struct virtqueue *vq;
+	struct sglist_seg segs[1];
+	struct sglist *sg;
+	int rdlen;
+	int error;
+
+	bzero(&cmd, sizeof(struct virtio_gpu_resource_create_2d));
+
+	vq = sc->ctrlq;
+
+	cmd.hdr.type = VIRTIO_GPU_CMD_RESOURCE_CREATE_2D;
+	cmd.resource_id = 0;
+	cmd.format = 0;
+	cmd.width = 0;
+	cmd.height = 0;
+
+	sg = sglist_alloc(1, M_NOWAIT);
+	sglist_init(sg, 1, segs);
+
+	error = sglist_append(sg, &cmd,
+	    sizeof(struct virtio_gpu_resource_create_2d));
+	if (error)
+		return (error);
+
+	error = virtqueue_enqueue(vq, &cmd, sg, 1, 0);
+	if (error)
+		return (error);
+
+	virtqueue_notify(vq);
+
+	virtqueue_poll(vq, &rdlen);
+
+	printf("%s: rdlen %d\n", __func__, rdlen);
+
+	sglist_free(sg);
 
 	return (0);
 }
