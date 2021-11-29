@@ -34,5 +34,6 @@
 #define	_DEV_DRM_VIRTIO_VIRTIO_CMD_H_
 
 int virtio_cmd_get_edids(struct virtio_drm_softc *sc);
+int virtio_gpu_cmd_get_display_info(struct virtio_drm_softc *sc);
 
 #endif /* !_DEV_DRM_VIRTIO_VIRTIO_CMD_H_ */

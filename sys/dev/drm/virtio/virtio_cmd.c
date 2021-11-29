@@ -86,7 +86,7 @@ virtio_cmd_get_edids(struct virtio_drm_softc *sc)
 {
 	struct virtio_gpu_cmd_get_edid cmd;
 	struct virtqueue *vq;
-	struct sglist_seg segs[3];
+	struct sglist_seg segs[2];
 	struct virtio_gpu_resp_edid resp;
 	struct sglist *sg;
 	int rdlen;
@@ -106,25 +106,27 @@ virtio_cmd_get_edids(struct virtio_drm_softc *sc)
 		bzero(&resp, sizeof(struct virtio_gpu_resp_edid));
 
 		cmd.hdr.type = VIRTIO_GPU_CMD_GET_EDID;
+#if 0
 		cmd.hdr.flags = VIRTIO_GPU_FLAG_FENCE;
 		cmd.hdr.flags |= VIRTIO_GPU_FLAG_INFO_RING_IDX;
 		cmd.hdr.fence_id = 0;
 		cmd.hdr.ring_idx = 0;
+#endif
 		cmd.scanout = i;
 
-		sglist_init(sg, 3, segs);
+		sglist_init(sg, 2, segs);
+
+		printf("cmd addr %p sz %d resp %d\n", &cmd,
+		    sizeof(struct virtio_gpu_cmd_get_edid),
+		    sizeof(struct virtio_gpu_resp_edid));
 
 		error = sglist_append(sg, &cmd,
-		    sizeof(struct virtio_gpu_cmd_get_edid));
-
-		printf("%s: error %d, sg->sg_nseg %d\n", __func__, error, sg->sg_nseg);
-
-		error = sglist_append(sg, &resp,
-		    sizeof(struct virtio_gpu_resp_edid));
+		    sizeof(struct virtio_gpu_cmd_get_edid) + 1);
 		error = sglist_append(sg, &resp,
 		    sizeof(struct virtio_gpu_resp_edid));
 
-		printf("%s: error %d, sg->sg_nseg %d\n", __func__, error, sg->sg_nseg);
+		printf("%s: error %d, sg->sg_nseg %d\n", __func__, error,
+		    sg->sg_nseg);
 
 		error = virtqueue_enqueue(vq, &cmd, sg, 1, 1);
 		if (error) {
@@ -139,6 +141,46 @@ virtio_cmd_get_edids(struct virtio_drm_softc *sc)
 		for (j = 0; j < 1024; j++)
 			printf("%d ", resp.edid[j]);
 	}
+
+	return (0);
+}
+
+int
+virtio_gpu_cmd_get_display_info(struct virtio_drm_softc *sc)
+{
+	struct virtio_gpu_resp_display_info resp;
+	struct virtio_gpu_ctrl_hdr hdr;
+	struct sglist *sg;
+	struct sglist_seg segs[2];
+	struct virtqueue *vq;
+	int rdlen;
+	int error;
+
+	sg = sglist_alloc(2, M_NOWAIT);
+
+	bzero(&hdr, sizeof(struct virtio_gpu_ctrl_hdr));
+	bzero(&resp, sizeof(struct virtio_gpu_resp_display_info));
+
+	vq = sc->ctrlq;
+
+	hdr.type = VIRTIO_GPU_CMD_GET_DISPLAY_INFO;
+
+	sglist_init(sg, 2, segs);
+	error = sglist_append(sg, &hdr,
+	    sizeof(struct virtio_gpu_cmd_get_edid)+10000);
+
+	printf("%s: error %d\n", __func__, error);
+	error = sglist_append(sg, &resp,
+	    sizeof(struct virtio_gpu_resp_display_info));
+	printf("%s: error %d\n", __func__, error);
+
+	error = virtqueue_enqueue(vq, &hdr, sg, 1, 1);
+	printf("%s: error %d\n", __func__, error);
+
+	virtqueue_notify(vq);
+
+	virtqueue_poll(vq, &rdlen);
+	printf("%s: rdlen %d\n", __func__, rdlen);
 
 	return (0);
 }
