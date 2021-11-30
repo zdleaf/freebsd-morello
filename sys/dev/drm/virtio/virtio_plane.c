@@ -73,10 +73,6 @@ __FBSDID("$FreeBSD$");
 #include <dev/drm/virtio/virtio_drm.h>
 #include <dev/drm/virtio/virtio_cmd.h>
 
-#include <dev/extres/hwreset/hwreset.h>
-#include <dev/extres/clk/clk.h>
-//#include <dev/extres/phy/phy.h>
-
 #include <dev/videomode/videomode.h>
 #include <dev/videomode/edidvar.h>
 

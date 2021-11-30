@@ -45,10 +45,6 @@ __FBSDID("$FreeBSD$");
 #include <dev/ofw/ofw_bus.h>
 #include <dev/ofw/ofw_bus_subr.h>
 
-#include <dev/extres/clk/clk.h>
-#include <dev/extres/syscon/syscon.h>
-#include <dev/extres/hwreset/hwreset.h>
-
 #include <drm/drm_atomic_helper.h>
 #include <drm/drm_crtc_helper.h>
 #include <drm/drm_drv.h>
@@ -59,17 +55,6 @@ __FBSDID("$FreeBSD$");
 #include <dev/drm/virtio/virtio_gpu.h>
 #include <dev/drm/virtio/virtio_plane.h>
 #include <dev/drm/virtio/virtio_drm.h>
-
-#if 0
-struct virtio_drm_softc {
-	struct drm_encoder	encoder;
-	struct drm_connector	connector;
-	struct drm_display_mode	mode;
-	struct i2c_adapter	*ddc;
-	struct drm_crtc		crtc;
-	struct virtio_plane	planes[2];
-};
-#endif
 
 static enum drm_connector_status
 virtio_connector_detect(struct drm_connector *connector, bool force)
