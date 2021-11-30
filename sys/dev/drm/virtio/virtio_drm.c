@@ -62,7 +62,6 @@ __FBSDID("$FreeBSD$");
 #include <drm/drm_drv.h>
 #include <drm/drm_file.h>
 #include <drm/drm_ioctl.h>
-#include <drm/drm_vblank.h>
 
 #include <dev/drm/virtio/virtio_plane.h>
 #include <dev/drm/virtio/virtio_gpu.h>
@@ -339,8 +338,6 @@ virtio_drm_irq_hook(void *arg)
 
 	virtio_drm_fb_preinit(&sc->drm_dev);
  
-	drm_vblank_init(&sc->drm_dev, sc->drm_dev.mode_config.num_crtc);
-
 	drm_mode_config_reset(&sc->drm_dev);
 
 	sc->drm_dev.mode_config.max_width = 2560;

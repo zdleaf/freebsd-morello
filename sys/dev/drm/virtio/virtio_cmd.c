@@ -64,7 +64,6 @@ __FBSDID("$FreeBSD$");
 #include <drm/drm_gem_cma_helper.h>
 #include <drm/drm_fourcc.h>
 #include <drm/drm_print.h>
-#include <drm/drm_vblank.h>
 
 #include <dev/virtio/virtio.h>
 #include <dev/virtio/virtqueue.h>

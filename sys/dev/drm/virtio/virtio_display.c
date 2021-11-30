@@ -277,31 +277,6 @@ static const struct drm_crtc_helper_funcs rk_vop_crtc_helper_funcs = {
 	.mode_set_nofb  = rk_crtc_mode_set_nofb,
 };
 
-static uint32_t
-rk_vop_get_vblank_counter(struct drm_crtc *crtc)
-{
-
-	printf("%s\n", __func__);
-
-	return (0);
-}
-
-static int
-rk_vop_enable_vblank(struct drm_crtc *crtc)
-{
-
-	printf("%s\n", __func__);
-
-	return (0);
-}
-
-static void
-rk_vop_disable_vblank(struct drm_crtc *crtc)
-{
-
-	printf("%s\n", __func__);
-}
-
 static const struct drm_crtc_funcs rk_vop_funcs = {
 	.atomic_destroy_state	= drm_atomic_helper_crtc_destroy_state,
 	.atomic_duplicate_state	= drm_atomic_helper_crtc_duplicate_state,
@@ -309,11 +284,6 @@ static const struct drm_crtc_funcs rk_vop_funcs = {
 	.page_flip		= drm_atomic_helper_page_flip,
 	.reset			= drm_atomic_helper_crtc_reset,
 	.set_config		= drm_atomic_helper_set_config,
-
-	.get_vblank_counter	= rk_vop_get_vblank_counter,
-	.enable_vblank		= rk_vop_enable_vblank,
-	.disable_vblank		= rk_vop_disable_vblank,
-
 	.gamma_set		= drm_atomic_helper_legacy_gamma_set,
 };
 
