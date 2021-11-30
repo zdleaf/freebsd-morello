@@ -186,8 +186,13 @@ virtio_plane_atomic_update(struct drm_plane *plane,
 
 	printf("%s: paddr %lx\n", __func__, paddr);
 
+	struct virtio_gpu_mem_entry mem;
+	mem.addr = bo->pbase;
+	mem.length = bo->size;
+
 	virtio_gpu_cmd_create_resource(sc);
-	virtio_gpu_cmd_attach_backing(sc);
+	virtio_gpu_cmd_attach_backing(sc, &mem, 1);
+	virtio_gpu_cmd_set_scanout(sc, 0, 22, src_w, src_h, 0, 0);
 }
 
 static struct drm_plane_helper_funcs virtio_plane_helper_funcs = {

@@ -245,7 +245,7 @@ virtio_gpu_cmd_create_resource(struct virtio_drm_softc *sc)
 	vq = sc->ctrlq;
 
 	cmd.hdr.type = VIRTIO_GPU_CMD_RESOURCE_CREATE_2D;
-	cmd.resource_id = 0;
+	cmd.resource_id = 22;
 	cmd.format = virtio_convert_format(DRM_FORMAT_XRGB8888);
 	cmd.width = 1024;
 	cmd.height = 768;
@@ -274,8 +274,86 @@ virtio_gpu_cmd_create_resource(struct virtio_drm_softc *sc)
 }
 
 int
-virtio_gpu_cmd_attach_backing(struct virtio_drm_softc *sc)
+virtio_gpu_cmd_attach_backing(struct virtio_drm_softc *sc,
+    struct virtio_gpu_mem_entry *mem, int nitems)
 {
+	struct virtio_gpu_resource_attach_backing cmd;
+	struct virtqueue *vq;
+	struct sglist_seg segs[2];
+	struct sglist *sg;
+	int rdlen;
+	int error;
+
+	bzero(&cmd, sizeof(struct virtio_gpu_resource_attach_backing));
+
+	vq = sc->ctrlq;
+
+	cmd.hdr.type = VIRTIO_GPU_CMD_RESOURCE_ATTACH_BACKING;
+	cmd.resource_id = 22;
+	cmd.nr_entries = 1;
+
+	sg = sglist_alloc(2, M_NOWAIT);
+	sglist_init(sg, 2, segs);
+
+	error = sglist_append(sg, &cmd,
+	    sizeof(struct virtio_gpu_resource_attach_backing));
+	if (error)
+		return (error);
+
+	error = sglist_append(sg, mem, sizeof(struct virtio_gpu_mem_entry));
+	if (error)
+		return (error);
+
+	error = virtqueue_enqueue(vq, &cmd, sg, 2, 0);
+	if (error)
+		return (error);
+
+	virtqueue_notify(vq);
+	virtqueue_poll(vq, &rdlen);
+
+	printf("%s: rdlen %d\n", __func__, rdlen);
+	sglist_free(sg);
+
+	return (0);
+}
+
+int
+virtio_gpu_cmd_set_scanout(struct virtio_drm_softc *sc, uint32_t scanout_id,
+    uint32_t resource_id, uint32_t width, uint32_t height, uint32_t x,
+    uint32_t y)
+{
+	struct virtio_gpu_set_scanout cmd;
+	struct virtqueue *vq;
+	struct sglist_seg segs[1];
+	struct sglist *sg;
+	int rdlen;
+	int error;
+
+	bzero(&cmd, sizeof(struct virtio_gpu_resource_attach_backing));
+	vq = sc->ctrlq;
+
+	cmd.hdr.type = VIRTIO_GPU_CMD_SET_SCANOUT;
+	cmd.resource_id = resource_id;
+	cmd.scanout_id = scanout_id;
+	cmd.r.width = width;
+	cmd.r.height = height;
+	cmd.r.x = x;
+	cmd.r.y = y;
+
+	sg = sglist_alloc(1, M_NOWAIT);
+	sglist_init(sg, 1, segs);
+	error = sglist_append(sg, &cmd,
+	    sizeof(struct virtio_gpu_set_scanout));
+
+	error = virtqueue_enqueue(vq, &cmd, sg, 1, 0);
+	if (error)
+		return (error);
+
+	virtqueue_notify(vq);
+	virtqueue_poll(vq, &rdlen);
+
+	printf("%s: rdlen %d\n", __func__, rdlen);
+	sglist_free(sg);
 
 	return (0);
 }
