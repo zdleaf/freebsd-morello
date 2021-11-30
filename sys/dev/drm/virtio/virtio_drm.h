@@ -43,7 +43,6 @@ struct virtio_drm_softc {
 
 	struct drm_encoder	encoder;
 	struct drm_connector	connector;
-	struct drm_bridge	bridge;
 	struct drm_display_mode	mode;
 	struct i2c_adapter	*ddc;
 	struct drm_crtc		crtc;
