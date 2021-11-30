@@ -78,8 +78,6 @@ static int	vtgpu_detach(device_t);
 static int	vtgpu_negotiate_features(struct virtio_drm_softc *);
 static int	vtgpu_setup_features(struct virtio_drm_softc *);
 static int	vtgpu_alloc_virtqueue(struct virtio_drm_softc *);
-static int	vtgpu_harvest(struct virtio_drm_softc *, void *, size_t *);
-static unsigned	vtgpu_read(void *, unsigned);
 
 #define VTGPU_FEATURES	(VIRTIO_GPU_F_VIRGL		|\
 			VIRTIO_GPU_F_EDID		|\
@@ -224,18 +222,6 @@ static const struct drm_mode_config_funcs virtio_drm_mode_config_funcs = {
 	.output_poll_changed	= virtio_drm_output_poll_changed,
 	.fb_create		= drm_gem_fb_create,
 };
-
-static struct fb_info *
-drm_fb_cma_helper_getinfo(device_t dev)
-{
-	struct virtio_drm_softc *sc;
-
-	sc = device_get_softc(dev);
-	if (sc->fb == NULL)
-		return (NULL);
-
-	return (sc->fb->fb_helper.fbdev);
-}
 
 static struct drm_fb_helper_funcs fb_helper_funcs = {
 	.fb_probe = drm_fb_cma_probe,
