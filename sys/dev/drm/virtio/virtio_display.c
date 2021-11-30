@@ -227,11 +227,10 @@ virtio_add_encoder(device_t dev, struct drm_crtc *crtc, struct drm_device *drm)
 	drm_encoder_init(drm, &sc->encoder, &virtio_encoder_funcs,
 	    DRM_MODE_ENCODER_TMDS, NULL);
 
-	sc->connector.polled = DRM_CONNECTOR_POLL_HPD;
 	drm_connector_helper_add(&sc->connector,
 	    &virtio_connector_helper_funcs);
 	drm_connector_init(&sc->drm_dev, &sc->connector,
-	    &virtio_connector_funcs, DRM_MODE_CONNECTOR_HDMIA);
+	    &virtio_connector_funcs, DRM_MODE_CONNECTOR_VIRTUAL);
 	drm_connector_attach_encoder(&sc->connector, &sc->encoder);
 	drm_connector_register(&sc->connector);
 
