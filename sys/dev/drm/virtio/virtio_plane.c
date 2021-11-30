@@ -193,6 +193,8 @@ virtio_plane_atomic_update(struct drm_plane *plane,
 	virtio_gpu_cmd_create_resource(sc);
 	virtio_gpu_cmd_attach_backing(sc, &mem, 1);
 	virtio_gpu_cmd_set_scanout(sc, 0, 22, src_w, src_h, 0, 0);
+	virtio_gpu_cmd_transfer_to_host_2d(sc, 22, src_w, src_h, 0, 0);
+	virtio_gpu_cmd_resource_flush(sc, 22, src_w, src_h, 0, 0);
 }
 
 static struct drm_plane_helper_funcs virtio_plane_helper_funcs = {

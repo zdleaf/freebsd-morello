@@ -357,3 +357,84 @@ virtio_gpu_cmd_set_scanout(struct virtio_drm_softc *sc, uint32_t scanout_id,
 
 	return (0);
 }
+
+int
+virtio_gpu_cmd_transfer_to_host_2d(struct virtio_drm_softc *sc,
+    uint32_t resource_id, uint32_t width, uint32_t height, uint32_t x,
+    uint32_t y)
+{
+	struct virtio_gpu_transfer_to_host_2d cmd;
+	struct virtqueue *vq;
+	struct sglist_seg segs[1];
+	struct sglist *sg;
+	int rdlen;
+	int error;
+
+	bzero(&cmd, sizeof(struct virtio_gpu_transfer_to_host_2d));
+	vq = sc->ctrlq;
+
+	cmd.hdr.type = VIRTIO_GPU_CMD_TRANSFER_TO_HOST_2D;
+	cmd.resource_id = resource_id;
+	cmd.offset = 0;
+	cmd.r.width = width;
+	cmd.r.height = height;
+	cmd.r.x = x;
+	cmd.r.y = y;
+
+	sg = sglist_alloc(1, M_NOWAIT);
+	sglist_init(sg, 1, segs);
+	error = sglist_append(sg, &cmd,
+	    sizeof(struct virtio_gpu_transfer_to_host_2d));
+
+	error = virtqueue_enqueue(vq, &cmd, sg, 1, 0);
+	if (error)
+		return (error);
+
+	virtqueue_notify(vq);
+	virtqueue_poll(vq, &rdlen);
+
+	printf("%s: rdlen %d\n", __func__, rdlen);
+	sglist_free(sg);
+
+	return (0);
+}
+
+int
+virtio_gpu_cmd_resource_flush(struct virtio_drm_softc *sc,
+    uint32_t resource_id, uint32_t width, uint32_t height, uint32_t x,
+    uint32_t y)
+{
+	struct virtio_gpu_resource_flush cmd;
+	struct virtqueue *vq;
+	struct sglist_seg segs[1];
+	struct sglist *sg;
+	int rdlen;
+	int error;
+
+	bzero(&cmd, sizeof(struct virtio_gpu_resource_flush));
+	vq = sc->ctrlq;
+
+	cmd.hdr.type = VIRTIO_GPU_CMD_RESOURCE_FLUSH;
+	cmd.resource_id = resource_id;
+	cmd.r.width = width;
+	cmd.r.height = height;
+	cmd.r.x = x;
+	cmd.r.y = y;
+
+	sg = sglist_alloc(1, M_NOWAIT);
+	sglist_init(sg, 1, segs);
+	error = sglist_append(sg, &cmd,
+	    sizeof(struct virtio_gpu_resource_flush));
+
+	error = virtqueue_enqueue(vq, &cmd, sg, 1, 0);
+	if (error)
+		return (error);
+
+	virtqueue_notify(vq);
+	virtqueue_poll(vq, &rdlen);
+
+	printf("%s: rdlen %d\n", __func__, rdlen);
+	sglist_free(sg);
+
+	return (0);
+}
