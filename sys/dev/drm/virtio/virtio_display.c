@@ -225,7 +225,7 @@ virtio_add_encoder(device_t dev, struct drm_crtc *crtc, struct drm_device *drm)
 	drm_encoder_helper_add(&sc->encoder, &virtio_encoder_helper_funcs);
 	sc->encoder.possible_crtcs = drm_crtc_mask(crtc);
 	drm_encoder_init(drm, &sc->encoder, &virtio_encoder_funcs,
-	    DRM_MODE_ENCODER_TMDS, NULL);
+	    DRM_MODE_ENCODER_VIRTUAL, NULL);
 
 	drm_connector_helper_add(&sc->connector,
 	    &virtio_connector_helper_funcs);
