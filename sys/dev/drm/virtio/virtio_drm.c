@@ -225,10 +225,6 @@ static const struct drm_mode_config_funcs virtio_drm_mode_config_funcs = {
 	.fb_create		= drm_gem_fb_create,
 };
 
-static struct drm_mode_config_helper_funcs virtio_drm_mode_config_helpers = {
-	.atomic_commit_tail	= drm_atomic_helper_commit_tail_rpm,
-};
-
 static struct fb_info *
 drm_fb_cma_helper_getinfo(device_t dev)
 {
@@ -342,8 +338,7 @@ virtio_drm_irq_hook(void *arg)
 	sc->drm_dev.mode_config.max_width = 2560;
 	sc->drm_dev.mode_config.max_height = 1600;
 	sc->drm_dev.mode_config.funcs = &virtio_drm_mode_config_funcs;
-	sc->drm_dev.mode_config.helper_private =
-	    &virtio_drm_mode_config_helpers;
+	sc->drm_dev.mode_config.quirk_addfb_prefer_host_byte_order = true;
 
 	virtio_drm_fb_init(&sc->drm_dev);
  
