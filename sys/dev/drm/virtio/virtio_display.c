@@ -134,16 +134,32 @@ rk_crtc_atomic_check(struct drm_crtc *crtc, struct drm_crtc_state *state)
 static void
 rk_crtc_atomic_begin(struct drm_crtc *crtc, struct drm_crtc_state *old_state)
 {
+	unsigned long flags;
 
 	printf("%s\n", __func__);
+
+	if (crtc->state->event == NULL)
+		return;
+
+	spin_lock_irqsave(&crtc->dev->event_lock, flags);
+	crtc->state->event = NULL;
+	spin_unlock_irqrestore(&crtc->dev->event_lock, flags);
 }
 
 static void
 rk_crtc_atomic_flush(struct drm_crtc *crtc,
     struct drm_crtc_state *old_state)
 {
+	unsigned long flags;
 
 	printf("%s\n", __func__);
+
+	if (crtc->state->event == NULL)
+		return;
+
+	spin_lock_irqsave(&crtc->dev->event_lock, flags);
+	crtc->state->event = NULL;
+	spin_unlock_irqrestore(&crtc->dev->event_lock, flags);
 }
 
 static void
