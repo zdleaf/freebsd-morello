@@ -111,18 +111,7 @@ virtio_encoder_mode_set(struct drm_encoder *encoder,
     struct drm_display_mode *mode,
     struct drm_display_mode *adj_mode)
 {
-#if 0
-	struct virtio_drm_softc *sc;
-	struct virtio_drm_softc *base_sc;
 
-	base_sc = container_of(encoder, struct virtio_drm_softc, encoder);
-	sc = container_of(base_sc, struct virtio_drm_softc, base_sc);
-
-	/*
-	 * Note: we are setting vpll, which should be the same as vop dclk.
-	 */
-	clk_set_freq(sc->clk[2], mode->crtc_clock * 1000, 0);
-#endif
 }
 
 static const struct drm_encoder_helper_funcs virtio_encoder_helper_funcs = {
