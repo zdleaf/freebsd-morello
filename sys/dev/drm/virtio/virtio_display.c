@@ -243,6 +243,7 @@ virtio_add_encoder(device_t dev, struct drm_crtc *crtc, struct drm_device *drm)
 	drm_connector_init(&sc->drm_dev, &sc->connector,
 	    &virtio_connector_funcs, DRM_MODE_CONNECTOR_HDMIA);
 	drm_connector_attach_encoder(&sc->connector, &sc->encoder);
+	drm_connector_register(&sc->connector);
 
 	return (0);
 }
