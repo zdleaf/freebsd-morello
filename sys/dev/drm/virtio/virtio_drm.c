@@ -405,6 +405,9 @@ printf("%s\n", __func__);
 		goto fail;
 	}
 
+	mtx_init(&sc->sc_mtx, device_get_nameunit(dev), MTX_NETWORK_LOCK,
+	    MTX_DEF);
+	callout_init_mtx(&sc->flush_ticker, &sc->sc_mtx, 0);
 
 	vtgpu_read_config(sc, &sc->gpucfg);
 	printf("%s: num_scanouts %d\n", __func__, sc->gpucfg.num_scanouts);
@@ -468,14 +471,14 @@ static void
 vtgpu_ctrlq_intr(void *arg)
 {
 
-	printf("%s\n", __func__);
+	//printf("%s\n", __func__);
 }
 
 static void
 vtgpu_cursor_intr(void *arg)
 {
 
-	printf("%s\n", __func__);
+	//printf("%s\n", __func__);
 }
 
 static int

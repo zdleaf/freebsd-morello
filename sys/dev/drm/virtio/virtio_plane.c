@@ -62,6 +62,7 @@ __FBSDID("$FreeBSD$");
 #include <drm/drm_gem_cma_helper.h>
 #include <drm/drm_fourcc.h>
 #include <drm/drm_print.h>
+#include <drm/drm_vblank.h>
 
 #include <dev/virtio/virtio.h>
 #include <dev/virtio/virtqueue.h>
@@ -134,6 +135,21 @@ virtio_plane_atomic_disable(struct drm_plane *plane,
 }
 
 static void
+virtio_tick(void *arg)
+{
+	struct virtio_drm_softc *sc;
+
+	sc = arg;
+
+	mtx_assert(&sc->sc_mtx, MA_OWNED);
+
+	virtio_gpu_cmd_transfer_to_host_2d(sc, 22, sc->src_w, sc->src_h, 0, 0);
+	virtio_gpu_cmd_resource_flush(sc, 22, sc->src_w, sc->src_h, 0, 0);
+
+	callout_reset(&sc->flush_ticker, hz / 25, virtio_tick, sc);
+}
+
+static void
 virtio_plane_atomic_update(struct drm_plane *plane,
     struct drm_plane_state *old_state)
 {
@@ -189,6 +205,11 @@ virtio_plane_atomic_update(struct drm_plane *plane,
 	virtio_gpu_cmd_set_scanout(sc, 0, 22, src_w, src_h, 0, 0);
 	virtio_gpu_cmd_transfer_to_host_2d(sc, 22, src_w, src_h, 0, 0);
 	virtio_gpu_cmd_resource_flush(sc, 22, src_w, src_h, 0, 0);
+
+	sc->src_w = src_w;
+	sc->src_h = src_h;
+
+	callout_reset(&sc->flush_ticker, hz / 25, virtio_tick, sc);
 }
 
 static struct drm_plane_helper_funcs virtio_plane_helper_funcs = {

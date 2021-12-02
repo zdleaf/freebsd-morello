@@ -49,6 +49,7 @@ __FBSDID("$FreeBSD$");
 #include <drm/drm_probe_helper.h>
 #include <drm/drm_edid.h>
 #include <drm/drm_print.h>
+#include <drm/drm_vblank.h>
 
 #include <dev/drm/virtio/virtio_gpu.h>
 #include <dev/drm/virtio/virtio_plane.h>
@@ -140,24 +141,17 @@ rk_crtc_atomic_begin(struct drm_crtc *crtc, struct drm_crtc_state *old_state)
 		return;
 
 	spin_lock_irqsave(&crtc->dev->event_lock, flags);
+	if (drm_crtc_vblank_get(crtc) != 0)
+		drm_crtc_send_vblank_event(crtc, crtc->state->event);
 	crtc->state->event = NULL;
 	spin_unlock_irqrestore(&crtc->dev->event_lock, flags);
 }
 
 static void
-rk_crtc_atomic_flush(struct drm_crtc *crtc,
-    struct drm_crtc_state *old_state)
+rk_crtc_atomic_flush(struct drm_crtc *crtc, struct drm_crtc_state *old_state)
 {
-	unsigned long flags;
 
 	printf("%s\n", __func__);
-
-	if (crtc->state->event == NULL)
-		return;
-
-	spin_lock_irqsave(&crtc->dev->event_lock, flags);
-	crtc->state->event = NULL;
-	spin_unlock_irqrestore(&crtc->dev->event_lock, flags);
 }
 
 static void
