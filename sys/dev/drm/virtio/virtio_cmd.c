@@ -391,7 +391,7 @@ virtio_gpu_cmd_transfer_to_host_2d(struct virtio_drm_softc *sc,
 	virtqueue_notify(vq);
 	virtqueue_poll(vq, &rdlen);
 
-	printf("%s: rdlen %d\n", __func__, rdlen);
+	//printf("%s: rdlen %d\n", __func__, rdlen);
 	sglist_free(sg);
 
 	return (0);
@@ -431,7 +431,7 @@ virtio_gpu_cmd_resource_flush(struct virtio_drm_softc *sc,
 	virtqueue_notify(vq);
 	virtqueue_poll(vq, &rdlen);
 
-	printf("%s: rdlen %d\n", __func__, rdlen);
+	//printf("%s: rdlen %d\n", __func__, rdlen);
 	sglist_free(sg);
 
 	return (0);
