@@ -748,7 +748,7 @@ in_pcb_lport_dest(struct inpcb *inp, struct sockaddr *lsa, u_short *lportp,
 	if (first == last)
 		dorandom = 0;
 	/* Make sure to not include UDP(-Lite) packets in the count. */
-	if (pcbinfo != &V_udbinfo || pcbinfo != &V_ulitecbinfo)
+	if (pcbinfo != &V_udbinfo && pcbinfo != &V_ulitecbinfo)
 		V_ipport_tcpallocs++;
 	/*
 	 * Instead of having two loops further down counting up or down
@@ -2577,8 +2577,8 @@ ipport_tick(void *xtp)
 	VNET_LIST_RLOCK_NOSLEEP();
 	VNET_FOREACH(vnet_iter) {
 		CURVNET_SET(vnet_iter);	/* XXX appease INVARIANTS here */
-		if (V_ipport_tcpallocs <=
-		    V_ipport_tcplastcount + V_ipport_randomcps) {
+		if (V_ipport_tcpallocs - V_ipport_tcplastcount <=
+		    V_ipport_randomcps) {
 			if (V_ipport_stoprandom > 0)
 				V_ipport_stoprandom--;
 		} else
