@@ -205,8 +205,39 @@ static int
 virtio_ioctl_getparam(struct drm_device *dev, void *data,
     struct drm_file *file)
 {
+	struct drm_virtgpu_getparam *param;
+	struct virtio_drm_softc *sc;
 
-	printf("%s\n", __func__);
+	sc = dev->dev_private;
+	param = data;
+
+	printf("%s: param %d\n", __func__, param->param);
+
+	switch (param->param) {
+	case VIRTGPU_PARAM_3D_FEATURES:
+		param->value = sc->has_virgl_3d ? 1 : 0;
+		break;
+	case VIRTGPU_PARAM_CAPSET_QUERY_FIX:
+		param->value = 1;
+		break;
+	case VIRTGPU_PARAM_RESOURCE_BLOB:
+		param->value = sc->has_resource_blob ? 1 : 0;
+		break;
+	case VIRTGPU_PARAM_HOST_VISIBLE:
+		param->value = sc->has_host_visible ? 1 : 0;
+		break;
+	case VIRTGPU_PARAM_CROSS_DEVICE:
+		param->value = sc->has_resource_assign_uuid ? 1 : 0;
+		break;
+	case VIRTGPU_PARAM_CONTEXT_INIT:
+		param->value = sc->has_context_init ? 1 : 0;
+		break;
+	case VIRTGPU_PARAM_SUPPORTED_CAPSET_IDs:
+		param->value = sc->capset_id_mask;
+		break;
+	default:
+		return (EINVAL);
+	}
 
 	return (0);
 }
@@ -434,6 +465,8 @@ virtio_drm_irq_hook(void *arg)
 
 	sc = arg;
 
+	sc->drm_dev.dev_private = sc;
+
 	node = ofw_bus_get_node(sc->dev);
 
 	drm_mode_config_init(&sc->drm_dev);
@@ -530,6 +563,23 @@ printf("%s\n", __func__);
 		device_printf(dev, "cannot setup features\n");
 		goto fail;
 	}
+
+	if (virtio_with_feature(dev, VIRTIO_GPU_F_VIRGL))
+		sc->has_virgl_3d = true;
+
+	if (virtio_with_feature(dev, VIRTIO_GPU_F_RESOURCE_BLOB))
+		sc->has_resource_blob = true;
+
+	if (virtio_with_feature(dev, VIRTIO_GPU_F_RESOURCE_UUID))
+		sc->has_resource_assign_uuid = true;
+
+	if (virtio_with_feature(dev, VIRTIO_GPU_F_CONTEXT_INIT))
+		sc->has_context_init = true;
+
+#if 0
+        bool                    has_host_visible;
+        int                     capset_id_mask;
+#endif
 
 	if (virtio_with_feature(dev, VIRTIO_RING_F_INDIRECT_DESC))
 		printf("%s: indirect desc negotiated\n", __func__);

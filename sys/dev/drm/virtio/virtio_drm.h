@@ -54,6 +54,13 @@ struct virtio_drm_softc {
 	struct mtx		sc_mtx;
 	uint32_t		src_w;
 	uint32_t		src_h;
+
+	bool			has_virgl_3d;
+	bool			has_resource_blob;
+	bool			has_host_visible;
+	bool			has_resource_assign_uuid;
+	bool			has_context_init;
+	int			capset_id_mask;
 };
 
 int virtio_add_encoder(device_t dev, struct drm_crtc *crtc, struct drm_device *drm);
