@@ -66,6 +66,7 @@ __FBSDID("$FreeBSD$");
 #include <dev/drm/virtio/virtio_gpu.h>
 #include <dev/drm/virtio/virtio_drm.h>
 #include <dev/drm/virtio/virtio_cmd.h>
+#include <dev/drm/virtio/virtgpu_drm.h>
 
 #include <dev/drm/drmkpi/include/linux/dma-buf.h>
 
@@ -180,9 +181,146 @@ static const struct file_operations virtio_drm_drv_fops = {
 	/* .llseek = noop_llseek, */
 };
 
+static int
+virtio_ioctl_map(struct drm_device *dev, void *data,
+    struct drm_file *file)
+{
+
+	printf("%s\n", __func__);
+
+	return (0);
+}
+
+static int
+virtio_ioctl_execbuffer(struct drm_device *dev, void *data,
+    struct drm_file *file)
+{
+
+	printf("%s\n", __func__);
+
+	return (0);
+}
+
+static int
+virtio_ioctl_getparam(struct drm_device *dev, void *data,
+    struct drm_file *file)
+{
+
+	printf("%s\n", __func__);
+
+	return (0);
+}
+
+static int
+virtio_ioctl_resource_create(struct drm_device *dev, void *data,
+    struct drm_file *file)
+{
+
+	printf("%s\n", __func__);
+
+	return (0);
+}
+
+static int
+virtio_ioctl_resource_info(struct drm_device *dev, void *data,
+    struct drm_file *file)
+{
+
+	printf("%s\n", __func__);
+
+	return (0);
+}
+
+static int
+virtio_ioctl_(struct drm_device *dev, void *data,
+    struct drm_file *file)
+{
+
+	printf("%s\n", __func__);
+
+	return (0);
+}
+
+static int
+virtio_ioctl_transfer_from(struct drm_device *dev, void *data,
+    struct drm_file *file)
+{
+
+	printf("%s\n", __func__);
+
+	return (0);
+}
+
+static int
+virtio_ioctl_transfer_to(struct drm_device *dev, void *data,
+    struct drm_file *file)
+{
+
+	printf("%s\n", __func__);
+
+	return (0);
+}
+
+static int
+virtio_ioctl_wait(struct drm_device *dev, void *data,
+    struct drm_file *file)
+{
+
+	printf("%s\n", __func__);
+
+	return (0);
+}
+
+static int
+virtio_ioctl_get_caps(struct drm_device *dev, void *data,
+    struct drm_file *file)
+{
+
+	printf("%s\n", __func__);
+
+	return (0);
+}
+
+static int
+virtio_ioctl_resource_create_blob(struct drm_device *dev, void *data,
+    struct drm_file *file)
+{
+
+	printf("%s\n", __func__);
+
+	return (0);
+}
+
+static int
+virtio_ioctl_context_init(struct drm_device *dev, void *data,
+    struct drm_file *file)
+{
+
+	printf("%s\n", __func__);
+
+	return (0);
+}
+
+static const struct drm_ioctl_desc virtio_gpu_ioctls[] = {
+#define VCTL(name, func, flags) \
+	DRM_IOCTL_DEF_DRV(VIRTGPU_##name, virtio_ioctl_##func, flags)
+
+	VCTL(MAP,			map,		DRM_RENDER_ALLOW),
+	VCTL(EXECBUFFER,		execbuffer,	DRM_RENDER_ALLOW),
+	VCTL(GETPARAM,			getparam,	DRM_RENDER_ALLOW),
+	VCTL(RESOURCE_CREATE,		resource_create,DRM_RENDER_ALLOW),
+	VCTL(RESOURCE_INFO,		resource_info,	DRM_RENDER_ALLOW),
+	VCTL(TRANSFER_FROM_HOST,	transfer_from,	DRM_RENDER_ALLOW),
+	VCTL(TRANSFER_TO_HOST,		transfer_to,	DRM_RENDER_ALLOW),
+	VCTL(WAIT,			wait,		DRM_RENDER_ALLOW),
+	VCTL(GET_CAPS,			get_caps,	DRM_RENDER_ALLOW),
+	VCTL(RESOURCE_CREATE_BLOB,	resource_create_blob, DRM_RENDER_ALLOW),
+	VCTL(CONTEXT_INIT,		context_init,	DRM_RENDER_ALLOW),
+};
+
 static struct drm_driver virtio_drm_driver = {
 	.driver_features = DRIVER_GEM | DRIVER_MODESET | \
-	    DRIVER_ATOMIC | DRIVER_PRIME,
+	    DRIVER_ATOMIC | DRIVER_PRIME | DRIVER_RENDER,
 
 	/* Generic Operations */
 	.lastclose = drm_fb_helper_lastclose,
@@ -199,7 +337,10 @@ static struct drm_driver virtio_drm_driver = {
 	.gem_prime_import_sg_table	= virtio_gem_prime_import_sg_table,
 	.gem_prime_mmap			= virtio_gem_mmap_buf,
 
-	.name				= "virtio",
+	.ioctls				= virtio_gpu_ioctls,
+	.num_ioctls			= ARRAY_SIZE(virtio_gpu_ioctls),
+
+	.name				= "virtio_gpu",
 	.desc				= "Virtio Display Subsystem",
 	.date				= "20211109",
 	.major				= 0,
