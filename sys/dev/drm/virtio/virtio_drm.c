@@ -80,12 +80,12 @@ static int	vtgpu_negotiate_features(struct virtio_drm_softc *);
 static int	vtgpu_setup_features(struct virtio_drm_softc *);
 static int	vtgpu_alloc_virtqueue(struct virtio_drm_softc *);
 
-#define VTGPU_FEATURES	(VIRTIO_GPU_F_VIRGL		|\
-			VIRTIO_GPU_F_EDID		|\
-			VIRTIO_RING_F_INDIRECT_DESC	|\
-			VIRTIO_GPU_F_RESOURCE_UUID	|\
-			VIRTIO_GPU_F_RESOURCE_BLOB	|\
-			VIRTIO_GPU_F_CONTEXT_INIT)
+#define VTGPU_FEATURES	(1 << VIRTIO_GPU_F_VIRGL)		|\
+			(1 << VIRTIO_GPU_F_EDID)		|\
+			(1 << VIRTIO_GPU_F_RESOURCE_UUID)	|\
+			(1 << VIRTIO_GPU_F_RESOURCE_BLOB)	|\
+			(1 << VIRTIO_GPU_F_CONTEXT_INIT)	|\
+			(VIRTIO_RING_F_INDIRECT_DESC)
 
 static struct virtio_feature_desc vtgpu_feature_desc[] = {
 	{ 0, NULL }
@@ -564,16 +564,20 @@ printf("%s\n", __func__);
 		goto fail;
 	}
 
-	if (virtio_with_feature(dev, VIRTIO_GPU_F_VIRGL))
+	if (virtio_with_feature(dev, (1 << VIRTIO_GPU_F_VIRGL))) {
+		printf("virtio has virgl\n");
 		sc->has_virgl_3d = true;
+	} else
+		printf("virtio has no virgl\n");
 
-	if (virtio_with_feature(dev, VIRTIO_GPU_F_RESOURCE_BLOB))
+
+	if (virtio_with_feature(dev, (1 << VIRTIO_GPU_F_RESOURCE_BLOB)))
 		sc->has_resource_blob = true;
 
-	if (virtio_with_feature(dev, VIRTIO_GPU_F_RESOURCE_UUID))
+	if (virtio_with_feature(dev, (1 << VIRTIO_GPU_F_RESOURCE_UUID)))
 		sc->has_resource_assign_uuid = true;
 
-	if (virtio_with_feature(dev, VIRTIO_GPU_F_CONTEXT_INIT))
+	if (virtio_with_feature(dev, (1 << VIRTIO_GPU_F_CONTEXT_INIT)))
 		sc->has_context_init = true;
 
 #if 0
