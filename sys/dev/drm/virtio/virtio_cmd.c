@@ -57,10 +57,7 @@ __FBSDID("$FreeBSD$");
 #include <drm/drm_atomic_helper.h>
 #include <drm/drm_gem_framebuffer_helper.h>
 #include <drm/drm_plane_helper.h>
-#include <drm/drm_fb_cma_helper.h>
 #include <drm/drm_fb_helper.h>
-#include <drm/drm_fb_cma_helper.h>
-#include <drm/drm_gem_cma_helper.h>
 #include <drm/drm_fourcc.h>
 #include <drm/drm_print.h>
 
@@ -182,6 +179,8 @@ virtio_gpu_cmd_get_display_info(struct virtio_drm_softc *sc)
 	int error;
 	int i;
 
+printf("%s\n", __func__);
+
 	bzero(&hdr, sizeof(struct virtio_gpu_ctrl_hdr));
 	bzero(&resp, sizeof(struct virtio_gpu_resp_display_info));
 
@@ -240,6 +239,8 @@ virtio_gpu_cmd_create_resource(struct virtio_drm_softc *sc)
 
 	bzero(&cmd, sizeof(struct virtio_gpu_resource_create_2d));
 
+printf("%s\n", __func__);
+
 	vq = sc->ctrlq;
 
 	cmd.hdr.type = VIRTIO_GPU_CMD_RESOURCE_CREATE_2D;
@@ -281,6 +282,8 @@ virtio_gpu_cmd_attach_backing(struct virtio_drm_softc *sc,
 	struct sglist *sg;
 	int rdlen;
 	int error;
+
+printf("%s\n", __func__);
 
 	bzero(&cmd, sizeof(struct virtio_gpu_resource_attach_backing));
 
@@ -327,6 +330,8 @@ virtio_gpu_cmd_set_scanout(struct virtio_drm_softc *sc, uint32_t scanout_id,
 	int rdlen;
 	int error;
 
+printf("%s\n", __func__);
+
 	bzero(&cmd, sizeof(struct virtio_gpu_resource_attach_backing));
 	vq = sc->ctrlq;
 
@@ -367,6 +372,8 @@ virtio_gpu_cmd_transfer_to_host_2d(struct virtio_drm_softc *sc,
 	struct sglist *sg;
 	int rdlen;
 	int error;
+
+printf("%s\n", __func__);
 
 	bzero(&cmd, sizeof(struct virtio_gpu_transfer_to_host_2d));
 	vq = sc->ctrlq;
@@ -409,6 +416,7 @@ virtio_gpu_cmd_resource_flush(struct virtio_drm_softc *sc,
 	int rdlen;
 	int error;
 
+printf("%s\n", __func__);
 	bzero(&cmd, sizeof(struct virtio_gpu_resource_flush));
 	vq = sc->ctrlq;
 

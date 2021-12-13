@@ -51,7 +51,6 @@ __FBSDID("$FreeBSD$");
 #include <dev/ofw/ofw_bus_subr.h>
 
 #include <drm/drm_atomic_helper.h>
-#include <drm/drm_gem_cma_helper.h>
 #include <drm/drm_gem_framebuffer_helper.h>
 #include <drm/drm_fb_helper.h>
 #include <drm/drm_fb_cma_helper.h>
@@ -143,6 +142,8 @@ static int
 virtio_gem_mmap_buf(struct drm_gem_object *obj, struct vm_area_struct *vma)
 {
 
+	while (1)
+		printf("%s\n", __func__);
 	panic("implement me");
 
 	return (0);
@@ -152,6 +153,8 @@ struct sg_table *
 virtio_gem_prime_get_sg_table(struct drm_gem_object *obj)
 {
 
+	while (1)
+		printf("%s\n", __func__);
 	panic("implement me");
 
 	return (NULL);
@@ -162,6 +165,8 @@ virtio_gem_prime_import_sg_table(struct drm_device *dev,
     struct dma_buf_attachment *attach, struct sg_table *sg)
 {
 
+	while (1)
+		printf("%s\n", __func__);
 	panic("implement me");
 
 	return (NULL);
@@ -176,9 +181,9 @@ static const struct file_operations virtio_drm_drv_fops = {
 	.compat_ioctl = drm_compat_ioctl,
 	.poll = drm_poll,
 	.read = drm_read,
-	.mmap = drm_gem_cma_mmap,
 	.kqfilter = drm_kqfilter,
 	/* .llseek = noop_llseek, */
+	.mmap	= drm_gem_mmap,
 };
 
 static int
@@ -349,9 +354,24 @@ static const struct drm_ioctl_desc virtio_gpu_ioctls[] = {
 	VCTL(CONTEXT_INIT,		context_init,	DRM_RENDER_ALLOW),
 };
 
+static int
+virtio_open(struct drm_device *dev, struct drm_file *file)
+{
+
+	printf("%s\n", __func__);
+	return (EINVAL);
+}
+
+static void
+virtio_postclose(struct drm_device *dev, struct drm_file *file)
+{
+
+	printf("%s\n", __func__);
+}
+
 static struct drm_driver virtio_drm_driver = {
 	.driver_features = DRIVER_GEM | DRIVER_MODESET | \
-	    DRIVER_ATOMIC | DRIVER_PRIME | DRIVER_RENDER,
+	    DRIVER_ATOMIC | DRIVER_PRIME | DRIVER_SYNCOBJ | DRIVER_RENDER,
 
 	/* Generic Operations */
 	.lastclose = drm_fb_helper_lastclose,
@@ -359,8 +379,8 @@ static struct drm_driver virtio_drm_driver = {
 
 	/* GEM Opeations */
 	.dumb_create			= drm_gem_cma_dumb_create,
-	.gem_free_object		= drm_gem_cma_free_object,
-	.gem_vm_ops			= &drm_gem_cma_vm_ops,
+	//.gem_free_object		= drm_gem_cma_free_object,
+	//.gem_vm_ops			= &drm_gem_cma_vm_ops,
 
 	.prime_handle_to_fd		= drm_gem_prime_handle_to_fd,
 	.prime_fd_to_handle		= drm_gem_prime_fd_to_handle,
@@ -376,6 +396,9 @@ static struct drm_driver virtio_drm_driver = {
 	.date				= "20211109",
 	.major				= 0,
 	.minor				= 1,
+
+	.open				= virtio_open,
+	.postclose			= virtio_postclose,
 };
 
 static void
@@ -502,14 +525,14 @@ virtio_drm_irq_hook(void *arg)
 
 	virtio_drm_fb_init(&sc->drm_dev);
  
-	drm_kms_helper_poll_init(&sc->drm_dev);
+	//drm_kms_helper_poll_init(&sc->drm_dev);
 
 	/* Finally register our drm device */
 	rv = drm_dev_register(&sc->drm_dev, 0);
 	if (rv < 0)
 		goto fail;
 
-	sc->drm_dev.irq_enabled = true;
+	//sc->drm_dev.irq_enabled = true;
 
 	return;
 fail:
@@ -569,7 +592,6 @@ printf("%s\n", __func__);
 		sc->has_virgl_3d = true;
 	} else
 		printf("virtio has no virgl\n");
-
 
 	if (virtio_with_feature(dev, (1 << VIRTIO_GPU_F_RESOURCE_BLOB)))
 		sc->has_resource_blob = true;
@@ -666,14 +688,14 @@ static void
 vtgpu_ctrlq_intr(void *arg)
 {
 
-	//printf("%s\n", __func__);
+	printf("%s\n", __func__);
 }
 
 static void
 vtgpu_cursor_intr(void *arg)
 {
 
-	//printf("%s\n", __func__);
+	printf("%s\n", __func__);
 }
 
 static int

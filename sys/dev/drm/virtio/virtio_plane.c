@@ -132,12 +132,15 @@ virtio_plane_atomic_disable(struct drm_plane *plane,
     struct drm_plane_state *old_state)
 {
 
+	dprintf("%s\n", __func__);
 }
 
 static void
 virtio_tick(void *arg)
 {
 	struct virtio_drm_softc *sc;
+
+	dprintf("%s\n", __func__);
 
 	sc = arg;
 
@@ -165,6 +168,8 @@ virtio_plane_atomic_update(struct drm_plane *plane,
 	struct drm_rect *dst;
 	int id;
 
+	dprintf("%s\n", __func__);
+
 	state = plane->state;
 	dst = &state->dst;
 	src = &state->src;
@@ -186,8 +191,11 @@ virtio_plane_atomic_update(struct drm_plane *plane,
 	    __func__, src_w, src_h, dst_w, dst_h);
 
 	/* TODO */
-	if (!plane->state->visible)
+	if (!plane->state->visible) {
+		while (1)
+			printf("%s\n", __func__);
 		panic("plane is not visible");
+	}
 
 	bo = drm_fb_cma_get_gem_obj(fb, 0);
 	paddr = bo->pbase + fb->drm_fb.offsets[0];
@@ -209,7 +217,8 @@ virtio_plane_atomic_update(struct drm_plane *plane,
 	sc->src_w = src_w;
 	sc->src_h = src_h;
 
-	callout_reset(&sc->flush_ticker, hz / 25, virtio_tick, sc);
+	if (1 == 0)
+		callout_reset(&sc->flush_ticker, hz / 25, virtio_tick, sc);
 }
 
 static struct drm_plane_helper_funcs virtio_plane_helper_funcs = {

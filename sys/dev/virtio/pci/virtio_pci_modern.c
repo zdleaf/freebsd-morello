@@ -437,6 +437,7 @@ vtpci_modern_negotiate_features(device_t dev, uint64_t child_features)
 
 	sc = device_get_softc(dev);
 	host_features = vtpci_modern_read_features(sc);
+printf("%s: host features %lx\n", __func__, host_features);
 
 	/*
 	 * Since the driver was added as a child of the modern PCI bus,

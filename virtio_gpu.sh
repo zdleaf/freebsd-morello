@@ -13,4 +13,7 @@ make -j8 TARGET=riscv KERN${A}=GENERIC buildkernel || exit 1
 # make -j8 TARGET=riscv -DNO_ROOT DESTDIR=/mnt/world-riscv installworld
 # makefs -D -f 1000000 -s 8g /mnt/riscv-full.img METALOG
 
-scp /usr/obj/usr/home/br/dev/freebsd-head/riscv.riscv64/sys/GENERIC/kernel 10.8.0.1:~/virtgl_kernel
+# scp /usr/obj/usr/home/br/dev/freebsd-head/riscv.riscv64/sys/GENERIC/kernel 10.8.0.1:~/virtgl_kernel
+
+#scp /mnt/obj/usr/home/br/dev/freebsd-head/riscv.riscv64/sys/GENERIC/kernel 10.8.0.1:~/virtgl_kernel
+scp /mnt/obj/usr/home/br/dev/freebsd-head/riscv.riscv64/sys/GENERIC/kernel 10.4.0.2:~/virtgl_kernel
