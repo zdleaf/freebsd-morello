@@ -40,6 +40,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/kernel.h>
 #include <sys/lock.h>
 #include <sys/malloc.h>
+#include <sys/rman.h>
 #include <sys/module.h>
 #include <sys/mutex.h>
 #include <sys/priv.h>
@@ -48,20 +49,35 @@ __FBSDID("$FreeBSD$");
 #include <sys/systm.h>
 #include <sys/uio.h>
 
-#include <vm/vm.h>
-#include <vm/vm_param.h>
-#include <vm/pmap.h>
-#include <vm/vm_map.h>
-#include <vm/vm_object.h>
-#include <vm/vm_page.h>
-#include <vm/vm_phys.h>
-#include <vm/vm_extern.h>
+#include <dev/fdt/fdt_common.h>
+#include <dev/ofw/openfirm.h>
+#include <dev/ofw/ofw_bus.h>
+#include <dev/ofw/ofw_bus_subr.h>
+#include <dev/ofw/ofw_subr.h>
 
-#define	FMEM_BASE	0xf9000000
-#define	FMEM_NUNITS	8
+#include <machine/bus.h>
 
-static struct cdev *fmemdev[FMEM_NUNITS];
-static uint64_t vaddr[FMEM_NUNITS];
+#define	FMEM_MAXDEVS		128
+
+struct fmem_dev {
+	struct cdev		*cdev;
+	uint64_t		offset;
+	uint64_t		length;
+};
+
+struct fmem_softc {
+	struct resource		*res[1];
+	device_t		dev;
+	int			mem_size;
+	int			mem_start;
+	struct fmem_dev		fmem[FMEM_MAXDEVS];
+	int			ndevs;
+};
+
+static struct resource_spec fmem_spec[] = {
+	{ SYS_RES_MEMORY,	0,	RF_ACTIVE },
+	{ -1, 0 }
+};
 
 struct fmem_request {
 	uint32_t offset;
@@ -85,40 +101,43 @@ fmemioctl(struct cdev *dev, u_long cmd, caddr_t data, int flags,
     struct thread *td)
 {
 	struct fmem_request *req;
+	struct fmem_softc *sc;
 	uint64_t addr;
 	int unit;
+
+	sc = dev->si_drv1;
 
 	req = (struct fmem_request *)data;
 	if ((req->offset + req->access_width) > PAGE_SIZE)
 		return (ERANGE);
 
 	unit = dev2unit(dev);
-	addr = vaddr[unit] + req->offset;
+	addr = sc->fmem[unit].offset + req->offset;
 
 	switch (cmd) {
 	case FMEM_READ:
 		switch (req->access_width) {
 		case 1:
-			req->data = *(volatile uint8_t *)addr;
+			req->data = bus_read_1(sc->res[0], addr);
 			break;
 		case 2:
-			req->data = *(volatile uint16_t *)addr;
+			req->data = bus_read_2(sc->res[0], addr);
 			break;
 		case 4:
-			req->data = *(volatile uint32_t *)addr;
+			req->data = bus_read_4(sc->res[0], addr);
 			break;
 		}
 		break;
 	case FMEM_WRITE:
 		switch (req->access_width) {
 		case 1:
-			*(volatile uint8_t *)addr = req->data;
+			bus_write_1(sc->res[0], addr, req->data);
 			break;
 		case 2:
-			*(volatile uint16_t *)addr = req->data;
+			bus_write_2(sc->res[0], addr, req->data);
 			break;
 		case 4:
-			*(volatile uint32_t *)addr = req->data;
+			bus_write_4(sc->res[0], addr, req->data);
 			break;
 		}
 	}
@@ -137,52 +156,108 @@ static struct cdevsw fmem_cdevsw = {
 	.d_name =	"fmem",
 };
 
-static void
-fmem_init(void)
+static int
+fmem_probe(device_t dev)
 {
-	uint32_t base;
-	int i;
 
-	for (i = 0; i < FMEM_NUNITS; i++) {
-		fmemdev[i] = make_dev(&fmem_cdevsw, i, UID_ROOT,
-		    GID_KMEM, 0640, "fmem%d", i);
-		vaddr[i] = kva_alloc(PAGE_SIZE);
-		base = FMEM_BASE + PAGE_SIZE * i;
-		pmap_kenter(vaddr[i], PAGE_SIZE, base, VM_MEMATTR_DEVICE);
-	}
-}
+	if (!ofw_bus_status_okay(dev))
+		return (ENXIO);
 
-static void
-fmem_uninit(void)
-{
-	int i;
+	if (!ofw_bus_is_compatible(dev, "cheri,fmem"))
+		return (ENXIO);
 
-	for (i = 0; i < FMEM_NUNITS; i++) {
-		pmap_kremove(vaddr[i]);
-		kva_free(vaddr[i], PAGE_SIZE);
-		destroy_dev(fmemdev[i]);
-	}
+	device_set_desc(dev, "CHERI FPGA memory");
+	return (BUS_PROBE_DEFAULT);
 }
 
 static int
-fmem_modevent(module_t mod __unused, int type, void *data __unused)
+fmem_attach(device_t dev)
 {
+	struct fmem_softc *sc;
+	phandle_t node, child;
+	bus_addr_t paddr;
+	bus_size_t psize;
+	char *name;
+	int error;
+	int u;
 
-	switch(type) {
-	case MOD_LOAD:
-		fmem_init();
-		break;
-	case MOD_UNLOAD:
-		fmem_uninit();
-		break;
-	case MOD_SHUTDOWN:
-		break;
-	default:
-		return(EOPNOTSUPP);
+	sc = device_get_softc(dev);
+	sc->dev = dev;
+
+	if (bus_alloc_resources(dev, fmem_spec, sc->res)) {
+		device_printf(dev, "could not allocate resources\n");
+		return (ENXIO);
+	}
+
+	/* Memory info */
+	sc->mem_size = rman_get_size(sc->res[0]);
+	sc->mem_start = rman_get_start(sc->res[0]);
+	sc->ndevs = 0;
+
+	node = ofw_bus_get_node(dev);
+
+	/* Optional group. */
+	child = ofw_bus_find_child(node, "regions");
+	if (child)
+		node = child;
+
+	for (child = OF_child(node), u = 0; child != 0 && u < FMEM_MAXDEVS;
+	    child = OF_peer(child), u ++) {
+
+		error = OF_getprop_alloc(child, "name", (void **)&name);
+		if (error == -1)
+			continue;
+
+		error = ofw_reg_to_paddr(child, 0, &paddr, &psize, NULL);
+		if (error)
+			continue;
+
+		if ((psize & 0xfff) != 0) {
+			device_printf(sc->dev,
+			    "psize must be multiple of PAGE_SIZE\n");
+			continue;
+		}
+
+		sc->fmem[u].cdev = make_dev(&fmem_cdevsw, u, UID_ROOT,
+		    GID_KMEM, 0640, "fmem_%s", name);
+		sc->fmem[u].cdev->si_drv1 = sc;
+		sc->fmem[u].offset = paddr;
+		sc->fmem[u].length = psize;
+		sc->ndevs++;
 	}
 
 	return (0);
 }
 
-DEV_MODULE(fmem, fmem_modevent, NULL);
-MODULE_VERSION(fmem, 1);
+static int
+fmem_detach(device_t dev)
+{
+	struct fmem_softc *sc;
+	int i;
+
+	sc = device_get_softc(dev);
+
+	for (i = 0; i < sc->ndevs; i++)
+		destroy_dev(sc->fmem[i].cdev);
+
+	bus_release_resources(dev, fmem_spec, sc->res);
+
+	return (0);
+}
+
+static device_method_t fmem_methods[] = {
+	DEVMETHOD(device_probe,		fmem_probe),
+	DEVMETHOD(device_attach,	fmem_attach),
+	DEVMETHOD(device_detach,	fmem_detach),
+	{ 0, 0 }
+};
+
+static driver_t fmem_driver = {
+	"fmem",
+	fmem_methods,
+	sizeof(struct fmem_softc),
+};
+
+static devclass_t fmem_devclass;
+
+DRIVER_MODULE(fmem, simplebus, fmem_driver, fmem_devclass, 0, 0);
