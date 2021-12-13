@@ -1958,10 +1958,15 @@ pmap_bootstrap(vm_paddr_t *firstaddr)
 	kernel_pmap->pm_pmltop = kernel_pml4;
 	kernel_pmap->pm_cr3 = KPML4phys;
 	kernel_pmap->pm_ucr3 = PMAP_NO_CR3;
-	CPU_FILL(&kernel_pmap->pm_active);	/* don't allow deactivation */
 	TAILQ_INIT(&kernel_pmap->pm_pvchunk);
 	kernel_pmap->pm_stats.resident_count = res;
 	kernel_pmap->pm_flags = pmap_flags;
+
+	/*
+	 * The kernel pmap is always active on all CPUs.  Once CPUs are
+	 * enumerated, the mask will be set equal to all_cpus.
+	 */
+	CPU_FILL(&kernel_pmap->pm_active);
 
  	/*
 	 * Initialize the TLB invalidations generation number lock.
@@ -3010,12 +3015,6 @@ pmap_invalidate_ept(pmap_t pmap)
 	smr_wait(pmap->pm_eptsmr, goal);
 }
 
-static cpuset_t
-pmap_invalidate_cpu_mask(pmap_t pmap)
-{
-	return (pmap == kernel_pmap ? all_cpus : pmap->pm_active);
-}
-
 static inline void
 pmap_invalidate_preipi_pcid(pmap_t pmap)
 {
@@ -3147,8 +3146,7 @@ pmap_invalidate_page(pmap_t pmap, vm_offset_t va)
 	    ("pmap_invalidate_page: invalid type %d", pmap->pm_type));
 
 	pmap_invalidate_preipi(pmap);
-	smp_masked_invlpg(pmap_invalidate_cpu_mask(pmap), va, pmap,
-	    pmap_invalidate_page_curcpu_cb);
+	smp_masked_invlpg(va, pmap, pmap_invalidate_page_curcpu_cb);
 }
 
 /* 4k PTEs -- Chosen to exceed the total size of Broadwell L2 TLB */
@@ -3246,7 +3244,7 @@ pmap_invalidate_range(pmap_t pmap, vm_offset_t sva, vm_offset_t eva)
 	    ("pmap_invalidate_range: invalid type %d", pmap->pm_type));
 
 	pmap_invalidate_preipi(pmap);
-	smp_masked_invlpg_range(pmap_invalidate_cpu_mask(pmap), sva, eva, pmap,
+	smp_masked_invlpg_range(sva, eva, pmap,
 	    pmap_invalidate_range_curcpu_cb);
 }
 
@@ -3332,8 +3330,7 @@ pmap_invalidate_all(pmap_t pmap)
 	    ("pmap_invalidate_all: invalid type %d", pmap->pm_type));
 
 	pmap_invalidate_preipi(pmap);
-	smp_masked_invltlb(pmap_invalidate_cpu_mask(pmap), pmap,
-	    pmap_invalidate_all_curcpu_cb);
+	smp_masked_invltlb(pmap, pmap_invalidate_all_curcpu_cb);
 }
 
 static void
@@ -3735,7 +3732,8 @@ pmap_flush_cache_phys_range(vm_paddr_t spa, vm_paddr_t epa, vm_memattr_t mattr)
 {
 	pt_entry_t *pte;
 	vm_offset_t vaddr;
-	int error, pte_bits;
+	int error __diagused;
+	int pte_bits;
 
 	KASSERT((spa & PAGE_MASK) == 0,
 	    ("pmap_flush_cache_phys_range: spa not page-aligned"));
@@ -6143,7 +6141,7 @@ pmap_remove_pde(pmap_t pmap, pd_entry_t *pdq, vm_offset_t sva,
 		if (mpte != NULL) {
 			KASSERT(mpte->valid == VM_PAGE_BITS_ALL,
 			    ("pmap_remove_pde: pte page not promoted"));
-			pmap_resident_count_adj(pmap, -1);
+			pmap_pt_page_count_adj(pmap, -1);
 			KASSERT(mpte->ref_count == NPTEPG,
 			    ("pmap_remove_pde: pte page ref count error"));
 			mpte->ref_count = 0;
@@ -7732,7 +7730,7 @@ pmap_unwire(pmap_t pmap, vm_offset_t sva, vm_offset_t eva)
 	pml4_entry_t *pml4e;
 	pdp_entry_t *pdpe;
 	pd_entry_t *pde;
-	pt_entry_t *pte, PG_V, PG_G;
+	pt_entry_t *pte, PG_V, PG_G __diagused;
 
 	PG_V = pmap_valid_bit(pmap);
 	PG_G = pmap_global_bit(pmap);
@@ -8411,7 +8409,7 @@ pmap_remove_pages(pmap_t pmap)
 					if (mpte != NULL) {
 						KASSERT(mpte->valid == VM_PAGE_BITS_ALL,
 						    ("pmap_remove_pages: pte page not promoted"));
-						pmap_resident_count_adj(pmap, -1);
+						pmap_pt_page_count_adj(pmap, -1);
 						KASSERT(mpte->ref_count == NPTEPG,
 						    ("pmap_remove_pages: pte page reference count error"));
 						mpte->ref_count = 0;
@@ -10925,7 +10923,14 @@ pmap_pti_init(void)
 	pti_finalized = true;
 	VM_OBJECT_WUNLOCK(pti_obj);
 }
-SYSINIT(pmap_pti, SI_SUB_CPU + 1, SI_ORDER_ANY, pmap_pti_init, NULL);
+
+static void
+pmap_cpu_init(void *arg __unused)
+{
+	CPU_COPY(&all_cpus, &kernel_pmap->pm_active);
+	pmap_pti_init();
+}
+SYSINIT(pmap_cpu, SI_SUB_CPU + 1, SI_ORDER_ANY, pmap_cpu_init, NULL);
 
 static pdp_entry_t *
 pmap_pti_pdpe(vm_offset_t va)

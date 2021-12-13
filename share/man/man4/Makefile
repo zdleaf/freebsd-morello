@@ -46,7 +46,6 @@ MAN=	aac.4 \
 	${_amdsmn.4} \
 	${_amdtemp.4} \
 	${_bxe.4} \
-	amr.4 \
 	${_aout.4} \
 	${_apic.4} \
 	arcmsr.4 \
@@ -142,7 +141,6 @@ MAN=	aac.4 \
 	ena.4 \
 	enc.4 \
 	epair.4 \
-	esp.4 \
 	est.4 \
 	et.4 \
 	etherswitch.4 \
@@ -223,7 +221,6 @@ MAN=	aac.4 \
 	iichid.4 \
 	iicmux.4 \
 	iicsmb.4 \
-	iir.4 \
 	${_igc.4} \
 	${_imcsmb.4} \
 	inet.4 \
@@ -288,6 +285,7 @@ MAN=	aac.4 \
 	mac_ntpd.4 \
 	mac_partition.4 \
 	mac_portacl.4 \
+	mac_priority.4 \
 	mac_seeotheruids.4 \
 	mac_stub.4 \
 	mac_test.4 \
@@ -305,7 +303,6 @@ MAN=	aac.4 \
 	mlx.4 \
 	mlx4en.4 \
 	mlx5en.4 \
-	mly.4 \
 	mmc.4 \
 	mmcsd.4 \
 	mod_cc.4 \
@@ -418,6 +415,7 @@ MAN=	aac.4 \
 	owc.4 \
 	${_padlock.4} \
 	pass.4 \
+	pca954x.4 \
 	pccard.4 \
 	pccbb.4 \
 	pcf.4 \
@@ -554,7 +552,6 @@ MAN=	aac.4 \
 	${_tpm.4} \
 	tty.4 \
 	tun.4 \
-	twa.4 \
 	twe.4 \
 	tws.4 \
 	udp.4 \

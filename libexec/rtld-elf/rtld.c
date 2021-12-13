@@ -104,6 +104,7 @@ static Obj_Entry *dlopen_object(const char *name, int fd, Obj_Entry *refobj,
 static Obj_Entry *do_load_object(int, const char *, char *, struct stat *, int);
 static int do_search_info(const Obj_Entry *obj, int, struct dl_serinfo *);
 static bool donelist_check(DoneList *, const Obj_Entry *);
+static void dump_auxv(Elf_Auxinfo **aux_info);
 static void errmsg_restore(struct dlerror_save *);
 static struct dlerror_save *errmsg_save(void);
 static void *fill_search_info(const char *, size_t, void *);
@@ -124,6 +125,7 @@ static void load_filtees(Obj_Entry *, int flags, RtldLockState *);
 static void unload_filtees(Obj_Entry *, RtldLockState *);
 static int load_needed_objects(Obj_Entry *, int);
 static int load_preload_objects(const char *, bool);
+static int load_kpreload(const void *addr);
 static Obj_Entry *load_object(const char *, int fd, const Obj_Entry *, int);
 static void map_stacks_exec(RtldLockState *);
 static int obj_disable_relro(Obj_Entry *);
@@ -364,6 +366,7 @@ enum {
 	LD_TRACE_LOADED_OBJECTS_FMT1,
 	LD_TRACE_LOADED_OBJECTS_FMT2,
 	LD_TRACE_LOADED_OBJECTS_ALL,
+	LD_SHOW_AUXV,
 };
 
 struct ld_env_var_desc {
@@ -396,6 +399,7 @@ static struct ld_env_var_desc ld_env_vars[] = {
 	LD_ENV_DESC(TRACE_LOADED_OBJECTS_FMT1, false),
 	LD_ENV_DESC(TRACE_LOADED_OBJECTS_FMT2, false),
 	LD_ENV_DESC(TRACE_LOADED_OBJECTS_ALL, false),
+	LD_ENV_DESC(SHOW_AUXV, false),
 };
 
 static const char *
@@ -825,6 +829,13 @@ _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
     if (!libmap_disable)
         libmap_disable = (bool)lm_init(libmap_override);
 
+    if (aux_info[AT_KPRELOAD] != NULL &&
+      aux_info[AT_KPRELOAD]->a_un.a_ptr != NULL) {
+	dbg("loading kernel vdso");
+	if (load_kpreload(aux_info[AT_KPRELOAD]->a_un.a_ptr) == -1)
+	    rtld_die();
+    }
+
     dbg("loading LD_PRELOAD_FDS libraries");
     if (load_preload_objects(ld_preload_fds, true) == -1)
 	rtld_die();
@@ -856,6 +867,9 @@ _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
     dbg("checking for required versions");
     if (rtld_verify_versions(&list_main) == -1 && !ld_tracing)
 	rtld_die();
+
+    if (ld_get_env_var(LD_SHOW_AUXV) != NULL)
+       dump_auxv(aux_info);
 
     if (ld_tracing) {		/* We're done */
 	trace_loaded_objects(obj_main);
@@ -2836,6 +2850,77 @@ errp:
     return (NULL);
 }
 
+static int
+load_kpreload(const void *addr)
+{
+	Obj_Entry *obj;
+	const Elf_Ehdr *ehdr;
+	const Elf_Phdr *phdr, *phlimit, *phdyn, *seg0, *segn;
+	static const char kname[] = "[vdso]";
+
+	ehdr = addr;
+	if (!check_elf_headers(ehdr, "kpreload"))
+		return (-1);
+	obj = obj_new();
+	phdr = (const Elf_Phdr *)((const char *)addr + ehdr->e_phoff);
+	obj->phdr = phdr;
+	obj->phsize = ehdr->e_phnum * sizeof(*phdr);
+	phlimit = phdr + ehdr->e_phnum;
+	seg0 = segn = NULL;
+
+	for (; phdr < phlimit; phdr++) {
+		switch (phdr->p_type) {
+		case PT_DYNAMIC:
+			phdyn = phdr;
+			break;
+		case PT_GNU_STACK:
+			/* Absense of PT_GNU_STACK implies stack_flags == 0. */
+			obj->stack_flags = phdr->p_flags;
+			break;
+		case PT_LOAD:
+			if (seg0 == NULL || seg0->p_vaddr > phdr->p_vaddr)
+				seg0 = phdr;
+			if (segn == NULL || segn->p_vaddr + segn->p_memsz <
+			    phdr->p_vaddr + phdr->p_memsz)
+				segn = phdr;
+			break;
+		}
+	}
+
+	obj->mapbase = __DECONST(caddr_t, addr);
+	obj->mapsize = segn->p_vaddr + segn->p_memsz - (Elf_Addr)addr;
+	obj->vaddrbase = 0;
+	obj->relocbase = obj->mapbase;
+
+	object_add_name(obj, kname);
+	obj->path = xstrdup(kname);
+	obj->dynamic = (const Elf_Dyn *)(obj->relocbase + phdyn->p_vaddr);
+
+	if (!digest_dynamic(obj, 0)) {
+		obj_free(obj);
+		return (-1);
+	}
+
+	/*
+	 * We assume that kernel-preloaded object does not need
+	 * relocation.  It is currently written into read-only page,
+	 * handling relocations would mean we need to allocate at
+	 * least one additional page per AS.
+	 */
+	dbg("%s mapbase %p phdrs %p PT_LOAD phdr %p vaddr %p dynamic %p",
+	    obj->path, obj->mapbase, obj->phdr, seg0,
+	    obj->relocbase + seg0->p_vaddr, obj->dynamic);
+
+	TAILQ_INSERT_TAIL(&obj_list, obj, next);
+	obj_count++;
+	obj_loads++;
+	linkmap_add(obj);	/* for GDB & dlinfo() */
+	max_stack_flags |= obj->stack_flags;
+
+	LD_UTRACE(UTRACE_LOAD_OBJECT, obj, obj->mapbase, 0, 0, obj->path);
+	return (0);
+}
+
 Obj_Entry *
 obj_from_addr(const void *addr)
 {
@@ -4086,14 +4171,14 @@ dlinfo(void *handle, int request, void *p)
 static void
 rtld_fill_dl_phdr_info(const Obj_Entry *obj, struct dl_phdr_info *phdr_info)
 {
-	Elf_Addr **dtvp;
+	uintptr_t **dtvp;
 
 	phdr_info->dlpi_addr = (Elf_Addr)obj->relocbase;
 	phdr_info->dlpi_name = obj->path;
 	phdr_info->dlpi_phdr = obj->phdr;
 	phdr_info->dlpi_phnum = obj->phsize / sizeof(obj->phdr[0]);
 	phdr_info->dlpi_tls_modid = obj->tlsindex;
-	dtvp = _get_tp();
+	dtvp = &_tcb_get()->tcb_dtv;
 	phdr_info->dlpi_tls_data = (char *)tls_get_addr_slow(dtvp,
 	    obj->tlsindex, 0, true) + TLS_DTV_OFFSET;
 	phdr_info->dlpi_adds = obj_loads;
@@ -5090,9 +5175,9 @@ tls_get_addr_slow(Elf_Addr **dtvp, int index, size_t offset, bool locked)
 }
 
 void *
-tls_get_addr_common(Elf_Addr **dtvp, int index, size_t offset)
+tls_get_addr_common(uintptr_t **dtvp, int index, size_t offset)
 {
-	Elf_Addr *dtv;
+	uintptr_t *dtv;
 
 	dtv = *dtvp;
 	/* Check dtv generation in case new modules have arrived */
@@ -6056,6 +6141,83 @@ print_usage(const char *argv0)
 	    "  --        End of RTLD options\n"
 	    "  <binary>  Name of process to execute\n"
 	    "  <args>    Arguments to the executed process\n", argv0);
+}
+
+#define	AUXFMT(at, xfmt) [at] = { .name = #at, .fmt = xfmt }
+static const struct auxfmt {
+	const char *name;
+	const char *fmt;
+} auxfmts[] = {
+	AUXFMT(AT_NULL, NULL),
+	AUXFMT(AT_IGNORE, NULL),
+	AUXFMT(AT_EXECFD, "%ld"),
+	AUXFMT(AT_PHDR, "%p"),
+	AUXFMT(AT_PHENT, "%lu"),
+	AUXFMT(AT_PHNUM, "%lu"),
+	AUXFMT(AT_PAGESZ, "%lu"),
+	AUXFMT(AT_BASE, "%#lx"),
+	AUXFMT(AT_FLAGS, "%#lx"),
+	AUXFMT(AT_ENTRY, "%p"),
+	AUXFMT(AT_NOTELF, NULL),
+	AUXFMT(AT_UID, "%ld"),
+	AUXFMT(AT_EUID, "%ld"),
+	AUXFMT(AT_GID, "%ld"),
+	AUXFMT(AT_EGID, "%ld"),
+	AUXFMT(AT_EXECPATH, "%s"),
+	AUXFMT(AT_CANARY, "%p"),
+	AUXFMT(AT_CANARYLEN, "%lu"),
+	AUXFMT(AT_OSRELDATE, "%lu"),
+	AUXFMT(AT_NCPUS, "%lu"),
+	AUXFMT(AT_PAGESIZES, "%p"),
+	AUXFMT(AT_PAGESIZESLEN, "%lu"),
+	AUXFMT(AT_TIMEKEEP, "%p"),
+	AUXFMT(AT_STACKPROT, "%#lx"),
+	AUXFMT(AT_EHDRFLAGS, "%#lx"),
+	AUXFMT(AT_HWCAP, "%#lx"),
+	AUXFMT(AT_HWCAP2, "%#lx"),
+	AUXFMT(AT_BSDFLAGS, "%#lx"),
+	AUXFMT(AT_ARGC, "%lu"),
+	AUXFMT(AT_ARGV, "%p"),
+	AUXFMT(AT_ENVC, "%p"),
+	AUXFMT(AT_ENVV, "%p"),
+	AUXFMT(AT_PS_STRINGS, "%p"),
+	AUXFMT(AT_FXRNG, "%p"),
+	AUXFMT(AT_KPRELOAD, "%p"),
+};
+
+static bool
+is_ptr_fmt(const char *fmt)
+{
+	char last;
+
+	last = fmt[strlen(fmt) - 1];
+	return (last == 'p' || last == 's');
+}
+
+static void
+dump_auxv(Elf_Auxinfo **aux_info)
+{
+	Elf_Auxinfo *auxp;
+	const struct auxfmt *fmt;
+	int i;
+
+	for (i = 0; i < AT_COUNT; i++) {
+		auxp = aux_info[i];
+		if (auxp == NULL)
+			continue;
+		fmt = &auxfmts[i];
+		if (fmt->fmt == NULL)
+			continue;
+		rtld_fdprintf(STDOUT_FILENO, "%s:\t", fmt->name);
+		if (is_ptr_fmt(fmt->fmt)) {
+			rtld_fdprintfx(STDOUT_FILENO, fmt->fmt,
+			    auxp->a_un.a_ptr);
+		} else {
+			rtld_fdprintfx(STDOUT_FILENO, fmt->fmt,
+			    auxp->a_un.a_val);
+		}
+		rtld_fdprintf(STDOUT_FILENO, "\n");
+	}
 }
 
 /*

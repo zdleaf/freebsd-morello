@@ -271,8 +271,11 @@ epair_transmit(struct ifnet *ifp, struct mbuf *m)
 {
 	struct epair_softc *sc;
 	struct ifnet *oifp;
-	int error, len;
+	int error;
+#ifdef ALTQ
+	int len;
 	short mflags;
+#endif
 
 	if (m == NULL)
 		return (0);
@@ -309,10 +312,11 @@ epair_transmit(struct ifnet *ifp, struct mbuf *m)
 		m_freem(m);
 		return (0);
 	}
+
+#ifdef ALTQ
 	len = m->m_pkthdr.len;
 	mflags = m->m_flags;
 
-#ifdef ALTQ
 	/* Support ALTQ via the classic if_start() path. */
 	IF_LOCK(&ifp->if_snd);
 	if (ALTQ_IS_ENABLED(&ifp->if_snd)) {
@@ -625,6 +629,7 @@ epair_clone_create(struct if_clone *ifc, char *name, size_t len, caddr_t params)
 	ifp->if_dname = epairname;
 	ifp->if_dunit = unit;
 	ifp->if_flags = IFF_BROADCAST | IFF_SIMPLEX | IFF_MULTICAST;
+	ifp->if_flags |= IFF_KNOWSEPOCH;
 	ifp->if_capabilities = IFCAP_VLAN_MTU;
 	ifp->if_capenable = IFCAP_VLAN_MTU;
 	ifp->if_start = epair_start;

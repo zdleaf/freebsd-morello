@@ -908,7 +908,6 @@ VNET_DECLARE(int, tcp_sc_rst_sock_fail);
 VNET_DECLARE(int, tcp_sendspace);
 VNET_DECLARE(int, tcp_udp_tunneling_overhead);
 VNET_DECLARE(int, tcp_udp_tunneling_port);
-VNET_DECLARE(struct inpcbhead, tcb);
 VNET_DECLARE(struct inpcbinfo, tcbinfo);
 
 #define	V_tcp_do_lrd			VNET(tcp_do_lrd)
@@ -917,7 +916,6 @@ VNET_DECLARE(struct inpcbinfo, tcbinfo);
 #define	V_tcp_do_newcwv			VNET(tcp_do_newcwv)
 #define	V_drop_synfin			VNET(drop_synfin)
 #define	V_path_mtu_discovery		VNET(path_mtu_discovery)
-#define	V_tcb				VNET(tcb)
 #define	V_tcbinfo			VNET(tcbinfo)
 #define	V_tcp_abc_l_var			VNET(tcp_abc_l_var)
 #define	V_tcp_autorcvbuf_max		VNET(tcp_autorcvbuf_max)
@@ -967,6 +965,7 @@ int	 tcp_ccalgounload(struct cc_algo *unload_algo);
 struct tcpcb *
 	 tcp_close(struct tcpcb *);
 void	 tcp_discardcb(struct tcpcb *);
+bool	 tcp_freecb(struct tcpcb *);
 void	 tcp_twstart(struct tcpcb *);
 void	 tcp_twclose(struct tcptw *, int);
 void	 tcp_ctlinput(int, struct sockaddr *, void *);

@@ -761,8 +761,8 @@ zfs_lookup_lock(vnode_t *dvp, vnode_t *vp, const char *name, int lkflags)
 /* ARGSUSED */
 static int
 zfs_lookup(vnode_t *dvp, const char *nm, vnode_t **vpp,
-    struct componentname *cnp, int nameiop, cred_t *cr, kthread_t *td,
-    int flags, boolean_t cached)
+    struct componentname *cnp, int nameiop, cred_t *cr, int flags,
+    boolean_t cached)
 {
 	znode_t *zdp = VTOZ(dvp);
 	znode_t *zp;
@@ -1337,8 +1337,8 @@ zfs_lookup_internal(znode_t *dzp, const char *name, vnode_t **vpp,
 		a.a_cnp = cnp;
 		error = vfs_cache_lookup(&a);
 	} else {
-		error = zfs_lookup(ZTOV(dzp), name, vpp, cnp, nameiop, kcred,
-		    curthread, 0, B_FALSE);
+		error = zfs_lookup(ZTOV(dzp), name, vpp, cnp, nameiop, kcred, 0,
+		    B_FALSE);
 	}
 #ifdef ZFS_DEBUG
 	if (error) {
@@ -4582,7 +4582,7 @@ zfs_freebsd_lookup(struct vop_lookup_args *ap, boolean_t cached)
 	strlcpy(nm, cnp->cn_nameptr, MIN(cnp->cn_namelen + 1, sizeof (nm)));
 
 	return (zfs_lookup(ap->a_dvp, nm, ap->a_vpp, cnp, cnp->cn_nameiop,
-	    cnp->cn_cred, curthread, 0, cached));
+	    cnp->cn_cred, 0, cached));
 }
 
 static int
@@ -5339,14 +5339,13 @@ zfs_getextattr_dir(struct vop_getextattr_args *ap, const char *attrname)
 	vnode_t *xvp = NULL, *vp;
 	int error, flags;
 
-	error = zfs_lookup(ap->a_vp, NULL, &xvp, NULL, 0, ap->a_cred, td,
+	error = zfs_lookup(ap->a_vp, NULL, &xvp, NULL, 0, ap->a_cred,
 	    LOOKUP_XATTR, B_FALSE);
 	if (error != 0)
 		return (error);
 
 	flags = FREAD;
-	NDINIT_ATVP(&nd, LOOKUP, NOFOLLOW, UIO_SYSSPACE, attrname,
-	    xvp, td);
+	NDINIT_ATVP(&nd, LOOKUP, NOFOLLOW, UIO_SYSSPACE, attrname, xvp);
 	error = vn_open_cred(&nd, &flags, 0, VN_OPEN_INVFS, ap->a_cred, NULL);
 	vp = nd.ni_vp;
 	NDFREE(&nd, NDF_ONLY_PNBUF);
@@ -5450,18 +5449,17 @@ struct vop_deleteextattr {
 static int
 zfs_deleteextattr_dir(struct vop_deleteextattr_args *ap, const char *attrname)
 {
-	struct thread *td = ap->a_td;
 	struct nameidata nd;
 	vnode_t *xvp = NULL, *vp;
 	int error;
 
-	error = zfs_lookup(ap->a_vp, NULL, &xvp, NULL, 0, ap->a_cred, td,
+	error = zfs_lookup(ap->a_vp, NULL, &xvp, NULL, 0, ap->a_cred,
 	    LOOKUP_XATTR, B_FALSE);
 	if (error != 0)
 		return (error);
 
 	NDINIT_ATVP(&nd, DELETE, NOFOLLOW | LOCKPARENT | LOCKLEAF,
-	    UIO_SYSSPACE, attrname, xvp, td);
+	    UIO_SYSSPACE, attrname, xvp);
 	error = namei(&nd);
 	vp = nd.ni_vp;
 	if (error != 0) {
@@ -5583,13 +5581,13 @@ zfs_setextattr_dir(struct vop_setextattr_args *ap, const char *attrname)
 	vnode_t *xvp = NULL, *vp;
 	int error, flags;
 
-	error = zfs_lookup(ap->a_vp, NULL, &xvp, NULL, 0, ap->a_cred, td,
+	error = zfs_lookup(ap->a_vp, NULL, &xvp, NULL, 0, ap->a_cred,
 	    LOOKUP_XATTR | CREATE_XATTR_DIR, B_FALSE);
 	if (error != 0)
 		return (error);
 
 	flags = FFLAGS(O_WRONLY | O_CREAT);
-	NDINIT_ATVP(&nd, LOOKUP, NOFOLLOW, UIO_SYSSPACE, attrname, xvp, td);
+	NDINIT_ATVP(&nd, LOOKUP, NOFOLLOW, UIO_SYSSPACE, attrname, xvp);
 	error = vn_open_cred(&nd, &flags, 0600, VN_OPEN_INVFS, ap->a_cred,
 	    NULL);
 	vp = nd.ni_vp;
@@ -5732,7 +5730,7 @@ zfs_listextattr_dir(struct vop_listextattr_args *ap, const char *attrprefix)
 	vnode_t *xvp = NULL, *vp;
 	int error, eof;
 
-	error = zfs_lookup(ap->a_vp, NULL, &xvp, NULL, 0, ap->a_cred, td,
+	error = zfs_lookup(ap->a_vp, NULL, &xvp, NULL, 0, ap->a_cred,
 	    LOOKUP_XATTR, B_FALSE);
 	if (error != 0) {
 		/*
@@ -5745,7 +5743,7 @@ zfs_listextattr_dir(struct vop_listextattr_args *ap, const char *attrprefix)
 	}
 
 	NDINIT_ATVP(&nd, LOOKUP, NOFOLLOW | LOCKLEAF | LOCKSHARED,
-	    UIO_SYSSPACE, ".", xvp, td);
+	    UIO_SYSSPACE, ".", xvp);
 	error = namei(&nd);
 	vp = nd.ni_vp;
 	NDFREE(&nd, NDF_ONLY_PNBUF);
@@ -6174,6 +6172,7 @@ struct vop_vector zfs_vnodeops = {
 	.vop_unlock =		vop_unlock,
 	.vop_islocked =		vop_islocked,
 #endif
+	.vop_add_writecount =	vop_stdadd_writecount_nomsync,
 };
 VFS_VOP_VECTOR_REGISTER(zfs_vnodeops);
 
@@ -6198,6 +6197,7 @@ struct vop_vector zfs_fifoops = {
 	.vop_getacl =		zfs_freebsd_getacl,
 	.vop_setacl =		zfs_freebsd_setacl,
 	.vop_aclcheck =		zfs_freebsd_aclcheck,
+	.vop_add_writecount =	vop_stdadd_writecount_nomsync,
 };
 VFS_VOP_VECTOR_REGISTER(zfs_fifoops);
 
@@ -6217,5 +6217,6 @@ struct vop_vector zfs_shareops = {
 	.vop_reclaim =		zfs_freebsd_reclaim,
 	.vop_fid =		zfs_freebsd_fid,
 	.vop_pathconf =		zfs_freebsd_pathconf,
+	.vop_add_writecount =	vop_stdadd_writecount_nomsync,
 };
 VFS_VOP_VECTOR_REGISTER(zfs_shareops);

@@ -34,13 +34,8 @@
 #include <sys/sched.h>
 #if __BSD_VISIBLE
 #include <sys/cpuset.h>
-#endif /* __BSD_VISIBLE */
-
-#if __BSD_VISIBLE
-#ifdef _WITH_CPU_SET_T
 struct _cpuset;
 typedef struct _cpuset cpu_set_t;
-#endif /* _WITH_CPU_SET_T */
 #endif /* __BSD_VISIBLE */
 
 __BEGIN_DECLS
