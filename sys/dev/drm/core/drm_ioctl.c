@@ -922,6 +922,19 @@ long drm_ioctl(struct file *filp,
 		memset(kdata + in_size, 0, ksize - in_size);
 
 	retcode = drm_ioctl_kernel(filp, func, kdata, ioctl->flags);
+
+#if 1
+	if (is_driver_ioctl) {
+#if 1
+		printf("%s: drm ioctl user %s, ret %d\n",
+		    __func__, ioctl->name, retcode);
+#endif
+	} else {
+		printf("%s: drm ioctl kern %s (%d), ret %d\n",
+		    __func__, ioctl->name, nr, retcode);
+	}
+#endif
+
 #ifdef __linux__
 	if (copy_to_user((void __user *)arg, kdata, out_size) != 0)
 		retcode = -EFAULT;
