@@ -2454,7 +2454,7 @@ pci_emul_diow(struct vmctx *ctx, int vcpu, struct pci_devinst *pi, int baridx,
 		} else {
 			printf("diow: memw unknown size %d\n", size);
 		}
-		
+
 		/*
 		 * magic interrupt ??
 		 */
@@ -2479,7 +2479,7 @@ pci_emul_dior(struct vmctx *ctx, int vcpu, struct pci_devinst *pi, int baridx,
 			       offset, size);
 			return (0);
 		}
-	
+
 		value = 0;
 		if (size == 1) {
 			value = sc->ioregs[offset];
@@ -2498,7 +2498,7 @@ pci_emul_dior(struct vmctx *ctx, int vcpu, struct pci_devinst *pi, int baridx,
 			       offset, size);
 			return (0);
 		}
-		
+
 		i = baridx - 1;		/* 'memregs' index */
 
 		if (size == 1) {
