@@ -209,8 +209,14 @@ fmem_attach(device_t dev)
 			continue;
 
 		error = ofw_reg_to_paddr(child, 0, &paddr, &psize, NULL);
-		if (error)
+		if (error) {
+			device_printf(sc->dev,
+			    "ofw_reg_to_paddr() failed, error %d\n", error);
 			continue;
+		}
+
+		device_printf(sc->dev, "region name %s paddr %lx size %lx\n",
+		    name, paddr, psize);
 
 		if ((psize & 0xfff) != 0) {
 			device_printf(sc->dev,
@@ -220,6 +226,11 @@ fmem_attach(device_t dev)
 
 		sc->fmem[u].cdev = make_dev(&fmem_cdevsw, u, UID_ROOT,
 		    GID_KMEM, 0640, "fmem_%s", name);
+		if (sc->fmem[u].cdev == NULL) {
+			device_printf(sc->dev, "can't create device\n");
+			continue;
+		}
+
 		sc->fmem[u].cdev->si_drv1 = sc;
 		sc->fmem[u].offset = paddr;
 		sc->fmem[u].length = psize;
