@@ -5083,7 +5083,9 @@ cache_fplookup_dotdot(struct cache_fpl *fpl)
 static int __noinline
 cache_fplookup_neg(struct cache_fpl *fpl, struct namecache *ncp, uint32_t hash)
 {
+#ifdef INVARIANTS
 	u_char nc_flag __diagused;
+#endif
 	bool neg_promote;
 
 #ifdef INVARIANTS

@@ -1379,7 +1379,9 @@ static int __always_inline
 vop_stdadd_writecount_impl(struct vop_add_writecount_args *ap, bool handle_msync)
 {
 	struct vnode *vp;
+#ifdef INVARIANTS
 	struct mount *mp __diagused;
+#endif
 	int n;
 
 	vp = ap->a_vp;
