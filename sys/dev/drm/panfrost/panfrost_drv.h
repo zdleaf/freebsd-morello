@@ -52,6 +52,7 @@ struct panfrost_features {
 	uint32_t		thread_max_workgroup_size;
 	uint32_t		thread_max_barrier_size;
 	uint32_t		coherency_features;
+	uint32_t		afbc_features;
 	uint32_t		texture_features[4];
 	uint32_t		js_features[16];
 

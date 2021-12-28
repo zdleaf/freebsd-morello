@@ -250,6 +250,7 @@ panfrost_device_init_features(struct panfrost_softc *sc)
 	sc->features.thread_max_barrier_size =
 	    GPU_READ(sc, GPU_THREAD_MAX_BARRIER_SIZE);
 	sc->features.coherency_features = GPU_READ(sc, GPU_COHERENCY_FEATURES);
+	sc->features.afbc_features = GPU_READ(sc, GPU_AFBC_FEATURES);
 	sc->features.as_present = GPU_READ(sc, GPU_AS_PRESENT);
 	sc->features.js_present = GPU_READ(sc, GPU_JS_PRESENT);
 
