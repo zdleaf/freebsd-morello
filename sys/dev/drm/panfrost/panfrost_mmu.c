@@ -575,8 +575,8 @@ panfrost_mmu_map(struct panfrost_softc *sc,
 	if (bo->noexec == 0)
 		prot |= VM_PROT_EXECUTE;
 
-	dprintf("%s: bo %p mmu %p as %d mapping %lx -> %lx, %d pages\n",
-	    __func__, bo, mmu, mmu->as, sva, VM_PAGE_TO_PHYS(m), bo->npages);
+	dprintf("%s: bo %p mmu %p as %d sva %lx, %d pages\n",
+	    __func__, bo, mmu, mmu->as, sva, bo->npages);
 
 	sgt = bo->sgt;
 
