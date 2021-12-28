@@ -292,7 +292,7 @@ panfrost_gem_fault(struct vm_area_struct *vma, struct vm_fault *vmf)
 				goto fail_unlock;
 			if (vm_page_insert(page, obj, i))
 				goto fail_unlock;
-			vm_page_xbusy(page);
+			vm_page_tryxbusy(page);
 			page->valid = VM_PAGE_BITS_ALL;
 			page++;
 			len -= PAGE_SIZE;
