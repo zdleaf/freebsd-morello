@@ -24,4 +24,5 @@ cp /usr/obj/usr/home/br/dev/freebsd-head/arm64.aarch64/sys/EDGE/kernel /mnt/tftp
 #echo "load disk0p1:kernel"
 #echo "boot"
 
-scp /usr/obj/usr/home/br/dev/freebsd-head/arm64.aarch64/sys/EDGE/kernel 10.8.0.1:/tftpboot/edge/
+#scp /usr/obj/usr/home/br/dev/freebsd-head/arm64.aarch64/sys/EDGE/kernel 10.8.0.1:/tftpboot/edge/
+scp /mnt/obj/usr/home/br/dev/freebsd-head/arm64.aarch64/sys/EDGE/kernel 10.8.0.1:/tftpboot/edge/
