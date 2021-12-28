@@ -164,6 +164,7 @@ MAN=	aac.4 \
 	gbde.4 \
 	gdb.4 \
 	gem.4 \
+	genet.4 \
 	geom.4 \
 	geom_linux_lvm.4 \
 	geom_map.4 \
@@ -250,6 +251,8 @@ MAN=	aac.4 \
 	iwmfw.4 \
 	iwn.4 \
 	iwnfw.4 \
+	iwlwifi.4 \
+	iwlwififw.4 \
 	ixgbe.4 \
 	ixl.4 \
 	jedec_dimm.4 \
@@ -295,7 +298,6 @@ MAN=	aac.4 \
 	mdio.4 \
 	me.4 \
 	mem.4 \
-	meteor.4 \
 	mfi.4 \
 	${_mgb.4} \
 	miibus.4 \
@@ -666,6 +668,7 @@ MLINKS+=fwe.4 if_fwe.4
 MLINKS+=fwip.4 if_fwip.4
 MLINKS+=fxp.4 if_fxp.4
 MLINKS+=gem.4 if_gem.4
+MLINKS+=genet.4 if_genet.4
 MLINKS+=geom.4 GEOM.4
 MLINKS+=gif.4 if_gif.4
 MLINKS+=gpio.4 gpiobus.4

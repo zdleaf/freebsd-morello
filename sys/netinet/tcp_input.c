@@ -258,28 +258,6 @@ SYSCTL_COUNTER_U64_ARRAY(_net_inet_tcp, TCPCTL_STATES, states, CTLFLAG_RD |
     CTLFLAG_VNET, &VNET_NAME(tcps_states)[0], TCP_NSTATES,
     "TCP connection counts by TCP state");
 
-static void
-tcp_vnet_init(const void *unused)
-{
-
-	COUNTER_ARRAY_ALLOC(V_tcps_states, TCP_NSTATES, M_WAITOK);
-	VNET_PCPUSTAT_ALLOC(tcpstat, M_WAITOK);
-}
-VNET_SYSINIT(tcp_vnet_init, SI_SUB_PROTO_IFATTACHDOMAIN, SI_ORDER_ANY,
-    tcp_vnet_init, NULL);
-
-#ifdef VIMAGE
-static void
-tcp_vnet_uninit(const void *unused)
-{
-
-	COUNTER_ARRAY_FREE(V_tcps_states, TCP_NSTATES);
-	VNET_PCPUSTAT_FREE(tcpstat);
-}
-VNET_SYSUNINIT(tcp_vnet_uninit, SI_SUB_PROTO_IFATTACHDOMAIN, SI_ORDER_ANY,
-    tcp_vnet_uninit, NULL);
-#endif /* VIMAGE */
-
 /*
  * Kernel module interface for updating tcpstat.  The first argument is an index
  * into tcpstat treated as an array.
@@ -1911,7 +1889,7 @@ tcp_do_segment(struct mbuf *m, struct tcphdr *th, struct socket *so,
 						      tp->t_rxtcur);
 				sowwakeup(so);
 				if (sbavail(&so->so_snd))
-					(void) tp->t_fb->tfb_tcp_output(tp);
+					(void) tcp_output(tp);
 				goto check_delack;
 			}
 		} else if (th->th_ack == tp->snd_una &&
@@ -1980,7 +1958,7 @@ tcp_do_segment(struct mbuf *m, struct tcphdr *th, struct socket *so,
 				tp->t_flags |= TF_DELACK;
 			} else {
 				tp->t_flags |= TF_ACKNOW;
-				tp->t_fb->tfb_tcp_output(tp);
+				tcp_output(tp);
 			}
 			goto check_delack;
 		}
@@ -2651,7 +2629,7 @@ tcp_do_segment(struct mbuf *m, struct tcphdr *th, struct socket *so,
 						}
 					} else
 						tp->snd_cwnd += maxseg;
-					(void) tp->t_fb->tfb_tcp_output(tp);
+					(void) tcp_output(tp);
 					goto drop;
 				} else if (tp->t_dupacks == tcprexmtthresh ||
 					    (tp->t_flags & TF_SACK_PERMIT &&
@@ -2720,14 +2698,14 @@ enter_recovery:
 						    tcps_sack_recovery_episode);
 						tp->snd_recover = tp->snd_nxt;
 						tp->snd_cwnd = maxseg;
-						(void) tp->t_fb->tfb_tcp_output(tp);
+						(void) tcp_output(tp);
 						if (SEQ_GT(th->th_ack, tp->snd_una))
 							goto resume_partialack;
 						goto drop;
 					}
 					tp->snd_nxt = th->th_ack;
 					tp->snd_cwnd = maxseg;
-					(void) tp->t_fb->tfb_tcp_output(tp);
+					(void) tcp_output(tp);
 					KASSERT(tp->snd_limited <= 2,
 					    ("%s: tp->snd_limited too big",
 					    __func__));
@@ -2775,7 +2753,7 @@ enter_recovery:
 					    (tp->snd_nxt - tp->snd_una);
 					SOCKBUF_UNLOCK(&so->so_snd);
 					if (avail > 0)
-						(void) tp->t_fb->tfb_tcp_output(tp);
+						(void) tcp_output(tp);
 					sent = tp->snd_max - oldsndmax;
 					if (sent > maxseg) {
 						KASSERT((tp->t_dupacks == 2 &&
@@ -3327,7 +3305,7 @@ dodata:							/* XXX */
 	 * Return any desired output.
 	 */
 	if (needoutput || (tp->t_flags & TF_ACKNOW))
-		(void) tp->t_fb->tfb_tcp_output(tp);
+		(void) tcp_output(tp);
 
 check_delack:
 	INP_WLOCK_ASSERT(tp->t_inpcb);
@@ -3368,7 +3346,7 @@ dropafterack:
 #endif
 	TCP_PROBE3(debug__input, tp, th, m);
 	tp->t_flags |= TF_ACKNOW;
-	(void) tp->t_fb->tfb_tcp_output(tp);
+	(void) tcp_output(tp);
 	INP_WUNLOCK(tp->t_inpcb);
 	m_freem(m);
 	return;
@@ -4071,7 +4049,7 @@ tcp_newreno_partial_ack(struct tcpcb *tp, struct tcphdr *th)
 	 */
 	tp->snd_cwnd = maxseg + BYTES_THIS_ACK(tp, th);
 	tp->t_flags |= TF_ACKNOW;
-	(void) tp->t_fb->tfb_tcp_output(tp);
+	(void) tcp_output(tp);
 	tp->snd_cwnd = ocwnd;
 	if (SEQ_GT(onxt, tp->snd_nxt))
 		tp->snd_nxt = onxt;
