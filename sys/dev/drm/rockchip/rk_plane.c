@@ -184,7 +184,7 @@ rk_vop_plane_atomic_update(struct drm_plane *plane,
 	sc = vop_plane->sc;
 	id = vop_plane->id;
 
-	printf("%s: id %d\n", __func__, vop_plane->id);
+	dprintf("%s: id %d\n", __func__, vop_plane->id);
 
 	src_w = drm_rect_width(&state->src) >> 16;
 	src_h = drm_rect_height(&state->src) >> 16;
