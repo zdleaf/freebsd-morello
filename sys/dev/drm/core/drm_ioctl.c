@@ -923,7 +923,7 @@ long drm_ioctl(struct file *filp,
 
 	retcode = drm_ioctl_kernel(filp, func, kdata, ioctl->flags);
 
-#if 1
+#if 0
 	if (is_driver_ioctl) {
 #if 1
 		printf("%s: drm ioctl user %s, ret %d\n",
