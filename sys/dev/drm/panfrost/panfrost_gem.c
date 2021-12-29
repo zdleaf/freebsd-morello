@@ -237,8 +237,11 @@ panfrost_gem_unpin(struct drm_gem_object *obj)
 struct sg_table *
 panfrost_gem_get_sg_table(struct drm_gem_object *obj)
 {
+	struct panfrost_gem_object *bo;
 
-	return (NULL);
+	bo = (struct panfrost_gem_object *)obj;
+
+	return (bo->sgt);
 }
 
 void *
