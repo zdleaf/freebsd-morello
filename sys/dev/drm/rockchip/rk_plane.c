@@ -278,6 +278,8 @@ rk_vop_plane_atomic_update(struct drm_plane *plane,
 	paddr += (state->src.x1 >> 16) * fb->drm_fb.format->cpp[0];
 	paddr += (state->src.y1 >> 16) * fb->drm_fb.pitches[0];
 
+	dprintf("%s: pbase %lx\n", __func__, bo->pbase);
+
 	if (id == 0)
 		VOP_WRITE(sc, RK3399_WIN0_YRGB_MST, paddr);
 	else
