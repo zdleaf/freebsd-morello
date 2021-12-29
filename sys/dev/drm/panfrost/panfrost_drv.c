@@ -544,6 +544,9 @@ panfrost_ioctl_get_param(struct drm_device *ddev, void *data,
 		param->value = sc->features.js_features[param->param -
 		    DRM_PANFROST_PARAM_JS_FEATURES0];
 		break;
+	case DRM_PANFROST_PARAM_AFBC_FEATURES:
+		param->value = sc->features.afbc_features;
+		break;
 	default:
 		return (EINVAL);
 	}
