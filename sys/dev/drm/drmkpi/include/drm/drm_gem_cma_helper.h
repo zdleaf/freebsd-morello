@@ -29,9 +29,11 @@
 #define	_DRM_GEM_CMA_H_
 
 #include <drm/drm_gem.h>
+#include <linux/scatterlist.h>
 
 struct drm_gem_cma_object {
 	struct drm_gem_object	gem_obj;
+	struct sg_table         *sgt;
 
 	/* mapped memory buffer */
 	vm_paddr_t		pbase;
