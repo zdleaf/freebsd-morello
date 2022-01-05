@@ -97,7 +97,7 @@ static int
 msi_caplen(int msgctrl)
 {
 	int len;
-	
+
 	len = 10;		/* minimum length of msi capability */
 
 	if (msgctrl & PCIM_MSICTRL_64BIT)
@@ -211,7 +211,7 @@ cfginitmsi(struct passthru_softc *sc)
 				}
 			} else if (cap == PCIY_MSIX) {
 				/*
-				 * Copy the MSI-X capability 
+				 * Copy the MSI-X capability
 				 */
 				sc->psc_msix.capoff = ptr;
 				caplen = 12;
@@ -271,7 +271,7 @@ cfginitmsi(struct passthru_softc *sc)
 #endif
 
 	/* Make sure one of the capabilities is present */
-	if (sc->psc_msi.capoff == 0 && sc->psc_msix.capoff == 0) 
+	if (sc->psc_msi.capoff == 0 && sc->psc_msix.capoff == 0)
 		return (-1);
 	else
 		return (0);
@@ -593,13 +593,17 @@ cfginit(struct vmctx *ctx, struct pci_devinst *pi, int bus, int slot, int func)
 	 * We need to do this after PCIR_COMMAND got possibly updated, e.g.,
 	 * a BAR was enabled, as otherwise the PCIOCBARMMAP might fail on us.
 	 */
-	error = init_msix_table(ctx, sc);
-	if (error != 0) {
-		warnx("failed to initialize MSI-X table for PCI %d/%d/%d: %d",
-		    bus, slot, func, error);
-		goto done;
+	if (pci_msix_table_bar(pi) >= 0) {
+		error = init_msix_table(ctx, sc);
+		if (error != 0) {
+			warnx(
+			    "failed to initialize MSI-X table for PCI %d/%d/%d: %d",
+			    bus, slot, func, error);
+			goto done;
+		}
 	}
 
+	error = 0;				/* success */
 done:
 	return (error);
 }
@@ -726,13 +730,13 @@ msicap_access(struct passthru_softc *sc, int coff)
 		return (0);
 }
 
-static int 
+static int
 msixcap_access(struct passthru_softc *sc, int coff)
 {
-	if (sc->psc_msix.capoff == 0) 
+	if (sc->psc_msix.capoff == 0)
 		return (0);
 
-	return (coff >= sc->psc_msix.capoff && 
+	return (coff >= sc->psc_msix.capoff &&
 	        coff < sc->psc_msix.capoff + MSIX_CAPLEN);
 }
 
@@ -819,12 +823,12 @@ passthru_cfgwrite(struct vmctx *ctx, int vcpu, struct pci_devinst *pi,
 			msix_table_entries = pi->pi_msix.table_count;
 			for (i = 0; i < msix_table_entries; i++) {
 				error = vm_setup_pptdev_msix(ctx, vcpu,
-				    sc->psc_sel.pc_bus, sc->psc_sel.pc_dev, 
-				    sc->psc_sel.pc_func, i, 
+				    sc->psc_sel.pc_bus, sc->psc_sel.pc_dev,
+				    sc->psc_sel.pc_func, i,
 				    pi->pi_msix.table[i].addr,
 				    pi->pi_msix.table[i].msg_data,
 				    pi->pi_msix.table[i].vector_control);
-		
+
 				if (error)
 					err(1, "vm_setup_pptdev_msix");
 			}
