@@ -79,11 +79,9 @@ static void
 panfrost_gem_free_object(struct drm_gem_object *obj)
 {
 	struct panfrost_gem_object *bo;
-	struct panfrost_softc *sc;
 	vm_page_t m;
 	int i;
 
-	sc = obj->dev->dev_private;
 	bo = (struct panfrost_gem_object *)obj;
 
 	if (obj->import_attach)
@@ -553,27 +551,16 @@ panfrost_gem_mapping_get(struct panfrost_gem_object *bo,
 	return (result);
 }
 
-int
-panfrost_gem_get_pages(struct panfrost_gem_object *bo)
+static int
+panfrost_alloc_pages_iommu(struct panfrost_gem_object *bo)
 {
 	vm_paddr_t low, high, boundary;
-	struct drm_gem_object *obj;
 	vm_memattr_t memattr;
-	vm_offset_t va;
-	vm_page_t m;
 	int alignment;
+	vm_offset_t va;
 	int pflags;
-	int npages;
-	vm_page_t *m0;
+	vm_page_t m;
 	int i;
-
-	if (bo->sgt != NULL || bo->pages != NULL)
-		return (0);
-
-	obj = &bo->base;
-	npages = obj->size / PAGE_SIZE;
-
-	KASSERT(npages != 0, ("npages is 0"));
 
 	alignment = PAGE_SIZE;
 	low = 0;
@@ -583,15 +570,10 @@ panfrost_gem_get_pages(struct panfrost_gem_object *bo)
 	    VM_ALLOC_ZERO;
 	memattr = VM_MEMATTR_WRITE_COMBINING;
 
-	m0 = malloc(sizeof(vm_page_t *) * npages,
-	    M_PANFROST, M_WAITOK | M_ZERO);
-	bo->pages = m0;
-	bo->npages = npages;
-
-	for (i = 0; i < npages; i++) {
+	for (i = 0; i < bo->npages; i++) {
 retry:
-		m = vm_page_alloc_noobj_contig(pflags, 1, low, high, alignment,
-		    boundary, memattr);
+		m = vm_page_alloc_noobj_contig(pflags, 1, low, high,
+		    alignment, boundary, memattr);
 		if (m == NULL) {
 			vm_wait(NULL);
 			goto retry;
@@ -603,8 +585,77 @@ retry:
 		m->valid = VM_PAGE_BITS_ALL;
 		m->oflags &= ~VPO_UNMANAGED;
 		m->flags |= PG_FICTITIOUS;
-		m0[i] = m;
+		bo->pages[i] = m;
 	}
+
+	return (0);
+}
+
+static int
+panfrost_alloc_pages_contig(struct panfrost_gem_object *bo)
+{
+	vm_paddr_t low, high, boundary;
+	vm_memattr_t memattr;
+	int alignment;
+	vm_offset_t va;
+	int pflags;
+	vm_page_t m;
+	int i;
+
+	alignment = PAGE_SIZE;
+	low = 0;
+	high = -1UL;
+	boundary = 0;
+	pflags = VM_ALLOC_NORMAL | VM_ALLOC_NOBUSY | VM_ALLOC_WIRED |
+	    VM_ALLOC_ZERO;
+	memattr = VM_MEMATTR_WRITE_COMBINING;
+
+retry:
+	m = vm_page_alloc_noobj_contig(pflags, bo->npages, low, high,
+	    alignment, boundary, memattr);
+	if (m == NULL) {
+		vm_wait(NULL);
+		goto retry;
+	}
+	for (i = 0; i < bo->npages; i++) {
+		if ((m->flags & PG_ZERO) == 0)
+			pmap_zero_page(m);
+		va = PHYS_TO_DMAP(VM_PAGE_TO_PHYS(m));
+		cpu_dcache_wb_range(va, PAGE_SIZE);
+		m->valid = VM_PAGE_BITS_ALL;
+		m->oflags &= ~VPO_UNMANAGED;
+		m->flags |= PG_FICTITIOUS;
+		bo->pages[i] = m;
+		m++;
+	}
+
+	return (0);
+}
+
+int
+panfrost_gem_get_pages(struct panfrost_gem_object *bo)
+{
+	struct drm_gem_object *obj;
+	int npages;
+	vm_page_t *m0;
+
+	if (bo->sgt != NULL || bo->pages != NULL)
+		return (0);
+
+	obj = &bo->base;
+	npages = obj->size / PAGE_SIZE;
+
+	KASSERT(npages != 0, ("npages is 0"));
+
+	m0 = malloc(sizeof(vm_page_t *) * npages,
+	    M_PANFROST, M_WAITOK | M_ZERO);
+	bo->pages = m0;
+	bo->npages = npages;
+
+	if (1 == 0)
+		panfrost_alloc_pages_iommu(bo);
+	else
+		panfrost_alloc_pages_contig(bo);
 
 	bo->sgt = drm_prime_pages_to_sg(m0, npages);
 
