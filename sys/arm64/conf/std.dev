@@ -110,3 +110,6 @@ device		mmcsd			# mmc/sd flash cards
 # HID support
 options 	HID_DEBUG		# enable debug msgs
 device		hid			# Generic HID support
+
+# I2C adapters
+device		cdns_i2c		# Cadence I2C
