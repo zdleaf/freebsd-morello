@@ -34,8 +34,23 @@
 #define	_DEV_CADENCE_CDNS_I2C_H_
 
 #define	CDNS_I2C_CR		0x00	/* Control Register */
+#define	 I2C_CR_DIVA_S		24
+#define	 I2C_CR_DIVA_M		(0x3 << I2C_CR_DIVA_S)
+#define	 I2C_CR_DIVB_S		8
+#define	 I2C_CR_DIVB_M		(0x3f << I2C_CR_DIVB_S)
+#define	 I2C_CR_CLR_FIFO	(1 << 6)
+#define	 I2C_CR_HOLD		(1 << 4)
+#define	 I2C_CR_ACK_EN		(1 << 3)
+#define	 I2C_CR_NEA		(1 << 2)
+#define	 I2C_CR_MS		(1 << 1)
+#define	 I2C_CR_RW		(1 << 0) /* 0 = Transmitter, 1 = Receiver */
 #define	CDNS_I2C_SR		0x04	/* (ro) Status Register */
+#define	 I2C_SR_BA		(1 << 8)
+#define	 I2C_SR_TXDV		(1 << 6)
+#define	 I2C_SR_RXDV		(1 << 5)
+#define	 I2C_SR_RXRW		(1 << 3)
 #define	CDNS_I2C_ADDR		0x08	/* Address Register */
+#define	 I2C_ADDR_M		(0x3ff)
 #define	CDNS_I2C_DATA		0x0C	/* Data Register */
 #define	CDNS_I2C_ISR		0x10	/* Interrupt Status Register */
 #define	CDNS_I2C_TRANS_SIZE	0x14	/* (8) Transfer Size Register */
@@ -44,5 +59,16 @@
 #define	CDNS_I2C_IMR		0x20	/* (ro) Interrupt Mask Register */
 #define	CDNS_I2C_IER		0x24	/* Interrupt Enable Register */
 #define	CDNS_I2C_IDR		0x28	/* Interrupt Disable Register */
+#define	 I2C_IMR_ARB_LOST	(1 << 9)
+#define	 I2C_IMR_RX_UNF		(1 << 7)
+#define	 I2C_IMR_TX_OVF		(1 << 6)
+#define	 I2C_IMR_RX_OVF		(1 << 5)
+#define	 I2C_IMR_SLV_RDY	(1 << 4)
+#define	 I2C_IMR_TO		(1 << 3)
+#define	 I2C_IMR_NACK		(1 << 2)
+#define	 I2C_IMR_DATA		(1 << 1)
+#define	 I2C_IMR_COMP		(1 << 0)
+
+#define	CDNS_I2C_FIFO_DEPTH	16
 
 #endif /* !_DEV_CADENCE_CDNS_I2C_H_ */
