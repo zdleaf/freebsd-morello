@@ -47,6 +47,8 @@ __FBSDID("$FreeBSD$");
 
 #include <dev/extres/clk/clk.h>
 
+#include <dev/cadence/cdns_i2c.h>
+
 #include "iicbus_if.h"
 
 struct cdns_i2c_softc {
@@ -69,11 +71,14 @@ static struct resource_spec cdns_i2c_spec[] = {
 	{ -1, 0 }
 };
 
-#define	CDNS_I2C_LOCK(sc)			mtx_lock(&(sc)->mtx)
+#define	CDNS_I2C_TIMEOUT_MAX		0xff
+
+#define	CDNS_I2C_LOCK(sc)		mtx_lock(&(sc)->mtx)
 #define	CDNS_I2C_UNLOCK(sc)		mtx_unlock(&(sc)->mtx)
 #define	CDNS_I2C_ASSERT_LOCKED(sc)	mtx_assert(&(sc)->mtx, MA_OWNED)
-#define	CDNS_I2C_READ(sc, reg)		bus_read_4((sc)->res[0], (reg))
-#define	CDNS_I2C_WRITE(sc, reg, val)	bus_write_4((sc)->res[0], (reg), (val))
+
+#define	RD4(sc, reg)		bus_read_4((sc)->res[0], (reg))
+#define	WR4(sc, reg, val)	bus_write_4((sc)->res[0], (reg), (val))
 
 static int
 cdns_i2c_reset(device_t dev, u_char speed, u_char addr, u_char *oldaddr)
@@ -137,6 +142,7 @@ static int
 cdns_i2c_attach(device_t dev)
 {
 	struct cdns_i2c_softc *sc;
+	uint32_t reg;
 
 	sc = device_get_softc(dev);
 	sc->dev = dev;
@@ -182,6 +188,12 @@ cdns_i2c_attach(device_t dev)
 		}
 	}
 #endif
+
+	reg = I2C_CR_ACK_EN | I2C_CR_NEA | I2C_CR_MS;
+	WR4(sc, CDNS_I2C_CR, reg);
+
+	/* A bug workaround in master receiver mode. */
+	WR4(sc, CDNS_I2C_TIME_OUT, CDNS_I2C_TIMEOUT_MAX);
 
 	sc->iicbus = device_add_child(dev, "iicbus", -1);
 	if (sc->iicbus == NULL) {
