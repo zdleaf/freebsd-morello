@@ -1,0 +1,23 @@
+#
+# Morello
+#
+
+makeoptions	NO_MODULES
+nooptions	NFSCL
+
+device		pl011
+
+# device	acpi
+# options	IOMMU
+
+device		cdns_i2c
+
+device		re
+options		FDT
+
+options		ROOTDEVNAME=\"ufs:/dev/ada0\"
+
+# Flattened Device Tree
+options		FDT
+options		FDT_DTB_STATIC
+makeoptions	FDT_DTS_FILE=arm/morello-soc.dts
