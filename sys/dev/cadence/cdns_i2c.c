@@ -61,8 +61,8 @@ struct cdns_i2c_softc {
 };
 
 static struct ofw_compat_data compat_data[] = {
-	{"cdns,i2c",	1},
-	{NULL,		0}
+	{"cdns,i2c-r1p14",	1},
+	{NULL,			0}
 };
 
 static struct resource_spec cdns_i2c_spec[] = {
