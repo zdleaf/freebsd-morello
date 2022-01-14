@@ -269,6 +269,28 @@ komeda_drm_irq_hook(void *arg)
 		return;
 	}
 
+	/* Query pipelines. */
+	uint32_t pipeline_reg;
+	phandle_t child;
+	char *name;
+	int ret;
+
+	for (child = OF_child(node); child != 0; child = OF_peer(child)) {
+		ret = OF_getprop_alloc(child, "name", (void **)&name);
+		if (ret == -1)
+			continue;
+
+		if (strcasecmp(name, "pipeline") ||
+		    strncasecmp(name, "pipeline@", 10)) {
+			pipeline_reg = -1;
+			OF_getencprop(child, "reg", (void *)&pipeline_reg,
+			    sizeof(pipeline_reg));
+			printf("%s: pipeline found, reg %x\n", __func__,
+			    pipeline_reg);
+		}
+
+	}
+
 	nports = OF_getencprop_alloc_multi(node, "ports", sizeof(*ports),
 	    (void **)&ports);
 	if (nports <= 0) {
@@ -313,6 +335,8 @@ komeda_drm_irq_hook(void *arg)
 		goto fail;
 
 	sc->drm_dev.irq_enabled = true;
+
+printf("%s: DRM device registered\n", __func__);
 
 	return;
 fail:
