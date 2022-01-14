@@ -164,6 +164,7 @@ cdns_i2c_read_data(device_t dev, struct iic_msg *msg)
 	if (len > CDNS_I2C_TRANSFER_SIZE) {
 		curr_len = CDNS_I2C_TRANSFER_SIZE;
 		WR4(sc, CDNS_I2C_TRANS_SIZE, curr_len);
+		panic("implement me");
 	} else
 		WR4(sc, CDNS_I2C_TRANS_SIZE, len);
 
@@ -182,17 +183,17 @@ cdns_i2c_read_data(device_t dev, struct iic_msg *msg)
 			}
 			d = RD4(sc, CDNS_I2C_DATA);
 			printf("%s: data received: %x\n", __func__, d);
-			*(data)++ = d;
+			*(data++) = d;
 			len --;
 		}
 	}
 
 	reg = cdns_i2c_wait(sc, I2C_ISR_COMP | I2C_ISR_ARBLOST);
-	printf("%s: compl reg %x ISR %x\n", __func__, reg,
-	    RD4(sc, CDNS_I2C_ISR));
-
-	if (reg & I2C_ISR_ARBLOST)
+	if (reg & I2C_ISR_ARBLOST) {
+		printf("%s: compl reg %x ISR %x\n", __func__, reg,
+		    RD4(sc, CDNS_I2C_ISR));
 		return (EAGAIN);
+	}
 
 	return (0);
 }
@@ -219,8 +220,10 @@ cdns_i2c_write_data(device_t dev, struct iic_msg *msg)
 	reg &= ~I2C_CR_RW;
 	WR4(sc, CDNS_I2C_CR, reg);
 
-	if (msg->len > CDNS_I2C_FIFO_DEPTH)
+	if (msg->len > CDNS_I2C_FIFO_DEPTH) {
 		printf("msg too big %d %d\n", msg->len, CDNS_I2C_FIFO_DEPTH);
+		panic("impl me");
+	}
 
 	WR4(sc, CDNS_I2C_ISR, CDNS_I2C_ISR_MASK);
 	WR4(sc, CDNS_I2C_ADDR, msg->slave);
@@ -239,16 +242,16 @@ cdns_i2c_write_data(device_t dev, struct iic_msg *msg)
 
 	if (sc->hold_flag == 0) {
 		reg = RD4(sc, CDNS_I2C_CR);
-		reg &= I2C_CR_HOLD;
+		reg &= ~I2C_CR_HOLD;
 		WR4(sc, CDNS_I2C_CR, reg);
 	}
 
 	reg = cdns_i2c_wait(sc, I2C_ISR_COMP | I2C_ISR_ARBLOST);
-	printf("%s: compl reg %x ISR %x\n", __func__, reg,
-	    RD4(sc, CDNS_I2C_ISR));
-
-	if (reg & I2C_ISR_ARBLOST)
+	if (reg & I2C_ISR_ARBLOST) {
+		printf("%s: compl reg %x ISR %x\n", __func__, reg,
+		    RD4(sc, CDNS_I2C_ISR));
 		return (EAGAIN);
+	}
 
 	return (0);
 }
@@ -374,8 +377,14 @@ cdns_i2c_attach(device_t dev)
 	}
 #endif
 
-	reg = I2C_CR_ACK_EN | I2C_CR_NEA | I2C_CR_MS;
+	reg = RD4(sc, CDNS_I2C_CR);
+	printf("%s: original CR %x\n", __func__, reg);
+
+	reg |= 2 << 14;
+	reg |= I2C_CR_ACK_EN | I2C_CR_NEA | I2C_CR_MS;
 	WR4(sc, CDNS_I2C_CR, reg);
+
+	printf("%s: new CR %x\n", __func__, reg);
 
 	/* A bug workaround in master receiver mode. */
 	WR4(sc, CDNS_I2C_TIME_OUT, CDNS_I2C_TIMEOUT_MAX);
