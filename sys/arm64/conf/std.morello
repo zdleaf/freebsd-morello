@@ -10,6 +10,12 @@ device		pl011
 # device	acpi
 # options	IOMMU
 
+# DRM Support
+options		COMPAT_DRMKPI
+
+device		drm
+device		komeda_drm
+
 device		cdns_i2c
 
 device		re
