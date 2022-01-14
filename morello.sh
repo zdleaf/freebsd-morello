@@ -7,7 +7,7 @@ fi
 
 # make -j6 TARGET=arm64 KERNCONF=MORELLO kernel-toolchain
 
-make -j6 TARGET=arm64 KERN${A}=MORELLO buildkernel
+make -j6 TARGET=arm64 KERN${A}=MORELLO buildkernel || exit 1
 
 # cp /xhome/obj/usr/home/br/dev/freebsd-head/arm64.aarch64/sys/MORELLO/kernel /tftpboot/stratix10/
 #cp /home/br/obj/usr/home/br/dev/freebsd-head/arm64.aarch64/sys/MORELLO/kernel /tftpboot/stratix10/
@@ -49,6 +49,6 @@ if [ $(hostname) = "pooh.bsdpad.com" ]; then
 	scp /mnt/obj/usr/home/br/dev/freebsd-head/arm64.aarch64/sys/MORELLO/kernel 10.8.0.1:/tftpboot/root/
 fi
 
-echo sysctl kern.bootfile=/kernel
-echo kldload pmc
-echo pmcstat -T -S INST_RETIRED
+# echo sysctl kern.bootfile=/kernel
+# echo kldload pmc
+# echo pmcstat -T -S INST_RETIRED
