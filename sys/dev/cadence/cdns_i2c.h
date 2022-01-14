@@ -34,7 +34,7 @@
 #define	_DEV_CADENCE_CDNS_I2C_H_
 
 #define	CDNS_I2C_CR		0x00	/* Control Register */
-#define	 I2C_CR_DIVA_S		24
+#define	 I2C_CR_DIVA_S		14
 #define	 I2C_CR_DIVA_M		(0x3 << I2C_CR_DIVA_S)
 #define	 I2C_CR_DIVB_S		8
 #define	 I2C_CR_DIVB_M		(0x3f << I2C_CR_DIVB_S)
