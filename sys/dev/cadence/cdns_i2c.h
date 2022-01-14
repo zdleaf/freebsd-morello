@@ -53,6 +53,15 @@
 #define	 I2C_ADDR_M		(0x3ff)
 #define	CDNS_I2C_DATA		0x0C	/* Data Register */
 #define	CDNS_I2C_ISR		0x10	/* Interrupt Status Register */
+#define	 I2C_ISR_COMP		(1 << 0)
+#define	 I2C_ISR_DATA		(1 << 1)
+#define	 I2C_ISR_NACK		(1 << 2)
+#define	 I2C_ISR_TO		(1 << 3)
+#define	 I2C_ISR_SLVRDY		(1 << 4)
+#define	 I2C_ISR_RXOVF		(1 << 5)
+#define	 I2C_ISR_TXOVF		(1 << 6)
+#define	 I2C_ISR_RXUNF		(1 << 7)
+#define	 I2C_ISR_ARBLOST	(1 << 9)
 #define	CDNS_I2C_TRANS_SIZE	0x14	/* (8) Transfer Size Register */
 #define	CDNS_I2C_SLV_PAUSE	0x18	/* (8) Slave Monitor Pause Register */
 #define	CDNS_I2C_TIME_OUT	0x1C	/* (8) Time Out Register */
@@ -69,6 +78,8 @@
 #define	 I2C_IMR_DATA		(1 << 1)
 #define	 I2C_IMR_COMP		(1 << 0)
 
-#define	CDNS_I2C_FIFO_DEPTH	16
+#define	CDNS_I2C_FIFO_DEPTH		16
+#define	CDNS_I2C_TRANSFER_SIZE_MAX	255 /* Controller transfer limit */
+#define	CDNS_I2C_TRANSFER_SIZE		(CDNS_I2C_TRANSFER_SIZE_MAX - 3)
 
 #endif /* !_DEV_CADENCE_CDNS_I2C_H_ */

@@ -51,6 +51,16 @@ __FBSDID("$FreeBSD$");
 
 #include "iicbus_if.h"
 
+#define	CDNS_I2C_ISR_MASK	(I2C_ISR_COMP	|\
+				 I2C_ISR_DATA	|\
+				 I2C_ISR_NACK	|\
+				 I2C_ISR_TO	|\
+				 I2C_ISR_SLVRDY	|\
+				 I2C_ISR_RXOVF	|\
+				 I2C_ISR_TXOVF	|\
+				 I2C_ISR_RXUNF	|\
+				 I2C_ISR_ARBLOST)
+
 struct cdns_i2c_softc {
 	device_t	dev;
 	struct resource	*res[2];
@@ -58,6 +68,7 @@ struct cdns_i2c_softc {
 	int		busy;
 	void *		intrhand;
 	device_t	iicbus;
+	int		hold_flag;
 };
 
 static struct ofw_compat_data compat_data[] = {
@@ -108,10 +119,148 @@ printf("%s\n", __func__);
 	CDNS_I2C_UNLOCK(sc);
 }
 
+static uint32_t
+cdns_i2c_wait(struct cdns_i2c_softc *sc, uint32_t mask)
+{
+	uint32_t timeout;
+	uint32_t reg;
+
+	for (timeout = 0; timeout < 100; timeout++) {
+		reg = RD4(sc, CDNS_I2C_ISR);
+		if (reg & mask)
+			break;
+		DELAY(100);
+	}
+
+	/* Clear interrupt status flags. */
+	WR4(sc, CDNS_I2C_ISR, reg & mask);
+
+	return (reg & mask);
+}
+
+static int
+cdns_i2c_read_data(device_t dev, struct iic_msg *msg)
+{
+	struct cdns_i2c_softc *sc;
+	uint8_t *data;
+	uint32_t len;
+	uint32_t reg;
+	int curr_len;
+	uint8_t d;
+
+	sc = device_get_softc(dev);
+
+	printf("%s: slave %x len %d\n", __func__, msg->slave, msg->len);
+
+	len = msg->len;
+	data = msg->buf;
+
+	/* Set the controller in Master receive mode and clear FIFO. */
+	reg = RD4(sc, CDNS_I2C_CR);
+	reg |= I2C_CR_CLR_FIFO;
+	reg |= I2C_CR_RW;
+	WR4(sc, CDNS_I2C_CR, reg);
+
+	if (len > CDNS_I2C_TRANSFER_SIZE) {
+		curr_len = CDNS_I2C_TRANSFER_SIZE;
+		WR4(sc, CDNS_I2C_TRANS_SIZE, curr_len);
+	} else
+		WR4(sc, CDNS_I2C_TRANS_SIZE, len);
+
+	WR4(sc, CDNS_I2C_ADDR, msg->slave);
+
+	while (len) {
+		if (RD4(sc, CDNS_I2C_ISR) & I2C_ISR_ARBLOST) {
+			printf("%s: arb lost\n", __func__);
+			return (EAGAIN);
+		}
+		while (RD4(sc, CDNS_I2C_SR) & I2C_SR_RXDV) {
+			if ((len < CDNS_I2C_FIFO_DEPTH) && !sc->hold_flag) {
+				reg = RD4(sc, CDNS_I2C_CR);
+				reg &= ~I2C_CR_HOLD;
+				WR4(sc, CDNS_I2C_CR, reg);
+			}
+			d = RD4(sc, CDNS_I2C_DATA);
+			printf("%s: data received: %x\n", __func__, d);
+			*(data)++ = d;
+			len --;
+		}
+	}
+
+	reg = cdns_i2c_wait(sc, I2C_ISR_COMP | I2C_ISR_ARBLOST);
+	printf("%s: compl reg %x ISR %x\n", __func__, reg,
+	    RD4(sc, CDNS_I2C_ISR));
+
+	if (reg & I2C_ISR_ARBLOST)
+		return (EAGAIN);
+
+	return (0);
+}
+
+static int
+cdns_i2c_write_data(device_t dev, struct iic_msg *msg)
+{
+	struct cdns_i2c_softc *sc;
+	uint8_t *data;
+	uint32_t reg;
+	uint32_t len;
+
+	sc = device_get_softc(dev);
+
+	data = msg->buf;
+	len = msg->len;
+
+	printf("%s: slave %x len %d\n", __func__, msg->slave, msg->len);
+
+	/* Set the controller in Master transmit mode and clear FIFO. */
+	reg = RD4(sc, CDNS_I2C_CR);
+	reg |= I2C_CR_CLR_FIFO;
+	WR4(sc, CDNS_I2C_CR, reg);
+	reg &= ~I2C_CR_RW;
+	WR4(sc, CDNS_I2C_CR, reg);
+
+	if (msg->len > CDNS_I2C_FIFO_DEPTH)
+		printf("msg too big %d %d\n", msg->len, CDNS_I2C_FIFO_DEPTH);
+
+	WR4(sc, CDNS_I2C_ISR, CDNS_I2C_ISR_MASK);
+	WR4(sc, CDNS_I2C_ADDR, msg->slave);
+
+	while (len --) {
+		if (RD4(sc, CDNS_I2C_ISR) & I2C_ISR_ARBLOST) {
+			printf("%s: arb lost\n", __func__);
+			return (EAGAIN);
+		}
+
+		WR4(sc, CDNS_I2C_DATA, *(data++));
+		if (len && RD4(sc, CDNS_I2C_TRANS_SIZE) == CDNS_I2C_FIFO_DEPTH){
+			panic("here");
+		}
+	}
+
+	if (sc->hold_flag == 0) {
+		reg = RD4(sc, CDNS_I2C_CR);
+		reg &= I2C_CR_HOLD;
+		WR4(sc, CDNS_I2C_CR, reg);
+	}
+
+	reg = cdns_i2c_wait(sc, I2C_ISR_COMP | I2C_ISR_ARBLOST);
+	printf("%s: compl reg %x ISR %x\n", __func__, reg,
+	    RD4(sc, CDNS_I2C_ISR));
+
+	if (reg & I2C_ISR_ARBLOST)
+		return (EAGAIN);
+
+	return (0);
+}
+
 static int
 cdns_i2c_transfer(device_t dev, struct iic_msg *msgs, uint32_t nmsgs)
 {
 	struct cdns_i2c_softc *sc;
+	struct iic_msg *msg;
+	uint32_t reg;
+	int error;
+	int i;
 
 	sc = device_get_softc(dev);
 
@@ -123,6 +272,33 @@ printf("%s: nmsgs %d\n", __func__, nmsgs);
 		mtx_sleep(sc, &sc->mtx, 0, "i2cbuswait", 0);
 
 	sc->busy = 1;
+
+	if (nmsgs > 1) {
+		sc->hold_flag = 1;
+
+		reg = RD4(sc, CDNS_I2C_CR);
+		reg |= I2C_CR_HOLD;
+		WR4(sc, CDNS_I2C_CR, reg);
+	} else
+		sc->hold_flag = 0;
+
+retry:
+	for (i = 0; i < nmsgs; i++) {
+		if (i == (nmsgs - 1))
+			sc->hold_flag = 0;
+
+		msg = &msgs[i];
+		if (msg->flags & IIC_M_RD)
+			error = cdns_i2c_read_data(dev, msg);
+		else
+			error = cdns_i2c_write_data(dev, msg);
+
+		if (error == EAGAIN)
+			goto retry;
+	}
+
+	if (error)
+		printf("%s: error %d\n", __func__, error);
 
 	sc->busy = 0;
 
