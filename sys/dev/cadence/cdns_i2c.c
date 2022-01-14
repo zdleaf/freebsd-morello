@@ -84,6 +84,8 @@ static int
 cdns_i2c_reset(device_t dev, u_char speed, u_char addr, u_char *oldaddr)
 {
 
+printf("%s\n", __func__);
+
 	return (0);
 }
 
@@ -99,6 +101,8 @@ cdns_i2c_intr(void *arg)
 
 	sc = (struct cdns_i2c_softc *)arg;
 
+printf("%s\n", __func__);
+
 	CDNS_I2C_LOCK(sc);
 	cdns_i2c_intr_locked(sc);
 	CDNS_I2C_UNLOCK(sc);
@@ -111,10 +115,13 @@ cdns_i2c_transfer(device_t dev, struct iic_msg *msgs, uint32_t nmsgs)
 
 	sc = device_get_softc(dev);
 
+printf("%s: nmsgs %d\n", __func__, nmsgs);
+
 	CDNS_I2C_LOCK(sc);
 
 	while (sc->busy)
 		mtx_sleep(sc, &sc->mtx, 0, "i2cbuswait", 0);
+
 	sc->busy = 1;
 
 	sc->busy = 0;
@@ -160,6 +167,8 @@ cdns_i2c_attach(device_t dev)
 		return (ENXIO);
 	}
 
+	mtx_init(&sc->mtx, device_get_nameunit(dev), "cdns_i2c", MTX_DEF);
+
 	clk_set_assigned(dev, ofw_bus_get_node(dev));
 
 #if 0
@@ -200,8 +209,6 @@ cdns_i2c_attach(device_t dev)
 		device_printf(dev, "cannot add iicbus child device\n");
 		return (ENXIO);
 	}
-
-	mtx_init(&sc->mtx, device_get_nameunit(dev), "cdns_i2c", MTX_DEF);
 
 	bus_generic_attach(dev);
 
