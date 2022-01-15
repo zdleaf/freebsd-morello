@@ -51,6 +51,15 @@ __FBSDID("$FreeBSD$");
 
 #include "iicbus_if.h"
 
+#define	CDNS_I2C_DEBUG
+#undef	CDNS_I2C_DEBUG
+
+#ifdef	CDNS_I2C_DEBUG
+#define	dprintf(fmt, ...)	printf(fmt, ##__VA_ARGS__)
+#else
+#define	dprintf(fmt, ...)
+#endif
+
 #define	CDNS_I2C_ISR_MASK	(I2C_ISR_COMP	|\
 				 I2C_ISR_DATA	|\
 				 I2C_ISR_NACK	|\
@@ -182,7 +191,8 @@ cdns_i2c_read_data(device_t dev, struct iic_msg *msg)
 				WR4(sc, CDNS_I2C_CR, reg);
 			}
 			d = RD4(sc, CDNS_I2C_DATA);
-			printf("%s: data received: %x\n", __func__, d);
+			if (d != 0)
+				printf("%s: data received: %x\n", __func__, d);
 			*(data++) = d;
 			len --;
 		}
