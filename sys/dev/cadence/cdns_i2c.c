@@ -177,7 +177,7 @@ cdns_i2c_read_data(device_t dev, struct iic_msg *msg)
 	} else
 		WR4(sc, CDNS_I2C_TRANS_SIZE, len);
 
-	WR4(sc, CDNS_I2C_ADDR, msg->slave);
+	WR4(sc, CDNS_I2C_ADDR, msg->slave >> 1);
 
 	while (len) {
 		if (RD4(sc, CDNS_I2C_ISR) & I2C_ISR_ARBLOST) {
@@ -236,7 +236,7 @@ cdns_i2c_write_data(device_t dev, struct iic_msg *msg)
 	}
 
 	WR4(sc, CDNS_I2C_ISR, CDNS_I2C_ISR_MASK);
-	WR4(sc, CDNS_I2C_ADDR, msg->slave);
+	WR4(sc, CDNS_I2C_ADDR, msg->slave >> 1);
 
 	while (len --) {
 		if (RD4(sc, CDNS_I2C_ISR) & I2C_ISR_ARBLOST) {
