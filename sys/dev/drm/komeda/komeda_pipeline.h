@@ -1,7 +1,7 @@
 /*-
  * SPDX-License-Identifier: BSD-2-Clause
  *
- * Copyright (c) 2021 Ruslan Bukin <br@bsdpad.com>
+ * Copyright (c) 2022 Ruslan Bukin <br@bsdpad.com>
  *
  * This work was supported by Innovate UK project 105694, "Digital Security
  * by Design (DSbD) Technology Platform Prototype".
@@ -30,19 +30,23 @@
  * $FreeBSD$
  */
 
-#ifndef _DEV_DRM_KOMEDA_KOMEDA_PLANE_H_
-#define	_DEV_DRM_KOMEDA_KOMEDA_PLANE_H_
+#ifndef _DEV_DRM_KOMEDA_KOMEDA_PIPELINE_H_
+#define	_DEV_DRM_KOMEDA_KOMEDA_PIPELINE_H_
 
 struct komeda_drm_softc;
-struct komeda_pipeline;
 
-struct komeda_plane {
-	struct drm_plane	plane;
-	struct komeda_drm_softc	*sc;
-	int id;
+struct komeda_pipeline {
+	struct komeda_drm_softc		*sc;
+	struct komeda_plane		planes[2];
+	struct drm_pending_vblank_event	*event;
+	struct drm_device		*drm;
+	struct drm_crtc			crtc;
+	struct drm_encoder		encoder;
+	uint32_t			vbl_counter;
 };
 
-int komeda_plane_create(struct komeda_pipeline *pipeline,
-    struct drm_device *drm);
+int
+komeda_pipeline_create_pipeline(struct komeda_drm_softc *sc,
+    struct komeda_pipeline *pipeline);
 
-#endif /* !_DEV_DRM_KOMEDA_KOMEDA_PLANE_H_ */
+#endif /* !_DEV_DRM_KOMEDA_KOMEDA_PIPELINE_H_ */

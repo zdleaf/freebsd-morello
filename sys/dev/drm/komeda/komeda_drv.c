@@ -64,6 +64,7 @@ __FBSDID("$FreeBSD$");
 #include <drm/drm_vblank.h>
 
 #include <dev/drm/komeda/komeda_plane.h>
+#include <dev/drm/komeda/komeda_pipeline.h>
 #include <dev/drm/komeda/komeda_drv.h>
 #include <dev/drm/komeda/komeda_gem.h>
 
@@ -270,6 +271,8 @@ komeda_drm_irq_hook(void *arg)
 	char *name;
 	int ret;
 
+	i = 0;
+
 	for (child = OF_child(node); child != 0; child = OF_peer(child)) {
 		ret = OF_getprop_alloc(child, "name", (void **)&name);
 		if (ret == -1)
@@ -282,8 +285,9 @@ komeda_drm_irq_hook(void *arg)
 			    sizeof(pipeline_reg));
 			printf("%s: pipeline found, reg %x\n", __func__,
 			    pipeline_reg);
+			komeda_pipeline_create_pipeline(sc,
+			    &sc->pipelines[i++]);
 		}
-
 	}
 
 	nports = OF_getencprop_alloc_multi(node, "ports", sizeof(*ports),

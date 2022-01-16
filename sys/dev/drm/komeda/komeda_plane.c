@@ -72,8 +72,8 @@ __FBSDID("$FreeBSD$");
 #include <dev/videomode/edidvar.h>
 
 #include <dev/drm/komeda/komeda_plane.h>
+#include <dev/drm/komeda/komeda_pipeline.h>
 #include <dev/drm/komeda/komeda_drv.h>
-//#include <dev/drm/komeda/komeda_pipeline.h>
 
 //#include "komeda_if.h"
 //#include "dw_hdmi_if.h"
@@ -134,7 +134,7 @@ komeda_plane_atomic_check(struct drm_plane *plane,
 	struct drm_crtc *crtc;
 	struct drm_crtc_state *crtc_state;
 
-	dprintf("%s\n", __func__);
+	printf("%s\n", __func__);
 
 	crtc = state->crtc;
 	if (crtc == NULL)
@@ -155,12 +155,16 @@ komeda_plane_atomic_disable(struct drm_plane *plane,
     struct drm_plane_state *old_state)
 {
 
+	printf("%s\n", __func__);
 }
 
 static void
 komeda_plane_atomic_update(struct drm_plane *plane,
     struct drm_plane_state *old_state)
 {
+
+	printf("%s\n", __func__);
+
 #if 0
 	struct drm_plane_state *state;
 	struct komeda_plane *vop_plane;
@@ -310,13 +314,16 @@ static const struct drm_plane_funcs komeda_plane_funcs = {
 };
 
 int
-komeda_plane_create(struct komeda_drm_softc *sc, struct drm_device *drm)
+komeda_plane_create(struct komeda_pipeline *pipeline, struct drm_device *drm)
 {
+	struct komeda_drm_softc *sc;
 	enum drm_plane_type type;
 	int error;
 	int i;
 
-	dprintf("%s\n", __func__);
+	sc = pipeline->sc;
+
+	printf("%s\n", __func__);
 
 	for (i = 0; i < 2; i++) {
 		if (i == 0)
@@ -325,7 +332,7 @@ komeda_plane_create(struct komeda_drm_softc *sc, struct drm_device *drm)
 			type = DRM_PLANE_TYPE_CURSOR;
 
 		error = drm_universal_plane_init(drm,
-		    &sc->planes[i].plane,
+		    &pipeline->planes[i].plane,
 		    0,
 		    &komeda_plane_funcs,
 		    komeda_plane_formats,
@@ -335,11 +342,11 @@ komeda_plane_create(struct komeda_drm_softc *sc, struct drm_device *drm)
 			device_printf(sc->dev, "Could not init plane.");
 			return (error);
 		}
-		drm_plane_helper_add(&sc->planes[i].plane,
+		drm_plane_helper_add(&pipeline->planes[i].plane,
 		    &komeda_plane_helper_funcs);
 
-		sc->planes[i].sc = sc;
-		sc->planes[i].id = i;
+		pipeline->planes[i].sc = sc;
+		pipeline->planes[i].id = i;
 	}
 
 	return (0);

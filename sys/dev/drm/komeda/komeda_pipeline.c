@@ -72,10 +72,9 @@ __FBSDID("$FreeBSD$");
 #include <dev/videomode/edidvar.h>
 
 #include <dev/drm/komeda/komeda_plane.h>
+#include <dev/drm/komeda/komeda_pipeline.h>
 #include <dev/drm/komeda/komeda_drv.h>
-//#include <dev/drm/komeda/komeda_pipeline.h>
 
-//#include "komeda_pipeline_if.h"
 //#include "dw_hdmi_if.h"
 
 #define	VOP_READ(sc, reg)	bus_read_4((sc)->res[0], (reg))
@@ -90,7 +89,7 @@ static int
 komeda_pipeline_enable_vblank(struct drm_crtc *crtc)
 {
 
-	dprintf("%s\n", __func__);
+	printf("%s\n", __func__);
 
 	return (0);
 }
@@ -99,19 +98,19 @@ static void
 komeda_pipeline_disable_vblank(struct drm_crtc *crtc)
 {
 
-	dprintf("%s\n", __func__);
+	printf("%s\n", __func__);
 }
 
 static uint32_t
 komeda_pipeline_get_vblank_counter(struct drm_crtc *crtc)
 {
-	struct komeda_drm_softc *sc;
+	struct komeda_pipeline *pipeline;
 
-	dprintf("%s\n", __func__);
+	printf("%s\n", __func__);
 
-	sc = container_of(crtc, struct komeda_drm_softc, crtc);
+	pipeline = container_of(crtc, struct komeda_pipeline, crtc);
 
-	return (sc->vbl_counter);
+	return (pipeline->vbl_counter);
 }
 
 static const struct drm_crtc_funcs komeda_pipeline_funcs = {
@@ -133,20 +132,21 @@ static int
 komeda_crtc_atomic_check(struct drm_crtc *crtc, struct drm_crtc_state *state)
 {
 
-	dprintf("%s\n", __func__);
+	printf("%s\n", __func__);
 
 	return (0);
 }
 
 static void
-komeda_crtc_atomic_begin(struct drm_crtc *crtc, struct drm_crtc_state *old_state)
+komeda_crtc_atomic_begin(struct drm_crtc *crtc,
+    struct drm_crtc_state *old_state)
 {
-	struct komeda_drm_softc *sc;
+	struct komeda_pipeline *pipeline;
 	unsigned long flags;
 
-	dprintf("%s\n", __func__);
+	printf("%s\n", __func__);
 
-	sc = container_of(crtc, struct komeda_drm_softc, crtc);
+	pipeline = container_of(crtc, struct komeda_pipeline, crtc);
 
 	if (crtc->state->event == NULL)
 		return;
@@ -166,14 +166,16 @@ static void
 komeda_crtc_atomic_flush(struct drm_crtc *crtc,
     struct drm_crtc_state *old_state)
 {
-	struct komeda_drm_softc *sc;
 	struct drm_pending_vblank_event *event;
+	struct komeda_pipeline *pipeline;
+	struct komeda_drm_softc *sc;
 
-	dprintf("%s\n", __func__);
+	printf("%s\n", __func__);
 
 	event = crtc->state->event;
 
-	sc = container_of(crtc, struct komeda_drm_softc, crtc);
+	pipeline = container_of(crtc, struct komeda_pipeline, crtc);
+	sc = pipeline->sc;
 
 	if (event) {
 		crtc->state->event = NULL;
@@ -194,6 +196,9 @@ komeda_crtc_atomic_flush(struct drm_crtc *crtc,
 static void
 komeda_crtc_atomic_enable(struct drm_crtc *crtc, struct drm_crtc_state *old_state)
 {
+
+	dprintf("%s\n", __func__);
+
 #if 0
 	uint32_t hsync_len, vsync_len;
 	uint32_t hact_st, hact_end;
@@ -216,14 +221,15 @@ komeda_crtc_atomic_enable(struct drm_crtc *crtc, struct drm_crtc_state *old_stat
 }
 
 static void
-komeda_crtc_atomic_disable(struct drm_crtc *crtc, struct drm_crtc_state *old_state)
+komeda_crtc_atomic_disable(struct drm_crtc *crtc,
+    struct drm_crtc_state *old_state)
 {
-	struct komeda_drm_softc *sc;
+	struct komeda_pipeline *pipeline;
 	uint32_t irqflags;
 
-	dprintf("%s\n", __func__);
+	printf("%s\n", __func__);
 
-	sc = container_of(crtc, struct komeda_drm_softc, crtc);
+	pipeline = container_of(crtc, struct komeda_pipeline, crtc);
 
 	/* Disable VBLANK events */
 	drm_crtc_vblank_off(crtc);
@@ -241,10 +247,10 @@ komeda_crtc_atomic_disable(struct drm_crtc *crtc, struct drm_crtc_state *old_sta
 static void
 komeda_crtc_mode_set_nofb(struct drm_crtc *crtc)
 {
+	struct komeda_pipeline *pipeline;
 	struct drm_display_mode *mode;
-	struct komeda_drm_softc *sc;
 
-	sc = container_of(crtc, struct komeda_drm_softc, crtc);
+	pipeline = container_of(crtc, struct komeda_pipeline, crtc);
 	mode = &crtc->state->adjusted_mode;
 
 	//komeda_pipeline_clk_enable(sc->dev, mode);
@@ -267,27 +273,30 @@ komeda_pipeline_add_encoder(struct komeda_drm_softc *sc,
 	return (0);
 }
 
-static int
-komeda_pipeline_create_pipeline(device_t dev, struct drm_device *drm)
+int
+komeda_pipeline_create_pipeline(struct komeda_drm_softc *sc,
+    struct komeda_pipeline *pipeline)
 {
-	struct komeda_drm_softc *sc;
+	struct drm_device *drm;
 	int error;
 
-	sc = device_get_softc(dev);
+	drm = &sc->drm_dev;
 
-	dprintf("%s\n", __func__);
+	printf("%s\n", __func__);
 
-	komeda_plane_create(sc, drm);
+	komeda_plane_create(pipeline, drm);
 
-	error = drm_crtc_init_with_planes(drm, &sc->crtc, &sc->planes[0].plane,
-	    &sc->planes[1].plane, &komeda_pipeline_funcs, NULL);
+	error = drm_crtc_init_with_planes(drm, &pipeline->crtc,
+	    &pipeline->planes[0].plane, &pipeline->planes[1].plane,
+	    &komeda_pipeline_funcs, NULL);
 	if (error != 0) {
 		device_printf(sc->dev,
 		    "%s: drm_crtc_init_with_planes failed\n", __func__);
 		return (error);
 	}
 
-	drm_crtc_helper_add(&sc->crtc, &komeda_pipeline_crtc_helper_funcs);
+	drm_crtc_helper_add(&pipeline->crtc,
+	    &komeda_pipeline_crtc_helper_funcs);
 
 	error = komeda_pipeline_add_encoder(sc, drm);
 

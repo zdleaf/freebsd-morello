@@ -35,25 +35,13 @@
 
 MALLOC_DECLARE(M_KOMEDA);
 
-#if 0
-struct panfrost_softc {
-	device_t		dev;
-	struct drm_device	drm_dev;
-	struct resource		*res[2];
-	void			*intrhand[1];
-};
-#endif
+#define	KOMEDA_MAX_PIPELINES	16
 
 struct komeda_drm_softc {
 	device_t		dev;
-
 	struct drm_device	drm_dev;
 	struct drm_fb_cma	*fb;
-
-	struct drm_crtc		crtc;
-	struct drm_encoder	encoder;
-	uint32_t		vbl_counter;
-	struct komeda_plane	planes[2];
+	struct komeda_pipeline	pipelines[KOMEDA_MAX_PIPELINES];
 };
 
 #define	KOMEDA_DEBUG
