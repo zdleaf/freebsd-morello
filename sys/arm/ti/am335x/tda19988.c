@@ -71,6 +71,8 @@ __FBSDID("$FreeBSD$");
 #define		DDC_ENABLE		0
 #define	TDA_CCLK		MKREG(0x00, 0x0c)
 #define		CCLK_ENABLE		1
+#define	TDA_CTRL_INTR_CTRL_REG	MKREG(0x00, 0x0f)
+#define	 CTRL_INTR_EN_GLO_MASK		0x04
 #define	TDA_INT_FLAGS_2		MKREG(0x00, 0x11)
 #define		INT_FLAGS_2_EDID_BLK_RD	(1 << 1)
 
@@ -573,6 +575,9 @@ tda19988_read_edid_block(struct tda19988_softc *sc, uint8_t *buf, int block)
 
 	tda19988_reg_set(sc, TDA_INT_FLAGS_2, INT_FLAGS_2_EDID_BLK_RD);
 
+	/* gl int en */
+	tda19988_reg_set(sc, TDA_CTRL_INTR_CTRL_REG, CTRL_INTR_EN_GLO_MASK);
+
 	/* Block 0 */
 	tda19988_reg_write(sc, TDA_DDC_ADDR, 0xa0);
 	tda19988_reg_write(sc, TDA_DDC_OFFS, (block % 2) ? 128 : 0);
@@ -701,6 +706,8 @@ tda19988_start(struct tda19988_softc *sc)
 	}
 
 	tda19988_reg_write(sc, TDA_DDC_CTRL, DDC_ENABLE);
+	tda19988_reg_write(sc, TDA_CCLK, CCLK_ENABLE);
+
 	tda19988_reg_write(sc, TDA_TX3, 39);
 
     	tda19988_cec_write(sc, TDA_CEC_FRO_IM_CLK_CTRL,
