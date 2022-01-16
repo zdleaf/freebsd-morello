@@ -63,19 +63,14 @@ __FBSDID("$FreeBSD$");
 #include <drm/drm_ioctl.h>
 #include <drm/drm_vblank.h>
 
+#include <dev/drm/komeda/komeda_plane.h>
+#include <dev/drm/komeda/komeda_drv.h>
 #include <dev/drm/komeda/komeda_gem.h>
 
 #include <dev/drm/drmkpi/include/linux/dma-buf.h>
 
 #include "fb_if.h"
 //#include "komeda_vop_if.h"
-
-struct komeda_drm_softc {
-	device_t		dev;
-
-	struct drm_device	drm_dev;
-	struct drm_fb_cma	*fb;
-};
 
 static struct ofw_compat_data compat_data[] = {
 	{ "arm,mali-d32",		1 },

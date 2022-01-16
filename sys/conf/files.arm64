@@ -111,6 +111,8 @@ dev/drm/panfrost/panfrost_job.c		optional drm fdt aw_de2_drm compile-with "${DRM
 # ARM Komeda Display Subsystem
 dev/drm/komeda/komeda_drv.c		optional drm fdt komeda_drm compile-with "${DRM_C}"
 dev/drm/komeda/komeda_gem.c		optional drm fdt komeda_drm compile-with "${DRM_C}"
+dev/drm/komeda/komeda_pipeline.c	optional drm fdt komeda_drm compile-with "${DRM_C}"
+dev/drm/komeda/komeda_plane.c		optional drm fdt komeda_drm compile-with "${DRM_C}"
 
 dev/hdmi/hdmi_if.m			optional hdmi
 arm/ti/am335x/tda19988.c		optional drm fdt komeda_drm
