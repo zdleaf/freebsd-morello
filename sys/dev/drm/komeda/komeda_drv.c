@@ -121,7 +121,7 @@ static struct drm_driver komeda_drm_driver = {
 
 	.name			= "mali-dp",
 	.desc			= "ARM Komeda Display Subsystem",
-	.date			= "20211401",
+	.date			= "20220114",
 	.major			= 1,
 	.minor			= 0,
 };
