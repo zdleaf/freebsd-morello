@@ -270,6 +270,8 @@ komeda_pipeline_add_encoder(struct komeda_drm_softc *sc,
     struct drm_device *drm)
 {
 
+	printf("%s\n", __func__);
+
 	return (0);
 }
 
