@@ -49,10 +49,14 @@ __FBSDID("$FreeBSD$");
 #include <dev/ofw/ofw_bus.h>
 #include <dev/ofw/ofw_bus_subr.h>
 
-#include <dev/videomode/videomode.h>
-#include <dev/videomode/edidvar.h>
+#include <drm/drm_atomic_helper.h>
+#include <drm/drm_bridge.h>
+#include <drm/drm_crtc_helper.h>
+#include <drm/drm_probe_helper.h>
+#include <drm/drm_edid.h>
 
 #include "iicbus_if.h"
+#include "drm_bridge_if.h"
 
 #define	MKREG(page, addr)	(((page) << 8) | (addr))
 
@@ -221,7 +225,6 @@ __FBSDID("$FreeBSD$");
 #define		CEC_FRO_IM_CLK_CTRL_IMCLK_SEL	(1 << 1)
 
 /* EDID reading */ 
-#define EDID_LENGTH		0x80
 #define	MAX_READ_ATTEMPTS	100
 
 /* EDID fields */
@@ -240,13 +243,17 @@ __FBSDID("$FreeBSD$");
 #define	TDA19988		0x0301
 
 struct tda19988_softc {
-	device_t		sc_dev;
+	device_t		dev;
 	uint32_t		sc_addr;
 	uint32_t		sc_cec_addr;
 	uint16_t		sc_version;
 	int			sc_current_page;
 	uint8_t			*sc_edid;
 	uint32_t		sc_edid_len;
+
+	struct drm_encoder	encoder;
+	struct drm_connector	connector;
+	struct drm_bridge	bridge;
 };
 
 static int
@@ -262,7 +269,7 @@ tda19988_set_page(struct tda19988_softc *sc, uint8_t page)
 	cmd[0] = addr;
 	cmd[1] = page;
 
-	result = (iicbus_transfer(sc->sc_dev, msg, 1));
+	result = (iicbus_transfer(sc->dev, msg, 1));
 	if (result)
 		printf("tda19988_set_page failed: %d\n", result);
 	else
@@ -280,7 +287,7 @@ tda19988_cec_read(struct tda19988_softc *sc, uint8_t addr, uint8_t *data)
 		{ sc->sc_cec_addr, IIC_M_RD, 1, data },
 	};
 
-	result =  iicbus_transfer(sc->sc_dev, msg, 2);
+	result =  iicbus_transfer(sc->dev, msg, 2);
 	if (result)
 		printf("tda19988_cec_read failed: %d\n", result);
 	return (result);
@@ -298,7 +305,7 @@ tda19988_cec_write(struct tda19988_softc *sc, uint8_t address, uint8_t data)
 	cmd[0] = address;
 	cmd[1] = data;
 
-	result = iicbus_transfer(sc->sc_dev, msg, 1);
+	result = iicbus_transfer(sc->dev, msg, 1);
 	if (result)
 		printf("tda19988_cec_write failed: %d\n", result);
 	return (result);
@@ -319,9 +326,9 @@ tda19988_block_read(struct tda19988_softc *sc, uint16_t addr, uint8_t *data, int
 	if (sc->sc_current_page != REGPAGE(addr))
 		tda19988_set_page(sc, REGPAGE(addr));
 
-	result = (iicbus_transfer(sc->sc_dev, msg, 2));
+	result = (iicbus_transfer(sc->dev, msg, 2));
 	if (result)
-		device_printf(sc->sc_dev, "tda19988_block_read failed: %d\n", result);
+		device_printf(sc->dev, "tda19988_block_read failed: %d\n", result);
 	return (result);
 }
 
@@ -340,9 +347,9 @@ tda19988_reg_read(struct tda19988_softc *sc, uint16_t addr, uint8_t *data)
 	if (sc->sc_current_page != REGPAGE(addr))
 		tda19988_set_page(sc, REGPAGE(addr));
 
-	result = (iicbus_transfer(sc->sc_dev, msg, 2));
+	result = (iicbus_transfer(sc->dev, msg, 2));
 	if (result)
-		device_printf(sc->sc_dev, "tda19988_reg_read failed: %d\n", result);
+		device_printf(sc->dev, "tda19988_reg_read failed: %d\n", result);
 	return (result);
 }
 
@@ -361,9 +368,9 @@ tda19988_reg_write(struct tda19988_softc *sc, uint16_t address, uint8_t data)
 	if (sc->sc_current_page != REGPAGE(address))
 		tda19988_set_page(sc, REGPAGE(address));
 
-	result = iicbus_transfer(sc->sc_dev, msg, 1);
+	result = iicbus_transfer(sc->dev, msg, 1);
 	if (result)
-		device_printf(sc->sc_dev, "tda19988_reg_write failed: %d\n", result);
+		device_printf(sc->dev, "tda19988_reg_write failed: %d\n", result);
 
 	return (result);
 }
@@ -384,9 +391,9 @@ tda19988_reg_write2(struct tda19988_softc *sc, uint16_t address, uint16_t data)
 	if (sc->sc_current_page != REGPAGE(address))
 		tda19988_set_page(sc, REGPAGE(address));
 
-	result = iicbus_transfer(sc->sc_dev, msg, 1);
+	result = iicbus_transfer(sc->dev, msg, 1);
 	if (result)
-		device_printf(sc->sc_dev, "tda19988_reg_write2 failed: %d\n", result);
+		device_printf(sc->dev, "tda19988_reg_write2 failed: %d\n", result);
 
 	return (result);
 }
@@ -641,7 +648,7 @@ tda19988_read_edid(struct tda19988_softc *sc)
 		}
 	}
 
-	//EVENTHANDLER_INVOKE(hdmi_event, sc->sc_dev, HDMI_EVENT_CONNECTED);
+	//EVENTHANDLER_INVOKE(hdmi_event, sc->dev, HDMI_EVENT_CONNECTED);
 done:
 	if (sc->sc_version == TDA19988)
 		tda19988_reg_set(sc, TDA_TX4, TX4_PD_RAM);
@@ -656,7 +663,7 @@ tda19988_start(struct tda19988_softc *sc)
 	uint8_t data;
 	uint16_t version;
 
-	dev = sc->sc_dev;
+	dev = sc->dev;
 
 	tda19988_cec_write(sc, TDA_CEC_ENAMODS, ENAMODS_RXSENS | ENAMODS_HDMI);
 	DELAY(1000);
@@ -733,7 +740,7 @@ tda19988_attach(device_t dev)
 
 	sc = device_get_softc(dev);
 
-	sc->sc_dev = dev;
+	sc->dev = dev;
 	sc->sc_addr = iicbus_get_addr(dev);
 	sc->sc_cec_addr = (0x34 << 1); /* hardcoded */
 	sc->sc_edid = malloc(EDID_LENGTH, M_DEVBUF, M_WAITOK | M_ZERO);
@@ -787,10 +794,156 @@ tda19988_set_videomode(device_t dev, const struct videomode *mode)
 }
 #endif
 
+static enum drm_connector_status
+tda19988_connector_detect(struct drm_connector *connector, bool force)
+{
+	struct tda19988_softc *sc;
+
+	sc = container_of(connector, struct tda19988_softc, connector);
+
+	device_printf(sc->dev, "%s\n", __func__);
+
+	return (connector_status_connected);
+}
+
+static const struct drm_connector_funcs tda19988_connector_funcs = {
+	.fill_modes = drm_helper_probe_single_connector_modes,
+	.detect = tda19988_connector_detect,
+	.destroy = drm_connector_cleanup,
+	.reset = drm_atomic_helper_connector_reset,
+	.atomic_duplicate_state = drm_atomic_helper_connector_duplicate_state,
+	.atomic_destroy_state = drm_atomic_helper_connector_destroy_state,
+};
+
+/* hack */
+static uint8_t raw_edid[EDID_LENGTH] = {
+	0, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x0, 0x9, 0xe5, 0xf0, 0x5, 0x0, 0x0, 0x0, 0x0, 0x1, 0x18, 0x1, 0x4, 0x95, 0x1f, 0x11, 0x78, 0x2, 0x8f, 0xa0, 0x92, 0x5c, 0x56, 0x95, 0x28, 0x1a, 0x50, 0x54, 0x0, 0x0, 0x0, 0x1, 0x1, 0x1, 0x1, 0x1, 0x1, 0x1, 0x1, 0x1, 0x1, 0x1, 0x1, 0x1, 0x1, 0x1, 0x1, 0x3e, 0x1c, 0x56, 0xa0, 0x50, 0x0, 0x16, 0x30, 0x30, 0x20, 0x36, 0x0, 0x35, 0xad, 0x10, 0x0, 0x0, 0x1a, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x1a, 0x0, 0x0, 0x0, 0xfe, 0x0, 0x42, 0x4f, 0x45, 0x20, 0x44, 0x54, 0xa, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x0, 0x0, 0x0, 0xfe, 0x0, 0x48, 0x42, 0x31, 0x34, 0x30, 0x57, 0x58, 0x31, 0x2d, 0x33, 0x30, 0x31, 0xa, 0x0, 0x18
+};
+
+static int
+tda19988_connector_get_modes(struct drm_connector *connector)
+{
+	struct tda19988_softc *sc;
+	/* uint8_t edid[EDID_LENGTH]; */
+	/* struct edid *edid = NULL; */
+	int ret = 0;
+
+	sc = container_of(connector, struct tda19988_softc, connector);
+
+	device_printf(sc->dev, "%s\n", __func__);
+
+	/* ret = tda19988_read_edid(sc, edid); */
+
+	/* edid = drm_get_edid(connector, sc->ddc); */
+
+	drm_connector_update_edid_property(connector, (struct edid *)raw_edid);
+	ret = drm_add_edid_modes(connector, (struct edid *)raw_edid);
+
+	return (ret);
+}
+
+static const struct drm_connector_helper_funcs
+    tda19988_connector_helper_funcs = {
+	.get_modes = tda19988_connector_get_modes,
+};
+
+static int
+tda19988_bridge_attach(struct drm_bridge *bridge)
+{
+	struct tda19988_softc *sc;
+
+	sc = container_of(bridge, struct tda19988_softc, bridge);
+
+	device_printf(sc->dev, "%s\n", __func__);
+
+	sc->connector.polled = DRM_CONNECTOR_POLL_CONNECT;
+	drm_connector_helper_add(&sc->connector,
+	    &tda19988_connector_helper_funcs);
+
+	drm_connector_init(bridge->dev, &sc->connector,
+	    &tda19988_connector_funcs, DRM_MODE_CONNECTOR_HDMIA);
+	drm_connector_attach_encoder(&sc->connector, &sc->encoder);
+
+	return (0);
+}
+
+static enum drm_mode_status
+tda19988_bridge_mode_valid(struct drm_bridge *bridge,
+    const struct drm_display_mode *mode)
+{
+	struct tda19988_softc *sc;
+
+	sc = container_of(bridge, struct tda19988_softc, bridge);
+
+	device_printf(sc->dev, "%s\n", __func__);
+
+	return (MODE_OK);
+}
+
+static void
+tda19988_bridge_mode_set(struct drm_bridge *bridge,
+    const struct drm_display_mode *orig_mode,
+    const struct drm_display_mode *mode)
+{
+	struct tda19988_softc *sc;
+
+	sc = container_of(bridge, struct tda19988_softc, bridge);
+
+	device_printf(sc->dev, "%s\n", __func__);
+}
+
+static void
+tda19988_bridge_disable(struct drm_bridge *bridge)
+{
+	struct tda19988_softc *sc;
+
+	sc = container_of(bridge, struct tda19988_softc, bridge);
+
+	device_printf(sc->dev, "%s\n", __func__);
+}
+
+static void
+tda19988_bridge_enable(struct drm_bridge *bridge)
+{
+	struct tda19988_softc *sc;
+
+	sc = container_of(bridge, struct tda19988_softc, bridge);
+
+	device_printf(sc->dev, "%s\n", __func__);
+}
+
+static const struct drm_bridge_funcs tda19988_bridge_funcs = {
+	.attach = tda19988_bridge_attach,
+	.enable = tda19988_bridge_enable,
+	.disable = tda19988_bridge_disable,
+	.mode_set = tda19988_bridge_mode_set,
+	.mode_valid = tda19988_bridge_mode_valid,
+};
+
+static int
+tda19988_add_bridge(device_t dev, struct drm_encoder *encoder,
+    struct drm_device *drm)
+{
+	struct tda19988_softc *sc;
+
+	sc = device_get_softc(dev);
+
+	device_printf(sc->dev, "%s\n", __func__);
+
+	sc->encoder = *encoder;
+	sc->bridge.funcs = &tda19988_bridge_funcs;
+	drm_bridge_attach(&sc->encoder, &sc->bridge, NULL);
+
+	return (0);
+}
+
 static device_method_t tda_methods[] = {
-	DEVMETHOD(device_probe,		tda19988_probe),
-	DEVMETHOD(device_attach,	tda19988_attach),
-	DEVMETHOD(device_detach,	tda19988_detach),
+	DEVMETHOD(device_probe,			tda19988_probe),
+	DEVMETHOD(device_attach,		tda19988_attach),
+	DEVMETHOD(device_detach,		tda19988_detach),
+
+	DEVMETHOD(drm_bridge_add_bridge,	tda19988_add_bridge),
+
 	{0, 0},
 };
 
