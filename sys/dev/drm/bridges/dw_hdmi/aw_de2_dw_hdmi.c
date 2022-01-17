@@ -297,14 +297,16 @@ dw_hdmi_connector_get_modes(struct drm_connector *connector)
 {
 	struct dw_hdmi_softc *sc;
 	struct edid *edid = NULL;
+	uint8_t *ed;
 	int ret = 0;
 
 	sc = container_of(connector, struct dw_hdmi_softc, connector);
 
 	edid = drm_get_edid(connector, sc->ddc);
-	if (bootverbose)
+	ed = (uint8_t *)edid;
+	if (edid && bootverbose)
 		print_hex_dump(KERN_NOTICE, " \t", DUMP_PREFIX_NONE, 16, 1,
-		    edid, EDID_LENGTH, false);
+		    edid, (ed[0x7e] + 1) * EDID_LENGTH, false);
 
 	drm_connector_update_edid_property(connector, edid);
 	ret = drm_add_edid_modes(connector, edid);
