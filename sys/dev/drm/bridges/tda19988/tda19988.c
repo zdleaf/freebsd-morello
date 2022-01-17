@@ -429,10 +429,10 @@ tda19988_probe(device_t dev)
 	return (BUS_PROBE_DEFAULT);
 }
 
-#if 0
 static void
-tda19988_init_encoder(struct tda19988_softc *sc, const struct videomode *mode)
+tda19988_init_encoder(struct tda19988_softc *sc)
 {
+	const struct drm_display_mode *mode;
 	uint16_t ref_pix, ref_line, n_pix, n_line;
 	uint16_t hs_pix_start, hs_pix_stop;
 	uint16_t vs1_pix_start, vs1_pix_stop;
@@ -444,6 +444,8 @@ tda19988_init_encoder(struct tda19988_softc *sc, const struct videomode *mode)
 	uint16_t de_start, de_stop;
 	uint8_t reg, div;
 
+	mode = &sc->mode;
+
 	n_pix = mode->htotal;
 	n_line = mode->vtotal;
 
@@ -454,10 +456,10 @@ tda19988_init_encoder(struct tda19988_softc *sc, const struct videomode *mode)
 	de_start = mode->htotal - mode->hdisplay;
 	ref_pix = hs_pix_start + 3;
 
-	if (mode->flags & VID_HSKEW)
+	if (mode->flags & DRM_MODE_FLAG_HSKEW)
 		ref_pix += mode->hskew;
 
-	if ((mode->flags & VID_INTERLACE) == 0) {
+	if ((mode->flags & DRM_MODE_FLAG_INTERLACE) == 0) {
 		ref_line = 1 + mode->vsync_start - mode->vdisplay;
 		vwin1_line_start = mode->vtotal - mode->vdisplay - 1;
 		vwin1_line_end = vwin1_line_start + mode->vdisplay;
@@ -486,7 +488,7 @@ tda19988_init_encoder(struct tda19988_softc *sc, const struct videomode *mode)
 		vs2_line_end = vs2_line_start + (mode->vsync_end - mode->vsync_start)/2;
 	}
 
-	div = 148500 / mode->dot_clock;
+	div = 148500 / mode->crtc_clock;
 	if (div != 0) {
 		div--;
 		if (div > 3)
@@ -528,16 +530,16 @@ tda19988_init_encoder(struct tda19988_softc *sc, const struct videomode *mode)
 	 * Sync on rising HSYNC/VSYNC
 	 */
 	reg = VIP_CNTRL_3_SYNC_HS;
-	if (mode->flags & VID_NHSYNC)
+	if (mode->flags & DRM_MODE_FLAG_NHSYNC)
 		reg |= VIP_CNTRL_3_H_TGL;
-	if (mode->flags & VID_NVSYNC)
+	if (mode->flags & DRM_MODE_FLAG_NVSYNC)
 		reg |= VIP_CNTRL_3_V_TGL;
 	tda19988_reg_write(sc, TDA_VIP_CNTRL_3, reg);
 
 	reg = TBG_CNTRL_1_TGL_EN;
-	if (mode->flags & VID_NHSYNC)
+	if (mode->flags & DRM_MODE_FLAG_NHSYNC)
 		reg |= TBG_CNTRL_1_H_TGL;
-	if (mode->flags & VID_NVSYNC)
+	if (mode->flags & DRM_MODE_FLAG_NVSYNC)
 		reg |= TBG_CNTRL_1_V_TGL;
 	tda19988_reg_write(sc, TDA_TBG_CNTRL_1, reg);
 
@@ -572,7 +574,6 @@ tda19988_init_encoder(struct tda19988_softc *sc, const struct videomode *mode)
 	/* must be last register set */
 	tda19988_reg_clear(sc, TDA_TBG_CNTRL_0, TBG_CNTRL_0_SYNC_ONCE);
 }
-#endif
 
 static int
 tda19988_read_edid_block(struct tda19988_softc *sc, uint8_t *buf, int block)
@@ -922,6 +923,8 @@ tda19988_bridge_enable(struct drm_bridge *bridge)
 	    sc->mode.hsync_end,
 	    sc->mode.vsync_start,
 	    sc->mode.vsync_end);
+
+	tda19988_init_encoder(sc);
 }
 
 static const struct drm_bridge_funcs tda19988_bridge_funcs = {
