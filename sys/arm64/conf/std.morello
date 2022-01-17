@@ -23,6 +23,16 @@ options		FDT
 
 options		ROOTDEVNAME=\"ufs:/dev/ada0\"
 
+# No USB support
+nodevice	ohci
+nodevice	uhci
+nodevice	ehci
+nodevice	xhci
+nodevice	usb
+nodevice	ukbd
+nodevice	umass
+nodevice	hid
+
 # Flattened Device Tree
 options		FDT
 options		FDT_DTB_STATIC
