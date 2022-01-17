@@ -323,8 +323,14 @@ komeda_drm_irq_hook(void *arg)
 	drm_vblank_init(&sc->drm_dev, sc->drm_dev.mode_config.num_crtc);
 
 	drm_mode_config_reset(&sc->drm_dev);
+
 	sc->drm_dev.mode_config.max_width = 4096;
 	sc->drm_dev.mode_config.max_height = 4096;
+
+	/* Temporary hack. */
+	sc->drm_dev.mode_config.max_width = 1920;
+	sc->drm_dev.mode_config.max_height = 1080;
+
 	sc->drm_dev.mode_config.funcs = &komeda_drm_mode_config_funcs;
 	sc->drm_dev.mode_config.helper_private =
 	    &komeda_drm_mode_config_helpers;
