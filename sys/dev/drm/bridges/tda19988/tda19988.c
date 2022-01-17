@@ -859,12 +859,13 @@ tda19988_bridge_attach(struct drm_bridge *bridge)
 
 	device_printf(sc->dev, "%s\n", __func__);
 
-	sc->connector.polled = DRM_CONNECTOR_POLL_CONNECT;
+	sc->connector.polled = DRM_CONNECTOR_POLL_HPD;
 	drm_connector_helper_add(&sc->connector,
 	    &tda19988_connector_helper_funcs);
 
 	drm_connector_init(bridge->dev, &sc->connector,
 	    &tda19988_connector_funcs, DRM_MODE_CONNECTOR_HDMIA);
+
 	drm_connector_attach_encoder(&sc->connector, &sc->encoder);
 
 	return (0);
