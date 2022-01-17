@@ -721,10 +721,12 @@ tda19988_start(struct tda19988_softc *sc)
     	tda19988_cec_write(sc, TDA_CEC_FRO_IM_CLK_CTRL,
             CEC_FRO_IM_CLK_CTRL_GHOST_DIS | CEC_FRO_IM_CLK_CTRL_IMCLK_SEL);
 
+#if 0
 	if (tda19988_read_edid(sc) < 0) {
 		device_printf(dev, "failed to read EDID\n");
 		return;
 	}
+#endif
 
 	/* Default values for RGB 4:4:4 mapping */
 	tda19988_reg_write(sc, TDA_VIP_CNTRL_0, 0x23);
