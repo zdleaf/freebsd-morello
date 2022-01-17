@@ -42,6 +42,8 @@ struct komeda_drm_softc {
 	struct drm_device	drm_dev;
 	struct drm_fb_cma	*fb;
 	struct komeda_pipeline	pipelines[KOMEDA_MAX_PIPELINES];
+	struct resource		*res[2];
+	void			*intrhand;
 };
 
 #define	KOMEDA_DEBUG

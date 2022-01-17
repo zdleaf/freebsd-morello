@@ -67,6 +67,7 @@ __FBSDID("$FreeBSD$");
 #include <dev/drm/komeda/komeda_pipeline.h>
 #include <dev/drm/komeda/komeda_drv.h>
 #include <dev/drm/komeda/komeda_gem.h>
+#include <dev/drm/komeda/komeda_regs.h>
 
 #include <dev/drm/drmkpi/include/linux/dma-buf.h>
 
@@ -76,6 +77,12 @@ __FBSDID("$FreeBSD$");
 static struct ofw_compat_data compat_data[] = {
 	{ "arm,mali-d32",		1 },
 	{ NULL,				0 }
+};
+
+static struct resource_spec komeda_spec[] = {
+	{ SYS_RES_MEMORY,	0,	RF_ACTIVE },
+	{ SYS_RES_IRQ,		0,	RF_ACTIVE | RF_SHAREABLE },
+	{ -1, 0 }
 };
 
 static int komeda_drm_probe(device_t dev);
@@ -340,6 +347,13 @@ fail:
 	device_printf(sc->dev, "drm_dev_register(): %d\n", rv);
 }
 
+static void
+komeda_intr(void *arg)
+{
+
+	printf("%s\n", __func__);
+}
+
 static int
 komeda_drm_probe(device_t dev)
 {
@@ -357,9 +371,30 @@ static int
 komeda_drm_attach(device_t dev)
 {
 	struct komeda_drm_softc *sc;
+	uint32_t reg;
 
 	sc = device_get_softc(dev);
 	sc->dev = dev;
+
+	if (bus_alloc_resources(dev, komeda_spec, sc->res) != 0) {
+		device_printf(dev, "cannot allocate resources for device\n");
+		return (ENXIO);
+	}
+
+	if (bus_setup_intr(dev, sc->res[1],
+	    INTR_TYPE_MISC | INTR_MPSAFE, NULL, komeda_intr, sc,
+	    &sc->intrhand)) {
+		bus_release_resources(dev, komeda_spec, sc->res);
+		device_printf(dev, "cannot setup interrupt handler\n");
+		return (ENXIO);
+	}
+
+	reg = DPU_READ(sc, GLB_ARCH_ID);
+	device_printf(dev, "Mali ARCH id reg %x\n", reg);
+
+	reg = DPU_READ(sc, GLB_CORE_ID);
+	device_printf(dev, "ARM Mali-DP%3x version r%dp%d detected\n",
+	    reg >> 16, (reg >> 12) & 0xf, (reg >> 8) & 0xf);
 
 	config_intrhook_oneshot(&komeda_drm_irq_hook, sc);
 
