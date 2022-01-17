@@ -916,6 +916,24 @@ tda19988_bridge_enable(struct drm_bridge *bridge)
 	sc = container_of(bridge, struct tda19988_softc, bridge);
 
 	device_printf(sc->dev, "%s\n", __func__);
+
+	device_printf(sc->dev, "Mode information:\n"
+	    "hdisplay: %d\n"
+	    "vdisplay: %d\n"
+	    "htotal: %d\n"
+	    "vtotal: %d\n"
+	    "hsync_start: %d\n"
+	    "hsync_end: %d\n"
+	    "vsync_start: %d\n"
+	    "vsync_end: %d\n",
+	    sc->mode.hdisplay,
+	    sc->mode.vdisplay,
+	    sc->mode.htotal,
+	    sc->mode.vtotal,
+	    sc->mode.hsync_start,
+	    sc->mode.hsync_end,
+	    sc->mode.vsync_start,
+	    sc->mode.vsync_end);
 }
 
 static const struct drm_bridge_funcs tda19988_bridge_funcs = {
