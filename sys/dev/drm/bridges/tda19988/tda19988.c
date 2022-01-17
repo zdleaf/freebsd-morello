@@ -783,18 +783,6 @@ tda19988_get_edid(device_t dev, uint8_t **edid, uint32_t *edid_len)
 
 	return (0);
 }
-
-static int
-tda19988_set_videomode(device_t dev, const struct videomode *mode)
-{
-	struct tda19988_softc *sc;
-
-	sc = device_get_softc(dev);
-
-	tda19988_init_encoder(sc, mode);
-
-	return (0);
-}
 #endif
 
 static enum drm_connector_status
