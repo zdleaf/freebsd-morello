@@ -390,11 +390,34 @@ komeda_drm_attach(device_t dev)
 	}
 
 	reg = DPU_READ(sc, GLB_ARCH_ID);
-	device_printf(dev, "Mali ARCH id reg %x\n", reg);
+	device_printf(dev, "Mali arch_id reg %x\n", reg);
 
 	reg = DPU_READ(sc, GLB_CORE_ID);
-	device_printf(dev, "ARM Mali-DP%3x version r%dp%d detected\n",
+	device_printf(dev, "ARM Mali D%3x r%dp%d detected\n",
 	    reg >> 16, (reg >> 12) & 0xf, (reg >> 8) & 0xf);
+
+	int num_pipelines;
+	int num_blocks;
+
+	reg = DPU_READ(sc, GLB_CORE_INFO);
+	num_blocks = reg & 0xff;
+	num_pipelines = (reg >> 8) & 0x7;
+
+	device_printf(dev, "Mali core_info reg %x\n", reg);
+	device_printf(dev, "num blocks %d, num pipelines %d\n",
+	    num_blocks, num_pipelines);
+
+	if (num_pipelines > KOMEDA_MAX_PIPELINES) {
+		device_printf(dev, "Max pipelines supported %d, got %d\n",
+		    KOMEDA_MAX_PIPELINES, num_pipelines);
+		return (ENXIO);
+	}
+
+	reg = DPU_READ(sc, PERIPH_BLOCK_INFO);
+	if (BLOCK_INFO_BLK_TYPE(reg) == D71_BLK_TYPE_PERIPH) {
+		device_printf(dev, "Legacy HW detected. Add support.\n");
+		return (ENXIO);
+	}
 
 	config_intrhook_oneshot(&komeda_drm_irq_hook, sc);
 

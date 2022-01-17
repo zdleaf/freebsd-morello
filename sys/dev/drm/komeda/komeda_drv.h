@@ -35,7 +35,7 @@
 
 MALLOC_DECLARE(M_KOMEDA);
 
-#define	KOMEDA_MAX_PIPELINES	16
+#define	KOMEDA_MAX_PIPELINES	2	/* Mali D71 limitation */
 
 struct komeda_drm_softc {
 	device_t		dev;
