@@ -44,6 +44,12 @@ struct komeda_drm_softc {
 	struct komeda_pipeline	pipelines[KOMEDA_MAX_PIPELINES];
 	struct resource		*res[2];
 	void			*intrhand;
+
+	uint32_t max_line_size;
+	uint32_t max_num_lines;
+	uint32_t num_rich_layers;
+	uint32_t dual_link_supp;
+	uint32_t tbu_en;
 };
 
 #define	KOMEDA_DEBUG

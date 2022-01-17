@@ -414,10 +414,28 @@ komeda_drm_attach(device_t dev)
 	}
 
 	reg = DPU_READ(sc, PERIPH_BLOCK_INFO);
-	if (BLOCK_INFO_BLK_TYPE(reg) == D71_BLK_TYPE_PERIPH) {
+	if (BLOCK_INFO_BLOCK_TYPE(reg) == D71_BLK_TYPE_PERIPH) {
 		device_printf(dev, "Legacy HW detected. Add support.\n");
 		return (ENXIO);
 	}
+
+	reg = DPU_READ(sc, GCU_CONFIGURATION_ID0);
+	sc->max_line_size = (reg & CONFIG_ID0_MAX_LINE_SIZE_M) >> \
+				CONFIG_ID0_MAX_LINE_SIZE_S;
+	sc->max_num_lines = (reg & CONFIG_ID0_MAX_NUM_LINES_M) >> \
+				CONFIG_ID0_MAX_NUM_LINES_S;
+
+	reg = DPU_READ(sc, GCU_CONFIGURATION_ID1);
+	sc->num_rich_layers = (reg & CONFIG_ID1_NUM_RICH_LAYERS_M) >> \
+				CONFIG_ID1_NUM_RICH_LAYERS_S;
+	sc->dual_link_supp = reg & CONFIG_ID1_DISPLAY_SPLIT_EN ? 1 : 0;
+	sc->tbu_en = reg & CONFIG_ID1_DISPLAY_TBU_EN ? 1 : 0;
+
+	device_printf(dev,
+	    "Max line size %d, max num lines %d, num rich layers %d\n",
+	    sc->max_line_size, sc->max_num_lines, sc->num_rich_layers);
+	device_printf(dev, "dual link supp %d, tbu %d\n",
+	    sc->dual_link_supp, sc->tbu_en);
 
 	config_intrhook_oneshot(&komeda_drm_irq_hook, sc);
 
