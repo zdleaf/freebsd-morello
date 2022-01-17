@@ -16,9 +16,6 @@ options		COMPAT_DRMKPI
 device		drm
 device		komeda_drm
 
-#non-drm
-device		hdmi
-
 device		cdns_i2c
 
 device		re
