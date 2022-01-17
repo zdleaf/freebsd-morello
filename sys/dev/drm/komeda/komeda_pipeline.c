@@ -75,7 +75,7 @@ __FBSDID("$FreeBSD$");
 #include <dev/drm/komeda/komeda_pipeline.h>
 #include <dev/drm/komeda/komeda_drv.h>
 
-//#include "dw_hdmi_if.h"
+#include "tda19988_if.h"
 
 #define	VOP_READ(sc, reg)	bus_read_4((sc)->res[0], (reg))
 #define	VOP_WRITE(sc, reg, val)	bus_write_4((sc)->res[0], (reg), (val))
@@ -266,17 +266,30 @@ static const struct drm_crtc_helper_funcs komeda_pipeline_crtc_helper_funcs = {
 };
 
 static int
-komeda_pipeline_add_encoder(struct komeda_drm_softc *sc,
+komeda_pipeline_add_encoder(struct komeda_pipeline *pipeline,
     struct drm_device *drm)
 {
+	struct komeda_drm_softc *sc;
+	device_t dev;
+	int ret;
 
 	printf("%s\n", __func__);
+
+	sc = pipeline->sc;
+
+	dev = ofw_graph_get_device_by_port_ep(pipeline->node, 0, 1);
+	if (dev == NULL)
+		return (ENOENT);
+
+	ret = TDA19988_ADD_ENCODER(dev, &pipeline->crtc, drm);
+	if (ret == 0)
+		return (ENODEV);
 
 	return (0);
 }
 
 int
-komeda_pipeline_create_pipeline(struct komeda_drm_softc *sc,
+komeda_pipeline_create_pipeline(struct komeda_drm_softc *sc, phandle_t node,
     struct komeda_pipeline *pipeline)
 {
 	struct drm_device *drm;
@@ -286,6 +299,7 @@ komeda_pipeline_create_pipeline(struct komeda_drm_softc *sc,
 
 	printf("%s\n", __func__);
 
+	pipeline->node = node;
 	komeda_plane_create(pipeline, drm);
 
 	error = drm_crtc_init_with_planes(drm, &pipeline->crtc,
@@ -300,7 +314,7 @@ komeda_pipeline_create_pipeline(struct komeda_drm_softc *sc,
 	drm_crtc_helper_add(&pipeline->crtc,
 	    &komeda_pipeline_crtc_helper_funcs);
 
-	error = komeda_pipeline_add_encoder(sc, drm);
+	error = komeda_pipeline_add_encoder(pipeline, drm);
 
 	return (error);
 }

@@ -959,6 +959,8 @@ tda19988_add_encoder(device_t dev, struct drm_crtc *crtc,
 
 	sc = device_get_softc(dev);
 
+printf("%s\n", __func__);
+
 	drm_encoder_helper_add(&sc->encoder,
 	    &tda19988_encoder_helper_funcs);
 	sc->encoder.possible_crtcs = drm_crtc_mask(crtc);
@@ -989,6 +991,7 @@ static driver_t tda_driver = {
 
 static devclass_t tda_devclass;
 
-DRIVER_MODULE(tda, iicbus, tda_driver, tda_devclass, 0, 0);
+EARLY_DRIVER_MODULE(tda, iicbus, tda_driver, tda_devclass, 0, 0,
+    BUS_PASS_INTERRUPT + BUS_PASS_ORDER_MIDDLE);
 MODULE_VERSION(tda, 1);
 MODULE_DEPEND(tda, iicbus, 1, 1, 1);

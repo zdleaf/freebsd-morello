@@ -43,10 +43,11 @@ struct komeda_pipeline {
 	struct drm_crtc			crtc;
 	struct drm_encoder		encoder;
 	uint32_t			vbl_counter;
+	phandle_t			node;
 };
 
 int
-komeda_pipeline_create_pipeline(struct komeda_drm_softc *sc,
+komeda_pipeline_create_pipeline(struct komeda_drm_softc *sc, phandle_t node,
     struct komeda_pipeline *pipeline);
 
 #endif /* !_DEV_DRM_KOMEDA_KOMEDA_PIPELINE_H_ */

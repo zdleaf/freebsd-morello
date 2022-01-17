@@ -255,9 +255,7 @@ komeda_drm_irq_hook(void *arg)
 {
 	struct komeda_drm_softc *sc;
 	phandle_t node;
-	device_t portdev;
-	uint32_t *ports;
-	int rv, nports, i;
+	int error, i;
 
 	sc = arg;
 
@@ -265,10 +263,10 @@ komeda_drm_irq_hook(void *arg)
 
 	drm_mode_config_init(&sc->drm_dev);
 
-	rv = drm_dev_init(&sc->drm_dev, &komeda_drm_driver,
+	error = drm_dev_init(&sc->drm_dev, &komeda_drm_driver,
 	    sc->dev);
-	if (rv != 0) {
-		device_printf(sc->dev, "drm_dev_init(): %d\n", rv);
+	if (error != 0) {
+		device_printf(sc->dev, "drm_dev_init(): %d\n", error);
 		return;
 	}
 
@@ -292,11 +290,12 @@ komeda_drm_irq_hook(void *arg)
 			    sizeof(pipeline_reg));
 			printf("%s: pipeline found, reg %x\n", __func__,
 			    pipeline_reg);
-			komeda_pipeline_create_pipeline(sc,
+			komeda_pipeline_create_pipeline(sc, child,
 			    &sc->pipelines[i++]);
 		}
 	}
 
+#if 0
 	nports = OF_getencprop_alloc_multi(node, "ports", sizeof(*ports),
 	    (void **)&ports);
 	if (nports <= 0) {
@@ -317,6 +316,7 @@ komeda_drm_irq_hook(void *arg)
 			device_printf(sc->dev,
 			    "Cannot find port with phandle %x\n", ports[i]);
 	}
+#endif
 
 	komeda_drm_fb_preinit(&sc->drm_dev);
 
@@ -334,8 +334,8 @@ komeda_drm_irq_hook(void *arg)
 	drm_kms_helper_poll_init(&sc->drm_dev);
 
 	/* Finally register our drm device */
-	rv = drm_dev_register(&sc->drm_dev, 0);
-	if (rv < 0)
+	error = drm_dev_register(&sc->drm_dev, 0);
+	if (error < 0)
 		goto fail;
 
 	sc->drm_dev.irq_enabled = true;
@@ -344,7 +344,7 @@ printf("%s: DRM device registered\n", __func__);
 
 	return;
 fail:
-	device_printf(sc->dev, "drm_dev_register(): %d\n", rv);
+	device_printf(sc->dev, "drm_dev_register(): %d\n", error);
 }
 
 static void
@@ -477,8 +477,7 @@ static driver_t komeda_driver = {
 static devclass_t komeda_drm_devclass;
 
 EARLY_DRIVER_MODULE(komeda_drm, simplebus, komeda_driver, komeda_drm_devclass,
-    0, 0, BUS_PASS_INTERRUPT + BUS_PASS_ORDER_FIRST);
-//MODULE_DEPEND(komeda_drm, komeda_vop, 1, 1, 1);
+    0, 0, BUS_PASS_INTERRUPT + BUS_PASS_ORDER_LAST);
 
 /* Bindings for fbd device. */
 extern devclass_t fbd_devclass;
