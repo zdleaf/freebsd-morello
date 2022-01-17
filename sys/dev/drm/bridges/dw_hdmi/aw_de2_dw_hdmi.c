@@ -302,6 +302,10 @@ dw_hdmi_connector_get_modes(struct drm_connector *connector)
 	sc = container_of(connector, struct dw_hdmi_softc, connector);
 
 	edid = drm_get_edid(connector, sc->ddc);
+	if (bootverbose)
+		print_hex_dump(KERN_NOTICE, " \t", DUMP_PREFIX_NONE, 16, 1,
+		    edid, EDID_LENGTH, false);
+
 	drm_connector_update_edid_property(connector, edid);
 	ret = drm_add_edid_modes(connector, edid);
 
