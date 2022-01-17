@@ -56,7 +56,7 @@ __FBSDID("$FreeBSD$");
 #include <drm/drm_edid.h>
 
 #include "iicbus_if.h"
-#include "drm_bridge_if.h"
+#include "tda19988_if.h"
 
 #define	MKREG(page, addr)	(((page) << 8) | (addr))
 
@@ -254,6 +254,7 @@ struct tda19988_softc {
 	struct drm_encoder	encoder;
 	struct drm_connector	connector;
 	struct drm_bridge	bridge;
+	struct drm_display_mode	mode;
 };
 
 static int
@@ -892,6 +893,8 @@ tda19988_bridge_mode_set(struct drm_bridge *bridge,
 	sc = container_of(bridge, struct tda19988_softc, bridge);
 
 	device_printf(sc->dev, "%s\n", __func__);
+
+	memcpy(&sc->mode, mode, sizeof(struct drm_display_mode));
 }
 
 static void
@@ -922,17 +925,39 @@ static const struct drm_bridge_funcs tda19988_bridge_funcs = {
 	.mode_valid = tda19988_bridge_mode_valid,
 };
 
+static void
+tda19988_encoder_mode_set(struct drm_encoder *encoder,
+    struct drm_display_mode *mode,
+    struct drm_display_mode *adj_mode)
+{
+	struct tda19988_softc *sc;
+
+	sc = container_of(encoder, struct tda19988_softc, encoder);
+}
+
+static const struct drm_encoder_helper_funcs
+    tda19988_encoder_helper_funcs = {
+	.mode_set = tda19988_encoder_mode_set,
+};
+
+static const struct drm_encoder_funcs tda19988_encoder_funcs = {
+	.destroy = drm_encoder_cleanup,
+};
+
 static int
-tda19988_add_bridge(device_t dev, struct drm_encoder *encoder,
+tda19988_add_encoder(device_t dev, struct drm_crtc *crtc,
     struct drm_device *drm)
 {
 	struct tda19988_softc *sc;
 
 	sc = device_get_softc(dev);
 
-	device_printf(sc->dev, "%s\n", __func__);
+	drm_encoder_helper_add(&sc->encoder,
+	    &tda19988_encoder_helper_funcs);
+	sc->encoder.possible_crtcs = drm_crtc_mask(crtc);
+	drm_encoder_init(drm, &sc->encoder, &tda19988_encoder_funcs,
+	    DRM_MODE_ENCODER_TMDS, NULL);
 
-	sc->encoder = *encoder;
 	sc->bridge.funcs = &tda19988_bridge_funcs;
 	drm_bridge_attach(&sc->encoder, &sc->bridge, NULL);
 
@@ -944,7 +969,7 @@ static device_method_t tda_methods[] = {
 	DEVMETHOD(device_attach,		tda19988_attach),
 	DEVMETHOD(device_detach,		tda19988_detach),
 
-	DEVMETHOD(drm_bridge_add_bridge,	tda19988_add_bridge),
+	DEVMETHOD(tda19988_add_encoder,		tda19988_add_encoder),
 
 	{0, 0},
 };
