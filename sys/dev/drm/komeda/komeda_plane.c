@@ -74,12 +74,10 @@ __FBSDID("$FreeBSD$");
 #include <dev/drm/komeda/komeda_plane.h>
 #include <dev/drm/komeda/komeda_pipeline.h>
 #include <dev/drm/komeda/komeda_drv.h>
+#include <dev/drm/komeda/komeda_regs.h>
 
 //#include "komeda_if.h"
 //#include "dw_hdmi_if.h"
-
-#define	VOP_READ(sc, reg)	bus_read_4((sc)->res[0], (reg))
-#define	VOP_WRITE(sc, reg, val)	bus_write_4((sc)->res[0], (reg), (val))
 
 #define	dprintf(fmt, ...)
 
@@ -188,14 +186,17 @@ static void
 komeda_plane_atomic_update(struct drm_plane *plane,
     struct drm_plane_state *old_state)
 {
+	struct komeda_drm_softc *sc;
 	uint32_t src_w, src_h, dst_w, dst_h;
 	struct komeda_plane *komeda_plane;
+	struct drm_gem_cma_object *bo;
 	struct drm_plane_state *state;
 	struct drm_rect *src, *dst;
 	struct drm_crtc *crtc;
 	struct drm_fb_cma *fb;
-	int rgb_mode;
-	int i;
+	dma_addr_t paddr;
+	int fmt;
+	int i, id;
 
 	printf("%s\n", __func__);
 
@@ -212,20 +213,37 @@ komeda_plane_atomic_update(struct drm_plane *plane,
 	komeda_plane = container_of(plane, struct komeda_plane, plane);
 	fb = container_of(plane->state->fb, struct drm_fb_cma, drm_fb);
 
+	sc = komeda_plane->sc;
+	id = komeda_plane->id;
+
 	for (i = 0; i < nitems(komeda_plane_formats); i++)
 		if (komeda_plane_formats[i] == state->fb->format->format)
 			break;
 
-	rgb_mode = komeda_convert_format(komeda_plane_formats[i]);
-	printf("%s: fmt %d\n", __func__, rgb_mode);
+	fmt = komeda_convert_format(komeda_plane_formats[i]);
+	printf("%s: fmt %d\n", __func__, fmt);
 
-	if (state->fb->format->has_alpha && komeda_plane->id > 0)
+	if (state->fb->format->has_alpha && id > 0)
 		printf("%s: cursor plane\n", __func__);
 
+	bo = drm_fb_cma_get_gem_obj(fb, 0);
+	paddr = bo->pbase + fb->drm_fb.offsets[0];
+	paddr += (state->src.x1 >> 16) * fb->drm_fb.format->cpp[0];
+	paddr += (state->src.y1 >> 16) * fb->drm_fb.pitches[0];
+
+	printf("%s: pbase %lx, paddr %lx\n", __func__, bo->pbase, paddr);
+
+	const struct drm_format_info *info;
+	int block_h;
+
+	info = fb->drm_fb.format;
+	block_h = drm_format_info_block_height(info, 0);
+
+	DPU_WR4(sc, LR_P0_STRIDE, fb->drm_fb.pitches[0] * block_h);
+	DPU_WR8(sc, LR_P0_PTR_LOW, paddr);
+	DPU_WR4(sc, LR_FORMAT, fmt);
+
 #if 0
-	struct komeda_drm_softc *sc;
-	struct drm_gem_cma_object *bo;
-	dma_addr_t paddr;
 	uint32_t reg;
 	uint32_t dsp_stx, dsp_sty;
 	int lb_mode;
@@ -361,6 +379,9 @@ komeda_plane_create(struct komeda_pipeline *pipeline, struct drm_device *drm)
 		else
 			type = DRM_PLANE_TYPE_CURSOR;
 
+		pipeline->planes[i].sc = sc;
+		pipeline->planes[i].id = i;
+
 		error = drm_universal_plane_init(drm,
 		    &pipeline->planes[i].plane,
 		    0,
@@ -374,9 +395,6 @@ komeda_plane_create(struct komeda_pipeline *pipeline, struct drm_device *drm)
 		}
 		drm_plane_helper_add(&pipeline->planes[i].plane,
 		    &komeda_plane_helper_funcs);
-
-		pipeline->planes[i].sc = sc;
-		pipeline->planes[i].id = i;
 	}
 
 	return (0);

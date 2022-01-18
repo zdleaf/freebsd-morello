@@ -300,6 +300,7 @@ komeda_pipeline_create_pipeline(struct komeda_drm_softc *sc, phandle_t node,
 	printf("%s\n", __func__);
 
 	pipeline->node = node;
+	pipeline->sc = sc;
 	komeda_plane_create(pipeline, drm);
 
 	error = drm_crtc_init_with_planes(drm, &pipeline->crtc,
