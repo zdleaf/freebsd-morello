@@ -44,6 +44,9 @@
 #define	GCU_IRQ_STATUS		0x00AC
 #define	GCU_STATUS		0x00B0
 #define	GCU_CONTROL		0x00D0
+#define	 CONTROL_MODE_S			0
+#define	 CONTROL_MODE_M			(0x7 << CONTROL_MODE_S)
+#define	 CONTROL_MODE_DO0_ACTIVE	(0x3 << CONTROL_MODE_S)
 #define	GCU_CONFIG_VALID0	0x00D4
 #define	GCU_CONFIGURATION_ID0	0x0100
 #define	 CONFIG_ID0_MAX_LINE_SIZE_S	0
@@ -110,7 +113,14 @@ enum d71_block_type {
 #define	BLOCK_INFO_BLOCK_TYPE(reg)	\
 	((reg & BLOCK_INFO_BLOCK_TYPE_M) >> BLOCK_INFO_BLOCK_TYPE_S)
 
+#define	LR_CONTROL		0x04D0
+#define	 CONTROL_EN		(1 << 0)	/* Layer enable */
 #define	LR_FORMAT		0x04D8
+#define	LR_IN_SIZE		0x04E0
+#define	 IN_SIZE_HSIZE_S	0
+#define	 IN_SIZE_HSIZE_M	(0xfff << IN_SIZE_HSIZE_S)
+#define	 IN_SIZE_VSIZE_S	16
+#define	 IN_SIZE_VSIZE_M	(0xfff << IN_SIZE_VSIZE_S)
 #define	LR_P0_PTR_LOW		0x0500
 #define	LR_P0_PTR_HIGH		0x0504
 #define	LR_P0_STRIDE		0x0508

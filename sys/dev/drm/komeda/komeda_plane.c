@@ -243,6 +243,19 @@ komeda_plane_atomic_update(struct drm_plane *plane,
 	DPU_WR8(sc, LR_P0_PTR_LOW, paddr);
 	DPU_WR4(sc, LR_FORMAT, fmt);
 
+	struct drm_display_mode *m;
+	uint32_t reg;
+
+	m = &crtc->state->adjusted_mode;
+	printf("%s: adj mode hdisplay %d vdisplay %d\n", __func__,
+	    m->hdisplay, m->vdisplay);
+
+	reg = m->hdisplay << IN_SIZE_HSIZE_S | m->vdisplay << IN_SIZE_VSIZE_S;
+	DPU_WR4(sc, LR_IN_SIZE, reg);
+	DPU_WR4(sc, LR_CONTROL, CONTROL_EN);
+
+	DPU_WR4(sc, GCU_CONTROL, CONTROL_MODE_DO0_ACTIVE);
+
 #if 0
 	uint32_t reg;
 	uint32_t dsp_stx, dsp_sty;
