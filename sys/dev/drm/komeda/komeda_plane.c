@@ -183,6 +183,62 @@ komeda_plane_atomic_disable(struct drm_plane *plane,
 }
 
 static void
+komeda_timing_setup(struct komeda_drm_softc *sc, struct drm_plane *plane)
+{
+	uint32_t hactive, hfront_porch, hback_porch, hsync_len;
+	uint32_t vactive, vfront_porch, vback_porch, vsync_len;
+	struct drm_plane_state *state;
+	struct drm_display_mode *m;
+	struct drm_crtc *crtc;
+	uint32_t reg;
+
+	state = plane->state;
+	crtc = state->crtc;
+
+	m = &crtc->state->adjusted_mode;
+
+	hactive = m->crtc_hdisplay;
+	hfront_porch = m->crtc_hsync_start - m->crtc_hdisplay;
+	hsync_len = m->crtc_hsync_end - m->crtc_hsync_start;
+	hback_porch = m->crtc_htotal - m->crtc_hsync_end;
+
+	vactive = m->crtc_vdisplay;
+	vfront_porch = m->crtc_vsync_start - m->crtc_vdisplay;
+	vsync_len = m->crtc_vsync_end - m->crtc_vsync_start;
+	vback_porch = m->crtc_vtotal - m->crtc_vsync_end;
+
+	reg = hactive << ACTIVESIZE_HACTIVE_S;
+	reg |= vactive << ACTIVESIZE_VACTIVE_S;
+	DPU_WR4(sc, BS_ACTIVESIZE, reg);
+
+	reg = hfront_porch << HINTERVALS_HFRONTPORCH_S;
+	reg |= hback_porch << HINTERVALS_HBACKPORCH_S;
+	DPU_WR4(sc, BS_HINTERVALS, reg);
+
+	reg = vfront_porch << VINTERVALS_VFRONTPORCH_S;
+	reg |= vback_porch << VINTERVALS_VBACKPORCH_S;
+	DPU_WR4(sc, BS_VINTERVALS, reg);
+
+	reg = vsync_len << SYNC_VSYNCWIDTH_S;
+	reg |= hsync_len << SYNC_HSYNCWIDTH_S;
+	reg |= m->flags & DRM_MODE_FLAG_PVSYNC ? SYNC_VSP : 0;
+	reg |= m->flags & DRM_MODE_FLAG_PHSYNC ? SYNC_HSP : 0;
+	DPU_WR4(sc, BS_SYNC, reg);
+
+	DPU_WR4(sc, BS_PROG_LINE, D71_DEFAULT_PREPRETCH_LINE - 1);
+	DPU_WR4(sc, BS_PREFETCH_LINE, D71_DEFAULT_PREPRETCH_LINE);
+
+	reg = BS_CONTROL_EN | BS_CONTROL_VM;
+#if 0
+	if (c->pipeline->dual_link) {
+		DPU_WR4(sc, BS_DRIFT_TO, hfront_porch + 16);
+		reg |= BS_CONTROL_DL;
+	}
+#endif
+	DPU_WR4(sc, BS_CONTROL, reg);
+}
+
+static void
 komeda_plane_atomic_update(struct drm_plane *plane,
     struct drm_plane_state *old_state)
 {
@@ -255,6 +311,8 @@ komeda_plane_atomic_update(struct drm_plane *plane,
 	DPU_WR4(sc, LR_CONTROL, CONTROL_EN);
 
 	DPU_WR4(sc, GCU_CONTROL, CONTROL_MODE_DO0_ACTIVE);
+
+	komeda_timing_setup(sc, plane);
 
 #if 0
 	uint32_t reg;

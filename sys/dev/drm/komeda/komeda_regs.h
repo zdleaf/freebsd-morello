@@ -61,13 +61,27 @@
 
 /* DOU0 Backend Subsystem. */
 #define	BS_INFO			0x1EC0
+#define	BS_CONTROL		0x1ED0
+#define	 BS_CONTROL_DL		(1 << 16) /* Dual link (1:2 display split) */
+#define	 BS_CONTROL_VM		(1 << 1) /* Video Mode enable */
+#define	 BS_CONTROL_EN		(1 << 0) /* Display backend timing enable */
 #define	BS_PROG_LINE		0x1ED4
 #define	BS_PREFETCH_LINE	0x1ED8
 #define	BS_BG_COLOR		0x1EDC
 #define	BS_ACTIVESIZE		0x1EE0
+#define	 ACTIVESIZE_VACTIVE_S	16
+#define	 ACTIVESIZE_HACTIVE_S	0
 #define	BS_HINTERVALS		0x1EE4
+#define	 HINTERVALS_HBACKPORCH_S	16
+#define	 HINTERVALS_HFRONTPORCH_S	0
 #define	BS_VINTERVALS		0x1EE8
+#define	 VINTERVALS_VBACKPORCH_S	16
+#define	 VINTERVALS_VFRONTPORCH_S	0
 #define	BS_SYNC			0x1EEC
+#define	 SYNC_VSYNCWIDTH_S	16
+#define	 SYNC_HSYNCWIDTH_S	0
+#define	 SYNC_HSP		(1 << 12)
+#define	 SYNC_VSP		(1 << 28)
 #define	BS_DRIFT_TO		0x1F00
 #define	BS_FRAME_TO		0x1F04
 #define	BS_TE_TO		0x1F08
@@ -124,5 +138,7 @@ enum d71_block_type {
 #define	LR_P0_PTR_LOW		0x0500
 #define	LR_P0_PTR_HIGH		0x0504
 #define	LR_P0_STRIDE		0x0508
+
+#define	D71_DEFAULT_PREPRETCH_LINE	5
 
 #endif /* !_DEV_DRM_KOMEDA_KOMEDA_REGS_H_ */
