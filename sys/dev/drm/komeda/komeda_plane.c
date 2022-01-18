@@ -310,9 +310,24 @@ komeda_plane_atomic_update(struct drm_plane *plane,
 	DPU_WR4(sc, LR_IN_SIZE, reg);
 	DPU_WR4(sc, LR_CONTROL, CONTROL_EN);
 
+	komeda_timing_setup(sc, plane);
+
 	DPU_WR4(sc, GCU_CONTROL, CONTROL_MODE_DO0_ACTIVE);
 
-	komeda_timing_setup(sc, plane);
+	int timeout;
+
+	timeout = 10000;
+
+	do {
+		reg = DPU_RD4(sc, GCU_CONTROL);
+		if ((reg & CONTROL_MODE_M) == CONTROL_MODE_DO0_ACTIVE)
+			break;
+	} while (timeout--);
+
+	if (timeout <= 0)
+		printf("%s: Failed to set DO0 active\n", __func__);
+	else
+		printf("%s: plane initialized\n", __func__);
 
 #if 0
 	uint32_t reg;
