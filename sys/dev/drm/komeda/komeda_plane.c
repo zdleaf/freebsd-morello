@@ -84,48 +84,74 @@ __FBSDID("$FreeBSD$");
 #define	dprintf(fmt, ...)
 
 static const u32 komeda_plane_formats[] = {
-	DRM_FORMAT_XRGB8888,
+	DRM_FORMAT_ARGB2101010,
+	DRM_FORMAT_ABGR2101010,
+	DRM_FORMAT_RGBA1010102,
+	DRM_FORMAT_BGRA1010102,
 	DRM_FORMAT_ARGB8888,
-	DRM_FORMAT_XBGR8888,
 	DRM_FORMAT_ABGR8888,
+	DRM_FORMAT_RGBA8888,
+	DRM_FORMAT_BGRA8888,
+	DRM_FORMAT_XRGB8888,
+	DRM_FORMAT_XBGR8888,
+	DRM_FORMAT_RGBX8888,
+	DRM_FORMAT_BGRX8888,
 	DRM_FORMAT_RGB888,
 	DRM_FORMAT_BGR888,
+	/* Except last (WB) layer. */
+	DRM_FORMAT_RGBA5551,
+	DRM_FORMAT_ABGR1555,
 	DRM_FORMAT_RGB565,
 	DRM_FORMAT_BGR565,
-	DRM_FORMAT_NV12,
-	DRM_FORMAT_NV16,
-	DRM_FORMAT_NV24,
 };
 
-#if 0
-static enum komeda_data_format
-vop_convert_format(uint32_t format)
+static uint32_t
+komeda_convert_format(uint32_t format)
 {
 
 	switch (format) {
-	case DRM_FORMAT_XRGB8888:
+	case DRM_FORMAT_ARGB2101010:
+		return (0);
+	case DRM_FORMAT_ABGR2101010:
+		return (1);
+	case DRM_FORMAT_RGBA1010102:
+		return (2);
+	case DRM_FORMAT_BGRA1010102:
+		return (3);
 	case DRM_FORMAT_ARGB8888:
-	case DRM_FORMAT_XBGR8888:
+		return (8);
 	case DRM_FORMAT_ABGR8888:
-		return VOP_FMT_ARGB8888;
+		return (9);
+	case DRM_FORMAT_RGBA8888:
+		return (10);
+	case DRM_FORMAT_BGRA8888:
+		return (11);
+	case DRM_FORMAT_XRGB8888:
+		return (16);
+	case DRM_FORMAT_XBGR8888:
+		return (17);
+	case DRM_FORMAT_RGBX8888:
+		return (18);
+	case DRM_FORMAT_BGRX8888:
+		return (19);
 	case DRM_FORMAT_RGB888:
+		return (24);
 	case DRM_FORMAT_BGR888:
-		return VOP_FMT_RGB888;
+		return (25);
+	case DRM_FORMAT_RGBA5551:
+		return (32);
+	case DRM_FORMAT_ABGR1555:
+		return (33);
 	case DRM_FORMAT_RGB565:
+		return (34);
 	case DRM_FORMAT_BGR565:
-		return VOP_FMT_RGB565;
-	case DRM_FORMAT_NV12:
-		return VOP_FMT_YUV420SP;
-	case DRM_FORMAT_NV16:
-		return VOP_FMT_YUV422SP;
-	case DRM_FORMAT_NV24:
-		return VOP_FMT_YUV444SP;
+		return (35);
 	default:
 		return (-1);
 	}
+
 	return (-1);
 }
-#endif
 
 static int
 komeda_plane_atomic_check(struct drm_plane *plane,
@@ -162,43 +188,54 @@ static void
 komeda_plane_atomic_update(struct drm_plane *plane,
     struct drm_plane_state *old_state)
 {
+	uint32_t src_w, src_h, dst_w, dst_h;
+	struct komeda_plane *komeda_plane;
+	struct drm_plane_state *state;
+	struct drm_rect *src, *dst;
+	struct drm_crtc *crtc;
+	struct drm_fb_cma *fb;
+	int rgb_mode;
+	int i;
 
 	printf("%s\n", __func__);
-
-#if 0
-	struct drm_plane_state *state;
-	struct komeda_plane *vop_plane;
-	struct komeda_drm_softc *sc;
-	struct drm_gem_cma_object *bo;
-	struct drm_fb_cma *fb;
-	uint32_t src_w, src_h, dst_w, dst_h;
-	dma_addr_t paddr;
-	uint32_t reg;
-	struct drm_crtc *crtc;
-	struct drm_rect *src;
-	struct drm_rect *dst;
-	uint32_t dsp_stx, dsp_sty;
-	int rgb_mode;
-	int lb_mode;
-	int id;
-	int i;
 
 	state = plane->state;
 	dst = &state->dst;
 	src = &state->src;
 	crtc = state->crtc;
-	vop_plane = container_of(plane, struct komeda_plane, plane);
-	fb = container_of(plane->state->fb, struct drm_fb_cma, drm_fb);
-
-	sc = vop_plane->sc;
-	id = vop_plane->id;
-
-	dprintf("%s: id %d\n", __func__, vop_plane->id);
 
 	src_w = drm_rect_width(&state->src) >> 16;
 	src_h = drm_rect_height(&state->src) >> 16;
 	dst_w = drm_rect_width(&state->dst);
 	dst_h = drm_rect_height(&state->dst);
+
+	komeda_plane = container_of(plane, struct komeda_plane, plane);
+	fb = container_of(plane->state->fb, struct drm_fb_cma, drm_fb);
+
+	for (i = 0; i < nitems(komeda_plane_formats); i++)
+		if (komeda_plane_formats[i] == state->fb->format->format)
+			break;
+
+	rgb_mode = komeda_convert_format(komeda_plane_formats[i]);
+	printf("%s: fmt %d\n", __func__, rgb_mode);
+
+	if (state->fb->format->has_alpha && komeda_plane->id > 0)
+		printf("%s: cursor plane\n", __func__);
+
+#if 0
+	struct komeda_drm_softc *sc;
+	struct drm_gem_cma_object *bo;
+	dma_addr_t paddr;
+	uint32_t reg;
+	uint32_t dsp_stx, dsp_sty;
+	int lb_mode;
+	int id;
+	int i;
+
+	sc = vop_plane->sc;
+	id = vop_plane->id;
+
+	dprintf("%s: id %d\n", __func__, vop_plane->id);
 
 	dprintf("%s: src w %d h %d, dst w %d h %d\n",
 	    __func__, src_w, src_h, dst_w, dst_h);
@@ -227,13 +264,6 @@ komeda_plane_atomic_update(struct drm_plane *plane,
 		VOP_WRITE(sc, RK3399_WIN0_DSP_INFO, reg);
 	else
 		VOP_WRITE(sc, RK3399_WIN2_DSP_INFO0, reg);
-
-	for (i = 0; i < nitems(komeda_plane_formats); i++)
-		if (komeda_plane_formats[i] == state->fb->format->format)
-			break;
-
-	rgb_mode = vop_convert_format(komeda_plane_formats[i]);
-	dprintf("fmt %d\n", rgb_mode);
 
 	if (dst_w <= 1280)
 		lb_mode = LB_RGB_1280X8;
