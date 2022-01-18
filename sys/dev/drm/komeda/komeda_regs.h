@@ -110,4 +110,9 @@ enum d71_block_type {
 #define	BLOCK_INFO_BLOCK_TYPE(reg)	\
 	((reg & BLOCK_INFO_BLOCK_TYPE_M) >> BLOCK_INFO_BLOCK_TYPE_S)
 
+#define	LR_FORMAT		0x04D8
+#define	LR_P0_PTR_LOW		0x0500
+#define	LR_P0_PTR_HIGH		0x0504
+#define	LR_P0_STRIDE		0x0508
+
 #endif /* !_DEV_DRM_KOMEDA_KOMEDA_REGS_H_ */
