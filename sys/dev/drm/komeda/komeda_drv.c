@@ -395,17 +395,17 @@ komeda_drm_attach(device_t dev)
 		return (ENXIO);
 	}
 
-	reg = DPU_READ(sc, GLB_ARCH_ID);
+	reg = DPU_RD4(sc, GLB_ARCH_ID);
 	device_printf(dev, "Mali arch_id reg %x\n", reg);
 
-	reg = DPU_READ(sc, GLB_CORE_ID);
+	reg = DPU_RD4(sc, GLB_CORE_ID);
 	device_printf(dev, "ARM Mali D%3x r%dp%d detected\n",
 	    reg >> 16, (reg >> 12) & 0xf, (reg >> 8) & 0xf);
 
 	int num_pipelines;
 	int num_blocks;
 
-	reg = DPU_READ(sc, GLB_CORE_INFO);
+	reg = DPU_RD4(sc, GLB_CORE_INFO);
 	num_blocks = reg & 0xff;
 	num_pipelines = (reg >> 8) & 0x7;
 
@@ -419,19 +419,19 @@ komeda_drm_attach(device_t dev)
 		return (ENXIO);
 	}
 
-	reg = DPU_READ(sc, PERIPH_BLOCK_INFO);
+	reg = DPU_RD4(sc, PERIPH_BLOCK_INFO);
 	if (BLOCK_INFO_BLOCK_TYPE(reg) == D71_BLK_TYPE_PERIPH) {
 		device_printf(dev, "Legacy HW detected. Add support.\n");
 		return (ENXIO);
 	}
 
-	reg = DPU_READ(sc, GCU_CONFIGURATION_ID0);
+	reg = DPU_RD4(sc, GCU_CONFIGURATION_ID0);
 	sc->max_line_size = (reg & CONFIG_ID0_MAX_LINE_SIZE_M) >> \
 				CONFIG_ID0_MAX_LINE_SIZE_S;
 	sc->max_num_lines = (reg & CONFIG_ID0_MAX_NUM_LINES_M) >> \
 				CONFIG_ID0_MAX_NUM_LINES_S;
 
-	reg = DPU_READ(sc, GCU_CONFIGURATION_ID1);
+	reg = DPU_RD4(sc, GCU_CONFIGURATION_ID1);
 	sc->num_rich_layers = (reg & CONFIG_ID1_NUM_RICH_LAYERS_M) >> \
 				CONFIG_ID1_NUM_RICH_LAYERS_S;
 	sc->dual_link_supp = reg & CONFIG_ID1_DISPLAY_SPLIT_EN ? 1 : 0;

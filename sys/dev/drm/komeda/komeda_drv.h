@@ -61,7 +61,10 @@ struct komeda_drm_softc {
 #define	dprintf(fmt, ...)
 #endif
 
-#define	DPU_READ(sc, reg)	bus_read_4((sc)->res[0], (reg))
-#define	DPU_WRITE(sc, reg, val)	bus_write_4((sc)->res[0], (reg), (val))
+#define	DPU_RD4(sc, reg)	bus_read_4((sc)->res[0], (reg))
+#define	DPU_WR4(sc, reg, val)	bus_write_4((sc)->res[0], (reg), (val))
+
+#define	DPU_RD8(sc, reg)	bus_read_8((sc)->res[0], (reg))
+#define	DPU_WR8(sc, reg, val)	bus_write_8((sc)->res[0], (reg), (val))
 
 #endif /* !_DEV_DRM_KOMEDA_KOMEDA_DRV_H_ */
