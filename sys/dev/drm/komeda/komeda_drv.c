@@ -371,7 +371,7 @@ komeda_intr(void *arg)
 		lpu_intr(sc);
 
 	if (reg & GLB_IRQ_CU0)
-		printf("CU0 intr\n");
+		cu_intr(sc);
 
 	if (reg & GLB_IRQ_DOU0)
 		dou_intr(sc);

@@ -48,5 +48,6 @@ int komeda_plane_create(struct komeda_pipeline *pipeline,
 void gcu_intr(struct komeda_drm_softc *sc);
 void dou_intr(struct komeda_drm_softc *sc);
 void lpu_intr(struct komeda_drm_softc *sc);
+void cu_intr(struct komeda_drm_softc *sc);
 
 #endif /* !_DEV_DRM_KOMEDA_KOMEDA_PLANE_H_ */

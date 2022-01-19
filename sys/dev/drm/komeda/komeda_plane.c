@@ -271,6 +271,18 @@ gcu_intr(struct komeda_drm_softc *sc)
 }
 
 void
+cu_intr(struct komeda_drm_softc *sc)
+{
+	uint32_t reg;
+
+	reg = DPU_RD4(sc, CU0_CU_IRQ_STATUS);
+
+	printf("%s: reg %x\n", __func__, reg);
+
+	DPU_WR4(sc, CU0_CU_IRQ_CLEAR, reg);
+}
+
+void
 lpu_intr(struct komeda_drm_softc *sc)
 {
 	uint32_t reg;
@@ -321,10 +333,7 @@ dou_configure(struct komeda_drm_softc *sc, struct drm_fb_cma *fb,
 	reg = (m->hdisplay << 0) * 1;
 	reg |= (m->vdisplay << 16) * 1;
 	DPU_WR4(sc, DOU0_IPS_SIZE, reg);
-
-	DPU_WR4(sc, DOU0_IPS_DEPTH, fb->drm_fb.format->depth);
-printf("depth is %d\n", fb->drm_fb.format->depth);
-
+	DPU_WR4(sc, DOU0_IPS_DEPTH, 10); /* YUV */
 	DPU_WR4(sc, DOU0_IPS_CONTROL, 0);
 }
 
