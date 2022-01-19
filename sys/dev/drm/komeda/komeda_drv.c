@@ -361,9 +361,8 @@ komeda_intr(void *arg)
 
 	sc = arg;
 
-	printf("%s: glb irq status %x\n", __func__, reg);
-
 	reg = DPU_RD4(sc, GLB_IRQ_STATUS);
+	printf("%s: glb irq status %x\n", __func__, reg);
 
 	if (reg & GLB_IRQ_GCU)
 		gcu_intr(sc);
