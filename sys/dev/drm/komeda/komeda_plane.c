@@ -310,9 +310,25 @@ komeda_plane_atomic_update(struct drm_plane *plane,
 	DPU_WR4(sc, LR_IN_SIZE, reg);
 	DPU_WR4(sc, LR_CONTROL, CONTROL_EN);
 
+	printf("%s: LPU layer 0 block info %x\n", __func__,
+	    DPU_RD4(sc, LPU0_LAYER0_BLOCK_INFO));
+	printf("%s: LPU layer 0 output id 0 %x\n", __func__,
+	    DPU_RD4(sc, LPU0_LAYER0_OUTPUT_ID0));
+
 	komeda_timing_setup(sc, plane);
 
 	DPU_WR4(sc, GCU_CONTROL, CONTROL_MODE_DO0_ACTIVE);
+
+	/* Layer 0 outputs to CU 0 */
+	reg = DPU_RD4(sc, LPU0_LAYER0_OUTPUT_ID0);
+	DPU_WR4(sc, CU0_CU_INPUT_ID0, reg);
+
+	reg = m->hdisplay << 0 | m->vdisplay << 16;
+	DPU_WR4(sc, CU0_INPUT0_SIZE, reg);
+	DPU_WR4(sc, CU0_CU_SIZE, reg);
+
+	/* Enable CU */
+	DPU_WR4(sc, CU0_CU_CONTROL, CU_CONTROL_COPR);
 
 	int timeout;
 
@@ -328,6 +344,9 @@ komeda_plane_atomic_update(struct drm_plane *plane,
 		printf("%s: Failed to set DO0 active\n", __func__);
 	else
 		printf("%s: plane initialized\n", __func__);
+
+	/* Flush */
+	DPU_WR4(sc, GCU_CONFIG_VALID0, CONFIG_VALID0_CVAL);
 
 #if 0
 	uint32_t reg;

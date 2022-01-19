@@ -48,6 +48,7 @@
 #define	 CONTROL_MODE_M			(0x7 << CONTROL_MODE_S)
 #define	 CONTROL_MODE_DO0_ACTIVE	(0x3 << CONTROL_MODE_S)
 #define	GCU_CONFIG_VALID0	0x00D4
+#define	 CONFIG_VALID0_CVAL	(1 << 0)
 #define	GCU_CONFIGURATION_ID0	0x0100
 #define	 CONFIG_ID0_MAX_LINE_SIZE_S	0
 #define	 CONFIG_ID0_MAX_LINE_SIZE_M	(0xffff << CONFIG_ID0_MAX_LINE_SIZE_S)
@@ -126,7 +127,11 @@ enum d71_block_type {
 #define	BLOCK_INFO_BLOCK_TYPE_M		(0xff << BLOCK_INFO_BLOCK_TYPE_S)
 #define	BLOCK_INFO_BLOCK_TYPE(reg)	\
 	((reg & BLOCK_INFO_BLOCK_TYPE_M) >> BLOCK_INFO_BLOCK_TYPE_S)
+#define	BLOCK_INFO_BLOCK_ID_S		4
+#define	BLOCK_INFO_BLOCK_ID_M		(0xf << BLOCK_INFO_BLOCK_ID_S)
 
+#define	LPU0_LAYER0_BLOCK_INFO	0x0400
+#define	LPU0_LAYER0_OUTPUT_ID0	0x0460
 #define	LR_CONTROL		0x04D0
 #define	 CONTROL_EN		(1 << 0)	/* Layer enable */
 #define	LR_FORMAT		0x04D8
@@ -138,6 +143,16 @@ enum d71_block_type {
 #define	LR_P0_PTR_LOW		0x0500
 #define	LR_P0_PTR_HIGH		0x0504
 #define	LR_P0_STRIDE		0x0508
+
+#define	CU0_BLOCK_INFO		0x0E00
+#define	CU0_CU_INPUT_ID0	0x0E80
+#define	CU0_CU_STATUS		0x0EB0
+#define	CU0_CU_CONTROL		0x0ED0
+#define	 CU_CONTROL_COPR	(1 << 0) /* Coprocessor interface enable */
+#define	CU0_CU_SIZE		0x0ED4
+#define	CU0_INPUT0_SIZE		0x0EE0
+#define	CU0_INPUT0_OFFSET	0x0EE4
+#define	CU0_INPUT0_CONTROL	0x0EE8
 
 #define	D71_DEFAULT_PREPRETCH_LINE	5
 
