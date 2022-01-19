@@ -3,6 +3,7 @@ if [ "$1" = "fast" ]; then
     A=FAST
 fi
 
+export MK_CTF=no
 # make -j6 TARGET=arm64 NO_ROOT=1 DESTDIR=/home/br/world-arm64 installworld
 
 # make -j6 TARGET=arm64 KERNCONF=MORELLO kernel-toolchain
