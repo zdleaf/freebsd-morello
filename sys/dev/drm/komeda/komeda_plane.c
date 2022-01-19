@@ -229,6 +229,7 @@ komeda_timing_setup(struct komeda_drm_softc *sc, struct drm_plane *plane)
 	DPU_WR4(sc, BS_PREFETCH_LINE, D71_DEFAULT_PREPRETCH_LINE);
 
 	reg = BS_CONTROL_EN | BS_CONTROL_VM;
+	//reg |= BS_CONTROL_TM;	/* Test Mode */
 #if 0
 	if (c->pipeline->dual_link) {
 		DPU_WR4(sc, BS_DRIFT_TO, hfront_porch + 16);
@@ -290,50 +291,57 @@ komeda_plane_atomic_update(struct drm_plane *plane,
 	printf("%s: pbase %lx, paddr %lx\n", __func__, bo->pbase, paddr);
 
 	const struct drm_format_info *info;
+	struct drm_display_mode *m;
+	int timeout;
+	uint32_t reg;
 	int block_h;
 
 	info = fb->drm_fb.format;
 	block_h = drm_format_info_block_height(info, 0);
-
-	DPU_WR4(sc, LR_P0_STRIDE, fb->drm_fb.pitches[0] * block_h);
-	DPU_WR8(sc, LR_P0_PTR_LOW, paddr);
-	DPU_WR4(sc, LR_FORMAT, fmt);
-
-	struct drm_display_mode *m;
-	uint32_t reg;
-
 	m = &crtc->state->adjusted_mode;
 	printf("%s: adj mode hdisplay %d vdisplay %d\n", __func__,
 	    m->hdisplay, m->vdisplay);
 
+	/*
+	 * LPU configuration. Setup layer 0.
+	 */
+	DPU_WR4(sc, LR_P0_STRIDE, fb->drm_fb.pitches[0] * block_h);
+	DPU_WR8(sc, LR_P0_PTR_LOW, paddr);
+	DPU_WR4(sc, LR_FORMAT, fmt);
 	reg = m->hdisplay << IN_SIZE_HSIZE_S | m->vdisplay << IN_SIZE_VSIZE_S;
 	DPU_WR4(sc, LR_IN_SIZE, reg);
 	DPU_WR4(sc, LR_CONTROL, CONTROL_EN);
 
-	printf("%s: LPU layer 0 block info %x\n", __func__,
-	    DPU_RD4(sc, LPU0_LAYER0_BLOCK_INFO));
-	printf("%s: LPU layer 0 output id 0 %x\n", __func__,
-	    DPU_RD4(sc, LPU0_LAYER0_OUTPUT_ID0));
+	/*
+	 * DOU configuration. DOU0 IPS inputs from CU0
+	 */
+	reg = DPU_RD4(sc, CU0_OUTPUT_ID0);
+	DPU_WR4(sc, DOU0_IPS_INPUT_ID0, reg);
+	reg = m->hdisplay << 0 | m->vdisplay << 16;
+	DPU_WR4(sc, DOU0_IPS_SIZE, reg);
+	DPU_WR4(sc, DOU0_IPS_DEPTH, fb->drm_fb.format->depth);
+printf("depth is %d\n", fb->drm_fb.format->depth);
+	DPU_WR4(sc, DOU0_IPS_CONTROL, IPS_CONTROL_YUV);
+
+	/*
+	 * CU configuration. CU0 inputs from layer 0.
+	 */
+	reg = DPU_RD4(sc, LPU0_LAYER0_OUTPUT_ID0);
+	DPU_WR4(sc, CU0_CU_INPUT_ID0, reg);
+	reg = m->hdisplay << 0 | m->vdisplay << 16;
+	DPU_WR4(sc, CU0_INPUT0_SIZE, reg);
+	DPU_WR4(sc, CU0_INPUT0_OFFSET, 0);
+	DPU_WR4(sc, CU0_INPUT0_CONTROL, INPUT0_CONTROL_EN);	/* Layer EN */
+	//DPU_WR4(sc, CU0_CU_SIZE, reg);
+	//DPU_WR4(sc, CU0_CU_CONTROL, CU_CONTROL_COPR); /* Enable CU */
 
 	komeda_timing_setup(sc, plane);
 
+	/* Flush */
+	DPU_WR4(sc, GCU_CONFIG_VALID0, CONFIG_VALID0_CVAL);
 	DPU_WR4(sc, GCU_CONTROL, CONTROL_MODE_DO0_ACTIVE);
 
-	/* Layer 0 outputs to CU 0 */
-	reg = DPU_RD4(sc, LPU0_LAYER0_OUTPUT_ID0);
-	DPU_WR4(sc, CU0_CU_INPUT_ID0, reg);
-
-	reg = m->hdisplay << 0 | m->vdisplay << 16;
-	DPU_WR4(sc, CU0_INPUT0_SIZE, reg);
-	DPU_WR4(sc, CU0_CU_SIZE, reg);
-
-	/* Enable CU */
-	DPU_WR4(sc, CU0_CU_CONTROL, CU_CONTROL_COPR);
-
-	int timeout;
-
 	timeout = 10000;
-
 	do {
 		reg = DPU_RD4(sc, GCU_CONTROL);
 		if ((reg & CONTROL_MODE_M) == CONTROL_MODE_DO0_ACTIVE)
@@ -344,9 +352,6 @@ komeda_plane_atomic_update(struct drm_plane *plane,
 		printf("%s: Failed to set DO0 active\n", __func__);
 	else
 		printf("%s: plane initialized\n", __func__);
-
-	/* Flush */
-	DPU_WR4(sc, GCU_CONFIG_VALID0, CONFIG_VALID0_CVAL);
 
 #if 0
 	uint32_t reg;

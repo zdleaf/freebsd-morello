@@ -64,6 +64,7 @@
 #define	BS_INFO			0x1EC0
 #define	BS_CONTROL		0x1ED0
 #define	 BS_CONTROL_DL		(1 << 16) /* Dual link (1:2 display split) */
+#define	 BS_CONTROL_TM		(1 << 12) /* Test mode (color bars) enable */
 #define	 BS_CONTROL_VM		(1 << 1) /* Video Mode enable */
 #define	 BS_CONTROL_EN		(1 << 0) /* Display backend timing enable */
 #define	BS_PROG_LINE		0x1ED4
@@ -94,6 +95,13 @@
 #define	BS_CRC1_LOW		0x1F28
 #define	BS_CRC1_HIGH		0x1F2C
 #define	BS_USER			0x1F30
+
+/* DOU0 IPS Image Processing Unit */
+#define	DOU0_IPS_INPUT_ID0	0x1A80
+#define	DOU0_IPS_CONTROL	0x1AD0
+#define	 IPS_CONTROL_YUV	(1 << 8)
+#define	DOU0_IPS_SIZE		0x1AD4
+#define	DOU0_IPS_DEPTH		0x1AD8
 
 #define	PERIPH_BLOCK_INFO	0xFE00
 #define	PERIPH_PIPELINE_INFO	0xFE04
@@ -145,6 +153,7 @@ enum d71_block_type {
 #define	LR_P0_STRIDE		0x0508
 
 #define	CU0_BLOCK_INFO		0x0E00
+#define	CU0_OUTPUT_ID0		0x0E60
 #define	CU0_CU_INPUT_ID0	0x0E80
 #define	CU0_CU_STATUS		0x0EB0
 #define	CU0_CU_CONTROL		0x0ED0
@@ -153,6 +162,7 @@ enum d71_block_type {
 #define	CU0_INPUT0_SIZE		0x0EE0
 #define	CU0_INPUT0_OFFSET	0x0EE4
 #define	CU0_INPUT0_CONTROL	0x0EE8
+#define	 INPUT0_CONTROL_EN	(1 << 0)
 
 #define	D71_DEFAULT_PREPRETCH_LINE	5
 
