@@ -368,13 +368,13 @@ komeda_intr(void *arg)
 		gcu_intr(sc);
 
 	if (reg & GLB_IRQ_LPU0)
-		printf("LPU0 intr\n");
+		lpu_intr(sc);
 
 	if (reg & GLB_IRQ_CU0)
 		printf("CU0 intr\n");
 
 	if (reg & GLB_IRQ_DOU0)
-		printf("DOU0 intr\n");
+		dou_intr(sc);
 }
 
 static int

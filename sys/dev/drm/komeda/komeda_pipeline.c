@@ -74,6 +74,7 @@ __FBSDID("$FreeBSD$");
 #include <dev/drm/komeda/komeda_plane.h>
 #include <dev/drm/komeda/komeda_pipeline.h>
 #include <dev/drm/komeda/komeda_drv.h>
+#include <dev/drm/komeda/komeda_regs.h>
 
 #include "tda19988_if.h"
 
@@ -88,8 +89,18 @@ __FBSDID("$FreeBSD$");
 static int
 komeda_pipeline_enable_vblank(struct drm_crtc *crtc)
 {
+	struct komeda_pipeline *pipeline;
+	struct komeda_drm_softc *sc;
+	uint32_t reg;
 
 	printf("%s\n", __func__);
+
+	pipeline = container_of(crtc, struct komeda_pipeline, crtc);
+	sc = pipeline->sc;
+
+	reg = DPU_RD4(sc, DOU0_IRQ_MASK);
+	reg |= DOU_IRQ_PL0;
+	DPU_WR4(sc, DOU0_IRQ_MASK, reg);
 
 	return (0);
 }
@@ -97,8 +108,18 @@ komeda_pipeline_enable_vblank(struct drm_crtc *crtc)
 static void
 komeda_pipeline_disable_vblank(struct drm_crtc *crtc)
 {
+	struct komeda_pipeline *pipeline;
+	struct komeda_drm_softc *sc;
+	uint32_t reg;
 
 	printf("%s\n", __func__);
+
+	pipeline = container_of(crtc, struct komeda_pipeline, crtc);
+	sc = pipeline->sc;
+
+	reg = DPU_RD4(sc, DOU0_IRQ_MASK);
+	reg &= ~DOU_IRQ_PL0;
+	DPU_WR4(sc, DOU0_IRQ_MASK, reg);
 }
 
 static uint32_t
@@ -301,6 +322,7 @@ komeda_pipeline_create_pipeline(struct komeda_drm_softc *sc, phandle_t node,
 
 	pipeline->node = node;
 	pipeline->sc = sc;
+	pipeline->vbl_counter = 0;
 	komeda_plane_create(pipeline, drm);
 
 	error = drm_crtc_init_with_planes(drm, &pipeline->crtc,

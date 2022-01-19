@@ -240,6 +240,25 @@ dou_ds_timing_setup(struct komeda_drm_softc *sc, struct drm_plane *plane)
 }
 
 void
+dou_intr(struct komeda_drm_softc *sc)
+{
+	struct komeda_pipeline *pipeline;
+	uint32_t reg;
+
+	reg = DPU_RD4(sc, DOU0_IRQ_STATUS);
+
+	pipeline = &sc->pipelines[0];	/* TODO */
+
+	printf("%s: reg %x\n", __func__, reg);
+	if (reg & DOU_IRQ_PL0) {
+		atomic_add_32(&pipeline->vbl_counter, 1);
+		drm_crtc_handle_vblank(&pipeline->crtc);
+	}
+
+	DPU_WR4(sc, DOU0_IRQ_CLEAR, reg);
+}
+
+void
 gcu_intr(struct komeda_drm_softc *sc)
 {
 	uint32_t reg;
@@ -249,6 +268,18 @@ gcu_intr(struct komeda_drm_softc *sc)
 	printf("%s: reg %x\n", __func__, reg);
 
 	DPU_WR4(sc, GCU_IRQ_CLEAR, reg);
+}
+
+void
+lpu_intr(struct komeda_drm_softc *sc)
+{
+	uint32_t reg;
+
+	reg = DPU_RD4(sc, LPU0_IRQ_STATUS);
+
+	printf("%s: reg %x\n", __func__, reg);
+
+	DPU_WR4(sc, LPU0_IRQ_CLEAR, reg);
 }
 
 static int
@@ -287,7 +318,8 @@ dou_configure(struct komeda_drm_softc *sc, struct drm_fb_cma *fb,
 	reg = DPU_RD4(sc, CU0_OUTPUT_ID0);
 	DPU_WR4(sc, DOU0_IPS_INPUT_ID0, reg);
 
-	reg = m->hdisplay << 0 | m->vdisplay << 16;
+	reg = (m->hdisplay << 0) * 1;
+	reg |= (m->vdisplay << 16) * 1;
 	DPU_WR4(sc, DOU0_IPS_SIZE, reg);
 
 	DPU_WR4(sc, DOU0_IPS_DEPTH, fb->drm_fb.format->depth);
@@ -341,11 +373,12 @@ lpu_configure(struct komeda_drm_softc *sc, struct drm_fb_cma *fb,
 	DPU_WR8(sc, LR_P1_PTR_LOW, 0);
 	DPU_WR8(sc, LR_P2_PTR_LOW, 0);
 	DPU_WR4(sc, LR_FORMAT, fmt);
-	reg = m->hdisplay << IN_SIZE_HSIZE_S | m->vdisplay << IN_SIZE_VSIZE_S;
+	reg = (m->hdisplay << IN_SIZE_HSIZE_S) * 1;
+	reg |= (m->vdisplay << IN_SIZE_VSIZE_S) * 1;
 	DPU_WR4(sc, LR_IN_SIZE, reg);
 	DPU_WR4(sc, LR_AD_CONTROL, 0); /* No modifiers. */
 	reg = CONTROL_EN | 3 << 28; /* ARCACHE */
-	DPU_WR4(sc, LR_CONTROL, CONTROL_EN);
+	DPU_WR4(sc, LR_CONTROL, reg);
 }
 
 static void
@@ -358,7 +391,8 @@ cu_configure(struct komeda_drm_softc *sc, struct drm_display_mode *m)
 	 */
 	reg = DPU_RD4(sc, LPU0_LAYER0_OUTPUT_ID0);
 	DPU_WR4(sc, CU0_CU_INPUT_ID0, reg);
-	reg = m->hdisplay << 0 | m->vdisplay << 16;
+	reg = (m->hdisplay << 0) * 1;
+	reg |= (m->vdisplay << 16) * 1;
 	DPU_WR4(sc, CU0_INPUT0_SIZE, reg);
 	DPU_WR4(sc, CU0_INPUT0_OFFSET, 0);
 	DPU_WR4(sc, CU0_INPUT0_CONTROL, INPUT0_CONTROL_EN);	/* Layer EN */
@@ -376,6 +410,7 @@ komeda_plane_atomic_update(struct drm_plane *plane,
 	struct drm_fb_cma *fb;
 	struct drm_display_mode *m;
 	struct drm_plane_state *state;
+	uint32_t reg;
 
 	printf("%s\n", __func__);
 
@@ -390,9 +425,15 @@ komeda_plane_atomic_update(struct drm_plane *plane,
 	printf("%s: adj mode hdisplay %d vdisplay %d\n", __func__,
 	    m->hdisplay, m->vdisplay);
 
+	printf("%s: Clock freq needed: %d\n", __func__, m->crtc_clock);
+
 	/* Enable IRQs */
 	DPU_WR4(sc, GCU_IRQ_MASK, GCU_IRQ_ERR | GCU_IRQ_MODE | GCU_IRQ_CVAL0);
-	DPU_WR4(sc, DOU0_IRQ_MASK, DOU_IRQ_ERR | DOU_IRQ_UND);
+
+	reg = DPU_RD4(sc, DOU0_IRQ_MASK);
+	reg |= DOU_IRQ_ERR | DOU_IRQ_UND;
+	DPU_WR4(sc, DOU0_IRQ_MASK, reg);
+
 	DPU_WR4(sc, LPU0_IRQ_MASK, (LPU_IRQ_MASK_PL0 | LPU_IRQ_MASK_EOW | \
 					LPU_IRQ_MASK_ERR | LPU_IRQ_MASK_IBSY));
 	DPU_WR4(sc, CU0_CU_IRQ_MASK, CU_IRQ_MASK_OVR | CU_IRQ_MASK_ERR);

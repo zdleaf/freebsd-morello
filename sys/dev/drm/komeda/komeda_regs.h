@@ -112,11 +112,13 @@
 #define	DOU0_IPS_DEPTH		0x1AD8
 
 /* DOU0 */
+#define	DOU0_IRQ_CLEAR		0x18A4
 #define	DOU0_IRQ_MASK		0x18A8
 #define	 DOU_IRQ_PL1		(1 << 14)
 #define	 DOU_IRQ_PL0		(1 << 13)
 #define	 DOU_IRQ_ERR		(1 << 11)
 #define	 DOU_IRQ_UND		(1 << 8) /* Underrun interrupt */
+#define	DOU0_IRQ_STATUS		0x18AC
 #define	DOU0_STATUS		0x18B0
 
 #define	PERIPH_BLOCK_INFO	0xFE00
@@ -155,11 +157,13 @@ enum d71_block_type {
 #define	BLOCK_INFO_BLOCK_ID_M		(0xf << BLOCK_INFO_BLOCK_ID_S)
 
 #define	LPU0_IRQ_RAW_STATUS	0x02A0
+#define	LPU0_IRQ_CLEAR		0x02A4
 #define	LPU0_IRQ_MASK		0x02A8
 #define	 LPU_IRQ_MASK_PL0	(1 << 13)
 #define	 LPU_IRQ_MASK_EOW	(1 << 12)
 #define	 LPU_IRQ_MASK_ERR	(1 << 11)
 #define	 LPU_IRQ_MASK_IBSY	(1 << 10)
+#define	LPU0_IRQ_STATUS		0x02AC
 #define	LPU0_STATUS		0x02B0
 
 #define	LPU0_LAYER0_BLOCK_INFO	0x0400
