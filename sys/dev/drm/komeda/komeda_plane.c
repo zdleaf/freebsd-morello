@@ -313,17 +313,6 @@ komeda_plane_atomic_update(struct drm_plane *plane,
 	DPU_WR4(sc, LR_CONTROL, CONTROL_EN);
 
 	/*
-	 * DOU configuration. DOU0 IPS inputs from CU0
-	 */
-	reg = DPU_RD4(sc, CU0_OUTPUT_ID0);
-	DPU_WR4(sc, DOU0_IPS_INPUT_ID0, reg);
-	reg = m->hdisplay << 0 | m->vdisplay << 16;
-	DPU_WR4(sc, DOU0_IPS_SIZE, reg);
-	DPU_WR4(sc, DOU0_IPS_DEPTH, fb->drm_fb.format->depth);
-printf("depth is %d\n", fb->drm_fb.format->depth);
-	DPU_WR4(sc, DOU0_IPS_CONTROL, IPS_CONTROL_YUV);
-
-	/*
 	 * CU configuration. CU0 inputs from layer 0.
 	 */
 	reg = DPU_RD4(sc, LPU0_LAYER0_OUTPUT_ID0);
@@ -334,6 +323,17 @@ printf("depth is %d\n", fb->drm_fb.format->depth);
 	DPU_WR4(sc, CU0_INPUT0_CONTROL, INPUT0_CONTROL_EN);	/* Layer EN */
 	//DPU_WR4(sc, CU0_CU_SIZE, reg);
 	//DPU_WR4(sc, CU0_CU_CONTROL, CU_CONTROL_COPR); /* Enable CU */
+
+	/*
+	 * DOU configuration. DOU0 IPS inputs from CU0
+	 */
+	reg = DPU_RD4(sc, CU0_OUTPUT_ID0);
+	DPU_WR4(sc, DOU0_IPS_INPUT_ID0, reg);
+	reg = m->hdisplay << 0 | m->vdisplay << 16;
+	DPU_WR4(sc, DOU0_IPS_SIZE, reg);
+	DPU_WR4(sc, DOU0_IPS_DEPTH, fb->drm_fb.format->depth);
+printf("depth is %d\n", fb->drm_fb.format->depth);
+	DPU_WR4(sc, DOU0_IPS_CONTROL, IPS_CONTROL_YUV);
 
 	komeda_timing_setup(sc, plane);
 
