@@ -103,6 +103,9 @@
 #define	DOU0_IPS_SIZE		0x1AD4
 #define	DOU0_IPS_DEPTH		0x1AD8
 
+/* DOU0 */
+#define	DOU0_STATUS		0x18B0
+
 #define	PERIPH_BLOCK_INFO	0xFE00
 #define	PERIPH_PIPELINE_INFO	0xFE04
 
@@ -138,6 +141,9 @@ enum d71_block_type {
 #define	BLOCK_INFO_BLOCK_ID_S		4
 #define	BLOCK_INFO_BLOCK_ID_M		(0xf << BLOCK_INFO_BLOCK_ID_S)
 
+#define	LPU0_IRQ_RAW_STATUS	0x02A0
+#define	LPU0_STATUS		0x02B0
+
 #define	LPU0_LAYER0_BLOCK_INFO	0x0400
 #define	LPU0_LAYER0_OUTPUT_ID0	0x0460
 #define	LR_CONTROL		0x04D0
@@ -151,6 +157,9 @@ enum d71_block_type {
 #define	LR_P0_PTR_LOW		0x0500
 #define	LR_P0_PTR_HIGH		0x0504
 #define	LR_P0_STRIDE		0x0508
+#define	LR_P1_PTR_LOW		0x0510
+#define	LR_P2_PTR_LOW		0x0520
+#define	LR_AD_CONTROL		0x0560
 
 #define	CU0_BLOCK_INFO		0x0E00
 #define	CU0_OUTPUT_ID0		0x0E60

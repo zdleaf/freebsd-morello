@@ -292,7 +292,6 @@ komeda_plane_atomic_update(struct drm_plane *plane,
 
 	const struct drm_format_info *info;
 	struct drm_display_mode *m;
-	int timeout;
 	uint32_t reg;
 	int block_h;
 
@@ -302,15 +301,36 @@ komeda_plane_atomic_update(struct drm_plane *plane,
 	printf("%s: adj mode hdisplay %d vdisplay %d\n", __func__,
 	    m->hdisplay, m->vdisplay);
 
+	int timeout;
 	/*
-	 * LPU configuration. Setup layer 0.
+	 * GCU configuration.
 	 */
-	DPU_WR4(sc, LR_P0_STRIDE, fb->drm_fb.pitches[0] * block_h);
-	DPU_WR8(sc, LR_P0_PTR_LOW, paddr);
-	DPU_WR4(sc, LR_FORMAT, fmt);
-	reg = m->hdisplay << IN_SIZE_HSIZE_S | m->vdisplay << IN_SIZE_VSIZE_S;
-	DPU_WR4(sc, LR_IN_SIZE, reg);
-	DPU_WR4(sc, LR_CONTROL, CONTROL_EN);
+	DPU_WR4(sc, GCU_CONTROL, CONTROL_MODE_DO0_ACTIVE);
+
+	timeout = 10000;
+	do {
+		reg = DPU_RD4(sc, GCU_CONTROL);
+		if ((reg & CONTROL_MODE_M) == CONTROL_MODE_DO0_ACTIVE)
+			break;
+	} while (timeout--);
+
+	if (timeout <= 0)
+		printf("%s: Failed to set DO0 active\n", __func__);
+	else
+		printf("%s: GCU initialized\n", __func__);
+
+	/*
+	 * DOU configuration. DOU0 IPS inputs from CU0
+	 */
+	reg = DPU_RD4(sc, CU0_OUTPUT_ID0);
+	DPU_WR4(sc, DOU0_IPS_INPUT_ID0, reg);
+	reg = m->hdisplay << 0 | m->vdisplay << 16;
+	DPU_WR4(sc, DOU0_IPS_SIZE, reg);
+	DPU_WR4(sc, DOU0_IPS_DEPTH, fb->drm_fb.format->depth);
+printf("depth is %d\n", fb->drm_fb.format->depth);
+	//DPU_WR4(sc, DOU0_IPS_CONTROL, IPS_CONTROL_YUV);
+
+	komeda_timing_setup(sc, plane);
 
 	/*
 	 * CU configuration. CU0 inputs from layer 0.
@@ -325,33 +345,31 @@ komeda_plane_atomic_update(struct drm_plane *plane,
 	//DPU_WR4(sc, CU0_CU_CONTROL, CU_CONTROL_COPR); /* Enable CU */
 
 	/*
-	 * DOU configuration. DOU0 IPS inputs from CU0
+	 * LPU configuration. Setup layer 0.
 	 */
-	reg = DPU_RD4(sc, CU0_OUTPUT_ID0);
-	DPU_WR4(sc, DOU0_IPS_INPUT_ID0, reg);
-	reg = m->hdisplay << 0 | m->vdisplay << 16;
-	DPU_WR4(sc, DOU0_IPS_SIZE, reg);
-	DPU_WR4(sc, DOU0_IPS_DEPTH, fb->drm_fb.format->depth);
-printf("depth is %d\n", fb->drm_fb.format->depth);
-	DPU_WR4(sc, DOU0_IPS_CONTROL, IPS_CONTROL_YUV);
+	DPU_WR4(sc, LR_P0_STRIDE, fb->drm_fb.pitches[0] * block_h);
+	printf("%s: plane 0 STRIDE is %x\n", __func__,
+	    fb->drm_fb.pitches[0] * block_h);
+	DPU_WR8(sc, LR_P0_PTR_LOW, paddr);
+	DPU_WR8(sc, LR_P1_PTR_LOW, 0);
+	DPU_WR8(sc, LR_P2_PTR_LOW, 0);
+	DPU_WR4(sc, LR_FORMAT, fmt);
+	reg = m->hdisplay << IN_SIZE_HSIZE_S | m->vdisplay << IN_SIZE_VSIZE_S;
+	DPU_WR4(sc, LR_IN_SIZE, reg);
+	DPU_WR4(sc, LR_AD_CONTROL, 0); /* No modifiers. */
+	DPU_WR4(sc, LR_CONTROL, CONTROL_EN);
 
-	komeda_timing_setup(sc, plane);
-
-	/* Flush */
 	DPU_WR4(sc, GCU_CONFIG_VALID0, CONFIG_VALID0_CVAL);
-	DPU_WR4(sc, GCU_CONTROL, CONTROL_MODE_DO0_ACTIVE);
 
-	timeout = 10000;
-	do {
-		reg = DPU_RD4(sc, GCU_CONTROL);
-		if ((reg & CONTROL_MODE_M) == CONTROL_MODE_DO0_ACTIVE)
-			break;
-	} while (timeout--);
-
-	if (timeout <= 0)
-		printf("%s: Failed to set DO0 active\n", __func__);
-	else
-		printf("%s: plane initialized\n", __func__);
+	DELAY(100000);
+	DELAY(100000);
+	DELAY(100000);
+	printf("%s: GCU_STATUS %x\n", __func__, DPU_RD4(sc, GCU_STATUS));
+	printf("%s: LPU0_IRQ_RAW_STATUS %x\n", __func__,
+	    DPU_RD4(sc, LPU0_IRQ_RAW_STATUS));
+	printf("%s: LPU0_STATUS %x\n", __func__, DPU_RD4(sc, LPU0_STATUS));
+	printf("%s: CU0_CU_STATUS %x\n", __func__, DPU_RD4(sc, CU0_CU_STATUS));
+	printf("%s: DOU0_STATUS %x\n", __func__, DPU_RD4(sc, DOU0_STATUS));
 
 #if 0
 	uint32_t reg;
