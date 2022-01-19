@@ -41,6 +41,9 @@
 #define	GCU_IRQ_RAW_STATUS	0x00A0
 #define	GCU_IRQ_CLEAR		0x00A4
 #define	GCU_IRQ_MASK		0x00A8
+#define	 GCU_IRQ_ERR		(1 << 11)
+#define	 GCU_IRQ_MODE		(1 << 4)
+#define	 GCU_IRQ_CVAL0		(1 << 0)
 #define	GCU_IRQ_STATUS		0x00AC
 #define	GCU_STATUS		0x00B0
 #define	GCU_CONTROL		0x00D0
@@ -104,6 +107,11 @@
 #define	DOU0_IPS_DEPTH		0x1AD8
 
 /* DOU0 */
+#define	DOU0_IRQ_MASK		0x18A8
+#define	 DOU_IRQ_PL1		(1 << 14)
+#define	 DOU_IRQ_PL0		(1 << 13)
+#define	 DOU_IRQ_ERR		(1 << 11)
+#define	 DOU_IRQ_UND		(1 << 8) /* Underrun interrupt */
 #define	DOU0_STATUS		0x18B0
 
 #define	PERIPH_BLOCK_INFO	0xFE00
@@ -143,10 +151,10 @@ enum d71_block_type {
 
 #define	LPU0_IRQ_RAW_STATUS	0x02A0
 #define	LPU0_IRQ_MASK		0x02A8
-#define	 IRQ_MASK_PL0		(1 << 13)
-#define	 IRQ_MASK_EOW		(1 << 12)
-#define	 IRQ_MASK_ERR		(1 << 11)
-#define	 IRQ_MASK_IBSY		(1 << 10)
+#define	 LPU_IRQ_MASK_PL0	(1 << 13)
+#define	 LPU_IRQ_MASK_EOW	(1 << 12)
+#define	 LPU_IRQ_MASK_ERR	(1 << 11)
+#define	 LPU_IRQ_MASK_IBSY	(1 << 10)
 #define	LPU0_STATUS		0x02B0
 
 #define	LPU0_LAYER0_BLOCK_INFO	0x0400
@@ -169,6 +177,9 @@ enum d71_block_type {
 #define	CU0_BLOCK_INFO		0x0E00
 #define	CU0_OUTPUT_ID0		0x0E60
 #define	CU0_CU_INPUT_ID0	0x0E80
+#define	CU0_CU_IRQ_MASK		0x0EA8
+#define	 CU_IRQ_MASK_OVR	(1 << 9)
+#define	 CU_IRQ_MASK_ERR	(1 << 11)
 #define	CU0_CU_STATUS		0x0EB0
 #define	CU0_CU_CONTROL		0x0ED0
 #define	 CU_CONTROL_COPR	(1 << 0) /* Coprocessor interface enable */

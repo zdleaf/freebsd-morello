@@ -334,8 +334,8 @@ lpu_configure(struct komeda_drm_softc *sc, struct drm_fb_cma *fb,
 	DPU_WR4(sc, LR_AD_CONTROL, 0); /* No modifiers. */
 	reg = CONTROL_EN | 3 << 28; /* ARCACHE */
 	DPU_WR4(sc, LR_CONTROL, CONTROL_EN);
-	DPU_WR4(sc, LPU0_IRQ_MASK, (IRQ_MASK_PL0 | IRQ_MASK_EOW | \
-					IRQ_MASK_ERR | IRQ_MASK_IBSY));
+	DPU_WR4(sc, LPU0_IRQ_MASK, (LPU_IRQ_MASK_PL0 | LPU_IRQ_MASK_EOW | \
+					LPU_IRQ_MASK_ERR | LPU_IRQ_MASK_IBSY));
 }
 
 static void
@@ -374,7 +374,6 @@ komeda_plane_atomic_update(struct drm_plane *plane,
 
 	komeda_plane = container_of(plane, struct komeda_plane, plane);
 	fb = container_of(plane->state->fb, struct drm_fb_cma, drm_fb);
-
 	sc = komeda_plane->sc;
 
 	m = &crtc->state->adjusted_mode;
