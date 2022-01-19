@@ -239,6 +239,18 @@ dou_ds_timing_setup(struct komeda_drm_softc *sc, struct drm_plane *plane)
 	DPU_WR4(sc, BS_CONTROL, reg);
 }
 
+void
+gcu_intr(struct komeda_drm_softc *sc)
+{
+	uint32_t reg;
+
+	reg = DPU_RD4(sc, GCU_IRQ_STATUS);
+
+	printf("%s: reg %x\n", __func__, reg);
+
+	DPU_WR4(sc, GCU_IRQ_CLEAR, reg);
+}
+
 static int
 gcu_configure(struct komeda_drm_softc *sc)
 {
@@ -334,8 +346,6 @@ lpu_configure(struct komeda_drm_softc *sc, struct drm_fb_cma *fb,
 	DPU_WR4(sc, LR_AD_CONTROL, 0); /* No modifiers. */
 	reg = CONTROL_EN | 3 << 28; /* ARCACHE */
 	DPU_WR4(sc, LR_CONTROL, CONTROL_EN);
-	DPU_WR4(sc, LPU0_IRQ_MASK, (LPU_IRQ_MASK_PL0 | LPU_IRQ_MASK_EOW | \
-					LPU_IRQ_MASK_ERR | LPU_IRQ_MASK_IBSY));
 }
 
 static void
@@ -379,6 +389,13 @@ komeda_plane_atomic_update(struct drm_plane *plane,
 	m = &crtc->state->adjusted_mode;
 	printf("%s: adj mode hdisplay %d vdisplay %d\n", __func__,
 	    m->hdisplay, m->vdisplay);
+
+	/* Enable IRQs */
+	DPU_WR4(sc, GCU_IRQ_MASK, GCU_IRQ_ERR | GCU_IRQ_MODE | GCU_IRQ_CVAL0);
+	DPU_WR4(sc, DOU0_IRQ_MASK, DOU_IRQ_ERR | DOU_IRQ_UND);
+	DPU_WR4(sc, LPU0_IRQ_MASK, (LPU_IRQ_MASK_PL0 | LPU_IRQ_MASK_EOW | \
+					LPU_IRQ_MASK_ERR | LPU_IRQ_MASK_IBSY));
+	DPU_WR4(sc, CU0_CU_IRQ_MASK, CU_IRQ_MASK_OVR | CU_IRQ_MASK_ERR);
 
 	lpu_configure(sc, fb, m, komeda_plane, state);
 	cu_configure(sc, m);

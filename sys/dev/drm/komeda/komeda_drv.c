@@ -356,8 +356,26 @@ fail:
 static void
 komeda_intr(void *arg)
 {
+	struct komeda_drm_softc *sc;
+	uint32_t reg;
 
-	printf("%s\n", __func__);
+	sc = arg;
+
+	printf("%s: glb irq status %x\n", __func__, reg);
+
+	reg = DPU_RD4(sc, GLB_IRQ_STATUS);
+
+	if (reg & GLB_IRQ_GCU)
+		gcu_intr(sc);
+
+	if (reg & GLB_IRQ_LPU0)
+		printf("LPU0 intr\n");
+
+	if (reg & GLB_IRQ_CU0)
+		printf("CU0 intr\n");
+
+	if (reg & GLB_IRQ_DOU0)
+		printf("DOU0 intr\n");
 }
 
 static int

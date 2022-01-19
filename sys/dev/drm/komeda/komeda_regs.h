@@ -38,6 +38,11 @@
 #define	GLB_CORE_ID		0x0004
 #define	GLB_CORE_INFO		0x0008
 #define	GLB_IRQ_STATUS		0x0010
+#define	 GLB_IRQ_DOU0		(1 << 24)
+#define	 GLB_IRQ_CU0		(1 << 16)
+#define	 GLB_IRQ_LPU0		(1 << 8)
+#define	 GLB_IRQ_GCU		(1 << 0)
+
 #define	GCU_IRQ_RAW_STATUS	0x00A0
 #define	GCU_IRQ_CLEAR		0x00A4
 #define	GCU_IRQ_MASK		0x00A8

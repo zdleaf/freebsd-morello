@@ -45,4 +45,6 @@ struct komeda_plane {
 int komeda_plane_create(struct komeda_pipeline *pipeline,
     struct drm_device *drm);
 
+void gcu_intr(struct komeda_drm_softc *sc);
+
 #endif /* !_DEV_DRM_KOMEDA_KOMEDA_PLANE_H_ */
