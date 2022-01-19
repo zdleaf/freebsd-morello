@@ -325,7 +325,7 @@ dou_configure(struct komeda_drm_softc *sc, struct drm_fb_cma *fb,
 	DPU_WR4(sc, DOU0_IPS_DEPTH, fb->drm_fb.format->depth);
 printf("depth is %d\n", fb->drm_fb.format->depth);
 
-	//DPU_WR4(sc, DOU0_IPS_CONTROL, IPS_CONTROL_YUV);
+	DPU_WR4(sc, DOU0_IPS_CONTROL, 0);
 }
 
 static void
@@ -376,6 +376,7 @@ lpu_configure(struct komeda_drm_softc *sc, struct drm_fb_cma *fb,
 	reg = (m->hdisplay << IN_SIZE_HSIZE_S) * 1;
 	reg |= (m->vdisplay << IN_SIZE_VSIZE_S) * 1;
 	DPU_WR4(sc, LR_IN_SIZE, reg);
+	DPU_WR4(sc, LR_PALPHA, D71_PALPHA_DEF_MAP);
 	DPU_WR4(sc, LR_AD_CONTROL, 0); /* No modifiers. */
 	reg = CONTROL_EN | 3 << 28; /* ARCACHE */
 	DPU_WR4(sc, LR_CONTROL, reg);

@@ -176,6 +176,7 @@ enum d71_block_type {
 #define	 IN_SIZE_HSIZE_M	(0xfff << IN_SIZE_HSIZE_S)
 #define	 IN_SIZE_VSIZE_S	16
 #define	 IN_SIZE_VSIZE_M	(0xfff << IN_SIZE_VSIZE_S)
+#define	LR_PALPHA		0x04E4
 #define	LR_P0_PTR_LOW		0x0500
 #define	LR_P0_PTR_HIGH		0x0504
 #define	LR_P0_STRIDE		0x0508
@@ -199,5 +200,6 @@ enum d71_block_type {
 #define	 INPUT0_CONTROL_EN	(1 << 0)
 
 #define	D71_DEFAULT_PREPRETCH_LINE	5
+#define	D71_PALPHA_DEF_MAP		0xFFAA5500
 
 #endif /* !_DEV_DRM_KOMEDA_KOMEDA_REGS_H_ */
