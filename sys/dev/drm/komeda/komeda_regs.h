@@ -142,6 +142,11 @@ enum d71_block_type {
 #define	BLOCK_INFO_BLOCK_ID_M		(0xf << BLOCK_INFO_BLOCK_ID_S)
 
 #define	LPU0_IRQ_RAW_STATUS	0x02A0
+#define	LPU0_IRQ_MASK		0x02A8
+#define	 IRQ_MASK_PL0		(1 << 13)
+#define	 IRQ_MASK_EOW		(1 << 12)
+#define	 IRQ_MASK_ERR		(1 << 11)
+#define	 IRQ_MASK_IBSY		(1 << 10)
 #define	LPU0_STATUS		0x02B0
 
 #define	LPU0_LAYER0_BLOCK_INFO	0x0400

@@ -183,7 +183,7 @@ komeda_plane_atomic_disable(struct drm_plane *plane,
 }
 
 static void
-komeda_timing_setup(struct komeda_drm_softc *sc, struct drm_plane *plane)
+dou_ds_timing_setup(struct komeda_drm_softc *sc, struct drm_plane *plane)
 {
 	uint32_t hactive, hfront_porch, hback_porch, hsync_len;
 	uint32_t vactive, vfront_porch, vback_porch, vsync_len;
@@ -239,38 +239,63 @@ komeda_timing_setup(struct komeda_drm_softc *sc, struct drm_plane *plane)
 	DPU_WR4(sc, BS_CONTROL, reg);
 }
 
-static void
-komeda_plane_atomic_update(struct drm_plane *plane,
-    struct drm_plane_state *old_state)
+static int
+gcu_configure(struct komeda_drm_softc *sc)
 {
-	struct komeda_drm_softc *sc;
-	uint32_t src_w, src_h, dst_w, dst_h;
-	struct komeda_plane *komeda_plane;
+	uint32_t reg;
+	int timeout;
+
+	timeout = 10000;
+
+	DPU_WR4(sc, GCU_CONTROL, CONTROL_MODE_DO0_ACTIVE);
+	do {
+		reg = DPU_RD4(sc, GCU_CONTROL);
+		if ((reg & CONTROL_MODE_M) == CONTROL_MODE_DO0_ACTIVE)
+			break;
+	} while (timeout--);
+
+	if (timeout <= 0) {
+		printf("%s: Failed to set DO0 active\n", __func__);
+		return (-1);
+	}
+
+	printf("%s: GCU initialized\n", __func__);
+
+	return (0);
+}
+
+static void
+dou_configure(struct komeda_drm_softc *sc, struct drm_fb_cma *fb,
+    struct drm_display_mode *m)
+{
+	uint32_t reg;
+
+	reg = DPU_RD4(sc, CU0_OUTPUT_ID0);
+	DPU_WR4(sc, DOU0_IPS_INPUT_ID0, reg);
+
+	reg = m->hdisplay << 0 | m->vdisplay << 16;
+	DPU_WR4(sc, DOU0_IPS_SIZE, reg);
+
+	DPU_WR4(sc, DOU0_IPS_DEPTH, fb->drm_fb.format->depth);
+printf("depth is %d\n", fb->drm_fb.format->depth);
+
+	//DPU_WR4(sc, DOU0_IPS_CONTROL, IPS_CONTROL_YUV);
+}
+
+static void
+lpu_configure(struct komeda_drm_softc *sc, struct drm_fb_cma *fb,
+    struct drm_display_mode *m, struct komeda_plane *komeda_plane,
+    struct drm_plane_state *state)
+{
+	const struct drm_format_info *info;
 	struct drm_gem_cma_object *bo;
-	struct drm_plane_state *state;
-	struct drm_rect *src, *dst;
-	struct drm_crtc *crtc;
-	struct drm_fb_cma *fb;
 	dma_addr_t paddr;
+	uint32_t reg;
+	int block_h;
 	int fmt;
-	int i, id;
+	int id;
+	int i;
 
-	printf("%s\n", __func__);
-
-	state = plane->state;
-	dst = &state->dst;
-	src = &state->src;
-	crtc = state->crtc;
-
-	src_w = drm_rect_width(&state->src) >> 16;
-	src_h = drm_rect_height(&state->src) >> 16;
-	dst_w = drm_rect_width(&state->dst);
-	dst_h = drm_rect_height(&state->dst);
-
-	komeda_plane = container_of(plane, struct komeda_plane, plane);
-	fb = container_of(plane->state->fb, struct drm_fb_cma, drm_fb);
-
-	sc = komeda_plane->sc;
 	id = komeda_plane->id;
 
 	for (i = 0; i < nitems(komeda_plane_formats); i++)
@@ -288,61 +313,10 @@ komeda_plane_atomic_update(struct drm_plane *plane,
 	paddr += (state->src.x1 >> 16) * fb->drm_fb.format->cpp[0];
 	paddr += (state->src.y1 >> 16) * fb->drm_fb.pitches[0];
 
-	printf("%s: pbase %lx, paddr %lx\n", __func__, bo->pbase, paddr);
-
-	const struct drm_format_info *info;
-	struct drm_display_mode *m;
-	uint32_t reg;
-	int block_h;
-
 	info = fb->drm_fb.format;
 	block_h = drm_format_info_block_height(info, 0);
-	m = &crtc->state->adjusted_mode;
-	printf("%s: adj mode hdisplay %d vdisplay %d\n", __func__,
-	    m->hdisplay, m->vdisplay);
 
-	int timeout;
-	/*
-	 * GCU configuration.
-	 */
-	DPU_WR4(sc, GCU_CONTROL, CONTROL_MODE_DO0_ACTIVE);
-
-	timeout = 10000;
-	do {
-		reg = DPU_RD4(sc, GCU_CONTROL);
-		if ((reg & CONTROL_MODE_M) == CONTROL_MODE_DO0_ACTIVE)
-			break;
-	} while (timeout--);
-
-	if (timeout <= 0)
-		printf("%s: Failed to set DO0 active\n", __func__);
-	else
-		printf("%s: GCU initialized\n", __func__);
-
-	/*
-	 * DOU configuration. DOU0 IPS inputs from CU0
-	 */
-	reg = DPU_RD4(sc, CU0_OUTPUT_ID0);
-	DPU_WR4(sc, DOU0_IPS_INPUT_ID0, reg);
-	reg = m->hdisplay << 0 | m->vdisplay << 16;
-	DPU_WR4(sc, DOU0_IPS_SIZE, reg);
-	DPU_WR4(sc, DOU0_IPS_DEPTH, fb->drm_fb.format->depth);
-printf("depth is %d\n", fb->drm_fb.format->depth);
-	//DPU_WR4(sc, DOU0_IPS_CONTROL, IPS_CONTROL_YUV);
-
-	komeda_timing_setup(sc, plane);
-
-	/*
-	 * CU configuration. CU0 inputs from layer 0.
-	 */
-	reg = DPU_RD4(sc, LPU0_LAYER0_OUTPUT_ID0);
-	DPU_WR4(sc, CU0_CU_INPUT_ID0, reg);
-	reg = m->hdisplay << 0 | m->vdisplay << 16;
-	DPU_WR4(sc, CU0_INPUT0_SIZE, reg);
-	DPU_WR4(sc, CU0_INPUT0_OFFSET, 0);
-	DPU_WR4(sc, CU0_INPUT0_CONTROL, INPUT0_CONTROL_EN);	/* Layer EN */
-	//DPU_WR4(sc, CU0_CU_SIZE, reg);
-	//DPU_WR4(sc, CU0_CU_CONTROL, CU_CONTROL_COPR); /* Enable CU */
+	printf("%s: pbase %lx, paddr %lx\n", __func__, bo->pbase, paddr);
 
 	/*
 	 * LPU configuration. Setup layer 0.
@@ -357,121 +331,74 @@ printf("depth is %d\n", fb->drm_fb.format->depth);
 	reg = m->hdisplay << IN_SIZE_HSIZE_S | m->vdisplay << IN_SIZE_VSIZE_S;
 	DPU_WR4(sc, LR_IN_SIZE, reg);
 	DPU_WR4(sc, LR_AD_CONTROL, 0); /* No modifiers. */
+	reg = CONTROL_EN | 3 << 28; /* ARCACHE */
 	DPU_WR4(sc, LR_CONTROL, CONTROL_EN);
+	DPU_WR4(sc, LPU0_IRQ_MASK, (IRQ_MASK_PL0 | IRQ_MASK_EOW | \
+					IRQ_MASK_ERR | IRQ_MASK_IBSY));
+}
 
+static void
+cu_configure(struct komeda_drm_softc *sc, struct drm_display_mode *m)
+{
+	uint32_t reg;
+
+	/*
+	 * CU configuration. CU0 inputs from layer 0.
+	 */
+	reg = DPU_RD4(sc, LPU0_LAYER0_OUTPUT_ID0);
+	DPU_WR4(sc, CU0_CU_INPUT_ID0, reg);
+	reg = m->hdisplay << 0 | m->vdisplay << 16;
+	DPU_WR4(sc, CU0_INPUT0_SIZE, reg);
+	DPU_WR4(sc, CU0_INPUT0_OFFSET, 0);
+	DPU_WR4(sc, CU0_INPUT0_CONTROL, INPUT0_CONTROL_EN);	/* Layer EN */
+	//DPU_WR4(sc, CU0_CU_SIZE, reg);
+	//DPU_WR4(sc, CU0_CU_CONTROL, CU_CONTROL_COPR); /* Enable CU */
+}
+
+static void
+komeda_plane_atomic_update(struct drm_plane *plane,
+    struct drm_plane_state *old_state)
+{
+	struct komeda_plane *komeda_plane;
+	struct komeda_drm_softc *sc;
+	struct drm_crtc *crtc;
+	struct drm_fb_cma *fb;
+	struct drm_display_mode *m;
+	struct drm_plane_state *state;
+
+	printf("%s\n", __func__);
+
+	state = plane->state;
+	crtc = state->crtc;
+
+	komeda_plane = container_of(plane, struct komeda_plane, plane);
+	fb = container_of(plane->state->fb, struct drm_fb_cma, drm_fb);
+
+	sc = komeda_plane->sc;
+
+	m = &crtc->state->adjusted_mode;
+	printf("%s: adj mode hdisplay %d vdisplay %d\n", __func__,
+	    m->hdisplay, m->vdisplay);
+
+	lpu_configure(sc, fb, m, komeda_plane, state);
+	cu_configure(sc, m);
+	dou_configure(sc, fb, m);
+
+	gcu_configure(sc);
 	DPU_WR4(sc, GCU_CONFIG_VALID0, CONFIG_VALID0_CVAL);
 
+	dou_ds_timing_setup(sc, plane);
+
 	DELAY(100000);
 	DELAY(100000);
 	DELAY(100000);
+
 	printf("%s: GCU_STATUS %x\n", __func__, DPU_RD4(sc, GCU_STATUS));
 	printf("%s: LPU0_IRQ_RAW_STATUS %x\n", __func__,
 	    DPU_RD4(sc, LPU0_IRQ_RAW_STATUS));
 	printf("%s: LPU0_STATUS %x\n", __func__, DPU_RD4(sc, LPU0_STATUS));
 	printf("%s: CU0_CU_STATUS %x\n", __func__, DPU_RD4(sc, CU0_CU_STATUS));
 	printf("%s: DOU0_STATUS %x\n", __func__, DPU_RD4(sc, DOU0_STATUS));
-
-#if 0
-	uint32_t reg;
-	uint32_t dsp_stx, dsp_sty;
-	int lb_mode;
-	int id;
-	int i;
-
-	sc = vop_plane->sc;
-	id = vop_plane->id;
-
-	dprintf("%s: id %d\n", __func__, vop_plane->id);
-
-	dprintf("%s: src w %d h %d, dst w %d h %d\n",
-	    __func__, src_w, src_h, dst_w, dst_h);
-
-	/* TODO */
-	if (!plane->state->visible)
-		panic("plane is not visible");
-
-	/* Actual size. */
-	reg = (src_w - 1);
-	reg |= (src_h - 1) << 16;
-	if (id == 0)
-		VOP_WRITE(sc, RK3399_WIN0_ACT_INFO, reg);
-
-	dsp_stx = dst->x1 + crtc->mode.htotal - crtc->mode.hsync_start;
-	dsp_sty = dst->y1 + crtc->mode.vtotal - crtc->mode.vsync_start;
-	reg = dsp_sty << 16 | (dsp_stx & 0xffff);
-	if (id == 0)
-		VOP_WRITE(sc, RK3399_WIN0_DSP_ST, reg);
-	else
-		VOP_WRITE(sc, RK3399_WIN2_DSP_ST0, reg);
-
-	reg = (dst_w - 1);
-	reg |= (dst_h - 1) << 16;
-	if (id == 0)
-		VOP_WRITE(sc, RK3399_WIN0_DSP_INFO, reg);
-	else
-		VOP_WRITE(sc, RK3399_WIN2_DSP_INFO0, reg);
-
-	if (dst_w <= 1280)
-		lb_mode = LB_RGB_1280X8;
-	else if (dst_w <= 1920)
-		lb_mode = LB_RGB_1920X5;
-	else if (dst_w <= 2560)
-		lb_mode = LB_RGB_2560X4;
-	else if (dst_w <= 3840)
-		lb_mode = LB_RGB_3840X2;
-	else
-		panic("unknown lb_mode, dst_w %d", dst_w);
-
-	if (id == 0) {
-		VOP_WRITE(sc, RK3399_WIN0_VIR, state->fb->pitches[0] >> 2);
-
-		reg = VOP_READ(sc, RK3399_WIN0_CTRL0);
-		reg &= ~WIN0_CTRL0_LB_MODE_M;
-		reg &= ~WIN0_CTRL0_DATA_FMT_M;
-		reg &= ~WIN0_CTRL0_EN;
-		VOP_WRITE(sc, RK3399_WIN0_CTRL0, reg);
-		reg |= lb_mode << WIN0_CTRL0_LB_MODE_S;
-		reg |= rgb_mode << WIN0_CTRL0_DATA_FMT_S;
-		reg |= WIN0_CTRL0_EN;
-		VOP_WRITE(sc, RK3399_WIN0_CTRL0, reg);
-	} else {
-		VOP_WRITE(sc, RK3399_WIN2_VIR0_1, state->fb->pitches[0] >> 2);
-
-		reg = VOP_READ(sc, RK3399_WIN2_CTRL0);
-		reg &= ~WIN2_CTRL0_DATA_FMT_M;
-		reg &= ~WIN2_CTRL0_EN;
-		VOP_WRITE(sc, RK3399_WIN2_CTRL0, reg);
-		reg |= rgb_mode << WIN2_CTRL0_DATA_FMT_S;
-		reg |= WIN2_CTRL0_EN;
-		reg |= WIN2_CTRL0_GATE;
-		VOP_WRITE(sc, RK3399_WIN2_CTRL0, reg);
-	}
-
-	/* Cursor plane alpha. */
-	if (state->fb->format->has_alpha && id > 0) {
-		VOP_WRITE(sc, RK3399_WIN2_DST_ALPHA_CTRL, DST_FACTOR_M0(3));
-
-		reg = SRC_ALPHA_EN;
-		reg |= 1 << SRC_BLEND_M0_S;
-		reg |= SRC_ALPHA_CAL_M0;
-		reg |= SRC_FACTOR_M0;
-		VOP_WRITE(sc, RK3399_WIN2_SRC_ALPHA_CTRL, reg);
-	}
-
-	bo = drm_fb_cma_get_gem_obj(fb, 0);
-	paddr = bo->pbase + fb->drm_fb.offsets[0];
-	paddr += (state->src.x1 >> 16) * fb->drm_fb.format->cpp[0];
-	paddr += (state->src.y1 >> 16) * fb->drm_fb.pitches[0];
-
-	dprintf("%s: pbase %lx\n", __func__, bo->pbase);
-
-	if (id == 0)
-		VOP_WRITE(sc, RK3399_WIN0_YRGB_MST, paddr);
-	else
-		VOP_WRITE(sc, RK3399_WIN2_MST0, paddr);
-
-	VOP_WRITE(sc, RK3399_REG_CFG_DONE, 1);
-#endif
 }
 
 static struct drm_plane_helper_funcs komeda_plane_helper_funcs = {
