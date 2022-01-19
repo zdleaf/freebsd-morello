@@ -259,6 +259,8 @@ gcu_configure(struct komeda_drm_softc *sc)
 		return (-1);
 	}
 
+	DPU_WR4(sc, GCU_CONFIG_VALID0, CONFIG_VALID0_CVAL);
+
 	printf("%s: GCU initialized\n", __func__);
 
 	return (0);
@@ -312,11 +314,10 @@ lpu_configure(struct komeda_drm_softc *sc, struct drm_fb_cma *fb,
 	paddr = bo->pbase + fb->drm_fb.offsets[0];
 	paddr += (state->src.x1 >> 16) * fb->drm_fb.format->cpp[0];
 	paddr += (state->src.y1 >> 16) * fb->drm_fb.pitches[0];
+	printf("%s: pbase %lx, paddr %lx\n", __func__, bo->pbase, paddr);
 
 	info = fb->drm_fb.format;
 	block_h = drm_format_info_block_height(info, 0);
-
-	printf("%s: pbase %lx, paddr %lx\n", __func__, bo->pbase, paddr);
 
 	/*
 	 * LPU configuration. Setup layer 0.
@@ -351,7 +352,7 @@ cu_configure(struct komeda_drm_softc *sc, struct drm_display_mode *m)
 	DPU_WR4(sc, CU0_INPUT0_SIZE, reg);
 	DPU_WR4(sc, CU0_INPUT0_OFFSET, 0);
 	DPU_WR4(sc, CU0_INPUT0_CONTROL, INPUT0_CONTROL_EN);	/* Layer EN */
-	//DPU_WR4(sc, CU0_CU_SIZE, reg);
+	DPU_WR4(sc, CU0_CU_SIZE, reg);
 	//DPU_WR4(sc, CU0_CU_CONTROL, CU_CONTROL_COPR); /* Enable CU */
 }
 
@@ -383,15 +384,8 @@ komeda_plane_atomic_update(struct drm_plane *plane,
 	lpu_configure(sc, fb, m, komeda_plane, state);
 	cu_configure(sc, m);
 	dou_configure(sc, fb, m);
-
-	gcu_configure(sc);
-	DPU_WR4(sc, GCU_CONFIG_VALID0, CONFIG_VALID0_CVAL);
-
 	dou_ds_timing_setup(sc, plane);
-
-	DELAY(100000);
-	DELAY(100000);
-	DELAY(100000);
+	gcu_configure(sc);
 
 	printf("%s: GCU_STATUS %x\n", __func__, DPU_RD4(sc, GCU_STATUS));
 	printf("%s: LPU0_IRQ_RAW_STATUS %x\n", __func__,
