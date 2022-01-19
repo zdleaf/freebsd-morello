@@ -405,7 +405,7 @@ cu_configure(struct komeda_drm_softc *sc, struct drm_display_mode *m)
 	reg |= (m->vdisplay << 16) * 1;
 	DPU_WR4(sc, CU0_INPUT0_SIZE, reg);
 	DPU_WR4(sc, CU0_INPUT0_OFFSET, 0);
-	DPU_WR4(sc, CU0_INPUT0_CONTROL, INPUT0_CONTROL_EN);	/* Layer EN */
+	DPU_WR4(sc, CU0_INPUT0_CONTROL, INPUT0_CONTROL_EN | 255 << 8);	/* Layer EN */
 	DPU_WR4(sc, CU0_CU_SIZE, reg);
 	//DPU_WR4(sc, CU0_CU_CONTROL, CU_CONTROL_COPR); /* Enable CU */
 }
