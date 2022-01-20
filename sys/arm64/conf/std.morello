@@ -15,6 +15,7 @@ options		COMPAT_DRMKPI
 
 device		drm
 device		komeda_drm
+device		panfrost
 
 device		cdns_i2c
 
@@ -24,14 +25,14 @@ options		FDT
 options		ROOTDEVNAME=\"ufs:/dev/ada0\"
 
 # No USB support
-nodevice	ohci
-nodevice	uhci
-nodevice	ehci
-nodevice	xhci
-nodevice	usb
-nodevice	ukbd
-nodevice	umass
-nodevice	hid
+# nodevice	ohci
+# nodevice	uhci
+# nodevice	ehci
+# nodevice	xhci
+# nodevice	usb
+# nodevice	ukbd
+# nodevice	umass
+# nodevice	hid
 
 # Flattened Device Tree
 options		FDT
