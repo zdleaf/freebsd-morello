@@ -258,6 +258,7 @@ usage(int code)
 		"       -H: vmexit from the guest on HLT\n"
 		"       -h: help\n"
 		"       -k: key=value flat config file\n"
+		"       -K: PS2 keyboard layout\n"
 #ifdef __amd64__
 		"       -l: LPC device configuration\n"
 #endif
@@ -1380,9 +1381,9 @@ main(int argc, char *argv[])
 	progname = basename(argv[0]);
 
 #ifdef BHYVE_SNAPSHOT
-	optstr = "abehuwxABCDHIPSWYk:o:p:G:c:s:m:l:U:r:";
+	optstr = "abehuwxABCDHIPSWYk:o:p:G:c:s:m:l:K:U:r:";
 #else
-	optstr = "abehuwxABCDHIPSWYk:o:p:G:c:s:m:l:U:";
+	optstr = "abehuwxABCDHIPSWYk:o:p:G:c:s:m:l:K:U:";
 #endif
 	while ((c = getopt(argc, argv, optstr)) != -1) {
 		switch (c) {
@@ -1421,6 +1422,9 @@ main(int argc, char *argv[])
 			break;
 		case 'k':
 			parse_simple_config_file(optarg);
+			break;
+		case 'K':
+			set_config_value("keyboard.layout", optarg);
 			break;
 #ifdef __amd64__
 		case 'l':
