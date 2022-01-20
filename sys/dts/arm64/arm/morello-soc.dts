@@ -186,6 +186,16 @@
 		};
 	};
 
+	gpu: gpu@2d000000 {
+		compatible = "arm,mali-bifrost";
+		reg = <0x0 0x2d000000 0x0 0x4000>;
+		interrupts = <GIC_SPI 66 IRQ_TYPE_LEVEL_HIGH>,
+			     <GIC_SPI 67 IRQ_TYPE_LEVEL_HIGH>,
+			     <GIC_SPI 65 IRQ_TYPE_LEVEL_HIGH>;
+		interrupt-names = "job", "mmu", "gpu";
+		status = "okay";
+	};
+
 	i2c@1c0f0000 {
 		compatible = "cdns,i2c-r1p14";
 		reg = <0x0 0x1c0f0000 0x0 0x1000>;

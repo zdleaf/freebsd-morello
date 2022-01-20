@@ -772,20 +772,18 @@ panfrost_attach(device_t dev)
 		return (ENXIO);
 	}
 
-	if (clk_get_by_ofw_index(sc->dev, 0, 0, &sc->clk) != 0) {
-		device_printf(dev, "cannot get clock\n");
-		return (ENXIO);
-	}
+	if (clk_get_by_ofw_index(sc->dev, 0, 0, &sc->clk) == 0) {
+		err = clk_enable(sc->clk);
+		if (err != 0) {
+			device_printf(sc->dev,
+			    "could not enable clock: %d\n", err);
+			return (ENXIO);
+		}
 
-	err = clk_enable(sc->clk);
-	if (err != 0) {
-		device_printf(sc->dev, "could not enable clock: %d\n", err);
-		return (ENXIO);
-	}
-
-	clk_get_freq(sc->clk, &rate);
-
-	device_printf(dev, "Mali GPU clock rate %jd Hz\n", rate);
+		clk_get_freq(sc->clk, &rate);
+		device_printf(dev, "Mali GPU clock rate %jd Hz\n", rate);
+	} else
+		device_printf(dev, "Mali GPU clock is unknown\n");
 
 	mtx_init(&sc->as_mtx, "asid set mtx", NULL, MTX_SPIN);
 
