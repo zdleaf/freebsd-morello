@@ -249,7 +249,9 @@ dou_intr(struct komeda_drm_softc *sc)
 
 	pipeline = &sc->pipelines[0];	/* TODO */
 
-	printf("%s: reg %x\n", __func__, reg);
+	if ((reg & DOU_IRQ_PL0) != reg)
+		printf("%s: reg %x\n", __func__, reg);
+
 	if (reg & DOU_IRQ_PL0) {
 		atomic_add_32(&pipeline->vbl_counter, 1);
 		drm_crtc_handle_vblank(&pipeline->crtc);

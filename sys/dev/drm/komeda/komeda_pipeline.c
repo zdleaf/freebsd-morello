@@ -78,9 +78,6 @@ __FBSDID("$FreeBSD$");
 
 #include "tda19988_if.h"
 
-#define	VOP_READ(sc, reg)	bus_read_4((sc)->res[0], (reg))
-#define	VOP_WRITE(sc, reg, val)	bus_write_4((sc)->res[0], (reg), (val))
-
 #define	dprintf(fmt, ...)
 
 /*
@@ -127,7 +124,7 @@ komeda_pipeline_get_vblank_counter(struct drm_crtc *crtc)
 {
 	struct komeda_pipeline *pipeline;
 
-	printf("%s\n", __func__);
+	dprintf("%s\n", __func__);
 
 	pipeline = container_of(crtc, struct komeda_pipeline, crtc);
 

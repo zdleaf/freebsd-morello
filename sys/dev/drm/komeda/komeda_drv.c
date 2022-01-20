@@ -358,11 +358,15 @@ komeda_intr(void *arg)
 {
 	struct komeda_drm_softc *sc;
 	uint32_t reg;
+	int mask;
 
 	sc = arg;
 
 	reg = DPU_RD4(sc, GLB_IRQ_STATUS);
-	printf("%s: glb irq status %x\n", __func__, reg);
+
+	mask = GLB_IRQ_GCU | GLB_IRQ_LPU0 | GLB_IRQ_CU0 | GLB_IRQ_DOU0;
+	if ((reg & mask) != reg)
+		printf("%s: glb irq status %x\n", __func__, reg);
 
 	if (reg & GLB_IRQ_GCU)
 		gcu_intr(sc);
