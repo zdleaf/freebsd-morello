@@ -430,6 +430,11 @@ komeda_plane_atomic_update(struct drm_plane *plane,
 	crtc = state->crtc;
 
 	komeda_plane = container_of(plane, struct komeda_plane, plane);
+	if (komeda_plane->id == 1) {
+		/* No cursor for now. */
+		return;
+	}
+
 	fb = container_of(plane->state->fb, struct drm_fb_cma, drm_fb);
 	sc = komeda_plane->sc;
 
