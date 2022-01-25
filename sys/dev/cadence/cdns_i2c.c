@@ -159,7 +159,7 @@ cdns_i2c_read_data(device_t dev, struct iic_msg *msg)
 
 	sc = device_get_softc(dev);
 
-	printf("%s: slave %x len %d\n", __func__, msg->slave, msg->len);
+	dprintf("%s: slave %x len %d\n", __func__, msg->slave, msg->len);
 
 	len = msg->len;
 	data = msg->buf;
@@ -183,7 +183,7 @@ cdns_i2c_read_data(device_t dev, struct iic_msg *msg)
 
 	while (len) {
 		if (RD4(sc, CDNS_I2C_ISR) & I2C_ISR_ARBLOST) {
-			printf("%s: arb lost\n", __func__);
+			dprintf("%s: arb lost\n", __func__);
 			return (EAGAIN);
 		}
 		while (RD4(sc, CDNS_I2C_SR) & I2C_SR_RXDV) {
@@ -210,7 +210,7 @@ cdns_i2c_read_data(device_t dev, struct iic_msg *msg)
 
 	reg = cdns_i2c_wait(sc, I2C_ISR_COMP | I2C_ISR_ARBLOST);
 	if (reg & I2C_ISR_ARBLOST) {
-		printf("%s: compl reg %x ISR %x\n", __func__, reg,
+		dprintf("%s: compl reg %x ISR %x\n", __func__, reg,
 		    RD4(sc, CDNS_I2C_ISR));
 		return (EAGAIN);
 	}
@@ -231,7 +231,7 @@ cdns_i2c_write_data(device_t dev, struct iic_msg *msg)
 	data = msg->buf;
 	len = msg->len;
 
-	printf("%s: slave %x len %d\n", __func__, msg->slave, msg->len);
+	dprintf("%s: slave %x len %d\n", __func__, msg->slave, msg->len);
 
 	/* Set the controller in Master transmit mode and clear FIFO. */
 	reg = RD4(sc, CDNS_I2C_CR);
@@ -246,7 +246,7 @@ cdns_i2c_write_data(device_t dev, struct iic_msg *msg)
 
 	while (len --) {
 		if (RD4(sc, CDNS_I2C_ISR) & I2C_ISR_ARBLOST) {
-			printf("%s: arb lost\n", __func__);
+			dprintf("%s: arb lost\n", __func__);
 			return (EAGAIN);
 		}
 
@@ -265,7 +265,7 @@ cdns_i2c_write_data(device_t dev, struct iic_msg *msg)
 
 	reg = cdns_i2c_wait(sc, I2C_ISR_COMP | I2C_ISR_ARBLOST);
 	if (reg & I2C_ISR_ARBLOST) {
-		printf("%s: compl reg %x ISR %x\n", __func__, reg,
+		dprintf("%s: compl reg %x ISR %x\n", __func__, reg,
 		    RD4(sc, CDNS_I2C_ISR));
 		return (EAGAIN);
 	}
@@ -284,7 +284,7 @@ cdns_i2c_transfer(device_t dev, struct iic_msg *msgs, uint32_t nmsgs)
 
 	sc = device_get_softc(dev);
 
-printf("%s: nmsgs %d\n", __func__, nmsgs);
+	dprintf("%s: nmsgs %d\n", __func__, nmsgs);
 
 	CDNS_I2C_LOCK(sc);
 
