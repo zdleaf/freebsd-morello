@@ -172,42 +172,30 @@ cdns_i2c_read_data(device_t dev, struct iic_msg *msg)
 	reg |= I2C_CR_RW;
 	WR4(sc, CDNS_I2C_CR, reg);
 
-	if (len > CDNS_I2C_TRANSFER_SIZE) {
+	if (len > CDNS_I2C_TRANSFER_SIZE)
 		curr_len = CDNS_I2C_TRANSFER_SIZE;
-		WR4(sc, CDNS_I2C_TRANS_SIZE, curr_len);
-	} else {
+	else
 		curr_len = len;
-		WR4(sc, CDNS_I2C_TRANS_SIZE, len);
-		printf("len %d ts read back %d\n", len, RD4(sc, CDNS_I2C_TRANS_SIZE));
-	}
+	WR4(sc, CDNS_I2C_TRANS_SIZE, curr_len);
 
+	/* Start operation.  */
 	WR4(sc, CDNS_I2C_ADDR, msg->slave >> 1);
-
-	critical_enter();
 
 	while (len) {
 		if (RD4(sc, CDNS_I2C_ISR) & I2C_ISR_ARBLOST) {
 			printf("%s: arb lost\n", __func__);
-			critical_exit();
 			return (EAGAIN);
 		}
 		while (RD4(sc, CDNS_I2C_SR) & I2C_SR_RXDV) {
 			if ((len < CDNS_I2C_FIFO_DEPTH) && !sc->hold_flag) {
-				printf("%s: clearing hold\n", __func__);
 				reg = RD4(sc, CDNS_I2C_CR);
 				reg &= ~I2C_CR_HOLD;
 				WR4(sc, CDNS_I2C_CR, reg);
 			}
 			d = RD4(sc, CDNS_I2C_DATA);
-			printf("%s: ts %d cr %x sr %x isr %x data received: %x\n",
-			    __func__,
-			    RD4(sc, CDNS_I2C_TRANS_SIZE),
-			    RD4(sc, CDNS_I2C_CR), RD4(sc, CDNS_I2C_SR),
-			    RD4(sc, CDNS_I2C_ISR), d);
 			*(data++) = d;
 			len --;
 			curr_len --;
-			//WR4(sc, CDNS_I2C_TRANS_SIZE, 15);
 		}
 
 		if (len && !curr_len) {
@@ -219,8 +207,6 @@ cdns_i2c_read_data(device_t dev, struct iic_msg *msg)
 			WR4(sc, CDNS_I2C_TRANS_SIZE, curr_len);
 		}
 	}
-
-	critical_exit();
 
 	reg = cdns_i2c_wait(sc, I2C_ISR_COMP | I2C_ISR_ARBLOST);
 	if (reg & I2C_ISR_ARBLOST) {

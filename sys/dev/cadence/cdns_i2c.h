@@ -79,8 +79,6 @@
 #define	 I2C_IMR_COMP		(1 << 0)
 
 #define	CDNS_I2C_FIFO_DEPTH		16
-#define	CDNS_I2C_TRANSFER_SIZE_MAX	255 /* Controller transfer limit */
-//#define	CDNS_I2C_TRANSFER_SIZE		(CDNS_I2C_TRANSFER_SIZE_MAX - 3)
 #define	CDNS_I2C_TRANSFER_SIZE		15
 
 #endif /* !_DEV_CADENCE_CDNS_I2C_H_ */
