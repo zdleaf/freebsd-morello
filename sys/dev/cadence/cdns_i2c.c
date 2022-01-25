@@ -164,8 +164,10 @@ cdns_i2c_read_data(device_t dev, struct iic_msg *msg)
 	len = msg->len;
 	data = msg->buf;
 
-	/* Set the controller in Master receive mode and clear FIFO. */
 	reg = RD4(sc, CDNS_I2C_CR);
+	if (len > CDNS_I2C_FIFO_DEPTH)
+		reg |= I2C_CR_HOLD;
+	/* Set the controller in Master receive mode and clear FIFO. */
 	reg |= I2C_CR_CLR_FIFO;
 	reg |= I2C_CR_RW;
 	WR4(sc, CDNS_I2C_CR, reg);
@@ -173,30 +175,52 @@ cdns_i2c_read_data(device_t dev, struct iic_msg *msg)
 	if (len > CDNS_I2C_TRANSFER_SIZE) {
 		curr_len = CDNS_I2C_TRANSFER_SIZE;
 		WR4(sc, CDNS_I2C_TRANS_SIZE, curr_len);
-		panic("implement me");
-	} else
+	} else {
+		curr_len = len;
 		WR4(sc, CDNS_I2C_TRANS_SIZE, len);
+		printf("len %d ts read back %d\n", len, RD4(sc, CDNS_I2C_TRANS_SIZE));
+	}
 
 	WR4(sc, CDNS_I2C_ADDR, msg->slave >> 1);
+
+	critical_enter();
 
 	while (len) {
 		if (RD4(sc, CDNS_I2C_ISR) & I2C_ISR_ARBLOST) {
 			printf("%s: arb lost\n", __func__);
+			critical_exit();
 			return (EAGAIN);
 		}
 		while (RD4(sc, CDNS_I2C_SR) & I2C_SR_RXDV) {
 			if ((len < CDNS_I2C_FIFO_DEPTH) && !sc->hold_flag) {
+				printf("%s: clearing hold\n", __func__);
 				reg = RD4(sc, CDNS_I2C_CR);
 				reg &= ~I2C_CR_HOLD;
 				WR4(sc, CDNS_I2C_CR, reg);
 			}
 			d = RD4(sc, CDNS_I2C_DATA);
-			if (d != 0)
-				printf("%s: data received: %x\n", __func__, d);
+			printf("%s: ts %d cr %x sr %x isr %x data received: %x\n",
+			    __func__,
+			    RD4(sc, CDNS_I2C_TRANS_SIZE),
+			    RD4(sc, CDNS_I2C_CR), RD4(sc, CDNS_I2C_SR),
+			    RD4(sc, CDNS_I2C_ISR), d);
 			*(data++) = d;
 			len --;
+			curr_len --;
+			//WR4(sc, CDNS_I2C_TRANS_SIZE, 15);
+		}
+
+		if (len && !curr_len) {
+			WR4(sc, CDNS_I2C_ADDR, msg->slave >> 1);
+			if (len > CDNS_I2C_TRANSFER_SIZE)
+				curr_len = CDNS_I2C_TRANSFER_SIZE;
+			else
+				curr_len = len;
+			WR4(sc, CDNS_I2C_TRANS_SIZE, curr_len);
 		}
 	}
+
+	critical_exit();
 
 	reg = cdns_i2c_wait(sc, I2C_ISR_COMP | I2C_ISR_ARBLOST);
 	if (reg & I2C_ISR_ARBLOST) {
@@ -225,15 +249,11 @@ cdns_i2c_write_data(device_t dev, struct iic_msg *msg)
 
 	/* Set the controller in Master transmit mode and clear FIFO. */
 	reg = RD4(sc, CDNS_I2C_CR);
+	if (len > CDNS_I2C_FIFO_DEPTH)
+		reg |= I2C_CR_HOLD;
 	reg |= I2C_CR_CLR_FIFO;
-	WR4(sc, CDNS_I2C_CR, reg);
 	reg &= ~I2C_CR_RW;
 	WR4(sc, CDNS_I2C_CR, reg);
-
-	if (msg->len > CDNS_I2C_FIFO_DEPTH) {
-		printf("msg too big %d %d\n", msg->len, CDNS_I2C_FIFO_DEPTH);
-		panic("impl me");
-	}
 
 	WR4(sc, CDNS_I2C_ISR, CDNS_I2C_ISR_MASK);
 	WR4(sc, CDNS_I2C_ADDR, msg->slave >> 1);
@@ -245,7 +265,8 @@ cdns_i2c_write_data(device_t dev, struct iic_msg *msg)
 		}
 
 		WR4(sc, CDNS_I2C_DATA, *(data++));
-		if (len && RD4(sc, CDNS_I2C_TRANS_SIZE) == CDNS_I2C_FIFO_DEPTH){
+		if (len &&
+		    (RD4(sc, CDNS_I2C_TRANS_SIZE) == CDNS_I2C_FIFO_DEPTH)) {
 			panic("here");
 		}
 	}
@@ -299,7 +320,6 @@ retry:
 	for (i = 0; i < nmsgs; i++) {
 		if (i == (nmsgs - 1))
 			sc->hold_flag = 0;
-
 		msg = &msgs[i];
 		if (msg->flags & IIC_M_RD)
 			error = cdns_i2c_read_data(dev, msg);
