@@ -49,5 +49,8 @@ void gcu_intr(struct komeda_drm_softc *sc);
 void dou_intr(struct komeda_drm_softc *sc);
 void lpu_intr(struct komeda_drm_softc *sc);
 void cu_intr(struct komeda_drm_softc *sc);
+void cu_configure(struct komeda_drm_softc *sc, struct drm_display_mode *m);
+void dou_configure(struct komeda_drm_softc *sc, struct drm_display_mode *m);
+void dou_ds_timing_setup(struct komeda_drm_softc *sc, struct drm_display_mode *m);
 
 #endif /* !_DEV_DRM_KOMEDA_KOMEDA_PLANE_H_ */

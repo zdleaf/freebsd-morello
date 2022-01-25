@@ -158,7 +158,7 @@ komeda_plane_atomic_check(struct drm_plane *plane,
 	struct drm_crtc *crtc;
 	struct drm_crtc_state *crtc_state;
 
-	printf("%s\n", __func__);
+	dprintf("%s\n", __func__);
 
 	crtc = state->crtc;
 	if (crtc == NULL)
@@ -179,23 +179,15 @@ komeda_plane_atomic_disable(struct drm_plane *plane,
     struct drm_plane_state *old_state)
 {
 
-	printf("%s\n", __func__);
+	dprintf("%s\n", __func__);
 }
 
-static void
-dou_ds_timing_setup(struct komeda_drm_softc *sc, struct drm_plane *plane)
+void
+dou_ds_timing_setup(struct komeda_drm_softc *sc, struct drm_display_mode *m)
 {
 	uint32_t hactive, hfront_porch, hback_porch, hsync_len;
 	uint32_t vactive, vfront_porch, vback_porch, vsync_len;
-	struct drm_plane_state *state;
-	struct drm_display_mode *m;
-	struct drm_crtc *crtc;
 	uint32_t reg;
-
-	state = plane->state;
-	crtc = state->crtc;
-
-	m = &crtc->state->adjusted_mode;
 
 	hactive = m->crtc_hdisplay;
 	hfront_porch = m->crtc_hsync_start - m->crtc_hdisplay;
@@ -264,10 +256,14 @@ void
 gcu_intr(struct komeda_drm_softc *sc)
 {
 	uint32_t reg;
+	int mask;
 
 	reg = DPU_RD4(sc, GCU_IRQ_STATUS);
 
-	printf("%s: reg %x\n", __func__, reg);
+	mask = GCU_IRQ_CVAL0;
+
+	if ((reg & mask) != reg)
+		printf("%s: reg %x\n", __func__, reg);
 
 	DPU_WR4(sc, GCU_IRQ_CLEAR, reg);
 }
@@ -318,14 +314,13 @@ gcu_configure(struct komeda_drm_softc *sc)
 
 	DPU_WR4(sc, GCU_CONFIG_VALID0, CONFIG_VALID0_CVAL);
 
-	printf("%s: GCU initialized\n", __func__);
+	dprintf("%s: GCU initialized\n", __func__);
 
 	return (0);
 }
 
-static void
-dou_configure(struct komeda_drm_softc *sc, struct drm_fb_cma *fb,
-    struct drm_display_mode *m)
+void
+dou_configure(struct komeda_drm_softc *sc, struct drm_display_mode *m)
 {
 	uint32_t reg;
 
@@ -360,7 +355,7 @@ lpu_configure(struct komeda_drm_softc *sc, struct drm_fb_cma *fb,
 			break;
 
 	fmt = komeda_convert_format(komeda_plane_formats[i]);
-	printf("%s: fmt %d\n", __func__, fmt);
+	dprintf("%s: fmt %d\n", __func__, fmt);
 
 	if (state->fb->format->has_alpha && id > 0)
 		printf("%s: cursor plane\n", __func__);
@@ -369,7 +364,7 @@ lpu_configure(struct komeda_drm_softc *sc, struct drm_fb_cma *fb,
 	paddr = bo->pbase + fb->drm_fb.offsets[0];
 	paddr += (state->src.x1 >> 16) * fb->drm_fb.format->cpp[0];
 	paddr += (state->src.y1 >> 16) * fb->drm_fb.pitches[0];
-	printf("%s: pbase %lx, paddr %lx\n", __func__, bo->pbase, paddr);
+	dprintf("%s: pbase %lx, paddr %lx\n", __func__, bo->pbase, paddr);
 
 	info = fb->drm_fb.format;
 	block_h = drm_format_info_block_height(info, 0);
@@ -378,7 +373,7 @@ lpu_configure(struct komeda_drm_softc *sc, struct drm_fb_cma *fb,
 	 * LPU configuration. Setup layer 0.
 	 */
 	DPU_WR4(sc, LR_P0_STRIDE, fb->drm_fb.pitches[0] * block_h);
-	printf("%s: plane 0 STRIDE is %x\n", __func__,
+	dprintf("%s: plane 0 STRIDE is %x\n", __func__,
 	    fb->drm_fb.pitches[0] * block_h);
 	DPU_WR8(sc, LR_P0_PTR_LOW, paddr);
 	DPU_WR8(sc, LR_P1_PTR_LOW, 0);
@@ -393,7 +388,7 @@ lpu_configure(struct komeda_drm_softc *sc, struct drm_fb_cma *fb,
 	DPU_WR4(sc, LR_CONTROL, reg);
 }
 
-static void
+void
 cu_configure(struct komeda_drm_softc *sc, struct drm_display_mode *m)
 {
 	uint32_t reg;
@@ -424,7 +419,7 @@ komeda_plane_atomic_update(struct drm_plane *plane,
 	struct drm_plane_state *state;
 	uint32_t reg;
 
-	printf("%s\n", __func__);
+	dprintf("%s\n", __func__);
 
 	state = plane->state;
 	crtc = state->crtc;
@@ -439,10 +434,10 @@ komeda_plane_atomic_update(struct drm_plane *plane,
 	sc = komeda_plane->sc;
 
 	m = &crtc->state->adjusted_mode;
-	printf("%s: adj mode hdisplay %d vdisplay %d\n", __func__,
+	dprintf("%s: adj mode hdisplay %d vdisplay %d\n", __func__,
 	    m->hdisplay, m->vdisplay);
 
-	printf("%s: Clock freq needed: %d\n", __func__, m->crtc_clock);
+	dprintf("%s: Clock freq needed: %d\n", __func__, m->crtc_clock);
 
 	/* Enable IRQs */
 	DPU_WR4(sc, GCU_IRQ_MASK, GCU_IRQ_ERR | GCU_IRQ_MODE | GCU_IRQ_CVAL0);
@@ -456,17 +451,17 @@ komeda_plane_atomic_update(struct drm_plane *plane,
 	DPU_WR4(sc, CU0_CU_IRQ_MASK, CU_IRQ_MASK_OVR | CU_IRQ_MASK_ERR);
 
 	lpu_configure(sc, fb, m, komeda_plane, state);
-	cu_configure(sc, m);
-	dou_configure(sc, fb, m);
-	dou_ds_timing_setup(sc, plane);
+	//cu_configure(sc, m);
+	//dou_configure(sc, m);
+	//dou_ds_timing_setup(sc, m);
 	gcu_configure(sc);
 
-	printf("%s: GCU_STATUS %x\n", __func__, DPU_RD4(sc, GCU_STATUS));
-	printf("%s: LPU0_IRQ_RAW_STATUS %x\n", __func__,
+	dprintf("%s: GCU_STATUS %x\n", __func__, DPU_RD4(sc, GCU_STATUS));
+	dprintf("%s: LPU0_IRQ_RAW_STATUS %x\n", __func__,
 	    DPU_RD4(sc, LPU0_IRQ_RAW_STATUS));
-	printf("%s: LPU0_STATUS %x\n", __func__, DPU_RD4(sc, LPU0_STATUS));
-	printf("%s: CU0_CU_STATUS %x\n", __func__, DPU_RD4(sc, CU0_CU_STATUS));
-	printf("%s: DOU0_STATUS %x\n", __func__, DPU_RD4(sc, DOU0_STATUS));
+	dprintf("%s: LPU0_STATUS %x\n", __func__, DPU_RD4(sc, LPU0_STATUS));
+	dprintf("%s: CU0_CU_STATUS %x\n", __func__, DPU_RD4(sc, CU0_CU_STATUS));
+	dprintf("%s: DOU0_STATUS %x\n", __func__, DPU_RD4(sc, DOU0_STATUS));
 }
 
 static struct drm_plane_helper_funcs komeda_plane_helper_funcs = {

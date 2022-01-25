@@ -150,7 +150,7 @@ static int
 komeda_crtc_atomic_check(struct drm_crtc *crtc, struct drm_crtc_state *state)
 {
 
-	printf("%s\n", __func__);
+	dprintf("%s\n", __func__);
 
 	return (0);
 }
@@ -162,7 +162,7 @@ komeda_crtc_atomic_begin(struct drm_crtc *crtc,
 	struct komeda_pipeline *pipeline;
 	unsigned long flags;
 
-	printf("%s\n", __func__);
+	dprintf("%s\n", __func__);
 
 	pipeline = container_of(crtc, struct komeda_pipeline, crtc);
 
@@ -188,7 +188,7 @@ komeda_crtc_atomic_flush(struct drm_crtc *crtc,
 	struct komeda_pipeline *pipeline;
 	struct komeda_drm_softc *sc;
 
-	printf("%s\n", __func__);
+	dprintf("%s\n", __func__);
 
 	event = crtc->state->event;
 
@@ -212,30 +212,26 @@ komeda_crtc_atomic_flush(struct drm_crtc *crtc,
 }
 
 static void
-komeda_crtc_atomic_enable(struct drm_crtc *crtc, struct drm_crtc_state *old_state)
+komeda_crtc_atomic_enable(struct drm_crtc *crtc,
+    struct drm_crtc_state *old_state)
 {
-
-	dprintf("%s\n", __func__);
-
-#if 0
-	uint32_t hsync_len, vsync_len;
-	uint32_t hact_st, hact_end;
-	uint32_t vact_st, vact_end;
 	struct komeda_drm_softc *sc;
+	struct komeda_pipeline *pipeline;
 	struct drm_display_mode *adj;
-	uint32_t mode1;
-	uint32_t reg;
-	int pol;
 
 	adj = &crtc->state->adjusted_mode;
 
-	sc = container_of(crtc, struct komeda_drm_softc, crtc);
+	pipeline = container_of(crtc, struct komeda_pipeline, crtc);
+	sc = pipeline->sc;
 
 	dprintf("%s\n", __func__);
 
+	cu_configure(sc, adj);
+	dou_configure(sc, adj);
+	dou_ds_timing_setup(sc, adj);
+
 	/* Enable VBLANK events */
 	drm_crtc_vblank_on(crtc);
-#endif
 }
 
 static void
@@ -245,7 +241,7 @@ komeda_crtc_atomic_disable(struct drm_crtc *crtc,
 	struct komeda_pipeline *pipeline;
 	uint32_t irqflags;
 
-	printf("%s\n", __func__);
+	dprintf("%s\n", __func__);
 
 	pipeline = container_of(crtc, struct komeda_pipeline, crtc);
 
