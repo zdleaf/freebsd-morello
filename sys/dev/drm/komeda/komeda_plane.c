@@ -323,7 +323,7 @@ dou_configure(struct komeda_drm_softc *sc, struct drm_display_mode *m)
 	reg = (m->hdisplay << 0) * 1;
 	reg |= (m->vdisplay << 16) * 1;
 	DPU_WR4(sc, DOU0_IPS_SIZE, reg);
-	DPU_WR4(sc, DOU0_IPS_DEPTH, 10); /* YUV */
+	DPU_WR4(sc, DOU0_IPS_DEPTH, 10);
 	DPU_WR4(sc, DOU0_IPS_CONTROL, 0);
 }
 
@@ -460,8 +460,6 @@ komeda_plane_atomic_update(struct drm_plane *plane,
 
 	lpu_configure(sc, fb, state, komeda_plane->id);
 	cu_configure(sc, m, state, komeda_plane->id);
-	//dou_configure(sc, m);
-	//dou_ds_timing_setup(sc, m);
 	gcu_configure(sc);
 
 	dprintf("%s: GCU_STATUS %x\n", __func__, DPU_RD4(sc, GCU_STATUS));
