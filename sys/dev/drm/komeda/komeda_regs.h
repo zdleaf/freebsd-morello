@@ -166,23 +166,23 @@ enum d71_block_type {
 #define	LPU0_IRQ_STATUS		0x02AC
 #define	LPU0_STATUS		0x02B0
 
-#define	LR_BLOCK_INFO		0x0400
-#define	LR_OUTPUT_ID0		0x0460
-#define	LR_CONTROL		0x04D0
+#define	LR_BLOCK_INFO(n)	(0x0400 + 0x200 * (n))
+#define	LR_OUTPUT_ID0(n)	(0x0460 + 0x200 * (n))
+#define	LR_CONTROL(n)		(0x04D0 + 0x200 * (n))
 #define	 CONTROL_EN		(1 << 0)	/* Layer enable */
-#define	LR_FORMAT		0x04D8
-#define	LR_IN_SIZE		0x04E0
+#define	LR_FORMAT(n)		(0x04D8 + 0x200 * (n))
+#define	LR_IN_SIZE(n)		(0x04E0 + 0x200 * (n))
 #define	 IN_SIZE_HSIZE_S	0
 #define	 IN_SIZE_HSIZE_M	(0xfff << IN_SIZE_HSIZE_S)
 #define	 IN_SIZE_VSIZE_S	16
 #define	 IN_SIZE_VSIZE_M	(0xfff << IN_SIZE_VSIZE_S)
-#define	LR_PALPHA		0x04E4
-#define	LR_P0_PTR_LOW		0x0500
-#define	LR_P0_PTR_HIGH		0x0504
-#define	LR_P0_STRIDE		0x0508
-#define	LR_P1_PTR_LOW		0x0510
-#define	LR_P2_PTR_LOW		0x0520
-#define	LR_AD_CONTROL		0x0560
+#define	LR_PALPHA(n)		(0x04E4 + 0x200 * (n))
+#define	LR_P0_PTR_LOW(n)	(0x0500 + 0x200 * (n))
+#define	LR_P0_PTR_HIGH(n)	(0x0504 + 0x200 * (n))
+#define	LR_P0_STRIDE(n)		(0x0508 + 0x200 * (n))
+#define	LR_P1_PTR_LOW(n)	(0x0510 + 0x200 * (n))
+#define	LR_P2_PTR_LOW(n)	(0x0520 + 0x200 * (n))
+#define	LR_AD_CONTROL(n)	(0x0560 + 0x200 * (n))
 
 #define	CU0_BLOCK_INFO		0x0E00
 #define	CU0_OUTPUT_ID0		0x0E60

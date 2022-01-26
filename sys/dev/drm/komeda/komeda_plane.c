@@ -372,20 +372,20 @@ lpu_configure(struct komeda_drm_softc *sc, struct drm_fb_cma *fb,
 	/*
 	 * LPU configuration. Setup layer 0.
 	 */
-	DPU_WR4(sc, LR_P0_STRIDE, fb->drm_fb.pitches[0] * block_h);
+	DPU_WR4(sc, LR_P0_STRIDE(id), fb->drm_fb.pitches[0] * block_h);
 	dprintf("%s: plane 0 STRIDE is %x\n", __func__,
 	    fb->drm_fb.pitches[0] * block_h);
-	DPU_WR8(sc, LR_P0_PTR_LOW, paddr);
-	DPU_WR8(sc, LR_P1_PTR_LOW, 0);
-	DPU_WR8(sc, LR_P2_PTR_LOW, 0);
-	DPU_WR4(sc, LR_FORMAT, fmt);
+	DPU_WR8(sc, LR_P0_PTR_LOW(id), paddr);
+	DPU_WR8(sc, LR_P1_PTR_LOW(id), 0);
+	DPU_WR8(sc, LR_P2_PTR_LOW(id), 0);
+	DPU_WR4(sc, LR_FORMAT(id), fmt);
 	reg = (m->hdisplay << IN_SIZE_HSIZE_S) * 1;
 	reg |= (m->vdisplay << IN_SIZE_VSIZE_S) * 1;
-	DPU_WR4(sc, LR_IN_SIZE, reg);
-	DPU_WR4(sc, LR_PALPHA, D71_PALPHA_DEF_MAP);
-	DPU_WR4(sc, LR_AD_CONTROL, 0); /* No modifiers. */
+	DPU_WR4(sc, LR_IN_SIZE(id), reg);
+	DPU_WR4(sc, LR_PALPHA(id), D71_PALPHA_DEF_MAP);
+	DPU_WR4(sc, LR_AD_CONTROL(id), 0); /* No modifiers. */
 	reg = CONTROL_EN | 3 << 28; /* ARCACHE */
-	DPU_WR4(sc, LR_CONTROL, reg);
+	DPU_WR4(sc, LR_CONTROL(id), reg);
 }
 
 void
@@ -396,7 +396,7 @@ cu_configure(struct komeda_drm_softc *sc, struct drm_display_mode *m)
 	/*
 	 * CU configuration. CU0 inputs from layer 0.
 	 */
-	reg = DPU_RD4(sc, LR_OUTPUT_ID0);
+	reg = DPU_RD4(sc, LR_OUTPUT_ID0(0));
 	DPU_WR4(sc, CU0_CU_INPUT_ID0, reg);
 	reg = (m->hdisplay << 0) * 1;
 	reg |= (m->vdisplay << 16) * 1;
