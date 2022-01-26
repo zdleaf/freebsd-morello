@@ -398,6 +398,8 @@ cu_configure(struct komeda_drm_softc *sc, struct drm_display_mode *m)
 	 */
 	reg = DPU_RD4(sc, LR_OUTPUT_ID0(0));
 	DPU_WR4(sc, CU0_CU_INPUT_ID0, reg);
+	reg = DPU_RD4(sc, LR_OUTPUT_ID0(1));
+	DPU_WR4(sc, CU0_CU_INPUT_ID1, reg);
 	reg = (m->hdisplay << 0) * 1;
 	reg |= (m->vdisplay << 16) * 1;
 	DPU_WR4(sc, CU0_INPUT0_SIZE, reg);

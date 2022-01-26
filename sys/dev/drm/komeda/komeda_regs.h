@@ -187,6 +187,7 @@ enum d71_block_type {
 #define	CU0_BLOCK_INFO		0x0E00
 #define	CU0_OUTPUT_ID0		0x0E60
 #define	CU0_CU_INPUT_ID0	0x0E80
+#define	CU0_CU_INPUT_ID1	0x0E84
 #define	CU0_CU_IRQ_CLEAR	0x0EA4
 #define	CU0_CU_IRQ_MASK		0x0EA8
 #define	 CU_IRQ_MASK_OVR	(1 << 9)
