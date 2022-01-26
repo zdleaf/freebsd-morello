@@ -166,8 +166,8 @@ enum d71_block_type {
 #define	LPU0_IRQ_STATUS		0x02AC
 #define	LPU0_STATUS		0x02B0
 
-#define	LPU0_LAYER0_BLOCK_INFO	0x0400
-#define	LPU0_LAYER0_OUTPUT_ID0	0x0460
+#define	LR_BLOCK_INFO		0x0400
+#define	LR_OUTPUT_ID0		0x0460
 #define	LR_CONTROL		0x04D0
 #define	 CONTROL_EN		(1 << 0)	/* Layer enable */
 #define	LR_FORMAT		0x04D8
