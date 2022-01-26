@@ -221,13 +221,6 @@ dou_ds_timing_setup(struct komeda_drm_softc *sc, struct drm_display_mode *m)
 	DPU_WR4(sc, BS_PREFETCH_LINE, D71_DEFAULT_PREPRETCH_LINE);
 
 	reg = BS_CONTROL_EN | BS_CONTROL_VM;
-	//reg |= BS_CONTROL_TM;	/* Test Mode */
-#if 0
-	if (c->pipeline->dual_link) {
-		DPU_WR4(sc, BS_DRIFT_TO, hfront_porch + 16);
-		reg |= BS_CONTROL_DL;
-	}
-#endif
 	DPU_WR4(sc, BS_CONTROL, reg);
 }
 
@@ -336,8 +329,7 @@ dou_configure(struct komeda_drm_softc *sc, struct drm_display_mode *m)
 
 static void
 lpu_configure(struct komeda_drm_softc *sc, struct drm_fb_cma *fb,
-    struct drm_display_mode *m, struct komeda_plane *komeda_plane,
-    struct drm_plane_state *state)
+    struct drm_plane_state *state, int id)
 {
 	const struct drm_format_info *info;
 	struct drm_gem_cma_object *bo;
@@ -346,10 +338,7 @@ lpu_configure(struct komeda_drm_softc *sc, struct drm_fb_cma *fb,
 	uint32_t reg;
 	int block_h;
 	int fmt;
-	int id;
 	int i;
-
-	id = komeda_plane->id;
 
 	for (i = 0; i < nitems(komeda_plane_formats); i++)
 		if (komeda_plane_formats[i] == state->fb->format->format)
@@ -390,8 +379,6 @@ lpu_configure(struct komeda_drm_softc *sc, struct drm_fb_cma *fb,
 	DPU_WR4(sc, LR_AD_CONTROL(id), 0); /* No modifiers. */
 	reg = CONTROL_EN | 3 << 28; /* ARCACHE */
 	DPU_WR4(sc, LR_CONTROL(id), reg);
-
-	cu_configure(sc, m, state, id);
 }
 
 void
@@ -471,8 +458,8 @@ komeda_plane_atomic_update(struct drm_plane *plane,
 					LPU_IRQ_MASK_ERR | LPU_IRQ_MASK_IBSY));
 	DPU_WR4(sc, CU0_CU_IRQ_MASK, CU_IRQ_MASK_OVR | CU_IRQ_MASK_ERR);
 
-	lpu_configure(sc, fb, m, komeda_plane, state);
-	//cu_configure(sc, m);
+	lpu_configure(sc, fb, state, komeda_plane->id);
+	cu_configure(sc, m, state, komeda_plane->id);
 	//dou_configure(sc, m);
 	//dou_ds_timing_setup(sc, m);
 	gcu_configure(sc);
