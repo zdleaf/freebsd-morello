@@ -341,6 +341,7 @@ lpu_configure(struct komeda_drm_softc *sc, struct drm_fb_cma *fb,
 {
 	const struct drm_format_info *info;
 	struct drm_gem_cma_object *bo;
+	uint32_t dst_w, dst_h;
 	dma_addr_t paddr;
 	uint32_t reg;
 	int block_h;
@@ -358,7 +359,7 @@ lpu_configure(struct komeda_drm_softc *sc, struct drm_fb_cma *fb,
 	dprintf("%s: fmt %d\n", __func__, fmt);
 
 	if (state->fb->format->has_alpha && id > 0)
-		printf("%s: cursor plane\n", __func__);
+		dprintf("%s: cursor plane\n", __func__);
 
 	bo = drm_fb_cma_get_gem_obj(fb, 0);
 	paddr = bo->pbase + fb->drm_fb.offsets[0];
@@ -369,44 +370,66 @@ lpu_configure(struct komeda_drm_softc *sc, struct drm_fb_cma *fb,
 	info = fb->drm_fb.format;
 	block_h = drm_format_info_block_height(info, 0);
 
+	dprintf("%s: num_planes %d\n", __func__, info->num_planes);
+
 	/*
-	 * LPU configuration. Setup layer 0.
+	 * LPU configuration. Setup layer.
 	 */
 	DPU_WR4(sc, LR_P0_STRIDE(id), fb->drm_fb.pitches[0] * block_h);
 	dprintf("%s: plane 0 STRIDE is %x\n", __func__,
 	    fb->drm_fb.pitches[0] * block_h);
 	DPU_WR8(sc, LR_P0_PTR_LOW(id), paddr);
-	DPU_WR8(sc, LR_P1_PTR_LOW(id), 0);
-	DPU_WR8(sc, LR_P2_PTR_LOW(id), 0);
 	DPU_WR4(sc, LR_FORMAT(id), fmt);
-	reg = (m->hdisplay << IN_SIZE_HSIZE_S) * 1;
-	reg |= (m->vdisplay << IN_SIZE_VSIZE_S) * 1;
+
+	dst_w = drm_rect_width(&state->dst);
+	dst_h = drm_rect_height(&state->dst);
+	reg = dst_w | dst_h << 16;
 	DPU_WR4(sc, LR_IN_SIZE(id), reg);
+
 	DPU_WR4(sc, LR_PALPHA(id), D71_PALPHA_DEF_MAP);
 	DPU_WR4(sc, LR_AD_CONTROL(id), 0); /* No modifiers. */
 	reg = CONTROL_EN | 3 << 28; /* ARCACHE */
 	DPU_WR4(sc, LR_CONTROL(id), reg);
+
+	cu_configure(sc, m, state, id);
 }
 
 void
-cu_configure(struct komeda_drm_softc *sc, struct drm_display_mode *m)
+cu_configure(struct komeda_drm_softc *sc, struct drm_display_mode *m, 
+    struct drm_plane_state *state, int id)
 {
+	uint32_t dst_w, dst_h;
+	struct drm_rect *dst;
 	uint32_t reg;
+
+	dst = &state->dst;
 
 	/*
 	 * CU configuration. CU0 inputs from layer 0.
 	 */
-	reg = DPU_RD4(sc, LR_OUTPUT_ID0(0));
-	DPU_WR4(sc, CU0_CU_INPUT_ID0, reg);
-	reg = DPU_RD4(sc, LR_OUTPUT_ID0(1));
-	DPU_WR4(sc, CU0_CU_INPUT_ID1, reg);
+	reg = DPU_RD4(sc, LR_OUTPUT_ID0(id));
+	if (id == 0)
+		DPU_WR4(sc, CU0_CU_INPUT_ID0, reg);
+	else
+		DPU_WR4(sc, CU0_CU_INPUT_ID1, reg);
+
 	reg = (m->hdisplay << 0) * 1;
 	reg |= (m->vdisplay << 16) * 1;
-	DPU_WR4(sc, CU0_INPUT0_SIZE, reg);
-	DPU_WR4(sc, CU0_INPUT0_OFFSET, 0);
-	DPU_WR4(sc, CU0_INPUT0_CONTROL, INPUT0_CONTROL_EN | 255 << 8);	/* Layer EN */
 	DPU_WR4(sc, CU0_CU_SIZE, reg);
-	//DPU_WR4(sc, CU0_CU_CONTROL, CU_CONTROL_COPR); /* Enable CU */
+
+	dst_w = drm_rect_width(&state->dst);
+	dst_h = drm_rect_height(&state->dst);
+	reg = dst_w | dst_h << 16;
+
+	if (id == 0) {
+		DPU_WR4(sc, CU0_INPUT0_SIZE, reg);
+		DPU_WR4(sc, CU0_INPUT0_OFFSET, 0);
+		DPU_WR4(sc, CU0_INPUT0_CONTROL, INPUT0_CONTROL_EN | 255 << 8);
+	} else {
+		DPU_WR4(sc, CU0_INPUT1_SIZE, reg);
+		DPU_WR4(sc, CU0_INPUT1_OFFSET, (dst->x1 | dst->y1 << 16));
+		DPU_WR4(sc, CU0_INPUT1_CONTROL, INPUT0_CONTROL_EN | 255 << 8);
+	}
 }
 
 static void
@@ -427,10 +450,6 @@ komeda_plane_atomic_update(struct drm_plane *plane,
 	crtc = state->crtc;
 
 	komeda_plane = container_of(plane, struct komeda_plane, plane);
-	if (komeda_plane->id == 1) {
-		/* No cursor for now. */
-		return;
-	}
 
 	fb = container_of(plane->state->fb, struct drm_fb_cma, drm_fb);
 	sc = komeda_plane->sc;

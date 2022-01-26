@@ -181,6 +181,7 @@ enum d71_block_type {
 #define	LR_P0_PTR_HIGH(n)	(0x0504 + 0x200 * (n))
 #define	LR_P0_STRIDE(n)		(0x0508 + 0x200 * (n))
 #define	LR_P1_PTR_LOW(n)	(0x0510 + 0x200 * (n))
+#define	LR_P1_STRIDE(n)		(0x0518 + 0x200 * (n))
 #define	LR_P2_PTR_LOW(n)	(0x0520 + 0x200 * (n))
 #define	LR_AD_CONTROL(n)	(0x0560 + 0x200 * (n))
 
@@ -201,6 +202,9 @@ enum d71_block_type {
 #define	CU0_INPUT0_OFFSET	0x0EE4
 #define	CU0_INPUT0_CONTROL	0x0EE8
 #define	 INPUT0_CONTROL_EN	(1 << 0)
+#define	CU0_INPUT1_SIZE		0x0EF0
+#define	CU0_INPUT1_OFFSET	0x0EF4
+#define	CU0_INPUT1_CONTROL	0x0EF8
 
 #define	D71_DEFAULT_PREPRETCH_LINE	5
 #define	D71_PALPHA_DEF_MAP		0xFFAA5500

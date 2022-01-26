@@ -226,7 +226,7 @@ komeda_crtc_atomic_enable(struct drm_crtc *crtc,
 
 	dprintf("%s\n", __func__);
 
-	cu_configure(sc, adj);
+	//cu_configure(sc, adj);
 	dou_configure(sc, adj);
 	dou_ds_timing_setup(sc, adj);
 
