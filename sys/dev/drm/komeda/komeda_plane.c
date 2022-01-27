@@ -395,10 +395,7 @@ cu_configure(struct komeda_drm_softc *sc, struct drm_display_mode *m,
 	 * CU configuration. CU0 inputs from layer 0.
 	 */
 	reg = DPU_RD4(sc, LR_OUTPUT_ID0(id));
-	if (id == 0)
-		DPU_WR4(sc, CU0_CU_INPUT_ID0, reg);
-	else
-		DPU_WR4(sc, CU0_CU_INPUT_ID1, reg);
+	DPU_WR4(sc, CU0_CU_INPUT_ID(id), reg);
 
 	reg = (m->hdisplay << 0) * 1;
 	reg |= (m->vdisplay << 16) * 1;
