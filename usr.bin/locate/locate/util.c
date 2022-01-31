@@ -35,11 +35,10 @@
  * $FreeBSD$
  */
 
-
+#include <sys/param.h>
 #include <stdlib.h>
 #include <string.h>
 #include <err.h>
-#include <sys/param.h>
 #include <arpa/inet.h>
 #include <stdio.h>
 
@@ -140,7 +139,7 @@ char *
 patprep(name)
 	char *name;
 {
-	register char *endmark, *p, *subp;
+	char *endmark, *p, *subp;
 
 	subp = globfree;
 	*subp++ = '\0';   /* set first element to '\0' */
@@ -194,7 +193,7 @@ u_char *
 tolower_word(word)
 	u_char *word;
 {
-	register u_char *p;
+	u_char *p;
 
 	for(p = word; *p != '\0'; p++)
 		*p = TOLOWER(*p);
@@ -221,11 +220,11 @@ getwm(p)
 		char buf[INTSIZE];
 		int i;
 	} u;
-	register int i, hi;
+	int i, hi;
 
 	/* the integer is stored by an offset of 14 (!!!) */
-        int i_max = MAXPATHLEN + OFFSET;
-        int i_min = -(MAXPATHLEN - OFFSET);
+        int i_max = LOCATE_PATH_MAX + OFFSET;
+        int i_min = -(LOCATE_PATH_MAX - OFFSET);
 
 	for (i = 0; i < (int)INTSIZE; i++)
 		u.buf[i] = *p++;
@@ -254,9 +253,9 @@ int
 getwf(fp)
 	FILE *fp;
 {
-	register int word, hword;
-        int i_max = MAXPATHLEN + OFFSET;
-        int i_min = -(MAXPATHLEN - OFFSET);
+	int word, hword;
+        int i_max = LOCATE_PATH_MAX + OFFSET;
+        int i_min = -(LOCATE_PATH_MAX - OFFSET);
 
 	word = getw(fp);
 
