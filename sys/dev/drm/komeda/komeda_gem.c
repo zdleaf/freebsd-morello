@@ -73,7 +73,7 @@ komeda_gem_prime_import_sg_table(struct drm_device *dev,
 	int ret;
 
 	size = PAGE_ALIGN(attach->dmabuf->size);
-	ret = drm_gem_cma_create_nobufs(dev, size, &bo);
+	ret = drm_gem_cma_create_nobufs(dev, size, true, &bo);
 	if (ret) {
 		printf("%s: could not create CMA object\n", __func__);
 		return (NULL);

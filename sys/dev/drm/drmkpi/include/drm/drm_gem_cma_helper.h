@@ -46,7 +46,7 @@ struct drm_gem_cma_object {
 int drm_gem_cma_create(struct drm_device *drm, size_t size,
     struct drm_gem_cma_object **res_bo);
 int drm_gem_cma_create_nobufs(struct drm_device *drm, size_t size,
-    struct drm_gem_cma_object **res_bo);
+    bool private, struct drm_gem_cma_object **res_bo);
 void drm_gem_cma_free_object(struct drm_gem_object *gem_obj);
 int drm_gem_cma_dumb_create(struct drm_file *file, struct drm_device *drm_dev,
     struct drm_mode_create_dumb *args);

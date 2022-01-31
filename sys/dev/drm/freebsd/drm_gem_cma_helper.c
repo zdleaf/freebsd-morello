@@ -307,7 +307,7 @@ drm_gem_cma_mmap(struct file *file, struct vm_area_struct *vma)
 }
 
 int
-drm_gem_cma_create_nobufs(struct drm_device *drm, size_t size,
+drm_gem_cma_create_nobufs(struct drm_device *drm, size_t size, bool private,
     struct drm_gem_cma_object **res_bo)
 {
 	struct drm_gem_cma_object *bo;
@@ -319,12 +319,18 @@ drm_gem_cma_create_nobufs(struct drm_device *drm, size_t size,
 	bo = malloc(sizeof(*bo), DRM_MEM_DRIVER, M_WAITOK | M_ZERO);
 
 	size = round_page(size);
-	rv = drm_gem_object_init(drm, &bo->gem_obj, size);
-	if (rv != 0) {
-		DRM_ERROR("%s: drm_gem_object_init failed\n", __func__);
-		free(bo, DRM_MEM_DRIVER);
-		return (rv);
+
+	if (private) {
+		drm_gem_private_object_init(drm, &bo->gem_obj, size);
+	} else {
+		rv = drm_gem_object_init(drm, &bo->gem_obj, size);
+		if (rv != 0) {
+			DRM_ERROR("%s: drm_gem_object_init failed\n", __func__);
+			free(bo, DRM_MEM_DRIVER);
+			return (rv);
+		}
 	}
+
 	rv = drm_gem_create_mmap_offset(&bo->gem_obj);
 	if (rv != 0) {
 		DRM_ERROR("%s: drm_gem_create_mmap_offset failed\n", __func__);
@@ -344,7 +350,7 @@ drm_gem_cma_create(struct drm_device *drm, size_t size, struct drm_gem_cma_objec
 	struct drm_gem_cma_object *bo;
 	int rv;
 
-	rv = drm_gem_cma_create_nobufs(drm, size, &bo);
+	rv = drm_gem_cma_create_nobufs(drm, size, false, &bo);
 	if (rv != 0) {
 		DRM_ERROR("%s: drm_gem_cma_alloc failed\n", __func__);
 		return (rv);
