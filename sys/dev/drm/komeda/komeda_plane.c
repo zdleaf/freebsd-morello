@@ -76,9 +76,6 @@ __FBSDID("$FreeBSD$");
 #include <dev/drm/komeda/komeda_drv.h>
 #include <dev/drm/komeda/komeda_regs.h>
 
-//#include "komeda_if.h"
-//#include "dw_hdmi_if.h"
-
 #define	dprintf(fmt, ...)
 
 static const u32 komeda_plane_formats[] = {
@@ -125,7 +122,10 @@ komeda_convert_format(uint32_t format)
 	case DRM_FORMAT_BGRA8888:
 		return (11);
 	case DRM_FORMAT_XRGB8888:
-		return (16);
+	/*
+	 * Documentation states this should be 16, but it works better with 17.
+	 * FALLTHROUGH
+	 */
 	case DRM_FORMAT_XBGR8888:
 		return (17);
 	case DRM_FORMAT_RGBX8888:
