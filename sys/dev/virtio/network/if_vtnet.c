@@ -518,6 +518,11 @@ vtnet_detach(device_t dev)
 	netmap_detach(ifp);
 #endif
 
+	if (sc->vtnet_pfil != NULL) {
+		pfil_head_unregister(sc->vtnet_pfil);
+		sc->vtnet_pfil = NULL;
+	}
+
 	vtnet_free_taskqueues(sc);
 
 	if (sc->vtnet_vlan_attach != NULL) {
@@ -2079,6 +2084,7 @@ vtnet_rxq_eof(struct vtnet_rxq *rxq)
 		if (sc->vtnet_flags & VTNET_FLAG_MRG_RXBUFS) {
 			struct virtio_net_hdr_mrg_rxbuf *mhdr =
 			    mtod(m, struct virtio_net_hdr_mrg_rxbuf *);
+			kmsan_mark(mhdr, sizeof(*mhdr), KMSAN_STATE_INITED);
 			nbufs = vtnet_htog16(sc, mhdr->num_buffers);
 			adjsz = sizeof(struct virtio_net_hdr_mrg_rxbuf);
 		} else if (vtnet_modern(sc)) {

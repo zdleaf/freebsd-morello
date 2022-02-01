@@ -169,14 +169,12 @@ fuse_internal_access(struct vnode *vp,
 	int err = 0;
 	uint32_t mask = F_OK;
 	int dataflags;
-	int vtype;
 	struct mount *mp;
 	struct fuse_dispatcher fdi;
 	struct fuse_access_in *fai;
 	struct fuse_data *data;
 
 	mp = vnode_mount(vp);
-	vtype = vnode_vtype(vp);
 
 	data = fuse_get_mpdata(mp);
 	dataflags = data->dataflags;
@@ -931,6 +929,8 @@ fuse_internal_do_getattr(struct vnode *vp, struct vattr *vap,
 	enum vtype vtyp;
 	int err;
 
+	ASSERT_VOP_LOCKED(vp, __func__);
+
 	fdisp_init(&fdi, sizeof(*fgai));
 	fdisp_make_vp(&fdi, FUSE_GETATTR, vp, td, cred);
 	fgai = fdi.indata;
@@ -1072,6 +1072,10 @@ fuse_internal_init_callback(struct fuse_ticket *tick, struct uio *uio)
 		fsess_set_notimpl(data->mp, FUSE_DESTROY);
 	}
 
+	if (!fuse_libabi_geq(data, 7, 19)) {
+		fsess_set_notimpl(data->mp, FUSE_FALLOCATE);
+	}
+
 	if (fuse_libabi_geq(data, 7, 23) && fiio->time_gran >= 1 &&
 	    fiio->time_gran <= 1000000000)
 		data->time_gran = fiio->time_gran;
@@ -1163,16 +1167,14 @@ int fuse_internal_setattr(struct vnode *vp, struct vattr *vap,
 	struct mount *mp;
 	pid_t pid = td->td_proc->p_pid;
 	struct fuse_data *data;
-	int dataflags;
 	int err = 0;
 	enum vtype vtyp;
-	int sizechanged = -1;
-	uint64_t newsize = 0;
+
+	ASSERT_VOP_ELOCKED(vp, __func__);
 
 	mp = vnode_mount(vp);
 	fvdat = VTOFUD(vp);
 	data = fuse_get_mpdata(mp);
-	dataflags = data->dataflags;
 
 	fdisp_init(&fdi, sizeof(*fsai));
 	fdisp_make_vp(&fdi, FUSE_SETATTR, vp, td, cred);
@@ -1196,8 +1198,6 @@ int fuse_internal_setattr(struct vnode *vp, struct vattr *vap,
 
 		/*Truncate to a new value. */
 		fsai->size = vap->va_size;
-		sizechanged = 1;
-		newsize = vap->va_size;
 		fsai->valid |= FATTR_SIZE;
 
 		fuse_filehandle_getrw(vp, FWRITE, &fufh, cred, pid);
@@ -1271,6 +1271,7 @@ int fuse_internal_setattr(struct vnode *vp, struct vattr *vap,
 		fuse_vnode_undirty_cached_timestamps(vp, true);
 		fuse_internal_cache_attrs(vp, &fao->attr, fao->attr_valid,
 			fao->attr_valid_nsec, NULL, false);
+		getnanouptime(&fvdat->last_local_modify);
 	}
 
 out:

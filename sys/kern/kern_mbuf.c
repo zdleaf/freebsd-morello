@@ -223,7 +223,7 @@ sysctl_nmbclusters(SYSCTL_HANDLER_ARGS)
 	return (error);
 }
 SYSCTL_PROC(_kern_ipc, OID_AUTO, nmbclusters,
-    CTLTYPE_INT | CTLFLAG_RW | CTLFLAG_NEEDGIANT, &nmbclusters, 0,
+    CTLTYPE_INT | CTLFLAG_RW | CTLFLAG_MPSAFE, &nmbclusters, 0,
     sysctl_nmbclusters, "IU",
     "Maximum number of mbuf clusters allowed");
 
@@ -245,7 +245,7 @@ sysctl_nmbjumbop(SYSCTL_HANDLER_ARGS)
 	return (error);
 }
 SYSCTL_PROC(_kern_ipc, OID_AUTO, nmbjumbop,
-    CTLTYPE_INT | CTLFLAG_RW | CTLFLAG_NEEDGIANT, &nmbjumbop, 0,
+    CTLTYPE_INT | CTLFLAG_RW | CTLFLAG_MPSAFE, &nmbjumbop, 0,
     sysctl_nmbjumbop, "IU",
     "Maximum number of mbuf page size jumbo clusters allowed");
 
@@ -267,7 +267,7 @@ sysctl_nmbjumbo9(SYSCTL_HANDLER_ARGS)
 	return (error);
 }
 SYSCTL_PROC(_kern_ipc, OID_AUTO, nmbjumbo9,
-    CTLTYPE_INT | CTLFLAG_RW | CTLFLAG_NEEDGIANT, &nmbjumbo9, 0,
+    CTLTYPE_INT | CTLFLAG_RW | CTLFLAG_MPSAFE, &nmbjumbo9, 0,
     sysctl_nmbjumbo9, "IU",
     "Maximum number of mbuf 9k jumbo clusters allowed");
 
@@ -289,7 +289,7 @@ sysctl_nmbjumbo16(SYSCTL_HANDLER_ARGS)
 	return (error);
 }
 SYSCTL_PROC(_kern_ipc, OID_AUTO, nmbjumbo16,
-    CTLTYPE_INT | CTLFLAG_RW | CTLFLAG_NEEDGIANT, &nmbjumbo16, 0,
+    CTLTYPE_INT | CTLFLAG_RW | CTLFLAG_MPSAFE, &nmbjumbo16, 0,
     sysctl_nmbjumbo16, "IU",
     "Maximum number of mbuf 16k jumbo clusters allowed");
 
@@ -311,7 +311,7 @@ sysctl_nmbufs(SYSCTL_HANDLER_ARGS)
 	return (error);
 }
 SYSCTL_PROC(_kern_ipc, OID_AUTO, nmbufs,
-    CTLTYPE_INT | CTLFLAG_RW | CTLFLAG_NEEDGIANT,
+    CTLTYPE_INT | CTLFLAG_RW | CTLFLAG_MPSAFE,
     &nmbufs, 0, sysctl_nmbufs, "IU",
     "Maximum number of mbufs allowed");
 
@@ -1633,6 +1633,33 @@ m_snd_tag_destroy(struct m_snd_tag *mst)
 	mst->sw->snd_tag_free(mst);
 	if_rele(ifp);
 	counter_u64_add(snd_tag_count, -1);
+}
+
+void
+m_rcvif_serialize(struct mbuf *m)
+{
+	u_short idx, gen;
+
+	M_ASSERTPKTHDR(m);
+	idx = m->m_pkthdr.rcvif->if_index;
+	gen = m->m_pkthdr.rcvif->if_idxgen;
+	m->m_pkthdr.rcvidx = idx;
+	m->m_pkthdr.rcvgen = gen;
+}
+
+struct ifnet *
+m_rcvif_restore(struct mbuf *m)
+{
+	struct ifnet *ifp;
+
+	M_ASSERTPKTHDR(m);
+	NET_EPOCH_ASSERT();
+
+	ifp = ifnet_byindexgen(m->m_pkthdr.rcvidx, m->m_pkthdr.rcvgen);
+	if (ifp == NULL || (ifp->if_flags & IFF_DYING))
+		return (NULL);
+
+	return (m->m_pkthdr.rcvif = ifp);
 }
 
 /*

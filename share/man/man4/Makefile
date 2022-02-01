@@ -251,6 +251,8 @@ MAN=	aac.4 \
 	iwmfw.4 \
 	iwn.4 \
 	iwnfw.4 \
+	iwlwifi.4 \
+	iwlwififw.4 \
 	ixgbe.4 \
 	ixl.4 \
 	jedec_dimm.4 \
@@ -544,7 +546,6 @@ MAN=	aac.4 \
 	tcp.4 \
 	tcp_bbr.4 \
 	tdfx.4 \
-	terasic_mtl.4 \
 	termios.4 \
 	textdump.4 \
 	ti.4 \

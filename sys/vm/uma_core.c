@@ -1051,6 +1051,7 @@ cache_fetch_bucket(uma_zone_t zone, uma_cache_t cache, int domain)
 {
 	uma_zone_domain_t zdom;
 	uma_bucket_t bucket;
+	smr_seq_t seq;
 
 	/*
 	 * Avoid the lock if possible.
@@ -1060,7 +1061,8 @@ cache_fetch_bucket(uma_zone_t zone, uma_cache_t cache, int domain)
 		return (NULL);
 
 	if ((cache_uz_flags(cache) & UMA_ZONE_SMR) != 0 &&
-	    !smr_poll(zone->uz_smr, zdom->uzd_seq, false))
+	    (seq = atomic_load_32(&zdom->uzd_seq)) != SMR_SEQ_INVALID &&
+	    !smr_poll(zone->uz_smr, seq, false))
 		return (NULL);
 
 	/*
@@ -1899,7 +1901,7 @@ startup_alloc(uma_zone_t zone, vm_size_t bytes, int domain, uint8_t *pflag,
 
 	pa = VM_PAGE_TO_PHYS(m);
 	for (i = 0; i < pages; i++, pa += PAGE_SIZE) {
-#if defined(__aarch64__) || defined(__amd64__) || defined(__mips__) || \
+#if defined(__aarch64__) || defined(__amd64__) || \
     defined(__riscv) || defined(__powerpc64__)
 		if ((wait & M_NODUMP) == 0)
 			dump_add_page(pa);
@@ -1927,7 +1929,7 @@ startup_free(void *mem, vm_size_t bytes)
 	if (va >= bootstart && va + bytes <= bootmem)
 		pmap_remove(kernel_pmap, va, va + bytes);
 	for (; bytes != 0; bytes -= PAGE_SIZE, m++) {
-#if defined(__aarch64__) || defined(__amd64__) || defined(__mips__) || \
+#if defined(__aarch64__) || defined(__amd64__) || \
     defined(__riscv) || defined(__powerpc64__)
 		dump_drop_page(VM_PAGE_TO_PHYS(m));
 #endif
@@ -3625,6 +3627,9 @@ uma_zalloc_smr(uma_zone_t zone, int flags)
 	uma_cache_bucket_t bucket;
 	uma_cache_t cache;
 
+	CTR3(KTR_UMA, "uma_zalloc_smr zone %s(%p) flags %d", zone->uz_name,
+	    zone, flags);
+
 #ifdef UMA_ZALLOC_DEBUG
 	void *item;
 
@@ -4379,6 +4384,9 @@ uma_zfree_smr(uma_zone_t zone, void *item)
 	uma_cache_bucket_t bucket;
 	int itemdomain, uz_flags;
 
+	CTR3(KTR_UMA, "uma_zfree_smr zone %s(%p) item %p",
+	    zone->uz_name, zone, item);
+
 #ifdef UMA_ZALLOC_DEBUG
 	KASSERT((zone->uz_flags & UMA_ZONE_SMR) != 0,
 	    ("uma_zfree_smr: called with non-SMR zone."));
@@ -4430,7 +4438,8 @@ uma_zfree_arg(uma_zone_t zone, void *item, void *udata)
 	/* Enable entropy collection for RANDOM_ENABLE_UMA kernel option */
 	random_harvest_fast_uma(&zone, sizeof(zone), RANDOM_UMA);
 
-	CTR2(KTR_UMA, "uma_zfree_arg zone %s(%p)", zone->uz_name, zone);
+	CTR3(KTR_UMA, "uma_zfree_arg zone %s(%p) item %p",
+	    zone->uz_name, zone, item);
 
 #ifdef UMA_ZALLOC_DEBUG
 	KASSERT((zone->uz_flags & UMA_ZONE_SMR) == 0,

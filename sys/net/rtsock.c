@@ -2169,14 +2169,12 @@ rt_dispatch(struct mbuf *m, sa_family_t saf)
 		*(unsigned short *)(tag + 1) = saf;
 		m_tag_prepend(m, tag);
 	}
-#ifdef VIMAGE
 	if (V_loif)
 		m->m_pkthdr.rcvif = V_loif;
 	else {
 		m_freem(m);
 		return;
 	}
-#endif
 	netisr_queue(NETISR_ROUTE, m);	/* mbuf is free'd on failure. */
 }
 
@@ -2691,7 +2689,6 @@ static struct protosw routesw[] = {
 	.pr_flags =		PR_ATOMIC|PR_ADDR,
 	.pr_output =		route_output,
 	.pr_ctlinput =		raw_ctlinput,
-	.pr_init =		raw_init,
 	.pr_usrreqs =		&route_usrreqs
 }
 };
@@ -2703,4 +2700,4 @@ static struct domain routedomain = {
 	.dom_protoswNPROTOSW =	&routesw[nitems(routesw)]
 };
 
-VNET_DOMAIN_SET(route);
+DOMAIN_SET(route);

@@ -57,6 +57,8 @@
 #include <sys/taskqueue.h>
 #include <sys/resourcevar.h>
 
+#include <machine/atomic.h>
+
 #include <security/mac/mac_framework.h>
 
 #include <vm/uma.h>
@@ -254,9 +256,8 @@ unionfs_rem_cached_vnode(struct unionfs_node *unp, struct vnode *dvp)
  * This function will return with the caller's locks and references undone.
  */
 static void
-unionfs_nodeget_cleanup(struct vnode *vp, void *arg)
+unionfs_nodeget_cleanup(struct vnode *vp, struct unionfs_node *unp)
 {
-	struct unionfs_node *unp;
 
 	/*
 	 * Lock and reset the default vnode lock; vgone() expects a locked
@@ -276,7 +277,6 @@ unionfs_nodeget_cleanup(struct vnode *vp, void *arg)
 	vgone(vp);
 	vput(vp);
 
-	unp = arg;
 	if (unp->un_dvp != NULLVP)
 		vrele(unp->un_dvp);
 	if (unp->un_uppervp != NULLVP)
@@ -334,12 +334,6 @@ unionfs_nodeget(struct mount *mp, struct vnode *uppervp,
 		}
 	}
 
-	if ((uppervp == NULLVP || ump->um_uppervp != uppervp) ||
-	    (lowervp == NULLVP || ump->um_lowervp != lowervp)) {
-		/* dvp will be NULLVP only in case of root vnode. */
-		if (dvp == NULLVP)
-			return (EINVAL);
-	}
 	unp = malloc(sizeof(struct unionfs_node),
 	    M_UNIONFSNODE, M_WAITOK | M_ZERO);
 
@@ -381,14 +375,25 @@ unionfs_nodeget(struct mount *mp, struct vnode *uppervp,
 	vp->v_type = vt;
 	vp->v_data = unp;
 
-	if ((uppervp != NULLVP && ump->um_uppervp == uppervp) &&
-	    (lowervp != NULLVP && ump->um_lowervp == lowervp))
+	/*
+	 * TODO: This is an imperfect check, as there's no guarantee that
+	 * the underlying filesystems will always return vnode pointers
+	 * for the root inodes that match our cached values.  To reduce
+	 * the likelihood of failure, for example in the case where either
+	 * vnode has been forcibly doomed, we check both pointers and set
+	 * VV_ROOT if either matches.
+	 */
+	if (ump->um_uppervp == uppervp || ump->um_lowervp == lowervp)
 		vp->v_vflag |= VV_ROOT;
+	KASSERT(dvp != NULL || (vp->v_vflag & VV_ROOT) != 0,
+	    ("%s: NULL dvp for non-root vp %p", __func__, vp));
 
 	vn_lock_pair(lowervp, false, uppervp, false); 
-	error = insmntque1(vp, mp, unionfs_nodeget_cleanup, unp);
-	if (error != 0)
+	error = insmntque1(vp, mp);
+	if (error != 0) {
+		unionfs_nodeget_cleanup(vp, unp);
 		return (error);
+	}
 	if (lowervp != NULL && VN_IS_DOOMED(lowervp)) {
 		vput(lowervp);
 		unp->un_lowervp = NULL;
@@ -435,6 +440,7 @@ unionfs_noderem(struct vnode *vp)
 	struct vnode   *uvp;
 	struct vnode   *dvp;
 	int		count;
+	int		writerefs;
 
 	KASSERT(vp->v_vnlock->lk_recurse == 0,
 	    ("%s: vnode %p locked recursively", __func__, vp));
@@ -454,13 +460,6 @@ unionfs_noderem(struct vnode *vp)
 	vp->v_vnlock = &(vp->v_lock);
 	vp->v_data = NULL;
 	vp->v_object = NULL;
-	if (vp->v_writecount > 0) {
-		if (uvp != NULL)
-			VOP_ADD_WRITECOUNT(uvp, -vp->v_writecount);
-		else if (lvp != NULL)
-			VOP_ADD_WRITECOUNT(lvp, -vp->v_writecount);
-	} else if (vp->v_writecount < 0)
-		vp->v_writecount = 0;
 	if (unp->un_hashtbl != NULL) {
 		/*
 		 * Clear out any cached child vnodes.  This should only
@@ -479,6 +478,19 @@ unionfs_noderem(struct vnode *vp)
 	}
 	VI_UNLOCK(vp);
 
+	writerefs = atomic_load_int(&vp->v_writecount);
+	VNASSERT(writerefs >= 0, vp,
+	    ("%s: write count %d, unexpected text ref", __func__, writerefs));
+	/*
+	 * If we were opened for write, we leased the write reference
+	 * to the lower vnode.  If this is a reclamation due to the
+	 * forced unmount, undo the reference now.
+	 */
+	if (writerefs > 0) {
+		VNASSERT(uvp != NULL, vp,
+		    ("%s: write reference without upper vnode", __func__));
+		VOP_ADD_WRITECOUNT(uvp, -writerefs);
+	}
 	if (lvp != NULLVP)
 		VOP_UNLOCK(lvp);
 	if (uvp != NULLVP)
@@ -516,8 +528,9 @@ unionfs_noderem(struct vnode *vp)
 }
 
 /*
- * Get the unionfs node status.
- * You need exclusive lock this vnode.
+ * Get the unionfs node status object for the vnode corresponding to unp,
+ * for the process that owns td.  Allocate a new status object if one
+ * does not already exist.
  */
 void
 unionfs_get_node_status(struct unionfs_node *unp, struct thread *td,
@@ -805,6 +818,8 @@ unionfs_node_update(struct unionfs_node *unp, struct vnode *uvp,
 	ASSERT_VOP_ELOCKED(uvp, __func__);
 	dvp = unp->un_dvp;
 
+	VNASSERT(vp->v_writecount == 0, vp,
+	    ("%s: non-zero writecount", __func__));
 	/*
 	 * Uppdate the upper vnode's lock state to match the lower vnode,
 	 * and then switch the unionfs vnode's lock to the upper vnode.

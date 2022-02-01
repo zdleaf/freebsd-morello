@@ -399,8 +399,10 @@ retry:
 		diff = fwi->size - fwo->size;
 		as_written_offset = uio->uio_offset - diff;
 
-		if (as_written_offset - diff > filesize)
+		if (as_written_offset - diff > filesize) {
 			fuse_vnode_setsize(vp, as_written_offset, false);
+			getnanouptime(&fvdat->last_local_modify);
+		}
 		if (as_written_offset - diff >= filesize)
 			fvdat->flag &= ~FN_SIZECHANGE;
 
@@ -465,7 +467,6 @@ fuse_write_biobackend(struct vnode *vp, struct uio *uio,
 	off_t filesize;
 	int bcount;
 	int n, on, seqcount, err = 0;
-	bool last_page;
 
 	const int biosize = fuse_iosize(vp);
 
@@ -516,11 +517,6 @@ again:
 			extending = true;
 			bcount = on + n;
 		}
-		if (howmany(((off_t)lbn * biosize + on + n - 1), PAGE_SIZE) >=
-		    howmany(filesize, PAGE_SIZE))
-			last_page = true;
-		else
-			last_page = false;
 		if (direct_append) {
 			/* 
 			 * Take care to preserve the buffer's B_CACHE state so
@@ -546,6 +542,7 @@ again:
 			 */
 			err = fuse_vnode_setsize(vp, uio->uio_offset + n, false);
 			filesize = uio->uio_offset + n;
+			getnanouptime(&fvdat->last_local_modify);
 			fvdat->flag |= FN_SIZECHANGE;
 			if (err) {
 				brelse(bp);

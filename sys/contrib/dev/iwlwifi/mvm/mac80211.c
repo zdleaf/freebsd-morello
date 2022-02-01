@@ -1674,6 +1674,7 @@ static void iwl_mvm_recalc_multicast(struct iwl_mvm *mvm)
 	struct iwl_mvm_mc_iter_data iter_data = {
 		.mvm = mvm,
 	};
+	int ret;
 
 	lockdep_assert_held(&mvm->mutex);
 
@@ -1683,6 +1684,22 @@ static void iwl_mvm_recalc_multicast(struct iwl_mvm *mvm)
 	ieee80211_iterate_active_interfaces_atomic(
 		mvm->hw, IEEE80211_IFACE_ITER_NORMAL,
 		iwl_mvm_mc_iface_iterator, &iter_data);
+
+	/*
+	 * Send a (synchronous) ech command so that we wait for the
+	 * multiple asynchronous MCAST_FILTER_CMD commands sent by
+	 * the interface iterator. Otherwise, we might get here over
+	 * and over again (by userspace just sending a lot of these)
+	 * and the CPU can send them faster than the firmware can
+	 * process them.
+	 * Note that the CPU is still faster - but with this we'll
+	 * actually send fewer commands overall because the CPU will
+	 * not schedule the work in mac80211 as frequently if it's
+	 * still running when rescheduled (possibly multiple times).
+	 */
+	ret = iwl_mvm_send_cmd_pdu(mvm, ECHO_CMD, 0, 0, NULL);
+	if (ret)
+		IWL_ERR(mvm, "Failed to synchronize multicast groups update\n");
 }
 
 static u64 iwl_mvm_prepare_multicast(struct ieee80211_hw *hw,
@@ -2140,23 +2157,23 @@ static void iwl_mvm_cfg_he_sta(struct iwl_mvm *mvm,
 
 		flags |= STA_CTXT_HE_PACKET_EXT;
 	} else if ((sta->he_cap.he_cap_elem.phy_cap_info[9] &
-		    IEEE80211_HE_PHY_CAP9_NOMIMAL_PKT_PADDING_MASK) !=
-		  IEEE80211_HE_PHY_CAP9_NOMIMAL_PKT_PADDING_RESERVED) {
+		    IEEE80211_HE_PHY_CAP9_NOMINAL_PKT_PADDING_MASK) !=
+		  IEEE80211_HE_PHY_CAP9_NOMINAL_PKT_PADDING_RESERVED) {
 		int low_th = -1;
 		int high_th = -1;
 
 		/* Take the PPE thresholds from the nominal padding info */
 		switch (sta->he_cap.he_cap_elem.phy_cap_info[9] &
-			IEEE80211_HE_PHY_CAP9_NOMIMAL_PKT_PADDING_MASK) {
-		case IEEE80211_HE_PHY_CAP9_NOMIMAL_PKT_PADDING_0US:
+			IEEE80211_HE_PHY_CAP9_NOMINAL_PKT_PADDING_MASK) {
+		case IEEE80211_HE_PHY_CAP9_NOMINAL_PKT_PADDING_0US:
 			low_th = IWL_HE_PKT_EXT_NONE;
 			high_th = IWL_HE_PKT_EXT_NONE;
 			break;
-		case IEEE80211_HE_PHY_CAP9_NOMIMAL_PKT_PADDING_8US:
+		case IEEE80211_HE_PHY_CAP9_NOMINAL_PKT_PADDING_8US:
 			low_th = IWL_HE_PKT_EXT_BPSK;
 			high_th = IWL_HE_PKT_EXT_NONE;
 			break;
-		case IEEE80211_HE_PHY_CAP9_NOMIMAL_PKT_PADDING_16US:
+		case IEEE80211_HE_PHY_CAP9_NOMINAL_PKT_PADDING_16US:
 			low_th = IWL_HE_PKT_EXT_NONE;
 			high_th = IWL_HE_PKT_EXT_BPSK;
 			break;
@@ -3292,16 +3309,16 @@ static int iwl_mvm_mac_sta_state(struct ieee80211_hw *hw,
 		if (vif->type == NL80211_IFTYPE_AP) {
 			mvmvif->ap_assoc_sta_count--;
 			iwl_mvm_mac_ctxt_changed(mvm, vif, false, NULL);
-		} else if (vif->type == NL80211_IFTYPE_STATION && !sta->tdls) {
-			/* remove session protection if still running */
+		} else if (vif->type == NL80211_IFTYPE_STATION && !sta->tdls)
 			iwl_mvm_stop_session_protection(mvm, vif);
-		}
 		ret = 0;
 	} else if (old_state == IEEE80211_STA_AUTH &&
 		   new_state == IEEE80211_STA_NONE) {
 		ret = 0;
 	} else if (old_state == IEEE80211_STA_NONE &&
 		   new_state == IEEE80211_STA_NOTEXIST) {
+		if (vif->type == NL80211_IFTYPE_STATION && !sta->tdls)
+			iwl_mvm_stop_session_protection(mvm, vif);
 		ret = iwl_mvm_rm_sta(mvm, vif, sta);
 		if (sta->tdls) {
 			iwl_mvm_recalc_tdls_state(mvm, vif, false);

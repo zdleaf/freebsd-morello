@@ -1648,8 +1648,10 @@ tcp_do_segment(struct mbuf *m, struct tcphdr *th, struct socket *so,
 		to.to_tsecr -= tp->ts_offset;
 		if (TSTMP_GT(to.to_tsecr, tcp_ts_getticks()))
 			to.to_tsecr = 0;
-		else if (tp->t_flags & TF_PREVVALID &&
-			 tp->t_badrxtwin != 0 && SEQ_LT(to.to_tsecr, tp->t_badrxtwin))
+		else if (tp->t_rxtshift == 1 &&
+			 tp->t_flags & TF_PREVVALID &&
+			 tp->t_badrxtwin != 0 &&
+			 TSTMP_LT(to.to_tsecr, tp->t_badrxtwin))
 			cc_cong_signal(tp, th, CC_RTO_ERR);
 	}
 	/*
@@ -1806,7 +1808,8 @@ tcp_do_segment(struct mbuf *m, struct tcphdr *th, struct socket *so,
 				if ((to.to_flags & TOF_TS) == 0 &&
 				    tp->t_rxtshift == 1 &&
 				    tp->t_flags & TF_PREVVALID &&
-				    (int)(ticks - tp->t_badrxtwin) < 0) {
+				    tp->t_badrxtwin != 0 &&
+				    TSTMP_LT(ticks, tp->t_badrxtwin)) {
 					cc_cong_signal(tp, th, CC_RTO_ERR);
 				}
 
@@ -1889,7 +1892,7 @@ tcp_do_segment(struct mbuf *m, struct tcphdr *th, struct socket *so,
 						      tp->t_rxtcur);
 				sowwakeup(so);
 				if (sbavail(&so->so_snd))
-					(void) tp->t_fb->tfb_tcp_output(tp);
+					(void) tcp_output(tp);
 				goto check_delack;
 			}
 		} else if (th->th_ack == tp->snd_una &&
@@ -1958,7 +1961,7 @@ tcp_do_segment(struct mbuf *m, struct tcphdr *th, struct socket *so,
 				tp->t_flags |= TF_DELACK;
 			} else {
 				tp->t_flags |= TF_ACKNOW;
-				tp->t_fb->tfb_tcp_output(tp);
+				tcp_output(tp);
 			}
 			goto check_delack;
 		}
@@ -2629,7 +2632,7 @@ tcp_do_segment(struct mbuf *m, struct tcphdr *th, struct socket *so,
 						}
 					} else
 						tp->snd_cwnd += maxseg;
-					(void) tp->t_fb->tfb_tcp_output(tp);
+					(void) tcp_output(tp);
 					goto drop;
 				} else if (tp->t_dupacks == tcprexmtthresh ||
 					    (tp->t_flags & TF_SACK_PERMIT &&
@@ -2698,14 +2701,14 @@ enter_recovery:
 						    tcps_sack_recovery_episode);
 						tp->snd_recover = tp->snd_nxt;
 						tp->snd_cwnd = maxseg;
-						(void) tp->t_fb->tfb_tcp_output(tp);
+						(void) tcp_output(tp);
 						if (SEQ_GT(th->th_ack, tp->snd_una))
 							goto resume_partialack;
 						goto drop;
 					}
 					tp->snd_nxt = th->th_ack;
 					tp->snd_cwnd = maxseg;
-					(void) tp->t_fb->tfb_tcp_output(tp);
+					(void) tcp_output(tp);
 					KASSERT(tp->snd_limited <= 2,
 					    ("%s: tp->snd_limited too big",
 					    __func__));
@@ -2753,7 +2756,7 @@ enter_recovery:
 					    (tp->snd_nxt - tp->snd_una);
 					SOCKBUF_UNLOCK(&so->so_snd);
 					if (avail > 0)
-						(void) tp->t_fb->tfb_tcp_output(tp);
+						(void) tcp_output(tp);
 					sent = tp->snd_max - oldsndmax;
 					if (sent > maxseg) {
 						KASSERT((tp->t_dupacks == 2 &&
@@ -2883,8 +2886,10 @@ process_ACK:
 		 */
 		if (tp->t_rxtshift == 1 &&
 		    tp->t_flags & TF_PREVVALID &&
-		    tp->t_badrxtwin &&
-		    SEQ_LT(to.to_tsecr, tp->t_badrxtwin))
+		    tp->t_badrxtwin != 0 &&
+		    to.to_flags & TOF_TS &&
+		    to.to_tsecr != 0 &&
+		    TSTMP_LT(to.to_tsecr, tp->t_badrxtwin))
 			cc_cong_signal(tp, th, CC_RTO_ERR);
 
 		/*
@@ -3305,7 +3310,7 @@ dodata:							/* XXX */
 	 * Return any desired output.
 	 */
 	if (needoutput || (tp->t_flags & TF_ACKNOW))
-		(void) tp->t_fb->tfb_tcp_output(tp);
+		(void) tcp_output(tp);
 
 check_delack:
 	INP_WLOCK_ASSERT(tp->t_inpcb);
@@ -3346,7 +3351,7 @@ dropafterack:
 #endif
 	TCP_PROBE3(debug__input, tp, th, m);
 	tp->t_flags |= TF_ACKNOW;
-	(void) tp->t_fb->tfb_tcp_output(tp);
+	(void) tcp_output(tp);
 	INP_WUNLOCK(tp->t_inpcb);
 	m_freem(m);
 	return;
@@ -4049,7 +4054,7 @@ tcp_newreno_partial_ack(struct tcpcb *tp, struct tcphdr *th)
 	 */
 	tp->snd_cwnd = maxseg + BYTES_THIS_ACK(tp, th);
 	tp->t_flags |= TF_ACKNOW;
-	(void) tp->t_fb->tfb_tcp_output(tp);
+	(void) tcp_output(tp);
 	tp->snd_cwnd = ocwnd;
 	if (SEQ_GT(onxt, tp->snd_nxt))
 		tp->snd_nxt = onxt;

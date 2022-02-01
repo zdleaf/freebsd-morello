@@ -119,7 +119,7 @@ VNET_DEFINE(struct socket *, ip_mrouter);
  */
 int (*ip_mrouter_set)(struct socket *, struct sockopt *);
 int (*ip_mrouter_get)(struct socket *, struct sockopt *);
-int (*ip_mrouter_done)(void);
+int (*ip_mrouter_done)(void *locked);
 int (*ip_mforward)(struct ip *, struct ifnet *, struct mbuf *,
 		   struct ip_moptions *);
 int (*mrt_ioctl)(u_long, caddr_t, int);
@@ -182,38 +182,15 @@ rip_delhash(struct inpcb *inp)
 }
 #endif /* INET */
 
-/*
- * Raw interface to IP protocol.
- */
+INPCBSTORAGE_DEFINE(ripcbstor, "rawinp", "ripcb", "rip", "riphash");
 
-/*
- * Initialize raw connection block q.
- */
 static void
-rip_zone_change(void *tag)
+rip_init(void *arg __unused)
 {
 
-	uma_zone_set_max(V_ripcbinfo.ipi_zone, maxsockets);
+	in_pcbinfo_init(&V_ripcbinfo, &ripcbstor, INP_PCBHASH_RAW_SIZE, 1);
 }
-
-static int
-rip_inpcb_init(void *mem, int size, int flags)
-{
-	struct inpcb *inp = mem;
-
-	INP_LOCK_INIT(inp, "inp", "rawinp");
-	return (0);
-}
-
-void
-rip_init(void)
-{
-
-	in_pcbinfo_init(&V_ripcbinfo, "rip", INP_PCBHASH_RAW_SIZE, 1, "ripcb",
-	    rip_inpcb_init);
-	EVENTHANDLER_REGISTER(maxsockets_change, rip_zone_change, NULL,
-	    EVENTHANDLER_PRI_ANY);
-}
+VNET_SYSINIT(rip_init, SI_SUB_PROTO_DOMAIN, SI_ORDER_THIRD, rip_init, NULL);
 
 #ifdef VIMAGE
 static void
@@ -902,18 +879,25 @@ static void
 rip_detach(struct socket *so)
 {
 	struct inpcb *inp;
+	MROUTER_RLOCK_TRACKER;
 
 	inp = sotoinpcb(so);
 	KASSERT(inp != NULL, ("rip_detach: inp == NULL"));
 	KASSERT(inp->inp_faddr.s_addr == INADDR_ANY,
 	    ("rip_detach: not closed"));
 
+	/* Disable mrouter first, lock released inside ip_mrouter_done */
+	MROUTER_RLOCK();
+	if (so == V_ip_mrouter && ip_mrouter_done)
+		ip_mrouter_done(MROUTER_RLOCK_PARAM_PTR);
+	else
+		MROUTER_RUNLOCK();
+
 	INP_WLOCK(inp);
 	INP_HASH_WLOCK(&V_ripcbinfo);
 	rip_delhash(inp);
 	INP_HASH_WUNLOCK(&V_ripcbinfo);
-	if (so == V_ip_mrouter && ip_mrouter_done)
-		ip_mrouter_done();
+
 	if (ip_rsvp_force_done)
 		ip_rsvp_force_done(so);
 	if (so == V_ip_rsvpd)
