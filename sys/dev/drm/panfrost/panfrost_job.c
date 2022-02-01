@@ -564,6 +564,7 @@ panfrost_job_cleanup(struct panfrost_job *job)
 	atomic_add_int(&sc->job_cnt, -1);
 
 	dprintf("%s: job cnt %d\n", __func__, sc->job_cnt);
+	dprintf(".");
 
 	if (job->in_fences) {
 		for (i = 0; i < job->in_fence_count; i++)
