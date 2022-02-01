@@ -71,7 +71,6 @@ __FBSDID("$FreeBSD$");
 #include <dev/drm/drmkpi/include/linux/dma-buf.h>
 
 #include "fb_if.h"
-//#include "komeda_vop_if.h"
 
 static struct ofw_compat_data compat_data[] = {
 	{ "arm,mali-d32",		1 },
@@ -293,29 +292,6 @@ komeda_drm_irq_hook(void *arg)
 			    &sc->pipelines[i++]);
 		}
 	}
-
-#if 0
-	nports = OF_getencprop_alloc_multi(node, "ports", sizeof(*ports),
-	    (void **)&ports);
-	if (nports <= 0) {
-		device_printf(sc->dev, "Cannot find ports property\n");
-		goto fail;
-	}
-
-	/* Attach the port(s) */
-	for (i = 0; i < nports; i++) {
-		if (bootverbose)
-			device_printf(sc->dev, "Lookup port with phandle %x\n",
-			    ports[i]);
-		portdev = OF_device_from_xref(ports[i]);
-		if (portdev != NULL) {
-			device_printf(sc->dev, "port found\n");
-			//KOMEDA_CREATE_PIPELINE(portdev, &sc->drm_dev);
-		} else
-			device_printf(sc->dev,
-			    "Cannot find port with phandle %x\n", ports[i]);
-	}
-#endif
 
 	komeda_drm_fb_preinit(&sc->drm_dev);
 
