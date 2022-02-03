@@ -22,6 +22,8 @@ device		cdns_i2c
 device		re
 options		FDT
 
+device		ums
+
 options		ROOTDEVNAME=\"ufs:/dev/ada0\"
 
 # No USB support
