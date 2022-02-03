@@ -153,8 +153,6 @@ __FBSDID("$FreeBSD$");
 #define	PMAP_ASSERT_STAGE1(pmap)	MPASS((pmap)->pm_stage == PM_STAGE1)
 #define	PMAP_ASSERT_STAGE2(pmap)	MPASS((pmap)->pm_stage == PM_STAGE2)
 
-#define	PMAP_ASSERT_ALIVE(pmap)		MPASS((pmap)->pm_dead == FALSE)
-
 #define	NL0PG		(PAGE_SIZE/(sizeof (pd_entry_t)))
 #define	NL1PG		(PAGE_SIZE/(sizeof (pd_entry_t)))
 #define	NL2PG		(PAGE_SIZE/(sizeof (pd_entry_t)))
@@ -1185,6 +1183,24 @@ static u_long pmap_l2_promotions;
 SYSCTL_ULONG(_vm_pmap_l2, OID_AUTO, promotions, CTLFLAG_RD,
     &pmap_l2_promotions, 0, "2MB page promotions");
 
+static bool
+pmap_is_current_epoch(pmap_t pmap)
+{
+	struct asid_set *set;
+	int epoch;
+
+	/* The kernel pmap is always current, and may not be locked */
+	if (pmap == kernel_pmap)
+		return (true);
+
+	PMAP_LOCK_ASSERT(pmap, MA_OWNED);
+	set = pmap->pm_asid_set;
+	epoch = COOKIE_TO_EPOCH(pmap->pm_cookie);
+	MPASS(epoch >= 0);
+
+	return (epoch == set->asid_epoch);
+}
+
 /*
  * Invalidate a single TLB entry.
  */
@@ -1192,9 +1208,6 @@ static __inline void
 pmap_invalidate_page(pmap_t pmap, vm_offset_t va)
 {
 	uint64_t r;
-
-	if (pmap->pm_dead == TRUE)
-		return;
 
 	PMAP_ASSERT_STAGE1(pmap);
 
@@ -1214,9 +1227,6 @@ static __inline void
 pmap_invalidate_range(pmap_t pmap, vm_offset_t sva, vm_offset_t eva)
 {
 	uint64_t end, r, start;
-
-	if (pmap->pm_dead == TRUE)
-		return;
 
 	PMAP_ASSERT_STAGE1(pmap);
 
@@ -1241,9 +1251,6 @@ static __inline void
 pmap_invalidate_all(pmap_t pmap)
 {
 	uint64_t r;
-
-	if (pmap->pm_dead == TRUE)
-		return;
 
 	PMAP_ASSERT_STAGE1(pmap);
 
@@ -1708,7 +1715,7 @@ _pmap_unwire_l3(pmap_t pmap, vm_offset_t va, vm_page_t m, struct spglist *free)
 		l1pg = PHYS_TO_VM_PAGE(tl0 & ~ATTR_MASK);
 		pmap_unwire_l3(pmap, va, l1pg, free);
 	}
-	if (pmap->pm_stage != PM_STAGE1_EL2)
+	if (pmap->pm_stage != PM_STAGE1_EL2 && pmap_is_current_epoch(pmap))
 		pmap_invalidate_page(pmap, va);
 
 	/*
@@ -1766,7 +1773,6 @@ pmap_pinit0(pmap_t pmap)
 
 	PMAP_LOCK_INIT(pmap);
 	bzero(&pmap->pm_stats, sizeof(pmap->pm_stats));
-	pmap->pm_dead = FALSE;
 	pmap->pm_l0_paddr = READ_SPECIALREG(ttbr0_el1);
 	pmap->pm_l0 = (pd_entry_t *)PHYS_TO_DMAP(pmap->pm_l0_paddr);
 	vm_radix_init(&pmap->pm_root);
@@ -1783,8 +1789,6 @@ int
 pmap_pinit_stage(pmap_t pmap, enum pmap_stage stage, int levels)
 {
 	vm_page_t m;
-
-	pmap->pm_dead = FALSE;
 
 	/*
 	 * allocate the l0 page
@@ -1845,7 +1849,6 @@ pmap_pinit(pmap_t pmap)
 void
 pmap_pre_destroy(pmap_t pmap)
 {
-	pmap->pm_dead = TRUE;
 }
 
 /*
@@ -2156,15 +2159,18 @@ pmap_release(pmap_t pmap)
 	 * we don't reuse VMIDs within a generation.
 	 */
 	if (pmap->pm_stage == PM_STAGE1) {
+		PMAP_LOCK(pmap);
 		mtx_lock_spin(&set->asid_set_mutex);
 		if (COOKIE_TO_EPOCH(pmap->pm_cookie) == set->asid_epoch) {
 			asid = COOKIE_TO_ASID(pmap->pm_cookie);
 			KASSERT(asid >= ASID_FIRST_AVAILABLE &&
 			    asid < set->asid_set_size,
 			    ("pmap_release: pmap cookie has out-of-range asid"));
+			pmap_invalidate_all(pmap);
 			bit_clear(set->asid_set, asid);
 		}
 		mtx_unlock_spin(&set->asid_set_mutex);
+		PMAP_UNLOCK(pmap);
 	}
 
 	m = PHYS_TO_VM_PAGE(pmap->pm_l0_paddr);
@@ -2994,7 +3000,8 @@ pmap_remove_l3_range(pmap_t pmap, pd_entry_t l2e, vm_offset_t sva,
 	for (l3 = pmap_l2_to_l3(&l2e, sva); sva != eva; l3++, sva += L3_SIZE) {
 		if (!pmap_l3_valid(pmap_load(l3))) {
 			if (va != eva) {
-				pmap_invalidate_range(pmap, va, sva);
+				if (pmap_is_current_epoch(pmap))
+					pmap_invalidate_range(pmap, va, sva);
 				va = eva;
 			}
 			continue;
@@ -3021,8 +3028,9 @@ pmap_remove_l3_range(pmap_t pmap, pd_entry_t l2e, vm_offset_t sva,
 					 * still provides access to that page. 
 					 */
 					if (va != eva) {
-						pmap_invalidate_range(pmap, va,
-						    sva);
+						if (pmap_is_current_epoch(pmap))
+							pmap_invalidate_range(
+							    pmap, va, sva);
 						va = eva;
 					}
 					rw_wunlock(*lockp);
@@ -3046,7 +3054,8 @@ pmap_remove_l3_range(pmap_t pmap, pd_entry_t l2e, vm_offset_t sva,
 		}
 	}
 	if (va != eva && pmap->pm_stage != PM_STAGE1_EL2)
-		pmap_invalidate_range(pmap, va, sva);
+		if (pmap_is_current_epoch(pmap))
+			pmap_invalidate_range(pmap, va, sva);
 }
 
 /*
@@ -3643,7 +3652,6 @@ pmap_enter_largepage(pmap_t pmap, vm_offset_t va, pt_entry_t newpte, int flags,
 
 	PMAP_LOCK_ASSERT(pmap, MA_OWNED);
 	PMAP_ASSERT_STAGE1(pmap);
-	PMAP_ASSERT_ALIVE(pmap);
 	KASSERT(psind > 0 && psind < MAXPAGESIZES,
 	    ("psind %d unexpected", psind));
 	KASSERT(((newpte & ~ATTR_MASK) & (pagesizes[psind] - 1)) == 0,
@@ -3752,7 +3760,6 @@ pmap_enter(pmap_t pmap, vm_offset_t va, vm_page_t m, vm_prot_t prot,
 	boolean_t nosleep;
 	int lvl, rv;
 
-	PMAP_ASSERT_ALIVE(pmap);
 	KASSERT(ADDR_IS_CANONICAL(va),
 	    ("%s: Address not in canonical form: %lx", __func__, va));
 
@@ -4079,7 +4086,6 @@ pmap_enter_2mpage(pmap_t pmap, vm_offset_t va, vm_page_t m, vm_prot_t prot,
 
 	PMAP_LOCK_ASSERT(pmap, MA_OWNED);
 	PMAP_ASSERT_STAGE1(pmap);
-	PMAP_ASSERT_ALIVE(pmap);
 	KASSERT(ADDR_IS_CANONICAL(va),
 	    ("%s: Address not in canonical form: %lx", __func__, va));
 
@@ -4140,7 +4146,6 @@ pmap_enter_l2(pmap_t pmap, vm_offset_t va, pd_entry_t new_l2, u_int flags,
 	vm_page_t l2pg, mt;
 
 	PMAP_LOCK_ASSERT(pmap, MA_OWNED);
-	PMAP_ASSERT_ALIVE(pmap);
 	KASSERT(ADDR_IS_CANONICAL(va),
 	    ("%s: Address not in canonical form: %lx", __func__, va));
 
@@ -4265,7 +4270,6 @@ pmap_enter_object(pmap_t pmap, vm_offset_t start, vm_offset_t end,
 	vm_pindex_t diff, psize;
 
 	VM_OBJECT_ASSERT_LOCKED(m_start->object);
-	PMAP_ASSERT_ALIVE(pmap);
 
 	psize = atop(end - start);
 	mpte = NULL;
@@ -4303,7 +4307,6 @@ pmap_enter_quick(pmap_t pmap, vm_offset_t va, vm_page_t m, vm_prot_t prot)
 	struct rwlock *lock;
 
 	lock = NULL;
-	PMAP_ASSERT_ALIVE(pmap);
 	PMAP_LOCK(pmap);
 	(void)pmap_enter_quick_locked(pmap, va, m, prot, NULL, &lock);
 	if (lock != NULL)
@@ -4325,7 +4328,6 @@ pmap_enter_quick_locked(pmap_t pmap, vm_offset_t va, vm_page_t m,
 	    ("pmap_enter_quick_locked: managed mapping within the clean submap"));
 	PMAP_LOCK_ASSERT(pmap, MA_OWNED);
 	PMAP_ASSERT_STAGE1(pmap);
-	PMAP_ASSERT_ALIVE(pmap);
 	KASSERT(ADDR_IS_CANONICAL(va),
 	    ("%s: Address not in canonical form: %lx", __func__, va));
 
@@ -5000,6 +5002,8 @@ pmap_remove_pages(pmap_t pmap)
 
 	SLIST_INIT(&free);
 	PMAP_LOCK(pmap);
+	if (pmap->pm_stage == PM_STAGE2)
+		pmap->pm_cookie = COOKIE_FROM(-1, INT_MAX);
 	TAILQ_FOREACH_SAFE(pc, &pmap->pm_pvchunk, pc_list, npc) {
 		allfree = 1;
 		freed = 0;
@@ -5143,7 +5147,8 @@ pmap_remove_pages(pmap_t pmap)
 	}
 	if (lock != NULL)
 		rw_wunlock(lock);
-	pmap_invalidate_all(pmap);
+	if (pmap->pm_stage == PM_STAGE1)
+		pmap_invalidate_all(pmap);
 	PMAP_UNLOCK(pmap);
 	vm_page_free_pages_toq(&free, true);
 }
@@ -6617,9 +6622,10 @@ pmap_activate_int(pmap_t pmap)
 	 * Ensure that the store to curpmap is globally visible before the
 	 * load from asid_epoch is performed.
 	 */
-	if (pmap->pm_stage == PM_STAGE1)
+	if (pmap->pm_stage == PM_STAGE1) {
 		PCPU_SET(curpmap, pmap);
-	else
+		PCPU_SET(curvmpmap, NULL);
+	} else
 		PCPU_SET(curvmpmap, pmap);
 	dsb(ish);
 	epoch = COOKIE_TO_EPOCH(pmap->pm_cookie);

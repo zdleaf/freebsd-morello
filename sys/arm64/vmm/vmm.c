@@ -351,6 +351,12 @@ vm_cleanup(struct vm *vm, bool destroy)
 	if (destroy) {
 		pmap = vmspace_pmap(vm->vmspace);
 		pmap_pre_destroy(pmap);
+		sched_pin();
+		PCPU_SET(curvmpmap, NULL);
+		sched_unpin();
+		CPU_FOREACH(i) {
+			MPASS(cpuid_to_pcpu[i]->pc_curvmpmap != pmap);
+		}
 	}
 
 	vtimer_vmcleanup(vm);
@@ -369,10 +375,12 @@ vm_cleanup(struct vm *vm, bool destroy)
 	 * Device memory can be relocated by the guest (e.g. using PCI BARs)
 	 * so those mappings are removed on a VM reset.
 	 */
+	if (!destroy) {
 	for (i = 0; i < VM_MAX_MEMMAPS; i++) {
 		mm = &vm->mem_maps[i];
 		if (destroy || !sysmem_mapping(vm, mm))
 			vm_free_memmap(vm, i);
+	}
 	}
 
 	if (destroy) {

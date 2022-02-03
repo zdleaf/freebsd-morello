@@ -40,6 +40,7 @@
 #include <vm/vm.h>
 #include <vm/pmap.h>
 #include <vm/vm_extern.h>
+#include <vm/vm_map.h>
 #include <vm/vm_page.h>
 #include <vm/vm_param.h>
 
@@ -396,6 +397,7 @@ static void
 arm_vmspace_free(struct vmspace *vmspace)
 {
 
+	pmap_remove_pages(vmspace_pmap(vmspace));
 	vmspace_free(vmspace);
 }
 
