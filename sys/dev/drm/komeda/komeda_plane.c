@@ -387,6 +387,7 @@ cu_configure(struct komeda_drm_softc *sc, struct drm_display_mode *m,
 {
 	uint32_t dst_w, dst_h;
 	struct drm_rect *dst;
+	uint32_t ctrl;
 	uint32_t reg;
 
 	dst = &state->dst;
@@ -405,14 +406,18 @@ cu_configure(struct komeda_drm_softc *sc, struct drm_display_mode *m,
 	dst_h = drm_rect_height(&state->dst);
 	reg = dst_w | dst_h << 16;
 
+	ctrl = INPUT0_CONTROL_LALPHA_MAX | INPUT0_CONTROL_EN;
+
 	if (id == 0) {
 		DPU_WR4(sc, CU0_INPUT0_SIZE, reg);
 		DPU_WR4(sc, CU0_INPUT0_OFFSET, 0);
-		DPU_WR4(sc, CU0_INPUT0_CONTROL, INPUT0_CONTROL_EN | 255 << 8);
+		DPU_WR4(sc, CU0_INPUT0_CONTROL, ctrl);
+		/* Disable cursor plane, it will be enabled if needed. */
+		DPU_WR4(sc, CU0_INPUT1_CONTROL, 0);
 	} else {
 		DPU_WR4(sc, CU0_INPUT1_SIZE, reg);
 		DPU_WR4(sc, CU0_INPUT1_OFFSET, (dst->x1 | dst->y1 << 16));
-		DPU_WR4(sc, CU0_INPUT1_CONTROL, INPUT0_CONTROL_EN | 255 << 8);
+		DPU_WR4(sc, CU0_INPUT1_CONTROL, ctrl);
 	}
 }
 
@@ -492,7 +497,7 @@ komeda_plane_create(struct komeda_pipeline *pipeline, struct drm_device *drm)
 
 	sc = pipeline->sc;
 
-	printf("%s\n", __func__);
+	dprintf("%s\n", __func__);
 
 	for (i = 0; i < 2; i++) {
 		if (i == 0)
