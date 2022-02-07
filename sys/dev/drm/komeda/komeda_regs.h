@@ -109,7 +109,11 @@
 #define	DOU0_IPS_CONTROL	0x1AD0
 #define	 IPS_CONTROL_YUV	(1 << 8)
 #define	DOU0_IPS_SIZE		0x1AD4
+#define	 IPS_SIZE_VSIZE_S	16
+#define	 IPS_SIZE_HSIZE_S	0
 #define	DOU0_IPS_DEPTH		0x1AD8
+#define	 IPS_OUT_DEPTH_S	0
+#define	 IPS_OUT_DEPTH_10	(10 << IPS_OUT_DEPTH_S)
 
 /* DOU0 */
 #define	DOU0_IRQ_CLEAR		0x18A4
@@ -202,6 +206,8 @@ enum d71_block_type {
 #define	CU0_CU_CONTROL			0x0ED0
 #define	 CU_CONTROL_COPR	(1 << 0) /* Coprocessor interface enable */
 #define	CU0_CU_SIZE			0x0ED4
+#define	 CU_SIZE_VSIZE_S		16
+#define	 CU_SIZE_HSIZE_S		0
 #define	CU0_INPUT0_SIZE			0x0EE0
 #define	 INPUT0_SIZE_HSIZE_S		0
 #define	 INPUT0_SIZE_VSIZE_S		16

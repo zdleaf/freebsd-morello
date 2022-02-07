@@ -320,10 +320,10 @@ dou_configure(struct komeda_drm_softc *sc, struct drm_display_mode *m)
 	reg = DPU_RD4(sc, CU0_OUTPUT_ID0);
 	DPU_WR4(sc, DOU0_IPS_INPUT_ID0, reg);
 
-	reg = (m->hdisplay << 0) * 1;
-	reg |= (m->vdisplay << 16) * 1;
+	reg = m->hdisplay << IPS_SIZE_HSIZE_S;
+	reg |= m->vdisplay << IPS_SIZE_VSIZE_S;
 	DPU_WR4(sc, DOU0_IPS_SIZE, reg);
-	DPU_WR4(sc, DOU0_IPS_DEPTH, 10);
+	DPU_WR4(sc, DOU0_IPS_DEPTH, IPS_OUT_DEPTH_10);
 	DPU_WR4(sc, DOU0_IPS_CONTROL, 0);
 }
 
@@ -398,8 +398,8 @@ cu_configure(struct komeda_drm_softc *sc, struct drm_display_mode *m,
 	reg = DPU_RD4(sc, LR_OUTPUT_ID0(id));
 	DPU_WR4(sc, CU0_CU_INPUT_ID(id), reg);
 
-	reg = (m->hdisplay << 0) * 1;
-	reg |= (m->vdisplay << 16) * 1;
+	reg = (m->hdisplay << CU_SIZE_HSIZE_S);
+	reg |= (m->vdisplay << CU_SIZE_VSIZE_S);
 	DPU_WR4(sc, CU0_CU_SIZE, reg);
 
 	dst_w = drm_rect_width(&state->dst);
