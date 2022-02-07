@@ -169,6 +169,9 @@ enum d71_block_type {
 #define	LR_BLOCK_INFO(n)	(0x0400 + 0x200 * (n))
 #define	LR_OUTPUT_ID0(n)	(0x0460 + 0x200 * (n))
 #define	LR_CONTROL(n)		(0x04D0 + 0x200 * (n))
+#define	 CONTROL_ARCACHE_S	28
+#define	 CONTROL_ARCACHE_AXIC_BUF_CACHE	(0x3 << CONTROL_ARCACHE_S)
+		/* Cacheable and bufferable, but do not allocate */
 #define	 CONTROL_EN		(1 << 0)	/* Layer enable */
 #define	LR_FORMAT(n)		(0x04D8 + 0x200 * (n))
 #define	LR_IN_SIZE(n)		(0x04E0 + 0x200 * (n))

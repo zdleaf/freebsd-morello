@@ -377,7 +377,7 @@ lpu_configure(struct komeda_drm_softc *sc, struct drm_fb_cma *fb,
 
 	DPU_WR4(sc, LR_PALPHA(id), D71_PALPHA_DEF_MAP);
 	DPU_WR4(sc, LR_AD_CONTROL(id), 0); /* No modifiers. */
-	reg = CONTROL_EN | 3 << 28; /* ARCACHE */
+	reg = CONTROL_EN | CONTROL_ARCACHE_AXIC_BUF_CACHE;
 	DPU_WR4(sc, LR_CONTROL(id), reg);
 }
 
