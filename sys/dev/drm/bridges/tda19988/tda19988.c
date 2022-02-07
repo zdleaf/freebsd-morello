@@ -245,6 +245,15 @@ __FBSDID("$FreeBSD$");
 #define	TDA19988_XRES_MAX		1920
 #define	TDA19988_YRES_MAX		1080
 
+#define	TDA19988_DEBUG
+#undef	TDA19988_DEBUG
+
+#ifdef	TDA19988_DEBUG
+#define	dprintf(fmt, ...)	printf(fmt, ##__VA_ARGS__)
+#else
+#define	dprintf(fmt, ...)
+#endif
+
 struct tda19988_softc {
 	device_t		dev;
 	uint32_t		sc_addr;
@@ -792,11 +801,6 @@ tda19988_get_edid(device_t dev, uint8_t **edid, uint32_t *edid_len)
 static enum drm_connector_status
 tda19988_connector_detect(struct drm_connector *connector, bool force)
 {
-	struct tda19988_softc *sc;
-
-	sc = container_of(connector, struct tda19988_softc, connector);
-
-	device_printf(sc->dev, "%s\n", __func__);
 
 	return (connector_status_connected);
 }
@@ -820,8 +824,6 @@ tda19988_connector_get_modes(struct drm_connector *connector)
 	ret = 0;
 
 	sc = container_of(connector, struct tda19988_softc, connector);
-
-	device_printf(sc->dev, "%s\n", __func__);
 
 #ifdef STATIC_EDID
 	ret = drm_add_modes_noedid(connector, TDA19988_XRES_MAX,
@@ -855,8 +857,6 @@ tda19988_bridge_attach(struct drm_bridge *bridge)
 
 	sc = container_of(bridge, struct tda19988_softc, bridge);
 
-	device_printf(sc->dev, "%s\n", __func__);
-
 	sc->connector.polled = DRM_CONNECTOR_POLL_HPD;
 	drm_connector_helper_add(&sc->connector,
 	    &tda19988_connector_helper_funcs);
@@ -873,11 +873,6 @@ static enum drm_mode_status
 tda19988_bridge_mode_valid(struct drm_bridge *bridge,
     const struct drm_display_mode *mode)
 {
-	struct tda19988_softc *sc;
-
-	sc = container_of(bridge, struct tda19988_softc, bridge);
-
-	device_printf(sc->dev, "%s\n", __func__);
 
 	return (MODE_OK);
 }
@@ -891,19 +886,13 @@ tda19988_bridge_mode_set(struct drm_bridge *bridge,
 
 	sc = container_of(bridge, struct tda19988_softc, bridge);
 
-	device_printf(sc->dev, "%s\n", __func__);
-
 	memcpy(&sc->mode, mode, sizeof(struct drm_display_mode));
 }
 
 static void
 tda19988_bridge_disable(struct drm_bridge *bridge)
 {
-	struct tda19988_softc *sc;
 
-	sc = container_of(bridge, struct tda19988_softc, bridge);
-
-	device_printf(sc->dev, "%s\n", __func__);
 }
 
 static void
@@ -913,9 +902,7 @@ tda19988_bridge_enable(struct drm_bridge *bridge)
 
 	sc = container_of(bridge, struct tda19988_softc, bridge);
 
-	device_printf(sc->dev, "%s\n", __func__);
-
-	device_printf(sc->dev, "Mode information:\n"
+	dprintf(sc->dev, "Mode information:\n"
 	    "hdisplay: %d\n"
 	    "vdisplay: %d\n"
 	    "htotal: %d\n"
@@ -949,9 +936,7 @@ tda19988_encoder_mode_set(struct drm_encoder *encoder,
     struct drm_display_mode *mode,
     struct drm_display_mode *adj_mode)
 {
-	struct tda19988_softc *sc;
 
-	sc = container_of(encoder, struct tda19988_softc, encoder);
 }
 
 static const struct drm_encoder_helper_funcs
@@ -970,8 +955,6 @@ tda19988_add_encoder(device_t dev, struct drm_crtc *crtc,
 	struct tda19988_softc *sc;
 
 	sc = device_get_softc(dev);
-
-printf("%s\n", __func__);
 
 	drm_encoder_helper_add(&sc->encoder,
 	    &tda19988_encoder_helper_funcs);
