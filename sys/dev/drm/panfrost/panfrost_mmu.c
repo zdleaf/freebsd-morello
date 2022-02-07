@@ -292,7 +292,6 @@ panfrost_mmu_page_fault(struct panfrost_softc *sc, int as, uint64_t addr)
 	vm_offset_t va;
 	vm_paddr_t pa;
 	vm_prot_t prot;
-	int error;
 	int i;
 
 	bomapping = panfrost_mmu_find_mapping(sc, as, addr);
@@ -311,7 +310,7 @@ panfrost_mmu_page_fault(struct panfrost_softc *sc, int as, uint64_t addr)
 
 	va = bomapping->mmnode.start << PAGE_SHIFT;
 
-	device_printf(sc->dev, "addr %jx va %jx page_offset %d, npages %d\n",
+	dprintf("addr %jx va %jx page_offset %d, npages %d\n",
 	    addr, va, page_offset, bo->npages);
 
 	mmu = bomapping->mmu;
@@ -324,7 +323,7 @@ panfrost_mmu_page_fault(struct panfrost_softc *sc, int as, uint64_t addr)
 	for (i = 0; i < 512; i++) {
 		page = bo->pages[page_offset + i];
 		pa = VM_PAGE_TO_PHYS(page);
-		error = pmap_gpu_enter(&mmu->p, va, pa, prot, 0);
+		pmap_gpu_enter(&mmu->p, va, pa, prot, 0);
 		va += PAGE_SIZE;
 	}
 
@@ -353,7 +352,7 @@ panfrost_mmu_intr(void *arg)
 	sc = arg;
 
 	status = GPU_READ(sc, MMU_INT_RAWSTAT);
-	device_printf(sc->dev, "%s: status %x\n", __func__, status);
+	dprintf("%s: status %x\n", __func__, status);
 
 	for (i = 0; status != 0; i++) {
 		mask = (1 << i) | (1 << (i + 16)); /* fault | error */
@@ -373,7 +372,7 @@ panfrost_mmu_intr(void *arg)
 
 		if ((status & mask) == (1 << i)) {
 			if ((exception_type & 0xF8) == 0xC0) {
-				printf("%s: page fault at %jx\n",
+				dprintf("%s: page fault at %jx\n",
 				    __func__, addr);
 				error = panfrost_mmu_page_fault(sc, i, addr);
 			}
@@ -603,7 +602,6 @@ void
 panfrost_mmu_unmap(struct panfrost_softc *sc,
     struct panfrost_gem_mapping *mapping)
 {
-	struct panfrost_gem_object *bo;
 	struct panfrost_mmu *mmu;
 	vm_offset_t sva;
 	vm_offset_t va;
@@ -611,7 +609,6 @@ panfrost_mmu_unmap(struct panfrost_softc *sc,
 	int error;
 	int len;
 
-	bo = mapping->obj;
 	mmu = mapping->mmu;
 
 	len = mapping->mmnode.size << PAGE_SHIFT;
