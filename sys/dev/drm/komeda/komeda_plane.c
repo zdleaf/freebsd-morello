@@ -404,7 +404,8 @@ cu_configure(struct komeda_drm_softc *sc, struct drm_display_mode *m,
 
 	dst_w = drm_rect_width(&state->dst);
 	dst_h = drm_rect_height(&state->dst);
-	reg = dst_w | dst_h << 16;
+	reg = dst_w << INPUT0_SIZE_HSIZE_S;
+	reg |= dst_h << INPUT0_SIZE_VSIZE_S;
 
 	ctrl = INPUT0_CONTROL_LALPHA_MAX | INPUT0_CONTROL_EN;
 
@@ -416,7 +417,9 @@ cu_configure(struct komeda_drm_softc *sc, struct drm_display_mode *m,
 		DPU_WR4(sc, CU0_INPUT1_CONTROL, 0);
 	} else {
 		DPU_WR4(sc, CU0_INPUT1_SIZE, reg);
-		DPU_WR4(sc, CU0_INPUT1_OFFSET, (dst->x1 | dst->y1 << 16));
+		reg = dst->x1 << INPUT0_OFFSET_HOFFSET_S;
+		reg |= dst->y1 << INPUT0_OFFSET_VOFFSET_S;
+		DPU_WR4(sc, CU0_INPUT1_OFFSET, reg);
 		DPU_WR4(sc, CU0_INPUT1_CONTROL, ctrl);
 	}
 }
