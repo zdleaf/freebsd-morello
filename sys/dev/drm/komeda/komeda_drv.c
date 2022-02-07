@@ -321,7 +321,7 @@ komeda_drm_irq_hook(void *arg)
 
 	sc->drm_dev.irq_enabled = true;
 
-printf("%s: DRM device registered\n", __func__);
+	dprintf("%s: DRM device registered\n", __func__);
 
 	return;
 fail:
@@ -373,6 +373,8 @@ static int
 komeda_drm_attach(device_t dev)
 {
 	struct komeda_drm_softc *sc;
+	int num_pipelines;
+	int num_blocks;
 	uint32_t reg;
 
 	sc = device_get_softc(dev);
@@ -397,9 +399,6 @@ komeda_drm_attach(device_t dev)
 	reg = DPU_RD4(sc, GLB_CORE_ID);
 	device_printf(dev, "ARM Mali D%3x r%dp%d detected\n",
 	    reg >> 16, (reg >> 12) & 0xf, (reg >> 8) & 0xf);
-
-	int num_pipelines;
-	int num_blocks;
 
 	reg = DPU_RD4(sc, GLB_CORE_INFO);
 	num_blocks = reg & 0xff;
