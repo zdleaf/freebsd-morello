@@ -87,7 +87,7 @@ komeda_pipeline_enable_vblank(struct drm_crtc *crtc)
 	struct komeda_drm_softc *sc;
 	uint32_t reg;
 
-	printf("%s\n", __func__);
+	dprintf("%s\n", __func__);
 
 	pipeline = container_of(crtc, struct komeda_pipeline, crtc);
 	sc = pipeline->sc;
@@ -106,7 +106,7 @@ komeda_pipeline_disable_vblank(struct drm_crtc *crtc)
 	struct komeda_drm_softc *sc;
 	uint32_t reg;
 
-	printf("%s\n", __func__);
+	dprintf("%s\n", __func__);
 
 	pipeline = container_of(crtc, struct komeda_pipeline, crtc);
 	sc = pipeline->sc;
@@ -264,7 +264,9 @@ komeda_crtc_mode_set_nofb(struct drm_crtc *crtc)
 	pipeline = container_of(crtc, struct komeda_pipeline, crtc);
 	mode = &crtc->state->adjusted_mode;
 
-	//komeda_pipeline_clk_enable(sc->dev, mode);
+#if 0
+	komeda_pipeline_clk_enable(sc->dev, mode);
+#endif
 }
 
 static const struct drm_crtc_helper_funcs komeda_pipeline_crtc_helper_funcs = {
@@ -284,7 +286,7 @@ komeda_pipeline_add_encoder(struct komeda_pipeline *pipeline,
 	device_t dev;
 	int ret;
 
-	printf("%s\n", __func__);
+	dprintf("%s\n", __func__);
 
 	sc = pipeline->sc;
 
@@ -308,7 +310,7 @@ komeda_pipeline_create_pipeline(struct komeda_drm_softc *sc, phandle_t node,
 
 	drm = &sc->drm_dev;
 
-	printf("%s\n", __func__);
+	dprintf("%s\n", __func__);
 
 	pipeline->node = node;
 	pipeline->sc = sc;
