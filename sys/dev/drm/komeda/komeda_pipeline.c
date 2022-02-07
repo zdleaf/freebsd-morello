@@ -156,12 +156,9 @@ static void
 komeda_crtc_atomic_begin(struct drm_crtc *crtc,
     struct drm_crtc_state *old_state)
 {
-	struct komeda_pipeline *pipeline;
 	unsigned long flags;
 
 	dprintf("%s\n", __func__);
-
-	pipeline = container_of(crtc, struct komeda_pipeline, crtc);
 
 	if (crtc->state->event == NULL)
 		return;
@@ -223,7 +220,6 @@ komeda_crtc_atomic_enable(struct drm_crtc *crtc,
 
 	dprintf("%s\n", __func__);
 
-	//cu_configure(sc, adj);
 	dou_configure(sc, adj);
 	dou_ds_timing_setup(sc, adj);
 
@@ -235,12 +231,9 @@ static void
 komeda_crtc_atomic_disable(struct drm_crtc *crtc,
     struct drm_crtc_state *old_state)
 {
-	struct komeda_pipeline *pipeline;
 	uint32_t irqflags;
 
 	dprintf("%s\n", __func__);
-
-	pipeline = container_of(crtc, struct komeda_pipeline, crtc);
 
 	/* Disable VBLANK events */
 	drm_crtc_vblank_off(crtc);
@@ -258,13 +251,13 @@ komeda_crtc_atomic_disable(struct drm_crtc *crtc,
 static void
 komeda_crtc_mode_set_nofb(struct drm_crtc *crtc)
 {
+#if 0
 	struct komeda_pipeline *pipeline;
 	struct drm_display_mode *mode;
 
 	pipeline = container_of(crtc, struct komeda_pipeline, crtc);
 	mode = &crtc->state->adjusted_mode;
 
-#if 0
 	komeda_pipeline_clk_enable(sc->dev, mode);
 #endif
 }
@@ -282,13 +275,10 @@ static int
 komeda_pipeline_add_encoder(struct komeda_pipeline *pipeline,
     struct drm_device *drm)
 {
-	struct komeda_drm_softc *sc;
 	device_t dev;
 	int ret;
 
 	dprintf("%s\n", __func__);
-
-	sc = pipeline->sc;
 
 	dev = ofw_graph_get_device_by_port_ep(pipeline->node, 0, 1);
 	if (dev == NULL)
