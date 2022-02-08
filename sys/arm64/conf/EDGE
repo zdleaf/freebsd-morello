@@ -141,6 +141,7 @@ options		COMPAT_DRMKPI
 device		drm
 device		aw_de2_drm
 device		dw_hdmi
+device		panfrost
 
 # Timer drivers
 device		a10_timer
