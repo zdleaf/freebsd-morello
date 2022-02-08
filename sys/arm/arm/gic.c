@@ -37,6 +37,7 @@
 __FBSDID("$FreeBSD$");
 
 #include "opt_acpi.h"
+#include "opt_ddb.h"
 #include "opt_platform.h"
 
 #include <sys/param.h>
@@ -70,6 +71,11 @@ __FBSDID("$FreeBSD$");
 #ifdef DEV_ACPI
 #include <contrib/dev/acpica/include/acpi.h>
 #include <dev/acpica/acpivar.h>
+#endif
+
+#ifdef DDB
+#include <ddb/ddb.h>
+#include <ddb/db_lex.h>
 #endif
 
 #include <arm/arm/gic.h>
@@ -1185,6 +1191,109 @@ static device_method_t arm_gic_methods[] = {
 
 DEFINE_CLASS_0(gic, arm_gic_driver, arm_gic_methods,
     sizeof(struct arm_gic_softc));
+
+#ifdef DDB
+static void
+db_show_gic_one(device_t dev)
+{
+	struct arm_gic_softc *sc = device_get_softc(dev);
+	uint32_t val;
+	u_int i;
+
+	db_printf("%s CPU registers:\n", device_get_nameunit(dev));
+	db_printf(" CTLR: %08x   PMR: %08x   BPR: %08x   IAR: %08x\n",
+	    gic_c_read_4(sc, GICC_CTLR), gic_c_read_4(sc, GICC_PMR),
+	    gic_c_read_4(sc, GICC_BPR), gic_c_read_4(sc, GICC_IAR));
+	db_printf(" EOIR: %08x   RPR: %08x HPPIR: %08x  ABPR: %08x\n",
+	    gic_c_read_4(sc, GICC_EOIR), gic_c_read_4(sc, GICC_RPR),
+	    gic_c_read_4(sc, GICC_HPPIR), gic_c_read_4(sc, GICC_ABPR));
+	db_printf(" IIDR: %08x\n", gic_c_read_4(sc, GICC_IIDR));
+
+	db_printf("%s Distributor registers:\n", device_get_nameunit(dev));
+	db_printf(" CTLR: %08x TYPER: %08x  IIDR: %08x\n",
+	    gic_d_read_4(sc, GICD_CTLR), gic_d_read_4(sc, GICD_TYPER),
+	    gic_d_read_4(sc, GICD_IIDR));
+	for (i = 0; i < sc->nirqs; i++) {
+		db_printf("[%u] ", i);
+		if (i <= GIC_LAST_SGI)
+			db_printf("SGI");
+		else if (i <= GIC_LAST_PPI)
+			db_printf("PPI");
+		else
+			db_printf("SPI");
+		db_printf(" grp:%u",
+		    !!(gic_d_read_4(sc, GICD_IGROUPR(i)) & GICD_I_MASK(i)));
+		db_printf(" Sen:%u pd:%u ac:%u",
+		    !!(gic_d_read_4(sc, GICD_ISENABLER(i)) & GICD_I_MASK(i)),
+		    !!(gic_d_read_4(sc, GICD_ISPENDR(i)) & GICD_I_MASK(i)),
+		    !!(gic_d_read_4(sc, GICD_ISACTIVER(i)) & GICD_I_MASK(i)));
+		db_printf(" Cen:%u pd:%u ac:%u",
+		    !!(gic_d_read_4(sc, GICD_ICENABLER(i)) & GICD_I_MASK(i)),
+		    !!(gic_d_read_4(sc, GICD_ICPENDR(i)) & GICD_I_MASK(i)),
+		    !!(gic_d_read_4(sc, GICD_ICACTIVER(i)) & GICD_I_MASK(i)));
+		db_printf(" pri:%u",
+		    (gic_d_read_4(sc, GICD_IPRIORITYR(i)) >> (i & 0x3)) & 0xff);
+		db_printf(" trg:%u",
+		    (gic_d_read_4(sc, GICD_ITARGETSR(i)) >> (i & 0x3)) & 0xff);
+		val = gic_d_read_4(sc, GICD_ICFGR(i)) >> (i & 0xf);
+		if ((val & GICD_ICFGR_POL_MASK) == GICD_ICFGR_POL_LOW)
+			db_printf(" LO");
+		else
+			db_printf(" HI");
+		if ((val & GICD_ICFGR_TRIG_MASK) == GICD_ICFGR_TRIG_LVL)
+			db_printf(" LV");
+		else
+			db_printf(" ED");
+		db_printf("\n");
+	}
+}
+
+DB_FUNC(gic, db_show_gic, db_show_table, CS_OWN, NULL)
+{
+	device_t dev;
+	int t;
+	bool valid;
+
+	valid = false;
+	t = db_read_token();
+	if (t == tIDENT) {
+		dev = device_lookup_by_name(db_tok_string);
+		valid = true;
+	}
+	db_skip_to_eol();
+	if (!valid) {
+		db_printf("usage: show gic <name>\n");
+		return;
+	}
+
+	if (dev == NULL) {
+		db_printf("device not found\n");
+		return;
+	}
+
+	db_show_gic_one(dev);
+}
+
+DB_SHOW_ALL_COMMAND(gics, db_show_all_gics)
+{
+	devclass_t dc;
+	device_t dev;
+	int i;
+
+	dc = devclass_find("gic");
+	if (dc == NULL)
+		return;
+
+	for (i = 0; i < devclass_get_maxunit(dc); i++) {
+		dev = devclass_get_device(dc, i);
+		if (dev != NULL)
+			db_show_gic_one(dev);
+		if (db_pager_quit)
+			break;
+	}
+}
+
+#endif
 
 /*
  * GICv2m support -- the GICv2 MSI/MSI-X controller.
