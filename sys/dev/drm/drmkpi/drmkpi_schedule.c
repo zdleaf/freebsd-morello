@@ -146,7 +146,8 @@ drmkpi_wake_up(wait_queue_head_t *wqh, unsigned int state, int nr, bool locked)
 }
 
 void
-drmkpi_prepare_to_wait(wait_queue_head_t *wqh, wait_queue_entry_t *wq, int state)
+drmkpi_prepare_to_wait(wait_queue_head_t *wqh, wait_queue_entry_t *wq,
+    int state)
 {
 
 	spin_lock(&wqh->lock);
@@ -170,8 +171,8 @@ drmkpi_finish_wait(wait_queue_head_t *wqh, wait_queue_entry_t *wq)
 }
 
 int
-drmkpi_wait_event_common(wait_queue_head_t *wqh, wait_queue_entry_t *wq, int timeout,
-    unsigned int state, spinlock_t *lock)
+drmkpi_wait_event_common(wait_queue_head_t *wqh, wait_queue_entry_t *wq,
+    int timeout, unsigned int state, spinlock_t *lock)
 {
 	struct drm_task *task;
 	int ret;
