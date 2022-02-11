@@ -170,7 +170,7 @@ drm_sched_entity_get_free_sched(struct drm_sched_entity *entity)
 long drm_sched_entity_flush(struct drm_sched_entity *entity, long timeout)
 {
 	struct drm_gpu_scheduler *sched;
-#if 0
+#ifdef __linux__
 	struct task_struct *last_user;
 #endif
 	long ret = timeout;
@@ -183,7 +183,7 @@ long drm_sched_entity_flush(struct drm_sched_entity *entity, long timeout)
 	 * The client will not queue more IBs during this fini, consume existing
 	 * queued IBs or discard them on SIGKILL
 	 */
-#if 0
+#ifdef __linux__
 	if (current->flags & PF_EXITING) {
 #else
 	if (0) {
@@ -198,7 +198,7 @@ long drm_sched_entity_flush(struct drm_sched_entity *entity, long timeout)
 				    drm_sched_entity_is_idle(entity));
 	}
 
-#if 0
+#ifdef __linux__
 	/* For killed process disable any more IBs enqueue right now */
 	last_user = cmpxchg(&entity->last_user, current->group_leader, NULL);
 	if ((!last_user || last_user == current->group_leader) &&
