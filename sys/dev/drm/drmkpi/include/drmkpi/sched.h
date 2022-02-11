@@ -52,7 +52,11 @@ struct drm_task {
 	atomic_t state;
 };
 
-#define	current	(struct drm_task *)curthread
+#define	current	({ \
+	struct thread *__td = curthread; \
+	linux_set_current(__td); \
+	((struct drm_task *)__td->td_lkpi_task); \
+})
 
 bool drmkpi_signal_pending(struct drm_task *task);
 
