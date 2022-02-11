@@ -47,7 +47,7 @@
 
 #define	TASK_COMM_LEN		(MAXCOMLEN + 1)
 
-struct task_struct {
+struct drm_task {
 	struct thread *task_thread;
 	atomic_t state;
 };
@@ -55,10 +55,10 @@ struct task_struct {
 #define	current	({ \
 	struct thread *__td = curthread; \
 	linux_set_current(__td); \
-	((struct task_struct *)__td->td_lkpi_task); \
+	((struct drm_task *)__td->td_lkpi_task); \
 })
 
-bool drmkpi_signal_pending(struct task_struct *task);
+bool drmkpi_signal_pending(struct drm_task *task);
 
 int drmkpi_schedule_timeout(int timeout);
 
