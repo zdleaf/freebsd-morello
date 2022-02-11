@@ -113,8 +113,8 @@ drmkpi_signal_pending(struct drm_task *task)
 }
 
 int
-drmkpi_autoremove_wake_function(wait_queue_entry_t *wq, unsigned int state, int flags,
-    void *key __unused)
+drmkpi_autoremove_wake_function(wait_queue_entry_t *wq, unsigned int state,
+    int flags, void *key __unused)
 {
 	struct drm_task *task;
 	int ret;
