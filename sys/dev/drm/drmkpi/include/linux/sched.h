@@ -52,10 +52,10 @@
 
 #include <drmkpi/sched.h>
 
-#define	task_pid_group_leader(task) (task)->task_thread->td_proc->p_pid
-#define	task_pid(task)		((task)->task_thread->td_tid)
-#define	task_pid_nr(task)	((task)->task_thread->td_tid)
-#define	task_pid_vnr(task)	((task)->task_thread->td_tid)
+#define	task_pid_group_leader(task) (task)->td->td_proc->p_pid
+#define	task_pid(task)		((task)->td->td_tid)
+#define	task_pid_nr(task)	((task)->td->td_tid)
+#define	task_pid_vnr(task)	((task)->td->td_tid)
 #define	get_pid(x)		(x)
 #define	put_pid(x)		do { } while (0)
 #define	current_euid()	(curthread->td_ucred->cr_uid)

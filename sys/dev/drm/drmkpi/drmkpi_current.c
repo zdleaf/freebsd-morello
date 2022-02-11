@@ -33,7 +33,8 @@ __FBSDID("$FreeBSD$");
 
 #include <linux/compat.h>
 
-static MALLOC_DEFINE(M_DRMKPI_CURRENT, "drmkpicurrent", "DRMKPI task structure");
+static MALLOC_DEFINE(M_DRMKPI_CURRENT, "drmkpicurrent",
+    "DRMKPI task structure");
 
 int
 drmkpi_alloc_current(struct thread *td, int flags)
@@ -48,7 +49,7 @@ drmkpi_alloc_current(struct thread *td, int flags)
 		return (ENOMEM);
 
 	/* setup new task structure */
-	ts->task_thread = td;
+	ts->td = td;
 	atomic_set(&ts->state, TASK_RUNNING);
 
 	proc = td->td_proc;

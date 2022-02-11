@@ -103,7 +103,7 @@ drmkpi_signal_pending(struct drm_task *task)
 	struct thread *td;
 	sigset_t pending;
 
-	td = task->task_thread;
+	td = task->td;
 	PROC_LOCK(td->td_proc);
 	pending = td->td_siglist;
 	SIGSETOR(pending, td->td_proc->p_siglist);
@@ -191,7 +191,7 @@ drmkpi_wait_event_common(wait_queue_head_t *wqh, wait_queue_entry_t *wq, int tim
 	 * Our wait queue entry is on the stack - make sure it doesn't
 	 * get swapped out while we sleep.
 	 */
-	PHOLD(task->task_thread->td_proc);
+	PHOLD(task->td->td_proc);
 	sleepq_lock(task);
 	if (atomic_read(&task->state) != TASK_WAKING) {
 		ret = drmkpi_add_to_sleepqueue(task, task, "wevent", timeout,
@@ -200,7 +200,7 @@ drmkpi_wait_event_common(wait_queue_head_t *wqh, wait_queue_entry_t *wq, int tim
 		sleepq_release(task);
 		ret = 0;
 	}
-	PRELE(task->task_thread->td_proc);
+	PRELE(task->td->td_proc);
 
 	if (lock != NULL)
 		spin_lock_irq(lock);
