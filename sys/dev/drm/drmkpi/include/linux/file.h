@@ -46,8 +46,7 @@ put_unused_fd(unsigned int fd)
 {
 	struct file *file;
 
-	if (fget_unlocked(curthread->td_proc->p_fd, fd,
-	    &cap_no_rights, &file) != 0) {
+	if (fget_unlocked(curthread, fd, &cap_no_rights, &file) != 0) {
 		return;
 	}
 	/*
