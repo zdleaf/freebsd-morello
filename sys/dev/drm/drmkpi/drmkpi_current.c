@@ -40,7 +40,7 @@ int
 drmkpi_alloc_current(struct thread *td, int flags)
 {
 	struct proc *proc;
-	struct drm_task *ts;
+	struct task_struct *ts;
 
 	MPASS(td->td_lkpi_task == NULL);
 

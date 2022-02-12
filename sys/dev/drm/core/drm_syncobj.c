@@ -141,7 +141,7 @@
 
 struct syncobj_wait_entry {
 	struct list_head node;
-	struct drm_task *task;
+	struct task_struct *task;
 	struct dma_fence *fence;
 	struct dma_fence_cb fence_cb;
 	u64    point;

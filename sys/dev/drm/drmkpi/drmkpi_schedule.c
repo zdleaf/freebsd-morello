@@ -43,7 +43,7 @@ __FBSDID("$FreeBSD$");
 #include <drmkpi/ww_mutex.h>
 
 static int
-drmkpi_add_to_sleepqueue(void *wchan, struct drm_task *task,
+drmkpi_add_to_sleepqueue(void *wchan, struct task_struct *task,
     const char *wmesg, int timeout, int state)
 {
 	int flags, ret;
@@ -80,7 +80,7 @@ drmkpi_add_to_sleepqueue(void *wchan, struct drm_task *task,
 }
 
 static int
-wake_up_task(struct drm_task *task, unsigned int state)
+wake_up_task(struct task_struct *task, unsigned int state)
 {
 	int ret, wakeup_swapper;
 
@@ -98,7 +98,7 @@ wake_up_task(struct drm_task *task, unsigned int state)
 }
 
 bool
-drmkpi_signal_pending(struct drm_task *task)
+drmkpi_signal_pending(struct task_struct *task)
 {
 	struct thread *td;
 	sigset_t pending;
@@ -116,7 +116,7 @@ int
 drmkpi_autoremove_wake_function(wait_queue_entry_t *wq, unsigned int state,
     int flags, void *key __unused)
 {
-	struct drm_task *task;
+	struct task_struct *task;
 	int ret;
 
 	task = wq->private;
@@ -174,7 +174,7 @@ int
 drmkpi_wait_event_common(wait_queue_head_t *wqh, wait_queue_entry_t *wq,
     int timeout, unsigned int state, spinlock_t *lock)
 {
-	struct drm_task *task;
+	struct task_struct *task;
 	int ret;
 
 	if (lock != NULL)
@@ -211,7 +211,7 @@ drmkpi_wait_event_common(wait_queue_head_t *wqh, wait_queue_entry_t *wq,
 int
 drmkpi_schedule_timeout(int timeout)
 {
-	struct drm_task *task;
+	struct task_struct *task;
 	int ret;
 	int state;
 	int remainder;
@@ -254,7 +254,7 @@ drmkpi_schedule_timeout(int timeout)
 }
 
 bool
-drmkpi_wake_up_state(struct drm_task *task, unsigned int state)
+drmkpi_wake_up_state(struct task_struct *task, unsigned int state)
 {
 
 	return (wake_up_task(task, state) != 0);
