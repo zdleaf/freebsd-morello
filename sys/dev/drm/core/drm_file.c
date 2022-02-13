@@ -126,7 +126,11 @@ struct drm_file *drm_file_alloc(struct drm_minor *minor)
 	if (!file)
 		return ERR_PTR(-ENOMEM);
 
+#ifdef __linux__
 	file->pid = get_pid(task_pid(current));
+#else
+	file->pid = curthread->td_proc->p_pid;
+#endif
 	file->minor = minor;
 
 	/* for compatibility root is always authenticated */
@@ -315,7 +319,12 @@ static int drm_open_helper(struct file *filp, struct drm_minor *minor)
 	if (dev->switch_power_state != DRM_SWITCH_POWER_ON && dev->switch_power_state != DRM_SWITCH_POWER_DYNAMIC_OFF)
 		return -EINVAL;
 
+#ifdef __linux__
 	DRM_DEBUG("pid = %d, minor = %d\n", task_pid_nr(current), minor->index);
+#else
+	DRM_DEBUG("pid = %d, minor = %d\n", curthread->td_proc->p_pid,
+	    minor->index);
+#endif
 
 	priv = drm_file_alloc(minor);
 	if (IS_ERR(priv))

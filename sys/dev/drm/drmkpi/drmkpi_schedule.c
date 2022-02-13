@@ -43,7 +43,7 @@ __FBSDID("$FreeBSD$");
 #include <drmkpi/ww_mutex.h>
 
 static int
-drmkpi_add_to_sleepqueue(void *wchan, struct task_struct *task,
+drmkpi_add_to_sleepqueue(void *wchan, struct thread *task,
     const char *wmesg, int timeout, int state)
 {
 	int flags, ret;
@@ -80,7 +80,7 @@ drmkpi_add_to_sleepqueue(void *wchan, struct task_struct *task,
 }
 
 static int
-wake_up_task(struct task_struct *task, unsigned int state)
+wake_up_task(struct thread *task, unsigned int state)
 {
 	int wakeup_swapper;
 
@@ -96,7 +96,7 @@ static int
 wake_up_task_by_wq(wait_queue_entry_t *wq, unsigned int state)
 {
 	int ret, wakeup_swapper;
-	struct task_struct *task;
+	struct thread *task;
 
 	task = wq->private;
 
@@ -114,12 +114,10 @@ wake_up_task_by_wq(wait_queue_entry_t *wq, unsigned int state)
 }
 
 bool
-drmkpi_signal_pending(struct task_struct *task)
+drmkpi_signal_pending(struct thread *td)
 {
-	struct thread *td;
 	sigset_t pending;
 
-	td = task->td;
 	PROC_LOCK(td->td_proc);
 	pending = td->td_siglist;
 	SIGSETOR(pending, td->td_proc->p_siglist);
@@ -132,7 +130,7 @@ int
 drmkpi_autoremove_wake_function(wait_queue_entry_t *wq, unsigned int state,
     int flags, void *key __unused)
 {
-	struct task_struct *task;
+	struct thread *task;
 	int ret;
 
 	task = wq->private;
@@ -190,7 +188,7 @@ int
 drmkpi_wait_event_common(wait_queue_head_t *wqh, wait_queue_entry_t *wq,
     int timeout, unsigned int state, spinlock_t *lock)
 {
-	struct task_struct *task;
+	struct thread *task;
 	int ret;
 
 	if (lock != NULL)
@@ -208,7 +206,7 @@ drmkpi_wait_event_common(wait_queue_head_t *wqh, wait_queue_entry_t *wq,
 	 * Our wait queue entry is on the stack - make sure it doesn't
 	 * get swapped out while we sleep.
 	 */
-	PHOLD(task->td->td_proc);
+	PHOLD(task->td_proc);
 	sleepq_lock(task);
 	if (atomic_read(&wq->state) != TASK_WAKING) {
 		ret = drmkpi_add_to_sleepqueue(task, task, "wevent", timeout,
@@ -217,7 +215,7 @@ drmkpi_wait_event_common(wait_queue_head_t *wqh, wait_queue_entry_t *wq,
 		sleepq_release(task);
 		ret = 0;
 	}
-	PRELE(task->td->td_proc);
+	PRELE(task->td_proc);
 
 	if (lock != NULL)
 		spin_lock_irq(lock);
@@ -230,7 +228,7 @@ drmkpi_wait_event_common(wait_queue_head_t *wqh, wait_queue_entry_t *wq,
 int
 drmkpi_schedule_timeout_interruptible(int timeout)
 {
-	struct task_struct *task;
+	struct thread *task;
 	int remainder;
 	int ret;
 
@@ -264,7 +262,7 @@ drmkpi_schedule_timeout_interruptible(int timeout)
 }
 
 bool
-drmkpi_wake_up_state(struct task_struct *task, unsigned int state)
+drmkpi_wake_up_state(struct thread *task, unsigned int state)
 {
 
 	return (wake_up_task(task, state) != 0);

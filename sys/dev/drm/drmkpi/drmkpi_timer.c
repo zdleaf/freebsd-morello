@@ -31,8 +31,6 @@ __FBSDID("$FreeBSD$");
 #include <sys/time.h>
 #include <sys/kernel.h>
 
-#include <linux/compat.h>	/* For linux_set_current */
-
 #include <drmkpi/timer.h>
 
 unsigned long drmkpi_timer_hz_mask;
@@ -79,10 +77,6 @@ static void
 drmkpi_timer_callback_wrapper(void *context)
 {
 	struct timer_list *timer;
-
-	THREAD_SLEEPING_OK();
-	linux_set_current(curthread);
-	THREAD_NO_SLEEPING();
 
 	timer = context;
 	timer->function(timer->data);

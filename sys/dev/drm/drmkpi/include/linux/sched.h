@@ -40,7 +40,6 @@
 #include <sys/time.h>
 
 #include <linux/bitmap.h>
-#include <linux/compat.h>
 #include <linux/completion.h>
 #include <linux/mm_types.h>
 #include <linux/pid.h>

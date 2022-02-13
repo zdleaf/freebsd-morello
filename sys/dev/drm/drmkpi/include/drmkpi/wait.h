@@ -72,7 +72,6 @@ int drmkpi_wait_event_common(wait_queue_head_t *, wait_queue_entry_t *, int,
 void drmkpi_prepare_to_wait(wait_queue_head_t *, wait_queue_entry_t *, int);
 void drmkpi_finish_wait(wait_queue_head_t *, wait_queue_entry_t *);
 
-struct task_struct;
-bool drmkpi_wake_up_state(struct task_struct *, unsigned int);
+bool drmkpi_wake_up_state(struct thread *, unsigned int);
 
 #endif	/* __DRMKPI_WAIT_H__ */

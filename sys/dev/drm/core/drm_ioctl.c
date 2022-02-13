@@ -215,10 +215,11 @@ int drm_getclient(struct drm_device *dev, void *data,
 	 */
 	if (client->idx == 0) {
 		client->auth = file_priv->authenticated;
-		client->pid = task_pid_vnr(current);
 #ifdef __linux__
+		client->pid = task_pid_vnr(current);
 		client->uid = overflowuid;
 #else
+		client->pid = curthread->td_proc->p_pid;
 		client->uid = 0;
 #endif
 		client->magic = 0;
@@ -885,8 +886,8 @@ long drm_ioctl(struct file *filp,
 		  (long)old_encode_dev(file_priv->minor->kdev->devt),
 		  file_priv->authenticated, ioctl->name);
 #else
-	DRM_DEBUG("%s: pid=%d, auth=%d, %s\n", __func__, task_pid_nr(current),
-	        file_priv->authenticated, ioctl->name);
+	DRM_DEBUG("%s: pid=%d, auth=%d, %s\n", __func__,
+	    curthread->td_proc->p_pid, file_priv->authenticated, ioctl->name);
 #endif
 
 	/* Do not trust userspace, use our own definition */
@@ -954,7 +955,8 @@ long drm_ioctl(struct file *filp,
 	if (kdata != stack_kdata)
 		kfree(kdata);
 	if (retcode)
-		DRM_DEBUG("pid=%d, ret = %d\n", task_pid_nr(current), retcode);
+		DRM_DEBUG("pid=%d, ret = %d\n", curthread->td_proc->p_pid,
+		    retcode);
 	return retcode;
 }
 EXPORT_SYMBOL(drm_ioctl);

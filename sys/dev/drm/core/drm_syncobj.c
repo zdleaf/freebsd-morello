@@ -141,12 +141,14 @@
 
 struct syncobj_wait_entry {
 	struct list_head node;
+#ifdef __linux__
 	struct task_struct *task;
-	struct dma_fence *fence;
-	struct dma_fence_cb fence_cb;
-#ifdef __FreeBSD__
+#else
+	struct thread *task;
 	bool   *signalledp;
 #endif
+	struct dma_fence *fence;
+	struct dma_fence_cb fence_cb;
 	u64    point;
 };
 

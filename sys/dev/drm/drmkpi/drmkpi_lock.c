@@ -34,7 +34,7 @@
 #include <sys/queue.h>
 #include <sys/sx.h>
 
-#include <linux/compat.h>
+#include <linux/compiler.h>
 
 #include <drmkpi/mutex.h>
 #include <drmkpi/ww_mutex.h>
