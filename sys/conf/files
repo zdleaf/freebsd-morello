@@ -1664,11 +1664,6 @@ dev/drm/drmkpi/drmkpi_work.c			optional compat_drmkpi compile-with "${DRM_C}"
 dev/drm/drmkpi/hdmi.c				optional compat_drmkpi compile-with "${DRM_C}"
 dev/drm/drmkpi/drmkpi_sort.c			optional compat_drmkpi compile-with "${DRM_C}"
 
-dev/drm/virtio/virtio_cmd.c			optional compat_drmkpi drm virtio_drm compile-with "${DRM_C}"
-dev/drm/virtio/virtio_display.c			optional compat_drmkpi drm virtio_drm compile-with "${DRM_C}"
-dev/drm/virtio/virtio_drm.c			optional compat_drmkpi drm virtio_drm compile-with "${DRM_C}"
-dev/drm/virtio/virtio_plane.c			optional compat_drmkpi drm virtio_drm compile-with "${DRM_C}"
-
 dev/drm2/drm_agpsupport.c	optional drm2
 dev/drm2/drm_auth.c		optional drm2
 dev/drm2/drm_bufs.c		optional drm2
