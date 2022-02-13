@@ -49,7 +49,6 @@
 
 struct task_struct {
 	struct thread *td;
-	atomic_t state;
 };
 
 #define	current	({ \
@@ -61,5 +60,6 @@ struct task_struct {
 bool drmkpi_signal_pending(struct task_struct *task);
 
 int drmkpi_schedule_timeout(int timeout);
+int drmkpi_schedule_timeout_interruptible(int timeout);
 
 #endif	/* __DRMKPI_SCHED_H__ */

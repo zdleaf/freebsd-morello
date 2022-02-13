@@ -50,7 +50,6 @@ drmkpi_alloc_current(struct thread *td, int flags)
 
 	/* setup new task structure */
 	ts->td = td;
-	atomic_set(&ts->state, TASK_RUNNING);
 
 	proc = td->td_proc;
 
