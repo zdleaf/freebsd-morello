@@ -114,6 +114,7 @@ dev/drm/komeda/komeda_gem.c		optional drm fdt komeda_drm compile-with "${DRM_C}"
 dev/drm/komeda/komeda_pipeline.c	optional drm fdt komeda_drm compile-with "${DRM_C}"
 dev/drm/komeda/komeda_plane.c		optional drm fdt komeda_drm compile-with "${DRM_C}"
 
+# NXP TDA998x HDMI Controller
 dev/drm/bridges/tda19988/tda19988.c	optional drm fdt komeda_drm compile-with "${DRM_C}"
 dev/drm/bridges/tda19988/tda19988_if.m	optional drm fdt komeda_drm
 
