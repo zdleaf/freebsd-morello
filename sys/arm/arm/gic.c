@@ -1232,10 +1232,10 @@ db_show_gic_one(device_t dev)
 		    !!(gic_d_read_4(sc, GICD_ICPENDR(i)) & GICD_I_MASK(i)),
 		    !!(gic_d_read_4(sc, GICD_ICACTIVER(i)) & GICD_I_MASK(i)));
 		db_printf(" pri:%u",
-		    (gic_d_read_4(sc, GICD_IPRIORITYR(i)) >> (i & 0x3)) & 0xff);
+		    (gic_d_read_4(sc, GICD_IPRIORITYR(i)) >> (8 * (i & 0x3))) & 0xff);
 		db_printf(" trg:%u",
-		    (gic_d_read_4(sc, GICD_ITARGETSR(i)) >> (i & 0x3)) & 0xff);
-		val = gic_d_read_4(sc, GICD_ICFGR(i)) >> (i & 0xf);
+		    (gic_d_read_4(sc, GICD_ITARGETSR(i)) >> (8 * (i & 0x3))) & 0xff);
+		val = gic_d_read_4(sc, GICD_ICFGR(i)) >> (2 * (i & 0xf));
 		if ((val & GICD_ICFGR_POL_MASK) == GICD_ICFGR_POL_LOW)
 			db_printf(" LO");
 		else
