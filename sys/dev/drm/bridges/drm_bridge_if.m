@@ -28,6 +28,7 @@
 INTERFACE drm_bridge;
 
 HEADER {
+	struct drm_crtc;
 	struct drm_encoder;
 	struct drm_device;
 };
@@ -38,5 +39,14 @@ HEADER {
 METHOD int add_bridge {
 	device_t		dev;
 	struct drm_encoder	*encoder;
+	struct drm_device	*drm;
+};
+
+#
+# Add the encoder to the drm pipeline
+#
+METHOD int add_encoder {
+	device_t		dev;
+	struct drm_crtc		*crtc;
 	struct drm_device	*drm;
 };
