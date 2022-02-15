@@ -27,7 +27,7 @@
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 /*
-* NXP TDA19988 HDMI encoder 
+* NXP TDA19988 HDMI encoder
 */
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -63,10 +63,10 @@ __FBSDID("$FreeBSD$");
 #define	REGPAGE(reg)		(((reg) >> 8) & 0xff)
 #define	REGADDR(reg)		((reg) & 0xff)
 
-#define TDA_VERSION		MKREG(0x00, 0x00)
-#define TDA_MAIN_CNTRL0		MKREG(0x00, 0x01)
-#define 	MAIN_CNTRL0_SR		(1 << 0)
-#define TDA_VERSION_MSB		MKREG(0x00, 0x02)
+#define	TDA_VERSION		MKREG(0x00, 0x00)
+#define	TDA_MAIN_CNTRL0		MKREG(0x00, 0x01)
+#define		MAIN_CNTRL0_SR		(1 << 0)
+#define	TDA_VERSION_MSB		MKREG(0x00, 0x02)
 #define	TDA_SOFTRESET		MKREG(0x00, 0x0a)
 #define		SOFTRESET_I2C		(1 << 1)
 #define		SOFTRESET_AUDIO		(1 << 0)
@@ -99,7 +99,7 @@ __FBSDID("$FreeBSD$");
 #define	TDA_VIP_CNTRL_5		MKREG(0x00, 0x25)
 #define		VIP_CNTRL_5_SP_CNT(n)	(((n) & 3) << 1)
 #define	TDA_MUX_VP_VIP_OUT	MKREG(0x00, 0x27)
-#define TDA_MAT_CONTRL		MKREG(0x00, 0x80)
+#define	TDA_MAT_CONTRL		MKREG(0x00, 0x80)
 #define		MAT_CONTRL_MAT_BP	(1 << 2)
 #define	TDA_VIDFORMAT		MKREG(0x00, 0xa0)
 #define	TDA_REFPIX_MSB		MKREG(0x00, 0xa1)
@@ -224,7 +224,7 @@ __FBSDID("$FreeBSD$");
 #define		CEC_FRO_IM_CLK_CTRL_GHOST_DIS	(1 << 7)
 #define		CEC_FRO_IM_CLK_CTRL_IMCLK_SEL	(1 << 1)
 
-/* EDID reading */ 
+/* EDID reading */
 #define	MAX_READ_ATTEMPTS	100
 
 /* EDID fields */
@@ -236,8 +236,8 @@ __FBSDID("$FreeBSD$");
 #define	EDID_FREQ(v)		(((v) & 0x3f) + 60)
 #define	EDID_RATIO(v)		(((v) >> 6) & 0x3)
 #define	EDID_RATIO_10x16	0
-#define	EDID_RATIO_3x4		1	
-#define	EDID_RATIO_4x5		2	
+#define	EDID_RATIO_3x4		1
+#define	EDID_RATIO_4x5		2
 #define	EDID_RATIO_9x16		3
 
 #define	TDA19988		0x0301
@@ -732,15 +732,8 @@ tda19988_start(struct tda19988_softc *sc)
 
 	tda19988_reg_write(sc, TDA_TX3, 39);
 
-    	tda19988_cec_write(sc, TDA_CEC_FRO_IM_CLK_CTRL,
-            CEC_FRO_IM_CLK_CTRL_GHOST_DIS | CEC_FRO_IM_CLK_CTRL_IMCLK_SEL);
-
-#if 0
-	if (tda19988_read_edid(sc) < 0) {
-		device_printf(dev, "failed to read EDID\n");
-		return;
-	}
-#endif
+	tda19988_cec_write(sc, TDA_CEC_FRO_IM_CLK_CTRL,
+	    CEC_FRO_IM_CLK_CTRL_GHOST_DIS | CEC_FRO_IM_CLK_CTRL_IMCLK_SEL);
 
 	/* Default values for RGB 4:4:4 mapping */
 	tda19988_reg_write(sc, TDA_VIP_CNTRL_0, 0x23);
@@ -779,24 +772,6 @@ tda19988_detach(device_t dev)
 	/* XXX: Do not let unload drive */
 	return (EBUSY);
 }
-
-#if 0
-static int
-tda19988_get_edid(device_t dev, uint8_t **edid, uint32_t *edid_len)
-{
-	struct tda19988_softc *sc;
-
-	sc = device_get_softc(dev);
-
-	if (sc->sc_edid) {
-		*edid = sc->sc_edid;
-		*edid_len = sc->sc_edid_len;
-	} else
-		return (ENXIO);
-
-	return (0);
-}
-#endif
 
 static enum drm_connector_status
 tda19988_connector_detect(struct drm_connector *connector, bool force)
