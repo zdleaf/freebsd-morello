@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2020-2021 The FreeBSD Foundation
+ * Copyright (c) 2020-2022 The FreeBSD Foundation
  * Copyright (c) 2020-2022 Bjoern A. Zeeb
  *
  * This software was developed by Björn Zeeb under sponsorship from
@@ -71,14 +71,6 @@ __FBSDID("$FreeBSD$");
 #include "linux_80211.h"
 
 static MALLOC_DEFINE(M_LKPI80211, "lkpi80211", "Linux KPI 80211 compat");
-
-/* -------------------------------------------------------------------------- */
-/* These are unrelated to 802.11 sysctl bug debugging during 802.11 work so   *
- * keep them here rather than in a more general file.                         */
-
-int debug_skb;
-SYSCTL_INT(_compat_linuxkpi, OID_AUTO, debug_skb, CTLFLAG_RWTUN,
-    &debug_skb, 0, "SKB debug level");
 
 /* -------------------------------------------------------------------------- */
 
@@ -374,6 +366,30 @@ lkpi_get_lkpi80211_chan(struct ieee80211com *ic, struct ieee80211_node *ni)
 	}
 
 	return (chan);
+}
+
+struct linuxkpi_ieee80211_channel *
+linuxkpi_ieee80211_get_channel(struct wiphy *wiphy, uint32_t freq)
+{
+	enum nl80211_band band;
+
+	for (band = 0; band < NUM_NL80211_BANDS; band++) {
+		struct ieee80211_supported_band *supband;
+		struct linuxkpi_ieee80211_channel *channels;
+		int i;
+
+		supband = wiphy->bands[band];
+		if (supband == NULL || supband->n_channels == 0)
+			continue;
+
+		channels = supband->channels;
+		for (i = 0; i < supband->n_channels; i++) {
+			if (channels[i].center_freq == freq)
+				return (&channels[i]);
+		}
+	}
+
+	return (NULL);
 }
 
 #ifdef TRY_HW_CRYPTO
@@ -1883,13 +1899,13 @@ lkpi_ic_scan_start(struct ieee80211com *ic)
 	ss = ic->ic_scan;
 	vap = ss->ss_vap;
 	if (vap->iv_state != IEEE80211_S_SCAN) {
-		/* Do not start a scan for now. */
+		IMPROVE("We need to be able to scan if not in S_SCAN");
 		return;
 	}
 
 	hw = LHW_TO_HW(lhw);
 	if ((ic->ic_flags_ext & IEEE80211_FEXT_SCAN_OFFLOAD) == 0) {
-
+sw_scan:
 		lvif = VAP_TO_LVIF(vap);
 		vif = LVIF_TO_VIF(lvif);
 
@@ -1949,6 +1965,10 @@ lkpi_ic_scan_start(struct ieee80211com *ic)
 		hw_req->req.ie_len = ;
 		hw_req->req.ie = ;
 #endif
+#if 0
+		hw->wiphy->max_scan_ie_len
+		hw->wiphy->max_scan_ssids
+#endif
 
 		hw_req->req.n_channels = nchan;
 		cpp = (struct linuxkpi_ieee80211_channel **)(hw_req + 1);
@@ -1994,12 +2014,21 @@ lkpi_ic_scan_start(struct ieee80211com *ic)
 		vif = LVIF_TO_VIF(lvif);
 		error = lkpi_80211_mo_hw_scan(hw, vif, hw_req);
 		if (error != 0) {
-			ic_printf(ic, "ERROR: %s: hw_scan returned %d\n",
-			    __func__, error);
-			ieee80211_cancel_scan(vap);
 			free(hw_req->ies.common_ies, M_80211_VAP);
 			free(hw_req, M_LKPI80211);
 			lhw->hw_req = NULL;
+
+			/*
+			 * XXX-SIGH magic number.
+			 * rtw88 has a magic "return 1" if offloading scan is
+			 * not possible.  Fall back to sw scan in that case.
+			 */
+			if (error == 1)
+				goto sw_scan;
+
+			ic_printf(ic, "ERROR: %s: hw_scan returned %d\n",
+			    __func__, error);
+			ieee80211_cancel_scan(vap);
 		}
 	}
 }
@@ -2719,11 +2748,7 @@ linuxkpi_ieee80211_alloc_hw(size_t priv_len, const struct ieee80211_ops *ops)
 
 	lhw = wiphy_priv(wiphy);
 	lhw->ops = ops;
-	lhw->workq = alloc_ordered_workqueue(wiphy_name(wiphy), 0);
-	if (lhw->workq == NULL) {
-		wiphy_free(wiphy);
-		return (NULL);
-	}
+
 	mtx_init(&lhw->mtx, "lhw", NULL, MTX_DEF | MTX_RECURSE);
 	TAILQ_INIT(&lhw->lvif_head);
 
@@ -2800,17 +2825,20 @@ lkpi_radiotap_attach(struct lkpi_hw *lhw)
 	    LKPI_RTAP_RX_FLAGS_PRESENT);
 }
 
-void
+int
 linuxkpi_ieee80211_ifattach(struct ieee80211_hw *hw)
 {
 	struct ieee80211com *ic;
 	struct lkpi_hw *lhw;
-#ifdef TRY_HW_CRYPTO
-	int i;
-#endif
+	int band, i;
 
 	lhw = HW_TO_LHW(hw);
 	ic = lhw->ic;
+
+	/* We do it this late as wiphy->dev should be set for the name. */
+	lhw->workq = alloc_ordered_workqueue(wiphy_name(hw->wiphy), 0);
+	if (lhw->workq == NULL)
+		return (-EAGAIN);
 
 	/* XXX-BZ figure this out how they count his... */
 	if (!is_zero_ether_addr(hw->wiphy->perm_addr)) {
@@ -2906,8 +2934,38 @@ linuxkpi_ieee80211_ifattach(struct ieee80211_hw *hw)
 
 	lkpi_radiotap_attach(lhw);
 
+	/*
+	 * Assign the first possible channel for now;  seems Realtek drivers
+	 * expect one.
+	 */
+	for (band = 0; band < NUM_NL80211_BANDS &&
+	    hw->conf.chandef.chan == NULL; band++) {
+		struct ieee80211_supported_band *supband;
+		struct linuxkpi_ieee80211_channel *channels;
+
+		supband = hw->wiphy->bands[band];
+		if (supband == NULL || supband->n_channels == 0)
+			continue;
+
+		channels = supband->channels;
+		for (i = 0; i < supband->n_channels; i++) {
+			struct cfg80211_chan_def chandef;
+
+			if (channels[i].flags & IEEE80211_CHAN_DISABLED)
+				continue;
+
+			memset(&chandef, 0, sizeof(chandef));
+			cfg80211_chandef_create(&chandef, &channels[i],
+			    NL80211_CHAN_NO_HT);
+			hw->conf.chandef = chandef;
+			break;
+		}
+	}
+
 	if (bootverbose)
 		ieee80211_announce(ic);
+
+	return (0);
 }
 
 void
@@ -2930,12 +2988,13 @@ linuxkpi_ieee80211_iterate_interfaces(struct ieee80211_hw *hw,
 	struct lkpi_hw *lhw;
 	struct lkpi_vif *lvif;
 	struct ieee80211_vif *vif;
-	bool active, atomic;
+	bool active, atomic, nin_drv;
 
 	lhw = HW_TO_LHW(hw);
 
 	if (flags & ~(IEEE80211_IFACE_ITER_NORMAL|
 	    IEEE80211_IFACE_ITER_RESUME_ALL|
+	    IEEE80211_IFACE_SKIP_SDATA_NOT_IN_DRIVER|
 	    IEEE80211_IFACE_ITER__ACTIVE|IEEE80211_IFACE_ITER__ATOMIC)) {
 		ic_printf(lhw->ic, "XXX TODO %s flags(%#x) not yet supported.\n",
 		    __func__, flags);
@@ -2943,6 +3002,7 @@ linuxkpi_ieee80211_iterate_interfaces(struct ieee80211_hw *hw,
 
 	active = (flags & IEEE80211_IFACE_ITER__ACTIVE) != 0;
 	atomic = (flags & IEEE80211_IFACE_ITER__ATOMIC) != 0;
+	nin_drv = (flags & IEEE80211_IFACE_SKIP_SDATA_NOT_IN_DRIVER) != 0;
 
 	if (atomic)
 		LKPI_80211_LHW_LOCK(lhw);
@@ -2959,6 +3019,13 @@ linuxkpi_ieee80211_iterate_interfaces(struct ieee80211_hw *hw,
 		 */
 		if (active && !lvif->added_to_drv &&
 		    (flags & IEEE80211_IFACE_ITER_RESUME_ALL) != 0)
+			continue;
+
+		/*
+		 * If we shall skip interfaces not added to the driver do so
+		 * if we haven't yet.
+		 */
+		if (nin_drv && !lvif->added_to_drv)
 			continue;
 
 		/*
@@ -3388,8 +3455,8 @@ linuxkpi_ieee80211_find_sta(struct ieee80211_vif *vif, const u8 *peer)
 }
 
 struct ieee80211_sta *
-linuxkpi_ieee80211_find_sta_by_ifaddr(struct ieee80211_hw *hw, uint8_t *addr,
-    uint8_t *ourvifaddr)
+linuxkpi_ieee80211_find_sta_by_ifaddr(struct ieee80211_hw *hw,
+    const uint8_t *addr, const uint8_t *ourvifaddr)
 {
 	struct lkpi_hw *lhw;
 	struct lkpi_vif *lvif;
