@@ -560,6 +560,7 @@ panfrost_alloc_pages_iommu(struct panfrost_gem_object *bo)
 	vm_offset_t va;
 	int pflags;
 	vm_page_t m;
+	int tries;
 	int i;
 
 	alignment = PAGE_SIZE;
@@ -571,12 +572,20 @@ panfrost_alloc_pages_iommu(struct panfrost_gem_object *bo)
 	memattr = VM_MEMATTR_WRITE_COMBINING;
 
 	for (i = 0; i < bo->npages; i++) {
+		tries = 0;
 retry:
 		m = vm_page_alloc_noobj_contig(pflags, 1, low, high,
 		    alignment, boundary, memattr);
 		if (m == NULL) {
-			vm_wait(NULL);
-			goto retry;
+			if (tries < 3) {
+				if (!vm_page_reclaim_contig(pflags, 1, low,
+				    high, alignment, boundary))
+					vm_wait(NULL);
+				tries++;
+				goto retry;
+			}
+
+			return (ENOMEM);
 		}
 		if ((m->flags & PG_ZERO) == 0)
 			pmap_zero_page(m);
@@ -600,6 +609,7 @@ panfrost_alloc_pages_contig(struct panfrost_gem_object *bo)
 	vm_offset_t va;
 	int pflags;
 	vm_page_t m;
+	int tries;
 	int i;
 
 	alignment = PAGE_SIZE;
@@ -610,12 +620,20 @@ panfrost_alloc_pages_contig(struct panfrost_gem_object *bo)
 	    VM_ALLOC_ZERO;
 	memattr = VM_MEMATTR_WRITE_COMBINING;
 
+	tries = 0;
 retry:
 	m = vm_page_alloc_noobj_contig(pflags, bo->npages, low, high,
 	    alignment, boundary, memattr);
 	if (m == NULL) {
-		vm_wait(NULL);
-		goto retry;
+		if (tries < 3) {
+			if (!vm_page_reclaim_contig(pflags, bo->npages, low,
+			    high, alignment, boundary))
+				vm_wait(NULL);
+			tries++;
+			goto retry;
+		}
+
+		return (ENOMEM);
 	}
 	for (i = 0; i < bo->npages; i++) {
 		if ((m->flags & PG_ZERO) == 0)
