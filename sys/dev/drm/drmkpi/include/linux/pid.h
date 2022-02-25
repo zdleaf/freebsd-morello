@@ -46,4 +46,27 @@ enum pid_type {
 #define	pid_vnr(n) (n)
 #define	from_kuid_munged(a, uid) (uid)
 
+#define	pid_task(pid, type) ({			\
+	struct task_struct *__ts;		\
+	CTASSERT((type) == PIDTYPE_PID);	\
+	__ts = linux_pid_task(pid);		\
+	__ts;					\
+})
+
+#define	get_pid_task(pid, type) ({		\
+	struct task_struct *__ts;		\
+	CTASSERT((type) == PIDTYPE_PID);	\
+	__ts = drmkpi_get_pid_task(pid);	\
+	__ts;					\
+})
+
+#define	get_task_pid(task, type) ({		\
+	CTASSERT((type) == PIDTYPE_PID);	\
+	(task)->task_thread->td_tid;		\
+})
+
+struct task_struct;
+extern struct task_struct *drmkpi_pid_task(pid_t);
+extern struct task_struct *drmkpi_get_pid_task(pid_t);
+
 #endif	/* __DRMKPI_LINUX_PID_H__ */

@@ -70,17 +70,24 @@ struct tcon_config {
 
 static struct tcon_config a83t_tcon_lcd = {
 	.model = A83T_TCON_LCD,
-	.name = "Allwinner DE2 LCD TCON",
+	.name = "Allwinner A83T DE2 LCD TCON",
 	.clk_parent_name = "pll_video0-2x",
 };
 
 static struct tcon_config a83t_tcon_tv = {
 	.model = A83T_TCON_TV,
-	.name = "Allwinner DE2 TV TCON",
+	.name = "Allwinner A83T DE2 TV TCON",
 	.clk_parent_name = "pll_video1",
 };
 
+static struct tcon_config h3_tcon_tv = {
+	.model = A83T_TCON_TV,
+	.name = "Allwinner H3 DE2 TV TCON",
+	.clk_parent_name = "pll_video",
+};
+
 static struct ofw_compat_data compat_data[] = {
+	{ "allwinner,sun8i-h3-tcon-tv",	(uintptr_t)&h3_tcon_tv },
 	{ "allwinner,sun8i-a83t-tcon-lcd",	(uintptr_t)&a83t_tcon_lcd },
 	{ "allwinner,sun8i-a83t-tcon-tv",	(uintptr_t)&a83t_tcon_tv },
 	{ NULL,					0 }
@@ -259,10 +266,7 @@ static void
 aw_crtc_atomic_begin(struct drm_crtc *crtc,
     struct drm_crtc_state *old_state)
 {
-	struct aw_de2_tcon_softc *sc;
 	unsigned long flags;
-
-	sc = container_of(crtc, struct aw_de2_tcon_softc, crtc);
 
 	if (crtc->state->event == NULL)
 		return;
@@ -360,24 +364,11 @@ aw_crtc_mode_set_nofb(struct drm_crtc *crtc)
 {
 	struct aw_de2_tcon_softc *sc;
 	struct drm_display_mode *mode;
-	clk_t parent;
 	uint64_t freq;
 	uint32_t reg;
 
 	sc = container_of(crtc, struct aw_de2_tcon_softc, crtc);
 	mode = &crtc->state->adjusted_mode;
-
-	clk_disable(sc->clk_tcon);
-	if (clk_get_by_name(sc->dev, sc->conf->clk_parent_name, &parent) != 0) {
-		DRM_ERROR("%s: Cannot get parent clock %s\n", __func__,
-		    sc->conf->clk_parent_name);
-		return;
-	}
-	if (clk_set_parent_by_clk(sc->clk_tcon, parent) != 0) {
-		DRM_ERROR("%s: Cannot set clock parent to %s\n", __func__,
-		    sc->conf->clk_parent_name);
-		return;
-	}
 
 	if (__drm_debug & DRM_UT_DRIVER)
 		aw_de2_tcon_dump_regs(sc);
@@ -387,7 +378,6 @@ aw_crtc_mode_set_nofb(struct drm_crtc *crtc)
 	clk_set_freq(sc->clk_tcon, mode->crtc_clock * 1000, CLK_SET_ROUND_ANY);
 	clk_get_freq(sc->clk_tcon, &freq);
 	DRM_DEBUG_DRIVER("%s: New freq: %ju\n", __func__, (uintmax_t)freq);
-	clk_enable(sc->clk_tcon);
 	AW_DE2_TCON_LOCK(sc);
 
 	/* Clock delay, writing what u-boot left, need to figure what it is */
@@ -659,10 +649,8 @@ static int
 aw_de2_tcon_detach(device_t dev)
 {
 	struct aw_de2_tcon_softc *sc;
-	phandle_t node;
 
 	sc = device_get_softc(dev);
-	node = ofw_bus_get_node(dev);
 
 	clk_release(sc->clk_tcon);
 	clk_release(sc->clk_ahb);

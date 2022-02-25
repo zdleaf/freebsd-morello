@@ -826,7 +826,8 @@ static const struct drm_connector_helper_funcs
 };
 
 static int
-tda19988_bridge_attach(struct drm_bridge *bridge)
+tda19988_bridge_attach(struct drm_bridge *bridge,
+    enum drm_bridge_attach_flags flags)
 {
 	struct tda19988_softc *sc;
 
@@ -938,7 +939,7 @@ tda19988_add_encoder(device_t dev, struct drm_crtc *crtc,
 	    DRM_MODE_ENCODER_TMDS, NULL);
 
 	sc->bridge.funcs = &tda19988_bridge_funcs;
-	drm_bridge_attach(&sc->encoder, &sc->bridge, NULL);
+	drm_bridge_attach(&sc->encoder, &sc->bridge, NULL, 0);
 
 	return (0);
 }

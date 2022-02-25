@@ -73,9 +73,12 @@ struct drm_device {
 	/**
 	 * @dev_private:
 	 *
-	 * DRM driver private data. Instead of using this pointer it is
-	 * recommended that drivers use drm_dev_init() and embed struct
-	 * &drm_device in their larger per-device structure.
+	 * DRM driver private data. This is deprecated and should be left set to
+	 * NULL.
+	 *
+	 * Instead of using this pointer it is recommended that drivers use
+	 * drm_dev_init() and embed struct &drm_device in their larger
+	 * per-device structure.
 	 */
 	void *dev_private;
 
@@ -144,7 +147,7 @@ struct drm_device {
 	 * Usage counter for outstanding files open,
 	 * protected by drm_global_mutex
 	 */
-	int open_count;
+	atomic_t open_count;
 
 	/** @filelist_mutex: Protects @filelist. */
 	struct mutex filelist_mutex;

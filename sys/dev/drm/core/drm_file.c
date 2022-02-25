@@ -48,6 +48,11 @@
 #include "drm_internal.h"
 #include "drm_legacy.h"
 
+#if defined(CONFIG_MMU) && defined(CONFIG_TRANSPARENT_HUGEPAGE)
+#include <uapi/asm/mman.h>
+#include <drm/drm_vma_manager.h>
+#endif
+
 /* from BKL pushdown */
 DEFINE_MUTEX(drm_global_mutex);
 
@@ -126,11 +131,7 @@ struct drm_file *drm_file_alloc(struct drm_minor *minor)
 	if (!file)
 		return ERR_PTR(-ENOMEM);
 
-#ifdef __linux__
 	file->pid = get_pid(task_pid(current));
-#else
-	file->pid = curthread->td_proc->p_pid;
-#endif
 	file->minor = minor;
 
 	/* for compatibility root is always authenticated */
@@ -229,7 +230,7 @@ void drm_file_free(struct drm_file *file)
 	DRM_DEBUG("pid = %d, device = 0x%lx, open_count = %d\n",
 		  task_pid_nr(current),
 		  (long)old_encode_dev(file->minor->kdev->devt),
-		  dev->open_count);
+		  atomic_read(dev->open_count));
 #endif
 
 	if (drm_core_check_feature(dev, DRIVER_LEGACY) &&
@@ -319,12 +320,7 @@ static int drm_open_helper(struct file *filp, struct drm_minor *minor)
 	if (dev->switch_power_state != DRM_SWITCH_POWER_ON && dev->switch_power_state != DRM_SWITCH_POWER_DYNAMIC_OFF)
 		return -EINVAL;
 
-#ifdef __linux__
 	DRM_DEBUG("pid = %d, minor = %d\n", task_pid_nr(current), minor->index);
-#else
-	DRM_DEBUG("pid = %d, minor = %d\n", curthread->td_proc->p_pid,
-	    minor->index);
-#endif
 
 	priv = drm_file_alloc(minor);
 	if (IS_ERR(priv))
@@ -396,7 +392,7 @@ int drm_open(struct inode *inode, struct file *filp)
 		return PTR_ERR(minor);
 
 	dev = minor->dev;
-	if (!dev->open_count++)
+	if (!atomic_fetch_inc(&dev->open_count))
 		need_setup = 1;
 
 	/* share address_space across all char-devs of a single device */
@@ -417,7 +413,7 @@ int drm_open(struct inode *inode, struct file *filp)
 	return 0;
 
 err_undo:
-	dev->open_count--;
+	atomic_dec(&dev->open_count);
 	drm_minor_release(minor);
 	return retcode;
 }
@@ -459,11 +455,11 @@ int drm_release(struct inode *inode, struct file *filp)
 
 	mutex_lock(&drm_global_mutex);
 
-	DRM_DEBUG("open_count = %d\n", dev->open_count);
+	DRM_DEBUG("open_count = %d\n", atomic_read(&dev->open_count));
 
 	drm_close_helper(filp);
 
-	if (!--dev->open_count)
+	if (atomic_dec_and_test(&dev->open_count))
 		drm_lastclose(dev);
 
 	mutex_unlock(&drm_global_mutex);
@@ -473,6 +469,40 @@ int drm_release(struct inode *inode, struct file *filp)
 	return 0;
 }
 EXPORT_SYMBOL(drm_release);
+
+/**
+ * drm_release_noglobal - release method for DRM file
+ * @inode: device inode
+ * @filp: file pointer.
+ *
+ * This function may be used by drivers as their &file_operations.release
+ * method. It frees any resources associated with the open file prior to taking
+ * the drm_global_mutex, which then calls the &drm_driver.postclose driver
+ * callback. If this is the last open file for the DRM device also proceeds to
+ * call the &drm_driver.lastclose driver callback.
+ *
+ * RETURNS:
+ *
+ * Always succeeds and returns 0.
+ */
+int drm_release_noglobal(struct inode *inode, struct file *filp)
+{
+	struct drm_file *file_priv = filp->private_data;
+	struct drm_minor *minor = file_priv->minor;
+	struct drm_device *dev = minor->dev;
+
+	drm_close_helper(filp);
+
+	if (atomic_dec_and_mutex_lock(&dev->open_count, &drm_global_mutex)) {
+		drm_lastclose(dev);
+		mutex_unlock(&drm_global_mutex);
+	}
+
+	drm_minor_release(minor);
+
+	return 0;
+}
+EXPORT_SYMBOL(drm_release_noglobal);
 
 /**
  * drm_read - read method for DRM file
@@ -506,9 +536,6 @@ ssize_t drm_read(struct file *filp, char __user *buffer,
 	struct drm_file *file_priv = filp->private_data;
 	struct drm_device *dev = file_priv->minor->dev;
 	ssize_t ret;
-
-	if (!access_ok(buffer, count))
-		return -EFAULT;
 
 	ret = mutex_lock_interruptible(&file_priv->event_read_lock);
 	if (ret)
@@ -912,4 +939,140 @@ struct file *mock_drm_getfile(struct drm_minor *minor, unsigned int flags)
 	return file;
 }
 EXPORT_SYMBOL_FOR_TESTS_ONLY(mock_drm_getfile);
+
+#ifdef CONFIG_MMU
+#ifdef CONFIG_TRANSPARENT_HUGEPAGE
+/*
+ * drm_addr_inflate() attempts to construct an aligned area by inflating
+ * the area size and skipping the unaligned start of the area.
+ * adapted from shmem_get_unmapped_area()
+ */
+static unsigned long drm_addr_inflate(unsigned long addr,
+				      unsigned long len,
+				      unsigned long pgoff,
+				      unsigned long flags,
+				      unsigned long huge_size)
+{
+	unsigned long offset, inflated_len;
+	unsigned long inflated_addr;
+	unsigned long inflated_offset;
+
+	offset = (pgoff << PAGE_SHIFT) & (huge_size - 1);
+	if (offset && offset + len < 2 * huge_size)
+		return addr;
+	if ((addr & (huge_size - 1)) == offset)
+		return addr;
+
+	inflated_len = len + huge_size - PAGE_SIZE;
+	if (inflated_len > TASK_SIZE)
+		return addr;
+	if (inflated_len < len)
+		return addr;
+
+	inflated_addr = current->mm->get_unmapped_area(NULL, 0, inflated_len,
+						       0, flags);
+	if (IS_ERR_VALUE(inflated_addr))
+		return addr;
+	if (inflated_addr & ~PAGE_MASK)
+		return addr;
+
+	inflated_offset = inflated_addr & (huge_size - 1);
+	inflated_addr += offset - inflated_offset;
+	if (inflated_offset > offset)
+		inflated_addr += huge_size;
+
+	if (inflated_addr > TASK_SIZE - len)
+		return addr;
+
+	return inflated_addr;
+}
+
+/**
+ * drm_get_unmapped_area() - Get an unused user-space virtual memory area
+ * suitable for huge page table entries.
+ * @file: The struct file representing the address space being mmap()'d.
+ * @uaddr: Start address suggested by user-space.
+ * @len: Length of the area.
+ * @pgoff: The page offset into the address space.
+ * @flags: mmap flags
+ * @mgr: The address space manager used by the drm driver. This argument can
+ * probably be removed at some point when all drivers use the same
+ * address space manager.
+ *
+ * This function attempts to find an unused user-space virtual memory area
+ * that can accommodate the size we want to map, and that is properly
+ * aligned to facilitate huge page table entries matching actual
+ * huge pages or huge page aligned memory in buffer objects. Buffer objects
+ * are assumed to start at huge page boundary pfns (io memory) or be
+ * populated by huge pages aligned to the start of the buffer object
+ * (system- or coherent memory). Adapted from shmem_get_unmapped_area.
+ *
+ * Return: aligned user-space address.
+ */
+unsigned long drm_get_unmapped_area(struct file *file,
+				    unsigned long uaddr, unsigned long len,
+				    unsigned long pgoff, unsigned long flags,
+				    struct drm_vma_offset_manager *mgr)
+{
+	unsigned long addr;
+	unsigned long inflated_addr;
+	struct drm_vma_offset_node *node;
+
+	if (len > TASK_SIZE)
+		return -ENOMEM;
+
+	/*
+	 * @pgoff is the file page-offset the huge page boundaries of
+	 * which typically aligns to physical address huge page boundaries.
+	 * That's not true for DRM, however, where physical address huge
+	 * page boundaries instead are aligned with the offset from
+	 * buffer object start. So adjust @pgoff to be the offset from
+	 * buffer object start.
+	 */
+	drm_vma_offset_lock_lookup(mgr);
+	node = drm_vma_offset_lookup_locked(mgr, pgoff, 1);
+	if (node)
+		pgoff -= node->vm_node.start;
+	drm_vma_offset_unlock_lookup(mgr);
+
+	addr = current->mm->get_unmapped_area(file, uaddr, len, pgoff, flags);
+	if (IS_ERR_VALUE(addr))
+		return addr;
+	if (addr & ~PAGE_MASK)
+		return addr;
+	if (addr > TASK_SIZE - len)
+		return addr;
+
+	if (len < HPAGE_PMD_SIZE)
+		return addr;
+	if (flags & MAP_FIXED)
+		return addr;
+	/*
+	 * Our priority is to support MAP_SHARED mapped hugely;
+	 * and support MAP_PRIVATE mapped hugely too, until it is COWed.
+	 * But if caller specified an address hint, respect that as before.
+	 */
+	if (uaddr)
+		return addr;
+
+	inflated_addr = drm_addr_inflate(addr, len, pgoff, flags,
+					 HPAGE_PMD_SIZE);
+
+	if (IS_ENABLED(CONFIG_HAVE_ARCH_TRANSPARENT_HUGEPAGE_PUD) &&
+	    len >= HPAGE_PUD_SIZE)
+		inflated_addr = drm_addr_inflate(inflated_addr, len, pgoff,
+						 flags, HPAGE_PUD_SIZE);
+	return inflated_addr;
+}
+#else /* CONFIG_TRANSPARENT_HUGEPAGE */
+unsigned long drm_get_unmapped_area(struct file *file,
+				    unsigned long uaddr, unsigned long len,
+				    unsigned long pgoff, unsigned long flags,
+				    struct drm_vma_offset_manager *mgr)
+{
+	return current->mm->get_unmapped_area(file, uaddr, len, pgoff, flags);
+}
+#endif /* CONFIG_TRANSPARENT_HUGEPAGE */
+EXPORT_SYMBOL_GPL(drm_get_unmapped_area);
+#endif /* CONFIG_MMU */
 #endif /* __linux__ */
