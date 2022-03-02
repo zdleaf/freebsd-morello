@@ -34,7 +34,7 @@
 
 #include <machine/atomic.h>
 
-#include <drmkpi/rcupdate.h>
+#include <drmcompat/rcupdate.h>
 
 #define	RCU_INITIALIZER(v)			\
 	((__typeof(*(v)) *)(v))
@@ -44,27 +44,27 @@
 } while (0)
 
 #define	call_rcu(ptr, func) do {		\
-	drmkpi_call_rcu(RCU_TYPE_REGULAR, ptr, func);	\
+	drmcompat_call_rcu(RCU_TYPE_REGULAR, ptr, func);	\
 } while (0)
 
 #define	rcu_barrier(void) do {			\
-	drmkpi_rcu_barrier(RCU_TYPE_REGULAR);	\
+	drmcompat_rcu_barrier(RCU_TYPE_REGULAR);	\
 } while (0)
 
 #define	rcu_read_lock(void) do {		\
-	drmkpi_rcu_read_lock(RCU_TYPE_REGULAR);	\
+	drmcompat_rcu_read_lock(RCU_TYPE_REGULAR);	\
 } while (0)
 
 #define	rcu_read_unlock(void) do {		\
-	drmkpi_rcu_read_unlock(RCU_TYPE_REGULAR);\
+	drmcompat_rcu_read_unlock(RCU_TYPE_REGULAR);\
 } while (0)
 
 #define	synchronize_rcu(void) do {	\
-	drmkpi_synchronize_rcu(RCU_TYPE_REGULAR);	\
+	drmcompat_synchronize_rcu(RCU_TYPE_REGULAR);	\
 } while (0)
 
 #define	synchronize_rcu_expedited(void) do {	\
-	drmkpi_synchronize_rcu(RCU_TYPE_REGULAR);	\
+	drmcompat_synchronize_rcu(RCU_TYPE_REGULAR);	\
 } while (0)
 
 #define	kfree_rcu(ptr, rcu_head) do {				\

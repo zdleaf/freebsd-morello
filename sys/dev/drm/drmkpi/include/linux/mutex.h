@@ -39,7 +39,7 @@
 
 #include <linux/spinlock.h>
 
-#include <drmkpi/mutex.h>
+#include <drmcompat/mutex.h>
 
 /*
  * By defining CONFIG_NO_MUTEX_SKIP DRMKPI mutexes and asserts will
@@ -62,7 +62,7 @@
 
 #define	mutex_lock_interruptible(_m) ({		\
 	MUTEX_SKIP() ? 0 :			\
-	drmkpi_mutex_lock_interruptible(_m);	\
+	drmcompat_mutex_lock_interruptible(_m);	\
 })
 
 #define	mutex_unlock(_m) do {			\

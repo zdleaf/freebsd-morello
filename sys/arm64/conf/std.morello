@@ -11,7 +11,7 @@ device		pl011
 # options	IOMMU
 
 # DRM Support
-options		COMPAT_DRMKPI
+options		COMPAT_DRMCOMPAT
 
 device		drm
 device		komeda_drm

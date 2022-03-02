@@ -41,7 +41,7 @@ __FBSDID("$FreeBSD$");
 #define	DRMKPI_SUSPEND_WAIT	2000000
 
 bool
-drmkpi_kthread_should_stop_task(struct thread *td)
+drmcompat_kthread_should_stop_task(struct thread *td)
 {
 
 	if (td->td_flags & TDF_KTH_SUSP)
@@ -51,17 +51,17 @@ drmkpi_kthread_should_stop_task(struct thread *td)
 }
 
 bool
-drmkpi_kthread_should_stop(void)
+drmcompat_kthread_should_stop(void)
 {
 	struct thread *td;
 
 	td = curthread;
 
-	return (drmkpi_kthread_should_stop_task(td));
+	return (drmcompat_kthread_should_stop_task(td));
 }
 
 int
-drmkpi_kthread_stop(struct thread *td)
+drmcompat_kthread_stop(struct thread *td)
 {
 	int error;
 
@@ -71,7 +71,7 @@ drmkpi_kthread_stop(struct thread *td)
 }
 
 int
-drmkpi_kthread_park(struct thread *td)
+drmcompat_kthread_park(struct thread *td)
 {
 	int error;
 
@@ -81,31 +81,31 @@ drmkpi_kthread_park(struct thread *td)
 }
 
 void
-drmkpi_kthread_parkme(void)
+drmcompat_kthread_parkme(void)
 {
 
 	kthread_suspend_check();
 }
 
 bool
-drmkpi_kthread_should_park(void)
+drmcompat_kthread_should_park(void)
 {
 	struct thread *td;
 
 	td = curthread;
 
-	return (drmkpi_kthread_should_stop_task(td));
+	return (drmcompat_kthread_should_stop_task(td));
 }
 
 void
-drmkpi_kthread_unpark(struct thread *td)
+drmcompat_kthread_unpark(struct thread *td)
 {
 
 	kthread_resume(td);
 }
 
 struct thread *
-drmkpi_kthread_setup_and_run(struct thread *td)
+drmcompat_kthread_setup_and_run(struct thread *td)
 {
 
 	thread_lock(td);
@@ -118,7 +118,7 @@ drmkpi_kthread_setup_and_run(struct thread *td)
 }
 
 void
-drmkpi_kthread_fn(void *arg)
+drmcompat_kthread_fn(void *arg)
 {
 	struct kthr_wrap *w;
 

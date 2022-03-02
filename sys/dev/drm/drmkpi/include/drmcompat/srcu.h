@@ -1,8 +1,5 @@
 /*-
- * Copyright (c) 2010 Isilon Systems, Inc.
- * Copyright (c) 2010 iX Systems, Inc.
- * Copyright (c) 2010 Panasas, Inc.
- * Copyright (c) 2013, 2014 Mellanox Technologies, Ltd.
+ * Copyright (c) 2015-2017 Mellanox Technologies, Ltd.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -29,17 +26,17 @@
  * $FreeBSD$
  */
 
-#ifndef __DRMKPI_COMPLETION_H__
-#define	__DRMKPI_COMPLETION_H__
+#ifndef __DRMKPI_SRCU_H__
+#define	__DRMKPI_SRCU_H__
 
-struct completion {
-	unsigned int done;
+struct srcu_struct {
 };
 
-void drmkpi_complete_common(struct completion *, int);
-int drmkpi_wait_for_common(struct completion *, int);
-int drmkpi_wait_for_timeout_common(struct completion *, int, int);
-int drmkpi_try_wait_for_completion(struct completion *);
-int drmkpi_completion_done(struct completion *);
+int drmcompat_srcu_read_lock(struct srcu_struct *);
+void drmcompat_srcu_read_unlock(struct srcu_struct *, int index);
+void drmcompat_synchronize_srcu(struct srcu_struct *);
+void drmcompat_srcu_barrier(struct srcu_struct *);
+int drmcompat_init_srcu_struct(struct srcu_struct *);
+void drmcompat_cleanup_srcu_struct(struct srcu_struct *);
 
-#endif
+#endif	/* __DRMKPI_SRCU_H__ */

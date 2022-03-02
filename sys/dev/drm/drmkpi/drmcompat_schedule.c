@@ -37,13 +37,13 @@ __FBSDID("$FreeBSD$");
 #include <linux/list.h>
 #include <linux/spinlock.h>
 
-#include <drmkpi/completion.h>
-#include <drmkpi/sched.h>
-#include <drmkpi/wait.h>
-#include <drmkpi/ww_mutex.h>
+#include <drmcompat/completion.h>
+#include <drmcompat/sched.h>
+#include <drmcompat/wait.h>
+#include <drmcompat/ww_mutex.h>
 
 static int
-drmkpi_add_to_sleepqueue(void *wchan, struct thread *task,
+drmcompat_add_to_sleepqueue(void *wchan, struct thread *task,
     const char *wmesg, int timeout, int state)
 {
 	int flags, ret;
@@ -114,7 +114,7 @@ wake_up_task_by_wq(wait_queue_entry_t *wq, unsigned int state)
 }
 
 bool
-drmkpi_signal_pending(struct thread *td)
+drmcompat_signal_pending(struct thread *td)
 {
 	sigset_t pending;
 
@@ -127,7 +127,7 @@ drmkpi_signal_pending(struct thread *td)
 }
 
 int
-drmkpi_autoremove_wake_function(wait_queue_entry_t *wq, unsigned int state,
+drmcompat_autoremove_wake_function(wait_queue_entry_t *wq, unsigned int state,
     int flags, void *key __unused)
 {
 	struct thread *task;
@@ -140,7 +140,7 @@ drmkpi_autoremove_wake_function(wait_queue_entry_t *wq, unsigned int state,
 }
 
 void
-drmkpi_wake_up(wait_queue_head_t *wqh, unsigned int state, int nr, bool locked)
+drmcompat_wake_up(wait_queue_head_t *wqh, unsigned int state, int nr, bool locked)
 {
 	wait_queue_entry_t *pos, *next;
 
@@ -160,7 +160,7 @@ drmkpi_wake_up(wait_queue_head_t *wqh, unsigned int state, int nr, bool locked)
 }
 
 void
-drmkpi_prepare_to_wait(wait_queue_head_t *wqh, wait_queue_entry_t *wq,
+drmcompat_prepare_to_wait(wait_queue_head_t *wqh, wait_queue_entry_t *wq,
     int state)
 {
 
@@ -172,7 +172,7 @@ drmkpi_prepare_to_wait(wait_queue_head_t *wqh, wait_queue_entry_t *wq,
 }
 
 void
-drmkpi_finish_wait(wait_queue_head_t *wqh, wait_queue_entry_t *wq)
+drmcompat_finish_wait(wait_queue_head_t *wqh, wait_queue_entry_t *wq)
 {
 
 	spin_lock(&wqh->lock);
@@ -185,7 +185,7 @@ drmkpi_finish_wait(wait_queue_head_t *wqh, wait_queue_entry_t *wq)
 }
 
 int
-drmkpi_wait_event_common(wait_queue_head_t *wqh, wait_queue_entry_t *wq,
+drmcompat_wait_event_common(wait_queue_head_t *wqh, wait_queue_entry_t *wq,
     int timeout, unsigned int state, spinlock_t *lock)
 {
 	struct thread *task;
@@ -209,7 +209,7 @@ drmkpi_wait_event_common(wait_queue_head_t *wqh, wait_queue_entry_t *wq,
 	PHOLD(task->td_proc);
 	sleepq_lock(task);
 	if (atomic_read(&wq->state) != TASK_WAKING) {
-		ret = drmkpi_add_to_sleepqueue(task, task, "wevent", timeout,
+		ret = drmcompat_add_to_sleepqueue(task, task, "wevent", timeout,
 		    state);
 	} else {
 		sleepq_release(task);
@@ -226,7 +226,7 @@ drmkpi_wait_event_common(wait_queue_head_t *wqh, wait_queue_entry_t *wq,
  * Use sleepq_lock(current) before entering this function.
  */
 int
-drmkpi_schedule_timeout_interruptible(int timeout)
+drmcompat_schedule_timeout_interruptible(int timeout)
 {
 	struct thread *task;
 	int remainder;
@@ -242,7 +242,7 @@ drmkpi_schedule_timeout_interruptible(int timeout)
 
 	remainder = ticks + timeout;
 
-	ret = drmkpi_add_to_sleepqueue(task, task, "sched", timeout,
+	ret = drmcompat_add_to_sleepqueue(task, task, "sched", timeout,
 	    TASK_INTERRUPTIBLE);
 
 	if (timeout == 0)
@@ -262,7 +262,7 @@ drmkpi_schedule_timeout_interruptible(int timeout)
 }
 
 bool
-drmkpi_wake_up_state(struct thread *task, unsigned int state)
+drmcompat_wake_up_state(struct thread *task, unsigned int state)
 {
 
 	return (wake_up_task(task, state) != 0);

@@ -1,8 +1,5 @@
 /*-
- * Copyright (c) 2010 Isilon Systems, Inc.
- * Copyright (c) 2010 iX Systems, Inc.
- * Copyright (c) 2010 Panasas, Inc.
- * Copyright (c) 2013-2017 Mellanox Technologies, Ltd.
+ * Copyright (c) 2013-2018 Mellanox Technologies, Ltd.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -25,17 +22,54 @@
  * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
-#ifndef __DRMKPI_MUTEX_H__
-#define	__DRMKPI_MUTEX_H__
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD$");
 
-typedef struct mutex {
-	struct sx sx;
-} mutex_t;
+#include <linux/list.h>
 
-int drmkpi_mutex_lock_interruptible(mutex_t *m);
+#include <drmcompat/list_sort.h>
 
-#endif
+MALLOC_DECLARE(M_DRMKMALLOC);
+
+struct list_sort_thunk {
+	int (*cmp)(void *, struct list_head *, struct list_head *);
+	void *priv;
+};
+
+static inline int
+linux_le_cmp(void *priv, const void *d1, const void *d2)
+{
+	struct list_head *le1, *le2;
+	struct list_sort_thunk *thunk;
+
+	thunk = priv;
+	le1 = *(__DECONST(struct list_head **, d1));
+	le2 = *(__DECONST(struct list_head **, d2));
+	return ((thunk->cmp)(thunk->priv, le1, le2));
+}
+
+void
+drmcompat_list_sort(void *priv, struct list_head *head, int (*cmp)(void *priv,
+    struct list_head *a, struct list_head *b))
+{
+	struct list_sort_thunk thunk;
+	struct list_head **ar, *le;
+	size_t count, i;
+
+	count = 0;
+	list_for_each(le, head)
+		count++;
+	ar = malloc(sizeof(struct list_head *) * count, M_DRMKMALLOC, M_WAITOK);
+	i = 0;
+	list_for_each(le, head)
+		ar[i++] = le;
+	thunk.cmp = cmp;
+	thunk.priv = priv;
+	qsort_r(ar, count, sizeof(struct list_head *), &thunk, linux_le_cmp);
+	INIT_LIST_HEAD(head);
+	for (i = 0; i < count; i++)
+		list_add_tail(ar[i], head);
+	free(ar, M_DRMKMALLOC);
+}

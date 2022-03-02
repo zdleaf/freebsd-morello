@@ -28,7 +28,7 @@
 #ifndef __DRMKPI_LIST_SORT_H__
 #define	__DRMKPI_LIST_SORT_H__
 
-void drmkpi_list_sort(void *priv, struct list_head *head, int (*cmp)(void *priv,
+void drmcompat_list_sort(void *priv, struct list_head *head, int (*cmp)(void *priv,
     struct list_head *a, struct list_head *b));
 
 #endif	/* __DRMKPI_LIST_SORT_H__ */

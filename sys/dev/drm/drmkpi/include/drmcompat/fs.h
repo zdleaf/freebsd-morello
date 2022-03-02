@@ -104,11 +104,11 @@ struct file_operations {
 };
 
 /* Shared memory support */
-unsigned long drmkpi_invalidate_mapping_pages(vm_object_t, pgoff_t, pgoff_t);
-struct page *drmkpi_shmem_read_mapping_page_gfp(vm_object_t, int, gfp_t);
-struct file *drmkpi_shmem_file_setup(const char *, loff_t, unsigned long);
-void drmkpi_shmem_truncate_range(vm_object_t, loff_t, loff_t);
+unsigned long drmcompat_invalidate_mapping_pages(vm_object_t, pgoff_t, pgoff_t);
+struct page *drmcompat_shmem_read_mapping_page_gfp(vm_object_t, int, gfp_t);
+struct file *drmcompat_shmem_file_setup(const char *, loff_t, unsigned long);
+void drmcompat_shmem_truncate_range(vm_object_t, loff_t, loff_t);
 
-unsigned int drmkpi_iminor(struct inode *inode);
+unsigned int drmcompat_iminor(struct inode *inode);
 
 #endif /* __DRMKPI_FS_H__ */

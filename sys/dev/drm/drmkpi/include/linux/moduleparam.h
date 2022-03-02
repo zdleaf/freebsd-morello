@@ -52,7 +52,7 @@
 #define	DRMKPI_PARAM_CONCAT_SUB(a,b,c,d) a##b##c##d
 #define	DRMKPI_PARAM_CONCAT(...) DRMKPI_PARAM_CONCAT_SUB(__VA_ARGS__)
 #define	DRMKPI_PARAM_PASS(...) __VA_ARGS__
-#define	DRMKPI_PARAM_DESC(name) DRMKPI_PARAM_CONCAT(drmkpi_,DRMKPI_PARAM_PREFIX,name,_desc)
+#define	DRMKPI_PARAM_DESC(name) DRMKPI_PARAM_CONCAT(drmcompat_,DRMKPI_PARAM_PREFIX,name,_desc)
 #define	DRMKPI_PARAM_NAME(name) DRMKPI_PARAM_CONCAT(DRMKPI_PARAM_PREFIX,name,,)
 
 #define	DRMKPI_PARAM_bool(name, var, perm)				\

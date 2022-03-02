@@ -11,7 +11,7 @@ include		GENERIC
 ident		GENERIC-DRM
 
 # DRM Support
-options		COMPAT_DRMKPI
+options		COMPAT_DRMCOMPAT
 options		COMPAT_LINUXKPI
 
 device		drm

@@ -443,7 +443,7 @@ int drm_syncobj_find_fence(struct drm_file *file_private,
 			sleepq_release(wait.task);
 		else
 			timeout =
-			    drmkpi_schedule_timeout_interruptible(timeout);
+			    drmcompat_schedule_timeout_interruptible(timeout);
 #endif
 	} while (1);
 
@@ -1169,7 +1169,7 @@ static signed long drm_syncobj_array_wait_timeout(struct drm_syncobj **syncobjs,
 			sleepq_release(current);
 		else
 			timeout =
-			    drmkpi_schedule_timeout_interruptible(timeout);
+			    drmcompat_schedule_timeout_interruptible(timeout);
 #endif
 	} while (1);
 

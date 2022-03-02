@@ -42,45 +42,45 @@ struct rcu_head {
 typedef void (*rcu_callback_t)(struct rcu_head *head);
 typedef void (*call_rcu_func_t)(struct rcu_head *head, rcu_callback_t func);
 
-extern struct mtx drmkpi_global_rcu_lock;
+extern struct mtx drmcompat_global_rcu_lock;
 
 static inline void
-drmkpi_call_rcu(unsigned type, struct rcu_head *ptr, rcu_callback_t func)
+drmcompat_call_rcu(unsigned type, struct rcu_head *ptr, rcu_callback_t func)
 {
 
-	mtx_lock(&drmkpi_global_rcu_lock);
+	mtx_lock(&drmcompat_global_rcu_lock);
 	func(ptr);
-	mtx_unlock(&drmkpi_global_rcu_lock);
+	mtx_unlock(&drmcompat_global_rcu_lock);
 }
 
 static inline void
-drmkpi_rcu_read_lock(unsigned type)
+drmcompat_rcu_read_lock(unsigned type)
 {
 
-	mtx_lock(&drmkpi_global_rcu_lock);
+	mtx_lock(&drmcompat_global_rcu_lock);
 }
 
 static inline void
-drmkpi_rcu_read_unlock(unsigned type)
+drmcompat_rcu_read_unlock(unsigned type)
 {
 
-	mtx_unlock(&drmkpi_global_rcu_lock);
+	mtx_unlock(&drmcompat_global_rcu_lock);
 }
 
 static inline void
-drmkpi_rcu_barrier(unsigned type)
+drmcompat_rcu_barrier(unsigned type)
 {
 
-	mtx_lock(&drmkpi_global_rcu_lock);
-	mtx_unlock(&drmkpi_global_rcu_lock);
+	mtx_lock(&drmcompat_global_rcu_lock);
+	mtx_unlock(&drmcompat_global_rcu_lock);
 }
 
 static inline void
-drmkpi_synchronize_rcu(unsigned type)
+drmcompat_synchronize_rcu(unsigned type)
 {
 
-	mtx_lock(&drmkpi_global_rcu_lock);
-	mtx_unlock(&drmkpi_global_rcu_lock);
+	mtx_lock(&drmcompat_global_rcu_lock);
+	mtx_unlock(&drmcompat_global_rcu_lock);
 }
 
 #endif	/* __DRMKPI_RCUPDATE_H__ */

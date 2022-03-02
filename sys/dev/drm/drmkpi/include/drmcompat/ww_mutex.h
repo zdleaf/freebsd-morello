@@ -1,8 +1,5 @@
 /*-
- * Copyright (c) 2010 Isilon Systems, Inc.
- * Copyright (c) 2010 iX Systems, Inc.
- * Copyright (c) 2010 Panasas, Inc.
- * Copyright (c) 2013, 2014 Mellanox Technologies, Ltd.
+ * Copyright (c) 2017 Mellanox Technologies, Ltd.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -29,23 +26,19 @@
  * $FreeBSD$
  */
 
-#ifndef __DRMKPI_TIMER_H__
-#define	__DRMKPI_TIMER_H__
+#ifndef __DRMKPI_WW_MUTEX_H__
+#define	__DRMKPI_WW_MUTEX_H__
 
-struct timer_list {
-	struct callout callout;
-	union {
-		void (*function) (unsigned long);	/* < v4.15 */
-		void (*function_415) (struct timer_list *);
-	};
-	unsigned long data;
-	int expires;
+#include <drmcompat/mutex.h>
+
+struct ww_mutex {
+	struct mutex base;
+	struct cv condvar;
+	struct ww_acquire_ctx *ctx;
 };
 
-int drmkpi_mod_timer(struct timer_list *timer, int expires);
-void drmkpi_add_timer(struct timer_list *timer);
-void drmkpi_add_timer_on(struct timer_list *timer, int cpu);
-int drmkpi_del_timer(struct timer_list *timer);
-int drmkpi_del_timer_sync(struct timer_list *timer);
+int drmcompat_ww_mutex_lock_sub(struct ww_mutex *,
+    struct ww_acquire_ctx *, int catch_signal);
+void drmcompat_ww_mutex_unlock_sub(struct ww_mutex *);
 
-#endif /* __DRMKPI_TIMER_H__ */
+#endif	/* __DRMKPI_WW_MUTEX_H__ */

@@ -49,7 +49,7 @@
 
 #include <asm/atomic.h>
 
-#include <drmkpi/sched.h>
+#include <drmcompat/sched.h>
 
 #ifdef __linux__
 #define	task_pid_group_leader(task) (task)->td->td_proc->p_pid
@@ -76,12 +76,12 @@
 
 #define	need_resched() (curthread->td_flags & TDF_NEEDRESCHED)
 
-#define	signal_pending(task)		drmkpi_signal_pending(task)
+#define	signal_pending(task)		drmcompat_signal_pending(task)
 
 #define	schedule()					\
-	(void)drmkpi_schedule_timeout(MAX_SCHEDULE_TIMEOUT)
+	(void)drmcompat_schedule_timeout(MAX_SCHEDULE_TIMEOUT)
 #define	schedule_timeout(timeout)			\
-	drmkpi_schedule_timeout(timeout)
+	drmcompat_schedule_timeout(timeout)
 #define	schedule_timeout_killable(timeout)		\
 	schedule_timeout_interruptible(timeout)
 #define	schedule_timeout_interruptible(timeout) ({	\

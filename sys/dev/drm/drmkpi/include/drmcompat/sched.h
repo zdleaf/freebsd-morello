@@ -1,5 +1,8 @@
 /*-
- * Copyright (c) 2017 Mellanox Technologies, Ltd.
+ * Copyright (c) 2010 Isilon Systems, Inc.
+ * Copyright (c) 2010 iX Systems, Inc.
+ * Copyright (c) 2010 Panasas, Inc.
+ * Copyright (c) 2013-2018 Mellanox Technologies, Ltd.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -26,19 +29,29 @@
  * $FreeBSD$
  */
 
-#ifndef __DRMKPI_WW_MUTEX_H__
-#define	__DRMKPI_WW_MUTEX_H__
+#ifndef __DRMKPI_SCHED_H__
+#define	__DRMKPI_SCHED_H__
 
-#include <drmkpi/mutex.h>
+#include <linux/atomic.h>
+#include <linux/types.h>
+#include <drmcompat/completion.h>
 
-struct ww_mutex {
-	struct mutex base;
-	struct cv condvar;
-	struct ww_acquire_ctx *ctx;
-};
+#define	MAX_SCHEDULE_TIMEOUT	INT_MAX
 
-int drmkpi_ww_mutex_lock_sub(struct ww_mutex *,
-    struct ww_acquire_ctx *, int catch_signal);
-void drmkpi_ww_mutex_unlock_sub(struct ww_mutex *);
+#define	TASK_RUNNING		0x0000
+#define	TASK_INTERRUPTIBLE	0x0001
+#define	TASK_UNINTERRUPTIBLE	0x0002
+#define	TASK_NORMAL		(TASK_INTERRUPTIBLE | TASK_UNINTERRUPTIBLE)
+#define	TASK_WAKING		0x0100
+#define	TASK_PARKED		0x0200
 
-#endif	/* __DRMKPI_WW_MUTEX_H__ */
+#define	TASK_COMM_LEN		(MAXCOMLEN + 1)
+
+#define	current	curthread
+
+bool drmcompat_signal_pending(struct thread *task);
+
+int drmcompat_schedule_timeout(int timeout);
+int drmcompat_schedule_timeout_interruptible(int timeout);
+
+#endif	/* __DRMKPI_SCHED_H__ */

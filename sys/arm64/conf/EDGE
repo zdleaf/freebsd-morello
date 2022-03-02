@@ -135,7 +135,7 @@ options 	SOC_ROCKCHIP_RK3399
 options 	SOC_XILINX_ZYNQ
 
 # DRM Support
-options		COMPAT_DRMKPI
+options		COMPAT_DRMCOMPAT
 #options 	COMPAT_LINUXKPI
 
 device		drm
