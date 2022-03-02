@@ -51,17 +51,10 @@
 
 #include <drmcompat/sched.h>
 
-#ifdef __linux__
-#define	task_pid_group_leader(task) (task)->td->td_proc->p_pid
-#define	task_pid(task)		((task)->td->td_tid)
-#define	task_pid_nr(task)	((task)->td->td_tid)
-#define	task_pid_vnr(task)	((task)->td->td_tid)
-#else
 #define	task_pid_group_leader(task) (task)->td_proc->p_pid
 #define	task_pid(task)		((task)->td_tid)
 #define	task_pid_nr(task)	((task)->td_tid)
 #define	task_pid_vnr(task)	((task)->td_tid)
-#endif
 #define	get_pid(x)		(x)
 #define	put_pid(x)		do { } while (0)
 #define	current_euid()	(curthread->td_ucred->cr_uid)
