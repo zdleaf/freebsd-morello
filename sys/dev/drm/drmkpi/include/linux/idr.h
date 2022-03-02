@@ -29,8 +29,8 @@
  * $FreeBSD$
  */
 
-#ifndef __LINUX_IDR_H__
-#define	__LINUX_IDR_H__
+#ifndef __DRMCOMPAT_LINUX_IDR_H__
+#define	__DRMCOMPAT_LINUX_IDR_H__
 
 #include <linux/types.h>
 
@@ -77,4 +77,4 @@
 #define	ida_simple_remove(ida, id)		drmcompat_ida_simple_remove(ida, id)
 #define	ida_get_new(ida, id)			drmcompat_ida_get_new_above(ida, 0, id)
 
-#endif	/* __LINUX_IDR_H__ */
+#endif	/* __DRMCOMPAT_LINUX_IDR_H__ */

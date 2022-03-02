@@ -43,7 +43,7 @@
 #define	srcu_read_lock(s)	drmcompat_srcu_read_lock(s)
 #define	srcu_read_unlock(s, i)	drmcompat_srcu_read_unlock(s, i)
 #define	synchronize_srcu(s)	drmcompat_synchronize_srcu(s)
-#define	scru_barrier(s)	drmcompat_srcu_barrier(s)
+#define	scru_barrier(s)		drmcompat_srcu_barrier(s)
 #define	cleanup_srcu_struct(s)	drmcompat_cleanup_srcu_struct(s)
 #define	init_srcu_struct(s)	drmcompat_init_srcu_struct(s)
 

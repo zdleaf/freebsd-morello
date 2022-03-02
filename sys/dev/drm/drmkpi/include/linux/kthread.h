@@ -29,8 +29,8 @@
  * $FreeBSD$
  */
 
-#ifndef	_LINUX_KTHREAD_H_
-#define	_LINUX_KTHREAD_H_
+#ifndef	__DRMCOMPAT_LINUX_KTHREAD_H__
+#define	__DRMCOMPAT_LINUX_KTHREAD_H__
 
 #include <linux/sched.h>
 
@@ -77,4 +77,4 @@ struct thread *drmcompat_kthread_setup_and_run(struct thread *);
 #define	kthread_should_park()		drmcompat_kthread_should_park()
 #define	kthread_unpark(task)		drmcompat_kthread_unpark(task)
 
-#endif /* _LINUX_KTHREAD_H_ */
+#endif /* __DRMCOMPAT_LINUX_KTHREAD_H__ */

@@ -29,7 +29,7 @@
 #ifndef __DRMCOMPAT_LINUX_BOTTOM_HALF_H__
 #define	__DRMCOMPAT_LINUX_BOTTOM_HALF_H__
 
-extern void drmcompat_local_bh_enable(void);
-extern void drmcompat_local_bh_disable(void);
+void drmcompat_local_bh_enable(void);
+void drmcompat_local_bh_disable(void);
 
 #endif	/* __DRMCOMPAT_LINUX_BOTTOM_HALF_H__ */

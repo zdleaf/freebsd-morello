@@ -89,4 +89,4 @@
 		return (ewma->zt >> (_p));					\
 	}									\
 
-#endif /* _LINUXKPI_LINUX_AVERAGE_H */
+#endif /* __DRMCOMPAT_LINUX_AVERAGE_H__ */
