@@ -41,13 +41,15 @@
 struct device_type {
 	const char	*name;
 };
-struct _device;
+#define	device _device
 
 char *kvasprintf(gfp_t, const char *, va_list);
 char *kasprintf(gfp_t, const char *, ...);
 
 #define dev_name(dev, ...) device_get_name(dev)
+#define dev_driver_string(dev, ...) device_get_name(dev)
 #define dev_dbg(dev, ...) device_printf(dev, ##__VA_ARGS__)
+#define dev_err(dev, ...) device_printf(dev, ##__VA_ARGS__)
 #define dev_warn(dev, ...) device_printf(dev, ##__VA_ARGS__)
 #define dev_info(dev, ...) device_printf(dev, ##__VA_ARGS__)
 #define dev_printk(level, dev, ...) device_printf(dev, ##__VA_ARGS__)
