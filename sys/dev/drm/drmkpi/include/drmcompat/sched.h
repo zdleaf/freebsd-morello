@@ -29,8 +29,8 @@
  * $FreeBSD$
  */
 
-#ifndef __DRMKPI_SCHED_H__
-#define	__DRMKPI_SCHED_H__
+#ifndef __DRMCOMPAT_SCHED_H__
+#define	__DRMCOMPAT_SCHED_H__
 
 #include <linux/atomic.h>
 #include <linux/types.h>
@@ -54,4 +54,4 @@ bool drmcompat_signal_pending(struct thread *task);
 int drmcompat_schedule_timeout(int timeout);
 int drmcompat_schedule_timeout_interruptible(int timeout);
 
-#endif	/* __DRMKPI_SCHED_H__ */
+#endif	/* __DRMCOMPAT_SCHED_H__ */

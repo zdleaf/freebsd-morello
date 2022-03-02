@@ -25,11 +25,11 @@
  * $FreeBSD$
  */
 
-#ifndef __DRMKPI_SORT_H__
-#define	__DRMKPI_SORT_H__
+#ifndef __DRMCOMPAT_SORT_H__
+#define	__DRMCOMPAT_SORT_H__
 
 void drmcompat_sort(void *base, size_t num, size_t size,
 	  int (*cmp)(const void *, const void *),
 	  void (*swap)(void *, void *, int));
 
-#endif	/* __DRMKPI_SORT_H__ */
+#endif	/* __DRMCOMPAT_SORT_H__ */

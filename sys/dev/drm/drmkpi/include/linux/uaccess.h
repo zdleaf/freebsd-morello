@@ -30,8 +30,8 @@
  * $FreeBSD$
  */
 
-#ifndef	__DRMKPI_LINUX_UACCESS_H__
-#define	__DRMKPI_LINUX_UACCESS_H__
+#ifndef	__DRMCOMPAT_LINUX_UACCESS_H__
+#define	__DRMCOMPAT_LINUX_UACCESS_H__
 
 #include <drmcompat/uaccess.h>
 
@@ -53,4 +53,4 @@
 #define	clear_user(...)		drmcompat_clear_user(__VA_ARGS__)
 #define	access_ok(...)		drmcompat_access_ok(__VA_ARGS__)
 
-#endif	/* __DRMKPI_LINUX_UACCESS_H__ */
+#endif	/* __DRMCOMPAT_LINUX_UACCESS_H__ */

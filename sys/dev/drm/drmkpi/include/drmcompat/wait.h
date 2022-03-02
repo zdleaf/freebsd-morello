@@ -30,8 +30,8 @@
  * $FreeBSD$
  */
 
-#ifndef __DRMKPI_WAIT_H__
-#define	__DRMKPI_WAIT_H__
+#ifndef __DRMCOMPAT_WAIT_H__
+#define	__DRMCOMPAT_WAIT_H__
 
 struct wait_queue_entry;
 struct wait_queue_head;
@@ -74,4 +74,4 @@ void drmcompat_finish_wait(wait_queue_head_t *, wait_queue_entry_t *);
 
 bool drmcompat_wake_up_state(struct thread *, unsigned int);
 
-#endif	/* __DRMKPI_WAIT_H__ */
+#endif	/* __DRMCOMPAT_WAIT_H__ */

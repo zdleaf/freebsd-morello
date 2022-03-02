@@ -29,8 +29,8 @@
  * $FreeBSD$
  */
 
-#ifndef __DRMKPI_LINUX_MUTEX_H__
-#define	__DRMKPI_LINUX_MUTEX_H__
+#ifndef __DRMCOMPAT_LINUX_MUTEX_H__
+#define	__DRMCOMPAT_LINUX_MUTEX_H__
 
 #include <sys/param.h>
 #include <sys/proc.h>
@@ -42,7 +42,7 @@
 #include <drmcompat/mutex.h>
 
 /*
- * By defining CONFIG_NO_MUTEX_SKIP DRMKPI mutexes and asserts will
+ * By defining CONFIG_NO_MUTEX_SKIP DRMCOMPAT mutexes and asserts will
  * not be skipped during panic().
  */
 #ifdef CONFIG_NO_MUTEX_SKIP
@@ -152,4 +152,4 @@ linux_mutex_destroy(mutex_t *m)
 	sx_destroy(&m->sx);
 }
 
-#endif	/* __DRMKPI_LINUX_MUTEX_H__ */
+#endif	/* __DRMCOMPAT_LINUX_MUTEX_H__ */

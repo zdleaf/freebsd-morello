@@ -30,8 +30,8 @@
  * $FreeBSD$
  */
 
-#ifndef __DRMKPI_LINUX_WAIT_H__
-#define	__DRMKPI_LINUX_WAIT_H__
+#ifndef __DRMCOMPAT_LINUX_WAIT_H__
+#define	__DRMCOMPAT_LINUX_WAIT_H__
 
 #include <linux/compiler.h>
 #include <linux/list.h>
@@ -168,4 +168,4 @@
 #define	wake_up_process(task)		drmcompat_wake_up_state(task, TASK_NORMAL)
 #define	wake_up_state(task, state)	drmcompat_wake_up_state(task, state)
 
-#endif /* __DRMKPI_LINUX_WAIT_H__ */
+#endif /* __DRMCOMPAT_LINUX_WAIT_H__ */

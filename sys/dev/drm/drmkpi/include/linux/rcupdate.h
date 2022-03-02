@@ -26,8 +26,8 @@
  * $FreeBSD$
  */
 
-#ifndef	__DRMKPI_LINUX_RCUPDATE_H__
-#define	__DRMKPI_LINUX_RCUPDATE_H__
+#ifndef	__DRMCOMPAT_LINUX_RCUPDATE_H__
+#define	__DRMCOMPAT_LINUX_RCUPDATE_H__
 
 #include <linux/compiler.h>
 #include <linux/types.h>
@@ -105,4 +105,4 @@
 #define	init_rcu_head_on_stack(...)
 #define	destroy_rcu_head_on_stack(...)
 
-#endif	/* __DRMKPI_LINUX_RCUPDATE_H__ */
+#endif	/* __DRMCOMPAT_LINUX_RCUPDATE_H__ */

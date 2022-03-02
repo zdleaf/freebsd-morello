@@ -29,8 +29,8 @@
  * $FreeBSD$
  */
 
-#ifndef __DRMKPI_FS_H__
-#define	__DRMKPI_FS_H__
+#ifndef __DRMCOMPAT_FS_H__
+#define	__DRMCOMPAT_FS_H__
 
 #include <sys/cdefs.h>
 
@@ -111,4 +111,4 @@ void drmcompat_shmem_truncate_range(vm_object_t, loff_t, loff_t);
 
 unsigned int drmcompat_iminor(struct inode *inode);
 
-#endif /* __DRMKPI_FS_H__ */
+#endif /* __DRMCOMPAT_FS_H__ */

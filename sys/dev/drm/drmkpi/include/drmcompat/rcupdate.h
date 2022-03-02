@@ -26,8 +26,8 @@
  * $FreeBSD$
  */
 
-#ifndef __DRMKPI_RCUPDATE_H__
-#define	__DRMKPI_RCUPDATE_H__
+#ifndef __DRMCOMPAT_RCUPDATE_H__
+#define	__DRMCOMPAT_RCUPDATE_H__
 
 /* BSD specific defines */
 #define	RCU_TYPE_REGULAR 0
@@ -83,4 +83,4 @@ drmcompat_synchronize_rcu(unsigned type)
 	mtx_unlock(&drmcompat_global_rcu_lock);
 }
 
-#endif	/* __DRMKPI_RCUPDATE_H__ */
+#endif	/* __DRMCOMPAT_RCUPDATE_H__ */

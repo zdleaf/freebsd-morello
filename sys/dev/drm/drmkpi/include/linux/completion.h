@@ -29,8 +29,8 @@
  * $FreeBSD$
  */
 
-#ifndef	__DRMKPI_LINUX_COMPLETION_H__
-#define	__DRMKPI_LINUX_COMPLETION_H__
+#ifndef	__DRMCOMPAT_LINUX_COMPLETION_H__
+#define	__DRMCOMPAT_LINUX_COMPLETION_H__
 
 #include <linux/errno.h>
 
@@ -59,4 +59,4 @@
 #define	completion_done(c) \
 	drmcompat_completion_done(c)
 
-#endif	/* __DRMKPI_LINUX_COMPLETION_H__ */
+#endif	/* __DRMCOMPAT_LINUX_COMPLETION_H__ */

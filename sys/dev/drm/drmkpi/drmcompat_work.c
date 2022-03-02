@@ -96,11 +96,11 @@ drmcompat_update_state(atomic_t *v, const uint8_t *pstate)
 }
 
 /*
- * A DRMKPI task is allowed to free itself inside the callback function
+ * A DRMCOMPAT task is allowed to free itself inside the callback function
  * and cannot safely be referred after the callback function has
  * completed. This function gives the drmcompat_work_fn() function a hint,
  * that the task is not going away and can have its state checked
- * again. Without this extra hint DRMKPI tasks cannot be serialized
+ * again. Without this extra hint DRMCOMPAT tasks cannot be serialized
  * accross multiple worker threads.
  */
 static bool

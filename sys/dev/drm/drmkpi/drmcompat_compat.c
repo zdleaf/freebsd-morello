@@ -40,7 +40,7 @@ __FBSDID("$FreeBSD$");
 
 #include <drmcompat/uaccess.h>
 
-SYSCTL_NODE(_compat, OID_AUTO, drmcompat, CTLFLAG_RW, 0, "DRMKPI parameters");
+SYSCTL_NODE(_compat, OID_AUTO, drmcompat, CTLFLAG_RW, 0, "DRMCOMPAT parameters");
 
 MALLOC_DEFINE(M_DRMKMALLOC, "drmcompat", "DRM kmalloc compat");
 
@@ -142,6 +142,6 @@ drmcompat_iminor(struct inode *inode)
  * NOTE: Linux frequently uses "unsigned long" for pointer to integer
  * conversion and vice versa, where in FreeBSD "uintptr_t" would be
  * used. Assert these types have the same size, else some parts of the
- * DRMKPI may not work like expected:
+ * DRMCOMPAT may not work like expected:
  */
 CTASSERT(sizeof(unsigned long) == sizeof(uintptr_t));

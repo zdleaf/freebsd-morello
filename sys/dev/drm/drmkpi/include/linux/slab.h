@@ -29,8 +29,8 @@
  * $FreeBSD$
  */
 
-#ifndef __DRMKPI_LINUX_SLAB_H__
-#define	__DRMKPI_LINUX_SLAB_H__
+#ifndef __DRMCOMPAT_LINUX_SLAB_H__
+#define	__DRMCOMPAT_LINUX_SLAB_H__
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -102,7 +102,7 @@ linux_check_m_flags(gfp_t flags)
 	else if ((flags & m) == m)
 		flags &= ~M_WAITOK;
 
-	/* mask away DRMKPI specific flags */
+	/* mask away DRMCOMPAT specific flags */
 	return (flags & GFP_NATIVE_MASK);
 }
 
@@ -191,4 +191,4 @@ drmcompat_kmem_cache_free(struct drmcompat_kmem_cache *c, void *m)
 
 extern void drmcompat_kmem_cache_destroy(struct drmcompat_kmem_cache *);
 
-#endif	/* __DRMKPI_LINUX_SLAB_H__ */
+#endif	/* __DRMCOMPAT_LINUX_SLAB_H__ */

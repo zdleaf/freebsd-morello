@@ -29,8 +29,8 @@
  * $FreeBSD$
  */
 
-#ifndef __DRMKPI_LINUX_GFP_H__
-#define	__DRMKPI_LINUX_GFP_H__
+#ifndef __DRMCOMPAT_LINUX_GFP_H__
+#define	__DRMCOMPAT_LINUX_GFP_H__
 
 #include <sys/cdefs.h>
 #include <sys/types.h>
@@ -59,7 +59,7 @@
 #define	__GFP_NO_KSWAPD	0
 #define	__GFP_KSWAPD_RECLAIM	0
 #define	__GFP_WAIT	M_WAITOK
-#define	__GFP_DMA32	(1U << 24) /* DRMKPI only */
+#define	__GFP_DMA32	(1U << 24) /* DRMCOMPAT only */
 #define	__GFP_BITS_SHIFT 25
 #define	__GFP_BITS_MASK	((1 << __GFP_BITS_SHIFT) - 1)
 #define	__GFP_NOFAIL	M_WAITOK
@@ -106,4 +106,4 @@ free_page(uintptr_t addr)
 #define	SetPageReserved(page)	do { } while (0)	/* NOP */
 #define	ClearPageReserved(page)	do { } while (0)	/* NOP */
 
-#endif	/* __DRMKPI_LINUX_GFP_H__ */
+#endif	/* __DRMCOMPAT_LINUX_GFP_H__ */

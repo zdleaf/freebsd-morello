@@ -26,8 +26,8 @@
  * $FreeBSD$
  */
 
-#ifndef __DRMKPI_LINUX_SRCU_H__
-#define	__DRMKPI_LINUX_SRCU_H__
+#ifndef __DRMCOMPAT_LINUX_SRCU_H__
+#define	__DRMCOMPAT_LINUX_SRCU_H__
 
 #include <drmcompat/srcu.h>
 
@@ -47,4 +47,4 @@
 #define	cleanup_srcu_struct(s)	drmcompat_cleanup_srcu_struct(s)
 #define	init_srcu_struct(s)	drmcompat_init_srcu_struct(s)
 
-#endif	/* __DRMKPI_LINUX_SRCU_H__ */
+#endif	/* __DRMCOMPAT_LINUX_SRCU_H__ */

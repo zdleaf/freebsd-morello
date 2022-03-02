@@ -26,8 +26,8 @@
  * $FreeBSD$
  */
 
-#ifndef __DRMKPI_WW_MUTEX_H__
-#define	__DRMKPI_WW_MUTEX_H__
+#ifndef __DRMCOMPAT_WW_MUTEX_H__
+#define	__DRMCOMPAT_WW_MUTEX_H__
 
 #include <drmcompat/mutex.h>
 
@@ -41,4 +41,4 @@ int drmcompat_ww_mutex_lock_sub(struct ww_mutex *,
     struct ww_acquire_ctx *, int catch_signal);
 void drmcompat_ww_mutex_unlock_sub(struct ww_mutex *);
 
-#endif	/* __DRMKPI_WW_MUTEX_H__ */
+#endif	/* __DRMCOMPAT_WW_MUTEX_H__ */

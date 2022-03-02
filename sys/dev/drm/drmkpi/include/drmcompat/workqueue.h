@@ -29,8 +29,8 @@
  * $FreeBSD$
  */
 
-#ifndef __DRMKPI_WORKQUEUE_H__
-#define	__DRMKPI_WORKQUEUE_H__
+#ifndef __DRMCOMPAT_WORKQUEUE_H__
+#define	__DRMCOMPAT_WORKQUEUE_H__
 
 struct work_struct;
 typedef void (*work_func_t)(struct work_struct *);

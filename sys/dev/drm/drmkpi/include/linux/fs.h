@@ -29,8 +29,8 @@
  * $FreeBSD$
  */
 
-#ifndef	__DRMKPI_LINUX_FS_H__
-#define	__DRMKPI_LINUX_FS_H__
+#ifndef	__DRMCOMPAT_LINUX_FS_H__
+#define	__DRMCOMPAT_LINUX_FS_H__
 
 #include <linux/types.h>
 #include <linux/wait.h>
@@ -56,4 +56,4 @@
 
 #define	iminor(inode)	drmcompat_iminor(inode)
 
-#endif /* __DRMKPI_LINUX_FS_H__ */
+#endif /* __DRMCOMPAT_LINUX_FS_H__ */

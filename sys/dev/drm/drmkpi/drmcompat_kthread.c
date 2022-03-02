@@ -38,7 +38,7 @@ __FBSDID("$FreeBSD$");
 
 #include <linux/kthread.h>
 
-#define	DRMKPI_SUSPEND_WAIT	2000000
+#define	DRMCOMPAT_SUSPEND_WAIT	2000000
 
 bool
 drmcompat_kthread_should_stop_task(struct thread *td)
@@ -65,7 +65,7 @@ drmcompat_kthread_stop(struct thread *td)
 {
 	int error;
 
-	error = kthread_suspend(td, DRMKPI_SUSPEND_WAIT);
+	error = kthread_suspend(td, DRMCOMPAT_SUSPEND_WAIT);
 
 	return (error);
 }
@@ -75,7 +75,7 @@ drmcompat_kthread_park(struct thread *td)
 {
 	int error;
 
-	error = kthread_suspend(td, DRMKPI_SUSPEND_WAIT);
+	error = kthread_suspend(td, DRMCOMPAT_SUSPEND_WAIT);
 
 	return (error);
 }

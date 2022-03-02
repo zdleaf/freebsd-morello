@@ -29,8 +29,8 @@
  * $FreeBSD$
  */
 
-#ifndef __DRMKPI_COMPLETION_H__
-#define	__DRMKPI_COMPLETION_H__
+#ifndef __DRMCOMPAT_COMPLETION_H__
+#define	__DRMCOMPAT_COMPLETION_H__
 
 struct completion {
 	unsigned int done;

@@ -29,8 +29,8 @@
  * $FreeBSD$
  */
 
-#ifndef __DRMKPI_IDR_H__
-#define	__DRMKPI_IDR_H__
+#ifndef __DRMCOMPAT_IDR_H__
+#define	__DRMCOMPAT_IDR_H__
 
 /* IDR Implementation */
 #define	IDR_BITS	5
@@ -90,4 +90,4 @@ void	drmcompat_ida_init(struct ida *ida);
 int	drmcompat_ida_simple_get(struct ida *ida, unsigned int start, unsigned int end, gfp_t gfp_mask);
 void	drmcompat_ida_simple_remove(struct ida *ida, unsigned int id);
 
-#endif /* __DRMKPI_IDR_H__ */
+#endif /* __DRMCOMPAT_IDR_H__ */

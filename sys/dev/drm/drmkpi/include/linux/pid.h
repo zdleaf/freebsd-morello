@@ -26,8 +26,8 @@
  * $FreeBSD$
  */
 
-#ifndef	__DRMKPI_LINUX_PID_H__
-#define	__DRMKPI_LINUX_PID_H__
+#ifndef	__DRMCOMPAT_LINUX_PID_H__
+#define	__DRMCOMPAT_LINUX_PID_H__
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -69,4 +69,4 @@ struct task_struct;
 extern struct task_struct *drmcompat_pid_task(pid_t);
 extern struct task_struct *drmcompat_get_pid_task(pid_t);
 
-#endif	/* __DRMKPI_LINUX_PID_H__ */
+#endif	/* __DRMCOMPAT_LINUX_PID_H__ */

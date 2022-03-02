@@ -29,8 +29,8 @@
  * $FreeBSD$
  */
 
-#ifndef __DRMKPI_LINUX_FILE_H__
-#define	__DRMKPI_LINUX_FILE_H__
+#ifndef __DRMCOMPAT_LINUX_FILE_H__
+#define	__DRMCOMPAT_LINUX_FILE_H__
 
 #include <sys/param.h>
 #include <sys/file.h>
@@ -141,4 +141,4 @@ fput(struct file *file)
 	}
 }
 
-#endif	/* __DRMKPI_LINUX_FILE_H__ */
+#endif	/* __DRMCOMPAT_LINUX_FILE_H__ */

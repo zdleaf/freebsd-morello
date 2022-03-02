@@ -29,8 +29,8 @@
  * $FreeBSD$
  */
 
-#ifndef __DRMKPI_MUTEX_H__
-#define	__DRMKPI_MUTEX_H__
+#ifndef __DRMCOMPAT_MUTEX_H__
+#define	__DRMCOMPAT_MUTEX_H__
 
 typedef struct mutex {
 	struct sx sx;

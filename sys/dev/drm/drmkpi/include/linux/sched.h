@@ -29,8 +29,8 @@
  * $FreeBSD$
  */
 
-#ifndef __DRMKPI_LINUX_SCHED_H__
-#define	__DRMKPI_LINUX_SCHED_H__
+#ifndef __DRMCOMPAT_LINUX_SCHED_H__
+#define	__DRMCOMPAT_LINUX_SCHED_H__
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -105,4 +105,4 @@ local_clock(void)
 	return ((uint64_t)ts.tv_sec * NSEC_PER_SEC + ts.tv_nsec);
 }
 
-#endif	/* __DRMKPI_LINUX_SCHED_H__ */
+#endif	/* __DRMCOMPAT_LINUX_SCHED_H__ */
