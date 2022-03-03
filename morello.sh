@@ -47,7 +47,7 @@ fi
 if [ $(hostname) = "pooh.bsdpad.com" ]; then
 	#sudo cp /usr/obj/usr/home/br/dev/freebsd-head/arm64.aarch64/sys/MORELLO/kernel /mnt/tftpboot/root
 	#scp /usr/obj/usr/home/br/dev/freebsd-head/arm64.aarch64/sys/MORELLO/kernel 10.8.0.1:/tftpboot/root/
-	scp /mnt/obj/usr/home/br/dev/freebsd-head/arm64.aarch64/sys/MORELLO/kernel 10.8.0.1:/tftpboot/root/
+	scp /mnt/obj/usr/home/br/dev/freebsd-head/arm64.aarch64/sys/MORELLO/kernel 10.8.0.1:/tftpboot/root/boot/kernel/
 fi
 
 # echo sysctl kern.bootfile=/kernel
