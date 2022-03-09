@@ -1590,7 +1590,7 @@ main(int argc, char *argv[])
 	}
 #endif
 
-	init_mem();
+	init_mem(guest_ncpus);
 	init_uart(ctx);
 #ifdef __aarch64__
 	error = bootcode_load(ctx, "/root/u-boot.bin", &rip);
