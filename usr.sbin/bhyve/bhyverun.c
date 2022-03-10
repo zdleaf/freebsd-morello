@@ -262,7 +262,7 @@ usage(int code)
 #ifdef __amd64__
 		"       -l: LPC device configuration\n"
 #endif
-		"       -m: memory size in MB\n"
+		"       -m: memory size\n"
 		"       -o: set config 'var' to 'value'\n"
 		"       -P: vmexit from the guest on pause\n"
 		"       -p: pin 'vcpu' to 'hostcpu'\n"
