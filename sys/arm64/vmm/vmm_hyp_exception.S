@@ -271,15 +271,15 @@ LEND(handle_el2_el2h_sync)
 
 LENTRY(handle_el2_el2h_irq)
 	handle_el2_excp #EXCP_TYPE_EL2_IRQ
-LEND(handle_el2_el2h_sync)
+LEND(handle_el2_el2h_irq)
 
 LENTRY(handle_el2_el2h_fiq)
 	handle_el2_excp #EXCP_TYPE_EL2_FIQ
-LEND(handle_el2_el2h_sync)
+LEND(handle_el2_el2h_fiq)
 
 LENTRY(handle_el2_el2h_error)
 	handle_el2_excp #EXCP_TYPE_EL2_ERROR
-LEND(handle_el2_el2h_sync)
+LEND(handle_el2_el2h_error)
 
 
 LENTRY(handle_el2_el1_sync64)
