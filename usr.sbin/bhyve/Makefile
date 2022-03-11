@@ -25,7 +25,6 @@ SRCS=	\
 	console.c		\
 	ctl_util.c		\
 	ctl_scsi_all.c		\
-	fwctl.c			\
 	hda_codec.c		\
 	mem.c			\
 	mevent.c		\
@@ -70,6 +69,7 @@ SRCS+=	\
 	atkbdc.c		\
 	consport.c		\
 	dbgport.c		\
+	fwctl.c			\
 	gdb.c			\
 	inout.c			\
 	ioapic.c		\
