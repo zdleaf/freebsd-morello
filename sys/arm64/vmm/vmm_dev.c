@@ -447,7 +447,8 @@ vmmdev_ioctl(struct cdev *cdev, u_long cmd, caddr_t data, int fflag,
 		CTASSERT(MAX_VM_STATS >= MAX_VMM_STAT_ELEMS);
 		vmstats = (struct vm_stats *)data;
 		getmicrotime(&vmstats->tv);
-		error = vmm_stat_copy(sc->vm, vmstats->cpuid,
+		error = vmm_stat_copy(sc->vm, vmstats->cpuid, vmstats->index,
+				      nitems(vmstats->statbuf),
 				      &vmstats->num_entries, vmstats->statbuf);
 		break;
 	}
