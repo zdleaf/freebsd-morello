@@ -1748,6 +1748,7 @@ vm_set_topology(struct vmctx *ctx,
 	topology.maxcpus = maxcpus;
 	return (ioctl(ctx->fd, VM_SET_TOPOLOGY, &topology));
 }
+#endif
 
 int
 vm_get_topology(struct vmctx *ctx,
@@ -1766,7 +1767,6 @@ vm_get_topology(struct vmctx *ctx,
 	}
 	return (error);
 }
-#endif
 
 int
 vm_get_device_fd(struct vmctx *ctx)

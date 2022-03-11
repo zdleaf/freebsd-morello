@@ -141,6 +141,13 @@ struct vm_irq {
 	uint32_t irq;
 };
 
+struct vm_cpu_topology {
+	uint16_t	sockets;
+	uint16_t	cores;
+	uint16_t	threads;
+	uint16_t	maxcpus;
+};
+
 enum {
 	/* general routines */
 	IOCNUM_ABIVERS = 0,
@@ -167,6 +174,10 @@ enum {
 	/* statistics */
 	IOCNUM_VM_STATS = 50, 
 	IOCNUM_VM_STAT_DESC = 51,
+
+	/* CPU Topology */
+	IOCNUM_SET_TOPOLOGY = 63,
+	IOCNUM_GET_TOPOLOGY = 64,
 
 	/* interrupt injection */
 	IOCNUM_ASSERT_IRQ = 80,
@@ -219,6 +230,10 @@ enum {
 	_IOW('v', IOCNUM_DEASSERT_IRQ, struct vm_irq)
 #define VM_RAISE_MSI \
 	_IOW('v', IOCNUM_RAISE_MSI, struct vm_msi)
+#define VM_SET_TOPOLOGY \
+	_IOW('v', IOCNUM_SET_TOPOLOGY, struct vm_cpu_topology)
+#define VM_GET_TOPOLOGY \
+	_IOR('v', IOCNUM_GET_TOPOLOGY, struct vm_cpu_topology)
 #define	VM_GLA2GPA	\
 	_IOWR('v', IOCNUM_GLA2GPA, struct vm_gla2gpa)
 #define	VM_ACTIVATE_CPU	\

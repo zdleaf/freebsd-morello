@@ -350,6 +350,7 @@ vmmdev_ioctl(struct cdev *cdev, u_long cmd, caddr_t data, int fflag,
 	struct vm_suspend *vmsuspend;
 	struct vm_memmap *mm;
 	struct vm_msi *vmsi;
+	struct vm_cpu_topology *topology;
 	uint64_t *regvals;
 	int *regnums;
 
@@ -574,6 +575,17 @@ vmmdev_ioctl(struct cdev *cdev, u_long cmd, caddr_t data, int fflag,
 		vmsi = (struct vm_msi *)data;
 		error = vm_raise_msi(sc->vm, vmsi->msg, vmsi->addr, vmsi->bus,
 		    vmsi->slot, vmsi->func);
+		break;
+	case VM_SET_TOPOLOGY:
+		topology = (struct vm_cpu_topology *)data;
+		error = vm_set_topology(sc->vm, topology->sockets,
+		    topology->cores, topology->threads, topology->maxcpus);
+		break;
+	case VM_GET_TOPOLOGY:
+		topology = (struct vm_cpu_topology *)data;
+		vm_get_topology(sc->vm, &topology->sockets, &topology->cores,
+		    &topology->threads, &topology->maxcpus);
+		error = 0;
 		break;
 	default:
 		error = ENOTTY;

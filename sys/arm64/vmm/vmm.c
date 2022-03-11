@@ -134,9 +134,13 @@ struct vm {
 	struct vmspace	*vmspace;		/* (o) guest's address space */
 	char		name[VM_MAX_NAMELEN];	/* (o) virtual machine name */
 	struct vcpu	vcpu[VM_MAXCPU];	/* (i) guest vcpus */
-	uint16_t	maxcpus;		/* (o) max pluggable cpus */
 	struct vmm_mmio_region mmio_region[VM_MAX_MMIO_REGIONS];
 						/* (o) guest MMIO regions */
+	/* The following describe the vm cpu topology */
+	uint16_t	sockets;		/* (o) num of sockets */
+	uint16_t	cores;			/* (o) num of cores/socket */
+	uint16_t	threads;		/* (o) num of threads/core */
+	uint16_t	maxcpus;		/* (o) max pluggable cpus */
 };
 
 static bool vmm_initialized = false;
@@ -326,6 +330,9 @@ vm_create(const char *name, struct vm **retvm)
 	strcpy(vm->name, name);
 	vm->vmspace = vmspace;
 
+	vm->sockets = 1;
+	vm->cores = 1;			/* XXX backwards compatibility */
+	vm->threads = 1;		/* XXX backwards compatibility */
 	vm->maxcpus = VM_MAXCPU;	/* XXX temp to keep code working */
 
 	vm_init(vm, true);
@@ -334,12 +341,37 @@ vm_create(const char *name, struct vm **retvm)
 	return (0);
 }
 
+void
+vm_get_topology(struct vm *vm, uint16_t *sockets, uint16_t *cores,
+    uint16_t *threads, uint16_t *maxcpus)
+{
+	*sockets = vm->sockets;
+	*cores = vm->cores;
+	*threads = vm->threads;
+	*maxcpus = vm->maxcpus;
+}
+
 uint16_t
 vm_get_maxcpus(struct vm *vm)
 {
 	return (vm->maxcpus);
 }
 
+int
+vm_set_topology(struct vm *vm, uint16_t sockets, uint16_t cores,
+    uint16_t threads, uint16_t maxcpus)
+{
+	if (maxcpus != 0)
+		return (EINVAL);	/* XXX remove when supported */
+	if ((sockets * cores * threads) > vm->maxcpus)
+		return (EINVAL);
+	/* XXX need to check sockets * cores * threads == vCPU, how? */
+	vm->sockets = sockets;
+	vm->cores = cores;
+	vm->threads = threads;
+	vm->maxcpus = VM_MAXCPU;	/* XXX temp to keep code working */
+	return(0);
+}
 
 static void
 vm_cleanup(struct vm *vm, bool destroy)

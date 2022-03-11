@@ -187,6 +187,10 @@ void vm_gpa_release(void *cookie);
 bool vm_mem_allocated(struct vm *vm, int vcpuid, vm_paddr_t gpa);
 
 uint16_t vm_get_maxcpus(struct vm *vm);
+void vm_get_topology(struct vm *vm, uint16_t *sockets, uint16_t *cores,
+    uint16_t *threads, uint16_t *maxcpus);
+int vm_set_topology(struct vm *vm, uint16_t sockets, uint16_t cores,
+    uint16_t threads, uint16_t maxcpus);
 int vm_get_register(struct vm *vm, int vcpu, int reg, uint64_t *retval);
 int vm_set_register(struct vm *vm, int vcpu, int reg, uint64_t val);
 int vm_run(struct vm *vm, struct vm_run *vmrun);
