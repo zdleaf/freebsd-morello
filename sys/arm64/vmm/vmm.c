@@ -721,50 +721,65 @@ vmm_sysmem_maxaddr(struct vm *vm)
 #include <sys/queue.h>
 #include <sys/linker.h>
 
+static struct {
+	uint32_t	esr_iss;
+	reg_read_t	reg_read;
+	reg_write_t	reg_write;
+	void		*arg;
+} vmm_special_regs[] = {
+#define	SPECIAL_REG(_reg, _read, _write)				\
+	{								\
+		.esr_iss = ((_reg ## _op0) << ISS_MSR_OP0_SHIFT) |	\
+		    ((_reg ## _op1) << ISS_MSR_OP1_SHIFT) |		\
+		    ((_reg ## _CRn) << ISS_MSR_CRn_SHIFT) |		\
+		    ((_reg ## _CRm) << ISS_MSR_CRm_SHIFT) |		\
+		    ((_reg ## _op2) << ISS_MSR_OP2_SHIFT),		\
+		.reg_read = (_read),					\
+		.reg_write = (_write),					\
+		.arg = NULL,						\
+	}
+
+	/* Counter physical registers */
+	SPECIAL_REG(CNTP_CTL_EL0, vtimer_phys_ctl_read, vtimer_phys_ctl_write),
+	SPECIAL_REG(CNTP_CVAL_EL0, vtimer_phys_cval_read,
+	    vtimer_phys_cval_write),
+	SPECIAL_REG(CNTP_TVAL_EL0, vtimer_phys_tval_read,
+	    vtimer_phys_tval_write),
+	SPECIAL_REG(CNTPCT_EL0, vtimer_phys_cnt_read, vtimer_phys_cnt_write),
+
+	/* GICv3 registers */
+	SPECIAL_REG(ICC_SGI1R_EL1, vgic_v3_icc_sgi1r_read,
+	    vgic_v3_icc_sgi1r_write),
+#undef SPECIAL_REG
+};
+
 static int
 vm_handle_reg_emul(struct vm *vm, int vcpuid, bool *retu)
 {
-	struct hyp *hyp;
 	struct vm_exit *vme;
 	struct vre *vre;
-	reg_read_t rread;
-	reg_write_t rwrite;
+	int i, rv;
 
-	hyp = (struct hyp *)vm->cookie;
 	vme = vm_exitinfo(vm, vcpuid);
 	vre = &vme->u.reg_emul.vre;
 
-	switch(vre->inst_syndrome & ISS_MSR_REG_MASK) {
-	/* Counter registers */
-	case ISS_CNTP_CTL_EL0:
-		rread = vtimer_phys_ctl_read;
-		rwrite = vtimer_phys_ctl_write;
-		break;
-	case ISS_CNTP_CT_EL0:
-		rread = vtimer_phys_cnt_read;
-		rwrite = vtimer_phys_cnt_write;
-		break;
-	case ISS_CNTP_CVAL_EL0:
-		rread = vtimer_phys_cval_read;
-		rwrite = vtimer_phys_cval_write;
-		break;
-	case ISS_CNTP_TVAL_EL0:
-		rread = vtimer_phys_tval_read;
-		rwrite = vtimer_phys_tval_write;
-		break;
-
-	/* Interrupt controller registers */
-	case ISS_ICC_SGI1R_EL1:
-		rread = vgic_v3_icc_sgi1r_read;
-		rwrite = vgic_v3_icc_sgi1r_write;
-		break;
-
-	default:
-		*retu = true;
-		return (0);
+	for (i = 0; i < nitems(vmm_special_regs); i++) {
+		if ((vre->inst_syndrome & ISS_MSR_REG_MASK) ==
+		    vmm_special_regs[i].esr_iss) {
+			rv = vmm_emulate_register(vm, vcpuid, vre,
+			    vmm_special_regs[i].reg_read,
+			    vmm_special_regs[i].reg_write,
+			    vmm_special_regs[i].arg);
+			if (rv == 0) {
+				*retu = false;
+			}
+			return (rv);
+		}
 	}
 
-	return (vmm_emulate_register(vm, vcpuid, vre, rread, rwrite, retu));
+
+	*retu = true;
+	return (0);
 }
 
 void

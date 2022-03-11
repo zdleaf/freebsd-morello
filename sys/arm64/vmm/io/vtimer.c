@@ -267,7 +267,6 @@ vtimer_phys_ctl_read(void *vm, int vcpuid, uint64_t *rval, void *arg)
 	struct hyp *hyp;
 	struct vtimer_cpu *vtimer_cpu;
 	uint64_t cntpct_el0;
-	bool *retu = arg;
 
 	hyp = vm_get_cookie(vm);
 	vtimer_cpu = &hyp->ctx[vcpuid].vtimer_cpu;
@@ -279,7 +278,6 @@ vtimer_phys_ctl_read(void *vm, int vcpuid, uint64_t *rval, void *arg)
 	else
 		*rval = vtimer_cpu->cntp_ctl_el0 & ~CNTP_CTL_ISTATUS;
 
-	*retu = false;
 	return (0);
 }
 
@@ -291,7 +289,6 @@ vtimer_phys_ctl_write(void *vm, int vcpuid, uint64_t wval, void *arg)
 	struct vtimer_cpu *vtimer_cpu;
 	uint64_t ctl_el0;
 	bool timer_toggled_on;
-	bool *retu = arg;
 
 	hyp = vm_get_cookie(vm);
 	hypctx = &hyp->ctx[vcpuid];
@@ -308,26 +305,19 @@ vtimer_phys_ctl_write(void *vm, int vcpuid, uint64_t wval, void *arg)
 	if (timer_toggled_on)
 		vtimer_schedule_irq(vtimer_cpu, hyp, vcpuid);
 
-	*retu = false;
 	return (0);
 }
 
 int
 vtimer_phys_cnt_read(void *vm, int vcpuid, uint64_t *rval, void *arg)
 {
-	bool *retu = arg;
-
 	*rval = READ_SPECIALREG(cntpct_el0);
-	*retu = false;
 	return (0);
 }
 
 int
 vtimer_phys_cnt_write(void *vm, int vcpuid, uint64_t wval, void *arg)
 {
-	bool *retu = arg;
-
-	*retu = false;
 	return (0);
 }
 
@@ -336,14 +326,12 @@ vtimer_phys_cval_read(void *vm, int vcpuid, uint64_t *rval, void *arg)
 {
 	struct hyp *hyp;
 	struct vtimer_cpu *vtimer_cpu;
-	bool *retu = arg;
 
 	hyp = vm_get_cookie(vm);
 	vtimer_cpu = &hyp->ctx[vcpuid].vtimer_cpu;
 
 	*rval = vtimer_cpu->cntp_cval_el0;
 
-	*retu = false;
 	return (0);
 }
 
@@ -353,7 +341,6 @@ vtimer_phys_cval_write(void *vm, int vcpuid, uint64_t wval, void *arg)
 	struct hyp *hyp;
 	struct hypctx *hypctx;
 	struct vtimer_cpu *vtimer_cpu;
-	bool *retu = arg;
 
 	hyp = vm_get_cookie(vm);
 	hypctx = &hyp->ctx[vcpuid];
@@ -366,7 +353,6 @@ vtimer_phys_cval_write(void *vm, int vcpuid, uint64_t wval, void *arg)
 		vtimer_schedule_irq(vtimer_cpu, hyp, vcpuid);
 	}
 
-	*retu = false;
 	return (0);
 }
 
@@ -376,7 +362,6 @@ vtimer_phys_tval_read(void *vm, int vcpuid, uint64_t *rval, void *arg)
 	struct hyp *hyp;
 	struct vtimer_cpu *vtimer_cpu;
 	uint32_t cntpct_el0;
-	bool *retu = arg;
 
 	hyp = vm_get_cookie(vm);
 	vtimer_cpu = &hyp->ctx[vcpuid].vtimer_cpu;
@@ -394,7 +379,6 @@ vtimer_phys_tval_read(void *vm, int vcpuid, uint64_t *rval, void *arg)
 		*rval = vtimer_cpu->cntp_cval_el0 - cntpct_el0;
 	}
 
-	*retu = false;
 	return (0);
 }
 
@@ -405,7 +389,6 @@ vtimer_phys_tval_write(void *vm, int vcpuid, uint64_t wval, void *arg)
 	struct hypctx *hypctx;
 	struct vtimer_cpu *vtimer_cpu;
 	uint64_t cntpct_el0;
-	bool *retu = arg;
 
 	hyp = vm_get_cookie(vm);
 	hypctx = &hyp->ctx[vcpuid];
@@ -419,6 +402,5 @@ vtimer_phys_tval_write(void *vm, int vcpuid, uint64_t wval, void *arg)
 		vtimer_schedule_irq(vtimer_cpu, hyp, vcpuid);
 	}
 
-	*retu = false;
 	return (0);
 }

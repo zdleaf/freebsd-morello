@@ -1191,7 +1191,6 @@ dist_read(void *vm, int vcpuid, uint64_t fault_ipa, uint64_t *rval,
 {
 	struct hyp *hyp = vm_get_cookie(vm);
 	struct vgic_v3_dist *dist = &hyp->vgic_dist;
-	bool *retu = arg;
 	uint64_t reg;
 
 	/* Check the register is one of ours and is the correct size */
@@ -1205,10 +1204,8 @@ dist_read(void *vm, int vcpuid, uint64_t fault_ipa, uint64_t *rval,
 		return (EINVAL);
 
 	if (vgic_register_read(hyp, dist_registers, nitems(dist_registers),
-	    vcpuid, reg, size, rval, NULL)) {
-		*retu = false;
+	    vcpuid, reg, size, rval, NULL))
 		return (0);
-	}
 
 	panic("%s: %lx\n", __func__, fault_ipa - dist->start);
 	return (0);
@@ -1220,7 +1217,6 @@ dist_write(void *vm, int vcpuid, uint64_t fault_ipa, uint64_t wval,
 {
 	struct hyp *hyp = vm_get_cookie(vm);
 	struct vgic_v3_dist *dist = &hyp->vgic_dist;
-	bool *retu = arg;
 	uint64_t reg;
 
 	/* Check the register is one of ours and is the correct size */
@@ -1234,10 +1230,8 @@ dist_write(void *vm, int vcpuid, uint64_t fault_ipa, uint64_t wval,
 		return (EINVAL);
 
 	if (vgic_register_write(hyp, dist_registers, nitems(dist_registers),
-	    vcpuid, reg, size, wval, NULL)) {
-		*retu = false;
+	    vcpuid, reg, size, wval, NULL))
 		return (0);
-	}
 
 	panic("%s: %lx\n", __func__, fault_ipa - dist->start);
 	return (0);
@@ -1458,7 +1452,6 @@ redist_read(void *vm, int vcpuid, uint64_t fault_ipa, uint64_t *rval,
 {
 	struct hyp *hyp = vm_get_cookie(vm);
 	struct vgic_v3_redist *redist = &hyp->ctx[vcpuid].vgic_redist;
-	bool *retu = arg;
 	uint64_t reg;
 
 	/* Check the register is one of ours and is the correct size */
@@ -1473,18 +1466,13 @@ redist_read(void *vm, int vcpuid, uint64_t fault_ipa, uint64_t *rval,
 
 	if (reg < GICR_RD_BASE_SIZE) {
 		if (vgic_register_read(hyp, redist_rd_registers,
-		    nitems(redist_rd_registers), vcpuid, reg, size, rval,
-		    NULL)) {
-			*retu = false;
+		    nitems(redist_rd_registers), vcpuid, reg, size, rval, NULL))
 			return (0);
-		}
 	} else if (reg < (GICR_SGI_BASE + GICR_SGI_BASE_SIZE)) {
 		if (vgic_register_read(hyp, redist_sgi_registers,
 		    nitems(redist_sgi_registers), vcpuid,
-		    reg - GICR_SGI_BASE, size, rval, NULL)) {
-			*retu = false;
+		    reg - GICR_SGI_BASE, size, rval, NULL))
 			return (0);
-		}
 	}
 
 	panic("%s: %lx", __func__, reg);
@@ -1496,7 +1484,6 @@ redist_write(void *vm, int vcpuid, uint64_t fault_ipa, uint64_t wval,
 {
 	struct hyp *hyp = vm_get_cookie(vm);
 	struct vgic_v3_redist *redist = &hyp->ctx[vcpuid].vgic_redist;
-	bool *retu = arg;
 	uint64_t reg;
 
 	/* Check the register is one of ours and is the correct size */
@@ -1511,18 +1498,13 @@ redist_write(void *vm, int vcpuid, uint64_t fault_ipa, uint64_t wval,
 
 	if (reg < GICR_RD_BASE_SIZE) {
 		if (vgic_register_write(hyp, redist_rd_registers,
-		    nitems(redist_rd_registers), vcpuid, reg, size, wval,
-		    NULL)) {
-			*retu = false;
+		    nitems(redist_rd_registers), vcpuid, reg, size, wval, NULL))
 			return (0);
-		}
 	} else if (reg < (GICR_SGI_BASE + GICR_SGI_BASE_SIZE)) {
 		if (vgic_register_write(hyp, redist_sgi_registers,
 		    nitems(redist_sgi_registers), vcpuid,
-		    reg - GICR_SGI_BASE, size, wval, NULL)) {
-			*retu = false;
+		    reg - GICR_SGI_BASE, size, wval, NULL))
 			return (0);
-		}
 	}
 
 	panic("%s: %lx", __func__, reg);
@@ -1531,13 +1513,10 @@ redist_write(void *vm, int vcpuid, uint64_t fault_ipa, uint64_t wval,
 int
 vgic_v3_icc_sgi1r_read(void *vm, int vcpuid, uint64_t *rval, void *arg)
 {
-	bool *retu = arg;
-
 	/*
 	 * TODO: Inject an unknown exception.
 	 */
 	*rval = 0;
-	*retu = false;
 	return (0);
 }
 
@@ -1548,7 +1527,6 @@ vgic_v3_icc_sgi1r_write(void *vm, int vcpuid, uint64_t rval, void *arg)
 	cpuset_t active_cpus;
 	uint32_t irqid;
 	int cpus, vcpu;
-	bool *retu = arg;
 
 	hyp = vm_get_cookie(vm);
 	active_cpus = vm_active_cpus(vm);
@@ -1571,8 +1549,6 @@ vgic_v3_icc_sgi1r_write(void *vm, int vcpuid, uint64_t rval, void *arg)
 			cpus >>= 1;
 		}
 	}
-
-	*retu = false;
 
 	return (0);
 }

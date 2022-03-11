@@ -32,34 +32,6 @@
 #define	GT_PHYS_NS_IRQ	30
 #define	GT_VIRT_IRQ	27
 
-#define	ISS_CNTP_CTL_EL0	\
-    (CNTP_CTL_EL0_op0 << ISS_MSR_OP0_SHIFT | 	\
-     CNTP_CTL_EL0_op2 << ISS_MSR_OP2_SHIFT |	\
-     CNTP_CTL_EL0_op1 << ISS_MSR_OP1_SHIFT | 	\
-     CNTP_CTL_EL0_CRn << ISS_MSR_CRn_SHIFT |	\
-     CNTP_CTL_EL0_CRm << ISS_MSR_CRm_SHIFT)
-
-#define	ISS_CNTP_CT_EL0	\
-    (CNTPCT_EL0_op0 << ISS_MSR_OP0_SHIFT | 	\
-     CNTPCT_EL0_op2 << ISS_MSR_OP2_SHIFT |	\
-     CNTPCT_EL0_op1 << ISS_MSR_OP1_SHIFT | 	\
-     CNTPCT_EL0_CRn << ISS_MSR_CRn_SHIFT |	\
-     CNTPCT_EL0_CRm << ISS_MSR_CRm_SHIFT)
-
-#define	ISS_CNTP_CVAL_EL0	\
-    (CNTP_CVAL_EL0_op0 << ISS_MSR_OP0_SHIFT | 	\
-     CNTP_CVAL_EL0_op2 << ISS_MSR_OP2_SHIFT |	\
-     CNTP_CVAL_EL0_op1 << ISS_MSR_OP1_SHIFT | 	\
-     CNTP_CVAL_EL0_CRn << ISS_MSR_CRn_SHIFT |	\
-     CNTP_CVAL_EL0_CRm << ISS_MSR_CRm_SHIFT)
-
-#define	ISS_CNTP_TVAL_EL0	\
-    (CNTP_TVAL_EL0_op0 << ISS_MSR_OP0_SHIFT | 	\
-     CNTP_TVAL_EL0_op2 << ISS_MSR_OP2_SHIFT |	\
-     CNTP_TVAL_EL0_op1 << ISS_MSR_OP1_SHIFT | 	\
-     CNTP_TVAL_EL0_CRn << ISS_MSR_CRn_SHIFT |	\
-     CNTP_TVAL_EL0_CRm << ISS_MSR_CRm_SHIFT)
-
 struct vtimer
 {
 	uint64_t	cnthctl_el2;
