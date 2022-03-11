@@ -67,6 +67,10 @@
 
 #define	UNUSED		0
 
+/* TODO: Move the host hypctx off the stack */
+#define	VMM_STACK_PAGES	2
+#define	VMM_STACK_SIZE	(VMM_STACK_PAGES * PAGE_SIZE)
+
 MALLOC_DEFINE(M_HYP, "ARM VMM HYP", "ARM VMM HYP");
 
 extern char hyp_init_vectors[];
@@ -114,7 +118,7 @@ arm_setup_vectors(void *arg)
 	vmm_call_hyp((void *)vtophys(&vmm_hyp_code));
 
 	/* Create and map the hypervisor stack */
-	stack_top = (char *)stack_hyp_va[PCPU_GET(cpuid)] + PAGE_SIZE;
+	stack_top = (char *)stack_hyp_va[PCPU_GET(cpuid)] + VMM_STACK_SIZE;
 
 	/* Configure address translation at EL2 */
 	tcr_el1 = READ_SPECIALREG(tcr_el1);
@@ -229,7 +233,7 @@ arm_init(int ipinum)
 	uint64_t cnthctl_el2;
 	size_t hyp_code_len;
 	register_t daif;
-	int cpu;
+	int cpu, i;
 
 	if (!virt_enabled()) {
 		printf("arm_init: Processor doesn't have support for virtualization.\n");
@@ -261,11 +265,14 @@ arm_init(int ipinum)
 
 	/* Create a per-CPU hypervisor stack */
 	CPU_FOREACH(cpu) {
-		stack[cpu] = malloc(PAGE_SIZE, M_HYP, M_WAITOK | M_ZERO);
+		stack[cpu] = malloc(VMM_STACK_SIZE, M_HYP, M_WAITOK | M_ZERO);
 		stack_hyp_va[cpu] = next_hyp_va;
 
-		vmmpmap_enter(stack_hyp_va[cpu], PAGE_SIZE, vtophys(stack[cpu]),
-		    VM_PROT_READ | VM_PROT_WRITE);
+		for (i = 0; i < VMM_STACK_PAGES; i++) {
+			vmmpmap_enter(stack_hyp_va[cpu] + (i * PAGE_SIZE),
+			    PAGE_SIZE, vtophys(stack[cpu] + (i * PAGE_SIZE)),
+			    VM_PROT_READ | VM_PROT_WRITE);
+		}
 		next_hyp_va += L2_SIZE;
 	}
 
