@@ -112,6 +112,8 @@ vfp_restore(struct vfpstate *state)
 static void
 vmm_hyp_reg_store(struct hypctx *hypctx, struct hyp *hyp, bool guest)
 {
+	uint64_t dfr0;
+
 	/* Store the guest VFP registers */
 	if (guest) {
 		vfp_store(&hypctx->vfpstate);
@@ -173,6 +175,63 @@ vmm_hyp_reg_store(struct hypctx *hypctx, struct hyp *hyp, bool guest)
 		}
 	}
 
+	dfr0 = READ_SPECIALREG(id_aa64dfr0_el1);
+	switch(ID_AA64DFR0_BRPs_VAL(dfr0) - 1) {
+#define	STORE_DBG_BRP(x)						\
+	case x:								\
+		hypctx->dbgbcr_el1[x] =					\
+		    READ_SPECIALREG(dbgbcr ## x ## _el1);		\
+		hypctx->dbgbvr_el1[x] =					\
+		    READ_SPECIALREG(dbgbvr ## x ## _el1)
+	STORE_DBG_BRP(15);
+	STORE_DBG_BRP(14);
+	STORE_DBG_BRP(13);
+	STORE_DBG_BRP(12);
+	STORE_DBG_BRP(11);
+	STORE_DBG_BRP(10);
+	STORE_DBG_BRP(9);
+	STORE_DBG_BRP(8);
+	STORE_DBG_BRP(7);
+	STORE_DBG_BRP(6);
+	STORE_DBG_BRP(5);
+	STORE_DBG_BRP(4);
+	STORE_DBG_BRP(3);
+	STORE_DBG_BRP(2);
+	STORE_DBG_BRP(1);
+	default:
+	STORE_DBG_BRP(0);
+#undef STORE_DBG_BRP
+	}
+
+	switch(ID_AA64DFR0_WRPs_VAL(dfr0) - 1) {
+#define	STORE_DBG_WRP(x)						\
+	case x:								\
+		hypctx->dbgwcr_el1[x] =					\
+		    READ_SPECIALREG(dbgwcr ## x ## _el1);		\
+		hypctx->dbgwvr_el1[x] =					\
+		    READ_SPECIALREG(dbgwvr ## x ## _el1)
+	STORE_DBG_WRP(15);
+	STORE_DBG_WRP(14);
+	STORE_DBG_WRP(13);
+	STORE_DBG_WRP(12);
+	STORE_DBG_WRP(11);
+	STORE_DBG_WRP(10);
+	STORE_DBG_WRP(9);
+	STORE_DBG_WRP(8);
+	STORE_DBG_WRP(7);
+	STORE_DBG_WRP(6);
+	STORE_DBG_WRP(5);
+	STORE_DBG_WRP(4);
+	STORE_DBG_WRP(3);
+	STORE_DBG_WRP(2);
+	STORE_DBG_WRP(1);
+	default:
+	STORE_DBG_WRP(0);
+#undef STORE_DBG_WRP
+	}
+
+	/* Store the PMU registers */
+
 	/* Store the special to from the trapframe */
 	hypctx->tf.tf_sp = READ_SPECIALREG(sp_el1);
 	hypctx->tf.tf_elr = READ_SPECIALREG(elr_el2);
@@ -195,9 +254,12 @@ vmm_hyp_reg_store(struct hypctx *hypctx, struct hyp *hyp, bool guest)
 	hypctx->amair_el1 = READ_SPECIALREG(amair_el1);
 	hypctx->contextidr_el1 = READ_SPECIALREG(contextidr_el1);
 	hypctx->cpacr_el1 = READ_SPECIALREG(cpacr_el1);
+	hypctx->csselr_el1 = READ_SPECIALREG(csselr_el1);
 	hypctx->esr_el1 = READ_SPECIALREG(esr_el1);
 	hypctx->far_el1 = READ_SPECIALREG(far_el1);
 	hypctx->mair_el1 = READ_SPECIALREG(mair_el1);
+	hypctx->mdccint_el1 = READ_SPECIALREG(mdccint_el1);
+	hypctx->mdscr_el1 = READ_SPECIALREG(mdscr_el1);
 	hypctx->par_el1 = READ_SPECIALREG(par_el1);
 	hypctx->sctlr_el1 = READ_SPECIALREG(sctlr_el1);
 	hypctx->spsr_el1 = READ_SPECIALREG(spsr_el1);
@@ -214,6 +276,8 @@ vmm_hyp_reg_store(struct hypctx *hypctx, struct hyp *hyp, bool guest)
 static void
 vmm_hyp_reg_restore(struct hypctx *hypctx, struct hyp *hyp, bool guest)
 {
+	uint64_t dfr0;
+
 	/* Restore the special registers */
 	WRITE_SPECIALREG(elr_el1, hypctx->elr_el1);
 	WRITE_SPECIALREG(sp_el0, hypctx->sp_el0);
@@ -228,8 +292,11 @@ vmm_hyp_reg_restore(struct hypctx *hypctx, struct hyp *hyp, bool guest)
 	WRITE_SPECIALREG(amair_el1, hypctx->amair_el1);
 	WRITE_SPECIALREG(contextidr_el1, hypctx->contextidr_el1);
 	WRITE_SPECIALREG(cpacr_el1, hypctx->cpacr_el1);
+	WRITE_SPECIALREG(csselr_el1, hypctx->csselr_el1);
 	WRITE_SPECIALREG(esr_el1, hypctx->esr_el1);
 	WRITE_SPECIALREG(far_el1, hypctx->far_el1);
+	WRITE_SPECIALREG(mdccint_el1, hypctx->mdccint_el1);
+	WRITE_SPECIALREG(mdscr_el1, hypctx->mdscr_el1);
 	WRITE_SPECIALREG(mair_el1, hypctx->mair_el1);
 	WRITE_SPECIALREG(par_el1, hypctx->par_el1);
 	WRITE_SPECIALREG(sctlr_el1, hypctx->sctlr_el1);
@@ -247,6 +314,61 @@ vmm_hyp_reg_restore(struct hypctx *hypctx, struct hyp *hyp, bool guest)
 	WRITE_SPECIALREG(sp_el1, hypctx->tf.tf_sp);
 	WRITE_SPECIALREG(elr_el2, hypctx->tf.tf_elr);
 	WRITE_SPECIALREG(spsr_el2, hypctx->tf.tf_spsr);
+
+	dfr0 = READ_SPECIALREG(id_aa64dfr0_el1);
+	switch(ID_AA64DFR0_BRPs_VAL(dfr0) - 1) {
+#define	LOAD_DBG_BRP(x)							\
+	case x:								\
+		WRITE_SPECIALREG(dbgbcr ## x ## _el1,			\
+		    hypctx->dbgbcr_el1[x]);				\
+		WRITE_SPECIALREG(dbgbvr ## x ## _el1,			\
+		    hypctx->dbgbvr_el1[x])
+	LOAD_DBG_BRP(15);
+	LOAD_DBG_BRP(14);
+	LOAD_DBG_BRP(13);
+	LOAD_DBG_BRP(12);
+	LOAD_DBG_BRP(11);
+	LOAD_DBG_BRP(10);
+	LOAD_DBG_BRP(9);
+	LOAD_DBG_BRP(8);
+	LOAD_DBG_BRP(7);
+	LOAD_DBG_BRP(6);
+	LOAD_DBG_BRP(5);
+	LOAD_DBG_BRP(4);
+	LOAD_DBG_BRP(3);
+	LOAD_DBG_BRP(2);
+	LOAD_DBG_BRP(1);
+	default:
+	LOAD_DBG_BRP(0);
+#undef LOAD_DBG_BRP
+	}
+
+	switch(ID_AA64DFR0_WRPs_VAL(dfr0) - 1) {
+#define	LOAD_DBG_WRP(x)							\
+	case x:								\
+		WRITE_SPECIALREG(dbgwcr ## x ## _el1,			\
+		    hypctx->dbgwcr_el1[x]);				\
+		WRITE_SPECIALREG(dbgwvr ## x ## _el1,			\
+		    hypctx->dbgwvr_el1[x])
+	LOAD_DBG_WRP(15);
+	LOAD_DBG_WRP(14);
+	LOAD_DBG_WRP(13);
+	LOAD_DBG_WRP(12);
+	LOAD_DBG_WRP(11);
+	LOAD_DBG_WRP(10);
+	LOAD_DBG_WRP(9);
+	LOAD_DBG_WRP(8);
+	LOAD_DBG_WRP(7);
+	LOAD_DBG_WRP(6);
+	LOAD_DBG_WRP(5);
+	LOAD_DBG_WRP(4);
+	LOAD_DBG_WRP(3);
+	LOAD_DBG_WRP(2);
+	LOAD_DBG_WRP(1);
+	default:
+	LOAD_DBG_WRP(0);
+#undef LOAD_DBG_WRP
+	}
 
 	if (guest) {
 		/* Load the timer registers */
@@ -335,8 +457,14 @@ vmm_hyp_call_guest(struct hyp *hyp, int vcpu)
 	/* Load the common hypervisor registers */
 	WRITE_SPECIALREG(vttbr_el2, hyp->vttbr_el2);
 
+	host_hypctx.mdcr_el2 = READ_SPECIALREG(mdcr_el2);
+	WRITE_SPECIALREG(mdcr_el2, hypctx->mdcr_el2);
+
 	/* Call into the guest */
 	ret = vmm_enter_guest(hypctx);
+
+	WRITE_SPECIALREG(mdcr_el2, host_hypctx.mdcr_el2);
+	isb();
 
 	/* Store the exit info */
 	hypctx->exit_info.far_el2 = READ_SPECIALREG(far_el2);

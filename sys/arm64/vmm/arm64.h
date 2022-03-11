@@ -55,10 +55,13 @@ struct hypctx {
 	uint64_t	afsr1_el1;	/* Auxiliary Fault Status Register 1 */
 	uint64_t	amair_el1;	/* Auxiliary Memory Attribute Indirection Register */
 	uint64_t	contextidr_el1;	/* Current Process Identifier */
-	uint64_t	cpacr_el1;	/* Arhitectural Feature Access Control Register */
+	uint64_t	cpacr_el1;	/* Architectural Feature Access Control Register */
+	uint64_t	csselr_el1;	/* Cache Size Selection Register */
 	uint64_t	esr_el1;	/* Exception Syndrome Register */
 	uint64_t	far_el1;	/* Fault Address Register */
 	uint64_t	mair_el1;	/* Memory Attribute Indirection Register */
+	uint64_t	mdccint_el1;	/* Monitor DCC Interrupt Enable Register */
+	uint64_t	mdscr_el1;	/* Monitor Debug System Control Register */
 	uint64_t	par_el1;	/* Physical Address Register */
 	uint64_t	sctlr_el1;	/* System Control Register */
 	uint64_t	tcr_el1;	/* Translation Control Register */
@@ -66,9 +69,17 @@ struct hypctx {
 	uint64_t	ttbr1_el1;	/* Translation Table Base Register 1 */
 	uint64_t	spsr_el1;	/* Saved Program Status Register */
 
+	uint64_t	pmcr_el0;	/* Performance Monitors Control Register */
+
+	uint64_t	dbgbcr_el1[16];	/* Debug Breakpoint Control Registers */
+	uint64_t	dbgbvr_el1[16];	/* Debug Breakpoint Value Registers */
+	uint64_t	dbgwcr_el1[16];	/* Debug Watchpoint Control Registers */
+	uint64_t	dbgwvr_el1[16];	/* Debug Watchpoint Value Registers */
+
 	/* EL2 control registers */
 	uint64_t	cptr_el2;	/* Architectural Feature Trap Register */
 	uint64_t	hcr_el2;	/* Hypervisor Configuration Register */
+	uint64_t	mdcr_el2;	/* Monitor Debug Configuration Register */
 	uint64_t	vpidr_el2;	/* Virtualization Processor ID Register */
 	uint64_t	vmpidr_el2;	/* Virtualization Multiprocessor ID Register */
 	uint32_t	vcpu;

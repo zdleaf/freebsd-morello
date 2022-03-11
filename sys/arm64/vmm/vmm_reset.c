@@ -57,10 +57,13 @@ reset_vm_el01_regs(void *vcpu)
 	set_arch_unknown(el2ctx->amair_el1);
 	set_arch_unknown(el2ctx->contextidr_el1);
 	set_arch_unknown(el2ctx->cpacr_el1);
+	set_arch_unknown(el2ctx->csselr_el1);
 	set_arch_unknown(el2ctx->elr_el1);
 	set_arch_unknown(el2ctx->esr_el1);
 	set_arch_unknown(el2ctx->far_el1);
 	set_arch_unknown(el2ctx->mair_el1);
+	set_arch_unknown(el2ctx->mdccint_el1);
+	set_arch_unknown(el2ctx->mdscr_el1);
 	set_arch_unknown(el2ctx->par_el1);
 
 	/*
@@ -83,6 +86,15 @@ reset_vm_el01_regs(void *vcpu)
 	set_arch_unknown(el2ctx->ttbr1_el1);
 	set_arch_unknown(el2ctx->vbar_el1);
 	set_arch_unknown(el2ctx->spsr_el1);
+
+	set_arch_unknown(el2ctx->dbgbcr_el1);
+	set_arch_unknown(el2ctx->dbgbvr_el1);
+	set_arch_unknown(el2ctx->dbgwcr_el1);
+	set_arch_unknown(el2ctx->dbgwvr_el1);
+
+	el2ctx->pmcr_el0 = READ_SPECIALREG(pmcr_el0) & PMCR_N_MASK;
+	/* PMCR_LC is unknown when AArch32 is supported or RES1 otherwise */
+	el2ctx->pmcr_el0 |= PMCR_LC;
 }
 
 void
@@ -109,6 +121,9 @@ reset_vm_el2_regs(void *vcpu)
 	 */
 	el2ctx->hcr_el2 = HCR_RW | HCR_BSU_IS | HCR_SWIO | HCR_FB | \
 			  HCR_VM | HCR_AMO | HCR_IMO | HCR_FMO;
+
+	/* TODO: Trap all extensions we don't support */
+	el2ctx->mdcr_el2 = 0;
 
 	el2ctx->vmpidr_el2 = VMPIDR_EL2_RES1;
 	/* The guest will detect a multi-core, single-threaded CPU */
