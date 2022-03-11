@@ -141,11 +141,13 @@ TAILQ_HEAD(pci_bar_list, pci_bar_allocation) pci_bars = TAILQ_HEAD_INITIALIZER(
 #define	PCI_EMUL_ECFG_SIZE	(MAXBUSES * 1024 * 1024)    /* 1MB per bus */
 SYSRES_MEM(PCI_EMUL_ECFG_BASE, PCI_EMUL_ECFG_SIZE);
 
+#if defined(__amd64__)
 /*
  * OVMF always uses 0xC0000000 as base address for 32 bit PCI MMIO. Don't
  * change this address without changing it in OVMF.
  */
 #define PCI_EMUL_MEMBASE32 0xC0000000
+#endif
 #define	PCI_EMUL_MEMLIMIT32	PCI_EMUL_ECFG_BASE
 #define PCI_EMUL_MEMSIZE64	(32*GB)
 
