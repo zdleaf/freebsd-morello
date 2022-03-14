@@ -56,7 +56,7 @@ __FBSDID("$FreeBSD$");
 #include <drm/drm_edid.h>
 
 #include "iicbus_if.h"
-#include "drm_bridge_if.h"
+#include "drm_encoder_if.h"
 
 #define	MKREG(page, addr)	(((page) << 8) | (addr))
 
@@ -949,7 +949,7 @@ static device_method_t tda_methods[] = {
 	DEVMETHOD(device_attach,		tda19988_attach),
 	DEVMETHOD(device_detach,		tda19988_detach),
 
-	DEVMETHOD(drm_bridge_add_encoder,	tda19988_add_encoder),
+	DEVMETHOD(drm_encoder_add_encoder,	tda19988_add_encoder),
 
 	{0, 0},
 };

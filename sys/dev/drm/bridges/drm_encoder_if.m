@@ -1,5 +1,5 @@
 #-
-# Copyright (c) 2019 Emmanuel Vadot <manu@FreeBSD.org>
+# Copyright (c) 2022 Ruslan Bukin <br@bsdpad.com>
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -25,18 +25,19 @@
 # $FreeBSD$
 #
 
-INTERFACE drm_bridge;
+INTERFACE drm_encoder;
 
 HEADER {
+	struct drm_crtc;
 	struct drm_encoder;
 	struct drm_device;
 };
 
 #
-# Add the bridge to the drm pipeline
+# Add the encoder to the drm pipeline
 #
-METHOD int add_bridge {
+METHOD int add_encoder {
 	device_t		dev;
-	struct drm_encoder	*encoder;
+	struct drm_crtc		*crtc;
 	struct drm_device	*drm;
 };

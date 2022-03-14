@@ -73,7 +73,7 @@ __FBSDID("$FreeBSD$");
 #include <dev/drm/komeda/komeda_drv.h>
 #include <dev/drm/komeda/komeda_regs.h>
 
-#include "drm_bridge_if.h"
+#include "drm_encoder_if.h"
 
 #define	dprintf(fmt, ...)
 
@@ -284,7 +284,7 @@ komeda_pipeline_add_encoder(struct komeda_pipeline *pipeline,
 	if (dev == NULL)
 		return (ENOENT);
 
-	ret = DRM_BRIDGE_ADD_ENCODER(dev, &pipeline->crtc, drm);
+	ret = DRM_ENCODER_ADD_ENCODER(dev, &pipeline->crtc, drm);
 	if (ret == 0)
 		return (ENODEV);
 
