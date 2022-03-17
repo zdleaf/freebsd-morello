@@ -70,6 +70,15 @@ struct hypctx {
 	uint64_t	spsr_el1;	/* Saved Program Status Register */
 
 	uint64_t	pmcr_el0;	/* Performance Monitors Control Register */
+	uint64_t	pmccntr_el0;
+	uint64_t	pmccfiltr_el0;
+	uint64_t	pmcntenset_el0;
+	uint64_t	pmintenset_el1;
+	uint64_t	pmovsset_el0;
+	uint64_t	pmselr_el0;
+	uint64_t	pmuserenr_el0;
+	uint64_t	pmevcntr_el0[31];
+	uint64_t	pmevtyper_el0[31];
 
 	uint64_t	dbgbcr_el1[16];	/* Debug Breakpoint Control Registers */
 	uint64_t	dbgbvr_el1[16];	/* Debug Breakpoint Value Registers */

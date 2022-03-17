@@ -231,6 +231,55 @@ vmm_hyp_reg_store(struct hypctx *hypctx, struct hyp *hyp, bool guest)
 	}
 
 	/* Store the PMU registers */
+	hypctx->pmcr_el0 = READ_SPECIALREG(pmcr_el0);
+	hypctx->pmccntr_el0 = READ_SPECIALREG(pmccntr_el0);
+	hypctx->pmccfiltr_el0 = READ_SPECIALREG(pmccfiltr_el0);
+	hypctx->pmcntenset_el0 = READ_SPECIALREG(pmcntenset_el0);
+	hypctx->pmintenset_el1 = READ_SPECIALREG(pmintenset_el1);
+	hypctx->pmovsset_el0 = READ_SPECIALREG(pmovsset_el0);
+	hypctx->pmuserenr_el0 = READ_SPECIALREG(pmuserenr_el0);
+	switch ((hypctx->pmcr_el0 & PMCR_N_MASK) >> PMCR_N_SHIFT) {
+#define	STORE_PMU(x)							\
+	case (x + 1):							\
+		hypctx->pmevcntr_el0[x] =				\
+		    READ_SPECIALREG(pmevcntr ## x ## _el0);		\
+		hypctx->pmevtyper_el0[x] =				\
+		    READ_SPECIALREG(pmevtyper ## x ## _el0)
+	STORE_PMU(30);
+	STORE_PMU(29);
+	STORE_PMU(28);
+	STORE_PMU(27);
+	STORE_PMU(26);
+	STORE_PMU(25);
+	STORE_PMU(24);
+	STORE_PMU(23);
+	STORE_PMU(22);
+	STORE_PMU(21);
+	STORE_PMU(20);
+	STORE_PMU(19);
+	STORE_PMU(18);
+	STORE_PMU(17);
+	STORE_PMU(16);
+	STORE_PMU(15);
+	STORE_PMU(14);
+	STORE_PMU(13);
+	STORE_PMU(12);
+	STORE_PMU(11);
+	STORE_PMU(10);
+	STORE_PMU(9);
+	STORE_PMU(8);
+	STORE_PMU(7);
+	STORE_PMU(6);
+	STORE_PMU(5);
+	STORE_PMU(4);
+	STORE_PMU(3);
+	STORE_PMU(2);
+	STORE_PMU(1);
+	STORE_PMU(0);
+	default:		/* N == 0 when only PMCCNTR_EL0 is available */
+		break;
+#undef STORE_PMU
+	}
 
 	/* Store the special to from the trapframe */
 	hypctx->tf.tf_sp = READ_SPECIALREG(sp_el1);
@@ -314,6 +363,61 @@ vmm_hyp_reg_restore(struct hypctx *hypctx, struct hyp *hyp, bool guest)
 	WRITE_SPECIALREG(sp_el1, hypctx->tf.tf_sp);
 	WRITE_SPECIALREG(elr_el2, hypctx->tf.tf_elr);
 	WRITE_SPECIALREG(spsr_el2, hypctx->tf.tf_spsr);
+
+	/* Restore the PMU registers */
+	WRITE_SPECIALREG(pmcr_el0, hypctx->pmcr_el0);
+	WRITE_SPECIALREG(pmccntr_el0, hypctx->pmccntr_el0);
+	WRITE_SPECIALREG(pmccfiltr_el0, hypctx->pmccfiltr_el0);
+	/* Clear all events/interrupts then enable them */
+	WRITE_SPECIALREG(pmcntenclr_el0, 0xfffffffful);
+	WRITE_SPECIALREG(pmcntenset_el0, hypctx->pmcntenset_el0);
+	WRITE_SPECIALREG(pmintenclr_el1, 0xfffffffful);
+	WRITE_SPECIALREG(pmintenset_el1, hypctx->pmintenset_el1);
+	WRITE_SPECIALREG(pmovsclr_el0, 0xfffffffful);
+	WRITE_SPECIALREG(pmovsset_el0, hypctx->pmovsset_el0);
+
+	switch ((hypctx->pmcr_el0 & PMCR_N_MASK) >> PMCR_N_SHIFT) {
+#define	LOAD_PMU(x)							\
+	case (x + 1):							\
+		WRITE_SPECIALREG(pmevcntr ## x ## _el0,			\
+		    hypctx->pmevcntr_el0[x]);				\
+		WRITE_SPECIALREG(pmevtyper ## x ## _el0,		\
+		    hypctx->pmevtyper_el0[x])
+	LOAD_PMU(30);
+	LOAD_PMU(29);
+	LOAD_PMU(28);
+	LOAD_PMU(27);
+	LOAD_PMU(26);
+	LOAD_PMU(25);
+	LOAD_PMU(24);
+	LOAD_PMU(23);
+	LOAD_PMU(22);
+	LOAD_PMU(21);
+	LOAD_PMU(20);
+	LOAD_PMU(19);
+	LOAD_PMU(18);
+	LOAD_PMU(17);
+	LOAD_PMU(16);
+	LOAD_PMU(15);
+	LOAD_PMU(14);
+	LOAD_PMU(13);
+	LOAD_PMU(12);
+	LOAD_PMU(11);
+	LOAD_PMU(10);
+	LOAD_PMU(9);
+	LOAD_PMU(8);
+	LOAD_PMU(7);
+	LOAD_PMU(6);
+	LOAD_PMU(5);
+	LOAD_PMU(4);
+	LOAD_PMU(3);
+	LOAD_PMU(2);
+	LOAD_PMU(1);
+	LOAD_PMU(0);
+	default:		/* N == 0 when only PMCCNTR_EL0 is available */
+		break;
+#undef LOAD_PMU
+	}
 
 	dfr0 = READ_SPECIALREG(id_aa64dfr0_el1);
 	switch(ID_AA64DFR0_BRPs_VAL(dfr0) - 1) {

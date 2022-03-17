@@ -68,7 +68,7 @@
 #define	UNUSED		0
 
 /* TODO: Move the host hypctx off the stack */
-#define	VMM_STACK_PAGES	2
+#define	VMM_STACK_PAGES	4
 #define	VMM_STACK_SIZE	(VMM_STACK_PAGES * PAGE_SIZE)
 
 MALLOC_DEFINE(M_HYP, "ARM VMM HYP", "ARM VMM HYP");
