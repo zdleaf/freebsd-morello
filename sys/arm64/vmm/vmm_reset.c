@@ -95,7 +95,6 @@ reset_vm_el01_regs(void *vcpu)
 	el2ctx->pmcr_el0 = READ_SPECIALREG(pmcr_el0) & PMCR_N_MASK;
 	/* PMCR_LC is unknown when AArch32 is supported or RES1 otherwise */
 	el2ctx->pmcr_el0 |= PMCR_LC;
-	printf("pmcr_el0: %lx\n", el2ctx->pmcr_el0);
 	set_arch_unknown(el2ctx->pmccntr_el0);
 	set_arch_unknown(el2ctx->pmccfiltr_el0);
 	set_arch_unknown(el2ctx->pmcntenset_el0);
