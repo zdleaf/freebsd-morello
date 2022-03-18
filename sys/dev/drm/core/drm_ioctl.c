@@ -159,7 +159,7 @@ static int drm_set_busid(struct drm_device *dev, struct drm_file *file_priv)
 #if defined(__linux__) || defined(CONFIG_PCI)
 #ifdef __linux__
 	if (dev->dev && dev_is_pci(dev->dev)) {
-#else
+#elif defined(__FreeBSD__)
 	// BSDFIXME: Assume it's PCI for now
 	if (dev->dev) {
 #endif
@@ -922,28 +922,7 @@ long drm_ioctl(struct file *filp,
 	if (ksize > in_size)
 		memset(kdata + in_size, 0, ksize - in_size);
 
-#if 0
-	if (is_driver_ioctl)
-		printf("%s: drm ioctl user %s (%d)\n", __func__, ioctl->name,
-		    nr);
-	else
-		printf("%s: drm ioctl kern %s (%d)\n", __func__, ioctl->name,
-		    nr);
-#endif
-
 	retcode = drm_ioctl_kernel(filp, func, kdata, ioctl->flags);
-
-#if 0
-	if (is_driver_ioctl) {
-#if 0
-		printf("%s: drm ioctl user %s, ret (%d)\n", __func__,
-		    ioctl->name, retcode);
-#endif
-	} else
-		printf("%s: drm ioctl kern %s (%d), ret %d\n", __func__,
-		    ioctl->name, nr, retcode);
-#endif
-
 #ifdef __linux__
 	if (copy_to_user((void __user *)arg, kdata, out_size) != 0)
 		retcode = -EFAULT;
