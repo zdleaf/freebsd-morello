@@ -862,7 +862,7 @@ iommu_pmap_remove_pages(pmap_t pmap)
 					l3e = l3[l];
 					if ((l3e & ATTR_DESCR_VALID) == 0)
 						continue;
-					panic("%s: l3e found for va %jx\n",
+					printf("%s: l3e found for va %jx\n",
 					    __func__, sva);
 				}
 
