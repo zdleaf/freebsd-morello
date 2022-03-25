@@ -723,6 +723,7 @@ vmm_sysmem_maxaddr(struct vm *vm)
 
 static struct {
 	uint32_t	esr_iss;
+	uint32_t	esr_mask;
 	reg_read_t	reg_read;
 	reg_write_t	reg_write;
 	void		*arg;
@@ -734,6 +735,7 @@ static struct {
 		    ((_reg ## _CRn) << ISS_MSR_CRn_SHIFT) |		\
 		    ((_reg ## _CRm) << ISS_MSR_CRm_SHIFT) |		\
 		    ((_reg ## _op2) << ISS_MSR_OP2_SHIFT),		\
+		.esr_mask = ISS_MSR_REG_MASK,				\
 		.reg_read = (_read),					\
 		.reg_write = (_write),					\
 		.arg = NULL,						\
@@ -764,7 +766,7 @@ vm_handle_reg_emul(struct vm *vm, int vcpuid, bool *retu)
 	vre = &vme->u.reg_emul.vre;
 
 	for (i = 0; i < nitems(vmm_special_regs); i++) {
-		if ((vre->inst_syndrome & ISS_MSR_REG_MASK) ==
+		if ((vre->inst_syndrome & vmm_special_regs[i].esr_mask) ==
 		    vmm_special_regs[i].esr_iss) {
 			rv = vmm_emulate_register(vm, vcpuid, vre,
 			    vmm_special_regs[i].reg_read,
