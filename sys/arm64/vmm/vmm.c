@@ -198,6 +198,48 @@ SYSCTL_INT(_hw_vmm, OID_AUTO, trace_guest_exceptions, CTLFLAG_RDTUN,
     &trace_guest_exceptions, 0,
     "Trap into hypervisor on all guest exceptions and reflect them back");
 
+static struct cpu_desc vmm_desc = {
+	.id_aa64afr0 = 0,
+	.id_aa64afr1 = 0,
+	.id_aa64dfr0 =
+	    (0xful << ID_AA64DFR0_CTX_CMPs_SHIFT) |
+	    (0xful << ID_AA64DFR0_WRPs_SHIFT) |
+	    (0xful << ID_AA64DFR0_BRPs_SHIFT) |
+	    ID_AA64DFR0_PMUVer_3 |
+	    ID_AA64DFR0_DebugVer_8,
+	.id_aa64dfr1 = 0,
+	.id_aa64isar0 =
+	    ID_AA64ISAR0_TLB_TLBIOSR |
+	    ID_AA64ISAR0_SHA3_IMPL |
+	    ID_AA64ISAR0_RDM_IMPL |
+	    ID_AA64ISAR0_Atomic_IMPL |
+	    ID_AA64ISAR0_CRC32_BASE |
+	    ID_AA64ISAR0_SHA2_512 |
+	    ID_AA64ISAR0_SHA1_BASE |
+	    ID_AA64ISAR0_AES_PMULL,
+	.id_aa64isar1 = 0,
+	.id_aa64mmfr0 =
+	    ID_AA64MMFR0_TGran4_IMPL |
+	    ID_AA64MMFR0_TGran64_IMPL |
+	    ID_AA64MMFR0_TGran16_IMPL |
+	    ID_AA64MMFR0_ASIDBits_16 |
+	    ID_AA64MMFR0_PARange_4P,
+	.id_aa64mmfr1 =
+	    ID_AA64MMFR1_SpecSEI_IMPL |
+	    ID_AA64MMFR1_PAN_ATS1E1 |
+	    ID_AA64MMFR1_HAFDBS_AF,
+	.id_aa64mmfr2 = 0,
+	.id_aa64pfr0 =
+	    ID_AA64PFR0_GIC_CPUIF_NONE |
+	    ID_AA64PFR0_AdvSIMD_HP |
+	    ID_AA64PFR0_FP_HP |
+	    ID_AA64PFR0_EL3_64 |
+	    ID_AA64PFR0_EL2_64 |
+	    ID_AA64PFR0_EL1_64 |
+	    ID_AA64PFR0_EL0_64,
+	.id_aa64pfr1 = 0,
+};
+
 static void vm_free_memmap(struct vm *vm, int ident);
 static bool sysmem_mapping(struct vm *vm, struct mem_map *mm);
 static void vcpu_notify_event_locked(struct vcpu *vcpu, bool lapic_intr);
@@ -241,6 +283,8 @@ static int
 vmm_init(void)
 {
 	ops = &vmm_ops_arm;
+
+	update_cpu_desc(&vmm_desc);
 
 	return (VMM_INIT(0));
 }
@@ -725,27 +769,17 @@ vmm_reg_raz(void *vm, int vcpuid, uint64_t *rval, void *arg)
 }
 
 static int
+vmm_reg_read_arg(void *vm, int vcpuid, uint64_t *rval, void *arg)
+{
+	*rval = *(uint64_t *)arg;
+	return (0);
+}
+
+static int
 vmm_reg_wi(void *vm, int vcpuid, uint64_t wval, void *arg)
 {
 	return (0);
 }
-
-#define	VMM_HYPCTX_ID_REG(_reg)						\
-static int								\
-vmm_ ## _reg ## _read(void *vm, int vcpuid, uint64_t *rval, void *arg)	\
-{									\
-	*rval = READ_SPECIALREG(_reg);					\
-	return (0);							\
-}
-
-VMM_HYPCTX_ID_REG(id_aa64pfr0_el1);
-VMM_HYPCTX_ID_REG(id_aa64pfr1_el1);
-VMM_HYPCTX_ID_REG(id_aa64dfr0_el1);
-VMM_HYPCTX_ID_REG(id_aa64dfr1_el1);
-VMM_HYPCTX_ID_REG(id_aa64isar0_el1);
-VMM_HYPCTX_ID_REG(id_aa64isar1_el1);
-VMM_HYPCTX_ID_REG(id_aa64mmfr0_el1);
-VMM_HYPCTX_ID_REG(id_aa64mmfr1_el1);
 
 
 #include <sys/queue.h>
@@ -778,23 +812,23 @@ static struct {
 		    ((_reg ## _CRm) << ISS_MSR_CRm_SHIFT) |		\
 		    ((_reg ## _op2) << ISS_MSR_OP2_SHIFT),		\
 		.esr_mask = ISS_MSR_REG_MASK,				\
-		.reg_read = (vmm_ ## _name ## _read),			\
-		.reg_write = (vmm_reg_wi),				\
-		.arg = NULL,						\
+		.reg_read = vmm_reg_read_arg,				\
+		.reg_write = vmm_reg_wi,				\
+		.arg = &(vmm_desc._name),				\
 	}
 
 	/* ID registers */
-	ID_SPECIAL_REG(ID_AA64PFR0_EL1, id_aa64pfr0_el1),
-	ID_SPECIAL_REG(ID_AA64PFR1_EL1, id_aa64pfr1_el1),
+	ID_SPECIAL_REG(ID_AA64PFR0_EL1, id_aa64pfr0),
+	ID_SPECIAL_REG(ID_AA64PFR1_EL1, id_aa64pfr1),
 
-	ID_SPECIAL_REG(ID_AA64DFR0_EL1, id_aa64dfr0_el1),
-	ID_SPECIAL_REG(ID_AA64DFR1_EL1, id_aa64dfr1_el1),
+	ID_SPECIAL_REG(ID_AA64DFR0_EL1, id_aa64dfr0),
+	ID_SPECIAL_REG(ID_AA64DFR1_EL1, id_aa64dfr1),
 
-	ID_SPECIAL_REG(ID_AA64ISAR0_EL1, id_aa64isar0_el1),
-	ID_SPECIAL_REG(ID_AA64ISAR1_EL1, id_aa64isar1_el1),
+	ID_SPECIAL_REG(ID_AA64ISAR0_EL1, id_aa64isar0),
+	ID_SPECIAL_REG(ID_AA64ISAR1_EL1, id_aa64isar1),
 
-	ID_SPECIAL_REG(ID_AA64MMFR0_EL1, id_aa64mmfr0_el1),
-	ID_SPECIAL_REG(ID_AA64MMFR1_EL1, id_aa64mmfr1_el1),
+	ID_SPECIAL_REG(ID_AA64MMFR0_EL1, id_aa64mmfr0),
+	ID_SPECIAL_REG(ID_AA64MMFR1_EL1, id_aa64mmfr1),
 
 	/*
 	 * All other ID registers are read as zero.
