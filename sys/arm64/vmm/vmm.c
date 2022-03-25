@@ -717,6 +717,36 @@ vmm_sysmem_maxaddr(struct vm *vm)
 	return (maxaddr);
 }
 
+static int
+vmm_reg_raz(void *vm, int vcpuid, uint64_t *rval, void *arg)
+{
+	*rval = 0;
+	return (0);
+}
+
+static int
+vmm_reg_wi(void *vm, int vcpuid, uint64_t wval, void *arg)
+{
+	return (0);
+}
+
+#define	VMM_HYPCTX_ID_REG(_reg)						\
+static int								\
+vmm_ ## _reg ## _read(void *vm, int vcpuid, uint64_t *rval, void *arg)	\
+{									\
+	*rval = READ_SPECIALREG(_reg);					\
+	return (0);							\
+}
+
+VMM_HYPCTX_ID_REG(id_aa64pfr0_el1);
+VMM_HYPCTX_ID_REG(id_aa64pfr1_el1);
+VMM_HYPCTX_ID_REG(id_aa64dfr0_el1);
+VMM_HYPCTX_ID_REG(id_aa64dfr1_el1);
+VMM_HYPCTX_ID_REG(id_aa64isar0_el1);
+VMM_HYPCTX_ID_REG(id_aa64isar1_el1);
+VMM_HYPCTX_ID_REG(id_aa64mmfr0_el1);
+VMM_HYPCTX_ID_REG(id_aa64mmfr1_el1);
+
 
 #include <sys/queue.h>
 #include <sys/linker.h>
@@ -740,6 +770,47 @@ static struct {
 		.reg_write = (_write),					\
 		.arg = NULL,						\
 	}
+#define	ID_SPECIAL_REG(_reg, _name)						\
+	{								\
+		.esr_iss = ((_reg ## _op0) << ISS_MSR_OP0_SHIFT) |	\
+		    ((_reg ## _op1) << ISS_MSR_OP1_SHIFT) |		\
+		    ((_reg ## _CRn) << ISS_MSR_CRn_SHIFT) |		\
+		    ((_reg ## _CRm) << ISS_MSR_CRm_SHIFT) |		\
+		    ((_reg ## _op2) << ISS_MSR_OP2_SHIFT),		\
+		.esr_mask = ISS_MSR_REG_MASK,				\
+		.reg_read = (vmm_ ## _name ## _read),			\
+		.reg_write = (vmm_reg_wi),				\
+		.arg = NULL,						\
+	}
+
+	/* ID registers */
+	ID_SPECIAL_REG(ID_AA64PFR0_EL1, id_aa64pfr0_el1),
+	ID_SPECIAL_REG(ID_AA64PFR1_EL1, id_aa64pfr1_el1),
+
+	ID_SPECIAL_REG(ID_AA64DFR0_EL1, id_aa64dfr0_el1),
+	ID_SPECIAL_REG(ID_AA64DFR1_EL1, id_aa64dfr1_el1),
+
+	ID_SPECIAL_REG(ID_AA64ISAR0_EL1, id_aa64isar0_el1),
+	ID_SPECIAL_REG(ID_AA64ISAR1_EL1, id_aa64isar1_el1),
+
+	ID_SPECIAL_REG(ID_AA64MMFR0_EL1, id_aa64mmfr0_el1),
+	ID_SPECIAL_REG(ID_AA64MMFR1_EL1, id_aa64mmfr1_el1),
+
+	/*
+	 * All other ID registers are read as zero.
+	 * They are all in the op0=3, op1=0, CRn=0, CRm={0..7} space.
+	 */
+	{
+		.esr_iss = (3 << ISS_MSR_OP0_SHIFT) |
+		    (0 << ISS_MSR_OP1_SHIFT) |
+		    (0 << ISS_MSR_CRn_SHIFT) |
+		    (0 << ISS_MSR_CRm_SHIFT),
+		.esr_mask = ISS_MSR_OP0_MASK | ISS_MSR_OP1_MASK |
+		    ISS_MSR_CRn_MASK | (0x8 << ISS_MSR_CRm_SHIFT),
+		.reg_read = vmm_reg_raz,
+		.reg_write = vmm_reg_wi,
+		.arg = NULL,
+	},
 
 	/* Counter physical registers */
 	SPECIAL_REG(CNTP_CTL_EL0, vtimer_phys_ctl_read, vtimer_phys_ctl_write),
