@@ -853,6 +853,7 @@ vfs_lookup_degenerate(struct nameidata *ndp, struct vnode *dp, int wantparent)
 		VREF(dp);
 	}
 	ndp->ni_vp = dp;
+	cnp->cn_namelen = 0;
 
 	if (cnp->cn_flags & AUDITVNODE1)
 		AUDIT_ARG_VNODE1(dp);
@@ -940,6 +941,7 @@ vfs_lookup(struct nameidata *ndp)
 	char *cp;			/* pointer into pathname argument */
 	char *prev_ni_next;		/* saved ndp->ni_next */
 	char *nulchar;			/* location of '\0' in cn_pnbuf */
+	char *lastchar;			/* location of the last character */
 	struct vnode *dp = NULL;	/* the directory we are searching */
 	struct vnode *tdp;		/* saved dp */
 	struct mount *mp;		/* mount table entry */
@@ -1002,6 +1004,28 @@ vfs_lookup(struct nameidata *ndp)
 	}
 
 	/*
+	 * Nul-out trailing slashes (e.g., "foo///" -> "foo").
+	 *
+	 * This must be done before VOP_LOOKUP() because some fs's don't know
+	 * about trailing slashes.  Remember if there were trailing slashes to
+	 * handle symlinks, existing non-directories and non-existing files
+	 * that won't be directories specially later.
+	 */
+	MPASS(ndp->ni_pathlen >= 2);
+	lastchar = &cnp->cn_nameptr[ndp->ni_pathlen - 2];
+	if (*lastchar == '/') {
+		while (lastchar >= cnp->cn_pnbuf) {
+			*lastchar = '\0';
+			lastchar--;
+			ndp->ni_pathlen--;
+			if (*lastchar != '/') {
+				break;
+			}
+		}
+		cnp->cn_flags |= TRAILINGSLASH;
+	}
+
+	/*
 	 * We use shared locks until we hit the parent of the last cn then
 	 * we adjust based on the requesting flags.
 	 */
@@ -1035,7 +1059,7 @@ dirloop:
 	}
 	*nulchar = '\0';
 	cnp->cn_namelen = cp - cnp->cn_nameptr;
-	if (cnp->cn_namelen > NAME_MAX) {
+	if (__predict_false(cnp->cn_namelen > NAME_MAX)) {
 		error = ENAMETOOLONG;
 		goto bad;
 	}
@@ -1053,21 +1077,9 @@ dirloop:
 	ndp->ni_next = cp;
 
 	/*
-	 * Replace multiple slashes by a single slash and trailing slashes
-	 * by a null.  This must be done before VOP_LOOKUP() because some
-	 * fs's don't know about trailing slashes.  Remember if there were
-	 * trailing slashes to handle symlinks, existing non-directories
-	 * and non-existing files that won't be directories specially later.
+	 * Something else should be clearing this.
 	 */
-	while (*cp == '/' && (cp[1] == '/' || cp[1] == '\0')) {
-		cp++;
-		ndp->ni_pathlen--;
-		if (*cp == '\0') {
-			*ndp->ni_next = '\0';
-			cnp->cn_flags |= TRAILINGSLASH;
-		}
-	}
-	ndp->ni_next = cp;
+	cnp->cn_flags &= ~(ISDOTDOT|ISLASTCN);
 
 	cnp->cn_flags |= MAKEENTRY;
 	if (*cp == '\0' && docache == 0)
@@ -1075,18 +1087,14 @@ dirloop:
 	if (cnp->cn_namelen == 2 &&
 	    cnp->cn_nameptr[1] == '.' && cnp->cn_nameptr[0] == '.')
 		cnp->cn_flags |= ISDOTDOT;
-	else
-		cnp->cn_flags &= ~ISDOTDOT;
-	if (*ndp->ni_next == 0)
+	if (*ndp->ni_next == 0) {
 		cnp->cn_flags |= ISLASTCN;
-	else
-		cnp->cn_flags &= ~ISLASTCN;
 
-	if ((cnp->cn_flags & ISLASTCN) != 0 &&
-	    cnp->cn_namelen == 1 && cnp->cn_nameptr[0] == '.' &&
-	    (cnp->cn_nameiop == DELETE || cnp->cn_nameiop == RENAME)) {
-		error = EINVAL;
-		goto bad;
+		if (__predict_false(cnp->cn_namelen == 1 && cnp->cn_nameptr[0] == '.' &&
+		    (cnp->cn_nameiop == DELETE || cnp->cn_nameiop == RENAME))) {
+			error = EINVAL;
+			goto bad;
+		}
 	}
 
 	nameicap_tracker_add(ndp, dp);
@@ -1179,7 +1187,7 @@ dirloop:
 unionlookup:
 #ifdef MAC
 	error = mac_vnode_check_lookup(cnp->cn_cred, dp, cnp);
-	if (error)
+	if (__predict_false(error))
 		goto bad;
 #endif
 	ndp->ni_dvp = dp;
