@@ -314,8 +314,11 @@ panfrost_gem_fault(struct vm_area_struct *vma, struct vm_fault *vmf)
 		/* Imported object. */
 		KASSERT(bo->sgt != NULL, ("sgt is NULL"));
 		page = sgt_get_page_by_idx(bo->sgt, pidx);
-		if (!page)
+		if (!page) {
+			device_printf(sc->dev, "%s: error: page %d not found ",
+			    __func__, pidx);
 			return (VM_FAULT_SIGBUS);
+		}
 	}
 
 	if (vm_page_busied(page))
