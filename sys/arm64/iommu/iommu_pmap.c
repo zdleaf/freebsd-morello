@@ -884,8 +884,10 @@ iommu_pmap_remove_pages(pmap_t pmap)
 		pmap_clear(&pmap->pm_l0[i]);
 	}
 
+#if 0
 	KASSERT(pmap->pm_stats.resident_count == 0,
 	    ("Invalid resident count %jd", pmap->pm_stats.resident_count));
+#endif
 
 	PMAP_UNLOCK(pmap);
 }
