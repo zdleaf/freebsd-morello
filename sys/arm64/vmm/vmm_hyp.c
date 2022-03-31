@@ -42,7 +42,6 @@ struct hypctx;
 uint64_t vmm_hyp_enter(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t,
     uint64_t, uint64_t, uint64_t);
 uint64_t vmm_enter_guest(struct hypctx *);
-void vmm_cleanup(void *);
 
 /* TODO: Make this common between this & vfp.h */
 static void
@@ -680,10 +679,6 @@ vmm_hyp_enter(uint64_t handle, uint64_t x1, uint64_t x2, uint64_t x3,
 	uint64_t ret;
 
 	switch (handle) {
-	case HYP_CLEANUP:
-		vmm_cleanup((void *)x1);
-		/* NOTREACHED */
-		break;
 	case HYP_ENTER_GUEST:
 		do {
 			ret = vmm_hyp_call_guest((struct hyp *)x1, x2);
@@ -693,6 +688,7 @@ vmm_hyp_enter(uint64_t handle, uint64_t x1, uint64_t x2, uint64_t x3,
 		return (vmm_hyp_read_reg(x1));
 	case HYP_CLEAN_S2_TLBI:
 		return (vmm_clean_s2_tlbi());
+	case HYP_CLEANUP:	/* Handled in vmm_hyp_exception.S */
 	default:
 		break;
 	}

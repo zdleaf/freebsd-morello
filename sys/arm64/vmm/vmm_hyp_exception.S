@@ -292,7 +292,14 @@ LENTRY(handle_el2_el1_sync64)
 	ldr	x9, [sp], #16 /* Restore the temp register */
 	bne	1f
 
-	/* Called from the host */
+	/*
+	 * Called from the host
+	 */
+
+	/* Check if this is a cleanup call and handle in a controlled state */
+	cmp	x0, #(HYP_CLEANUP)
+	b.eq	vmm_cleanup
+
 	str	lr, [sp, #-16]!
 	bl	vmm_hyp_enter
 	ldr	lr, [sp], #16
@@ -357,20 +364,21 @@ END(vmm_enter_guest)
 
 /*
  * Usage:
- * void vmm_cleanup(void *hyp_stub_vectors)
+ * void vmm_cleanup(uint64_t handle, void *hyp_stub_vectors)
  *
  * Expecting:
- * x0 - physical address of hyp_stub_vectors
+ * x1 - physical address of hyp_stub_vectors
  */
-ENTRY(vmm_cleanup)
+LENTRY(vmm_cleanup)
 	/* Restore the stub vectors */
-	msr	vbar_el2, x0
+	msr	vbar_el2, x1
 
 	/* Disable the MMU */
 	dsb	sy
 	mrs	x2, sctlr_el2
 	bic	x2, x2, #SCTLR_EL2_M
 	msr	sctlr_el2, x2
+	isb
 
 	ERET
-END(vmm_cleanup)
+LEND(vmm_cleanup)

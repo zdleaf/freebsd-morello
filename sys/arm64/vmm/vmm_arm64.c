@@ -215,10 +215,8 @@ arm_teardown_vectors(void *arg)
 	 * address.
 	 */
 	daif = intr_disable();
-#if 0
-	/* TODO */
-	vmm_call_hyp((void *)vtophys(vmm_cleanup), vtophys(hyp_stub_vectors));
-#endif
+	/* TODO: Invalidate the cache */
+	vmm_call_hyp((void *)HYP_CLEANUP, vtophys(hyp_stub_vectors));
 	intr_restore(daif);
 
 	arm64_set_active_vcpu(NULL);
@@ -332,6 +330,8 @@ arm_cleanup(void)
 	vmmpmap_fini();
 	for (cpu = 0; cpu < nitems(stack); cpu++)
 		free(stack[cpu], M_HYP);
+
+	pmap_clean_stage2_tlbi = NULL;
 
 	return (0);
 }
