@@ -24,11 +24,33 @@ SRCS+=	vmm_arm64.c \
 	vmm_psci.c \
 	vmm_reset.c \
 	vmm_call.S \
-	vmm_mmu.c
+	vmm_mmu.c \
+	vmm_hyp_el2.S
 
 .PATH: ${SRCTOP}/sys/${MACHINE}/vmm/io
 SRCS+=	vgic_v3.c \
 	vtimer.c
+
+CLEANFILES+=	vmm_hyp_exception.o vmm_hyp.o vmm_hyp_blob.elf.full
+CLEANFILES+=	vmm_hyp_blob.elf vmm_hyp_blob.bin
+
+CFLAGS.vmm_hyp_exception.S += -fpie
+CFLAGS.vmm_hyp.c += -fpie
+vmm_hyp_exception.o:	vmm_hyp_exception.S
+vmm_hyp.o: vmm_hyp.c
+
+vmm_hyp_blob.elf.full:	vmm_hyp_exception.o vmm_hyp.o
+	${CC} -o ${.TARGET} ${.ALLSRC} -fPIE -nostdlib \
+	    -T ${SYSDIR}/conf/ldscript.arm64 \
+	    -Wl,--defsym=text_start='0x0'
+
+vmm_hyp_blob.elf:	vmm_hyp_blob.elf.full
+	${OBJCOPY} --strip-debug ${.ALLSRC} ${.TARGET}
+
+vmm_hyp_blob.bin:	vmm_hyp_blob.elf
+	${OBJCOPY} --output-target=binary ${.ALLSRC} ${.TARGET}
+
+vmm_hyp_el2.o:	vmm_hyp_blob.bin
 
 .elif ${MACHINE_CPUARCH} == "amd64"
 DPSRCS+=	vmx_assym.h svm_assym.h
@@ -80,7 +102,7 @@ SRCS+=	vmcb.c		\
 SRCS+=	vmm_snapshot.c
 .endif
 
-CLEANFILES=	vmx_assym.h vmx_genassym.o svm_assym.h svm_genassym.o
+CLEANFILES+=	vmx_assym.h vmx_genassym.o svm_assym.h svm_genassym.o
 
 OBJS_DEPEND_GUESS.vmx_support.o+= vmx_assym.h
 OBJS_DEPEND_GUESS.svm_support.o+= svm_assym.h
