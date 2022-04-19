@@ -110,10 +110,9 @@ static struct diff *d13;
 static struct diff *d23;
 /*
  * "de" is used to gather editing scripts.  These are later spewed out in
- * reverse order.  Its first element must be all zero, the "new" component
- * of "de" contains line positions or byte positions depending on when you
- * look (!?).  Array overlap indicates which sections in "de" correspond to
- * lines that are different in all three files.
+ * reverse order.  Its first element must be all zero, the "old" and "new"
+ * components of "de" contain line positions. Array overlap indicates which
+ * sections in "de" correspond to lines that are different in all three files.
  */
 static struct diff *de;
 static char *overlap;
@@ -139,11 +138,12 @@ static int skip(int, int, const char *);
 static void change(int, struct range *, bool);
 static void keep(int, struct range *);
 static void merge(int, int);
-static void prange(struct range *);
+static void prange(struct range *, bool);
 static void repos(int);
 static void edscript(int) __dead2;
 static void increase(void);
 static void usage(void) __dead2;
+static void printrange(FILE *, struct range *);
 
 enum {
 	DIFFPROG_OPT,
@@ -382,7 +382,7 @@ change(int i, struct range *rold, bool dup)
 
 	printf("%d:", i);
 	last[i] = rold->to;
-	prange(rold);
+	prange(rold, false);
 	if (dup)
 		return;
 	i--;
@@ -395,7 +395,7 @@ change(int i, struct range *rold, bool dup)
  * n1.
  */
 static void
-prange(struct range *rold)
+prange(struct range *rold, bool delete)
 {
 
 	if (rold->to <= rold->from)
@@ -404,7 +404,10 @@ prange(struct range *rold)
 		printf("%d", rold->from);
 		if (rold->to > rold->from + 1)
 			printf(",%d", rold->to - 1);
-		printf("c\n");
+		if (delete)
+			printf("d\n");
+		else
+			printf("c\n");
 	}
 }
 
@@ -504,55 +507,60 @@ edit(struct diff *diff, bool dup, int j)
 		overlapcnt++;
 	de[j].old.from = diff->old.from;
 	de[j].old.to = diff->old.to;
-	de[j].new.from = de[j-1].new.to + skip(2, diff->new.from, NULL);
-	de[j].new.to = de[j].new.from + skip(2, diff->new.to, NULL);
+	de[j].new.from = diff->new.from;
+	de[j].new.to = diff->new.to;
 	return (j);
+}
+
+static void
+printrange(FILE *p, struct range *r)
+{
+	char *line = NULL;
+	size_t len = 0;
+	int i = 1;
+	ssize_t rlen = 0;
+
+	/* We haven't been asked to print anything */
+	if (r->from == r->to)
+		return;
+
+	if (r->from > r->to)
+			errx(EXIT_FAILURE, "invalid print range");
+
+	/*
+	 * XXX-THJ: We read through all of the file for each range printed.
+	 * This duplicates work and will probably impact performance on large
+	 * files with lots of ranges.
+	 */
+	fseek(p, 0L, SEEK_SET);
+	while ((rlen = getline(&line, &len, p)) > 0) {
+		if (i >= r->from)
+			printf("%s", line);
+		if (++i > r->to - 1)
+			break;
+	}
+	free(line);
 }
 
 /* regurgitate */
 static void
 edscript(int n)
 {
-	int k;
-	size_t j;
-	char block[BUFSIZ];
+	bool delete;
 
 	for (; n > 0; n--) {
+		delete = (de[n].new.from == de[n].new.to);
 		if (!oflag || !overlap[n]) {
-			prange(&de[n].old);
+			prange(&de[n].old, delete);
 		} else {
 			printf("%da\n", de[n].old.to - 1);
-			if (Aflag) {
-				printf("%s\n", f2mark);
-				fseek(fp[1], de[n].old.from, SEEK_SET);
-				for (k = de[n].old.to - de[n].old.from; k > 0; k -= j) {
-					j = k > BUFSIZ ? BUFSIZ : k;
-					if (fread(block, 1, j, fp[1]) != j)
-						errx(2, "logic error");
-					fwrite(block, 1, j, stdout);
-				}
-				printf("\n");
-			}
 			printf("=======\n");
 		}
-		fseek(fp[2], (long)de[n].new.from, SEEK_SET);
-		for (k = de[n].new.to - de[n].new.from; k > 0; k -= j) {
-			size_t r;
-
-			j = k > BUFSIZ ? BUFSIZ : k;
-			r = fread(block, 1, j, fp[2]);
-			if (r == 0) {
-				if (feof(fp[2]))
-					break;
-				errx(2, "logic error");
-			}
-			if (r != j)
-				j = r;
-			(void)fwrite(block, 1, j, stdout);
-		}
-		if (!oflag || !overlap[n])
-			printf(".\n");
-		else {
+		printrange(fp[2], &de[n].new);
+		if (!oflag || !overlap[n]) {
+			if (!delete)
+				printf(".\n");
+		} else {
 			printf("%s\n.\n", f3mark);
 			printf("%da\n%s\n.\n", de[n].old.from - 1, f1mark);
 		}

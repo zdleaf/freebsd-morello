@@ -1914,7 +1914,7 @@ sctp_is_address_in_scope(struct sctp_ifa *ifa,
 			/* ok to use deprecated addresses? */
 			sin6 = &ifa->address.sin6;
 			if (IN6_IS_ADDR_UNSPECIFIED(&sin6->sin6_addr)) {
-				/* skip unspecifed addresses */
+				/* skip unspecified addresses */
 				return (0);
 			}
 			if (	/* (local_scope == 0) && */
@@ -3317,7 +3317,7 @@ sctp_source_address_selection(struct sctp_inpcb *inp,
 	 *   have the best source.
 	 * - If not we must rotate amongst the addresses.
 	 *
-	 * Cavets and issues
+	 * Caveats and issues
 	 *
 	 * Do we need to pay attention to scope. We can have a private address
 	 * or a global address we are sourcing or sending to. So if we draw
@@ -6967,7 +6967,7 @@ sctp_clean_up_datalist(struct sctp_tcb *stcb,
 		if (i > 0) {
 			/*
 			 * Any chunk NOT 0 you zap the time chunk 0 gets
-			 * zapped or set based on if a RTO measurment is
+			 * zapped or set based on if a RTO measurement is
 			 * needed.
 			 */
 			data_list[i]->do_rtt = 0;
@@ -7125,7 +7125,7 @@ sctp_can_we_split_this(struct sctp_tcb *stcb, uint32_t length,
 	}
 	if ((length <= space_left) ||
 	    ((length - space_left) < SCTP_BASE_SYSCTL(sctp_min_residual))) {
-		/* Sub-optimial residual don't split in non-eeor mode. */
+		/* Sub-optimal residual don't split in non-eeor mode. */
 		return (0);
 	}
 	/*
@@ -7359,7 +7359,7 @@ dont_do_it:
 				 * than the sp->length.
 				 */
 #ifdef INVARIANTS
-				panic("Huh, freing tail? - TSNH");
+				panic("Huh, freeing tail? - TSNH");
 #else
 				SCTP_PRINTF("Huh, freeing tail? - TSNH\n");
 				sp->tail_mbuf = sp->data = NULL;
@@ -7742,10 +7742,10 @@ sctp_med_chunk_output(struct sctp_inpcb *inp,
 	 * - Service the stream queue that is next, moving any
 	 *   message (note I must get a complete message i.e. FIRST/MIDDLE and
 	 *   LAST to the out queue in one pass) and assigning TSN's. This
-	 *   only applys though if the peer does not support NDATA. For NDATA
+	 *   only applies though if the peer does not support NDATA. For NDATA
 	 *   chunks its ok to not send the entire message ;-)
 	 * - Check to see if the cwnd/rwnd allows any output, if so we go ahead and
-	 *   fomulate and send the low level chunks. Making sure to combine
+	 *   formulate and send the low level chunks. Making sure to combine
 	 *   any control in the control chunk queue also.
 	 */
 	struct sctp_nets *net, *start_at, *sack_goes_to = NULL, *old_start_at = NULL;
@@ -7941,7 +7941,7 @@ again_one_more_time:
 		/* how much can we send? */
 		/* SCTPDBG("Examine for sending net:%x\n", (uint32_t)net); */
 		if (old_start_at && (old_start_at == net)) {
-			/* through list ocmpletely. */
+			/* through list completely. */
 			break;
 		}
 		tsns_sent = 0xa;
@@ -8639,7 +8639,7 @@ again_one_more_time:
 						SCTP_LTRACE_ERR_RET(inp, stcb, NULL, SCTP_FROM_SCTP_OUTPUT, ENOMEM);
 						return (ENOMEM);
 					}
-					/* upate our MTU size */
+					/* update our MTU size */
 					/* Do clear IP_DF ? */
 					if (chk->flags & CHUNK_FLAGS_FRAGMENT_OK) {
 						no_fragmentflg = 0;
@@ -9630,7 +9630,7 @@ one_chunk_around:
 			if (chk->flags & CHUNK_FLAGS_FRAGMENT_OK) {
 				no_fragmentflg = 0;
 			}
-			/* upate our MTU size */
+			/* update our MTU size */
 			if (mtu > (chk->send_size + dmtu))
 				mtu -= (chk->send_size + dmtu);
 			else
@@ -9690,7 +9690,7 @@ one_chunk_around:
 					if (fwd->flags & CHUNK_FLAGS_FRAGMENT_OK) {
 						no_fragmentflg = 0;
 					}
-					/* upate our MTU size */
+					/* update our MTU size */
 					if (mtu > (fwd->send_size + dmtu))
 						mtu -= (fwd->send_size + dmtu);
 					else
@@ -9905,7 +9905,7 @@ sctp_chunk_output(struct sctp_inpcb *inp,
 	 *   FIRST/MIDDLE and LAST to the out queue in one pass) and assigning
 	 *   TSN's
 	 * - Check to see if the cwnd/rwnd allows any output, if so we
-	 *   go ahead and fomulate and send the low level chunks. Making sure
+	 *   go ahead and formulate and send the low level chunks. Making sure
 	 *   to combine any control in the control chunk queue also.
 	 */
 	struct sctp_association *asoc;
@@ -9960,7 +9960,7 @@ do_it_again:
 		 */
 		if (from_where == SCTP_OUTPUT_FROM_COOKIE_ACK) {
 			/*-
-			 * Special hook for handling cookiess discarded
+			 * Special hook for handling cookies discarded
 			 * by peer that carried data. Send cookie-ack only
 			 * and then the next call with get the retran's.
 			 */
@@ -12993,21 +12993,21 @@ sctp_lower_sosend(struct socket *so,
 			SCTP_TCB_UNLOCK(stcb);
 			hold_tcblock = false;
 			error = sbwait(&so->so_snd);
-			if (error || so->so_error || be.error) {
-				if (error == 0) {
-					if (so->so_error != 0) {
-						error = so->so_error;
-					}
-					if (be.error != 0) {
-						error = be.error;
-					}
+			if (error == 0) {
+				if (so->so_error != 0) {
+					error = so->so_error;
 				}
-				SOCKBUF_UNLOCK(&so->so_snd);
-				goto out_unlocked;
+				if (be.error != 0) {
+					error = be.error;
+				}
 			}
 			SOCKBUF_UNLOCK(&so->so_snd);
 			SCTP_TCB_LOCK(stcb);
 			hold_tcblock = true;
+			stcb->block_entry = NULL;
+			if (error != 0) {
+				goto out_unlocked;
+			}
 			if ((asoc->state & SCTP_STATE_ABOUT_TO_BE_FREED) ||
 			    (asoc->state & SCTP_STATE_WAS_ABORTED)) {
 				if (asoc->state & SCTP_STATE_WAS_ABORTED) {
@@ -13021,7 +13021,6 @@ sctp_lower_sosend(struct socket *so,
 				}
 				goto out_unlocked;
 			}
-			stcb->block_entry = NULL;
 			if (SCTP_BASE_SYSCTL(sctp_logging_level) & SCTP_BLK_LOGGING_ENABLE) {
 				sctp_log_block(SCTP_BLOCK_LOG_OUTOF_BLK,
 				    asoc, asoc->total_output_queue_size);
@@ -13354,43 +13353,39 @@ skip_preblock:
 				SCTP_TCB_UNLOCK(stcb);
 				hold_tcblock = false;
 				error = sbwait(&so->so_snd);
-				if (error || so->so_error || be.error) {
-					if (error == 0) {
-						if (so->so_error)
-							error = so->so_error;
-						if (be.error) {
-							error = be.error;
-						}
+				if (error == 0) {
+					if (so->so_error != 0)
+						error = so->so_error;
+					if (be.error != 0) {
+						error = be.error;
 					}
-					SOCKBUF_UNLOCK(&so->so_snd);
-					SCTP_TCB_LOCK(stcb);
-					hold_tcblock = true;
-					stcb->block_entry = NULL;
-					if (((asoc->state & SCTP_STATE_ABOUT_TO_BE_FREED) == 0) &&
-					    ((asoc->state & SCTP_STATE_WAS_ABORTED) == 0) &&
-					    (sp != NULL)) {
+				}
+				SOCKBUF_UNLOCK(&so->so_snd);
+				SCTP_TCB_LOCK(stcb);
+				hold_tcblock = true;
+				stcb->block_entry = NULL;
+				if ((asoc->state & SCTP_STATE_ABOUT_TO_BE_FREED) ||
+				    (asoc->state & SCTP_STATE_WAS_ABORTED)) {
+					if (asoc->state & SCTP_STATE_WAS_ABORTED) {
+						/*
+						 * XXX: Could also be
+						 * ECONNABORTED, not enough
+						 * info.
+						 */
+						error = ECONNRESET;
+					} else {
+						error = ENOTCONN;
+					}
+					goto out_unlocked;
+				}
+				if (error != 0) {
+					if (sp != NULL) {
 						sp->processing = 0;
 					}
 					goto out_unlocked;
 				}
-
-			}
-			SOCKBUF_UNLOCK(&so->so_snd);
-			SCTP_TCB_LOCK(stcb);
-			hold_tcblock = true;
-			stcb->block_entry = NULL;
-			if ((asoc->state & SCTP_STATE_ABOUT_TO_BE_FREED) ||
-			    (asoc->state & SCTP_STATE_WAS_ABORTED)) {
-				if (asoc->state & SCTP_STATE_WAS_ABORTED) {
-					/*
-					 * XXX: Could also be ECONNABORTED,
-					 * not enough info.
-					 */
-					error = ECONNRESET;
-				} else {
-					error = ENOTCONN;
-				}
-				goto out;
+			} else {
+				SOCKBUF_UNLOCK(&so->so_snd);
 			}
 			if (SCTP_BASE_SYSCTL(sctp_logging_level) & SCTP_BLK_LOGGING_ENABLE) {
 				sctp_log_block(SCTP_BLOCK_LOG_OUTOF_BLK,
@@ -13406,6 +13401,8 @@ skip_preblock:
 		KASSERT((asoc->state & SCTP_STATE_WAS_ABORTED) == 0,
 		    ("Association was aborted"));
 
+		/* The out streams might be reallocated. */
+		strm = &asoc->strmout[srcv->sinfo_stream];
 		if (sp != NULL) {
 			if (sp->msg_is_complete == 0) {
 				strm->last_msg_incomplete = 1;
@@ -13656,11 +13653,6 @@ out_unlocked:
 		if (free_cnt_applied) {
 			atomic_subtract_int(&asoc->refcnt, 1);
 		}
-#ifdef INVARIANTS
-		if (mtx_owned(&stcb->tcb_mtx)) {
-			panic("Leaving with tcb mtx owned?");
-		}
-#endif
 	}
 	if (top != NULL) {
 		sctp_m_freem(top);
