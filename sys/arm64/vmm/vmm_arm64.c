@@ -77,7 +77,10 @@ extern char hyp_init_vectors[];
 extern char hyp_vectors[];
 extern char hyp_stub_vectors[];
 
-char *stack[MAXCPU];
+static vm_paddr_t hyp_code_base;
+static size_t hyp_code_len;
+
+static char *stack[MAXCPU];
 static vm_offset_t stack_hyp_va[MAXCPU];
 
 static vmem_t *el2_mem_alloc;
@@ -229,9 +232,9 @@ arm_init(int ipinum)
 	vm_paddr_t vmm_base;
 	uint64_t ich_vtr_el2;
 	uint64_t cnthctl_el2;
-	size_t hyp_code_len;
 	register_t daif;
 	int cpu, i;
+	bool rv;
 
 	if (!virt_enabled()) {
 		printf("arm_init: Processor doesn't have support for virtualization.\n");
@@ -243,6 +246,12 @@ arm_init(int ipinum)
 		return (ENODEV);
 	}
 
+	/* Initialise the EL2 MMU */
+	if (!vmmpmap_init()) {
+		printf("arm_init: Failed to init the EL2 MMU\n");
+		return (ENOMEM);
+	}
+
 	/* Set up the stage 2 pmap callbacks */
 	MPASS(pmap_clean_stage2_tlbi == NULL);
 	pmap_clean_stage2_tlbi = vmm_pmap_clean_stage2_tlbi;
@@ -251,13 +260,13 @@ arm_init(int ipinum)
 	el2_mem_alloc = vmem_create("VMM EL2", 0, 0, PAGE_SIZE, 0, M_WAITOK);
 
 	/* Create the mappings for the hypervisor translation table. */
-	vmmpmap_init();
 	hyp_code_len = roundup2(&vmm_hyp_code_end - &vmm_hyp_code, PAGE_SIZE);
 
 	/* We need an physical identity mapping for when we activate the MMU */
-	vmm_base = vtophys(&vmm_hyp_code);
-	vmmpmap_enter(vmm_base, hyp_code_len, vtophys(&vmm_hyp_code),
+	hyp_code_base = vmm_base = vtophys(&vmm_hyp_code);
+	rv = vmmpmap_enter(vmm_base, hyp_code_len, vtophys(&vmm_hyp_code),
 	    VM_PROT_READ | VM_PROT_EXECUTE);
+	MPASS(rv);
 
 	next_hyp_va = roundup2(vtophys(&vmm_hyp_code) + hyp_code_len, L2_SIZE);
 
@@ -267,9 +276,10 @@ arm_init(int ipinum)
 		stack_hyp_va[cpu] = next_hyp_va;
 
 		for (i = 0; i < VMM_STACK_PAGES; i++) {
-			vmmpmap_enter(stack_hyp_va[cpu] + (i * PAGE_SIZE),
+			rv = vmmpmap_enter(stack_hyp_va[cpu] + (i * PAGE_SIZE),
 			    PAGE_SIZE, vtophys(stack[cpu] + (i * PAGE_SIZE)),
 			    VM_PROT_READ | VM_PROT_WRITE);
+			MPASS(rv);
 		}
 		next_hyp_va += L2_SIZE;
 	}
@@ -325,6 +335,15 @@ arm_cleanup(void)
 
 	smp_rendezvous(NULL, arm_teardown_vectors, NULL, NULL);
 
+#ifdef INVARIANTS
+	CPU_FOREACH(cpu) {
+		vmmpmap_remove(stack_hyp_va[cpu], VMM_STACK_PAGES * PAGE_SIZE,
+		    false);
+	}
+
+	vmmpmap_remove(hyp_code_base, hyp_code_len, false);
+#endif
+
 	vtimer_cleanup();
 
 	vmmpmap_fini();
@@ -343,7 +362,7 @@ arm_vminit(struct vm *vm, pmap_t pmap)
 	struct hypctx *hypctx;
 	vmem_addr_t vm_addr;
 	vm_size_t size;
-	bool last_vcpu;
+	bool last_vcpu, rv;
 	int err, i, maxcpus;
 
 	/* Ensure this is the only data on the page */
@@ -380,8 +399,9 @@ arm_vminit(struct vm *vm, pmap_t pmap)
 	MPASS((vm_addr & PAGE_MASK) == 0);
 	hyp->el2_addr = vm_addr;
 
-	vmmpmap_enter(hyp->el2_addr, size, vtophys(hyp),
+	rv = vmmpmap_enter(hyp->el2_addr, size, vtophys(hyp),
 	    VM_PROT_READ | VM_PROT_WRITE);
+	MPASS(rv);
 
 	return (hyp);
 }
@@ -759,7 +779,8 @@ arm_vmcleanup(void *arg)
 	smp_rendezvous(NULL, arm_pcpu_vmcleanup, NULL, hyp);
 
 	/* Unmap the VM hyp struct from the hyp mode translation table */
-	vmmpmap_remove(hyp->el2_addr, roundup2(sizeof(*hyp), PAGE_SIZE));
+	vmmpmap_remove(hyp->el2_addr, roundup2(sizeof(*hyp), PAGE_SIZE),
+	    true);
 
 	free(hyp, M_HYP);
 }

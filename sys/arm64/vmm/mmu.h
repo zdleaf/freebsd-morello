@@ -42,10 +42,10 @@ extern char vmm_hyp_code_end;
 extern char _vmm_start;
 extern char _vmm_end;
 
-void	vmmpmap_init(void);
+bool	vmmpmap_init(void);
 void	vmmpmap_fini(void);
 uint64_t vmmpmap_to_ttbr0(void);
-void	vmmpmap_enter(vm_offset_t, vm_size_t, vm_paddr_t, vm_prot_t);
-void	vmmpmap_remove(vm_offset_t, vm_size_t);
+bool	vmmpmap_enter(vm_offset_t, vm_size_t, vm_paddr_t, vm_prot_t);
+void	vmmpmap_remove(vm_offset_t, vm_size_t, bool);
 
 #endif
