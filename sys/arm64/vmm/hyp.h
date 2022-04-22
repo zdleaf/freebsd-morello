@@ -81,6 +81,10 @@
 #define	 HYP_REG_ICH_VTR	0x1
 #define	 HYP_REG_CNTHCTL	0x2
 #define	HYP_CLEAN_S2_TLBI	0x00000004
+#define	HYP_DC_CIVAC		0x00000005
+#define	HYP_EL2_TLBI		0x00000006
+#define	 HYP_EL2_TLBI_ALL	0x1
+#define	 HYP_EL2_TLBI_VA	0x2
 
 /*
  * When taking asynchronous exceptions, or interrupts, with the exception of the
