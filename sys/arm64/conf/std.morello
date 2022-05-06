@@ -7,8 +7,8 @@ nooptions	NFSCL
 
 device		pl011
 
-# device	acpi
-# options	IOMMU
+#device		acpi
+options		IOMMU
 
 # DRM Support
 options		COMPAT_DRMCOMPAT
@@ -38,6 +38,6 @@ options		ROOTDEVNAME=\"ufs:/dev/ada0\"
 # nodevice	hid
 
 # Flattened Device Tree
-options		FDT
-options		FDT_DTB_STATIC
+options 	FDT
+options 	FDT_DTB_STATIC
 makeoptions	FDT_DTS_FILE=arm/morello-soc.dts
