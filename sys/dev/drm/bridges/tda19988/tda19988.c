@@ -785,6 +785,9 @@ tda19988_connector_detect(struct drm_connector *connector, bool force)
 	sc = container_of(connector, struct tda19988_softc, connector);
 
 	error = tda19988_cec_read(sc, TDA_CEC_RXSHPDLEV, &data);
+	if (error)
+		return (connector_status_disconnected);
+
 	if (data & RXSHPDLEV_HPD)
 		return (connector_status_connected);
 

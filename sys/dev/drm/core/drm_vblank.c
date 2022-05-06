@@ -1859,7 +1859,7 @@ done:
 static void drm_handle_vblank_events(struct drm_device *dev, unsigned int pipe)
 {
 	struct drm_crtc *crtc = drm_crtc_from_index(dev, pipe);
-	bool high_prec = false;
+	bool high_prec __unused = false;
 	struct drm_pending_vblank_event *e, *t;
 	ktime_t now;
 	u64 seq;

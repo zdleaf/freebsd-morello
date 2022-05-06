@@ -246,7 +246,7 @@ static void insert_hole_size(struct rb_root_cached *root,
 {
 	struct rb_node **link = &root->rb_root.rb_node, *rb = NULL;
 	u64 x = node->hole_size;
-	bool first = true;
+	bool first __unused = true;
 
 	while (*link) {
 		rb = *link;
