@@ -58,9 +58,11 @@ struct vgic_v3_irq {
 	struct mtx irq_spinmtx;
 	uint64_t mpidr;
 	uint32_t irq;
-	uint8_t enabled;
-	uint8_t pending;
-	uint8_t active;
+	bool active;
+	bool pending;
+	bool enabled;
+	bool level;
+	bool on_aplist;
 	uint8_t priority;
 	uint8_t config;
 #define	VGIC_CONFIG_MASK	0x2

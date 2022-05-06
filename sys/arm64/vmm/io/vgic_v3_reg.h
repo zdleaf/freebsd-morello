@@ -31,6 +31,8 @@
 #define	ICH_LR_EL2_VINTID(x)		((x) & ICH_LR_EL2_VINTID_MASK)
 #define ICH_LR_EL2_PINTID_SHIFT		32
 #define ICH_LR_EL2_PINTID_MASK		(0x3fUL << ICH_LR_EL2_PINTID_SHIFT)
+/* Raise a maintanance IRQ when deactivated (only non-HW virqs) */
+#define	ICH_LR_EL2_EOI			(1UL << 41)
 #define ICH_LR_EL2_PRIO_SHIFT		48
 #define ICH_LR_EL2_PRIO_MASK		(0xffUL << ICH_LR_EL2_PRIO_SHIFT)
 #define	ICH_LR_EL2_GROUP_SHIFT		60

@@ -404,7 +404,7 @@ vgic_v3_cpuinit(void *arg, bool last_vcpu)
 		irq->mpidr = hypctx->vmpidr_el2 & GICD_AFF;
 		if (irqid < VGIC_SGI_NUM) {
 			/* SGIs */
-			irq->enabled = 1;
+			irq->enabled = true;
 			irq->config = VGIC_CONFIG_EDGE;
 		} else {
 			/* PPIs */
@@ -471,6 +471,38 @@ vgic_v3_vminit(void *arg)
 	mtx_init(&dist->dist_mtx, "VGICv3 Distributor lock", NULL, MTX_SPIN);
 }
 
+static bool
+vgic_v3_irq_pending(struct vgic_v3_irq *irq)
+{
+	if ((irq->config & VGIC_CONFIG_MASK) == VGIC_CONFIG_LEVEL) {
+		return (irq->pending || irq->level);
+	} else {
+		return (irq->pending);
+	}
+}
+
+static void
+vgic_v3_queue_irq(struct vgic_v3_cpu_if *cpu_if, struct vgic_v3_irq *irq)
+{
+	mtx_assert(&cpu_if->lr_mtx, MA_OWNED);
+	mtx_assert(&irq->irq_spinmtx, MA_OWNED);
+
+	/* No need to queue the IRQ */
+	if (!irq->level && !irq->pending)
+		return;
+
+	if (irq->on_aplist) {
+		/*
+		 * TODO: Signal to the VCPU there is an interrupt
+		 */
+		return;
+	}
+
+	irq->on_aplist = true;
+	TAILQ_INSERT_TAIL(&cpu_if->irq_act_pend, irq, act_pend_list);
+}
+
+
 static uint64_t
 gic_reg_value_64(uint64_t field, uint64_t val, u_int offset, u_int size)
 {
@@ -526,7 +558,7 @@ read_enabler(struct hyp *hyp, int vcpuid, int n)
 		if (irq == NULL)
 			continue;
 
-		if (irq->enabled != 0)
+		if (!irq->enabled)
 			ret |= 1u << i;
 		vgic_v3_release_irq(irq);
 	}
@@ -552,9 +584,7 @@ write_enabler(struct hyp *hyp, int vcpuid, int n, bool set, uint64_t val)
 		if (irq == NULL)
 			continue;
 
-		/* TODO: Clear from lr if set == false? */
-		/* TODO: Manage when irq is a level interrupt */
-		irq->enabled = set ? 1 : 0;
+		irq->enabled = set;
 		vgic_v3_release_irq(irq);
 	}
 }
@@ -574,7 +604,7 @@ read_pendr(struct hyp *hyp, int vcpuid, int n)
 		if (irq == NULL)
 			continue;
 
-		if (irq->pending)
+		if (vgic_v3_irq_pending(irq))
 			ret |= 1u << i;
 		vgic_v3_release_irq(irq);
 	}
@@ -609,17 +639,15 @@ write_pendr(struct hyp *hyp, int vcpuid, int n, bool set, uint64_t val)
 		mpidr = irq->mpidr;
 		cpu_if = &hyp->ctx[mpidr].vgic_cpu_if;
 
-		mtx_lock_spin(&cpu_if->lr_mtx);
-		if (irq->pending && !set) {
+		if (!set) {
 			/* pending -> not pending */
-			TAILQ_REMOVE(&cpu_if->irq_act_pend, irq, act_pend_list);
-		} else if (!irq->pending && set) {
-			/* not pending -> pending */
-			TAILQ_INSERT_TAIL(&cpu_if->irq_act_pend, irq,
-			    act_pend_list);
+			irq->pending = false;
+		} else {
+			irq->pending = true;
+			mtx_lock_spin(&cpu_if->lr_mtx);
+			vgic_v3_queue_irq(cpu_if, irq);
+			mtx_unlock_spin(&cpu_if->lr_mtx);
 		}
-		irq->pending = set ? 1 : 0;
-		mtx_unlock_spin(&cpu_if->lr_mtx);
 		vgic_v3_release_irq(irq);
 	}
 
@@ -674,17 +702,16 @@ write_activer(struct hyp *hyp, int vcpuid, u_int n, bool set, uint64_t val)
 		mpidr = irq->mpidr;
 		cpu_if = &hyp->ctx[mpidr].vgic_cpu_if;
 
-		mtx_lock_spin(&cpu_if->lr_mtx);
-		if (irq->active && !set) {
+		if (!set) {
 			/* active -> not active */
-			TAILQ_REMOVE(&cpu_if->irq_act_pend, irq, act_pend_list);
-		} else if (!irq->active && set) {
+			irq->active = false;
+		} else {
 			/* not active -> active */
-			TAILQ_INSERT_TAIL(&cpu_if->irq_act_pend, irq,
-			    act_pend_list);
+			irq->active = true;
+			mtx_lock_spin(&cpu_if->lr_mtx);
+			vgic_v3_queue_irq(cpu_if, irq);
+			mtx_unlock_spin(&cpu_if->lr_mtx);
 		}
-		irq->active = set ? 1 : 0;
-		mtx_unlock_spin(&cpu_if->lr_mtx);
 		vgic_v3_release_irq(irq);
 	}
 }
@@ -1672,6 +1699,26 @@ vgic_v3_vcpu_pending_irq(void *arg)
 	panic("vgic_v3_vcpu_pending_irq");
 }
 
+static bool
+vgic_v3_check_irq(struct vgic_v3_irq *irq, bool level)
+{
+	/*
+	 * Only inject if:
+	 *  - Level-triggered IRQ: level changes low -> high
+	 *  - Edge-triggered IRQ: level is high
+	 */
+	switch (irq->config & VGIC_CONFIG_MASK) {
+	case VGIC_CONFIG_LEVEL:
+		return (level != irq->level);
+	case VGIC_CONFIG_EDGE:
+		return (level);
+	default:
+		break;
+	}
+
+	return (false);
+}
+
 int
 vgic_v3_inject_irq(struct hyp *hyp, int vcpuid, uint32_t irqid, bool level)
 {
@@ -1689,12 +1736,6 @@ vgic_v3_inject_irq(struct hyp *hyp, int vcpuid, uint32_t irqid, bool level)
 	if (irq == NULL) {
 		eprintf("Malformed IRQ %u.\n", irqid);
 		return (1);
-	}
-
-	/* Ignore already pending IRQs */
-	if (irq->pending || irq->active) {
-		vgic_v3_release_irq(irq);
-		return (0);
 	}
 
 	irouter = irq->mpidr;
@@ -1716,19 +1757,18 @@ vgic_v3_inject_irq(struct hyp *hyp, int vcpuid, uint32_t irqid, bool level)
 
 	mtx_lock_spin(&cpu_if->lr_mtx);
 
-	/*
-	 * TODO: Only inject if:
-	 *  - Level-triggered IRQ: level changes low -> high
-	 *  -  Edge-triggered IRQ: level is high
-	 */
-
-	if (level) {
-		MPASS(!irq->active);
-		/* TODO: Insert in the correct place */
-		TAILQ_INSERT_TAIL(&cpu_if->irq_act_pend, irq, act_pend_list);
-		irq->pending = 1;
+	if (!vgic_v3_check_irq(irq, level)) {
+		goto out;
 	}
 
+	if ((irq->config & VGIC_CONFIG_MASK) == VGIC_CONFIG_LEVEL)
+		irq->level = level;
+	else /* VGIC_CONFIG_EDGE */
+		irq->pending = true;
+
+	vgic_v3_queue_irq(cpu_if, irq);
+
+out:
 	mtx_unlock_spin(&cpu_if->lr_mtx);
 	vgic_v3_release_irq(irq);
 
@@ -1795,10 +1835,30 @@ vgic_v3_flush_hwstate(void *arg)
 		cpu_if->ich_lr_el2[i] = ICH_LR_EL2_GROUP1 |
 		    ((uint64_t)irq->priority << ICH_LR_EL2_PRIO_SHIFT) |
 		    irq->irq;
-		if (irq->pending)
-			cpu_if->ich_lr_el2[i] |= ICH_LR_EL2_STATE_PENDING;
-		if (irq->active)
+
+		if (irq->active) {
 			cpu_if->ich_lr_el2[i] |= ICH_LR_EL2_STATE_ACTIVE;
+		}
+
+#ifdef notyet
+		/* TODO: Check why this is needed */
+		if ((irq->config & _MASK) == LEVEL)
+			cpu_if->ich_lr_el2[i] |= ICH_LR_EL2_EOI;
+#endif
+
+		if (!irq->active && vgic_v3_irq_pending(irq)) {
+			cpu_if->ich_lr_el2[i] |= ICH_LR_EL2_STATE_PENDING;
+
+			/*
+			 * This IRQ is now pending on the guest. Allow for
+			 * another edge that could cause the interrupt to
+			 * be raised again.
+			 */
+			if ((irq->config & VGIC_CONFIG_MASK) ==
+			    VGIC_CONFIG_EDGE) {
+				irq->pending = false;
+			}
+		}
 
 		i++;
 	}
@@ -1839,20 +1899,38 @@ vgic_v3_sync_hwstate(void *arg)
 			continue;
 
 		irq->active = (lr & ICH_LR_EL2_STATE_ACTIVE) != 0;
-		irq->pending = !irq->active &&
-		    (lr & ICH_LR_EL2_STATE_PENDING) != 0;
+
+		if ((irq->config & VGIC_CONFIG_MASK) == VGIC_CONFIG_EDGE) {
+			/*
+			 * If we have an edge triggered IRQ preserve the
+			 * pending bit until the IRQ has been handled.
+			 */
+			if ((lr & ICH_LR_EL2_STATE_PENDING) != 0) {
+				irq->pending = true;
+			}
+		} else {
+			/*
+			 * If we have a level triggerend IRQ remove the
+			 * pending bit if the IRQ has been handled.
+			 * The level is separate, so may still be high
+			 * triggering another IRQ.
+			 */
+			if ((lr & ICH_LR_EL2_STATE_PENDING) == 0) {
+				irq->pending = false;
+			}
+		}
 
 		/* Lock to update irq_act_pend */
 		mtx_lock_spin(&cpu_if->lr_mtx);
 		if (irq->active) {
-			MPASS(!irq->pending);
 			/* Ensure the active IRQ is at the head of the list */
 			TAILQ_REMOVE(&cpu_if->irq_act_pend, irq, act_pend_list);
 			TAILQ_INSERT_HEAD(&cpu_if->irq_act_pend, irq,
 			    act_pend_list);
-		} else if (!irq->pending) {
+		} else if (!vgic_v3_irq_pending(irq)) {
 			/* If pending or active remove from the list */
 			TAILQ_REMOVE(&cpu_if->irq_act_pend, irq, act_pend_list);
+			irq->on_aplist = false;
 		}
 		mtx_unlock_spin(&cpu_if->lr_mtx);
 		vgic_v3_release_irq(irq);
