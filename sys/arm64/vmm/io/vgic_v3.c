@@ -1727,7 +1727,6 @@ vgic_v3_inject_irq(struct hyp *hyp, int vcpuid, uint32_t irqid, bool level)
 	struct vgic_v3_irq *irq;
 	uint64_t irouter;
 
-
 	KASSERT(vcpuid == -1 || irqid < VGIC_PRV_I_NUM,
 	    ("%s: SPI/LPI with vcpuid set: irq %u vcpuid %u", __func__, irqid,
 	    vcpuid));
