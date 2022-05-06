@@ -775,6 +775,17 @@ static void
 arm_vmcleanup(void *arg)
 {
 	struct hyp *hyp = arg;
+	struct hypctx *hypctx;
+	int i;
+
+	for (i = 0; i < VM_MAXCPU; i++) {
+		hypctx = &hyp->ctx[i];
+		vtimer_cpucleanup(hypctx);
+		vgic_v3_cpucleanup(hypctx);
+	}
+
+	vtimer_vmcleanup(hyp);
+	vgic_v3_vmcleanup(hyp);
 
 	smp_rendezvous(NULL, arm_pcpu_vmcleanup, NULL, hyp);
 

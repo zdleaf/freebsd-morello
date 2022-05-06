@@ -128,12 +128,10 @@ vtimer_init(uint64_t cnthctl_el2)
 }
 
 void
-vtimer_vminit(void *arg)
+vtimer_vminit(struct hyp *hyp)
 {
-	struct hyp *hyp;
 	uint64_t now;
 
-	hyp = (struct hyp *)arg;
 	/*
 	 * Configure the Counter-timer Hypervisor Control Register for the VM.
 	 *
@@ -150,12 +148,10 @@ vtimer_vminit(void *arg)
 }
 
 void
-vtimer_cpuinit(void *arg)
+vtimer_cpuinit(struct hypctx *hypctx)
 {
-	struct hypctx *hypctx;
 	struct vtimer_cpu *vtimer_cpu;
 
-	hypctx = (struct hypctx *)arg;
 	vtimer_cpu = &hypctx->vtimer_cpu;
 	/*
 	 * Configure physical timer interrupts for the VCPU.
@@ -170,16 +166,20 @@ vtimer_cpuinit(void *arg)
 }
 
 void
-vtimer_vmcleanup(struct vm *vm)
+vtimer_cpucleanup(struct hypctx *hypctx)
 {
-	struct hyp *hyp = vm_get_cookie(vm);
-	struct hypctx *hypctx;
-	struct vtimer *vtimer;
 	struct vtimer_cpu *vtimer_cpu;
-	uint32_t cntv_ctl;
-	int i;
 
-	vtimer = &hyp->vtimer;
+	vtimer_cpu = &hypctx->vtimer_cpu;
+	callout_drain(&vtimer_cpu->callout);
+	mtx_destroy(&vtimer_cpu->mtx);
+}
+
+void
+vtimer_vmcleanup(struct hyp *hyp)
+{
+	struct hypctx *hypctx;
+	uint32_t cntv_ctl;
 
 	hypctx = arm64_get_active_vcpu();
 	if (!hypctx) {
@@ -187,11 +187,6 @@ vtimer_vmcleanup(struct vm *vm)
 		cntv_ctl = READ_SPECIALREG(cntv_ctl_el0);
 		cntv_ctl &= ~CNTP_CTL_ENABLE;
 		WRITE_SPECIALREG(cntv_ctl_el0, cntv_ctl);
-	}
-
-	for (i = 0; i < VM_MAXCPU; i++) {
-		vtimer_cpu = &hyp->ctx[i].vtimer_cpu;
-		callout_drain(&vtimer_cpu->callout);
 	}
 }
 

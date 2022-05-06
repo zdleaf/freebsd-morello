@@ -354,9 +354,27 @@ static struct vgic_v3_irq *vgic_v3_get_irq(struct hyp *, int, uint32_t);
 static void vgic_v3_release_irq(struct vgic_v3_irq *);
 
 void
-vgic_v3_cpuinit(void *arg, bool last_vcpu)
+vgic_v3_vminit(struct hyp *hyp)
 {
-	struct hypctx *hypctx = arg;
+	struct vgic_v3_dist *dist = &hyp->vgic_dist;
+
+	/*
+	 * Configure the Distributor control register. The register resets to an
+	 * architecturally UNKNOWN value, so we reset to 0 to disable all
+	 * functionality controlled by the register.
+	 *
+	 * The exception is GICD_CTLR.DS, which is RA0/WI when the Distributor
+	 * supports one security state (ARM GIC Architecture Specification for
+	 * GICv3 and GICv4, p. 4-464)
+	 */
+	dist->gicd_ctlr = 0;
+
+	mtx_init(&dist->dist_mtx, "VGICv3 Distributor lock", NULL, MTX_SPIN);
+}
+
+void
+vgic_v3_cpuinit(struct hypctx *hypctx, bool last_vcpu)
+{
 	struct vgic_v3_cpu_if *cpu_if = &hypctx->vgic_cpu_if;
 	struct vgic_v3_redist *redist = &hypctx->vgic_redist;
 	struct vgic_v3_irq *irq;
@@ -452,23 +470,27 @@ vgic_v3_cpuinit(void *arg, bool last_vcpu)
 }
 
 void
-vgic_v3_vminit(void *arg)
+vgic_v3_cpucleanup(struct hypctx *hypctx)
 {
-	struct hyp *hyp = arg;
+	struct vgic_v3_cpu_if *cpu_if;
+	struct vgic_v3_irq *irq;
+	int irqid;
+
+	cpu_if = &hypctx->vgic_cpu_if;
+	for (irqid = 0; irqid < VGIC_PRV_I_NUM; irqid++) {
+		irq = &cpu_if->private_irqs[irqid];
+		mtx_destroy(&irq->irq_spinmtx);
+	}
+
+	mtx_destroy(&cpu_if->lr_mtx);
+}
+
+void
+vgic_v3_vmcleanup(struct hyp *hyp)
+{
 	struct vgic_v3_dist *dist = &hyp->vgic_dist;
 
-	/*
-	 * Configure the Distributor control register. The register resets to an
-	 * architecturally UNKNOWN value, so we reset to 0 to disable all
-	 * functionality controlled by the register.
-	 *
-	 * The exception is GICD_CTLR.DS, which is RA0/WI when the Distributor
-	 * supports one security state (ARM GIC Architecture Specification for
-	 * GICv3 and GICv4, p. 4-464)
-	 */
-	dist->gicd_ctlr = 0;
-
-	mtx_init(&dist->dist_mtx, "VGICv3 Distributor lock", NULL, MTX_SPIN);
+	mtx_destroy(&dist->dist_mtx);
 }
 
 static bool
@@ -1605,6 +1627,7 @@ static void
 vgic_v3_mmio_destroy(struct hyp *hyp)
 {
 	struct vgic_v3_dist *dist = &hyp->vgic_dist;
+	struct vgic_v3_irq *irq;
 	int i;
 
 	for (i = 0; i < VGIC_NIRQS - VGIC_PRV_I_NUM; i++) {

@@ -153,8 +153,10 @@ void	vgic_v3_detach_from_vm(struct vm *vm);
 
 bool	vgic_attach(void);
 void	vgic_v3_init(uint64_t ich_vtr_el2);
-void	vgic_v3_vminit(void *arg);
-void	vgic_v3_cpuinit(void *arg, bool last_vcpu);
+void	vgic_v3_vminit(struct hyp *);
+void	vgic_v3_cpuinit(struct hypctx *, bool last_vcpu);
+void	vgic_v3_cpucleanup(struct hypctx *);
+void	vgic_v3_vmcleanup(struct hyp *);
 void 	vgic_v3_flush_hwstate(void *arg);
 void 	vgic_v3_sync_hwstate(void *arg);
 
