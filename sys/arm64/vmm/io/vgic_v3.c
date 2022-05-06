@@ -1567,7 +1567,6 @@ vgic_v3_mmio_init(struct hyp *hyp)
 	for (i = 0; i < VGIC_NIRQS - VGIC_PRV_I_NUM; i++) {
 		irq = &dist->irqs[i];
 
-		/* TODO: We need a call to mtx_destroy */
 		mtx_init(&irq->irq_spinmtx, "VGIC IRQ spinlock", NULL,
 		    MTX_SPIN);
 
@@ -1579,6 +1578,13 @@ static void
 vgic_v3_mmio_destroy(struct hyp *hyp)
 {
 	struct vgic_v3_dist *dist = &hyp->vgic_dist;
+	int i;
+
+	for (i = 0; i < VGIC_NIRQS - VGIC_PRV_I_NUM; i++) {
+		irq = &dist->irqs[i];
+
+		mtx_destroy(&irq->irq_spinmtx);
+	}
 
 	free(dist->irqs, M_VGIC_V3);
 }
@@ -1619,15 +1625,8 @@ void
 vgic_v3_detach_from_vm(struct vm *vm)
 {
 	struct hyp *hyp = vm_get_cookie(vm);
-	struct hypctx *hypctx;
-	struct vgic_v3_cpu_if *cpu_if;
-	int i;
 
-	for (i = 0; i < VM_MAXCPU; i++) {
-		hypctx = & hyp->ctx[i];
-		cpu_if = &hypctx->vgic_cpu_if;
-	}
-
+	hyp->vgic_attached = false;
 	vgic_v3_mmio_destroy(hyp);
 }
 
