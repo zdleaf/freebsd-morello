@@ -1248,9 +1248,7 @@ static void
 redist_ctlr_read(struct hyp *hyp, int vcpuid, u_int reg, uint64_t *rval,
     void *arg)
 {
-	struct vgic_v3_redist *redist;
-
-	redist = &hyp->ctx[vcpuid].vgic_redist;
+	/* LPIs not supported */
 	*rval = 0;
 }
 
