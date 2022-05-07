@@ -338,7 +338,7 @@ generic_pcie_translate_resource_common(device_t dev, int type, rman_res_t start,
 	struct generic_pcie_core_softc *sc;
 	uint64_t phys_base;
 	uint64_t pci_base;
-	//uint64_t size;
+	uint64_t size;
 	int i, space;
 	bool found;
 
@@ -351,10 +351,10 @@ generic_pcie_translate_resource_common(device_t dev, int type, rman_res_t start,
 		for (i = 0; i < MAX_RANGES_TUPLES; i++) {
 			pci_base = sc->ranges[i].pci_base;
 			phys_base = sc->ranges[i].phys_base;
-			//size = sc->ranges[i].size;
+			size = sc->ranges[i].size;
 
-			//if (start < pci_base || start >= pci_base + size)
-			//	continue;
+			if (start < pci_base || start >= pci_base + size)
+				continue;
 
 			switch (FLAG_TYPE(sc->ranges[i].flags)) {
 			case FLAG_TYPE_MEM:

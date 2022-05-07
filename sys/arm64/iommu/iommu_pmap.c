@@ -870,7 +870,7 @@ iommu_pmap_remove_pages(pmap_t pmap)
 					l3e = l3[l];
 					if ((l3e & ATTR_DESCR_VALID) == 0)
 						continue;
-					printf("%s: l3e found for va %jx\n",
+					panic("%s: l3e found for va %jx\n",
 					    __func__, sva);
 				}
 
@@ -892,10 +892,8 @@ iommu_pmap_remove_pages(pmap_t pmap)
 		pmap_clear(&pmap->pm_l0[i]);
 	}
 
-#if 0
 	KASSERT(pmap->pm_stats.resident_count == 0,
 	    ("Invalid resident count %jd", pmap->pm_stats.resident_count));
-#endif
 
 	PMAP_UNLOCK(pmap);
 }
