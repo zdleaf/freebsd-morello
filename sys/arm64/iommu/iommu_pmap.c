@@ -46,7 +46,6 @@ __FBSDID("$FreeBSD$");
 #include <sys/lock.h>
 #include <sys/mutex.h>
 #include <sys/rwlock.h>
-#include <sys/systm.h>
 
 #include <vm/vm.h>
 #include <vm/vm_param.h>
