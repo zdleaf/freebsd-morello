@@ -1,6 +1,10 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause
+ *
  * Copyright (c) 2022 Ruslan Bukin <br@bsdpad.com>
- * All rights reserved.
+ *
+ * This work was supported by Innovate UK project 105694, "Digital Security
+ * by Design (DSbD) Technology Platform Prototype".
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
