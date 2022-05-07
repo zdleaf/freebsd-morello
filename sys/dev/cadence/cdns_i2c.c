@@ -476,11 +476,13 @@ static driver_t cdns_i2c_driver = {
 	sizeof(struct cdns_i2c_softc),
 };
 
+#if 0
 static devclass_t cdns_i2c_devclass;
+#endif
 
-EARLY_DRIVER_MODULE(cdns_i2c, simplebus, cdns_i2c_driver, cdns_i2c_devclass,
+EARLY_DRIVER_MODULE(cdns_i2c, simplebus, cdns_i2c_driver,
     0, 0, BUS_PASS_INTERRUPT + BUS_PASS_ORDER_LATE);
 EARLY_DRIVER_MODULE(ofw_iicbus, cdns_i2c, ofw_iicbus_driver,
-    ofw_iicbus_devclass, 0, 0, BUS_PASS_INTERRUPT + BUS_PASS_ORDER_LATE);
+    0, 0, BUS_PASS_INTERRUPT + BUS_PASS_ORDER_LATE);
 MODULE_DEPEND(cdns_i2c, iicbus, 1, 1, 1);
 MODULE_VERSION(cdns_i2c, 1);

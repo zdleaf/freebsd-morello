@@ -481,6 +481,5 @@ EARLY_DRIVER_MODULE(komeda_drm, simplebus, komeda_driver, komeda_drm_devclass,
     0, 0, BUS_PASS_INTERRUPT + BUS_PASS_ORDER_LAST);
 
 /* Bindings for fbd device. */
-extern devclass_t fbd_devclass;
 extern driver_t fbd_driver;
-DRIVER_MODULE(fbd, komeda_drm, fbd_driver, fbd_devclass, 0, 0);
+DRIVER_MODULE(fbd, komeda_drm, fbd_driver, 0, 0);
