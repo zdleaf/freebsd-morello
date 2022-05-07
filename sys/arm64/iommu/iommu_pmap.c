@@ -561,9 +561,7 @@ _pmap_alloc_l3(pmap_t pmap, vm_pindex_t ptepindex)
 void
 iommu_pmap_release(pmap_t pmap)
 {
-#ifdef INVARIANTS
-	boolean_t rv;
-#endif
+	boolean_t rv __unused;
 	struct spglist free;
 	vm_page_t m;
 
@@ -607,9 +605,7 @@ pmap_gpu_enter(pmap_t pmap, vm_offset_t va, vm_paddr_t pa,
 {
 	pd_entry_t *pde;
 	pt_entry_t new_l3;
-#ifdef INVARIANTS
-	pt_entry_t orig_l3;
-#endif
+	pt_entry_t orig_l3 __unused;
 	pt_entry_t *l3;
 	vm_page_t mpte;
 	pd_entry_t *l1p;
@@ -727,9 +723,7 @@ pmap_smmu_enter(pmap_t pmap, vm_offset_t va, vm_paddr_t pa,
 {
 	pd_entry_t *pde;
 	pt_entry_t new_l3;
-#ifdef INVARIANTS
-	pt_entry_t orig_l3;
-#endif
+	pt_entry_t orig_l3 __unused;
 	pt_entry_t *l3;
 	vm_page_t mpte;
 	int lvl;
