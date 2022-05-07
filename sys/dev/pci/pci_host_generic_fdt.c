@@ -376,7 +376,7 @@ generic_pcie_fdt_release_msix(device_t pci, device_t child, int irq)
 static int
 generic_pcie_get_iommu(device_t pci, device_t child, uintptr_t *id)
 {
-	struct pci_id_iommu *iommu;
+	struct pci_id_ofw_iommu *iommu;
 	uint32_t iommu_rid;
 	uint32_t iommu_xref;
 	uint16_t pci_rid;
@@ -386,7 +386,7 @@ generic_pcie_get_iommu(device_t pci, device_t child, uintptr_t *id)
 	node = ofw_bus_get_node(pci);
 	pci_rid = pci_get_rid(child);
 
-	iommu = (struct pci_id_iommu *)id;
+	iommu = (struct pci_id_ofw_iommu *)id;
 
 	err = ofw_bus_iommu_map(node, pci_rid, &iommu_xref, &iommu_rid);
 	if (err == 0) {
@@ -406,7 +406,7 @@ generic_pcie_get_id(device_t pci, device_t child, enum pci_id_type type,
 	uint32_t rid;
 	uint16_t pci_rid;
 
-	if (type == PCI_ID_IOMMU)
+	if (type == PCI_ID_OFW_IOMMU)
 		return (generic_pcie_get_iommu(pci, child, id));
 
 	if (type != PCI_ID_MSI)

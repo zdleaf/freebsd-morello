@@ -127,7 +127,7 @@ struct pcicfg_msix {
     struct resource *msix_pba_res;	/* Resource containing PBA. */
 };
 
-struct pci_id_iommu {
+struct pci_id_ofw_iommu {
 	uint32_t id;
 	uint32_t xref;
 };

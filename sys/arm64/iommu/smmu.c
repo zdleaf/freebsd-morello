@@ -1778,7 +1778,7 @@ smmu_ctx_alloc(device_t dev, struct iommu_domain *iodom, device_t child,
 	u_int xref;
 	int seg;
 #else
-	struct pci_id_iommu pi;
+	struct pci_id_ofw_iommu pi;
 #endif
 	u_int sid;
 	int err;
@@ -1791,7 +1791,7 @@ smmu_ctx_alloc(device_t dev, struct iommu_domain *iodom, device_t child,
 	rid = pci_get_rid(child);
 	err = acpi_iort_map_pci_smmuv3(seg, rid, &xref, &sid);
 #else
-	err = pci_get_id(child, PCI_ID_IOMMU, (uintptr_t *)&pi);
+	err = pci_get_id(child, PCI_ID_OFW_IOMMU, (uintptr_t *)&pi);
 	sid = pi.id;
 #endif
 	if (err != 0)
@@ -1916,7 +1916,7 @@ smmu_find(device_t dev, device_t child)
 #else
 	phandle_t node;
 	uint64_t base, size;
-	struct pci_id_iommu pi;
+	struct pci_id_ofw_iommu pi;
 #endif
 
 	sc = device_get_softc(dev);
@@ -1936,7 +1936,7 @@ smmu_find(device_t dev, device_t child)
 		return (ENOENT);
 	}
 #else
-	error = pci_get_id(child, PCI_ID_IOMMU, (uintptr_t *)&pi);
+	error = pci_get_id(child, PCI_ID_OFW_IOMMU, (uintptr_t *)&pi);
 	if (error) {
 		/* Could not find reference to an SMMU device. */
 		return (ENOENT);
