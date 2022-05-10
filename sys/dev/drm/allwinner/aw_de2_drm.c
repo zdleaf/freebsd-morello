@@ -361,4 +361,4 @@ MODULE_DEPEND(aw_de2_drm, aw_de2_mixer, 1, 1, 1);
 /* Bindings for fbd device. */
 extern devclass_t fbd_devclass;
 extern driver_t fbd_driver;
-DRIVER_MODULE(fbd, aw_de2_drm, fbd_driver, fbd_devclass, 0, 0);
+DRIVER_MODULE(fbd, aw_de2_drm, fbd_driver, 0, 0);
