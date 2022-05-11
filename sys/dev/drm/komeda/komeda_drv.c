@@ -70,6 +70,9 @@ __FBSDID("$FreeBSD$");
 
 #include <dev/drm/drmkpi/include/linux/dma-buf.h>
 
+#include <dev/iommu/iommu.h>
+#include <arm64/iommu/iommu.h>
+
 #include "fb_if.h"
 
 static struct ofw_compat_data compat_data[] = {
@@ -437,6 +440,10 @@ komeda_drm_attach(device_t dev)
 	    sc->max_line_size, sc->max_num_lines, sc->num_rich_layers);
 	device_printf(dev, "dual link supp %d, tbu %d\n",
 	    sc->dual_link_supp, sc->tbu_en);
+
+	struct iommu_ctx *ioctx;
+	ioctx = iommu_get_ctx_ofw(dev, 0);
+	printf("ioctx is %p\n", ioctx);
 
 	config_intrhook_oneshot(&komeda_drm_irq_hook, sc);
 

@@ -57,6 +57,12 @@ __FBSDID("$FreeBSD$");
 #include <dev/iommu/busdma_iommu.h>
 #include <machine/vmparam.h>
 
+#ifdef FDT
+#include <dev/fdt/fdt_common.h>
+#include <dev/ofw/ofw_bus.h>
+#include <dev/ofw/ofw_bus_subr.h>
+#endif
+
 #include "iommu.h"
 #include "iommu_if.h"
 
@@ -184,6 +190,7 @@ iommu_ctx_alloc(device_t dev, struct iommu_domain *iodom, bool disabled)
 {
 	struct iommu_unit *iommu;
 	struct iommu_ctx *ioctx;
+	int error;
 
 	iommu = iodom->iommu;
 
@@ -191,12 +198,117 @@ iommu_ctx_alloc(device_t dev, struct iommu_domain *iodom, bool disabled)
 	if (ioctx == NULL)
 		return (NULL);
 
+	error = IOMMU_CTX_INIT(iommu->dev, ioctx);
+	if (error) {
+		IOMMU_CTX_FREE(iommu->dev, ioctx);
+		return (NULL);
+	}
+
+	return (ioctx);
+}
+
+static struct iommu_unit *
+iommu_lookup(device_t dev)
+{
+	struct iommu_entry *entry;
+	struct iommu_unit *iommu;
+
+	IOMMU_LIST_LOCK();
+	LIST_FOREACH(entry, &iommu_list, next) {
+		iommu = entry->iommu;
+		if (iommu->dev == dev) {
+			IOMMU_LIST_UNLOCK();
+			return (iommu);
+		}
+	}
+	IOMMU_LIST_UNLOCK();
+
+	return (NULL);
+}
+
+struct iommu_ctx *
+iommu_get_ctx_ofw(device_t dev, int channel)
+{
+	struct iommu_domain *iodom;
+	struct iommu_unit *iommu;
+	struct iommu_ctx *ioctx;
+	phandle_t node, parent;
+	device_t iommu_dev;
+	pcell_t *cells;
+	int niommus;
+	int ncells;
+	int error;
+
+	node = ofw_bus_get_node(dev);
+	if (node <= 0) {
+		device_printf(dev,
+		    "%s called on not ofw based device.\n", __func__);
+		return (NULL);
+	}
+
+	error = ofw_bus_parse_xref_list_get_length(node,
+	    "iommus", "#iommu-cells", &niommus);
+	if (error) {
+		device_printf(dev, "%s can't get iommu list.\n", __func__);
+		return (NULL);
+	}
+
+	if (niommus == 0) {
+		device_printf(dev, "%s iommu list is empty.\n", __func__);
+		return (NULL);
+	}
+
+	error = ofw_bus_parse_xref_list_alloc(node, "iommus", "#iommu-cells",
+	    channel, &parent, &ncells, &cells);
+	if (error != 0) {
+		device_printf(dev, "%s can't get iommu device xref.\n",
+		    __func__);
+		return (NULL);
+	}
+
+	iommu_dev = OF_device_from_xref(parent);
+	if (iommu_dev == NULL) {
+		device_printf(dev, "%s can't get iommu device.\n", __func__);
+		return (NULL);
+	}
+
+	iommu = iommu_lookup(iommu_dev);
+	if (iommu == NULL) {
+		device_printf(dev, "%s can't lookup iommu.\n", __func__);
+		return (NULL);
+	}
+
 	/*
-	 * iommu can also be used for non-PCI based devices.
-	 * This should be reimplemented as new newbus method with
-	 * pci_get_rid() as a default for PCI device class.
+	 * In our current configuration we have a domain per each ctx,
+	 * so allocate a domain first.
 	 */
-	ioctx->rid = pci_get_rid(dev);
+	iodom = iommu_domain_alloc(iommu);
+	if (iodom == NULL) {
+		device_printf(dev, "%s can't allocate domain.\n", __func__);
+		return (NULL);
+	}
+
+	ioctx = IOMMU_CTX_ALLOC(iommu->dev, iodom, dev, false);
+	if (ioctx == NULL) {
+		device_printf(dev, "%s can't allocate ctx.\n", __func__);
+		iommu_domain_free(iodom);
+		return (NULL);
+	}
+
+	ioctx->domain = iodom;
+
+	error = IOMMU_OFW_MD_DATA(iommu->dev, ioctx, cells, ncells);
+	if (error) {
+		device_printf(dev, "%s can't set MD data\n", __func__);
+		return (NULL);
+	}
+
+	error = IOMMU_CTX_INIT(iommu->dev, ioctx);
+	if (error) {
+		device_printf(dev, "%s can't initialize ctx\n", __func__);
+		IOMMU_CTX_FREE(iommu->dev, ioctx);
+		return (NULL);
+	}
 
 	return (ioctx);
 }
