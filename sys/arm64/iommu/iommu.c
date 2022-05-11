@@ -186,25 +186,46 @@ iommu_tag_init(struct bus_dma_tag_iommu *t)
 }
 
 static struct iommu_ctx *
-iommu_ctx_alloc(device_t dev, struct iommu_domain *iodom, bool disabled)
+iommu_ctx_alloc(device_t requester, struct iommu_domain *iodom, bool disabled)
 {
 	struct iommu_unit *iommu;
 	struct iommu_ctx *ioctx;
-	int error;
 
 	iommu = iodom->iommu;
 
-	ioctx = IOMMU_CTX_ALLOC(iommu->dev, iodom, dev, disabled);
+	ioctx = IOMMU_CTX_ALLOC(iommu->dev, iodom, requester, disabled);
 	if (ioctx == NULL)
 		return (NULL);
 
-	error = IOMMU_CTX_INIT(iommu->dev, ioctx);
-	if (error) {
-		IOMMU_CTX_FREE(iommu->dev, ioctx);
-		return (NULL);
-	}
+	ioctx->domain = iodom;
 
 	return (ioctx);
+}
+
+static int
+iommu_ctx_init(device_t requester, struct iommu_ctx *ioctx)
+{
+	struct bus_dma_tag_iommu *tag;
+	struct iommu_domain *iodom;
+	struct iommu_unit *iommu;
+	int error;
+
+	iodom = ioctx->domain;
+	iommu = iodom->iommu;
+
+	error = IOMMU_CTX_INIT(iommu->dev, ioctx);
+	if (error)
+		return (error);
+
+	tag = ioctx->tag = malloc(sizeof(struct bus_dma_tag_iommu),
+	    M_IOMMU, M_WAITOK | M_ZERO);
+	tag->owner = requester;
+	tag->ctx = ioctx;
+	tag->ctx->domain = iodom;
+
+	iommu_tag_init(tag);
+
+	return (error);
 }
 
 static struct iommu_unit *
@@ -288,9 +309,8 @@ iommu_get_ctx_ofw(device_t dev, int channel)
 		return (NULL);
 	}
 
-	ioctx = IOMMU_CTX_ALLOC(iommu->dev, iodom, dev, false);
+	ioctx = iommu_ctx_alloc(dev, iodom, false);
 	if (ioctx == NULL) {
-		device_printf(dev, "%s can't allocate ctx.\n", __func__);
 		iommu_domain_free(iodom);
 		return (NULL);
 	}
@@ -303,10 +323,10 @@ iommu_get_ctx_ofw(device_t dev, int channel)
 		return (NULL);
 	}
 
-	error = IOMMU_CTX_INIT(iommu->dev, ioctx);
+	error = iommu_ctx_init(dev, ioctx);
 	if (error) {
-		device_printf(dev, "%s can't initialize ctx\n", __func__);
 		IOMMU_CTX_FREE(iommu->dev, ioctx);
+		iommu_domain_free(iodom);
 		return (NULL);
 	}
 
@@ -317,9 +337,9 @@ struct iommu_ctx *
 iommu_get_ctx(struct iommu_unit *iommu, device_t requester,
     uint16_t rid, bool disabled, bool rmrr)
 {
-	struct iommu_ctx *ioctx;
 	struct iommu_domain *iodom;
-	struct bus_dma_tag_iommu *tag;
+	struct iommu_ctx *ioctx;
+	int error;
 
 	IOMMU_LOCK(iommu);
 	ioctx = IOMMU_CTX_LOOKUP(iommu->dev, requester);
@@ -343,15 +363,12 @@ iommu_get_ctx(struct iommu_unit *iommu, device_t requester,
 		return (NULL);
 	}
 
-	tag = ioctx->tag = malloc(sizeof(struct bus_dma_tag_iommu),
-	    M_IOMMU, M_WAITOK | M_ZERO);
-	tag->owner = requester;
-	tag->ctx = ioctx;
-	tag->ctx->domain = iodom;
-
-	iommu_tag_init(tag);
-
-	ioctx->domain = iodom;
+	error = iommu_ctx_init(requester, ioctx);
+	if (error) {
+		IOMMU_CTX_FREE(iommu->dev, ioctx);
+		iommu_domain_free(iodom);
+		return (NULL);
+	}
 
 	return (ioctx);
 }
