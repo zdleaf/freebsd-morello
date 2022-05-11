@@ -76,6 +76,9 @@ __FBSDID("$FreeBSD$");
 #include <dev/drm/komeda/komeda_drv.h>
 #include <dev/drm/komeda/komeda_regs.h>
 
+#include <dev/iommu/iommu.h>
+#include <arm64/iommu/iommu.h>
+
 #define	dprintf(fmt, ...)
 
 static const u32 komeda_plane_formats[] = {
@@ -495,6 +498,7 @@ komeda_plane_create(struct komeda_pipeline *pipeline, struct drm_device *drm)
 {
 	struct komeda_drm_softc *sc;
 	enum drm_plane_type type;
+	struct komeda_plane *plane;
 	int error;
 	int i;
 
@@ -503,17 +507,20 @@ komeda_plane_create(struct komeda_pipeline *pipeline, struct drm_device *drm)
 	dprintf("%s\n", __func__);
 
 	for (i = 0; i < 2; i++) {
+		plane = &pipeline->planes[i];
+		plane->sc = sc;
+		plane->id = i;
+		plane->ioctx = iommu_get_ctx_ofw(sc->dev, plane->id);
+
+		printf("%s: ioctx is %p\n", __func__, plane->ioctx);
+
 		if (i == 0)
 			type = DRM_PLANE_TYPE_PRIMARY;
 		else
 			type = DRM_PLANE_TYPE_CURSOR;
 
-		pipeline->planes[i].sc = sc;
-		pipeline->planes[i].id = i;
-
 		error = drm_universal_plane_init(drm,
-		    &pipeline->planes[i].plane,
-		    0,
+		    &plane->plane, 0,
 		    &komeda_plane_funcs,
 		    komeda_plane_formats,
 		    nitems(komeda_plane_formats),
@@ -522,8 +529,7 @@ komeda_plane_create(struct komeda_pipeline *pipeline, struct drm_device *drm)
 			device_printf(sc->dev, "Could not init plane.");
 			return (error);
 		}
-		drm_plane_helper_add(&pipeline->planes[i].plane,
-		    &komeda_plane_helper_funcs);
+		drm_plane_helper_add(&plane->plane, &komeda_plane_helper_funcs);
 	}
 
 	return (0);

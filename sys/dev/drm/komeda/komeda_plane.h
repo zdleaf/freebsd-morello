@@ -39,6 +39,7 @@ struct komeda_pipeline;
 struct komeda_plane {
 	struct drm_plane	plane;
 	struct komeda_drm_softc	*sc;
+	struct iommu_ctx	*ioctx;
 	int id;
 };
 
