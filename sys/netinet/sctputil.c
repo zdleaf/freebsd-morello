@@ -2300,7 +2300,8 @@ sctp_timer_start(int t_type, struct sctp_inpcb *inp, struct sctp_tcb *stcb,
 		} else {
 			to_ticks = UINT32_MAX;
 		}
-		if (((net->dest_state & SCTP_ADDR_UNCONFIRMED) == 0) &&
+		if (!((net->dest_state & SCTP_ADDR_UNCONFIRMED) &&
+		    (net->dest_state & SCTP_ADDR_REACHABLE)) &&
 		    ((net->dest_state & SCTP_ADDR_PF) == 0)) {
 			if (net->heart_beat_delay < (UINT32_MAX - to_ticks)) {
 				to_ticks += net->heart_beat_delay;
@@ -5673,7 +5674,7 @@ restart_nosblocks:
 #ifdef INVARIANTS
 			panic("Huh, its non zero and nothing on control?");
 #endif
-			so->so_rcv.sb_cc = 0;
+			SCTP_SB_CLEAR(so->so_rcv);
 		}
 		SCTP_INP_READ_UNLOCK(inp);
 		hold_rlock = 0;
