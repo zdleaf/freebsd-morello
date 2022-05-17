@@ -990,6 +990,8 @@ smmu_init_l1_entry(struct smmu_softc *sc, int sid)
 
 	strtab = &sc->strtab;
 	l1_desc = &strtab->l1[sid >> STRTAB_SPLIT];
+	if (l1_desc->va)
+		return (0);
 
 	size = 1 << (STRTAB_SPLIT + ilog2(STRTAB_STE_DWORDS) + 3);
 
