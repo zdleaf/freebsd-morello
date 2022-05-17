@@ -180,7 +180,9 @@ panfrost_gem_open(struct drm_gem_object *obj, struct drm_file *file_priv)
 
 error:
 	panfrost_gem_mapping_put(mapping);
+	mutex_lock(&obj->dev->struct_mutex);
 	drm_gem_object_put(obj);
+	mutex_unlock(&obj->dev->struct_mutex);
 	return (error);
 }
 
@@ -232,7 +234,9 @@ void
 panfrost_gem_unpin(struct drm_gem_object *obj)
 {
 
+	mutex_lock(&obj->dev->struct_mutex);
 	drm_gem_object_put(obj);
+	mutex_unlock(&obj->dev->struct_mutex);
 }
 
 struct sg_table *
