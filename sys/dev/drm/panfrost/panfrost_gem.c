@@ -696,7 +696,7 @@ panfrost_gem_get_pages(struct panfrost_gem_object *bo)
 	bo->pages = m0;
 	bo->npages = npages;
 
-	if (1 == 0)
+	if (1 == 1)
 		error = panfrost_alloc_pages_iommu(bo);
 	else
 		error = panfrost_alloc_pages_contig(bo);

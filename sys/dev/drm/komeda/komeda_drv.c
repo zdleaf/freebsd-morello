@@ -328,6 +328,61 @@ fail:
 	device_printf(sc->dev, "drm_dev_register(): %d\n", error);
 }
 
+static int
+tbu_connect(struct komeda_drm_softc *sc)
+{
+	uint32_t reg;
+	int timeout;
+
+	timeout = 100000;
+
+	DPU_WR4(sc, GCU_CONTROL, CONTROL_MODE_TBU_CONNECT);
+	do {
+		reg = DPU_RD4(sc, GCU_STATUS);
+		if (reg & STATUS_TCS0)
+			break;
+	} while (timeout--);
+
+	if (timeout <= 0) {
+		DPU_WR4(sc, GCU_CONTROL, 0);
+		printf("%s: Failed to connect TBU\n", __func__);
+		return (-1);
+	}
+
+	/* Connect to LPU0 only. */
+	DPU_WR4(sc, LPU0_TBU_CONTROL, TBU_CONTROL_TLBPEN);
+
+	dprintf("%s: TBU connected\n", __func__);
+
+	return (0);
+}
+
+static int
+tbu_disconnect(struct komeda_drm_softc *sc)
+{
+	uint32_t reg;
+	int timeout;
+
+	timeout = 10000;
+
+	DPU_WR4(sc, GCU_CONTROL, CONTROL_MODE_TBU_DISCONNECT);
+	do {
+		reg = DPU_RD4(sc, GCU_STATUS);
+		if ((reg & STATUS_TCS0) == 0)
+			break;
+	} while (timeout--);
+
+	if (timeout <= 0) {
+		DPU_WR4(sc, GCU_CONTROL, 0);
+		printf("%s: Failed to disconnect TBU\n", __func__);
+		return (-1);
+	}
+
+	dprintf("%s: TBU disconnected\n", __func__);
+
+	return (0);
+}
+
 static void
 komeda_intr(void *arg)
 {
@@ -437,6 +492,9 @@ komeda_drm_attach(device_t dev)
 	    sc->max_line_size, sc->max_num_lines, sc->num_rich_layers);
 	device_printf(dev, "dual link supp %d, tbu %d\n",
 	    sc->dual_link_supp, sc->tbu_en);
+
+	if (sc->tbu_en)
+		tbu_connect(sc);
 
 	config_intrhook_oneshot(&komeda_drm_irq_hook, sc);
 
