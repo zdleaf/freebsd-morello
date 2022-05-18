@@ -2043,7 +2043,9 @@ static device_method_t smmu_methods[] = {
 	DEVMETHOD(iommu_ctx_init,	smmu_ctx_init),
 	DEVMETHOD(iommu_ctx_free,	smmu_ctx_free),
 	DEVMETHOD(iommu_ctx_lookup,	smmu_ctx_lookup),
+#ifdef FDT
 	DEVMETHOD(iommu_ofw_md_data,	smmu_ofw_md_data),
+#endif
 
 	/* Bus interface */
 	DEVMETHOD(bus_read_ivar,	smmu_read_ivar),
