@@ -1257,7 +1257,10 @@ dist_read(void *vm, int vcpuid, uint64_t fault_ipa, uint64_t *rval,
 	    vcpuid, reg, size, rval, NULL))
 		return (0);
 
-	panic("%s: %lx\n", __func__, fault_ipa - dist->start);
+	/* TODO: Check the correct behaviour */
+	printf("%s: %lx\n", __func__, fault_ipa - dist->start);
+	*rval = 0;
+
 	return (0);
 }
 
