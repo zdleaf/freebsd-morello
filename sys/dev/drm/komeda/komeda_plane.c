@@ -206,6 +206,7 @@ gcu_configure(struct komeda_drm_softc *sc)
 	return (0);
 }
 
+#ifdef IOMMU
 static void
 komeda_unmap(struct drm_gem_cma_object *bo)
 {
@@ -253,7 +254,7 @@ komeda_map(struct drm_gem_cma_object *bo, struct komeda_plane *komeda_plane)
 
 	return (error);
 }
-
+#endif
 
 static void
 komeda_plane_atomic_disable(struct drm_plane *plane,
@@ -261,8 +262,10 @@ komeda_plane_atomic_disable(struct drm_plane *plane,
 {
 	struct komeda_plane *komeda_plane;
 	struct komeda_drm_softc *sc;
+#ifdef IOMMU
 	struct drm_gem_cma_object *bo;
 	struct drm_fb_cma *fb;
+#endif
 	uint32_t reg;
 	int timeout;
 	int id;
@@ -276,8 +279,6 @@ komeda_plane_atomic_disable(struct drm_plane *plane,
 
 	DPU_WR4(sc, LR_CONTROL(id), 0);
 
-	fb = container_of(old_state->fb, struct drm_fb_cma, drm_fb);
-	bo = drm_fb_cma_get_gem_obj(fb, 0);
 	gcu_configure(sc);
 
 	/* Ensure all traffic stopped, otherwise SMMU will fault. */
@@ -295,7 +296,11 @@ komeda_plane_atomic_disable(struct drm_plane *plane,
 		device_printf(sc->dev, "%s: Failed to stop layer %d.\n",
 		    __func__, id);
 
+#ifdef IOMMU
+	fb = container_of(old_state->fb, struct drm_fb_cma, drm_fb);
+	bo = drm_fb_cma_get_gem_obj(fb, 0);
 	komeda_unmap(bo);
+#endif
 }
 
 void
@@ -432,7 +437,9 @@ lpu_configure(struct komeda_drm_softc *sc, struct drm_fb_cma *fb,
 	dma_addr_t paddr;
 	uint32_t reg;
 	int block_h;
+#ifdef IOMMU
 	int error;
+#endif
 	int fmt;
 	int id;
 	int i;
@@ -450,11 +457,13 @@ lpu_configure(struct komeda_drm_softc *sc, struct drm_fb_cma *fb,
 		dprintf("%s: cursor plane\n", __func__);
 
 	bo = drm_fb_cma_get_gem_obj(fb, 0);
+#ifdef IOMMU
 	if (sc->tbu_en) {
 		error = komeda_map(bo, komeda_plane);
 		KASSERT(error == 0, ("could not map"));
 		paddr = bo->entry->start;
 	} else
+#endif
 		paddr = bo->pbase;
 
 	paddr += fb->drm_fb.offsets[0];
@@ -484,8 +493,10 @@ lpu_configure(struct komeda_drm_softc *sc, struct drm_fb_cma *fb,
 	DPU_WR4(sc, LR_PALPHA(id), D71_PALPHA_DEF_MAP);
 	DPU_WR4(sc, LR_AD_CONTROL(id), 0); /* No modifiers. */
 	reg = CONTROL_EN | CONTROL_ARCACHE_AXIC_BUF_CACHE;
+#ifdef IOMMU
 	if (sc->tbu_en)
 		reg |= CONTROL_TBU_EN;
+#endif
 	DPU_WR4(sc, LR_CONTROL(id), reg);
 }
 
@@ -615,7 +626,9 @@ komeda_plane_create(struct komeda_pipeline *pipeline, struct drm_device *drm)
 		plane = &pipeline->planes[i];
 		plane->sc = sc;
 		plane->id = i;
+#ifdef IOMMU
 		plane->ioctx = iommu_get_ctx_ofw(sc->dev, plane->id);
+#endif
 
 		printf("%s: ioctx is %p\n", __func__, plane->ioctx);
 

@@ -485,7 +485,11 @@ komeda_drm_attach(device_t dev)
 	sc->num_rich_layers = (reg & CONFIG_ID1_NUM_RICH_LAYERS_M) >> \
 				CONFIG_ID1_NUM_RICH_LAYERS_S;
 	sc->dual_link_supp = reg & CONFIG_ID1_DISPLAY_SPLIT_EN ? 1 : 0;
+#ifdef IOMMU
 	sc->tbu_en = reg & CONFIG_ID1_DISPLAY_TBU_EN ? 1 : 0;
+#else
+	sc->tbu_en = false;
+#endif
 
 	device_printf(dev,
 	    "Max line size %d, max num lines %d, num rich layers %d\n",
