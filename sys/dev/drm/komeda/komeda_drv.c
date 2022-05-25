@@ -31,6 +31,8 @@
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
+#include "opt_iommu.h"
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/bus.h>

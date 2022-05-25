@@ -31,6 +31,8 @@
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
+#include "opt_iommu.h"
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/bus.h>
@@ -628,9 +630,10 @@ komeda_plane_create(struct komeda_pipeline *pipeline, struct drm_device *drm)
 		plane->id = i;
 #ifdef IOMMU
 		plane->ioctx = iommu_get_ctx_ofw(sc->dev, plane->id);
+		if (plane->ioctx && sc->tbu_en)
+			device_printf(sc->dev, "IOMMU enabled for plane %d\n",
+			    i);
 #endif
-
-		printf("%s: ioctx is %p\n", __func__, plane->ioctx);
 
 		if (i == 0)
 			type = DRM_PLANE_TYPE_PRIMARY;
