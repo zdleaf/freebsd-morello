@@ -192,6 +192,8 @@ struct cpu_desc {
 	uint64_t	mvfr0;
 	uint64_t	mvfr1;
 #endif
+	uint64_t	clidr;
+	uint32_t	ccsidr[MAX_CACHES][2]; /* 2 possible types. */
 };
 
 
