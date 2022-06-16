@@ -1694,7 +1694,8 @@ main(int argc, char *argv[])
 	}
 
 	error = smbios_build(ctx);
-	assert(error == 0);
+	if (error != 0)
+		exit(4);
 #endif
 
 	if (get_config_bool("acpi_tables")) {
