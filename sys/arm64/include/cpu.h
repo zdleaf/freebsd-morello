@@ -186,6 +186,7 @@ struct cpu_desc {
 	uint64_t	id_aa64mmfr2;
 	uint64_t	id_aa64pfr0;
 	uint64_t	id_aa64pfr1;
+	uint64_t	id_aa64zfr0;
 	uint64_t	ctr;
 #ifdef COMPAT_FREEBSD32
 	uint64_t	id_isar5;
@@ -194,6 +195,7 @@ struct cpu_desc {
 #endif
 	uint64_t	clidr;
 	uint32_t	ccsidr[MAX_CACHES][2]; /* 2 possible types. */
+	bool		have_sve;
 };
 
 
