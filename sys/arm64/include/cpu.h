@@ -181,6 +181,7 @@ struct cpu_desc {
 	uint64_t	id_aa64dfr1;
 	uint64_t	id_aa64isar0;
 	uint64_t	id_aa64isar1;
+	uint64_t	id_aa64isar2;
 	uint64_t	id_aa64mmfr0;
 	uint64_t	id_aa64mmfr1;
 	uint64_t	id_aa64mmfr2;
