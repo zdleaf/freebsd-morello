@@ -232,6 +232,8 @@ gic_v3_ofw_get_devinfo(device_t bus __unused, device_t child)
 	struct gic_v3_ofw_devinfo *di;
 
 	di = device_get_ivars(child);
+	if (di->di_gic_dinfo.is_vgic)
+		return (NULL);
 	return (&di->di_dinfo);
 }
 
@@ -346,6 +348,26 @@ gic_v3_ofw_bus_attach(device_t dev)
 			sc->gic_nchildren++;
 			device_set_ivars(child, di);
 		}
+	}
+
+	/*
+	 * If there is a vgic maintanance interupt add a virtual gic
+	 * child so we can use this in the vmm module for bhyve.
+	 */
+	/* TODO: Support with ACPI */
+	if (OF_hasprop(parent, "interrupts")) {
+		di = malloc(sizeof(*di), M_GIC_V3, M_WAITOK | M_ZERO);
+		resource_list_init(&di->di_rl);
+		di->di_gic_dinfo.gic_domain = -1;
+		di->di_gic_dinfo.is_vgic = 1;
+		child = device_add_child(dev, "vgic", -1);
+		if (child == NULL) {
+			device_printf(dev, "Could not add vgic child\n");
+			resource_list_free(&di->di_rl);
+			free(di, M_GIC_V3);
+		}
+		device_set_ivars(child, di);
+		sc->gic_nchildren++;
 	}
 
 	return (bus_generic_attach(dev));

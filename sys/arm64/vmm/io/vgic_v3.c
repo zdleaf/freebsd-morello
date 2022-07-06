@@ -68,6 +68,8 @@
 
 MALLOC_DEFINE(M_VGIC_V3, "ARM VMM VGIC V3", "ARM VMM VGIC V3");
 
+static bool have_vgic = false;
+
 struct vgic_v3_virt_features {
 	uint8_t min_prio;
 	size_t ich_lr_num;
@@ -347,8 +349,6 @@ static struct vgic_register redist_sgi_registers[] = {
 };
 
 static struct vgic_v3_virt_features virt_features;
-
-static struct gic_v3_softc *gic_sc;
 
 static struct vgic_v3_irq *vgic_v3_get_irq(struct hyp *, int, uint32_t);
 static void vgic_v3_release_irq(struct vgic_v3_irq *);
@@ -1965,26 +1965,44 @@ vgic_v3_sync_hwstate(void *arg)
 	cpu_if->ich_lr_used = 0;
 }
 
-bool
-vgic_attach(void)
+static int
+vgic_probe(device_t dev)
 {
-	device_t gic_dev;
-	uintptr_t ver;
+	if (!gic_get_vgic(dev))
+		return (EINVAL);
 
-	KASSERT(gic_sc == NULL, ("%s: GIC softc is not NULL", __func__));
+	/* We currently only support the GICv3 */
+	if (gic_get_hw_rev(dev) < 3)
+		return (EINVAL);
 
-	gic_dev = device_lookup_by_name("gic0");
-	if (gic_dev == NULL)
-		return (false);
+	device_set_desc(dev, "Virtual GIC");
+	return (BUS_PROBE_DEFAULT);
+}
 
-	if (BUS_READ_IVAR(gic_dev, NULL, GIC_IVAR_HW_REV, &ver) != 0)
-		return (false);
-	if (ver < 3)
-		return (false);
+static int
+_vgic_attach(device_t dev)
+{
+	have_vgic = true;
+	return (0);
+}
 
-	gic_sc = device_get_softc(gic_dev);
+static device_method_t vgic_methods[] = {
+	/* Device interface */
+	DEVMETHOD(device_probe,		vgic_probe),
+	DEVMETHOD(device_attach,	_vgic_attach),
 
-	return (true);
+	/* End */
+	DEVMETHOD_END
+};
+
+DEFINE_CLASS_0(vgic, vgic_driver, vgic_methods, 0);
+
+DRIVER_MODULE(vgic, gic, vgic_driver, 0, 0);
+
+bool
+vgic_present(void)
+{
+	return (have_vgic);
 }
 
 void
@@ -1992,7 +2010,7 @@ vgic_v3_init(uint64_t ich_vtr_el2)
 {
 	uint32_t pribits, prebits;
 
-	KASSERT(gic_sc != NULL, ("GIC softc is NULL"));
+	MPASS(have_vgic);
 
 	pribits = ICH_VTR_EL2_PRIBITS(ich_vtr_el2);
 	switch (pribits) {

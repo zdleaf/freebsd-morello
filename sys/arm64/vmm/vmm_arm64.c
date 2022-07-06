@@ -241,7 +241,7 @@ arm_init(int ipinum)
 		return (ENXIO);
 	}
 
-	if (!vgic_attach()) {
+	if (!vgic_present()) {
 		printf("arm_init: No GICv3 found\n");
 		return (ENODEV);
 	}
