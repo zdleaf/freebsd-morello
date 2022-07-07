@@ -1581,6 +1581,7 @@ vgic_v3_icc_sgi1r_write(void *vm, int vcpuid, uint64_t rval, void *arg)
 
 	hyp = vm_get_cookie(vm);
 	active_cpus = vm_active_cpus(vm);
+	irqid = (rval >> ICC_SGI1R_EL1_SGIID_SHIFT) & ICC_SGI1R_EL1_SGIID_MASK;
 	if ((rval & ICC_SGI1R_EL1_IRM) == 0) {
 		/*
 		 * TODO: Support on mure than 16 CPUs. This is the mask for the
@@ -1588,8 +1589,6 @@ vgic_v3_icc_sgi1r_write(void *vm, int vcpuid, uint64_t rval, void *arg)
 		 */
 		if ((rval & 0xff00ff00ff000ul) != 0)
 			return (0);
-		irqid = (rval >> ICC_SGI1R_EL1_SGIID_SHIFT) &
-		    ICC_SGI1R_EL1_SGIID_MASK;
 		cpus = rval & 0xff;
 		vcpu = 0;
 		while (cpus > 0) {
@@ -1598,6 +1597,13 @@ vgic_v3_icc_sgi1r_write(void *vm, int vcpuid, uint64_t rval, void *arg)
 			}
 			vcpu++;
 			cpus >>= 1;
+		}
+	} else {
+		/* Send an IPI to all CPUs other than the current CPU */
+		for (vcpu = 0; vcpu < VM_MAXCPU; vcpu++) {
+			if (CPU_ISSET(vcpu, &active_cpus) && vcpu != vcpuid) {
+				vgic_v3_inject_irq(hyp, vcpu, irqid, true);
+			}
 		}
 	}
 
