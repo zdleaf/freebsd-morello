@@ -1679,8 +1679,10 @@ vgic_v3_detach_from_vm(struct vm *vm)
 {
 	struct hyp *hyp = vm_get_cookie(vm);
 
-	hyp->vgic_attached = false;
-	vgic_v3_mmio_destroy(hyp);
+	if (hyp->vgic_attached) {
+		hyp->vgic_attached = false;
+		vgic_v3_mmio_destroy(hyp);
+	}
 }
 
 static struct vgic_v3_irq *
