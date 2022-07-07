@@ -116,7 +116,7 @@ add_timer(void *fdt, uint32_t gic_phandle)
 
 	fdt_begin_node(fdt, "timer");
 	fdt_property_string(fdt, "compatible", "arm,armv8-timer");
-	fdt_property_u32(fdt, "interrupt-controller", gic_phandle);
+	fdt_property_u32(fdt, "interrupt-parent", gic_phandle);
 	fdt_property_placeholder(fdt, "interrupts", 9 * sizeof(uint32_t),
 	    &interrupts);
 	for (int i = 0; i < nitems(irqs); i++) {
