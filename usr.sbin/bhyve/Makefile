@@ -58,8 +58,12 @@ SRCS=	\
 .if ${MACHINE_CPUARCH} == "aarch64"
 # Missing vm_get_ioctls
 CFLAGS+=	-DWITHOUT_CAPSICUM
+LIBFDTSRCDIR=	${SRCTOP}/sys/contrib/libfdt
+CFLAGS+=	-I${LIBFDTSRCDIR}
+LIBADD+=		fdt
 SRCS+=	\
 	bootcode.c		\
+	fdt.c			\
 	mmio_uart.c		\
 	pl011.c
 .endif
@@ -102,7 +106,7 @@ CFLAGS.kernemu_dev.c+=	-I${SRCTOP}/sys/amd64
 .PATH:  ${BHYVE_SYSDIR}/sys/${MACHINE}/vmm
 SRCS+=	vmm_instruction_emul.c
 
-LIBADD=	vmmapi md nv pthread z util sbuf cam 9p
+LIBADD+=vmmapi md nv pthread z util sbuf cam 9p
 
 .if ${MK_CASPER} != "no"
 LIBADD+=	casper

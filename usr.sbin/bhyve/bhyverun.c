@@ -117,6 +117,8 @@ __FBSDID("$FreeBSD$");
 #include "rtc.h"
 #include "vmgenc.h"
 
+int fdt_build(struct vmctx *ctx, int ncpu);
+
 #define GUEST_NIO_PORT		0x488	/* guest upcalls via i/o port */
 
 #define MB		(1024UL * 1024)
@@ -1699,6 +1701,9 @@ main(int argc, char *argv[])
 		error = acpi_build(ctx, guest_ncpus);
 		assert(error == 0);
 	}
+
+	error = fdt_build(ctx, guest_ncpus);
+	assert(error == 0);
 
 #ifdef __amd64__
 	if (lpc_bootrom())
