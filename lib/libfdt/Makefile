@@ -3,8 +3,8 @@
 PACKAGE=lib${LIB}
 INTERNALLIB=
 
-LIBFDTDIR=	${SRCTOP}/sys/contrib/libfdt
-.PATH:		${LIBFDTDIR}
+LIBFDTSRCDIR=	${SRCTOP}/sys/contrib/libfdt
+.PATH:		${LIBFDTSRCDIR}
 
 LIB=		fdt
 
@@ -25,7 +25,7 @@ INCS=					\
 		ibfdt_env.h
 
 # XXX: Should come from installed includes?
-CFLAGS+=	-I${LIBFDTDIR}
+CFLAGS+=	-I${LIBFDTSRCDIR}
 WARNS?=		2
 
 MAN=
