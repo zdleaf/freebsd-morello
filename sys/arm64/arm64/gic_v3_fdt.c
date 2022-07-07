@@ -364,18 +364,17 @@ gic_v3_ofw_bus_attach(device_t dev)
 	 */
 	/* TODO: Support with ACPI */
 	if (OF_hasprop(parent, "interrupts")) {
-		di = malloc(sizeof(*di), M_GIC_V3, M_WAITOK | M_ZERO);
-		resource_list_init(&di->di_rl);
-		di->di_gic_dinfo.gic_domain = -1;
-		di->di_gic_dinfo.is_vgic = 1;
 		child = device_add_child(dev, "vgic", -1);
 		if (child == NULL) {
 			device_printf(dev, "Could not add vgic child\n");
-			resource_list_free(&di->di_rl);
-			free(di, M_GIC_V3);
+		} else {
+			di = malloc(sizeof(*di), M_GIC_V3, M_WAITOK | M_ZERO);
+			resource_list_init(&di->di_rl);
+			di->di_gic_dinfo.gic_domain = -1;
+			di->di_gic_dinfo.is_vgic = 1;
+			device_set_ivars(child, di);
+			sc->gic_nchildren++;
 		}
-		device_set_ivars(child, di);
-		sc->gic_nchildren++;
 	}
 
 	return (bus_generic_attach(dev));
