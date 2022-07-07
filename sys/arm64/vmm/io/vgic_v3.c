@@ -1594,7 +1594,7 @@ vgic_v3_icc_sgi1r_write(void *vm, int vcpuid, uint64_t rval, void *arg)
 		vcpu = 0;
 		while (cpus > 0) {
 			if (CPU_ISSET(vcpu, &active_cpus) && vcpu != vcpuid) {
-				vgic_v3_inject_irq(hyp, vcpuid, irqid, true);
+				vgic_v3_inject_irq(hyp, vcpu, irqid, true);
 			}
 			vcpu++;
 			cpus >>= 1;
