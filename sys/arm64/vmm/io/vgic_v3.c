@@ -1571,6 +1571,8 @@ vgic_v3_icc_sgi1r_read(void *vm, int vcpuid, uint64_t *rval, void *arg)
 	return (0);
 }
 
+/* vgic_v3_icc_sgi1r_write currently only handles 16 CPUs */
+CTASSERT(VM_MAXCPU <= 16);
 int
 vgic_v3_icc_sgi1r_write(void *vm, int vcpuid, uint64_t rval, void *arg)
 {
