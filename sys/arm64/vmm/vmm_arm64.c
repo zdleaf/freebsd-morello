@@ -925,14 +925,26 @@ arm_setreg(void *arg, int vcpu, int reg, uint64_t val)
 }
 
 static int
-arm_setcap(void *arg, int vcpu, int type, int val)
+arm_getcap(void *arg, int vcpu, int type, int *retval)
 {
+	int ret;
 
-	return (ENOENT);
+	ret = ENOENT;
+
+	switch (type) {
+	case VM_CAP_UNRESTRICTED_GUEST:
+		*retval = 1;
+		ret = 0;
+		break;
+	default:
+		break;
+	}
+
+	return (ret);
 }
 
 static int
-arm_getcap(void *arg, int vcpu, int type, int *retval)
+arm_setcap(void *arg, int vcpu, int type, int val)
 {
 
 	return (ENOENT);
