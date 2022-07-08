@@ -47,23 +47,15 @@ psci_version(struct hypctx *hypctx, bool *retu)
 }
 
 static int
-psci_system_off(struct vm_exit *vme, bool *retu)
+psci_system_off(struct vm *vm)
 {
-	vme->u.suspended.how = VM_SUSPEND_POWEROFF;
-	vme->exitcode = VM_EXITCODE_SUSPENDED;
-
-	*retu = true;
-	return (0);
+	return (vm_suspend(vm, VM_SUSPEND_POWEROFF));
 }
 
 static int
-psci_system_reset(struct vm_exit *vme, bool *retu)
+psci_system_reset(struct vm *vm)
 {
-	vme->u.suspended.how = VM_SUSPEND_RESET;
-	vme->exitcode = VM_EXITCODE_SUSPENDED;
-
-	*retu = true;
-	return (0);
+	return (vm_suspend(vm, VM_SUSPEND_RESET));
 }
 
 int
@@ -94,10 +86,10 @@ psci_handle_call(struct vm *vm, int vcpuid, struct vm_exit *vme, bool *retu)
 		error = psci_version(hypctx, retu);
 		break;
 	case PSCI_FNID_SYSTEM_OFF:
-		error = psci_system_off(vme, retu);
+		error = psci_system_off(vm);
 		break;
 	case PSCI_FNID_SYSTEM_RESET:
-		error = psci_system_reset(vme, retu);
+		error = psci_system_reset(vm);
 		break;
 	default:
 		vme->exitcode = VM_EXITCODE_SMCCC;
