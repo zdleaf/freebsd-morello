@@ -111,13 +111,18 @@ struct vm_object;
 struct pmap;
 struct hypctx;
 
+struct vm_eventinfo {
+	void	*rptr;		/* rendezvous cookie */
+	int	*sptr;		/* suspend cookie */
+	int	*iptr;		/* reqidle cookie */
+};
+
 typedef int	(*vmm_init_func_t)(int ipinum);
 typedef int	(*vmm_cleanup_func_t)(void);
 typedef void	(*vmm_resume_func_t)(void);
 typedef void *	(*vmi_init_func_t)(struct vm *vm, struct pmap *pmap);
 typedef int	(*vmi_run_func_t)(void *vmi, int vcpu, register_t rip,
-				  struct pmap *pmap, void *rendezvous_cookie,
-				  void *suspend_cookie);
+				  struct pmap *pmap, struct vm_eventinfo *evinfo);
 typedef void	(*vmi_cleanup_func_t)(void *vmi);
 typedef void	(*vmi_mmap_set_func_t)(void *arg, vm_offset_t va,
 				       vm_offset_t pa, size_t len,
@@ -243,17 +248,17 @@ virt_enabled()
 }
 
 static __inline int
-vcpu_rendezvous_pending(void *rendezvous_cookie)
+vcpu_rendezvous_pending(struct vm_eventinfo *info)
 {
 
-	return (*(uintptr_t *)rendezvous_cookie != 0);
+	return (*((uintptr_t *)(info->rptr)) != 0);
 }
 
 static __inline int
-vcpu_suspended(void *suspend_cookie)
+vcpu_suspended(struct vm_eventinfo *info)
 {
 
-	return (*(int *)suspend_cookie);
+	return (*info->sptr);
 }
 
 enum vcpu_state {

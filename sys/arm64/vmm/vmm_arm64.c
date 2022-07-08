@@ -687,7 +687,7 @@ arm64_handle_world_switch(struct hyp *hyp, int vcpu, int excp_type,
 
 static int
 arm_vmrun(void *arg, int vcpu, register_t pc, pmap_t pmap,
-	void *rendezvous_cookie, void *suspend_cookie)
+    struct vm_eventinfo *evinfo)
 {
 	uint64_t excp_type;
 	int handled;

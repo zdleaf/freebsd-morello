@@ -152,8 +152,8 @@ static struct vmm_ops *ops = NULL;
 #define	VMM_CLEANUP()	(ops != NULL ? (*ops->cleanup)() : 0)
 
 #define	VMINIT(vm, pmap) (ops != NULL ? (*ops->vminit)(vm, pmap): NULL)
-#define	VMRUN(vmi, vcpu, pc, pmap, rvc, sc) \
-	(ops != NULL ? (*ops->vmrun)(vmi, vcpu, pc, pmap, rvc, sc) : ENXIO)
+#define	VMRUN(vmi, vcpu, pc, pmap, evinfo) \
+	(ops != NULL ? (*ops->vmrun)(vmi, vcpu, pc, pmap, evinfo) : ENXIO)
 #define	VMCLEANUP(vmi)	(ops != NULL ? (*ops->vmcleanup)(vmi) : NULL)
 #define	VMSPACE_ALLOC(min, max) \
 	(ops != NULL ? (*ops->vmspace_alloc)(min, max) : NULL)
@@ -1496,11 +1496,11 @@ vm_handle_paging(struct vm *vm, int vcpuid, bool *retu)
 int
 vm_run(struct vm *vm, struct vm_run *vmrun)
 {
+	struct vm_eventinfo evinfo;
 	int error, vcpuid;
 	struct vcpu *vcpu;
 	struct vm_exit *vme;
 	bool retu;
-	void *rvc, *sc;
 	pmap_t pmap;
 
 	vcpuid = vmrun->cpuid;
@@ -1516,11 +1516,13 @@ vm_run(struct vm *vm, struct vm_run *vmrun)
 
 	pmap = vmspace_pmap(vm->vmspace);
 	vcpu = &vm->vcpu[vcpuid];
-	rvc = sc = NULL;
+	evinfo.rptr = NULL;
+	evinfo.sptr = NULL;
+	evinfo.iptr = NULL;
 restart:
 	critical_enter();
 	vcpu_require_state(vm, vcpuid, VCPU_RUNNING);
-	error = VMRUN(vm->cookie, vcpuid, vcpu->nextpc, pmap, rvc, sc);
+	error = VMRUN(vm->cookie, vcpuid, vcpu->nextpc, pmap, &evinfo);
 	vcpu_require_state(vm, vcpuid, VCPU_FROZEN);
 	critical_exit();
 
