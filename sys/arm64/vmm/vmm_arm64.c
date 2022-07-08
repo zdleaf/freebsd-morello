@@ -707,6 +707,13 @@ arm_vmrun(void *arg, int vcpu, register_t pc, pmap_t pmap,
 	for (;;) {
 		daif = intr_disable();
 
+		/* Check if the vcpu is suspended */
+		if (vcpu_suspended(evinfo)) {
+			intr_restore(daif);
+			vm_exit_suspended(vm, vcpu, pc);
+			break;
+		}
+
 		/* Activate the stage2 pmap so the vmid is valid */
 		pmap_activate_vm(pmap);
 		hyp->vttbr_el2 = pmap_to_ttbr0(pmap);

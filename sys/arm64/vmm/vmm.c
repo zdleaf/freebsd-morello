@@ -994,6 +994,21 @@ vm_suspend(struct vm *vm, enum vm_suspend_how how)
 	return (0);
 }
 
+void
+vm_exit_suspended(struct vm *vm, int vcpuid, uint64_t pc)
+{
+	struct vm_exit *vmexit;
+
+	KASSERT(vm->suspend > VM_SUSPEND_NONE && vm->suspend < VM_SUSPEND_LAST,
+	    ("vm_exit_suspended: invalid suspend type %d", vm->suspend));
+
+	vmexit = vm_exitinfo(vm, vcpuid);
+	vmexit->pc = pc;
+	vmexit->inst_length = 4;
+	vmexit->exitcode = VM_EXITCODE_SUSPENDED;
+	vmexit->u.suspended.how = vm->suspend;
+}
+
 int
 vm_activate_cpu(struct vm *vm, int vcpuid)
 {
@@ -1517,7 +1532,7 @@ vm_run(struct vm *vm, struct vm_run *vmrun)
 	pmap = vmspace_pmap(vm->vmspace);
 	vcpu = &vm->vcpu[vcpuid];
 	evinfo.rptr = NULL;
-	evinfo.sptr = NULL;
+	evinfo.sptr = &vm->suspend;
 	evinfo.iptr = NULL;
 restart:
 	critical_enter();
