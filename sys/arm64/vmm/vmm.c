@@ -61,6 +61,7 @@
 
 #include <dev/pci/pcireg.h>
 
+#include "vmm_ktr.h"
 #include "vmm_stat.h"
 #include "vmm_mem.h"
 #include "arm64.h"
@@ -975,16 +976,12 @@ vm_suspend(struct vm *vm, enum vm_suspend_how how)
 		return (EINVAL);
 
 	if (atomic_cmpset_int(&vm->suspend, 0, how) == 0) {
-#if 0
 		VM_CTR2(vm, "virtual machine already suspended %d/%d",
 		    vm->suspend, how);
-#endif
 		return (EALREADY);
 	}
 
-#if 0
 	VM_CTR1(vm, "virtual machine successfully suspended %d", how);
-#endif
 
 	/*
 	 * Notify all active vcpus that they are now suspended.
