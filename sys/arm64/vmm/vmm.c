@@ -1447,23 +1447,27 @@ vm_raise_msi(struct vm *vm, uint64_t msg, uint64_t addr, int bus, int slot,
 static int
 vm_handle_wfi(struct vm *vm, int vcpuid, struct vm_exit *vme, bool *retu)
 {
+	struct hyp *hyp;
 	struct vcpu *vcpu;
 	struct hypctx *hypctx;
-	bool intr_disabled;
 
 	vcpu = &vm->vcpu[vcpuid];
-	hypctx = vme->u.wfi.hypctx;
-	intr_disabled = !(hypctx->tf.tf_spsr & PSR_I);
+	hyp = vm->cookie;
+	hypctx = &hyp->ctx[vcpuid];
 
 	vcpu_lock(vcpu);
 	while (1) {
-		if (!intr_disabled && vgic_v3_vcpu_pending_irq(hypctx))
+		if (vgic_v3_vcpu_pending_irq(hypctx))
 			break;
 
 		if (vcpu_should_yield(vm, vcpuid))
 			break;
 
 		vcpu_require_state_locked(vm, vcpuid, VCPU_SLEEPING);
+		/*
+		 * XXX msleep_spin() cannot be interrupted by signals so
+		 * wake up periodically to check pending signals.
+		 */
 		msleep_spin(vcpu, &vcpu->mtx, "vmidle", hz);
 		vcpu_require_state_locked(vm, vcpuid, VCPU_FROZEN);
 	}
