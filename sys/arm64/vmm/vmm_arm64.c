@@ -603,6 +603,12 @@ handle_el1_sync_excp(struct hyp *hyp, int vcpu, struct vm_exit *vme_ret,
 		arm64_print_hyp_regs(vme_ret);
 		vme_ret->exitcode = VM_EXITCODE_HYP;
 		break;
+	case EXCP_TRAP_WFI_WFE:
+		if ((hypctx->tf.tf_esr & 0x3) == 0) /* WFI */
+			vme_ret->exitcode = VM_EXITCODE_WFI;
+		else
+			vme_ret->exitcode = VM_EXITCODE_HYP;
+		break;
 	case EXCP_HVC:
 		vme_ret->exitcode = VM_EXITCODE_HVC;
 		break;

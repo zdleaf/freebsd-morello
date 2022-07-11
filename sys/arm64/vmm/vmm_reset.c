@@ -119,6 +119,7 @@ reset_vm_el2_regs(void *vcpu)
 	 * HCR_RW: use AArch64 for EL1
 	 * HCR_TID3: handle ID registers in the vmm to privide a common
 	 * set of featers on all vcpus
+	 * HCR_TWI: Trap WFI to the hypervisor
 	 * HCR_BSU_IS: barrier instructions apply to the inner shareable
 	 * domain
 	 * HCR_FB: broadcast maintenance operations
@@ -129,8 +130,8 @@ reset_vm_el2_regs(void *vcpu)
 	 * invalidate
 	 * HCR_VM: use stage 2 translation
 	 */
-	el2ctx->hcr_el2 = HCR_RW | HCR_TID3 | HCR_BSU_IS | HCR_FB | HCR_AMO |
-	    HCR_IMO | HCR_FMO | HCR_SWIO | HCR_VM;
+	el2ctx->hcr_el2 = HCR_RW | HCR_TID3 | HCR_TWI | HCR_BSU_IS | HCR_FB |
+	    HCR_AMO | HCR_IMO | HCR_FMO | HCR_SWIO | HCR_VM;
 
 	/* TODO: Trap all extensions we don't support */
 	el2ctx->mdcr_el2 = 0;
