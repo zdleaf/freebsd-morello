@@ -160,7 +160,7 @@ void	vgic_v3_vmcleanup(struct hyp *);
 void 	vgic_v3_flush_hwstate(void *arg);
 void 	vgic_v3_sync_hwstate(void *arg);
 
-int 	vgic_v3_vcpu_pending_irq(void *arg);
+bool 	vgic_v3_vcpu_pending_irq(struct hypctx *hypctx);
 int	vgic_v3_inject_irq(struct hyp *hyp, int vcpuid, uint32_t irqid,
 	   bool level);
 int	vgic_v3_inject_msi(struct hyp *hyp, uint64_t msg, uint64_t addr);

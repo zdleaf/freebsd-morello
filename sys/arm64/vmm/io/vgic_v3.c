@@ -503,25 +503,25 @@ vgic_v3_irq_pending(struct vgic_v3_irq *irq)
 	}
 }
 
-static void
-vgic_v3_queue_irq(struct vgic_v3_cpu_if *cpu_if, struct vgic_v3_irq *irq)
+static bool
+vgic_v3_queue_irq(struct hyp *hyp, struct vgic_v3_cpu_if *cpu_if,
+    int vcpuid, struct vgic_v3_irq *irq)
 {
+	MPASS(vcpuid >= 0);
+	MPASS(vcpuid < VM_MAXCPU);
+
 	mtx_assert(&cpu_if->lr_mtx, MA_OWNED);
 	mtx_assert(&irq->irq_spinmtx, MA_OWNED);
 
 	/* No need to queue the IRQ */
 	if (!irq->level && !irq->pending)
-		return;
+		return (false);
 
-	if (irq->on_aplist) {
-		/*
-		 * TODO: Signal to the VCPU there is an interrupt
-		 */
-		return;
+	if (!irq->on_aplist) {
+		irq->on_aplist = true;
+		TAILQ_INSERT_TAIL(&cpu_if->irq_act_pend, irq, act_pend_list);
 	}
-
-	irq->on_aplist = true;
-	TAILQ_INSERT_TAIL(&cpu_if->irq_act_pend, irq, act_pend_list);
+	return (true);
 }
 
 
@@ -642,6 +642,7 @@ write_pendr(struct hyp *hyp, int vcpuid, int n, bool set, uint64_t val)
 	uint64_t ret;
 	uint32_t irq_base;
 	int mpidr, i;
+	bool notify;
 
 	ret = 0;
 	irq_base = n * 32;
@@ -660,6 +661,7 @@ write_pendr(struct hyp *hyp, int vcpuid, int n, bool set, uint64_t val)
 		 */
 		mpidr = irq->mpidr;
 		cpu_if = &hyp->ctx[mpidr].vgic_cpu_if;
+		notify = false;
 
 		if (!set) {
 			/* pending -> not pending */
@@ -667,10 +669,13 @@ write_pendr(struct hyp *hyp, int vcpuid, int n, bool set, uint64_t val)
 		} else {
 			irq->pending = true;
 			mtx_lock_spin(&cpu_if->lr_mtx);
-			vgic_v3_queue_irq(cpu_if, irq);
+			notify = vgic_v3_queue_irq(hyp, cpu_if, mpidr, irq);
 			mtx_unlock_spin(&cpu_if->lr_mtx);
 		}
 		vgic_v3_release_irq(irq);
+
+		if (notify)
+			vcpu_notify_event(hyp->vm, mpidr, false);
 	}
 
 	return (ret);
@@ -706,6 +711,7 @@ write_activer(struct hyp *hyp, int vcpuid, u_int n, bool set, uint64_t val)
 	struct vgic_v3_irq *irq;
 	uint32_t irq_base;
 	int mpidr, i;
+	bool notify;
 
 	irq_base = n * 32;
 	for (i = 0; i < 32; i++) {
@@ -723,6 +729,7 @@ write_activer(struct hyp *hyp, int vcpuid, u_int n, bool set, uint64_t val)
 		 */
 		mpidr = irq->mpidr;
 		cpu_if = &hyp->ctx[mpidr].vgic_cpu_if;
+		notify = false;
 
 		if (!set) {
 			/* active -> not active */
@@ -731,10 +738,13 @@ write_activer(struct hyp *hyp, int vcpuid, u_int n, bool set, uint64_t val)
 			/* not active -> active */
 			irq->active = true;
 			mtx_lock_spin(&cpu_if->lr_mtx);
-			vgic_v3_queue_irq(cpu_if, irq);
+			notify = vgic_v3_queue_irq(hyp, cpu_if, mpidr, irq);
 			mtx_unlock_spin(&cpu_if->lr_mtx);
 		}
 		vgic_v3_release_irq(irq);
+
+		if (notify)
+			vcpu_notify_event(hyp->vm, mpidr, false);
 	}
 }
 
@@ -1729,10 +1739,18 @@ vgic_v3_release_irq(struct vgic_v3_irq *irq)
 	mtx_unlock_spin(&irq->irq_spinmtx);
 }
 
-int
-vgic_v3_vcpu_pending_irq(void *arg)
+bool
+vgic_v3_vcpu_pending_irq(struct hypctx *hypctx)
 {
-	panic("vgic_v3_vcpu_pending_irq");
+	struct vgic_v3_cpu_if *cpu_if;
+	bool empty;
+
+	cpu_if = &hypctx->vgic_cpu_if;
+	mtx_lock_spin(&cpu_if->lr_mtx);
+	empty = TAILQ_EMPTY(&cpu_if->irq_act_pend);
+	mtx_unlock_spin(&cpu_if->lr_mtx);
+
+	return (!empty);
 }
 
 static bool
@@ -1762,6 +1780,7 @@ vgic_v3_inject_irq(struct hyp *hyp, int vcpuid, uint32_t irqid, bool level)
 	struct vgic_v3_cpu_if *cpu_if;
 	struct vgic_v3_irq *irq;
 	uint64_t irouter;
+	bool notify;
 
 	KASSERT(vcpuid == -1 || irqid < VGIC_PRV_I_NUM,
 	    ("%s: SPI/LPI with vcpuid set: irq %u vcpuid %u", __func__, irqid,
@@ -1788,6 +1807,7 @@ vgic_v3_inject_irq(struct hyp *hyp, int vcpuid, uint32_t irqid, bool level)
 		return (1);
 	}
 
+	notify = false;
 	cpu_if = &hyp->ctx[vcpuid].vgic_cpu_if;
 
 	mtx_lock_spin(&cpu_if->lr_mtx);
@@ -1801,11 +1821,14 @@ vgic_v3_inject_irq(struct hyp *hyp, int vcpuid, uint32_t irqid, bool level)
 	else /* VGIC_CONFIG_EDGE */
 		irq->pending = true;
 
-	vgic_v3_queue_irq(cpu_if, irq);
+	notify = vgic_v3_queue_irq(hyp, cpu_if, vcpuid, irq);
 
 out:
 	mtx_unlock_spin(&cpu_if->lr_mtx);
 	vgic_v3_release_irq(irq);
+
+	if (notify)
+		vcpu_notify_event(hyp->vm, vcpuid, false);
 
 	return (0);
 }
