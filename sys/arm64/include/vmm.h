@@ -109,7 +109,6 @@ struct vm_exit;
 struct vm_run;
 struct vm_object;
 struct pmap;
-struct hypctx;
 
 struct vm_eventinfo {
 	void	*rptr;		/* rendezvous cookie */
@@ -427,10 +426,6 @@ struct vm_exit {
 			struct vm_guest_paging paging;
 			struct vie	vie;
 		} inst_emul;
-
-		struct {
-			struct hypctx *hypctx;
-		} wfi;
 
 		/*
 		 * A SMCCC call, e.g. starting a core via PSCI.

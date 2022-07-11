@@ -39,6 +39,8 @@
 #include <arm64/arm64/gic_v3_reg.h>
 #include <arm/arm/gic_common.h>
 
+struct hypctx;
+
 int vgic_v3_icc_sgi1r_read(void *vm, int vcpuid, uint64_t *rval, void *arg);
 int vgic_v3_icc_sgi1r_write(void *vm, int vcpuid, uint64_t rval, void *arg);
 
