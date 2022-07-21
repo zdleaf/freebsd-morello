@@ -159,10 +159,13 @@ vtimer_cpuinit(struct hypctx *hypctx)
 	 * CNTP_CTL_IMASK: mask interrupts
 	 * ~CNTP_CTL_ENABLE: disable the timer
 	 */
-	vtimer_cpu->cntp_ctl_el0 = CNTP_CTL_IMASK & ~CNTP_CTL_ENABLE;
+	vtimer_cpu->phys_timer.cntx_ctl_el0 = CNTP_CTL_IMASK & ~CNTP_CTL_ENABLE;
 
-	mtx_init(&vtimer_cpu->mtx, "vtimer callout mutex", NULL, MTX_DEF);
-	callout_init_mtx(&vtimer_cpu->callout, &vtimer_cpu->mtx, 0);
+	mtx_init(&vtimer_cpu->phys_timer.mtx, "vtimer phys callout mutex", NULL,
+	    MTX_DEF);
+	callout_init_mtx(&vtimer_cpu->phys_timer.callout,
+	    &vtimer_cpu->phys_timer.mtx, 0);
+	vtimer_cpu->phys_timer.irqid = GT_PHYS_NS_IRQ;
 }
 
 void
@@ -171,8 +174,8 @@ vtimer_cpucleanup(struct hypctx *hypctx)
 	struct vtimer_cpu *vtimer_cpu;
 
 	vtimer_cpu = &hypctx->vtimer_cpu;
-	callout_drain(&vtimer_cpu->callout);
-	mtx_destroy(&vtimer_cpu->mtx);
+	callout_drain(&vtimer_cpu->phys_timer.callout);
+	mtx_destroy(&vtimer_cpu->phys_timer.mtx);
 }
 
 void
@@ -207,7 +210,8 @@ vtimer_inject_irq_callout_func(void *context)
 	struct hypctx *hypctx;
 
 	hypctx = context;
-	vgic_v3_inject_irq(hypctx->hyp, hypctx->vcpu, GT_PHYS_NS_IRQ, true);
+	vgic_v3_inject_irq(hypctx->hyp, hypctx->vcpu,
+	    hypctx->vtimer_cpu.phys_timer.irqid, true);
 }
 
 
@@ -219,13 +223,14 @@ vtimer_schedule_irq(struct vtimer_cpu *vtimer_cpu, struct hyp *hyp, int vcpuid)
 	uint64_t diff;
 
 	cntpct_el0 = READ_SPECIALREG(cntpct_el0);
-	if (vtimer_cpu->cntp_cval_el0 < cntpct_el0) {
+	if (vtimer_cpu->phys_timer.cntx_cval_el0 < cntpct_el0) {
 		/* Timer set in the past, trigger interrupt */
-		vgic_v3_inject_irq(hyp, vcpuid, GT_PHYS_NS_IRQ, true);
+		vgic_v3_inject_irq(hyp, vcpuid, vtimer_cpu->phys_timer.irqid,
+		    true);
 	} else {
-		diff = vtimer_cpu->cntp_cval_el0 - cntpct_el0;
+		diff = vtimer_cpu->phys_timer.cntx_cval_el0 - cntpct_el0;
 		time = diff * SBT_1S / tmr_frq;
-		callout_reset_sbt(&vtimer_cpu->callout, time, 0,
+		callout_reset_sbt(&vtimer_cpu->phys_timer.callout, time, 0,
 		    vtimer_inject_irq_callout_func, &hyp->ctx[vcpuid], 0);
 	}
 }
@@ -237,14 +242,15 @@ vtimer_remove_irq(struct hypctx *hypctx, int vcpuid)
 
 	vtimer_cpu = &hypctx->vtimer_cpu;
 
-	callout_drain(&vtimer_cpu->callout);
+	callout_drain(&vtimer_cpu->phys_timer.callout);
 	/*
 	 * The interrupt needs to be deactivated here regardless of the callout
 	 * function having been executed. The timer interrupt can be masked with
 	 * the CNTP_CTL_EL0.IMASK bit instead of reading the IAR register.
 	 * Masking the interrupt doesn't remove it from the list registers.
 	 */
-	vgic_v3_inject_irq(hypctx->hyp, vcpuid, GT_PHYS_NS_IRQ, false);
+	vgic_v3_inject_irq(hypctx->hyp, vcpuid, vtimer_cpu->phys_timer.irqid,
+	    false);
 }
 
 /*
@@ -267,11 +273,11 @@ vtimer_phys_ctl_read(void *vm, int vcpuid, uint64_t *rval, void *arg)
 	vtimer_cpu = &hyp->ctx[vcpuid].vtimer_cpu;
 
 	cntpct_el0 = READ_SPECIALREG(cntpct_el0);
-	if (vtimer_cpu->cntp_cval_el0 < cntpct_el0)
+	if (vtimer_cpu->phys_timer.cntx_cval_el0 < cntpct_el0)
 		/* Timer condition met */
-		*rval = vtimer_cpu->cntp_ctl_el0 | CNTP_CTL_ISTATUS;
+		*rval = vtimer_cpu->phys_timer.cntx_ctl_el0 | CNTP_CTL_ISTATUS;
 	else
-		*rval = vtimer_cpu->cntp_ctl_el0 & ~CNTP_CTL_ISTATUS;
+		*rval = vtimer_cpu->phys_timer.cntx_ctl_el0 & ~CNTP_CTL_ISTATUS;
 
 	return (0);
 }
@@ -290,12 +296,12 @@ vtimer_phys_ctl_write(void *vm, int vcpuid, uint64_t wval, void *arg)
 	vtimer_cpu = &hypctx->vtimer_cpu;
 
 	timer_toggled_on = false;
-	ctl_el0 = vtimer_cpu->cntp_ctl_el0;
+	ctl_el0 = vtimer_cpu->phys_timer.cntx_ctl_el0;
 
 	if (!timer_enabled(ctl_el0) && timer_enabled(wval))
 		timer_toggled_on = true;
 
-	vtimer_cpu->cntp_ctl_el0 = wval;
+	vtimer_cpu->phys_timer.cntx_ctl_el0 = wval;
 
 	if (timer_toggled_on)
 		vtimer_schedule_irq(vtimer_cpu, hyp, vcpuid);
@@ -325,7 +331,7 @@ vtimer_phys_cval_read(void *vm, int vcpuid, uint64_t *rval, void *arg)
 	hyp = vm_get_cookie(vm);
 	vtimer_cpu = &hyp->ctx[vcpuid].vtimer_cpu;
 
-	*rval = vtimer_cpu->cntp_cval_el0;
+	*rval = vtimer_cpu->phys_timer.cntx_cval_el0;
 
 	return (0);
 }
@@ -341,9 +347,9 @@ vtimer_phys_cval_write(void *vm, int vcpuid, uint64_t wval, void *arg)
 	hypctx = &hyp->ctx[vcpuid];
 	vtimer_cpu = &hypctx->vtimer_cpu;
 
-	vtimer_cpu->cntp_cval_el0 = wval;
+	vtimer_cpu->phys_timer.cntx_cval_el0 = wval;
 
-	if (timer_enabled(vtimer_cpu->cntp_ctl_el0)) {
+	if (timer_enabled(vtimer_cpu->phys_timer.cntx_ctl_el0)) {
 		vtimer_remove_irq(hypctx, vcpuid);
 		vtimer_schedule_irq(vtimer_cpu, hyp, vcpuid);
 	}
@@ -361,7 +367,7 @@ vtimer_phys_tval_read(void *vm, int vcpuid, uint64_t *rval, void *arg)
 	hyp = vm_get_cookie(vm);
 	vtimer_cpu = &hyp->ctx[vcpuid].vtimer_cpu;
 
-	if (!(vtimer_cpu->cntp_ctl_el0 & CNTP_CTL_ENABLE)) {
+	if (!(vtimer_cpu->phys_timer.cntx_ctl_el0 & CNTP_CTL_ENABLE)) {
 		/*
 		 * ARMv8 Architecture Manual, p. D7-2702: the result of reading
 		 * TVAL when the timer is disabled is UNKNOWN. I have chosen to
@@ -371,7 +377,7 @@ vtimer_phys_tval_read(void *vm, int vcpuid, uint64_t *rval, void *arg)
 		*rval = (uint32_t)RES1;
 	} else {
 		cntpct_el0 = READ_SPECIALREG(cntpct_el0);
-		*rval = vtimer_cpu->cntp_cval_el0 - cntpct_el0;
+		*rval = vtimer_cpu->phys_timer.cntx_cval_el0 - cntpct_el0;
 	}
 
 	return (0);
@@ -390,9 +396,9 @@ vtimer_phys_tval_write(void *vm, int vcpuid, uint64_t wval, void *arg)
 	vtimer_cpu = &hypctx->vtimer_cpu;
 
 	cntpct_el0 = READ_SPECIALREG(cntpct_el0);
-	vtimer_cpu->cntp_cval_el0 = (int32_t)wval + cntpct_el0;
+	vtimer_cpu->phys_timer.cntx_cval_el0 = (int32_t)wval + cntpct_el0;
 
-	if (timer_enabled(vtimer_cpu->cntp_ctl_el0)) {
+	if (timer_enabled(vtimer_cpu->phys_timer.cntx_ctl_el0)) {
 		vtimer_remove_irq(hypctx, vcpuid);
 		vtimer_schedule_irq(vtimer_cpu, hyp, vcpuid);
 	}

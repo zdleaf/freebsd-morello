@@ -38,19 +38,30 @@ struct vtimer
 	uint64_t	cntvoff_el2;
 };
 
-struct vtimer_cpu
+struct vtimer_timer
 {
 	struct callout	callout;
 	struct mtx	mtx;
-	uint32_t	cntkctl_el1;
+
+	uint32_t	irqid;
+
 	/*
-	 * Emulated registers:
-	 *
-	 * CNTP_CTL_EL0:  Counter-timer Physical Timer Control Register
-	 * CNTP_CVAL_EL0: Counter-timer Physical Timer CompareValue Register
+	 * These registers are either emulated for the physical timer, or
+	 * the guest has full access to them for the virtual timer.
+
+	 * CNTx_CTL_EL0:  Counter-timer Timer Control Register
+	 * CNTx_CVAL_EL0: Counter-timer Timer CompareValue Register
 	 */
-	uint64_t	cntp_cval_el0;
-	uint32_t	cntp_ctl_el0;
+	uint32_t	cntx_cval_el0;
+	uint32_t	cntx_ctl_el0;
+};
+
+struct vtimer_cpu
+{
+	struct vtimer_timer phys_timer;
+
+	uint32_t	cntkctl_el1;
+
 	/*
 	 * The virtual machine has full access to the virtual timer. The
 	 * following registers are part of the VM context for the current CPU:
