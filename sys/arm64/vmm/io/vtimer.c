@@ -266,10 +266,12 @@ vtimer_remove_irq(struct hypctx *hypctx, int vcpuid)
 /*
  * Timer emulation functions.
  *
- * The guest dts is configured to use the physical timer because the Generic
- * Timer can only trap physical timer accesses. This is why we always read the
- * physical counter value when programming the time for the timer interrupt in
- * the guest.
+ * The guest should use the virtual timer, however some software, e.g. u-boot,
+ * used the physical timer. Emulate this in software for the guest to use.
+ *
+ * Adjust for cntvoff_el2 so the physical and virtual timers are at similar
+ * times. This simplifies interrupt handling in the virtual timer as the
+ * adjustment will have already happened.
  */
 
 int
@@ -282,7 +284,7 @@ vtimer_phys_ctl_read(void *vm, int vcpuid, uint64_t *rval, void *arg)
 	hyp = vm_get_cookie(vm);
 	vtimer_cpu = &hyp->ctx[vcpuid].vtimer_cpu;
 
-	cntpct_el0 = READ_SPECIALREG(cntpct_el0);
+	cntpct_el0 = READ_SPECIALREG(cntpct_el0) - hyp->vtimer.cntvoff_el2;
 	if (vtimer_cpu->phys_timer.cntx_cval_el0 < cntpct_el0)
 		/* Timer condition met */
 		*rval = vtimer_cpu->phys_timer.cntx_ctl_el0 | CNTP_CTL_ISTATUS;
@@ -322,7 +324,10 @@ vtimer_phys_ctl_write(void *vm, int vcpuid, uint64_t wval, void *arg)
 int
 vtimer_phys_cnt_read(void *vm, int vcpuid, uint64_t *rval, void *arg)
 {
-	*rval = READ_SPECIALREG(cntpct_el0);
+	struct hyp *hyp;
+
+	hyp = vm_get_cookie(vm);
+	*rval = READ_SPECIALREG(cntpct_el0) - hyp->vtimer.cntvoff_el2;
 	return (0);
 }
 
@@ -386,7 +391,8 @@ vtimer_phys_tval_read(void *vm, int vcpuid, uint64_t *rval, void *arg)
 		 */
 		*rval = (uint32_t)RES1;
 	} else {
-		cntpct_el0 = READ_SPECIALREG(cntpct_el0);
+		cntpct_el0 = READ_SPECIALREG(cntpct_el0) -
+		    hyp->vtimer.cntvoff_el2;
 		*rval = vtimer_cpu->phys_timer.cntx_cval_el0 - cntpct_el0;
 	}
 
@@ -405,7 +411,7 @@ vtimer_phys_tval_write(void *vm, int vcpuid, uint64_t wval, void *arg)
 	hypctx = &hyp->ctx[vcpuid];
 	vtimer_cpu = &hypctx->vtimer_cpu;
 
-	cntpct_el0 = READ_SPECIALREG(cntpct_el0);
+	cntpct_el0 = READ_SPECIALREG(cntpct_el0) - hyp->vtimer.cntvoff_el2;
 	vtimer_cpu->phys_timer.cntx_cval_el0 = (int32_t)wval + cntpct_el0;
 
 	if (timer_enabled(vtimer_cpu->phys_timer.cntx_ctl_el0)) {
