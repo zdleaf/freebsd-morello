@@ -119,9 +119,10 @@ vmm_hyp_reg_store(struct hypctx *hypctx, struct hyp *hyp, bool guest)
 
 		/* Store the timer registers */
 		hypctx->vtimer_cpu.cntkctl_el1 = READ_SPECIALREG(cntkctl_el1);
-		hypctx->vtimer_cpu.cntv_cval_el0 =
+		hypctx->vtimer_cpu.virt_timer.cntx_cval_el0 =
 		    READ_SPECIALREG(cntv_cval_el0);
-		hypctx->vtimer_cpu.cntv_ctl_el0 = READ_SPECIALREG(cntv_ctl_el0);
+		hypctx->vtimer_cpu.virt_timer.cntx_ctl_el0 =
+		    READ_SPECIALREG(cntv_ctl_el0);
 
 		/* Store the GICv3 registers */
 		hypctx->vgic_cpu_if.ich_eisr_el2 =
@@ -477,8 +478,9 @@ vmm_hyp_reg_restore(struct hypctx *hypctx, struct hyp *hyp, bool guest)
 		/* Load the timer registers */
 		WRITE_SPECIALREG(cntkctl_el1, hypctx->vtimer_cpu.cntkctl_el1);
 		WRITE_SPECIALREG(cntv_cval_el0,
-		    hypctx->vtimer_cpu.cntv_cval_el0);
-		WRITE_SPECIALREG(cntv_ctl_el0, hypctx->vtimer_cpu.cntv_ctl_el0);
+		    hypctx->vtimer_cpu.virt_timer.cntx_cval_el0);
+		WRITE_SPECIALREG(cntv_ctl_el0,
+		    hypctx->vtimer_cpu.virt_timer.cntx_ctl_el0);
 		WRITE_SPECIALREG(cnthctl_el2, hyp->vtimer.cnthctl_el2);
 		WRITE_SPECIALREG(cntvoff_el2, hyp->vtimer.cntvoff_el2);
 

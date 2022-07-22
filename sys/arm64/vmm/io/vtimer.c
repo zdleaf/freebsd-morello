@@ -87,8 +87,8 @@ vtimer_virtual_timer_intr(void *arg)
 
 	vgic_v3_inject_irq(hypctx->hyp, hypctx->vcpu, GT_VIRT_IRQ, true);
 
-	hypctx->vtimer_cpu.cntv_ctl_el0 &= ~CNTP_CTL_ENABLE;
-	cntv_ctl = hypctx->vtimer_cpu.cntv_ctl_el0;
+	hypctx->vtimer_cpu.virt_timer.cntx_ctl_el0 &= ~CNTP_CTL_ENABLE;
+	cntv_ctl = hypctx->vtimer_cpu.virt_timer.cntx_ctl_el0;
 
 out:
 	/*
@@ -166,6 +166,12 @@ vtimer_cpuinit(struct hypctx *hypctx)
 	callout_init_mtx(&vtimer_cpu->phys_timer.callout,
 	    &vtimer_cpu->phys_timer.mtx, 0);
 	vtimer_cpu->phys_timer.irqid = GT_PHYS_NS_IRQ;
+
+	mtx_init(&vtimer_cpu->virt_timer.mtx, "vtimer virt callout mutex", NULL,
+	    MTX_DEF);
+	callout_init_mtx(&vtimer_cpu->virt_timer.callout,
+	    &vtimer_cpu->virt_timer.mtx, 0);
+	vtimer_cpu->virt_timer.irqid = GT_VIRT_IRQ;
 }
 
 void
@@ -175,7 +181,9 @@ vtimer_cpucleanup(struct hypctx *hypctx)
 
 	vtimer_cpu = &hypctx->vtimer_cpu;
 	callout_drain(&vtimer_cpu->phys_timer.callout);
+	callout_drain(&vtimer_cpu->virt_timer.callout);
 	mtx_destroy(&vtimer_cpu->phys_timer.mtx);
+	mtx_destroy(&vtimer_cpu->virt_timer.mtx);
 }
 
 void
@@ -219,18 +227,19 @@ static void
 vtimer_schedule_irq(struct vtimer_cpu *vtimer_cpu, struct hyp *hyp, int vcpuid)
 {
 	sbintime_t time;
+	struct vtimer_timer *timer;
 	uint64_t cntpct_el0;
 	uint64_t diff;
 
+	timer = &vtimer_cpu->phys_timer;
 	cntpct_el0 = READ_SPECIALREG(cntpct_el0);
-	if (vtimer_cpu->phys_timer.cntx_cval_el0 < cntpct_el0) {
+	if (timer->cntx_cval_el0 < cntpct_el0) {
 		/* Timer set in the past, trigger interrupt */
-		vgic_v3_inject_irq(hyp, vcpuid, vtimer_cpu->phys_timer.irqid,
-		    true);
+		vgic_v3_inject_irq(hyp, vcpuid, timer->irqid, true);
 	} else {
-		diff = vtimer_cpu->phys_timer.cntx_cval_el0 - cntpct_el0;
+		diff = timer->cntx_cval_el0 - cntpct_el0;
 		time = diff * SBT_1S / tmr_frq;
-		callout_reset_sbt(&vtimer_cpu->phys_timer.callout, time, 0,
+		callout_reset_sbt(&timer->callout, time, 0,
 		    vtimer_inject_irq_callout_func, &hyp->ctx[vcpuid], 0);
 	}
 }
@@ -239,18 +248,19 @@ static void
 vtimer_remove_irq(struct hypctx *hypctx, int vcpuid)
 {
 	struct vtimer_cpu *vtimer_cpu;
+	struct vtimer_timer *timer;
 
 	vtimer_cpu = &hypctx->vtimer_cpu;
+	timer = &vtimer_cpu->phys_timer;
 
-	callout_drain(&vtimer_cpu->phys_timer.callout);
+	callout_drain(&timer->callout);
 	/*
 	 * The interrupt needs to be deactivated here regardless of the callout
 	 * function having been executed. The timer interrupt can be masked with
 	 * the CNTP_CTL_EL0.IMASK bit instead of reading the IAR register.
 	 * Masking the interrupt doesn't remove it from the list registers.
 	 */
-	vgic_v3_inject_irq(hypctx->hyp, vcpuid, vtimer_cpu->phys_timer.irqid,
-	    false);
+	vgic_v3_inject_irq(hypctx->hyp, vcpuid, timer->irqid, false);
 }
 
 /*
