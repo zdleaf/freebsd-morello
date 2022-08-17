@@ -2485,13 +2485,6 @@ pmap_growkernel(vm_offset_t addr)
  ***************************************************/
 
 CTASSERT(sizeof(struct pv_chunk) == PAGE_SIZE);
-#if PAGE_SIZE == PAGE_SIZE_4K
-CTASSERT(_NPCM == 3);
-CTASSERT(_NPCPV == 168);
-#else
-CTASSERT(_NPCM == 11);
-CTASSERT(_NPCPV == 677);
-#endif
 
 static __inline struct pv_chunk *
 pv_to_chunk(pv_entry_t pv)
@@ -2503,11 +2496,7 @@ pv_to_chunk(pv_entry_t pv)
 #define PV_PMAP(pv) (pv_to_chunk(pv)->pc_pmap)
 
 #define	PC_FREEN	0xfffffffffffffffful
-#if _NPCM == 3
-#define	PC_FREEL	0x000000fffffffffful
-#elif _NPCM == 11
-#define	PC_FREEL	0x0000001ffffffffful
-#endif
+#define	PC_FREEL	((1ul << (_NPCPV % 64)) - 1)
 
 #if _NPCM == 3
 #define	PC_IS_FREE(pc)	((pc)->pc_map[0] == PC_FREEN &&			\
@@ -2526,6 +2515,15 @@ static const uint64_t pc_freemask[] = { PC_FREEN, PC_FREEN,
 };
 
 CTASSERT(nitems(pc_freemask) == _NPCM);
+
+static __inline bool
+pc_is_full(struct pv_chunk *pc)
+{
+	for (u_int i = 0; i < _NPCM; i++)
+		if (pc->pc_map[i] != 0)
+			return (false);
+	return (true);
+}
 
 #ifdef PV_STATS
 static int pc_chunk_count, pc_chunk_allocs, pc_chunk_frees, pc_chunk_tryfail;
@@ -2821,8 +2819,7 @@ retry:
 			pv = &pc->pc_pventry[field * 64 + bit];
 			pc->pc_map[field] &= ~(1ul << bit);
 			/* If this was the last item, move it to tail */
-			if (pc->pc_map[0] == 0 && pc->pc_map[1] == 0 &&
-			    pc->pc_map[2] == 0) {
+			if (pc_is_full(pc)) {
 				TAILQ_REMOVE(&pmap->pm_pvchunk, pc, pc_list);
 				TAILQ_INSERT_TAIL(&pmap->pm_pvchunk, pc,
 				    pc_list);
@@ -2989,8 +2986,7 @@ pmap_pv_demote_l2(pmap_t pmap, vm_offset_t va, vm_paddr_t pa,
 	va_last = va + L2_SIZE - PAGE_SIZE;
 	for (;;) {
 		pc = TAILQ_FIRST(&pmap->pm_pvchunk);
-		KASSERT(pc->pc_map[0] != 0 || pc->pc_map[1] != 0 ||
-		    pc->pc_map[2] != 0, ("pmap_pv_demote_l2: missing spare"));
+		KASSERT(!pc_is_full(pc), ("pmap_pv_demote_l2: missing spare"));
 		for (field = 0; field < _NPCM; field++) {
 			while (pc->pc_map[field]) {
 				bit = ffsl(pc->pc_map[field]) - 1;
@@ -3011,7 +3007,7 @@ pmap_pv_demote_l2(pmap_t pmap, vm_offset_t va, vm_paddr_t pa,
 		TAILQ_INSERT_TAIL(&pmap->pm_pvchunk, pc, pc_list);
 	}
 out:
-	if (pc->pc_map[0] == 0 && pc->pc_map[1] == 0 && pc->pc_map[2] == 0) {
+	if (pc_is_full(pc)) {
 		TAILQ_REMOVE(&pmap->pm_pvchunk, pc, pc_list);
 		TAILQ_INSERT_TAIL(&pmap->pm_pvchunk, pc, pc_list);
 	}
