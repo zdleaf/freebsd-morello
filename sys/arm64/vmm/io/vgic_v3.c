@@ -1341,7 +1341,7 @@ redist_propbaser_read(struct hyp *hyp, int vcpuid, u_int reg, uint64_t *rval,
 	struct vgic_v3_redist *redist;
 
 	redist = &hyp->ctx[vcpuid].vgic_redist;
-	*rval = atomic_load_32(&redist->gicr_propbaser);
+	*rval = atomic_load_64(&redist->gicr_propbaser);
 }
 
 static void
@@ -1358,7 +1358,7 @@ redist_propbaser_write(struct hyp *hyp, int vcpuid, u_int reg, u_int offset,
 	wval |=
 	    (GICR_PROPBASER_SHARE_OS << GICR_PROPBASER_SHARE_SHIFT) |
 	    (GICR_PROPBASER_CACHE_NIWAWB << GICR_PROPBASER_CACHE_SHIFT);
-	redist->gicr_propbaser = wval;
+	atomic_store_64(&redist->gicr_propbaser, wval);
 }
 
 /* GICR_PENDBASER */
