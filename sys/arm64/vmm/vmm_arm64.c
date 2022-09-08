@@ -192,7 +192,7 @@ arm_setup_vectors(void *arg)
 		panic("Invalid t0sz: %u", t0sz);
 
 	/* Special call to initialize EL2 */
-	vmm_call_hyp((void *)NULL, vmmpmap_to_ttbr0(), stack_top, tcr_el2,
+	vmm_call_hyp((void *)vmmpmap_to_ttbr0(), stack_top, tcr_el2,
 	    sctlr_el2, vtcr_el2);
 
 	intr_restore(daif);

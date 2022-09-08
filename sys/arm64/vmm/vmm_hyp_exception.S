@@ -195,12 +195,11 @@ hyp_vectors:
  * table and stack.
  *
  * Expecting:
- * x0 - the hypervisor exception vectors
- * x1 - translation tables physical address
- * x2 - stack top virtual address
- * x3 - TCR_EL2 value
- * x4 - SCTLR_EL2 value
- * x5 - VTCR_EL2 value
+ * x0 - translation tables physical address
+ * x1 - stack top virtual address
+ * x2 - TCR_EL2 value
+ * x3 - SCTLR_EL2 value
+ * x4 - VTCR_EL2 value
  */
 LENTRY(handle_hyp_init)
 	/* Install the new exception vectors */
@@ -208,24 +207,24 @@ LENTRY(handle_hyp_init)
 	add	x6, x6, :lo12:hyp_vectors
 	msr	vbar_el2, x6
 	/* Set the stack top address */
-	mov	sp, x2
+	mov	sp, x1
 	/* Use the host VTTBR_EL2 to tell the host and the guests apart */
 	mov	x9, #VTTBR_HOST
 	msr	vttbr_el2, x9
 	/* Load the base address for the translation tables */
-	msr	ttbr0_el2, x1
+	msr	ttbr0_el2, x0
 	/* Invalidate the TLB */
 	tlbi	alle2
 	/* Use the same memory attributes as EL1 */
 	mrs	x9, mair_el1
 	msr	mair_el2, x9
 	/* Configure address translation */
-	msr	tcr_el2, x3
+	msr	tcr_el2, x2
 	isb
 	/* Set the system control register for EL2 */
-	msr	sctlr_el2, x4
+	msr	sctlr_el2, x3
 	/* Set the Stage 2 translation control register */
-	msr	vtcr_el2, x5
+	msr	vtcr_el2, x4
 	/* Return success */
 	mov	x0, #0
 	/* MMU is up and running */
