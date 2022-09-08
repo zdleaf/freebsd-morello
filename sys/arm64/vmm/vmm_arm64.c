@@ -118,7 +118,7 @@ arm_setup_vectors(void *arg)
 	 * x0: the exception vector table responsible for hypervisor
 	 * initialization on the next call.
 	 */
-	vmm_call_hyp((void *)vtophys(&vmm_hyp_code));
+	vmm_call_hyp(vtophys(&vmm_hyp_code));
 
 	/* Create and map the hypervisor stack */
 	stack_top = (char *)stack_hyp_va[PCPU_GET(cpuid)] + VMM_STACK_SIZE;
@@ -192,7 +192,7 @@ arm_setup_vectors(void *arg)
 		panic("Invalid t0sz: %u", t0sz);
 
 	/* Special call to initialize EL2 */
-	vmm_call_hyp((void *)vmmpmap_to_ttbr0(), stack_top, tcr_el2,
+	vmm_call_hyp(vmmpmap_to_ttbr0(), stack_top, tcr_el2,
 	    sctlr_el2, vtcr_el2);
 
 	intr_restore(daif);
@@ -219,7 +219,7 @@ arm_teardown_vectors(void *arg)
 	 */
 	daif = intr_disable();
 	/* TODO: Invalidate the cache */
-	vmm_call_hyp((void *)HYP_CLEANUP, vtophys(hyp_stub_vectors));
+	vmm_call_hyp(HYP_CLEANUP, vtophys(hyp_stub_vectors));
 	intr_restore(daif);
 
 	arm64_set_active_vcpu(NULL);
@@ -318,8 +318,8 @@ arm_init(int ipinum)
 
 
 	daif = intr_disable();
-	ich_vtr_el2 = vmm_call_hyp((void *)HYP_READ_REGISTER, HYP_REG_ICH_VTR);
-	cnthctl_el2 = vmm_call_hyp((void *)HYP_READ_REGISTER, HYP_REG_CNTHCTL);
+	ich_vtr_el2 = vmm_call_hyp(HYP_READ_REGISTER, HYP_REG_ICH_VTR);
+	cnthctl_el2 = vmm_call_hyp(HYP_READ_REGISTER, HYP_REG_CNTHCTL);
 	intr_restore(daif);
 
 	vgic_v3_init(ich_vtr_el2);
@@ -441,7 +441,7 @@ vmm_pmap_clean_stage2_tlbi(void)
 	smp_rendezvous(NULL, NULL, NULL, NULL);
 
 	/* TODO: disable irqs */
-	vmm_call_hyp((void *)HYP_CLEAN_S2_TLBI);
+	vmm_call_hyp(HYP_CLEAN_S2_TLBI);
 }
 
 static enum vm_reg_name
@@ -732,7 +732,7 @@ arm_vmrun(void *arg, int vcpu, register_t pc, pmap_t pmap,
 		vgic_v3_flush_hwstate(hypctx);
 
 		/* Call into EL2 to switch to the guest */
-		excp_type = vmm_call_hyp((void *)HYP_ENTER_GUEST,
+		excp_type = vmm_call_hyp(HYP_ENTER_GUEST,
 		    hyp->el2_addr, vcpu);
 
 		vgic_v3_sync_hwstate(hypctx);

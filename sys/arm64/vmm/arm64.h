@@ -117,7 +117,7 @@ struct hyp {
 	bool		vgic_attached;
 };
 
-uint64_t	vmm_call_hyp(void *hyp_func_addr, ...);
+uint64_t	vmm_call_hyp(uint64_t, ...);
 void 		vmm_cleanup(void *hyp_stub_vectors);
 uint64_t 	vmm_enter_guest(struct hypctx *hypctx);
 uint64_t 	vmm_read_ich_vtr_el2(void);
