@@ -47,7 +47,6 @@ __FBSDID("$FreeBSD$");
 
 #ifdef __amd64__
 #include <amd64/vmm/intel/vmcs.h>
-#include <x86/apicreg.h>
 #endif
 
 #include <machine/atomic.h>
@@ -1049,34 +1048,6 @@ vmexit_breakpoint(struct vmctx *ctx, struct vm_exit *vmexit, int *pvcpu)
 	return (VMEXIT_CONTINUE);
 }
 
-static int
-vmexit_ipi(struct vmctx *ctx, struct vm_exit *vmexit, int *pvcpu)
-{
-	int error = -1;
-	int i;
-	switch (vmexit->u.ipi.mode) {
-	case APIC_DELMODE_INIT:
-		CPU_FOREACH_ISSET (i, &vmexit->u.ipi.dmask) {
-			error = vm_suspend_cpu(ctx, i);
-			if (error) {
-				warnx("%s: failed to suspend cpu %d\n",
-				    __func__, i);
-				break;
-			}
-		}
-		break;
-	case APIC_DELMODE_STARTUP:
-		CPU_FOREACH_ISSET (i, &vmexit->u.ipi.dmask) {
-			spinup_ap(ctx, i, vmexit->u.ipi.vector << PAGE_SHIFT);
-		}
-		error = 0;
-		break;
-	default:
-		break;
-	}
-
-	return (error);
-}
 #endif
 
 static vmexit_handler_t handler[VM_EXITCODE_MAX] = {
@@ -1102,7 +1073,6 @@ static vmexit_handler_t handler[VM_EXITCODE_MAX] = {
 	[VM_EXITCODE_TASK_SWITCH] = vmexit_task_switch,
 	[VM_EXITCODE_DEBUG] = vmexit_debug,
 	[VM_EXITCODE_BPT] = vmexit_breakpoint,
-	[VM_EXITCODE_IPI] = vmexit_ipi,
 #endif
 #ifdef __aarch64__
 	[VM_EXITCODE_SMCCC] = vmexit_smccc,
@@ -1326,8 +1296,6 @@ spinup_vcpu(struct vmctx *ctx, int vcpu, bool suspend)
 	error = vm_set_capability(ctx, vcpu, VM_CAP_UNRESTRICTED_GUEST, 1);
 	assert(error == 0);
 
-	error = vm_set_capability(ctx, vcpu, VM_CAP_IPI_EXIT, 1);
-	assert(error == 0);
 #endif
 
 	fbsdrun_addcpu(ctx, vcpu, rip, suspend);
