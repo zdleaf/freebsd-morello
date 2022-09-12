@@ -45,8 +45,10 @@ __FBSDID("$FreeBSD$");
 #include <sys/un.h>
 #endif
 
+#ifdef __amd64__
 #include <amd64/vmm/intel/vmcs.h>
 #include <x86/apicreg.h>
+#endif
 
 #include <machine/atomic.h>
 #ifdef __amd64__
@@ -135,6 +137,7 @@ int fdt_build(struct vmctx *ctx, int ncpu);
 #define	VM_REG_GUEST_PC		VM_REG_GUEST_RIP
 #endif
 
+#ifdef __amd64__
 static const char * const vmx_exit_reason_desc[] = {
 	[EXIT_REASON_EXCEPTION] = "Exception or non-maskable interrupt (NMI)",
 	[EXIT_REASON_EXT_INTR] = "External interrupt",
@@ -201,6 +204,7 @@ static const char * const vmx_exit_reason_desc[] = {
 	[EXIT_REASON_XSAVES] = "XSAVES",
 	[EXIT_REASON_XRSTORS] = "XRSTORS"
 };
+#endif
 
 void init_uart(struct vmctx *);
 
@@ -790,6 +794,7 @@ static uint64_t ept_misconfig_gpa, ept_misconfig_pte[4];
 static int ept_misconfig_ptenum;
 #endif
 
+#ifdef __amd64__
 static const char *
 vmexit_vmx_desc(uint32_t exit_reason)
 {
@@ -799,6 +804,7 @@ vmexit_vmx_desc(uint32_t exit_reason)
 		return ("Unknown");
 	return (vmx_exit_reason_desc[exit_reason]);
 }
+#endif
 
 static int
 vmexit_vmx(struct vmctx *ctx, struct vm_exit *vmexit, int *pvcpu)
@@ -810,8 +816,10 @@ vmexit_vmx(struct vmctx *ctx, struct vm_exit *vmexit, int *pvcpu)
 	    VM_EXIT_PC(*vmexit));
 	fprintf(stderr, "\tinst_length\t%d\n", vmexit->inst_length);
 	fprintf(stderr, "\tstatus\t\t%d\n", vmexit->u.vmx.status);
+#ifdef __amd64__
 	fprintf(stderr, "\texit_reason\t%u (%s)\n", vmexit->u.vmx.exit_reason,
 	    vmexit_vmx_desc(vmexit->u.vmx.exit_reason));
+#endif
 	fprintf(stderr, "\tqualification\t0x%016lx\n",
 	    vmexit->u.vmx.exit_qualification);
 	fprintf(stderr, "\tinst_type\t\t%d\n", vmexit->u.vmx.inst_type);
@@ -1312,8 +1320,10 @@ spinup_vcpu(struct vmctx *ctx, int vcpu, bool suspend)
 	error = vm_set_capability(ctx, vcpu, VM_CAP_UNRESTRICTED_GUEST, 1);
 	assert(error == 0);
 
+#ifdef __amd64__
 	error = vm_set_capability(ctx, vcpu, VM_CAP_IPI_EXIT, 1);
 	assert(error == 0);
+#endif
 
 	fbsdrun_addcpu(ctx, vcpu, rip, suspend);
 }
