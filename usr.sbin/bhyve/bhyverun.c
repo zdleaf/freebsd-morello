@@ -1310,9 +1310,15 @@ do_open(const char *vmname)
 static void
 spinup_vcpu(struct vmctx *ctx, int vcpu, bool suspend)
 {
+#ifdef __amd64__
 	int error;
+#endif
 	uint64_t rip;
 
+#ifdef __aarch64__
+	rip = 0x100000000;
+#endif
+#ifdef __amd64__
 	error = vm_get_register(ctx, vcpu, VM_REG_GUEST_PC, &rip);
 	assert(error == 0);
 
@@ -1320,7 +1326,6 @@ spinup_vcpu(struct vmctx *ctx, int vcpu, bool suspend)
 	error = vm_set_capability(ctx, vcpu, VM_CAP_UNRESTRICTED_GUEST, 1);
 	assert(error == 0);
 
-#ifdef __amd64__
 	error = vm_set_capability(ctx, vcpu, VM_CAP_IPI_EXIT, 1);
 	assert(error == 0);
 #endif
