@@ -104,8 +104,6 @@ static char cpu_model[64];
 SYSCTL_STRING(_hw, HW_MODEL, model, CTLFLAG_RD,
 	cpu_model, sizeof(cpu_model), "Machine model");
 
-#define	MAX_CACHES	8	/* Maximum number of caches supported
-				   architecturally. */
 /*
  * Per-CPU affinity as provided in MPIDR_EL1
  * Indexed by CPU number in logical order selected by the system.

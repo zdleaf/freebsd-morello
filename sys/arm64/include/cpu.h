@@ -173,6 +173,9 @@
 #define	CPU_MATCH_ERRATA_CAVIUM_THUNDERX_1_1	0
 #endif
 
+#define	MAX_CACHES	8	/* Maximum number of caches supported
+				   architecturally. */
+
 struct cpu_desc {
 	uint64_t	mpidr;
 	uint64_t	id_aa64afr0;
