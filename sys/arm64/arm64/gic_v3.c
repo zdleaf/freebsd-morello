@@ -445,7 +445,7 @@ gic_v3_get_domain(device_t dev, device_t child, int *domain)
 	struct gic_v3_devinfo *di;
 
 	di = device_get_ivars(child);
-	if (di == NULL || di->gic_domain < 0)
+	if (di->gic_domain < 0)
 		return (ENOENT);
 
 	*domain = di->gic_domain;
