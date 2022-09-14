@@ -79,9 +79,6 @@ __FBSDID("$FreeBSD$");
 #include <dev/acpica/acpivar.h>
 #endif
 
-/* TODO: delete me */
-#include <arm64/vmm/arm64.h>
-
 #include "generic_timer.h"
 
 #define	GT_CTRL_ENABLE		(1 << 0)
@@ -316,13 +313,6 @@ arm_tmr_start(struct eventtimer *et, sbintime_t first,
 	struct arm_tmr_softc *sc;
 	int counts, ctrl;
 
-#if DEBUG_ME == 1
-	if (!virt_enabled()) {
-		ctrl = READ_SPECIALREG(cntv_ctl_el0);
-		eprintf("Old cntv_ctl_el0 = 0x%08x\n", ctrl);
-	}
-#endif
-
 	sc = (struct arm_tmr_softc *)et->et_priv;
 
 	if (first != 0) {
@@ -331,10 +321,6 @@ arm_tmr_start(struct eventtimer *et, sbintime_t first,
 		ctrl &= ~GT_CTRL_INT_MASK;
 		ctrl |= GT_CTRL_ENABLE;
 		set_tval(counts, sc->physical);
-#if DEBUG_ME == 1
-		if (!virt_enabled())
-			eprintf("New cntv_ctl_el0 = 0x%08x\n", ctrl);
-#endif
 		set_ctrl(ctrl, sc->physical);
 		return (0);
 	}
@@ -358,24 +344,8 @@ arm_tmr_stop(struct eventtimer *et)
 {
 	struct arm_tmr_softc *sc;
 
-	/* TODO: delete me */
-#if DEBUG_ME == 1
-	int ctrl;
-	if (!virt_enabled()) {
-		ctrl = READ_SPECIALREG(cntv_ctl_el0);
-		eprintf("Old cntv_ctl_el0 = 0x%08x\n", ctrl);
-	}
-#endif
-
 	sc = (struct arm_tmr_softc *)et->et_priv;
 	arm_tmr_disable(sc->physical);
-
-#if DEBUG_ME == 1
-	if (!virt_enabled()) {
-		ctrl = READ_SPECIALREG(cntv_ctl_el0);
-		eprintf("New cntv_ctl_el0 = 0x%08x\n", ctrl);
-	}
-#endif
 
 	return (0);
 }
@@ -386,24 +356,11 @@ arm_tmr_intr(void *arg)
 	struct arm_tmr_softc *sc;
 	int ctrl;
 
-#if DEBUG_ME == 1
-	if (!virt_enabled()) {
-		ctrl = READ_SPECIALREG(cntv_ctl_el0);
-		eprintf("Old cntv_ctl_el0 = 0x%08x\n", ctrl);
-	}
-#endif
-
 	sc = (struct arm_tmr_softc *)arg;
 	ctrl = get_ctrl(sc->physical);
 	if (ctrl & GT_CTRL_INT_STAT) {
 		ctrl |= GT_CTRL_INT_MASK;
 		set_ctrl(ctrl, sc->physical);
-#if DEBUG_ME == 1
-		if (!virt_enabled()) {
-			ctrl = READ_SPECIALREG(cntv_ctl_el0);
-			eprintf("New cntv_ctl_el0 = 0x%08x\n", ctrl);
-		}
-#endif
 	}
 
 	if (sc->et.et_active)
