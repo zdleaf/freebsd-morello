@@ -100,8 +100,8 @@ extern char hypmode_enabled[];
 #endif
 
 struct arm_tmr_softc {
-	struct resource		*res[4];
-	void			*ihl[4];
+	struct resource		*res[GT_IRQ_COUNT];
+	void			*ihl[GT_IRQ_COUNT];
 	uint64_t		(*get_cntxct)(bool);
 	uint32_t		clkfreq;
 	struct eventtimer	et;
@@ -111,10 +111,10 @@ struct arm_tmr_softc {
 static struct arm_tmr_softc *arm_tmr_sc = NULL;
 
 static struct resource_spec timer_spec[] = {
-	{ SYS_RES_IRQ,		0,	RF_ACTIVE },	/* Secure */
-	{ SYS_RES_IRQ,		1,	RF_ACTIVE },	/* Non-secure */
-	{ SYS_RES_IRQ,		2,	RF_ACTIVE | RF_OPTIONAL }, /* Virt */
-	{ SYS_RES_IRQ,		3,	RF_ACTIVE | RF_OPTIONAL	}, /* Hyp */
+	{ SYS_RES_IRQ,	GT_PHYS_SECURE,		RF_ACTIVE },
+	{ SYS_RES_IRQ,	GT_PHYS_NONSECURE,	RF_ACTIVE },
+	{ SYS_RES_IRQ,	GT_VIRT,		RF_ACTIVE | RF_OPTIONAL },
+	{ SYS_RES_IRQ,	GT_HYP,			RF_ACTIVE | RF_OPTIONAL	},
 	{ -1, 0 }
 };
 
@@ -454,9 +454,12 @@ arm_tmr_acpi_identify(driver_t *driver, device_t parent)
 		goto out;
 	}
 
-	arm_tmr_acpi_add_irq(parent, dev, 0, gtdt->SecureEl1Interrupt);
-	arm_tmr_acpi_add_irq(parent, dev, 1, gtdt->NonSecureEl1Interrupt);
-	arm_tmr_acpi_add_irq(parent, dev, 2, gtdt->VirtualTimerInterrupt);
+	arm_tmr_acpi_add_irq(parent, dev, GT_PHYS_SECURE,
+	    gtdt->SecureEl1Interrupt);
+	arm_tmr_acpi_add_irq(parent, dev, GT_PHYS_NONSECURE,
+	    gtdt->NonSecureEl1Interrupt);
+	arm_tmr_acpi_add_irq(parent, dev, GT_VIRT,
+	    gtdt->VirtualTimerInterrupt);
 
 out:
 	acpi_unmap_table(gtdt);
@@ -520,12 +523,21 @@ arm_tmr_attach(device_t dev)
 		return (ENXIO);
 	}
 
-	sc->physical = (sc->res[GT_VIRT] == NULL);
-#ifdef __arm__
-	sc->physical |= (hypmode_enabled[0] == 0);
-#elif defined(__aarch64__)
-	sc->physical |= virt_enabled();
+#ifdef __aarch64__
+	/* Use the virtual timer if we have one. */
+	if (sc->res[GT_VIRT] != NULL && !virt_enabled()) {
+		sc->physical = false;
+		first_timer = GT_VIRT;
+		last_timer = GT_VIRT;
+	} else
 #endif
+	/* Otherwise set up the secure and non-secure physical timers. */
+	{
+		sc->physical = true;
+		first_timer = GT_PHYS_SECURE;
+		last_timer = GT_PHYS_NONSECURE;
+	}
+
 	arm_tmr_sc = sc;
 
 	/* Setup secure, non-secure and virtual IRQs handler */
@@ -551,7 +563,7 @@ arm_tmr_attach(device_t dev)
 	}
 
 	/* Disable the virtual timer until we are ready */
-	if (sc->res[2] != NULL)
+	if (sc->res[GT_VIRT] != NULL)
 		arm_tmr_disable(false);
 	/* And the physical */
 	if (sc->physical)
