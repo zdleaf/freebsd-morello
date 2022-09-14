@@ -359,7 +359,6 @@ gic_v3_ofw_bus_attach(device_t dev)
 	 * If there is a vgic maintanance interupt add a virtual gic
 	 * child so we can use this in the vmm module for bhyve.
 	 */
-	/* TODO: Support with ACPI */
 	if (OF_hasprop(parent, "interrupts")) {
 		child = device_add_child(dev, "vgic", -1);
 		if (child == NULL) {
