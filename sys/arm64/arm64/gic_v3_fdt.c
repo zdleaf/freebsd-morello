@@ -215,13 +215,10 @@ gic_v3_fdt_print_child(device_t bus, device_t child)
 	struct resource_list *rl;
 	int retval = 0;
 
-	if (di != NULL) {
-		rl = &di->di_rl;
-		retval += bus_print_child_header(bus, child);
-		retval += resource_list_print_type(rl, "mem", SYS_RES_MEMORY,
-		    "%#jx");
-		retval += bus_print_child_footer(bus, child);
-	}
+	rl = &di->di_rl;
+	retval += bus_print_child_header(bus, child);
+	retval += resource_list_print_type(rl, "mem", SYS_RES_MEMORY, "%#jx");
+	retval += bus_print_child_footer(bus, child);
 
 	return (retval);
 }
