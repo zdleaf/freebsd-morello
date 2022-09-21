@@ -36,6 +36,7 @@
 #define	GT_PHYS_NONSECURE	1
 #define	GT_VIRT			2
 #define	GT_HYP			3
+#define	GT_IRQ_COUNT		4
 
 int	arm_tmr_setup_intr(int gt_type, driver_filter_t filter,
     driver_intr_t handler, void *arg);

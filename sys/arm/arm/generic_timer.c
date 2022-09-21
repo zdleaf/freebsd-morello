@@ -527,33 +527,20 @@ arm_tmr_attach(device_t dev)
 	/* Use the virtual timer if we have one. */
 	if (sc->res[GT_VIRT] != NULL && !virt_enabled()) {
 		sc->physical = false;
-		first_timer = GT_VIRT;
-		last_timer = GT_VIRT;
 	} else
 #endif
 	/* Otherwise set up the secure and non-secure physical timers. */
 	{
 		sc->physical = true;
-		first_timer = GT_PHYS_SECURE;
-		last_timer = GT_PHYS_NONSECURE;
 	}
 
 	arm_tmr_sc = sc;
 
 	/* Setup secure, non-secure and virtual IRQs handler */
-	for (i = 0; i < 3; i++) {
+	for (i = 0; i < GT_IRQ_COUNT; i++) {
 		/* If we do not have the interrupt, skip it. */
 		if (sc->res[i] == NULL)
 			continue;
-#if defined(__aarch64__)
-		if (i == 2 && virt_enabled()) {
-			/*
-			 * Do not install an interrupt handler for the virtual
-			 * timer. This will be used by the VM.
-			 */
-			continue;
-		}
-#endif
 		error = bus_setup_intr(dev, sc->res[i], INTR_TYPE_CLK,
 		    arm_tmr_intr, NULL, sc, &sc->ihl[i]);
 		if (error) {
