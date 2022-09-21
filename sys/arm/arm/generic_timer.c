@@ -62,10 +62,6 @@ __FBSDID("$FreeBSD$");
 #include <machine/machdep.h> /* For arm_set_delay */
 
 #if defined(__aarch64__)
-#include <machine/vmm.h>	/* For virt_enabled() */
-#endif
-
-#if defined(__aarch64__)
 #include <machine/undefined.h>
 #endif
 
@@ -572,7 +568,7 @@ arm_tmr_attach(device_t dev)
 
 #ifdef __aarch64__
 	/* Use the virtual timer if we have one. */
-	if (sc->irqs[GT_VIRT].res != NULL && !virt_enabled()) {
+	if (sc->irqs[GT_VIRT].res != NULL && !has_hyp()) {
 		sc->physical = false;
 	} else
 #endif
