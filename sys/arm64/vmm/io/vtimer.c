@@ -30,6 +30,7 @@
 #include <sys/types.h>
 #include <sys/bus.h>
 #include <sys/mutex.h>
+#include <sys/rman.h>
 #include <sys/systm.h>
 #include <sys/time.h>
 #include <sys/timeet.h>
@@ -40,7 +41,6 @@
 #include <machine/vmm.h>
 #include <machine/armreg.h>
 
-#include <arm/arm/generic_timer.h>
 #include <arm64/vmm/arm64.h>
 
 #include "vgic_v3.h"
@@ -53,6 +53,7 @@
 
 static uint64_t cnthctl_el2_reg;
 static uint32_t tmr_frq;
+static bool have_vtimer = false;
 
 #define timer_condition_met(ctl)	((ctl) & CNTP_CTL_ISTATUS)
 
@@ -108,8 +109,6 @@ out:
 int
 vtimer_init(uint64_t cnthctl_el2)
 {
-	int error;
-
 	cnthctl_el2_reg = cnthctl_el2;
 	/*
 	 * The guest *MUST* use the same timer frequency as the host. The
@@ -117,12 +116,6 @@ vtimer_init(uint64_t cnthctl_el2)
 	 * in the guest dts file might have unforseen consequences.
 	 */
 	tmr_frq = READ_SPECIALREG(cntfrq_el0);
-
-	error = arm_tmr_setup_intr(GT_VIRT, vtimer_virtual_timer_intr, NULL, NULL);
-	if (error) {
-		printf("WARNING: arm_tmr_setup_intr() error: %d\n", error);
-		printf("WARNING: Expect reduced performance\n");
-	}
 
 	return (0);
 }
@@ -204,12 +197,6 @@ vtimer_vmcleanup(struct hyp *hyp)
 void
 vtimer_cleanup(void)
 {
-	int error;
-
-	error = arm_tmr_teardown_intr(GT_VIRT);
-	if (error)
-		printf("WARNING: arm_tmr_teardown_intr() error: %d\n", error);
-
 }
 
 static void
@@ -421,3 +408,49 @@ vtimer_phys_tval_write(void *vm, int vcpuid, uint64_t wval, void *arg)
 
 	return (0);
 }
+
+struct vtimer_softc {
+	struct resource *res;
+	void *ihl;
+	int rid;
+};
+
+static int
+vtimer_probe(device_t dev)
+{
+	device_set_desc(dev, "Virtual timer");
+	return (BUS_PROBE_DEFAULT);
+}
+
+static int
+vtimer_attach(device_t dev)
+{
+	struct vtimer_softc *sc;
+
+	sc = device_get_softc(dev);
+
+	sc->rid = 0;
+	sc->res = bus_alloc_resource_any(dev, SYS_RES_IRQ, &sc->rid, RF_ACTIVE);
+	if (sc->res == NULL)
+		return (ENXIO);
+
+	bus_setup_intr(dev, sc->res, INTR_TYPE_CLK, vtimer_virtual_timer_intr,
+	    NULL, NULL, &sc->ihl);
+
+	have_vtimer = true;
+	return (0);
+}
+
+static device_method_t vtimer_methods[] = {
+	/* Device interface */
+	DEVMETHOD(device_probe,		vtimer_probe),
+	DEVMETHOD(device_attach,	vtimer_attach),
+
+	/* End */
+	DEVMETHOD_END
+};
+
+DEFINE_CLASS_0(vtimer, vtimer_driver, vtimer_methods,
+    sizeof(struct vtimer_softc));
+
+DRIVER_MODULE(vtimer, generic_timer, vtimer_driver, 0, 0);

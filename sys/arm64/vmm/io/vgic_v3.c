@@ -55,7 +55,6 @@
 #include <machine/vmm_instruction_emul.h>
 
 #include <arm/arm/gic_common.h>
-#include <arm/arm/generic_timer.h>
 #include <arm64/arm64/gic_v3_reg.h>
 #include <arm64/arm64/gic_v3_var.h>
 
