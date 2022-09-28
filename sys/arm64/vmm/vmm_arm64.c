@@ -67,9 +67,21 @@
 
 #define	UNUSED		0
 
+/* Number of bits in an EL2 virtual address */
+#define	EL2_VIRT_BITS	48
+CTASSERT((1ul << EL2_VIRT_BITS) >= HYP_VM_MAX_ADDRESS);
+
 /* TODO: Move the host hypctx off the stack */
 #define	VMM_STACK_PAGES	4
 #define	VMM_STACK_SIZE	(VMM_STACK_PAGES * PAGE_SIZE)
+
+static int vmm_pmap_levels, vmm_virt_bits;
+
+/* Register values passed to arm_setup_vectors to set in the hypervisor */
+struct vmm_init_regs {
+	uint64_t tcr_el2;
+	uint64_t vtcr_el2;
+};
 
 MALLOC_DEFINE(M_HYP, "ARM VMM HYP", "ARM VMM HYP");
 
@@ -98,15 +110,12 @@ arm64_set_active_vcpu(struct hypctx *hypctx)
 static void
 arm_setup_vectors(void *arg)
 {
+	struct vmm_init_regs *el2_regs;
 	char *stack_top;
-	uint64_t tcr_el1, tcr_el2;
-	uint64_t id_aa64mmfr0_el1;
-	uint64_t pa_range_bits;
 	uint32_t sctlr_el2;
-	uint32_t vtcr_el2;
-	uint32_t t0sz;
 	register_t daif;
 
+	el2_regs = arg;
 	arm64_set_active_vcpu(NULL);
 
 	daif = intr_disable();
@@ -122,19 +131,6 @@ arm_setup_vectors(void *arg)
 
 	/* Create and map the hypervisor stack */
 	stack_top = (char *)stack_hyp_va[PCPU_GET(cpuid)] + VMM_STACK_SIZE;
-
-	/* Configure address translation at EL2 */
-	tcr_el1 = READ_SPECIALREG(tcr_el1);
-	tcr_el2 = TCR_EL2_RES1;
-
-	/* Set physical address size */
-	id_aa64mmfr0_el1 = READ_SPECIALREG(id_aa64mmfr0_el1);
-	pa_range_bits = ID_AA64MMFR0_PARange_VAL(id_aa64mmfr0_el1);
-	tcr_el2	|= (pa_range_bits & 0x7) << TCR_EL2_PS_SHIFT;
-
-	/* Use the same address translation attributes as the host */
-	tcr_el2 |= tcr_el1 & TCR_T0SZ_MASK;
-	tcr_el2 |= tcr_el1 & (0xff << TCR_IRGN0_SHIFT);
 
 	/*
 	 * Configure the system control register for EL2:
@@ -153,47 +149,9 @@ arm_setup_vectors(void *arg)
 	sctlr_el2 |= SCTLR_EL2_WXN;
 	sctlr_el2 &= ~SCTLR_EL2_EE;
 
-	/*
-	 * Configure the Stage 2 translation control register:
-	 *
-	 * VTCR_IRGN0_WBWA: Translation table walks access inner cacheable
-	 * normal memory
-	 * VTCR_ORGN0_WBWA: Translation table walks access outer cacheable
-	 * normal memory
-	 * VTCR_EL2_TG0_4K: Stage 2 uses 4K pages
-	 * VTCR_EL2_SL0_4K_LVL1: Stage 2 uses concatenated level 1 tables
-	 * VTCR_EL2_SH0_IS: Memory associated with Stage 2 walks is inner
-	 * shareable
-	 */
-	vtcr_el2 = VTCR_EL2_RES1;
-	vtcr_el2 |= (pa_range_bits & 0x7) << VTCR_EL2_PS_SHIFT;
-	vtcr_el2 |= VTCR_EL2_IRGN0_WBWA | VTCR_EL2_ORGN0_WBWA;
-	vtcr_el2 |= VTCR_EL2_TG0_4K;
-	vtcr_el2 |= VTCR_EL2_SH0_IS;
-
-	/* TODO: Set this based on pa_range_bits */
-	t0sz = (64 - 39);
-	vtcr_el2 |= t0sz & VTCR_EL2_T0SZ_MASK;
-
-	/*
-	 * Set which table to use for the top level translation table.
-	 */
-	if (16 <= t0sz && t0sz <= 24)
-		vtcr_el2 |= VTCR_EL2_SL0_4K_LVL0;
-	else if (25 <= t0sz && t0sz <= 33)
-		vtcr_el2 |= VTCR_EL2_SL0_4K_LVL1;
-#ifdef notyet
-	else if (34 <= t0sz && t0sz <= 42)
-		vtcr_el2 |= VTCR_EL2_SL0_4K_LVL2;
-	else if (43 <= t0sz && t0sz <= 48)
-		vtcr_el2 |= VTCR_EL2_SL0_4K_LVL3;
-#endif
-	else
-		panic("Invalid t0sz: %u", t0sz);
-
 	/* Special call to initialize EL2 */
-	vmm_call_hyp(vmmpmap_to_ttbr0(), stack_top, tcr_el2,
-	    sctlr_el2, vtcr_el2);
+	vmm_call_hyp(vmmpmap_to_ttbr0(), stack_top, el2_regs->tcr_el2,
+	    sctlr_el2, el2_regs->vtcr_el2);
 
 	intr_restore(daif);
 }
@@ -225,11 +183,45 @@ arm_teardown_vectors(void *arg)
 	arm64_set_active_vcpu(NULL);
 }
 
+static uint64_t
+vmm_vtcr_el2_sl(u_int levels)
+{
+#if PAGE_SIZE == PAGE_SIZE_4K
+	switch(levels) {
+	case 2:
+		return (VTCR_EL2_SL0_4K_LVL2);
+	case 3:
+		return (VTCR_EL2_SL0_4K_LVL1);
+	case 4:
+		return (VTCR_EL2_SL0_4K_LVL0);
+	default:
+		panic("%s: Invalid number of page table levels %u", __func__,
+		    levels);
+	}
+#elif PAGE_SIZE == PAGE_SIZE_16K
+	switch(levels) {
+	case 2:
+		return (VTCR_EL2_SL0_16K_LVL2);
+	case 3:
+		return (VTCR_EL2_SL0_16K_LVL1);
+	case 4:
+		return (VTCR_EL2_SL0_16K_LVL0);
+	default:
+		panic("%s: Invalid number of page table levels %u", __func__,
+		    levels);
+	}
+#else
+#error Unsupported page size
+#endif
+}
+
 static int
 arm_init(int ipinum)
 {
+	struct vmm_init_regs el2_regs;
 	vm_offset_t next_hyp_va;
 	vm_paddr_t vmm_base;
+	uint64_t id_aa64mmfr0_el1, pa_range_bits, pa_range_field;
 	uint64_t ich_vtr_el2;
 	uint64_t cnthctl_el2;
 	register_t daif;
@@ -245,6 +237,34 @@ arm_init(int ipinum)
 		printf("arm_init: No GICv3 found\n");
 		return (ENODEV);
 	}
+
+	if (!get_kernel_reg(ID_AA64MMFR0_EL1, &id_aa64mmfr0_el1)) {
+		printf("arm_init: Unable to read ID_AA64MMFR0_EL1\n");
+		return (ENXIO);
+	}
+	pa_range_field = ID_AA64MMFR0_PARange_VAL(id_aa64mmfr0_el1);
+	/*
+	 * Use 3 levels to give us up to 39 bits with 4k pages, or
+	 * 47 bits with 16k pages.
+	 */
+	/* TODO: Check the number of levels for 64k pages */
+	vmm_pmap_levels = 3;
+	switch (pa_range_field) {
+	case ID_AA64MMFR0_PARange_4G:
+		printf("arm_init: Not enough physical address bits\n");
+		return (ENXIO);
+	case ID_AA64MMFR0_PARange_64G:
+		vmm_virt_bits = 36;
+#if PAGE_SIZE == PAGE_SIZE_16K
+		/* TODO: Test */
+		vmm_pmap_levels = 2;
+#endif
+		break;
+	default:
+		vmm_virt_bits = 39;
+		break;
+	}
+	pa_range_bits = pa_range_field >> ID_AA64MMFR0_PARange_SHIFT;
 
 	/* Initialise the EL2 MMU */
 	if (!vmmpmap_init()) {
@@ -284,7 +304,52 @@ arm_init(int ipinum)
 		next_hyp_va += L2_SIZE;
 	}
 
-	smp_rendezvous(NULL, arm_setup_vectors, NULL, NULL);
+	el2_regs.tcr_el2 = TCR_EL2_RES1;
+	el2_regs.tcr_el2 |= min(pa_range_bits << TCR_EL2_PS_SHIFT,
+	    TCR_EL2_PS_52BITS);
+	el2_regs.tcr_el2 |= TCR_EL2_T0SZ(64 - EL2_VIRT_BITS);
+	el2_regs.tcr_el2 |= TCR_EL2_IRGN0_WBWA | TCR_EL2_ORGN0_WBWA;
+#if PAGE_SIZE == PAGE_SIZE_4K
+	el2_regs.tcr_el2 |= TCR_EL2_TG0_4K;
+#elif PAGE_SIZE == PAGE_SIZE_16K
+	el2_regs.tcr_el2 |= TCR_EL2_TG0_16K;
+#else
+#error Unsupported page size
+#endif
+#ifdef SMP
+	el2_regs.tcr_el2 |= TCR_EL2_SH0_IS;
+#endif
+
+	/*
+	 * Configure the Stage 2 translation control register:
+	 *
+	 * VTCR_IRGN0_WBWA: Translation table walks access inner cacheable
+	 * normal memory
+	 * VTCR_ORGN0_WBWA: Translation table walks access outer cacheable
+	 * normal memory
+	 * VTCR_EL2_TG0_4K/16K: Stage 2 uses the same page size as the kernel
+	 * VTCR_EL2_SL0_4K_LVL1: Stage 2 uses concatenated level 1 tables
+	 * VTCR_EL2_SH0_IS: Memory associated with Stage 2 walks is inner
+	 * shareable
+	 */
+	el2_regs.vtcr_el2 = VTCR_EL2_RES1;
+	el2_regs.vtcr_el2 |=
+	    min(pa_range_bits << VTCR_EL2_PS_SHIFT, VTCR_EL2_PS_48BIT);
+	el2_regs.vtcr_el2 |= VTCR_EL2_IRGN0_WBWA | VTCR_EL2_ORGN0_WBWA;
+	el2_regs.vtcr_el2 |= VTCR_EL2_T0SZ(64 - vmm_virt_bits);
+	el2_regs.vtcr_el2 |= vmm_vtcr_el2_sl(vmm_pmap_levels);
+#if PAGE_SIZE == PAGE_SIZE_4K
+	el2_regs.vtcr_el2 |= VTCR_EL2_TG0_4K;
+#elif PAGE_SIZE == PAGE_SIZE_16K
+	el2_regs.vtcr_el2 |= VTCR_EL2_TG0_16K;
+#else
+#error Unsupported page size
+#endif
+#ifdef SMP
+	el2_regs.vtcr_el2 |= VTCR_EL2_SH0_IS;
+#endif
+
+	smp_rendezvous(NULL, arm_setup_vectors, NULL, &el2_regs);
 
 	/* Add memory to the vmem allocator (checking there is space) */
 	if (vmm_base > L2_SIZE) {
@@ -410,7 +475,7 @@ static int
 arm_vmm_pinit(pmap_t pmap)
 {
 
-	pmap_pinit_stage(pmap, PM_STAGE2, 3);
+	pmap_pinit_stage(pmap, PM_STAGE2, vmm_pmap_levels);
 	return (1);
 }
 
