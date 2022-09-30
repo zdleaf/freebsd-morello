@@ -2012,7 +2012,7 @@ vgic_probe(device_t dev)
 }
 
 static int
-_vgic_attach(device_t dev)
+vgic_attach(device_t dev)
 {
 	have_vgic = true;
 	return (0);
@@ -2021,7 +2021,7 @@ _vgic_attach(device_t dev)
 static device_method_t vgic_methods[] = {
 	/* Device interface */
 	DEVMETHOD(device_probe,		vgic_probe),
-	DEVMETHOD(device_attach,	_vgic_attach),
+	DEVMETHOD(device_attach,	vgic_attach),
 
 	/* End */
 	DEVMETHOD_END
