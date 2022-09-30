@@ -1388,8 +1388,6 @@ main(int argc, char *argv[])
 	struct vmctx *ctx;
 	uint64_t rip;
 	size_t memsize;
-	const char *value, *vmname;
-	char *optstr;
 	const char *optstr, *value, *vmname;
 #ifdef BHYVE_SNAPSHOT
 	char *restore_file;
