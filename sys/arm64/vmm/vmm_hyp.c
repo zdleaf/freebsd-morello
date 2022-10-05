@@ -675,6 +675,54 @@ vmm_clean_s2_tlbi(void)
 }
 
 static int
+vm_s2_tlbi_range(uint64_t vttbr, vm_offset_t va, vm_size_t len, bool final_only)
+{
+	uint64_t end, r, start;
+	uint64_t host_vttbr;
+
+#define	TLBI_VA_SHIFT			12
+#define	TLBI_VA_MASK			((1ul << 44) - 1)
+#define	TLBI_VA(addr)			(((addr) >> TLBI_VA_SHIFT) & TLBI_VA_MASK)
+#define	TLBI_VA_L3_INCR			(L3_SIZE >> TLBI_VA_SHIFT)
+
+	/* Switch to the guest vttbr */
+	/* TODO: Handle Cortex-A57/A72 erratum 131936 */
+	host_vttbr = READ_SPECIALREG(vttbr_el2);
+	WRITE_SPECIALREG(vttbr_el2, vttbr);
+	isb();
+
+	/*
+	 * The CPU can cache the stage 1 + 2 combination so we need to ensure
+	 * the stage 2 is invalidated first, then when this has completed we
+	 * invalidate the stage 1 TLB. As we don't know which stage 1 virtual
+	 * addresses point at the stage 2 IPA we need to invalidate the entire
+	 * stage 1 TLB.
+	 */
+
+	start = TLBI_VA(va);
+	end = TLBI_VA(va + len);
+	for (r = start; r < end; r += TLBI_VA_L3_INCR) {
+		/* Invalidate the stage 2 TLB entry */
+		if (final_only)
+			__asm __volatile("tlbi	ipas2le1is, %0" : : "r"(r));
+		else
+			__asm __volatile("tlbi	ipas2e1is, %0" : : "r"(r));
+	}
+	/* Ensure the entry has been invalidated */
+	dsb(ish);
+	/* Invalidate the stage 1 TLB. */
+	__asm __volatile("tlbi vmalle1is");
+	dsb(ish);
+	isb();
+
+	/* Switch back t othe host vttbr */
+	WRITE_SPECIALREG(vttbr_el2, host_vttbr);
+	isb();
+
+	return (0);
+}
+
+static int
 vmm_dc_civac(uint64_t start, uint64_t len)
 {
 	size_t line_size, end;
@@ -738,6 +786,8 @@ vmm_hyp_enter(uint64_t handle, uint64_t x1, uint64_t x2, uint64_t x3,
 		return (vmm_dc_civac(x1, x2));
 	case HYP_EL2_TLBI:
 		return (vmm_el2_tlbi(x1, x2, x3));
+	case HYP_S2_TLBI_RANGE:
+		return (vm_s2_tlbi_range(x1, x2, x3, x4));
 	case HYP_CLEANUP:	/* Handled in vmm_hyp_exception.S */
 	default:
 		break;

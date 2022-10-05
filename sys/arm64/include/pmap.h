@@ -208,6 +208,7 @@ int	pmap_fault(pmap_t, uint64_t, uint64_t);
 struct pcb *pmap_switch(struct thread *);
 
 extern void (*pmap_clean_stage2_tlbi)(void);
+extern void (*pmap_stage2_invalidate_page)(uint64_t, vm_offset_t, bool);
 
 static inline int
 pmap_vmspace_copy(pmap_t dst_pmap __unused, pmap_t src_pmap __unused)

@@ -371,6 +371,7 @@ SYSCTL_INT(_vm_pmap_vmid, OID_AUTO, epoch, CTLFLAG_RD, &vmids.asid_epoch, 0,
     "The current epoch number");
 
 void (*pmap_clean_stage2_tlbi)(void);
+void (*pmap_stage2_invalidate_page)(uint64_t, vm_offset_t, bool);
 
 /*
  * A pmap's cookie encodes an ASID and epoch number.  Cookies for reserved
@@ -5864,12 +5865,15 @@ retry:
 			 * since the superpage is wired, the current state of
 			 * its reference bit won't affect page replacement.
 			 */
-			if (pmap->pm_stage == PM_STAGE1 &&
-			    (((pa >> PAGE_SHIFT) ^ (va >> L2_SHIFT) ^
+			if ((((pa >> PAGE_SHIFT) ^ (va >> L2_SHIFT) ^
 			    (uintptr_t)pmap) & (Ln_ENTRIES - 1)) == 0 &&
 			    (tpte & ATTR_SW_WIRED) == 0) {
 				pmap_clear_bits(pte, ATTR_AF);
-				pmap_invalidate_page(pmap, va, true);
+				if (pmap->pm_stage == PM_STAGE1)
+					pmap_invalidate_page(pmap, va, true);
+				else
+					pmap_stage2_invalidate_page(
+					    pmap_to_ttbr0(pmap), va, true);
 				cleared++;
 			} else
 				not_cleared++;
@@ -5908,10 +5912,13 @@ small_mappings:
 		if (pmap_pte_dirty(pmap, tpte))
 			vm_page_dirty(m);
 		if ((tpte & ATTR_AF) != 0) {
-			if (pmap->pm_stage == PM_STAGE1 &&
-			    (tpte & ATTR_SW_WIRED) == 0) {
+			if ((tpte & ATTR_SW_WIRED) == 0) {
 				pmap_clear_bits(pte, ATTR_AF);
-				pmap_invalidate_page(pmap, pv->pv_va, true);
+				if (pmap->pm_stage == PM_STAGE1)
+					pmap_invalidate_page(pmap, va, true);
+				else
+					pmap_stage2_invalidate_page(
+					    pmap_to_ttbr0(pmap), va, true);
 				cleared++;
 			} else
 				not_cleared++;
