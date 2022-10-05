@@ -498,16 +498,6 @@ arm_vmspace_free(struct vmspace *vmspace)
 static void
 vmm_pmap_clean_stage2_tlbi(void)
 {
-	/*
-	 * Force all VMs to exit. As the pmap code has changed the vmid
-	 * generation and is holding the vmid lock we don't re-enter
-	 * the VM.
-	 *
-	 * XXX: Unsure if this is needed if running VMs keep the same vmid.
-	 */
-	smp_rendezvous(NULL, NULL, NULL, NULL);
-
-	/* TODO: disable irqs */
 	vmm_call_hyp(HYP_CLEAN_S2_TLBI);
 }
 
