@@ -2413,7 +2413,7 @@ pci_snapshot_pci_dev(struct vm_snapshot_meta *meta)
 	SNAPSHOT_BUF_OR_LEAVE(pi->pi_cfgdata, sizeof(pi->pi_cfgdata),
 			      meta, ret, done);
 
-	for (i = 0; i < nitems(pi->pi_bar); i++) {
+	for (i = 0; i < (int)nitems(pi->pi_bar); i++) {
 		SNAPSHOT_VAR_OR_LEAVE(pi->pi_bar[i].type, meta, ret, done);
 		SNAPSHOT_VAR_OR_LEAVE(pi->pi_bar[i].size, meta, ret, done);
 		SNAPSHOT_VAR_OR_LEAVE(pi->pi_bar[i].addr, meta, ret, done);
