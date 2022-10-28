@@ -682,25 +682,43 @@ handle_el1_sync_excp(struct hyp *hyp, int vcpu, struct vm_exit *vme_ret,
 
 	case EXCP_INSN_ABORT_L:
 	case EXCP_DATA_ABORT_L:
-		hypctx = &hyp->ctx[vcpu];
-		gpa = HPFAR_EL2_FIPA_ADDR(hypctx->exit_info.hpfar_el2);
-		if (vm_mem_allocated(hyp->vm, vcpu, gpa)) {
-			vme_ret->exitcode = VM_EXITCODE_PAGING;
-			vme_ret->inst_length = 0;
-			vme_ret->u.paging.esr = hypctx->tf.tf_esr;
-			vme_ret->u.paging.gpa = gpa;
+		switch (hypctx->tf.tf_esr & ISS_DATA_DFSC_MASK) {
+		case ISS_DATA_DFSC_TF_L0:
+		case ISS_DATA_DFSC_TF_L1:
+		case ISS_DATA_DFSC_TF_L2:
+		case ISS_DATA_DFSC_TF_L3:
+		case ISS_DATA_DFSC_AFF_L1:
+		case ISS_DATA_DFSC_AFF_L2:
+		case ISS_DATA_DFSC_AFF_L3:
+		case ISS_DATA_DFSC_PF_L1:
+		case ISS_DATA_DFSC_PF_L2:
+		case ISS_DATA_DFSC_PF_L3:
+			hypctx = &hyp->ctx[vcpu];
+			gpa = HPFAR_EL2_FIPA_ADDR(hypctx->exit_info.hpfar_el2);
+			if (vm_mem_allocated(hyp->vm, vcpu, gpa)) {
+				vme_ret->exitcode = VM_EXITCODE_PAGING;
+				vme_ret->inst_length = 0;
+				vme_ret->u.paging.esr = hypctx->tf.tf_esr;
+				vme_ret->u.paging.gpa = gpa;
+			} else if (esr_ec == EXCP_DATA_ABORT_L) {
+				arm64_gen_inst_emul_data(&hyp->ctx[vcpu],
+				    esr_iss, vme_ret);
+				vme_ret->exitcode = VM_EXITCODE_INST_EMUL;
+			} else {
+				eprintf(
+				  "Unsupported instruction fault from guest\n");
+				arm64_print_hyp_regs(vme_ret);
+				vme_ret->exitcode = VM_EXITCODE_HYP;
+			}
+			break;
+		default:
+			eprintf(
+			    "Unsupported data/instruction fault from guest\n");
+			arm64_print_hyp_regs(vme_ret);
+			vme_ret->exitcode = VM_EXITCODE_HYP;
 			break;
 		}
 
-		if (esr_ec == EXCP_DATA_ABORT_L) {
-			arm64_gen_inst_emul_data(&hyp->ctx[vcpu], esr_iss,
-			    vme_ret);
-			vme_ret->exitcode = VM_EXITCODE_INST_EMUL;
-		} else {
-			eprintf("Unsupported instruction fault from guest\n");
-			arm64_print_hyp_regs(vme_ret);
-			vme_ret->exitcode = VM_EXITCODE_HYP;
-		}
 		break;
 
 	default:
