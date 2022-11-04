@@ -86,6 +86,7 @@
 #define	 HYP_EL2_TLBI_ALL	0x1
 #define	 HYP_EL2_TLBI_VA	0x2
 #define	HYP_S2_TLBI_RANGE	0x00000010
+#define	HYP_S2_TLBI_ALL		0x00000011
 
 /*
  * When taking asynchronous exceptions, or interrupts, with the exception of the

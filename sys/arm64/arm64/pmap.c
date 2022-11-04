@@ -372,6 +372,7 @@ SYSCTL_INT(_vm_pmap_vmid, OID_AUTO, epoch, CTLFLAG_RD, &vmids.asid_epoch, 0,
 
 void (*pmap_clean_stage2_tlbi)(void);
 void (*pmap_stage2_invalidate_page)(uint64_t, vm_offset_t, bool);
+void (*pmap_stage2_invalidate_all)(uint64_t);
 
 /*
  * A pmap's cookie encodes an ASID and epoch number.  Cookies for reserved
@@ -1503,6 +1504,14 @@ pmap_invalidate_page(pmap_t pmap, vm_offset_t va, bool final_only)
 	isb();
 }
 
+static __inline void
+pmap_s2_invalidate_page(pmap_t pmap, vm_offset_t va, bool final_only)
+{
+	PMAP_ASSERT_STAGE2(pmap);
+	MPASS(pmap_stage2_invalidate_all != NULL);
+	pmap_stage2_invalidate_page(pmap_to_ttbr0(pmap), va, true);
+}
+
 /*
  * Invalidates any cached final- and optionally intermediate-level TLB entries
  * for the specified virtual address range in the given virtual address space.
@@ -1553,6 +1562,15 @@ pmap_invalidate_all(pmap_t pmap)
 	dsb(ish);
 	isb();
 }
+
+static __inline void
+pmap_s2_invalidate_all(pmap_t pmap)
+{
+	PMAP_ASSERT_STAGE2(pmap);
+	MPASS(pmap_stage2_invalidate_all != NULL);
+	pmap_stage2_invalidate_all(pmap_to_ttbr0(pmap));
+}
+
 
 /*
  *	Routine:	pmap_extract
@@ -1997,8 +2015,10 @@ _pmap_unwire_l3(pmap_t pmap, vm_offset_t va, vm_page_t m, struct spglist *free)
 		l1pg = PHYS_TO_VM_PAGE(tl0 & ~ATTR_MASK);
 		pmap_unwire_l3(pmap, va, l1pg, free);
 	}
-	if (pmap_is_current_epoch(pmap))
+	if (pmap->pm_stage == PM_STAGE1)
 		pmap_invalidate_page(pmap, va, false);
+	else
+		pmap_s2_invalidate_page(pmap, va, false);
 
 	/*
 	 * Put page on a list so that it is released after
@@ -3310,8 +3330,9 @@ pmap_remove_l3_range(pmap_t pmap, pd_entry_t l2e, vm_offset_t sva,
 	for (l3 = pmap_l2_to_l3(&l2e, sva); sva != eva; l3++, sva += L3_SIZE) {
 		if (!pmap_l3_valid(pmap_load(l3))) {
 			if (va != eva) {
-				if (pmap_is_current_epoch(pmap))
-					pmap_invalidate_range(pmap, va, sva, true);
+				if (pmap->pm_stage == PM_STAGE1)
+					pmap_invalidate_range(pmap, va, sva,
+					    true);
 				va = eva;
 			}
 			continue;
@@ -3338,9 +3359,10 @@ pmap_remove_l3_range(pmap_t pmap, pd_entry_t l2e, vm_offset_t sva,
 					 * still provides access to that page. 
 					 */
 					if (va != eva) {
-						if (pmap_is_current_epoch(pmap))
+						if (pmap->pm_stage == PM_STAGE1)
 							pmap_invalidate_range(
-							    pmap, va, sva, true);
+							    pmap, va, sva,
+							    true);
 						va = eva;
 					}
 					rw_wunlock(*lockp);
@@ -3369,8 +3391,15 @@ pmap_remove_l3_range(pmap_t pmap, pd_entry_t l2e, vm_offset_t sva,
 		if (va == eva)
 			va = sva;
 	}
-	if (va != eva && pmap_is_current_epoch(pmap))
+	if (pmap->pm_stage == PM_STAGE1 && va != eva) {
 		pmap_invalidate_range(pmap, va, sva, true);
+	} else if (pmap->pm_stage == PM_STAGE2) {
+		/*
+		 * Invalidate all entries rather than as we remove them
+		 * as it may involve a call into EL2
+		 */
+		pmap_s2_invalidate_all(pmap);
+	}
 }
 
 /*
@@ -5371,8 +5400,6 @@ pmap_remove_pages(pmap_t pmap)
 		TAILQ_INIT(&free_chunks[i]);
 	SLIST_INIT(&free);
 	PMAP_LOCK(pmap);
-	if (pmap->pm_stage == PM_STAGE2)
-		pmap->pm_cookie = COOKIE_FROM(-1, INT_MAX);
 	TAILQ_FOREACH_SAFE(pc, &pmap->pm_pvchunk, pc_list, npc) {
 		allfree = 1;
 		freed = 0;
@@ -5846,8 +5873,7 @@ retry:
 				if (pmap->pm_stage == PM_STAGE1)
 					pmap_invalidate_page(pmap, va, true);
 				else
-					pmap_stage2_invalidate_page(
-					    pmap_to_ttbr0(pmap), va, true);
+					pmap_s2_invalidate_page(pmap, va, true);
 				cleared++;
 			} else
 				not_cleared++;
@@ -5891,8 +5917,7 @@ small_mappings:
 				if (pmap->pm_stage == PM_STAGE1)
 					pmap_invalidate_page(pmap, va, true);
 				else
-					pmap_stage2_invalidate_page(
-					    pmap_to_ttbr0(pmap), va, true);
+					pmap_s2_invalidate_page(pmap, va, true);
 				cleared++;
 			} else
 				not_cleared++;

@@ -723,6 +723,28 @@ vm_s2_tlbi_range(uint64_t vttbr, vm_offset_t va, vm_size_t len, bool final_only)
 }
 
 static int
+vm_s2_tlbi_all(uint64_t vttbr)
+{
+	uint64_t host_vttbr;
+
+	/* Switch to the guest vttbr */
+	/* TODO: Handle Cortex-A57/A72 erratum 131936 */
+	host_vttbr = READ_SPECIALREG(vttbr_el2);
+	WRITE_SPECIALREG(vttbr_el2, vttbr);
+	isb();
+
+	__asm __volatile("tlbi vmalls12e1is");
+	dsb(ish);
+	isb();
+
+	/* Switch back t othe host vttbr */
+	WRITE_SPECIALREG(vttbr_el2, host_vttbr);
+	isb();
+
+	return (0);
+}
+
+static int
 vmm_dc_civac(uint64_t start, uint64_t len)
 {
 	size_t line_size, end;
@@ -788,6 +810,8 @@ vmm_hyp_enter(uint64_t handle, uint64_t x1, uint64_t x2, uint64_t x3,
 		return (vmm_el2_tlbi(x1, x2, x3));
 	case HYP_S2_TLBI_RANGE:
 		return (vm_s2_tlbi_range(x1, x2, x3, x4));
+	case HYP_S2_TLBI_ALL:
+		return (vm_s2_tlbi_all(x1));
 	case HYP_CLEANUP:	/* Handled in vmm_hyp_exception.S */
 	default:
 		break;

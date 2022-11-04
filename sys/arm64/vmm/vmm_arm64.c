@@ -100,6 +100,7 @@ static vmem_t *el2_mem_alloc;
 static void arm_setup_vectors(void *arg);
 static void vmm_pmap_clean_stage2_tlbi(void);
 static void vmm_pmap_invalidate_page(uint64_t, vm_offset_t, bool);
+static void vmm_pmap_invalidate_all(uint64_t);
 
 static inline void
 arm64_set_active_vcpu(struct hypctx *hypctx)
@@ -277,6 +278,7 @@ arm_init(int ipinum)
 	MPASS(pmap_clean_stage2_tlbi == NULL);
 	pmap_clean_stage2_tlbi = vmm_pmap_clean_stage2_tlbi;
 	pmap_stage2_invalidate_page = vmm_pmap_invalidate_page;
+	pmap_stage2_invalidate_all = vmm_pmap_invalidate_all;
 
 	/* Create the vmem allocator */
 	el2_mem_alloc = vmem_create("VMM EL2", 0, 0, PAGE_SIZE, 0, M_WAITOK);
@@ -505,6 +507,12 @@ static void
 vmm_pmap_invalidate_page(uint64_t vttbr, vm_offset_t va, bool final_only)
 {
 	vmm_call_hyp(HYP_S2_TLBI_RANGE, vttbr, va, PAGE_SIZE, final_only);
+}
+
+static void
+vmm_pmap_invalidate_all(uint64_t vttbr)
+{
+	vmm_call_hyp(HYP_S2_TLBI_ALL, vttbr);
 }
 
 static enum vm_reg_name
