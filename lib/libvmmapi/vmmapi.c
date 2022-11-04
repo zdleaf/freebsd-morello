@@ -1812,6 +1812,7 @@ vm_get_topology(struct vmctx *ctx,
 	return (error);
 }
 
+#ifdef __amd64__
 /* Keep in sync with machine/vmm_dev.h. */
 static const cap_ioctl_t vm_ioctl_cmds[] = { VM_RUN, VM_SUSPEND, VM_REINIT,
     VM_ALLOC_MEMSEG, VM_GET_MEMSEG, VM_MMAP_MEMSEG, VM_MMAP_MEMSEG,
@@ -1850,6 +1851,7 @@ vm_limit_rights(struct vmctx *ctx)
 		return (-1);
 	return (0);
 }
+#endif
 
 /*
  * Avoid using in new code.  Operations on the fd should be wrapped here so that
