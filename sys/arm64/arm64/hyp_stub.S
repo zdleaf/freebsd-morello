@@ -30,23 +30,19 @@ __FBSDID("$FreeBSD$");
 
 	.text
 
-/*
- * Install a new exception vector table with the base address supplied by the
- * parameter in register x0.
- */
-ENTRY(handle_stub_el1h_sync)
-	msr 	vbar_el2, x0
-	eret
-END(handle_hyp_stub)
-
 .macro vempty
 	.align 7
 	1: b 	1b
 .endm
 
-.macro vector name
+/*
+ * Install a new exception vector table with the base address supplied by the
+ * parameter in register x0.
+ */
+.macro vector_stub_el1h_sync
 	.align 7
-	b 	handle_\name
+	msr	vbar_el2, x0
+	ERET
 .endm
 
 	.align 11
@@ -62,7 +58,7 @@ hyp_stub_vectors:
 	vempty			/* FIQ EL2h */
 	vempty			/* SError EL2h */
 
-	vector stub_el1h_sync	/* Synchronous 64-bit EL1 */
+	vector_stub_el1h_sync	/* Synchronous 64-bit EL1 */
 	vempty			/* IRQ 64-bit EL1 */
 	vempty			/* FIQ 64-bit EL1 */
 	vempty			/* SError 64-bit EL1 */
