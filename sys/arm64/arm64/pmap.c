@@ -1439,24 +1439,6 @@ static u_long pmap_l2_promotions;
 SYSCTL_ULONG(_vm_pmap_l2, OID_AUTO, promotions, CTLFLAG_RD,
     &pmap_l2_promotions, 0, "2MB page promotions");
 
-static bool
-pmap_is_current_epoch(pmap_t pmap)
-{
-	struct asid_set *set;
-	int epoch;
-
-	/* The kernel pmap is always current, and may not be locked */
-	if (pmap == kernel_pmap)
-		return (true);
-
-	PMAP_LOCK_ASSERT(pmap, MA_OWNED);
-	set = pmap->pm_asid_set;
-	epoch = COOKIE_TO_EPOCH(pmap->pm_cookie);
-	MPASS(epoch >= 0);
-
-	return (epoch == set->asid_epoch);
-}
-
 /*
  * If the given value for "final_only" is false, then any cached intermediate-
  * level entries, i.e., L{0,1,2}_TABLE entries, are invalidated in addition to
