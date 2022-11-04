@@ -721,7 +721,7 @@ static void
 vm_free_memmap(struct vm *vm, int ident)
 {
 	struct mem_map *mm;
-	int error;
+	int error __diagused;
 
 	mm = &vm->mem_maps[ident];
 	if (mm->len) {

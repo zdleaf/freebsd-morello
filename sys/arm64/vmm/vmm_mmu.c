@@ -75,7 +75,7 @@ vmmpmap_init(void)
 static void
 vmmpmap_release_l3(pd_entry_t l2e)
 {
-	pt_entry_t *l3;
+	pt_entry_t *l3 __diagused;
 	vm_page_t m;
 	int i;
 

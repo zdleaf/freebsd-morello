@@ -228,7 +228,7 @@ arm_init(int ipinum)
 	uint64_t cnthctl_el2;
 	register_t daif;
 	int cpu, i;
-	bool rv;
+	bool rv __diagused;
 
 	if (!virt_enabled()) {
 		printf("arm_init: Processor doesn't have support for virtualization.\n");
@@ -431,8 +431,8 @@ arm_vminit(struct vm *vm, pmap_t pmap)
 	struct hypctx *hypctx;
 	vmem_addr_t vm_addr;
 	vm_size_t size;
-	bool last_vcpu, rv;
-	int err, i, maxcpus;
+	bool last_vcpu, rv __diagused;
+	int err __diagused, i, maxcpus;
 
 	/* Ensure this is the only data on the page */
 	size = roundup2(sizeof(struct hyp), PAGE_SIZE);
