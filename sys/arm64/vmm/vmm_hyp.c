@@ -675,7 +675,8 @@ vmm_clean_s2_tlbi(void)
 }
 
 static int
-vm_s2_tlbi_range(uint64_t vttbr, vm_offset_t va, vm_size_t len, bool final_only)
+vm_s2_tlbi_range(uint64_t vttbr, vm_offset_t sva, vm_size_t eva,
+    bool final_only)
 {
 	uint64_t end, r, start;
 	uint64_t host_vttbr;
@@ -699,8 +700,8 @@ vm_s2_tlbi_range(uint64_t vttbr, vm_offset_t va, vm_size_t len, bool final_only)
 	 * stage 1 TLB.
 	 */
 
-	start = TLBI_VA(va);
-	end = TLBI_VA(va + len);
+	start = TLBI_VA(sva);
+	end = TLBI_VA(eva);
 	for (r = start; r < end; r += TLBI_VA_L3_INCR) {
 		/* Invalidate the stage 2 TLB entry */
 		if (final_only)

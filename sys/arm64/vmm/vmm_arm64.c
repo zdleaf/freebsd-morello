@@ -99,7 +99,7 @@ static vmem_t *el2_mem_alloc;
 
 static void arm_setup_vectors(void *arg);
 static void vmm_pmap_clean_stage2_tlbi(void);
-static void vmm_pmap_invalidate_page(uint64_t, vm_offset_t, bool);
+static void vmm_pmap_invalidate_range(uint64_t, vm_offset_t, vm_offset_t, bool);
 static void vmm_pmap_invalidate_all(uint64_t);
 
 static inline void
@@ -277,7 +277,7 @@ arm_init(int ipinum)
 	/* Set up the stage 2 pmap callbacks */
 	MPASS(pmap_clean_stage2_tlbi == NULL);
 	pmap_clean_stage2_tlbi = vmm_pmap_clean_stage2_tlbi;
-	pmap_stage2_invalidate_page = vmm_pmap_invalidate_page;
+	pmap_stage2_invalidate_range = vmm_pmap_invalidate_range;
 	pmap_stage2_invalidate_all = vmm_pmap_invalidate_all;
 
 	/* Create the vmem allocator */
@@ -504,9 +504,11 @@ vmm_pmap_clean_stage2_tlbi(void)
 }
 
 static void
-vmm_pmap_invalidate_page(uint64_t vttbr, vm_offset_t va, bool final_only)
+vmm_pmap_invalidate_range(uint64_t vttbr, vm_offset_t sva, vm_offset_t eva,
+    bool final_only)
 {
-	vmm_call_hyp(HYP_S2_TLBI_RANGE, vttbr, va, PAGE_SIZE, final_only);
+	MPASS(eva > sva);
+	vmm_call_hyp(HYP_S2_TLBI_RANGE, vttbr, sva, eva, final_only);
 }
 
 static void
