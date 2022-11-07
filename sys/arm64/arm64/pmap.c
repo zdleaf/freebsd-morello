@@ -1446,7 +1446,7 @@ SYSCTL_ULONG(_vm_pmap_l2, OID_AUTO, promotions, CTLFLAG_RD,
  * Otherwise, just the cached final-level entry is invalidated.
  */
 static __inline void
-pmap_invalidate_kernel(uint64_t r, bool final_only)
+pmap_s1_invalidate_kernel(uint64_t r, bool final_only)
 {
 	if (final_only)
 		__asm __volatile("tlbi vaale1is, %0" : : "r" (r));
@@ -1455,7 +1455,7 @@ pmap_invalidate_kernel(uint64_t r, bool final_only)
 }
 
 static __inline void
-pmap_invalidate_user(uint64_t r, bool final_only)
+pmap_s1_invalidate_user(uint64_t r, bool final_only)
 {
 	if (final_only)
 		__asm __volatile("tlbi vale1is, %0" : : "r" (r));
@@ -1477,10 +1477,10 @@ pmap_s1_invalidate_page(pmap_t pmap, vm_offset_t va, bool final_only)
 	dsb(ishst);
 	r = TLBI_VA(va);
 	if (pmap == kernel_pmap) {
-		pmap_invalidate_kernel(r, final_only);
+		pmap_s1_invalidate_kernel(r, final_only);
 	} else {
 		r |= ASID_TO_OPERAND(COOKIE_TO_ASID(pmap->pm_cookie));
-		pmap_invalidate_user(r, final_only);
+		pmap_s1_invalidate_user(r, final_only);
 	}
 	dsb(ish);
 	isb();
@@ -1521,13 +1521,13 @@ pmap_s1_invalidate_range(pmap_t pmap, vm_offset_t sva, vm_offset_t eva,
 		start = TLBI_VA(sva);
 		end = TLBI_VA(eva);
 		for (r = start; r < end; r += TLBI_VA_L3_INCR)
-			pmap_invalidate_kernel(r, final_only);
+			pmap_s1_invalidate_kernel(r, final_only);
 	} else {
 		start = end = ASID_TO_OPERAND(COOKIE_TO_ASID(pmap->pm_cookie));
 		start |= TLBI_VA(sva);
 		end |= TLBI_VA(eva);
 		for (r = start; r < end; r += TLBI_VA_L3_INCR)
-			pmap_invalidate_user(r, final_only);
+			pmap_s1_invalidate_user(r, final_only);
 	}
 	dsb(ish);
 	isb();
@@ -2038,7 +2038,7 @@ _pmap_unwire_l3(pmap_t pmap, vm_offset_t va, vm_page_t m, struct spglist *free)
 		l1pg = PHYS_TO_VM_PAGE(tl0 & ~ATTR_MASK);
 		pmap_unwire_l3(pmap, va, l1pg, free);
 	}
-	pmap_invalidate_page(pmap, va, false);
+	pmap_s1_invalidate_page(pmap, va, false);
 
 	/*
 	 * Put page on a list so that it is released after
@@ -3352,7 +3352,7 @@ pmap_remove_l3_range(pmap_t pmap, pd_entry_t l2e, vm_offset_t sva,
 	for (l3 = pmap_l2_to_l3(&l2e, sva); sva != eva; l3++, sva += L3_SIZE) {
 		if (!pmap_l3_valid(pmap_load(l3))) {
 			if (va != eva) {
-				pmap_invalidate_range(pmap, va, sva, true);
+				pmap_s1_invalidate_range(pmap, va, sva, true);
 				va = eva;
 			}
 			continue;
@@ -3596,7 +3596,7 @@ retry:
 		if (tpte & ATTR_SW_WIRED)
 			pmap->pm_stats.wired_count--;
 		if ((tpte & ATTR_AF) != 0) {
-			pmap_invalidate_page(pmap, pv->pv_va, true);
+			pmap_s1_invalidate_page(pmap, pv->pv_va, true);
 			vm_page_aflag_set(m, PGA_REFERENCED);
 		}
 
@@ -5555,7 +5555,7 @@ pmap_remove_pages(pmap_t pmap)
 	}
 	if (lock != NULL)
 		rw_wunlock(lock);
-	pmap_invalidate_all(pmap);
+	pmap_s1_invalidate_all(pmap);
 	free_pv_chunk_batch(free_chunks);
 	PMAP_UNLOCK(pmap);
 	vm_page_free_pages_toq(&free, true);
@@ -5791,7 +5791,7 @@ retry:
 			
 			if ((oldpte & rw_check) != 0)
 				vm_page_dirty(m);
-			pmap_invalidate_page(pmap, pv->pv_va, true);
+			pmap_s1_invalidate_page(pmap, pv->pv_va, true);
 		}
 		PMAP_UNLOCK(pmap);
 	}
@@ -5889,10 +5889,7 @@ retry:
 			    (uintptr_t)pmap) & (Ln_ENTRIES - 1)) == 0 &&
 			    (tpte & ATTR_SW_WIRED) == 0) {
 				pmap_clear_bits(pte, ATTR_AF);
-				if (pmap->pm_stage == PM_STAGE1)
-					pmap_s1_invalidate_page(pmap, va, true);
-				else
-					pmap_s2_invalidate_page(pmap, va, true);
+				pmap_invalidate_page(pmap, va, true);
 				cleared++;
 			} else
 				not_cleared++;
@@ -5933,10 +5930,7 @@ small_mappings:
 		if ((tpte & ATTR_AF) != 0) {
 			if ((tpte & ATTR_SW_WIRED) == 0) {
 				pmap_clear_bits(pte, ATTR_AF);
-				if (pmap->pm_stage == PM_STAGE1)
-					pmap_s1_invalidate_page(pmap, va, true);
-				else
-					pmap_s2_invalidate_page(pmap, va, true);
+				pmap_invalidate_page(pmap, va, true);
 				cleared++;
 			} else
 				not_cleared++;
