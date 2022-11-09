@@ -352,6 +352,20 @@ static struct vgic_v3_virt_features virt_features;
 static struct vgic_v3_irq *vgic_v3_get_irq(struct hyp *, int, uint32_t);
 static void vgic_v3_release_irq(struct vgic_v3_irq *);
 
+/* TODO: Move to a common file */
+static int
+mpidr_to_vcpu(struct hyp *hyp, uint64_t mpidr)
+{
+	struct vm *vm;
+
+	vm = hyp->vm;
+	for (int i = 0; i < vm_get_maxcpus(vm); i++) {
+		if ((hyp->ctx[i].vmpidr_el2 & GICD_AFF) == mpidr)
+			return (i);
+	}
+	return (-1);
+}
+
 void
 vgic_v3_vminit(struct hyp *hyp)
 {
@@ -407,18 +421,17 @@ vgic_v3_cpuinit(struct hypctx *hypctx, bool last_vcpu)
 	    (GICR_PENDBASER_SHARE_OS << GICR_PENDBASER_SHARE_SHIFT) |
 	    (GICR_PENDBASER_CACHE_NIWAWB << GICR_PENDBASER_CACHE_SHIFT);
 
-	/* TODO: We need a call to mtx_destroy */
 	mtx_init(&cpu_if->lr_mtx, "VGICv3 ICH_LR_EL2 lock", NULL, MTX_SPIN);
 
 	/* Set the SGI and PPI state */
 	for (irqid = 0; irqid < VGIC_PRV_I_NUM; irqid++) {
 		irq = &cpu_if->private_irqs[irqid];
 
-		/* TODO: We need a call to mtx_destroy */
 		mtx_init(&irq->irq_spinmtx, "VGIC IRQ spinlock", NULL,
 		    MTX_SPIN);
 		irq->irq = irqid;
 		irq->mpidr = hypctx->vmpidr_el2 & GICD_AFF;
+		irq->target_vcpu = mpidr_to_vcpu(hypctx->hyp, irq->mpidr);
 		if (irqid < VGIC_SGI_NUM) {
 			/* SGIs */
 			irq->enabled = true;
@@ -522,7 +535,6 @@ vgic_v3_queue_irq(struct hyp *hyp, struct vgic_v3_cpu_if *cpu_if,
 	}
 	return (true);
 }
-
 
 static uint64_t
 gic_reg_value_64(uint64_t field, uint64_t val, u_int offset, u_int size)
@@ -640,7 +652,7 @@ write_pendr(struct hyp *hyp, int vcpuid, int n, bool set, uint64_t val)
 	struct vgic_v3_irq *irq;
 	uint64_t ret;
 	uint32_t irq_base;
-	int mpidr, i;
+	int target_vcpu, i;
 	bool notify;
 
 	ret = 0;
@@ -654,13 +666,11 @@ write_pendr(struct hyp *hyp, int vcpuid, int n, bool set, uint64_t val)
 		if (irq == NULL)
 			continue;
 
-		/*
-		 * TODO: The target CPU could have changed, we need to know
-		 * on which CPU the interrupt is pending.
-		 */
-		mpidr = irq->mpidr;
-		cpu_if = &hyp->ctx[mpidr].vgic_cpu_if;
 		notify = false;
+		target_vcpu = irq->target_vcpu;
+		if (target_vcpu < 0)
+			goto next_irq;
+		cpu_if = &hyp->ctx[target_vcpu].vgic_cpu_if;
 
 		if (!set) {
 			/* pending -> not pending */
@@ -668,13 +678,15 @@ write_pendr(struct hyp *hyp, int vcpuid, int n, bool set, uint64_t val)
 		} else {
 			irq->pending = true;
 			mtx_lock_spin(&cpu_if->lr_mtx);
-			notify = vgic_v3_queue_irq(hyp, cpu_if, mpidr, irq);
+			notify = vgic_v3_queue_irq(hyp, cpu_if, target_vcpu,
+			    irq);
 			mtx_unlock_spin(&cpu_if->lr_mtx);
 		}
+next_irq:
 		vgic_v3_release_irq(irq);
 
 		if (notify)
-			vcpu_notify_event(hyp->vm, mpidr, false);
+			vcpu_notify_event(hyp->vm, target_vcpu, false);
 	}
 
 	return (ret);
@@ -709,7 +721,7 @@ write_activer(struct hyp *hyp, int vcpuid, u_int n, bool set, uint64_t val)
 	struct vgic_v3_cpu_if *cpu_if;
 	struct vgic_v3_irq *irq;
 	uint32_t irq_base;
-	int mpidr, i;
+	int target_vcpu, i;
 	bool notify;
 
 	irq_base = n * 32;
@@ -722,13 +734,11 @@ write_activer(struct hyp *hyp, int vcpuid, u_int n, bool set, uint64_t val)
 		if (irq == NULL)
 			continue;
 
-		/*
-		 * TODO: The target CPU could have changed, we need to know
-		 * on which CPU the interrupt is pending.
-		 */
-		mpidr = irq->mpidr;
-		cpu_if = &hyp->ctx[mpidr].vgic_cpu_if;
 		notify = false;
+		target_vcpu = irq->target_vcpu;
+		if (target_vcpu < 0)
+			goto next_irq;
+		cpu_if = &hyp->ctx[target_vcpu].vgic_cpu_if;
 
 		if (!set) {
 			/* active -> not active */
@@ -737,13 +747,15 @@ write_activer(struct hyp *hyp, int vcpuid, u_int n, bool set, uint64_t val)
 			/* not active -> active */
 			irq->active = true;
 			mtx_lock_spin(&cpu_if->lr_mtx);
-			notify = vgic_v3_queue_irq(hyp, cpu_if, mpidr, irq);
+			notify = vgic_v3_queue_irq(hyp, cpu_if, target_vcpu,
+			    irq);
 			mtx_unlock_spin(&cpu_if->lr_mtx);
 		}
+next_irq:
 		vgic_v3_release_irq(irq);
 
 		if (notify)
-			vcpu_notify_event(hyp->vm, mpidr, false);
+			vcpu_notify_event(hyp->vm, target_vcpu, false);
 	}
 }
 
@@ -862,8 +874,14 @@ write_route(struct hyp *hyp, int vcpuid, int n, uint64_t val, u_int offset,
 	if (irq == NULL)
 		return;
 
-	/* TODO: Move the interrupt to the correct pending list */
 	irq->mpidr = gic_reg_value_64(irq->mpidr, val, offset, size) & GICD_AFF;
+	irq->target_vcpu = mpidr_to_vcpu(hyp, irq->mpidr);
+	/*
+	 * If the interrupt is pending we can either use the old mpidr, or
+	 * the new mpidr. To simplify this code we use the old value so we
+	 * don't need to move the interrupt until the next time it is
+	 * moved to the pending state.
+	 */
 	vgic_v3_release_irq(irq);
 }
 
@@ -1595,7 +1613,7 @@ vgic_v3_icc_sgi1r_write(void *vm, int vcpuid, uint64_t rval, void *arg)
 	irqid = (rval >> ICC_SGI1R_EL1_SGIID_SHIFT) & ICC_SGI1R_EL1_SGIID_MASK;
 	if ((rval & ICC_SGI1R_EL1_IRM) == 0) {
 		/*
-		 * TODO: Support on mure than 16 CPUs. This is the mask for the
+		 * TODO: Support on more than 16 CPUs. This is the mask for the
 		 * affinity bits. These should be 0.
 		 */
 		if ((rval & 0xff00ff00ff000ul) != 0)
@@ -1724,7 +1742,8 @@ vgic_v3_get_irq(struct hyp *hyp, int vcpuid, uint32_t irqid)
 	} else if (irqid < GIC_FIRST_LPI) {
 		return (NULL);
 	} else {
-		panic("TODO: %s: Support LPIs (irq = %x)", __func__, irqid);
+		/* No support for LPIs */
+		return (NULL);
 	}
 
 	mtx_lock_spin(&irq->irq_spinmtx);
@@ -1778,7 +1797,7 @@ vgic_v3_inject_irq(struct hyp *hyp, int vcpuid, uint32_t irqid, bool level)
 
 	struct vgic_v3_cpu_if *cpu_if;
 	struct vgic_v3_irq *irq;
-	uint64_t irouter;
+	int target_vcpu;
 	bool notify;
 
 	KASSERT(vcpuid == -1 || irqid < VGIC_PRV_I_NUM,
@@ -1791,17 +1810,18 @@ vgic_v3_inject_irq(struct hyp *hyp, int vcpuid, uint32_t irqid, bool level)
 		return (1);
 	}
 
-	irouter = irq->mpidr;
-	KASSERT(vcpuid == -1 || vcpuid == irouter,
-	    ("%s: Interrupt %u has bad cpu affinity: vcpuid %u affinity %#lx",
-	    __func__, irqid, vcpuid, irouter));
-	KASSERT(irouter < VM_MAXCPU,
-	    ("%s: Interrupt %u sent to invalid vcpu %lu", __func__, irqid,
-	    irouter));
+	target_vcpu = irq->target_vcpu;
+	KASSERT(vcpuid == -1 || vcpuid == target_vcpu,
+	    ("%s: Interrupt %u has bad cpu affinity: vcpu %d target vcpu %d",
+	    __func__, irqid, vcpuid, target_vcpu));
+	KASSERT(target_vcpu >= 0 && target_vcpu < VM_MAXCPU,
+	    ("%s: Interrupt %u sent to invalid vcpu %d", __func__, irqid,
+	    target_vcpu));
 
 	if (vcpuid == -1)
-		vcpuid = irouter;
-	if (vcpuid >= VM_MAXCPU) {
+		vcpuid = target_vcpu;
+	/* TODO: Check from 0 to vm->maxcpus */
+	if (vcpuid < 0 || vcpuid >= VM_MAXCPU) {
 		vgic_v3_release_irq(irq);
 		return (1);
 	}

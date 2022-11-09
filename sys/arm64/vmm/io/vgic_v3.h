@@ -59,6 +59,7 @@ struct vgic_v3_irq {
 	TAILQ_ENTRY(vgic_v3_irq) act_pend_list;
 	struct mtx irq_spinmtx;
 	uint64_t mpidr;
+	int target_vcpu;
 	uint32_t irq;
 	bool active;
 	bool pending;
