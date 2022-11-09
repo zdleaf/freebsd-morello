@@ -35,6 +35,7 @@
 #include <unistd.h>
 
 #include <libfdt.h>
+#include <vmmapi.h>
 
 #include "bhyverun.h"
 
@@ -52,9 +53,7 @@
 #define	IRQ_TYPE_LEVEL_HIGH	4
 #define	IRQ_TYPE_LEVEL_LOW	8
 
-/* XXX: Ask for this info */
 #define	MEM_START	0x100000000
-#define	MEM_LEN		0x40000000
 
 static uint32_t next_phandle = 1;
 
@@ -285,9 +284,9 @@ fdt_build(struct vmctx *ctx, int ncpu)
 	fdt_property_string(fdt, "stdout-path", "serial0:115200n8");
 	fdt_end_node(fdt);
 
-	fdt_begin_node(fdt, "memory@100000000");
+	fdt_begin_node(fdt, "memory");
 	fdt_property_string(fdt, "device_type", "memory");
-	set_single_reg(fdt, MEM_START, MEM_LEN);
+	set_single_reg(fdt, vm_get_highmem_base(ctx), vm_get_highmem_size(ctx));
 	fdt_end_node(fdt);
 
 	add_cpus(fdt, ncpu);
