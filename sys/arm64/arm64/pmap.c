@@ -4276,12 +4276,6 @@ havel3:
 	 */
 	if (pmap_l3_valid(orig_l3)) {
 		/*
-		 * Only allow adding new entries on stage 2 tables for now.
-		 * This simplifies cache invalidation as we may need to call
-		 * into EL2 to perform such actions.
-		 */
-		PMAP_ASSERT_STAGE1(pmap);
-		/*
 		 * Wiring change, just update stats. We don't worry about
 		 * wiring PT pages as they remain resident as long as there
 		 * are valid mappings in them. Hence, if a user page is wired,
@@ -4316,6 +4310,13 @@ havel3:
 				vm_page_aflag_set(m, PGA_WRITEABLE);
 			goto validate;
 		}
+
+		/*
+		 * Only allow adding new entries on stage 2 tables for now.
+		 * This simplifies cache invalidation as we may need to call
+		 * into EL2 to perform such actions.
+		 */
+		PMAP_ASSERT_STAGE1(pmap);
 
 		/*
 		 * The physical page has changed.  Temporarily invalidate
@@ -4403,9 +4404,9 @@ validate:
 	 * Update the L3 entry
 	 */
 	if (pmap_l3_valid(orig_l3)) {
-		PMAP_ASSERT_STAGE1(pmap);
 		KASSERT(opa == pa, ("pmap_enter: invalid update"));
 		if ((orig_l3 & ~ATTR_AF) != (new_l3 & ~ATTR_AF)) {
+			PMAP_ASSERT_STAGE1(pmap);
 			/* same PA, different attributes */
 			orig_l3 = pmap_load_store(l3, new_l3);
 			pmap_s1_invalidate_page(pmap, va, true);
