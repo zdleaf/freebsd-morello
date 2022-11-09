@@ -683,7 +683,7 @@ vmexit_smccc(struct vmctx *ctx, struct vm_exit *vme, int *pvcpu)
 		    vme->u.smccc_call.args[1]);
 		assert(error == 0);
 
-		fbsdrun_addcpu(ctx, BSP, newcpu, vme->u.smccc_call.args[1]);
+		fbsdrun_addcpu(ctx, newcpu, vme->u.smccc_call.args[1], false);
 
 		smccc_rv = PSCI_RETVAL_SUCCESS;
 		break;
@@ -1781,6 +1781,7 @@ main(int argc, char *argv[])
 	vmexit = calloc(guest_ncpus, sizeof(*vmexit));
 	mt_vmm_info = calloc(guest_ncpus, sizeof(*mt_vmm_info));
 
+#ifdef __amd64__
 	/*
 	 * Add all vCPUs.
 	 */
@@ -1792,6 +1793,9 @@ main(int argc, char *argv[])
 #endif
 		spinup_vcpu(ctx, vcpu, suspend);
 	}
+#else
+	spinup_vcpu(ctx, 0, false);
+#endif
 
 	/*
 	 * Head off to the main event dispatch loop
