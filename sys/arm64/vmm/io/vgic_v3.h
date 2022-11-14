@@ -51,8 +51,7 @@ int vgic_v3_icc_sgi1r_write(void *vm, int vcpuid, uint64_t rval, void *arg);
 #define VGIC_SHR_I_NUM		(VGIC_SPI_NUM)
 
 #define VGIC_ICH_LR_NUM_MAX	16
-#define	VGIC_ICH_AP0R_NUM_MAX	4
-#define	VGIC_ICH_AP1R_NUM_MAX	VGIC_ICH_AP0R_NUM_MAX
+#define	VGIC_ICH_APR_NUM_MAX	4
 
 struct vgic_v3_irq {
 	/* List of IRQs that are active or pending */
@@ -140,10 +139,9 @@ struct vgic_v3_cpu_if {
 	struct mtx	lr_mtx;
 
 	/* Active Priorities Registers for Group 0 and 1 interrupts */
-	uint32_t	ich_ap0r_el2[VGIC_ICH_AP0R_NUM_MAX];
-	size_t		ich_ap0r_num;
-	uint32_t	ich_ap1r_el2[VGIC_ICH_AP1R_NUM_MAX];
-	size_t		ich_ap1r_num; /* TODO: Remove as it's identical to ich_ap0r_num */
+	size_t		ich_apr_num;
+	uint32_t	ich_ap0r_el2[VGIC_ICH_APR_NUM_MAX];
+	uint32_t	ich_ap1r_el2[VGIC_ICH_APR_NUM_MAX];
 
 	struct vgic_v3_irq private_irqs[VGIC_PRV_I_NUM];
 	TAILQ_HEAD(, vgic_v3_irq) irq_act_pend;

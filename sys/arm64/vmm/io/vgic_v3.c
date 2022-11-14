@@ -477,8 +477,7 @@ vgic_v3_cpuinit(struct hypctx *hypctx, bool last_vcpu)
 	cpu_if->ich_lr_used = 0;
 	TAILQ_INIT(&cpu_if->irq_act_pend);
 
-	cpu_if->ich_ap0r_num = virt_features.ich_apr_num;
-	cpu_if->ich_ap1r_num = virt_features.ich_apr_num;
+	cpu_if->ich_apr_num = virt_features.ich_apr_num;
 }
 
 void

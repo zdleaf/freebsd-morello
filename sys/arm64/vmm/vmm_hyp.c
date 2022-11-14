@@ -159,7 +159,7 @@ vmm_hyp_reg_store(struct hypctx *hypctx, struct hyp *hyp, bool guest)
 #undef STORE_LR
 		}
 
-		switch(hypctx->vgic_cpu_if.ich_ap0r_num - 1) {
+		switch(hypctx->vgic_cpu_if.ich_apr_num - 1) {
 #define	STORE_APR(x)						\
 	case x:							\
 		hypctx->vgic_cpu_if.ich_ap0r_el2[x] =		\
@@ -513,7 +513,7 @@ vmm_hyp_reg_restore(struct hypctx *hypctx, struct hyp *hyp, bool guest)
 #undef LOAD_LR
 		}
 
-		switch(hypctx->vgic_cpu_if.ich_ap0r_num - 1) {
+		switch(hypctx->vgic_cpu_if.ich_apr_num - 1) {
 #define	LOAD_APR(x)						\
 	case x:							\
 		WRITE_SPECIALREG(ich_ap0r ## x ##_el2,		\
