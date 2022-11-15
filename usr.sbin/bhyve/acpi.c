@@ -961,7 +961,9 @@ basl_make_templates(void)
 int
 acpi_build(struct vmctx *ctx, int ncpu)
 {
+#if defined(__amd64__)
 	int err;
+#endif
 
 	basl_ncpu = ncpu;
 
