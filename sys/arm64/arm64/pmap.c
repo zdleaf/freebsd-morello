@@ -2038,7 +2038,7 @@ _pmap_unwire_l3(pmap_t pmap, vm_offset_t va, vm_page_t m, struct spglist *free)
 		l1pg = PHYS_TO_VM_PAGE(tl0 & ~ATTR_MASK);
 		pmap_unwire_l3(pmap, va, l1pg, free);
 	}
-	pmap_s1_invalidate_page(pmap, va, false);
+	pmap_invalidate_page(pmap, va, false);
 
 	/*
 	 * Put page on a list so that it is released after
@@ -5555,7 +5555,7 @@ pmap_remove_pages(pmap_t pmap)
 	}
 	if (lock != NULL)
 		rw_wunlock(lock);
-	pmap_s1_invalidate_all(pmap);
+	pmap_invalidate_all(pmap);
 	free_pv_chunk_batch(free_chunks);
 	PMAP_UNLOCK(pmap);
 	vm_page_free_pages_toq(&free, true);
@@ -5791,7 +5791,7 @@ retry:
 			
 			if ((oldpte & rw_check) != 0)
 				vm_page_dirty(m);
-			pmap_s1_invalidate_page(pmap, pv->pv_va, true);
+			pmap_invalidate_page(pmap, pv->pv_va, true);
 		}
 		PMAP_UNLOCK(pmap);
 	}
