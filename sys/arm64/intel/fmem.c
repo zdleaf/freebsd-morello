@@ -106,12 +106,12 @@ fmemioctl(struct cdev *dev, u_long cmd, caddr_t data, int flags,
 	int unit;
 
 	sc = dev->si_drv1;
+	unit = dev2unit(dev);
 
 	req = (struct fmem_request *)data;
-	if ((req->offset + req->access_width) > PAGE_SIZE)
+	if ((req->offset + req->access_width) > sc->fmem[unit].length)
 		return (ERANGE);
 
-	unit = dev2unit(dev);
 	addr = sc->fmem[unit].offset + req->offset;
 
 	switch (cmd) {
