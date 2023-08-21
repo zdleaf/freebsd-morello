@@ -113,6 +113,7 @@ struct trace_context {
 	/* Raw trace. */
 	int raw;
 	FILE *raw_f;
+	uint64_t bytes_written;
 
 	/* Trace file. */
 	char *filename;

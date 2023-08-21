@@ -235,16 +235,19 @@ hwt_vm_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 	struct hwt_record_get *rget;
 	struct hwt_set_config *sconf;
 	struct hwt_bufptr_get *ptr_get;
+	struct hwt_svc_buf *sbuf;
 
 	struct hwt_context *ctx;
 	struct hwt_vm *vm;
 	struct hwt_owner *ho;
 
 	vm_offset_t offset;
-	int cpu_id;
 	int ident;
 	int error;
 	uint64_t data = 0;
+	void *data2;
+	size_t data_size;
+	int data_version;
 
 	vm = dev->si_drv1;
 	KASSERT(vm != NULL, ("si_drv1 is NULL"));
@@ -349,12 +352,28 @@ hwt_vm_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 		if (ctx->state == CTX_STATE_STOPPED) {
 			return (ENXIO);
 		}
-		cpu_id = *addr;
-		if (cpu_id > mp_ncpus)
-			return (ENXIO);
-		error = hwt_backend_svc_buf(ctx, cpu_id);
-		if (error)
+
+		sbuf = (struct hwt_svc_buf *)addr;
+		data_size = sbuf->data_size;
+		data_version = sbuf->data_version;
+
+		if (data_size == 0 || data_size > PAGE_SIZE)
+			return (EINVAL);
+
+		data2 = malloc(data_size, M_HWT_VM, M_WAITOK | M_ZERO);
+		error = copyin(sbuf->data, data2, data_size);
+		if (error) {
+			free(data2, M_HWT_VM);
 			return (error);
+		}
+
+		error = hwt_backend_svc_buf(ctx, data2, data_size, data_version);
+		if (error) {
+			free(data2, M_HWT_VM);
+			return (error);
+		}
+
+		free(data2, M_HWT_VM);
 		break;
 
 	default:

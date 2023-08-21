@@ -36,7 +36,8 @@ struct hwt_backend_ops {
 	void (*hwt_backend_deinit)(struct hwt_context *);
 	int (*hwt_backend_configure)(struct hwt_context *, int cpu_id,
 	    int thread_id);
-	int (*hwt_backend_svc_buf)(struct hwt_context *, int cpu_id);
+	int (*hwt_backend_svc_buf)(struct hwt_context *, void *data,
+	    size_t data_size, int data_version);
 	void (*hwt_backend_enable)(struct hwt_context *, int cpu_id);
 	void (*hwt_backend_disable)(struct hwt_context *, int cpu_id);
 	int (*hwt_backend_read)(struct hwt_vm *, int *ident,
@@ -72,7 +73,8 @@ int hwt_backend_read(struct hwt_context *ctx, struct hwt_vm *vm, int *ident,
 int hwt_backend_register(struct hwt_backend *);
 int hwt_backend_unregister(struct hwt_backend *);
 void hwt_backend_stop(struct hwt_context *);
-int hwt_backend_svc_buf(struct hwt_context *ctx, int cpu_id);
+int hwt_backend_svc_buf(struct hwt_context *ctx, void *data, size_t data_size,
+    int data_version);
 struct hwt_backend * hwt_backend_lookup(const char *name);
 int hwt_backend_thread_alloc(struct hwt_context *ctx, struct hwt_thread *);
 void hwt_backend_thread_free(struct hwt_thread *);

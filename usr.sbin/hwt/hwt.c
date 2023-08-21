@@ -61,6 +61,7 @@
 
 #if defined(__aarch64__)
 #include "hwt_coresight.h"
+#include "hwt_spe.h"
 #endif
 
 #if defined(__amd64__)
@@ -86,6 +87,7 @@ static struct trace_context tcs;
 static struct trace_dev trace_devs[] = {
 #if defined(__aarch64__)
 	{ "coresight",	"ARM Coresight", &cs_methods },
+	{ "spe",	"ARM Statistical Profiling Extension", &spe_methods },
 #endif
 #if defined(__amd64__)
 	{ "pt", "Intel PT", &pt_methods},
@@ -390,7 +392,8 @@ hwt_mode_cpu(struct trace_context *tc)
 	uint32_t nrec;
 	int error;
 
-	if (tc->image_name == NULL || tc->func_name == NULL)
+	if (strcmp(tc->trace_dev->name, "coresight") == 0 &&
+	    (tc->image_name == NULL || tc->func_name == NULL))
 		errx(EX_USAGE, "IP range filtering must be setup for CPU"
 		    " tracing");
 
@@ -421,9 +424,11 @@ hwt_mode_cpu(struct trace_context *tc)
 
 	printf("Received %d kernel mappings\n", nrec);
 
-	error = hwt_find_sym(tc);
-	if (error)
-		errx(EX_USAGE, "could not find symbol");
+	if(tc->image_name || tc->func_name) {
+		error = hwt_find_sym(tc);
+		if (error)
+			errx(EX_USAGE, "could not find symbol");
+	}
 
 	error = tc->trace_dev->methods->set_config(tc);
 	if (error != 0)

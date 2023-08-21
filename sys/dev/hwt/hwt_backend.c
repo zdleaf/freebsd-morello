@@ -252,13 +252,15 @@ hwt_backend_stop(struct hwt_context *ctx)
 }
 
 int
-hwt_backend_svc_buf(struct hwt_context *ctx, int cpu_id)
+hwt_backend_svc_buf(struct hwt_context *ctx, void *data, size_t data_size,
+    int data_version)
 {
 	int error;
 
 	dprintf("%s\n", __func__);
 
-	error = ctx->hwt_backend->ops->hwt_backend_svc_buf(ctx, cpu_id);
+	error = ctx->hwt_backend->ops->hwt_backend_svc_buf(ctx, data, data_size,
+	    data_version);
 
 	return (error);
 }
