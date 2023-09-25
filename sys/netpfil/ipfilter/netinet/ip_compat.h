@@ -4,7 +4,6 @@
  * See the IPFILTER.LICENCE file for details on licencing.
  *
  * @(#)ip_compat.h	1.8 1/14/96
- * $FreeBSD$
  * Id: ip_compat.h,v 2.142.2.57 2007/10/10 09:51:42 darrenr Exp $
  */
 
@@ -135,6 +134,7 @@
 						rw_runlock(&(x)->ipf_lk); \
 					} while (0)
 # include <net/if_var.h>
+# include <net/if_private.h>
 # define	GETKTIME(x)	microtime((struct timeval *)x)
 # define	if_addrlist	if_addrhead
 

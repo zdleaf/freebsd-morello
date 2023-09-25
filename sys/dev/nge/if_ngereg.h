@@ -31,8 +31,6 @@
  * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 #define NGE_CSR			0x00
@@ -634,7 +632,7 @@ struct nge_stats {
 };
 
 struct nge_softc {
-	struct ifnet		*nge_ifp;
+	if_t			nge_ifp;
 	device_t		nge_dev;
 	struct resource		*nge_res;
 	int			nge_res_type;

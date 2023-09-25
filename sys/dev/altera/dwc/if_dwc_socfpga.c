@@ -31,13 +31,14 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/bus.h>
 #include <sys/kernel.h>
+#include <sys/socket.h>
 #include <sys/module.h>
+
+#include <net/if.h>
 
 #include <machine/bus.h>
 
@@ -101,13 +102,11 @@ static device_method_t dwc_socfpga_methods[] = {
 	DEVMETHOD_END
 };
 
-static devclass_t dwc_socfpga_devclass;
-
 extern driver_t dwc_driver;
 
 DEFINE_CLASS_1(dwc, dwc_socfpga_driver, dwc_socfpga_methods,
     sizeof(struct dwc_softc), dwc_driver);
-EARLY_DRIVER_MODULE(dwc_socfpga, simplebus, dwc_socfpga_driver,
-    dwc_socfpga_devclass, 0, 0, BUS_PASS_SUPPORTDEV + BUS_PASS_ORDER_MIDDLE);
+EARLY_DRIVER_MODULE(dwc_socfpga, simplebus, dwc_socfpga_driver, 0, 0,
+    BUS_PASS_SUPPORTDEV + BUS_PASS_ORDER_MIDDLE);
 
 MODULE_DEPEND(dwc_socfpga, dwc, 1, 1, 1);

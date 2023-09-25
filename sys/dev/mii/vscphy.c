@@ -27,8 +27,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 /*
  * Microsemi / Vitesse VSC8501 (and similar).
  */
@@ -335,12 +333,10 @@ static device_method_t vscphy_methods[] = {
 	DEVMETHOD_END
 };
 
-static devclass_t vscphy_devclass;
-
 static driver_t vscphy_driver = {
 	"vscphy",
 	vscphy_methods,
 	sizeof(struct vscphy_softc)
 };
 
-DRIVER_MODULE(vscphy, miibus, vscphy_driver, vscphy_devclass, 0, 0);
+DRIVER_MODULE(vscphy, miibus, vscphy_driver, 0, 0);

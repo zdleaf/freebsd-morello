@@ -1,7 +1,5 @@
 /* 
  * FQ_PIE - The FlowQueue-PIE scheduler/AQM
- *
- * $FreeBSD$
  * 
  * Copyright (C) 2016 Centre for Advanced Internet Architectures,
  *  Swinburne University of Technology, Melbourne, Australia.
@@ -581,7 +579,7 @@ fqpie_callout_cleanup(void *x)
 	mtx_destroy(&pst->lock_mtx);
 	psi_extra = q->psi_extra;
 
-	DN_BH_WLOCK();
+	dummynet_sched_lock();
 	psi_extra->nr_active_q--;
 
 	/* when all sub-queues are destroyed, free flows fq_pie extra vars memory */
@@ -590,7 +588,7 @@ fqpie_callout_cleanup(void *x)
 		free(psi_extra, M_DUMMYNET);
 		fq_pie_desc.ref_count--;
 	}
-	DN_BH_WUNLOCK();
+	dummynet_sched_unlock();
 }
 
 /* 
@@ -649,10 +647,10 @@ pie_dequeue(struct fq_pie_flow *q, struct fq_pie_si *si)
 				if(pst->avg_dq_time == 0)
 					pst->avg_dq_time = dq_time;
 				else {
-					/* 
-					 * weight = PIE_DQ_THRESHOLD/2^6, but we scaled 
-					 * weight by 2^8. Thus, scaled 
-					 * weight = PIE_DQ_THRESHOLD /2^8 
+					/*
+					 * weight = PIE_DQ_THRESHOLD/2^6, but we scaled
+					 * weight by 2^8. Thus, scaled
+					 * weight = PIE_DQ_THRESHOLD /2^8
 					 * */
 					w = PIE_DQ_THRESHOLD >> 8;
 					pst->avg_dq_time = (dq_time* w
@@ -662,11 +660,11 @@ pie_dequeue(struct fq_pie_flow *q, struct fq_pie_si *si)
 			}
 		}
 
-		/* 
-		 * Start new measurment cycle when the queue has
-		 *  PIE_DQ_THRESHOLD worth of bytes.
+		/*
+		 * Start new measurement cycle when the queue has
+		 * PIE_DQ_THRESHOLD worth of bytes.
 		 */
-		if(!(pst->sflags & PIE_INMEASUREMENT) && 
+		if(!(pst->sflags & PIE_INMEASUREMENT) &&
 			q->stats.len_bytes >= PIE_DQ_THRESHOLD) {
 			pst->sflags |= PIE_INMEASUREMENT;
 			pst->measurement_start = now;
@@ -677,7 +675,7 @@ pie_dequeue(struct fq_pie_flow *q, struct fq_pie_si *si)
 	else
 		pst->current_qdelay = now - pkt_ts;
 
-	return m;	
+	return m;
 }
 
  /*
@@ -1061,7 +1059,9 @@ fq_pie_new_sched(struct dn_sch_inst *_si)
 		pie_init(&flows[i], schk);
 	}
 
+	dummynet_sched_lock();
 	fq_pie_desc.ref_count++;
+	dummynet_sched_unlock();
 
 	return 0;
 }

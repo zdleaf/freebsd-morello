@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2017,2018 Emmanuel Vadot <manu@freebsd.org>
  *
@@ -23,13 +23,9 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/bus.h>
@@ -209,13 +205,11 @@ static device_method_t ccu_sun8i_r_methods[] = {
 	DEVMETHOD_END
 };
 
-static devclass_t ccu_sun8i_r_devclass;
-
 DEFINE_CLASS_1(ccu_sun8i_r, ccu_sun8i_r_driver, ccu_sun8i_r_methods,
   sizeof(struct aw_ccung_softc), aw_ccung_driver);
 
-EARLY_DRIVER_MODULE(ccu_sun8i_r, simplebus, ccu_sun8i_r_driver,
-    ccu_sun8i_r_devclass, 0, 0, BUS_PASS_RESOURCE + BUS_PASS_ORDER_MIDDLE);
+EARLY_DRIVER_MODULE(ccu_sun8i_r, simplebus, ccu_sun8i_r_driver, 0, 0,
+    BUS_PASS_RESOURCE + BUS_PASS_ORDER_MIDDLE);
 
 static int
 ccu_a83t_r_probe(device_t dev)
@@ -256,10 +250,8 @@ static device_method_t ccu_a83t_r_methods[] = {
 	DEVMETHOD_END
 };
 
-static devclass_t ccu_a83t_r_devclass;
-
 DEFINE_CLASS_1(ccu_a83t_r, ccu_a83t_r_driver, ccu_a83t_r_methods,
   sizeof(struct aw_ccung_softc), aw_ccung_driver);
 
-EARLY_DRIVER_MODULE(ccu_a83t_r, simplebus, ccu_a83t_r_driver,
-    ccu_a83t_r_devclass, 0, 0, BUS_PASS_RESOURCE + BUS_PASS_ORDER_MIDDLE);
+EARLY_DRIVER_MODULE(ccu_a83t_r, simplebus, ccu_a83t_r_driver, 0, 0,
+    BUS_PASS_RESOURCE + BUS_PASS_ORDER_MIDDLE);

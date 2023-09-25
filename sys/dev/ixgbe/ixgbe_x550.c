@@ -30,7 +30,6 @@
   POSSIBILITY OF SUCH DAMAGE.
 
 ******************************************************************************/
-/*$FreeBSD$*/
 
 #include "ixgbe_x550.h"
 #include "ixgbe_x540.h"
@@ -1139,7 +1138,7 @@ s32 ixgbe_write_iosf_sb_reg_x550(struct ixgbe_hw *hw, u32 reg_addr,
 			    u32 device_type, u32 data)
 {
 	u32 gssr = IXGBE_GSSR_PHY1_SM | IXGBE_GSSR_PHY0_SM;
-	u32 command, error;
+	u32 command, error __unused;
 	s32 ret;
 
 	ret = ixgbe_acquire_swfw_semaphore(hw, gssr);
@@ -1185,7 +1184,7 @@ s32 ixgbe_read_iosf_sb_reg_x550(struct ixgbe_hw *hw, u32 reg_addr,
 			   u32 device_type, u32 *data)
 {
 	u32 gssr = IXGBE_GSSR_PHY1_SM | IXGBE_GSSR_PHY0_SM;
-	u32 command, error;
+	u32 command, error __unused;
 	s32 ret;
 
 	ret = ixgbe_acquire_swfw_semaphore(hw, gssr);

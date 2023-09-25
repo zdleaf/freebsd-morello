@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2016 The FreeBSD Foundation
  *
@@ -38,8 +38,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/bus.h>
 #include <sys/kernel.h>
@@ -224,9 +222,7 @@ static driver_t cfumass_driver = {
 	.size = sizeof(struct cfumass_softc),
 };
 
-static devclass_t cfumass_devclass;
-
-DRIVER_MODULE(cfumass, uhub, cfumass_driver, cfumass_devclass, NULL, 0);
+DRIVER_MODULE(cfumass, uhub, cfumass_driver, NULL, NULL);
 MODULE_VERSION(cfumass, 0);
 MODULE_DEPEND(cfumass, usb, 1, 1, 1);
 MODULE_DEPEND(cfumass, usb_template, 1, 1, 1);

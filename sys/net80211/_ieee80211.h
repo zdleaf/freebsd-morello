@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2001 Atsushi Onoe
  * Copyright (c) 2002-2008 Sam Leffler, Errno Consulting
@@ -24,8 +24,6 @@
  * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 #ifndef _NET80211__IEEE80211_H_
 #define _NET80211__IEEE80211_H_
@@ -602,8 +600,8 @@ struct ieee80211_rx_stats {
 	int16_t c_rssi_ext[IEEE80211_MAX_CHAINS];	/* per-chain RSSI */
 
 	/* 32 bits */
-	uint8_t c_nf;			/* global NF */
-	uint8_t c_rssi;			/* global RSSI */
+	int8_t c_nf;			/* global NF */
+	int8_t c_rssi;			/* global RSSI */
 	uint8_t c_chain;		/* number of RX chains involved */
 	uint8_t c_rate;			/* legacy; 11n rate code; VHT MCS */
 

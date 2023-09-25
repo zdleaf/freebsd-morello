@@ -24,8 +24,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/bus.h>
@@ -453,10 +451,8 @@ static driver_t sdhci_acpi_driver = {
 	sdhci_methods,
 	sizeof(struct sdhci_acpi_softc),
 };
-static devclass_t sdhci_acpi_devclass;
 
-DRIVER_MODULE(sdhci_acpi, acpi, sdhci_acpi_driver, sdhci_acpi_devclass, NULL,
-    NULL);
+DRIVER_MODULE(sdhci_acpi, acpi, sdhci_acpi_driver, NULL, NULL);
 SDHCI_DEPEND(sdhci_acpi);
 
 #ifndef MMCCAM

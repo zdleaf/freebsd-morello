@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright 1997, Stefan Esser <se@freebsd.org>
  *
@@ -26,8 +26,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/bus.h>
 #include <sys/kernel.h>
@@ -288,6 +286,4 @@ static driver_t pci_hostb_driver = {
 	1,
 };
 
-static devclass_t pci_hostb_devclass;
-
-DRIVER_MODULE(hostb, pci, pci_hostb_driver, pci_hostb_devclass, 0, 0);
+DRIVER_MODULE(hostb, pci, pci_hostb_driver, 0, 0);

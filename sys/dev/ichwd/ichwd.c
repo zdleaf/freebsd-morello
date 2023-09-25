@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2004 Texas A&M University
  * All rights reserved.
@@ -59,8 +59,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/eventhandler.h>
 #include <sys/kernel.h>
@@ -303,8 +301,6 @@ static struct ichwd_device ichwd_smb_devices[] = {
 	{ DEVICEID_C3000,         "Intel Atom C3000 watchdog timer",	10, 4 },
 	{ 0, NULL, 0, 0 },
 };
-
-static devclass_t ichwd_devclass;
 
 #define ichwd_read_tco_1(sc, off) \
 	bus_read_1((sc)->tco_res, (off))
@@ -988,4 +984,4 @@ static driver_t ichwd_driver = {
 	sizeof(struct ichwd_softc),
 };
 
-DRIVER_MODULE(ichwd, isa, ichwd_driver, ichwd_devclass, NULL, NULL);
+DRIVER_MODULE(ichwd, isa, ichwd_driver, NULL, NULL);

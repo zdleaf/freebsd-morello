@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2011-2012 Semihalf.
  * All rights reserved.
@@ -27,8 +27,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/cdefs.h>
 #include <sys/types.h>
 #include <sys/param.h>
@@ -134,9 +132,6 @@ booke_disable_l2_cache(void)
 int
 cpu_machine_check(struct thread *td, struct trapframe *frame, int *ucode)
 {
-	register_t mcsr;
-
-	mcsr = mfspr(SPR_MCSR);
 
 	*ucode = BUS_OBJERR;
 	return (SIGBUS);

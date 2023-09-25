@@ -2,7 +2,6 @@
  * System call names.
  *
  * DO NOT EDIT-- this file is automatically @generated.
- * $FreeBSD$
  */
 
 const char *linux_syscallnames[] = {
@@ -11,7 +10,7 @@ const char *linux_syscallnames[] = {
 	"linux_exit",			/* 1 = linux_exit */
 	"linux_fork",			/* 2 = linux_fork */
 	"read",			/* 3 = read */
-	"write",			/* 4 = write */
+	"linux_write",			/* 4 = linux_write */
 	"linux_open",			/* 5 = linux_open */
 	"close",			/* 6 = close */
 	"linux_waitpid",			/* 7 = linux_waitpid */
@@ -35,7 +34,7 @@ const char *linux_syscallnames[] = {
 	"linux_stime",			/* 25 = linux_stime */
 	"linux_ptrace",			/* 26 = linux_ptrace */
 	"linux_alarm",			/* 27 = linux_alarm */
-	"linux_fstat",			/* 28 = linux_fstat */
+	"#28",			/* 28 = fstat */
 	"linux_pause",			/* 29 = linux_pause */
 	"linux_utime",			/* 30 = linux_utime */
 	"#31",			/* 31 = stty */
@@ -153,7 +152,7 @@ const char *linux_syscallnames[] = {
 	"flock",			/* 143 = flock */
 	"linux_msync",			/* 144 = linux_msync */
 	"readv",			/* 145 = readv */
-	"writev",			/* 146 = writev */
+	"linux_writev",			/* 146 = linux_writev */
 	"linux_getsid",			/* 147 = linux_getsid */
 	"linux_fdatasync",			/* 148 = linux_fdatasync */
 	"linux_sysctl",			/* 149 = linux_sysctl */
@@ -448,7 +447,7 @@ const char *linux_syscallnames[] = {
 	"linux_pidfd_getfd",			/* 438 = linux_pidfd_getfd */
 	"linux_faccessat2",			/* 439 = linux_faccessat2 */
 	"linux_process_madvise",			/* 440 = linux_process_madvise */
-	"linux_epoll_pwait2",			/* 441 = linux_epoll_pwait2 */
+	"linux_epoll_pwait2_64",			/* 441 = linux_epoll_pwait2_64 */
 	"linux_mount_setattr",			/* 442 = linux_mount_setattr */
 	"#443",			/* 443 = nosys */
 };

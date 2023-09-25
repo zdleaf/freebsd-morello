@@ -26,8 +26,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 
 #include "lua.h"
@@ -59,6 +57,21 @@ lua_command(lua_State *L)
 	res = interp_builtin_cmd(argc, argv);
 	free(argv);
 	lua_pushinteger(L, res);
+
+	return 1;
+}
+
+static int
+lua_has_command(lua_State *L)
+{
+	const char	*cmd;
+
+	if (lua_gettop(L) != 1) {
+		lua_pushnil(L);
+		return 1;
+	}
+	cmd = luaL_checkstring(L, 1);
+	lua_pushinteger(L, interp_has_builtin_cmd(cmd));
 
 	return 1;
 }
@@ -539,9 +552,9 @@ static const struct luaL_Reg loaderlib[] = {
 	REG_SIMPLE(interpret),
 	REG_SIMPLE(parse),
 	REG_SIMPLE(getenv),
+	REG_SIMPLE(has_command),
 	REG_SIMPLE(perform),
-	/* Also registered as the global 'printc' */
-	REG_SIMPLE(printc),
+	REG_SIMPLE(printc),	/* Also registered as the global 'printc' */
 	REG_SIMPLE(setenv),
 	REG_SIMPLE(time),
 	REG_SIMPLE(unsetenv),
@@ -578,6 +591,8 @@ luaopen_loader(lua_State *L)
 	lua_setfield(L, -2, "machine_arch");
 	lua_pushstring(L, LUA_PATH);
 	lua_setfield(L, -2, "lua_path");
+	lua_pushinteger(L, bootprog_rev);
+	lua_setfield(L, -2, "version");
 	/* Set global printc to loader.printc */
 	lua_register(L, "printc", lua_printc);
 	return 1;

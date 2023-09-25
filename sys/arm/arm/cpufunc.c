@@ -44,8 +44,6 @@
  * Created      : 30/01/97
  */
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/lock.h>
@@ -146,7 +144,6 @@ get_cachetype_cp15(void)
 {
 	u_int ctype, dsize, cpuid;
 	u_int clevel, csize, i, sel;
-	u_int multiplier;
 	u_char type;
 
 	ctype = cp15_ctr_get();
@@ -193,7 +190,6 @@ get_cachetype_cp15(void)
 		 */
 
 		dsize = CPU_CT_DSIZE(ctype);
-		multiplier = (dsize & CPU_CT_xSIZE_M) ? 3 : 2;
 		arm_dcache_align = 1U << (CPU_CT_xSIZE_LEN(dsize) + 3);
 		if (CPU_CT_xSIZE_ASSOC(dsize) == 0) {
 			if (dsize & CPU_CT_xSIZE_M)

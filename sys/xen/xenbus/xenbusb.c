@@ -52,8 +52,6 @@
  *                        xnb1
  */
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/bus.h>
 #include <sys/kernel.h>
@@ -254,7 +252,7 @@ xenbusb_delete_child(device_t dev, device_t child)
 static void
 xenbusb_verify_device(device_t dev, device_t child)
 {
-	if (xs_exists(XST_NIL, xenbus_get_node(child), "") == 0) {
+	if (xs_exists(XST_NIL, xenbus_get_node(child), "state") == 0) {
 		/*
 		 * Device tree has been removed from Xenbus.
 		 * Tear down the device.
@@ -428,7 +426,7 @@ xenbusb_release_confighook(struct xenbusb_softc *xbs)
 }
 
 /**
- * \brief Verify the existance of attached device instances and perform
+ * \brief Verify the existence of attached device instances and perform
  *        probe/attach processing for newly arrived devices.
  *
  * \param dev  The NewBus device representing this XenBus bus.
@@ -907,6 +905,7 @@ xenbusb_write_ivar(device_t dev, device_t child, int index, uintptr_t value)
 	case XENBUS_IVAR_STATE:
 	{
 		int error;
+		struct xs_transaction xst;
 
 		newstate = (enum xenbus_state)value;
 		sx_xlock(&ivars->xd_lock);
@@ -915,31 +914,39 @@ xenbusb_write_ivar(device_t dev, device_t child, int index, uintptr_t value)
 			goto out;
 		}
 
-		error = xs_scanf(XST_NIL, ivars->xd_node, "state",
-		    NULL, "%d", &currstate);
-		if (error)
-			goto out;
-
 		do {
-			error = xs_printf(XST_NIL, ivars->xd_node, "state",
-			    "%d", newstate);
-		} while (error == EAGAIN);
-		if (error) {
-			/*
-			 * Avoid looping through xenbus_dev_fatal()
-			 * which calls xenbus_write_ivar to set the
-			 * state to closing.
-			 */
-			if (newstate != XenbusStateClosing)
-				xenbus_dev_fatal(dev, error,
-						 "writing new state");
-			goto out;
-		}
+			error = xs_transaction_start(&xst);
+			if (error != 0)
+				goto out;
+
+			do {
+				error = xs_scanf(xst, ivars->xd_node, "state",
+				    NULL, "%d", &currstate);
+			} while (error == EAGAIN);
+			if (error)
+				goto out;
+
+			do {
+				error = xs_printf(xst, ivars->xd_node, "state",
+				    "%d", newstate);
+			} while (error == EAGAIN);
+			if (error) {
+				/*
+				 * Avoid looping through xenbus_dev_fatal()
+				 * which calls xenbus_write_ivar to set the
+				 * state to closing.
+				 */
+				if (newstate != XenbusStateClosing)
+					xenbus_dev_fatal(dev, error,
+					    "writing new state");
+				goto out;
+			}
+		} while (xs_transaction_end(xst, 0));
 		ivars->xd_state = newstate;
 
-		if ((ivars->xd_flags & XDF_CONNECTING) != 0
-		 && (newstate == XenbusStateClosed
-		  || newstate == XenbusStateConnected)) {
+		if ((ivars->xd_flags & XDF_CONNECTING) != 0 &&
+		    (newstate == XenbusStateClosed ||
+		    newstate == XenbusStateConnected)) {
 			struct xenbusb_softc *xbs;
 
 			ivars->xd_flags &= ~XDF_CONNECTING;
@@ -949,8 +956,18 @@ xenbusb_write_ivar(device_t dev, device_t child, int index, uintptr_t value)
 
 		wakeup(&ivars->xd_state);
 	out:
+		if (error != 0)
+			xs_transaction_end(xst, 1);
 		sx_xunlock(&ivars->xd_lock);
-		return (error);
+		/*
+		 * Shallow ENOENT errors, as returning an error here will
+		 * trigger a panic.  ENOENT is fine to ignore, because it means
+		 * the toolstack has removed the state node as part of
+		 * destroying the device, and so we have to shut down the
+		 * device without recreating it or else the node would be
+		 * leaked.
+		 */
+		return (error == ENOENT ? 0 : error);
 	}
 
 	case XENBUS_IVAR_NODE:

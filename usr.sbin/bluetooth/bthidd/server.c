@@ -3,7 +3,7 @@
  */
 
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2006 Maksim Yevmenkin <m_evmenkin@yahoo.com>
  * All rights reserved.
@@ -30,7 +30,6 @@
  * SUCH DAMAGE.
  *
  * $Id: server.c,v 1.9 2006/09/07 21:06:53 max Exp $
- * $FreeBSD$
  */
 
 #include <sys/queue.h>
@@ -114,7 +113,7 @@ server_init(bthid_server_p srv)
 		return (-1);
 	}
 
-	/* Create intrrupt socket */
+	/* Create interrupt socket */
 	srv->intr = socket(PF_BLUETOOTH, SOCK_SEQPACKET, BLUETOOTH_PROTO_L2CAP);
 	if (srv->intr < 0) {
 		syslog(LOG_ERR, "Could not create interrupt L2CAP socket. " \

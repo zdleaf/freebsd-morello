@@ -31,8 +31,6 @@
  * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 #ifndef _LINUX_FUTEX_H
@@ -78,6 +76,17 @@
 #define	FUTEX_OWNER_DIED	0x40000000
 #define	FUTEX_TID_MASK		0x3fffffff
 #define	FUTEX_BITSET_MATCH_ANY	0xffffffff
+
+/* robust futexes */
+struct linux_robust_list {
+	l_uintptr_t			next;
+};
+
+struct linux_robust_list_head {
+	struct linux_robust_list	list;
+	l_long				futex_offset;
+	l_uintptr_t			pending_list;
+};
 
 int futex_xchgl(int oparg, uint32_t *uaddr, int *oldval);
 int futex_addl(int oparg, uint32_t *uaddr, int *oldval);

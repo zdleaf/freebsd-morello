@@ -29,18 +29,9 @@
  * SUCH DAMAGE.
  */
 
-#include <sys/cdefs.h>
-
-__FBSDID("$FreeBSD$");
 
 #ifdef lint
 static const char sccsid[] = "@(#)main.c	8.1 (Berkeley) 6/6/93";
-#endif
-
-#ifndef lint
-static const char copyright[] __unused =
-"@(#) Copyright (c) 1980, 1992, 1993\n\
-	The Regents of the University of California.  All rights reserved.\n";
 #endif
 
 #include <sys/param.h>
@@ -155,6 +146,7 @@ main(int argc, char **argv)
 	char errbuf[_POSIX2_LINE_MAX], dummy;
 	size_t	size;
 	struct cmdentry *cmd = NULL;
+	short cf, cb;
 
 	(void) setlocale(LC_ALL, "");
 
@@ -214,6 +206,13 @@ main(int argc, char **argv)
 	 * routines to minimize update work by curses.
 	 */
 	initscr();
+	start_color();
+	use_default_colors();
+	pair_content(0, &cf, &cb);
+	init_pair(1, COLOR_GREEN, cb);
+	init_pair(2, COLOR_MAGENTA, cb);
+	init_pair(3, COLOR_RED, cb);
+	init_pair(4, COLOR_BLUE, cb);
 	CMDLINE = LINES - 1;
 	wnd = (*curcmd->c_open)();
 	if (wnd == NULL) {

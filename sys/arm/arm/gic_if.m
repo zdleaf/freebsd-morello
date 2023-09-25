@@ -25,7 +25,6 @@
 # OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 # SUCH DAMAGE.
 #
-# $FreeBSD$
 #
 
 
@@ -66,4 +65,8 @@ METHOD int alloc_msix {
 METHOD int release_msix {
 	device_t	dev;
 	struct intr_irqsrc *isrc;
+};
+
+METHOD void db_show {
+	device_t	dev;
 };

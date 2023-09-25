@@ -16,8 +16,6 @@
  * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
  * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
  * DEALINGS IN THE SOFTWARE.
- *
- * $FreeBSD$
  */
 
 #ifndef	__XEN_HVM_H__
@@ -26,12 +24,12 @@
 #include <xen/xen-os.h>
 #include <xen/hypervisor.h>
 
-#include <xen/interface/hvm/params.h>
+#include <contrib/xen/hvm/params.h>
 
 /**
  * \brief Wrapper function to obtain a HVM parameter value.
  *
- * \param index	HVM parameter index; see <xen/interface/hvm/params.h>.
+ * \param index	HVM parameter index; see <contrib/xen/hvm/params.h>.
  * 
  * \returns	0 on failure; the value of the parameter otherwise.
  */

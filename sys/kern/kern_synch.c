@@ -37,8 +37,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include "opt_ktrace.h"
 #include "opt_sched.h"
 
@@ -87,7 +85,7 @@ struct loadavg averunnable =
  * Constants for averages over 1, 5, and 15 minutes
  * when sampling at 5 second intervals.
  */
-static fixpt_t cexp[3] = {
+static uint64_t cexp[3] = {
 	0.9200444146293232 * FSCALE,	/* exp(-1/12) */
 	0.9834714538216174 * FSCALE,	/* exp(-1/60) */
 	0.9944598480048967 * FSCALE,	/* exp(-1/180) */
@@ -483,7 +481,7 @@ kdb_switch(void)
 }
 
 /*
- * The machine independent parts of context switching.
+ * mi_switch(9): The machine-independent parts of context switching.
  *
  * The thread lock is required on entry and is no longer held on return.
  */
@@ -500,10 +498,15 @@ mi_switch(int flags)
 	if (!TD_ON_LOCK(td) && !TD_IS_RUNNING(td))
 		mtx_assert(&Giant, MA_NOTOWNED);
 #endif
+	/* thread_lock() performs spinlock_enter(). */
 	KASSERT(td->td_critnest == 1 || KERNEL_PANICKED(),
-		("mi_switch: switch in a critical section"));
+	    ("mi_switch: switch in a critical section"));
 	KASSERT((flags & (SW_INVOL | SW_VOL)) != 0,
 	    ("mi_switch: switch must be voluntary or involuntary"));
+	KASSERT((flags & SW_TYPE_MASK) != 0,
+	    ("mi_switch: a switch reason (type) must be specified"));
+	KASSERT((flags & SW_TYPE_MASK) < SWT_COUNT,
+	    ("mi_switch: invalid switch reason %d", (flags & SW_TYPE_MASK)));
 
 	/*
 	 * Don't perform context switches from the debugger.
@@ -611,14 +614,15 @@ setrunnable(struct thread *td, int srqflags)
 static void
 loadav(void *arg)
 {
-	int i, nrun;
+	int i;
+	uint64_t nrun;
 	struct loadavg *avg;
 
-	nrun = sched_load();
+	nrun = (uint64_t)sched_load();
 	avg = &averunnable;
 
 	for (i = 0; i < 3; i++)
-		avg->ldavg[i] = (cexp[i] * avg->ldavg[i] +
+		avg->ldavg[i] = (cexp[i] * (uint64_t)avg->ldavg[i] +
 		    nrun * FSCALE * (FSCALE - cexp[i])) >> FSHIFT;
 
 	/*
@@ -631,17 +635,33 @@ loadav(void *arg)
 	    loadav, NULL, C_DIRECT_EXEC | C_PREL(32));
 }
 
-/* ARGSUSED */
 static void
-synch_setup(void *dummy)
+ast_scheduler(struct thread *td, int tda __unused)
+{
+#ifdef KTRACE
+	if (KTRPOINT(td, KTR_CSW))
+		ktrcsw(1, 1, __func__);
+#endif
+	thread_lock(td);
+	sched_prio(td, td->td_user_pri);
+	mi_switch(SW_INVOL | SWT_NEEDRESCHED);
+#ifdef KTRACE
+	if (KTRPOINT(td, KTR_CSW))
+		ktrcsw(0, 1, __func__);
+#endif
+}
+
+static void
+synch_setup(void *dummy __unused)
 {
 	callout_init(&loadav_callout, 1);
+	ast_register(TDA_SCHED, ASTR_ASTF_REQUIRED, 0, ast_scheduler);
 
 	/* Kick off timeout driven events by calling first time. */
 	loadav(NULL);
 }
 
-int
+bool
 should_yield(void)
 {
 

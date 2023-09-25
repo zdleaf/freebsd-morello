@@ -29,7 +29,6 @@
  * SUCH DAMAGE.
  *
  *	From: @(#)if_loop.c	8.1 (Berkeley) 6/10/93
- * $FreeBSD$
  */
 
 /*
@@ -50,9 +49,9 @@
 #include <net/ethernet.h>	/* Ethernet related constants and types */
 #include <net/if.h>
 #include <net/if_var.h>		/* basic part of ifnet(9) */
+#include <net/if_private.h>
 #include <net/if_clone.h>	/* network interface cloning */
 #include <net/if_types.h>	/* IFT_ETHER and friends */
-#include <net/if_var.h>		/* kernel-only part of ifnet(9) */
 #include <net/vnet.h>
 
 static const char edscname[] = "edsc";

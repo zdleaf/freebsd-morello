@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) KATO Takenori, 1997, 1998.
  * 
@@ -30,8 +30,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include "opt_cpu.h"
 
 #include <sys/param.h>
@@ -247,6 +245,26 @@ cpu_auxmsr(void)
 	return (PCPU_GET(cpuid));
 }
 
+void
+cpu_init_small_core(void)
+{
+	u_int r[4];
+
+	if (cpu_high < 0x1a)
+		return;
+
+	cpuid_count(0x1a, 0, r);
+	if ((r[0] & CPUID_HYBRID_CORE_MASK) != CPUID_HYBRID_SMALL_CORE)
+		return;
+
+	PCPU_SET(small_core, 1);
+	if (pmap_pcid_enabled && invpcid_works &&
+	    pmap_pcid_invlpg_workaround_uena) {
+		PCPU_SET(pcid_invlpg_workaround, 1);
+		pmap_pcid_invlpg_workaround = 1;
+	}
+}
+
 /*
  * Initialize CPU control registers
  */
@@ -256,10 +274,11 @@ initializecpu(void)
 	uint64_t msr;
 	uint32_t cr4;
 
+	TSENTER();
 	cr4 = rcr4();
 	if ((cpu_feature & CPUID_XMM) && (cpu_feature & CPUID_FXSR)) {
 		cr4 |= CR4_FXSR | CR4_XMM;
-		cpu_fxsr = hw_instruction_sse = 1;
+		hw_instruction_sse = 1;
 	}
 	if (cpu_stdext_feature & CPUID_STDEXT_FSGSBASE)
 		cr4 |= CR4_FSGSBASE;
@@ -291,7 +310,12 @@ initializecpu(void)
 		if (cpu_stdext_feature & CPUID_STDEXT_SMAP)
 			cr4 |= CR4_SMAP;
 	}
+	TSENTER2("load_cr4");
 	load_cr4(cr4);
+	TSEXIT2("load_cr4");
+	/* Reload cpu ext features to reflect cr4 changes */
+	if (IS_BSP() && cold)
+		identify_cpu_ext_features();
 	if (IS_BSP() && (amd_feature & AMDID_NX) != 0) {
 		msr = rdmsr(MSR_EFER) | EFER_NXE;
 		wrmsr(MSR_EFER, msr);
@@ -314,6 +338,10 @@ initializecpu(void)
 	if ((amd_feature & AMDID_RDTSCP) != 0 ||
 	    (cpu_stdext_feature2 & CPUID_STDEXT2_RDPID) != 0)
 		wrmsr(MSR_TSC_AUX, cpu_auxmsr());
+
+	if (!IS_BSP())
+		cpu_init_small_core();
+	TSEXIT();
 }
 
 void

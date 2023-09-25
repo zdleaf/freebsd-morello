@@ -27,8 +27,6 @@
  * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 /**
@@ -87,5 +85,5 @@ extern void ocs_domain_attach(ocs_domain_t *domain, uint32_t s_id);
 extern int ocs_domain_post_event(ocs_domain_t *domain, ocs_sm_event_t, void *);
 
 extern int ocs_ddump_domain(ocs_textbuf_t *textbuf, ocs_domain_t *domain);
-extern void __ocs_domain_attach_internal(ocs_domain_t *domain, uint32_t s_id);;
+extern void __ocs_domain_attach_internal(ocs_domain_t *domain, uint32_t s_id);
 #endif

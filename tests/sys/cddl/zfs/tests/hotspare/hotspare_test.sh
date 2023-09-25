@@ -18,8 +18,6 @@
 # CDDL HEADER END
 #
 
-# $FreeBSD$
-
 #
 # Copyright 2012 Spectra Logic.  All rights reserved.
 # Use is subject to license terms.
@@ -90,6 +88,7 @@ hotspare_add_003_neg_body()
 	. $(atf_get_srcdir)/hotspare.kshlib
 	. $(atf_get_srcdir)/hotspare.cfg
 
+	verify_disk_count "$DISKS" 3
 	ksh93 $(atf_get_srcdir)/setup.ksh || atf_fail "Setup failed"
 	ksh93 $(atf_get_srcdir)/hotspare_add_003_neg.ksh || atf_fail "Testcase failed"
 }
@@ -185,7 +184,7 @@ atf_test_case hotspare_create_001_neg cleanup
 hotspare_create_001_neg_head()
 {
 	atf_set "descr" "'zpool create [-f]' with hot spares should be failedwith inapplicable scenarios."
-	atf_set "require.progs" "ksh93 dumpadm zpool"
+	atf_set "require.progs" "ksh93 zpool"
 	atf_set "timeout" 3600
 }
 hotspare_create_001_neg_body()
@@ -194,6 +193,7 @@ hotspare_create_001_neg_body()
 	. $(atf_get_srcdir)/hotspare.kshlib
 	. $(atf_get_srcdir)/hotspare.cfg
 
+	verify_disk_count "$DISKS" 3
 	ksh93 $(atf_get_srcdir)/setup.ksh || atf_fail "Setup failed"
 	ksh93 $(atf_get_srcdir)/hotspare_create_001_neg.ksh || atf_fail "Testcase failed"
 }

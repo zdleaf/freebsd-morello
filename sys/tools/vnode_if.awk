@@ -32,7 +32,6 @@
 
 #
 #	@(#)vnode_if.sh	8.1 (Berkeley) 6/10/93
-# $FreeBSD$
 #
 # Script to produce VFS front-end sugar.
 #
@@ -73,14 +72,14 @@ function add_debug_code(name, arg, pos, ind)
 	else
 		star = "";
 	if (lockdata[name, arg, pos] && (lockdata[name, arg, pos] != "-")) {
-		printc(ind"ASSERT_VI_UNLOCKED("star"a->a_"arg", \""uname"\");");
+		printc(ind"ASSERT_VI_UNLOCKED("star"a->a_"arg", \""uname" "pos" ("arg")\");");
 		# Add assertions for locking
 		if (lockdata[name, arg, pos] == "L")
-			printc(ind"ASSERT_VOP_LOCKED(" star "a->a_"arg", \""uname"\");");
+			printc(ind"ASSERT_VOP_LOCKED(" star "a->a_"arg", \""uname" "pos" ("arg")\");");
 		else if (lockdata[name, arg, pos] == "U")
-			printc(ind"ASSERT_VOP_UNLOCKED(" star "a->a_"arg", \""uname"\");");
+			printc(ind"ASSERT_VOP_UNLOCKED(" star "a->a_"arg", \""uname" "pos" ("arg")\");");
 		else if (lockdata[name, arg, pos] == "E")
-			printc(ind"ASSERT_VOP_ELOCKED(" star "a->a_"arg", \""uname"\");");
+			printc(ind"ASSERT_VOP_ELOCKED(" star "a->a_"arg", \""uname" "pos" ("arg")\");");
 		else if (0) {
 			# XXX More checks!
 		}
@@ -173,8 +172,6 @@ common_head = \
     "/*\n" \
     " * This file is " generated " automatically.\n" \
     " * Do not modify anything in here by hand.\n" \
-    " *\n" \
-    " * Created from $FreeBSD$\n" \
     " */\n" \
     "\n";
 
@@ -472,6 +469,8 @@ if (cfile) {
 	printc("\tif (orig_vop->registered)");
 	printc("\t\tpanic(\"%s: vop_vector %p already registered\",")
 	printc("\t\t    __func__, orig_vop);");
+	printc("");
+	printc("\tcache_vop_vector_register(orig_vop);");
 	printc("");
 	for (name in funcarr) {
 		printc("\tvop = orig_vop;");

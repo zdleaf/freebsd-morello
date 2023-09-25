@@ -1,4 +1,3 @@
-# $FreeBSD$
 
 LIB_CXX=	lutok
 INTERNALLIB=
@@ -22,5 +21,6 @@ SHLIB_MAJOR=	0
 
 # lutok uses auto_ptr
 CFLAGS+=	-Wno-deprecated-declarations
+CXXSTD=		c++11
 
 .include <bsd.lib.mk>

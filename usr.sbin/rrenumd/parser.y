@@ -29,8 +29,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 %{
@@ -335,10 +333,8 @@ rrenum_statement:
 match_prefix_definition:
 		rrenum_cmd MATCH_PREFIX_CMD prefixval maxlen minlen
 		{
-			struct icmp6_router_renum *irr;
 			struct rr_pco_match *rpm;
 
-			irr = &ple_cur.pl_irr;
 			rpm = &ple_cur.pl_rpm;
 			memset(rpm, 0, sizeof(*rpm));
 

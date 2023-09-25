@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2005-2006 Pawel Jakub Dawidek <pjd@FreeBSD.org>
  * All rights reserved.
@@ -27,8 +27,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/vnode.h>
@@ -73,7 +71,8 @@ g_journal_ufs_dirty(struct g_consumer *cp)
 
 	fs = NULL;
 	if (SBLOCKSIZE % cp->provider->sectorsize != 0 ||
-	    ffs_sbget(cp, &fs, STDSB, M_GEOM, g_use_g_read_data) != 0) {
+	    ffs_sbget(cp, &fs, UFS_STDSB, UFS_NOCSUM, M_GEOM, g_use_g_read_data)
+		    != 0) {
 		GJ_DEBUG(0, "Cannot find superblock to mark file system %s "
 		    "as dirty.", cp->provider->name);
 		KASSERT(fs == NULL,

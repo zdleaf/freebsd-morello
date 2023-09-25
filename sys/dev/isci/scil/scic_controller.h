@@ -50,8 +50,6 @@
  * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 #ifndef _SCIC_CONTROLLER_H_
 #define _SCIC_CONTROLLER_H_
@@ -767,7 +765,7 @@ SCI_STATUS scic_controller_set_mode(
  *                results in no interrupt coalescing timeout.
  *
  * @return Indicate if the user successfully set the interrupt coalesce parameters.
- * @retval SCI_SUCCESS The user successfully updated the interrutp coalescence.
+ * @retval SCI_SUCCESS The user successfully updated the interrupt coalescence.
  * @retval SCI_FAILURE_INVALID_PARAMETER_VALUE The user input value is out of range.
  */
 SCI_STATUS scic_controller_set_interrupt_coalescence(

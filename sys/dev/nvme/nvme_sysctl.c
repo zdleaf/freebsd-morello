@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (C) 2012-2016 Intel Corporation
  * All rights reserved.
@@ -27,8 +27,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include "opt_nvme.h"
 
 #include <sys/param.h>
@@ -38,7 +36,7 @@ __FBSDID("$FreeBSD$");
 #include "nvme_private.h"
 
 #ifndef NVME_USE_NVD
-#define NVME_USE_NVD 1
+#define NVME_USE_NVD 0
 #endif
 
 int nvme_use_nvd = NVME_USE_NVD;
@@ -65,14 +63,14 @@ nvme_dump_queue(struct nvme_qpair *qpair)
 	for (i = 0; i < qpair->num_entries; i++) {
 		cpl = &qpair->cpl[i];
 		printf("%05d: ", i);
-		nvme_dump_completion(cpl);
+		nvme_qpair_print_completion(qpair, cpl);
 	}
 
 	printf("Submission queue:\n");
 	for (i = 0; i < qpair->num_entries; i++) {
 		cmd = &qpair->cmd[i];
 		printf("%05d: ", i);
-		nvme_dump_command(cmd);
+		nvme_qpair_print_command(qpair, cmd);
 	}
 }
 
@@ -371,6 +369,14 @@ nvme_sysctl_initialize_ctrlr(struct nvme_controller *ctrlr)
 	SYSCTL_ADD_PROC(ctrlr_ctx, ctrlr_list, OID_AUTO,
 	    "reset_stats", CTLTYPE_UINT | CTLFLAG_RW | CTLFLAG_MPSAFE, ctrlr,
 	    0, nvme_sysctl_reset_stats, "IU", "Reset statistics to zero");
+
+	SYSCTL_ADD_UINT(ctrlr_ctx, ctrlr_list, OID_AUTO, "cap_lo",
+	    CTLFLAG_RD, &ctrlr->cap_lo, 0,
+	    "Low 32-bits of capacities for the drive");
+
+	SYSCTL_ADD_UINT(ctrlr_ctx, ctrlr_list, OID_AUTO, "cap_hi",
+	    CTLFLAG_RD, &ctrlr->cap_hi, 0,
+	    "Hi 32-bits of capacities for the drive");
 
 	que_tree = SYSCTL_ADD_NODE(ctrlr_ctx, ctrlr_list, OID_AUTO, "adminq",
 	    CTLFLAG_RD | CTLFLAG_MPSAFE, NULL, "Admin Queue");

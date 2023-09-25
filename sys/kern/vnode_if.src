@@ -27,7 +27,6 @@
 # SUCH DAMAGE.
 #
 #	@(#)vnode_if.src	8.12 (Berkeley) 5/14/95
-# $FreeBSD$
 #
 
 #
@@ -45,7 +44,7 @@
 # -: not applicable.  vnode does not yet (or no longer) exists.
 # =: the same on input and output, may be either L or U.
 #
-# The paramater named "vpp" is assumed to be always used with double
+# The parameter named "vpp" is assumed to be always used with double
 # indirection (**vpp) and that name is hard-coded in vnode_if.awk !
 #
 # Lines starting with %! specify a pre or post-condition function

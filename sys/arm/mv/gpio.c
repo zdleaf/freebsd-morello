@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2006 Benno Rice.
  * Copyright (C) 2008 MARVELL INTERNATIONAL LTD.
@@ -32,8 +32,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/bus.h>
@@ -187,9 +185,7 @@ static driver_t mv_gpio_driver = {
 	sizeof(struct mv_gpio_softc),
 };
 
-static devclass_t mv_gpio_devclass;
-
-EARLY_DRIVER_MODULE(mv_gpio, simplebus, mv_gpio_driver, mv_gpio_devclass, 0, 0,
+EARLY_DRIVER_MODULE(mv_gpio, simplebus, mv_gpio_driver, 0, 0,
     BUS_PASS_INTERRUPT + BUS_PASS_ORDER_LAST);
 
 struct ofw_compat_data compat_data[] = {
@@ -605,7 +601,7 @@ static void
 mv_gpio_double_edge_init(device_t dev, int pin)
 {
 	uint8_t raw_read;
-	struct mv_gpio_softc *sc;
+	struct mv_gpio_softc *sc __unused;
 	sc = (struct mv_gpio_softc *)device_get_softc(dev);
 
 	MV_GPIO_ASSERT_LOCKED();

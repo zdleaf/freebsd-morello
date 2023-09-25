@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2011-2012 Stefan Bethke.
  * Copyright (c) 2012 Adrian Chadd.
@@ -25,8 +25,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 #include <sys/param.h>
@@ -64,12 +62,10 @@
 #include <dev/etherswitch/arswitch/arswitch_phy.h>
 #include <dev/etherswitch/arswitch/arswitch_vlans.h>
 
-#include <dev/etherswitch/arswitch/arswitch_7240.h>
 #include <dev/etherswitch/arswitch/arswitch_8216.h>
 #include <dev/etherswitch/arswitch/arswitch_8226.h>
 #include <dev/etherswitch/arswitch/arswitch_8316.h>
 #include <dev/etherswitch/arswitch/arswitch_8327.h>
-#include <dev/etherswitch/arswitch/arswitch_9340.h>
 
 #include "mdio_if.h"
 #include "miibus_if.h"
@@ -85,8 +81,8 @@ static int led_pattern_table[] = {
 
 static inline int arswitch_portforphy(int phy);
 static void arswitch_tick(void *arg);
-static int arswitch_ifmedia_upd(struct ifnet *);
-static void arswitch_ifmedia_sts(struct ifnet *, struct ifmediareq *);
+static int arswitch_ifmedia_upd(if_t);
+static void arswitch_ifmedia_sts(if_t, struct ifmediareq *);
 static int ar8xxx_port_vlan_setup(struct arswitch_softc *sc,
     etherswitch_port_t *p);
 static int ar8xxx_port_vlan_get(struct arswitch_softc *sc,
@@ -105,28 +101,10 @@ arswitch_probe(device_t dev)
 	bzero(sc, sizeof(*sc));
 	sc->page = -1;
 
-	/* AR7240 probe */
-	if (ar7240_probe(dev) == 0) {
-		chipname = "AR7240";
-		sc->sc_switchtype = AR8X16_SWITCH_AR7240;
-		sc->is_internal_switch = 1;
-		id = 0;
-		goto done;
-	}
-
-	/* AR9340 probe */
-	if (ar9340_probe(dev) == 0) {
-		chipname = "AR9340";
-		sc->sc_switchtype = AR8X16_SWITCH_AR9340;
-		sc->is_internal_switch = 1;
-		id = 0;
-		goto done;
-	}
-
 	/* AR8xxx probe */
 	id = arswitch_readreg(dev, AR8X16_REG_MASK_CTRL);
 	sc->chip_rev = (id & AR8X16_MASK_CTRL_REV_MASK);
-	sc->chip_ver = (id & AR8X16_MASK_CTRL_VER_MASK) > AR8X16_MASK_CTRL_VER_SHIFT;
+	sc->chip_ver = (id & AR8X16_MASK_CTRL_VER_MASK) >> AR8X16_MASK_CTRL_VER_SHIFT;
 	switch (id & (AR8X16_MASK_CTRL_VER_MASK | AR8X16_MASK_CTRL_REV_MASK)) {
 	case 0x0101:
 		chipname = "AR8216";
@@ -151,8 +129,6 @@ arswitch_probe(device_t dev)
 	default:
 		chipname = NULL;
 	}
-
-done:
 
 	DPRINTF(sc, ARSWITCH_DBG_ANY, "chipname=%s, id=%08x\n", chipname, id);
 	if (chipname != NULL) {
@@ -183,9 +159,9 @@ arswitch_attach_phys(struct arswitch_softc *sc)
 			break;
 		}
 
-		sc->ifp[phy]->if_softc = sc;
-		sc->ifp[phy]->if_flags |= IFF_UP | IFF_BROADCAST |
-		    IFF_DRV_RUNNING | IFF_SIMPLEX;
+		if_setsoftc(sc->ifp[phy], sc);
+		if_setflagbits(sc->ifp[phy], IFF_UP | IFF_BROADCAST |
+		    IFF_DRV_RUNNING | IFF_SIMPLEX, 0);
 		sc->ifname[phy] = malloc(strlen(name)+1, M_DEVBUF, M_WAITOK);
 		bcopy(name, sc->ifname[phy], strlen(name)+1);
 		if_initname(sc->ifp[phy], sc->ifname[phy],
@@ -589,11 +565,7 @@ arswitch_attach(device_t dev)
 	/*
 	 * Attach switch related functions
 	 */
-	if (AR8X16_IS_SWITCH(sc, AR7240))
-		ar7240_attach(sc);
-	else if (AR8X16_IS_SWITCH(sc, AR9340))
-		ar9340_attach(sc);
-	else if (AR8X16_IS_SWITCH(sc, AR8216))
+	if (AR8X16_IS_SWITCH(sc, AR8216))
 		ar8216_attach(sc);
 	else if (AR8X16_IS_SWITCH(sc, AR8226))
 		ar8226_attach(sc);
@@ -748,7 +720,7 @@ arswitch_miiforport(struct arswitch_softc *sc, int port)
 	return (device_get_softc(sc->miibus[phy]));
 }
 
-static inline struct ifnet *
+static inline if_t 
 arswitch_ifpforport(struct arswitch_softc *sc, int port)
 {
 	int phy = port-1;
@@ -1052,7 +1024,7 @@ arswitch_setport(device_t dev, etherswitch_port_t *p)
 	struct arswitch_softc *sc;
 	struct ifmedia *ifm;
 	struct mii_data *mii;
-	struct ifnet *ifp;
+	if_t ifp;
 
 	sc = device_get_softc(dev);
 	if (p->es_port < 0 || p->es_port > sc->info.es_nports)
@@ -1122,10 +1094,10 @@ arswitch_statchg(device_t dev)
 }
 
 static int
-arswitch_ifmedia_upd(struct ifnet *ifp)
+arswitch_ifmedia_upd(if_t ifp)
 {
-	struct arswitch_softc *sc = ifp->if_softc;
-	struct mii_data *mii = arswitch_miiforport(sc, ifp->if_dunit);
+	struct arswitch_softc *sc = if_getsoftc(ifp);
+	struct mii_data *mii = arswitch_miiforport(sc, if_getdunit(ifp));
 
 	if (mii == NULL)
 		return (ENXIO);
@@ -1134,10 +1106,10 @@ arswitch_ifmedia_upd(struct ifnet *ifp)
 }
 
 static void
-arswitch_ifmedia_sts(struct ifnet *ifp, struct ifmediareq *ifmr)
+arswitch_ifmedia_sts(if_t ifp, struct ifmediareq *ifmr)
 {
-	struct arswitch_softc *sc = ifp->if_softc;
-	struct mii_data *mii = arswitch_miiforport(sc, ifp->if_dunit);
+	struct arswitch_softc *sc = if_getsoftc(ifp);
+	struct mii_data *mii = arswitch_miiforport(sc, if_getdunit(ifp));
 
 	DPRINTF(sc, ARSWITCH_DBG_POLL, "%s\n", __func__);
 
@@ -1344,12 +1316,11 @@ static device_method_t arswitch_methods[] = {
 
 DEFINE_CLASS_0(arswitch, arswitch_driver, arswitch_methods,
     sizeof(struct arswitch_softc));
-static devclass_t arswitch_devclass;
 
-DRIVER_MODULE(arswitch, mdio, arswitch_driver, arswitch_devclass, 0, 0);
-DRIVER_MODULE(miibus, arswitch, miibus_driver, miibus_devclass, 0, 0);
-DRIVER_MODULE(mdio, arswitch, mdio_driver, mdio_devclass, 0, 0);
-DRIVER_MODULE(etherswitch, arswitch, etherswitch_driver, etherswitch_devclass, 0, 0);
+DRIVER_MODULE(arswitch, mdio, arswitch_driver, 0, 0);
+DRIVER_MODULE(miibus, arswitch, miibus_driver, 0, 0);
+DRIVER_MODULE(mdio, arswitch, mdio_driver, 0, 0);
+DRIVER_MODULE(etherswitch, arswitch, etherswitch_driver, 0, 0);
 MODULE_VERSION(arswitch, 1);
 MODULE_DEPEND(arswitch, miibus, 1, 1, 1); /* XXX which versions? */
 MODULE_DEPEND(arswitch, etherswitch, 1, 1, 1); /* XXX which versions? */

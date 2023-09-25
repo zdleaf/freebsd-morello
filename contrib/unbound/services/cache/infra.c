@@ -721,13 +721,13 @@ infra_get_lame_rtt(struct infra_cache* infra,
 			else	*rtt = USEFUL_SERVER_TOP_TIMEOUT-1000;
 		}
 	}
+	/* expired entry */
 	if(timenow > host->ttl) {
-		/* expired entry */
+
 		/* see if this can be a re-probe of an unresponsive server */
 		/* minus 1000 because that is outside of the RTTBAND, so
 		 * blacklisted servers stay blacklisted if this is chosen */
-		if(host->rtt.rto >= USEFUL_SERVER_TOP_TIMEOUT ||
-			infra->infra_keep_probing) {
+		if(host->rtt.rto >= USEFUL_SERVER_TOP_TIMEOUT) {
 			lock_rw_unlock(&e->lock);
 			*rtt = USEFUL_SERVER_TOP_TIMEOUT-1000;
 			*lame = 0;
@@ -834,14 +834,13 @@ static struct lruhash_entry* infra_find_ratedata(struct infra_cache* infra,
 
 /** find data item in array for ip addresses */
 static struct lruhash_entry* infra_find_ip_ratedata(struct infra_cache* infra,
-	struct comm_reply* repinfo, int wr)
+	struct sockaddr_storage* addr, socklen_t addrlen, int wr)
 {
 	struct ip_rate_key key;
-	hashvalue_type h = hash_addr(&(repinfo->addr),
-		repinfo->addrlen, 0);
+	hashvalue_type h = hash_addr(addr, addrlen, 0);
 	memset(&key, 0, sizeof(key));
-	key.addr = repinfo->addr;
-	key.addrlen = repinfo->addrlen;
+	key.addr = *addr;
+	key.addrlen = addrlen;
 	key.entry.hash = h;
 	return slabhash_lookup(infra->client_ip_rates, h, &key, wr);
 }
@@ -876,10 +875,9 @@ static void infra_create_ratedata(struct infra_cache* infra,
 
 /** create rate data item for ip address */
 static void infra_ip_create_ratedata(struct infra_cache* infra,
-	struct comm_reply* repinfo, time_t timenow)
+	struct sockaddr_storage* addr, socklen_t addrlen, time_t timenow)
 {
-	hashvalue_type h = hash_addr(&(repinfo->addr),
-	repinfo->addrlen, 0);
+	hashvalue_type h = hash_addr(addr, addrlen, 0);
 	struct ip_rate_key* k = (struct ip_rate_key*)calloc(1, sizeof(*k));
 	struct ip_rate_data* d = (struct ip_rate_data*)calloc(1, sizeof(*d));
 	if(!k || !d) {
@@ -887,8 +885,8 @@ static void infra_ip_create_ratedata(struct infra_cache* infra,
 		free(d);
 		return; /* alloc failure */
 	}
-	k->addr = repinfo->addr;
-	k->addrlen = repinfo->addrlen;
+	k->addr = *addr;
+	k->addrlen = addrlen;
 	lock_rw_init(&k->entry.lock);
 	k->entry.hash = h;
 	k->entry.key = k;
@@ -898,8 +896,9 @@ static void infra_ip_create_ratedata(struct infra_cache* infra,
 	slabhash_insert(infra->client_ip_rates, h, &k->entry, d, NULL);
 }
 
-/** find the second and return its rate counter, if none, remove oldest */
-static int* infra_rate_find_second(void* data, time_t t)
+/** Find the second and return its rate counter. If none and should_add, remove
+ *  oldest to accommodate. Else return none. */
+static int* infra_rate_find_second_or_none(void* data, time_t t, int should_add)
 {
 	struct rate_data* d = (struct rate_data*)data;
 	int i, oldest;
@@ -907,6 +906,7 @@ static int* infra_rate_find_second(void* data, time_t t)
 		if(d->timestamp[i] == t)
 			return &(d->qps[i]);
 	}
+	if(!should_add) return NULL;
 	/* remove oldest timestamp, and insert it at t with 0 qps */
 	oldest = 0;
 	for(i=0; i<RATE_WINDOW; i++) {
@@ -918,21 +918,41 @@ static int* infra_rate_find_second(void* data, time_t t)
 	return &(d->qps[oldest]);
 }
 
-int infra_rate_max(void* data, time_t now)
+/** find the second and return its rate counter, if none, remove oldest to
+ *  accommodate */
+static int* infra_rate_give_second(void* data, time_t t)
+{
+    return infra_rate_find_second_or_none(data, t, 1);
+}
+
+/** find the second and return its rate counter only if it exists. Caller
+ *  should check for NULL return value */
+static int* infra_rate_get_second(void* data, time_t t)
+{
+    return infra_rate_find_second_or_none(data, t, 0);
+}
+
+int infra_rate_max(void* data, time_t now, int backoff)
 {
 	struct rate_data* d = (struct rate_data*)data;
 	int i, max = 0;
 	for(i=0; i<RATE_WINDOW; i++) {
-		if(now-d->timestamp[i] <= RATE_WINDOW) {
-			if(d->qps[i] > max)
+		if(backoff) {
+			if(now-d->timestamp[i] <= RATE_WINDOW &&
+				d->qps[i] > max) {
 				max = d->qps[i];
+			}
+		} else {
+			if(now == d->timestamp[i]) {
+				return d->qps[i];
+			}
 		}
 	}
 	return max;
 }
 
 int infra_ratelimit_inc(struct infra_cache* infra, uint8_t* name,
-	size_t namelen, time_t timenow, struct query_info* qinfo,
+	size_t namelen, time_t timenow, int backoff, struct query_info* qinfo,
 	struct comm_reply* replylist)
 {
 	int lim, max;
@@ -949,13 +969,13 @@ int infra_ratelimit_inc(struct infra_cache* infra, uint8_t* name,
 	/* find or insert ratedata */
 	entry = infra_find_ratedata(infra, name, namelen, 1);
 	if(entry) {
-		int premax = infra_rate_max(entry->data, timenow);
-		int* cur = infra_rate_find_second(entry->data, timenow);
+		int premax = infra_rate_max(entry->data, timenow, backoff);
+		int* cur = infra_rate_give_second(entry->data, timenow);
 		(*cur)++;
-		max = infra_rate_max(entry->data, timenow);
+		max = infra_rate_max(entry->data, timenow, backoff);
 		lock_rw_unlock(&entry->lock);
 
-		if(premax < lim && max >= lim) {
+		if(premax <= lim && max > lim) {
 			char buf[257], qnm[257], ts[12], cs[12], ip[128];
 			dname_str(name, buf);
 			dname_str(qinfo->qname, qnm);
@@ -963,19 +983,19 @@ int infra_ratelimit_inc(struct infra_cache* infra, uint8_t* name,
 			sldns_wire2str_class_buf(qinfo->qclass, cs, sizeof(cs));
 			ip[0]=0;
 			if(replylist) {
-				addr_to_str((struct sockaddr_storage *)&replylist->addr,
-					replylist->addrlen, ip, sizeof(ip));
+				addr_to_str((struct sockaddr_storage *)&replylist->remote_addr,
+					replylist->remote_addrlen, ip, sizeof(ip));
 				verbose(VERB_OPS, "ratelimit exceeded %s %d query %s %s %s from %s", buf, lim, qnm, cs, ts, ip);
 			} else {
 				verbose(VERB_OPS, "ratelimit exceeded %s %d query %s %s %s", buf, lim, qnm, cs, ts);
 			}
 		}
-		return (max < lim);
+		return (max <= lim);
 	}
 
 	/* create */
 	infra_create_ratedata(infra, name, namelen, timenow);
-	return (1 < lim);
+	return (1 <= lim);
 }
 
 void infra_ratelimit_dec(struct infra_cache* infra, uint8_t* name,
@@ -987,14 +1007,19 @@ void infra_ratelimit_dec(struct infra_cache* infra, uint8_t* name,
 		return; /* not enabled */
 	entry = infra_find_ratedata(infra, name, namelen, 1);
 	if(!entry) return; /* not cached */
-	cur = infra_rate_find_second(entry->data, timenow);
+	cur = infra_rate_get_second(entry->data, timenow);
+	if(cur == NULL) {
+		/* our timenow is not available anymore; nothing to decrease */
+		lock_rw_unlock(&entry->lock);
+		return;
+	}
 	if((*cur) > 0)
 		(*cur)--;
 	lock_rw_unlock(&entry->lock);
 }
 
 int infra_ratelimit_exceeded(struct infra_cache* infra, uint8_t* name,
-	size_t namelen, time_t timenow)
+	size_t namelen, time_t timenow, int backoff)
 {
 	struct lruhash_entry* entry;
 	int lim, max;
@@ -1010,10 +1035,10 @@ int infra_ratelimit_exceeded(struct infra_cache* infra, uint8_t* name,
 	entry = infra_find_ratedata(infra, name, namelen, 0);
 	if(!entry)
 		return 0; /* not cached */
-	max = infra_rate_max(entry->data, timenow);
+	max = infra_rate_max(entry->data, timenow, backoff);
 	lock_rw_unlock(&entry->lock);
 
-	return (max >= lim);
+	return (max > lim);
 }
 
 size_t 
@@ -1027,7 +1052,8 @@ infra_get_mem(struct infra_cache* infra)
 }
 
 int infra_ip_ratelimit_inc(struct infra_cache* infra,
-  struct comm_reply* repinfo, time_t timenow, struct sldns_buffer* buffer)
+	struct sockaddr_storage* addr, socklen_t addrlen, time_t timenow,
+	int backoff, struct sldns_buffer* buffer)
 {
 	int max;
 	struct lruhash_entry* entry;
@@ -1037,18 +1063,17 @@ int infra_ip_ratelimit_inc(struct infra_cache* infra,
 		return 1;
 	}
 	/* find or insert ratedata */
-	entry = infra_find_ip_ratedata(infra, repinfo, 1);
+	entry = infra_find_ip_ratedata(infra, addr, addrlen, 1);
 	if(entry) {
-		int premax = infra_rate_max(entry->data, timenow);
-		int* cur = infra_rate_find_second(entry->data, timenow);
+		int premax = infra_rate_max(entry->data, timenow, backoff);
+		int* cur = infra_rate_give_second(entry->data, timenow);
 		(*cur)++;
-		max = infra_rate_max(entry->data, timenow);
+		max = infra_rate_max(entry->data, timenow, backoff);
 		lock_rw_unlock(&entry->lock);
 
-		if(premax < infra_ip_ratelimit && max >= infra_ip_ratelimit) {
+		if(premax <= infra_ip_ratelimit && max > infra_ip_ratelimit) {
 			char client_ip[128], qnm[LDNS_MAX_DOMAINLEN+1+12+12];
-			addr_to_str((struct sockaddr_storage *)&repinfo->addr,
-				repinfo->addrlen, client_ip, sizeof(client_ip));
+			addr_to_str(addr, addrlen, client_ip, sizeof(client_ip));
 			qnm[0]=0;
 			if(sldns_buffer_limit(buffer)>LDNS_HEADER_SIZE &&
 				LDNS_QDCOUNT(sldns_buffer_begin(buffer))!=0) {
@@ -1073,6 +1098,6 @@ int infra_ip_ratelimit_inc(struct infra_cache* infra,
 	}
 
 	/* create */
-	infra_ip_create_ratedata(infra, repinfo, timenow);
+	infra_ip_create_ratedata(infra, addr, addrlen, timenow);
 	return 1;
 }

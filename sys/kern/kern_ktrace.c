@@ -34,8 +34,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include "opt_ktrace.h"
 
 #include <sys/param.h>
@@ -112,7 +110,7 @@ struct ktr_request {
 	STAILQ_ENTRY(ktr_request) ktr_list;
 };
 
-static int data_lengths[] = {
+static const int data_lengths[] = {
 	[KTR_SYSCALL] = offsetof(struct ktr_syscall, ktr_args),
 	[KTR_SYSRET] = sizeof(struct ktr_sysret),
 	[KTR_NAMEI] = 0,
@@ -210,6 +208,12 @@ ktrace_assert(struct thread *td)
 }
 
 static void
+ast_ktrace(struct thread *td, int tda __unused)
+{
+	KTRUSERRET(td);
+}
+
+static void
 ktrace_init(void *dummy)
 {
 	struct ktr_request *req;
@@ -223,6 +227,7 @@ ktrace_init(void *dummy)
 		    M_ZERO);
 		STAILQ_INSERT_HEAD(&ktr_free, req, ktr_list);
 	}
+	ast_register(TDA_KTRACE, ASTR_ASTF_REQUIRED, 0, ast_ktrace);
 }
 SYSINIT(ktrace_init, SI_SUB_KTRACE, SI_ORDER_ANY, ktrace_init, NULL);
 
@@ -322,9 +327,12 @@ ktr_getrequest_entered(struct thread *td, int type)
 			p->p_traceflag &= ~KTRFAC_DROP;
 		}
 		mtx_unlock(&ktrace_mtx);
-		microtime(&req->ktr_header.ktr_time);
+		nanotime(&req->ktr_header.ktr_time);
+		req->ktr_header.ktr_type |= KTR_VERSIONED;
 		req->ktr_header.ktr_pid = p->p_pid;
 		req->ktr_header.ktr_tid = td->td_tid;
+		req->ktr_header.ktr_cpu = PCPU_GET(cpuid);
+		req->ktr_header.ktr_version = KTR_VERSION1;
 		bcopy(td->td_name, req->ktr_header.ktr_comm,
 		    sizeof(req->ktr_header.ktr_comm));
 		req->ktr_buffer = NULL;
@@ -367,9 +375,7 @@ ktr_enqueuerequest(struct thread *td, struct ktr_request *req)
 	mtx_lock(&ktrace_mtx);
 	STAILQ_INSERT_TAIL(&td->td_proc->p_ktr, req, ktr_list);
 	mtx_unlock(&ktrace_mtx);
-	thread_lock(td);
-	td->td_flags |= TDF_ASTPENDING;
-	thread_unlock(td);
+	ast_sched(td, TDA_KTRACE);
 }
 
 /*
@@ -524,7 +530,7 @@ ktr_get_tracevp(struct proc *p, bool ref)
 }
 
 void
-ktrsyscall(int code, int narg, register_t args[])
+ktrsyscall(int code, int narg, syscallarg_t args[])
 {
 	struct ktr_request *req;
 	struct ktr_syscall *ktp;
@@ -1028,7 +1034,7 @@ sys_ktrace(struct thread *td, struct ktrace_args *uap)
 		error = vn_open(&nd, &flags, 0, NULL);
 		if (error)
 			return (error);
-		NDFREE(&nd, NDF_ONLY_PNBUF);
+		NDFREE_PNBUF(&nd);
 		vp = nd.ni_vp;
 		VOP_UNLOCK(vp);
 		if (vp->v_type != VREG) {
@@ -1301,9 +1307,9 @@ ktr_writerequest(struct thread *td, struct ktr_request *req)
 	mtx_unlock(&ktrace_mtx);
 
 	kth = &req->ktr_header;
-	KASSERT(((u_short)kth->ktr_type & ~KTR_DROP) < nitems(data_lengths),
+	KASSERT(((u_short)kth->ktr_type & ~KTR_TYPE) < nitems(data_lengths),
 	    ("data_lengths array overflow"));
-	datalen = data_lengths[(u_short)kth->ktr_type & ~KTR_DROP];
+	datalen = data_lengths[(u_short)kth->ktr_type & ~KTR_TYPE];
 	buflen = kth->ktr_len;
 	auio.uio_iov = &aiov[0];
 	auio.uio_offset = 0;

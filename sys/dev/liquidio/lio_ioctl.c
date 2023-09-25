@@ -30,7 +30,6 @@
  *   (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  *   OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-/*$FreeBSD$*/
 
 #include "lio_bsd.h"
 #include "lio_common.h"
@@ -46,13 +45,13 @@
 #include "lio_main.h"
 #include "lio_rxtx.h"
 
-static int	lio_set_rx_csum(struct ifnet *ifp, uint32_t data);
-static int	lio_set_tso4(struct ifnet *ifp);
-static int	lio_set_tso6(struct ifnet *ifp);
-static int	lio_set_lro(struct ifnet *ifp);
-static int	lio_change_mtu(struct ifnet *ifp, int new_mtu);
-static int	lio_set_mcast_list(struct ifnet *ifp);
-static inline enum	lio_ifflags lio_get_new_flags(struct ifnet *ifp);
+static int	lio_set_rx_csum(if_t ifp, uint32_t data);
+static int	lio_set_tso4(if_t ifp);
+static int	lio_set_tso6(if_t ifp);
+static int	lio_set_lro(if_t ifp);
+static int	lio_change_mtu(if_t ifp, int new_mtu);
+static int	lio_set_mcast_list(if_t ifp);
+static inline enum	lio_ifflags lio_get_new_flags(if_t ifp);
 
 static inline bool
 lio_is_valid_ether_addr(const uint8_t *addr)
@@ -63,7 +62,7 @@ lio_is_valid_ether_addr(const uint8_t *addr)
 }
 
 static int
-lio_change_dev_flags(struct ifnet *ifp)
+lio_change_dev_flags(if_t ifp)
 {
 	struct lio_ctrl_pkt	nctrl;
 	struct lio		*lio = if_getsoftc(ifp);
@@ -94,7 +93,7 @@ lio_change_dev_flags(struct ifnet *ifp)
  * return 0 on success, positive on failure
  */
 int
-lio_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
+lio_ioctl(if_t ifp, u_long cmd, caddr_t data)
 {
 	struct lio	*lio = if_getsoftc(ifp);
 	struct ifreq	*ifrequest = (struct ifreq *)data;
@@ -211,7 +210,7 @@ lio_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 }
 
 static int
-lio_set_tso4(struct ifnet *ifp)
+lio_set_tso4(if_t ifp)
 {
 	struct lio	*lio = if_getsoftc(ifp);
 
@@ -230,7 +229,7 @@ lio_set_tso4(struct ifnet *ifp)
 }
 
 static int
-lio_set_tso6(struct ifnet *ifp)
+lio_set_tso6(if_t ifp)
 {
 	struct lio	*lio = if_getsoftc(ifp);
 
@@ -249,7 +248,7 @@ lio_set_tso6(struct ifnet *ifp)
 }
 
 static int
-lio_set_rx_csum(struct ifnet *ifp, uint32_t data)
+lio_set_rx_csum(if_t ifp, uint32_t data)
 {
 	struct lio	*lio = if_getsoftc(ifp);
 	int	ret = 0;
@@ -276,7 +275,7 @@ lio_set_rx_csum(struct ifnet *ifp, uint32_t data)
 }
 
 static int
-lio_set_lro(struct ifnet *ifp)
+lio_set_lro(if_t ifp)
 {
 	struct lio	*lio = if_getsoftc(ifp);
 	int	ret = 0;
@@ -338,7 +337,7 @@ lio_mtu_ctl_callback(struct octeon_device *oct, uint32_t status, void *buf)
 
 /* @param ifp is network device */
 static int
-lio_change_mtu(struct ifnet *ifp, int new_mtu)
+lio_change_mtu(if_t ifp, int new_mtu)
 {
 	struct lio		*lio = if_getsoftc(ifp);
 	struct octeon_device	*oct = lio->oct_dev;
@@ -421,7 +420,7 @@ mtu_updation_failed:
 
 /* @param ifp network device */
 int
-lio_set_mac(struct ifnet *ifp, uint8_t *p)
+lio_set_mac(if_t ifp, uint8_t *p)
 {
 	struct lio_ctrl_pkt	nctrl;
 	struct lio		*lio = if_getsoftc(ifp);
@@ -465,7 +464,7 @@ lio_set_mac(struct ifnet *ifp, uint8_t *p)
  * received from the OS.
  */
 static inline enum lio_ifflags
-lio_get_new_flags(struct ifnet *ifp)
+lio_get_new_flags(if_t ifp)
 {
 	enum lio_ifflags f = LIO_IFFLAG_UNICAST;
 
@@ -509,7 +508,7 @@ lio_copy_maddr(void *arg, struct sockaddr_dl *sdl, u_int cnt)
 
 /* @param ifp network device */
 static int
-lio_set_mcast_list(struct ifnet *ifp)
+lio_set_mcast_list(if_t ifp)
 {
 	struct lio		*lio = if_getsoftc(ifp);
 	struct octeon_device	*oct = lio->oct_dev;

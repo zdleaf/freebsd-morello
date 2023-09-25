@@ -1,4 +1,3 @@
-$FreeBSD$
 /* $NetBSD: usbdevs,v 1.392 2004/12/29 08:38:44 imp Exp $ */
 
 /*-
@@ -1097,15 +1096,15 @@ product AMOI H02		0x0802	H02 3G modem
 /* American Power Conversion products */
 product APC UPS			0x0002	Uninterruptible Power Supply
 
+/* American Power Conversion products */
+product APC UPS1000		0x0003	Uninterruptible Power Supply
+
 /* Ambit Microsystems products */
 product AMBIT WLAN		0x0302	WLAN
 product AMBIT NTL_250		0x6098	NTL 250 cable modem
 
 /* Apacer products */
 product APACER HT202		0xb113	USB 2.0 Flash Drive
-
-/* American Power Conversion products */
-product APC UPS			0x0002	Uninterruptible Power Supply
 
 /* Amigo Technology products */
 product AMIGO RT2870_1		0x9031	RT2870
@@ -1135,9 +1134,6 @@ product ANYDATA ADU_500A	0x6502	CDMA 2000 EV-DO USB Modem
 
 /* AOX, Inc. products */
 product AOX USB101		0x0008	Ethernet
-
-/* American Power Conversion products */
-product APC UPS			0x0002	Uninterruptible Power Supply
 
 /* Apple Computer products */
 product APPLE DUMMY		0x0000	Dummy product
@@ -1196,6 +1192,7 @@ product APPLE WELLSPRING8_JIS	0x0292	Apple Internal Keyboard/Trackpad
 product APPLE WELLSPRING9_ANSI	0x0272	Apple Internal Keyboard/Trackpad
 product APPLE WELLSPRING9_ISO	0x0273	Apple Internal Keyboard/Trackpad
 product APPLE WELLSPRING9_JIS	0x0274	Apple Internal Keyboard/Trackpad
+product APPLE MAGIC_TRACKPAD2	0x0265	Apple Magic Trackpad 2
 product APPLE MOUSE		0x0301	Mouse M4848
 product APPLE OPTMOUSE		0x0302	Optical mouse
 product APPLE MIGHTYMOUSE	0x0304	Mighty Mouse
@@ -1337,6 +1334,7 @@ product AZUREWAVE RTL8192SU_5	0x3325	RTL8192SU
 
 /* Baltech products */
 product BALTECH CARDREADER	0x9999	Card reader
+product BALTECH SMARTCARDREADER	0xf019	SmartCard reader
 
 /* Bayer products */
 product BAYER CONTOUR_CABLE	0x6001	FTDI compatible adapter
@@ -1679,6 +1677,14 @@ product DELL U5520_3		0x8138	Dell 5520 3G
 product DELL U5730		0x8180	Dell 5730 3G
 product DELL U5730_2		0x8181	Dell 5730 3G
 product DELL U5730_3		0x8182	Dell 5730 3G
+product DELL DW5809		0x81b1	Dell DW5809e Snapdragon X7 LTE/GPS
+product DELL DW5809_2		0x81b3	Dell DW5809e Snapdragon X7 LTE/GPS
+product DELL DW5811		0x81b5	Dell DW5811e Snapdragon X7 LTE/GPS
+product DELL DW5811_2		0x81b6	Dell DW5811e Snapdragon X7 LTE/GPS
+product DELL DW5816		0x81cb	Dell DW5816e Snapdragon X7 LTE/GPS
+product DELL DW5816_2		0x81cc	Dell DW5816e Snapdragon X7 LTE/GPS
+product DELL DW5818		0x81d0	Dell DW5818 Snapdragon X7 LTE
+product DELL DW5818_2		0x81d2	Dell DW5819 Snapdragon X7 LTE
 product DELL DW700		0x9500	Dell DW700 GPS
 product DELL2 VARIOUS_UPS	0xffff	Various UPS Models
 
@@ -1721,6 +1727,7 @@ product DLINK DWA182C1		0x3315	DWA-182 rev C1
 product DLINK DWA180A1		0x3316	DWA-180 rev A1
 product DLINK DWA172A1		0x3318	DWA-172 rev A1
 product DLINK DWA131E1		0x3319	DWA-131 rev E1
+product DLINK DWA182D1		0x331c	DWA-182 rev D1
 product DLINK DWL122		0x3700	DWL-122
 product DLINK DWLG120		0x3701	DWL-G120
 product DLINK DWL120F		0x3702	DWL-120 rev F
@@ -1752,10 +1759,12 @@ product DLINK DWM157		0x7d02  DWM-157
 product DLINK DWM157_2		0x7d0e  DWM-157	
 product DLINK DWR510		0x7e12	DWR-510
 product DLINK DWM222		0x7e35	DWM-222
+product DLINK DWM222_2		0x7e3d	DWM-222
 product DLINK DWM157_CD_2	0xa407  DWM-157 CD-ROM Mode
 product DLINK DWM157_CD		0xa707  DWM-157 CD-ROM Mode
 product DLINK DWR510_CD		0xa805	DWR-510 CD-ROM Mode
 product DLINK DWM222_CD		0xab00	DWM-222 CD-ROM Mode
+product DLINK DWM222_CD_2	0xac01	DWM-222 CD-ROM Mode
 product DLINK DSB650		0xabc1	10/100 Ethernet
 product DLINK DUBH7		0xf103	DUB-H7 USB 2.0 7-Port Hub
 product DLINK2 RTL8192SU_1	0x3300	RTL8192SU
@@ -1939,6 +1948,7 @@ product EPSON 1270		0x0120	Perfection 1270 scanner
 product EPSON 2480		0x0121	Perfection 2480 scanner
 product EPSON 3590		0x0122	Perfection 3590 scanner
 product EPSON 4990		0x012a	Perfection 4990 Photo scanner
+product EPSON TMU220B		0x0202	TM-U220B
 product EPSON CRESSI_EDY	0x0521	Cressi Edy diving computer
 product EPSON N2ITION3		0x0522	Zeagle N2iTion3 diving computer
 product EPSON STYLUS_875DC	0x0601	Stylus Photo 875DC Card Reader
@@ -2539,9 +2549,7 @@ product HUAWEI K3770		0x14c9  3G modem
 product HUAWEI K3771		0x14ca  K3771
 product HUAWEI K3772		0x14cf	K3772
 product HUAWEI K3770_INIT	0x14d1  K3770 Initial
-product HUAWEI E3131_INIT	0x14fe	3G modem initial
 product HUAWEI E392		0x1505	LTE modem
-product HUAWEI E3131		0x1506	3G modem
 product HUAWEI K3765_INIT	0x1520	K3765 Initial
 product HUAWEI K4505_INIT	0x1521	K4505 Initial
 product HUAWEI K3772_INIT	0x1526	K3772 Initial
@@ -2554,6 +2562,13 @@ product HUAWEI ETS2055		0x1803	CDMA modem
 product HUAWEI E173		0x1c05	3G modem
 product HUAWEI E173_INIT	0x1c0b	3G modem initial
 product HUAWEI E3272		0x1c1e	LTE modem
+product HUAWEI E3372_INIT	0x1f01  LTE modem initial
+product HUAWEI E3372_NCM	0x1506  LTE modem in NCM mode
+product HUAWEI E3372v153_INIT	0x14fe	LTE modem initial
+product HUAWEI E3372v153_NCM	0x155f	LTE modem in NCM mode
+product HUAWEI E5573Cs322_NCM	0x155e	LTE AP modem NCM mode
+product HUAWEI E5573Cs322_ECM	0x14db	LTE AP modem ECM mode
+product HUAWEI E5573Cs322_ACM	0x1442	LTE AP modem ACM mode
 
 /* HUAWEI 3com products */
 product HUAWEI3COM WUB320G	0x0009	Aolynk WUB320g
@@ -2697,6 +2712,7 @@ product KEISOKUGIKEN USBDAQ	0x0068	HKS-0200 USBDAQ
 /* Kensington products */
 product KENSINGTON ORBIT	0x1003	Orbit USB/PS2 trackball
 product KENSINGTON TURBOBALL	0x1005	TurboBall
+product KENSINGTON SLIMBLADE	0x2041	Slimblade Trackball
 
 /* Synaptics products */
 product SYNAPTICS FPR9A		0x009a	Fingerprint Reader
@@ -2811,10 +2827,12 @@ product LENOVO GIGALAN		0x304b	USB 3.0 Ethernet
 product LENOVO ETHERNET		0x7203	USB 2.0 Ethernet
 product LENOVO RTL8153		0x7205	USB 3.0 Ethernet
 product LENOVO ONELINK		0x720a	USB 3.0 Ethernet
+product LENOVO RTL8153_04	0x720c	USB 3.0 Ethernet
 product LENOVO TBT3LAN		0x3069	LAN port in Thinkpad TB3 dock
 product LENOVO USBCLAN		0x3062	LAN port in Thinkpad USB-C dock
 product LENOVO TBT3LANGEN2	0x3082  LAN port in Thinkpad TB3 dock gen2 
-product LENOVO USBCLANGEN2	0xa387  LAN port in Thinkpad UBS-C dock gen2
+product LENOVO USBCLANGEN2	0xa387  LAN port in Thinkpad USB-C dock gen2
+product LENOVO USBCLANHYBRID	0xa359  LAN port in Thinkpad Hybrid USB-C with USB-A dock
 
 /* Lexar products */
 product LEXAR JUMPSHOT		0x0001	jumpSHOT CompactFlash Reader
@@ -3292,6 +3310,7 @@ product MICROSOFT WLNOTEBOOK3	0x00d2	Wireless Optical Mouse 3000 (Model 1049)
 product MICROSOFT NATURAL4000	0x00db	Natural Ergonomic Keyboard 4000
 product MICROSOFT WLNOTEBOOK2	0x00e1	Wireless Optical Mouse 3000 (Model 1056)
 product MICROSOFT XBOX360	0x0292	XBOX 360 WLAN
+product MICROSOFT WINDEVETH	0x0c5e	Windows Dev Kit 2023 Ethernet
 
 /* Microtech products */
 product MICROTECH SCSIDB25	0x0004	USB-SCSI-DB25
@@ -3533,6 +3552,20 @@ product OLIMEX ARM_USB_OCD_H		0x002b	FTDI compatible adapter
 /* Olympus products */
 product OLYMPUS C1		0x0102	C-1 Digital Camera
 product OLYMPUS C700		0x0105	C-700 Ultra Zoom
+/* Current Olympus DSLRs and EVIL cameras reuse the same product code and
+ * bcdDevice for multiple models.  This may result in problems with newer
+ * cameras. */
+/* Olympus DSLRs */
+product OLYMPUS E_1		0x0102
+product OLYMPUS E_300		0x0118
+product OLYMPUS E_330		0x0118
+product OLYMPUS E_30		0x0118
+/* Olympus EVIL cameras */
+product OLYMPUS E_PM1		0x012c
+product OLYMPUS E_PM2		0x012e
+product OLYMPUS E_M1		0x012e
+product OLYMPUS E_M1MarkII	0x012e
+product OLYMPUS E_M5MarkIII	0x012e
 
 /* OmniVision Technologies, Inc. products */
 product OMNIVISION OV511	0x0511	OV511 Camera
@@ -3952,9 +3985,27 @@ product QUANTA GLE		0xea06	HSDPA modem
 product QUANTA RW6815R		0xf003	HP iPAQ rw6815 RNDIS
 
 /* Quectel products */
-product QUECTEL EC25		0x0125	LTE modem
-product QUECTEL EM05		0x0127	LTE modem
-product QUECTEL EM12_G          0x0512  LTE modem
+product QUECTEL EC25		0x0125	Quectel EC20(MDM9x07)/EC25/EG25
+product QUECTEL EM05		0x0127	Quectel EM05
+product QUECTEL EC21		0x0121	Quectel EC21
+product QUECTEL EG91		0x0191	Quectel EG91
+product QUECTEL EG95		0x0195	Quectel EG95
+product QUECTEL EP06		0x0306	Quectel EG06/EP06/EM06
+product QUECTEL EG065K		0x030B	Quectel EG065K/EG060K
+product QUECTEL EM12		0x0512	Quectel EG12/EP12/EM12/EG16/EG18
+product QUECTEL BG96		0x0296	Quectel BG96
+product QUECTEL BG95		0x0700	Quectel BG95/BG77/BG600L-M3/BC69
+product QUECTEL AG35		0x0435	Quectel AG35
+product QUECTEL AG15		0x0415	Quectel AG15
+product QUECTEL AG520		0x0452	Quectel AG520
+product QUECTEL AG550		0x0455	Quectel AG550
+product QUECTEL EM160R		0x0620	Quectel EM160R/EG20
+product QUECTEL RG500		0x0800	Quectel RG500/RM500/RG510/RM510
+product QUECTEL RG520		0x0801	Quectel RG520/RM520/SG520
+product QUECTEL EC200		0x6000	Quectel EC200/UC200
+product QUECTEL EC200S		0x6002	Quectel EC200S
+product QUECTEL EC200T		0x6026	Quectel EC200T
+product QUECTEL UC200		0x6120	Quectel UC200
 
 /* Quickshot products */
 product QUICKSHOT STRIKEPAD	0x6238	USB StrikePad
@@ -4001,6 +4052,7 @@ product REALTEK USB20CRW	0x0158	USB20CRW Card Reader
 product REALTEK RTL8188ETV	0x0179	RTL8188ETV
 product REALTEK RTL8188CTV      0x018a  RTL8188CTV
 product REALTEK RTL8821AU_2	0x0811	RTL8821AU
+product REALTEK RTW8821CU_CD	0x1a2b	RTW8821CU_CD
 product REALTEK RTL8188RU_2	0x317f	RTL8188RU
 product REALTEK USBKR100	0x8150	USBKR100 USB Ethernet
 product REALTEK RTL8152		0x8152	RTL8152 USB Ethernet
@@ -4032,11 +4084,12 @@ product REALTEK RTL8187B_2	0x8198	RTL8187B Wireless Adapter
 product REALTEK RTL8712		0x8712	RTL8712
 product REALTEK RTL8713		0x8713	RTL8713
 product REALTEK RTL8188CU_COMBO	0x8754	RTL8188CU
+product REALTEK RTL8812AU_1	0x8812  RTL8812AU Wireless Adapter
+product REALTEK RTL8812AU_2	0x881a  RTL8812AU Wireless Adapter
 product REALTEK RTL8821AU_1	0xa811	RTL8821AU
 product REALTEK RTL8723BU	0xb720	RTL8723BU
 product REALTEK RTL8192SU	0xc512	RTL8192SU
-product REALTEK RTL8812AU_1	0x8812  RTL8812AU Wireless Adapter
-product REALTEK RTL8812AU_2	0x881a  RTL8812AU Wireless Adapter
+product REALTEK RTW8821CU	0xc811	RTW8821CU
 
 /* RedOctane products */
 product REDOCTANE DUMMY		0x0000	Dummy product
@@ -4306,6 +4359,12 @@ product SIERRA MC7355		0x9041	MC7355
 product SIERRA MC7430		0x9071	Sierra Wireless MC7430 Qualcomm Snapdragon X7 LTE-A
 product SIERRA AC313U		0x68aa	Sierra Wireless AirCard 313U
 product SIERRA TRUINSTALL	0x0fff	Aircard Tru Installer
+product SIERRA EM7430		0x81cb	Sierra Wireless EM7430 Qualcomm Snapdragon X7 LTE-A
+product SIERRA EM7430_2		0x81cc	Sierra Wireless EM7430 Qualcomm Snapdragon X7 LTE-A
+product SIERRA EM7455		0x9078	Sierra Wireless EM7455 Qualcomm Snapdragon X7 LTE-A
+product SIERRA EM7455_2		0x9079	Sierra Wireless EM7455 Qualcomm Snapdragon X7 LTE-A
+product SIERRA EM7565		0x9090	Sierra Wireless EM7565 Qualcomm Snapdragon X7 LTE-A
+product SIERRA EM7565_2		0x9091	Sierra Wireless EM7565 Qualcomm Snapdragon X7 LTE-A
 
 /* Sigmatel products */
 product SIGMATEL WBT_3052	0x4200	WBT-3052 IrDA/USB Bridge
@@ -4755,6 +4814,9 @@ product TWINMOS MDIV		0x1325	Memory Disk IV
 
 /* Ubiquam products */
 product UBIQUAM UALL		0x3100	CDMA 1xRTT USB Modem (U-100/105/200/300/520)
+
+/* u-blox products */
+product UBLOX XPLR_M9		0x0501	M9 GNSS Explorer Kit
 
 /* Ultima products */
 product ULTIMA 1200UBPLUS	0x4002	1200 UB Plus scanner

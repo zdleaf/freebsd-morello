@@ -1,4 +1,3 @@
-/* $FreeBSD$ */
 /*-
  * Copyright (c) 2007 Luigi Rizzo - Universita` di Pisa. All rights reserved.
  * Copyright (c) 2007 Hans Petter Selasky. All rights reserved.
@@ -37,12 +36,13 @@
 #include <dev/usb/usbdi.h>
 #include <dev/usb/usbdi_util.h>
 
+#include <linux/pm.h>
+
 struct usb_device;
 struct usb_interface;
 struct usb_driver;
 struct urb;
 
-typedef void *pm_message_t;
 typedef void (usb_complete_t)(struct urb *);
 
 #define	USB_MAX_FULL_SPEED_ISOC_FRAMES (60 * 1)

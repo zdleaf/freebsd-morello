@@ -30,7 +30,6 @@
   POSSIBILITY OF SUCH DAMAGE.
 
 ******************************************************************************/
-/*$FreeBSD$*/
 
 
 #include "ixl_pf.h"
@@ -67,6 +66,7 @@ static int	ixl_sysctl_set_link_active(SYSCTL_HANDLER_ARGS);
 /* Debug Sysctls */
 static int 	ixl_sysctl_link_status(SYSCTL_HANDLER_ARGS);
 static int	ixl_sysctl_phy_abilities(SYSCTL_HANDLER_ARGS);
+static int	ixl_sysctl_phy_statistics(SYSCTL_HANDLER_ARGS);
 static int	ixl_sysctl_sw_filter_list(SYSCTL_HANDLER_ARGS);
 static int	ixl_sysctl_hw_res_alloc(SYSCTL_HANDLER_ARGS);
 static int	ixl_sysctl_switch_config(SYSCTL_HANDLER_ARGS);
@@ -115,6 +115,71 @@ static char *ixl_fec_string[3] = {
        "CL74 FC-FEC/BASE-R",
        "None"
 };
+
+/* Functions for setting and checking driver state. Note the functions take
+ * bit positions, not bitmasks. The atomic_set_32 and atomic_clear_32
+ * operations require bitmasks. This can easily lead to programming error, so
+ * we provide wrapper functions to avoid this.
+ */
+
+/**
+ * ixl_set_state - Set the specified state
+ * @s: the state bitmap
+ * @bit: the state to set
+ *
+ * Atomically update the state bitmap with the specified bit set.
+ */
+inline void
+ixl_set_state(volatile u32 *s, enum ixl_state bit)
+{
+	/* atomic_set_32 expects a bitmask */
+	atomic_set_32(s, BIT(bit));
+}
+
+/**
+ * ixl_clear_state - Clear the specified state
+ * @s: the state bitmap
+ * @bit: the state to clear
+ *
+ * Atomically update the state bitmap with the specified bit cleared.
+ */
+inline void
+ixl_clear_state(volatile u32 *s, enum ixl_state bit)
+{
+	/* atomic_clear_32 expects a bitmask */
+	atomic_clear_32(s, BIT(bit));
+}
+
+/**
+ * ixl_test_state - Test the specified state
+ * @s: the state bitmap
+ * @bit: the bit to test
+ *
+ * Return true if the state is set, false otherwise. Use this only if the flow
+ * does not need to update the state. If you must update the state as well,
+ * prefer ixl_testandset_state.
+ */
+inline bool
+ixl_test_state(volatile u32 *s, enum ixl_state bit)
+{
+	return !!(*s & BIT(bit));
+}
+
+/**
+ * ixl_testandset_state - Test and set the specified state
+ * @s: the state bitmap
+ * @bit: the bit to test
+ *
+ * Atomically update the state bitmap, setting the specified bit. Returns the
+ * previous value of the bit.
+ */
+inline u32
+ixl_testandset_state(volatile u32 *s, enum ixl_state bit)
+{
+	/* atomic_testandset_32 expects a bit position, as opposed to bitmask
+	expected by other atomic functions */
+	return atomic_testandset_32(s, bit);
+}
 
 MALLOC_DEFINE(M_IXL, "ixl", "ixl driver allocations");
 
@@ -210,7 +275,7 @@ ixl_pf_reset(struct ixl_pf *pf)
 	fw_mode = ixl_get_fw_mode(pf);
 	ixl_dbg_info(pf, "%s: before PF reset FW mode: 0x%08x\n", __func__, fw_mode);
 	if (fw_mode == IXL_FW_MODE_RECOVERY) {
-		atomic_set_32(&pf->state, IXL_PF_STATE_RECOVERY_MODE);
+		ixl_set_state(&pf->state, IXL_STATE_RECOVERY_MODE);
 		/* Don't try to reset device if it's in recovery mode */
 		return (0);
 	}
@@ -224,7 +289,7 @@ ixl_pf_reset(struct ixl_pf *pf)
 	fw_mode = ixl_get_fw_mode(pf);
 	ixl_dbg_info(pf, "%s: after PF reset FW mode: 0x%08x\n", __func__, fw_mode);
 	if (fw_mode == IXL_FW_MODE_RECOVERY) {
-		atomic_set_32(&pf->state, IXL_PF_STATE_RECOVERY_MODE);
+		ixl_set_state(&pf->state, IXL_STATE_RECOVERY_MODE);
 		return (0);
 	}
 
@@ -387,7 +452,7 @@ retry:
 	}
 
 	/* Keep link active by default */
-	atomic_set_32(&pf->state, IXL_PF_STATE_LINK_ACTIVE_ON_DOWN);
+	ixl_set_state(&pf->state, IXL_STATE_LINK_ACTIVE_ON_DOWN);
 
 	/* Print a subset of the capability information. */
 	device_printf(dev,
@@ -527,21 +592,36 @@ ixl_add_maddr(void *arg, struct sockaddr_dl *sdl, u_int cnt)
  *	Routines for multicast and vlan filter management.
  *
  *********************************************************************/
+
+/**
+ * ixl_add_multi - Add multicast filters to the hardware
+ * @vsi: The VSI structure
+ *
+ * In case number of multicast filters in the IFP exceeds 127 entries,
+ * multicast promiscuous mode will be enabled and the filters will be removed
+ * from the hardware
+ */
 void
 ixl_add_multi(struct ixl_vsi *vsi)
 {
-	struct ifnet		*ifp = vsi->ifp;
+	if_t			ifp = vsi->ifp;
 	struct i40e_hw		*hw = vsi->hw;
 	int			mcnt = 0;
 	struct ixl_add_maddr_arg cb_arg;
+	enum i40e_status_code	status;
 
 	IOCTL_DEBUGOUT("ixl_add_multi: begin");
 
 	mcnt = if_llmaddr_count(ifp);
 	if (__predict_false(mcnt >= MAX_MULTICAST_ADDR)) {
-		i40e_aq_set_vsi_multicast_promiscuous(hw,
-		    vsi->seid, TRUE, NULL);
-		/* delete all existing MC filters */
+		status = i40e_aq_set_vsi_multicast_promiscuous(hw, vsi->seid,
+		    TRUE, NULL);
+		if (status != I40E_SUCCESS)
+			if_printf(ifp, "Failed to enable multicast promiscuous "
+			    "mode, status: %s\n", i40e_stat_str(hw, status));
+		else
+			if_printf(ifp, "Enabled multicast promiscuous mode\n");
+		/* Delete all existing MC filters */
 		ixl_del_multi(vsi, true);
 		return;
 	}
@@ -567,37 +647,99 @@ ixl_match_maddr(void *arg, struct sockaddr_dl *sdl, u_int cnt)
 		return (0);
 }
 
+/**
+ * ixl_dis_multi_promisc - Disable multicast promiscuous mode
+ * @vsi: The VSI structure
+ * @vsi_mcnt: Number of multicast filters in the VSI
+ *
+ * Disable multicast promiscuous mode based on number of entries in the IFP
+ * and the VSI, then re-add multicast filters.
+ *
+ */
+static void
+ixl_dis_multi_promisc(struct ixl_vsi *vsi, int vsi_mcnt)
+{
+	struct ifnet		*ifp = vsi->ifp;
+	struct i40e_hw		*hw = vsi->hw;
+	int			ifp_mcnt = 0;
+	enum i40e_status_code	status;
+
+	ifp_mcnt = if_llmaddr_count(ifp);
+	/*
+	 * Equal lists or empty ifp list mean the list has not been changed
+	 * and in such case avoid disabling multicast promiscuous mode as it
+	 * was not previously enabled. Case where multicast promiscuous mode has
+	 * been enabled is when vsi_mcnt == 0 && ifp_mcnt > 0.
+	 */
+	if (ifp_mcnt == vsi_mcnt || ifp_mcnt == 0 ||
+	    ifp_mcnt >= MAX_MULTICAST_ADDR)
+		return;
+
+	status = i40e_aq_set_vsi_multicast_promiscuous(hw, vsi->seid,
+	    FALSE, NULL);
+	if (status != I40E_SUCCESS) {
+		if_printf(ifp, "Failed to disable multicast promiscuous "
+		    "mode, status: %s\n", i40e_stat_str(hw, status));
+
+		return;
+	}
+
+	if_printf(ifp, "Disabled multicast promiscuous mode\n");
+
+	ixl_add_multi(vsi);
+}
+
+/**
+ * ixl_del_multi - Delete multicast filters from the hardware
+ * @vsi: The VSI structure
+ * @all: Bool to determine if all the multicast filters should be removed
+ *
+ * In case number of multicast filters in the IFP drops to 127 entries,
+ * multicast promiscuous mode will be disabled and the filters will be reapplied
+ * to the hardware.
+ */
 void
 ixl_del_multi(struct ixl_vsi *vsi, bool all)
 {
-	struct ixl_ftl_head	to_del;
-	struct ifnet		*ifp = vsi->ifp;
+	int			to_del_cnt = 0, vsi_mcnt = 0;
+	if_t			ifp = vsi->ifp;
 	struct ixl_mac_filter	*f, *fn;
-	int			mcnt = 0;
+	struct ixl_ftl_head	to_del;
 
 	IOCTL_DEBUGOUT("ixl_del_multi: begin");
 
 	LIST_INIT(&to_del);
 	/* Search for removed multicast addresses */
 	LIST_FOREACH_SAFE(f, &vsi->ftl, ftle, fn) {
-		if ((f->flags & IXL_FILTER_MC) == 0 ||
-		    (!all && (if_foreach_llmaddr(ifp, ixl_match_maddr, f) == 0)))
+		if ((f->flags & IXL_FILTER_MC) == 0)
+			continue;
+
+		/* Count all the multicast filters in the VSI for comparison */
+		vsi_mcnt++;
+
+		if (!all && if_foreach_llmaddr(ifp, ixl_match_maddr, f) != 0)
 			continue;
 
 		LIST_REMOVE(f, ftle);
 		LIST_INSERT_HEAD(&to_del, f, ftle);
-		mcnt++;
+		to_del_cnt++;
 	}
 
-	if (mcnt > 0)
-		ixl_del_hw_filters(vsi, &to_del, mcnt);
+	if (to_del_cnt > 0) {
+		ixl_del_hw_filters(vsi, &to_del, to_del_cnt);
+		return;
+	}
+
+	ixl_dis_multi_promisc(vsi, vsi_mcnt);
+
+	IOCTL_DEBUGOUT("ixl_del_multi: end");
 }
 
 void
 ixl_link_up_msg(struct ixl_pf *pf)
 {
 	struct i40e_hw *hw = &pf->hw;
-	struct ifnet *ifp = pf->vsi.ifp;
+	if_t ifp = pf->vsi.ifp;
 	char *req_fec_string, *neg_fec_string;
 	u8 fec_abilities;
 
@@ -618,7 +760,7 @@ ixl_link_up_msg(struct ixl_pf *pf)
 		neg_fec_string = ixl_fec_string[2];
 
 	log(LOG_NOTICE, "%s: Link is up, %s Full Duplex, Requested FEC: %s, Negotiated FEC: %s, Autoneg: %s, Flow Control: %s\n",
-	    ifp->if_xname,
+	    if_name(ifp),
 	    ixl_link_speed_string(hw->phy.link_info.link_speed),
 	    req_fec_string, neg_fec_string,
 	    (hw->phy.link_info.an_info & I40E_AQ_AN_COMPLETED) ? "True" : "False",
@@ -1114,6 +1256,14 @@ ixl_reconfigure_filters(struct ixl_vsi *vsi)
 
 	ixl_add_hw_filters(vsi, &tmp, cnt);
 
+	/*
+	 * When the vsi is allocated for the VFs, both vsi->hw and vsi->ifp
+	 * will be NULL. Furthermore, the ftl of such vsi already contains
+	 * IXL_VLAN_ANY filter so we can skip that as well.
+	 */
+	if (hw == NULL)
+		return;
+
 	/* Filter could be removed if MAC address was changed */
 	ixl_add_filter(vsi, hw->mac.addr, IXL_VLAN_ANY);
 
@@ -1388,6 +1538,11 @@ ixl_add_hw_filters(struct ixl_vsi *vsi, struct ixl_ftl_head *to_add, int cnt)
 			b->flags = 0;
 		}
 		b->flags |= I40E_AQC_MACVLAN_ADD_PERFECT_MATCH;
+		/* Some FW versions do not set match method
+		 * when adding filters fails. Initialize it with
+		 * expected error value to allow detection which
+		 * filters were not added */
+		b->match_method = I40E_AQC_MM_ERR_NO_RES;
 		ixl_dbg_filter(pf, "ADD: " MAC_FORMAT "\n",
 		    MAC_FORMAT_ARGS(f->macaddr));
 
@@ -1856,7 +2011,7 @@ ixl_handle_mdd_event(struct ixl_pf *pf)
 	ixl_handle_tx_mdd_event(pf);
 	ixl_handle_rx_mdd_event(pf);
 
-	atomic_clear_32(&pf->state, IXL_PF_STATE_MDD_PENDING);
+	ixl_clear_state(&pf->state, IXL_STATE_MDD_PENDING);
 
 	/* re-enable mdd interrupt cause */
 	reg = rd32(hw, I40E_PFINT_ICR0_ENA);
@@ -1911,7 +2066,7 @@ void
 ixl_handle_empr_reset(struct ixl_pf *pf)
 {
 	struct ixl_vsi	*vsi = &pf->vsi;
-	bool is_up = !!(vsi->ifp->if_drv_flags & IFF_DRV_RUNNING);
+	bool is_up = !!(if_getdrvflags(vsi->ifp) & IFF_DRV_RUNNING);
 
 	ixl_prepare_for_reset(pf, is_up);
 	/*
@@ -1924,7 +2079,7 @@ ixl_handle_empr_reset(struct ixl_pf *pf)
 
 	if (!IXL_PF_IN_RECOVERY_MODE(pf) &&
 	    ixl_get_fw_mode(pf) == IXL_FW_MODE_RECOVERY) {
-		atomic_set_32(&pf->state, IXL_PF_STATE_RECOVERY_MODE);
+		ixl_set_state(&pf->state, IXL_STATE_RECOVERY_MODE);
 		device_printf(pf->dev,
 		    "Firmware recovery mode detected. Limiting functionality. Refer to Intel(R) Ethernet Adapters and Devices User Guide for details on firmware recovery mode.\n");
 		pf->link_up = FALSE;
@@ -1933,7 +2088,7 @@ ixl_handle_empr_reset(struct ixl_pf *pf)
 
 	ixl_rebuild_hw_structs_after_reset(pf, is_up);
 
-	atomic_clear_32(&pf->state, IXL_PF_STATE_RESETTING);
+	ixl_clear_state(&pf->state, IXL_STATE_RESETTING);
 }
 
 void
@@ -2190,14 +2345,12 @@ void
 ixl_update_vsi_stats(struct ixl_vsi *vsi)
 {
 	struct ixl_pf		*pf;
-	struct ifnet		*ifp;
 	struct i40e_eth_stats	*es;
 	u64			tx_discards, csum_errs;
 
 	struct i40e_hw_port_stats *nsd;
 
 	pf = vsi->back;
-	ifp = vsi->ifp;
 	es = &vsi->eth_stats;
 	nsd = &pf->stats;
 
@@ -2269,16 +2422,7 @@ ixl_stat_update48(struct i40e_hw *hw, u32 hireg, u32 loreg,
 {
 	u64 new_data;
 
-#if defined(__FreeBSD__) && (__FreeBSD_version >= 1000000) && defined(__amd64__)
 	new_data = rd64(hw, loreg);
-#else
-	/*
-	 * Use two rd32's instead of one rd64; FreeBSD versions before
-	 * 10 don't support 64-bit bus reads/writes.
-	 */
-	new_data = rd32(hw, loreg);
-	new_data |= ((u64)(rd32(hw, hireg) & 0xFFFF)) << 32;
-#endif
 
 	if (!offset_loaded)
 		*offset = new_data;
@@ -2603,6 +2747,10 @@ ixl_add_device_sysctls(struct ixl_pf *pf)
 	    OID_AUTO, "queue_interrupt_table",
 	    CTLTYPE_STRING | CTLFLAG_RD | CTLFLAG_NEEDGIANT,
 	    pf, 0, ixl_sysctl_queue_interrupt_table, "A", "View MSI-X indices for TX/RX queues");
+
+	SYSCTL_ADD_PROC(ctx, debug_list,
+	    OID_AUTO, "phy_statistics", CTLTYPE_STRING | CTLFLAG_RD,
+	    pf, 0, ixl_sysctl_phy_statistics, "A", "PHY Statistics");
 
 	if (pf->has_i2c) {
 		SYSCTL_ADD_PROC(ctx, debug_list,
@@ -3435,6 +3583,61 @@ ixl_sysctl_phy_abilities(SYSCTL_HANDLER_ARGS)
 	    abilities.module_type[2], (abilities.fec_cfg_curr_mod_ext_info & 0xe0) >> 5,
 	    abilities.fec_cfg_curr_mod_ext_info & 0x1F,
 	    abilities.ext_comp_code);
+
+	error = sbuf_finish(buf);
+	if (error)
+		device_printf(dev, "Error finishing sbuf: %d\n", error);
+
+	sbuf_delete(buf);
+	return (error);
+}
+
+static int
+ixl_sysctl_phy_statistics(SYSCTL_HANDLER_ARGS)
+{
+	struct ixl_pf *pf = (struct ixl_pf *)arg1;
+	struct i40e_hw *hw = &pf->hw;
+	device_t dev = pf->dev;
+	struct sbuf *buf;
+	int error = 0;
+
+	buf = sbuf_new_for_sysctl(NULL, NULL, 128, req);
+	if (buf == NULL) {
+		device_printf(dev, "Could not allocate sbuf for sysctl output.\n");
+		return (ENOMEM);
+	}
+
+	if (hw->mac.type == I40E_MAC_X722) {
+		sbuf_printf(buf, "\n"
+		    "PCS Link Control Register:                          unavailable\n"
+		    "PCS Link Status 1:                                  unavailable\n"
+		    "PCS Link Status 2:                                  unavailable\n"
+		    "XGMII FIFO Status:                                  unavailable\n"
+		    "Auto-Negotiation (AN) Status:                       unavailable\n"
+		    "KR PCS Status:                                      unavailable\n"
+		    "KR FEC Status 1 – FEC Correctable Blocks Counter:   unavailable\n"
+		    "KR FEC Status 2 – FEC Uncorrectable Blocks Counter: unavailable"
+		);
+	} else {
+		sbuf_printf(buf, "\n"
+		    "PCS Link Control Register:                          %#010X\n"
+		    "PCS Link Status 1:                                  %#010X\n"
+		    "PCS Link Status 2:                                  %#010X\n"
+		    "XGMII FIFO Status:                                  %#010X\n"
+		    "Auto-Negotiation (AN) Status:                       %#010X\n"
+		    "KR PCS Status:                                      %#010X\n"
+		    "KR FEC Status 1 – FEC Correctable Blocks Counter:   %#010X\n"
+		    "KR FEC Status 2 – FEC Uncorrectable Blocks Counter: %#010X",
+		    rd32(hw, I40E_PRTMAC_PCS_LINK_CTRL),
+		    rd32(hw, I40E_PRTMAC_PCS_LINK_STATUS1(0)),
+		    rd32(hw, I40E_PRTMAC_PCS_LINK_STATUS2),
+		    rd32(hw, I40E_PRTMAC_PCS_XGMII_FIFO_STATUS),
+		    rd32(hw, I40E_PRTMAC_PCS_AN_LP_STATUS),
+		    rd32(hw, I40E_PRTMAC_PCS_KR_STATUS),
+		    rd32(hw, I40E_PRTMAC_PCS_FEC_KR_STATUS1),
+		    rd32(hw, I40E_PRTMAC_PCS_FEC_KR_STATUS2)
+		);
+	}
 
 	error = sbuf_finish(buf);
 	if (error)
@@ -4451,7 +4654,7 @@ ixl_start_fw_lldp(struct ixl_pf *pf)
 		}
 	}
 
-	atomic_clear_32(&pf->state, IXL_PF_STATE_FW_LLDP_DISABLED);
+	ixl_clear_state(&pf->state, IXL_STATE_FW_LLDP_DISABLED);
 	return (0);
 }
 
@@ -4488,7 +4691,7 @@ ixl_stop_fw_lldp(struct ixl_pf *pf)
 	}
 
 	i40e_aq_set_dcb_parameters(hw, true, NULL);
-	atomic_set_32(&pf->state, IXL_PF_STATE_FW_LLDP_DISABLED);
+	ixl_set_state(&pf->state, IXL_STATE_FW_LLDP_DISABLED);
 	return (0);
 }
 
@@ -4498,7 +4701,7 @@ ixl_sysctl_fw_lldp(SYSCTL_HANDLER_ARGS)
 	struct ixl_pf *pf = (struct ixl_pf *)arg1;
 	int state, new_state, error = 0;
 
-	state = new_state = ((pf->state & IXL_PF_STATE_FW_LLDP_DISABLED) == 0);
+	state = new_state = !ixl_test_state(&pf->state, IXL_STATE_FW_LLDP_DISABLED);
 
 	/* Read in new mode */
 	error = sysctl_handle_int(oidp, &new_state, 0, req);
@@ -4524,7 +4727,7 @@ ixl_sysctl_eee_enable(SYSCTL_HANDLER_ARGS)
 	enum i40e_status_code cmd_status;
 
 	/* Init states' values */
-	state = new_state = (!!(pf->state & IXL_PF_STATE_EEE_ENABLED));
+	state = new_state = ixl_test_state(&pf->state, IXL_STATE_EEE_ENABLED);
 
 	/* Get requested mode */
 	sysctl_handle_status = sysctl_handle_int(oidp, &new_state, 0, req);
@@ -4541,9 +4744,9 @@ ixl_sysctl_eee_enable(SYSCTL_HANDLER_ARGS)
 	/* Save new state or report error */
 	if (!cmd_status) {
 		if (new_state == 0)
-			atomic_clear_32(&pf->state, IXL_PF_STATE_EEE_ENABLED);
+			ixl_clear_state(&pf->state, IXL_STATE_EEE_ENABLED);
 		else
-			atomic_set_32(&pf->state, IXL_PF_STATE_EEE_ENABLED);
+			ixl_set_state(&pf->state, IXL_STATE_EEE_ENABLED);
 	} else if (cmd_status == I40E_ERR_CONFIG)
 		return (EPERM);
 	else
@@ -4558,17 +4761,16 @@ ixl_sysctl_set_link_active(SYSCTL_HANDLER_ARGS)
 	struct ixl_pf *pf = (struct ixl_pf *)arg1;
 	int error, state;
 
-	state = !!(atomic_load_acq_32(&pf->state) &
-	    IXL_PF_STATE_LINK_ACTIVE_ON_DOWN);
+	state = ixl_test_state(&pf->state, IXL_STATE_LINK_ACTIVE_ON_DOWN);
 
 	error = sysctl_handle_int(oidp, &state, 0, req);
 	if ((error) || (req->newptr == NULL))
 		return (error);
 
 	if (state == 0)
-		atomic_clear_32(&pf->state, IXL_PF_STATE_LINK_ACTIVE_ON_DOWN);
+		ixl_clear_state(&pf->state, IXL_STATE_LINK_ACTIVE_ON_DOWN);
 	else
-		atomic_set_32(&pf->state, IXL_PF_STATE_LINK_ACTIVE_ON_DOWN);
+		ixl_set_state(&pf->state, IXL_STATE_LINK_ACTIVE_ON_DOWN);
 
 	return (0);
 }
@@ -4579,22 +4781,38 @@ ixl_attach_get_link_status(struct ixl_pf *pf)
 {
 	struct i40e_hw *hw = &pf->hw;
 	device_t dev = pf->dev;
-	int error = 0;
+	enum i40e_status_code status;
 
 	if (((hw->aq.fw_maj_ver == 4) && (hw->aq.fw_min_ver < 33)) ||
 	    (hw->aq.fw_maj_ver < 4)) {
 		i40e_msec_delay(75);
-		error = i40e_aq_set_link_restart_an(hw, TRUE, NULL);
-		if (error) {
-			device_printf(dev, "link restart failed, aq_err=%d\n",
-			    pf->hw.aq.asq_last_status);
-			return error;
+		status = i40e_aq_set_link_restart_an(hw, TRUE, NULL);
+		if (status != I40E_SUCCESS) {
+			device_printf(dev,
+			    "%s link restart failed status: %s, aq_err=%s\n",
+			    __func__, i40e_stat_str(hw, status),
+			    i40e_aq_str(hw, hw->aq.asq_last_status));
+			return (EINVAL);
 		}
 	}
 
 	/* Determine link state */
 	hw->phy.get_link_info = TRUE;
-	i40e_get_link_status(hw, &pf->link_up);
+	status = i40e_get_link_status(hw, &pf->link_up);
+	if (status != I40E_SUCCESS) {
+		device_printf(dev,
+		    "%s get link status, status: %s aq_err=%s\n",
+		    __func__, i40e_stat_str(hw, status),
+		    i40e_aq_str(hw, hw->aq.asq_last_status));
+		/*
+		 * Most probably FW has not finished configuring PHY.
+		 * Retry periodically in a timer callback.
+		 */
+		ixl_set_state(&pf->state, IXL_STATE_LINK_POLLING);
+		pf->link_poll_start = getsbinuptime();
+		return (EAGAIN);
+	}
+ 	ixl_dbg_link(pf, "%s link_up: %d\n", __func__, pf->link_up);
 
 	/* Flow Control mode not set by user, read current FW settings */
 	if (pf->fc == -1)
@@ -4615,7 +4833,7 @@ ixl_sysctl_do_pf_reset(SYSCTL_HANDLER_ARGS)
 		return (error);
 
 	/* Initiate the PF reset later in the admin task */
-	atomic_set_32(&pf->state, IXL_PF_STATE_PF_RESET_REQ);
+	ixl_set_state(&pf->state, IXL_STATE_PF_RESET_REQ);
 
 	return (error);
 }

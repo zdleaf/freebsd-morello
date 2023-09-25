@@ -2,13 +2,12 @@
  * System call numbers.
  *
  * DO NOT EDIT-- this file is automatically @generated.
- * $FreeBSD$
  */
 
 #define	LINUX_SYS_linux_exit	1
 #define	LINUX_SYS_linux_fork	2
 #define	LINUX_SYS_read	3
-#define	LINUX_SYS_write	4
+#define	LINUX_SYS_linux_write	4
 #define	LINUX_SYS_linux_open	5
 #define	LINUX_SYS_close	6
 #define	LINUX_SYS_linux_waitpid	7
@@ -31,7 +30,6 @@
 #define	LINUX_SYS_linux_stime	25
 #define	LINUX_SYS_linux_ptrace	26
 #define	LINUX_SYS_linux_alarm	27
-#define	LINUX_SYS_linux_fstat	28
 #define	LINUX_SYS_linux_pause	29
 #define	LINUX_SYS_linux_utime	30
 #define	LINUX_SYS_linux_access	33
@@ -137,7 +135,7 @@
 #define	LINUX_SYS_flock	143
 #define	LINUX_SYS_linux_msync	144
 #define	LINUX_SYS_readv	145
-#define	LINUX_SYS_writev	146
+#define	LINUX_SYS_linux_writev	146
 #define	LINUX_SYS_linux_getsid	147
 #define	LINUX_SYS_linux_fdatasync	148
 #define	LINUX_SYS_linux_sysctl	149
@@ -409,6 +407,6 @@
 #define	LINUX_SYS_linux_pidfd_getfd	438
 #define	LINUX_SYS_linux_faccessat2	439
 #define	LINUX_SYS_linux_process_madvise	440
-#define	LINUX_SYS_linux_epoll_pwait2	441
+#define	LINUX_SYS_linux_epoll_pwait2_64	441
 #define	LINUX_SYS_linux_mount_setattr	442
 #define	LINUX_SYS_MAXSYSCALL	444

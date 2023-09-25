@@ -1,4 +1,3 @@
-# $FreeBSD$
 
 .PATH: ${SRCTOP}/sys/contrib/openzfs/lib/libtpool
 .PATH: ${SRCTOP}/sys/contrib/openzfs/include
@@ -6,7 +5,7 @@
 
 LIB=	tpool
 LIBADD=	spl
-PACKAGE=	runtime
+PACKAGE=	zfs
 
 INCS=	thread_pool_impl.h
 SRCS=	thread_pool.c

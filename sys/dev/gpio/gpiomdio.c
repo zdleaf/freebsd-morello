@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2019 Rubicon Communications, LLC (Netgate)
  *
@@ -26,8 +26,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include "opt_platform.h"
 
 #include <sys/param.h>
@@ -211,8 +209,6 @@ gpiomdio_get_node(device_t bus, device_t dev)
 	return (ofw_bus_get_node(bus));
 }
 
-static devclass_t gpiomdio_devclass;
-
 static device_method_t gpiomdio_methods[] = {
 	/* Device interface */
 	DEVMETHOD(device_probe,		gpiomdio_probe),
@@ -235,9 +231,9 @@ static driver_t gpiomdio_driver = {
 	sizeof(struct gpiomdio_softc),
 };
 
-EARLY_DRIVER_MODULE(gpiomdio, gpiobus, gpiomdio_driver, gpiomdio_devclass,
-    0, 0, BUS_PASS_BUS + BUS_PASS_ORDER_MIDDLE);
-DRIVER_MODULE(miibus, gpiomdio, miibus_driver, miibus_devclass, 0, 0);
+EARLY_DRIVER_MODULE(gpiomdio, gpiobus, gpiomdio_driver, 0, 0,
+    BUS_PASS_BUS + BUS_PASS_ORDER_MIDDLE);
+DRIVER_MODULE(miibus, gpiomdio, miibus_driver, 0, 0);
 MODULE_DEPEND(gpiomdio, gpiobus, 1, 1, 1);
 MODULE_DEPEND(gpiomdio, miibus, 1, 1, 1);
 MODULE_DEPEND(gpiomdio, mii_bitbang, 1, 1, 1);

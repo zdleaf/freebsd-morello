@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2019 Michal Meloun <mmel@FreeBSD.org>
  *
@@ -27,8 +27,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/bus.h>
@@ -160,11 +158,8 @@ mv_ap806_sei_disable_intr(device_t dev, struct intr_irqsrc *isrc)
 static int
 mv_ap806_sei_map(device_t dev, struct intr_map_data *data, u_int *irqp)
 {
-	struct mv_ap806_sei_softc *sc;
 	struct intr_map_data_fdt *daf;
 	u_int irq;
-
-	sc = device_get_softc(dev);
 
 	if (data->type != INTR_MAP_DATA_FDT)
 		return (ENOTSUP);
@@ -370,7 +365,7 @@ mv_ap806_sei_attach(device_t dev)
 		if (rv != 0)
 			goto fail; /* XXX deregister ISRCs */
 	}
-	xref = OF_xref_from_node(node);;
+	xref = OF_xref_from_node(node);
 	if (intr_pic_register(dev, xref) == NULL) {
 		device_printf(dev, "Cannot register SEI\n");
 		rv = ENXIO;
@@ -501,13 +496,11 @@ static device_method_t mv_ap806_sei_methods[] = {
 	DEVMETHOD_END
 };
 
-static devclass_t mv_ap806_sei_devclass;
-
 static driver_t mv_ap806_sei_driver = {
 	"mv_ap806_sei",
 	mv_ap806_sei_methods,
 	sizeof(struct mv_ap806_sei_softc),
 };
 
-EARLY_DRIVER_MODULE(mv_ap806_sei, simplebus, mv_ap806_sei_driver,
-    mv_ap806_sei_devclass, 0, 0, BUS_PASS_INTERRUPT + BUS_PASS_ORDER_MIDDLE);
+EARLY_DRIVER_MODULE(mv_ap806_sei, simplebus, mv_ap806_sei_driver, 0, 0,
+    BUS_PASS_INTERRUPT + BUS_PASS_ORDER_MIDDLE);

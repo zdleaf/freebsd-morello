@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2006 Vadim Goncharov <vadimnuclight@tpu.ru>
  * All rights reserved.
@@ -28,8 +28,6 @@
  *
  * Portions Copyright (c) 1999 Whistle Communications, Inc.
  * (ng_bpf by Archie Cobbs <archie@freebsd.org>)
- *
- * $FreeBSD$
  */
 
 /*
@@ -509,13 +507,15 @@ ng_tag_rcvdata(hook_p hook, item_p item)
 	uint32_t cookie;
 	hinfo_p dhip;
 	hook_p dest;
+#ifdef NG_TAG_DEBUG
 	int totlen;
+#endif
 	int found = 0, error = 0;
 
 	m = NGI_M(item);	/* 'item' still owns it.. we are peeking */
+#ifdef NG_TAG_DEBUG
 	totlen = m->m_pkthdr.len;
 
-#ifdef NG_TAG_DEBUG
 	hip->stats.recvFrames++;
 	hip->stats.recvOctets += totlen;
 #endif

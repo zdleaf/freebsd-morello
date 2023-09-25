@@ -1,4 +1,3 @@
-/* $FreeBSD$ */
 /*	$NetBSD: citrus_utf1632.c,v 1.9 2008/06/14 16:01:08 tnozaki Exp $	*/
 
 /*-
@@ -77,6 +76,7 @@ typedef struct {
 typedef struct {
 	int		 preffered_endian;
 	unsigned int	 cur_max;
+	unsigned int	 cur_min;
 	uint32_t	 mode;
 } _UTF1632EncodingInfo;
 
@@ -84,6 +84,7 @@ typedef struct {
 #define _ENCODING_INFO			_UTF1632EncodingInfo
 #define _ENCODING_STATE			_UTF1632State
 #define _ENCODING_MB_CUR_MAX(_ei_)	((_ei_)->cur_max)
+#define _ENCODING_MB_CUR_MIN(_ei_)	((_ei_)->cur_min)
 #define _ENCODING_IS_STATE_DEPENDENT	0
 #define _STATE_NEEDS_EXPLICIT_INIT(_ps_)	0
 
@@ -390,6 +391,7 @@ _citrus_UTF1632_encoding_module_init(_UTF1632EncodingInfo * __restrict ei,
 
 	parse_variable(ei, var, lenvar);
 
+	ei->cur_min = ((ei->mode&_MODE_UTF32) == 0) ? 2 : 4;
 	ei->cur_max = ((ei->mode&_MODE_UTF32) == 0) ? 6 : 8;
 	/* 6: endian + surrogate */
 	/* 8: endian + normal */

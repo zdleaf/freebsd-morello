@@ -22,14 +22,12 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 /*
  * tcpstream sets up a simple TCP client and server, and then streams a
  * predictable pseudo-random byte sequence through it using variable block
- * sizes.  The intent is to to detect corruption of data in the TCP stream.
+ * sizes.  The intent is to detect corruption of data in the TCP stream.
  */
 
 #include <sys/types.h>

@@ -26,8 +26,6 @@
 
 #include "opt_platform.h"
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
@@ -146,8 +144,7 @@ qman_portal_setup(struct qman_softc *qsc)
 		}
 
 		/* Not inititialized and "owned" by another thread */
-		thread_lock(curthread);
-		mi_switch(SW_VOL);
+		sched_relinquish(curthread);
 	}
 
 	/* Map portal registers */

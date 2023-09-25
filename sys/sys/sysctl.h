@@ -32,7 +32,6 @@
  * SUCH DAMAGE.
  *
  *	@(#)sysctl.h	8.1 (Berkeley) 6/2/93
- * $FreeBSD$
  */
 
 #ifndef _SYS_SYSCTL_H_
@@ -40,6 +39,7 @@
 
 #ifdef _KERNEL
 #include <sys/queue.h>
+#include <sys/tree.h>
 #endif
 
 /*
@@ -173,20 +173,25 @@ struct sysctl_req {
 	int		 flags;
 };
 
-SLIST_HEAD(sysctl_oid_list, sysctl_oid);
+struct sysctl_oid;
+
+/* RB Tree handling */
+RB_HEAD(sysctl_oid_list, sysctl_oid);
 
 /*
  * This describes one "oid" in the MIB tree.  Potentially more nodes can
  * be hidden behind it, expanded by the handler.
  */
 struct sysctl_oid {
-	struct sysctl_oid_list oid_children;
-	struct sysctl_oid_list *oid_parent;
-	SLIST_ENTRY(sysctl_oid) oid_link;
+	struct sysctl_oid_list	oid_children;
+	struct sysctl_oid_list*	oid_parent;
+	RB_ENTRY(sysctl_oid) oid_link;
+	/* Sort key for all siblings, and lookup key for userland */
 	int		 oid_number;
 	u_int		 oid_kind;
 	void		*oid_arg1;
 	intmax_t	 oid_arg2;
+	/* Must be unique amongst all siblings. */
 	const char	*oid_name;
 	int		(*oid_handler)(SYSCTL_HANDLER_ARGS);
 	const char	*oid_fmt;
@@ -195,6 +200,19 @@ struct sysctl_oid {
 	const char	*oid_descr;
 	const char	*oid_label;
 };
+
+static inline int
+cmp_sysctl_oid(struct sysctl_oid *a, struct sysctl_oid *b)
+{
+	if (a->oid_number > b->oid_number)
+		return (1);
+	else if (a->oid_number < b->oid_number)
+		return (-1);
+	else
+		return (0);
+}
+
+RB_PROTOTYPE(sysctl_oid_list, sysctl_oid, oid_link, cmp_sysctl_oid);
 
 #define	SYSCTL_IN(r, p, l)	(r->newfunc)(r, p, l)
 #define	SYSCTL_OUT(r, p, l)	(r->oldfunc)(r, p, l)
@@ -275,7 +293,7 @@ TAILQ_HEAD(sysctl_ctx_list, sysctl_ctx_entry);
 #define	SYSCTL_OID_RAW(id, parent_child_head, nbr, name, kind, a1, a2, handler, fmt, descr, label) \
 	struct sysctl_oid id = {					\
 		.oid_parent = (parent_child_head),			\
-		.oid_children = SLIST_HEAD_INITIALIZER(&id.oid_children), \
+		.oid_children = RB_INITIALIZER(&id.oid_children), \
 		.oid_number = (nbr),					\
 		.oid_kind = (kind),					\
 		.oid_arg1 = (a1),					\
@@ -738,8 +756,8 @@ TAILQ_HEAD(sysctl_ctx_list, sysctl_ctx_entry);
 /* Oid for an array of counter(9)s.  The pointer and length must be non zero. */
 #define	SYSCTL_COUNTER_U64_ARRAY(parent, nbr, name, access, ptr, len, descr) \
 	SYSCTL_OID(parent, nbr, name,					\
-	    CTLTYPE_OPAQUE | CTLFLAG_MPSAFE | CTLFLAG_STATS | (access),	\
-	    (ptr), (len), sysctl_handle_counter_u64_array, "S", descr);	\
+	    CTLTYPE_U64 | CTLFLAG_MPSAFE | CTLFLAG_STATS | (access),	\
+	    (ptr), (len), sysctl_handle_counter_u64_array, "QU", descr);\
 	CTASSERT((((access) & CTLTYPE) == 0 ||				\
 	    ((access) & SYSCTL_CT_ASSERT_MASK) == CTLTYPE_OPAQUE) &&	\
 	    sizeof(counter_u64_t) == sizeof(*(ptr)) &&			\
@@ -899,6 +917,9 @@ TAILQ_HEAD(sysctl_ctx_list, sysctl_ctx_entry);
 	    NULL);							\
 })
 
+#define	SYSCTL_FOREACH(oidp, list) \
+	RB_FOREACH(oidp, sysctl_oid_list, list)
+
 /*
  * A macro to generate a read-only sysctl to indicate the presence of optional
  * kernel features.
@@ -950,7 +971,7 @@ TAILQ_HEAD(sysctl_ctx_list, sysctl_ctx_entry);
 #define	KERN_HOSTNAME		10	/* string: hostname */
 #define	KERN_HOSTID		11	/* int: host identifier */
 #define	KERN_CLOCKRATE		12	/* struct: struct clockrate */
-#define	KERN_VNODE		13	/* struct: vnode structures */
+/* was: #define	KERN_VNODE	13	; disabled in 2003 and removed in 2023 */
 #define	KERN_PROC		14	/* struct: process entries */
 #define	KERN_FILE		15	/* struct: file entries */
 #define	KERN_PROF		16	/* node: kernel profiling info */
@@ -976,6 +997,7 @@ TAILQ_HEAD(sysctl_ctx_list, sysctl_ctx_entry);
 #define	KERN_HOSTUUID		36	/* string: host UUID identifier */
 #define	KERN_ARND		37	/* int: from arc4rand() */
 #define	KERN_MAXPHYS		38	/* int: MAXPHYS value */
+#define	KERN_LOCKF		39	/* struct: lockf reports */
 /*
  * KERN_PROC subtypes
  */

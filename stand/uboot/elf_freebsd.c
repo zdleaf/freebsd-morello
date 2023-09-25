@@ -26,8 +26,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/linker.h>
 
@@ -39,8 +37,7 @@ __FBSDID("$FreeBSD$");
 
 #include "bootstrap.h"
 #include "libuboot.h"
-
-extern vm_offset_t md_load(char *, vm_offset_t *, vm_offset_t *);
+#include "modinfo.h"
 
 int
 __elfN(uboot_load)(char *filename, uint64_t dest,

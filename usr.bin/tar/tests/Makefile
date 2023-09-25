@@ -1,4 +1,3 @@
-# $FreeBSD$
 
 PACKAGE=	tests
 
@@ -15,6 +14,8 @@ CFLAGS+=	-I${SRCTOP}/lib/libarchive -I${.OBJDIR}
 CFLAGS+=	-I${_LIBARCHIVEDIR}/libarchive
 CFLAGS+=	-I${_LIBARCHIVEDIR}/tar -I${_LIBARCHIVEDIR}/tar/test
 CFLAGS+=	-I${_LIBARCHIVEDIR}/test_utils
+
+CFLAGS.test_utils.c+=	-Wno-cast-align
 
 # Uncomment to link against dmalloc
 #LDADD+= -L/usr/local/lib -ldmalloc
@@ -59,6 +60,7 @@ TESTS_SRCS=	\
 	test_option_fflags.c			\
 	test_option_gid_gname.c			\
 	test_option_grzip.c			\
+	test_option_ignore_zeros.c		\
 	test_option_j.c				\
 	test_option_k.c				\
 	test_option_keep_newer_files.c		\

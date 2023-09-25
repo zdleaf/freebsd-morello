@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2005 Peter Grehan
  * All rights reserved.
@@ -24,8 +24,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 #ifndef _MACHINE_MMUVAR_H_
@@ -38,7 +36,7 @@ typedef	void	(*pmap_kenter_attr_t)(vm_offset_t, vm_paddr_t, vm_memattr_t);
 typedef	void	(*pmap_kremove_t)(vm_offset_t);
 typedef	void	*(*pmap_mapdev_t)(vm_paddr_t, vm_size_t);
 typedef	void	*(*pmap_mapdev_attr_t)(vm_paddr_t, vm_size_t, vm_memattr_t);
-typedef	void	(*pmap_unmapdev_t)(vm_offset_t, vm_size_t);
+typedef	void	(*pmap_unmapdev_t)(void *, vm_size_t);
 typedef	void	(*pmap_page_set_memattr_t)(vm_page_t, vm_memattr_t);
 typedef	int	(*pmap_change_attr_t)(vm_offset_t, vm_size_t, vm_memattr_t);
 typedef	int	(*pmap_map_user_ptr_t)(pmap_t, volatile const void *,

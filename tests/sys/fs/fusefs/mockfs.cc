@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2019 The FreeBSD Foundation
  *
@@ -26,8 +26,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 extern "C" {
@@ -229,6 +227,18 @@ void MockFS::debug_request(const mockfs_buf_in &in, ssize_t buflen)
 		case FUSE_FSYNCDIR:
 			printf(" flags=%#x", in.body.fsyncdir.fsync_flags);
 			break;
+		case FUSE_GETLK:
+			printf(" fh=%#" PRIx64
+				" type=%u pid=%u",
+				in.body.getlk.fh,
+				in.body.getlk.lk.type,
+				in.body.getlk.lk.pid);
+			if (verbosity >= 2) {
+				printf(" range=[%" PRIi64 ":%" PRIi64 "]",
+					in.body.getlk.lk.start,
+					in.body.getlk.lk.end);
+			}
+			break;
 		case FUSE_INTERRUPT:
 			printf(" unique=%" PRIu64, in.body.interrupt.unique);
 			break;
@@ -338,7 +348,7 @@ void MockFS::debug_request(const mockfs_buf_in &in, ssize_t buflen)
 				in.body.setlk.lk.type,
 				in.body.setlk.lk.pid);
 			if (verbosity >= 2) {
-				printf(" range=[%" PRIu64 "-%" PRIu64 "]",
+				printf(" range=[%" PRIi64 ":%" PRIi64 "]",
 					in.body.setlk.lk.start,
 					in.body.setlk.lk.end);
 			}
@@ -409,7 +419,8 @@ void MockFS::debug_response(const mockfs_buf_out &out) {
 MockFS::MockFS(int max_readahead, bool allow_other, bool default_permissions,
 	bool push_symlinks_in, bool ro, enum poll_method pm, uint32_t flags,
 	uint32_t kernel_minor_version, uint32_t max_write, bool async,
-	bool noclusterr, unsigned time_gran, bool nointr, bool noatime)
+	bool noclusterr, unsigned time_gran, bool nointr, bool noatime,
+	const char *fsname, const char *subtype)
 {
 	struct sigaction sa;
 	struct iovec *iov = NULL;
@@ -498,6 +509,14 @@ MockFS::MockFS(int max_readahead, bool allow_other, bool default_permissions,
 	} else {
 		build_iovec(&iov, &iovlen, "intr",
 			__DECONST(void*, &trueval), sizeof(bool));
+	}
+	if (*fsname) {
+		build_iovec(&iov, &iovlen, "fsname=",
+			__DECONST(void*, fsname), -1);
+	}
+	if (*subtype) {
+		build_iovec(&iov, &iovlen, "subtype=",
+			__DECONST(void*, subtype), -1);
 	}
 	if (nmount(iov, iovlen, 0))
 		throw(std::system_error(errno, std::system_category(),
@@ -1011,7 +1030,12 @@ void MockFS::write_response(const mockfs_buf_out &out) {
 		FAIL() << "not yet implemented";
 	}
 	r = write(m_fuse_fd, &out, out.header.len);
-	ASSERT_TRUE(r > 0 || errno == EAGAIN) << strerror(errno);
+	if (out.expected_errno) {
+		ASSERT_EQ(-1, r);
+		ASSERT_EQ(out.expected_errno, errno) << strerror(errno);
+	} else {
+		ASSERT_TRUE(r > 0 || errno == EAGAIN) << strerror(errno);
+	}
 }
 
 void* MockFS::service(void *pthr_data) {

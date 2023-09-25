@@ -8,7 +8,7 @@
  */
 
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD AND BSD-2-Clause-NetBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2001-2002, Shunsuke Akiyama <akiyama@jp.FreeBSD.org>.
  * All rights reserved.
@@ -65,8 +65,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 /*
  * BWCT serial adapter driver
  */
@@ -199,15 +197,13 @@ static device_method_t ubser_methods[] = {
 	DEVMETHOD_END
 };
 
-static devclass_t ubser_devclass;
-
 static driver_t ubser_driver = {
 	.name = "ubser",
 	.methods = ubser_methods,
 	.size = sizeof(struct ubser_softc),
 };
 
-DRIVER_MODULE(ubser, uhub, ubser_driver, ubser_devclass, NULL, 0);
+DRIVER_MODULE(ubser, uhub, ubser_driver, NULL, NULL);
 MODULE_DEPEND(ubser, ucom, 1, 1, 1);
 MODULE_DEPEND(ubser, usb, 1, 1, 1);
 MODULE_VERSION(ubser, 1);

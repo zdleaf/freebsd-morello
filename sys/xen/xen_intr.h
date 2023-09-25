@@ -27,18 +27,19 @@
  * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
  * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
  * IN THE SOFTWARE.
- *
- * $FreeBSD$
  */
 #ifndef _XEN_INTR_H_
 #define _XEN_INTR_H_
 
-#include <xen/interface/event_channel.h>
+#include <contrib/xen/event_channel.h>
 
 /** Registered Xen interrupt callback handle. */
 typedef void * xen_intr_handle_t;
 
-void xen_intr_handle_upcall(struct trapframe *trap_frame);
+/*
+ * Main handler for Xen event channel interrupts
+ */
+extern driver_filter_t xen_intr_handle_upcall;
 
 /**
  * Associate an already allocated local event channel port an interrupt

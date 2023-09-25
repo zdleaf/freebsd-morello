@@ -1,4 +1,3 @@
-# $FreeBSD$
 #
 # Machine dependent definitions for the arm architecture.
 #
@@ -11,7 +10,7 @@ SYM_MAPS+=${LIBC_SRCTOP}/arm/Symbol.map
 
 .include "${LIBC_SRCTOP}/arm/aeabi/Makefile.inc"
 
-.if ${MACHINE_ARCH:Marmv[67]*} && (!defined(CPUTYPE) || ${CPUTYPE:M*soft*} == "")
+.if !defined(CPUTYPE) || ${CPUTYPE:M*soft*} == ""
 SYM_MAPS+=${LIBC_SRCTOP}/arm/Symbol_vfp.map
 .endif
 

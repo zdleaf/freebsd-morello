@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 1999 Michael Smith
  * All rights reserved.
@@ -27,8 +27,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/bio.h>
@@ -75,7 +73,7 @@ static driver_t mlx_pci_driver = {
 	sizeof(struct mlx_softc)
 };
 
-DRIVER_MODULE(mlx, pci, mlx_pci_driver, mlx_devclass, 0, 0);
+DRIVER_MODULE(mlx, pci, mlx_pci_driver, 0, 0);
 
 struct mlx_ident
 {
@@ -205,7 +203,7 @@ mlx_pci_attach(device_t dev)
     }
 
     /*
-     * Do bus-independant initialisation.
+     * Do bus-independent initialisation.
      */
     error = mlx_attach(sc);
     if (error != 0) {

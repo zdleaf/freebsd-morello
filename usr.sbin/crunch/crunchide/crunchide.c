@@ -28,9 +28,7 @@
 /*
  * crunchide.c - tiptoes through a symbol table, hiding all defined
  *	global symbols.  Allows the user to supply a "keep list" of symbols
- *	that are not to be hidden.  This program relies on the use of the
- * 	linker's -dc flag to actually put global bss data into the file's
- * 	bss segment (rather than leaving it as undefined "common" data).
+ *	that are not to be hidden.
  *
  * 	The point of all this is to allow multiple programs to be linked
  *	together without getting multiple-defined errors.
@@ -40,7 +38,7 @@
  *	    int foo_main(int argc, char **argv){ return main(argc, argv); }
  *      like so:
  *	    cc -c foo.c foostub.c
- *	    ld -dc -r foo.o foostub.o -o foo.combined.o
+ *	    ld -r foo.o foostub.o -o foo.combined.o
  *	    crunchide -k _foo_main foo.combined.o
  *	at this point, foo.combined.o can be linked with another program
  * 	and invoked with "foo_main(argc, argv)".  foo's main() and any
@@ -63,8 +61,6 @@
 #ifndef lint
 __RCSID("$NetBSD: crunchide.c,v 1.8 1997/11/01 06:51:45 lukem Exp $");
 #endif
-__FBSDID("$FreeBSD$");
-
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/errno.h>
@@ -78,7 +74,7 @@ __FBSDID("$FreeBSD$");
 
 static const char *pname = "crunchide";
 
-static void usage(void);
+static void usage(void) __dead2;
 
 static void add_to_keep_list(char *symbol);
 static void add_file_to_keep_list(char *filename);

@@ -34,8 +34,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/proc.h>
 #include <sys/systm.h>
@@ -213,7 +211,7 @@ save_fpu_nodrop(struct thread *td)
  * Clear Floating-Point Status and Control Register
  */
 void
-cleanup_fpscr()
+cleanup_fpscr(void)
 {
 	register_t msr;
 

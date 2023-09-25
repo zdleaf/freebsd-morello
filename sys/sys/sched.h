@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: (BSD-4-Clause AND BSD-2-Clause-FreeBSD)
+ * SPDX-License-Identifier: (BSD-4-Clause AND BSD-2-Clause)
  *
  * Copyright (c) 1996, 1997
  *      HD Associates, Inc.  All rights reserved.
@@ -57,8 +57,6 @@
  * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 #ifndef _SCHED_H_
@@ -95,6 +93,7 @@ void	sched_ap_entry(void);
 void	sched_exit_thread(struct thread *td, struct thread *child);
 u_int	sched_estcpu(struct thread *td);
 void	sched_fork_thread(struct thread *td, struct thread *child);
+void	sched_ithread_prio(struct thread *td, u_char prio);
 void	sched_lend_prio(struct thread *td, u_char prio);
 void	sched_lend_user_prio(struct thread *td, u_char pri);
 void	sched_lend_user_prio_cond(struct thread *td, u_char pri);

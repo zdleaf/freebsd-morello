@@ -45,8 +45,6 @@ static char sccsid[] = "@(#)mountd.c	8.15 (Berkeley) 5/1/95";
 #endif
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/conf.h>
 #include <sys/fcntl.h>
@@ -210,7 +208,9 @@ static void	add_dlist(struct dirlist **, struct dirlist *,
 		    struct grouplist *, int, struct exportlist *,
 		    struct expcred *, uint64_t);
 static void	add_mlist(char *, char *);
-static int	check_dirpath(char *);
+static int	check_path_component(const char *, char **);
+static int	check_dirpath(char *, char **);
+static int	check_statfs(const char *, struct statfs *, char **);
 static int	check_options(struct dirlist *);
 static int	checkmask(struct sockaddr *sa);
 static int	chk_host(struct dirlist *, struct sockaddr *, int *, int *,
@@ -288,7 +288,7 @@ static int resvport_only = 1;
 static int nhosts = 0;
 static int dir_only = 1;
 static int dolog = 0;
-static int got_sighup = 0;
+static _Atomic(int) got_sighup = 0;
 static int xcreated = 0;
 
 static char *svcport_str = NULL;
@@ -319,6 +319,7 @@ static struct pidfh *pfh = NULL;
 #define	OP_QUIET	0x100
 #define OP_MASKLEN	0x200
 #define OP_SEC		0x400
+#define OP_CLASSMASK	0x800	/* mask not specified, is Class A/B/C default */
 
 #ifdef DEBUG
 static int debug = 1;
@@ -779,7 +780,7 @@ main(int argc, char **argv)
 /*
  * This routine creates and binds sockets on the appropriate
  * addresses. It gets called one time for each transport.
- * It returns 0 upon success, 1 for ingore the call and -1 to indicate
+ * It returns 0 upon success, 1 for ignore the call and -1 to indicate
  * bind failed with EADDRINUSE.
  * Any file descriptors that have been created are stored in sock_fd and
  * the total count of them is maintained in sock_fdcnt.
@@ -1557,6 +1558,7 @@ get_exportlist_one(int passno)
 	struct statfs fsb;
 	struct expcred anon;
 	char *cp, *endcp, *dirp, *hst, *usr, *dom, savedc;
+	char *err_msg = NULL;
 	int len, has_host, got_nondir, dirplen, netgrp;
 	uint64_t exflags;
 
@@ -1635,8 +1637,8 @@ get_exportlist_one(int passno)
 					goto nextline;
 				    }
 			    }
-			    if (check_dirpath(cp) &&
-				statfs(cp, &fsb) >= 0) {
+			    if (check_dirpath(cp, &err_msg) &&
+				check_statfs(cp, &fsb, &err_msg)) {
 				if ((fsb.f_flags & MNT_AUTOMOUNTED) != 0)
 				    syslog(LOG_ERR, "Warning: exporting of "
 					"automounted fs %s not supported", cp);
@@ -1701,8 +1703,15 @@ get_exportlist_one(int passno)
 				    dirplen = len;
 				}
 			    } else {
-				getexp_err(ep, tgrp,
-				    "symbolic link in export path or statfs failed");
+				if (err_msg != NULL) {
+					getexp_err(ep, tgrp, err_msg);
+					free(err_msg);
+					err_msg = NULL;
+				} else {
+					getexp_err(ep, tgrp,
+					    "symbolic link in export path or "
+					    "statfs failed");
+				}
 				goto nextline;
 			    }
 			    *endcp = savedc;
@@ -1749,6 +1758,11 @@ get_exportlist_one(int passno)
 			nextfield(&cp, &endcp);
 			len = endcp - cp;
 		}
+		if (opt_flags & OP_CLASSMASK)
+			syslog(LOG_WARNING,
+			    "WARNING: No mask specified for %s, "
+			    "using out-of-date default",
+			    (&grp->gr_ptr.gt_net)->nt_name);
 		if (check_options(dirhead)) {
 			getexp_err(ep, tgrp, NULL);
 			goto nextline;
@@ -2300,7 +2314,7 @@ compare_export(struct exportlist *ep, struct exportlist *oep)
  * "same" refers to having the same set of values in the two arrays.
  * The arrays are in no particular order and duplicates (multiple entries
  * in an array with the same value) is allowed.
- * The algorithm is inefficient, but the common case of indentical arrays is
+ * The algorithm is inefficient, but the common case of identical arrays is
  * handled first and "n" is normally fairly small.
  * Since the two functions need the same algorithm but for arrays of
  * different types (gid_t vs int), this is done as a macro.
@@ -3385,6 +3399,7 @@ get_net(char *cp, struct netmsk *net, int maskflg)
 			goto fail;
 		bcopy(sa, &net->nt_mask, sa->sa_len);
 		opt_flags |= OP_HAVEMASK;
+		opt_flags &= ~OP_CLASSMASK;
 	} else {
 		/* The specified sockaddr is a network address. */
 		bcopy(sa, &net->nt_net, sa->sa_len);
@@ -3418,9 +3433,6 @@ get_net(char *cp, struct netmsk *net, int maskflg)
 		    (opt_flags & OP_MASK) == 0) {
 			in_addr_t addr;
 
-			syslog(LOG_WARNING,
-			    "WARNING: No mask specified for %s, "
-			    "using out-of-date default", name);
 			addr = ((struct sockaddr_in *)sa)->sin_addr.s_addr;
 			if (IN_CLASSA(addr))
 				preflen = 8;
@@ -3435,7 +3447,7 @@ get_net(char *cp, struct netmsk *net, int maskflg)
 
 			bcopy(sa, &net->nt_mask, sa->sa_len);
 			makemask(&net->nt_mask, (int)preflen);
-			opt_flags |= OP_HAVEMASK;
+			opt_flags |= OP_HAVEMASK | OP_CLASSMASK;
 		}
 	}
 
@@ -3786,29 +3798,76 @@ check_options(struct dirlist *dp)
 	return (0);
 }
 
-/*
- * Check an absolute directory path for any symbolic links. Return true
- */
 static int
-check_dirpath(char *dirp)
+check_path_component(const char *path, char **err)
 {
-	char *cp;
-	int ret = 1;
 	struct stat sb;
 
+	if (lstat(path, &sb)) {
+		asprintf(err, "%s: lstat() failed: %s.\n",
+		    path, strerror(errno));
+		return (0);
+	}
+
+	switch (sb.st_mode & S_IFMT) {
+	case S_IFDIR:
+		return (1);
+	case S_IFLNK:
+		asprintf(err, "%s: path is a symbolic link.\n", path);
+		break;
+	case S_IFREG:
+		asprintf(err, "%s: path is a file rather than a directory.\n",
+		    path);
+		break;
+	default:
+		asprintf(err, "%s: path is not a directory.\n", path);
+	}
+
+	return (0);
+}
+
+/*
+ * Check each path component for the presence of symbolic links. Return true
+ */
+static int
+check_dirpath(char *dirp, char **err)
+{
+	char *cp;
+
 	cp = dirp + 1;
-	while (*cp && ret) {
+	while (*cp) {
 		if (*cp == '/') {
 			*cp = '\0';
-			if (lstat(dirp, &sb) < 0 || !S_ISDIR(sb.st_mode))
-				ret = 0;
+
+			if (!check_path_component(dirp, err)) {
+				*cp = '/';
+				return (0);
+			}
+
 			*cp = '/';
 		}
 		cp++;
 	}
-	if (lstat(dirp, &sb) < 0 || !S_ISDIR(sb.st_mode))
-		ret = 0;
-	return (ret);
+
+	if (!check_path_component(dirp, err))
+		return (0);
+
+	return (1);
+}
+
+/*
+ * Populate statfs information. Return true on success.
+ */
+static int
+check_statfs(const char *dirp, struct statfs *fsb, char **err)
+{
+	if (statfs(dirp, fsb)) {
+		asprintf(err, "%s: statfs() failed: %s\n", dirp,
+		    strerror(errno));
+		return (0);
+	}
+
+	return (1);
 }
 
 /*

@@ -29,8 +29,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include "opt_platform.h"
 #include <sys/param.h>
 #include <sys/conf.h>
@@ -76,10 +74,8 @@ xdma_enqueue(xdma_channel_t *xchan, uintptr_t src, uintptr_t dst,
     enum xdma_direction dir, void *user)
 {
 	struct xdma_request *xr;
-	xdma_controller_t *xdma;
 
-	xdma = xchan->xdma;
-	KASSERT(xdma != NULL, ("xdma is NULL"));
+	KASSERT(xchan->xdma != NULL, ("xdma is NULL"));
 
 	xr = xchan_bank_get(xchan);
 	if (xr == NULL)
@@ -107,11 +103,9 @@ xdma_enqueue(xdma_channel_t *xchan, uintptr_t src, uintptr_t dst,
 int
 xdma_queue_submit(xdma_channel_t *xchan)
 {
-	xdma_controller_t *xdma;
 	int ret;
 
-	xdma = xchan->xdma;
-	KASSERT(xdma != NULL, ("xdma is NULL"));
+	KASSERT(xchan->xdma != NULL, ("xdma is NULL"));
 
 	ret = 0;
 

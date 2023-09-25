@@ -1,4 +1,3 @@
-# $FreeBSD$
 
 # Directories to include in cscope name file and TAGS.
 CSCOPEDIRS=	bsm cam cddl compat conf contrib crypto ddb dev fs gdb \
@@ -11,9 +10,6 @@ CSCOPEDIRS=	bsm cam cddl compat conf contrib crypto ddb dev fs gdb \
 CSCOPE_ARCHDIR = amd64 arm arm64 i386 powerpc riscv x86
 .else
 CSCOPE_ARCHDIR = ${MACHINE}
-.if ${MACHINE} != ${MACHINE_CPUARCH}
-CSCOPE_ARCHDIR += ${MACHINE_CPUARCH}
-.endif
 .if ${MACHINE_CPUARCH} == "i386" || ${MACHINE_CPUARCH} == "amd64"
 CSCOPE_ARCHDIR += x86
 .endif

@@ -1,6 +1,5 @@
-# $FreeBSD$
 #
-# SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+# SPDX-License-Identifier: BSD-2-Clause
 #
 # Copyright (c) 2018 Kristof Provost <kp@FreeBSD.org>
 #
@@ -59,7 +58,81 @@ pr183198_cleanup()
 	pft_cleanup
 }
 
+atf_test_case "nested_anchor" "cleanup"
+nested_anchor_head()
+{
+	atf_set descr 'Test setting and retrieving nested anchors'
+	atf_set require.user root
+}
+
+nested_anchor_body()
+{
+	pft_init
+
+	epair=$(vnet_mkepair)
+	vnet_mkjail alcatraz ${epair}a
+
+	pft_set_rules alcatraz \
+		"anchor \"foo\" { \n\
+			anchor \"bar\" { \n\
+				pass on ${epair}a \n\
+			} \n\
+		}"
+
+	atf_check -s exit:0 -o inline:"anchor \"foo\" all {
+  anchor \"bar\" all {
+    pass on ${epair}a all flags S/SA keep state
+  }
+}
+" jexec alcatraz pfctl -sr -a "*"
+}
+
+nested_anchor_cleanup()
+{
+	pft_cleanup
+}
+
+atf_test_case "wildcard" "cleanup"
+wildcard_head()
+{
+	atf_set descr 'Test wildcard anchors for functionality'
+	atf_set require.user root
+}
+
+wildcard_body()
+{
+	pft_init
+
+	epair=$(vnet_mkepair)
+	vnet_mkjail alcatraz ${epair}a
+
+	ifconfig ${epair}b 192.0.2.2/24 up
+	jexec alcatraz ifconfig ${epair}a 192.0.2.1/24 up
+
+	# Sanity check
+	atf_check -s exit:0 -o ignore ping -c 1 192.0.2.1
+
+	jexec alcatraz pfctl -e
+	pft_set_rules alcatraz \
+		"block" \
+		"anchor \"foo/*\""
+
+	atf_check -s exit:2 -o ignore ping -c 1 192.0.2.1
+
+	echo "pass" | jexec alcatraz pfctl -g -f - -a "foo/bar"
+
+	jexec alcatraz pfctl -sr -a "*"
+	atf_check -s exit:0 -o ignore ping -c 1 192.0.2.1
+}
+
+wildcard_cleanup()
+{
+	pft_cleanup
+}
+
 atf_init_test_cases()
 {
 	atf_add_test_case "pr183198"
+	atf_add_test_case "nested_anchor"
+	atf_add_test_case "wildcard"
 }

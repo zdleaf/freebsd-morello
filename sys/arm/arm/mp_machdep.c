@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2011 Semihalf.
  * All rights reserved.
@@ -28,7 +28,6 @@
 #include "opt_ddb.h"
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/bus.h>
@@ -64,7 +63,6 @@ __FBSDID("$FreeBSD$");
 
 /* used to hold the AP's until we are ready to release them */
 struct mtx ap_boot_mtx;
-struct pcb stoppcbs[MAXCPU];
 
 /* # of Applications processors */
 volatile int mp_naps;
@@ -115,7 +113,7 @@ cpu_mp_start(void)
 
 	/* Reserve memory for application processors */
 	for(i = 0; i < (mp_ncpus - 1); i++)
-		dpcpu[i] = (void *)kmem_malloc(DPCPU_SIZE, M_WAITOK | M_ZERO);
+		dpcpu[i] = kmem_malloc(DPCPU_SIZE, M_WAITOK | M_ZERO);
 
 	dcache_wbinv_poc_all();
 
@@ -282,41 +280,17 @@ ipi_stop(void *dummy __unused)
 static void
 ipi_preempt(void *arg)
 {
-	struct trapframe *oldframe;
-	struct thread *td;
-
-	critical_enter();
-	td = curthread;
-	td->td_intr_nesting_level++;
-	oldframe = td->td_intr_frame;
-	td->td_intr_frame = (struct trapframe *)arg;
 
 	CTR1(KTR_SMP, "%s: IPI_PREEMPT", __func__);
-	sched_preempt(td);
-
-	td->td_intr_frame = oldframe;
-	td->td_intr_nesting_level--;
-	critical_exit();
+	sched_preempt(curthread);
 }
 
 static void
 ipi_hardclock(void *arg)
 {
-	struct trapframe *oldframe;
-	struct thread *td;
-
-	critical_enter();
-	td = curthread;
-	td->td_intr_nesting_level++;
-	oldframe = td->td_intr_frame;
-	td->td_intr_frame = (struct trapframe *)arg;
 
 	CTR1(KTR_SMP, "%s: IPI_HARDCLOCK", __func__);
 	hardclockintr();
-
-	td->td_intr_frame = oldframe;
-	td->td_intr_nesting_level--;
-	critical_exit();
 }
 
 static void

@@ -27,8 +27,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 #include <machine/asmacros.h>
@@ -38,7 +36,7 @@
 
 #include <xen/xen-os.h>
 #define __ASSEMBLY__
-#include <xen/interface/elfnote.h>
+#include <contrib/xen/elfnote.h>
 
 #include "assym.inc"
 

@@ -68,8 +68,6 @@
 #include "zfsd.h"
 #include "zfsd_exception.h"
 #include "zpool_list.h"
-
-__FBSDID("$FreeBSD$");
 /*============================ Namespace Control =============================*/
 using DevdCtl::Event;
 using DevdCtl::Guid;
@@ -229,7 +227,9 @@ bool
 GeomEvent::OnlineByLabel(const string &devPath, const string& physPath,
 			      nvlist_t *devConfig)
 {
+	bool ret = false;
 	try {
+		CaseFileList case_list;
 		/*
 		 * A device with ZFS label information has been
 		 * inserted.  If it matches a device for which we
@@ -238,10 +238,12 @@ GeomEvent::OnlineByLabel(const string &devPath, const string& physPath,
 		syslog(LOG_INFO, "Interrogating VDEV label for %s\n",
 		       devPath.c_str());
 		Vdev vdev(devConfig);
-		CaseFile *caseFile(CaseFile::Find(vdev.PoolGUID(),
-						  vdev.GUID()));
-		if (caseFile != NULL)
-			return (caseFile->ReEvaluate(devPath, physPath, &vdev));
+		CaseFile::Find(vdev.PoolGUID(),vdev.GUID(), case_list);
+		for (CaseFileList::iterator curr = case_list.begin();
+		    curr != case_list.end(); curr++) {
+			ret |= (*curr)->ReEvaluate(devPath, physPath, &vdev);
+		}
+		return (ret);
 
 	} catch (ZfsdException &exp) {
 		string context("GeomEvent::OnlineByLabel: " + devPath + ": ");
@@ -249,7 +251,7 @@ GeomEvent::OnlineByLabel(const string &devPath, const string& physPath,
 		exp.GetString().insert(0, context);
 		exp.Log();
 	}
-	return (false);
+	return (ret);
 }
 
 
@@ -281,7 +283,7 @@ ZfsEvent::Process() const
 	}
 
 	/* On config syncs, replay any queued events first. */
-	if (Value("type").find("misc.fs.zfs.config_sync") == 0) {
+	if (Value("type").find("sysevent.fs.zfs.config_sync") == 0) {
 		/*
 		 * Even if saved events are unconsumed the second time
 		 * around, drop them.  Any events that still can't be
@@ -292,7 +294,7 @@ ZfsEvent::Process() const
 		CaseFile::ReEvaluateByGuid(PoolGUID(), *this);
 	}
 
-	if (Value("type").find("misc.fs.zfs.") == 0) {
+	if (Value("type").find("sysevent.fs.zfs.") == 0) {
 		/* Configuration changes, resilver events, etc. */
 		ProcessPoolEvent();
 		return (false);
@@ -405,7 +407,7 @@ ZfsEvent::ProcessPoolEvent() const
 	bool degradedDevice(false);
 
 	/* The pool is destroyed.  Discard any open cases */
-	if (Value("type") == "misc.fs.zfs.pool_destroy") {
+	if (Value("type") == "sysevent.fs.zfs.pool_destroy") {
 		Log(LOG_INFO);
 		CaseFile::ReEvaluateByGuid(PoolGUID(), *this);
 		return;
@@ -420,7 +422,7 @@ ZfsEvent::ProcessPoolEvent() const
 		Log(LOG_INFO);
 		caseFile->ReEvaluate(*this);
 	}
-	else if (Value("type") == "misc.fs.zfs.resilver_finish")
+	else if (Value("type") == "sysevent.fs.zfs.resilver_finish")
 	{
 		/*
 		 * It's possible to get a resilver_finish event with no
@@ -431,7 +433,7 @@ ZfsEvent::ProcessPoolEvent() const
 		CleanupSpares();
 	}
 
-	if (Value("type") == "misc.fs.zfs.vdev_remove"
+	if (Value("type") == "sysevent.fs.zfs.vdev_remove"
 	 && degradedDevice == false) {
 
 		/* See if any other cases can make use of this device. */

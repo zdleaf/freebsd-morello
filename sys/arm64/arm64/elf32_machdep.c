@@ -33,8 +33,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #define	__ELF_WORD_SIZE 32
 
 #include <sys/param.h>
@@ -52,6 +50,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/vnode.h>
 
 #include <machine/elf.h>
+#include <machine/pcb.h>
 #ifdef VFP
 #include <machine/vfp.h>
 #endif
@@ -73,7 +72,7 @@ static void freebsd32_setregs(struct thread *td, struct image_params *imgp,
     u_long stack);
 static void freebsd32_set_syscall_retval(struct thread *, int);
 
-static boolean_t elf32_arm_abi_supported(struct image_params *, int32_t *,
+static bool elf32_arm_abi_supported(struct image_params *, int32_t *,
     uint32_t *);
 
 extern void freebsd32_sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask);
@@ -84,7 +83,6 @@ u_long __read_frequently elf32_hwcap2;
 static struct sysentvec elf32_freebsd_sysvec = {
 	.sv_size	= SYS_MAXSYSCALL,
 	.sv_table	= freebsd32_sysent,
-	.sv_transtrap	= NULL,
 	.sv_fixup	= elf32_freebsd_fixup,
 	.sv_sendsig	= freebsd32_sendsig,
 	.sv_sigcode	= aarch32_sigcode,
@@ -94,7 +92,6 @@ static struct sysentvec elf32_freebsd_sysvec = {
 	.sv_elf_core_osabi = ELFOSABI_FREEBSD,
 	.sv_elf_core_abi_vendor = FREEBSD_ABI_VENDOR,
 	.sv_elf_core_prepare_notes = elf32_prepare_notes,
-	.sv_imgact_try	= NULL,
 	.sv_minsigstksz	= MINSIGSTKSZ,
 	.sv_minuser	= FREEBSD32_MINUSER,
 	.sv_maxuser	= FREEBSD32_MAXUSER,
@@ -130,7 +127,6 @@ static Elf32_Brandinfo freebsd32_brand_info = {
 	.brand		= ELFOSABI_FREEBSD,
 	.machine	= EM_ARM,
 	.compat_3_brand	= "FreeBSD",
-	.emul_path	= NULL,
 	.interp_path	= "/libexec/ld-elf.so.1",
 	.sysvec		= &elf32_freebsd_sysvec,
 	.interp_newpath	= "/libexec/ld-elf32.so.1",
@@ -142,7 +138,7 @@ static Elf32_Brandinfo freebsd32_brand_info = {
 SYSINIT(elf32, SI_SUB_EXEC, SI_ORDER_FIRST,
     (sysinit_cfunc_t)elf32_insert_brand_entry, &freebsd32_brand_info);
 
-static boolean_t
+static bool
 elf32_arm_abi_supported(struct image_params *imgp, int32_t *osrel __unused,
     uint32_t *fctl0 __unused)
 {
@@ -151,10 +147,9 @@ elf32_arm_abi_supported(struct image_params *imgp, int32_t *osrel __unused,
 	/* Check if we support AArch32 */
 	if (ID_AA64PFR0_EL0_VAL(READ_SPECIALREG(id_aa64pfr0_el1)) !=
 	    ID_AA64PFR0_EL0_64_32)
-		return (FALSE);
+		return (false);
 
-#define	EF_ARM_EABI_VERSION(x)	(((x) & EF_ARM_EABIMASK) >> 24)
-#define	EF_ARM_EABI_FREEBSD_MIN	4
+#define	EF_ARM_EABI_FREEBSD_MIN	EF_ARM_EABI_VER4
 	hdr = (const Elf32_Ehdr *)imgp->image_header;
 	if (EF_ARM_EABI_VERSION(hdr->e_flags) < EF_ARM_EABI_FREEBSD_MIN) {
 		if (bootverbose)
@@ -162,10 +157,10 @@ elf32_arm_abi_supported(struct image_params *imgp, int32_t *osrel __unused,
 			    "(rev %d) image %s",
 			    EF_ARM_EABI_VERSION(hdr->e_flags),
 			    imgp->args->fname);
-		return (FALSE);
+		return (false);
         }
 
-	return (TRUE);
+	return (true);
 }
 
 static int
@@ -288,5 +283,4 @@ freebsd32_setregs(struct thread *td, struct image_params *imgp,
 void
 elf32_dump_thread(struct thread *td, void *dst, size_t *off)
 {
-	/* XXX: VFP */
 }

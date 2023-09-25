@@ -8,8 +8,6 @@ use and modify. Please send modifications and/or suggestions + bug fixes to
 */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #ifdef YP
 #include <rpc/rpc.h>
 #include <rpcsvc/yp_prot.h>
@@ -34,7 +32,7 @@ extern const char *bootpfile;
 
 static struct hostent *he;
 static char buffer[MAXLEN];
-static char hostname[MAX_MACHINE_NAME];
+static char hostname[MAX_MACHINE_NAME + 1];
 static char askname[MAX_MACHINE_NAME];
 static char path[MAX_PATH_LEN];
 static char domain_name[MAX_MACHINE_NAME];

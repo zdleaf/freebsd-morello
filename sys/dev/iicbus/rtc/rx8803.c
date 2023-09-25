@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2020 Alstom Group.
  * Copyright (c) 2020 Semihalf.
@@ -26,7 +26,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
+#include "opt_platform.h"
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -67,6 +67,11 @@ struct rx8803_time {
 	uint8_t day;
 	uint8_t mon;
 	uint8_t year;
+};
+
+static struct ofw_compat_data compat_data[] = {
+	{"epson,rx8803", 1},
+	{NULL,           0},
 };
 
 static int rx8803_probe(device_t dev);
@@ -134,11 +139,8 @@ rx8803_settime(device_t dev, struct timespec *ts)
 {
 	struct rx8803_time data;
 	struct bcd_clocktime bcd;
-	device_t bus;
 	uint8_t reg;
 	int rc;
-
-	bus = device_get_parent(dev);
 
 	ts->tv_sec -= utc_offset();
 	clock_ts_to_bcd(ts, &bcd, false);
@@ -194,7 +196,10 @@ static int
 rx8803_probe(device_t dev)
 {
 
-	if (!ofw_bus_is_compatible(dev, "epson,rx8803"))
+	if (!ofw_bus_status_okay(dev))
+		return (ENXIO);
+
+	if (ofw_bus_search_compatible(dev, compat_data)->ocd_data == 0)
 		return (ENXIO);
 
 	device_set_desc(dev, "Epson RX8803 Real Time Clock");
@@ -240,7 +245,7 @@ static driver_t rx8803_driver = {
 	0,			/* We don't need softc for this one. */
 };
 
-static devclass_t rx8803_devclass;
-
-DRIVER_MODULE(rx8803, iicbus, rx8803_driver, rx8803_devclass, NULL, NULL);
+DRIVER_MODULE(rx8803, iicbus, rx8803_driver, NULL, NULL);
+MODULE_VERSION(rx8803, 1);
 MODULE_DEPEND(rx8803, iicbus, IICBUS_MINVER, IICBUS_PREFVER, IICBUS_MAXVER);
+IICBUS_FDT_PNP_INFO(compat_data);

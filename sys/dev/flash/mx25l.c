@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2009 Oleksandr Tymoshenko.  All rights reserved.
  * Copyright (c) 2018 Ian Lepore.  All rights reserved.
@@ -27,8 +27,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include "opt_platform.h"
 
 #include <sys/param.h>
@@ -129,6 +127,7 @@ static struct mx25l_flash_ident flash_devices[] = {
 	{ "mx25ll64",	0xc2, 0x2017, 64 * 1024, 128, FL_NONE },
 	{ "mx25ll128",	0xc2, 0x2018, 64 * 1024, 256, FL_ERASE_4K | FL_ERASE_32K },
 	{ "mx25ll256",	0xc2, 0x2019, 64 * 1024, 512, FL_ERASE_4K | FL_ERASE_32K | FL_ENABLE_4B_ADDR },
+	{ "n25q64",     0x20, 0xba17, 64 * 1024, 128, FL_ERASE_4K },
 	{ "s25fl032",	0x01, 0x0215, 64 * 1024, 64, FL_NONE },
 	{ "s25fl064",	0x01, 0x0216, 64 * 1024, 128, FL_NONE },
 	{ "s25fl128",	0x01, 0x2018, 64 * 1024, 256, FL_NONE },
@@ -633,10 +632,8 @@ mx25l_task(void *arg)
 {
 	struct mx25l_softc *sc = (struct mx25l_softc*)arg;
 	struct bio *bp;
-	device_t dev;
 
 	for (;;) {
-		dev = sc->sc_dev;
 		M25PXX_LOCK(sc);
 		do {
 			if (sc->sc_taskstate == TSTATE_STOPPING) {
@@ -670,8 +667,6 @@ mx25l_task(void *arg)
 	}
 }
 
-static devclass_t mx25l_devclass;
-
 static device_method_t mx25l_methods[] = {
 	/* Device interface */
 	DEVMETHOD(device_probe,		mx25l_probe),
@@ -687,7 +682,7 @@ static driver_t mx25l_driver = {
 	sizeof(struct mx25l_softc),
 };
 
-DRIVER_MODULE(mx25l, spibus, mx25l_driver, mx25l_devclass, 0, 0);
+DRIVER_MODULE(mx25l, spibus, mx25l_driver, 0, 0);
 MODULE_DEPEND(mx25l, spibus, 1, 1, 1);
 #ifdef	FDT
 MODULE_DEPEND(mx25l, fdt_slicer, 1, 1, 1);

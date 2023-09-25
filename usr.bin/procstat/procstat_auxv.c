@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2011 Mikolaj Golub
  * Copyright (c) 2015 Allan Jude <allanjude@freebsd.org>
@@ -28,8 +28,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/elf.h>
 #include <sys/sysctl.h>
@@ -244,6 +242,20 @@ procstat_auxv(struct procstat *procstat, struct kinfo_proc *kipp)
 		case AT_KPRELOAD:
 			xo_emit("{dw:/%s}{Lw:/%-16s/%s}{:AT_KPRELOAD/%p}\n",
 			    prefix, "AT_KPRELOAD", auxv[i].a_un.a_ptr);
+			break;
+#endif
+#ifdef AT_USRSTACKBASE
+		case AT_USRSTACKBASE:
+			xo_emit("{dw:/%s}{Lw:/%-16s/%s}"
+			    "{:AT_USRSTACKBASE/%#lx}\n",
+			    prefix, "AT_USRSTACKBASE", auxv[i].a_un.a_val);
+			break;
+#endif
+#ifdef AT_USRSTACKLIM
+		case AT_USRSTACKLIM:
+			xo_emit("{dw:/%s}{Lw:/%-16s/%s}"
+			    "{:AT_USRSTACKLIM/%#lx}\n",
+			    prefix, "AT_USRSTACKLIM", auxv[i].a_un.a_val);
 			break;
 #endif
 		default:

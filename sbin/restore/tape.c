@@ -41,8 +41,6 @@ static char sccsid[] = "@(#)tape.c	8.9 (Berkeley) 5/1/95";
 #endif /* not lint */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/file.h>
 #include <sys/mtio.h>
@@ -628,10 +626,10 @@ extractfile(char *name)
 			return (GOOD);
 		}
 		if (linkit(lnkbuf, name, SYMLINK) == GOOD) {
-			if (extsize > 0)
-				set_extattr(-1, name, buf, extsize, SXA_LINK);
 			(void) lchown(name, uid, gid);
 			(void) lchmod(name, mode);
+			if (extsize > 0)
+				set_extattr(-1, name, buf, extsize, SXA_LINK);
 			(void) utimensat(AT_FDCWD, name, ctimep,
 			    AT_SYMLINK_NOFOLLOW);
 			(void) utimensat(AT_FDCWD, name, mtimep,
@@ -655,6 +653,8 @@ extractfile(char *name)
 			skipfile();
 			return (FAIL);
 		}
+		(void) chown(name, uid, gid);
+		(void) chmod(name, mode);
 		if (extsize == 0) {
 			skipfile();
 		} else {
@@ -662,8 +662,6 @@ extractfile(char *name)
 			getfile(xtrnull, xtrattr, xtrnull);
 			set_extattr(-1, name, buf, extsize, SXA_FILE);
 		}
-		(void) chown(name, uid, gid);
-		(void) chmod(name, mode);
 		(void) utimensat(AT_FDCWD, name, ctimep, 0);
 		(void) utimensat(AT_FDCWD, name, mtimep, 0);
 		(void) chflags(name, flags);
@@ -685,6 +683,8 @@ extractfile(char *name)
 			skipfile();
 			return (FAIL);
 		}
+		(void) chown(name, uid, gid);
+		(void) chmod(name, mode);
 		if (extsize == 0) {
 			skipfile();
 		} else {
@@ -692,8 +692,6 @@ extractfile(char *name)
 			getfile(xtrnull, xtrattr, xtrnull);
 			set_extattr(-1, name, buf, extsize, SXA_FILE);
 		}
-		(void) chown(name, uid, gid);
-		(void) chmod(name, mode);
 		(void) utimensat(AT_FDCWD, name, ctimep, 0);
 		(void) utimensat(AT_FDCWD, name, mtimep, 0);
 		(void) chflags(name, flags);
@@ -714,12 +712,12 @@ extractfile(char *name)
 			skipfile();
 			return (FAIL);
 		}
+		(void) fchown(ofile, uid, gid);
+		(void) fchmod(ofile, mode);
 		buf = setupextattr(extsize);
 		getfile(xtrfile, xtrattr, xtrskip);
 		if (extsize > 0)
 			set_extattr(ofile, name, buf, extsize, SXA_FD);
-		(void) fchown(ofile, uid, gid);
-		(void) fchmod(ofile, mode);
 		(void) futimens(ofile, ctimep);
 		(void) futimens(ofile, mtimep);
 		(void) fchflags(ofile, flags);

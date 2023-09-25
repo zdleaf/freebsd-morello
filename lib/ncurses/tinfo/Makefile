@@ -1,4 +1,3 @@
-# $FreeBSD$
 
 PACKAGE=	clibs
 SHLIBDIR?=	/lib
@@ -81,7 +80,7 @@ GENHDRS=	\
 	termcap.h \
 	unctrl.h
 
-SRCS=	${GENHDRS} ${GENSRCS}
+SRCS=	${GENHDRS} ${GENSRCS} ${SRCHDRS}
 
 .PATH: ${NCURSES_DIR}/ncurses/base
 SRCS+=	\
@@ -166,6 +165,9 @@ CLEANFILES=	${GENSRCS} ${GENHDRS} keys.list make_hash term.h.new \
 		make_keys MKterm.h.awk comp_captab.c curses.head
 
 CFLAGS+=	-DTERMIOS
+
+CWARNFLAGS.comp_parse.c= ${NO_WUNUSED_BUT_SET_VARIABLE}
+CWARNFLAGS.read_entry.c= ${NO_WUNUSED_BUT_SET_VARIABLE}
 
 # Installed
 HEADERS=	curses.h term.h termcap.h unctrl.h
@@ -270,6 +272,11 @@ keys.list: MKkeys_list.sh Caps Caps-ncurses
 	AWK=${AWK} sh ${NCURSES_DIR}/ncurses/tinfo/MKkeys_list.sh \
 	    ${NCURSES_DIR}/include/Caps ${NCURSES_DIR}/include/Caps-ncurses | LC_ALL=C sort > keys.list
 
+.if ${MK_DIRDEPS_BUILD} == "yes" && ${MACHINE} != "host"
+# we need to override the default
+BTOOLSPATH= ${HOST_OBJTOP}/${RELDIR:S,w$,,}
+.endif
+.if ${MACHINE} == "host" || ${MK_DIRDEPS_BUILD} == "no"
 # Build tools
 DEPENDOBJS+= make_hash make_keys
 build-tools: make_hash make_keys
@@ -280,6 +287,14 @@ make_keys: make_keys.c names.c ncurses_def.h ${HEADERS} ${BUILD_TOOLS_META}
 make_hash: make_hash.c hashsize.h ncurses_def.h ${HEADERS} ${BUILD_TOOLS_META}
 	${CC:N${CCACHE_BIN}} -o $@ ${CFLAGS} -DMAIN_PROGRAM \
 		${NCURSES_DIR}/ncurses/tinfo/make_hash.c
+.endif
+.if ${MK_DIRDEPS_BUILD} == "yes" && ${MACHINE} != "host"
+make_keys: ${BTOOLSPATH}/make_keys
+	${LN:Uln} -sf ${.ALLSRC} ${.TARGET}
+
+make_hash: ${BTOOLSPATH}/make_hash
+	${LN:Uln} -sf ${.ALLSRC} ${.TARGET}
+.endif
 
 # ./configure generated
 MKterm.h.awk: MKterm.h.awk.in
@@ -1038,9 +1053,9 @@ gen-pkgconfig: gen-pkgconfig.in
 		s,@PC_MODULE_SUFFIX@,,g ; \
 		s,@prefix@,/usr,g ; \
 		s,@exec_prefix@,$${prefix},g ; \
-		s,@includedir@,/usr/include,g ; \
+		s,@includedir@,${INCLUDEDIR},g ; \
 		s,@includesubdir@,,g ; \
-		s,@libdir@,/usr/lib,g ; \
+		s,@libdir@,${LIBDIR},g ; \
 		s,@RPATH_LIST@,$${libdir},g ; \
 		s,@PRIVATE_LIBS@,,g ; \
 		s,@USE_ARG_SUFFIX@,,g ; \

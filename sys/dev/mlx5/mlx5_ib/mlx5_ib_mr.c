@@ -21,8 +21,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 #include "opt_rss.h"
@@ -1285,10 +1283,13 @@ static int clean_mr(struct mlx5_ib_mr *mr)
 	mlx5_free_priv_descs(mr);
 
 	if (!umred) {
+		u32 key = mr->mmkey.key;
+
 		err = destroy_mkey(dev, mr);
+		kfree(mr);
 		if (err) {
 			mlx5_ib_warn(dev, "failed to destroy mkey 0x%x (%d)\n",
-				     mr->mmkey.key, err);
+				     key, err);
 			return err;
 		}
 	} else {
@@ -1299,9 +1300,6 @@ static int clean_mr(struct mlx5_ib_mr *mr)
 		}
 		free_cached_mr(dev, mr);
 	}
-
-	if (!umred)
-		kfree(mr);
 
 	return 0;
 }

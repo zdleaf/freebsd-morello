@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Written by Atsushi Murai <amurai@spec.co.jp>
  * Copyright (c) 1998, System Planning and Engineering Co.
@@ -31,8 +31,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 /*
     alias_nbt.c performs special processing for NetBios over TCP/IP
     sessions by UDP.
@@ -251,7 +249,9 @@ static u_char *
 AliasHandleName(u_char *p, char *pmax)
 {
 	u_char *s;
+#ifdef LIBALIAS_DEBUG
 	u_char c;
+#endif
 	int compress;
 
 	/* Following length field */
@@ -283,8 +283,8 @@ AliasHandleName(u_char *p, char *pmax)
 #endif
 		while (s < p) {
 			if (compress == 1) {
-				c = (u_char) (((((*s & 0x0f) << 4) | (*(s + 1) & 0x0f)) - 0x11));
 #ifdef LIBALIAS_DEBUG
+				c = (u_char) (((((*s & 0x0f) << 4) | (*(s + 1) & 0x0f)) - 0x11));
 				if (isprint(c))
 					printf("%c", c);
 				else

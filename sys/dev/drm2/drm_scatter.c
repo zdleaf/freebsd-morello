@@ -23,8 +23,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 /** @file drm_scatter.c
  * Allocation of memory for scatter-gather mappings by the graphics chip.
  * The memory allocated here is then made into an aperture in the card
@@ -35,7 +33,7 @@ __FBSDID("$FreeBSD$");
 
 #define DEBUG_SCATTER 0
 
-static inline vm_offset_t drm_vmalloc_dma(vm_size_t size)
+static inline void *drm_vmalloc_dma(vm_size_t size)
 {
 	return kmem_alloc_attr(size, M_NOWAIT | M_ZERO, 0,
 	    BUS_SPACE_MAXADDR_32BIT, VM_MEMATTR_WRITE_COMBINING);
@@ -46,7 +44,7 @@ void drm_sg_cleanup(struct drm_sg_mem * entry)
 	if (entry == NULL)
 		return;
 
-	if (entry->vaddr != 0)
+	if (entry->vaddr != NULL)
 		kmem_free(entry->vaddr, IDX_TO_OFF(entry->pages));
 
 	free(entry->busaddr, DRM_MEM_SGLISTS);
@@ -83,7 +81,7 @@ int drm_sg_alloc(struct drm_device *dev, struct drm_scatter_gather * request)
 	}
 
 	entry->vaddr = drm_vmalloc_dma(size);
-	if (entry->vaddr == 0) {
+	if (entry->vaddr == NULL) {
 		free(entry->busaddr, DRM_MEM_DRIVER);
 		free(entry, DRM_MEM_DRIVER);
 		return -ENOMEM;
@@ -91,14 +89,14 @@ int drm_sg_alloc(struct drm_device *dev, struct drm_scatter_gather * request)
 
 	for (pindex = 0; pindex < entry->pages; pindex++) {
 		entry->busaddr[pindex] =
-		    vtophys(entry->vaddr + IDX_TO_OFF(pindex));
+		    vtophys((uintptr_t)entry->vaddr + IDX_TO_OFF(pindex));
 	}
 
-	request->handle = entry->vaddr;
+	request->handle = (uintptr_t)entry->vaddr;
 
 	dev->sg = entry;
 
-	DRM_DEBUG("allocated %ju pages @ 0x%08zx, contents=%08lx\n",
+	DRM_DEBUG("allocated %ju pages @ %p, contents=%08lx\n",
 	    entry->pages, entry->vaddr, *(unsigned long *)entry->vaddr);
 
 	return 0;
@@ -125,10 +123,10 @@ int drm_sg_free(struct drm_device *dev, void *data,
 	entry = dev->sg;
 	dev->sg = NULL;
 
-	if (!entry || entry->vaddr != request->handle)
+	if (!entry || (uintptr_t)entry->vaddr != request->handle)
 		return -EINVAL;
 
-	DRM_DEBUG("free 0x%zx\n", entry->vaddr);
+	DRM_DEBUG("free %p\n", entry->vaddr);
 
 	drm_sg_cleanup(entry);
 

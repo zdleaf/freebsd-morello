@@ -35,8 +35,6 @@ static char *sccsid2 = "@(#)svc_tcp.c 1.21 87/08/11 Copyr 1984 Sun Micro";
 static char *sccsid = "@(#)svc_tcp.c	2.2 88/08/01 4.0 RPCSRC";
 #endif
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 /*
  * svc_vc.c, Server side for Connection Oriented based RPC. 
  *
@@ -159,7 +157,7 @@ svc_vc_create(SVCPOOL *pool, struct socket *so, size_t sendsize,
 	if (so->so_state & (SS_ISCONNECTED|SS_ISDISCONNECTED)) {
 		SOCK_UNLOCK(so);
 		CURVNET_SET(so->so_vnet);
-		error = so->so_proto->pr_usrreqs->pru_peeraddr(so, &sa);
+		error = so->so_proto->pr_peeraddr(so, &sa);
 		CURVNET_RESTORE();
 		if (error)
 			return (NULL);
@@ -178,7 +176,7 @@ svc_vc_create(SVCPOOL *pool, struct socket *so, size_t sendsize,
 	xprt->xp_ops = &svc_vc_rendezvous_ops;
 
 	CURVNET_SET(so->so_vnet);
-	error = so->so_proto->pr_usrreqs->pru_sockaddr(so, &sa);
+	error = so->so_proto->pr_sockaddr(so, &sa);
 	CURVNET_RESTORE();
 	if (error) {
 		goto cleanup_svc_vc_create;
@@ -262,7 +260,7 @@ svc_vc_create_conn(SVCPOOL *pool, struct socket *so, struct sockaddr *raddr)
 	memcpy(&xprt->xp_rtaddr, raddr, raddr->sa_len);
 
 	CURVNET_SET(so->so_vnet);
-	error = so->so_proto->pr_usrreqs->pru_sockaddr(so, &sa);
+	error = so->so_proto->pr_sockaddr(so, &sa);
 	CURVNET_RESTORE();
 	if (error)
 		goto cleanup_svc_vc_create;
@@ -449,7 +447,6 @@ svc_vc_rendezvous_stat(SVCXPRT *xprt)
 static void
 svc_vc_destroy_common(SVCXPRT *xprt)
 {
-	enum clnt_stat stat;
 	uint32_t reterr;
 
 	if (xprt->xp_socket) {
@@ -462,9 +459,9 @@ svc_vc_destroy_common(SVCXPRT *xprt)
 				 * daemon having crashed or been
 				 * restarted, so just ignore returned stat.
 				 */
-				stat = rpctls_srv_disconnect(xprt->xp_sslsec,
+				rpctls_srv_disconnect(xprt->xp_sslsec,
 				    xprt->xp_sslusec, xprt->xp_sslrefno,
-				    &reterr);
+				    xprt->xp_sslproc, &reterr);
 			}
 			/* Must sorele() to get rid of reference. */
 			CURVNET_SET(xprt->xp_socket->so_vnet);
@@ -805,8 +802,8 @@ tryagain:
 		}
 
 		/*
-		 * A return of ENXIO indicates that there is a
-		 * non-application data record at the head of the
+		 * A return of ENXIO indicates that there is an
+		 * alert record at the head of the
 		 * socket's receive queue, for TLS connections.
 		 * This record needs to be handled in userland
 		 * via an SSL_read() call, so do an upcall to the daemon.
@@ -818,7 +815,7 @@ tryagain:
 			sx_xunlock(&xprt->xp_lock);
 			ret = rpctls_srv_handlerecord(xprt->xp_sslsec,
 			    xprt->xp_sslusec, xprt->xp_sslrefno,
-			    &reterr);
+			    xprt->xp_sslproc, &reterr);
 			sx_xlock(&xprt->xp_lock);
 			xprt->xp_dontrcv = FALSE;
 			if (ret != RPC_SUCCESS || reterr != RPCTLSERR_OK) {
@@ -864,10 +861,10 @@ tryagain:
 			    cmsg->cmsg_len == CMSG_LEN(sizeof(tgr))) {
 				memcpy(&tgr, CMSG_DATA(cmsg), sizeof(tgr));
 				/*
-				 * This should have been handled by
-				 * the rpctls_svc_handlerecord()
-				 * upcall.  If not, all we can do is
-				 * toss it away.
+				 * TLS_RLTYPE_ALERT records should be handled
+				 * since soreceive() would have returned
+				 * ENXIO.  Just throw any other
+				 * non-TLS_RLTYPE_APP records away.
 				 */
 				if (tgr.tls_type != TLS_RLTYPE_APP) {
 					m_freem(m);
@@ -1076,7 +1073,7 @@ svc_vc_backchannel_reply(SVCXPRT *xprt, struct rpc_msg *msg,
 }
 
 static bool_t
-svc_vc_null()
+svc_vc_null(void)
 {
 
 	return (FALSE);

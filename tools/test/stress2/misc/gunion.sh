@@ -1,7 +1,7 @@
 #!/bin/sh
 
 #
-# SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+# SPDX-License-Identifier: BSD-2-Clause
 #
 # Copyright (c) 2021 Peter Holm <pho@FreeBSD.org>
 #
@@ -43,14 +43,17 @@ s=0
 
 set -e
 mdconfig -a -t swap -s 5g -u $md1
-newfs $newfs_flags -n /dev/md$md1
+newfs $newfs_flags -n /dev/md$md1 > /dev/null
 mkdir -p $mp1 $mp2
 mount /dev/md$md1 $mp1
 cp -r ../../stress2 $mp1
 umount $mp1
 
 mdconfig -a -t swap -s 5g -u $md2
-gunion create -v /dev/md$md2 /dev/md$md1
+set +e
+gunion create -v /dev/md$md2 /dev/md$md1; s=$?
+[ $s -ne 0 ] && echo "gunion create returned $s"
+set -e
 mount /dev/md$md2-md$md1.union $mntpoint
 
 export RUNDIR=$mntpoint/stressX
@@ -71,11 +74,12 @@ for i in `jot 6`; do
 done
 fsck_ffs -fyR /dev/md$md2-md$md1.union > $log 2>&1
 grep -Eq "IS CLEAN|MARKED CLEAN" $log || { s=2; cat $log; }
-set +e
+set -e
 gunion commit /dev/md$md2-md$md1.union
+gunion list | egrep Block\|Current | egrep -v 0 && s=3
 gunion destroy /dev/md$md2-md$md1.union
 fsck_ffs -fyR /dev/md$md1 > $log 2>&1
-grep -Eq "IS CLEAN|MARKED CLEAN" $log || { s=3; cat $log; }
+grep -Eq "IS CLEAN|MARKED CLEAN" $log || { s=4; cat $log; }
 mdconfig -d -u $md2
 mdconfig -d -u $md1
 rm -f $log

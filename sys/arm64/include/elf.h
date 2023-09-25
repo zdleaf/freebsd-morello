@@ -22,9 +22,11 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
+
+#ifdef __arm__
+#include <arm/elf.h>
+#else /* !__arm__ */
 
 #ifndef	_MACHINE_ELF_H_
 #define	_MACHINE_ELF_H_
@@ -86,7 +88,7 @@ __ElfType(Auxinfo);
 #endif
 
 #if __ELF_WORD_SIZE == 32
-#define	ET_DYN_LOAD_ADDR 0x12000
+#define	ET_DYN_LOAD_ADDR 0x01001000
 #else
 #define	ET_DYN_LOAD_ADDR 0x100000
 #endif
@@ -180,3 +182,5 @@ __ElfType(Auxinfo);
 #endif
 
 #endif /* !_MACHINE_ELF_H_ */
+
+#endif /* !__arm__ */

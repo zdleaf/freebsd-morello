@@ -21,6 +21,7 @@ SRCS+=	ecdh.c
 SRCS+=	eddsa.c
 SRCS+=	err.c
 SRCS+=	es256.c
+SRCS+=	es384.c
 SRCS+=	hid_freebsd.c
 SRCS+=	hid_unix.c
 SRCS+=	hid.c
@@ -32,8 +33,14 @@ SRCS+=	log.c
 SRCS+=	pin.c
 SRCS+=	random.c
 SRCS+=	reset.c
+SRCS+=	rs1.c
 SRCS+=	rs256.c
+SRCS+=	time.c
+SRCS+=	touch.c
+SRCS+=	tpm.c
+SRCS+=	types.c
 SRCS+=	u2f.c
+SRCS+=	util.c
 
 SRCS+=	openbsd-compat/freezero.c
 SRCS+=	openbsd-compat/recallocarray.c
@@ -41,6 +48,7 @@ SRCS+=	openbsd-compat/recallocarray.c
 CFLAGS+= -I ${DIST}/src -I${SRCTOP}/contrib/libcbor/src -I${.CURDIR}/../libcbor
 CFLAGS+= -D_FIDO_INTERNAL
 CFLAGS+= -DHAVE_ARC4RANDOM_BUF
+CFLAGS+= -DHAVE_ASPRINTF
 CFLAGS+= -DHAVE_CLOCK_GETTIME
 CFLAGS+= -DHAVE_DEV_URANDOM
 CFLAGS+= -DHAVE_ERR_H
@@ -60,9 +68,10 @@ CFLAGS+= -DHAVE_SYS_RANDOM_H
 CFLAGS+= -DHAVE_TIMESPECSUB
 CFLAGS+= -DHAVE_TIMINGSAFE_BCMP
 CFLAGS+= -DHAVE_UNISTD_H
+CFLAGS+= -DOPENSSL_API_COMPAT=0x10100000L
 CFLAGS+= -DTLS=__thread
 CFLAGS+= -D_FIDO_MAJOR=1
-CFLAGS+= -D_FIDO_MINOR=9
+CFLAGS+= -D_FIDO_MINOR=13
 CFLAGS+= -D_FIDO_PATCH=0
 
 LIBADD=	crypto z

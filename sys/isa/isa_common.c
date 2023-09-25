@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD AND MIT
+ * SPDX-License-Identifier: BSD-2-Clause AND MIT
  *
  * Copyright (c) 1999 Doug Rabson
  * All rights reserved.
@@ -60,8 +60,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include "opt_isa.h"
 
 #include <sys/param.h>
@@ -275,12 +273,7 @@ find_first_bit(uint32_t mask)
 static int
 find_next_bit(uint32_t mask, int bit)
 {
-	bit++;
-	while (bit < 32 && !(mask & (1 << bit)))
-		bit++;
-	if (bit != 32)
-		return (bit);
-	return (-1);
+	return (find_first_bit(mask & (-2 << bit)));
 }
 
 /*
@@ -1099,21 +1092,17 @@ static device_method_t isa_methods[] = {
 
 DEFINE_CLASS_0(isa, isa_driver, isa_methods, 0);
 
-devclass_t isa_devclass;
-
 /*
  * ISA can be attached to a PCI-ISA bridge, or other locations on some
  * platforms.
  */
-DRIVER_MODULE(isa, isab, isa_driver, isa_devclass, 0, 0);
-DRIVER_MODULE(isa, eisab, isa_driver, isa_devclass, 0, 0);
+DRIVER_MODULE(isa, isab, isa_driver, 0, 0);
+DRIVER_MODULE(isa, eisab, isa_driver, 0, 0);
 MODULE_VERSION(isa, 1);
 
 /*
  * Code common to ISA bridges.
  */
-
-devclass_t isab_devclass;
 
 int
 isab_attach(device_t dev)

@@ -53,8 +53,6 @@ All rights reserved.\n";
 #endif /* not lint */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/ioctl.h>
 #include <sys/stat.h>
@@ -118,7 +116,6 @@ static void	updjcg(int, time_t, int, int, unsigned int);
 static void	updcsloc(time_t, int, int, unsigned int);
 static void	frag_adjust(ufs2_daddr_t, int);
 static void	updclst(int);
-static void	mount_reload(const struct statfs *stfs);
 static void	cgckhash(struct cg *);
 
 /*
@@ -339,7 +336,7 @@ initcg(int cylno, time_t modtime, int fso, unsigned int Nflag)
 	acg.cg_ndblk = dmax - cbase;
 	if (sblock.fs_contigsumsize > 0)
 		acg.cg_nclusterblks = acg.cg_ndblk / sblock.fs_frag;
-	start = &acg.cg_space[0] - (u_char *)(&acg.cg_firstfield);
+	start = sizeof(acg);
 	if (sblock.fs_magic == FS_UFS2_MAGIC) {
 		acg.cg_iusedoff = start;
 	} else {
@@ -427,6 +424,7 @@ initcg(int cylno, time_t modtime, int fso, unsigned int Nflag)
 		sblock.fs_dsize += dlower;
 	}
 	sblock.fs_dsize += acg.cg_ndblk - dupper;
+	sblock.fs_old_dsize = sblock.fs_dsize;
 	if ((i = dupper % sblock.fs_frag)) {
 		acg.cg_frsum[sblock.fs_frag - i]++;
 		for (d = dupper + sblock.fs_frag - i; dupper < d; dupper++) {
@@ -560,7 +558,7 @@ static void
 updjcg(int cylno, time_t modtime, int fsi, int fso, unsigned int Nflag)
 {
 	DBG_FUNC("updjcg")
-	ufs2_daddr_t cbase, dmax, dupper;
+	ufs2_daddr_t cbase, dmax;
 	struct csum *cs;
 	int i, k;
 	int j = 0;
@@ -607,9 +605,6 @@ updjcg(int cylno, time_t modtime, int fsi, int fso, unsigned int Nflag)
 	dmax = cbase + sblock.fs_fpg;
 	if (dmax > sblock.fs_size)
 		dmax = sblock.fs_size;
-	dupper = cgdmin(&sblock, cylno) - cbase;
-	if (cylno == 0) /* XXX fscs may be relocated */
-		dupper += howmany(sblock.fs_cssize, sblock.fs_fsize);
 
 	/*
 	 * Set pointer to the cylinder summary for our cylinder group.
@@ -639,6 +634,7 @@ updjcg(int cylno, time_t modtime, int fsi, int fso, unsigned int Nflag)
 	DBG_PRINT0("\n");
 	acg.cg_ndblk = dmax - cbase;
 	sblock.fs_dsize += acg.cg_ndblk - aocg.cg_ndblk;
+	sblock.fs_old_dsize = sblock.fs_dsize;
 	if (sblock.fs_contigsumsize > 0)
 		acg.cg_nclusterblks = acg.cg_ndblk / sblock.fs_frag;
 
@@ -816,6 +812,10 @@ updcsloc(time_t modtime, int fsi, int fso, unsigned int Nflag)
 		DBG_LEAVE;
 		return;
 	}
+	/* Adjust fs_dsize by added summary blocks */
+	sblock.fs_dsize -= howmany(sblock.fs_cssize, sblock.fs_fsize) -
+	    howmany(osblock.fs_cssize, osblock.fs_fsize);
+	sblock.fs_old_dsize = sblock.fs_dsize;
 	ocscg = dtog(&osblock, osblock.fs_csaddr);
 	cs = fscs + ocscg;
 
@@ -1260,76 +1260,11 @@ is_dev(const char *name)
 	return (1);
 }
 
-/*
- * Return mountpoint on which the device is currently mounted.
- */ 
-static const struct statfs *
-dev_to_statfs(const char *dev)
-{
-	struct stat devstat, mntdevstat;
-	struct statfs *mntbuf, *statfsp;
-	char device[MAXPATHLEN];
-	char *mntdevname;
-	int i, mntsize;
-
-	/*
-	 * First check the mounted filesystems.
-	 */
-	if (stat(dev, &devstat) != 0)
-		return (NULL);
-	if (!S_ISCHR(devstat.st_mode) && !S_ISBLK(devstat.st_mode))
-		return (NULL);
-
-	mntsize = getmntinfo(&mntbuf, MNT_NOWAIT);
-	for (i = 0; i < mntsize; i++) {
-		statfsp = &mntbuf[i];
-		mntdevname = statfsp->f_mntfromname;
-		if (*mntdevname != '/') {
-			strcpy(device, _PATH_DEV);
-			strcat(device, mntdevname);
-			mntdevname = device;
-		}
-		if (stat(mntdevname, &mntdevstat) == 0 &&
-		    mntdevstat.st_rdev == devstat.st_rdev)
-			return (statfsp);
-	}
-
-	return (NULL);
-}
-
 static const char *
-mountpoint_to_dev(const char *mountpoint)
-{
-	struct statfs *mntbuf, *statfsp;
-	struct fstab *fs;
-	int i, mntsize;
-
-	/*
-	 * First check the mounted filesystems.
-	 */
-	mntsize = getmntinfo(&mntbuf, MNT_NOWAIT);
-	for (i = 0; i < mntsize; i++) {
-		statfsp = &mntbuf[i];
-
-		if (strcmp(statfsp->f_mntonname, mountpoint) == 0)
-			return (statfsp->f_mntfromname);
-	}
-
-	/*
-	 * Check the fstab.
-	 */
-	fs = getfsfile(mountpoint);
-	if (fs != NULL)
-		return (fs->fs_spec);
-
-	return (NULL);
-}
-
-static const char *
-getdev(const char *name)
+getdev(const char *name, struct statfs *statfsp)
 {
 	static char device[MAXPATHLEN];
-	const char *cp, *dev;
+	const char *cp;
 
 	if (is_dev(name))
 		return (name);
@@ -1341,9 +1276,8 @@ getdev(const char *name)
 			return (device);
 	}
 
-	dev = mountpoint_to_dev(name);
-	if (dev != NULL && is_dev(dev))
-		return (dev);
+	if (statfsp != NULL)
+		return (statfsp->f_mntfromname);
 
 	return (NULL);
 }
@@ -1375,7 +1309,7 @@ main(int argc, char **argv)
 	DBG_FUNC("main")
 	struct fs *fs;
 	const char *device;
-	const struct statfs *statfsp;
+	struct statfs *statfsp;
 	uint64_t size = 0;
 	off_t mediasize;
 	int error, j, fsi, fso, ch, ret, Nflag = 0, yflag = 0;
@@ -1427,11 +1361,10 @@ main(int argc, char **argv)
 	/*
 	 * Now try to guess the device name.
 	 */
-	device = getdev(*argv);
+	statfsp = getmntpoint(*argv);
+	device = getdev(*argv, statfsp);
 	if (device == NULL)
 		errx(1, "cannot find special device for %s", *argv);
-
-	statfsp = dev_to_statfs(device);
 
 	fsi = open(device, O_RDONLY);
 	if (fsi < 0)
@@ -1452,7 +1385,7 @@ main(int argc, char **argv)
 	/*
 	 * Read the current superblock, and take a backup.
 	 */
-	if ((ret = sbget(fsi, &fs, STDSB)) != 0) {
+	if ((ret = sbget(fsi, &fs, UFS_STDSB, 0)) != 0) {
 		switch (ret) {
 		case ENOENT:
 			errx(1, "superblock not recognized");
@@ -1510,7 +1443,8 @@ main(int argc, char **argv)
 		   "filesystem size %s", newsizebuf, oldsizebuf);
 	}
 
-	sblock.fs_size = dbtofsb(&osblock, size / DEV_BSIZE);
+	sblock.fs_old_size = sblock.fs_size =
+	    dbtofsb(&osblock, size / DEV_BSIZE);
 	sblock.fs_providersize = dbtofsb(&osblock, mediasize / DEV_BSIZE);
 
 	/*
@@ -1631,7 +1565,8 @@ main(int argc, char **argv)
 		sblock.fs_ncg--;
 		if (sblock.fs_magic == FS_UFS1_MAGIC)
 			sblock.fs_old_ncyl = sblock.fs_ncg * sblock.fs_old_cpg;
-		sblock.fs_size = sblock.fs_ncg * sblock.fs_fpg;
+		sblock.fs_old_size = sblock.fs_size =
+		    sblock.fs_ncg * sblock.fs_fpg;
 	}
 
 	/*
@@ -1661,8 +1596,9 @@ main(int argc, char **argv)
 		error = close(fso);
 		if (error != 0)
 			err(1, "close");
-		if (statfsp != NULL && (statfsp->f_flags & MNT_RDONLY) != 0)
-			mount_reload(statfsp);
+		if (statfsp != NULL && (statfsp->f_flags & MNT_RDONLY) != 0 &&
+		    chkdoreload(statfsp, warn) != 0)
+			exit(9);
 	}
 
 	DBG_CLOSE;
@@ -1727,29 +1663,6 @@ updclst(int block)
 
 	DBG_LEAVE;
 	return;
-}
-
-static void
-mount_reload(const struct statfs *stfs)
-{
-	char errmsg[255];
-	struct iovec *iov;
-	int iovlen;
-
-	iov = NULL;
-	iovlen = 0;
-	*errmsg = '\0';
-	build_iovec(&iov, &iovlen, "fstype", __DECONST(char *, "ffs"), 4);
-	build_iovec(&iov, &iovlen, "fspath", __DECONST(char *, stfs->f_mntonname), (size_t)-1);
-	build_iovec(&iov, &iovlen, "errmsg", errmsg, sizeof(errmsg));
-	build_iovec(&iov, &iovlen, "update", NULL, 0);
-	build_iovec(&iov, &iovlen, "reload", NULL, 0);
-
-	if (nmount(iov, iovlen, stfs->f_flags) < 0) {
-		errmsg[sizeof(errmsg) - 1] = '\0';
-		err(9, "%s: cannot reload filesystem%s%s", stfs->f_mntonname,
-		    *errmsg != '\0' ? ": " : "", errmsg);
-	}
 }
 
 /*

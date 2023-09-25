@@ -35,8 +35,6 @@ static char sccsid[] = "@(#)tty.c	8.2 (Berkeley) 6/6/93";
 #endif
 #endif /* not lint */
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 /*
  * Mail -- a mail program
  *
@@ -139,7 +137,9 @@ grabh(struct header *hp, int gflags)
 		hp->h_bcc =
 			extract(readtty("Bcc: ", detract(hp->h_bcc, 0)), GBCC);
 	}
+#ifdef TIOCSTI
 out:
+#endif
 	(void)signal(SIGTSTP, savetstp);
 	(void)signal(SIGTTOU, savettou);
 	(void)signal(SIGTTIN, savettin);
@@ -172,7 +172,10 @@ out:
 char *
 readtty(const char *pr, char src[])
 {
-	char ch, canonb[BUFSIZ];
+	char canonb[BUFSIZ];
+#ifdef TIOCSTI
+	char ch;
+#endif
 	int c;
 	char *cp, *cp2;
 

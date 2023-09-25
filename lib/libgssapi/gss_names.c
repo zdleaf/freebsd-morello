@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2005 Doug Rabson
  * All rights reserved.
@@ -24,8 +24,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- *	$FreeBSD$
  */
 
 #include <gssapi/gssapi.h>
@@ -181,7 +179,7 @@ gss_OID GSS_KRB5_NT_MACHINE_UID_NAME = &GSS_C_NT_MACHINE_UID_NAME_storage;
 gss_OID GSS_KRB5_NT_STRING_UID_NAME = &GSS_C_NT_STRING_UID_NAME_storage;
 
 OM_uint32
-_gss_find_mn(OM_uint32 *minor_status, struct _gss_name *name, gss_OID mech, 
+_gss_find_mn(OM_uint32 *minor_status, struct _gss_name *name, gss_OID mech,
 	     struct _gss_mechanism_name **output_mn)
 {
 	OM_uint32 major_status;
@@ -210,7 +208,7 @@ _gss_find_mn(OM_uint32 *minor_status, struct _gss_name *name, gss_OID mech,
 		mn = malloc(sizeof(struct _gss_mechanism_name));
 		if (!mn)
 			return (GSS_S_FAILURE);
-		
+
 		major_status = m->gm_import_name(minor_status,
 		    &name->gn_value,
 		    (name->gn_type.elements

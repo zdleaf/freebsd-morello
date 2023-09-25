@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2015 Netflix, Inc.
  *
@@ -7,29 +7,27 @@
  * modification, are permitted provided that the following conditions
  * are met:
  * 1. Redistributions of source code must retain the above copyright
- *    notice, this list of conditions and the following disclaimer,
- *    without modification, immediately at the beginning of the file.
+ *    notice, this list of conditions and the following disclaimer.
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
  *
- * THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
- * IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
- * OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
- * IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY DIRECT, INDIRECT,
- * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
- * NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
- * DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
- * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
- * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
- * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ * THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
  *
  * derived from ata_xpt.c: Copyright (c) 2009 Alexander Motin <mav@FreeBSD.org>
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/bus.h>
 #include <sys/endian.h>
@@ -150,22 +148,25 @@ static struct cam_ed *
 		 nvme_alloc_device(struct cam_eb *bus, struct cam_et *target,
 				   lun_id_t lun_id);
 static void	 nvme_device_transport(struct cam_path *path);
-static void	 nvme_dev_async(u_int32_t async_code,
+static void	 nvme_dev_async(uint32_t async_code,
 				struct cam_eb *bus,
 				struct cam_et *target,
 				struct cam_ed *device,
 				void *async_arg);
 static void	 nvme_action(union ccb *start_ccb);
-static void	 nvme_announce_periph(struct cam_periph *periph);
-static void	 nvme_proto_announce(struct cam_ed *device);
-static void	 nvme_proto_denounce(struct cam_ed *device);
+static void	 nvme_announce_periph_sbuf(struct cam_periph *periph,
+    struct sbuf *sb);
+static void	 nvme_proto_announce_sbuf(struct cam_ed *device,
+    struct sbuf *sb);
+static void	 nvme_proto_denounce_sbuf(struct cam_ed *device,
+    struct sbuf *sb);
 static void	 nvme_proto_debug_out(union ccb *ccb);
 
 static struct xpt_xport_ops nvme_xport_ops = {
 	.alloc_device = nvme_alloc_device,
 	.action = nvme_action,
 	.async = nvme_dev_async,
-	.announce = nvme_announce_periph,
+	.announce_sbuf = nvme_announce_periph_sbuf,
 };
 #define NVME_XPT_XPORT(x, X)			\
 static struct xpt_xport nvme_xport_ ## x = {	\
@@ -180,8 +181,8 @@ NVME_XPT_XPORT(nvme, NVME);
 #undef NVME_XPT_XPORT
 
 static struct xpt_proto_ops nvme_proto_ops = {
-	.announce = nvme_proto_announce,
-	.denounce = nvme_proto_denounce,
+	.announce_sbuf = nvme_proto_announce_sbuf,
+	.denounce_sbuf = nvme_proto_denounce_sbuf,
 	.debug_out = nvme_proto_debug_out,
 };
 static struct xpt_proto nvme_proto = {
@@ -310,7 +311,7 @@ nvme_probe_done(struct cam_periph *periph, union ccb *done_ccb)
 	struct cam_path *path;
 	struct scsi_vpd_device_id *did;
 	struct scsi_vpd_id_descriptor *idd;
-	u_int32_t  priority;
+	uint32_t  priority;
 	int found = 1, e, g, len;
 
 	CAM_DEBUG(done_ccb->ccb_h.path, CAM_DEBUG_TRACE, ("nvme_probe_done\n"));
@@ -373,11 +374,14 @@ device_fail:	if ((path->device->flags & CAM_DEV_UNCONFIGURED) == 0)
 			path->device->serial_num = NULL;
 			path->device->serial_num_len = 0;
 		}
-		path->device->serial_num = (u_int8_t *)
+		path->device->serial_num = (uint8_t *)
 		    malloc(NVME_SERIAL_NUMBER_LENGTH + 1, M_CAMXPT, M_NOWAIT);
 		if (path->device->serial_num != NULL) {
-			cam_strvis(path->device->serial_num, nvme_cdata->sn,
-			    NVME_SERIAL_NUMBER_LENGTH, NVME_SERIAL_NUMBER_LENGTH + 1);
+			cam_strvis_flag(path->device->serial_num,
+			    nvme_cdata->sn, sizeof(nvme_cdata->sn),
+			    NVME_SERIAL_NUMBER_LENGTH + 1,
+			    CAM_STRVIS_FLAG_NONASCII_SPC);
+
 			path->device->serial_num_len =
 			    strlen(path->device->serial_num);
 		}
@@ -427,7 +431,7 @@ device_fail:	if ((path->device->flags & CAM_DEV_UNCONFIGURED) == 0)
 		if (e < sizeof(nvme_data->eui64))
 			len += sizeof(struct scsi_vpd_id_descriptor) + 8;
 		if (len > 0) {
-			path->device->device_id = (u_int8_t *)
+			path->device->device_id = (uint8_t *)
 			    malloc(SVPD_DEVICE_ID_HDR_LEN + len,
 			    M_CAMXPT, M_NOWAIT);
 		}
@@ -761,7 +765,7 @@ nvme_action(union ccb *start_ccb)
  * Handle any per-device event notifications that require action by the XPT.
  */
 static void
-nvme_dev_async(u_int32_t async_code, struct cam_eb *bus, struct cam_et *target,
+nvme_dev_async(uint32_t async_code, struct cam_eb *bus, struct cam_et *target,
 	      struct cam_ed *device, void *async_arg)
 {
 
@@ -780,14 +784,12 @@ nvme_dev_async(u_int32_t async_code, struct cam_eb *bus, struct cam_et *target,
 }
 
 static void
-nvme_announce_periph(struct cam_periph *periph)
+nvme_announce_periph_sbuf(struct cam_periph *periph, struct sbuf *sb)
 {
 	struct	ccb_pathinq cpi;
 	struct	ccb_trans_settings cts;
 	struct	cam_path *path = periph->path;
 	struct ccb_trans_settings_nvme	*nvmex;
-	struct sbuf	sb;
-	char		buffer[120];
 
 	cam_periph_assert(periph, MA_OWNED);
 
@@ -799,41 +801,34 @@ nvme_announce_periph(struct cam_periph *periph)
 	xpt_action((union ccb*)&cts);
 	if ((cts.ccb_h.status & CAM_STATUS_MASK) != CAM_REQ_CMP)
 		return;
-	nvmex = &cts.xport_specific.nvme;
 
 	/* Ask the SIM for its base transfer speed */
 	xpt_path_inq(&cpi, periph->path);
-	sbuf_new(&sb, buffer, sizeof(buffer), SBUF_FIXEDLEN);
-	sbuf_printf(&sb, "%s%d: nvme version %d.%d",
+	sbuf_printf(sb, "%s%d: nvme version %d.%d",
 	    periph->periph_name, periph->unit_number,
-	    NVME_MAJOR(nvmex->spec),
-	    NVME_MINOR(nvmex->spec));
-	if (nvmex->valid & CTS_NVME_VALID_LINK)
-		sbuf_printf(&sb, " x%d (max x%d) lanes PCIe Gen%d (max Gen%d) link",
-		    nvmex->lanes, nvmex->max_lanes,
-		    nvmex->speed, nvmex->max_speed);
-	sbuf_printf(&sb, "\n");
-	sbuf_finish(&sb);
-	sbuf_putbuf(&sb);
+	    NVME_MAJOR(cts.protocol_version),
+	    NVME_MINOR(cts.protocol_version));
+	if (cts.transport == XPORT_NVME) {
+		nvmex = &cts.proto_specific.nvme;
+		if (nvmex->valid & CTS_NVME_VALID_LINK)
+			sbuf_printf(sb,
+			    " x%d (max x%d) lanes PCIe Gen%d (max Gen%d) link",
+			    nvmex->lanes, nvmex->max_lanes,
+			    nvmex->speed, nvmex->max_speed);
+	}
+	sbuf_printf(sb, "\n");
 }
 
 static void
-nvme_proto_announce(struct cam_ed *device)
+nvme_proto_announce_sbuf(struct cam_ed *device, struct sbuf *sb)
 {
-	struct sbuf	sb;
-	char		buffer[120];
-
-	sbuf_new(&sb, buffer, sizeof(buffer), SBUF_FIXEDLEN);
-	nvme_print_ident(device->nvme_cdata, device->nvme_data, &sb);
-	sbuf_finish(&sb);
-	sbuf_putbuf(&sb);
+	nvme_print_ident(device->nvme_cdata, device->nvme_data, sb);
 }
 
 static void
-nvme_proto_denounce(struct cam_ed *device)
+nvme_proto_denounce_sbuf(struct cam_ed *device, struct sbuf *sb)
 {
-
-	nvme_proto_announce(device);
+	nvme_print_ident_short(device->nvme_cdata, device->nvme_data, sb);
 }
 
 static void

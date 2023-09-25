@@ -1,9 +1,8 @@
-# $FreeBSD$
 
 #
 # Warning flags for compiling the kernel and components of the kernel:
 #
-CWARNFLAGS?=	-Wall -Wredundant-decls -Wnested-externs -Wstrict-prototypes \
+CWARNFLAGS?=	-Wall -Wstrict-prototypes \
 		-Wmissing-prototypes -Wpointer-arith -Wcast-qual \
 		-Wundef -Wno-pointer-sign ${FORMAT_EXTENSIONS} \
 		-Wmissing-include-dirs -fdiagnostics-show-option \
@@ -28,6 +27,16 @@ NO_WTAUTOLOGICAL_POINTER_COMPARE= -Wno-tautological-pointer-compare
 .if ${COMPILER_VERSION} >= 100000
 NO_WMISLEADING_INDENTATION=	-Wno-misleading-indentation
 .endif
+.if ${COMPILER_VERSION} >= 130000
+NO_WUNUSED_BUT_SET_VARIABLE=	-Wno-unused-but-set-variable
+.endif
+.if ${COMPILER_VERSION} >= 140000
+NO_WBITWISE_INSTEAD_OF_LOGICAL=	-Wno-bitwise-instead-of-logical
+.endif
+.if ${COMPILER_VERSION} >= 150000
+NO_WSTRICT_PROTOTYPES=		-Wno-strict-prototypes
+NO_WDEPRECATED_NON_PROTOTYPE=	-Wno-deprecated-non-prototype
+.endif
 # Several other warnings which might be useful in some cases, but not severe
 # enough to error out the whole kernel build.  Display them anyway, so there is
 # some incentive to fix them eventually.
@@ -36,15 +45,12 @@ CWARNEXTRA?=	-Wno-error=tautological-compare -Wno-error=empty-body \
 		-Wno-error=pointer-sign
 CWARNEXTRA+=	-Wno-error=shift-negative-value
 CWARNEXTRA+=	-Wno-address-of-packed-member
-.if ${COMPILER_VERSION} >= 130000
-CWARNFLAGS+=	-Wno-error=unused-but-set-variable
-.endif
 .endif	# clang
 
 .if ${COMPILER_TYPE} == "gcc"
 # Catch-all for all the things that are in our tree, but for which we're
 # not yet ready for this compiler.
-NO_WUNUSED_BUT_SET_VARIABLE = -Wno-unused-but-set-variable
+NO_WUNUSED_BUT_SET_VARIABLE=-Wno-unused-but-set-variable
 CWARNEXTRA?=	-Wno-error=address				\
 		-Wno-error=aggressive-loop-optimizations	\
 		-Wno-error=array-bounds				\
@@ -58,7 +64,7 @@ CWARNEXTRA?=	-Wno-error=address				\
 		-Wno-error=sequence-point			\
 		-Wno-error=shift-overflow			\
 		-Wno-error=tautological-compare			\
-		-Wno-unused-but-set-variable
+		-Wno-error=unused-function
 .if ${COMPILER_VERSION} >= 70100
 CWARNEXTRA+=	-Wno-error=stringop-overflow
 .endif
@@ -71,7 +77,18 @@ CWARNEXTRA+=	-Wno-error=packed-not-aligned
 .if ${COMPILER_VERSION} >= 90100
 CWARNEXTRA+=	-Wno-address-of-packed-member			\
 		-Wno-error=alloca-larger-than=
+.if ${COMPILER_VERSION} >= 120100
+CWARNEXTRA+=	-Wno-error=nonnull				\
+		-Wno-dangling-pointer				\
+		-Wno-zero-length-bounds
+NO_WINFINITE_RECURSION=	-Wno-infinite-recursion
+NO_WSTRINGOP_OVERREAD=	-Wno-stringop-overread
 .endif
+.endif
+
+# GCC produces false positives for functions that switch on an
+# enum (GCC bug 87950)
+CWARNFLAGS+=	-Wno-return-type
 .endif	# gcc
 
 # This warning is utter nonsense
@@ -81,7 +98,8 @@ CWARNFLAGS+=	-Wno-format-zero-length
 # to be disabled.  WARNING: format checking is disabled in this case.
 .if ${MK_FORMAT_EXTENSIONS} == "no"
 FORMAT_EXTENSIONS=	-Wno-format
-.elif ${COMPILER_TYPE} == "clang"
+.elif ${COMPILER_TYPE} == "clang" || \
+    (${COMPILER_TYPE} == "gcc" && ${COMPILER_VERSION} >= 120100)
 FORMAT_EXTENSIONS=	-D__printf__=__freebsd_kprintf__
 .else
 FORMAT_EXTENSIONS=	-fformat-extensions
@@ -127,10 +145,9 @@ INLINE_LIMIT?=	8000
 
 #
 # For RISC-V we specify the soft-float ABI (lp64) to avoid the use of floating
-# point registers within the kernel. However, for kernels supporting hardware
-# float (FPE), we have to include that in the march so we can have limited
-# floating point support in context switching needed for that. This is different
-# than userland where we use a hard-float ABI (lp64d).
+# point registers within the kernel. However, we include the F and D extensions
+# in -march so we can have limited floating point support in context switching
+# code. This is different than userland where we use a hard-float ABI (lp64d).
 #
 # We also specify the "medium" code model, which generates code suitable for a
 # 2GiB addressing range located at any offset, allowing modules to be located
@@ -188,7 +205,8 @@ CFLAGS.gcc+=	-mno-spe
 # Use dot symbols (or, better, the V2 ELF ABI) on powerpc64 to make
 # DDB happy. ELFv2, if available, has some other efficiency benefits.
 #
-.if ${MACHINE_ARCH:Mpowerpc64*} != ""
+.if ${MACHINE_ARCH:Mpowerpc64*} != "" && \
+    ${COMPILER_TYPE} == "clang" && ${COMPILER_VERSION} < 160000
 CFLAGS+=	-mabi=elfv2
 .endif
 
@@ -226,10 +244,12 @@ CFLAGS+=	-mretpoline
 #
 .if ${MK_INIT_ALL_ZERO} == "yes"
 .if ${COMPILER_FEATURES:Minit-all}
-CFLAGS+= -ftrivial-auto-var-init=zero \
-    -enable-trivial-auto-var-init-zero-knowing-it-will-be-removed-from-clang
+CFLAGS+= -ftrivial-auto-var-init=zero
+.if ${COMPILER_TYPE} == "clang" && ${COMPILER_VERSION} < 160000
+CFLAGS+= -enable-trivial-auto-var-init-zero-knowing-it-will-be-removed-from-clang
+.endif
 .else
-.warning InitAll (zeros) requested but not support by compiler
+.warning InitAll (zeros) requested but not supported by compiler
 .endif
 .elif ${MK_INIT_ALL_PATTERN} == "yes"
 .if ${COMPILER_FEATURES:Minit-all}
@@ -257,7 +277,7 @@ PHONY_NOTMAIN = afterdepend afterinstall all beforedepend beforeinstall \
 .PHONY: ${PHONY_NOTMAIN}
 .NOTMAIN: ${PHONY_NOTMAIN}
 
-CSTD=		c99
+CSTD=		gnu99
 
 .if ${CSTD} == "k&r"
 CFLAGS+=        -traditional
@@ -304,5 +324,4 @@ LD_EMULATION_powerpcspe= elf32ppc_fbsd
 LD_EMULATION_powerpc64= elf64ppc_fbsd
 LD_EMULATION_powerpc64le= elf64lppc_fbsd
 LD_EMULATION_riscv64= elf64lriscv
-LD_EMULATION_riscv64sf= elf64lriscv
 LD_EMULATION=${LD_EMULATION_${MACHINE_ARCH}}

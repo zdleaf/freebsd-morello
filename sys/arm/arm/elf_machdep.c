@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright 1996-1998 John D. Polstra.
  * All rights reserved.
@@ -26,8 +26,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/kernel.h>
 #include <sys/systm.h>
@@ -57,7 +55,7 @@ __FBSDID("$FreeBSD$");
 #include "opt_global.h"         /* for OPT_KDTRACE_HOOKS */
 #include "opt_stack.h"          /* for OPT_STACK */
 
-static boolean_t elf32_arm_abi_supported(struct image_params *, int32_t *,
+static bool elf32_arm_abi_supported(struct image_params *, int32_t *,
     uint32_t *);
 
 u_long elf_hwcap;
@@ -66,7 +64,6 @@ u_long elf_hwcap2;
 struct sysentvec elf32_freebsd_sysvec = {
 	.sv_size	= SYS_MAXSYSCALL,
 	.sv_table	= sysent,
-	.sv_transtrap	= NULL,
 	.sv_fixup	= __elfN(freebsd_fixup),
 	.sv_sendsig	= sendsig,
 	.sv_sigcode	= sigcode,
@@ -76,7 +73,6 @@ struct sysentvec elf32_freebsd_sysvec = {
 	.sv_elf_core_osabi = ELFOSABI_FREEBSD,
 	.sv_elf_core_abi_vendor = FREEBSD_ABI_VENDOR,
 	.sv_elf_core_prepare_notes = __elfN(prepare_notes),
-	.sv_imgact_try	= NULL,
 	.sv_minsigstksz	= MINSIGSTKSZ,
 	.sv_minuser	= VM_MIN_ADDRESS,
 	.sv_maxuser	= VM_MAXUSER_ADDRESS,
@@ -113,7 +109,6 @@ static Elf32_Brandinfo freebsd_brand_info = {
 	.brand		= ELFOSABI_FREEBSD,
 	.machine	= EM_ARM,
 	.compat_3_brand	= "FreeBSD",
-	.emul_path	= NULL,
 	.interp_path	= "/libexec/ld-elf.so.1",
 	.sysvec		= &elf32_freebsd_sysvec,
 	.interp_newpath	= NULL,
@@ -126,7 +121,7 @@ SYSINIT(elf32, SI_SUB_EXEC, SI_ORDER_FIRST,
 	(sysinit_cfunc_t) elf32_insert_brand_entry,
 	&freebsd_brand_info);
 
-static boolean_t
+static bool
 elf32_arm_abi_supported(struct image_params *imgp, int32_t *osrel __unused,
     uint32_t *fctl0 __unused)
 {
@@ -139,25 +134,15 @@ elf32_arm_abi_supported(struct image_params *imgp, int32_t *osrel __unused,
 		if (bootverbose)
 			uprintf("Attempting to execute non EABI binary (rev %d) image %s",
 			    EF_ARM_EABI_VERSION(hdr->e_flags), imgp->args->fname);
-		return (FALSE);
+		return (false);
 	}
-	return (TRUE);
+	return (true);
 }
 
 void
-elf32_dump_thread(struct thread *td, void *dst, size_t *off)
+elf32_dump_thread(struct thread *td __unused, void *dst __unused,
+    size_t *off __unused)
 {
-#ifdef VFP
-	mcontext_vfp_t vfp;
-
-	if (dst != NULL) {
-		get_vfpcontext(td, &vfp);
-		*off = elf32_populate_note(NT_ARM_VFP, &vfp, dst, sizeof(vfp),
-		    NULL);
-	} else
-		*off = elf32_populate_note(NT_ARM_VFP, NULL, NULL, sizeof(vfp),
-		    NULL);
-#endif
 }
 
 bool

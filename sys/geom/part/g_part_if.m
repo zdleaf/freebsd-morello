@@ -23,7 +23,6 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 # THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #
-# $FreeBSD$
 
 #include <sys/param.h>
 #include <sys/lock.h>
@@ -107,6 +106,13 @@ CODE {
 	{
 		return (ENOIOCTL);
 	}
+
+	static int
+	default_getattr(struct g_part_table *table __unused,
+	    struct g_part_entry *entry __unused, struct bio *bp __unused)
+	{
+		return (ENOIOCTL);
+	}
 };
 
 # add() - scheme specific processing for the add verb.
@@ -151,7 +157,7 @@ METHOD void dumpconf {
 	const char *indent;
 };
 
-# dumpto() - return whether the partiton can be used for kernel dumps.
+# dumpto() - return whether the partition can be used for kernel dumps.
 METHOD int dumpto {
 	struct g_part_table *table;
 	struct g_part_entry *entry;
@@ -259,3 +265,10 @@ METHOD int write {
 	struct g_part_table *table;
 	struct g_consumer *cp;
 };
+
+# getattr() - get the specified attribute, if any
+METHOD int getattr {
+	struct g_part_table *table;
+	struct g_part_entry *entry;
+	struct bio *bp;
+} DEFAULT default_getattr;

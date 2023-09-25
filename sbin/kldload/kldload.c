@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 1997 Doug Rabson
  * All rights reserved.
@@ -27,8 +27,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/types.h>
 #include <sys/param.h>
 #include <sys/linker.h>
@@ -171,21 +169,23 @@ main(int argc, char** argv)
 						printf("%s is already "
 						    "loaded\n", argv[0]);
 				} else {
-					switch (errno) {
-					case EEXIST:
-						warnx("can't load %s: module "
-						    "already loaded or "
-						    "in kernel", argv[0]);
-						break;
-					case ENOEXEC:
-						warnx("an error occurred while "
-						    "loading module %s. "
-						    "Please check dmesg(8) for "
-						    "more details.", argv[0]);
-						break;
-					default:
-						warn("can't load %s", argv[0]);
-						break;
+					if (!quiet) {
+						switch (errno) {
+						case EEXIST:
+							warnx("can't load %s: module "
+							    "already loaded or "
+							    "in kernel", argv[0]);
+							break;
+						case ENOEXEC:
+							warnx("an error occurred while "
+							    "loading module %s. "
+							    "Please check dmesg(8) for "
+							    "more details.", argv[0]);
+							break;
+						default:
+							warn("can't load %s", argv[0]);
+							break;
+						}
 					}
 					errors++;
 				}

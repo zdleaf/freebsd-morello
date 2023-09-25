@@ -34,8 +34,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/bus.h>
@@ -255,6 +253,4 @@ static driver_t rstmgr_driver = {
 	sizeof(struct rstmgr_softc),
 };
 
-static devclass_t rstmgr_devclass;
-
-DRIVER_MODULE(rstmgr, simplebus, rstmgr_driver, rstmgr_devclass, 0, 0);
+DRIVER_MODULE(rstmgr, simplebus, rstmgr_driver, 0, 0);

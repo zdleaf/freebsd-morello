@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2008 Isilon Inc http://www.isilon.com/
  * Authors: Doug Rabson <dfr@rabson.org>
@@ -30,8 +30,6 @@
 #include "opt_inet6.h"
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/fail.h>
 #include <sys/fcntl.h>
@@ -829,7 +827,7 @@ nlm_create_host(const char* caller_name)
 	if (!host)
 		return (NULL);
 	mtx_init(&host->nh_lock, "nh_lock", NULL, MTX_DEF);
-	host->nh_refs = 1;
+	refcount_init(&host->nh_refs, 1);
 	strlcpy(host->nh_caller_name, caller_name, MAXNAMELEN);
 	host->nh_sysid = nlm_next_sysid++;
 	snprintf(host->nh_sysid_string, sizeof(host->nh_sysid_string),

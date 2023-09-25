@@ -43,8 +43,6 @@ static char sccsid[] = "@(#)cmds.c	8.2 (Berkeley) 4/28/95";
 #endif
 
 #include "lp.cdefs.h"		/* A cross-platform version of <sys/cdefs.h> */
-__FBSDID("$FreeBSD$");
-
 /*
  * lpc -- line printer control program -- commands:
  */
@@ -644,8 +642,6 @@ clean_gi(int argc, char *argv[])
 			generic_initerr = 1;
 		}
 	}
-
-	return;
 }
 
 void
@@ -656,8 +652,6 @@ tclean_gi(int argc, char *argv[])
 	/* (...and the fact that 'clean' is priv and 'tclean' is not) */
 	clean_gi(argc, argv);
 	cln_testonly = 1;
-
-	return;
 }
 
 void

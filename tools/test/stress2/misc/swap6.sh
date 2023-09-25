@@ -1,7 +1,7 @@
 #!/bin/sh
 
 #
-# SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+# SPDX-License-Identifier: BSD-2-Clause
 #
 # Copyright (c) 2020 Peter Holm
 #
@@ -33,7 +33,7 @@
 . ../default.cfg
 
 [ `sysctl -n vm.swap_total` -eq 0 ] && exit 0
-min=5	# percent swap usage
+min=10	# percent swap usage
 (cd ../testcases/swap; ./swap -t 10m -i 100 -l 100 -h > /dev/null) &
 sleep 1
 mx=0

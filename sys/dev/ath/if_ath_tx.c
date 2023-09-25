@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2002-2009 Sam Leffler, Errno Consulting
  * Copyright (c) 2010-2012 Adrian Chadd, Xenion Pty Ltd
@@ -31,8 +31,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 /*
  * Driver for the Atheros Wireless LAN controller.
  *
@@ -1352,7 +1350,7 @@ ath_tx_setds(struct ath_softc *sc, struct ath_buf *bf)
 	);
 
 	/*
-	 * This will be overriden when the descriptor chain is written.
+	 * This will be overridden when the descriptor chain is written.
 	 */
 	bf->bf_lastds = ds;
 	bf->bf_last = bf;

@@ -24,14 +24,14 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 #ifndef _LINUXKPI_LINUX_PAGEMAP_H_
 #define _LINUXKPI_LINUX_PAGEMAP_H_
 
 #include <linux/mm.h>
+#include <linux/highmem.h>
+#include <linux/vmalloc.h>
 
 static inline void
 release_pages(struct page **pages, int nr)
@@ -40,6 +40,11 @@ release_pages(struct page **pages, int nr)
 
 	for (i = 0; i < nr; i++)
 		put_page(pages[i]);
+}
+
+static inline void
+mapping_clear_unevictable(vm_object_t mapping)
+{
 }
 
 #endif

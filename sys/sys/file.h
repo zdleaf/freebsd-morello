@@ -29,7 +29,6 @@
  * SUCH DAMAGE.
  *
  *	@(#)file.h	8.3 (Berkeley) 1/9/95
- * $FreeBSD$
  */
 
 #ifndef _SYS_FILE_H_
@@ -70,7 +69,7 @@ struct nameidata;
 #define	DTYPE_DEV	11	/* Device specific fd type */
 #define	DTYPE_PROCDESC	12	/* process descriptor */
 #define	DTYPE_EVENTFD	13	/* eventfd */
-#define	DTYPE_LINUXTFD	14	/* emulation timerfd type */
+#define	DTYPE_TIMERFD	14	/* timerfd */
 
 #ifdef _KERNEL
 
@@ -132,6 +131,7 @@ typedef int fo_fallocate_t(struct file *fp, off_t offset, off_t len,
 typedef int fo_fspacectl_t(struct file *fp, int cmd,
 		    off_t *offset, off_t *length, int flags,
 		    struct ucred *active_cred, struct thread *td);
+typedef int fo_spare_t(struct file *fp);
 typedef	int fo_flags_t;
 
 struct fileops {
@@ -154,6 +154,7 @@ struct fileops {
 	fo_get_seals_t	*fo_get_seals;
 	fo_fallocate_t	*fo_fallocate;
 	fo_fspacectl_t	*fo_fspacectl;
+	fo_spare_t	*fo_spares[8];	/* Spare slots */
 	fo_flags_t	fo_flags;	/* DFLAG_* below */
 };
 
@@ -291,6 +292,7 @@ int fgetvp_read(struct thread *td, int fd, cap_rights_t *rightsp,
 int fgetvp_write(struct thread *td, int fd, cap_rights_t *rightsp,
     struct vnode **vpp);
 int fgetvp_lookup_smr(int fd, struct nameidata *ndp, struct vnode **vpp, bool *fsearch);
+int fgetvp_lookup(int fd, struct nameidata *ndp, struct vnode **vpp);
 
 static __inline __result_use_check bool
 fhold(struct file *fp)

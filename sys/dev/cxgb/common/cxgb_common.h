@@ -1,5 +1,5 @@
 /**************************************************************************
-SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+SPDX-License-Identifier: BSD-2-Clause
 
 Copyright (c) 2007-2009, Chelsio Inc.
 All rights reserved.
@@ -25,8 +25,6 @@ INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
 CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
 ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 POSSIBILITY OF SUCH DAMAGE.
-
-$FreeBSD$
 
 ***************************************************************************/
 #ifndef __CHELSIO_COMMON_H
@@ -191,7 +189,7 @@ struct mac_stats {
 	u64 tx_deferred;          /* frames with deferred transmissions */
 	u64 tx_late_collisions;   /* # of late collisions */
 	u64 tx_total_collisions;  /* # of total collisions */
-	u64 tx_excess_collisions; /* frame errors from excessive collissions */
+	u64 tx_excess_collisions; /* frame errors from excessive collisions */
 	u64 tx_underrun;          /* # of Tx FIFO underruns */
 	u64 tx_len_errs;          /* # of Tx length errors */
 	u64 tx_mac_internal_errs; /* # of internal MAC errors on Tx */

@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2000-2001 Boris Popov
  * All rights reserved.
@@ -24,8 +24,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  *
  */
 #include <sys/param.h>
@@ -285,8 +283,9 @@ smbfs_writevnode(struct vnode *vp, struct uio *uiop,
 	if (uiop->uio_resid == 0)
 		return 0;
 
-	if (vn_rlimit_fsize(vp, uiop, td))
-		return (EFBIG);
+	error = vn_rlimit_fsize(vp, uiop, td);
+	if (error != 0)
+		return (error);
 
 	scred = smbfs_malloc_scred();
 	smb_makescred(scred, td, cred);
@@ -412,13 +411,7 @@ smbfs_doio(struct vnode *vp, struct buf *bp, struct ucred *cr, struct thread *td
  * Wish wish .... get rid from multiple IO routines
  */
 int
-smbfs_getpages(ap)
-	struct vop_getpages_args /* {
-		struct vnode *a_vp;
-		vm_page_t *a_m;
-		int a_count;
-		int a_reqpage;
-	} */ *ap;
+smbfs_getpages(struct vop_getpages_args *ap)
 {
 #ifdef SMBFS_RWGENERIC
 	return vop_stdgetpages(ap);
@@ -543,14 +536,7 @@ out:
  * not necessary to open vnode.
  */
 int
-smbfs_putpages(ap)
-	struct vop_putpages_args /* {
-		struct vnode *a_vp;
-		vm_page_t *a_m;
-		int a_count;
-		int a_sync;
-		int *a_rtvals;
-	} */ *ap;
+smbfs_putpages(struct vop_putpages_args *ap)
 {
 	int error;
 	struct vnode *vp = ap->a_vp;

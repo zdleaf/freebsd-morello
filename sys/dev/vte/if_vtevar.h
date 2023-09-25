@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2010, Pyun YongHyeon <yongari@FreeBSD.org>
  * All rights reserved.
@@ -25,8 +25,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 #ifndef	_IF_VTEVAR_H
@@ -123,7 +121,7 @@ struct vte_ident {
  * Software state per device.
  */
 struct vte_softc {
-	struct ifnet 		*vte_ifp;
+	if_t			vte_ifp;
 	device_t		vte_dev;
 	device_t		vte_miibus;
 	struct resource		*vte_res;

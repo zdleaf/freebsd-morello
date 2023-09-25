@@ -23,7 +23,6 @@
 # OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 # SUCH DAMAGE.
 #
-# $FreeBSD$
 
 .include <src.opts.mk>
 .include <bsd.init.mk>
@@ -41,6 +40,7 @@ CFLAGS+=	-DATF_SHELL='"/bin/sh"'
 
 # Silence warnings about usage of deprecated std::auto_ptr
 CXXWARNFLAGS+=	-Wno-deprecated-declarations
+CXXSTD=		c++11
 
 LIBADD=		atf_cxx
 

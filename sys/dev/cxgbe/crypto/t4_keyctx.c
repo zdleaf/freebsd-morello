@@ -28,8 +28,6 @@
 #include "opt_kern_tls.h"
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/types.h>
 #include <sys/ktls.h>
 #include <sys/malloc.h>
@@ -639,6 +637,9 @@ int
 t4_alloc_tls_keyid(struct adapter *sc)
 {
 	vmem_addr_t addr;
+
+	if (sc->vres.key.size == 0)
+		return (-1);
 
 	if (vmem_alloc(sc->key_map, TLS_KEY_CONTEXT_SZ, M_NOWAIT | M_FIRSTFIT,
 	    &addr) != 0)

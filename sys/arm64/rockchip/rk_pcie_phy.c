@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2019 Michal Meloun <mmel@FreeBSD.org>
  *
@@ -30,8 +30,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/bus.h>
@@ -364,7 +362,5 @@ static device_method_t rk_pcie_phy_methods[] = {
 DEFINE_CLASS_0(rk_pcie_phy, rk_pcie_phy_driver, rk_pcie_phy_methods,
     sizeof(struct rk_pcie_phy_softc));
 
-static devclass_t rk_pcie_phy_devclass;
-EARLY_DRIVER_MODULE(rk_pcie_phy, simplebus, rk_pcie_phy_driver,
-    rk_pcie_phy_devclass, NULL, NULL,
+EARLY_DRIVER_MODULE(rk_pcie_phy, simplebus, rk_pcie_phy_driver, NULL, NULL,
     BUS_PASS_SUPPORTDEV + BUS_PASS_ORDER_MIDDLE);

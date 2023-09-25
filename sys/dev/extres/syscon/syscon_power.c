@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2020 Jessica Clarke <jrtc27@FreeBSD.org>
  *
@@ -34,8 +34,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/bus.h>
 #include <sys/types.h>
@@ -192,7 +190,5 @@ static device_method_t syscon_power_methods[] = {
 
 DEFINE_CLASS_0(syscon_power, syscon_power_driver, syscon_power_methods,
     sizeof(struct syscon_power_softc));
-static devclass_t syscon_power_devclass;
 
-DRIVER_MODULE(syscon_power, simplebus, syscon_power_driver,
-    syscon_power_devclass, NULL, NULL);
+DRIVER_MODULE(syscon_power, simplebus, syscon_power_driver, NULL, NULL);

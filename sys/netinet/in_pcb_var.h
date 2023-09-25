@@ -34,7 +34,6 @@
  * SUCH DAMAGE.
  *
  *	@(#)in_pcb.h	8.1 (Berkeley) 6/10/93
- * $FreeBSD$
  */
 
 #ifndef _NETINET_IN_PCB_VAR_H_
@@ -47,6 +46,9 @@
 VNET_DECLARE(uint32_t, in_pcbhashseed);
 #define	V_in_pcbhashseed	VNET(in_pcbhashseed)
 
+void	inp_lock(struct inpcb *inp, const inp_lookup_t lock);
+void	inp_unlock(struct inpcb *inp, const inp_lookup_t lock);
+int	inp_trylock(struct inpcb *inp, const inp_lookup_t lock);
 bool	inp_smr_lock(struct inpcb *, const inp_lookup_t);
 int	in_pcb_lport(struct inpcb *, struct in_addr *, u_short *,
 	    struct ucred *, int);

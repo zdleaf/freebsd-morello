@@ -1,4 +1,4 @@
-# $NetBSD: var-op-shell.mk,v 1.4 2021/02/06 04:55:08 sjg Exp $
+# $NetBSD: var-op-shell.mk,v 1.7 2023/06/01 20:56:35 rillig Exp $
 #
 # Tests for the != variable assignment operator, which runs its right-hand
 # side through the shell.
@@ -15,7 +15,7 @@ OUTPUT!=	echo "success"'ful'
 # an empty output produced the error message "Couldn't read shell's output
 # for \"%s\"".
 #
-# The error message is still there but reserved for technical errors.
+# The error message is still in Cmd_Exec but reserved for technical errors.
 # It may be possible to trigger the error message by killing the shell after
 # reading part of its output.
 OUTPUT!=	true
@@ -24,13 +24,18 @@ OUTPUT!=	true
 .endif
 
 # The output of a shell command that failed is processed nevertheless.
-# TODO: Make this an error in lint mode.
+# Unlike the other places that run external commands (expression modifier
+# '::!=', expression modifier ':!...!'), a failed command generates only a
+# warning, not an "error".  These "errors" are ignored in default mode, for
+# compatibility, but not in lint mode (-dL).
+# expect+1: warning: "echo "failed"; false" returned non-zero status
 OUTPUT!=	echo "failed"; false
 .if ${OUTPUT} != "failed"
 .  error
 .endif
 
 # A command with empty output may fail as well.
+# expect+1: warning: "false" returned non-zero status
 OUTPUT!=	false
 .if ${OUTPUT} != ""
 .  error
@@ -53,12 +58,14 @@ OUTPUT!=	echo "before"; false; echo "after"
 # This should result in a warning about "exited on a signal".
 # This used to be kill -14 (SIGALRM), but that stopped working on
 # Darwin18 after recent update.
+# expect+1: warning: "kill $$" exited on a signal
 OUTPUT!=	kill $$$$
 .if ${OUTPUT} != ""
 .  error
 .endif
 
 # A nonexistent command produces a non-zero exit status.
+# expect+1: warning: "/bin/no/such/command" returned non-zero status
 OUTPUT!=	/bin/no/such/command
 .if ${OUTPUT} != ""
 .  error
@@ -77,5 +84,11 @@ OUTPUT!=	echo '$$$$$$$$'
 .if ${OUTPUT} != "\$\$"
 .  error
 .endif
+
+
+# As a debugging aid, log the exact command that is run via the shell.
+.MAKEFLAGS: -dv
+OUTPUT!=	echo '$$$$$$$$'
+.MAKEFLAGS: -d0
 
 all:

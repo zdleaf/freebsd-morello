@@ -1,5 +1,4 @@
-
-/* $OpenBSD: servconf.c,v 1.382 2021/09/06 00:36:01 millert Exp $ */
+/* $OpenBSD: servconf.c,v 1.396 2023/07/17 05:26:38 djm Exp $ */
 /*
  * Copyright (c) 1995 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
  *                    All rights reserved
@@ -12,7 +11,6 @@
  */
 
 #include "includes.h"
-__RCSID("$FreeBSD$");
 
 #include <sys/types.h>
 #include <sys/socket.h>
@@ -55,7 +53,6 @@ __RCSID("$FreeBSD$");
 #include "sshbuf.h"
 #include "misc.h"
 #include "servconf.h"
-#include "compat.h"
 #include "pathnames.h"
 #include "cipher.h"
 #include "sshkey.h"
@@ -197,6 +194,10 @@ initialize_server_options(ServerOptions *options)
 	options->fingerprint_hash = -1;
 	options->disable_forwarding = -1;
 	options->expose_userauth_info = -1;
+	options->required_rsa_size = -1;
+	options->channel_timeouts = NULL;
+	options->num_channel_timeouts = 0;
+	options->unused_connection_timeout = -1;
 	options->use_blacklist = -1;
 }
 
@@ -328,7 +329,7 @@ fill_default_server_options(ServerOptions *options)
 	if (options->print_lastlog == -1)
 		options->print_lastlog = 1;
 	if (options->x11_forwarding == -1)
-		options->x11_forwarding = 1;
+		options->x11_forwarding = 0;
 	if (options->x11_display_offset == -1)
 		options->x11_display_offset = 10;
 	if (options->x11_use_localhost == -1)
@@ -450,6 +451,10 @@ fill_default_server_options(ServerOptions *options)
 		options->expose_userauth_info = 0;
 	if (options->sk_provider == NULL)
 		options->sk_provider = xstrdup("internal");
+	if (options->required_rsa_size == -1)
+		options->required_rsa_size = SSH_RSA_MINIMUM_MODULUS_SIZE;
+	if (options->unused_connection_timeout == -1)
+		options->unused_connection_timeout = 0;
 	if (options->use_blacklist == -1)
 		options->use_blacklist = 0;
 
@@ -466,6 +471,16 @@ fill_default_server_options(ServerOptions *options)
 			v = NULL; \
 		} \
 	} while(0)
+#define CLEAR_ON_NONE_ARRAY(v, nv, none) \
+	do { \
+		if (options->nv == 1 && \
+		    strcasecmp(options->v[0], none) == 0) { \
+			free(options->v[0]); \
+			free(options->v); \
+			options->v = NULL; \
+			options->nv = 0; \
+		} \
+	} while (0)
 	CLEAR_ON_NONE(options->pid_file);
 	CLEAR_ON_NONE(options->xauth_location);
 	CLEAR_ON_NONE(options->banner);
@@ -477,19 +492,16 @@ fill_default_server_options(ServerOptions *options)
 	CLEAR_ON_NONE(options->chroot_directory);
 	CLEAR_ON_NONE(options->routing_domain);
 	CLEAR_ON_NONE(options->host_key_agent);
+
 	for (i = 0; i < options->num_host_key_files; i++)
 		CLEAR_ON_NONE(options->host_key_files[i]);
 	for (i = 0; i < options->num_host_cert_files; i++)
 		CLEAR_ON_NONE(options->host_cert_files[i]);
-#undef CLEAR_ON_NONE
 
-	/* Similar handling for AuthenticationMethods=any */
-	if (options->num_auth_methods == 1 &&
-	    strcmp(options->auth_methods[0], "any") == 0) {
-		free(options->auth_methods[0]);
-		options->auth_methods[0] = NULL;
-		options->num_auth_methods = 0;
-	}
+	CLEAR_ON_NONE_ARRAY(channel_timeouts, num_channel_timeouts, "none");
+	CLEAR_ON_NONE_ARRAY(auth_methods, num_auth_methods, "any");
+#undef CLEAR_ON_NONE
+#undef CLEAR_ON_NONE_ARRAY
 }
 
 /* Keyword tokens. */
@@ -528,6 +540,7 @@ typedef enum {
 	sStreamLocalBindMask, sStreamLocalBindUnlink,
 	sAllowStreamLocalForwarding, sFingerprintHash, sDisableForwarding,
 	sExposeAuthInfo, sRDomain, sPubkeyAuthOptions, sSecurityKeyProvider,
+	sRequiredRSASize, sChannelTimeout, sUnusedConnectionTimeout,
 	sUseBlacklist,
 	sDeprecated, sIgnore, sUnsupported
 } ServerOpCodes;
@@ -688,12 +701,12 @@ static struct {
 	{ "rdomain", sRDomain, SSHCFG_ALL },
 	{ "casignaturealgorithms", sCASignatureAlgorithms, SSHCFG_ALL },
 	{ "securitykeyprovider", sSecurityKeyProvider, SSHCFG_GLOBAL },
+	{ "requiredrsasize", sRequiredRSASize, SSHCFG_ALL },
+	{ "channeltimeout", sChannelTimeout, SSHCFG_ALL },
+	{ "unusedconnectiontimeout", sUnusedConnectionTimeout, SSHCFG_ALL },
 	{ "useblacklist", sUseBlacklist, SSHCFG_GLOBAL },
 	{ "useblocklist", sUseBlacklist, SSHCFG_GLOBAL }, /* alias */
-	{ "noneenabled", sUnsupported, SSHCFG_ALL },
-	{ "hpndisabled", sDeprecated, SSHCFG_ALL },
-	{ "hpnbuffersize", sDeprecated, SSHCFG_ALL },
-	{ "tcprcvbufpoll", sDeprecated, SSHCFG_ALL },
+
 	{ NULL, sBadOption, 0 }
 };
 
@@ -913,7 +926,7 @@ process_permitopen_list(struct ssh *ssh, ServerOpCodes opcode,
 {
 	u_int i;
 	int port;
-	char *host, *arg, *oarg, ch;
+	char *host, *arg, *oarg;
 	int where = opcode == sPermitOpen ? FORWARD_LOCAL : FORWARD_REMOTE;
 	const char *what = lookup_opcode_name(opcode);
 
@@ -931,9 +944,8 @@ process_permitopen_list(struct ssh *ssh, ServerOpCodes opcode,
 	/* Otherwise treat it as a list of permitted host:port */
 	for (i = 0; i < num_opens; i++) {
 		oarg = arg = xstrdup(opens[i]);
-		ch = '\0';
-		host = hpdelim2(&arg, &ch);
-		if (host == NULL || ch == '/')
+		host = hpdelim(&arg);
+		if (host == NULL)
 			fatal_f("missing host in %s", what);
 		host = cleanhostname(host);
 		if (arg == NULL || ((port = permitopen_port(arg)) < 0))
@@ -956,6 +968,59 @@ process_permitopen(struct ssh *ssh, ServerOptions *options)
 	process_permitopen_list(ssh, sPermitListen,
 	    options->permitted_listens,
 	    options->num_permitted_listens);
+}
+
+/* Parse a ChannelTimeout clause "pattern=interval" */
+static int
+parse_timeout(const char *s, char **typep, int *secsp)
+{
+	char *cp, *sdup;
+	int secs;
+
+	if (typep != NULL)
+		*typep = NULL;
+	if (secsp != NULL)
+		*secsp = 0;
+	if (s == NULL)
+		return -1;
+	sdup = xstrdup(s);
+
+	if ((cp = strchr(sdup, '=')) == NULL || cp == sdup) {
+		free(sdup);
+		return -1;
+	}
+	*cp++ = '\0';
+	if ((secs = convtime(cp)) < 0) {
+		free(sdup);
+		return -1;
+	}
+	/* success */
+	if (typep != NULL)
+		*typep = xstrdup(sdup);
+	if (secsp != NULL)
+		*secsp = secs;
+	free(sdup);
+	return 0;
+}
+
+void
+process_channel_timeouts(struct ssh *ssh, ServerOptions *options)
+{
+	int secs;
+	u_int i;
+	char *type;
+
+	debug3_f("setting %u timeouts", options->num_channel_timeouts);
+	channel_clear_timeouts(ssh);
+	for (i = 0; i < options->num_channel_timeouts; i++) {
+		if (parse_timeout(options->channel_timeouts[i],
+		    &type, &secs) != 0) {
+			fatal_f("internal error: bad timeout %s",
+			    options->channel_timeouts[i]);
+		}
+		channel_add_timeout(ssh, type, secs);
+		free(type);
+	}
 }
 
 struct connection_info *
@@ -1279,8 +1344,9 @@ process_server_config_line_depth(ServerOptions *options, char *line,
     struct connection_info *connectinfo, int *inc_flags, int depth,
     struct include_list *includes)
 {
-	char ch, *str, ***chararrayptr, **charptr, *arg, *arg2, *p, *keyword;
+	char *str, ***chararrayptr, **charptr, *arg, *arg2, *p, *keyword;
 	int cmdline = 0, *intptr, value, value2, n, port, oactive, r, found;
+	int ca_only = 0;
 	SyslogFacility *log_facility_ptr;
 	LogLevel *log_level_ptr;
 	ServerOpCodes opcode;
@@ -1398,9 +1464,8 @@ process_server_config_line_depth(ServerOptions *options, char *line,
 			p = arg;
 		} else {
 			arg2 = NULL;
-			ch = '\0';
-			p = hpdelim2(&arg, &ch);
-			if (p == NULL || ch == '/')
+			p = hpdelim(&arg);
+			if (p == NULL)
 				fatal("%s line %d: bad address:port usage",
 				    filename, linenum);
 			p = cleanhostname(p);
@@ -1523,6 +1588,7 @@ process_server_config_line_depth(ServerOptions *options, char *line,
 
 	case sHostbasedAcceptedAlgorithms:
 		charptr = &options->hostbased_accepted_algos;
+		ca_only = 0;
  parse_pubkey_algos:
 		arg = argv_next(&ac, &av);
 		if (!arg || *arg == '\0')
@@ -1530,7 +1596,7 @@ process_server_config_line_depth(ServerOptions *options, char *line,
 			    filename, linenum);
 		if (*arg != '-' &&
 		    !sshkey_names_valid2(*arg == '+' || *arg == '^' ?
-		    arg + 1 : arg, 1))
+		    arg + 1 : arg, 1, ca_only))
 			fatal("%s line %d: Bad key types '%s'.",
 			    filename, linenum, arg ? arg : "<NONE>");
 		if (*activep && *charptr == NULL)
@@ -1539,18 +1605,22 @@ process_server_config_line_depth(ServerOptions *options, char *line,
 
 	case sHostKeyAlgorithms:
 		charptr = &options->hostkeyalgorithms;
+		ca_only = 0;
 		goto parse_pubkey_algos;
 
 	case sCASignatureAlgorithms:
 		charptr = &options->ca_sign_algorithms;
+		ca_only = 1;
 		goto parse_pubkey_algos;
 
 	case sPubkeyAuthentication:
 		intptr = &options->pubkey_authentication;
+		ca_only = 0;
 		goto parse_flag;
 
 	case sPubkeyAcceptedAlgorithms:
 		charptr = &options->pubkey_accepted_algos;
+		ca_only = 0;
 		goto parse_pubkey_algos;
 
 	case sPubkeyAuthOptions:
@@ -1933,6 +2003,10 @@ process_server_config_line_depth(ServerOptions *options, char *line,
 			    filename, linenum, keyword);
 		else
 			options->max_startups = options->max_startups_begin;
+		if (options->max_startups <= 0 ||
+		    options->max_startups_begin <= 0)
+			fatal("%s line %d: Invalid %s spec.",
+			    filename, linenum, keyword);
 		break;
 
 	case sPerSourceNetBlockSize:
@@ -2053,6 +2127,12 @@ process_server_config_line_depth(ServerOptions *options, char *line,
 				    filename, linenum);
 			if (!*activep || uvalue != 0)
 				continue;
+			if (lookup_setenv_in_list(arg, options->setenv,
+			    options->num_setenv) != NULL) {
+				debug2("%s line %d: ignoring duplicate env "
+				    "name \"%.64s\"", filename, linenum, arg);
+				continue;
+			}
 			opt_array_append(filename, linenum, keyword,
 			    &options->setenv, &options->num_setenv, arg);
 		}
@@ -2229,9 +2309,8 @@ process_server_config_line_depth(ServerOptions *options, char *line,
 				xasprintf(&arg2, "*:%s", arg);
 			} else {
 				arg2 = xstrdup(arg);
-				ch = '\0';
-				p = hpdelim2(&arg, &ch);
-				if (p == NULL || ch == '/') {
+				p = hpdelim(&arg);
+				if (p == NULL) {
 					fatal("%s line %d: %s missing host",
 					    filename, linenum, keyword);
 				}
@@ -2344,7 +2423,7 @@ process_server_config_line_depth(ServerOptions *options, char *line,
 			fatal("%.200s line %d: %s must be an absolute path",
 			    filename, linenum, keyword);
 		}
-		if (*activep && options->authorized_keys_command == NULL)
+		if (*activep && *charptr == NULL)
 			*charptr = xstrdup(str + len);
 		argv_consume(&ac);
 		break;
@@ -2453,6 +2532,45 @@ process_server_config_line_depth(ServerOptions *options, char *line,
 			*charptr = xstrdup(arg);
 		break;
 
+	case sRequiredRSASize:
+		intptr = &options->required_rsa_size;
+		goto parse_int;
+
+	case sChannelTimeout:
+		uvalue = options->num_channel_timeouts;
+		i = 0;
+		while ((arg = argv_next(&ac, &av)) != NULL) {
+			/* Allow "none" only in first position */
+			if (strcasecmp(arg, "none") == 0) {
+				if (i > 0 || ac > 0) {
+					error("%s line %d: keyword %s \"none\" "
+					    "argument must appear alone.",
+					    filename, linenum, keyword);
+					goto out;
+				}
+			} else if (parse_timeout(arg, NULL, NULL) != 0) {
+				fatal("%s line %d: invalid channel timeout %s",
+				    filename, linenum, arg);
+			}
+			if (!*activep || uvalue != 0)
+				continue;
+			opt_array_append(filename, linenum, keyword,
+			    &options->channel_timeouts,
+			    &options->num_channel_timeouts, arg);
+		}
+		break;
+
+	case sUnusedConnectionTimeout:
+		intptr = &options->unused_connection_timeout;
+		/* peek at first arg for "none" so we can reuse parse_time */
+		if (av[0] != NULL && strcasecmp(av[0], "none") == 0) {
+			(void)argv_next(&ac, &av); /* consume arg */
+			if (*activep)
+				*intptr = 0;
+			break;
+		}
+		goto parse_time;
+
 	case sUseBlacklist:
 		intptr = &options->use_blacklist;
 		goto parse_flag;
@@ -2507,7 +2625,7 @@ load_server_config(const char *filename, struct sshbuf *conf)
 	char *line = NULL, *cp;
 	size_t linesize = 0;
 	FILE *f;
-	int r, lineno = 0;
+	int r;
 
 	debug2_f("filename %s", filename);
 	if ((f = fopen(filename, "r")) == NULL) {
@@ -2520,7 +2638,6 @@ load_server_config(const char *filename, struct sshbuf *conf)
 	    (r = sshbuf_allocate(conf, st.st_size)) != 0)
 		fatal_fr(r, "allocate");
 	while (getline(&line, &linesize, f) != -1) {
-		lineno++;
 		/*
 		 * Strip whitespace
 		 * NB - preserve newlines, they are needed to reproduce
@@ -2545,7 +2662,7 @@ parse_server_match_config(ServerOptions *options,
 
 	initialize_server_options(&mo);
 	parse_server_config(&mo, "reprocess config", cfg, includes,
-	    connectinfo);
+	    connectinfo, 0);
 	copy_set_server_options(options, &mo, 0);
 }
 
@@ -2629,6 +2746,8 @@ copy_set_server_options(ServerOptions *dst, ServerOptions *src, int preauth)
 	M_CP_INTOPT(rekey_limit);
 	M_CP_INTOPT(rekey_interval);
 	M_CP_INTOPT(log_level);
+	M_CP_INTOPT(required_rsa_size);
+	M_CP_INTOPT(unused_connection_timeout);
 
 	/*
 	 * The bind_mask is a mode_t that may be unsigned, so we can't use
@@ -2723,12 +2842,13 @@ parse_server_config_depth(ServerOptions *options, const char *filename,
 void
 parse_server_config(ServerOptions *options, const char *filename,
     struct sshbuf *conf, struct include_list *includes,
-    struct connection_info *connectinfo)
+    struct connection_info *connectinfo, int reexec)
 {
 	int active = connectinfo ? 0 : 1;
 	parse_server_config_depth(options, filename, conf, includes,
 	    connectinfo, (connectinfo ? SSHCFG_MATCH_ONLY : 0), &active, 0);
-	process_queued_listen_addrs(options);
+	if (!reexec)
+		process_queued_listen_addrs(options);
 }
 
 static const char *
@@ -2780,6 +2900,10 @@ fmt_intarg(ServerOpCodes code, int val)
 static void
 dump_cfg_int(ServerOpCodes code, int val)
 {
+	if (code == sUnusedConnectionTimeout && val == 0) {
+		printf("%s none\n", lookup_opcode_name(code));
+		return;
+	}
 	printf("%s %d\n", lookup_opcode_name(code), val);
 }
 
@@ -2816,13 +2940,23 @@ dump_cfg_strarray_oneline(ServerOpCodes code, u_int count, char **vals)
 {
 	u_int i;
 
-	if (count <= 0 && code != sAuthenticationMethods)
-		return;
+	switch (code) {
+	case sAuthenticationMethods:
+	case sChannelTimeout:
+		break;
+	default:
+		if (count <= 0)
+			return;
+		break;
+	}
+
 	printf("%s", lookup_opcode_name(code));
 	for (i = 0; i < count; i++)
 		printf(" %s",  vals[i]);
 	if (code == sAuthenticationMethods && count == 0)
 		printf(" any");
+	else if (code == sChannelTimeout && count == 0)
+		printf(" none");
 	printf("\n");
 }
 
@@ -2892,7 +3026,9 @@ dump_config(ServerOptions *o)
 	dump_cfg_int(sMaxSessions, o->max_sessions);
 	dump_cfg_int(sClientAliveInterval, o->client_alive_interval);
 	dump_cfg_int(sClientAliveCountMax, o->client_alive_count_max);
+	dump_cfg_int(sRequiredRSASize, o->required_rsa_size);
 	dump_cfg_oct(sStreamLocalBindMask, o->fwd_opts.streamlocal_bind_mask);
+	dump_cfg_int(sUnusedConnectionTimeout, o->unused_connection_timeout);
 
 	/* formatted integer arguments */
 	dump_cfg_fmtint(sPermitRootLogin, o->permit_root_login);
@@ -2991,6 +3127,8 @@ dump_config(ServerOptions *o)
 	    o->num_auth_methods, o->auth_methods);
 	dump_cfg_strarray_oneline(sLogVerbose,
 	    o->num_log_verbose, o->log_verbose);
+	dump_cfg_strarray_oneline(sChannelTimeout,
+	    o->num_channel_timeouts, o->channel_timeouts);
 
 	/* other arguments */
 	for (i = 0; i < o->num_subsystems; i++)

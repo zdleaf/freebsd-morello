@@ -12,8 +12,6 @@
  * This software is provided ``AS IS'' without any warranties of any kind.
  *
  * in-kernel ipfw tables support.
- *
- * $FreeBSD$
  */
 
 
@@ -31,6 +29,7 @@
 #include <string.h>
 #include <sysexits.h>
 
+#include <net/ethernet.h>
 #include <net/if.h>
 #include <netinet/in.h>
 #include <netinet/ip_fw.h>
@@ -77,6 +76,7 @@ static int tables_foreach(table_cb_t *f, void *arg, int sort);
 
 static struct _s_x tabletypes[] = {
       { "addr",		IPFW_TABLE_ADDR },
+      { "mac",		IPFW_TABLE_MAC },
       { "iface",	IPFW_TABLE_INTERFACE },
       { "number",	IPFW_TABLE_NUMBER },
       { "flow",		IPFW_TABLE_FLOW },
@@ -104,6 +104,7 @@ static struct _s_x tablevaltypes[] = {
       { "limit",	IPFW_VTYPE_LIMIT },
       { "ipv4",		IPFW_VTYPE_NH4 },
       { "ipv6",		IPFW_VTYPE_NH6 },
+      { "mark",		IPFW_VTYPE_MARK },
       { NULL, 0 }
 };
 
@@ -914,7 +915,7 @@ table_do_modify_record(int cmd, ipfw_obj_header *oh,
 
 	memcpy(pbuf, oh, sizeof(*oh));
 	oh = (ipfw_obj_header *)pbuf;
-	oh->opheader.version = 1;
+	oh->opheader.version = 1; /* Current version */
 
 	ctlv = (ipfw_obj_ctlv *)(oh + 1);
 	ctlv->count = count;
@@ -1188,6 +1189,7 @@ tentry_fill_key_type(char *arg, ipfw_obj_tentry *tentry, uint8_t type,
 	char *p, *pp;
 	int mask, af;
 	struct in6_addr *paddr, tmp;
+	struct ether_addr *mac;
 	struct tflow_entry *tfe;
 	uint32_t key, *pkey;
 	uint16_t port;
@@ -1233,6 +1235,24 @@ tentry_fill_key_type(char *arg, ipfw_obj_tentry *tentry, uint8_t type,
 			type = IPFW_TABLE_ADDR;
 			af = AF_INET;
 		}
+		break;
+	case IPFW_TABLE_MAC:
+		/* Remove / if exists */
+		if ((p = strchr(arg, '/')) != NULL) {
+			*p = '\0';
+			mask = atoi(p + 1);
+		}
+
+		if (p != NULL && mask > 8 * ETHER_ADDR_LEN)
+			errx(EX_DATAERR, "bad MAC mask width: %s",
+			    p + 1);
+
+		if ((mac = ether_aton(arg)) == NULL)
+			errx(EX_DATAERR, "Incorrect MAC address");
+
+		memcpy(tentry->k.mac, mac->octet, ETHER_ADDR_LEN);
+		masklen = p ? mask : 8 * ETHER_ADDR_LEN;
+		af = AF_LINK;
 		break;
 	case IPFW_TABLE_INTERFACE:
 		/* Assume interface name. Copy significant data only */
@@ -1386,7 +1406,6 @@ guess_key_type(char *key, uint8_t *ptype)
 {
 	char *p;
 	struct in6_addr addr;
-	uint32_t kv;
 
 	if (ishexnumber(*key) != 0 || *key == ':') {
 		/* Remove / if exists */
@@ -1402,7 +1421,7 @@ guess_key_type(char *key, uint8_t *ptype)
 		} else {
 			/* Port or any other key */
 			/* Skip non-base 10 entries like 'fa1' */
-			kv = strtol(key, &p, 10);
+			(void)strtol(key, &p, 10);
 			if (*p == '\0') {
 				*ptype = IPFW_TABLE_NUMBER;
 				return (0);
@@ -1641,6 +1660,11 @@ tentry_fill_value(ipfw_obj_header *oh __unused, ipfw_obj_tentry *tent,
 			}
 			etype = "ipv6";
 			break;
+		case IPFW_VTYPE_MARK:
+			v->mark = strtol(n, &e, 16);
+			if (*e != '\0')
+				etype = "mark";
+			break;
 		}
 
 		if (etype != NULL)
@@ -1685,7 +1709,6 @@ tables_foreach(table_cb_t *f, void *arg, int sort)
 	ipfw_xtable_info *info;
 	size_t sz;
 	uint32_t i;
-	int error;
 
 	/* Start with reasonable default */
 	sz = sizeof(*olh) + 16 * sizeof(ipfw_xtable_info);
@@ -1710,7 +1733,7 @@ tables_foreach(table_cb_t *f, void *arg, int sort)
 		info = (ipfw_xtable_info *)(olh + 1);
 		for (i = 0; i < olh->count; i++) {
 			if (g_co.use_set == 0 || info->set == g_co.use_set - 1)
-				error = f(info, arg);
+				(void)f(info, arg);
 			info = (ipfw_xtable_info *)((caddr_t)info +
 			    olh->objsize);
 		}
@@ -1857,6 +1880,9 @@ table_show_value(char *buf, size_t bufsize, ipfw_table_value *v,
 			    NI_NUMERICHOST) == 0)
 				l = snprintf(buf, sz, "%s,", abuf);
 			break;
+		case IPFW_VTYPE_MARK:
+			l = snprintf(buf, sz, "%#x,", v->mark);
+			break;
 		}
 
 		buf += l;
@@ -1872,6 +1898,7 @@ table_show_entry(ipfw_xtable_info *i, ipfw_obj_tentry *tent)
 {
 	char tbuf[128], pval[128];
 	const char *comma;
+	const u_char *mac;
 	void *paddr;
 	struct tflow_entry *tfe;
 
@@ -1883,6 +1910,13 @@ table_show_entry(ipfw_xtable_info *i, ipfw_obj_tentry *tent)
 		/* IPv4 or IPv6 prefixes */
 		inet_ntop(tent->subtype, &tent->k, tbuf, sizeof(tbuf));
 		printf("%s/%u %s\n", tbuf, tent->masklen, pval);
+		break;
+	case IPFW_TABLE_MAC:
+		/* MAC prefixes */
+		mac = tent->k.mac;
+		printf("%02x:%02x:%02x:%02x:%02x:%02x/%u %s\n",
+		    mac[0], mac[1], mac[2], mac[3], mac[4], mac[5],
+		    tent->masklen, pval);
 		break;
 	case IPFW_TABLE_INTERFACE:
 		/* Interface names */
@@ -2005,37 +2039,17 @@ ipfw_list_ta(int ac __unused, char *av[] __unused)
 }
 
 
-/* Copy of current kernel table_value structure */
-struct _table_value {
-	uint32_t	tag;		/* O_TAG/O_TAGGED */
-	uint32_t	pipe;		/* O_PIPE/O_QUEUE */
-	uint16_t	divert;		/* O_DIVERT/O_TEE */
-	uint16_t	skipto;		/* skipto, CALLRET */
-	uint32_t	netgraph;	/* O_NETGRAPH/O_NGTEE */
-	uint32_t	fib;		/* O_SETFIB */
-	uint32_t	nat;		/* O_NAT */
-	uint32_t	nh4;
-	uint8_t		dscp;
-	uint8_t		spare0;
-	uint16_t	spare1;
-	/* -- 32 bytes -- */
-	struct in6_addr	nh6;
-	uint32_t	limit;		/* O_LIMIT */
-	uint32_t	zoneid;
-	uint64_t	refcnt;		/* Number of references */
-};
-
 static int
 compare_values(const void *_a, const void *_b)
 {
-	const struct _table_value *a, *b;
+	const ipfw_table_value *a, *b;
 
-	a = (const struct _table_value *)_a;
-	b = (const struct _table_value *)_b;
+	a = (const ipfw_table_value *)_a;
+	b = (const ipfw_table_value *)_b;
 
-	if (a->spare1 < b->spare1)
+	if (a->kidx < b->kidx)
 		return (-1);
-	else if (a->spare1 > b->spare1)
+	else if (a->kidx > b->kidx)
 		return (1);
 
 	return (0);
@@ -2046,7 +2060,7 @@ ipfw_list_values(int ac __unused, char *av[] __unused)
 {
 	char buf[128];
 	ipfw_obj_lheader *olh;
-	struct _table_value *v;
+	ipfw_table_value *v;
 	uint32_t i, vmask;
 	int error;
 
@@ -2058,13 +2072,13 @@ ipfw_list_values(int ac __unused, char *av[] __unused)
 
 	table_print_valheader(buf, sizeof(buf), vmask);
 	printf("HEADER: %s\n", buf);
-	v = (struct _table_value *)(olh + 1);
+	v = (ipfw_table_value *)(olh + 1);
 	qsort(v, olh->count, olh->objsize, compare_values);
 	for (i = 0; i < olh->count; i++) {
 		table_show_value(buf, sizeof(buf), (ipfw_table_value *)v,
 		    vmask, 0);
-		printf("[%u] refs=%lu %s\n", v->spare1, (u_long)v->refcnt, buf);
-		v = (struct _table_value *)((caddr_t)v + olh->objsize);
+		printf("[%u] refs=%lu %s\n", v->kidx, (u_long)v->refcnt, buf);
+		v = (ipfw_table_value *)((caddr_t)v + olh->objsize);
 	}
 
 	free(olh);

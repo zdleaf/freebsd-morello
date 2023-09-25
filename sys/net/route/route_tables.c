@@ -34,7 +34,6 @@
  ***********************************************************************/
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
 #include "opt_route.h"
 
 #include <sys/param.h>
@@ -42,6 +41,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/systm.h>
 #include <sys/malloc.h>
 #include <sys/jail.h>
+#include <sys/osd.h>
 #include <sys/proc.h>
 #include <sys/sysctl.h>
 #include <sys/syslog.h>
@@ -53,6 +53,7 @@ __FBSDID("$FreeBSD$");
 
 #include <net/vnet.h>
 #include <net/route.h>
+#include <net/route/route_ctl.h>
 #include <net/route/route_var.h>
 
 /* Kernel config default option. */
@@ -162,6 +163,53 @@ sys_setfib(struct thread *td, struct setfib_args *uap)
 	return (error);
 }
 
+static int
+rtables_check_proc_fib(void *obj, void *data)
+{
+	struct prison *pr = obj;
+	struct thread *td = data;
+	int error = 0;
+
+	if (TD_TO_VNET(td) != pr->pr_vnet) {
+		/* number of fibs may be lower in a new vnet */
+		CURVNET_SET(pr->pr_vnet);
+		if (td->td_proc->p_fibnum >= V_rt_numfibs)
+			error = EINVAL;
+		CURVNET_RESTORE();
+	}
+	return (error);
+}
+
+static void
+rtables_prison_destructor(void *data)
+{
+}
+
+static void
+rtables_init(void)
+{
+	osd_method_t methods[PR_MAXMETHOD] = {
+	    [PR_METHOD_ATTACH] =	rtables_check_proc_fib,
+	};
+	osd_jail_register(rtables_prison_destructor, methods);
+}
+SYSINIT(rtables_init, SI_SUB_PROTO_DOMAIN, SI_ORDER_THIRD, rtables_init, NULL);
+
+
+/*
+ * If required, copy interface routes from existing tables to the
+ * newly-created routing table.
+ */
+static void
+populate_kernel_routes(struct rib_head **new_rt_tables, struct rib_head *rh)
+{
+	for (int i = 0; i < V_rt_numfibs; i++) {
+		struct rib_head *rh_src = new_rt_tables[i * (AF_MAX + 1) + rh->rib_family];
+		if ((rh_src != NULL) && (rh_src != rh))
+			rib_copy_kernel_routes(rh_src, rh);
+	}
+}
+
 /*
  * Grows up the number of routing tables in the current fib.
  * Function creates new index array for all rtables and allocates
@@ -202,7 +250,7 @@ grow_rtables(uint32_t num_tables)
 		    V_rt_numfibs * (AF_MAX + 1) * sizeof(void *));
 
 	/* Populate the remainders */
-	for (dom = domains; dom; dom = dom->dom_next) {
+	SLIST_FOREACH(dom, &domains, dom_next) {
 		if (dom->dom_rtattach == NULL)
 			continue;
 		family = dom->dom_family;
@@ -214,6 +262,8 @@ grow_rtables(uint32_t num_tables)
 			if (rh == NULL)
 				log(LOG_ERR, "unable to create routing table for %d.%d\n",
 				    dom->dom_family, i);
+			else
+				populate_kernel_routes(new_rt_tables, rh);
 			*prnh = rh;
 		}
 	}
@@ -229,14 +279,14 @@ grow_rtables(uint32_t num_tables)
 
 	/* Wait till all cpus see new pointers */
 	atomic_thread_fence_rel();
-	epoch_wait_preempt(net_epoch_preempt);
+	NET_EPOCH_WAIT();
 
 	/* Set number of fibs to a new value */
 	V_rt_numfibs = num_tables;
 
 #ifdef FIB_ALGO
 	/* Attach fib algo to the new rtables */
-	for (dom = domains; dom; dom = dom->dom_next) {
+	SLIST_FOREACH(dom, &domains, dom_next) {
 		if (dom->dom_rtattach != NULL)
 			fib_setup_family(dom->dom_family, num_tables);
 	}
@@ -280,7 +330,7 @@ rtables_destroy(const void *unused __unused)
 	int family;
 
 	RTABLES_LOCK();
-	for (dom = domains; dom; dom = dom->dom_next) {
+	SLIST_FOREACH(dom, &domains, dom_next) {
 		if (dom->dom_rtdetach == NULL)
 			continue;
 		family = dom->dom_family;
@@ -299,7 +349,7 @@ rtables_destroy(const void *unused __unused)
 	 *  nexthops deletions will be scheduled for the next epoch run
 	 *  and will be completed after vnet teardown.
 	 */
-	epoch_drain_callbacks(net_epoch_preempt);
+	NET_EPOCH_DRAIN_CALLBACKS();
 
 	free(V_rt_tables, M_RTABLE);
 	vnet_rtzone_destroy();
@@ -334,6 +384,16 @@ struct rib_head *
 rt_tables_get_rnh(uint32_t table, sa_family_t family)
 {
 
+	return (rt_tables_get_rnh_ptr(table, family));
+}
+
+struct rib_head *
+rt_tables_get_rnh_safe(uint32_t table, sa_family_t family)
+{
+	if (__predict_false(table >= V_rt_numfibs))
+		return (NULL);
+	if (__predict_false(family >= (AF_MAX + 1)))
+		return (NULL);
 	return (rt_tables_get_rnh_ptr(table, family));
 }
 

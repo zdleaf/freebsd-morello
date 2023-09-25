@@ -21,8 +21,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 #define SPIBUS_IVAR(d) (struct spibus_ivar *) device_get_ivars(d)
@@ -43,6 +41,7 @@ struct spibus_ivar
 	uint32_t	cs;
 	uint32_t	mode;
 	uint32_t	clock;
+	uint32_t	cs_delay;
 	struct resource_list	rl;
 };
 
@@ -52,6 +51,7 @@ enum {
 	SPIBUS_IVAR_CS,		/* chip select that we're on */
 	SPIBUS_IVAR_MODE,	/* SPI mode (0-3) */
 	SPIBUS_IVAR_CLOCK,	/* maximum clock freq for device */
+	SPIBUS_IVAR_CS_DELAY,	/* delay in microseconds after toggling chip select */
 };
 
 #define SPIBUS_ACCESSOR(A, B, T)					\
@@ -71,8 +71,15 @@ spibus_set_ ## A(device_t dev, T t)					\
 SPIBUS_ACCESSOR(cs,		CS,		uint32_t)
 SPIBUS_ACCESSOR(mode,		MODE,		uint32_t)
 SPIBUS_ACCESSOR(clock,		CLOCK,		uint32_t)
+SPIBUS_ACCESSOR(cs_delay,	CS_DELAY,	uint32_t)
 
 extern driver_t spibus_driver;
-extern devclass_t spibus_devclass;
 extern driver_t ofw_spibus_driver;
-extern devclass_t ofw_spibus_devclass;
+
+int spibus_attach(device_t);
+int spibus_detach(device_t);
+device_t spibus_add_child_common(device_t, u_int, const char *, int, size_t);
+void spibus_probe_nomatch(device_t, device_t);
+int spibus_child_location(device_t, device_t, struct sbuf *);
+int spibus_read_ivar(device_t, device_t, int, uintptr_t *);
+int spibus_write_ivar(device_t, device_t, int, uintptr_t);

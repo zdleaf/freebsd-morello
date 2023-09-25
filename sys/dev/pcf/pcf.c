@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 1998 Nicolas Souchu, Marc Bouget
  * Copyright (c) 2004 Joerg Wunsch
@@ -28,8 +28,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/bus.h>
 #include <sys/lock.h>
@@ -478,6 +476,6 @@ error:
 	return (error);
 }
 
-DRIVER_MODULE(iicbus, pcf, iicbus_driver, iicbus_devclass, 0, 0);
+DRIVER_MODULE(iicbus, pcf, iicbus_driver, 0, 0);
 MODULE_DEPEND(pcf, iicbus, PCF_MINVER, PCF_PREFVER, PCF_MAXVER);
 MODULE_VERSION(pcf, PCF_MODVER);

@@ -1,7 +1,7 @@
 /*	$NetBSD: lancevar.h,v 1.10 2005/12/11 12:21:27 christos Exp $	*/
 
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-NetBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 1997, 1998 The NetBSD Foundation, Inc.
  * All rights reserved.
@@ -32,15 +32,12 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-/* $FreeBSD$ */
 
 #ifndef _DEV_LE_LANCEVAR_H_
 #define	_DEV_LE_LANCEVAR_H_
 
-extern devclass_t le_devclass;
-
 struct lance_softc {
-	struct ifnet	*sc_ifp;
+	if_t		sc_ifp;
 	struct ifmedia	sc_media;
 	struct mtx	sc_mtx;
 	struct callout	sc_wdog_ch;

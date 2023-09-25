@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2012 Andreas Tobler
  * Copyright (c) 2014 Justin Hibbits
@@ -28,8 +28,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/bus.h>
 #include <sys/systm.h>
@@ -143,9 +141,7 @@ static driver_t adt746x_driver = {
 	sizeof(struct adt746x_softc)
 };
 
-static devclass_t adt746x_devclass;
-
-DRIVER_MODULE(adt746x, iicbus, adt746x_driver, adt746x_devclass, 0, 0);
+DRIVER_MODULE(adt746x, iicbus, adt746x_driver, 0, 0);
 static MALLOC_DEFINE(M_ADT746X, "adt746x", "ADT Sensor Information");
 
 
@@ -472,15 +468,12 @@ adt746x_attach_fans(device_t dev)
 	struct adt746x_softc *sc;
 	struct sysctl_oid *oid, *fanroot_oid;
 	struct sysctl_ctx_list *ctx;
-	phandle_t child;
 	char sysctl_name[32];
 	int i, j;
 
 	sc = device_get_softc(dev);
 
 	sc->sc_nfans = 0;
-
-	child = ofw_bus_get_node(dev);
 
 	/* Count the actual number of fans. */
 	sc->sc_nfans = adt746x_fill_fan_prop(dev);
@@ -600,7 +593,6 @@ adt746x_attach_sensors(device_t dev)
 	struct adt746x_softc *sc;
 	struct sysctl_oid *oid, *sensroot_oid;
 	struct sysctl_ctx_list *ctx;
-	phandle_t child;
 	char sysctl_name[40];
 	const char *unit;
 	const char *desc;
@@ -609,7 +601,6 @@ adt746x_attach_sensors(device_t dev)
 
 	sc = device_get_softc(dev);
 	sc->sc_nsensors = 0;
-	child = ofw_bus_get_node(dev);
 
 	/* Count the actual number of sensors. */
 	sc->sc_nsensors = adt746x_fill_sensor_prop(dev);

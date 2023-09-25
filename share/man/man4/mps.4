@@ -36,7 +36,6 @@
 .\" Author: Stephen McConnell <slm@FreeBSD.org>
 .\"
 .\" $Id: //depot/SpectraBSD/head/share/man/man4/mps.4#6 $
-.\" $FreeBSD$
 .\"
 .Dd June 1, 2019
 .Dt MPS 4
@@ -311,7 +310,6 @@ dev.mps.X.use_phy_num
 .Ed
 .Pp
 The same set of values are valid as when setting this tunable for all adapters.
-.Pp
 .Sh DEBUGGING
 Driver diagnostic printing is controlled in
 .Xr loader.conf 5
@@ -365,6 +363,7 @@ The following levels are available:
 .Xr scsi 4 ,
 .Xr targ 4 ,
 .Xr loader.conf 5 ,
+.Xr mpsutil 8 ,
 .Xr sysctl 8
 .Sh HISTORY
 The
@@ -378,9 +377,9 @@ driver was originally written by
 .An -nosplit
 .An Scott Long Aq Mt scottl@FreeBSD.org .
 It has been improved and tested by LSI Corporation,
-Avago Technologies (formally LSI), and Broadcom Ltd. (formally Avago).
+Avago Technologies (formerly LSI), and Broadcom Ltd. (formerly Avago).
 .Pp
-This man page was written by
+This manual page was written by
 .An Ken Merry Aq Mt ken@FreeBSD.org
 with additional input from
 .An Stephen McConnell Aq Mt slm@FreeBSD.org .

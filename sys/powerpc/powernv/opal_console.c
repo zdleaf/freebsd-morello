@@ -23,8 +23,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/endian.h>
 #include <sys/param.h>
 #include <sys/conf.h>
@@ -112,7 +110,7 @@ static driver_t uart_opal_driver = {
 	sizeof(struct uart_opal_softc),
 };
 
-DRIVER_MODULE(uart_opal, opalcons, uart_opal_driver, uart_devclass, 0, 0);
+DRIVER_MODULE(uart_opal, opalcons, uart_opal_driver, 0, 0);
 
 static int uart_opal_getc(struct uart_opal_softc *sc);
 static cn_probe_t uart_opal_cnprobe;
@@ -611,6 +609,4 @@ static driver_t opalcons_driver = {
         0
 };
 
-static devclass_t opalcons_devclass;
-
-DRIVER_MODULE(opalcons, opal, opalcons_driver, opalcons_devclass, 0, 0);
+DRIVER_MODULE(opalcons, opal, opalcons_driver, 0, 0);

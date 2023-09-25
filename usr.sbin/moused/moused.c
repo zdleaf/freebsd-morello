@@ -47,8 +47,6 @@
  **/
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/consio.h>
 #include <sys/mouse.h>
@@ -314,11 +312,11 @@ static symtab_t pnpprod[] = {
     { "PNP0F0A",	MOUSE_PROTO_MS,		MOUSE_MODEL_GENERIC },
     /* MS PnP BallPoint serial */
     { "PNP0F0B",	MOUSE_PROTO_MS,		MOUSE_MODEL_GENERIC },
-    /* MS serial comatible */
+    /* MS serial compatible */
     { "PNP0F0C",	MOUSE_PROTO_MS,		MOUSE_MODEL_GENERIC },
-    /* MS PS/2 comatible */
+    /* MS PS/2 compatible */
     { "PNP0F0E",	MOUSE_PROTO_PS2,	MOUSE_MODEL_GENERIC },
-    /* MS BallPoint comatible */
+    /* MS BallPoint compatible */
     { "PNP0F0F",	MOUSE_PROTO_MS,		MOUSE_MODEL_GENERIC },
 #if notyet
     /* TI QuickPort */
@@ -3013,7 +3011,7 @@ pnpparse(pnpid_t *id, char *buf, int len)
     id->revision = ((buf[1] & 0x3f) << 6) | (buf[2] & 0x3f);
     debug("PnP rev %d.%02d", id->revision / 100, id->revision % 100);
 
-    /* EISA vender and product ID */
+    /* EISA vendor and product ID */
     id->eisaid = &buf[3];
     id->neisaid = 7;
 
@@ -3053,7 +3051,7 @@ pnpparse(pnpid_t *id, char *buf, int len)
 	}
 	/*
 	 * PnP COM spec prior to v0.96 allowed '*' in this field,
-	 * it's not allowed now; just igore it.
+	 * it's not allowed now; just ignore it.
 	 */
 	if (buf[j] == '*')
 	    ++j;

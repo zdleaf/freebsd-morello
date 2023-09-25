@@ -1,4 +1,3 @@
-# $FreeBSD$
 
 .include <src.opts.mk>
 
@@ -94,3 +93,8 @@ SUBDIR_DEPEND_uboot+=	fdt
 SUBDIR_PARALLEL=	yes
 
 .include <bsd.subdir.mk>
+
+# Simplified way to build-test the most important build combinations for the
+# loader.
+universe:
+	sh ${SRCTOP}/tools/boot/universe.sh

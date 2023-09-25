@@ -25,8 +25,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 /*
@@ -76,7 +74,7 @@ ipdivert_create(const char *test)
 {
 	int s;
 
-	s = socket(PF_INET, SOCK_RAW, IPPROTO_DIVERT);
+	s = socket(PF_DIVERT, SOCK_RAW, 0);
 	if (s < 0)
 		fail(test, "socket");
 	return (s);

@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2004-2005 M. Warner Losh <imp@FreeBSD.org>
  *
@@ -26,8 +26,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/bio.h>
 #include <sys/bus.h>
@@ -222,5 +220,5 @@ static driver_t fdc_driver = {
 	sizeof(struct fdc_data)
 };
 
-DRIVER_MODULE(fdc, isa, fdc_driver, fdc_devclass, 0, 0);
+DRIVER_MODULE(fdc, isa, fdc_driver, 0, 0);
 ISA_PNP_INFO(fdc_ids);

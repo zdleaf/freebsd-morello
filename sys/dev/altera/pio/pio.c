@@ -33,8 +33,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/bus.h>
@@ -208,6 +206,4 @@ static driver_t pio_driver = {
 	sizeof(struct pio_softc),
 };
 
-static devclass_t pio_devclass;
-
-DRIVER_MODULE(altera_pio, simplebus, pio_driver, pio_devclass, 0, 0);
+DRIVER_MODULE(altera_pio, simplebus, pio_driver, 0, 0);

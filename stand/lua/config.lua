@@ -1,5 +1,5 @@
 --
--- SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+-- SPDX-License-Identifier: BSD-2-Clause
 --
 -- Copyright (c) 2015 Pedro Souza <pedrosouza@freebsd.org>
 -- Copyright (c) 2018 Kyle Evans <kevans@FreeBSD.org>
@@ -26,8 +26,6 @@
 -- OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 -- SUCH DAMAGE.
 --
--- $FreeBSD$
---
 
 local hook = require("hook")
 
@@ -45,6 +43,7 @@ local MSG_FAILSETENV = "Failed to '%s' with value: %s"
 local MSG_FAILOPENCFG = "Failed to open config: '%s'"
 local MSG_FAILREADCFG = "Failed to read config: '%s'"
 local MSG_FAILPARSECFG = "Failed to parse config: '%s'"
+local MSG_FAILEXECLUA = "Failed to execute lua conf '%s': '%s'"
 local MSG_FAILPARSEVAR = "Failed to parse variable '%s': %s"
 local MSG_FAILEXBEF = "Failed to execute '%s' before loading '%s'"
 local MSG_FAILEXAF = "Failed to execute '%s' after loading '%s'"
@@ -62,7 +61,10 @@ local MSG_FAILSYN_EOLESC = "Stray escape at end of line"
 local MSG_FAILSYN_EOLVAR = "Unescaped $ at end of line"
 local MSG_FAILSYN_BADVAR = "Malformed variable expression at position '%d'"
 
-local MODULEEXPR = '([-%w_]+)'
+-- MODULEEXPR should more or less allow the exact same set of characters as the
+-- env_var entries in the pattern table.  This is perhaps a good target for a
+-- little refactoring.
+local MODULEEXPR = '([%w%d-_.]+)'
 local QVALEXPR = '"(.*)"'
 local QVALREPL = QVALEXPR:gsub('%%', '%%%%')
 local WORDEXPR = "([-%w%d][-%w%d_.]*)"
@@ -244,65 +246,82 @@ end
 --
 local pattern_table = {
 	{
+		luaexempt = true,
 		str = "(#.*)",
 		process = function(_, _)  end,
 		groups = 1,
 	},
 	--  module_load="value"
 	{
-		str = MODULEEXPR .. "_load%s*=%s*$VALUE",
+		name = MODULEEXPR .. "_load%s*",
+		val = "%s*$VALUE",
 		process = function(k, v)
 			if modules[k] == nil then
 				modules[k] = {}
 			end
 			modules[k].load = v:upper()
+			setEnv(k .. "_load", v:upper())
 		end,
 	},
 	--  module_name="value"
 	{
-		str = MODULEEXPR .. "_name%s*=%s*$VALUE",
+		name = MODULEEXPR .. "_name%s*",
+		val = "%s*$VALUE",
 		process = function(k, v)
 			setKey(k, "name", v)
+			setEnv(k .. "_name", v)
 		end,
 	},
 	--  module_type="value"
 	{
-		str = MODULEEXPR .. "_type%s*=%s*$VALUE",
+		name = MODULEEXPR .. "_type%s*",
+		val = "%s*$VALUE",
 		process = function(k, v)
 			setKey(k, "type", v)
+			setEnv(k .. "_type", v)
 		end,
 	},
 	--  module_flags="value"
 	{
-		str = MODULEEXPR .. "_flags%s*=%s*$VALUE",
+		name = MODULEEXPR .. "_flags%s*",
+		val = "%s*$VALUE",
 		process = function(k, v)
 			setKey(k, "flags", v)
+			setEnv(k .. "_flags", v)
 		end,
 	},
 	--  module_before="value"
 	{
-		str = MODULEEXPR .. "_before%s*=%s*$VALUE",
+		name = MODULEEXPR .. "_before%s*",
+		val = "%s*$VALUE",
 		process = function(k, v)
 			setKey(k, "before", v)
+			setEnv(k .. "_before", v)
 		end,
 	},
 	--  module_after="value"
 	{
-		str = MODULEEXPR .. "_after%s*=%s*$VALUE",
+		name = MODULEEXPR .. "_after%s*",
+		val = "%s*$VALUE",
 		process = function(k, v)
 			setKey(k, "after", v)
+			setEnv(k .. "_after", v)
 		end,
 	},
 	--  module_error="value"
 	{
-		str = MODULEEXPR .. "_error%s*=%s*$VALUE",
+		name = MODULEEXPR .. "_error%s*",
+		val = "%s*$VALUE",
 		process = function(k, v)
 			setKey(k, "error", v)
+			setEnv(k .. "_error", v)
 		end,
 	},
 	--  exec="command"
 	{
-		str = "exec%s*=%s*" .. QVALEXPR,
+		luaexempt = true,
+		name = "exec%s*",
+		val = "%s*" .. QVALEXPR,
 		process = function(k, _)
 			if cli_execute_unparsed(k) ~= 0 then
 				print(MSG_FAILEXEC:format(k))
@@ -312,7 +331,8 @@ local pattern_table = {
 	},
 	--  env_var="value" or env_var=[word|num]
 	{
-		str = "([%w][%w%d-_.]*)%s*=%s*$VALUE",
+		name = "([%w][%w%d-_.]*)%s*",
+		val = "%s*$VALUE",
 		process = function(k, v)
 			local pv, msg = processEnvVar(v)
 			if not pv then
@@ -321,6 +341,8 @@ local pattern_table = {
 			end
 			if setEnv(k, pv) ~= 0 then
 				print(MSG_FAILSETENV:format(k, v))
+			else
+				return pv
 			end
 		end,
 	},
@@ -479,6 +501,18 @@ local function checkNextboot()
 	loader.setenv("nextboot_enable", "NO")
 end
 
+local function processEnv(k, v)
+	for _, val in ipairs(pattern_table) do
+		if not val.luaexempt and val.name then
+			local matched = k:match(val.name)
+
+			if matched then
+				return val.process(matched, v)
+			end
+		end
+	end
+end
+
 -- Module exports
 config.verbose = false
 
@@ -504,7 +538,47 @@ function config.processFile(name, silent)
 		return silent
 	end
 
-	return config.parse(text)
+	if name:match(".lua$") then
+		local cfg_env = setmetatable({}, {
+			indices = {},
+			__index = function(env, key)
+				if getmetatable(env).indices[key] then
+					return rawget(env, key)
+				end
+
+				return loader.getenv(key)
+			end,
+			__newindex = function(env, key, val)
+				getmetatable(env).indices[key] = true
+				rawset(env, key, val)
+			end,
+		})
+
+		-- Give local modules a chance to populate the config
+		-- environment.
+		hook.runAll("config.buildenv", cfg_env)
+		local res, err = pcall(load(text, name, "t", cfg_env))
+		if res then
+			for k, v in pairs(cfg_env) do
+				local t = type(v)
+				if t ~= "function" and t ~= "table" then
+					if t ~= "string" then
+						v = tostring(v)
+					end
+					local pval = processEnv(k, v)
+					if pval then
+						setEnv(k, pval)
+					end
+				end
+			end
+		else
+			print(MSG_FAILEXECLUA:format(name, err))
+		end
+
+		return res
+	else
+		return config.parse(text)
+	end
 end
 
 -- silent runs will not return false if we fail to open the file
@@ -515,6 +589,9 @@ function config.parse(text)
 	for line in text:gmatch("([^\n]+)") do
 		if line:match("^%s*$") == nil then
 			for _, val in ipairs(pattern_table) do
+				if val.str == nil then
+					val.str = val.name .. "=" .. val.val
+				end
 				local pattern = '^%s*' .. val.str .. '%s*(.*)';
 				local cgroups = val.groups or 2
 				local k, v, c = checkPattern(line, pattern)
@@ -798,6 +875,7 @@ function config.getModuleInfo()
 	}
 end
 
+hook.registerType("config.buildenv")
 hook.registerType("config.loaded")
 hook.registerType("config.reloaded")
 hook.registerType("kernel.loaded")

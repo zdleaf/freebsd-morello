@@ -1,4 +1,3 @@
-/*	$FreeBSD$	*/
 
 /*-
  * Copyright (c) 2006,2007
@@ -77,7 +76,7 @@ struct wpi_tx_ring {
 	uint8_t			cur;
 	uint8_t			pending;
 	int16_t			queued;
-	int			update:1;
+	bool			update:1;
 };
 
 struct wpi_rx_data {

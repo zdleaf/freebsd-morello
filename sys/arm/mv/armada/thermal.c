@@ -25,8 +25,6 @@
  * SUCH DAMAGE.
  */
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/sysctl.h>
 #include <sys/systm.h>
@@ -123,12 +121,8 @@ static driver_t	armada_thermal_driver = {
 	sizeof(struct armada_thermal_softc)
 };
 
-static devclass_t armada_thermal_devclass;
-
-DRIVER_MODULE(armada_thermal, simplebus, armada_thermal_driver,
-        armada_thermal_devclass, 0, 0);
-DRIVER_MODULE(armada_thermal, ofwbus, armada_thermal_driver,
-        armada_thermal_devclass, 0, 0);
+DRIVER_MODULE(armada_thermal, simplebus, armada_thermal_driver, 0, 0);
+DRIVER_MODULE(armada_thermal, ofwbus, armada_thermal_driver, 0, 0);
 
 static int
 armada_thermal_probe(device_t dev)

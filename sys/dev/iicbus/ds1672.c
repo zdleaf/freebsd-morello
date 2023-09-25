@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2006 Sam Leffler.  All rights reserved.
  *
@@ -25,7 +25,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
 /*
  * Dallas Semiconductor DS1672 RTC sitting on the I2C bus.
  */
@@ -187,8 +186,7 @@ static driver_t ds1672_driver = {
 	ds1672_methods,
 	sizeof(struct ds1672_softc),
 };
-static devclass_t ds1672_devclass;
 
-DRIVER_MODULE(ds1672, iicbus, ds1672_driver, ds1672_devclass, 0, 0);
+DRIVER_MODULE(ds1672, iicbus, ds1672_driver, 0, 0);
 MODULE_VERSION(ds1672, 1);
 MODULE_DEPEND(ds1672, iicbus, 1, 1, 1);

@@ -34,8 +34,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 #include "opt_atpic.h"
@@ -585,7 +583,7 @@ fast_syscall_common:
 	jnz	4f
 	/* Check for and handle AST's on return to userland. */
 	movq	PCPU(CURTHREAD),%rax
-	testl	$TDF_ASTPENDING | TDF_NEEDRESCHED,TD_FLAGS(%rax)
+	cmpl	$0,TD_AST(%rax)
 	jne	3f
 	call	handle_ibrs_exit
 	callq	*mds_handler
@@ -1141,7 +1139,7 @@ doreti_ast:
 	 */
 	cli
 	movq	PCPU(CURTHREAD),%rax
-	testl	$TDF_ASTPENDING | TDF_NEEDRESCHED,TD_FLAGS(%rax)
+	cmpl	$0,TD_AST(%rax)
 	je	doreti_exit
 	sti
 	movq	%rsp,%rdi	/* pass a pointer to the trapframe */

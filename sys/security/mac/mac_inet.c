@@ -43,8 +43,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include "opt_mac.h"
 
 #include <sys/param.h>
@@ -106,6 +104,17 @@ mac_inpcb_init(struct inpcb *inp, int flag)
 	} else
 		inp->inp_label = NULL;
 	return (0);
+}
+
+/* Check with rules in module if the IPv4 address is allowed. */
+int
+mac_inet_check_add_addr(struct ucred *cred, const struct in_addr *ia,
+    struct ifnet *ifp)
+{
+	int error;
+
+	MAC_POLICY_CHECK(ip4_check_jail, cred, ia, ifp);
+	return (error);
 }
 
 static struct label *
@@ -274,8 +283,8 @@ mac_netinet_arp_send(struct ifnet *ifp, struct mbuf *m)
 	mlabel = mac_mbuf_to_label(m);
 
 	MAC_IFNET_LOCK(ifp, locked);
-	MAC_POLICY_PERFORM_NOSLEEP(netinet_arp_send, ifp, ifp->if_label, m,
-	    mlabel);
+	MAC_POLICY_PERFORM_NOSLEEP(netinet_arp_send, ifp, if_getmaclabel(ifp),
+	    m, mlabel);
 	MAC_IFNET_UNLOCK(ifp, locked);
 }
 
@@ -319,8 +328,8 @@ mac_netinet_igmp_send(struct ifnet *ifp, struct mbuf *m)
 	mlabel = mac_mbuf_to_label(m);
 
 	MAC_IFNET_LOCK(ifp, locked);
-	MAC_POLICY_PERFORM_NOSLEEP(netinet_igmp_send, ifp, ifp->if_label, m,
-	    mlabel);
+	MAC_POLICY_PERFORM_NOSLEEP(netinet_igmp_send, ifp, if_getmaclabel(ifp),
+	    m, mlabel);
 	MAC_IFNET_UNLOCK(ifp, locked);
 }
 

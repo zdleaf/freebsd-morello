@@ -22,9 +22,7 @@
 .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 .\" SUCH DAMAGE.
 .\"
-.\" $FreeBSD$
-.\"
-.Dd January 20, 2022
+.Dd March 26, 2023
 .Dt KQUEUE 2
 .Os
 .Sh NAME
@@ -37,6 +35,8 @@
 .In sys/event.h
 .Ft int
 .Fn kqueue "void"
+.Ft int
+.Fn kqueuex "u_int flags"
 .Ft int
 .Fo kevent
 .Fa "int kq"
@@ -88,6 +88,30 @@ is called without the
 .Dv RFFDG
 flag, then the descriptor table is shared,
 which will allow sharing of the kqueue between two processes.
+.Pp
+The
+.Fn kqueuex
+system call also creates a new kernel event queue, and additionally takes
+the
+.Fa flags
+argument, which is a bitwise-inclusive OR of the following flags:
+.Bl -tag -width "KQUEUE_CLOEXEC"
+.It Fa KQUEUE_CLOEXEC
+The returned file descriptor is automatically closed on
+.Xr execve 2
+.El
+The
+.Ql fd = kqueue()
+call is equivalent to
+.Ql fd = kqueuex(0) .
+.Pp
+For compatibility with
+.Nx ,
+the
+.Fn kqueue1
+function is provided, which accepts the
+.Dv O_CLOEXEC
+flag with the expected semantic.
 .Pp
 The
 .Fn kevent
@@ -295,7 +319,7 @@ on the descriptor type.
 .Bl -tag -width 2n
 .It Sockets
 Sockets which have previously been passed to
-.Fn listen
+.Xr listen 2
 return when there is an incoming connection pending.
 .Va data
 contains the size of the listen backlog.
@@ -742,8 +766,6 @@ main(int argc, char **argv)
     ret = kevent(kq, &event, 1, NULL, 0, NULL);
     if (ret == -1)
 	err(EXIT_FAILURE, "kevent register");
-    if (event.flags & EV_ERROR)
-	errx(EXIT_FAILURE, "Event error: %s", strerror(event.data));
 
     for (;;) {
 	/* Sleep until something happens. */
@@ -751,9 +773,16 @@ main(int argc, char **argv)
 	if (ret == -1) {
 	    err(EXIT_FAILURE, "kevent wait");
 	} else if (ret > 0) {
-	    printf("Something was written in '%s'\en", argv[1]);
+	    if (tevent.flags & EV_ERROR)
+		errx(EXIT_FAILURE, "Event error: %s", strerror(event.data));
+	    else
+		printf("Something was written in '%s'\en", argv[1]);
 	}
     }
+
+    /* kqueues are destroyed upon close() */
+    (void)close(kq);
+    (void)close(fd);
 }
 .Ed
 .Sh ERRORS
@@ -849,10 +878,6 @@ The
 system and this manual page were written by
 .An Jonathan Lemon Aq Mt jlemon@FreeBSD.org .
 .Sh BUGS
-The
-.Fa timeout
-value is limited to 24 hours; longer timeouts will be silently
-reinterpreted as 24 hours.
 .Pp
 In versions older than
 .Fx 12.0 ,

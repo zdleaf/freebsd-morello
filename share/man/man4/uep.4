@@ -22,8 +22,6 @@
 .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 .\" SUCH DAMAGE.
 .\"
-.\" $FreeBSD$
-.\"
 .Dd August 5, 2018
 .Dt UEP 4
 .Os
@@ -63,12 +61,12 @@ Depending on compile-time kernel options it supports either native
 or evdev operation modes.
 .Pp
 To get the mouse working in
-.Xr X 7
+.Xr X 7 Pq Pa ports/x11/xorg-docs
 in native mode, install
 .Pa ports/x11-drivers/xf86-input-egalax .
 .Pp
 To get the mouse working in
-.Xr X 7
+.Xr X 7 Pq Pa ports/x11/xorg-docs
 in evdev mode, install
 .Pa ports/x11-drivers/xf86-input-evdev .
 .Sh FILES

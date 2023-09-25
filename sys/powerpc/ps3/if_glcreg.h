@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (C) 2010 Nathan Whitehorn
  * All rights reserved.
@@ -23,8 +23,6 @@
  * WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR
  * OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 #ifndef _POWERPC_PS3_IF_GLCREG_H
@@ -65,7 +63,7 @@ struct glc_rxsoft {
 };
 
 struct glc_softc {
-	struct ifnet	*sc_ifp;
+	if_t		sc_ifp;
 	device_t	sc_self;
 	struct mtx	sc_mtx;
 	u_char		sc_enaddr[ETHER_ADDR_LEN];

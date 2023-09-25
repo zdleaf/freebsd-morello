@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 1999 Kazutaka YOKOTA <yokota@zodiac.mech.utsunomiya-u.ac.jp>
  * All rights reserved.
@@ -29,8 +29,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include "opt_kbd.h"
 
 #include <sys/param.h>
@@ -46,8 +44,6 @@ __FBSDID("$FreeBSD$");
 #include <dev/atkbdc/atkbdcreg.h>
 
 MALLOC_DEFINE(M_ATKBDDEV, "atkbddev", "AT Keyboard device");
-
-devclass_t atkbdc_devclass;
 
 int
 atkbdc_print_child(device_t bus, device_t dev)

@@ -24,23 +24,27 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 #ifndef __LINUXKPI_LINUX_MOD_DEVICETABLE_H__
 #define	__LINUXKPI_LINUX_MOD_DEVICETABLE_H__
+
+#include <linux/types.h>
 
 enum dmi_field {
 	DMI_NONE,
 	DMI_BIOS_VENDOR,
 	DMI_BIOS_VERSION,
 	DMI_BIOS_DATE,
+	DMI_BIOS_RELEASE,
+	DMI_EC_FIRMWARE_RELEASE,
 	DMI_SYS_VENDOR,
 	DMI_PRODUCT_NAME,
 	DMI_PRODUCT_VERSION,
 	DMI_PRODUCT_SERIAL,
 	DMI_PRODUCT_UUID,
+	DMI_PRODUCT_SKU,
+	DMI_PRODUCT_FAMILY,
 	DMI_BOARD_VENDOR,
 	DMI_BOARD_NAME,
 	DMI_BOARD_VERSION,
@@ -52,10 +56,12 @@ enum dmi_field {
 	DMI_CHASSIS_SERIAL,
 	DMI_CHASSIS_ASSET_TAG,
 	DMI_STRING_MAX,
+	DMI_OEM_STRING,
 };
 
 struct dmi_strmatch {
-	unsigned char slot;
+	unsigned char slot : 7;
+	unsigned char exact_match : 1;
 	char substr[79];
 };
 
@@ -67,6 +73,9 @@ struct dmi_system_id {
 };
 
 #define DMI_MATCH(a, b) { .slot = a, .substr = b }
-#define DMI_EXACT_MATCH(a, b)   { .slot = a, .substr = b, }
+#define DMI_EXACT_MATCH(a, b)   { .slot = a, .substr = b, .exact_match = 1 }
+
+#define	I2C_NAME_SIZE		20
+#define	I2C_MODULE_PREFIX	"i2c:"
 
 #endif	/* __LINUXKPI_LINUX_MOD_DEVICETABLE_H__ */

@@ -32,8 +32,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include "opt_inet.h"
 
 #include <sys/param.h>
@@ -49,6 +47,7 @@ __FBSDID("$FreeBSD$");
 
 #include <net/if.h>
 #include <net/if_var.h>
+#include <net/if_private.h>
 #include <net/if_types.h>
 #include <net/route.h>
 #include <net/route/route_ctl.h>
@@ -66,7 +65,6 @@ __FBSDID("$FreeBSD$");
 #include <netinet/ip_options.h>
 #include <netinet/sctp.h>
 #include <netinet/tcp.h>
-#include <netinet/tcp_var.h>
 #include <netinet/tcpip.h>
 #include <netinet/icmp_var.h>
 
@@ -76,6 +74,8 @@ __FBSDID("$FreeBSD$");
 
 #include <security/mac/mac_framework.h>
 #endif /* INET */
+
+extern ipproto_ctlinput_t	*ip_ctlprotox[];
 
 /*
  * ICMP routines: error generation, receive packet processing, and
@@ -87,6 +87,14 @@ VNET_DEFINE_STATIC(int, icmplim) = 200;
 SYSCTL_INT(_net_inet_icmp, ICMPCTL_ICMPLIM, icmplim, CTLFLAG_VNET | CTLFLAG_RW,
 	&VNET_NAME(icmplim), 0,
 	"Maximum number of ICMP responses per second");
+
+VNET_DEFINE_STATIC(int, icmplim_curr_jitter) = 0;
+#define V_icmplim_curr_jitter		VNET(icmplim_curr_jitter)
+VNET_DEFINE_STATIC(int, icmplim_jitter) = 16;
+#define	V_icmplim_jitter		VNET(icmplim_jitter)
+SYSCTL_INT(_net_inet_icmp, OID_AUTO, icmplim_jitter, CTLFLAG_VNET | CTLFLAG_RW,
+	&VNET_NAME(icmplim_jitter), 0,
+	"Random icmplim jitter adjustment limit");
 
 VNET_DEFINE_STATIC(int, icmplim_output) = 1;
 #define	V_icmplim_output		VNET(icmplim_output)
@@ -178,8 +186,6 @@ static void	icmp_reflect(struct mbuf *);
 static void	icmp_send(struct mbuf *, struct mbuf *);
 static int	icmp_verify_redirect_gateway(struct sockaddr_in *,
     struct sockaddr_in *, struct sockaddr_in *, u_int);
-
-extern	struct protosw inetsw[];
 
 /*
  * Kernel module interface for updating icmpstat.  The argument is an index
@@ -395,6 +401,55 @@ freeit:
 	m_freem(n);
 }
 
+int
+icmp_errmap(const struct icmp *icp)
+{
+
+	switch (icp->icmp_type) {
+	case ICMP_UNREACH:
+		switch (icp->icmp_code) {
+		case ICMP_UNREACH_NET:
+		case ICMP_UNREACH_HOST:
+		case ICMP_UNREACH_SRCFAIL:
+		case ICMP_UNREACH_NET_UNKNOWN:
+		case ICMP_UNREACH_HOST_UNKNOWN:
+		case ICMP_UNREACH_ISOLATED:
+		case ICMP_UNREACH_TOSNET:
+		case ICMP_UNREACH_TOSHOST:
+		case ICMP_UNREACH_HOST_PRECEDENCE:
+		case ICMP_UNREACH_PRECEDENCE_CUTOFF:
+			return (EHOSTUNREACH);
+		case ICMP_UNREACH_NEEDFRAG:
+			return (EMSGSIZE);
+		case ICMP_UNREACH_PROTOCOL:
+		case ICMP_UNREACH_PORT:
+		case ICMP_UNREACH_NET_PROHIB:
+		case ICMP_UNREACH_HOST_PROHIB:
+		case ICMP_UNREACH_FILTER_PROHIB:
+			return (ECONNREFUSED);
+		default:
+			return (0);
+		}
+	case ICMP_TIMXCEED:
+		switch (icp->icmp_code) {
+		case ICMP_TIMXCEED_INTRANS:
+			return (EHOSTUNREACH);
+		default:
+			return (0);
+		}
+	case ICMP_PARAMPROB:
+		switch (icp->icmp_code) {
+		case ICMP_PARAMPROB_ERRATPTR:
+		case ICMP_PARAMPROB_OPTABSENT:
+			return (ENOPROTOOPT);
+		default:
+			return (0);
+		}
+	default:
+		return (0);
+	}
+}
+
 /*
  * Process a received ICMP message.
  */
@@ -409,7 +464,6 @@ icmp_input(struct mbuf **mp, int *offp, int proto)
 	int hlen = *offp;
 	int icmplen = ntohs(ip->ip_len) - *offp;
 	int i, code;
-	void (*ctlfunc)(int, struct sockaddr *, void *);
 	int fibnum;
 
 	NET_EPOCH_ASSERT();
@@ -477,56 +531,21 @@ icmp_input(struct mbuf **mp, int *offp, int proto)
 	code = icp->icmp_code;
 	switch (icp->icmp_type) {
 	case ICMP_UNREACH:
-		switch (code) {
-			case ICMP_UNREACH_NET:
-			case ICMP_UNREACH_HOST:
-			case ICMP_UNREACH_SRCFAIL:
-			case ICMP_UNREACH_NET_UNKNOWN:
-			case ICMP_UNREACH_HOST_UNKNOWN:
-			case ICMP_UNREACH_ISOLATED:
-			case ICMP_UNREACH_TOSNET:
-			case ICMP_UNREACH_TOSHOST:
-			case ICMP_UNREACH_HOST_PRECEDENCE:
-			case ICMP_UNREACH_PRECEDENCE_CUTOFF:
-				code = PRC_UNREACH_NET;
-				break;
-
-			case ICMP_UNREACH_NEEDFRAG:
-				code = PRC_MSGSIZE;
-				break;
-
-			/*
-			 * RFC 1122, Sections 3.2.2.1 and 4.2.3.9.
-			 * Treat subcodes 2,3 as immediate RST
-			 */
-			case ICMP_UNREACH_PROTOCOL:
-				code = PRC_UNREACH_PROTOCOL;
-				break;
-			case ICMP_UNREACH_PORT:
-				code = PRC_UNREACH_PORT;
-				break;
-
-			case ICMP_UNREACH_NET_PROHIB:
-			case ICMP_UNREACH_HOST_PROHIB:
-			case ICMP_UNREACH_FILTER_PROHIB:
-				code = PRC_UNREACH_ADMIN_PROHIB;
-				break;
-
-			default:
-				goto badcode;
-		}
-		goto deliver;
+		if (code > ICMP_UNREACH_PRECEDENCE_CUTOFF)
+			goto badcode;
+		else
+			goto deliver;
 
 	case ICMP_TIMXCEED:
-		if (code > 1)
+		if (code > ICMP_TIMXCEED_REASS)
 			goto badcode;
-		code += PRC_TIMXCEED_INTRANS;
-		goto deliver;
+		else
+			goto deliver;
 
 	case ICMP_PARAMPROB:
-		if (code > 1)
+		if (code > ICMP_PARAMPROB_LENGTH)
 			goto badcode;
-		code = PRC_PARAMPROB;
+
 	deliver:
 		/*
 		 * Problem with datagram; advise higher level routines.
@@ -539,11 +558,14 @@ icmp_input(struct mbuf **mp, int *offp, int proto)
 		/* Discard ICMP's in response to multicast packets */
 		if (IN_MULTICAST(ntohl(icp->icmp_ip.ip_dst.s_addr)))
 			goto badcode;
+		/* Filter out responses to INADDR_ANY, protocols ignore it. */
+		if (icp->icmp_ip.ip_dst.s_addr == INADDR_ANY ||
+		    icp->icmp_ip.ip_src.s_addr == INADDR_ANY)
+			goto freeit;
 #ifdef ICMPPRINTFS
 		if (icmpprintfs)
 			printf("deliver to protocol %d\n", icp->icmp_ip.ip_p);
 #endif
-		icmpsrc.sin_addr = icp->icmp_ip.ip_dst;
 		/*
 		 * XXX if the packet contains [IPv4 AH TCP], we can't make a
 		 * notification to TCP layer.
@@ -565,10 +587,8 @@ icmp_input(struct mbuf **mp, int *offp, int proto)
 		 *   n is at least 8, but might be larger based on
 		 *   ICMP_ADVLENPREF. See its definition in ip_icmp.h.
 		 */
-		ctlfunc = inetsw[ip_protox[icp->icmp_ip.ip_p]].pr_ctlinput;
-		if (ctlfunc)
-			(*ctlfunc)(code, (struct sockaddr *)&icmpsrc,
-				   (void *)&icp->icmp_ip);
+		if (ip_ctlprotox[icp->icmp_ip.ip_p] != NULL)
+			ip_ctlprotox[icp->icmp_ip.ip_p](icp);
 		break;
 
 	badcode:
@@ -721,7 +741,6 @@ reflect:
 			    (struct sockaddr *)&icmpgw, m->m_pkthdr.rcvif,
 			    RTF_GATEWAY, V_redirtimeout);
 		}
-		pfctlinput(PRC_REDIRECT_HOST, (struct sockaddr *)&icmpsrc);
 		break;
 
 	/*
@@ -767,8 +786,8 @@ icmp_reflect(struct mbuf *m)
 	NET_EPOCH_ASSERT();
 
 	if (IN_MULTICAST(ntohl(ip->ip_src.s_addr)) ||
-	    IN_EXPERIMENTAL(ntohl(ip->ip_src.s_addr)) ||
-	    IN_ZERONET(ntohl(ip->ip_src.s_addr)) ) {
+	    (IN_EXPERIMENTAL(ntohl(ip->ip_src.s_addr)) && !V_ip_allow_net240) ||
+	    (IN_ZERONET(ntohl(ip->ip_src.s_addr)) && !V_ip_allow_net0) ) {
 		m_freem(m);	/* Bad return address */
 		ICMPSTAT_INC(icps_badaddr);
 		goto done;	/* Ip_output() will check for broadcast */
@@ -1122,11 +1141,29 @@ badport_bandlim(int which)
 	KASSERT(which >= 0 && which < BANDLIM_MAX,
 	    ("%s: which %d", __func__, which));
 
-	pps = counter_ratecheck(&V_icmp_rates[which].cr, V_icmplim);
+	if ((V_icmplim + V_icmplim_curr_jitter) <= 0)
+		V_icmplim_curr_jitter = -V_icmplim + 1;
+
+	pps = counter_ratecheck(&V_icmp_rates[which].cr, V_icmplim +
+	    V_icmplim_curr_jitter);
+	if (pps > 0) {
+		/*
+		 * Adjust limit +/- to jitter the measurement to deny a
+		 * side-channel port scan as in CVE-2020-25705
+		 */
+		if (V_icmplim_jitter > 0) {
+			int32_t inc =
+			    arc4random_uniform(V_icmplim_jitter * 2 +1)
+			    - V_icmplim_jitter;
+
+			V_icmplim_curr_jitter = inc;
+		}
+	}
 	if (pps == -1)
 		return (-1);
 	if (pps > 0 && V_icmplim_output)
 		log(LOG_NOTICE, "Limiting %s from %jd to %d packets/sec\n",
-			V_icmp_rates[which].descr, (intmax_t )pps, V_icmplim);
+		    V_icmp_rates[which].descr, (intmax_t )pps, V_icmplim +
+		    V_icmplim_curr_jitter);
 	return (0);
 }

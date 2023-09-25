@@ -1,6 +1,5 @@
 #!/bin/sh
 #
-# $FreeBSD$
 #
 
 # PROVIDE: local_unbound
@@ -34,6 +33,8 @@ load_rc_config $name
 : ${local_unbound_anchor:=${local_unbound_workdir}/root.key}
 : ${local_unbound_forwarders:=}
 : ${local_unbound_tls:=}
+: ${local_unbound_pidfile:=${pidfile}}
+pidfile=${local_unbound_pidfile}
 
 do_as_unbound()
 {

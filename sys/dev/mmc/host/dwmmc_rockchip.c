@@ -25,8 +25,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/kernel.h>
 #include <sys/bus.h>
@@ -41,9 +39,7 @@ __FBSDID("$FreeBSD$");
 
 #include <dev/ofw/ofw_bus_subr.h>
 
-#ifdef EXT_RESOURCES
 #include <dev/extres/clk/clk.h>
-#endif
 
 #include <dev/mmc/host/dwmmc_var.h>
 
@@ -94,14 +90,11 @@ rockchip_dwmmc_attach(device_t dev)
 		break;
 	}
 
-#ifdef EXT_RESOURCES
 	sc->update_ios = &dwmmc_rockchip_update_ios;
-#endif
 
 	return (dwmmc_attach(dev));
 }
 
-#ifdef EXT_RESOURCES
 static int
 dwmmc_rockchip_update_ios(struct dwmmc_softc *sc, struct mmc_ios *ios)
 {
@@ -128,7 +121,6 @@ dwmmc_rockchip_update_ios(struct dwmmc_softc *sc, struct mmc_ios *ios)
 	}
 	return (0);
 }
-#endif
 
 static device_method_t rockchip_dwmmc_methods[] = {
 	/* bus interface */
@@ -139,15 +131,11 @@ static device_method_t rockchip_dwmmc_methods[] = {
 	DEVMETHOD_END
 };
 
-static devclass_t rockchip_dwmmc_devclass;
-
 DEFINE_CLASS_1(rockchip_dwmmc, rockchip_dwmmc_driver, rockchip_dwmmc_methods,
     sizeof(struct dwmmc_softc), dwmmc_driver);
 
-DRIVER_MODULE(rockchip_dwmmc, simplebus, rockchip_dwmmc_driver,
-    rockchip_dwmmc_devclass, 0, 0);
-DRIVER_MODULE(rockchip_dwmmc, ofwbus, rockchip_dwmmc_driver,
-    rockchip_dwmmc_devclass, NULL, NULL);
+DRIVER_MODULE(rockchip_dwmmc, simplebus, rockchip_dwmmc_driver, 0, 0);
+DRIVER_MODULE(rockchip_dwmmc, ofwbus, rockchip_dwmmc_driver, NULL, NULL);
 #ifndef MMCCAM
 MMC_DECLARE_BRIDGE(rockchip_dwmmc);
 #endif

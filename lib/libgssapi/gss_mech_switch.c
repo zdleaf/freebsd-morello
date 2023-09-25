@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2005 Doug Rabson
  * All rights reserved.
@@ -24,8 +24,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- *	$FreeBSD$
  */
 
 #include <gssapi/gssapi.h>
@@ -72,7 +70,7 @@ _gss_string_to_oid(const char* s, gss_OID oid)
 		if (q) q = q + 1;
 		number_count++;
 	}
-	
+
 	/*
 	 * The first two numbers are in the first byte and each
 	 * subsequent number is encoded in a variable byte sequence.
@@ -136,7 +134,7 @@ _gss_string_to_oid(const char* s, gss_OID oid)
 				while (bytes) {
 					if (res) {
 						int bit = 7*(bytes-1);
-						
+
 						*res = (number >> bit) & 0x7f;
 						if (bytes != 1)
 							*res |= 0x80;
@@ -190,7 +188,6 @@ _gss_load_mech(void)
 	char		*p;
 	char		*name, *oid, *lib, *kobj;
 	struct _gss_mech_switch *m;
-	int		count;
 	void		*so;
 	const char	*(*prefix_fn)(void);
 
@@ -208,7 +205,6 @@ _gss_load_mech(void)
 		return;
 	}
 
-	count = 0;
 	while (fgets(buf, sizeof(buf), fp)) {
 		if (*buf == '#')
 			continue;
@@ -237,7 +233,7 @@ _gss_load_mech(void)
 			free(m);
 			continue;
 		}
-		
+
 		prefix_fn = (const char *(*)(void))
 			dlsym(so, "_gss_name_prefix");
 		if (prefix_fn)
@@ -290,7 +286,6 @@ _gss_load_mech(void)
 		OPTSYM(pname_to_uid);
 
 		SLIST_INSERT_HEAD(&_gss_mechs, m, gm_link);
-		count++;
 		continue;
 
 	bad:

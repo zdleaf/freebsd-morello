@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 1997,1998,2003 Doug Rabson
  * All rights reserved.
@@ -24,8 +24,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 #ifndef _SYS_BUS_H_
@@ -59,6 +57,21 @@ typedef enum device_state {
 	DS_ATTACHING = 25,		/**< @brief currently attaching */
 	DS_ATTACHED = 30,		/**< @brief attach method called */
 } device_state_t;
+
+/**
+ * @brief Device proprty types.
+ *
+ * Those are used by bus logic to encode requested properties,
+ * e.g. in DT all properties are stored as BE and need to be converted
+ * to host endianness.
+ */
+typedef enum device_property_type {
+	DEVICE_PROP_ANY = 0,
+	DEVICE_PROP_BUFFER = 1,
+	DEVICE_PROP_UINT32 = 2,
+	DEVICE_PROP_UINT64 = 3,
+	DEVICE_PROP_HANDLE = 4,
+} device_property_type_t;
 
 /**
  * @brief Device information exported to userspace.
@@ -129,6 +142,7 @@ struct devreq {
 #define	DEV_FREEZE	_IOW('D', 11, struct devreq)
 #define	DEV_THAW	_IOW('D', 12, struct devreq)
 #define	DEV_RESET	_IOW('D', 13, struct devreq)
+#define	DEV_GET_PATH	_IOWR('D', 14, struct devreq)
 
 /* Flags for DEV_DETACH and DEV_DISABLE. */
 #define	DEVF_FORCE_DETACH	0x0000001
@@ -237,17 +251,19 @@ typedef void driver_intr_t(void*);
 
 /**
  * @brief Interrupt type bits.
- * 
- * These flags are used both by newbus interrupt
- * registration (nexus.c) and also in struct intrec, which defines
- * interrupt properties.
  *
- * XXX We should probably revisit this and remove the vestiges of the
- * spls implicit in names like INTR_TYPE_TTY. In the meantime, don't
- * confuse things by renaming them (Grog, 18 July 2000).
+ * These flags may be passed by drivers to bus_setup_intr(9) when
+ * registering a new interrupt handler. The field is overloaded to
+ * specify both the interrupt's type and any special properties.
  *
- * Buses which do interrupt remapping will want to change their type
- * to reflect what sort of devices are underneath.
+ * The INTR_TYPE* bits will be passed to intr_priority(9) to determine
+ * the scheduling priority of the handler's ithread. Historically, each
+ * type was assigned a unique scheduling preference, but now only
+ * INTR_TYPE_CLK receives a default priority higher than other
+ * interrupts. See sys/priority.h.
+ *
+ * Buses may choose to modify or augment these flags as appropriate,
+ * e.g. nexus may apply INTR_EXCL.
  */
 enum intr_type {
 	INTR_TYPE_TTY = 1,
@@ -443,6 +459,9 @@ bus_dma_tag_t
 bus_space_tag_t
 	bus_generic_get_bus_tag(device_t dev, device_t child);
 int	bus_generic_get_domain(device_t dev, device_t child, int *domain);
+ssize_t	bus_generic_get_property(device_t dev, device_t child,
+				 const char *propname, void *propvalue,
+				 size_t size, device_property_type_t type);
 struct resource_list *
 	bus_generic_get_resource_list(device_t, device_t);
 int	bus_generic_map_resource(device_t dev, device_t child, int type,
@@ -491,6 +510,8 @@ int	bus_generic_unmap_resource(device_t dev, device_t child, int type,
 				   struct resource_map *map);
 int	bus_generic_write_ivar(device_t dev, device_t child, int which,
 			       uintptr_t value);
+int	bus_generic_get_device_path(device_t bus, device_t child, const char *locator,
+				    struct sbuf *sb);
 int	bus_helper_reset_post(device_t dev, int flags);
 int	bus_helper_reset_prepare(device_t dev, int flags);
 int	bus_null_rescan(device_t dev);
@@ -631,7 +652,8 @@ int	device_set_unit(device_t dev, int unit);	/* XXX DONT USE XXX */
 int	device_shutdown(device_t dev);
 void	device_unbusy(device_t dev);
 void	device_verbose(device_t dev);
-ssize_t	device_get_property(device_t dev, const char *prop, void *val, size_t sz);
+ssize_t	device_get_property(device_t dev, const char *prop, void *val,
+    size_t sz, device_property_type_t type);
 bool device_has_property(device_t dev, const char *prop);
 
 /*
@@ -734,6 +756,11 @@ void	bus_data_generation_update(void);
 #define	BUS_PASS_ORDER_LATE	7
 #define	BUS_PASS_ORDER_LAST	9
 
+#define BUS_LOCATOR_ACPI	"ACPI"
+#define BUS_LOCATOR_FREEBSD	"FreeBSD"
+#define BUS_LOCATOR_UEFI	"UEFI"
+#define BUS_LOCATOR_OFW		"OFW"
+
 extern int bus_current_pass;
 
 void	bus_set_pass(int pass);
@@ -775,14 +802,14 @@ struct driver_module_data {
 	int		dmd_pass;
 };
 
-#define	EARLY_DRIVER_MODULE_ORDERED(name, busname, driver, devclass,	\
-    evh, arg, order, pass)						\
-								\
+#define	EARLY_DRIVER_MODULE_ORDERED(name, busname, driver, evh, arg,	 \
+    order, pass)							\
+									\
 static struct driver_module_data name##_##busname##_driver_mod = {	\
 	evh, arg,							\
 	#busname,							\
 	(kobj_class_t) &driver,						\
-	&devclass,							\
+	NULL,								\
 	pass								\
 };									\
 									\
@@ -794,17 +821,16 @@ static moduledata_t name##_##busname##_mod = {				\
 DECLARE_MODULE(name##_##busname, name##_##busname##_mod,		\
 	       SI_SUB_DRIVERS, order)
 
-#define	EARLY_DRIVER_MODULE(name, busname, driver, devclass, evh, arg, pass) \
-	EARLY_DRIVER_MODULE_ORDERED(name, busname, driver, devclass,	\
-	    evh, arg, SI_ORDER_MIDDLE, pass)
+#define	EARLY_DRIVER_MODULE(name, busname, driver, evh, arg, pass)	\
+	EARLY_DRIVER_MODULE_ORDERED(name, busname, driver, evh, arg,	\
+	    SI_ORDER_MIDDLE, pass)
 
-#define	DRIVER_MODULE_ORDERED(name, busname, driver, devclass, evh, arg,\
-    order)								\
-	EARLY_DRIVER_MODULE_ORDERED(name, busname, driver, devclass,	\
-	    evh, arg, order, BUS_PASS_DEFAULT)
+#define	DRIVER_MODULE_ORDERED(name, busname, driver, evh, arg, order)	\
+	EARLY_DRIVER_MODULE_ORDERED(name, busname, driver, evh, arg,	\
+	    order, BUS_PASS_DEFAULT)
 
-#define	DRIVER_MODULE(name, busname, driver, devclass, evh, arg)	\
-	EARLY_DRIVER_MODULE(name, busname, driver, devclass, evh, arg,	\
+#define	DRIVER_MODULE(name, busname, driver, evh, arg)			\
+	EARLY_DRIVER_MODULE(name, busname, driver, evh, arg,		\
 	    BUS_PASS_DEFAULT)
 
 /**
@@ -834,6 +860,13 @@ static __inline void varp ## _set_ ## var(device_t dev, type t)		\
 	    __func__, device_get_nameunit(dev),				\
 	    device_get_nameunit(device_get_parent(dev)), e));		\
 }
+
+struct device_location_cache;
+typedef struct device_location_cache device_location_cache_t;
+device_location_cache_t *dev_wired_cache_init(void);
+void dev_wired_cache_fini(device_location_cache_t *dcp);
+bool dev_wired_cache_match(device_location_cache_t *dcp, device_t dev, const char *at);
+
 
 /**
  * Shorthand macros, taking resource argument

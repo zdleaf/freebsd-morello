@@ -220,7 +220,7 @@ static void execute_one(void);
 
 static void loop(void)
 {
-  int iter = 0;
+  int iter __unused = 0;
   for (;; iter++) {
     int pid = fork();
     if (pid < 0)
@@ -352,5 +352,5 @@ mycc -o /tmp/syzkaller28 -Wall -Wextra -O0 /tmp/syzkaller28.c -lpthread ||
 while pkill swap; do :; done
 wait
 
-rm -rf /tmp/syzkaller28 syzkaller28.c /tmp/syzkaller.*
+rm -rf /tmp/syzkaller28 /tmp/syzkaller28.c /tmp/syzkaller.*
 exit 0

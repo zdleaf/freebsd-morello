@@ -20,8 +20,6 @@
  * CDDL HEADER END
  *
  * Portions Copyright 2016 Ruslan Bukin <br@bsdpad.com>
- *
- * $FreeBSD$
  */
 /*
  * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
@@ -37,6 +35,8 @@
 
 #include <machine/frame.h>
 #include <machine/md_var.h>
+#include <machine/encoding.h>
+#include <machine/riscvreg.h>
 
 #include <vm/vm.h>
 #include <vm/vm_param.h>
@@ -52,12 +52,6 @@
 
 #include "regset.h"
 
-/*
- * Wee need some reasonable default to prevent backtrace code
- * from wandering too far
- */
-#define	MAX_FUNCTION_SIZE 0x10000
-#define	MAX_PROLOGUE_SIZE 0x100
 #define	MAX_USTACK_DEPTH  2048
 
 uint8_t dtrace_fuword8_nocheck(void *);
@@ -65,47 +59,61 @@ uint16_t dtrace_fuword16_nocheck(void *);
 uint32_t dtrace_fuword32_nocheck(void *);
 uint64_t dtrace_fuword64_nocheck(void *);
 
+int dtrace_match_opcode(uint32_t, int, int);
+int dtrace_instr_sdsp(uint32_t **);
+int dtrace_instr_ret(uint32_t **);
+int dtrace_instr_c_sdsp(uint32_t **);
+int dtrace_instr_c_ret(uint32_t **);
+
 void
 dtrace_getpcstack(pc_t *pcstack, int pcstack_limit, int aframes,
     uint32_t *intrpc)
 {
 	struct unwind_state state;
-	int scp_offset;
+	uintptr_t caller;
 	register_t sp;
+	int scp_offset;
 	int depth;
 
 	depth = 0;
+	caller = solaris_cpu[curcpu].cpu_dtrace_caller;
 
 	if (intrpc != 0) {
-		pcstack[depth++] = (pc_t) intrpc;
+		pcstack[depth++] = (pc_t)intrpc;
 	}
 
-	aframes++;
-
+	/*
+	 * Construct the unwind state, starting from this function. This frame,
+	 * and 'aframes' others will be skipped.
+	 */
 	__asm __volatile("mv %0, sp" : "=&r" (sp));
 
 	state.fp = (uintptr_t)__builtin_frame_address(0);
-	state.sp = sp;
+	state.sp = (uintptr_t)sp;
 	state.pc = (uintptr_t)dtrace_getpcstack;
 
 	while (depth < pcstack_limit) {
 		if (!unwind_frame(curthread, &state))
 			break;
 
-		if (!INKERNEL(state.pc) || !INKERNEL(state.fp))
+		if (!INKERNEL(state.pc) || !kstack_contains(curthread,
+		    (vm_offset_t)state.fp, sizeof(uintptr_t)))
 			break;
 
-		/*
-		 * NB: Unlike some other architectures, we don't need to
-		 * explicitly insert cpu_dtrace_caller as it appears in the
-		 * normal kernel stack trace rather than a special trap frame.
-		 */
 		if (aframes > 0) {
 			aframes--;
+
+			/*
+			 * fbt_invop() records the return address at the time
+			 * the FBT probe fires. We need to insert this into the
+			 * backtrace manually, since the stack frame state at
+			 * the time of the probe does not capture it.
+			 */
+			if (aframes == 0 && caller != 0)
+				pcstack[depth++] = caller;
 		} else {
 			pcstack[depth++] = state.pc;
 		}
-
 	}
 
 	for (; depth < pcstack_limit; depth++) {
@@ -148,9 +156,8 @@ dtrace_getustack_common(uint64_t *pcstack, int pcstack_limit, uintptr_t pc,
 		if (fp == 0)
 			break;
 
-		pc = dtrace_fuword64((void *)(fp +
-		    offsetof(struct riscv_frame, f_retaddr)));
-		fp = dtrace_fuword64((void *)fp);
+		pc = dtrace_fuword64((void *)(fp - 1 * sizeof(uint64_t)));
+		fp = dtrace_fuword64((void *)(fp - 2 * sizeof(uint64_t)));
 
 		if (fp == oldfp) {
 			*flags |= CPU_DTRACE_BADSTACK;
@@ -168,7 +175,7 @@ dtrace_getupcstack(uint64_t *pcstack, int pcstack_limit)
 {
 	volatile uint16_t *flags;
 	struct trapframe *tf;
-	uintptr_t pc, sp, fp;
+	uintptr_t pc, fp;
 	proc_t *p;
 	int n;
 
@@ -194,7 +201,6 @@ dtrace_getupcstack(uint64_t *pcstack, int pcstack_limit)
 		return;
 
 	pc = tf->tf_sepc;
-	sp = tf->tf_sp;
 	fp = tf->tf_s[0];
 
 	if (DTRACE_CPUFLAG_ISSET(CPU_DTRACE_ENTRY)) {
@@ -206,7 +212,6 @@ dtrace_getupcstack(uint64_t *pcstack, int pcstack_limit)
 		 * at the current stack pointer address since the call
 		 * instruction puts it there right before the branch.
 		 */
-
 		*pcstack++ = (uint64_t)pc;
 		pcstack_limit--;
 		if (pcstack_limit <= 0)
@@ -230,8 +235,33 @@ zero:
 int
 dtrace_getustackdepth(void)
 {
+	struct trapframe *tf;
+	uintptr_t pc, fp;
+	int n = 0;
 
-	printf("IMPLEMENT ME: %s\n", __func__);
+	if (curproc == NULL || (tf = curthread->td_frame) == NULL)
+		return (0);
+
+	if (DTRACE_CPUFLAG_ISSET(CPU_DTRACE_FAULT))
+		return (-1);
+
+	pc = tf->tf_sepc;
+	fp = tf->tf_s[0];
+
+	if (DTRACE_CPUFLAG_ISSET(CPU_DTRACE_ENTRY)) {
+		/*
+		 * In an entry probe.  The frame pointer has not yet been
+		 * pushed (that happens in the function prologue).  The
+		 * best approach is to add the current pc as a missing top
+		 * of stack and back the pc up to the caller, which is stored
+		 * at the current stack pointer address since the call
+		 * instruction puts it there right before the branch.
+		 */
+		pc = tf->tf_ra;
+		n++;
+	}
+
+	n += dtrace_getustack_common(NULL, 0, pc, fp);
 
 	return (0);
 }
@@ -285,12 +315,36 @@ dtrace_getstackdepth(int aframes)
 }
 
 ulong_t
-dtrace_getreg(struct trapframe *rp, uint_t reg)
+dtrace_getreg(struct trapframe *frame, uint_t reg)
 {
-
-	printf("IMPLEMENT ME: %s\n", __func__);
-
-	return (0);
+	switch (reg) {
+	case REG_ZERO:
+		return (0);
+	case REG_RA:
+		return (frame->tf_ra);
+	case REG_SP:
+		return (frame->tf_sp);
+	case REG_GP:
+		return (frame->tf_gp);
+	case REG_TP:
+		return (frame->tf_tp);
+	case REG_T0 ... REG_T2:
+		return (frame->tf_t[reg - REG_T0]);
+	case REG_S0 ... REG_S1:
+		return (frame->tf_s[reg - REG_S0]);
+	case REG_A0 ... REG_A7:
+		return (frame->tf_a[reg - REG_A0]);
+	case REG_S2 ... REG_S11:
+		return (frame->tf_s[reg - REG_S2 + 2]);
+	case REG_T3 ... REG_T6:
+		return (frame->tf_t[reg - REG_T3 + 3]);
+	case REG_PC:
+		return (frame->tf_sepc);
+	default:
+		DTRACE_CPUFLAG_SET(CPU_DTRACE_ILLOP);
+		return (0);
+	}
+	/* NOTREACHED */
 }
 
 static int
@@ -392,4 +446,69 @@ dtrace_fuword64(void *uaddr)
 	}
 
 	return (dtrace_fuword64_nocheck(uaddr));
+}
+
+int
+dtrace_match_opcode(uint32_t insn, int match, int mask)
+{
+	if (((insn ^ match) & mask) == 0)
+		return (1);
+
+	return (0);
+}
+
+int
+dtrace_instr_sdsp(uint32_t **instr)
+{
+	if (dtrace_match_opcode(**instr, (MATCH_SD | RS2_RA | RS1_SP),
+	    (MASK_SD | RS2_MASK | RS1_MASK)))
+		return (1);
+
+	return (0);
+}
+
+int
+dtrace_instr_c_sdsp(uint32_t **instr)
+{
+	uint16_t *instr1;
+	int i;
+
+	for (i = 0; i < 2; i++) {
+		instr1 = (uint16_t *)(*instr) + i;
+		if (dtrace_match_opcode(*instr1, (MATCH_C_SDSP | RS2_C_RA),
+		    (MASK_C_SDSP | RS2_C_MASK))) {
+			*instr = (uint32_t *)instr1;
+			return (1);
+		}
+	}
+
+	return (0);
+}
+
+int
+dtrace_instr_ret(uint32_t **instr)
+{
+	if (dtrace_match_opcode(**instr, (MATCH_JALR | (X_RA << RS1_SHIFT)),
+	    (MASK_JALR | RD_MASK | RS1_MASK | IMM_MASK)))
+		return (1);
+
+	return (0);
+}
+
+int
+dtrace_instr_c_ret(uint32_t **instr)
+{
+	uint16_t *instr1;
+	int i;
+
+	for (i = 0; i < 2; i++) {
+		instr1 = (uint16_t *)(*instr) + i;
+		if (dtrace_match_opcode(*instr1,
+		    (MATCH_C_JR | (X_RA << RD_SHIFT)), (MASK_C_JR | RD_MASK))) {
+			*instr = (uint32_t *)instr1;
+			return (1);
+		}
+	}
+
+	return (0);
 }

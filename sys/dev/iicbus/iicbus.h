@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 1998 Nicolas Souchu
  * All rights reserved.
@@ -24,8 +24,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  *
  */
 #ifndef __IICBUS_H
@@ -99,9 +97,7 @@ int iicbus_child_location(device_t bus, device_t child, struct sbuf *sb);
 int iicbus_child_pnpinfo(device_t bus, device_t child, struct sbuf *sb);
 
 extern driver_t iicbus_driver;
-extern devclass_t iicbus_devclass;
 extern driver_t ofw_iicbus_driver;
-extern devclass_t ofw_iicbus_devclass;
 extern driver_t acpi_iicbus_driver;
 
 #endif

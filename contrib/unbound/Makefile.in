@@ -57,7 +57,7 @@ LEX=@LEX@
 STRIP=@STRIP@
 CC=@CC@
 CPPFLAGS=-I. @CPPFLAGS@
-PYTHON_CPPFLAGS=-I. @PYTHON_CPPFLAGS@
+PYTHON_CPPFLAGS=-I. -I$(srcdir) @PYTHON_CPPFLAGS@
 CFLAGS=-DSRCDIR=$(srcdir) @CFLAGS@
 LDFLAGS=@LDFLAGS@
 LIBS=@LIBS@
@@ -130,7 +130,7 @@ util/fptr_wlist.c util/locks.c util/log.c util/mini_event.c util/module.c \
 util/netevent.c util/net_help.c util/random.c util/rbtree.c util/regional.c \
 util/rtt.c util/edns.c util/storage/dnstree.c util/storage/lookup3.c \
 util/storage/lruhash.c util/storage/slabhash.c util/tcp_conn_limit.c \
-util/timehist.c util/tube.c \
+util/timehist.c util/tube.c util/proxy_protocol.c \
 util/ub_event.c util/ub_event_pluggable.c util/winsock_event.c \
 validator/autotrust.c validator/val_anchor.c validator/validator.c \
 validator/val_kcache.c validator/val_kentry.c validator/val_neg.c \
@@ -148,7 +148,7 @@ outbound_list.lo alloc.lo config_file.lo configlexer.lo configparser.lo \
 fptr_wlist.lo edns.lo locks.lo log.lo mini_event.lo module.lo net_help.lo \
 random.lo rbtree.lo regional.lo rtt.lo dnstree.lo lookup3.lo lruhash.lo \
 slabhash.lo tcp_conn_limit.lo timehist.lo tube.lo winsock_event.lo \
-autotrust.lo val_anchor.lo rpz.lo \
+autotrust.lo val_anchor.lo rpz.lo proxy_protocol.lo \
 validator.lo val_kcache.lo val_kentry.lo val_neg.lo val_nsec3.lo val_nsec.lo \
 val_secalgo.lo val_sigcrypt.lo val_utils.lo dns64.lo $(CACHEDB_OBJ) authzone.lo \
 $(SUBNET_OBJ) $(PYTHONMOD_OBJ) $(CHECKLOCK_OBJ) $(DNSTAP_OBJ) $(DNSCRYPT_OBJ) \
@@ -344,7 +344,16 @@ longcheck: longtest
 test:	unittest$(EXEEXT) testbound$(EXEEXT)
 	./unittest$(EXEEXT)
 	./testbound$(EXEEXT) -s
-	for x in $(srcdir)/testdata/*.rpl; do printf "%s" "$$x "; if ./testbound$(EXEEXT) -p $$x >/dev/null 2>&1; then echo OK; else echo failed; exit 1; fi done
+	for x in $(srcdir)/testdata/*.rpl; do \
+		output=`./testbound$(EXEEXT) -p $$x -o -vvvvv 2>&1`; \
+		if test $$? -eq 0; then \
+			printf "%s OK\n" "$$x "; \
+		else \
+			printf "%s\n" "$$output "; \
+			printf "%s failed\n" "$$x "; \
+			exit 1; \
+		fi; \
+	done
 	@echo test OK
 
 longtest:	tests
@@ -556,7 +565,7 @@ pythonmod-install:
 
 pyunbound-install:
 	$(INSTALL) -m 755 -d $(DESTDIR)$(PYTHON_SITE_PKG)
-	$(INSTALL) -c -m 644 $(srcdir)/libunbound/python/unbound.py $(DESTDIR)$(PYTHON_SITE_PKG)/unbound.py
+	$(INSTALL) -c -m 644 libunbound/python/unbound.py $(DESTDIR)$(PYTHON_SITE_PKG)/unbound.py
 	$(LIBTOOL) --mode=install cp _unbound.la $(DESTDIR)$(PYTHON_SITE_PKG)
 	$(LIBTOOL) --mode=finish $(DESTDIR)$(PYTHON_SITE_PKG)
 
@@ -583,6 +592,8 @@ install-lib:	lib $(UNBOUND_EVENT_INSTALL)
 		echo ".so man3/libunbound.3" > $(DESTDIR)$(mandir)/man3/$$mpage.3 ; \
 	done
 	$(LIBTOOL) --mode=install cp unbound.h $(DESTDIR)$(includedir)/unbound.h
+	$(INSTALL) -m 755 -d $(DESTDIR)$(libdir)/pkgconfig
+	$(INSTALL) -m 644 contrib/libunbound.pc $(DESTDIR)$(libdir)/pkgconfig
 	$(LIBTOOL) --mode=install cp libunbound.la $(DESTDIR)$(libdir)
 	$(LIBTOOL) --mode=finish $(DESTDIR)$(libdir)
 
@@ -592,8 +603,6 @@ install-all:	all $(PYTHONMOD_INSTALL) $(PYUNBOUND_INSTALL) $(UNBOUND_EVENT_INSTA
 	$(INSTALL) -m 755 -d $(DESTDIR)$(mandir)/man8
 	$(INSTALL) -m 755 -d $(DESTDIR)$(mandir)/man5
 	$(INSTALL) -m 755 -d $(DESTDIR)$(mandir)/man1
-	$(INSTALL) -m 755 -d $(DESTDIR)$(libdir)/pkgconfig
-	$(INSTALL) -m 644 contrib/libunbound.pc $(DESTDIR)$(libdir)/pkgconfig
 	$(LIBTOOL) --mode=install cp -f unbound$(EXEEXT) $(DESTDIR)$(sbindir)/unbound$(EXEEXT)
 	$(LIBTOOL) --mode=install cp -f unbound-checkconf$(EXEEXT) $(DESTDIR)$(sbindir)/unbound-checkconf$(EXEEXT)
 	$(LIBTOOL) --mode=install cp -f unbound-control$(EXEEXT) $(DESTDIR)$(sbindir)/unbound-control$(EXEEXT)
@@ -607,7 +616,7 @@ install-all:	all $(PYTHONMOD_INSTALL) $(PYUNBOUND_INSTALL) $(UNBOUND_EVENT_INSTA
 	$(INSTALL) -c -m 644 doc/unbound.conf.5 $(DESTDIR)$(mandir)/man5
 	$(INSTALL) -c -m 644 doc/unbound-host.1 $(DESTDIR)$(mandir)/man1
 	$(INSTALL) -c -m 755 unbound-control-setup $(DESTDIR)$(sbindir)/unbound-control-setup
-	if test ! -e $(DESTDIR)$(configfile); then $(INSTALL) -d `dirname $(DESTDIR)$(configfile)`; $(INSTALL) -c -m 644 doc/example.conf $(DESTDIR)$(configfile); fi
+	if test ! -e "$(DESTDIR)$(configfile)"; then $(INSTALL) -d `dirname "$(DESTDIR)$(configfile)"`; $(INSTALL) -c -m 644 doc/example.conf "$(DESTDIR)$(configfile)"; fi
 
 pythonmod-uninstall:
 	rm -f -- $(DESTDIR)$(PYTHON_SITE_PKG)/unboundmodule.py
@@ -636,7 +645,7 @@ uninstall:	$(PYTHONMOD_UNINSTALL) $(PYUNBOUND_UNINSTALL) $(UNBOUND_EVENT_UNINSTA
 	rm -f -- $(DESTDIR)$(includedir)/unbound.h
 	$(LIBTOOL) --mode=uninstall rm -f $(DESTDIR)$(libdir)/libunbound.la
 	@echo
-	@echo "You still need to remove "`dirname $(DESTDIR)$(configfile)`" , $(DESTDIR)$(configfile) by hand"
+	@echo "You still need to remove "`dirname "$(DESTDIR)$(configfile)"`" , $(DESTDIR)$(configfile) by hand"
 
 iana_update:
 	curl -o port-numbers.tmp https://www.iana.org/assignments/service-names-port-numbers/service-names-port-numbers.xml --compressed
@@ -975,6 +984,8 @@ netevent.lo netevent.o: $(srcdir)/util/netevent.c config.h $(srcdir)/util/neteve
  $(srcdir)/sldns/sbuffer.h $(srcdir)/util/config_file.h $(srcdir)/services/authzone.h $(srcdir)/daemon/stats.h \
  $(srcdir)/util/timehist.h $(srcdir)/libunbound/unbound.h $(srcdir)/respip/respip.h $(srcdir)/sldns/str2wire.h \
  $(srcdir)/dnstap/dnstap.h  $(srcdir)/services/listen_dnsport.h
+proxy_protocol.lo proxy_protocol.o: $(srcdir)/util/proxy_protocol.c config.h \
+ $(srcdir)/util/proxy_protocol.h $(srcdir)/sldns/sbuffer.h
 net_help.lo net_help.o: $(srcdir)/util/net_help.c config.h $(srcdir)/util/net_help.h $(srcdir)/util/log.h \
  $(srcdir)/util/data/dname.h $(srcdir)/util/storage/lruhash.h $(srcdir)/util/locks.h $(srcdir)/util/module.h \
  $(srcdir)/util/data/msgreply.h $(srcdir)/util/data/packed_rrset.h $(srcdir)/util/data/msgparse.h \
@@ -1248,7 +1259,7 @@ cachedump.lo cachedump.o: $(srcdir)/daemon/cachedump.c config.h $(srcdir)/daemon
  $(srcdir)/util/regional.h $(srcdir)/util/net_help.h $(srcdir)/util/data/dname.h $(srcdir)/iterator/iterator.h \
  $(srcdir)/services/outbound_list.h $(srcdir)/iterator/iter_delegpt.h $(srcdir)/iterator/iter_utils.h \
  $(srcdir)/iterator/iter_resptype.h $(srcdir)/iterator/iter_fwd.h $(srcdir)/iterator/iter_hints.h \
- $(srcdir)/sldns/wire2str.h $(srcdir)/sldns/str2wire.h
+ $(srcdir)/sldns/wire2str.h $(srcdir)/sldns/str2wire.h $(srcdir)/util/config_file.h $(srcdir)/services/outside_network.h
 daemon.lo daemon.o: $(srcdir)/daemon/daemon.c config.h $(srcdir)/daemon/daemon.h $(srcdir)/util/locks.h \
  $(srcdir)/util/log.h $(srcdir)/util/alloc.h $(srcdir)/services/modstack.h  \
   $(srcdir)/daemon/worker.h $(srcdir)/libunbound/worker.h \
@@ -1503,7 +1514,7 @@ asynclook.lo asynclook.o: $(srcdir)/testcode/asynclook.c config.h $(srcdir)/libu
  $(srcdir)/services/modstack.h $(srcdir)/libunbound/unbound-event.h $(srcdir)/util/data/packed_rrset.h \
  $(srcdir)/util/storage/lruhash.h $(srcdir)/sldns/rrdef.h
 streamtcp.lo streamtcp.o: $(srcdir)/testcode/streamtcp.c config.h $(srcdir)/util/locks.h $(srcdir)/util/log.h \
- $(srcdir)/util/net_help.h $(srcdir)/util/data/msgencode.h $(srcdir)/util/data/msgparse.h \
+ $(srcdir)/util/net_help.h $(srcdir)/util/proxy_protocol.h $(srcdir)/util/data/msgencode.h $(srcdir)/util/data/msgparse.h \
  $(srcdir)/util/storage/lruhash.h $(srcdir)/sldns/pkthdr.h $(srcdir)/sldns/rrdef.h $(srcdir)/util/data/msgreply.h \
  $(srcdir)/util/data/packed_rrset.h $(srcdir)/util/data/dname.h $(srcdir)/sldns/sbuffer.h \
  $(srcdir)/sldns/str2wire.h $(srcdir)/sldns/wire2str.h

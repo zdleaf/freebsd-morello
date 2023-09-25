@@ -53,8 +53,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 /**
  * @file
  *
@@ -346,7 +344,7 @@ SCI_STATUS scic_sds_mpc_agent_validate_phy_configuration(
 
       if (phy_mask != 0)
       {
-         // Make sure that one or more of the phys were not already assinged to
+         // Make sure that one or more of the phys were not already assigned to
          // a different port.
          if ((phy_mask & ~assigned_phy_mask) == 0)
          {
@@ -1012,7 +1010,7 @@ void scic_sds_port_configuration_agent_construct(
  *            agent is being initialized.
  *
  * @param[in] port_agent This is the port configuration agent that is being
- *            initialized.  The initialization path is handled differntly
+ *            initialized.  The initialization path is handled differently
  *            for the automatic port configuration agent and the manual port
  *            configuration agent.
  *

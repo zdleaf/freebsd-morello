@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright 2020 Michal Meloun <mmel@FreeBSD.org>
  *
@@ -26,8 +26,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/bus.h>
@@ -621,8 +619,7 @@ static device_method_t tegra210_pmc_methods[] = {
 	DEVMETHOD_END
 };
 
-static devclass_t tegra210_pmc_devclass;
 static DEFINE_CLASS_0(pmc, tegra210_pmc_driver, tegra210_pmc_methods,
     sizeof(struct tegra210_pmc_softc));
-EARLY_DRIVER_MODULE(tegra210_pmc, simplebus, tegra210_pmc_driver,
-    tegra210_pmc_devclass, NULL, NULL, 70);
+EARLY_DRIVER_MODULE(tegra210_pmc, simplebus, tegra210_pmc_driver, NULL, NULL,
+    70);

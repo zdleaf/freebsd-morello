@@ -22,13 +22,9 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 struct ntb_transport_qp;
-
-extern devclass_t ntb_transport_devclass;
 
 enum ntb_link_event {
 	NTB_LINK_DOWN = 0,

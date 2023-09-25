@@ -32,7 +32,6 @@
  * SUCH DAMAGE.
  *
  * $DragonFly: src/sys/vfs/hammer/hammer_disk.h,v 1.55 2008/11/13 02:18:43 dillon Exp $
- * $FreeBSD$
  */
 
 #ifndef VFS_HAMMER_DISK_H_
@@ -765,7 +764,7 @@ typedef struct hammer_volume_ondisk {
 
 	/*
 	 * These fields are initialized and space is reserved in every
-	 * volume making up a HAMMER filesytem, but only the root volume
+	 * volume making up a HAMMER filesystem, but only the root volume
 	 * contains valid data.  Note that vol0_stat_bigblocks does not
 	 * include big-blocks for freemap and undomap initially allocated
 	 * by newfs_hammer(8).
@@ -910,7 +909,7 @@ typedef struct hammer_inode_data {
 } *hammer_inode_data_t;
 
 /*
- * Neither mtime nor atime upates are CRCd by the B-Tree element.
+ * Neither mtime nor atime updates are CRCd by the B-Tree element.
  * mtime updates have UNDO, atime updates do not.
  */
 #define HAMMER_INODE_CRCSIZE	\
@@ -1038,7 +1037,7 @@ typedef struct hammer_pseudofs_data *hammer_pseudofs_data_t;
  * Snapshot meta-data { Objid = HAMMER_OBJID_ROOT, Key = tid, rectype = SNAPSHOT }.
  *
  * Snapshot records replace the old <fs>/snapshots/<softlink> methodology.  Snapshot
- * records are mirrored but may be independantly managed once they are laid down on
+ * records are mirrored but may be independently managed once they are laid down on
  * a slave.
  *
  * NOTE: The b-tree key is signed, the tid is not, so callers must still sort the

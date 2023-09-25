@@ -18,8 +18,6 @@
 # CDDL HEADER END
 #
 
-# $FreeBSD$
-
 #
 # Copyright 2012 Spectra Logic.  All rights reserved.
 # Use is subject to license terms.
@@ -148,8 +146,7 @@ zpool_add_005_pos_body()
 	. $(atf_get_srcdir)/zpool_add.kshlib
 	. $(atf_get_srcdir)/zpool_add.cfg
 
-	verify_disk_count "$DISKS" 3
-	atf_expect_fail "PR 241070 dumpon opens geom devices non-exclusively"
+	verify_disk_count "$DISKS" 5
 	ksh93 $(atf_get_srcdir)/setup.ksh || atf_fail "Setup failed"
 	ksh93 $(atf_get_srcdir)/zpool_add_005_pos.ksh || atf_fail "Testcase failed"
 }

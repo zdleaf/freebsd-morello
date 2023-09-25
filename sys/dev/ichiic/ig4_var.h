@@ -31,8 +31,6 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
  * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 #ifndef _ICHIIC_IG4_VAR_H_
@@ -91,10 +89,10 @@ struct ig4iic_softc {
 	struct ig4_cfg	cfg;
 	uint32_t	intr_mask;
 	uint8_t		last_slave;
-	int		platform_attached : 1;
-	int		use_10bit : 1;
-	int		slave_valid : 1;
-	int		poll: 1;
+	bool		platform_attached : 1;
+	bool		use_10bit : 1;
+	bool		slave_valid : 1;
+	bool		poll: 1;
 
 	/*
 	 * Locking semantics:
@@ -113,8 +111,6 @@ struct ig4iic_softc {
 };
 
 typedef struct ig4iic_softc ig4iic_softc_t;
-
-extern devclass_t ig4iic_devclass;
 
 /* Attach/Detach called from ig4iic_pci_*() */
 int ig4iic_attach(ig4iic_softc_t *sc);

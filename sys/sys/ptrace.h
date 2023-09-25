@@ -29,7 +29,6 @@
  * SUCH DAMAGE.
  *
  *	@(#)ptrace.h	8.2 (Berkeley) 1/4/94
- * $FreeBSD$
  */
 
 #ifndef	_SYS_PTRACE_H_
@@ -87,6 +86,7 @@
 #define	PT_VM_ENTRY	41	/* Get VM map (entry) */
 #define	PT_GETREGSET	42	/* Get a target register set */
 #define	PT_SETREGSET	43	/* Set a target register set */
+#define	PT_SC_REMOTE	44	/* Execute a syscall */
 
 #define PT_FIRSTMACH    64	/* for machine-specific requests */
 #include <machine/ptrace.h>	/* machine-specific requests, if any */
@@ -162,7 +162,7 @@ struct ptrace_lwpinfo32 {
 
 /* Argument structure for PT_GET_SC_RET. */
 struct ptrace_sc_ret {
-	register_t	sr_retval[2];	/* Only valid if sr_error == 0. */
+	syscallarg_t	sr_retval[2];	/* Only valid if sr_error == 0. */
 	int		sr_error;
 };
 
@@ -192,13 +192,28 @@ struct ptrace_coredump {
 #define	PC_COMPRESS	0x00000001	/* Allow compression */
 #define	PC_ALL		0x00000002	/* Include non-dumpable entries */
 
+struct ptrace_sc_remote {
+	struct ptrace_sc_ret pscr_ret;
+	u_int	pscr_syscall;
+	u_int	pscr_nargs;
+	syscallarg_t	*pscr_args;
+};
+
 #ifdef _KERNEL
+
+#include <sys/proc.h>
 
 struct thr_coredump_req {
 	struct vnode	*tc_vp;		/* vnode to write coredump to. */
 	off_t		tc_limit;	/* max coredump file size. */
 	int		tc_flags;	/* user flags */
 	int		tc_error;	/* request result */
+};
+
+struct thr_syscall_req {
+	struct ptrace_sc_ret ts_ret;
+	u_int	ts_nargs;
+	struct syscall_args ts_sa;
 };
 
 int	ptrace_set_pc(struct thread *_td, unsigned long _addr);

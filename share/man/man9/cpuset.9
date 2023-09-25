@@ -22,9 +22,7 @@
 .\" ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 .\" POSSIBILITY OF SUCH DAMAGE.
 .\"
-.\" $FreeBSD$
-.\"
-.Dd December 12, 2019
+.Dd September 23, 2022
 .Dt CPUSET 9
 .Os
 .Sh NAME
@@ -110,9 +108,9 @@ Each CPU is represented by a single bit.
 The maximum number of CPUs representable by
 .Vt cpuset_t
 is
-.Va MAXCPU .
+.Va CPU_SETSIZE .
 Individual CPUs in cpusets are referenced with indices zero through
-.Fa MAXCPU - 1 .
+.Fa CPU_SETSIZE - 1 .
 .Pp
 The
 .Fn CPUSET_T_INITIALIZER
@@ -176,6 +174,15 @@ machine instructions.
 The
 .Fn CPU_SET_ATOMIC_ACQ
 macro sets the bit representing the CPU with atomic acquire semantics.
+.Pp
+The
+.Fn CPU_ISSET
+macro returns
+.Dv true
+if CPU
+.Fa cpu_idx
+is a member of the cpuset pointed to by
+.Fa cpuset .
 .Pp
 The
 .Fn CPU_ZERO

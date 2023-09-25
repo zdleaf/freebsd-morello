@@ -34,8 +34,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 /*
  * National Semiconductor DP83820/DP83821 gigabit ethernet driver
  * for FreeBSD. Datasheets are available from:
@@ -166,17 +164,17 @@ static void nge_txeof(struct nge_softc *);
 static void nge_intr(void *);
 static void nge_tick(void *);
 static void nge_stats_update(struct nge_softc *);
-static void nge_start(struct ifnet *);
-static void nge_start_locked(struct ifnet *);
-static int nge_ioctl(struct ifnet *, u_long, caddr_t);
+static void nge_start(if_t);
+static void nge_start_locked(if_t);
+static int nge_ioctl(if_t, u_long, caddr_t);
 static void nge_init(void *);
 static void nge_init_locked(struct nge_softc *);
 static int nge_stop_mac(struct nge_softc *);
 static void nge_stop(struct nge_softc *);
 static void nge_wol(struct nge_softc *);
 static void nge_watchdog(struct nge_softc *);
-static int nge_mediachange(struct ifnet *);
-static void nge_mediastatus(struct ifnet *, struct ifmediareq *);
+static int nge_mediachange(if_t);
+static void nge_mediastatus(if_t, struct ifmediareq *);
 
 static void nge_delay(struct nge_softc *);
 static void nge_eeprom_idle(struct nge_softc *);
@@ -240,10 +238,8 @@ static driver_t nge_driver = {
 	sizeof(struct nge_softc)
 };
 
-static devclass_t nge_devclass;
-
-DRIVER_MODULE(nge, pci, nge_driver, nge_devclass, 0, 0);
-DRIVER_MODULE(miibus, nge, miibus_driver, miibus_devclass, 0, 0);
+DRIVER_MODULE(nge, pci, nge_driver, 0, 0);
+DRIVER_MODULE(miibus, nge, miibus_driver, 0, 0);
 
 #define NGE_SETBIT(sc, reg, x)				\
 	CSR_WRITE_4(sc, reg,				\
@@ -514,7 +510,7 @@ nge_miibus_statchg(device_t dev)
 {
 	struct nge_softc *sc;
 	struct mii_data *mii;
-	struct ifnet *ifp;
+	if_t ifp;
 	struct nge_txdesc *txd;
 	uint32_t done, reg, status;
 	int i;
@@ -525,7 +521,7 @@ nge_miibus_statchg(device_t dev)
 	mii = device_get_softc(sc->nge_miibus);
 	ifp = sc->nge_ifp;
 	if (mii == NULL || ifp == NULL ||
-	    (ifp->if_drv_flags & IFF_DRV_RUNNING) == 0)
+	    (if_getdrvflags(ifp) & IFF_DRV_RUNNING) == 0)
 		return;
 
 	sc->nge_flags &= ~NGE_FLAG_LINK;
@@ -686,7 +682,7 @@ nge_write_maddr(void *arg, struct sockaddr_dl *sdl, u_int cnt)
 static void
 nge_rxfilter(struct nge_softc *sc)
 {
-	struct ifnet *ifp;
+	if_t ifp;
 	uint32_t i, rxfilt;
 
 	NGE_LOCK_ASSERT(sc);
@@ -717,13 +713,13 @@ nge_rxfilter(struct nge_softc *sc)
 	/*
 	 * Set the capture broadcast bit to capture broadcast frames.
 	 */
-	if ((ifp->if_flags & IFF_BROADCAST) != 0)
+	if ((if_getflags(ifp) & IFF_BROADCAST) != 0)
 		rxfilt |= NGE_RXFILTCTL_BROAD;
 
-	if ((ifp->if_flags & IFF_PROMISC) != 0 ||
-	    (ifp->if_flags & IFF_ALLMULTI) != 0) {
+	if ((if_getflags(ifp) & IFF_PROMISC) != 0 ||
+	    (if_getflags(ifp) & IFF_ALLMULTI) != 0) {
 		rxfilt |= NGE_RXFILTCTL_ALLMULTI;
-		if ((ifp->if_flags & IFF_PROMISC) != 0)
+		if ((if_getflags(ifp) & IFF_PROMISC) != 0)
 			rxfilt |= NGE_RXFILTCTL_ALLPHYS;
 		goto done;
 	}
@@ -822,7 +818,7 @@ nge_attach(device_t dev)
 	uint8_t eaddr[ETHER_ADDR_LEN];
 	uint16_t ea[ETHER_ADDR_LEN/2], ea_temp, reg;
 	struct nge_softc *sc;
-	struct ifnet *ifp;
+	if_t ifp;
 	int error, i, rid;
 
 	error = 0;
@@ -909,25 +905,24 @@ nge_attach(device_t dev)
 		error = ENOSPC;
 		goto fail;
 	}
-	ifp->if_softc = sc;
+	if_setsoftc(ifp, sc);
 	if_initname(ifp, device_get_name(dev), device_get_unit(dev));
-	ifp->if_flags = IFF_BROADCAST | IFF_SIMPLEX | IFF_MULTICAST;
-	ifp->if_ioctl = nge_ioctl;
-	ifp->if_start = nge_start;
-	ifp->if_init = nge_init;
-	ifp->if_snd.ifq_drv_maxlen = NGE_TX_RING_CNT - 1;
-	IFQ_SET_MAXLEN(&ifp->if_snd, ifp->if_snd.ifq_drv_maxlen);
-	IFQ_SET_READY(&ifp->if_snd);
-	ifp->if_hwassist = NGE_CSUM_FEATURES;
-	ifp->if_capabilities = IFCAP_HWCSUM;
+	if_setflags(ifp, IFF_BROADCAST | IFF_SIMPLEX | IFF_MULTICAST);
+	if_setioctlfn(ifp, nge_ioctl);
+	if_setstartfn(ifp, nge_start);
+	if_setinitfn(ifp, nge_init);
+	if_setsendqlen(ifp, NGE_TX_RING_CNT - 1);
+	if_setsendqready(ifp);
+	if_sethwassist(ifp, NGE_CSUM_FEATURES);
+	if_setcapabilities(ifp, IFCAP_HWCSUM);
 	/*
 	 * It seems that some hardwares doesn't provide 3.3V auxiliary
 	 * supply(3VAUX) to drive PME such that checking PCI power
 	 * management capability is necessary.
 	 */
 	if (pci_find_cap(sc->nge_dev, PCIY_PMG, &i) == 0)
-		ifp->if_capabilities |= IFCAP_WOL;
-	ifp->if_capenable = ifp->if_capabilities;
+		if_setcapabilitiesbit(ifp, IFCAP_WOL, 0);
+	if_setcapenable(ifp, if_getcapabilities(ifp));
 
 	if ((CSR_READ_4(sc, NGE_CFG) & NGE_CFG_TBI_EN) != 0) {
 		sc->nge_flags |= NGE_FLAG_TBI;
@@ -956,18 +951,18 @@ nge_attach(device_t dev)
 	ether_ifattach(ifp, eaddr);
 
 	/* VLAN capability setup. */
-	ifp->if_capabilities |= IFCAP_VLAN_MTU | IFCAP_VLAN_HWTAGGING;
-	ifp->if_capabilities |= IFCAP_VLAN_HWCSUM;
-	ifp->if_capenable = ifp->if_capabilities;
+	if_setcapabilitiesbit(ifp, IFCAP_VLAN_MTU | IFCAP_VLAN_HWTAGGING, 0);
+	if_setcapabilitiesbit(ifp, IFCAP_VLAN_HWCSUM, 0);
+	if_setcapenable(ifp, if_getcapabilities(ifp));
 #ifdef DEVICE_POLLING
-	ifp->if_capabilities |= IFCAP_POLLING;
+	if_setcapabilitiesbit(ifp, IFCAP_POLLING, 0);
 #endif
 	/*
 	 * Tell the upper layer(s) we support long frames.
 	 * Must appear after the call to ether_ifattach() because
 	 * ether_ifattach() sets ifi_hdrlen to the default value.
 	 */
-	ifp->if_hdrlen = sizeof(struct ether_vlan_header);
+	if_setifheaderlen(ifp, sizeof(struct ether_vlan_header));
 
 	/*
 	 * Hookup IRQ last.
@@ -989,13 +984,13 @@ static int
 nge_detach(device_t dev)
 {
 	struct nge_softc *sc;
-	struct ifnet *ifp;
+	if_t ifp;
 
 	sc = device_get_softc(dev);
 	ifp = sc->nge_ifp;
 
 #ifdef DEVICE_POLLING
-	if (ifp != NULL && ifp->if_capenable & IFCAP_POLLING)
+	if (ifp != NULL && if_getcapenable(ifp) & IFCAP_POLLING)
 		ether_poll_deregister(ifp);
 #endif
 
@@ -1441,7 +1436,7 @@ static int
 nge_rxeof(struct nge_softc *sc)
 {
 	struct mbuf *m;
-	struct ifnet *ifp;
+	if_t ifp;
 	struct nge_desc *cur_rx;
 	struct nge_rxdesc *rxd;
 	int cons, prog, rx_npkts, total_len;
@@ -1458,10 +1453,10 @@ nge_rxeof(struct nge_softc *sc)
 	    BUS_DMASYNC_POSTREAD | BUS_DMASYNC_POSTWRITE);
 
 	for (prog = 0; prog < NGE_RX_RING_CNT &&
-	    (ifp->if_drv_flags & IFF_DRV_RUNNING) != 0;
+	    (if_getdrvflags(ifp) & IFF_DRV_RUNNING) != 0;
 	    NGE_INC(cons, NGE_RX_RING_CNT)) {
 #ifdef DEVICE_POLLING
-		if (ifp->if_capenable & IFCAP_POLLING) {
+		if (if_getcapenable(ifp) & IFCAP_POLLING) {
 			if (sc->rxcycles <= 0)
 				break;
 			sc->rxcycles--;
@@ -1568,7 +1563,7 @@ nge_rxeof(struct nge_softc *sc)
 		m->m_pkthdr.rcvif = ifp;
 		if_inc_counter(ifp, IFCOUNTER_IPACKETS, 1);
 
-		if ((ifp->if_capenable & IFCAP_RXCSUM) != 0) {
+		if ((if_getcapenable(ifp) & IFCAP_RXCSUM) != 0) {
 			/* Do IP checksum checking. */
 			if ((extsts & NGE_RXEXTSTS_IPPKT) != 0)
 				m->m_pkthdr.csum_flags |= CSUM_IP_CHECKED;
@@ -1589,13 +1584,13 @@ nge_rxeof(struct nge_softc *sc)
 		 * to vlan_input() instead of ether_input().
 		 */
 		if ((extsts & NGE_RXEXTSTS_VLANPKT) != 0 &&
-		    (ifp->if_capenable & IFCAP_VLAN_HWTAGGING) != 0) {
+		    (if_getcapenable(ifp) & IFCAP_VLAN_HWTAGGING) != 0) {
 			m->m_pkthdr.ether_vtag =
 			    bswap16(extsts & NGE_RXEXTSTS_VTCI);
 			m->m_flags |= M_VLANTAG;
 		}
 		NGE_UNLOCK(sc);
-		(*ifp->if_input)(ifp, m);
+		if_input(ifp, m);
 		NGE_LOCK(sc);
 		rx_npkts++;
 	}
@@ -1618,7 +1613,7 @@ nge_txeof(struct nge_softc *sc)
 {
 	struct nge_desc	*cur_tx;
 	struct nge_txdesc *txd;
-	struct ifnet *ifp;
+	if_t ifp;
 	uint32_t cmdsts;
 	int cons, prod;
 
@@ -1644,7 +1639,7 @@ nge_txeof(struct nge_softc *sc)
 		if ((cmdsts & NGE_CMDSTS_OWN) != 0)
 			break;
 		sc->nge_cdata.nge_tx_cnt--;
-		ifp->if_drv_flags &= ~IFF_DRV_OACTIVE;
+		if_setdrvflagbits(ifp, 0, IFF_DRV_OACTIVE);
 		if ((cmdsts & NGE_CMDSTS_MORE) != 0)
 			continue;
 
@@ -1700,7 +1695,7 @@ nge_tick(void *xsc)
 static void
 nge_stats_update(struct nge_softc *sc)
 {
-	struct ifnet *ifp;
+	if_t ifp;
 	struct nge_stats now, *stats, *nstats;
 
 	NGE_LOCK_ASSERT(sc);
@@ -1755,15 +1750,15 @@ nge_stats_update(struct nge_softc *sc)
 static poll_handler_t nge_poll;
 
 static int
-nge_poll(struct ifnet *ifp, enum poll_cmd cmd, int count)
+nge_poll(if_t ifp, enum poll_cmd cmd, int count)
 {
 	struct nge_softc *sc;
 	int rx_npkts = 0;
 
-	sc = ifp->if_softc;
+	sc = if_getsoftc(ifp);
 
 	NGE_LOCK(sc);
-	if ((ifp->if_drv_flags & IFF_DRV_RUNNING) == 0) {
+	if ((if_getdrvflags(ifp) & IFF_DRV_RUNNING) == 0) {
 		NGE_UNLOCK(sc);
 		return (rx_npkts);
 	}
@@ -1778,7 +1773,7 @@ nge_poll(struct ifnet *ifp, enum poll_cmd cmd, int count)
 	sc->rxcycles = count;
 	rx_npkts = nge_rxeof(sc);
 	nge_txeof(sc);
-	if (!IFQ_DRV_IS_EMPTY(&ifp->if_snd))
+	if (!if_sendq_empty(ifp))
 		nge_start_locked(ifp);
 
 	if (sc->rxcycles > 0 || cmd == POLL_AND_CHECK_STATUS) {
@@ -1794,7 +1789,7 @@ nge_poll(struct ifnet *ifp, enum poll_cmd cmd, int count)
 			NGE_SETBIT(sc, NGE_CSR, NGE_CSR_RX_ENABLE);
 
 		if ((status & NGE_ISR_SYSERR) != 0) {
-			ifp->if_drv_flags &= ~IFF_DRV_RUNNING;
+			if_setdrvflagbits(ifp, 0, IFF_DRV_RUNNING);
 			nge_init_locked(sc);
 		}
 	}
@@ -1807,7 +1802,7 @@ static void
 nge_intr(void *arg)
 {
 	struct nge_softc *sc;
-	struct ifnet *ifp;
+	if_t ifp;
 	uint32_t status;
 
 	sc = (struct nge_softc *)arg;
@@ -1823,10 +1818,10 @@ nge_intr(void *arg)
 	if (status == 0xffffffff || (status & NGE_INTRS) == 0)
 		goto done_locked;
 #ifdef DEVICE_POLLING
-	if ((ifp->if_capenable & IFCAP_POLLING) != 0)
+	if ((if_getcapenable(ifp) & IFCAP_POLLING) != 0)
 		goto done_locked;
 #endif
-	if ((ifp->if_drv_flags & IFF_DRV_RUNNING) == 0)
+	if ((if_getdrvflags(ifp) & IFF_DRV_RUNNING) == 0)
 		goto done_locked;
 
 	/* Disable interrupts. */
@@ -1851,7 +1846,7 @@ nge_intr(void *arg)
 			NGE_SETBIT(sc, NGE_CSR, NGE_CSR_RX_ENABLE);
 
 		if ((status & NGE_ISR_SYSERR) != 0) {
-			ifp->if_drv_flags &= ~IFF_DRV_RUNNING;
+			if_setdrvflagbits(ifp, 0, IFF_DRV_RUNNING);
 			nge_init_locked(sc);
 		}
 		/* Reading the ISR register clears all interrupts. */
@@ -1861,7 +1856,7 @@ nge_intr(void *arg)
 	/* Re-enable interrupts. */
 	CSR_WRITE_4(sc, NGE_IER, 1);
 
-	if (!IFQ_DRV_IS_EMPTY(&ifp->if_snd))
+	if (!if_sendq_empty(ifp))
 		nge_start_locked(ifp);
 
 	/* Data LED off for TBI mode */
@@ -1983,34 +1978,34 @@ nge_encap(struct nge_softc *sc, struct mbuf **m_head)
  */
 
 static void
-nge_start(struct ifnet *ifp)
+nge_start(if_t ifp)
 {
 	struct nge_softc *sc;
 
-	sc = ifp->if_softc;
+	sc = if_getsoftc(ifp);
 	NGE_LOCK(sc);
 	nge_start_locked(ifp);
 	NGE_UNLOCK(sc);
 }
 
 static void
-nge_start_locked(struct ifnet *ifp)
+nge_start_locked(if_t ifp)
 {
 	struct nge_softc *sc;
 	struct mbuf *m_head;
 	int enq;
 
-	sc = ifp->if_softc;
+	sc = if_getsoftc(ifp);
 
 	NGE_LOCK_ASSERT(sc);
 
-	if ((ifp->if_drv_flags & (IFF_DRV_RUNNING | IFF_DRV_OACTIVE)) !=
+	if ((if_getdrvflags(ifp) & (IFF_DRV_RUNNING | IFF_DRV_OACTIVE)) !=
 	    IFF_DRV_RUNNING || (sc->nge_flags & NGE_FLAG_LINK) == 0)
 		return;
 
-	for (enq = 0; !IFQ_DRV_IS_EMPTY(&ifp->if_snd) &&
+	for (enq = 0; !if_sendq_empty(ifp) &&
 	    sc->nge_cdata.nge_tx_cnt < NGE_TX_RING_CNT - 2; ) {
-		IFQ_DRV_DEQUEUE(&ifp->if_snd, m_head);
+		m_head = if_dequeue(ifp);
 		if (m_head == NULL)
 			break;
 		/*
@@ -2021,8 +2016,8 @@ nge_start_locked(struct ifnet *ifp)
 		if (nge_encap(sc, &m_head)) {
 			if (m_head == NULL)
 				break;
-			IFQ_DRV_PREPEND(&ifp->if_snd, m_head);
-			ifp->if_drv_flags |= IFF_DRV_OACTIVE;
+			if_sendq_prepend(ifp, m_head);
+			if_setdrvflagbits(ifp, IFF_DRV_OACTIVE, 0);
 			break;
 		}
 
@@ -2059,14 +2054,14 @@ nge_init(void *xsc)
 static void
 nge_init_locked(struct nge_softc *sc)
 {
-	struct ifnet *ifp = sc->nge_ifp;
+	if_t ifp = sc->nge_ifp;
 	struct mii_data *mii;
 	uint8_t *eaddr;
 	uint32_t reg;
 
 	NGE_LOCK_ASSERT(sc);
 
-	if ((ifp->if_drv_flags & IFF_DRV_RUNNING) != 0)
+	if ((if_getdrvflags(ifp) & IFF_DRV_RUNNING) != 0)
 		return;
 
 	/*
@@ -2084,7 +2079,7 @@ nge_init_locked(struct nge_softc *sc)
 	mii = device_get_softc(sc->nge_miibus);
 
 	/* Set MAC address. */
-	eaddr = IF_LLADDR(sc->nge_ifp);
+	eaddr = if_getlladdr(sc->nge_ifp);
 	CSR_WRITE_4(sc, NGE_RXFILT_CTL, NGE_FILTADDR_PAR0);
 	CSR_WRITE_4(sc, NGE_RXFILT_DATA, (eaddr[1] << 8) | eaddr[0]);
 	CSR_WRITE_4(sc, NGE_RXFILT_CTL, NGE_FILTADDR_PAR1);
@@ -2148,7 +2143,7 @@ nge_init_locked(struct nge_softc *sc)
 	 * Enable hardware checksum validation for all IPv4
 	 * packets, do not reject packets with bad checksums.
 	 */
-	if ((ifp->if_capenable & IFCAP_RXCSUM) != 0)
+	if ((if_getcapenable(ifp) & IFCAP_RXCSUM) != 0)
 		NGE_SETBIT(sc, NGE_VLAN_IP_RXCTL, NGE_VIPRXCTL_IPCSUM_ENB);
 
 	/*
@@ -2157,7 +2152,7 @@ nge_init_locked(struct nge_softc *sc)
 	 * field in the RX descriptors.
 	 */
 	NGE_SETBIT(sc, NGE_VLAN_IP_RXCTL, NGE_VIPRXCTL_TAG_DETECT_ENB);
-	if ((ifp->if_capenable & IFCAP_VLAN_HWTAGGING) != 0)
+	if ((if_getcapenable(ifp) & IFCAP_VLAN_HWTAGGING) != 0)
 		NGE_SETBIT(sc, NGE_VLAN_IP_RXCTL, NGE_VIPRXCTL_TAG_STRIP_ENB);
 
 	/* Set TX configuration. */
@@ -2208,7 +2203,7 @@ nge_init_locked(struct nge_softc *sc)
 	 * ... only enable interrupts if we are not polling, make sure
 	 * they are off otherwise.
 	 */
-	if ((ifp->if_capenable & IFCAP_POLLING) != 0)
+	if ((if_getcapenable(ifp) & IFCAP_POLLING) != 0)
 		CSR_WRITE_4(sc, NGE_IER, 0);
 	else
 #endif
@@ -2220,22 +2215,22 @@ nge_init_locked(struct nge_softc *sc)
 	sc->nge_watchdog_timer = 0;
 	callout_reset(&sc->nge_stat_ch, hz, nge_tick, sc);
 
-	ifp->if_drv_flags |= IFF_DRV_RUNNING;
-	ifp->if_drv_flags &= ~IFF_DRV_OACTIVE;
+	if_setdrvflagbits(ifp, IFF_DRV_RUNNING, 0);
+	if_setdrvflagbits(ifp, 0, IFF_DRV_OACTIVE);
 }
 
 /*
  * Set media options.
  */
 static int
-nge_mediachange(struct ifnet *ifp)
+nge_mediachange(if_t ifp)
 {
 	struct nge_softc *sc;
 	struct mii_data	*mii;
 	struct mii_softc *miisc;
 	int error;
 
-	sc = ifp->if_softc;
+	sc = if_getsoftc(ifp);
 	NGE_LOCK(sc);
 	mii = device_get_softc(sc->nge_miibus);
 	LIST_FOREACH(miisc, &mii->mii_phys, mii_list)
@@ -2250,12 +2245,12 @@ nge_mediachange(struct ifnet *ifp)
  * Report current media status.
  */
 static void
-nge_mediastatus(struct ifnet *ifp, struct ifmediareq *ifmr)
+nge_mediastatus(if_t ifp, struct ifmediareq *ifmr)
 {
 	struct nge_softc *sc;
 	struct mii_data *mii;
 
-	sc = ifp->if_softc;
+	sc = if_getsoftc(ifp);
 	NGE_LOCK(sc);
 	mii = device_get_softc(sc->nge_miibus);
 	mii_pollstat(mii);
@@ -2265,9 +2260,9 @@ nge_mediastatus(struct ifnet *ifp, struct ifmediareq *ifmr)
 }
 
 static int
-nge_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
+nge_ioctl(if_t ifp, u_long command, caddr_t data)
 {
-	struct nge_softc *sc = ifp->if_softc;
+	struct nge_softc *sc = if_getsoftc(ifp);
 	struct ifreq *ifr = (struct ifreq *) data;
 	struct mii_data *mii;
 	int error = 0, mask;
@@ -2278,18 +2273,18 @@ nge_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 			error = EINVAL;
 		else {
 			NGE_LOCK(sc);
-			ifp->if_mtu = ifr->ifr_mtu;
+			if_setmtu(ifp, ifr->ifr_mtu);
 			/*
 			 * Workaround: if the MTU is larger than
 			 * 8152 (TX FIFO size minus 64 minus 18), turn off
 			 * TX checksum offloading.
 			 */
 			if (ifr->ifr_mtu >= 8152) {
-				ifp->if_capenable &= ~IFCAP_TXCSUM;
-				ifp->if_hwassist &= ~NGE_CSUM_FEATURES;
+				if_setcapenablebit(ifp, 0, IFCAP_TXCSUM);
+				if_sethwassistbits(ifp, 0, NGE_CSUM_FEATURES);
 			} else {
-				ifp->if_capenable |= IFCAP_TXCSUM;
-				ifp->if_hwassist |= NGE_CSUM_FEATURES;
+				if_setcapenablebit(ifp, IFCAP_TXCSUM, 0);
+				if_sethwassistbits(ifp, NGE_CSUM_FEATURES, 0);
 			}
 			NGE_UNLOCK(sc);
 			VLAN_CAPABILITIES(ifp);
@@ -2297,9 +2292,9 @@ nge_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		break;
 	case SIOCSIFFLAGS:
 		NGE_LOCK(sc);
-		if ((ifp->if_flags & IFF_UP) != 0) {
-			if ((ifp->if_drv_flags & IFF_DRV_RUNNING) != 0) {
-				if ((ifp->if_flags ^ sc->nge_if_flags) &
+		if ((if_getflags(ifp) & IFF_UP) != 0) {
+			if ((if_getdrvflags(ifp) & IFF_DRV_RUNNING) != 0) {
+				if ((if_getflags(ifp) ^ sc->nge_if_flags) &
 				    (IFF_PROMISC | IFF_ALLMULTI))
 					nge_rxfilter(sc);
 			} else {
@@ -2307,17 +2302,17 @@ nge_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 					nge_init_locked(sc);
 			}
 		} else {
-			if ((ifp->if_drv_flags & IFF_DRV_RUNNING) != 0)
+			if ((if_getdrvflags(ifp) & IFF_DRV_RUNNING) != 0)
 				nge_stop(sc);
 		}
-		sc->nge_if_flags = ifp->if_flags;
+		sc->nge_if_flags = if_getflags(ifp);
 		NGE_UNLOCK(sc);
 		error = 0;
 		break;
 	case SIOCADDMULTI:
 	case SIOCDELMULTI:
 		NGE_LOCK(sc);
-		if ((ifp->if_drv_flags & IFF_DRV_RUNNING) != 0)
+		if ((if_getdrvflags(ifp) & IFF_DRV_RUNNING) != 0)
 			nge_rxfilter(sc);
 		NGE_UNLOCK(sc);
 		break;
@@ -2328,12 +2323,12 @@ nge_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		break;
 	case SIOCSIFCAP:
 		NGE_LOCK(sc);
-		mask = ifr->ifr_reqcap ^ ifp->if_capenable;
+		mask = ifr->ifr_reqcap ^ if_getcapenable(ifp);
 #ifdef DEVICE_POLLING
 		if ((mask & IFCAP_POLLING) != 0 &&
-		    (IFCAP_POLLING & ifp->if_capabilities) != 0) {
-			ifp->if_capenable ^= IFCAP_POLLING;
-			if ((IFCAP_POLLING & ifp->if_capenable) != 0) {
+		    (IFCAP_POLLING & if_getcapabilities(ifp)) != 0) {
+			if_togglecapenable(ifp, IFCAP_POLLING);
+			if ((IFCAP_POLLING & if_getcapenable(ifp)) != 0) {
 				error = ether_poll_register(nge_poll, ifp);
 				if (error != 0) {
 					NGE_UNLOCK(sc);
@@ -2349,35 +2344,35 @@ nge_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		}
 #endif /* DEVICE_POLLING */
 		if ((mask & IFCAP_TXCSUM) != 0 &&
-		    (IFCAP_TXCSUM & ifp->if_capabilities) != 0) {
-			ifp->if_capenable ^= IFCAP_TXCSUM;
-			if ((IFCAP_TXCSUM & ifp->if_capenable) != 0)
-				ifp->if_hwassist |= NGE_CSUM_FEATURES;
+		    (IFCAP_TXCSUM & if_getcapabilities(ifp)) != 0) {
+			if_togglecapenable(ifp, IFCAP_TXCSUM);
+			if ((IFCAP_TXCSUM & if_getcapenable(ifp)) != 0)
+				if_sethwassistbits(ifp, NGE_CSUM_FEATURES, 0);
 			else
-				ifp->if_hwassist &= ~NGE_CSUM_FEATURES;
+				if_sethwassistbits(ifp, 0, NGE_CSUM_FEATURES);
 		}
 		if ((mask & IFCAP_RXCSUM) != 0 &&
-		    (IFCAP_RXCSUM & ifp->if_capabilities) != 0)
-			ifp->if_capenable ^= IFCAP_RXCSUM;
+		    (IFCAP_RXCSUM & if_getcapabilities(ifp)) != 0)
+			if_togglecapenable(ifp, IFCAP_RXCSUM);
 
 		if ((mask & IFCAP_WOL) != 0 &&
-		    (ifp->if_capabilities & IFCAP_WOL) != 0) {
+		    (if_getcapabilities(ifp) & IFCAP_WOL) != 0) {
 			if ((mask & IFCAP_WOL_UCAST) != 0)
-				ifp->if_capenable ^= IFCAP_WOL_UCAST;
+				if_togglecapenable(ifp, IFCAP_WOL_UCAST);
 			if ((mask & IFCAP_WOL_MCAST) != 0)
-				ifp->if_capenable ^= IFCAP_WOL_MCAST;
+				if_togglecapenable(ifp, IFCAP_WOL_MCAST);
 			if ((mask & IFCAP_WOL_MAGIC) != 0)
-				ifp->if_capenable ^= IFCAP_WOL_MAGIC;
+				if_togglecapenable(ifp, IFCAP_WOL_MAGIC);
 		}
 
 		if ((mask & IFCAP_VLAN_HWCSUM) != 0 &&
-		    (ifp->if_capabilities & IFCAP_VLAN_HWCSUM) != 0)
-			ifp->if_capenable ^= IFCAP_VLAN_HWCSUM;
+		    (if_getcapabilities(ifp) & IFCAP_VLAN_HWCSUM) != 0)
+			if_togglecapenable(ifp, IFCAP_VLAN_HWCSUM);
 		if ((mask & IFCAP_VLAN_HWTAGGING) != 0 &&
-		    (ifp->if_capabilities & IFCAP_VLAN_HWTAGGING) != 0) {
-			ifp->if_capenable ^= IFCAP_VLAN_HWTAGGING;
-			if ((ifp->if_drv_flags & IFF_DRV_RUNNING) != 0) {
-				if ((ifp->if_capenable &
+		    (if_getcapabilities(ifp) & IFCAP_VLAN_HWTAGGING) != 0) {
+			if_togglecapenable(ifp, IFCAP_VLAN_HWTAGGING);
+			if ((if_getdrvflags(ifp) & IFF_DRV_RUNNING) != 0) {
+				if ((if_getcapenable(ifp) &
 				    IFCAP_VLAN_HWTAGGING) != 0)
 					NGE_SETBIT(sc,
 					    NGE_VLAN_IP_RXCTL,
@@ -2392,10 +2387,10 @@ nge_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		 * Both VLAN hardware tagging and checksum offload is
 		 * required to do checksum offload on VLAN interface.
 		 */
-		if ((ifp->if_capenable & IFCAP_TXCSUM) == 0)
-			ifp->if_capenable &= ~IFCAP_VLAN_HWCSUM;
-		if ((ifp->if_capenable & IFCAP_VLAN_HWTAGGING) == 0)
-			ifp->if_capenable &= ~IFCAP_VLAN_HWCSUM;
+		if ((if_getcapenable(ifp) & IFCAP_TXCSUM) == 0)
+			if_setcapenablebit(ifp, 0, IFCAP_VLAN_HWCSUM);
+		if ((if_getcapenable(ifp) & IFCAP_VLAN_HWTAGGING) == 0)
+			if_setcapenablebit(ifp, 0, IFCAP_VLAN_HWCSUM);
 		NGE_UNLOCK(sc);
 		VLAN_CAPABILITIES(ifp);
 		break;
@@ -2410,7 +2405,7 @@ nge_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 static void
 nge_watchdog(struct nge_softc *sc)
 {
-	struct ifnet *ifp;
+	if_t ifp;
 
 	NGE_LOCK_ASSERT(sc);
 
@@ -2421,10 +2416,10 @@ nge_watchdog(struct nge_softc *sc)
 	if_inc_counter(ifp, IFCOUNTER_OERRORS, 1);
 	if_printf(ifp, "watchdog timeout\n");
 
-	ifp->if_drv_flags &= ~IFF_DRV_RUNNING;
+	if_setdrvflagbits(ifp, 0, IFF_DRV_RUNNING);
 	nge_init_locked(sc);
 
-	if (!IFQ_DRV_IS_EMPTY(&ifp->if_snd))
+	if (!if_sendq_empty(ifp))
 		nge_start_locked(ifp);
 }
 
@@ -2464,12 +2459,12 @@ nge_stop(struct nge_softc *sc)
 	struct nge_txdesc *txd;
 	struct nge_rxdesc *rxd;
 	int i;
-	struct ifnet *ifp;
+	if_t ifp;
 
 	NGE_LOCK_ASSERT(sc);
 	ifp = sc->nge_ifp;
 
-	ifp->if_drv_flags &= ~(IFF_DRV_RUNNING | IFF_DRV_OACTIVE);
+	if_setdrvflagbits(ifp, 0, (IFF_DRV_RUNNING | IFF_DRV_OACTIVE));
 	sc->nge_flags &= ~NGE_FLAG_LINK;
 	callout_stop(&sc->nge_stat_ch);
 	sc->nge_watchdog_timer = 0;
@@ -2522,7 +2517,7 @@ nge_stop(struct nge_softc *sc)
 static void
 nge_wol(struct nge_softc *sc)
 {
-	struct ifnet *ifp;
+	if_t ifp;
 	uint32_t reg;
 	uint16_t pmstat;
 	int pmc;
@@ -2533,7 +2528,7 @@ nge_wol(struct nge_softc *sc)
 		return;
 
 	ifp = sc->nge_ifp;
-	if ((ifp->if_capenable & IFCAP_WOL) == 0) {
+	if ((if_getcapenable(ifp) & IFCAP_WOL) == 0) {
 		/* Disable WOL & disconnect CLKRUN to save power. */
 		CSR_WRITE_4(sc, NGE_WOLCSR, 0);
 		CSR_WRITE_4(sc, NGE_CLKRUN, 0);
@@ -2555,11 +2550,11 @@ nge_wol(struct nge_softc *sc)
 
 		/* Configure WOL events. */
 		reg = 0;
-		if ((ifp->if_capenable & IFCAP_WOL_UCAST) != 0)
+		if ((if_getcapenable(ifp) & IFCAP_WOL_UCAST) != 0)
 			reg |= NGE_WOLCSR_WAKE_ON_UNICAST;
-		if ((ifp->if_capenable & IFCAP_WOL_MCAST) != 0)
+		if ((if_getcapenable(ifp) & IFCAP_WOL_MCAST) != 0)
 			reg |= NGE_WOLCSR_WAKE_ON_MULTICAST;
-		if ((ifp->if_capenable & IFCAP_WOL_MAGIC) != 0)
+		if ((if_getcapenable(ifp) & IFCAP_WOL_MAGIC) != 0)
 			reg |= NGE_WOLCSR_WAKE_ON_MAGICPKT;
 		CSR_WRITE_4(sc, NGE_WOLCSR, reg);
 
@@ -2572,7 +2567,7 @@ nge_wol(struct nge_softc *sc)
 	/* Request PME. */
 	pmstat = pci_read_config(sc->nge_dev, pmc + PCIR_POWER_STATUS, 2);
 	pmstat &= ~(PCIM_PSTAT_PME | PCIM_PSTAT_PMEENABLE);
-	if ((ifp->if_capenable & IFCAP_WOL) != 0)
+	if ((if_getcapenable(ifp) & IFCAP_WOL) != 0)
 		pmstat |= PCIM_PSTAT_PME | PCIM_PSTAT_PMEENABLE;
 	pci_write_config(sc->nge_dev, pmc + PCIR_POWER_STATUS, pmstat, 2);
 }
@@ -2608,7 +2603,7 @@ static int
 nge_resume(device_t dev)
 {
 	struct nge_softc *sc;
-	struct ifnet *ifp;
+	if_t ifp;
 	uint16_t pmstat;
 	int pmc;
 
@@ -2626,8 +2621,8 @@ nge_resume(device_t dev)
 			    pmc + PCIR_POWER_STATUS, pmstat, 2);
 		}
 	}
-	if (ifp->if_flags & IFF_UP) {
-		ifp->if_drv_flags &= ~IFF_DRV_RUNNING;
+	if (if_getflags(ifp) & IFF_UP) {
+		if_setdrvflagbits(ifp, 0, IFF_DRV_RUNNING);
 		nge_init_locked(sc);
 	}
 

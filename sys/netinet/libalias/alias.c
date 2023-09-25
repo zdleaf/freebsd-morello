@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2001 Charles Mott <cm@linktel.net>
  * All rights reserved.
@@ -27,8 +27,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 /*
     Alias.c provides supervisory control for the functions of the
     packet aliasing software.  It consists of routines to monitor
@@ -843,7 +841,6 @@ UdpAliasOut(struct libalias *la, struct ip *pip, int maxpacketsize, int create)
 	u_short dest_port;
 	u_short proxy_server_port;
 	int proxy_type;
-	int error;
 
 	LIBALIAS_LOCK_ASSERT(la);
 
@@ -910,7 +907,7 @@ UdpAliasOut(struct libalias *la, struct ip *pip, int maxpacketsize, int create)
 		alias_port = GetAliasPort(lnk);
 
 		/* Walk out chain. */
-		error = find_handler(OUT, UDP, la, pip, &ad);
+		find_handler(OUT, UDP, la, pip, &ad);
 
 		/* If UDP checksum is not zero, adjust since source port is */
 		/* being aliased and source address is being altered	*/
@@ -960,7 +957,7 @@ TcpAliasIn(struct libalias *la, struct ip *pip)
 		struct in_addr proxy_address;
 		u_short alias_port;
 		u_short proxy_port;
-		int accumulate, error;
+		int accumulate;
 
 		/*
 		 * The init of MANY vars is a bit below, but aliashandlepptpin
@@ -979,7 +976,7 @@ TcpAliasIn(struct libalias *la, struct ip *pip)
 		};
 
 		/* Walk out chain. */
-		error = find_handler(IN, TCP, la, pip, &ad);
+		find_handler(IN, TCP, la, pip, &ad);
 
 		alias_address = GetAliasAddress(lnk);
 		original_address = GetOriginalAddress(lnk);
@@ -1066,7 +1063,7 @@ TcpAliasIn(struct libalias *la, struct ip *pip)
 static int
 TcpAliasOut(struct libalias *la, struct ip *pip, int maxpacketsize, int create)
 {
-	int proxy_type, error;
+	int proxy_type;
 	u_short dest_port;
 	u_short proxy_server_port;
 	size_t dlen;
@@ -1148,7 +1145,7 @@ TcpAliasOut(struct libalias *la, struct ip *pip, int maxpacketsize, int create)
 		TcpMonitorOut(tc->th_flags, lnk);
 
 		/* Walk out chain. */
-		error = find_handler(OUT, TCP, la, pip, &ad);
+		find_handler(OUT, TCP, la, pip, &ad);
 
 		/* Adjust TCP checksum since source port is being aliased
 		 * and source address is being altered */

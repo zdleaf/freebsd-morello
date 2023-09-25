@@ -101,8 +101,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/bus.h>
@@ -283,9 +281,9 @@ static void msk_rxeof(struct msk_if_softc *, uint32_t, uint32_t, int);
 static void msk_jumbo_rxeof(struct msk_if_softc *, uint32_t, uint32_t, int);
 static void msk_txeof(struct msk_if_softc *, int);
 static int msk_encap(struct msk_if_softc *, struct mbuf **);
-static void msk_start(struct ifnet *);
-static void msk_start_locked(struct ifnet *);
-static int msk_ioctl(struct ifnet *, u_long, caddr_t);
+static void msk_start(if_t);
+static void msk_start_locked(if_t);
+static int msk_ioctl(if_t, u_long, caddr_t);
 static void msk_set_prefetch(struct msk_softc *, int, bus_addr_t, uint32_t);
 static void msk_set_rambuffer(struct msk_if_softc *);
 static void msk_set_tx_stfwd(struct msk_if_softc *);
@@ -293,8 +291,8 @@ static void msk_init(void *);
 static void msk_init_locked(struct msk_if_softc *);
 static void msk_stop(struct msk_if_softc *);
 static void msk_watchdog(struct msk_if_softc *);
-static int msk_mediachange(struct ifnet *);
-static void msk_mediastatus(struct ifnet *, struct ifmediareq *);
+static int msk_mediachange(if_t);
+static void msk_mediastatus(if_t, struct ifmediareq *);
 static void msk_phy_power(struct msk_softc *, int);
 static void msk_dmamap_cb(void *, bus_dma_segment_t *, int, int);
 static int msk_status_dma_alloc(struct msk_softc *);
@@ -319,7 +317,7 @@ static int msk_miibus_writereg(device_t, int, int, int);
 static void msk_miibus_statchg(device_t);
 
 static void msk_rxfilter(struct msk_if_softc *);
-static void msk_setvlan(struct msk_if_softc *, struct ifnet *);
+static void msk_setvlan(struct msk_if_softc *, if_t);
 
 static void msk_stats_clear(struct msk_if_softc *);
 static void msk_stats_update(struct msk_if_softc *);
@@ -349,8 +347,6 @@ static driver_t mskc_driver = {
 	sizeof(struct msk_softc)
 };
 
-static devclass_t mskc_devclass;
-
 static device_method_t msk_methods[] = {
 	/* Device interface */
 	DEVMETHOD(device_probe,		msk_probe),
@@ -372,11 +368,9 @@ static driver_t msk_driver = {
 	sizeof(struct msk_if_softc)
 };
 
-static devclass_t msk_devclass;
-
-DRIVER_MODULE(mskc, pci, mskc_driver, mskc_devclass, NULL, NULL);
-DRIVER_MODULE(msk, mskc, msk_driver, msk_devclass, NULL, NULL);
-DRIVER_MODULE(miibus, msk, miibus_driver, miibus_devclass, NULL, NULL);
+DRIVER_MODULE(mskc, pci, mskc_driver, NULL, NULL);
+DRIVER_MODULE(msk, mskc, msk_driver, NULL, NULL);
+DRIVER_MODULE(miibus, msk, miibus_driver, NULL, NULL);
 
 static struct resource_spec msk_res_spec_io[] = {
 	{ SYS_RES_IOPORT,	PCIR_BAR(1),	RF_ACTIVE },
@@ -475,7 +469,7 @@ msk_miibus_statchg(device_t dev)
 	struct msk_softc *sc;
 	struct msk_if_softc *sc_if;
 	struct mii_data *mii;
-	struct ifnet *ifp;
+	if_t ifp;
 	uint32_t gmac;
 
 	sc_if = device_get_softc(dev);
@@ -486,7 +480,7 @@ msk_miibus_statchg(device_t dev)
 	mii = device_get_softc(sc_if->msk_miibus);
 	ifp = sc_if->msk_ifp;
 	if (mii == NULL || ifp == NULL ||
-	    (ifp->if_drv_flags & IFF_DRV_RUNNING) == 0)
+	    (if_getdrvflags(ifp) & IFF_DRV_RUNNING) == 0)
 		return;
 
 	sc_if->msk_flags &= ~MSK_FLAG_LINK;
@@ -592,7 +586,7 @@ static void
 msk_rxfilter(struct msk_if_softc *sc_if)
 {
 	struct msk_softc *sc;
-	struct ifnet *ifp;
+	if_t ifp;
 	uint32_t mchash[2];
 	uint16_t mode;
 
@@ -604,9 +598,9 @@ msk_rxfilter(struct msk_if_softc *sc_if)
 
 	bzero(mchash, sizeof(mchash));
 	mode = GMAC_READ_2(sc, sc_if->msk_port, GM_RX_CTRL);
-	if ((ifp->if_flags & IFF_PROMISC) != 0)
+	if ((if_getflags(ifp) & IFF_PROMISC) != 0)
 		mode &= ~(GM_RXCR_UCF_ENA | GM_RXCR_MCF_ENA);
-	else if ((ifp->if_flags & IFF_ALLMULTI) != 0) {
+	else if ((if_getflags(ifp) & IFF_ALLMULTI) != 0) {
 		mode |= GM_RXCR_UCF_ENA | GM_RXCR_MCF_ENA;
 		mchash[0] = 0xffff;
 		mchash[1] = 0xffff;
@@ -629,12 +623,12 @@ msk_rxfilter(struct msk_if_softc *sc_if)
 }
 
 static void
-msk_setvlan(struct msk_if_softc *sc_if, struct ifnet *ifp)
+msk_setvlan(struct msk_if_softc *sc_if, if_t ifp)
 {
 	struct msk_softc *sc;
 
 	sc = sc_if->msk_softc;
-	if ((ifp->if_capenable & IFCAP_VLAN_HWTAGGING) != 0) {
+	if ((if_getcapenable(ifp) & IFCAP_VLAN_HWTAGGING) != 0) {
 		CSR_WRITE_4(sc, MR_ADDR(sc_if->msk_port, RX_GMF_CTRL_T),
 		    RX_VLAN_STRIP_ON);
 		CSR_WRITE_4(sc, MR_ADDR(sc_if->msk_port, TX_GMF_CTRL_T),
@@ -654,7 +648,7 @@ msk_rx_fill(struct msk_if_softc *sc_if, int jumbo)
 	int i;
 
 	if ((sc_if->msk_flags & MSK_FLAG_DESCV2) == 0 &&
-	    (sc_if->msk_ifp->if_capenable & IFCAP_RXCSUM) != 0) {
+	    (if_getcapenable(sc_if->msk_ifp) & IFCAP_RXCSUM) != 0) {
 		/* Wait until controller executes OP_TCPSTART command. */
 		for (i = 100; i > 0; i--) {
 			DELAY(100);
@@ -720,7 +714,7 @@ msk_init_rx_ring(struct msk_if_softc *sc_if)
 	prod = 0;
 	/* Have controller know how to compute Rx checksum. */
 	if ((sc_if->msk_flags & MSK_FLAG_DESCV2) == 0 &&
-	    (sc_if->msk_ifp->if_capenable & IFCAP_RXCSUM) != 0) {
+	    (if_getcapenable(sc_if->msk_ifp) & IFCAP_RXCSUM) != 0) {
 #ifdef MSK_64BIT_DMA
 		rxd = &sc_if->msk_cdata.msk_rxdesc[prod];
 		rxd->rx_m = NULL;
@@ -788,7 +782,7 @@ msk_init_jumbo_rx_ring(struct msk_if_softc *sc_if)
 	prod = 0;
 	/* Have controller know how to compute Rx checksum. */
 	if ((sc_if->msk_flags & MSK_FLAG_DESCV2) == 0 &&
-	    (sc_if->msk_ifp->if_capenable & IFCAP_RXCSUM) != 0) {
+	    (if_getcapenable(sc_if->msk_ifp) & IFCAP_RXCSUM) != 0) {
 #ifdef MSK_64BIT_DMA
 		rxd = &sc_if->msk_cdata.msk_jumbo_rxdesc[prod];
 		rxd->rx_m = NULL;
@@ -1015,13 +1009,13 @@ msk_jumbo_newbuf(struct msk_if_softc *sc_if, int idx)
  * Set media options.
  */
 static int
-msk_mediachange(struct ifnet *ifp)
+msk_mediachange(if_t ifp)
 {
 	struct msk_if_softc *sc_if;
 	struct mii_data	*mii;
 	int error;
 
-	sc_if = ifp->if_softc;
+	sc_if = if_getsoftc(ifp);
 
 	MSK_IF_LOCK(sc_if);
 	mii = device_get_softc(sc_if->msk_miibus);
@@ -1035,14 +1029,14 @@ msk_mediachange(struct ifnet *ifp)
  * Report current media status.
  */
 static void
-msk_mediastatus(struct ifnet *ifp, struct ifmediareq *ifmr)
+msk_mediastatus(if_t ifp, struct ifmediareq *ifmr)
 {
 	struct msk_if_softc *sc_if;
 	struct mii_data	*mii;
 
-	sc_if = ifp->if_softc;
+	sc_if = if_getsoftc(ifp);
 	MSK_IF_LOCK(sc_if);
-	if ((ifp->if_flags & IFF_UP) == 0) {
+	if ((if_getflags(ifp) & IFF_UP) == 0) {
 		MSK_IF_UNLOCK(sc_if);
 		return;
 	}
@@ -1055,14 +1049,14 @@ msk_mediastatus(struct ifnet *ifp, struct ifmediareq *ifmr)
 }
 
 static int
-msk_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
+msk_ioctl(if_t ifp, u_long command, caddr_t data)
 {
 	struct msk_if_softc *sc_if;
 	struct ifreq *ifr;
 	struct mii_data	*mii;
 	int error, mask, reinit;
 
-	sc_if = ifp->if_softc;
+	sc_if = if_getsoftc(ifp);
 	ifr = (struct ifreq *)data;
 	error = 0;
 
@@ -1071,7 +1065,7 @@ msk_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		MSK_IF_LOCK(sc_if);
 		if (ifr->ifr_mtu > MSK_JUMBO_MTU || ifr->ifr_mtu < ETHERMIN)
 			error = EINVAL;
-		else if (ifp->if_mtu != ifr->ifr_mtu) {
+		else if (if_getmtu(ifp) != ifr->ifr_mtu) {
 			if (ifr->ifr_mtu > ETHERMTU) {
 				if ((sc_if->msk_flags & MSK_FLAG_JUMBO) == 0) {
 					error = EINVAL;
@@ -1080,16 +1074,16 @@ msk_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 				}
 				if ((sc_if->msk_flags &
 				    MSK_FLAG_JUMBO_NOCSUM) != 0) {
-					ifp->if_hwassist &=
-					    ~(MSK_CSUM_FEATURES | CSUM_TSO);
-					ifp->if_capenable &=
-					    ~(IFCAP_TSO4 | IFCAP_TXCSUM);
+					if_sethwassistbits(ifp, 0,
+					    MSK_CSUM_FEATURES | CSUM_TSO);
+					if_setcapenablebit(ifp, 0,
+					    IFCAP_TSO4 | IFCAP_TXCSUM);
 					VLAN_CAPABILITIES(ifp);
 				}
 			}
-			ifp->if_mtu = ifr->ifr_mtu;
-			if ((ifp->if_drv_flags & IFF_DRV_RUNNING) != 0) {
-				ifp->if_drv_flags &= ~IFF_DRV_RUNNING;
+			if_setmtu(ifp, ifr->ifr_mtu);
+			if ((if_getdrvflags(ifp) & IFF_DRV_RUNNING) != 0) {
+				if_setdrvflagbits(ifp, 0, IFF_DRV_RUNNING);
 				msk_init_locked(sc_if);
 			}
 		}
@@ -1097,22 +1091,22 @@ msk_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		break;
 	case SIOCSIFFLAGS:
 		MSK_IF_LOCK(sc_if);
-		if ((ifp->if_flags & IFF_UP) != 0) {
-			if ((ifp->if_drv_flags & IFF_DRV_RUNNING) != 0 &&
-			    ((ifp->if_flags ^ sc_if->msk_if_flags) &
+		if ((if_getflags(ifp) & IFF_UP) != 0) {
+			if ((if_getdrvflags(ifp) & IFF_DRV_RUNNING) != 0 &&
+			    ((if_getflags(ifp) ^ sc_if->msk_if_flags) &
 			    (IFF_PROMISC | IFF_ALLMULTI)) != 0)
 				msk_rxfilter(sc_if);
 			else if ((sc_if->msk_flags & MSK_FLAG_DETACH) == 0)
 				msk_init_locked(sc_if);
-		} else if ((ifp->if_drv_flags & IFF_DRV_RUNNING) != 0)
+		} else if ((if_getdrvflags(ifp) & IFF_DRV_RUNNING) != 0)
 			msk_stop(sc_if);
-		sc_if->msk_if_flags = ifp->if_flags;
+		sc_if->msk_if_flags = if_getflags(ifp);
 		MSK_IF_UNLOCK(sc_if);
 		break;
 	case SIOCADDMULTI:
 	case SIOCDELMULTI:
 		MSK_IF_LOCK(sc_if);
-		if ((ifp->if_drv_flags & IFF_DRV_RUNNING) != 0)
+		if ((if_getdrvflags(ifp) & IFF_DRV_RUNNING) != 0)
 			msk_rxfilter(sc_if);
 		MSK_IF_UNLOCK(sc_if);
 		break;
@@ -1124,51 +1118,51 @@ msk_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 	case SIOCSIFCAP:
 		reinit = 0;
 		MSK_IF_LOCK(sc_if);
-		mask = ifr->ifr_reqcap ^ ifp->if_capenable;
+		mask = ifr->ifr_reqcap ^ if_getcapenable(ifp);
 		if ((mask & IFCAP_TXCSUM) != 0 &&
-		    (IFCAP_TXCSUM & ifp->if_capabilities) != 0) {
-			ifp->if_capenable ^= IFCAP_TXCSUM;
-			if ((IFCAP_TXCSUM & ifp->if_capenable) != 0)
-				ifp->if_hwassist |= MSK_CSUM_FEATURES;
+		    (IFCAP_TXCSUM & if_getcapabilities(ifp)) != 0) {
+			if_togglecapenable(ifp, IFCAP_TXCSUM);
+			if ((IFCAP_TXCSUM & if_getcapenable(ifp)) != 0)
+				if_sethwassistbits(ifp, MSK_CSUM_FEATURES, 0);
 			else
-				ifp->if_hwassist &= ~MSK_CSUM_FEATURES;
+				if_sethwassistbits(ifp, 0, MSK_CSUM_FEATURES);
 		}
 		if ((mask & IFCAP_RXCSUM) != 0 &&
-		    (IFCAP_RXCSUM & ifp->if_capabilities) != 0) {
-			ifp->if_capenable ^= IFCAP_RXCSUM;
+		    (IFCAP_RXCSUM & if_getcapabilities(ifp)) != 0) {
+			if_togglecapenable(ifp, IFCAP_RXCSUM);
 			if ((sc_if->msk_flags & MSK_FLAG_DESCV2) == 0)
 				reinit = 1;
 		}
 		if ((mask & IFCAP_VLAN_HWCSUM) != 0 &&
-		    (IFCAP_VLAN_HWCSUM & ifp->if_capabilities) != 0)
-			ifp->if_capenable ^= IFCAP_VLAN_HWCSUM;
+		    (IFCAP_VLAN_HWCSUM & if_getcapabilities(ifp)) != 0)
+			if_togglecapenable(ifp, IFCAP_VLAN_HWCSUM);
 		if ((mask & IFCAP_TSO4) != 0 &&
-		    (IFCAP_TSO4 & ifp->if_capabilities) != 0) {
-			ifp->if_capenable ^= IFCAP_TSO4;
-			if ((IFCAP_TSO4 & ifp->if_capenable) != 0)
-				ifp->if_hwassist |= CSUM_TSO;
+		    (IFCAP_TSO4 & if_getcapabilities(ifp)) != 0) {
+			if_togglecapenable(ifp, IFCAP_TSO4);
+			if ((IFCAP_TSO4 & if_getcapenable(ifp)) != 0)
+				if_sethwassistbits(ifp, CSUM_TSO, 0);
 			else
-				ifp->if_hwassist &= ~CSUM_TSO;
+				if_sethwassistbits(ifp, 0, CSUM_TSO);
 		}
 		if ((mask & IFCAP_VLAN_HWTSO) != 0 &&
-		    (IFCAP_VLAN_HWTSO & ifp->if_capabilities) != 0)
-			ifp->if_capenable ^= IFCAP_VLAN_HWTSO;
+		    (IFCAP_VLAN_HWTSO & if_getcapabilities(ifp)) != 0)
+			if_togglecapenable(ifp, IFCAP_VLAN_HWTSO);
 		if ((mask & IFCAP_VLAN_HWTAGGING) != 0 &&
-		    (IFCAP_VLAN_HWTAGGING & ifp->if_capabilities) != 0) {
-			ifp->if_capenable ^= IFCAP_VLAN_HWTAGGING;
-			if ((IFCAP_VLAN_HWTAGGING & ifp->if_capenable) == 0)
-				ifp->if_capenable &=
-				    ~(IFCAP_VLAN_HWTSO | IFCAP_VLAN_HWCSUM);
+		    (IFCAP_VLAN_HWTAGGING & if_getcapabilities(ifp)) != 0) {
+			if_togglecapenable(ifp, IFCAP_VLAN_HWTAGGING);
+			if ((IFCAP_VLAN_HWTAGGING & if_getcapenable(ifp)) == 0)
+				if_setcapenablebit(ifp, 0,
+				    IFCAP_VLAN_HWTSO | IFCAP_VLAN_HWCSUM);
 			msk_setvlan(sc_if, ifp);
 		}
-		if (ifp->if_mtu > ETHERMTU &&
+		if (if_getmtu(ifp) > ETHERMTU &&
 		    (sc_if->msk_flags & MSK_FLAG_JUMBO_NOCSUM) != 0) {
-			ifp->if_hwassist &= ~(MSK_CSUM_FEATURES | CSUM_TSO);
-			ifp->if_capenable &= ~(IFCAP_TSO4 | IFCAP_TXCSUM);
+			if_sethwassistbits(ifp, 0, (MSK_CSUM_FEATURES | CSUM_TSO));
+			if_setcapenablebit(ifp, 0, (IFCAP_TSO4 | IFCAP_TXCSUM));
 		}
 		VLAN_CAPABILITIES(ifp);
-		if (reinit > 0 && (ifp->if_drv_flags & IFF_DRV_RUNNING) != 0) {
-			ifp->if_drv_flags &= ~IFF_DRV_RUNNING;
+		if (reinit > 0 && (if_getdrvflags(ifp) & IFF_DRV_RUNNING) != 0) {
+			if_setdrvflagbits(ifp, 0, IFF_DRV_RUNNING);
 			msk_init_locked(sc_if);
 		}
 		MSK_IF_UNLOCK(sc_if);
@@ -1594,7 +1588,7 @@ msk_attach(device_t dev)
 {
 	struct msk_softc *sc;
 	struct msk_if_softc *sc_if;
-	struct ifnet *ifp;
+	if_t ifp;
 	struct msk_mii_data *mmd;
 	int i, port, error;
 	uint8_t eaddr[6];
@@ -1637,28 +1631,27 @@ msk_attach(device_t dev)
 		error = ENOSPC;
 		goto fail;
 	}
-	ifp->if_softc = sc_if;
+	if_setsoftc(ifp, sc_if);
 	if_initname(ifp, device_get_name(dev), device_get_unit(dev));
-	ifp->if_flags = IFF_BROADCAST | IFF_SIMPLEX | IFF_MULTICAST;
-	ifp->if_capabilities = IFCAP_TXCSUM | IFCAP_TSO4;
+	if_setflags(ifp, IFF_BROADCAST | IFF_SIMPLEX | IFF_MULTICAST);
+	if_setcapabilities(ifp, IFCAP_TXCSUM | IFCAP_TSO4);
 	/*
 	 * Enable Rx checksum offloading if controller supports
 	 * new descriptor formant and controller is not Yukon XL.
 	 */
 	if ((sc_if->msk_flags & MSK_FLAG_DESCV2) == 0 &&
 	    sc->msk_hw_id != CHIP_ID_YUKON_XL)
-		ifp->if_capabilities |= IFCAP_RXCSUM;
+		if_setcapabilitiesbit(ifp, IFCAP_RXCSUM, 0);
 	if ((sc_if->msk_flags & MSK_FLAG_DESCV2) != 0 &&
 	    (sc_if->msk_flags & MSK_FLAG_NORX_CSUM) == 0)
-		ifp->if_capabilities |= IFCAP_RXCSUM;
-	ifp->if_hwassist = MSK_CSUM_FEATURES | CSUM_TSO;
-	ifp->if_capenable = ifp->if_capabilities;
-	ifp->if_ioctl = msk_ioctl;
-	ifp->if_start = msk_start;
-	ifp->if_init = msk_init;
-	IFQ_SET_MAXLEN(&ifp->if_snd, MSK_TX_RING_CNT - 1);
-	ifp->if_snd.ifq_drv_maxlen = MSK_TX_RING_CNT - 1;
-	IFQ_SET_READY(&ifp->if_snd);
+		if_setcapabilitiesbit(ifp, IFCAP_RXCSUM, 0);
+	if_sethwassist(ifp, MSK_CSUM_FEATURES | CSUM_TSO);
+	if_setcapenable(ifp, if_getcapabilities(ifp));
+	if_setioctlfn(ifp, msk_ioctl);
+	if_setstartfn(ifp, msk_start);
+	if_setinitfn(ifp, msk_init);
+	if_setsendqlen(ifp, MSK_TX_RING_CNT - 1);
+	if_setsendqready(ifp);
 	/*
 	 * Get station address for this interface. Note that
 	 * dual port cards actually come with three station
@@ -1680,7 +1673,7 @@ msk_attach(device_t dev)
 	MSK_IF_LOCK(sc_if);
 
 	/* VLAN capability setup */
-	ifp->if_capabilities |= IFCAP_VLAN_MTU;
+	if_setcapabilitiesbit(ifp, IFCAP_VLAN_MTU, 0);
 	if ((sc_if->msk_flags & MSK_FLAG_NOHWVLAN) == 0) {
 		/*
 		 * Due to Tx checksum offload hardware bugs, msk(4) manually
@@ -1688,29 +1681,29 @@ msk_attach(device_t dev)
 		 * this workaround does not work so disable checksum offload
 		 * for VLAN interface.
 		 */
-		ifp->if_capabilities |= IFCAP_VLAN_HWTAGGING | IFCAP_VLAN_HWTSO;
+		if_setcapabilitiesbit(ifp, IFCAP_VLAN_HWTAGGING | IFCAP_VLAN_HWTSO, 0);
 		/*
 		 * Enable Rx checksum offloading for VLAN tagged frames
 		 * if controller support new descriptor format.
 		 */
 		if ((sc_if->msk_flags & MSK_FLAG_DESCV2) != 0 &&
 		    (sc_if->msk_flags & MSK_FLAG_NORX_CSUM) == 0)
-			ifp->if_capabilities |= IFCAP_VLAN_HWCSUM;
+			if_setcapabilitiesbit(ifp, IFCAP_VLAN_HWCSUM, 0);
 	}
-	ifp->if_capenable = ifp->if_capabilities;
+	if_setcapenable(ifp, if_getcapabilities(ifp));
 	/*
 	 * Disable RX checksum offloading on controllers that don't use
 	 * new descriptor format but give chance to enable it.
 	 */
 	if ((sc_if->msk_flags & MSK_FLAG_DESCV2) == 0)
-		ifp->if_capenable &= ~IFCAP_RXCSUM;
+		if_setcapenablebit(ifp, 0, IFCAP_RXCSUM);
 
 	/*
 	 * Tell the upper layer(s) we support long frames.
 	 * Must appear after the call to ether_ifattach() because
 	 * ether_ifattach() sets ifi_hdrlen to the default value.
 	 */
-        ifp->if_hdrlen = sizeof(struct ether_vlan_header);
+        if_setifheaderlen(ifp, sizeof(struct ether_vlan_header));
 
 	/*
 	 * Do miibus setup.
@@ -2017,7 +2010,7 @@ msk_detach(device_t dev)
 {
 	struct msk_softc *sc;
 	struct msk_if_softc *sc_if;
-	struct ifnet *ifp;
+	if_t ifp;
 
 	sc_if = device_get_softc(dev);
 	KASSERT(mtx_initialized(&sc_if->msk_softc->msk_mtx),
@@ -2900,34 +2893,34 @@ msk_encap(struct msk_if_softc *sc_if, struct mbuf **m_head)
 }
 
 static void
-msk_start(struct ifnet *ifp)
+msk_start(if_t ifp)
 {
 	struct msk_if_softc *sc_if;
 
-	sc_if = ifp->if_softc;
+	sc_if = if_getsoftc(ifp);
 	MSK_IF_LOCK(sc_if);
 	msk_start_locked(ifp);
 	MSK_IF_UNLOCK(sc_if);
 }
 
 static void
-msk_start_locked(struct ifnet *ifp)
+msk_start_locked(if_t ifp)
 {
 	struct msk_if_softc *sc_if;
 	struct mbuf *m_head;
 	int enq;
 
-	sc_if = ifp->if_softc;
+	sc_if = if_getsoftc(ifp);
 	MSK_IF_LOCK_ASSERT(sc_if);
 
-	if ((ifp->if_drv_flags & (IFF_DRV_RUNNING | IFF_DRV_OACTIVE)) !=
+	if ((if_getdrvflags(ifp) & (IFF_DRV_RUNNING | IFF_DRV_OACTIVE)) !=
 	    IFF_DRV_RUNNING || (sc_if->msk_flags & MSK_FLAG_LINK) == 0)
 		return;
 
-	for (enq = 0; !IFQ_DRV_IS_EMPTY(&ifp->if_snd) &&
+	for (enq = 0; !if_sendq_empty(ifp) &&
 	    sc_if->msk_cdata.msk_tx_cnt <
 	    (MSK_TX_RING_CNT - MSK_RESERVED_TX_DESC_CNT); ) {
-		IFQ_DRV_DEQUEUE(&ifp->if_snd, m_head);
+		m_head = if_dequeue(ifp);
 		if (m_head == NULL)
 			break;
 		/*
@@ -2938,8 +2931,8 @@ msk_start_locked(struct ifnet *ifp)
 		if (msk_encap(sc_if, &m_head) != 0) {
 			if (m_head == NULL)
 				break;
-			IFQ_DRV_PREPEND(&ifp->if_snd, m_head);
-			ifp->if_drv_flags |= IFF_DRV_OACTIVE;
+			if_sendq_prepend(ifp, m_head);
+			if_setdrvflagbits(ifp, IFF_DRV_OACTIVE, 0);
 			break;
 		}
 
@@ -2965,7 +2958,7 @@ msk_start_locked(struct ifnet *ifp)
 static void
 msk_watchdog(struct msk_if_softc *sc_if)
 {
-	struct ifnet *ifp;
+	if_t ifp;
 
 	MSK_IF_LOCK_ASSERT(sc_if);
 
@@ -2977,16 +2970,16 @@ msk_watchdog(struct msk_if_softc *sc_if)
 			if_printf(sc_if->msk_ifp, "watchdog timeout "
 			   "(missed link)\n");
 		if_inc_counter(ifp, IFCOUNTER_OERRORS, 1);
-		ifp->if_drv_flags &= ~IFF_DRV_RUNNING;
+		if_setdrvflagbits(ifp, 0, IFF_DRV_RUNNING);
 		msk_init_locked(sc_if);
 		return;
 	}
 
 	if_printf(ifp, "watchdog timeout\n");
 	if_inc_counter(ifp, IFCOUNTER_OERRORS, 1);
-	ifp->if_drv_flags &= ~IFF_DRV_RUNNING;
+	if_setdrvflagbits(ifp, 0, IFF_DRV_RUNNING);
 	msk_init_locked(sc_if);
-	if (!IFQ_DRV_IS_EMPTY(&ifp->if_snd))
+	if (!if_sendq_empty(ifp))
 		msk_start_locked(ifp);
 }
 
@@ -3000,7 +2993,7 @@ mskc_shutdown(device_t dev)
 	MSK_LOCK(sc);
 	for (i = 0; i < sc->msk_num_port; i++) {
 		if (sc->msk_if[i] != NULL && sc->msk_if[i]->msk_ifp != NULL &&
-		    ((sc->msk_if[i]->msk_ifp->if_drv_flags &
+		    ((if_getdrvflags(sc->msk_if[i]->msk_ifp) &
 		    IFF_DRV_RUNNING) != 0))
 			msk_stop(sc->msk_if[i]);
 	}
@@ -3023,7 +3016,7 @@ mskc_suspend(device_t dev)
 
 	for (i = 0; i < sc->msk_num_port; i++) {
 		if (sc->msk_if[i] != NULL && sc->msk_if[i]->msk_ifp != NULL &&
-		    ((sc->msk_if[i]->msk_ifp->if_drv_flags &
+		    ((if_getdrvflags(sc->msk_if[i]->msk_ifp) &
 		    IFF_DRV_RUNNING) != 0))
 			msk_stop(sc->msk_if[i]);
 	}
@@ -3059,9 +3052,9 @@ mskc_resume(device_t dev)
 	mskc_reset(sc);
 	for (i = 0; i < sc->msk_num_port; i++) {
 		if (sc->msk_if[i] != NULL && sc->msk_if[i]->msk_ifp != NULL &&
-		    ((sc->msk_if[i]->msk_ifp->if_flags & IFF_UP) != 0)) {
-			sc->msk_if[i]->msk_ifp->if_drv_flags &=
-			    ~IFF_DRV_RUNNING;
+		    ((if_getflags(sc->msk_if[i]->msk_ifp) & IFF_UP) != 0)) {
+			if_setdrvflagbits(sc->msk_if[i]->msk_ifp, 0,
+			    IFF_DRV_RUNNING);
 			msk_init_locked(sc->msk_if[i]);
 		}
 	}
@@ -3184,7 +3177,7 @@ msk_rxeof(struct msk_if_softc *sc_if, uint32_t status, uint32_t control,
     int len)
 {
 	struct mbuf *m;
-	struct ifnet *ifp;
+	if_t ifp;
 	struct msk_rxdesc *rxd;
 	int cons, rxlen;
 
@@ -3196,7 +3189,7 @@ msk_rxeof(struct msk_if_softc *sc_if, uint32_t status, uint32_t control,
 	do {
 		rxlen = status >> 16;
 		if ((status & GMR_FS_VLAN) != 0 &&
-		    (ifp->if_capenable & IFCAP_VLAN_HWTAGGING) != 0)
+		    (if_getcapenable(ifp) & IFCAP_VLAN_HWTAGGING) != 0)
 			rxlen -= ETHER_VLAN_ENCAP_LEN;
 		if ((sc_if->msk_flags & MSK_FLAG_NORXCHK) != 0) {
 			/*
@@ -3238,16 +3231,16 @@ msk_rxeof(struct msk_if_softc *sc_if, uint32_t status, uint32_t control,
 			msk_fixup_rx(m);
 #endif
 		if_inc_counter(ifp, IFCOUNTER_IPACKETS, 1);
-		if ((ifp->if_capenable & IFCAP_RXCSUM) != 0)
+		if ((if_getcapenable(ifp) & IFCAP_RXCSUM) != 0)
 			msk_rxcsum(sc_if, control, m);
 		/* Check for VLAN tagged packets. */
 		if ((status & GMR_FS_VLAN) != 0 &&
-		    (ifp->if_capenable & IFCAP_VLAN_HWTAGGING) != 0) {
+		    (if_getcapenable(ifp) & IFCAP_VLAN_HWTAGGING) != 0) {
 			m->m_pkthdr.ether_vtag = sc_if->msk_vtag;
 			m->m_flags |= M_VLANTAG;
 		}
 		MSK_IF_UNLOCK(sc_if);
-		(*ifp->if_input)(ifp, m);
+		if_input(ifp, m);
 		MSK_IF_LOCK(sc_if);
 	} while (0);
 
@@ -3260,7 +3253,7 @@ msk_jumbo_rxeof(struct msk_if_softc *sc_if, uint32_t status, uint32_t control,
     int len)
 {
 	struct mbuf *m;
-	struct ifnet *ifp;
+	if_t ifp;
 	struct msk_rxdesc *jrxd;
 	int cons, rxlen;
 
@@ -3272,7 +3265,7 @@ msk_jumbo_rxeof(struct msk_if_softc *sc_if, uint32_t status, uint32_t control,
 	do {
 		rxlen = status >> 16;
 		if ((status & GMR_FS_VLAN) != 0 &&
-		    (ifp->if_capenable & IFCAP_VLAN_HWTAGGING) != 0)
+		    (if_getcapenable(ifp) & IFCAP_VLAN_HWTAGGING) != 0)
 			rxlen -= ETHER_VLAN_ENCAP_LEN;
 		if (len > sc_if->msk_framesize ||
 		    ((status & GMR_FS_ANY_ERR) != 0) ||
@@ -3303,16 +3296,16 @@ msk_jumbo_rxeof(struct msk_if_softc *sc_if, uint32_t status, uint32_t control,
 			msk_fixup_rx(m);
 #endif
 		if_inc_counter(ifp, IFCOUNTER_IPACKETS, 1);
-		if ((ifp->if_capenable & IFCAP_RXCSUM) != 0)
+		if ((if_getcapenable(ifp) & IFCAP_RXCSUM) != 0)
 			msk_rxcsum(sc_if, control, m);
 		/* Check for VLAN tagged packets. */
 		if ((status & GMR_FS_VLAN) != 0 &&
-		    (ifp->if_capenable & IFCAP_VLAN_HWTAGGING) != 0) {
+		    (if_getcapenable(ifp) & IFCAP_VLAN_HWTAGGING) != 0) {
 			m->m_pkthdr.ether_vtag = sc_if->msk_vtag;
 			m->m_flags |= M_VLANTAG;
 		}
 		MSK_IF_UNLOCK(sc_if);
-		(*ifp->if_input)(ifp, m);
+		if_input(ifp, m);
 		MSK_IF_LOCK(sc_if);
 	} while (0);
 
@@ -3325,7 +3318,7 @@ msk_txeof(struct msk_if_softc *sc_if, int idx)
 {
 	struct msk_txdesc *txd;
 	struct msk_tx_desc *cur_tx;
-	struct ifnet *ifp;
+	if_t ifp;
 	uint32_t control;
 	int cons, prog;
 
@@ -3349,7 +3342,7 @@ msk_txeof(struct msk_if_softc *sc_if, int idx)
 		cur_tx = &sc_if->msk_rdata.msk_tx_ring[cons];
 		control = le32toh(cur_tx->msk_control);
 		sc_if->msk_cdata.msk_tx_cnt--;
-		ifp->if_drv_flags &= ~IFF_DRV_OACTIVE;
+		if_setdrvflagbits(ifp, 0, IFF_DRV_OACTIVE);
 		if ((control & EOP) == 0)
 			continue;
 		txd = &sc_if->msk_cdata.msk_txdesc[cons];
@@ -3629,7 +3622,7 @@ msk_handle_events(struct msk_softc *sc)
 			sc_if->msk_csum = status;
 			break;
 		case OP_RXSTAT:
-			if (!(sc_if->msk_ifp->if_drv_flags & IFF_DRV_RUNNING))
+			if (!(if_getdrvflags(sc_if->msk_ifp) & IFF_DRV_RUNNING))
 				break;
 			if (sc_if->msk_framesize >
 			    (MCLBYTES - MSK_RX_BUF_ALIGN))
@@ -3687,7 +3680,7 @@ msk_intr(void *xsc)
 {
 	struct msk_softc *sc;
 	struct msk_if_softc *sc_if0, *sc_if1;
-	struct ifnet *ifp0, *ifp1;
+	if_t ifp0, ifp1;
 	uint32_t status;
 	int domore;
 
@@ -3742,11 +3735,11 @@ msk_intr(void *xsc)
 	/* Reenable interrupts. */
 	CSR_WRITE_4(sc, B0_Y2_SP_ICR, 2);
 
-	if (ifp0 != NULL && (ifp0->if_drv_flags & IFF_DRV_RUNNING) != 0 &&
-	    !IFQ_DRV_IS_EMPTY(&ifp0->if_snd))
+	if (ifp0 != NULL && (if_getdrvflags(ifp0) & IFF_DRV_RUNNING) != 0 &&
+	    !if_sendq_empty(ifp0))
 		msk_start_locked(ifp0);
-	if (ifp1 != NULL && (ifp1->if_drv_flags & IFF_DRV_RUNNING) != 0 &&
-	    !IFQ_DRV_IS_EMPTY(&ifp1->if_snd))
+	if (ifp1 != NULL && (if_getdrvflags(ifp1) & IFF_DRV_RUNNING) != 0 &&
+	    !if_sendq_empty(ifp1))
 		msk_start_locked(ifp1);
 
 	MSK_UNLOCK(sc);
@@ -3756,7 +3749,7 @@ static void
 msk_set_tx_stfwd(struct msk_if_softc *sc_if)
 {
 	struct msk_softc *sc;
-	struct ifnet *ifp;
+	if_t ifp;
 
 	ifp = sc_if->msk_ifp;
 	sc = sc_if->msk_softc;
@@ -3766,7 +3759,7 @@ msk_set_tx_stfwd(struct msk_if_softc *sc_if)
 		CSR_WRITE_4(sc, MR_ADDR(sc_if->msk_port, TX_GMF_CTRL_T),
 		    TX_STFW_ENA);
 	} else {
-		if (ifp->if_mtu > ETHERMTU) {
+		if (if_getmtu(ifp) > ETHERMTU) {
 			/* Set Tx GMAC FIFO Almost Empty Threshold. */
 			CSR_WRITE_4(sc,
 			    MR_ADDR(sc_if->msk_port, TX_GMF_AE_THR),
@@ -3795,7 +3788,7 @@ static void
 msk_init_locked(struct msk_if_softc *sc_if)
 {
 	struct msk_softc *sc;
-	struct ifnet *ifp;
+	if_t ifp;
 	struct mii_data	 *mii;
 	uint8_t *eaddr;
 	uint16_t gmac;
@@ -3808,22 +3801,22 @@ msk_init_locked(struct msk_if_softc *sc_if)
 	sc = sc_if->msk_softc;
 	mii = device_get_softc(sc_if->msk_miibus);
 
-	if ((ifp->if_drv_flags & IFF_DRV_RUNNING) != 0)
+	if ((if_getdrvflags(ifp) & IFF_DRV_RUNNING) != 0)
 		return;
 
 	error = 0;
 	/* Cancel pending I/O and free all Rx/Tx buffers. */
 	msk_stop(sc_if);
 
-	if (ifp->if_mtu < ETHERMTU)
+	if (if_getmtu(ifp) < ETHERMTU)
 		sc_if->msk_framesize = ETHERMTU;
 	else
-		sc_if->msk_framesize = ifp->if_mtu;
+		sc_if->msk_framesize = if_getmtu(ifp);
 	sc_if->msk_framesize += ETHER_HDR_LEN + ETHER_VLAN_ENCAP_LEN;
-	if (ifp->if_mtu > ETHERMTU &&
+	if (if_getmtu(ifp) > ETHERMTU &&
 	    (sc_if->msk_flags & MSK_FLAG_JUMBO_NOCSUM) != 0) {
-		ifp->if_hwassist &= ~(MSK_CSUM_FEATURES | CSUM_TSO);
-		ifp->if_capenable &= ~(IFCAP_TSO4 | IFCAP_TXCSUM);
+		if_sethwassistbits(ifp, 0, (MSK_CSUM_FEATURES | CSUM_TSO));
+		if_setcapenablebit(ifp, 0, (IFCAP_TSO4 | IFCAP_TXCSUM));
 	}
 
 	/* GMAC Control reset. */
@@ -3865,12 +3858,12 @@ msk_init_locked(struct msk_if_softc *sc_if)
 	gmac = DATA_BLIND_VAL(DATA_BLIND_DEF) |
 	    GM_SMOD_VLAN_ENA | IPG_DATA_VAL(IPG_DATA_DEF);
 
-	if (ifp->if_mtu > ETHERMTU)
+	if (if_getmtu(ifp) > ETHERMTU)
 		gmac |= GM_SMOD_JUMBO_ENA;
 	GMAC_WRITE_2(sc, sc_if->msk_port, GM_SERIAL_MODE, gmac);
 
 	/* Set station address. */
-	eaddr = IF_LLADDR(ifp);
+	eaddr = if_getlladdr(ifp);
 	GMAC_WRITE_2(sc, sc_if->msk_port, GM_SRC_ADDR_1L,
 	    eaddr[0] | (eaddr[1] << 8));
 	GMAC_WRITE_2(sc, sc_if->msk_port, GM_SRC_ADDR_1M,
@@ -4004,7 +3997,7 @@ msk_init_locked(struct msk_if_softc *sc_if)
 	/* Disable Rx checksum offload and RSS hash. */
 	reg = BMU_DIS_RX_RSS_HASH;
 	if ((sc_if->msk_flags & MSK_FLAG_DESCV2) == 0 &&
-	    (ifp->if_capenable & IFCAP_RXCSUM) != 0)
+	    (if_getcapenable(ifp) & IFCAP_RXCSUM) != 0)
 		reg |= BMU_ENA_RX_CHKSUM;
 	else
 		reg |= BMU_DIS_RX_CHKSUM;
@@ -4057,8 +4050,8 @@ msk_init_locked(struct msk_if_softc *sc_if)
 	CSR_WRITE_4(sc, B0_IMSK, sc->msk_intrmask);
 	CSR_READ_4(sc, B0_IMSK);
 
-	ifp->if_drv_flags |= IFF_DRV_RUNNING;
-	ifp->if_drv_flags &= ~IFF_DRV_OACTIVE;
+	if_setdrvflagbits(ifp, IFF_DRV_RUNNING, 0);
+	if_setdrvflagbits(ifp, 0, IFF_DRV_OACTIVE);
 
 	sc_if->msk_flags &= ~MSK_FLAG_LINK;
 	mii_mediachg(mii);
@@ -4148,7 +4141,7 @@ msk_stop(struct msk_if_softc *sc_if)
 	struct msk_txdesc *txd;
 	struct msk_rxdesc *rxd;
 	struct msk_rxdesc *jrxd;
-	struct ifnet *ifp;
+	if_t ifp;
 	uint32_t val;
 	int i;
 
@@ -4291,7 +4284,7 @@ msk_stop(struct msk_if_softc *sc_if)
 	/*
 	 * Mark the interface down.
 	 */
-	ifp->if_drv_flags &= ~(IFF_DRV_RUNNING | IFF_DRV_OACTIVE);
+	if_setdrvflagbits(ifp, 0, (IFF_DRV_RUNNING | IFF_DRV_OACTIVE));
 	sc_if->msk_flags &= ~MSK_FLAG_LINK;
 }
 
@@ -4301,17 +4294,16 @@ msk_stop(struct msk_if_softc *sc_if)
  * lower 16 bits should be the last operation.
  */
 #define	MSK_READ_MIB32(x, y)					\
-	(((uint32_t)GMAC_READ_2(sc, x, (y) + 4)) << 16) +	\
-	(uint32_t)GMAC_READ_2(sc, x, y)
+	((((uint32_t)GMAC_READ_2(sc, x, (y) + 4)) << 16) +	\
+	(uint32_t)GMAC_READ_2(sc, x, y))
 #define	MSK_READ_MIB64(x, y)					\
-	(((uint64_t)MSK_READ_MIB32(x, (y) + 8)) << 32) +	\
-	(uint64_t)MSK_READ_MIB32(x, y)
+	((((uint64_t)MSK_READ_MIB32(x, (y) + 8)) << 32) +	\
+	(uint64_t)MSK_READ_MIB32(x, y))
 
 static void
 msk_stats_clear(struct msk_if_softc *sc_if)
 {
 	struct msk_softc *sc;
-	uint32_t reg;
 	uint16_t gmac;
 	int i;
 
@@ -4323,7 +4315,7 @@ msk_stats_clear(struct msk_if_softc *sc_if)
 	GMAC_WRITE_2(sc, sc_if->msk_port, GM_PHY_ADDR, gmac | GM_PAR_MIB_CLR);
 	/* Read all MIB Counters with Clear Mode set. */
 	for (i = GM_RXF_UC_OK; i <= GM_TXE_FIFO_UR; i += sizeof(uint32_t))
-		reg = MSK_READ_MIB32(sc_if->msk_port, i);
+		(void)MSK_READ_MIB32(sc_if->msk_port, i);
 	/* Clear MIB Clear Counter Mode. */
 	gmac &= ~GM_PAR_MIB_CLR;
 	GMAC_WRITE_2(sc, sc_if->msk_port, GM_PHY_ADDR, gmac);
@@ -4333,15 +4325,14 @@ static void
 msk_stats_update(struct msk_if_softc *sc_if)
 {
 	struct msk_softc *sc;
-	struct ifnet *ifp;
+	if_t ifp;
 	struct msk_hw_stats *stats;
 	uint16_t gmac;
-	uint32_t reg;
 
 	MSK_IF_LOCK_ASSERT(sc_if);
 
 	ifp = sc_if->msk_ifp;
-	if ((ifp->if_drv_flags & IFF_DRV_RUNNING) == 0)
+	if ((if_getdrvflags(ifp) & IFF_DRV_RUNNING) == 0)
 		return;
 	sc = sc_if->msk_softc;
 	stats = &sc_if->msk_stats;
@@ -4360,7 +4351,6 @@ msk_stats_update(struct msk_if_softc *sc_if)
 	    MSK_READ_MIB32(sc_if->msk_port, GM_RXF_MC_OK);
 	stats->rx_crc_errs +=
 	    MSK_READ_MIB32(sc_if->msk_port, GM_RXF_FCS_ERR);
-	reg = MSK_READ_MIB32(sc_if->msk_port, GM_RXF_SPARE1);
 	stats->rx_good_octets +=
 	    MSK_READ_MIB64(sc_if->msk_port, GM_RXO_OK_LO);
 	stats->rx_bad_octets +=
@@ -4387,10 +4377,8 @@ msk_stats_update(struct msk_if_softc *sc_if)
 	    MSK_READ_MIB32(sc_if->msk_port, GM_RXF_LNG_ERR);
 	stats->rx_pkts_jabbers +=
 	    MSK_READ_MIB32(sc_if->msk_port, GM_RXF_JAB_PKT);
-	reg = MSK_READ_MIB32(sc_if->msk_port, GM_RXF_SPARE2);
 	stats->rx_fifo_oflows +=
 	    MSK_READ_MIB32(sc_if->msk_port, GM_RXE_FIFO_OV);
-	reg = MSK_READ_MIB32(sc_if->msk_port, GM_RXF_SPARE3);
 
 	/* Tx stats. */
 	stats->tx_ucast_frames +=
@@ -4417,7 +4405,6 @@ msk_stats_update(struct msk_if_softc *sc_if)
 	    MSK_READ_MIB32(sc_if->msk_port, GM_TXF_1518B);
 	stats->tx_pkts_1519_max +=
 	    MSK_READ_MIB32(sc_if->msk_port, GM_TXF_MAX_SZ);
-	reg = MSK_READ_MIB32(sc_if->msk_port, GM_TXF_SPARE1);
 	stats->tx_colls +=
 	    MSK_READ_MIB32(sc_if->msk_port, GM_TXF_COL);
 	stats->tx_late_colls +=

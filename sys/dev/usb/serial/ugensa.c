@@ -1,8 +1,7 @@
-/* $FreeBSD$ */
 /*	$NetBSD: ugensa.c,v 1.9.2.1 2007/03/24 14:55:50 yamt Exp $	*/
 
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-NetBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2004, 2005 The NetBSD Foundation, Inc.
  * All rights reserved.
@@ -146,8 +145,6 @@ static device_method_t ugensa_methods[] = {
 	DEVMETHOD_END
 };
 
-static devclass_t ugensa_devclass;
-
 static driver_t ugensa_driver = {
 	.name = "ugensa",
 	.methods = ugensa_methods,
@@ -165,7 +162,7 @@ static const STRUCT_USB_HOST_ID ugensa_devs[] = {
 		USB_IFACE_SUBCLASS(0x50), USB_IFACE_PROTOCOL(0x01), USB_DRIVER_INFO(10)},
 };
 
-DRIVER_MODULE(ugensa, uhub, ugensa_driver, ugensa_devclass, NULL, 0);
+DRIVER_MODULE(ugensa, uhub, ugensa_driver, NULL, NULL);
 MODULE_DEPEND(ugensa, ucom, 1, 1, 1);
 MODULE_DEPEND(ugensa, usb, 1, 1, 1);
 MODULE_VERSION(ugensa, 1);

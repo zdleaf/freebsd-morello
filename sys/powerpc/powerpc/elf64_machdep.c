@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright 1996-1998 John D. Polstra.
  * All rights reserved.
@@ -23,8 +23,6 @@
  * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 #include <sys/param.h>
@@ -49,6 +47,8 @@
 
 #include <vm/vm.h>
 #include <vm/vm_param.h>
+#include <vm/pmap.h>
+#include <vm/vm_map.h>
 
 #include <machine/altivec.h>
 #include <machine/cpu.h>
@@ -64,7 +64,6 @@ static void exec_setregs_funcdesc(struct thread *td, struct image_params *imgp,
 struct sysentvec elf64_freebsd_sysvec_v1 = {
 	.sv_size	= SYS_MAXSYSCALL,
 	.sv_table	= sysent,
-	.sv_transtrap	= NULL,
 	.sv_fixup	= __elfN(freebsd_fixup),
 	.sv_sendsig	= sendsig,
 	.sv_sigcode	= sigcode64,
@@ -74,7 +73,6 @@ struct sysentvec elf64_freebsd_sysvec_v1 = {
 	.sv_elf_core_osabi = ELFOSABI_FREEBSD,
 	.sv_elf_core_abi_vendor = FREEBSD_ABI_VENDOR,
 	.sv_elf_core_prepare_notes = __elfN(prepare_notes),
-	.sv_imgact_try	= NULL,
 	.sv_minsigstksz	= MINSIGSTKSZ,
 	.sv_minuser	= VM_MIN_ADDRESS,
 	.sv_maxuser	= VM_MAXUSER_ADDRESS,
@@ -108,7 +106,6 @@ struct sysentvec elf64_freebsd_sysvec_v1 = {
 struct sysentvec elf64_freebsd_sysvec_v2 = {
 	.sv_size	= SYS_MAXSYSCALL,
 	.sv_table	= sysent,
-	.sv_transtrap	= NULL,
 	.sv_fixup	= __elfN(freebsd_fixup),
 	.sv_sendsig	= sendsig,
 	.sv_sigcode	= sigcode64, /* Fixed up in ppc64_init_sysvecs(). */
@@ -118,7 +115,6 @@ struct sysentvec elf64_freebsd_sysvec_v2 = {
 	.sv_elf_core_osabi = ELFOSABI_FREEBSD,
 	.sv_elf_core_abi_vendor = FREEBSD_ABI_VENDOR,
 	.sv_elf_core_prepare_notes = __elfN(prepare_notes),
-	.sv_imgact_try	= NULL,
 	.sv_minsigstksz	= MINSIGSTKSZ,
 	.sv_minuser	= VM_MIN_ADDRESS,
 	.sv_maxuser	= VM_MAXUSER_ADDRESS,
@@ -149,16 +145,15 @@ struct sysentvec elf64_freebsd_sysvec_v2 = {
 	.sv_regset_end  = SET_LIMIT(__elfN(regset)),
 };
 
-static boolean_t ppc64_elfv1_header_match(struct image_params *params,
+static bool ppc64_elfv1_header_match(struct image_params *params,
     int32_t *, uint32_t *);
-static boolean_t ppc64_elfv2_header_match(struct image_params *params,
+static bool ppc64_elfv2_header_match(struct image_params *params,
     int32_t *, uint32_t *);
 
 static Elf64_Brandinfo freebsd_brand_info_elfv1 = {
 	.brand		= ELFOSABI_FREEBSD,
 	.machine	= EM_PPC64,
 	.compat_3_brand	= "FreeBSD",
-	.emul_path	= NULL,
 	.interp_path	= "/libexec/ld-elf.so.1",
 	.sysvec		= &elf64_freebsd_sysvec_v1,
 	.interp_newpath	= NULL,
@@ -175,7 +170,6 @@ static Elf64_Brandinfo freebsd_brand_info_elfv2 = {
 	.brand		= ELFOSABI_FREEBSD,
 	.machine	= EM_PPC64,
 	.compat_3_brand	= "FreeBSD",
-	.emul_path	= NULL,
 	.interp_path	= "/libexec/ld-elf.so.1",
 	.sysvec		= &elf64_freebsd_sysvec_v2,
 	.interp_newpath	= NULL,
@@ -192,7 +186,6 @@ static Elf64_Brandinfo freebsd_brand_oinfo = {
 	.brand		= ELFOSABI_FREEBSD,
 	.machine	= EM_PPC64,
 	.compat_3_brand	= "FreeBSD",
-	.emul_path	= NULL,
 	.interp_path	= "/usr/libexec/ld-elf.so.1",
 	.sysvec		= &elf64_freebsd_sysvec_v1,
 	.interp_newpath	= NULL,
@@ -218,16 +211,16 @@ ppc64_init_sysvecs(void *arg)
 	 * exec_sysvec_init_secondary() assumes secondary sysvecs use
 	 * identical signal code, and skips allocating a second copy.
 	 * Since the ELFv2 trampoline is a strict subset of the ELFv1 code,
-	 * we can work around this by adjusting the base address. This also
+	 * we can work around this by adjusting the offset. This also
 	 * avoids two copies of the trampoline code being allocated!
 	 */
-	elf64_freebsd_sysvec_v2.sv_sigcode_base +=
+	elf64_freebsd_sysvec_v2.sv_sigcode_offset +=
 	    (uintptr_t)sigcode64_elfv2 - (uintptr_t)&sigcode64;
 	elf64_freebsd_sysvec_v2.sv_szsigcode = &szsigcode64_elfv2;
 }
 SYSINIT(elf64_sysvec, SI_SUB_EXEC, SI_ORDER_ANY, ppc64_init_sysvecs, NULL);
 
-static boolean_t
+static bool
 ppc64_elfv1_header_match(struct image_params *params, int32_t *osrel __unused,
     uint32_t *fctl0 __unused)
 {
@@ -237,7 +230,7 @@ ppc64_elfv1_header_match(struct image_params *params, int32_t *osrel __unused,
 	return (abi == 0 || abi == 1);
 }
 
-static boolean_t
+static bool
 ppc64_elfv2_header_match(struct image_params *params, int32_t *osrel __unused,
     uint32_t *fctl0 __unused)
 {

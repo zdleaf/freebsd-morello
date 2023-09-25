@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2012 Alexander Rybalko <ray@freebsd.org>
  * All rights reserved.
@@ -26,8 +26,6 @@
  * SUCH DAMAGE.
  */
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/bus.h>
 #include <sys/eventhandler.h>
@@ -256,6 +254,5 @@ static driver_t bcmwd_driver = {
 	bcmwd_methods,
 	sizeof(struct bcmwd_softc),
 };
-static devclass_t bcmwd_devclass;
 
-DRIVER_MODULE(bcmwd, simplebus, bcmwd_driver, bcmwd_devclass, 0, 0);
+DRIVER_MODULE(bcmwd, simplebus, bcmwd_driver, 0, 0);

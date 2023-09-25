@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2009 Nathan Whitehorn
  * All rights reserved.
@@ -28,8 +28,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/bus.h>
 #include <sys/eventhandler.h>
@@ -213,9 +211,7 @@ static driver_t smu_driver = {
 	sizeof(struct smu_softc)
 };
 
-static devclass_t smu_devclass;
-
-DRIVER_MODULE(smu, ofwbus, smu_driver, smu_devclass, 0, 0);
+DRIVER_MODULE(smu, ofwbus, smu_driver, 0, 0);
 static MALLOC_DEFINE(M_SMU, "smu", "SMU Sensor Information");
 
 #define SMU_MAILBOX		0x8000860c
@@ -631,10 +627,8 @@ static driver_t doorbell_driver = {
 	0
 };
 
-static devclass_t doorbell_devclass;
-
-EARLY_DRIVER_MODULE(smudoorbell, macgpio, doorbell_driver, doorbell_devclass,
-    0, 0, BUS_PASS_SUPPORTDEV);
+EARLY_DRIVER_MODULE(smudoorbell, macgpio, doorbell_driver, 0, 0,
+    BUS_PASS_SUPPORTDEV);
 
 static int
 doorbell_probe(device_t dev)
@@ -1415,9 +1409,8 @@ static driver_t smuiic_driver = {
 	smuiic_methods,
 	sizeof(struct smuiic_softc)
 };
-static devclass_t smuiic_devclass;
 
-DRIVER_MODULE(smuiic, smu, smuiic_driver, smuiic_devclass, 0, 0);
+DRIVER_MODULE(smuiic, smu, smuiic_driver, 0, 0);
 
 static void
 smu_attach_i2c(device_t smu, phandle_t i2croot)

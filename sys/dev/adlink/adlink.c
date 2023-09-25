@@ -45,8 +45,6 @@
 
 #ifdef _KERNEL
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/malloc.h>
@@ -344,8 +342,6 @@ adlink_ioctl(struct cdev *dev, u_long cmd, caddr_t data, int fflag, struct threa
 	return (error);
 }
 
-static devclass_t adlink_devclass;
-
 struct pci_id
 {
 	uint16_t	vendor;
@@ -437,7 +433,7 @@ static driver_t adlink_driver = {
 	sizeof(struct softc)
 };
 
-DRIVER_MODULE(adlink, pci, adlink_driver, adlink_devclass, 0, 0);
+DRIVER_MODULE(adlink, pci, adlink_driver, 0, 0);
 MODULE_PNP_INFO("U16:vendor;U16:device;D:#", pci, adlink, adlink_id,
     nitems(adlink_id));
 #endif /* _KERNEL */

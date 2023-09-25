@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-NetBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
  * All rights reserved.
@@ -36,8 +36,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include "opt_hid.h"
 
 #include <sys/param.h>
@@ -379,7 +377,7 @@ hidraw_open(struct cdev *dev, int flag, int mode, struct thread *td)
 	sc->sc_head = sc->sc_tail = 0;
 	sc->sc_fflags = flag;
 
-	hidbus_intr_start(sc->sc_dev);
+	hid_intr_start(sc->sc_dev);
 
 	return (0);
 }
@@ -392,7 +390,7 @@ hidraw_dtor(void *data)
 	DPRINTF("sc=%p\n", sc);
 
 	/* Disable interrupts. */
-	hidbus_intr_stop(sc->sc_dev);
+	hid_intr_stop(sc->sc_dev);
 
 	sc->sc_tail = sc->sc_head = 0;
 	sc->sc_async = 0;
@@ -566,9 +564,11 @@ hidraw_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flag,
 #endif
 	void *buf;
 	struct hidraw_softc *sc;
+	struct hidraw_device_info *hdi;
 	struct hidraw_gen_descriptor *hgd;
 	struct hidraw_report_descriptor *hrd;
-	struct hidraw_devinfo *hdi;
+	struct hidraw_devinfo *hd;
+	const char *devname;
 	uint32_t size;
 	int id, len;
 	int error = 0;
@@ -678,10 +678,9 @@ hidraw_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flag,
 
 		buf = HIDRAW_LOCAL_ALLOC(local_buf, hgd->hgd_maxlen);
 		copyin(hgd->hgd_data, buf, hgd->hgd_maxlen);
-		/* Lock newbus around set_report_descr call */
-		mtx_lock(&Giant);
+		bus_topo_lock();
 		error = hid_set_report_descr(sc->sc_dev, buf, hgd->hgd_maxlen);
-		mtx_unlock(&Giant);
+		bus_topo_unlock();
 		HIDRAW_LOCAL_FREE(local_buf, buf);
 
 		/* Realloc hidraw input queue */
@@ -788,6 +787,23 @@ hidraw_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flag,
 		*(int *)addr = 0;	/* XXX: we only support reportid 0? */
 		return (0);
 
+	case HIDRAW_GET_DEVICEINFO:
+		hdi = (struct hidraw_device_info *)addr;
+		bzero(hdi, sizeof(struct hidraw_device_info));
+		hdi->hdi_product = sc->sc_hw->idProduct;
+		hdi->hdi_vendor = sc->sc_hw->idVendor;
+		hdi->hdi_version = sc->sc_hw->idVersion;
+		hdi->hdi_bustype = sc->sc_hw->idBus;
+		strlcpy(hdi->hdi_name, sc->sc_hw->name,
+		    sizeof(hdi->hdi_name));
+		strlcpy(hdi->hdi_phys, device_get_nameunit(sc->sc_dev),
+		    sizeof(hdi->hdi_phys));
+		strlcpy(hdi->hdi_uniq, sc->sc_hw->serial,
+		    sizeof(hdi->hdi_uniq));
+		snprintf(hdi->hdi_release, sizeof(hdi->hdi_release), "%x.%02x",
+		    sc->sc_hw->idVersion >> 8, sc->sc_hw->idVersion & 0xff);
+		return(0);
+
 	case HIDIOCGRDESCSIZE:
 		*(int *)addr = sc->sc_hw->rdescsize;
 		return (0);
@@ -813,10 +829,10 @@ hidraw_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flag,
 		return (error);
 
 	case HIDIOCGRAWINFO:
-		hdi = (struct hidraw_devinfo *)addr;
-		hdi->bustype = sc->sc_hw->idBus;
-		hdi->vendor = sc->sc_hw->idVendor;
-		hdi->product = sc->sc_hw->idProduct;
+		hd = (struct hidraw_devinfo *)addr;
+		hd->bustype = sc->sc_hw->idBus;
+		hd->vendor = sc->sc_hw->idVendor;
+		hd->product = sc->sc_hw->idProduct;
 		return (0);
 	}
 
@@ -825,10 +841,13 @@ hidraw_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flag,
 	switch (IOCBASECMD(cmd)) {
 	case HIDIOCGRAWNAME(0):
 		strlcpy(addr, sc->sc_hw->name, len);
+		td->td_retval[0] = min(strlen(sc->sc_hw->name) + 1, len);
 		return (0);
 
 	case HIDIOCGRAWPHYS(0):
-		strlcpy(addr, device_get_nameunit(sc->sc_dev), len);
+		devname = device_get_nameunit(sc->sc_dev);
+		strlcpy(addr, devname, len);
+		td->td_retval[0] = min(strlen(devname) + 1, len);
 		return (0);
 
 	case HIDIOCSFEATURE(0):
@@ -859,6 +878,7 @@ hidraw_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flag,
 
 	case HIDIOCGRAWUNIQ(0):
 		strlcpy(addr, sc->sc_hw->serial, len);
+		td->td_retval[0] = min(strlen(sc->sc_hw->serial) + 1, len);
 		return (0);
 	}
 
@@ -984,12 +1004,7 @@ static driver_t hidraw_driver = {
 	sizeof(struct hidraw_softc)
 };
 
-#ifndef HIDRAW_MAKE_UHID_ALIAS
-devclass_t hidraw_devclass;
-#endif
-
-DRIVER_MODULE(hidraw, hidbus, hidraw_driver, hidraw_devclass, NULL, 0);
+DRIVER_MODULE(hidraw, hidbus, hidraw_driver, NULL, NULL);
 MODULE_DEPEND(hidraw, hidbus, 1, 1, 1);
 MODULE_DEPEND(hidraw, hid, 1, 1, 1);
-MODULE_DEPEND(hidraw, usb, 1, 1, 1);
 MODULE_VERSION(hidraw, 1);

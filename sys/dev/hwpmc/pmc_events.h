@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2005  Joseph Koshy
  * All rights reserved.
@@ -24,22 +24,18 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 #ifndef _DEV_HWPMC_PMC_EVENTS_H_
 #define	_DEV_HWPMC_PMC_EVENTS_H_
 
 /*
- * Note: Documentation on adding events can be found both in
- * the source tree at src/share/doc/papers/hwpmc/hwpmc.ms
- * as well as on-line at:
+ * Note: Documentation on adding events can be found online at:
  *
  * https://wiki.freebsd.org/PmcTools/PmcHardwareHowTo
  *
- * Please refer to those resources before you attempt to modify
- * this file or the hwpmc driver/subsystem.
+ * Please refer to this resource before you attempt to modify this file or the
+ * hwpmc driver/subsystem.
  */
 
 /* * PMC event codes.
@@ -203,32 +199,6 @@ __PMC_EV(IAF, CPU_CLK_UNHALTED_REF)
 __PMC_EV_ALIAS("instruction-retired",	IAF_INSTR_RETIRED_ANY)		\
 __PMC_EV_ALIAS("unhalted-core-cycles",	IAF_CPU_CLK_UNHALTED_CORE)	\
 __PMC_EV_ALIAS("unhalted-reference-cycles", IAF_CPU_CLK_UNHALTED_REF)
-
-
-#define	PMC_EV_IAP_FIRST	PMC_EV_IAP_ARCH_BR_INS_RET
-#define	PMC_EV_IAP_LAST		PMC_EV_IAP_EVENT_FDH_40H
-
-/*
- * Map "architectural" event names to event ids.
- */
-#define	__PMC_EV_ALIAS_INTEL_ARCHITECTURAL()				\
-__PMC_EV_ALIAS("branch-instruction-retired",	IAP_ARCH_BR_INS_RET)	\
-__PMC_EV_ALIAS("branch-misses-retired",		IAP_ARCH_BR_MIS_RET)	\
-__PMC_EV_ALIAS("instruction-retired",		IAP_ARCH_INS_RET)	\
-__PMC_EV_ALIAS("llc-misses",			IAP_ARCH_LLC_MIS)	\
-__PMC_EV_ALIAS("llc-reference",			IAP_ARCH_LLC_REF)	\
-__PMC_EV_ALIAS("unhalted-reference-cycles",	IAP_ARCH_UNH_REF_CYC)	\
-__PMC_EV_ALIAS("unhalted-core-cycles",		IAP_ARCH_UNH_COR_CYC)
-
-#define        __PMC_EV_UCP()                          \
-	__PMC_EV(UCP, EVENT_0CH_04H_E)					   \
-	__PMC_EV(UCP, EVENT_0CH_04H_F)					   \
-	__PMC_EV(UCP, EVENT_0CH_04H_M)					   \
-	__PMC_EV(UCP, EVENT_0CH_04H_S)					   \
-	__PMC_EV(UCP, EVENT_0CH_08H_E)					   \
-	__PMC_EV(UCP, EVENT_0CH_08H_F)					   \
-	__PMC_EV(UCP, EVENT_0CH_08H_M)					   \
-	__PMC_EV(UCP, EVENT_0CH_08H_S)					   \
 
 /*
  * ARMv7 Events
@@ -610,6 +580,9 @@ __PMC_EV_ALIAS("unhalted-core-cycles",		IAP_ARCH_UNH_COR_CYC)
 
 /*
  * ARMv8 Events
+ *
+ * NB: ARMv8.1 extends this to a 16-bit encoding, but we only define the 10-bit
+ * event numbers here.
  */
 
 #define	__PMC_EV_ARMV8()			\
@@ -868,10 +841,778 @@ __PMC_EV_ALIAS("unhalted-core-cycles",		IAP_ARCH_UNH_COR_CYC)
 	__PMC_EV(ARMV8, EVENT_FCH)		\
 	__PMC_EV(ARMV8, EVENT_FDH)		\
 	__PMC_EV(ARMV8, EVENT_FEH)		\
-	__PMC_EV(ARMV8, EVENT_FFH)
+	__PMC_EV(ARMV8, EVENT_FFH)		\
+	__PMC_EV(ARMV8, EVENT_100H)		\
+	__PMC_EV(ARMV8, EVENT_101H)		\
+	__PMC_EV(ARMV8, EVENT_102H)		\
+	__PMC_EV(ARMV8, EVENT_103H)		\
+	__PMC_EV(ARMV8, EVENT_104H)		\
+	__PMC_EV(ARMV8, EVENT_105H)		\
+	__PMC_EV(ARMV8, EVENT_106H)		\
+	__PMC_EV(ARMV8, EVENT_107H)		\
+	__PMC_EV(ARMV8, EVENT_108H)		\
+	__PMC_EV(ARMV8, EVENT_109H)		\
+	__PMC_EV(ARMV8, EVENT_10AH)		\
+	__PMC_EV(ARMV8, EVENT_10BH)		\
+	__PMC_EV(ARMV8, EVENT_10CH)		\
+	__PMC_EV(ARMV8, EVENT_10DH)		\
+	__PMC_EV(ARMV8, EVENT_10EH)		\
+	__PMC_EV(ARMV8, EVENT_10FH)		\
+	__PMC_EV(ARMV8, EVENT_110H)		\
+	__PMC_EV(ARMV8, EVENT_111H)		\
+	__PMC_EV(ARMV8, EVENT_112H)		\
+	__PMC_EV(ARMV8, EVENT_113H)		\
+	__PMC_EV(ARMV8, EVENT_114H)		\
+	__PMC_EV(ARMV8, EVENT_115H)		\
+	__PMC_EV(ARMV8, EVENT_116H)		\
+	__PMC_EV(ARMV8, EVENT_117H)		\
+	__PMC_EV(ARMV8, EVENT_118H)		\
+	__PMC_EV(ARMV8, EVENT_119H)		\
+	__PMC_EV(ARMV8, EVENT_11AH)		\
+	__PMC_EV(ARMV8, EVENT_11BH)		\
+	__PMC_EV(ARMV8, EVENT_11CH)		\
+	__PMC_EV(ARMV8, EVENT_11DH)		\
+	__PMC_EV(ARMV8, EVENT_11EH)		\
+	__PMC_EV(ARMV8, EVENT_11FH)		\
+	__PMC_EV(ARMV8, EVENT_120H)		\
+	__PMC_EV(ARMV8, EVENT_121H)		\
+	__PMC_EV(ARMV8, EVENT_122H)		\
+	__PMC_EV(ARMV8, EVENT_123H)		\
+	__PMC_EV(ARMV8, EVENT_124H)		\
+	__PMC_EV(ARMV8, EVENT_125H)		\
+	__PMC_EV(ARMV8, EVENT_126H)		\
+	__PMC_EV(ARMV8, EVENT_127H)		\
+	__PMC_EV(ARMV8, EVENT_128H)		\
+	__PMC_EV(ARMV8, EVENT_129H)		\
+	__PMC_EV(ARMV8, EVENT_12AH)		\
+	__PMC_EV(ARMV8, EVENT_12BH)		\
+	__PMC_EV(ARMV8, EVENT_12CH)		\
+	__PMC_EV(ARMV8, EVENT_12DH)		\
+	__PMC_EV(ARMV8, EVENT_12EH)		\
+	__PMC_EV(ARMV8, EVENT_12FH)		\
+	__PMC_EV(ARMV8, EVENT_130H)		\
+	__PMC_EV(ARMV8, EVENT_131H)		\
+	__PMC_EV(ARMV8, EVENT_132H)		\
+	__PMC_EV(ARMV8, EVENT_133H)		\
+	__PMC_EV(ARMV8, EVENT_134H)		\
+	__PMC_EV(ARMV8, EVENT_135H)		\
+	__PMC_EV(ARMV8, EVENT_136H)		\
+	__PMC_EV(ARMV8, EVENT_137H)		\
+	__PMC_EV(ARMV8, EVENT_138H)		\
+	__PMC_EV(ARMV8, EVENT_139H)		\
+	__PMC_EV(ARMV8, EVENT_13AH)		\
+	__PMC_EV(ARMV8, EVENT_13BH)		\
+	__PMC_EV(ARMV8, EVENT_13CH)		\
+	__PMC_EV(ARMV8, EVENT_13DH)		\
+	__PMC_EV(ARMV8, EVENT_13EH)		\
+	__PMC_EV(ARMV8, EVENT_13FH)		\
+	__PMC_EV(ARMV8, EVENT_140H)		\
+	__PMC_EV(ARMV8, EVENT_141H)		\
+	__PMC_EV(ARMV8, EVENT_142H)		\
+	__PMC_EV(ARMV8, EVENT_143H)		\
+	__PMC_EV(ARMV8, EVENT_144H)		\
+	__PMC_EV(ARMV8, EVENT_145H)		\
+	__PMC_EV(ARMV8, EVENT_146H)		\
+	__PMC_EV(ARMV8, EVENT_147H)		\
+	__PMC_EV(ARMV8, EVENT_148H)		\
+	__PMC_EV(ARMV8, EVENT_149H)		\
+	__PMC_EV(ARMV8, EVENT_14AH)		\
+	__PMC_EV(ARMV8, EVENT_14BH)		\
+	__PMC_EV(ARMV8, EVENT_14CH)		\
+	__PMC_EV(ARMV8, EVENT_14DH)		\
+	__PMC_EV(ARMV8, EVENT_14EH)		\
+	__PMC_EV(ARMV8, EVENT_14FH)		\
+	__PMC_EV(ARMV8, EVENT_150H)		\
+	__PMC_EV(ARMV8, EVENT_151H)		\
+	__PMC_EV(ARMV8, EVENT_152H)		\
+	__PMC_EV(ARMV8, EVENT_153H)		\
+	__PMC_EV(ARMV8, EVENT_154H)		\
+	__PMC_EV(ARMV8, EVENT_155H)		\
+	__PMC_EV(ARMV8, EVENT_156H)		\
+	__PMC_EV(ARMV8, EVENT_157H)		\
+	__PMC_EV(ARMV8, EVENT_158H)		\
+	__PMC_EV(ARMV8, EVENT_159H)		\
+	__PMC_EV(ARMV8, EVENT_15AH)		\
+	__PMC_EV(ARMV8, EVENT_15BH)		\
+	__PMC_EV(ARMV8, EVENT_15CH)		\
+	__PMC_EV(ARMV8, EVENT_15DH)		\
+	__PMC_EV(ARMV8, EVENT_15EH)		\
+	__PMC_EV(ARMV8, EVENT_15FH)		\
+	__PMC_EV(ARMV8, EVENT_160H)		\
+	__PMC_EV(ARMV8, EVENT_161H)		\
+	__PMC_EV(ARMV8, EVENT_162H)		\
+	__PMC_EV(ARMV8, EVENT_163H)		\
+	__PMC_EV(ARMV8, EVENT_164H)		\
+	__PMC_EV(ARMV8, EVENT_165H)		\
+	__PMC_EV(ARMV8, EVENT_166H)		\
+	__PMC_EV(ARMV8, EVENT_167H)		\
+	__PMC_EV(ARMV8, EVENT_168H)		\
+	__PMC_EV(ARMV8, EVENT_169H)		\
+	__PMC_EV(ARMV8, EVENT_16AH)		\
+	__PMC_EV(ARMV8, EVENT_16BH)		\
+	__PMC_EV(ARMV8, EVENT_16CH)		\
+	__PMC_EV(ARMV8, EVENT_16DH)		\
+	__PMC_EV(ARMV8, EVENT_16EH)		\
+	__PMC_EV(ARMV8, EVENT_16FH)		\
+	__PMC_EV(ARMV8, EVENT_170H)		\
+	__PMC_EV(ARMV8, EVENT_171H)		\
+	__PMC_EV(ARMV8, EVENT_172H)		\
+	__PMC_EV(ARMV8, EVENT_173H)		\
+	__PMC_EV(ARMV8, EVENT_174H)		\
+	__PMC_EV(ARMV8, EVENT_175H)		\
+	__PMC_EV(ARMV8, EVENT_176H)		\
+	__PMC_EV(ARMV8, EVENT_177H)		\
+	__PMC_EV(ARMV8, EVENT_178H)		\
+	__PMC_EV(ARMV8, EVENT_179H)		\
+	__PMC_EV(ARMV8, EVENT_17AH)		\
+	__PMC_EV(ARMV8, EVENT_17BH)		\
+	__PMC_EV(ARMV8, EVENT_17CH)		\
+	__PMC_EV(ARMV8, EVENT_17DH)		\
+	__PMC_EV(ARMV8, EVENT_17EH)		\
+	__PMC_EV(ARMV8, EVENT_17FH)		\
+	__PMC_EV(ARMV8, EVENT_180H)		\
+	__PMC_EV(ARMV8, EVENT_181H)		\
+	__PMC_EV(ARMV8, EVENT_182H)		\
+	__PMC_EV(ARMV8, EVENT_183H)		\
+	__PMC_EV(ARMV8, EVENT_184H)		\
+	__PMC_EV(ARMV8, EVENT_185H)		\
+	__PMC_EV(ARMV8, EVENT_186H)		\
+	__PMC_EV(ARMV8, EVENT_187H)		\
+	__PMC_EV(ARMV8, EVENT_188H)		\
+	__PMC_EV(ARMV8, EVENT_189H)		\
+	__PMC_EV(ARMV8, EVENT_18AH)		\
+	__PMC_EV(ARMV8, EVENT_18BH)		\
+	__PMC_EV(ARMV8, EVENT_18CH)		\
+	__PMC_EV(ARMV8, EVENT_18DH)		\
+	__PMC_EV(ARMV8, EVENT_18EH)		\
+	__PMC_EV(ARMV8, EVENT_18FH)		\
+	__PMC_EV(ARMV8, EVENT_190H)		\
+	__PMC_EV(ARMV8, EVENT_191H)		\
+	__PMC_EV(ARMV8, EVENT_192H)		\
+	__PMC_EV(ARMV8, EVENT_193H)		\
+	__PMC_EV(ARMV8, EVENT_194H)		\
+	__PMC_EV(ARMV8, EVENT_195H)		\
+	__PMC_EV(ARMV8, EVENT_196H)		\
+	__PMC_EV(ARMV8, EVENT_197H)		\
+	__PMC_EV(ARMV8, EVENT_198H)		\
+	__PMC_EV(ARMV8, EVENT_199H)		\
+	__PMC_EV(ARMV8, EVENT_19AH)		\
+	__PMC_EV(ARMV8, EVENT_19BH)		\
+	__PMC_EV(ARMV8, EVENT_19CH)		\
+	__PMC_EV(ARMV8, EVENT_19DH)		\
+	__PMC_EV(ARMV8, EVENT_19EH)		\
+	__PMC_EV(ARMV8, EVENT_19FH)		\
+	__PMC_EV(ARMV8, EVENT_1A0H)		\
+	__PMC_EV(ARMV8, EVENT_1A1H)		\
+	__PMC_EV(ARMV8, EVENT_1A2H)		\
+	__PMC_EV(ARMV8, EVENT_1A3H)		\
+	__PMC_EV(ARMV8, EVENT_1A4H)		\
+	__PMC_EV(ARMV8, EVENT_1A5H)		\
+	__PMC_EV(ARMV8, EVENT_1A6H)		\
+	__PMC_EV(ARMV8, EVENT_1A7H)		\
+	__PMC_EV(ARMV8, EVENT_1A8H)		\
+	__PMC_EV(ARMV8, EVENT_1A9H)		\
+	__PMC_EV(ARMV8, EVENT_1AAH)		\
+	__PMC_EV(ARMV8, EVENT_1ABH)		\
+	__PMC_EV(ARMV8, EVENT_1ACH)		\
+	__PMC_EV(ARMV8, EVENT_1ADH)		\
+	__PMC_EV(ARMV8, EVENT_1AEH)		\
+	__PMC_EV(ARMV8, EVENT_1AFH)		\
+	__PMC_EV(ARMV8, EVENT_1B0H)		\
+	__PMC_EV(ARMV8, EVENT_1B1H)		\
+	__PMC_EV(ARMV8, EVENT_1B2H)		\
+	__PMC_EV(ARMV8, EVENT_1B3H)		\
+	__PMC_EV(ARMV8, EVENT_1B4H)		\
+	__PMC_EV(ARMV8, EVENT_1B5H)		\
+	__PMC_EV(ARMV8, EVENT_1B6H)		\
+	__PMC_EV(ARMV8, EVENT_1B7H)		\
+	__PMC_EV(ARMV8, EVENT_1B8H)		\
+	__PMC_EV(ARMV8, EVENT_1B9H)		\
+	__PMC_EV(ARMV8, EVENT_1BAH)		\
+	__PMC_EV(ARMV8, EVENT_1BBH)		\
+	__PMC_EV(ARMV8, EVENT_1BCH)		\
+	__PMC_EV(ARMV8, EVENT_1BDH)		\
+	__PMC_EV(ARMV8, EVENT_1BEH)		\
+	__PMC_EV(ARMV8, EVENT_1BFH)		\
+	__PMC_EV(ARMV8, EVENT_1C0H)		\
+	__PMC_EV(ARMV8, EVENT_1C1H)		\
+	__PMC_EV(ARMV8, EVENT_1C2H)		\
+	__PMC_EV(ARMV8, EVENT_1C3H)		\
+	__PMC_EV(ARMV8, EVENT_1C4H)		\
+	__PMC_EV(ARMV8, EVENT_1C5H)		\
+	__PMC_EV(ARMV8, EVENT_1C6H)		\
+	__PMC_EV(ARMV8, EVENT_1C7H)		\
+	__PMC_EV(ARMV8, EVENT_1C8H)		\
+	__PMC_EV(ARMV8, EVENT_1C9H)		\
+	__PMC_EV(ARMV8, EVENT_1CAH)		\
+	__PMC_EV(ARMV8, EVENT_1CBH)		\
+	__PMC_EV(ARMV8, EVENT_1CCH)		\
+	__PMC_EV(ARMV8, EVENT_1CDH)		\
+	__PMC_EV(ARMV8, EVENT_1CEH)		\
+	__PMC_EV(ARMV8, EVENT_1CFH)		\
+	__PMC_EV(ARMV8, EVENT_1D0H)		\
+	__PMC_EV(ARMV8, EVENT_1D1H)		\
+	__PMC_EV(ARMV8, EVENT_1D2H)		\
+	__PMC_EV(ARMV8, EVENT_1D3H)		\
+	__PMC_EV(ARMV8, EVENT_1D4H)		\
+	__PMC_EV(ARMV8, EVENT_1D5H)		\
+	__PMC_EV(ARMV8, EVENT_1D6H)		\
+	__PMC_EV(ARMV8, EVENT_1D7H)		\
+	__PMC_EV(ARMV8, EVENT_1D8H)		\
+	__PMC_EV(ARMV8, EVENT_1D9H)		\
+	__PMC_EV(ARMV8, EVENT_1DAH)		\
+	__PMC_EV(ARMV8, EVENT_1DBH)		\
+	__PMC_EV(ARMV8, EVENT_1DCH)		\
+	__PMC_EV(ARMV8, EVENT_1DDH)		\
+	__PMC_EV(ARMV8, EVENT_1DEH)		\
+	__PMC_EV(ARMV8, EVENT_1DFH)		\
+	__PMC_EV(ARMV8, EVENT_1E0H)		\
+	__PMC_EV(ARMV8, EVENT_1E1H)		\
+	__PMC_EV(ARMV8, EVENT_1E2H)		\
+	__PMC_EV(ARMV8, EVENT_1E3H)		\
+	__PMC_EV(ARMV8, EVENT_1E4H)		\
+	__PMC_EV(ARMV8, EVENT_1E5H)		\
+	__PMC_EV(ARMV8, EVENT_1E6H)		\
+	__PMC_EV(ARMV8, EVENT_1E7H)		\
+	__PMC_EV(ARMV8, EVENT_1E8H)		\
+	__PMC_EV(ARMV8, EVENT_1E9H)		\
+	__PMC_EV(ARMV8, EVENT_1EAH)		\
+	__PMC_EV(ARMV8, EVENT_1EBH)		\
+	__PMC_EV(ARMV8, EVENT_1ECH)		\
+	__PMC_EV(ARMV8, EVENT_1EDH)		\
+	__PMC_EV(ARMV8, EVENT_1EEH)		\
+	__PMC_EV(ARMV8, EVENT_1EFH)		\
+	__PMC_EV(ARMV8, EVENT_1F0H)		\
+	__PMC_EV(ARMV8, EVENT_1F1H)		\
+	__PMC_EV(ARMV8, EVENT_1F2H)		\
+	__PMC_EV(ARMV8, EVENT_1F3H)		\
+	__PMC_EV(ARMV8, EVENT_1F4H)		\
+	__PMC_EV(ARMV8, EVENT_1F5H)		\
+	__PMC_EV(ARMV8, EVENT_1F6H)		\
+	__PMC_EV(ARMV8, EVENT_1F7H)		\
+	__PMC_EV(ARMV8, EVENT_1F8H)		\
+	__PMC_EV(ARMV8, EVENT_1F9H)		\
+	__PMC_EV(ARMV8, EVENT_1FAH)		\
+	__PMC_EV(ARMV8, EVENT_1FBH)		\
+	__PMC_EV(ARMV8, EVENT_1FCH)		\
+	__PMC_EV(ARMV8, EVENT_1FDH)		\
+	__PMC_EV(ARMV8, EVENT_1FEH)		\
+	__PMC_EV(ARMV8, EVENT_1FFH)		\
+	__PMC_EV(ARMV8, EVENT_200H)		\
+	__PMC_EV(ARMV8, EVENT_201H)		\
+	__PMC_EV(ARMV8, EVENT_202H)		\
+	__PMC_EV(ARMV8, EVENT_203H)		\
+	__PMC_EV(ARMV8, EVENT_204H)		\
+	__PMC_EV(ARMV8, EVENT_205H)		\
+	__PMC_EV(ARMV8, EVENT_206H)		\
+	__PMC_EV(ARMV8, EVENT_207H)		\
+	__PMC_EV(ARMV8, EVENT_208H)		\
+	__PMC_EV(ARMV8, EVENT_209H)		\
+	__PMC_EV(ARMV8, EVENT_20AH)		\
+	__PMC_EV(ARMV8, EVENT_20BH)		\
+	__PMC_EV(ARMV8, EVENT_20CH)		\
+	__PMC_EV(ARMV8, EVENT_20DH)		\
+	__PMC_EV(ARMV8, EVENT_20EH)		\
+	__PMC_EV(ARMV8, EVENT_20FH)		\
+	__PMC_EV(ARMV8, EVENT_210H)		\
+	__PMC_EV(ARMV8, EVENT_211H)		\
+	__PMC_EV(ARMV8, EVENT_212H)		\
+	__PMC_EV(ARMV8, EVENT_213H)		\
+	__PMC_EV(ARMV8, EVENT_214H)		\
+	__PMC_EV(ARMV8, EVENT_215H)		\
+	__PMC_EV(ARMV8, EVENT_216H)		\
+	__PMC_EV(ARMV8, EVENT_217H)		\
+	__PMC_EV(ARMV8, EVENT_218H)		\
+	__PMC_EV(ARMV8, EVENT_219H)		\
+	__PMC_EV(ARMV8, EVENT_21AH)		\
+	__PMC_EV(ARMV8, EVENT_21BH)		\
+	__PMC_EV(ARMV8, EVENT_21CH)		\
+	__PMC_EV(ARMV8, EVENT_21DH)		\
+	__PMC_EV(ARMV8, EVENT_21EH)		\
+	__PMC_EV(ARMV8, EVENT_21FH)		\
+	__PMC_EV(ARMV8, EVENT_220H)		\
+	__PMC_EV(ARMV8, EVENT_221H)		\
+	__PMC_EV(ARMV8, EVENT_222H)		\
+	__PMC_EV(ARMV8, EVENT_223H)		\
+	__PMC_EV(ARMV8, EVENT_224H)		\
+	__PMC_EV(ARMV8, EVENT_225H)		\
+	__PMC_EV(ARMV8, EVENT_226H)		\
+	__PMC_EV(ARMV8, EVENT_227H)		\
+	__PMC_EV(ARMV8, EVENT_228H)		\
+	__PMC_EV(ARMV8, EVENT_229H)		\
+	__PMC_EV(ARMV8, EVENT_22AH)		\
+	__PMC_EV(ARMV8, EVENT_22BH)		\
+	__PMC_EV(ARMV8, EVENT_22CH)		\
+	__PMC_EV(ARMV8, EVENT_22DH)		\
+	__PMC_EV(ARMV8, EVENT_22EH)		\
+	__PMC_EV(ARMV8, EVENT_22FH)		\
+	__PMC_EV(ARMV8, EVENT_230H)		\
+	__PMC_EV(ARMV8, EVENT_231H)		\
+	__PMC_EV(ARMV8, EVENT_232H)		\
+	__PMC_EV(ARMV8, EVENT_233H)		\
+	__PMC_EV(ARMV8, EVENT_234H)		\
+	__PMC_EV(ARMV8, EVENT_235H)		\
+	__PMC_EV(ARMV8, EVENT_236H)		\
+	__PMC_EV(ARMV8, EVENT_237H)		\
+	__PMC_EV(ARMV8, EVENT_238H)		\
+	__PMC_EV(ARMV8, EVENT_239H)		\
+	__PMC_EV(ARMV8, EVENT_23AH)		\
+	__PMC_EV(ARMV8, EVENT_23BH)		\
+	__PMC_EV(ARMV8, EVENT_23CH)		\
+	__PMC_EV(ARMV8, EVENT_23DH)		\
+	__PMC_EV(ARMV8, EVENT_23EH)		\
+	__PMC_EV(ARMV8, EVENT_23FH)		\
+	__PMC_EV(ARMV8, EVENT_240H)		\
+	__PMC_EV(ARMV8, EVENT_241H)		\
+	__PMC_EV(ARMV8, EVENT_242H)		\
+	__PMC_EV(ARMV8, EVENT_243H)		\
+	__PMC_EV(ARMV8, EVENT_244H)		\
+	__PMC_EV(ARMV8, EVENT_245H)		\
+	__PMC_EV(ARMV8, EVENT_246H)		\
+	__PMC_EV(ARMV8, EVENT_247H)		\
+	__PMC_EV(ARMV8, EVENT_248H)		\
+	__PMC_EV(ARMV8, EVENT_249H)		\
+	__PMC_EV(ARMV8, EVENT_24AH)		\
+	__PMC_EV(ARMV8, EVENT_24BH)		\
+	__PMC_EV(ARMV8, EVENT_24CH)		\
+	__PMC_EV(ARMV8, EVENT_24DH)		\
+	__PMC_EV(ARMV8, EVENT_24EH)		\
+	__PMC_EV(ARMV8, EVENT_24FH)		\
+	__PMC_EV(ARMV8, EVENT_250H)		\
+	__PMC_EV(ARMV8, EVENT_251H)		\
+	__PMC_EV(ARMV8, EVENT_252H)		\
+	__PMC_EV(ARMV8, EVENT_253H)		\
+	__PMC_EV(ARMV8, EVENT_254H)		\
+	__PMC_EV(ARMV8, EVENT_255H)		\
+	__PMC_EV(ARMV8, EVENT_256H)		\
+	__PMC_EV(ARMV8, EVENT_257H)		\
+	__PMC_EV(ARMV8, EVENT_258H)		\
+	__PMC_EV(ARMV8, EVENT_259H)		\
+	__PMC_EV(ARMV8, EVENT_25AH)		\
+	__PMC_EV(ARMV8, EVENT_25BH)		\
+	__PMC_EV(ARMV8, EVENT_25CH)		\
+	__PMC_EV(ARMV8, EVENT_25DH)		\
+	__PMC_EV(ARMV8, EVENT_25EH)		\
+	__PMC_EV(ARMV8, EVENT_25FH)		\
+	__PMC_EV(ARMV8, EVENT_260H)		\
+	__PMC_EV(ARMV8, EVENT_261H)		\
+	__PMC_EV(ARMV8, EVENT_262H)		\
+	__PMC_EV(ARMV8, EVENT_263H)		\
+	__PMC_EV(ARMV8, EVENT_264H)		\
+	__PMC_EV(ARMV8, EVENT_265H)		\
+	__PMC_EV(ARMV8, EVENT_266H)		\
+	__PMC_EV(ARMV8, EVENT_267H)		\
+	__PMC_EV(ARMV8, EVENT_268H)		\
+	__PMC_EV(ARMV8, EVENT_269H)		\
+	__PMC_EV(ARMV8, EVENT_26AH)		\
+	__PMC_EV(ARMV8, EVENT_26BH)		\
+	__PMC_EV(ARMV8, EVENT_26CH)		\
+	__PMC_EV(ARMV8, EVENT_26DH)		\
+	__PMC_EV(ARMV8, EVENT_26EH)		\
+	__PMC_EV(ARMV8, EVENT_26FH)		\
+	__PMC_EV(ARMV8, EVENT_270H)		\
+	__PMC_EV(ARMV8, EVENT_271H)		\
+	__PMC_EV(ARMV8, EVENT_272H)		\
+	__PMC_EV(ARMV8, EVENT_273H)		\
+	__PMC_EV(ARMV8, EVENT_274H)		\
+	__PMC_EV(ARMV8, EVENT_275H)		\
+	__PMC_EV(ARMV8, EVENT_276H)		\
+	__PMC_EV(ARMV8, EVENT_277H)		\
+	__PMC_EV(ARMV8, EVENT_278H)		\
+	__PMC_EV(ARMV8, EVENT_279H)		\
+	__PMC_EV(ARMV8, EVENT_27AH)		\
+	__PMC_EV(ARMV8, EVENT_27BH)		\
+	__PMC_EV(ARMV8, EVENT_27CH)		\
+	__PMC_EV(ARMV8, EVENT_27DH)		\
+	__PMC_EV(ARMV8, EVENT_27EH)		\
+	__PMC_EV(ARMV8, EVENT_27FH)		\
+	__PMC_EV(ARMV8, EVENT_280H)		\
+	__PMC_EV(ARMV8, EVENT_281H)		\
+	__PMC_EV(ARMV8, EVENT_282H)		\
+	__PMC_EV(ARMV8, EVENT_283H)		\
+	__PMC_EV(ARMV8, EVENT_284H)		\
+	__PMC_EV(ARMV8, EVENT_285H)		\
+	__PMC_EV(ARMV8, EVENT_286H)		\
+	__PMC_EV(ARMV8, EVENT_287H)		\
+	__PMC_EV(ARMV8, EVENT_288H)		\
+	__PMC_EV(ARMV8, EVENT_289H)		\
+	__PMC_EV(ARMV8, EVENT_28AH)		\
+	__PMC_EV(ARMV8, EVENT_28BH)		\
+	__PMC_EV(ARMV8, EVENT_28CH)		\
+	__PMC_EV(ARMV8, EVENT_28DH)		\
+	__PMC_EV(ARMV8, EVENT_28EH)		\
+	__PMC_EV(ARMV8, EVENT_28FH)		\
+	__PMC_EV(ARMV8, EVENT_290H)		\
+	__PMC_EV(ARMV8, EVENT_291H)		\
+	__PMC_EV(ARMV8, EVENT_292H)		\
+	__PMC_EV(ARMV8, EVENT_293H)		\
+	__PMC_EV(ARMV8, EVENT_294H)		\
+	__PMC_EV(ARMV8, EVENT_295H)		\
+	__PMC_EV(ARMV8, EVENT_296H)		\
+	__PMC_EV(ARMV8, EVENT_297H)		\
+	__PMC_EV(ARMV8, EVENT_298H)		\
+	__PMC_EV(ARMV8, EVENT_299H)		\
+	__PMC_EV(ARMV8, EVENT_29AH)		\
+	__PMC_EV(ARMV8, EVENT_29BH)		\
+	__PMC_EV(ARMV8, EVENT_29CH)		\
+	__PMC_EV(ARMV8, EVENT_29DH)		\
+	__PMC_EV(ARMV8, EVENT_29EH)		\
+	__PMC_EV(ARMV8, EVENT_29FH)		\
+	__PMC_EV(ARMV8, EVENT_2A0H)		\
+	__PMC_EV(ARMV8, EVENT_2A1H)		\
+	__PMC_EV(ARMV8, EVENT_2A2H)		\
+	__PMC_EV(ARMV8, EVENT_2A3H)		\
+	__PMC_EV(ARMV8, EVENT_2A4H)		\
+	__PMC_EV(ARMV8, EVENT_2A5H)		\
+	__PMC_EV(ARMV8, EVENT_2A6H)		\
+	__PMC_EV(ARMV8, EVENT_2A7H)		\
+	__PMC_EV(ARMV8, EVENT_2A8H)		\
+	__PMC_EV(ARMV8, EVENT_2A9H)		\
+	__PMC_EV(ARMV8, EVENT_2AAH)		\
+	__PMC_EV(ARMV8, EVENT_2ABH)		\
+	__PMC_EV(ARMV8, EVENT_2ACH)		\
+	__PMC_EV(ARMV8, EVENT_2ADH)		\
+	__PMC_EV(ARMV8, EVENT_2AEH)		\
+	__PMC_EV(ARMV8, EVENT_2AFH)		\
+	__PMC_EV(ARMV8, EVENT_2B0H)		\
+	__PMC_EV(ARMV8, EVENT_2B1H)		\
+	__PMC_EV(ARMV8, EVENT_2B2H)		\
+	__PMC_EV(ARMV8, EVENT_2B3H)		\
+	__PMC_EV(ARMV8, EVENT_2B4H)		\
+	__PMC_EV(ARMV8, EVENT_2B5H)		\
+	__PMC_EV(ARMV8, EVENT_2B6H)		\
+	__PMC_EV(ARMV8, EVENT_2B7H)		\
+	__PMC_EV(ARMV8, EVENT_2B8H)		\
+	__PMC_EV(ARMV8, EVENT_2B9H)		\
+	__PMC_EV(ARMV8, EVENT_2BAH)		\
+	__PMC_EV(ARMV8, EVENT_2BBH)		\
+	__PMC_EV(ARMV8, EVENT_2BCH)		\
+	__PMC_EV(ARMV8, EVENT_2BDH)		\
+	__PMC_EV(ARMV8, EVENT_2BEH)		\
+	__PMC_EV(ARMV8, EVENT_2BFH)		\
+	__PMC_EV(ARMV8, EVENT_2C0H)		\
+	__PMC_EV(ARMV8, EVENT_2C1H)		\
+	__PMC_EV(ARMV8, EVENT_2C2H)		\
+	__PMC_EV(ARMV8, EVENT_2C3H)		\
+	__PMC_EV(ARMV8, EVENT_2C4H)		\
+	__PMC_EV(ARMV8, EVENT_2C5H)		\
+	__PMC_EV(ARMV8, EVENT_2C6H)		\
+	__PMC_EV(ARMV8, EVENT_2C7H)		\
+	__PMC_EV(ARMV8, EVENT_2C8H)		\
+	__PMC_EV(ARMV8, EVENT_2C9H)		\
+	__PMC_EV(ARMV8, EVENT_2CAH)		\
+	__PMC_EV(ARMV8, EVENT_2CBH)		\
+	__PMC_EV(ARMV8, EVENT_2CCH)		\
+	__PMC_EV(ARMV8, EVENT_2CDH)		\
+	__PMC_EV(ARMV8, EVENT_2CEH)		\
+	__PMC_EV(ARMV8, EVENT_2CFH)		\
+	__PMC_EV(ARMV8, EVENT_2D0H)		\
+	__PMC_EV(ARMV8, EVENT_2D1H)		\
+	__PMC_EV(ARMV8, EVENT_2D2H)		\
+	__PMC_EV(ARMV8, EVENT_2D3H)		\
+	__PMC_EV(ARMV8, EVENT_2D4H)		\
+	__PMC_EV(ARMV8, EVENT_2D5H)		\
+	__PMC_EV(ARMV8, EVENT_2D6H)		\
+	__PMC_EV(ARMV8, EVENT_2D7H)		\
+	__PMC_EV(ARMV8, EVENT_2D8H)		\
+	__PMC_EV(ARMV8, EVENT_2D9H)		\
+	__PMC_EV(ARMV8, EVENT_2DAH)		\
+	__PMC_EV(ARMV8, EVENT_2DBH)		\
+	__PMC_EV(ARMV8, EVENT_2DCH)		\
+	__PMC_EV(ARMV8, EVENT_2DDH)		\
+	__PMC_EV(ARMV8, EVENT_2DEH)		\
+	__PMC_EV(ARMV8, EVENT_2DFH)		\
+	__PMC_EV(ARMV8, EVENT_2E0H)		\
+	__PMC_EV(ARMV8, EVENT_2E1H)		\
+	__PMC_EV(ARMV8, EVENT_2E2H)		\
+	__PMC_EV(ARMV8, EVENT_2E3H)		\
+	__PMC_EV(ARMV8, EVENT_2E4H)		\
+	__PMC_EV(ARMV8, EVENT_2E5H)		\
+	__PMC_EV(ARMV8, EVENT_2E6H)		\
+	__PMC_EV(ARMV8, EVENT_2E7H)		\
+	__PMC_EV(ARMV8, EVENT_2E8H)		\
+	__PMC_EV(ARMV8, EVENT_2E9H)		\
+	__PMC_EV(ARMV8, EVENT_2EAH)		\
+	__PMC_EV(ARMV8, EVENT_2EBH)		\
+	__PMC_EV(ARMV8, EVENT_2ECH)		\
+	__PMC_EV(ARMV8, EVENT_2EDH)		\
+	__PMC_EV(ARMV8, EVENT_2EEH)		\
+	__PMC_EV(ARMV8, EVENT_2EFH)		\
+	__PMC_EV(ARMV8, EVENT_2F0H)		\
+	__PMC_EV(ARMV8, EVENT_2F1H)		\
+	__PMC_EV(ARMV8, EVENT_2F2H)		\
+	__PMC_EV(ARMV8, EVENT_2F3H)		\
+	__PMC_EV(ARMV8, EVENT_2F4H)		\
+	__PMC_EV(ARMV8, EVENT_2F5H)		\
+	__PMC_EV(ARMV8, EVENT_2F6H)		\
+	__PMC_EV(ARMV8, EVENT_2F7H)		\
+	__PMC_EV(ARMV8, EVENT_2F8H)		\
+	__PMC_EV(ARMV8, EVENT_2F9H)		\
+	__PMC_EV(ARMV8, EVENT_2FAH)		\
+	__PMC_EV(ARMV8, EVENT_2FBH)		\
+	__PMC_EV(ARMV8, EVENT_2FCH)		\
+	__PMC_EV(ARMV8, EVENT_2FDH)		\
+	__PMC_EV(ARMV8, EVENT_2FEH)		\
+	__PMC_EV(ARMV8, EVENT_2FFH)		\
+	__PMC_EV(ARMV8, EVENT_300H)		\
+	__PMC_EV(ARMV8, EVENT_301H)		\
+	__PMC_EV(ARMV8, EVENT_302H)		\
+	__PMC_EV(ARMV8, EVENT_303H)		\
+	__PMC_EV(ARMV8, EVENT_304H)		\
+	__PMC_EV(ARMV8, EVENT_305H)		\
+	__PMC_EV(ARMV8, EVENT_306H)		\
+	__PMC_EV(ARMV8, EVENT_307H)		\
+	__PMC_EV(ARMV8, EVENT_308H)		\
+	__PMC_EV(ARMV8, EVENT_309H)		\
+	__PMC_EV(ARMV8, EVENT_30AH)		\
+	__PMC_EV(ARMV8, EVENT_30BH)		\
+	__PMC_EV(ARMV8, EVENT_30CH)		\
+	__PMC_EV(ARMV8, EVENT_30DH)		\
+	__PMC_EV(ARMV8, EVENT_30EH)		\
+	__PMC_EV(ARMV8, EVENT_30FH)		\
+	__PMC_EV(ARMV8, EVENT_310H)		\
+	__PMC_EV(ARMV8, EVENT_311H)		\
+	__PMC_EV(ARMV8, EVENT_312H)		\
+	__PMC_EV(ARMV8, EVENT_313H)		\
+	__PMC_EV(ARMV8, EVENT_314H)		\
+	__PMC_EV(ARMV8, EVENT_315H)		\
+	__PMC_EV(ARMV8, EVENT_316H)		\
+	__PMC_EV(ARMV8, EVENT_317H)		\
+	__PMC_EV(ARMV8, EVENT_318H)		\
+	__PMC_EV(ARMV8, EVENT_319H)		\
+	__PMC_EV(ARMV8, EVENT_31AH)		\
+	__PMC_EV(ARMV8, EVENT_31BH)		\
+	__PMC_EV(ARMV8, EVENT_31CH)		\
+	__PMC_EV(ARMV8, EVENT_31DH)		\
+	__PMC_EV(ARMV8, EVENT_31EH)		\
+	__PMC_EV(ARMV8, EVENT_31FH)		\
+	__PMC_EV(ARMV8, EVENT_320H)		\
+	__PMC_EV(ARMV8, EVENT_321H)		\
+	__PMC_EV(ARMV8, EVENT_322H)		\
+	__PMC_EV(ARMV8, EVENT_323H)		\
+	__PMC_EV(ARMV8, EVENT_324H)		\
+	__PMC_EV(ARMV8, EVENT_325H)		\
+	__PMC_EV(ARMV8, EVENT_326H)		\
+	__PMC_EV(ARMV8, EVENT_327H)		\
+	__PMC_EV(ARMV8, EVENT_328H)		\
+	__PMC_EV(ARMV8, EVENT_329H)		\
+	__PMC_EV(ARMV8, EVENT_32AH)		\
+	__PMC_EV(ARMV8, EVENT_32BH)		\
+	__PMC_EV(ARMV8, EVENT_32CH)		\
+	__PMC_EV(ARMV8, EVENT_32DH)		\
+	__PMC_EV(ARMV8, EVENT_32EH)		\
+	__PMC_EV(ARMV8, EVENT_32FH)		\
+	__PMC_EV(ARMV8, EVENT_330H)		\
+	__PMC_EV(ARMV8, EVENT_331H)		\
+	__PMC_EV(ARMV8, EVENT_332H)		\
+	__PMC_EV(ARMV8, EVENT_333H)		\
+	__PMC_EV(ARMV8, EVENT_334H)		\
+	__PMC_EV(ARMV8, EVENT_335H)		\
+	__PMC_EV(ARMV8, EVENT_336H)		\
+	__PMC_EV(ARMV8, EVENT_337H)		\
+	__PMC_EV(ARMV8, EVENT_338H)		\
+	__PMC_EV(ARMV8, EVENT_339H)		\
+	__PMC_EV(ARMV8, EVENT_33AH)		\
+	__PMC_EV(ARMV8, EVENT_33BH)		\
+	__PMC_EV(ARMV8, EVENT_33CH)		\
+	__PMC_EV(ARMV8, EVENT_33DH)		\
+	__PMC_EV(ARMV8, EVENT_33EH)		\
+	__PMC_EV(ARMV8, EVENT_33FH)		\
+	__PMC_EV(ARMV8, EVENT_340H)		\
+	__PMC_EV(ARMV8, EVENT_341H)		\
+	__PMC_EV(ARMV8, EVENT_342H)		\
+	__PMC_EV(ARMV8, EVENT_343H)		\
+	__PMC_EV(ARMV8, EVENT_344H)		\
+	__PMC_EV(ARMV8, EVENT_345H)		\
+	__PMC_EV(ARMV8, EVENT_346H)		\
+	__PMC_EV(ARMV8, EVENT_347H)		\
+	__PMC_EV(ARMV8, EVENT_348H)		\
+	__PMC_EV(ARMV8, EVENT_349H)		\
+	__PMC_EV(ARMV8, EVENT_34AH)		\
+	__PMC_EV(ARMV8, EVENT_34BH)		\
+	__PMC_EV(ARMV8, EVENT_34CH)		\
+	__PMC_EV(ARMV8, EVENT_34DH)		\
+	__PMC_EV(ARMV8, EVENT_34EH)		\
+	__PMC_EV(ARMV8, EVENT_34FH)		\
+	__PMC_EV(ARMV8, EVENT_350H)		\
+	__PMC_EV(ARMV8, EVENT_351H)		\
+	__PMC_EV(ARMV8, EVENT_352H)		\
+	__PMC_EV(ARMV8, EVENT_353H)		\
+	__PMC_EV(ARMV8, EVENT_354H)		\
+	__PMC_EV(ARMV8, EVENT_355H)		\
+	__PMC_EV(ARMV8, EVENT_356H)		\
+	__PMC_EV(ARMV8, EVENT_357H)		\
+	__PMC_EV(ARMV8, EVENT_358H)		\
+	__PMC_EV(ARMV8, EVENT_359H)		\
+	__PMC_EV(ARMV8, EVENT_35AH)		\
+	__PMC_EV(ARMV8, EVENT_35BH)		\
+	__PMC_EV(ARMV8, EVENT_35CH)		\
+	__PMC_EV(ARMV8, EVENT_35DH)		\
+	__PMC_EV(ARMV8, EVENT_35EH)		\
+	__PMC_EV(ARMV8, EVENT_35FH)		\
+	__PMC_EV(ARMV8, EVENT_360H)		\
+	__PMC_EV(ARMV8, EVENT_361H)		\
+	__PMC_EV(ARMV8, EVENT_362H)		\
+	__PMC_EV(ARMV8, EVENT_363H)		\
+	__PMC_EV(ARMV8, EVENT_364H)		\
+	__PMC_EV(ARMV8, EVENT_365H)		\
+	__PMC_EV(ARMV8, EVENT_366H)		\
+	__PMC_EV(ARMV8, EVENT_367H)		\
+	__PMC_EV(ARMV8, EVENT_368H)		\
+	__PMC_EV(ARMV8, EVENT_369H)		\
+	__PMC_EV(ARMV8, EVENT_36AH)		\
+	__PMC_EV(ARMV8, EVENT_36BH)		\
+	__PMC_EV(ARMV8, EVENT_36CH)		\
+	__PMC_EV(ARMV8, EVENT_36DH)		\
+	__PMC_EV(ARMV8, EVENT_36EH)		\
+	__PMC_EV(ARMV8, EVENT_36FH)		\
+	__PMC_EV(ARMV8, EVENT_370H)		\
+	__PMC_EV(ARMV8, EVENT_371H)		\
+	__PMC_EV(ARMV8, EVENT_372H)		\
+	__PMC_EV(ARMV8, EVENT_373H)		\
+	__PMC_EV(ARMV8, EVENT_374H)		\
+	__PMC_EV(ARMV8, EVENT_375H)		\
+	__PMC_EV(ARMV8, EVENT_376H)		\
+	__PMC_EV(ARMV8, EVENT_377H)		\
+	__PMC_EV(ARMV8, EVENT_378H)		\
+	__PMC_EV(ARMV8, EVENT_379H)		\
+	__PMC_EV(ARMV8, EVENT_37AH)		\
+	__PMC_EV(ARMV8, EVENT_37BH)		\
+	__PMC_EV(ARMV8, EVENT_37CH)		\
+	__PMC_EV(ARMV8, EVENT_37DH)		\
+	__PMC_EV(ARMV8, EVENT_37EH)		\
+	__PMC_EV(ARMV8, EVENT_37FH)		\
+	__PMC_EV(ARMV8, EVENT_380H)		\
+	__PMC_EV(ARMV8, EVENT_381H)		\
+	__PMC_EV(ARMV8, EVENT_382H)		\
+	__PMC_EV(ARMV8, EVENT_383H)		\
+	__PMC_EV(ARMV8, EVENT_384H)		\
+	__PMC_EV(ARMV8, EVENT_385H)		\
+	__PMC_EV(ARMV8, EVENT_386H)		\
+	__PMC_EV(ARMV8, EVENT_387H)		\
+	__PMC_EV(ARMV8, EVENT_388H)		\
+	__PMC_EV(ARMV8, EVENT_389H)		\
+	__PMC_EV(ARMV8, EVENT_38AH)		\
+	__PMC_EV(ARMV8, EVENT_38BH)		\
+	__PMC_EV(ARMV8, EVENT_38CH)		\
+	__PMC_EV(ARMV8, EVENT_38DH)		\
+	__PMC_EV(ARMV8, EVENT_38EH)		\
+	__PMC_EV(ARMV8, EVENT_38FH)		\
+	__PMC_EV(ARMV8, EVENT_390H)		\
+	__PMC_EV(ARMV8, EVENT_391H)		\
+	__PMC_EV(ARMV8, EVENT_392H)		\
+	__PMC_EV(ARMV8, EVENT_393H)		\
+	__PMC_EV(ARMV8, EVENT_394H)		\
+	__PMC_EV(ARMV8, EVENT_395H)		\
+	__PMC_EV(ARMV8, EVENT_396H)		\
+	__PMC_EV(ARMV8, EVENT_397H)		\
+	__PMC_EV(ARMV8, EVENT_398H)		\
+	__PMC_EV(ARMV8, EVENT_399H)		\
+	__PMC_EV(ARMV8, EVENT_39AH)		\
+	__PMC_EV(ARMV8, EVENT_39BH)		\
+	__PMC_EV(ARMV8, EVENT_39CH)		\
+	__PMC_EV(ARMV8, EVENT_39DH)		\
+	__PMC_EV(ARMV8, EVENT_39EH)		\
+	__PMC_EV(ARMV8, EVENT_39FH)		\
+	__PMC_EV(ARMV8, EVENT_3A0H)		\
+	__PMC_EV(ARMV8, EVENT_3A1H)		\
+	__PMC_EV(ARMV8, EVENT_3A2H)		\
+	__PMC_EV(ARMV8, EVENT_3A3H)		\
+	__PMC_EV(ARMV8, EVENT_3A4H)		\
+	__PMC_EV(ARMV8, EVENT_3A5H)		\
+	__PMC_EV(ARMV8, EVENT_3A6H)		\
+	__PMC_EV(ARMV8, EVENT_3A7H)		\
+	__PMC_EV(ARMV8, EVENT_3A8H)		\
+	__PMC_EV(ARMV8, EVENT_3A9H)		\
+	__PMC_EV(ARMV8, EVENT_3AAH)		\
+	__PMC_EV(ARMV8, EVENT_3ABH)		\
+	__PMC_EV(ARMV8, EVENT_3ACH)		\
+	__PMC_EV(ARMV8, EVENT_3ADH)		\
+	__PMC_EV(ARMV8, EVENT_3AEH)		\
+	__PMC_EV(ARMV8, EVENT_3AFH)		\
+	__PMC_EV(ARMV8, EVENT_3B0H)		\
+	__PMC_EV(ARMV8, EVENT_3B1H)		\
+	__PMC_EV(ARMV8, EVENT_3B2H)		\
+	__PMC_EV(ARMV8, EVENT_3B3H)		\
+	__PMC_EV(ARMV8, EVENT_3B4H)		\
+	__PMC_EV(ARMV8, EVENT_3B5H)		\
+	__PMC_EV(ARMV8, EVENT_3B6H)		\
+	__PMC_EV(ARMV8, EVENT_3B7H)		\
+	__PMC_EV(ARMV8, EVENT_3B8H)		\
+	__PMC_EV(ARMV8, EVENT_3B9H)		\
+	__PMC_EV(ARMV8, EVENT_3BAH)		\
+	__PMC_EV(ARMV8, EVENT_3BBH)		\
+	__PMC_EV(ARMV8, EVENT_3BCH)		\
+	__PMC_EV(ARMV8, EVENT_3BDH)		\
+	__PMC_EV(ARMV8, EVENT_3BEH)		\
+	__PMC_EV(ARMV8, EVENT_3BFH)		\
+	__PMC_EV(ARMV8, EVENT_3C0H)		\
+	__PMC_EV(ARMV8, EVENT_3C1H)		\
+	__PMC_EV(ARMV8, EVENT_3C2H)		\
+	__PMC_EV(ARMV8, EVENT_3C3H)		\
+	__PMC_EV(ARMV8, EVENT_3C4H)		\
+	__PMC_EV(ARMV8, EVENT_3C5H)		\
+	__PMC_EV(ARMV8, EVENT_3C6H)		\
+	__PMC_EV(ARMV8, EVENT_3C7H)		\
+	__PMC_EV(ARMV8, EVENT_3C8H)		\
+	__PMC_EV(ARMV8, EVENT_3C9H)		\
+	__PMC_EV(ARMV8, EVENT_3CAH)		\
+	__PMC_EV(ARMV8, EVENT_3CBH)		\
+	__PMC_EV(ARMV8, EVENT_3CCH)		\
+	__PMC_EV(ARMV8, EVENT_3CDH)		\
+	__PMC_EV(ARMV8, EVENT_3CEH)		\
+	__PMC_EV(ARMV8, EVENT_3CFH)		\
+	__PMC_EV(ARMV8, EVENT_3D0H)		\
+	__PMC_EV(ARMV8, EVENT_3D1H)		\
+	__PMC_EV(ARMV8, EVENT_3D2H)		\
+	__PMC_EV(ARMV8, EVENT_3D3H)		\
+	__PMC_EV(ARMV8, EVENT_3D4H)		\
+	__PMC_EV(ARMV8, EVENT_3D5H)		\
+	__PMC_EV(ARMV8, EVENT_3D6H)		\
+	__PMC_EV(ARMV8, EVENT_3D7H)		\
+	__PMC_EV(ARMV8, EVENT_3D8H)		\
+	__PMC_EV(ARMV8, EVENT_3D9H)		\
+	__PMC_EV(ARMV8, EVENT_3DAH)		\
+	__PMC_EV(ARMV8, EVENT_3DBH)		\
+	__PMC_EV(ARMV8, EVENT_3DCH)		\
+	__PMC_EV(ARMV8, EVENT_3DDH)		\
+	__PMC_EV(ARMV8, EVENT_3DEH)		\
+	__PMC_EV(ARMV8, EVENT_3DFH)		\
+	__PMC_EV(ARMV8, EVENT_3E0H)		\
+	__PMC_EV(ARMV8, EVENT_3E1H)		\
+	__PMC_EV(ARMV8, EVENT_3E2H)		\
+	__PMC_EV(ARMV8, EVENT_3E3H)		\
+	__PMC_EV(ARMV8, EVENT_3E4H)		\
+	__PMC_EV(ARMV8, EVENT_3E5H)		\
+	__PMC_EV(ARMV8, EVENT_3E6H)		\
+	__PMC_EV(ARMV8, EVENT_3E7H)		\
+	__PMC_EV(ARMV8, EVENT_3E8H)		\
+	__PMC_EV(ARMV8, EVENT_3E9H)		\
+	__PMC_EV(ARMV8, EVENT_3EAH)		\
+	__PMC_EV(ARMV8, EVENT_3EBH)		\
+	__PMC_EV(ARMV8, EVENT_3ECH)		\
+	__PMC_EV(ARMV8, EVENT_3EDH)		\
+	__PMC_EV(ARMV8, EVENT_3EEH)		\
+	__PMC_EV(ARMV8, EVENT_3EFH)		\
+	__PMC_EV(ARMV8, EVENT_3F0H)		\
+	__PMC_EV(ARMV8, EVENT_3F1H)		\
+	__PMC_EV(ARMV8, EVENT_3F2H)		\
+	__PMC_EV(ARMV8, EVENT_3F3H)		\
+	__PMC_EV(ARMV8, EVENT_3F4H)		\
+	__PMC_EV(ARMV8, EVENT_3F5H)		\
+	__PMC_EV(ARMV8, EVENT_3F6H)		\
+	__PMC_EV(ARMV8, EVENT_3F7H)		\
+	__PMC_EV(ARMV8, EVENT_3F8H)		\
+	__PMC_EV(ARMV8, EVENT_3F9H)		\
+	__PMC_EV(ARMV8, EVENT_3FAH)		\
+	__PMC_EV(ARMV8, EVENT_3FBH)		\
+	__PMC_EV(ARMV8, EVENT_3FCH)		\
+	__PMC_EV(ARMV8, EVENT_3FDH)		\
+	__PMC_EV(ARMV8, EVENT_3FEH)		\
+	__PMC_EV(ARMV8, EVENT_3FFH)
 
 #define	PMC_EV_ARMV8_FIRST	PMC_EV_ARMV8_EVENT_00H
-#define	PMC_EV_ARMV8_LAST	PMC_EV_ARMV8_EVENT_FFH
+#define	PMC_EV_ARMV8_LAST	PMC_EV_ARMV8_EVENT_3FFH
 
 #define	__PMC_EV_ALIAS_ARMV8_COMMON()					\
 	__PMC_EV_ALIAS("SW_INCR",		ARMV8_EVENT_00H)	\
@@ -1003,6 +1744,236 @@ __PMC_EV_ALIAS("unhalted-core-cycles",		IAP_ARCH_UNH_COR_CYC)
 	__PMC_EV_ALIAS("L2D_TLB_WR",		ARMV8_EVENT_5FH)	\
 	__PMC_EV_ALIAS("STREX_SPEC",		ARMV8_EVENT_6FH)	\
 	__PMC_EV_ALIAS("L3_CACHE_RD",		ARMV8_EVENT_A0H)
+
+/*
+ * ARM DMC-620 memory controller counters.
+ */
+
+#define	__PMC_EV_DMC620_PMU_CD2()					\
+	__PMC_EV(DMC620_PMU_CD2, clkdiv2_cycle_count)			\
+	__PMC_EV(DMC620_PMU_CD2, clkdiv2_allocate)			\
+	__PMC_EV(DMC620_PMU_CD2, clkdiv2_queue_depth)			\
+	__PMC_EV(DMC620_PMU_CD2, clkdiv2_waiting_for_wr_data)		\
+	__PMC_EV(DMC620_PMU_CD2, clkdiv2_read_backlog)			\
+	__PMC_EV(DMC620_PMU_CD2, clkdiv2_waiting_for_mi)		\
+	__PMC_EV(DMC620_PMU_CD2, clkdiv2_hazard_resolution)		\
+	__PMC_EV(DMC620_PMU_CD2, clkdiv2_enqueue)			\
+	__PMC_EV(DMC620_PMU_CD2, clkdiv2_arbitrate)			\
+	__PMC_EV(DMC620_PMU_CD2, clkdiv2_lrank_turnaround_activate)	\
+	__PMC_EV(DMC620_PMU_CD2, clkdiv2_prank_turnaround_activate)	\
+	__PMC_EV(DMC620_PMU_CD2, clkdiv2_read_depth)			\
+	__PMC_EV(DMC620_PMU_CD2, clkdiv2_write_depth)			\
+	__PMC_EV(DMC620_PMU_CD2, clkdiv2_highhigh_qos_depth)		\
+	__PMC_EV(DMC620_PMU_CD2, clkdiv2_high_qos_depth)		\
+	__PMC_EV(DMC620_PMU_CD2, clkdiv2_medium_qos_depth)		\
+	__PMC_EV(DMC620_PMU_CD2, clkdiv2_low_qos_depth)			\
+	__PMC_EV(DMC620_PMU_CD2, clkdiv2_activate)			\
+	__PMC_EV(DMC620_PMU_CD2, clkdiv2_rdwr)				\
+	__PMC_EV(DMC620_PMU_CD2, clkdiv2_refresh)			\
+	__PMC_EV(DMC620_PMU_CD2, clkdiv2_training_request)		\
+	__PMC_EV(DMC620_PMU_CD2, clkdiv2_t_mac_tracker)			\
+	__PMC_EV(DMC620_PMU_CD2, clkdiv2_bk_fsm_tracker)		\
+	__PMC_EV(DMC620_PMU_CD2, clkdiv2_bk_open_tracker)		\
+	__PMC_EV(DMC620_PMU_CD2, clkdiv2_ranks_in_pwr_down)		\
+	__PMC_EV(DMC620_PMU_CD2, clkdiv2_ranks_in_sref)			\
+
+#define	__PMC_EV_DMC620_PMU_C()						\
+	__PMC_EV(DMC620_PMU_C, clk_cycle_count)				\
+	__PMC_EV(DMC620_PMU_C, clk_request)				\
+	__PMC_EV(DMC620_PMU_C, clk_upload_stall)
+
+#define	PMC_EV_DMC620_PMU_CD2_FIRST	PMC_EV_DMC620_PMU_CD2_clkdiv2_cycle_count
+#define	PMC_EV_DMC620_PMU_CD2_LAST	PMC_EV_DMC620_PMU_CD2_clkdiv2_ranks_in_sref
+#define	PMC_EV_DMC620_PMU_C_FIRST	PMC_EV_DMC620_PMU_C_clk_cycle_count
+#define	PMC_EV_DMC620_PMU_C_LAST	PMC_EV_DMC620_PMU_C_clk_upload_stall
+
+/*
+ * Arm CMN-600 Coherent Mesh Network controller counters.
+ */
+
+#define	__PMC_EV_CMN600_PMU()					\
+	__PMC_EV(CMN600_PMU, dn_rxreq_dvmop)			\
+	__PMC_EV(CMN600_PMU, dn_rxreq_dvmsync)			\
+	__PMC_EV(CMN600_PMU, dn_rxreq_dvmop_vmid_filtered)	\
+	__PMC_EV(CMN600_PMU, dn_rxreq_retried)			\
+	__PMC_EV(CMN600_PMU, dn_rxreq_trk_occupancy)		\
+	__PMC_EV(CMN600_PMU, dn_rxreq_tlbi_dvmop)		\
+	__PMC_EV(CMN600_PMU, dn_rxreq_bpi_dvmop)		\
+	__PMC_EV(CMN600_PMU, dn_rxreq_pici_dvmop)		\
+	__PMC_EV(CMN600_PMU, dn_rxreq_vivi_dvmop)		\
+	__PMC_EV(CMN600_PMU, dn_rxreq_dvmop_other_filtered)	\
+	__PMC_EV(CMN600_PMU, dn_rxreq_snp_sent)			\
+	__PMC_EV(CMN600_PMU, dn_rxreq_snp_stalled)		\
+	__PMC_EV(CMN600_PMU, dn_rxreq_trk_full)			\
+	__PMC_EV(CMN600_PMU, hnf_cache_miss)			\
+	__PMC_EV(CMN600_PMU, hnf_slc_sf_cache_access)		\
+	__PMC_EV(CMN600_PMU, hnf_cache_fill)			\
+	__PMC_EV(CMN600_PMU, hnf_pocq_retry)			\
+	__PMC_EV(CMN600_PMU, hnf_pocq_reqs_recvd)		\
+	__PMC_EV(CMN600_PMU, hnf_sf_hit)			\
+	__PMC_EV(CMN600_PMU, hnf_sf_evictions)			\
+	__PMC_EV(CMN600_PMU, hnf_dir_snoops_sent)		\
+	__PMC_EV(CMN600_PMU, hnf_brd_snoops_sent)		\
+	__PMC_EV(CMN600_PMU, hnf_slc_eviction)			\
+	__PMC_EV(CMN600_PMU, hnf_slc_fill_invalid_way)		\
+	__PMC_EV(CMN600_PMU, hnf_mc_retries)			\
+	__PMC_EV(CMN600_PMU, hnf_mc_reqs)			\
+	__PMC_EV(CMN600_PMU, hnf_qos_hh_retry)			\
+	__PMC_EV(CMN600_PMU, hnf_qos_pocq)			\
+	__PMC_EV(CMN600_PMU, hnf_pocq_addrhaz)			\
+	__PMC_EV(CMN600_PMU, hnf_pocq_atomic_addrhaz)		\
+	__PMC_EV(CMN600_PMU, hnf_ld_st_swp_adq_full)		\
+	__PMC_EV(CMN600_PMU, hnf_cmp_adq_full)			\
+	__PMC_EV(CMN600_PMU, hnf_txdat_stall)			\
+	__PMC_EV(CMN600_PMU, hnf_txrsp_stall)			\
+	__PMC_EV(CMN600_PMU, hnf_seq_full)			\
+	__PMC_EV(CMN600_PMU, hnf_seq_hit)			\
+	__PMC_EV(CMN600_PMU, hnf_snp_sent)			\
+	__PMC_EV(CMN600_PMU, hnf_sfbi_dir_snp_sent)		\
+	__PMC_EV(CMN600_PMU, hnf_sfbi_brd_snp_sent)		\
+	__PMC_EV(CMN600_PMU, hnf_snp_sent_untrk)		\
+	__PMC_EV(CMN600_PMU, hnf_intv_dirty)			\
+	__PMC_EV(CMN600_PMU, hnf_stash_snp_sent)		\
+	__PMC_EV(CMN600_PMU, hnf_stash_data_pull)		\
+	__PMC_EV(CMN600_PMU, hnf_snp_fwded)			\
+	__PMC_EV(CMN600_PMU, hni_rrt_rd_occ_cnt_ovfl)		\
+	__PMC_EV(CMN600_PMU, hni_rrt_wr_occ_cnt_ovfl)		\
+	__PMC_EV(CMN600_PMU, hni_rdt_rd_occ_cnt_ovfl)		\
+	__PMC_EV(CMN600_PMU, hni_rdt_wr_occ_cnt_ovfl)		\
+	__PMC_EV(CMN600_PMU, hni_wdb_occ_cnt_ovfl)		\
+	__PMC_EV(CMN600_PMU, hni_rrt_rd_alloc)			\
+	__PMC_EV(CMN600_PMU, hni_rrt_wr_alloc)			\
+	__PMC_EV(CMN600_PMU, hni_rdt_rd_alloc)			\
+	__PMC_EV(CMN600_PMU, hni_rdt_wr_alloc)			\
+	__PMC_EV(CMN600_PMU, hni_wdb_alloc)			\
+	__PMC_EV(CMN600_PMU, hni_txrsp_retryack)		\
+	__PMC_EV(CMN600_PMU, hni_arvalid_no_arready)		\
+	__PMC_EV(CMN600_PMU, hni_arready_no_arvalid)		\
+	__PMC_EV(CMN600_PMU, hni_awvalid_no_awready)		\
+	__PMC_EV(CMN600_PMU, hni_awready_no_awvalid)		\
+	__PMC_EV(CMN600_PMU, hni_wvalid_no_wready)		\
+	__PMC_EV(CMN600_PMU, hni_txdat_stall)			\
+	__PMC_EV(CMN600_PMU, hni_nonpcie_serialization)		\
+	__PMC_EV(CMN600_PMU, hni_pcie_serialization)		\
+	__PMC_EV(CMN600_PMU, xp_txflit_valid)			\
+	__PMC_EV(CMN600_PMU, xp_txflit_stall)			\
+	__PMC_EV(CMN600_PMU, xp_partial_dat_flit)		\
+	__PMC_EV(CMN600_PMU, sbsx_rd_req)			\
+	__PMC_EV(CMN600_PMU, sbsx_wr_req)			\
+	__PMC_EV(CMN600_PMU, sbsx_cmo_req)			\
+	__PMC_EV(CMN600_PMU, sbsx_txrsp_retryack)		\
+	__PMC_EV(CMN600_PMU, sbsx_txdat_flitv)			\
+	__PMC_EV(CMN600_PMU, sbsx_txrsp_flitv)			\
+	__PMC_EV(CMN600_PMU, sbsx_rd_req_trkr_occ_cnt_ovfl)	\
+	__PMC_EV(CMN600_PMU, sbsx_wr_req_trkr_occ_cnt_ovfl)	\
+	__PMC_EV(CMN600_PMU, sbsx_cmo_req_trkr_occ_cnt_ovfl)	\
+	__PMC_EV(CMN600_PMU, sbsx_wdb_occ_cnt_ovfl)		\
+	__PMC_EV(CMN600_PMU, sbsx_rd_axi_trkr_occ_cnt_ovfl)	\
+	__PMC_EV(CMN600_PMU, sbsx_cmo_axi_trkr_occ_cnt_ovfl)	\
+	__PMC_EV(CMN600_PMU, sbsx_arvalid_no_arready)		\
+	__PMC_EV(CMN600_PMU, sbsx_awvalid_no_awready)		\
+	__PMC_EV(CMN600_PMU, sbsx_wvalid_no_wready)		\
+	__PMC_EV(CMN600_PMU, sbsx_txdat_stall)			\
+	__PMC_EV(CMN600_PMU, sbsx_txrsp_stall)			\
+	__PMC_EV(CMN600_PMU, rnd_s0_rdata_beats)		\
+	__PMC_EV(CMN600_PMU, rnd_s1_rdata_beats)		\
+	__PMC_EV(CMN600_PMU, rnd_s2_rdata_beats)		\
+	__PMC_EV(CMN600_PMU, rnd_rxdat_flits)			\
+	__PMC_EV(CMN600_PMU, rnd_txdat_flits)			\
+	__PMC_EV(CMN600_PMU, rnd_txreq_flits_total)		\
+	__PMC_EV(CMN600_PMU, rnd_txreq_flits_retried)		\
+	__PMC_EV(CMN600_PMU, rnd_rrt_occ_ovfl)			\
+	__PMC_EV(CMN600_PMU, rnd_wrt_occ_ovfl)			\
+	__PMC_EV(CMN600_PMU, rnd_txreq_flits_replayed)		\
+	__PMC_EV(CMN600_PMU, rnd_wrcancel_sent)			\
+	__PMC_EV(CMN600_PMU, rnd_s0_wdata_beats)		\
+	__PMC_EV(CMN600_PMU, rnd_s1_wdata_beats)		\
+	__PMC_EV(CMN600_PMU, rnd_s2_wdata_beats)		\
+	__PMC_EV(CMN600_PMU, rnd_rrt_alloc)			\
+	__PMC_EV(CMN600_PMU, rnd_wrt_alloc)			\
+	__PMC_EV(CMN600_PMU, rnd_rdb_unord)			\
+	__PMC_EV(CMN600_PMU, rnd_rdb_replay)			\
+	__PMC_EV(CMN600_PMU, rnd_rdb_hybrid)			\
+	__PMC_EV(CMN600_PMU, rnd_rdb_ord)			\
+	__PMC_EV(CMN600_PMU, rni_s0_rdata_beats)		\
+	__PMC_EV(CMN600_PMU, rni_s1_rdata_beats)		\
+	__PMC_EV(CMN600_PMU, rni_s2_rdata_beats)		\
+	__PMC_EV(CMN600_PMU, rni_rxdat_flits)			\
+	__PMC_EV(CMN600_PMU, rni_txdat_flits)			\
+	__PMC_EV(CMN600_PMU, rni_txreq_flits_total)		\
+	__PMC_EV(CMN600_PMU, rni_txreq_flits_retried)		\
+	__PMC_EV(CMN600_PMU, rni_rrt_occ_ovfl)			\
+	__PMC_EV(CMN600_PMU, rni_wrt_occ_ovfl)			\
+	__PMC_EV(CMN600_PMU, rni_txreq_flits_replayed)		\
+	__PMC_EV(CMN600_PMU, rni_wrcancel_sent)			\
+	__PMC_EV(CMN600_PMU, rni_s0_wdata_beats)		\
+	__PMC_EV(CMN600_PMU, rni_s1_wdata_beats)		\
+	__PMC_EV(CMN600_PMU, rni_s2_wdata_beats)		\
+	__PMC_EV(CMN600_PMU, rni_rrt_alloc)			\
+	__PMC_EV(CMN600_PMU, rni_wrt_alloc)			\
+	__PMC_EV(CMN600_PMU, rni_rdb_unord)			\
+	__PMC_EV(CMN600_PMU, rni_rdb_replay)			\
+	__PMC_EV(CMN600_PMU, rni_rdb_hybrid)			\
+	__PMC_EV(CMN600_PMU, rni_rdb_ord)			\
+	__PMC_EV(CMN600_PMU, cxha_rddatbyp)			\
+	__PMC_EV(CMN600_PMU, cxha_chirsp_up_stall)		\
+	__PMC_EV(CMN600_PMU, cxha_chidat_up_stall)		\
+	__PMC_EV(CMN600_PMU, cxha_snppcrd_lnk0_stall)		\
+	__PMC_EV(CMN600_PMU, cxha_snppcrd_lnk1_stall)		\
+	__PMC_EV(CMN600_PMU, cxha_snppcrd_lnk2_stall)		\
+	__PMC_EV(CMN600_PMU, cxha_reqtrk_occ)			\
+	__PMC_EV(CMN600_PMU, cxha_rdb_occ)			\
+	__PMC_EV(CMN600_PMU, cxha_rdbbyp_occ)			\
+	__PMC_EV(CMN600_PMU, cxha_wdb_occ)			\
+	__PMC_EV(CMN600_PMU, cxha_snptrk_occ)			\
+	__PMC_EV(CMN600_PMU, cxha_sdb_occ)			\
+	__PMC_EV(CMN600_PMU, cxha_snphaz_occ)			\
+	__PMC_EV(CMN600_PMU, cxra_req_trk_occ)			\
+	__PMC_EV(CMN600_PMU, cxra_snp_trk_occ)			\
+	__PMC_EV(CMN600_PMU, cxra_rd_dat_buf_occ)		\
+	__PMC_EV(CMN600_PMU, cxra_wr_dat_buf_occ)		\
+	__PMC_EV(CMN600_PMU, cxra_snp_sink_buf_occ)		\
+	__PMC_EV(CMN600_PMU, cxra_snp_bcasts)			\
+	__PMC_EV(CMN600_PMU, cxra_req_chains)			\
+	__PMC_EV(CMN600_PMU, cxra_req_chain_avg_len)		\
+	__PMC_EV(CMN600_PMU, cxra_chi_rsp_upload_stalls)	\
+	__PMC_EV(CMN600_PMU, cxra_chi_dat_upload_stalls)	\
+	__PMC_EV(CMN600_PMU, cxra_dat_pcrd_stalls_lnk0)		\
+	__PMC_EV(CMN600_PMU, cxra_dat_pcrd_stalls_lnk1)		\
+	__PMC_EV(CMN600_PMU, cxra_dat_pcrd_stalls_lnk2)		\
+	__PMC_EV(CMN600_PMU, cxra_req_pcrd_stalls_lnk0)		\
+	__PMC_EV(CMN600_PMU, cxra_req_pcrd_stalls_lnk1)		\
+	__PMC_EV(CMN600_PMU, cxra_req_pcrd_stalls_lnk2)		\
+	__PMC_EV(CMN600_PMU, cxra_ext_rsp_stall)		\
+	__PMC_EV(CMN600_PMU, cxra_ext_dat_stall)		\
+	__PMC_EV(CMN600_PMU, cxla_rx_tlp_link0)			\
+	__PMC_EV(CMN600_PMU, cxla_rx_tlp_link1)			\
+	__PMC_EV(CMN600_PMU, cxla_rx_tlp_link2)			\
+	__PMC_EV(CMN600_PMU, cxla_tx_tlp_link0)			\
+	__PMC_EV(CMN600_PMU, cxla_tx_tlp_link1)			\
+	__PMC_EV(CMN600_PMU, cxla_tx_tlp_link2)			\
+	__PMC_EV(CMN600_PMU, cxla_rx_cxs_link0)			\
+	__PMC_EV(CMN600_PMU, cxla_rx_cxs_link1)			\
+	__PMC_EV(CMN600_PMU, cxla_rx_cxs_link2)			\
+	__PMC_EV(CMN600_PMU, cxla_tx_cxs_link0)			\
+	__PMC_EV(CMN600_PMU, cxla_tx_cxs_link1)			\
+	__PMC_EV(CMN600_PMU, cxla_tx_cxs_link2)			\
+	__PMC_EV(CMN600_PMU, cxla_avg_rx_tlp_sz_dws)		\
+	__PMC_EV(CMN600_PMU, cxla_avg_tx_tlp_sz_dws)		\
+	__PMC_EV(CMN600_PMU, cxla_avg_rx_tlp_sz_ccix_msg)	\
+	__PMC_EV(CMN600_PMU, cxla_avg_tx_tlp_sz_ccix_msg)	\
+	__PMC_EV(CMN600_PMU, cxla_avg_sz_rx_cxs_dw_beat)	\
+	__PMC_EV(CMN600_PMU, cxla_avg_sz_tx_cxs_dw_beat)	\
+	__PMC_EV(CMN600_PMU, cxla_tx_cxs_link_credit_backpressure) \
+	__PMC_EV(CMN600_PMU, cxla_rx_tlp_buffer_full)		\
+	__PMC_EV(CMN600_PMU, cxla_tx_tlp_buffer_full)		\
+	__PMC_EV(CMN600_PMU, cxla_avg_latency_process_rx_tlp)	\
+	__PMC_EV(CMN600_PMU, cxla_avg_latency_form_tx_tlp)
+
+
+#define	PMC_EV_CMN600_PMU_FIRST	PMC_EV_CMN600_PMU_dn_rxreq_dvmop
+#define	PMC_EV_CMN600_PMU_LAST	\
+		PMC_EV_CMN600_PMU_cxla_avg_latency_form_tx_tlp
 
 #define __PMC_EV_PPC7450()						\
 	__PMC_EV(PPC7450, CYCLE)					\
@@ -1463,10 +2434,10 @@ __PMC_EV_ALIAS("unhalted-core-cycles",		IAP_ARCH_UNH_COR_CYC)
  * 0x2000	0x0080		AMD K7 events
  * 0x2080	0x0100		AMD K8 events
  * 0x10000	0x0080		INTEL architectural fixed-function events
- * 0x10080	0x0F80		INTEL architectural programmable events
- * 0x11000	0x0080		INTEL Pentium 4 events
- * 0x11080	0x0080		INTEL Pentium MMX events
- * 0x11100	0x0100		INTEL Pentium Pro/P-II/P-III/Pentium-M events
+ * 0x10080	0x0F80		free (was INTEL architectural programmable events)
+ * 0x11000	0x0080		free (was INTEL Pentium 4 events)
+ * 0x11080	0x0080		free (was INTEL Pentium MMX events)
+ * 0x11100	0x0100		free (was INTEL Pentium Pro/P-II/P-III/Pentium-M events)
  * 0x11200	0x00FF		free (was INTEL XScale events)
  * 0x11300	0x00FF		free (was MIPS 24K events)
  * 0x11400	0x00FF		free (was Octeon events)
@@ -1477,30 +2448,37 @@ __PMC_EV_ALIAS("unhalted-core-cycles",		IAP_ARCH_UNH_COR_CYC)
  * 0x13200	0x00FF		free (was IBM POWER8 events)
  * 0x13300	0x00FF		Freescale e500 events
  * 0x14000	0x0100		ARMv7 events
- * 0x14100	0x0100		ARMv8 events
+ * 0x14100	0x0400		ARMv8 events
+ * 0x14500	0x0020		ARM DMC-620 clkdiv2 events
+ * 0x14520	0x0080		ARM DMC-620 clk events
+ * 0x14600	0x0100		ARM CMN-600 events
  * 0x20000	0x1000		Software events
  */
-#define	__PMC_EVENTS()				\
-	__PMC_EV_BLOCK(TSC,	0x01000)	\
-	__PMC_EV_TSC()				\
-	__PMC_EV_BLOCK(IAF,     0x10000)	\
-	__PMC_EV_IAF()				\
-	__PMC_EV_BLOCK(K7,	0x2000)		\
-	__PMC_EV_K7()				\
-	__PMC_EV_BLOCK(K8,	0x2080)	        \
-	__PMC_EV_K8()				\
-	__PMC_EV_BLOCK(UCP,     0x12080)        \
-	__PMC_EV_UCP()				\
-	__PMC_EV_BLOCK(PPC7450,	0x13000)	\
-	__PMC_EV_PPC7450()			\
-	__PMC_EV_BLOCK(PPC970,	0x13100)	\
-	__PMC_EV_PPC970()			\
-	__PMC_EV_BLOCK(E500,	0x13300)	\
-	__PMC_EV_E500()				\
-	__PMC_EV_BLOCK(ARMV7,	0x14000)	\
-	__PMC_EV_ARMV7()			\
-	__PMC_EV_BLOCK(ARMV8,	0x14100)	\
-	__PMC_EV_ARMV8()
+#define	__PMC_EVENTS()					\
+	__PMC_EV_BLOCK(TSC,		0x01000)	\
+	__PMC_EV_TSC()					\
+	__PMC_EV_BLOCK(K7,		0x02000)	\
+	__PMC_EV_K7()					\
+	__PMC_EV_BLOCK(K8,		0x02080)	\
+	__PMC_EV_K8()					\
+	__PMC_EV_BLOCK(IAF,		0x10000)	\
+	__PMC_EV_IAF()					\
+	__PMC_EV_BLOCK(PPC7450,		0x13000)	\
+	__PMC_EV_PPC7450()				\
+	__PMC_EV_BLOCK(PPC970,		0x13100)	\
+	__PMC_EV_PPC970()				\
+	__PMC_EV_BLOCK(E500,		0x13300)	\
+	__PMC_EV_E500()					\
+	__PMC_EV_BLOCK(ARMV7,		0x14000)	\
+	__PMC_EV_ARMV7()				\
+	__PMC_EV_BLOCK(ARMV8,		0x14100)	\
+	__PMC_EV_ARMV8()				\
+	__PMC_EV_BLOCK(DMC620_PMU_CD2,	0x14500)	\
+	__PMC_EV_DMC620_PMU_CD2()			\
+	__PMC_EV_BLOCK(DMC620_PMU_C,	0x14520)	\
+	__PMC_EV_DMC620_PMU_C()				\
+	__PMC_EV_BLOCK(CMN600_PMU,	0x14600)	\
+	__PMC_EV_CMN600_PMU()
 
 #define	PMC_EVENT_FIRST	PMC_EV_TSC_TSC
 #define	PMC_EVENT_LAST	PMC_EV_SOFT_LAST

@@ -27,8 +27,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/socket.h>
@@ -65,7 +63,6 @@ static driver_t sbni_isa_driver = {
 	sizeof(struct sbni_softc)
 };
 
-static devclass_t sbni_isa_devclass;
 static struct isa_pnp_id  sbni_ids[] = {
 	{ 0, NULL }	/* we have no pnp sbni cards atm.  */
 };
@@ -133,7 +130,7 @@ sbni_attach_isa(device_t dev)
 			return (ENXIO);
 		} else {
 			device_printf(dev, "shared irq with %s\n",
-			       master->ifp->if_xname);
+			       if_name(master->ifp));
 		}
 	} 
 #endif	/* SBNI_DUAL_COMPOUND */
@@ -162,6 +159,6 @@ sbni_attach_isa(device_t dev)
 	return (0);
 }
 
-DRIVER_MODULE(sbni, isa, sbni_isa_driver, sbni_isa_devclass, 0, 0);
+DRIVER_MODULE(sbni, isa, sbni_isa_driver, 0, 0);
 MODULE_DEPEND(sbni, isa, 1, 1, 1);
 ISA_PNP_INFO(sbni_ids);

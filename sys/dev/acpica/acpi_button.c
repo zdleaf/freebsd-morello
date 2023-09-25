@@ -27,8 +27,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include "opt_acpi.h"
 #include "opt_evdev.h"
 #include <sys/param.h>
@@ -53,10 +51,8 @@ ACPI_MODULE_NAME("BUTTON")
 struct acpi_button_softc {
     device_t	button_dev;
     ACPI_HANDLE	button_handle;
-    boolean_t	button_type;
-#define		ACPI_POWER_BUTTON	0
-#define		ACPI_SLEEP_BUTTON	1
-    boolean_t	fixed;
+    enum { ACPI_POWER_BUTTON, ACPI_SLEEP_BUTTON } button_type;
+    bool	fixed;
 #ifdef EVDEV_SUPPORT
     struct evdev_dev *button_evdev;
 #endif
@@ -97,9 +93,7 @@ static driver_t acpi_button_driver = {
     sizeof(struct acpi_button_softc),
 };
 
-static devclass_t acpi_button_devclass;
-DRIVER_MODULE(acpi_button, acpi, acpi_button_driver, acpi_button_devclass,
-	      0, 0);
+DRIVER_MODULE(acpi_button, acpi, acpi_button_driver, 0, 0);
 MODULE_DEPEND(acpi_button, acpi, 1, 1, 1);
 
 static int
@@ -122,14 +116,14 @@ acpi_button_probe(device_t dev)
     } else if (strcmp(str, "ACPI_FPB") == 0) {
 	device_set_desc(dev, "Power Button (fixed)");
 	sc->button_type = ACPI_POWER_BUTTON;
-	sc->fixed = 1;
+	sc->fixed = true;
     } else if (strcmp(str, "PNP0C0E") == 0) {
 	device_set_desc(dev, "Sleep Button");
 	sc->button_type = ACPI_SLEEP_BUTTON;
     } else if (strcmp(str, "ACPI_FSB") == 0) {
 	device_set_desc(dev, "Sleep Button (fixed)");
 	sc->button_type = ACPI_SLEEP_BUTTON;
-	sc->fixed = 1;
+	sc->fixed = true;
     }
 
     return (rv);

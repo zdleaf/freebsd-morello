@@ -1,6 +1,6 @@
 #!/bin/sh
 #
-# SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+# SPDX-License-Identifier: BSD-2-Clause
 #
 # Copyright (c) 2010-2013 Hudson River Trading LLC
 # Written by: John H. Baldwin <jhb@FreeBSD.org>
@@ -27,7 +27,6 @@
 # OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 # SUCH DAMAGE.
 #
-# $FreeBSD$
 
 # This is a tool to manage updating files that are not updated as part
 # of 'make installworld' such as files in /etc.  Unlike other tools,
@@ -62,14 +61,14 @@
 usage()
 {
 	cat <<EOF
-usage: etcupdate [-npBF] [-d workdir] [-r | -s source | -t tarball]
+usage: etcupdate [-npBFN] [-d workdir] [-r | -s source | -t tarball]
                  [-A patterns] [-D destdir] [-I patterns] [-L logfile]
-                 [-M options]
-       etcupdate build [-B] [-d workdir] [-s source] [-L logfile] [-M options]
-                 <tarball>
+                 [-M options] [-m make]
+       etcupdate build [-BN] [-d workdir] [-s source] [-L logfile] [-M options]
+                 [-m make] <tarball>
        etcupdate diff [-d workdir] [-D destdir] [-I patterns] [-L logfile]
-       etcupdate extract [-B] [-d workdir] [-s source | -t tarball]
-                 [-D destdir] [-L logfile] [-M options]
+       etcupdate extract [-BN] [-d workdir] [-s source | -t tarball]
+                 [-D destdir] [-L logfile] [-M options] [-m make]
        etcupdate resolve [-p] [-d workdir] [-D destdir] [-L logfile]
        etcupdate revert [-d workdir] [-D destdir] [-L logfile] file ...
        etcupdate status [-d workdir] [-D destdir]
@@ -184,14 +183,24 @@ always_install()
 # $1 - directory to store new tree in
 build_tree()
 (
-	local destdir dir file make
+	local destdir dir file make autogenfiles metatmp
 
-	make="make $MAKE_OPTIONS -DNO_FILEMON"
+	make="$MAKE_CMD $MAKE_OPTIONS -DNO_FILEMON"
+
+	if [ -n "$noroot" ]; then
+		make="$make -DNO_ROOT"
+		metatmp=`mktemp $WORKDIR/etcupdate-XXXXXXX`
+		: > $metatmp
+		trap "rm -f $metatmp; trap '' EXIT; return 1" INT
+		trap "rm -f $metatmp" EXIT
+	else
+		metatmp="/dev/null"
+		trap "return 1" INT
+	fi
 
 	log "Building tree at $1 with $make"
 
 	exec >&3 2>&1
-	trap 'return 1' INT
 
 	mkdir -p $1/usr/obj
 	destdir=`realpath $1`
@@ -204,28 +213,63 @@ build_tree()
 			mkdir -p $1/etc || return 1
 			cp -p $SRCDIR/$file $1/etc/$name || return 1
 		done
-	elif ! [ -n "$nobuild" ]; then
-		(cd $SRCDIR; $make DESTDIR=$destdir distrib-dirs &&
-    MAKEOBJDIRPREFIX=$destdir/usr/obj $make _obj SUBDIR_OVERRIDE=etc &&
-    MAKEOBJDIRPREFIX=$destdir/usr/obj $make everything SUBDIR_OVERRIDE=etc &&
-    MAKEOBJDIRPREFIX=$destdir/usr/obj $make DESTDIR=$destdir distribution) || \
-		    return 1
 	else
-		(cd $SRCDIR; $make DESTDIR=$destdir distrib-dirs &&
-		    $make DESTDIR=$destdir distribution) || return 1
+		(
+			cd $SRCDIR || exit 1
+			if ! [ -n "$nobuild" ]; then
+				export MAKEOBJDIRPREFIX=$destdir/usr/obj
+				if [ -n "$($make -V.ALLTARGETS:Mbuildetc)" ]; then
+					$make buildetc || exit 1
+				else
+					$make _obj SUBDIR_OVERRIDE=etc || exit 1
+					$make everything SUBDIR_OVERRIDE=etc || exit 1
+				fi
+			fi
+			if [ -n "$($make -V.ALLTARGETS:Minstalletc)" ]; then
+				$make DESTDIR=$destdir installetc || exit 1
+			else
+				$make DESTDIR=$destdir distrib-dirs || exit 1
+				$make DESTDIR=$destdir distribution || exit 1
+			fi
+		) || return 1
 	fi
 	chflags -R noschg $1 || return 1
 	rm -rf $1/usr/obj || return 1
 
 	# Purge auto-generated files.  Only the source files need to
 	# be updated after which these files are regenerated.
-	rm -f $1/etc/*.db $1/etc/passwd $1/var/db/services.db || return 1
+	autogenfiles="./etc/*.db ./etc/passwd ./var/db/services.db"
+	(cd $1 && printf '%s\n' $autogenfiles >> $metatmp && \
+	    rm -f $autogenfiles) || return 1
 
 	# Remove empty files.  These just clutter the output of 'diff'.
-	find $1 -type f -size 0 -delete || return 1
+	(cd $1 && find . -type f -size 0 -delete -print >> $metatmp) || \
+	    return 1
 
 	# Trim empty directories.
-	find -d $1 -type d -empty -delete || return 1
+	(cd $1 && find . -depth -type d -empty -delete -print >> $metatmp) || \
+	    return 1
+
+	if [ -n "$noroot" ]; then
+		# Rewrite the METALOG to exclude the files (and directories)
+		# removed above. $metatmp contains the list of files to delete,
+		# and we append #METALOG# as a delimiter followed by the
+		# original METALOG. This lets us scan through $metatmp in awk
+		# building up a table of names to delete until we reach the
+		# delimiter, then emit all the entries of the original METALOG
+		# after it that aren't in that table. We also exclude ./usr/obj
+		# and its children explicitly for simplicity rather than
+		# building up that list (and in practice only ./usr/obj itself
+		# will be in the METALOG since nothing is installed there).
+		echo '#METALOG#' >> $metatmp || return 1
+		cat $1/METALOG >> $metatmp || return 1
+		awk '/^#METALOG#$/ { metalog = 1; next }
+		    { f=$1; gsub(/\/\/+/, "/", f) }
+		    !metalog { rm[f] = 1; next }
+		    !rm[f] && f !~ /^\.\/usr\/obj(\/|$)/ { print }' \
+		    $metatmp > $1/METALOG || return 1
+	fi
+
 	return 0
 )
 
@@ -673,8 +717,9 @@ install_resolved()
 		return 1
 	fi
 
-	log "cp -Rp ${CONFLICTS}$1 ${DESTDIR}$1"
-	cp -Rp ${CONFLICTS}$1 ${DESTDIR}$1 >&3 2>&1
+	# Use cat rather than cp to preserve metadata
+	log "cat ${CONFLICTS}$1 > ${DESTDIR}$1"
+	cat ${CONFLICTS}$1 > ${DESTDIR}$1 2>&3
 	post_install_file $1
 	return 0
 }
@@ -849,8 +894,8 @@ merge_file()
 			# the conflicts directory.
 			if [ -z "$dryrun" ]; then
 				install_dirs $NEWTREE $CONFLICTS $1
-				log "diff3 -m -A ${DESTDIR}$1 ${CONFLICTS}$1"
-				diff3 -m -A -L "yours" -L "original" -L "new" \
+				log "diff3 -m ${DESTDIR}$1 ${CONFLICTS}$1"
+				diff3 -m -L "yours" -L "original" -L "new" \
 				    ${DESTDIR}$1 ${OLDTREE}$1 ${NEWTREE}$1 > \
 				    ${CONFLICTS}$1
 			fi
@@ -1285,7 +1330,7 @@ handle_added_file()
 # Build a new tree and save it in a tarball.
 build_cmd()
 {
-	local dir
+	local dir tartree
 
 	if [ $# -ne 1 ]; then
 		echo "Missing required tarball."
@@ -1306,7 +1351,12 @@ build_cmd()
 		remove_tree $dir
 		exit 1
 	fi
-	if ! tar cfj $1 -C $dir . >&3 2>&1; then
+	if [ -n "$noroot" ]; then
+		tartree=@METALOG
+	else
+		tartree=.
+	fi
+	if ! tar cfj $1 -C $dir $tartree >&3 2>&1; then
 		echo "Failed to create tarball."
 		remove_tree $dir
 		exit 1
@@ -1612,6 +1662,18 @@ EOF
 		cat $WARNINGS
 	fi
 
+	# If this was a dryrun, remove the temporary tree if we built
+	# a new one.
+	if [ -n "$dryrun" ]; then
+		if [ -n "$dir" ]; then
+			if [ -n "$rerun" ]; then
+				panic "Should not have a temporary directory"
+			fi
+			remove_tree $dir
+		fi
+		return
+	fi
+
 	# Finally, rotate any needed trees.
 	if [ "$new" != "$NEWTREE" ]; then
 		if [ -n "$rerun" ]; then
@@ -1694,6 +1756,9 @@ ALWAYS_INSTALL=
 # Files to ignore and never update during a merge.
 IGNORE_FILES=
 
+# The path to the make binary
+MAKE_CMD=make
+
 # Flags to pass to 'make' when building a tree.
 MAKE_OPTIONS=
 
@@ -1706,6 +1771,7 @@ MAKE_OPTIONS=
 # - FREEBSD_ID
 # - IGNORE_FILES
 # - LOGFILE
+# - MAKE_CMD
 # - MAKE_OPTIONS
 # - SRCDIR
 # - WORKDIR
@@ -1721,10 +1787,14 @@ dryrun=
 ignore=
 nobuild=
 preworld=
-while getopts "d:nprs:t:A:BD:FI:L:M:" option; do
+noroot=
+while getopts "d:m:nprs:t:A:BD:FI:L:M:N" option; do
 	case "$option" in
 		d)
 			WORKDIR=$OPTARG
+			;;
+		m)
+			MAKE_CMD=$OPTARG
 			;;
 		n)
 			dryrun=YES
@@ -1777,6 +1847,9 @@ while getopts "d:nprs:t:A:BD:FI:L:M:" option; do
 			;;
 		M)
 			MAKE_OPTIONS="$OPTARG"
+			;;
+		N)
+			noroot=YES
 			;;
 		*)
 			echo

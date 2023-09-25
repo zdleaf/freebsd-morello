@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2009-2013 Chelsio, Inc. All rights reserved.
  *
@@ -32,8 +32,6 @@
  * SOFTWARE.
  */
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include "opt_inet.h"
 
 #ifdef TCP_OFFLOAD
@@ -135,7 +133,7 @@ create_cq(struct c4iw_rdev *rdev, struct t4_cq *cq,
 
 	wr = alloc_wrqe(wr_len, &sc->sge.ctrlq[0]);
 	if (wr == NULL)
-        	return (0);
+		return (0);
         res_wr = wrtod(wr);
 
 	memset(res_wr, 0, wr_len);

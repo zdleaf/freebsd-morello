@@ -1,6 +1,5 @@
 /*	$OpenBSD: if_zyd.c,v 1.52 2007/02/11 00:08:04 jsg Exp $	*/
 /*	$NetBSD: if_zyd.c,v 1.7 2007/06/21 04:04:29 kiyohara Exp $	*/
-/*	$FreeBSD$	*/
 
 /*-
  * Copyright (c) 2006 by Damien Bergamini <damien.bergamini@free.fr>
@@ -20,8 +19,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 /*
  * ZyDAS ZD1211/ZD1211B USB WLAN driver.
  */
@@ -440,7 +437,7 @@ zyd_detach(device_t dev)
 {
 	struct zyd_softc *sc = device_get_softc(dev);
 	struct ieee80211com *ic = &sc->sc_ic;
-	unsigned int x;
+	unsigned x;
 
 	/*
 	 * Prevent further allocations from RX/TX data
@@ -2913,9 +2910,7 @@ static driver_t zyd_driver = {
 	.size = sizeof(struct zyd_softc)
 };
 
-static devclass_t zyd_devclass;
-
-DRIVER_MODULE(zyd, uhub, zyd_driver, zyd_devclass, NULL, 0);
+DRIVER_MODULE(zyd, uhub, zyd_driver, NULL, NULL);
 MODULE_DEPEND(zyd, usb, 1, 1, 1);
 MODULE_DEPEND(zyd, wlan, 1, 1, 1);
 MODULE_VERSION(zyd, 1);

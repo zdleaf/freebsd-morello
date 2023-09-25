@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2011 Sandvine Incorporated ULC.
  * Copyright (c) 2012 iXsystems, Inc.
@@ -40,8 +40,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/kernel.h>
 #include <sys/systm.h>
@@ -681,8 +679,6 @@ static driver_t wb_driver = {
 	sizeof(struct wb_softc)
 };
 
-static devclass_t wb_devclass;
-
-DRIVER_MODULE(wb, superio, wb_driver, wb_devclass, NULL, NULL);
+DRIVER_MODULE(wb, superio, wb_driver, NULL, NULL);
 MODULE_DEPEND(wb, superio, 1, 1, 1);
 MODULE_VERSION(wb, 1);

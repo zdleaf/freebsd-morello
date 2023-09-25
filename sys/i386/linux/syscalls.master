@@ -1,4 +1,3 @@
- $FreeBSD$
 
 ;	@(#)syscalls.master	8.1 (Berkeley) 7/19/93
 ; System call name/number master file (or rather, slave, from LINUX).
@@ -26,6 +25,10 @@
 ;		function prototype in sys/sysproto.h.  Does add a
 ;		definition to syscall.h besides adding a sysent.
 
+; #include's, #defines's, etc. may be included, and are copied to the output
+; files. However, #ifdef, etc will be copied, but any lines that don't start
+; with # will not. Caveat Emptor.
+
 #include <sys/param.h>
 #include <sys/sysent.h>
 #include <sys/sysproto.h>
@@ -35,8 +38,6 @@
 
 ; Isn't pretty, but there seems to be no other way to trap nosys
 #define	nosys	linux_nosys
-
-; #ifdef's, etc. may be included, and are copied to the output files.
 
 0	AUE_NULL	UNIMPL	setup
 1	AUE_EXIT	STD {
@@ -54,11 +55,11 @@
 		    u_int nbyte
 		);
 	}
-4	AUE_NULL	NOPROTO {
-		int write(
+4	AUE_NULL	STD {
+		int linux_write(
 		    int fd,
 		    char *buf,
-		    u_int nbyte
+		    l_size_t nbyte
 		);
 	}
 5	AUE_OPEN_RWTC	STD {
@@ -100,8 +101,8 @@
 11	AUE_EXECVE	STD {
 		int linux_execve(
 		    char *path,
-		    char **argp,
-		    char **envp
+		    l_uintptr_t *argp,
+		    l_uintptr_t *envp
 		);
 	}
 12	AUE_CHDIR	STD {
@@ -138,7 +139,7 @@
 18	AUE_STAT	STD {
 		int linux_stat(
 		    char *path,
-		    struct linux_stat *up
+		    struct l_old_stat *up
 		);
 	}
 19	AUE_LSEEK	STD {
@@ -189,12 +190,7 @@
 		    l_uint secs
 		);
 	}
-28	AUE_FSTAT	STD {
-		int linux_fstat(
-		    l_uint fd,
-		    struct linux_stat *up
-		);
-	}
+28	AUE_NULL	UNIMPL	fstat
 29	AUE_NULL	STD {
 		int linux_pause(void);
 	}
@@ -455,7 +451,7 @@
 84	AUE_LSTAT	STD {
 		int linux_lstat(
 		    char *path,
-		    struct l_stat *up
+		    struct l_old_stat *up
 		);
 	}
 85	AUE_READLINK	STD {
@@ -794,8 +790,8 @@
 		    u_int iovcnt
 		);
 	}
-146	AUE_WRITEV	NOPROTO {
-		int writev(
+146	AUE_WRITEV	STD {
+		int linux_writev(
 		    int fd,
 		    struct iovec *iovp,
 		    u_int iovcnt
@@ -937,10 +933,10 @@
 172	AUE_PRCTL	STD {
 		int linux_prctl(
 		    l_int option,
-		    l_int arg2,
-		    l_int arg3,
-		    l_int arg4,
-		    l_int arg5
+		    l_uintptr_t arg2,
+		    l_uintptr_t arg3,
+		    l_uintptr_t arg4,
+		    l_uintptr_t arg5
 		);
 	}
 173	AUE_NULL	STD {
@@ -1042,7 +1038,7 @@
 		int linux_sendfile(
 		    l_int out,
 		    l_int in,
-		    l_long *offset,
+		    l_off_t *offset,
 		    l_size_t count
 		);
 	}
@@ -1241,7 +1237,7 @@
 		int linux_setxattr(
 		    const char *path,
 		    const char *name,
-		    const char *value,
+		    void *value,
 		    l_size_t size,
 		    l_int flags
 		);
@@ -1250,7 +1246,7 @@
 		int linux_lsetxattr(
 		    const char *path,
 		    const char *name,
-		    const char *value,
+		    void *value,
 		    l_size_t size,
 		    l_int flags
 		);
@@ -1259,7 +1255,7 @@
 		int linux_fsetxattr(
 		    l_int fd,
 		    const char *name,
-		    const char *value,
+		    void *value,
 		    l_size_t size,
 		    l_int flags
 		);
@@ -1268,7 +1264,7 @@
 		int linux_getxattr(
 		    const char *path,
 		    const char *name,
-		    char *value,
+		    void *value,
 		    l_size_t size
 		);
 	}
@@ -1276,7 +1272,7 @@
 		int linux_lgetxattr(
 		    const char *path,
 		    const char *name,
-		    char *value,
+		    void *value,
 		    l_size_t size
 		);
 	}
@@ -1284,28 +1280,28 @@
 		int linux_fgetxattr(
 		    l_int fd,
 		    const char *name,
-		    char *value,
+		    void *value,
 		    l_size_t size
 		);
 	}
 232	AUE_NULL	STD {
 		int linux_listxattr(
 		    const char *path,
-		    const char *list,
+		    char *list,
 		    l_size_t size
 		);
 	}
 233	AUE_NULL	STD {
 		int linux_llistxattr(
 		    const char *path,
-		    const char *list,
+		    char *list,
 		    l_size_t size
 		);
 	}
 234	AUE_NULL	STD {
 		int linux_flistxattr(
 		    l_int fd,
-		    const char *list,
+		    char *list,
 		    l_size_t size
 		);
 	}
@@ -1597,11 +1593,18 @@
 		int linux_keyctl(void);
 	}
 ; Linux 2.6.13:
-289	AUE_NULL	STD {
-		int linux_ioprio_set(void);
+289	AUE_SETPRIORITY	STD	{
+		int linux_ioprio_set(
+		    l_int which,
+		    l_int who,
+		    l_int ioprio
+		);
 	}
-290	AUE_NULL	STD {
-		int linux_ioprio_get(void);
+290	AUE_GETPRIORITY	STD	{
+		int linux_ioprio_get(
+		    l_int which,
+		    l_int who
+		);
 	}
 291	AUE_NULL	STD {
 		int linux_inotify_init(void);
@@ -1636,7 +1639,7 @@
 		    l_int dfd,
 		    const char *filename,
 		    l_int mode,
-		    l_uint dev
+		    l_dev_t dev
 		);
 	}
 298	AUE_FCHOWNAT	STD {
@@ -2283,7 +2286,12 @@
 		int linux_io_pgetevents(void);
 	}
 386	AUE_NULL	STD {
-		int linux_rseq(void);
+		int linux_rseq(
+		    struct linux_rseq *rseq,
+		    uint32_t rseq_len,
+		    l_int flags,
+		    uint32_t sig
+		);
 	}
 387-392	AUE_NULL	UNIMPL	nosys
 393	AUE_NULL	STD {
@@ -2388,16 +2396,32 @@
 		);
 	}
 408	AUE_NULL	STD {
-		int linux_timer_gettime64(void);
+		int linux_timer_gettime64(
+		    l_timer_t timerid,
+		    struct l_itimerspec64 *setting
+		);
 	}
 409	AUE_NULL	STD {
-		int linux_timer_settime64(void);
+		int linux_timer_settime64(
+		    l_timer_t timerid,
+		    l_int flags,
+		    const struct l_itimerspec64 *new,
+		    struct l_itimerspec64 *old
+		);
 	}
 410	AUE_NULL	STD {
-		int linux_timerfd_gettime64(void);
+		int linux_timerfd_gettime64(
+		    l_int fd,
+		    struct l_itimerspec64 *old_value
+		);
 	}
 411	AUE_NULL	STD {
-		int linux_timerfd_settime64(void);
+		int linux_timerfd_settime64(
+		    l_int fd,
+		    l_int flags,
+		    const struct l_itimerspec64 *new_value,
+		    struct l_itimerspec64 *old_value
+		);
 	}
 412	AUE_NULL	STD {
 		int linux_utimensat_time64(
@@ -2431,7 +2455,13 @@
 		int linux_io_pgetevents_time64(void);
 	}
 417	AUE_NULL	STD {
-		int linux_recvmmsg_time64(void);
+		int linux_recvmmsg_time64(
+		    l_int s,
+		    struct l_mmsghdr *msg,
+		    l_uint vlen,
+		    l_uint flags,
+		    struct l_timespec64 *timeout
+		);
 	}
 418	AUE_NULL	STD {
 		int linux_mq_timedsend_time64(void);
@@ -2440,7 +2470,12 @@
 		int linux_mq_timedreceive_time64(void);
 	}
 420	AUE_NULL	STD {
-		int linux_semtimedop_time64(void);
+		int linux_semtimedop_time64(
+		    l_int semid,
+		    struct sembuf *tsops,
+		    l_size_t nsops,
+		    struct l_timespec64 *timeout
+		);
 	}
 421	AUE_NULL	STD {
 		int linux_rt_sigtimedwait_time64(
@@ -2460,8 +2495,11 @@
 		    uint32_t val3
 		);
 	}
-423	AUE_NULL	STD {
-		int linux_sched_rr_get_interval_time64(void);
+423	AUE_SCHED_RR_GET_INTERVAL	STD {
+		int linux_sched_rr_get_interval_time64(
+		    l_pid_t pid,
+		    struct l_timespec64 *interval
+		);
 	}
 424	AUE_NULL	STD {
 		int linux_pidfd_send_signal(
@@ -2507,8 +2545,12 @@
 		    l_size_t usize
 		);
 	}
-436    AUE_NULL		STD {
-		int linux_close_range(void);
+436	AUE_CLOSERANGE	STD {
+		int linux_close_range(
+		    l_uint first,
+		    l_uint last,
+		    l_uint flags
+		);
 	}
 437    AUE_NULL		STD {
 		int linux_openat2(void);
@@ -2528,7 +2570,14 @@
 		int linux_process_madvise(void);
 	}
 441    AUE_NULL		STD {
-		int linux_epoll_pwait2(void);
+		int linux_epoll_pwait2_64(
+		    l_int epfd,
+		    struct epoll_event *events,
+		    l_int maxevents,
+		    struct l_timespec64 *timeout,
+		    l_sigset_t *mask,
+		    l_size_t sigsetsize
+		);
 	}
 442    AUE_NULL		STD {
 		int linux_mount_setattr(void);

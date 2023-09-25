@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2004 Colin Percival
  * Copyright (c) 2005 Nate Lawson
@@ -28,8 +28,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/bus.h>
 #include <sys/cpu.h>
@@ -897,8 +895,7 @@ static driver_t est_driver = {
 	sizeof(struct est_softc),
 };
 
-static devclass_t est_devclass;
-DRIVER_MODULE(est, cpu, est_driver, est_devclass, 0, 0);
+DRIVER_MODULE(est, cpu, est_driver, 0, 0);
 MODULE_DEPEND(est, hwpstate_intel, 1, 1, 1);
 
 static int

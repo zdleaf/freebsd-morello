@@ -1,4 +1,3 @@
-# $FreeBSD$
 
 .if ${.MAKE.DEPENDFILE:M*.${MACHINE}} == ""
 # by default only MACHINE0 does updates
@@ -27,3 +26,10 @@ CLEANFILES+= .depend
 
 .cc.cpp-out: .NOMETA
 	@${CXX} -E ${CXXFLAGS} ${.IMPSRC} | grep -v '^[[:space:]]*$$'
+
+.-include <site.autodep.mk>
+
+.ifdef _RECURSING_CRUNCH
+# crunchgen does not want to see our stats
+_reldir_finish: .NOTMAIN
+.endif

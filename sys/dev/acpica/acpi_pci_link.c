@@ -25,8 +25,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include "opt_acpi.h"
 #include <sys/param.h>
 #include <sys/bus.h>
@@ -104,8 +102,8 @@ struct link {
 	int	l_num_irqs;
 	int	*l_irqs;
 	int	l_references;
-	int	l_routed:1;
-	int	l_isa_irq:1;
+	bool	l_routed:1;
+	bool	l_isa_irq:1;
 	ACPI_RESOURCE l_prs_template;
 };
 
@@ -355,18 +353,18 @@ link_add_prs(ACPI_RESOURCE *res, void *context)
 		 * valid IRQs are ISA IRQs, then mark this link as
 		 * routed via an ISA interrupt.
 		 */
-		link->l_isa_irq = TRUE;
+		link->l_isa_irq = true;
 		link->l_irqs = malloc(sizeof(int) * link->l_num_irqs,
 		    M_PCI_LINK, M_WAITOK | M_ZERO);
 		for (i = 0; i < link->l_num_irqs; i++) {
 			if (is_ext_irq) {
 				link->l_irqs[i] = ext_irqs[i];
 				if (ext_irqs[i] >= NUM_ISA_INTERRUPTS)
-					link->l_isa_irq = FALSE;
+					link->l_isa_irq = false;
 			} else {
 				link->l_irqs[i] = irqs[i];
 				if (irqs[i] >= NUM_ISA_INTERRUPTS)
-					link->l_isa_irq = FALSE;
+					link->l_isa_irq = false;
 			}
 		}
 
@@ -376,7 +374,7 @@ link_add_prs(ACPI_RESOURCE *res, void *context)
 		 */
 		if (!req->sc->pl_crs_bad && !link->l_isa_irq &&
 		    link->l_crs_type == ACPI_RESOURCE_TYPE_IRQ)
-			req->sc->pl_crs_bad = TRUE;
+			req->sc->pl_crs_bad = true;
 		break;
 	default:
 		if (req->in_dpf == DPF_IGNORE)
@@ -390,7 +388,7 @@ link_add_prs(ACPI_RESOURCE *res, void *context)
 	return (AE_OK);
 }
 
-static int
+static bool
 link_valid_irq(struct link *link, int irq)
 {
 	int i;
@@ -399,12 +397,12 @@ link_valid_irq(struct link *link, int irq)
 
 	/* Invalid interrupts are never valid. */
 	if (!PCI_INTERRUPT_VALID(irq))
-		return (FALSE);
+		return (false);
 
 	/* Any interrupt in the list of possible interrupts is valid. */
 	for (i = 0; i < link->l_num_irqs; i++)
 		if (link->l_irqs[i] == irq)
-			 return (TRUE);
+			 return (true);
 
 	/*
 	 * For links routed via an ISA interrupt, if the SCI is routed via
@@ -412,10 +410,10 @@ link_valid_irq(struct link *link, int irq)
 	 */
 	if (link->l_isa_irq && AcpiGbl_FADT.SciInterrupt == irq &&
 	    irq < NUM_ISA_INTERRUPTS)
-		return (TRUE);
+		return (true);
 
 	/* If the interrupt wasn't found in the list it is not valid. */
-	return (FALSE);
+	return (false);
 }
 
 static void
@@ -493,7 +491,7 @@ acpi_pci_link_attach(device_t dev)
 		sc->pl_links[i].l_irq = PCI_INVALID_IRQ;
 		sc->pl_links[i].l_bios_irq = PCI_INVALID_IRQ;
 		sc->pl_links[i].l_sc = sc;
-		sc->pl_links[i].l_isa_irq = FALSE;
+		sc->pl_links[i].l_isa_irq = false;
 		sc->pl_links[i].l_res_index = -1;
 	}
 
@@ -558,7 +556,7 @@ acpi_pci_link_attach(device_t dev)
 	else
 		for (i = 0; i < sc->pl_num_links; i++)
 			if (PCI_INTERRUPT_VALID(sc->pl_links[i].l_irq))
-				sc->pl_links[i].l_routed = TRUE;
+				sc->pl_links[i].l_routed = true;
 	if (bootverbose)
 		acpi_pci_link_dump(sc, 0, "After Disable");
 	ACPI_SERIAL_END(pci_link);
@@ -719,7 +717,7 @@ acpi_pci_link_srs_from_crs(struct acpi_pci_link_softc *sc, ACPI_BUFFER *srsbuf)
 	ACPI_RESOURCE *end, *res;
 	ACPI_STATUS status;
 	struct link *link;
-	int i, in_dpf;
+	int i __diagused, in_dpf;
 
 	/* Fetch the _CRS. */
 	ACPI_SERIAL_ASSERT(pci_link);
@@ -861,7 +859,7 @@ acpi_pci_link_route_irqs(device_t dev)
 	ACPI_BUFFER srsbuf;
 	ACPI_STATUS status;
 	struct link *link;
-	int i;
+	int i __diagused;
 
 	ACPI_SERIAL_ASSERT(pci_link);
 	sc = device_get_softc(dev);
@@ -904,7 +902,7 @@ acpi_pci_link_route_irqs(device_t dev)
 			 */
 			if (!link->l_routed &&
 			    PCI_INTERRUPT_VALID(link->l_irq)) {
-				link->l_routed = TRUE;
+				link->l_routed = true;
 				acpi_config_intr(dev, resource);
 				pci_link_interrupt_weights[link->l_irq] +=
 				    link->l_references;
@@ -1123,8 +1121,5 @@ static driver_t acpi_pci_link_driver = {
 	sizeof(struct acpi_pci_link_softc),
 };
 
-static devclass_t pci_link_devclass;
-
-DRIVER_MODULE(acpi_pci_link, acpi, acpi_pci_link_driver, pci_link_devclass, 0,
-    0);
+DRIVER_MODULE(acpi_pci_link, acpi, acpi_pci_link_driver, 0, 0);
 MODULE_DEPEND(acpi_pci_link, acpi, 1, 1, 1);

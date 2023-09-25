@@ -23,8 +23,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include "opt_platform.h"
 #include "opt_spi.h"
 
@@ -376,8 +374,6 @@ spigen_detach(device_t dev)
 	return (0);
 }
 
-static devclass_t spigen_devclass;
-
 static device_method_t spigen_methods[] = {
 	/* Device interface */
 	DEVMETHOD(device_probe,		spigen_probe),
@@ -392,7 +388,7 @@ static driver_t spigen_driver = {
 	sizeof(struct spigen_softc),
 };
 
-DRIVER_MODULE(spigen, spibus, spigen_driver, spigen_devclass, 0, 0);
+DRIVER_MODULE(spigen, spibus, spigen_driver, 0, 0);
 MODULE_DEPEND(spigen, spibus, 1, 1, 1);
 #ifdef FDT
 SIMPLEBUS_PNP_INFO(compat_data);

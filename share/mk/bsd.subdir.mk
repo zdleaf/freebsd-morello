@@ -1,5 +1,4 @@
 #	from: @(#)bsd.subdir.mk	5.9 (Berkeley) 2/1/91
-# $FreeBSD$
 #
 # The include file <bsd.subdir.mk> contains the default targets
 # for building subdirectories.
@@ -64,6 +63,11 @@ STANDALONE_SUBDIR_TARGETS+= realinstall
 
 .include <bsd.init.mk>
 
+.if ${MK_META_MODE} == "yes"
+.MAKE.JOB.PREFIX=
+ECHODIR=	:
+.endif
+
 .if make(print-dir)
 NEED_SUBDIR=	1
 ECHODIR=	:
@@ -94,7 +98,7 @@ DISTRIBUTION?=	base
 distribute: .MAKE
 .for dist in ${DISTRIBUTION}
 	${_+_}cd ${.CURDIR}; \
-	    ${MAKE} install installconfig -DNO_SUBDIR DESTDIR=${DISTDIR}/${dist} SHARED=copies
+	    ${MAKE} install installconfig -DNO_SUBDIR DISTBASE=/${dist} DESTDIR=${DISTDIR}/${dist} SHARED=copies
 .endfor
 .endif
 # Convenience targets to run 'build${target}' and 'install${target}' when

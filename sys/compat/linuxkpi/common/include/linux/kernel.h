@@ -26,8 +26,6 @@
  * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 #ifndef	_LINUXKPI_LINUX_KERNEL_H_
 #define	_LINUXKPI_LINUX_KERNEL_H_
@@ -49,13 +47,17 @@
 #include <linux/errno.h>
 #include <linux/sched.h>
 #include <linux/types.h>
+#include <linux/typecheck.h>
 #include <linux/jiffies.h>
 #include <linux/log2.h>
+#include <linux/kconfig.h>
 
 #include <asm/byteorder.h>
+#include <asm/cpufeature.h>
+#include <asm/processor.h>
 #include <asm/uaccess.h>
 
-#include <machine/stdarg.h>
+#include <linux/stdarg.h>
 
 #define KERN_CONT       ""
 #define	KERN_EMERG	"<0>"
@@ -99,7 +101,7 @@
 #define	_O_CTASSERT(x)		_O__CTASSERT(x, __LINE__)
 #define	_O__CTASSERT(x, y)	_O___CTASSERT(x, y)
 #define	_O___CTASSERT(x, y)	while (0) { \
-    typedef char __assert_line_ ## y[(x) ? 1 : -1]; \
+    typedef char __unused __assert_line_ ## y[(x) ? 1 : -1]; \
     __assert_line_ ## y _x; \
     _x[0] = '\0'; \
 }
@@ -150,6 +152,7 @@ extern int linuxkpi_warn_dump_stack;
 
 #undef	ALIGN
 #define	ALIGN(x, y)		roundup2((x), (y))
+#define	ALIGN_DOWN(x, y)	rounddown2(x, y)
 #undef PTR_ALIGN
 #define	PTR_ALIGN(p, a)		((__typeof(p))ALIGN((uintptr_t)(p), (a)))
 #define	IS_ALIGNED(x, a)	(((x) & ((__typeof(x))(a) - 1)) == 0)
@@ -433,19 +436,8 @@ kstrtou16(const char *cp, unsigned int base, u16 *res)
 static inline int
 kstrtou32(const char *cp, unsigned int base, u32 *res)
 {
-	char *end;
-	unsigned long temp;
 
-	*res = temp = strtoul(cp, &end, base);
-
-	/* skip newline character, if any */
-	if (*end == '\n')
-		end++;
-	if (*cp == 0 || *end != 0)
-		return (-EINVAL);
-	if (temp != (u32)temp)
-		return (-ERANGE);
-	return (0);
+	return (kstrtouint(cp, base, res));
 }
 
 static inline int
@@ -510,6 +502,44 @@ kstrtobool_from_user(const char __user *s, size_t count, bool *res)
 }
 
 static inline int
+kstrtoint_from_user(const char __user *s, size_t count, unsigned int base,
+    int *p)
+{
+	char buf[36] = {};
+
+	if (count > (sizeof(buf) - 1))
+		count = (sizeof(buf) - 1);
+
+	if (copy_from_user(buf, s, count))
+		return (-EFAULT);
+
+	return (kstrtoint(buf, base, p));
+}
+
+static inline int
+kstrtouint_from_user(const char __user *s, size_t count, unsigned int base,
+    unsigned int *p)
+{
+	char buf[36] = {};
+
+	if (count > (sizeof(buf) - 1))
+		count = (sizeof(buf) - 1);
+
+	if (copy_from_user(buf, s, count))
+		return (-EFAULT);
+
+	return (kstrtouint(buf, base, p));
+}
+
+static inline int
+kstrtou32_from_user(const char __user *s, size_t count, unsigned int base,
+    unsigned int *p)
+{
+
+	return (kstrtouint_from_user(s, count, base, p));
+}
+
+static inline int
 kstrtou8_from_user(const char __user *s, size_t count, unsigned int base,
     u8 *p)
 {
@@ -543,6 +573,8 @@ kstrtou8_from_user(const char __user *s, size_t count, unsigned int base,
 #define offsetofend(t, m)	\
         (offsetof(t, m) + sizeof((((t *)0)->m)))
 
+#define	typeof_member(s, e)	typeof(((s *)0)->e)
+
 #define clamp_t(type, _x, min, max)	min_t(type, max_t(type, _x, min), max)
 #define clamp(x, lo, hi)		min( max(x,lo), hi)
 #define	clamp_val(val, lo, hi) clamp_t(typeof(val), val, lo, hi)
@@ -565,10 +597,6 @@ kstrtou8_from_user(const char __user *s, size_t count, unsigned int base,
 extern bool linux_cpu_has_clflush;
 #define	cpu_has_clflush		linux_cpu_has_clflush
 #endif
-
-typedef struct pm_message {
-	int event;
-} pm_message_t;
 
 /* Swap values of a and b */
 #define swap(a, b) do {			\
@@ -593,12 +621,6 @@ mult_frac(uintmax_t x, uintmax_t multiplier, uintmax_t divisor)
 	uintmax_t r = (x % divisor);
 
 	return ((q * multiplier) + ((r * multiplier) / divisor));
-}
-
-static inline int64_t
-abs64(int64_t x)
-{
-	return (x < 0 ? -x : x);
 }
 
 typedef struct linux_ratelimit {
@@ -652,6 +674,8 @@ linux_ratelimited(linux_ratelimit_t *rl)
 
 #define	TAINT_WARN	0
 #define	test_taint(x)	(0)
+#define	add_taint(x,y)	do {	\
+	} while (0)
 
 static inline int
 _h2b(const char c)
@@ -684,46 +708,49 @@ hex2bin(uint8_t *bindst, const char *hexsrc, size_t binlen)
 	return (0);
 }
 
-/*
- * Checking if an option is defined would be easy if we could do CPP inside CPP.
- * The defined case whether -Dxxx or -Dxxx=1 are easy to deal with.  In either
- * case the defined value is "1". A more general -Dxxx=<c> case will require
- * more effort to deal with all possible "true" values. Hope we do not have
- * to do this as well.
- * The real problem is the undefined case.  To avoid this problem we do the
- * concat/varargs trick: "yyy" ## xxx can make two arguments if xxx is "1"
- * by having a #define for yyy_1 which is "ignore,".
- * Otherwise we will just get "yyy".
- * Need to be careful about variable substitutions in macros though.
- * This way we make a (true, false) problem a (don't care, true, false) or a
- * (don't care true, false).  Then we can use a variadic macro to only select
- * the always well known and defined argument #2.  And that seems to be
- * exactly what we need.  Use 1 for true and 0 for false to also allow
- * #if IS_*() checks pre-compiler checks which do not like #if true.
- */
-#define ___XAB_1		dontcare,
-#define ___IS_XAB(_ignore, _x, ...)	(_x)
-#define	__IS_XAB(_x)		___IS_XAB(_x 1, 0)
-#define	_IS_XAB(_x)		__IS_XAB(__CONCAT(___XAB_, _x))
+static inline bool
+mac_pton(const char *macin, uint8_t *macout)
+{
+	const char *s, *d;
+	uint8_t mac[6], hx, lx;;
+	int i;
 
-/* This is if CONFIG_ccc=y. */
-#define	IS_BUILTIN(_x)		_IS_XAB(_x)
-/* This is if CONFIG_ccc=m. */
-#define	IS_MODULE(_x)		_IS_XAB(_x ## _MODULE)
-/* This is if CONFIG_ccc is compiled in(=y) or a module(=m). */
-#define	IS_ENABLED(_x)		(IS_BUILTIN(_x) || IS_MODULE(_x))
-/*
- * This is weird case.  If the CONFIG_ccc is builtin (=y) this returns true;
- * or if the CONFIG_ccc is a module (=m) and the caller is built as a module
- * (-DMODULE defined) this returns true, but if the callers is not a module
- * (-DMODULE not defined, which means caller is BUILTIN) then it returns
- * false.  In other words, a module can reach the kernel, a module can reach
- * a module, but the kernel cannot reach a module, and code never compiled
- * cannot be reached either.
- * XXX -- I'd hope the module-to-module case would be handled by a proper
- * module dependency definition (MODULE_DEPEND() in FreeBSD).
- */
-#define	IS_REACHABLE(_x)	(IS_BUILTIN(_x) || \
-				    (IS_MODULE(_x) && IS_BUILTIN(MODULE)))
+	if (strlen(macin) < (3 * 6 - 1))
+		return (false);
+
+	i = 0;
+	s = macin;
+	do {
+		/* Should we also support '-'-delimiters? */
+		d = strchrnul(s, ':');
+		hx = lx = 0;
+		while (s < d) {
+			/* Fail on abc:123:xxx:... */
+			if ((d - s) > 2)
+				return (false);
+			/* We do support non-well-formed strings: 3:45:6:... */
+			if ((d - s) > 1) {
+				hx = _h2b(*s);
+				if (hx < 0)
+					return (false);
+				s++;
+			}
+			lx = _h2b(*s);
+			if (lx < 0)
+				return (false);
+			s++;
+		}
+		mac[i] = (hx << 4) | lx;
+		i++;
+		if (i >= 6)
+			return (false);
+	} while (d != NULL && *d != '\0');
+
+	memcpy(macout, mac, 6);
+	return (true);
+}
+
+#define	DECLARE_FLEX_ARRAY(_t, _n)					\
+    struct { struct { } __dummy_ ## _n; _t _n[0]; }
 
 #endif	/* _LINUXKPI_LINUX_KERNEL_H_ */

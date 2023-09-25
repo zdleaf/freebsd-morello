@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2012 Konstantin Belousov <kib@FreeBSD.org>
  * Copyright (c) 2021 Dmitry Chagin <dchagin@FreeBSD.org>
@@ -26,6 +26,14 @@
  * SUCH DAMAGE.
  */
 
+#if defined(__aarch64__)
+#define	__VDSO_PREFIX		__kernel
+#else
+#define	__VDSO_PREFIX		__vdso
+#endif
+
+#define	__vdsoN(x)	__CONCAT(__CONCAT(__VDSO_PREFIX,_),x)
+
 static int
 fls(int mask)
 {
@@ -37,25 +45,25 @@ fls(int mask)
 
 #ifdef _LP64
 static int
-ffsl(long mask)
+flsl(long mask)
 {
 	int bit;
 
 	if (mask == 0)
 		return (0);
-	for (bit = 1; !(mask & 1); bit++)
+	for (bit = 1; mask != 1; bit++)
 		mask = (unsigned long)mask >> 1;
 	return (bit);
 }
 #else
 static int
-ffsll(long long mask)
+flsll(long long mask)
 {
 	int bit;
 
 	if (mask == 0)
 		return (0);
-	for (bit = 1; !(mask & 1); bit++)
+	for (bit = 1; mask != 1; bit++)
 		mask = (unsigned long long)mask >> 1;
 	return (bit);
 }
@@ -186,9 +194,9 @@ freebsd_binuptime(struct bintime *bt, struct vdso_timekeep *tk, bool abs)
 			return (error);
 		scale = th->th_scale;
 #ifdef _LP64
-		scale_bits = ffsl(scale);
+		scale_bits = flsl(scale);
 #else
-		scale_bits = ffsll(scale);
+		scale_bits = flsll(scale);
 #endif
 		if (__predict_false(scale_bits + fls(delta) > 63)) {
 			x = (scale >> 32) * delta;
@@ -295,7 +303,7 @@ freebsd_clock_gettime(clockid_t clock_id, struct timespec *ts)
  *
  */
 int
-__vdso_clock_gettime(clockid_t clock_id, struct l_timespec *lts)
+__vdsoN(clock_gettime)(clockid_t clock_id, struct l_timespec *lts)
 {
 	struct timespec ts;
 	clockid_t which;
@@ -312,7 +320,7 @@ __vdso_clock_gettime(clockid_t clock_id, struct l_timespec *lts)
 }
 
 int
-__vdso_gettimeofday(l_timeval *ltv, struct timezone *tz)
+__vdsoN(gettimeofday)(l_timeval *ltv, struct timezone *tz)
 {
 	struct timeval tv;
 	int error;
@@ -324,7 +332,7 @@ __vdso_gettimeofday(l_timeval *ltv, struct timezone *tz)
 }
 
 int
-__vdso_clock_getres(clockid_t clock_id, struct l_timespec *lts)
+__vdsoN(clock_getres)(clockid_t clock_id, struct l_timespec *lts)
 {
 
 	return (__vdso_clock_getres_fallback(clock_id, lts));
@@ -352,12 +360,19 @@ int clock_gettime64(clockid_t clock_id, struct l_timespec64 *lts)
     __attribute__((weak, alias("__vdso_clock_gettime64")));
 #endif
 
-#if defined(__amd64__) && !defined(COMPAT_LINUX32)
+#if defined(__i386__) || defined(__amd64__)
 int
 __vdso_getcpu(uint32_t *cpu, uint32_t *node, void *cache)
 {
+	int ret;
 
-	return (__vdso_getcpu_fallback(cpu, node, cache));
+	if (node != NULL)
+		return (__vdso_getcpu_fallback(cpu, node, cache));
+	ret = __vdso_getcpu_try();
+	if (ret < 0)
+		return (__vdso_getcpu_fallback(cpu, node, cache));
+	*cpu = ret;
+	return (0);
 }
 #endif
 
@@ -365,7 +380,14 @@ __vdso_getcpu(uint32_t *cpu, uint32_t *node, void *cache)
 int
 __vdso_time(long *tm)
 {
+	struct timeval tv;
+	int error;
 
-	return (__vdso_time_fallback(tm));
+	error = freebsd_gettimeofday(&tv, NULL);
+	if (error != 0)
+		return (__vdso_time_fallback(tm));
+	if (tm != NULL)
+		*tm = tv.tv_sec;
+	return (tv.tv_sec);
 }
 #endif

@@ -25,12 +25,12 @@
  * ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD$
- *
  */
 
 #ifndef _IF_MVNETAREG_H_
 #define	_IF_MVNETAREG_H_
+
+#include "opt_mvneta.h"
 
 #if BYTE_ORDER == BIG_ENDIAN
 #error "BIG ENDIAN not supported"

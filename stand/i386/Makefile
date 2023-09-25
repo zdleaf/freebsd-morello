@@ -1,4 +1,3 @@
-# $FreeBSD$
 
 NO_OBJ=t
 
@@ -8,7 +7,6 @@ NO_OBJ=t
 # before everything else proceeds so we don't end up building against a stale
 # btxldr and ending up with a build-during-install scenario.
 SUBDIR.yes+=	btx libi386
-SUBDIR.${MK_LOADER_FIREWIRE}+=	libfirewire
 SUBDIR.yes+=	.WAIT
 
 SUBDIR.yes+=	mbr pmbr boot0 boot0sio boot2 cdboot gptboot \

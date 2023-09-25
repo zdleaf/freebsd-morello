@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2016 Jared McNeill <jmcneill@invisible.ca>
  * Copyright (c) 2018 Emmanuel Vadot <manu@FreeBSD.org>
@@ -27,8 +27,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/bus.h>
@@ -317,10 +315,7 @@ static driver_t syr827_driver = {
 	sizeof(struct syr827_softc),
 };
 
-static devclass_t syr827_devclass;
-
-EARLY_DRIVER_MODULE(syr827, iicbus, syr827_driver, syr827_devclass, 0, 0,
-    BUS_PASS_RESOURCE);
+EARLY_DRIVER_MODULE(syr827, iicbus, syr827_driver, 0, 0, BUS_PASS_RESOURCE);
 MODULE_VERSION(syr827, 1);
 MODULE_DEPEND(syr827, iicbus, 1, 1, 1);
 IICBUS_FDT_PNP_INFO(compat_data);

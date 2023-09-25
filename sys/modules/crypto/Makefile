@@ -1,4 +1,3 @@
-# $FreeBSD$
 
 LIBSODIUM=${SRCTOP}/sys/contrib/libsodium/src/libsodium
 
@@ -71,6 +70,7 @@ SRCS	+= xform_poly1305.c
 CFLAGS.xform_poly1305.c		+= -I${LIBSODIUM_INC} -I${LIBSODIUM_COMPAT}
 SRCS	+= ed25519_ref10.c
 CFLAGS.ed25519_ref10.c		+= -I${LIBSODIUM_INC}/sodium -I${LIBSODIUM_COMPAT}
+CWARNFLAGS.ed25519_ref10.c	+= -Wno-unused-function
 SRCS	+= core_hchacha20.c
 CFLAGS.core_hchacha20.c		+= -I${LIBSODIUM_INC}/sodium -I${LIBSODIUM_COMPAT}
 SRCS	+= onetimeauth_poly1305.c
@@ -85,6 +85,7 @@ SRCS	+= scalarmult_curve25519.c
 CFLAGS.scalarmult_curve25519.c	+= -I${LIBSODIUM_INC}/sodium -I${LIBSODIUM_COMPAT}
 SRCS	+= x25519_ref10.c
 CFLAGS.x25519_ref10.c		+= -I${LIBSODIUM_INC}/sodium -I${LIBSODIUM_COMPAT}
+CWARNFLAGS.x25519_ref10.c	+= -Wno-unused-function
 SRCS	+= verify.c
 CFLAGS.verify.c			+= -I${LIBSODIUM_INC}/sodium -I${LIBSODIUM_COMPAT}
 SRCS	+= randombytes.c
@@ -96,7 +97,6 @@ SRCS	+= curve25519.c
 CFLAGS.curve25519.c		+= -I${LIBSODIUM_INC} -I${LIBSODIUM_COMPAT}
 
 SRCS	+= opt_param.h cryptodev_if.h bus_if.h device_if.h
-SRCS	+= opt_compat.h
 SRCS	+= opt_ddb.h
 SRCS	+= cbc_mac.c
 SRCS	+= xform_cbc_mac.c

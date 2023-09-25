@@ -38,8 +38,6 @@ static char *sccsid2 = "@(#)xdr.c 1.35 87/08/12";
 static char *sccsid = "@(#)xdr.c	2.1 88/07/29 4.0 RPCSRC";
 #endif
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 /*
  * xdr.c, Generic XDR routines implementation.
  *
@@ -429,13 +427,13 @@ xdr_uint16_t(XDR *xdrs, uint16_t *u_int16_p)
 bool_t
 xdr_char(XDR *xdrs, char *cp)
 {
-	int i;
+	u_int i;
 
-	i = (*cp);
-	if (!xdr_int(xdrs, &i)) {
+	i = *((unsigned char *)cp);
+	if (!xdr_u_int(xdrs, &i)) {
 		return (FALSE);
 	}
-	*cp = i;
+	*((unsigned char *)cp) = i;
 	return (TRUE);
 }
 

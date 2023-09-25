@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2003-2012 Broadcom Corporation
  * All Rights Reserved
@@ -26,8 +26,6 @@
  * WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE
  * OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN
  * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 #ifndef __OPENCORE_I2C_H__
@@ -91,8 +89,6 @@ struct iicoc_softc {
 };
 
 #endif
-
-extern devclass_t iicoc_devclass;
 
 int iicoc_iicbus_start(device_t dev, u_char slave, int timeout);
 int iicoc_iicbus_stop(device_t dev);

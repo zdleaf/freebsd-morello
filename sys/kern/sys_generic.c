@@ -37,8 +37,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include "opt_capsicum.h"
 #include "opt_ktrace.h"
 
@@ -562,12 +560,16 @@ dofilewrite(struct thread *td, int fd, struct file *fp, struct uio *auio,
 		ktruio = cloneuio(auio);
 #endif
 	cnt = auio->uio_resid;
-	if ((error = fo_write(fp, auio, td->td_ucred, flags, td))) {
+	error = fo_write(fp, auio, td->td_ucred, flags, td);
+	/*
+	 * Socket layer is responsible for special error handling,
+	 * see sousrsend().
+	 */
+	if (error != 0 && fp->f_type != DTYPE_SOCKET) {
 		if (auio->uio_resid != cnt && (error == ERESTART ||
 		    error == EINTR || error == EWOULDBLOCK))
 			error = 0;
-		/* Socket layer is responsible for issuing SIGPIPE. */
-		if (fp->f_type != DTYPE_SOCKET && error == EPIPE) {
+		if (error == EPIPE) {
 			PROC_LOCK(td->td_proc);
 			tdsignal(td, SIGPIPE);
 			PROC_UNLOCK(td->td_proc);
@@ -748,7 +750,7 @@ kern_ioctl(struct thread *td, int fd, u_long com, caddr_t data)
 	}
 
 #ifdef CAPABILITIES
-	if ((fp = fget_locked(fdp, fd)) == NULL) {
+	if ((fp = fget_noref(fdp, fd)) == NULL) {
 		error = EBADF;
 		goto out;
 	}
@@ -1052,9 +1054,7 @@ kern_pselect(struct thread *td, int nd, fd_set *in, fd_set *ou, fd_set *ex,
 		 * usermode and TDP_OLDMASK is cleared, restoring old
 		 * sigmask.
 		 */
-		thread_lock(td);
-		td->td_flags |= TDF_ASTPENDING;
-		thread_unlock(td);
+		ast_sched(td, TDA_SIGSUSPEND);
 	}
 	error = kern_select(td, nd, in, ou, ex, tvp, abi_nfdbits);
 	return (error);
@@ -1406,7 +1406,7 @@ selrescan(struct thread *td, fd_mask **ibits, fd_mask **obits)
 		if (only_user)
 			error = fget_only_user(fdp, fd, &cap_event_rights, &fp);
 		else
-			error = fget_unlocked(fdp, fd, &cap_event_rights, &fp);
+			error = fget_unlocked(td, fd, &cap_event_rights, &fp);
 		if (__predict_false(error != 0))
 			return (error);
 		idx = fd / NFDBITS;
@@ -1452,7 +1452,7 @@ selscan(struct thread *td, fd_mask **ibits, fd_mask **obits, int nfd)
 			if (only_user)
 				error = fget_only_user(fdp, fd, &cap_event_rights, &fp);
 			else
-				error = fget_unlocked(fdp, fd, &cap_event_rights, &fp);
+				error = fget_unlocked(td, fd, &cap_event_rights, &fp);
 			if (__predict_false(error != 0))
 				return (error);
 			selfdalloc(td, (void *)(uintptr_t)fd);
@@ -1501,9 +1501,7 @@ kern_poll_kfds(struct thread *td, struct pollfd *kfds, u_int nfds,
 
 	precision = 0;
 	if (tsp != NULL) {
-		if (tsp->tv_sec < 0)
-			return (EINVAL);
-		if (tsp->tv_nsec < 0 || tsp->tv_nsec >= 1000000000)
+		if (!timespecvalid_interval(tsp))
 			return (EINVAL);
 		if (tsp->tv_sec == 0 && tsp->tv_nsec == 0)
 			sbt = 0;
@@ -1535,9 +1533,7 @@ kern_poll_kfds(struct thread *td, struct pollfd *kfds, u_int nfds,
 		 * usermode and TDP_OLDMASK is cleared, restoring old
 		 * sigmask.
 		 */
-		thread_lock(td);
-		td->td_flags |= TDF_ASTPENDING;
-		thread_unlock(td);
+		ast_sched(td, TDA_SIGSUSPEND);
 	}
 
 	seltdinit(td);
@@ -1659,7 +1655,7 @@ pollrescan(struct thread *td)
 		if (only_user)
 			error = fget_only_user(fdp, fd->fd, &cap_event_rights, &fp);
 		else
-			error = fget_unlocked(fdp, fd->fd, &cap_event_rights, &fp);
+			error = fget_unlocked(td, fd->fd, &cap_event_rights, &fp);
 		if (__predict_false(error != 0)) {
 			fd->revents = POLLNVAL;
 			n++;
@@ -1722,7 +1718,7 @@ pollscan(struct thread *td, struct pollfd *fds, u_int nfd)
 		if (only_user)
 			error = fget_only_user(fdp, fds->fd, &cap_event_rights, &fp);
 		else
-			error = fget_unlocked(fdp, fds->fd, &cap_event_rights, &fp);
+			error = fget_unlocked(td, fds->fd, &cap_event_rights, &fp);
 		if (__predict_false(error != 0)) {
 			fds->revents = POLLNVAL;
 			n++;

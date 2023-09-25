@@ -33,7 +33,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
+#include "opt_ddb.h"
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -57,9 +57,7 @@ __FBSDID("$FreeBSD$");
 #include <vm/vm_param.h>
 #include <vm/vm_extern.h>
 
-#ifdef FPE
 #include <machine/fpe.h>
-#endif
 #include <machine/frame.h>
 #include <machine/pcb.h>
 #include <machine/pcpu.h>
@@ -69,6 +67,11 @@ __FBSDID("$FreeBSD$");
 
 #ifdef KDTRACE_HOOKS
 #include <sys/dtrace_bsd.h>
+#endif
+
+#ifdef DDB
+#include <ddb/ddb.h>
+#include <ddb/db_sym.h>
 #endif
 
 int (*dtrace_invop_jump_addr)(struct trapframe *);
@@ -94,7 +97,7 @@ int
 cpu_fetch_syscall_args(struct thread *td)
 {
 	struct proc *p;
-	register_t *ap, *dst_ap;
+	syscallarg_t *ap, *dst_ap;
 	struct syscall_args *sa;
 
 	p = td->td_proc;
@@ -119,7 +122,7 @@ cpu_fetch_syscall_args(struct thread *td)
 	KASSERT(sa->callp->sy_narg <= nitems(sa->args),
 	    ("Syscall %d takes too many arguments", sa->code));
 
-	memcpy(dst_ap, ap, (NARGREG - 1) * sizeof(register_t));
+	memcpy(dst_ap, ap, (NARGREG - 1) * sizeof(*dst_ap));
 
 	td->td_retval[0] = 0;
 	td->td_retval[1] = 0;
@@ -130,30 +133,56 @@ cpu_fetch_syscall_args(struct thread *td)
 #include "../../kern/subr_syscall.c"
 
 static void
+print_with_symbol(const char *name, uint64_t value)
+{
+#ifdef DDB
+	c_db_sym_t sym;
+	db_expr_t sym_value;
+	db_expr_t offset;
+	const char *sym_name;
+#endif
+
+	printf("%7s: 0x%016lx", name, value);
+
+#ifdef DDB
+	if (value >= VM_MIN_KERNEL_ADDRESS) {
+		sym = db_search_symbol(value, DB_STGY_ANY, &offset);
+		if (sym != C_DB_SYM_NULL) {
+			db_symbol_values(sym, &sym_name, &sym_value);
+			printf(" (%s + 0x%lx)", sym_name, offset);
+		}
+	}
+#endif
+	printf("\n");
+}
+
+static void
 dump_regs(struct trapframe *frame)
 {
-	int n;
+	char name[6];
 	int i;
 
-	n = nitems(frame->tf_t);
-	for (i = 0; i < n; i++)
-		printf("t[%d] == 0x%016lx\n", i, frame->tf_t[i]);
+	for (i = 0; i < nitems(frame->tf_t); i++) {
+		snprintf(name, sizeof(name), "t[%d]", i);
+		print_with_symbol(name, frame->tf_t[i]);
+	}
 
-	n = nitems(frame->tf_s);
-	for (i = 0; i < n; i++)
-		printf("s[%d] == 0x%016lx\n", i, frame->tf_s[i]);
+	for (i = 0; i < nitems(frame->tf_s); i++) {
+		snprintf(name, sizeof(name), "s[%d]", i);
+		print_with_symbol(name, frame->tf_s[i]);
+	}
 
-	n = nitems(frame->tf_a);
-	for (i = 0; i < n; i++)
-		printf("a[%d] == 0x%016lx\n", i, frame->tf_a[i]);
+	for (i = 0; i < nitems(frame->tf_a); i++) {
+		snprintf(name, sizeof(name), "a[%d]", i);
+		print_with_symbol(name, frame->tf_a[i]);
+	}
 
-	printf("ra == 0x%016lx\n", frame->tf_ra);
-	printf("sp == 0x%016lx\n", frame->tf_sp);
-	printf("gp == 0x%016lx\n", frame->tf_gp);
-	printf("tp == 0x%016lx\n", frame->tf_tp);
-
-	printf("sepc == 0x%016lx\n", frame->tf_sepc);
-	printf("sstatus == 0x%016lx\n", frame->tf_sstatus);
+	print_with_symbol("ra", frame->tf_ra);
+	print_with_symbol("sp", frame->tf_sp);
+	print_with_symbol("gp", frame->tf_gp);
+	print_with_symbol("tp", frame->tf_tp);
+	print_with_symbol("sepc", frame->tf_sepc);
+	printf("sstatus: 0x%016lx\n", frame->tf_sstatus);
 }
 
 static void
@@ -213,10 +242,7 @@ page_fault_handler(struct trapframe *frame, int usermode)
 		 */
 		intr_enable();
 
-		if (!VIRT_IS_VALID(stval))
-			goto fatal;
-
-		if (stval >= VM_MAX_USER_ADDRESS) {
+		if (stval >= VM_MIN_KERNEL_ADDRESS) {
 			map = kernel_map;
 		} else {
 			if (pcb->pcb_onfault == 0)
@@ -235,7 +261,7 @@ page_fault_handler(struct trapframe *frame, int usermode)
 		ftype = VM_PROT_READ;
 	}
 
-	if (pmap_fault(map->pmap, va, ftype))
+	if (VIRT_IS_VALID(va) && pmap_fault(map->pmap, va, ftype))
 		goto done;
 
 	error = vm_fault_trap(map, va, ftype, VM_FAULT_NORMAL, &sig, &ucode);
@@ -296,8 +322,8 @@ do_trap_supervisor(struct trapframe *frame)
 		return;
 #endif
 
-	CTR3(KTR_TRAP, "do_trap_supervisor: curthread: %p, sepc: %lx, frame: %p",
-	    curthread, frame->tf_sepc, frame);
+	CTR4(KTR_TRAP, "%s: exception=%lu, sepc=%lx, stval=%lx", __func__,
+	    exception, frame->tf_sepc, frame->tf_stval);
 
 	switch (exception) {
 	case SCAUSE_LOAD_ACCESS_FAULT:
@@ -305,6 +331,13 @@ do_trap_supervisor(struct trapframe *frame)
 	case SCAUSE_INST_ACCESS_FAULT:
 		dump_regs(frame);
 		panic("Memory access exception at 0x%016lx\n", frame->tf_sepc);
+		break;
+	case SCAUSE_LOAD_MISALIGNED:
+	case SCAUSE_STORE_MISALIGNED:
+	case SCAUSE_INST_MISALIGNED:
+		dump_regs(frame);
+		panic("Misaligned address exception at %#016lx: %#016lx\n",
+		    frame->tf_sepc, frame->tf_stval);
 		break;
 	case SCAUSE_STORE_PAGE_FAULT:
 	case SCAUSE_LOAD_PAGE_FAULT:
@@ -363,14 +396,21 @@ do_trap_user(struct trapframe *frame)
 	}
 	intr_enable();
 
-	CTR3(KTR_TRAP, "do_trap_user: curthread: %p, sepc: %lx, frame: %p",
-	    curthread, frame->tf_sepc, frame);
+	CTR4(KTR_TRAP, "%s: exception=%lu, sepc=%lx, stval=%lx", __func__,
+	    exception, frame->tf_sepc, frame->tf_stval);
 
 	switch (exception) {
 	case SCAUSE_LOAD_ACCESS_FAULT:
 	case SCAUSE_STORE_ACCESS_FAULT:
 	case SCAUSE_INST_ACCESS_FAULT:
 		call_trapsignal(td, SIGBUS, BUS_ADRERR, (void *)frame->tf_sepc,
+		    exception);
+		userret(td, frame);
+		break;
+	case SCAUSE_LOAD_MISALIGNED:
+	case SCAUSE_STORE_MISALIGNED:
+	case SCAUSE_INST_MISALIGNED:
+		call_trapsignal(td, SIGBUS, BUS_ADRALN, (void *)frame->tf_sepc,
 		    exception);
 		userret(td, frame);
 		break;
@@ -384,7 +424,6 @@ do_trap_user(struct trapframe *frame)
 		ecall_handler();
 		break;
 	case SCAUSE_ILLEGAL_INSTRUCTION:
-#ifdef FPE
 		if ((pcb->pcb_fpflags & PCB_FP_STARTED) == 0) {
 			/*
 			 * May be a FPE trap. Enable FPE usage
@@ -396,7 +435,6 @@ do_trap_user(struct trapframe *frame)
 			pcb->pcb_fpflags |= PCB_FP_STARTED;
 			break;
 		}
-#endif
 		call_trapsignal(td, SIGILL, ILL_ILLTRP, (void *)frame->tf_sepc,
 		    exception);
 		userret(td, frame);

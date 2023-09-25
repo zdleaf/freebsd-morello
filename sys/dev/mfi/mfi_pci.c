@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD AND BSD-2-Clause
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2006 IronPort Systems
  * All rights reserved.
@@ -53,8 +53,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 /* PCI/PCI-X/PCIe bus interface for the LSI MegaSAS controllers */
 
 #include "opt_mfi.h"
@@ -108,8 +106,6 @@ static driver_t mfi_pci_driver = {
 	sizeof(struct mfi_softc)
 };
 
-static devclass_t	mfi_devclass;
-
 static int	mfi_msi = 1;
 SYSCTL_INT(_hw_mfi, OID_AUTO, msi, CTLFLAG_RDTUN, &mfi_msi, 0,
     "Enable use of MSI interrupts");
@@ -126,6 +122,7 @@ struct mfi_ident {
 	int		flags;
 	const char	*desc;
 } mfi_identifiers[] = {
+	{0x1000, 0x005b, 0x1028, 0x1fc9, MFI_FLAGS_SKINNY| MFI_FLAGS_TBOLT| MFI_FLAGS_MRSAS, "Dell PERC H840 Adapter"},
 	{0x1000, 0x005b, 0x1028, 0x1f2d, MFI_FLAGS_SKINNY| MFI_FLAGS_TBOLT| MFI_FLAGS_MRSAS, "Dell PERC H810 Adapter"},
 	{0x1000, 0x005b, 0x1028, 0x1f30, MFI_FLAGS_SKINNY| MFI_FLAGS_TBOLT| MFI_FLAGS_MRSAS, "Dell PERC H710 Embedded"},
 	{0x1000, 0x005b, 0x1028, 0x1f31, MFI_FLAGS_SKINNY| MFI_FLAGS_TBOLT| MFI_FLAGS_MRSAS, "Dell PERC H710P Adapter"},
@@ -160,7 +157,7 @@ struct mfi_ident {
 	{0, 0, 0, 0, 0, NULL}
 };
 
-DRIVER_MODULE(mfi, pci, mfi_pci_driver, mfi_devclass, 0, 0);
+DRIVER_MODULE(mfi, pci, mfi_pci_driver, 0, 0);
 MODULE_PNP_INFO("U16:vendor;U16:device;U16:subvendor;U16:subdevice", pci, mfi,
     mfi_identifiers, nitems(mfi_identifiers) - 1);
 MODULE_VERSION(mfi, 1);

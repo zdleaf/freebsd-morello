@@ -71,8 +71,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include "opt_kstack_pages.h"
 #include "opt_kstack_max_pages.h"
 #include "opt_vm.h"
@@ -560,7 +558,7 @@ vm_thread_swapin(struct thread *td, int oom_alloc)
 {
 	vm_page_t ma[KSTACK_MAX_PAGES];
 	vm_offset_t kaddr;
-	int a, count, i, j, pages, rv;
+	int a, count, i, j, pages, rv __diagused;
 
 	kaddr = td->td_kstack;
 	pages = td->td_kstack_pages;

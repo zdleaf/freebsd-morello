@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: BSD-3-Clause */
-/*  Copyright (c) 2021, Intel Corporation
+/*  Copyright (c) 2023, Intel Corporation
  *  All rights reserved.
  *
  *  Redistribution and use in source and binary forms, with or without
@@ -28,7 +28,6 @@
  *  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  *  POSSIBILITY OF SUCH DAMAGE.
  */
-/*$FreeBSD$*/
 
 /**
  * @file ice_common_sysctls.h
@@ -44,6 +43,15 @@
 #define _ICE_COMMON_SYSCTLS_H_
 
 #include <sys/sysctl.h>
+
+/**
+ * @var ice_enable_irdma
+ * @brief boolean indicating if the iRDMA client interface is enabled
+ *
+ * Global sysctl variable indicating whether the RDMA client interface feature
+ * is enabled.
+ */
+bool ice_enable_irdma = true;
 
 /**
  * @var ice_enable_tx_fc_filter
@@ -85,6 +93,26 @@ bool ice_enable_tx_lldp_filter = true;
  */
 bool ice_enable_health_events = true;
 
+/**
+ * @var ice_tx_balance_en
+ * @brief boolean permitting the 5-layer scheduler topology enablement
+ *
+ * Global sysctl variable indicating whether the driver will allow the
+ * 5-layer scheduler topology feature to be enabled. It's _not_
+ * specifically enabling the feature, just allowing it depending on what
+ * the DDP package allows.
+ */
+bool ice_tx_balance_en = true;
+
+/**
+ * @var ice_rdma_max_msix
+ * @brief maximum number of MSI-X vectors to reserve for RDMA interface
+ *
+ * Global sysctl variable indicating the maximum number of MSI-X vectors to
+ * reserve for a single RDMA interface.
+ */
+static uint16_t ice_rdma_max_msix = ICE_RDMA_MAX_MSIX;
+
 /* sysctls marked as tunable, (i.e. with the CTLFLAG_TUN set) will
  * automatically load tunable values, without the need to manually create the
  * TUNABLE definition.
@@ -105,6 +133,12 @@ SYSCTL_BOOL(_hw_ice, OID_AUTO, enable_health_events, CTLFLAG_RDTUN,
 	    &ice_enable_health_events, 0,
 	    "Enable FW health event reporting globally");
 
+SYSCTL_BOOL(_hw_ice, OID_AUTO, irdma, CTLFLAG_RDTUN, &ice_enable_irdma, 0,
+	    "Enable iRDMA client interface");
+
+SYSCTL_U16(_hw_ice, OID_AUTO, rdma_max_msix, CTLFLAG_RDTUN, &ice_rdma_max_msix,
+	   0, "Maximum number of MSI-X vectors to reserve per RDMA interface");
+
 SYSCTL_BOOL(_hw_ice_debug, OID_AUTO, enable_tx_fc_filter, CTLFLAG_RDTUN,
 	    &ice_enable_tx_fc_filter, 0,
 	    "Drop Ethertype 0x8808 control frames originating from non-HW sources");
@@ -112,5 +146,9 @@ SYSCTL_BOOL(_hw_ice_debug, OID_AUTO, enable_tx_fc_filter, CTLFLAG_RDTUN,
 SYSCTL_BOOL(_hw_ice_debug, OID_AUTO, enable_tx_lldp_filter, CTLFLAG_RDTUN,
 	    &ice_enable_tx_lldp_filter, 0,
 	    "Drop Ethertype 0x88cc LLDP frames originating from non-HW sources");
+
+SYSCTL_BOOL(_hw_ice_debug, OID_AUTO, tx_balance_en, CTLFLAG_RWTUN,
+	    &ice_tx_balance_en, 0,
+	    "Enable 5-layer scheduler topology");
 
 #endif /* _ICE_COMMON_SYSCTLS_H_ */

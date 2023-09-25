@@ -1,8 +1,8 @@
-# $FreeBSD$
 
 BINDIR= ${LIBEXECDIR}/bsdinstall
 PROG=	distfetch
-LIBADD=	fetch dialog m
+CFLAGS+=	-I${SRCTOP}/contrib/bsddialog/lib -I${.OBJDIR}/../distextract
+LIBADD=	fetch bsddialog
 
 MAN=
 

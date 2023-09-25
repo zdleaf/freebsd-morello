@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2020 Oleksandr Tymoshenko <gonzo@FreeBSD.org>
  * Copyright (c) 2018 Jared McNeill <jmcneill@invisible.ca>
@@ -24,13 +24,9 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/bus.h>
@@ -423,7 +419,7 @@ static int
 aw_i2s_dai_init(device_t dev, uint32_t format)
 {
 	struct aw_i2s_softc *sc;
-	int fmt, pol, clk;
+	int fmt, pol;
 	uint32_t ctl, fat0, chsel;
 	u_int offset;
 
@@ -431,7 +427,6 @@ aw_i2s_dai_init(device_t dev, uint32_t format)
 
 	fmt = AUDIO_DAI_FORMAT_FORMAT(format);
 	pol = AUDIO_DAI_FORMAT_POLARITY(format);
-	clk = AUDIO_DAI_FORMAT_CLOCK(format);
 
 	ctl = I2S_READ(sc, DA_CTL);
 	fat0 = I2S_READ(sc, DA_FAT0);
@@ -807,7 +802,5 @@ static driver_t aw_i2s_driver = {
 	sizeof(struct aw_i2s_softc),
 };
 
-static devclass_t aw_i2s_devclass;
-
-DRIVER_MODULE(aw_i2s, simplebus, aw_i2s_driver, aw_i2s_devclass, 0, 0);
+DRIVER_MODULE(aw_i2s, simplebus, aw_i2s_driver, 0, 0);
 SIMPLEBUS_PNP_INFO(compat_data);

@@ -1,4 +1,3 @@
-/* $FreeBSD$ */
 /*	$NetBSD: msdosfs_lookup.c,v 1.37 1997/11/17 15:36:54 ws Exp $	*/
 
 /*-
@@ -335,7 +334,7 @@ msdosfs_lookup_ino(struct vnode *vdp, struct vnode **vpp, struct componentname
 					continue;
 				}
 #ifdef MSDOSFS_DEBUG
-				printf("msdosfs_lookup(): match blkoff %d, diroff %d\n",
+				printf("msdosfs_lookup(): match blkoff %lu, diroff %d\n",
 				    blkoff, diroff);
 #endif
 				/*
@@ -421,13 +420,10 @@ notfound:
 		 * We return ni_vp == NULL to indicate that the entry
 		 * does not currently exist; we leave a pointer to
 		 * the (locked) directory inode in ndp->ni_dvp.
-		 * The pathname buffer is saved so that the name
-		 * can be obtained later.
 		 *
 		 * NB - if the directory is unlocked, then this
 		 * information cannot be used.
 		 */
-		cnp->cn_flags |= SAVENAME;
 		return (EJUSTRETURN);
 	}
 #if 0
@@ -554,7 +550,6 @@ foundroot:
 		if ((error = msdosfs_lookup_checker(pmp, vdp, tdp, vpp))
 		    != 0)
 			return (error);
-		cnp->cn_flags |= SAVENAME;
 		return (0);
 	}
 
@@ -688,6 +683,7 @@ createde(struct denode *dep, struct denode *ddep, struct denode **depp,
 		return error;
 	}
 	ndep = bptoep(pmp, bp, ddep->de_fndoffset);
+	rootde_alloced(ddep);
 
 	DE_EXTERNALIZE(ndep, dep);
 
@@ -725,6 +721,7 @@ createde(struct denode *dep, struct denode *ddep, struct denode **depp,
 				ndep--;
 				ddep->de_fndoffset -= sizeof(struct direntry);
 			}
+			rootde_alloced(ddep);
 			if (!unix2winfn(un, unlen, (struct winentry *)ndep,
 					cnt++, chksum, pmp))
 				break;
@@ -1019,6 +1016,7 @@ removede(struct denode *pdep, struct denode *dep)
 			 */
 			offset -= sizeof(struct direntry);
 			ep--->deName[0] = SLOT_DELETED;
+			rootde_freed(pdep);
 			if ((pmp->pm_flags & MSDOSFSMNT_NOWIN95)
 			    || !(offset & pmp->pm_crbomask)
 			    || ep->deAttributes != ATTR_WIN95)

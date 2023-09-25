@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+# SPDX-License-Identifier: BSD-2-Clause
 #
 # Copyright (c) 2016 Alan Somers
 #
@@ -23,7 +23,6 @@
 # OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 # SUCH DAMAGE.
 #
-# $FreeBSD$
 
 atf_test_case empty_r
 empty_r_head()
@@ -352,6 +351,60 @@ follow_rename_body()
 	atf_check kill $pid
 }
 
+atf_test_case silent_header
+silent_header_head() {
+	atf_set "descr" "Test tail(1)'s silent header feature"
+}
+silent_header_body() {
+	jot 11 1 11 > file1
+	jot 11 2 12 > file2
+	jot 10 2 11 > expectfile
+	jot 10 3 12 >> expectfile
+	tail -q file1 file2 > outfile
+	atf_check cmp outfile expectfile
+}
+
+atf_test_case verbose_header
+verbose_header_head() {
+	atf_set "descr" "Test tail(1)'s verbose header feature"
+}
+verbose_header_body() {
+	jot 11 1 11 > file1
+	echo '==> file1 <==' > expectfile
+	jot 10 2 11 >> expectfile
+	tail -v file1 > outfile
+	atf_check cmp outfile expectfile
+}
+
+atf_test_case si_number
+si_number_head() {
+	atf_set "descr" "Test tail(1)'s SI number feature"
+}
+si_number_body() {
+	jot -b aaaaaaa 129 > file1
+	jot -b aaaaaaa 128 > expectfile
+	tail -c 1k file1 > outfile
+	atf_check cmp outfile expectfile
+	jot 1025 1 1025 > file1
+	jot 1024 2 1025 > expectfile
+	tail -n 1k file1 > outfile
+	atf_check cmp outfile expectfile
+}
+
+atf_test_case no_lf_at_eof
+no_lf_at_eof_head()
+{
+	atf_set "descr" "File does not end in newline"
+}
+no_lf_at_eof_body()
+{
+	printf "a\nb\nc" >infile
+	atf_check -o inline:"c" tail -1 infile
+	atf_check -o inline:"b\nc" tail -2 infile
+	atf_check -o inline:"a\nb\nc" tail -3 infile
+	atf_check -o inline:"a\nb\nc" tail -4 infile
+}
+
 atf_init_test_cases()
 {
 	atf_add_test_case empty_r
@@ -372,4 +425,8 @@ atf_init_test_cases()
 	atf_add_test_case follow
 	atf_add_test_case follow_stdin
 	atf_add_test_case follow_rename
+	atf_add_test_case silent_header
+	atf_add_test_case verbose_header
+	atf_add_test_case si_number
+	atf_add_test_case no_lf_at_eof
 }

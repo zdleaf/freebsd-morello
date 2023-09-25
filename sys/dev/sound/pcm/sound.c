@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2005-2009 Ariff Abdullah <ariff@FreeBSD.org>
  * Portions Copyright (c) Ryan Beasley <ryan.beasley@gmail.com> - GSoC 2006
@@ -43,8 +43,6 @@
 #include <sys/sysctl.h>
 
 #include "feeder_if.h"
-
-SND_DECLARE_FILE("$FreeBSD$");
 
 devclass_t pcm_devclass;
 
@@ -1425,13 +1423,11 @@ static int
 sound_modevent(module_t mod, int type, void *data)
 {
 	int ret;
-#if 0
-	return (midi_modevent(mod, type, data));
-#else
-	ret = 0;
 
-	switch(type) {
+	ret = 0;
+	switch (type) {
 		case MOD_LOAD:
+			pcm_devclass = devclass_create("pcm");
 			pcmsg_unrhdr = new_unrhdr(1, INT_MAX, NULL);
 			break;
 		case MOD_UNLOAD:
@@ -1447,7 +1443,6 @@ sound_modevent(module_t mod, int type, void *data)
 	}
 
 	return ret;
-#endif
 }
 
 DEV_MODULE(sound, sound_modevent, NULL);

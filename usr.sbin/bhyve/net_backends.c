@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2019 Vincenzo Maffione <vmaffione@FreeBSD.org>
  *
@@ -23,8 +23,6 @@
  * WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE
  * OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
  * EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 /*
@@ -35,8 +33,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/types.h>		/* u_short etc */
 #ifndef WITHOUT_CAPSICUM
 #include <sys/capsicum.h>
@@ -168,9 +164,11 @@ struct net_backend {
 	/* Size of backend-specific private data. */
 	size_t priv_size;
 
-	/* Room for backend-specific data. */
-	char opaque[0];
+	/* Backend-specific private data follows. */
 };
+
+#define	NET_BE_PRIV(be)		((void *)((be) + 1))
+#define	NET_BE_SIZE(be)		(sizeof(*be) + (be)->priv_size)
 
 SET_DECLARE(net_backend_set, struct net_backend);
 
@@ -183,7 +181,7 @@ SET_DECLARE(net_backend_set, struct net_backend);
  */
 
 #if defined(INET6) || defined(INET)
-const int pf_list[] = {
+static const int pf_list[] = {
 #if defined(INET6)
 	PF_INET6,
 #endif
@@ -207,7 +205,7 @@ struct tap_priv {
 static void
 tap_cleanup(struct net_backend *be)
 {
-	struct tap_priv *priv = (struct tap_priv *)be->opaque;
+	struct tap_priv *priv = NET_BE_PRIV(be);
 
 	if (priv->mevp) {
 		mevent_delete(priv->mevp);
@@ -220,14 +218,14 @@ tap_cleanup(struct net_backend *be)
 
 static int
 tap_init(struct net_backend *be, const char *devname,
-	 nvlist_t *nvl, net_be_rxeof_t cb, void *param)
+    nvlist_t *nvl __unused, net_be_rxeof_t cb, void *param)
 {
-	struct tap_priv *priv = (struct tap_priv *)be->opaque;
+	struct tap_priv *priv = NET_BE_PRIV(be);
 	char tbuf[80];
 	int opt = 1;
 #if defined(INET6) || defined(INET)
 	struct ifreq ifrq;
-	int i, s;
+	int s;
 #endif
 #ifndef WITHOUT_CAPSICUM
 	cap_rights_t rights;
@@ -268,7 +266,7 @@ tap_init(struct net_backend *be, const char *devname,
 	}
 
 	s = -1;
-	for (i = 0; s == -1 && i < nitems(pf_list); i++)
+	for (size_t i = 0; s == -1 && i < nitems(pf_list); i++)
 		s = socket(pf_list[i], SOCK_DGRAM, 0);
 	if (s == -1) {
 		WPRINTF(("Could open socket"));
@@ -323,7 +321,7 @@ tap_send(struct net_backend *be, const struct iovec *iov, int iovcnt)
 static ssize_t
 tap_peek_recvlen(struct net_backend *be)
 {
-	struct tap_priv *priv = (struct tap_priv *)be->opaque;
+	struct tap_priv *priv = NET_BE_PRIV(be);
 	ssize_t ret;
 
 	if (priv->bbuflen > 0) {
@@ -353,7 +351,7 @@ tap_peek_recvlen(struct net_backend *be)
 static ssize_t
 tap_recv(struct net_backend *be, const struct iovec *iov, int iovcnt)
 {
-	struct tap_priv *priv = (struct tap_priv *)be->opaque;
+	struct tap_priv *priv = NET_BE_PRIV(be);
 	ssize_t ret;
 
 	if (priv->bbuflen > 0) {
@@ -381,7 +379,7 @@ tap_recv(struct net_backend *be, const struct iovec *iov, int iovcnt)
 static void
 tap_recv_enable(struct net_backend *be)
 {
-	struct tap_priv *priv = (struct tap_priv *)be->opaque;
+	struct tap_priv *priv = NET_BE_PRIV(be);
 
 	mevent_enable(priv->mevp);
 }
@@ -389,21 +387,21 @@ tap_recv_enable(struct net_backend *be)
 static void
 tap_recv_disable(struct net_backend *be)
 {
-	struct tap_priv *priv = (struct tap_priv *)be->opaque;
+	struct tap_priv *priv = NET_BE_PRIV(be);
 
 	mevent_disable(priv->mevp);
 }
 
 static uint64_t
-tap_get_cap(struct net_backend *be)
+tap_get_cap(struct net_backend *be __unused)
 {
 
 	return (0); /* no capabilities for now */
 }
 
 static int
-tap_set_cap(struct net_backend *be, uint64_t features,
-		unsigned vnet_hdr_len)
+tap_set_cap(struct net_backend *be __unused, uint64_t features,
+    unsigned vnet_hdr_len)
 {
 
 	return ((features || vnet_hdr_len) ? -1 : 0);
@@ -450,10 +448,10 @@ DATA_SET(net_backend_set, vmnet_backend);
 #define NG_SBUF_MAX_SIZE (4 * 1024 * 1024)
 
 static int
-ng_init(struct net_backend *be, const char *devname,
+ng_init(struct net_backend *be, const char *devname __unused,
 	 nvlist_t *nvl, net_be_rxeof_t cb, void *param)
 {
-	struct tap_priv *p = (struct tap_priv *)be->opaque;
+	struct tap_priv *p = NET_BE_PRIV(be);
 	struct ngm_connect ngc;
 	const char *value, *nodename;
 	int sbsz;
@@ -629,7 +627,7 @@ netmap_set_vnet_hdr_len(struct net_backend *be, int vnet_hdr_len)
 {
 	int err;
 	struct nmreq req;
-	struct netmap_priv *priv = (struct netmap_priv *)be->opaque;
+	struct netmap_priv *priv = NET_BE_PRIV(be);
 
 	nmreq_init(&req, priv->ifname);
 	req.nr_cmd = NETMAP_BDG_VNET_HDR;
@@ -649,7 +647,7 @@ netmap_set_vnet_hdr_len(struct net_backend *be, int vnet_hdr_len)
 static int
 netmap_has_vnet_hdr_len(struct net_backend *be, unsigned vnet_hdr_len)
 {
-	int prev_hdr_len = be->be_vnet_hdr_len;
+	unsigned prev_hdr_len = be->be_vnet_hdr_len;
 	int ret;
 
 	if (vnet_hdr_len == prev_hdr_len) {
@@ -675,8 +673,8 @@ netmap_get_cap(struct net_backend *be)
 }
 
 static int
-netmap_set_cap(struct net_backend *be, uint64_t features,
-	       unsigned vnet_hdr_len)
+netmap_set_cap(struct net_backend *be, uint64_t features __unused,
+    unsigned vnet_hdr_len)
 {
 
 	return (netmap_set_vnet_hdr_len(be, vnet_hdr_len));
@@ -684,9 +682,9 @@ netmap_set_cap(struct net_backend *be, uint64_t features,
 
 static int
 netmap_init(struct net_backend *be, const char *devname,
-	    nvlist_t *nvl, net_be_rxeof_t cb, void *param)
+    nvlist_t *nvl __unused, net_be_rxeof_t cb, void *param)
 {
-	struct netmap_priv *priv = (struct netmap_priv *)be->opaque;
+	struct netmap_priv *priv = NET_BE_PRIV(be);
 
 	strlcpy(priv->ifname, devname, sizeof(priv->ifname));
 	priv->ifname[sizeof(priv->ifname) - 1] = '\0';
@@ -695,7 +693,6 @@ netmap_init(struct net_backend *be, const char *devname,
 	if (priv->nmd == NULL) {
 		WPRINTF(("Unable to nm_open(): interface '%s', errno (%s)",
 			devname, strerror(errno)));
-		free(priv);
 		return (-1);
 	}
 
@@ -718,7 +715,7 @@ netmap_init(struct net_backend *be, const char *devname,
 static void
 netmap_cleanup(struct net_backend *be)
 {
-	struct netmap_priv *priv = (struct netmap_priv *)be->opaque;
+	struct netmap_priv *priv = NET_BE_PRIV(be);
 
 	if (priv->mevp) {
 		mevent_delete(priv->mevp);
@@ -733,13 +730,13 @@ static ssize_t
 netmap_send(struct net_backend *be, const struct iovec *iov,
 	    int iovcnt)
 {
-	struct netmap_priv *priv = (struct netmap_priv *)be->opaque;
+	struct netmap_priv *priv = NET_BE_PRIV(be);
 	struct netmap_ring *ring;
 	ssize_t totlen = 0;
 	int nm_buf_size;
 	int nm_buf_len;
 	uint32_t head;
-	void *nm_buf;
+	uint8_t *nm_buf;
 	int j;
 
 	ring = priv->tx;
@@ -753,8 +750,8 @@ netmap_send(struct net_backend *be, const struct iovec *iov,
 	nm_buf_len = 0;
 
 	for (j = 0; j < iovcnt; j++) {
+		uint8_t *iov_frag_buf = iov[j].iov_base;
 		int iov_frag_size = iov[j].iov_len;
-		void *iov_frag_buf = iov[j].iov_base;
 
 		totlen += iov_frag_size;
 
@@ -812,7 +809,7 @@ txsync:
 static ssize_t
 netmap_peek_recvlen(struct net_backend *be)
 {
-	struct netmap_priv *priv = (struct netmap_priv *)be->opaque;
+	struct netmap_priv *priv = NET_BE_PRIV(be);
 	struct netmap_ring *ring = priv->rx;
 	uint32_t head = ring->head;
 	ssize_t totlen = 0;
@@ -832,10 +829,10 @@ netmap_peek_recvlen(struct net_backend *be)
 static ssize_t
 netmap_recv(struct net_backend *be, const struct iovec *iov, int iovcnt)
 {
-	struct netmap_priv *priv = (struct netmap_priv *)be->opaque;
+	struct netmap_priv *priv = NET_BE_PRIV(be);
 	struct netmap_slot *slot = NULL;
 	struct netmap_ring *ring;
-	void *iov_frag_buf;
+	uint8_t *iov_frag_buf;
 	int iov_frag_size;
 	ssize_t totlen = 0;
 	uint32_t head;
@@ -848,8 +845,8 @@ netmap_recv(struct net_backend *be, const struct iovec *iov, int iovcnt)
 	iov_frag_size = iov->iov_len;
 
 	do {
+		uint8_t *nm_buf;
 		int nm_buf_len;
-		void *nm_buf;
 
 		if (head == ring->tail) {
 			return (0);
@@ -899,7 +896,7 @@ netmap_recv(struct net_backend *be, const struct iovec *iov, int iovcnt)
 static void
 netmap_recv_enable(struct net_backend *be)
 {
-	struct netmap_priv *priv = (struct netmap_priv *)be->opaque;
+	struct netmap_priv *priv = NET_BE_PRIV(be);
 
 	mevent_enable(priv->mevp);
 }
@@ -907,7 +904,7 @@ netmap_recv_enable(struct net_backend *be)
 static void
 netmap_recv_disable(struct net_backend *be)
 {
-	struct netmap_priv *priv = (struct netmap_priv *)be->opaque;
+	struct netmap_priv *priv = NET_BE_PRIV(be);
 
 	mevent_disable(priv->mevp);
 }
@@ -980,7 +977,7 @@ netbe_init(struct net_backend **ret, nvlist_t *nvl, net_be_rxeof_t cb,
     void *param)
 {
 	struct net_backend **pbe, *nbe, *tbe = NULL;
-	const char *value;
+	const char *value, *type;
 	char *devname;
 	int err;
 
@@ -991,11 +988,19 @@ netbe_init(struct net_backend **ret, nvlist_t *nvl, net_be_rxeof_t cb,
 	devname = strdup(value);
 
 	/*
+	 * Use the type given by configuration if exists; otherwise
+	 * use the prefix of the backend as the type.
+	 */
+	type = get_config_value_node(nvl, "type");
+	if (type == NULL)
+		type = devname;
+
+	/*
 	 * Find the network backend that matches the user-provided
 	 * device name. net_backend_set is built using a linker set.
 	 */
 	SET_FOREACH(pbe, net_backend_set) {
-		if (strncmp(devname, (*pbe)->prefix,
+		if (strncmp(type, (*pbe)->prefix,
 		    strlen((*pbe)->prefix)) == 0) {
 			tbe = *pbe;
 			assert(tbe->init != NULL);
@@ -1014,7 +1019,7 @@ netbe_init(struct net_backend **ret, nvlist_t *nvl, net_be_rxeof_t cb,
 		return (EINVAL);
 	}
 
-	nbe = calloc(1, sizeof(*nbe) + tbe->priv_size);
+	nbe = calloc(1, NET_BE_SIZE(tbe));
 	*nbe = *tbe;	/* copy the template */
 	nbe->fd = -1;
 	nbe->sc = param;

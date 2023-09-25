@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2019 Axiado Corporation.
  * All rights reserved.
@@ -30,8 +30,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
@@ -186,7 +184,7 @@ static driver_t iicoc_driver = {
 };
 
 SIMPLEBUS_PNP_INFO(compat_data);
-DRIVER_MODULE(iicoc, simplebus, iicoc_driver, iicoc_devclass, 0, 0);
-DRIVER_MODULE(ofw_iicbus, iicoc, ofw_iicbus_driver, ofw_iicbus_devclass, 0, 0);
+DRIVER_MODULE(iicoc, simplebus, iicoc_driver, 0, 0);
+DRIVER_MODULE(ofw_iicbus, iicoc, ofw_iicbus_driver, 0, 0);
 MODULE_DEPEND(iicoc, iicbus, 1, 1, 1);
 MODULE_DEPEND(iicoc, ofw_iicbus, 1, 1, 1);

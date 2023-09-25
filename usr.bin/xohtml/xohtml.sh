@@ -1,5 +1,4 @@
 #!/bin/sh
-# $FreeBSD$
 #!/bin/sh
 #
 # Copyright (c) 2014, Juniper Networks, Inc.
@@ -12,7 +11,7 @@
 #
 
 BASE=/usr/share/libxo
-VERSION=1.4.0
+VERSION=1.6.0
 CMD=cat
 DONE=
 WEB=http://juniper.github.io/libxo/${VERSION}/xohtml

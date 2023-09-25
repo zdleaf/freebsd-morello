@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD AND BSD-4-Clause
+ * SPDX-License-Identifier: BSD-2-Clause AND BSD-4-Clause
  *
  * Copyright (c) 2001 The NetBSD Foundation, Inc.
  * All rights reserved.
@@ -86,8 +86,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 /*
  * Manages physical address maps.
  *
@@ -315,12 +313,12 @@ void moea_cpu_bootstrap(int);
 void moea_bootstrap(vm_offset_t, vm_offset_t);
 void *moea_mapdev(vm_paddr_t, vm_size_t);
 void *moea_mapdev_attr(vm_paddr_t, vm_size_t, vm_memattr_t);
-void moea_unmapdev(vm_offset_t, vm_size_t);
+void moea_unmapdev(void *, vm_size_t);
 vm_paddr_t moea_kextract(vm_offset_t);
 void moea_kenter_attr(vm_offset_t, vm_paddr_t, vm_memattr_t);
 void moea_kenter(vm_offset_t, vm_paddr_t);
 void moea_page_set_memattr(vm_page_t m, vm_memattr_t ma);
-boolean_t moea_dev_direct_mapped(vm_paddr_t, vm_size_t);
+int moea_dev_direct_mapped(vm_paddr_t, vm_size_t);
 static void moea_sync_icache(pmap_t, vm_offset_t, vm_size_t);
 void moea_dumpsys_map(vm_paddr_t pa, size_t sz, void **va);
 void moea_scan_init(void);
@@ -1311,7 +1309,7 @@ moea_extract_and_hold(pmap_t pmap, vm_offset_t va, vm_prot_t prot)
 }
 
 void
-moea_init()
+moea_init(void)
 {
 
 	moea_upvo_zone = uma_zcreate("UPVO entry", sizeof (struct pvo_entry),
@@ -1739,7 +1737,7 @@ moea_pinit(pmap_t pmap)
 		u_int	hash, n;
 
 		/*
-		 * Create a new value by mutiplying by a prime and adding in
+		 * Create a new value by multiplying by a prime and adding in
 		 * entropy from the timebase register.  This is to make the
 		 * VSID more random so that the PT hash function collides
 		 * less often.  (Note that the prime casues gcc to do shifts
@@ -2658,7 +2656,7 @@ moea_bat_mapped(int idx, vm_paddr_t pa, vm_size_t size)
 	return (0);
 }
 
-boolean_t
+int
 moea_dev_direct_mapped(vm_paddr_t pa, vm_size_t size)
 {
 	int i;
@@ -2724,14 +2722,15 @@ moea_mapdev_attr(vm_paddr_t pa, vm_size_t size, vm_memattr_t ma)
 }
 
 void
-moea_unmapdev(vm_offset_t va, vm_size_t size)
+moea_unmapdev(void *p, vm_size_t size)
 {
-	vm_offset_t base, offset;
+	vm_offset_t base, offset, va;
 
 	/*
 	 * If this is outside kernel virtual space, then it's a
 	 * battable entry and doesn't require unmapping
 	 */
+	va = (vm_offset_t)p;
 	if ((va >= VM_MIN_KERNEL_ADDRESS) && (va <= virtual_end)) {
 		base = trunc_page(va);
 		offset = va & PAGE_MASK;
@@ -2774,7 +2773,7 @@ moea_dumpsys_map(vm_paddr_t pa, size_t sz, void **va)
 extern struct dump_pa dump_map[PHYS_AVAIL_SZ + 1];
 
 void
-moea_scan_init()
+moea_scan_init(void)
 {
 	struct pvo_entry *pvo;
 	vm_offset_t va;

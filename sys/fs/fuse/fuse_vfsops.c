@@ -61,8 +61,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/buf.h>
 #include <sys/module.h>
@@ -152,7 +150,7 @@ fuse_getdevice(const char *fspec, struct thread *td, struct cdev **fdevp)
 	NDINIT(ndp, LOOKUP, FOLLOW, UIO_SYSSPACE, fspec);
 	if ((err = namei(ndp)) != 0)
 		return err;
-	NDFREE(ndp, NDF_ONLY_PNBUF);
+	NDFREE_PNBUF(ndp);
 	devvp = ndp->ni_vp;
 
 	if (devvp->v_type != VCHR) {
@@ -308,7 +306,8 @@ fuse_vfsop_mount(struct mount *mp)
 	struct fuse_data *data = NULL;
 	struct thread *td;
 	struct file *fp, *fptmp;
-	char *fspec, *subtype;
+	char *fspec, *subtype, *fsname = NULL;
+	int fsnamelen;
 	struct vfsoptlist *opts;
 
 	subtype = NULL;
@@ -440,7 +439,9 @@ fuse_vfsop_mount(struct mount *mp)
 		strlcat(mp->mnt_stat.f_fstypename, subtype, MFSNAMELEN);
 	}
 	memset(mp->mnt_stat.f_mntfromname, 0, MNAMELEN);
-	strlcpy(mp->mnt_stat.f_mntfromname, fspec, MNAMELEN);
+	vfs_getopt(opts, "fsname=", (void**)&fsname, &fsnamelen);
+	strlcpy(mp->mnt_stat.f_mntfromname,
+		fsname == NULL ? fspec : fsname, MNAMELEN);
 	mp->mnt_iosize_max = maxphys;
 
 	/* Now handshaking with daemon */
@@ -540,7 +541,7 @@ fuse_vfsop_vget(struct mount *mp, ino_t ino, int flags, struct vnode **vpp)
 	struct fuse_vnode_data *fvdat;
 	struct timespec now;
 	const char dot[] = ".";
-	enum vtype vtyp;
+	__enum_uint8(vtype) vtyp;
 	int error;
 
 	if (!(data->dataflags & FSESS_EXPORT_SUPPORT)) {
@@ -621,8 +622,7 @@ fuse_vfsop_root(struct mount *mp, int lkflags, struct vnode **vpp)
 				SDT_PROBE2(fusefs, , vfsops, trace, 1,
 					"root vnode race");
 				FUSE_UNLOCK();
-				VOP_UNLOCK(*vpp);
-				vrele(*vpp);
+				vput(*vpp);
 				vrecycle(*vpp);
 				*vpp = data->vroot;
 			} else

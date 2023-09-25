@@ -1,5 +1,4 @@
 /*
- * $FreeBSD$
  */
 FBSD_1.2 {
 	procstat_close;
@@ -43,4 +42,9 @@ FBSD_1.5 {
 FBSD_1.6 {
 	procstat_get_pts_info;
 	procstat_get_vnode_info;
+};
+
+FBSD_1.7 {
+	 procstat_getadvlock;
+	 procstat_freeadvlock;
 };

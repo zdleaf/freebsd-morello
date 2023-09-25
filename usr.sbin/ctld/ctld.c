@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2012 The FreeBSD Foundation
  *
@@ -30,8 +30,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/types.h>
 #include <sys/time.h>
 #include <sys/socket.h>
@@ -2113,7 +2111,7 @@ conf_apply(struct conf *oldconf, struct conf *newconf)
 	/*
 	 * Now add new ports or modify existing ones.
 	 */
-	TAILQ_FOREACH(newport, &newconf->conf_ports, p_next) {
+	TAILQ_FOREACH_SAFE(newport, &newconf->conf_ports, p_next, tmpport) {
 		if (port_is_dummy(newport))
 			continue;
 		oldport = port_find(oldconf, newport->p_name);
@@ -2130,6 +2128,8 @@ conf_apply(struct conf *oldconf, struct conf *newconf)
 			log_warnx("failed to %s port %s",
 			    (oldport == NULL) ? "add" : "update",
 			    newport->p_name);
+			if (oldport == NULL || port_is_dummy(oldport))
+				port_delete(newport);
 			/*
 			 * XXX: Uncomment after fixing the root cause.
 			 *

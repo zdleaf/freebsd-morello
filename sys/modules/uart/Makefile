@@ -1,4 +1,3 @@
-# $FreeBSD$
 
 .PATH: ${SRCTOP}/sys/dev/uart
 
@@ -24,7 +23,9 @@ uart_cpu_machine= ${_uart_cpu}
 
 .if ${MACHINE} == "arm64"
 uart_dev_mvebu=uart_dev_mvebu.c
+.if !empty(OPT_FDT)
 uart_dev_mu=uart_dev_mu.c
+.endif
 .endif
 
 KMOD=	uart

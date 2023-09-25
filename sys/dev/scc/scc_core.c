@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2004-2006 Marcel Moolenaar
  * All rights reserved.
@@ -27,8 +27,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/bus.h>
@@ -49,7 +47,6 @@ __FBSDID("$FreeBSD$");
 
 #include "scc_if.h"
 
-devclass_t scc_devclass;
 const char scc_driver_name[] = "scc";
 
 static MALLOC_DEFINE(M_SCC, "SCC", "SCC driver");

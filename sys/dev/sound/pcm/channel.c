@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2005-2009 Ariff Abdullah <ariff@FreeBSD.org>
  * Portions Copyright (c) Ryan Beasley <ryan.beasley@gmail.com> - GSoC 2006
@@ -29,8 +29,6 @@
  * SUCH DAMAGE.
  */
 
-#include "opt_isa.h"
-
 #ifdef HAVE_KERNEL_OPTION_HEADERS
 #include "opt_snd.h"
 #endif
@@ -39,8 +37,6 @@
 #include <dev/sound/pcm/vchan.h>
 
 #include "feeder_if.h"
-
-SND_DECLARE_FILE("$FreeBSD$");
 
 int report_soft_formats = 1;
 SYSCTL_INT(_hw_snd, OID_AUTO, report_soft_formats, CTLFLAG_RW,
@@ -2191,17 +2187,10 @@ chn_syncstate(struct pcm_channel *c)
 int
 chn_trigger(struct pcm_channel *c, int go)
 {
-#ifdef DEV_ISA
-    	struct snd_dbuf *b = c->bufhard;
-#endif
 	struct snddev_info *d = c->parentsnddev;
 	int ret;
 
 	CHN_LOCKASSERT(c);
-#ifdef DEV_ISA
-	if (SND_DMA(b) && (go == PCMTRIG_EMLDMAWR || go == PCMTRIG_EMLDMARD))
-		sndbuf_dmabounce(b);
-#endif
 	if (!PCMTRIG_COMMON(go))
 		return (CHANNEL_TRIGGER(c->methods, c->devinfo, go));
 

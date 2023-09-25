@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2015-2016 Landon Fuller <landon@landonf.org>
  * All rights reserved.
@@ -30,8 +30,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/kernel.h>
 #include <sys/lock.h>
@@ -141,8 +139,8 @@ static device_method_t bhnd_pmucore_methods[] = {
 
 DEFINE_CLASS_1(bhnd_pmu, bhnd_pmucore_driver, bhnd_pmucore_methods,
     sizeof(struct bhnd_pmu_softc), bhnd_pmu_driver);
-EARLY_DRIVER_MODULE(bhnd_pmu, bhnd, bhnd_pmucore_driver, bhnd_pmu_devclass,
-    NULL, NULL, BUS_PASS_TIMER + BUS_PASS_ORDER_MIDDLE);
+EARLY_DRIVER_MODULE(bhnd_pmu, bhnd, bhnd_pmucore_driver, NULL, NULL,
+    BUS_PASS_TIMER + BUS_PASS_ORDER_MIDDLE);
 
 MODULE_DEPEND(bhnd_pmu_core, bhnd_pmu, 1, 1, 1);
 MODULE_VERSION(bhnd_pmu_core, 1);

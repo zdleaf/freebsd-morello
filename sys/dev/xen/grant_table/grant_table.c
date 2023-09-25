@@ -11,8 +11,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/bus.h>
@@ -29,9 +27,6 @@ __FBSDID("$FreeBSD$");
 
 #include <xen/xen-os.h>
 #include <xen/hypervisor.h>
-#include <machine/xen/synch_bitops.h>
-
-#include <xen/hypervisor.h>
 #include <xen/gnttab.h>
 
 #include <vm/vm.h>
@@ -41,7 +36,7 @@ __FBSDID("$FreeBSD$");
 
 /* External tools reserve first few grant table entries. */
 #define NR_RESERVED_ENTRIES 8
-#define GREFS_PER_GRANT_FRAME (PAGE_SIZE / sizeof(grant_entry_t))
+#define GREFS_PER_GRANT_FRAME (PAGE_SIZE / sizeof(grant_entry_v1_t))
 
 static grant_ref_t **gnttab_list;
 static unsigned int nr_grant_frames;
@@ -59,7 +54,7 @@ static struct resource *gnttab_pseudo_phys_res;
 /* Resource id for allocated physical address space. */
 static int gnttab_pseudo_phys_res_id;
 
-static grant_entry_t *shared;
+static grant_entry_v1_t *shared;
 
 static struct gnttab_free_callback *gnttab_free_callback_list = NULL;
 
@@ -182,18 +177,15 @@ gnttab_query_foreign_access(grant_ref_t ref)
 int
 gnttab_end_foreign_access_ref(grant_ref_t ref)
 {
-	uint16_t flags, nflags;
+	uint16_t flags;
 
-	nflags = shared[ref].flags;
-	do {
-		if ( (flags = nflags) & (GTF_reading|GTF_writing) ) {
-			printf("%s: WARNING: g.e. still in use!\n", __func__);
-			return (0);
-		}
-	} while ((nflags = synch_cmpxchg(&shared[ref].flags, flags, 0)) !=
-	       flags);
+	while (!((flags = atomic_load_16(&shared[ref].flags)) &
+	    (GTF_reading|GTF_writing)))
+		if (atomic_cmpset_16(&shared[ref].flags, flags, 0))
+			return (1);
 
-	return (1);
+	printf("%s: WARNING: g.e. still in use!\n", __func__);
+	return (0);
 }
 
 void
@@ -284,17 +276,21 @@ gnttab_end_foreign_transfer_ref(grant_ref_t ref)
 	/*
          * If a transfer is not even yet started, try to reclaim the grant
          * reference and return failure (== 0).
+	 *
+	 * NOTE: This is a loop since the atomic cmpset can fail multiple
+	 * times.  In normal operation it will be rare to execute more than
+	 * twice.  Attempting an attack would consume a great deal of
+	 * attacker resources and be unlikely to prolong the loop very much.
          */
-	while (!((flags = shared[ref].flags) & GTF_transfer_committed)) {
-		if ( synch_cmpxchg(&shared[ref].flags, flags, 0) == flags )
+	while (!((flags = atomic_load_16(&shared[ref].flags)) &
+	    GTF_transfer_committed))
+		if (atomic_cmpset_16(&shared[ref].flags, flags, 0))
 			return (0);
-		cpu_spinwait();
-	}
 
 	/* If a transfer is in progress then wait until it is completed. */
 	while (!(flags & GTF_transfer_completed)) {
-		flags = shared[ref].flags;
 		cpu_spinwait();
+		flags = atomic_load_16(&shared[ref].flags);
 	}
 
 	/* Read the frame number /after/ reading completion status. */
@@ -503,7 +499,7 @@ unmap_pte_fn(pte_t *pte, struct page *pmd_page,
 
 static vm_paddr_t resume_frames;
 
-static int
+static void
 gnttab_map(unsigned int start_idx, unsigned int end_idx)
 {
 	struct xen_add_to_physmap xatp;
@@ -521,21 +517,6 @@ gnttab_map(unsigned int start_idx, unsigned int end_idx)
 		if (HYPERVISOR_memory_op(XENMEM_add_to_physmap, &xatp))
 			panic("HYPERVISOR_memory_op failed to map gnttab");
 	} while (i-- > start_idx);
-
-	if (shared == NULL) {
-		vm_offset_t area;
-
-		area = kva_alloc(PAGE_SIZE * max_nr_grant_frames());
-		KASSERT(area, ("can't allocate VM space for grant table"));
-		shared = (grant_entry_t *)area;
-	}
-
-	for (i = start_idx; i <= end_idx; i++) {
-		pmap_kenter((vm_offset_t) shared + i * PAGE_SIZE,
-		    resume_frames + i * PAGE_SIZE);
-	}
-
-	return (0);
 }
 
 int
@@ -557,15 +538,16 @@ gnttab_resume(device_t dev)
 		if (gnttab_pseudo_phys_res == NULL)
 			panic("Unable to reserve physical memory for gnttab");
 		resume_frames = rman_get_start(gnttab_pseudo_phys_res);
+		shared = rman_get_virtual(gnttab_pseudo_phys_res);
 	}
+	gnttab_map(0, nr_gframes - 1);
 
-	return (gnttab_map(0, nr_gframes - 1));
+	return (0);
 }
 
 static int
 gnttab_expand(unsigned int req_entries)
 {
-	int error;
 	unsigned int cur, extra;
 
 	cur = nr_grant_frames;
@@ -573,11 +555,9 @@ gnttab_expand(unsigned int req_entries)
 	if (cur + extra > max_nr_grant_frames())
 		return (ENOSPC);
 
-	error = gnttab_map(cur, cur + extra - 1);
-	if (!error)
-		error = grow_gnttab_list(extra);
+	gnttab_map(cur, cur + extra - 1);
 
-	return (error);
+	return (grow_gnttab_list(extra));
 }
 
 MTX_SYSINIT(gnttab, &gnttab_list_lock, "GNTTAB LOCK", MTX_DEF | MTX_RECURSE);
@@ -691,7 +671,6 @@ static device_method_t granttable_methods[] = {
 };
 
 DEFINE_CLASS_0(granttable, granttable_driver, granttable_methods, 0);
-devclass_t granttable_devclass;
 
-DRIVER_MODULE_ORDERED(granttable, xenpv, granttable_driver, granttable_devclass,
-    NULL, NULL, SI_ORDER_FIRST);
+DRIVER_MODULE_ORDERED(granttable, xenpv, granttable_driver, NULL, NULL,
+    SI_ORDER_FIRST);

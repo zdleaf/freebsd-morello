@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2005-2009 Ariff Abdullah <ariff@FreeBSD.org>
  * All rights reserved.
@@ -60,8 +60,6 @@
 
 #define SND_USE_FXDIV
 #include "snd_fxdiv_gen.h"
-
-SND_DECLARE_FILE("$FreeBSD$");
 #endif
 
 #include "feeder_rate_gen.h"
@@ -310,7 +308,7 @@ SYSCTL_PROC(_hw_snd, OID_AUTO, feeder_rate_quality,
  */
 #define _Z_GCAST(x)		((uint64_t)(x))
 
-#if defined(__GNUCLIKE_ASM) && defined(__i386__)
+#if defined(__i386__)
 /*
  * This is where i386 being beaten to a pulp. Fortunately this function is
  * rarely being called and if it is, it will decide the best (hopefully)

@@ -1,4 +1,3 @@
-# $FreeBSD$
 
 .PATH:	${SRCTOP}/sys/dev/iicbus
 
@@ -21,7 +20,7 @@ SRCS+=	acpi_iicbus.c opt_acpi.h acpi_if.h
 .endif
 
 .if !empty(OPT_FDT)
-SRCS+=	ofw_iicbus.c ofw_bus_if.h
+SRCS+=	ofw_iicbus.c ofw_iicbus_if.h ofw_bus_if.h
 .endif
 
 EXPORT_SYMS=	YES

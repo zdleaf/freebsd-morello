@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2010 The FreeBSD Foundation
  * Copyright (c) 2010 Pawel Jakub Dawidek <pjd@FreeBSD.org>
@@ -31,8 +31,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/types.h>
 #include <sys/sysctl.h>
 #include <sys/wait.h>
@@ -312,7 +310,7 @@ hook_check(void)
 		}
 
 		/*
-		 * Skip proccesses younger than 1 minute.
+		 * Skip processes younger than 1 minute.
 		 */
 		if (now - hp->hp_lastreport < REPORT_INTERVAL)
 			continue;

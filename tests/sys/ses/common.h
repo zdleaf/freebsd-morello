@@ -21,8 +21,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 typedef bool(*ses_cb)(const char *devname, int fd);
@@ -57,7 +55,7 @@ for_each_ses_dev(ses_cb cb, int oflags)
 }
 
 static bool
-has_ses()
+has_ses(void)
 {
 	glob_t g;
 	int r;

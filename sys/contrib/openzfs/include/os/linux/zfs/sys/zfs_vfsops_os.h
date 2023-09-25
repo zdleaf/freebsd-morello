@@ -6,7 +6,7 @@
  * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
- * or http://www.opensolaris.org/os/licensing.
+ * or https://opensource.org/licenses/CDDL-1.0.
  * See the License for the specific language governing permissions
  * and limitations under the License.
  *
@@ -105,7 +105,6 @@ struct zfsvfs {
 	rrmlock_t	z_teardown_lock;
 	krwlock_t	z_teardown_inactive_lock;
 	list_t		z_all_znodes;	/* all znodes in the fs */
-	uint64_t	z_nr_znodes;	/* number of znodes in the fs */
 	unsigned long	z_rollback_time; /* last online rollback time */
 	unsigned long	z_snap_defer_time; /* last snapshot unmount deferral */
 	kmutex_t	z_znodes_lock;	/* lock for z_all_znodes */
@@ -142,9 +141,6 @@ struct zfsvfs {
 
 #define	ZFS_TEARDOWN_DESTROY(zfsvfs)		\
 	rrm_destroy(&(zfsvfs)->z_teardown_lock)
-
-#define	ZFS_TEARDOWN_TRY_ENTER_READ(zfsvfs)	\
-	rw_tryenter(&(zfsvfs)->z_teardown_lock, RW_READER)
 
 #define	ZFS_TEARDOWN_ENTER_READ(zfsvfs, tag)	\
 	rrm_enter_read(&(zfsvfs)->z_teardown_lock, tag);

@@ -1,4 +1,3 @@
-.\"	$FreeBSD$
 .\"	$NetBSD: tests.kyua.7,v 1.2 2013/07/20 21:39:59 wiz Exp $
 .\"
 .\" Copyright (c) 2010 The NetBSD Foundation, Inc.
@@ -128,7 +127,7 @@ by using Kyua's various reporting commands.
 For example, the following would print a plain-text report of the executed
 tests and show which ones failed:
 .Bd -literal -offset indent
-$ kyua report
+$ kyua report --verbose -r <.db file from output of test>
 .Ed
 .Pp
 This example would generate an HTML report ready to be published on a

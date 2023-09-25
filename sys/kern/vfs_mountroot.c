@@ -40,8 +40,6 @@
 #include "opt_rootdevname.h"
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/conf.h>
 #include <sys/cons.h>
@@ -64,7 +62,6 @@ __FBSDID("$FreeBSD$");
 #include <sys/sysproto.h>
 #include <sys/sx.h>
 #include <sys/sysctl.h>
-#include <sys/sysent.h>
 #include <sys/systm.h>
 #include <sys/vnode.h>
 
@@ -353,13 +350,13 @@ vfs_mountroot_shuffle(struct thread *td, struct mount *mpdevfs)
 		NDINIT(&nd, LOOKUP, FOLLOW | LOCKLEAF, UIO_SYSSPACE, fspath);
 		error = namei(&nd);
 		if (error) {
-			NDFREE(&nd, NDF_ONLY_PNBUF);
 			fspath = "/mnt";
 			NDINIT(&nd, LOOKUP, FOLLOW | LOCKLEAF, UIO_SYSSPACE,
 			    fspath);
 			error = namei(&nd);
 		}
 		if (!error) {
+			NDFREE_PNBUF(&nd);
 			vp = nd.ni_vp;
 			error = (vp->v_type == VDIR) ? 0 : ENOTDIR;
 			if (!error)
@@ -377,7 +374,6 @@ vfs_mountroot_shuffle(struct thread *td, struct mount *mpdevfs)
 			} else
 				vput(vp);
 		}
-		NDFREE(&nd, NDF_ONLY_PNBUF);
 
 		if (error)
 			printf("mountroot: unable to remount previous root "
@@ -388,6 +384,7 @@ vfs_mountroot_shuffle(struct thread *td, struct mount *mpdevfs)
 	NDINIT(&nd, LOOKUP, FOLLOW | LOCKLEAF, UIO_SYSSPACE, "/dev");
 	error = namei(&nd);
 	if (!error) {
+		NDFREE_PNBUF(&nd);
 		vp = nd.ni_vp;
 		error = (vp->v_type == VDIR) ? 0 : ENOTDIR;
 		if (!error)
@@ -414,7 +411,6 @@ vfs_mountroot_shuffle(struct thread *td, struct mount *mpdevfs)
 	if (error)
 		printf("mountroot: unable to remount devfs under /dev "
 		    "(error %d)\n", error);
-	NDFREE(&nd, NDF_ONLY_PNBUF);
 
 	if (mporoot == mpdevfs) {
 		vfs_unbusy(mpdevfs);
@@ -595,7 +591,7 @@ parse_dir_md(char **conf)
 	free(tok, M_TEMP);
 
 	/* Get file status. */
-	error = kern_statat(td, 0, AT_FDCWD, path, UIO_SYSSPACE, &sb, NULL);
+	error = kern_statat(td, 0, AT_FDCWD, path, UIO_SYSSPACE, &sb);
 	if (error)
 		goto out;
 
@@ -719,18 +715,19 @@ parse_directive(char **conf)
 	return (error);
 }
 
-static int
+static bool
 parse_mount_dev_present(const char *dev)
 {
 	struct nameidata nd;
 	int error;
 
-	NDINIT(&nd, LOOKUP, FOLLOW | LOCKLEAF, UIO_SYSSPACE, dev);
+	NDINIT(&nd, LOOKUP, FOLLOW, UIO_SYSSPACE, dev);
 	error = namei(&nd);
-	if (!error)
-		vput(nd.ni_vp);
-	NDFREE(&nd, NDF_ONLY_PNBUF);
-	return (error != 0) ? 0 : 1;
+	if (error != 0)
+		return (false);
+	vrele(nd.ni_vp);
+	NDFREE_PNBUF(&nd);
+	return (true);
 }
 
 #define	ERRMSGL	255
@@ -794,7 +791,7 @@ parse_mount(char **conf)
 		ma = parse_mountroot_options(ma, opts);
 
 		error = kernel_mount(ma, MNT_ROOTFS);
-		if (error == 0 || timeout <= 0)
+		if (error == 0 || error == EILSEQ || timeout <= 0)
 			break;
 
 		if (root_mount_timeout * hz == timeout ||
@@ -954,7 +951,7 @@ vfs_mountroot_readconf(struct thread *td, struct sbuf *sb)
 	if (error)
 		return (error);
 
-	NDFREE(&nd, NDF_ONLY_PNBUF);
+	NDFREE_PNBUF(&nd);
 	ofs = 0;
 	len = sizeof(buf) - 1;
 	while (1) {
@@ -979,6 +976,7 @@ static void
 vfs_mountroot_wait(void)
 {
 	struct root_hold_token *h;
+	struct thread *td;
 	struct timeval lastfail;
 	int curfail;
 
@@ -986,15 +984,16 @@ vfs_mountroot_wait(void)
 
 	curfail = 0;
 	lastfail.tv_sec = 0;
-	ppsratecheck(&lastfail, &curfail, 1);
+	eventratecheck(&lastfail, &curfail, 1);
+	td = curthread;
 	while (1) {
-		g_waitidle();
+		g_waitidle(td);
 		mtx_lock(&root_holds_mtx);
 		if (TAILQ_EMPTY(&root_holds)) {
 			mtx_unlock(&root_holds_mtx);
 			break;
 		}
-		if (ppsratecheck(&lastfail, &curfail, 1)) {
+		if (eventratecheck(&lastfail, &curfail, 1)) {
 			printf("Root mount waiting for:");
 			TAILQ_FOREACH(h, &root_holds, list)
 				printf(" %s", h->who);
@@ -1005,7 +1004,7 @@ vfs_mountroot_wait(void)
 		    hz);
 		TSUNWAIT("root mount");
 	}
-	g_waitidle();
+	g_waitidle(td);
 
 	TSEXIT();
 }
@@ -1031,7 +1030,7 @@ vfs_mountroot_wait_if_neccessary(const char *fs, const char *dev)
 	 * Note that we must wait for GEOM to finish reconfiguring itself,
 	 * eg for geom_part(4) to finish tasting.
 	 */
-	g_waitidle();
+	g_waitidle(curthread);
 	if (parse_mount_dev_present(dev))
 		return (0);
 

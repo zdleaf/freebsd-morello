@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 1998, 2001 Nicolas Souchu
  * All rights reserved.
@@ -24,8 +24,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 #include <sys/param.h>
@@ -56,8 +54,6 @@ static void smb_identify(driver_t *driver, device_t parent);
 static int smb_probe(device_t);
 static int smb_attach(device_t);
 static int smb_detach(device_t);
-
-static devclass_t smb_devclass;
 
 static device_method_t smb_methods[] = {
 	/* device interface */
@@ -277,6 +273,6 @@ smbioctl(struct cdev *dev, u_long cmd, caddr_t data, int flags, struct thread *t
 	return (error);
 }
 
-DRIVER_MODULE(smb, smbus, smb_driver, smb_devclass, 0, 0);
+DRIVER_MODULE(smb, smbus, smb_driver, 0, 0);
 MODULE_DEPEND(smb, smbus, SMBUS_MINVER, SMBUS_PREFVER, SMBUS_MAXVER);
 MODULE_VERSION(smb, 1);

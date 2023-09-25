@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2002-2009 Luigi Rizzo, Universita` di Pisa
  *
@@ -23,8 +23,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 #ifndef _IPFW2_H
@@ -295,7 +293,29 @@ enum ipfw_opcodes {		/* arguments (4 byte each)	*/
 	O_SKIP_ACTION,		/* none				*/
 	O_TCPMSS,		/* arg1=MSS value */
 
+	O_MAC_SRC_LOOKUP,	/* arg1=table number, u32=value */
+	O_MAC_DST_LOOKUP,	/* arg1=table number, u32=value */
+
+	O_SETMARK,		/* u32 = value */
+	O_MARK,			/* 2 u32 = value, bitmask */
+
 	O_LAST_OPCODE		/* not an opcode!		*/
+};
+
+/*
+ * Defines key types used by lookup instruction
+ */
+enum ipfw_table_lookup_type {
+	LOOKUP_DST_IP,
+	LOOKUP_SRC_IP,
+	LOOKUP_DST_PORT,
+	LOOKUP_SRC_PORT,
+	LOOKUP_UID,
+	LOOKUP_JAIL,
+	LOOKUP_DSCP,
+	LOOKUP_DST_MAC,
+	LOOKUP_SRC_MAC,
+	LOOKUP_MARK,
 };
 
 /*
@@ -754,7 +774,8 @@ struct _ipfw_dyn_rule {
 #define	IPFW_TABLE_INTERFACE	2	/* Table for holding interface names */
 #define	IPFW_TABLE_NUMBER	3	/* Table for holding ports/uid/gid/etc */
 #define	IPFW_TABLE_FLOW		4	/* Table for holding flow data */
-#define	IPFW_TABLE_MAXTYPE	4	/* Maximum valid number */
+#define	IPFW_TABLE_MAC		5	/* Table for holding mac address prefixes */
+#define	IPFW_TABLE_MAXTYPE	5	/* Maximum valid number */
 
 #define	IPFW_TABLE_CIDR	IPFW_TABLE_ADDR	/* compat */
 
@@ -771,6 +792,10 @@ struct _ipfw_dyn_rule {
 #define	IPFW_VTYPE_LIMIT	0x00000100	/* limit */
 #define	IPFW_VTYPE_NH4		0x00000200	/* IPv4 nexthop */
 #define	IPFW_VTYPE_NH6		0x00000400	/* IPv6 nexthop */
+#define	IPFW_VTYPE_MARK		0x00000800	/* [fw]mark */
+
+/* MAC/InfiniBand/etc address length */
+#define	IPFW_MAX_L2_ADDR_LEN	20
 
 typedef struct	_ipfw_table_entry {
 	in_addr_t	addr;		/* network address		*/
@@ -866,6 +891,7 @@ struct tflow_entry {
 	} a;
 };
 
+/* 64-byte structure representing multi-field table value */
 typedef struct _ipfw_table_value {
 	uint32_t	tag;		/* O_TAG/O_TAGGED */
 	uint32_t	pipe;		/* O_PIPE/O_QUEUE */
@@ -877,11 +903,12 @@ typedef struct _ipfw_table_value {
 	uint32_t	nh4;
 	uint8_t		dscp;
 	uint8_t		spare0;
-	uint16_t	spare1;
+	uint16_t	kidx;		/* value kernel index */
 	struct in6_addr	nh6;
 	uint32_t	limit;		/* O_LIMIT */
 	uint32_t	zoneid;		/* scope zone id for nh6 */
-	uint64_t	reserved;
+	uint32_t	mark;		/* O_SETMARK/O_MARK */
+	uint32_t	refcnt;		/* XXX 64-bit in kernel */
 } ipfw_table_value;
 
 /* Table entry TLV */
@@ -895,10 +922,11 @@ typedef struct	_ipfw_obj_tentry {
 	uint16_t	spare1;
 	union {
 		/* Longest field needs to be aligned by 8-byte boundary	*/
-		struct in_addr		addr;	/* IPv4 address		*/
-		uint32_t		key;		/* uid/gid/port	*/
-		struct in6_addr		addr6;	/* IPv6 address 	*/
-		char	iface[IF_NAMESIZE];	/* interface name	*/
+		struct in_addr		addr;		/* IPv4 address		*/
+		uint32_t		key;		/* uid/gid/port		*/
+		struct in6_addr		addr6;		/* IPv6 address 	*/
+		char	iface[IF_NAMESIZE];		/* interface name	*/
+		u_char	mac[IPFW_MAX_L2_ADDR_LEN];	/* MAC address		*/
 		struct tflow_entry	flow;
 	} k;
 	union {

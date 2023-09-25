@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: BSD-3-Clause */
-/*  Copyright (c) 2021, Intel Corporation
+/*  Copyright (c) 2023, Intel Corporation
  *  All rights reserved.
  *
  *  Redistribution and use in source and binary forms, with or without
@@ -28,7 +28,6 @@
  *  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  *  POSSIBILITY OF SUCH DAMAGE.
  */
-/*$FreeBSD$*/
 
 /**
  * @file ice_drv_info.h
@@ -63,16 +62,16 @@
  * @var ice_rc_version
  * @brief driver release candidate version number
  */
-const char ice_driver_version[] = "0.29.4-k";
-const uint8_t ice_major_version = 0;
-const uint8_t ice_minor_version = 29;
-const uint8_t ice_patch_version = 4;
+const char ice_driver_version[] = "1.37.11-k";
+const uint8_t ice_major_version = 1;
+const uint8_t ice_minor_version = 37;
+const uint8_t ice_patch_version = 11;
 const uint8_t ice_rc_version = 0;
 
 #define PVIDV(vendor, devid, name) \
-	PVID(vendor, devid, name " - 0.29.4-k")
+	PVID(vendor, devid, name " - 1.37.11-k")
 #define PVIDV_OEM(vendor, devid, svid, sdevid, revid, name) \
-	PVID_OEM(vendor, devid, svid, sdevid, revid, name " - 0.29.4-k")
+	PVID_OEM(vendor, devid, svid, sdevid, revid, name " - 1.37.11-k")
 
 /**
  * @var ice_vendor_info_array
@@ -86,7 +85,7 @@ const uint8_t ice_rc_version = 0;
  * to most-generic entry; e.g. PVIDV_OEM()s for a device ID must come before
  * the PVIDV() for it.
  */
-static pci_vendor_info_t ice_vendor_info_array[] = {
+static const pci_vendor_info_t ice_vendor_info_array[] = {
 	PVIDV(ICE_INTEL_VENDOR_ID, ICE_DEV_ID_E810C_BACKPLANE,
 		"Intel(R) Ethernet Controller E810-C for backplane"),
 	PVIDV_OEM(ICE_INTEL_VENDOR_ID, ICE_DEV_ID_E810C_QSFP,
@@ -131,12 +130,6 @@ static pci_vendor_info_t ice_vendor_info_array[] = {
 		ICE_INTEL_VENDOR_ID, 0x0007, 0,
 		"Intel(R) Ethernet Network Adapter E810-XXV-4"),
 	PVIDV_OEM(ICE_INTEL_VENDOR_ID, ICE_DEV_ID_E810C_SFP,
-		ICE_INTEL_VENDOR_ID, 0x0008, 0,
-		"Intel(R) Ethernet Network Adapter E810-XXV-2"),
-	PVIDV_OEM(ICE_INTEL_VENDOR_ID, ICE_DEV_ID_E810C_SFP,
-		ICE_INTEL_VENDOR_ID, 0x0009, 0,
-		"Intel(R) Ethernet Network Adapter E810-XXV-2 for OCP 2.0"),
-	PVIDV_OEM(ICE_INTEL_VENDOR_ID, ICE_DEV_ID_E810C_SFP,
 		ICE_INTEL_VENDOR_ID, 0x000C, 0,
 		"Intel(R) Ethernet Network Adapter E810-XXV-4 for OCP 3.0"),
 	PVIDV(ICE_INTEL_VENDOR_ID, ICE_DEV_ID_E810C_SFP,
@@ -169,6 +162,16 @@ static pci_vendor_info_t ice_vendor_info_array[] = {
 	      "Intel(R) Ethernet Connection E823-L/X557-AT 10GBASE-T"),
 	PVIDV(ICE_INTEL_VENDOR_ID, ICE_DEV_ID_E823L_1GBE,
 	      "Intel(R) Ethernet Connection E823-L 1GbE"),
+	PVIDV(ICE_INTEL_VENDOR_ID, ICE_DEV_ID_E823C_BACKPLANE,
+	      "Intel(R) Ethernet Connection E823-C for backplane"),
+	PVIDV(ICE_INTEL_VENDOR_ID, ICE_DEV_ID_E823C_QSFP,
+	      "Intel(R) Ethernet Connection E823-C for QSFP"),
+	PVIDV(ICE_INTEL_VENDOR_ID, ICE_DEV_ID_E823C_SFP,
+	      "Intel(R) Ethernet Connection E823-C for SFP"),
+	PVIDV(ICE_INTEL_VENDOR_ID, ICE_DEV_ID_E823C_10G_BASE_T,
+	      "Intel(R) Ethernet Connection E823-C/X557-AT 10GBASE-T"),
+	PVIDV(ICE_INTEL_VENDOR_ID, ICE_DEV_ID_E823C_SGMII,
+	      "Intel(R) Ethernet Connection E823-C 1GbE"),
 	PVIDV(ICE_INTEL_VENDOR_ID, ICE_DEV_ID_E810_XXV_BACKPLANE,
 	      "Intel(R) Ethernet Controller E810-XXV for backplane"),
 	PVIDV(ICE_INTEL_VENDOR_ID, ICE_DEV_ID_E810_XXV_QSFP,

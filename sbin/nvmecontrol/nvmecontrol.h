@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (C) 2012-2013 Intel Corporation
  * All rights reserved.
@@ -24,8 +24,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 #ifndef __NVMECONTROL_H__
@@ -76,7 +74,8 @@ void print_hex(void *data, uint32_t length);
 void print_namespace(struct nvme_namespace_data *nsdata);
 void read_logpage(int fd, uint8_t log_page, uint32_t nsid, uint8_t lsp,
     uint16_t lsi, uint8_t rae, void *payload, uint32_t payload_size);
-void print_temp(uint16_t t);
+void print_temp_C(uint16_t t);
+void print_temp_K(uint16_t t);
 void print_intel_add_smart(const struct nvme_controller_data *cdata __unused, void *buf, uint32_t size __unused);
 
 /* Utility Routines */
@@ -84,7 +83,7 @@ void print_intel_add_smart(const struct nvme_controller_data *cdata __unused, vo
  * 128-bit integer augments to standard values. On i386 this
  * doesn't exist, so we use 64-bit values. So, on 32-bit i386,
  * you'll get truncated values until someone implement 128bit
- * ints in sofware.
+ * ints in software.
  */
 #define UINT128_DIG	39
 #ifdef __i386__

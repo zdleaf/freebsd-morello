@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2020 Oskar Holmlund <oskar.holmlund@ohdata.se>
  *
@@ -23,13 +23,9 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/conf.h>
 #include <sys/bus.h>
@@ -257,8 +253,6 @@ static device_method_t ti_divider_methods[] = {
 DEFINE_CLASS_0(ti_divider, ti_divider_driver, ti_divider_methods,
 	sizeof(struct ti_divider_softc));
 
-static devclass_t ti_divider_devclass;
-
-EARLY_DRIVER_MODULE(ti_divider, simplebus, ti_divider_driver,
-	ti_divider_devclass, 0, 0, BUS_PASS_BUS + BUS_PASS_ORDER_MIDDLE);
+EARLY_DRIVER_MODULE(ti_divider, simplebus, ti_divider_driver, 0, 0,
+    BUS_PASS_BUS + BUS_PASS_ORDER_MIDDLE);
 MODULE_VERSION(ti_divider, 1);

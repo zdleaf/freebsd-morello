@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2021 Semihalf.
  *
@@ -26,8 +26,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/bus.h>
 #include <sys/kernel.h>
@@ -57,8 +55,6 @@ struct a37x0_xtal_softc {
 	struct clkdom		*clkdom;
 };
 
-static devclass_t a37x0_xtal_devclass;
-
 static int a37x0_xtal_attach(device_t dev);
 static int a37x0_xtal_detach(device_t dev);
 static int a37x0_xtal_probe(device_t dev);
@@ -76,8 +72,8 @@ static driver_t a37x0_xtal_driver = {
 	sizeof(struct a37x0_xtal_softc)
 };
 
-EARLY_DRIVER_MODULE(a37x0_xtal, simplebus, a37x0_xtal_driver,
-    a37x0_xtal_devclass, 0, 0, BUS_PASS_TIMER + BUS_PASS_ORDER_EARLY);
+EARLY_DRIVER_MODULE(a37x0_xtal, simplebus, a37x0_xtal_driver, 0, 0,
+    BUS_PASS_TIMER + BUS_PASS_ORDER_EARLY);
 
 static int
 a37x0_xtal_attach(device_t dev)
@@ -85,11 +81,9 @@ a37x0_xtal_attach(device_t dev)
 	struct a37x0_xtal_softc *sc;
 	struct clk_fixed_def def;
 	struct syscon *syscon;
-	phandle_t node;
 	uint32_t reg;
 	int error;
 
-	node = ofw_bus_get_node(dev);
 	sc = device_get_softc(dev);
 
 	def.clkdef.name = "armada-3700-xtal";

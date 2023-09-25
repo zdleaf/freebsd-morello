@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2001 Jake Burkholder <jake@FreeBSD.org>
  * All rights reserved.
@@ -27,8 +27,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include "opt_sched.h"
 
 #include <sys/param.h>
@@ -83,25 +81,19 @@ SYSCTL_INT(_kern_sched, OID_AUTO, preemption, CTLFLAG_RD,
 SYSCTL_NODE(_kern_sched, OID_AUTO, stats, CTLFLAG_RW | CTLFLAG_MPSAFE, 0,
     "switch stats");
 
-/* Switch reasons from mi_switch(). */
+/* Switch reasons from mi_switch(9). */
 DPCPU_DEFINE(long, sched_switch_stats[SWT_COUNT]);
-SCHED_STAT_DEFINE_VAR(uncategorized,
-    &DPCPU_NAME(sched_switch_stats[SWT_NONE]), "");
-SCHED_STAT_DEFINE_VAR(preempt,
-    &DPCPU_NAME(sched_switch_stats[SWT_PREEMPT]), "");
 SCHED_STAT_DEFINE_VAR(owepreempt,
     &DPCPU_NAME(sched_switch_stats[SWT_OWEPREEMPT]), "");
 SCHED_STAT_DEFINE_VAR(turnstile,
     &DPCPU_NAME(sched_switch_stats[SWT_TURNSTILE]), "");
 SCHED_STAT_DEFINE_VAR(sleepq,
     &DPCPU_NAME(sched_switch_stats[SWT_SLEEPQ]), "");
-SCHED_STAT_DEFINE_VAR(sleepqtimo,
-    &DPCPU_NAME(sched_switch_stats[SWT_SLEEPQTIMO]), "");
 SCHED_STAT_DEFINE_VAR(relinquish, 
     &DPCPU_NAME(sched_switch_stats[SWT_RELINQUISH]), "");
 SCHED_STAT_DEFINE_VAR(needresched,
     &DPCPU_NAME(sched_switch_stats[SWT_NEEDRESCHED]), "");
-SCHED_STAT_DEFINE_VAR(idle, 
+SCHED_STAT_DEFINE_VAR(idle,
     &DPCPU_NAME(sched_switch_stats[SWT_IDLE]), "");
 SCHED_STAT_DEFINE_VAR(iwait,
     &DPCPU_NAME(sched_switch_stats[SWT_IWAIT]), "");
@@ -111,6 +103,8 @@ SCHED_STAT_DEFINE_VAR(remotepreempt,
     &DPCPU_NAME(sched_switch_stats[SWT_REMOTEPREEMPT]), "");
 SCHED_STAT_DEFINE_VAR(remotewakeidle,
     &DPCPU_NAME(sched_switch_stats[SWT_REMOTEWAKEIDLE]), "");
+SCHED_STAT_DEFINE_VAR(bind,
+    &DPCPU_NAME(sched_switch_stats[SWT_BIND]), "");
 
 static int
 sysctl_stats_reset(SYSCTL_HANDLER_ARGS)
@@ -131,7 +125,7 @@ sysctl_stats_reset(SYSCTL_HANDLER_ARGS)
 	 * Traverse the list of children of _kern_sched_stats and reset each
 	 * to 0.  Skip the reset entry.
 	 */
-	SLIST_FOREACH(p, oidp->oid_parent, oid_link) {
+	RB_FOREACH(p, sysctl_oid_list, oidp->oid_parent) {
 		if (p == oidp || p->oid_arg1 == NULL)
 			continue;
 		counter = (uintptr_t)p->oid_arg1;

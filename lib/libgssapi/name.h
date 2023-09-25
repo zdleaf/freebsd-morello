@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2005 Doug Rabson
  * All rights reserved.
@@ -24,8 +24,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- *	$FreeBSD$
  */
 
 #include <sys/queue.h>
@@ -45,7 +43,7 @@ struct _gss_name {
 };
 
 extern OM_uint32
-	_gss_find_mn(OM_uint32 *, struct _gss_name *, gss_OID, 
+	_gss_find_mn(OM_uint32 *, struct _gss_name *, gss_OID,
 	      struct _gss_mechanism_name **);
 extern struct _gss_name *
 	_gss_make_name(struct _gss_mech_switch *m, gss_name_t new_mn);

@@ -27,8 +27,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include "opt_acpi.h"
 #include <sys/param.h>
 #include <sys/bus.h>
@@ -128,10 +126,7 @@ static driver_t acpi_panasonic_driver = {
 	sizeof(struct acpi_panasonic_softc),
 };
 
-static devclass_t acpi_panasonic_devclass;
-
-DRIVER_MODULE(acpi_panasonic, acpi, acpi_panasonic_driver,
-    acpi_panasonic_devclass, 0, 0);
+DRIVER_MODULE(acpi_panasonic, acpi, acpi_panasonic_driver, 0, 0);
 MODULE_DEPEND(acpi_panasonic, acpi, 1, 1, 1);
 
 static int

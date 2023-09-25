@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2016 Michael Zhilin <mizhka@gmail.com>
  * All rights reserved.
@@ -30,8 +30,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
@@ -87,4 +85,4 @@ static driver_t chipc_cfi_driver = {
 	sizeof(struct cfi_softc),
 };
 
-DRIVER_MODULE(cfi, bhnd_chipc, chipc_cfi_driver, cfi_devclass, 0, 0);
+DRIVER_MODULE(cfi, bhnd_chipc, chipc_cfi_driver, 0, 0);

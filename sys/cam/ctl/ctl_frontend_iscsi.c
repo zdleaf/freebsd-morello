@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2012 The FreeBSD Foundation
  *
@@ -26,8 +26,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 /*
@@ -35,8 +33,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/capsicum.h>
 #include <sys/condvar.h>
@@ -1896,7 +1892,7 @@ cfiscsi_ioctl_limits(struct ctl_iscsi *ci)
 
 	cilp = (struct ctl_iscsi_limits_params *)&(ci->data);
 
-	error = icl_limits(cilp->offload, false, &idl);
+	error = icl_limits(cilp->offload, false, cilp->socket, &idl);
 	if (error != 0) {
 		ci->status = CTL_ISCSI_ERROR;
 		snprintf(ci->error_str, sizeof(ci->error_str),
@@ -3062,11 +3058,11 @@ cfiscsi_done(union ctl_io *io)
 		/*
 		 * Implicit task termination has just completed; nothing to do.
 		 */
+		icl_pdu_free(request);
 		cs->cs_tasks_aborted = true;
 		refcount_release(&cs->cs_outstanding_ctl_pdus);
 		wakeup(__DEVOLATILE(void *, &cs->cs_outstanding_ctl_pdus));
 		ctl_free_io(io);
-		icl_pdu_free(request);
 		return;
 	default:
 		panic("cfiscsi_done called with wrong opcode 0x%x",

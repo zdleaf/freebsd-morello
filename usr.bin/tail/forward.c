@@ -32,9 +32,6 @@
  * SUCH DAMAGE.
  */
 
-#include <sys/cdefs.h>
-
-__FBSDID("$FreeBSD$");
 
 #ifndef lint
 static const char sccsid[] = "@(#)forward.c	8.1 (Berkeley) 6/6/93";
@@ -246,8 +243,8 @@ show(file_info_t *file)
 	int ch;
 
 	while ((ch = getc(file->fp)) != EOF) {
-		if (last != file && no_files > 1) {
-			if (!qflag)
+		if (last != file) {
+			if (vflag || (qflag == 0 && no_files > 1))
 				printfn(file->file_name, 1);
 			last = file;
 		}
@@ -325,7 +322,7 @@ follow(file_info_t *files, enum STYLE style, off_t off)
 		if (file->fp) {
 			active = 1;
 			n++;
-			if (no_files > 1 && !qflag)
+			if (vflag || (qflag == 0 && no_files > 1))
 				printfn(file->file_name, 1);
 			forward(file->fp, file->file_name, style, off, &file->st);
 			if (Fflag && fileno(file->fp) != STDIN_FILENO)
@@ -411,10 +408,16 @@ follow(file_info_t *files, enum STYLE style, off_t off)
 			/*
 			 * In the -F case we set a timeout to ensure that
 			 * we re-stat the file at least once every second.
+			 * If we've recieved EINTR, ignore it. Both reasons
+			 * for its generation are transient.
 			 */
-			n = kevent(kq, NULL, 0, ev, 1, Fflag ? &ts : NULL);
-			if (n < 0)
-				err(1, "kevent");
+			do {
+				n = kevent(kq, NULL, 0, ev, 1, Fflag ? &ts : NULL);
+				if (n < 0 && errno == EINTR)
+					continue;
+				if (n < 0)
+					err(1, "kevent");
+			} while (n < 0);
 			if (n == 0) {
 				/* timeout */
 				break;

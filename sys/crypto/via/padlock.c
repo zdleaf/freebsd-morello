@@ -25,8 +25,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
@@ -297,9 +295,8 @@ static driver_t padlock_driver = {
 	padlock_methods,
 	sizeof(struct padlock_softc),
 };
-static devclass_t padlock_devclass;
 
 /* XXX where to attach */
-DRIVER_MODULE(padlock, nexus, padlock_driver, padlock_devclass, 0, 0);
+DRIVER_MODULE(padlock, nexus, padlock_driver, 0, 0);
 MODULE_VERSION(padlock, 1);
 MODULE_DEPEND(padlock, crypto, 1, 1, 1);

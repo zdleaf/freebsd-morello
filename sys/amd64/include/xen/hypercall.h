@@ -32,8 +32,6 @@
  * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
  * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
  * IN THE SOFTWARE.
- *
- * $FreeBSD$
  */
 
 #ifndef __MACHINE_XEN_HYPERCALL_H__
@@ -49,8 +47,6 @@ extern char *hypercall_page;
 
 #define __STR(x) #x
 #define STR(x) __STR(x)
-#define	ENOXENSYS	38
-#define CONFIG_XEN_COMPAT	0x030002
 #define __must_check
 
 #define HYPERCALL_STR(name)					\
@@ -145,6 +141,9 @@ privcmd_hypercall(long op, long a1, long a2, long a3, long a4, long a5)
 	register long __arg5 __asm__("r8") = (long)(a5);
 	long __call = (long)&hypercall_page + (op * 32);
 
+	if (op >= PAGE_SIZE / 32)
+		return -EINVAL;
+
 	__asm__ volatile (
 		"call *%[call]"
 		: "=a" (__res), "=D" (__ign1), "=S" (__ign2),
@@ -207,13 +206,6 @@ HYPERVISOR_fpu_taskswitch(
 	int set)
 {
 	return _hypercall1(int, fpu_taskswitch, set);
-}
-
-static inline int __must_check
-HYPERVISOR_sched_op_compat(
-	int cmd, unsigned long arg)
-{
-	return _hypercall2(int, sched_op_compat, cmd, arg);
 }
 
 static inline int __must_check
@@ -284,19 +276,7 @@ static inline int __must_check
 HYPERVISOR_event_channel_op(
 	int cmd, void *arg)
 {
-	int rc = _hypercall2(int, event_channel_op, cmd, arg);
-
-#if CONFIG_XEN_COMPAT <= 0x030002
-	if (__predict_false(rc == -ENOXENSYS)) {
-		struct evtchn_op op;
-		op.cmd = cmd;
-		memcpy(&op.u, arg, sizeof(op.u));
-		rc = _hypercall1(int, event_channel_op_compat, &op);
-		memcpy(arg, &op.u, sizeof(op.u));
-	}
-#endif
-
-	return rc;
+	return _hypercall2(int, event_channel_op, cmd, arg);
 }
 
 static inline int __must_check
@@ -317,19 +297,7 @@ static inline int __must_check
 HYPERVISOR_physdev_op(
 	int cmd, void *arg)
 {
-	int rc = _hypercall2(int, physdev_op, cmd, arg);
-
-#if CONFIG_XEN_COMPAT <= 0x030002
-	if (__predict_false(rc == -ENOXENSYS)) {
-		struct physdev_op op;
-		op.cmd = cmd;
-		memcpy(&op.u, arg, sizeof(op.u));
-		rc = _hypercall1(int, physdev_op_compat, &op);
-		memcpy(arg, &op.u, sizeof(op.u));
-	}
-#endif
-
-	return rc;
+	return _hypercall2(int, physdev_op, cmd, arg);
 }
 
 static inline int __must_check
@@ -376,35 +344,16 @@ HYPERVISOR_suspend(
 		.reason = SHUTDOWN_suspend
 	};
 
-	int rc = _hypercall3(int, sched_op, SCHEDOP_shutdown,
+	return _hypercall3(int, sched_op, SCHEDOP_shutdown,
 			     &sched_shutdown, srec);
-
-#if CONFIG_XEN_COMPAT <= 0x030002
-	if (rc == -ENOXENSYS)
-		rc = _hypercall3(int, sched_op_compat, SCHEDOP_shutdown,
-				 SHUTDOWN_suspend, srec);
-#endif
-
-	return rc;
 }
 
-#if CONFIG_XEN_COMPAT <= 0x030002
-static inline int
-HYPERVISOR_nmi_op(
-	unsigned long op, void *arg)
-{
-	return _hypercall2(int, nmi_op, op, arg);
-}
-#endif
-
-#ifndef CONFIG_XEN
 static inline unsigned long __must_check
 HYPERVISOR_hvm_op(
     int op, void *arg)
 {
     return _hypercall2(unsigned long, hvm_op, op, arg);
 }
-#endif
 
 static inline int __must_check
 HYPERVISOR_callback_op(

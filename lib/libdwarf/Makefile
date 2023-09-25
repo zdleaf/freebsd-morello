@@ -1,4 +1,3 @@
-# $FreeBSD$
 .include <bsd.own.mk>
 
 PACKAGE=lib${LIB}
@@ -281,6 +280,7 @@ MLINKS+= \
 	dwarf_get_AT_name.3	dwarf_get_OP_name.3	\
 	dwarf_get_AT_name.3	dwarf_get_ORD_name.3	\
 	dwarf_get_AT_name.3	dwarf_get_TAG_name.3	\
+	dwarf_get_AT_name.3	dwarf_get_UT_name.3	\
 	dwarf_get_AT_name.3	dwarf_get_VIRTUALITY_name.3 \
 	dwarf_get_AT_name.3	dwarf_get_VIS_name.3	\
 	dwarf_get_cu_die_offset.3 dwarf_get_arange_cu_header_offset.3 \

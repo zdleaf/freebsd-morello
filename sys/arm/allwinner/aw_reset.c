@@ -21,8 +21,6 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 /*
@@ -30,8 +28,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/bus.h>
@@ -158,8 +154,6 @@ static driver_t aw_reset_driver = {
 	sizeof(struct aw_reset_softc),
 };
 
-static devclass_t aw_reset_devclass;
-
-EARLY_DRIVER_MODULE(aw_reset, simplebus, aw_reset_driver, aw_reset_devclass,
-    0, 0, BUS_PASS_RESOURCE + BUS_PASS_ORDER_MIDDLE);
+EARLY_DRIVER_MODULE(aw_reset, simplebus, aw_reset_driver, 0, 0,
+    BUS_PASS_RESOURCE + BUS_PASS_ORDER_MIDDLE);
 MODULE_VERSION(aw_reset, 1);

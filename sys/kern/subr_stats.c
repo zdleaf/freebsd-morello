@@ -22,8 +22,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 /*
@@ -31,8 +29,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/arb.h>
 #include <sys/ctype.h>
@@ -3406,6 +3402,13 @@ stats_v1_vsd_tdgst_add(enum vsd_dtype vs_dtype, struct voistatdata_tdgst *tdgst,
 
 				Q_TOSTR(rbctd64->mu, -1, 10, qstr,
 				    sizeof(qstr));
+				struct voistatdata_tdgstctd64 *parent;
+				parent = RB_PARENT(rbctd64, rblnk);
+				int rb_color =
+					parent == NULL ? 0 :
+					RB_LEFT(parent, rblnk) == rbctd64 ?
+					(_RB_BITSUP(parent, rblnk) & _RB_L) != 0 :
+ 					(_RB_BITSUP(parent, rblnk) & _RB_R) != 0;
 				printf(" RB ctd=%3d p=%3d l=%3d r=%3d c=%2d "
 				    "mu=%s\n",
 				    (int)ARB_SELFIDX(ctd64tree, rbctd64),
@@ -3415,7 +3418,7 @@ stats_v1_vsd_tdgst_add(enum vsd_dtype vs_dtype, struct voistatdata_tdgst *tdgst,
 				      RB_LEFT(rbctd64, rblnk)),
 				    (int)ARB_SELFIDX(ctd64tree,
 				      RB_RIGHT(rbctd64, rblnk)),
-				    RB_COLOR(rbctd64, rblnk),
+				    rb_color,
 				    qstr);
 
 				panic("RB@%p and ARB@%p trees differ\n",

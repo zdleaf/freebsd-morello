@@ -29,8 +29,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 #include <stdbool.h>
@@ -527,7 +525,6 @@ speeddisk(int fd, off_t mediasize, u_int sectorsize)
 	TR(bulk * 1024);
 
 	printf("\n");
-	return;
 }
 
 static void
@@ -559,7 +556,6 @@ commandtime(int fd, off_t mediasize, u_int sectorsize)
 		(dtsector - dtmega)*100/2048);
 
 	printf("\n");
-	return;
 }
 
 static void
@@ -621,8 +617,6 @@ iops(int fd, off_t mediasize, u_int sectorsize)
 	}
 
 	TI(completed);
-
-	return;
 }
 
 static void

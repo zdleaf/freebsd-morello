@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2009-2013
  * 	Swinburne University of Technology, Melbourne, Australia
@@ -49,8 +49,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/hhook.h>
 #include <sys/kernel.h>
@@ -297,7 +295,7 @@ cdg_cb_init(struct cc_var *ccv, void *ptr)
 {
 	struct cdg *cdg_data;
 
-	INP_WLOCK_ASSERT(ccv->ccvc.tcp->t_inpcb);
+	INP_WLOCK_ASSERT(tptoinpcb(ccv->ccvc.tcp));
 	if (ptr == NULL) {
 		cdg_data = malloc(sizeof(struct cdg), M_CC_MEM, M_NOWAIT);
 		if (cdg_data == NULL)
@@ -582,7 +580,7 @@ cdg_ack_received(struct cc_var *ccv, uint16_t ack_type)
 	int congestion, new_measurement, slowstart;
 
 	cdg_data = ccv->cc_data;
-	e_t = (struct ertt *)khelp_get_osd(CCV(ccv, osd), ertt_id);
+	e_t = (struct ertt *)khelp_get_osd(&CCV(ccv, t_osd), ertt_id);
 	new_measurement = e_t->flags & ERTT_NEW_MEASUREMENT;
 	congestion = 0;
 	cdg_data->maxrtt_in_rtt = imax(e_t->rtt, cdg_data->maxrtt_in_rtt);

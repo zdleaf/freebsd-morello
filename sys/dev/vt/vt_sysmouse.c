@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 1999 Kazutaka YOKOTA <yokota@zodiac.mech.utsunomiya-u.ac.jp>
  * All rights reserved.
@@ -33,8 +33,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include "opt_evdev.h"
 
 #include <sys/param.h>
@@ -249,6 +247,8 @@ sysmouse_process_event(mouse_info_t *mi)
 
 #ifdef EVDEV_SUPPORT
 	sysmouse_evdev_store(x, y, z, sysmouse_status.button);
+	if (evdev_is_grabbed(sysmouse_evdev))
+		goto done;
 #endif
 
 	/* The first five bytes are compatible with MouseSystems. */

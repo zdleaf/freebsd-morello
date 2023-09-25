@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD AND BSD-2-Clause-NetBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2012 Yusuke Tanaka
  * All rights reserved.
@@ -55,8 +55,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 /*
  * Driver for Seiko Instruments S-35390A Real-time Clock
  */
@@ -363,8 +361,7 @@ static driver_t s390rtc_driver = {
 	s390rtc_methods,
 	sizeof(struct s390rtc_softc),
 };
-static devclass_t s390rtc_devclass;
 
-DRIVER_MODULE(s35390a, iicbus, s390rtc_driver, s390rtc_devclass, NULL, NULL);
+DRIVER_MODULE(s35390a, iicbus, s390rtc_driver, NULL, NULL);
 MODULE_VERSION(s35390a, 1);
 MODULE_DEPEND(s35390a, iicbus, 1, 1, 1);

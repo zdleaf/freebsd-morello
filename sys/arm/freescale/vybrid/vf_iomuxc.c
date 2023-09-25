@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2013-2014 Ruslan Bukin <br@bsdpad.com>
  * All rights reserved.
@@ -32,8 +32,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/bus.h>
@@ -207,6 +205,4 @@ static driver_t iomuxc_driver = {
 	sizeof(struct iomuxc_softc),
 };
 
-static devclass_t iomuxc_devclass;
-
-DRIVER_MODULE(iomuxc, simplebus, iomuxc_driver, iomuxc_devclass, 0, 0);
+DRIVER_MODULE(iomuxc, simplebus, iomuxc_driver, 0, 0);

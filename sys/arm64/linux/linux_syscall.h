@@ -2,7 +2,6 @@
  * System call numbers.
  *
  * DO NOT EDIT-- this file is automatically @generated.
- * $FreeBSD$
  */
 
 #define	LINUX_SYS_linux_setxattr	5
@@ -61,9 +60,9 @@
 #define	LINUX_SYS_linux_getdents64	61
 #define	LINUX_SYS_linux_lseek	62
 #define	LINUX_SYS_read	63
-#define	LINUX_SYS_write	64
+#define	LINUX_SYS_linux_write	64
 #define	LINUX_SYS_readv	65
-#define	LINUX_SYS_writev	66
+#define	LINUX_SYS_linux_writev	66
 #define	LINUX_SYS_linux_pread	67
 #define	LINUX_SYS_linux_pwrite	68
 #define	LINUX_SYS_linux_preadv	69
@@ -188,7 +187,7 @@
 #define	LINUX_SYS_linux_semget	190
 #define	LINUX_SYS_linux_semctl	191
 #define	LINUX_SYS_linux_semtimedop	192
-#define	LINUX_SYS_linux_semop	193
+#define	LINUX_SYS_semop	193
 #define	LINUX_SYS_linux_shmget	194
 #define	LINUX_SYS_linux_shmctl	195
 #define	LINUX_SYS_linux_shmat	196

@@ -27,8 +27,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
@@ -82,12 +80,8 @@ static driver_t al_serdes_driver = {
 	sizeof(struct al_serdes_softc)
 };
 
-static devclass_t al_serdes_devclass;
-
-DRIVER_MODULE(al_serdes, simplebus, al_serdes_driver,
-    al_serdes_devclass, 0, 0);
-DRIVER_MODULE(al_serdes, ofwbus, al_serdes_driver,
-    al_serdes_devclass, 0, 0);
+DRIVER_MODULE(al_serdes, simplebus, al_serdes_driver, 0, 0);
+DRIVER_MODULE(al_serdes, ofwbus, al_serdes_driver, 0, 0);
 
 static int
 al_serdes_probe(device_t dev)

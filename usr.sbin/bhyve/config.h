@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2021 John H. Baldwin <jhb@FreeBSD.org>
  *
@@ -23,8 +23,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 #ifndef __CONFIG_H__
@@ -38,7 +36,7 @@
  * The database only stores string values.  Callers should parse
  * values into other types if needed.  String values can reference
  * other configuration variables using a '%(name)' syntax.  In this
- * case, the name must be the the full path of the configuration
+ * case, the name must be the full path of the configuration
  * variable.  The % character can be escaped with a preceding \ to
  * avoid expansion.  Any \ characters must be escaped.
  *

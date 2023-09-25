@@ -1,7 +1,7 @@
 /*	$NetBSD: iso9660_rrip.c,v 1.14 2014/05/30 13:14:47 martin Exp $	*/
 
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-NetBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2005 Daniel Watt, Walter Deignan, Ryan Gabrys, Alan
  * Perez-Rathke and Ram Vedam.  All rights reserved.
@@ -38,8 +38,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/queue.h>
 #include <sys/types.h>
 #include <stdio.h>
@@ -394,6 +392,12 @@ cd9660_rrip_initialize_node(iso9660_disk *diskStructure, cd9660node *node,
 				SUSP_ENTRY_RRIP_PX, "PX", SUSP_LOC_ENTRY);
 			cd9660node_rrip_px(current, parent->node);
 			TAILQ_INSERT_TAIL(&node->head, current, rr_ll);
+
+			/* TF - timestamp */
+			current = cd9660node_susp_create_node(SUSP_TYPE_RRIP,
+				SUSP_ENTRY_RRIP_TF, "TF", SUSP_LOC_ENTRY);
+			cd9660node_rrip_tf(current, parent->node);
+			TAILQ_INSERT_TAIL(&node->head, current, rr_ll);
 		}
 	} else if (node->type & CD9660_TYPE_DOTDOT) {
 		if (grandparent != NULL && grandparent->node != NULL &&
@@ -402,6 +406,12 @@ cd9660_rrip_initialize_node(iso9660_disk *diskStructure, cd9660node *node,
 			current = cd9660node_susp_create_node(SUSP_TYPE_RRIP,
 				SUSP_ENTRY_RRIP_PX, "PX", SUSP_LOC_ENTRY);
 			cd9660node_rrip_px(current, grandparent->node);
+			TAILQ_INSERT_TAIL(&node->head, current, rr_ll);
+
+			/* TF - timestamp */
+			current = cd9660node_susp_create_node(SUSP_TYPE_RRIP,
+				SUSP_ENTRY_RRIP_TF, "TF", SUSP_LOC_ENTRY);
+			cd9660node_rrip_tf(current, grandparent->node);
 			TAILQ_INSERT_TAIL(&node->head, current, rr_ll);
 		}
 		/* Handle PL */
@@ -414,25 +424,11 @@ cd9660_rrip_initialize_node(iso9660_disk *diskStructure, cd9660node *node,
 	} else {
 		cd9660_rrip_initialize_inode(node);
 
-		/*
-		 * Not every node needs a NM set - only if the name is
-		 * actually different. IE: If a file is TEST -> TEST,
-		 * no NM. test -> TEST, need a NM
-		 *
-		 * The rr_moved_dir needs to be assigned a NM record as well.
-		 */
 		if (node == diskStructure->rr_moved_dir) {
 			cd9660_rrip_add_NM(node, RRIP_DEFAULT_MOVE_DIR_NAME);
-		}
-		else if ((node->node != NULL) &&
-			((strlen(node->node->name) !=
-			    (uint8_t)node->isoDirRecord->name_len[0]) ||
-			(memcmp(node->node->name,node->isoDirRecord->name,
-				(uint8_t)node->isoDirRecord->name_len[0]) != 0))) {
+		} else if (node->node != NULL) {
 			cd9660_rrip_NM(node);
 		}
-
-
 
 		/* Rock ridge directory relocation code here. */
 
@@ -699,11 +695,11 @@ cd9660node_rrip_tf(struct ISO_SUSP_ATTRIBUTES *p, fsnode *_node)
 	 */
 
 	cd9660_time_915(p->attr.rr_entry.TF.timestamp,
-		_node->inode->st.st_atime);
+		_node->inode->st.st_mtime);
 	p->attr.rr_entry.TF.h.length[0] += 7;
 
 	cd9660_time_915(p->attr.rr_entry.TF.timestamp + 7,
-		_node->inode->st.st_mtime);
+		_node->inode->st.st_atime);
 	p->attr.rr_entry.TF.h.length[0] += 7;
 
 	cd9660_time_915(p->attr.rr_entry.TF.timestamp + 14,
@@ -756,7 +752,7 @@ cd9660_rrip_add_NM(cd9660node *node, const char *name)
 	struct ISO_SUSP_ATTRIBUTES *r;
 
 	/*
-	 * Each NM record has 254 byes to work with. This means that
+	 * Each NM record has 254 bytes to work with. This means that
 	 * the name data itself only has 249 bytes to work with. So, a
 	 * name with 251 characters would require two nm records.
 	 */

@@ -1,7 +1,7 @@
 #!/bin/sh
 
 #-
-# SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+# SPDX-License-Identifier: BSD-2-Clause
 #
 # Copyright 2004-2007 Colin Percival
 # All rights reserved
@@ -27,8 +27,6 @@
 # IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
-# $FreeBSD$
-
 #### Usage function -- called from command-line handling code.
 
 # Usage instructions.  Options not listed:
@@ -49,7 +47,7 @@ Options:
                   case of an unfinished upgrade
   -j jail      -- Operate on the given jail specified by jid or name
   -k KEY       -- Trust an RSA key with SHA256 hash of KEY
-  -r release   -- Target for upgrade (e.g., 11.1-RELEASE)
+  -r release   -- Target for upgrade (e.g., 13.2-RELEASE)
   -s server    -- Server from which to fetch updates
                   (default: update.FreeBSD.org)
   -t address   -- Mail output of cron command, if any, to address
@@ -890,7 +888,12 @@ install_check_params () {
 install_create_be () {
 	# Figure out if we're running in a jail and return if we are
 	if [ `sysctl -n security.jail.jailed` = 1 ]; then
-	    return 1
+		return 1
+	fi
+	# Operating on roots that aren't located at / will, more often than not,
+	# not touch the boot environment.
+	if [ "$BASEDIR" != "/" ]; then
+		return 1
 	fi
 	# Create a boot environment if enabled
 	if [ ${BOOTENV} = yes ]; then
@@ -911,7 +914,7 @@ install_create_be () {
 		esac
 		if [ ${CREATEBE} = yes ]; then
 			echo -n "Creating snapshot of existing boot environment... "
-			VERSION=`freebsd-version -k`
+			VERSION=`freebsd-version -ku | sort -V | tail -n 1`
 			TIMESTAMP=`date +"%Y-%m-%d_%H%M%S"`
 			bectl create ${VERSION}_${TIMESTAMP}
 			if [ $? -eq 0 ]; then
@@ -1672,11 +1675,12 @@ fetch_inspect_system () {
 	echo "done."
 }
 
-# For any paths matching ${MERGECHANGES}, compare $1 and $2 and find any
-# files which differ; generate $3 containing these paths and the old hashes.
+# For any paths matching ${MERGECHANGES}, compare $2 against $1 and $3 and
+# find any files with values unique to $2; generate $4 containing these paths
+# and their corresponding hashes from $1.
 fetch_filter_mergechanges () {
 	# Pull out the paths and hashes of the files matching ${MERGECHANGES}.
-	for F in $1 $2; do
+	for F in $1 $2 $3; do
 		for X in ${MERGECHANGES}; do
 			grep -E "^${X}" ${F}
 		done |
@@ -1684,9 +1688,10 @@ fetch_filter_mergechanges () {
 		    sort > ${F}-values
 	done
 
-	# Any line in $2-values which doesn't appear in $1-values and is a
-	# file means that we should list the path in $3.
-	comm -13 $1-values $2-values |
+	# Any line in $2-values which doesn't appear in $1-values or $3-values
+	# and is a file means that we should list the path in $3.
+	sort $1-values $3-values |
+	    comm -13 - $2-values |
 	    fgrep '|f|' |
 	    cut -f 1 -d '|' > $2-paths
 
@@ -1698,10 +1703,10 @@ fetch_filter_mergechanges () {
 	while read X; do
 		look "${X}|" $1-values |
 		    head -1
-	done < $2-paths > $3
+	done < $2-paths > $4
 
 	# Clean up
-	rm $1-values $2-values $2-paths
+	rm $1-values $2-values $3-values $2-paths
 }
 
 # For any paths matching ${UPDATEIFUNMODIFIED}, remove lines from $[123]
@@ -2538,8 +2543,21 @@ The following file could not be merged automatically: ${F}
 Press Enter to edit this file in ${EDITOR} and resolve the conflicts
 manually...
 			EOF
-			read dummy </dev/tty
-			${EDITOR} `pwd`/merge/new/${F} < /dev/tty
+			while true; do
+				read dummy </dev/tty
+				${EDITOR} `pwd`/merge/new/${F} < /dev/tty
+
+				if ! grep -qE '^(<<<<<<<|=======|>>>>>>>)([[:space:]].*)?$' $(pwd)/merge/new/${F} ; then
+					break
+				fi
+				cat <<-EOF
+
+Merge conflict markers remain in: ${F}
+These must be resolved for the system to be functional.
+
+Press Enter to return to editing this file.
+				EOF
+			done
 		done < failed.merges
 		rm failed.merges
 
@@ -2693,7 +2711,7 @@ upgrade_run () {
 
 	# Based on ${MERGECHANGES}, generate a file tomerge-old with the
 	# paths and hashes of old versions of files to merge.
-	fetch_filter_mergechanges INDEX-OLD INDEX-PRESENT tomerge-old
+	fetch_filter_mergechanges INDEX-OLD INDEX-PRESENT INDEX-NEW tomerge-old
 
 	# Based on ${UPDATEIFUNMODIFIED}, remove lines from INDEX-* which
 	# correspond to lines in INDEX-PRESENT with hashes not appearing
@@ -3017,6 +3035,15 @@ Kernel updates have been installed.  Please reboot and run
 		    grep -vE '^[^|]*/lib/[^|]*\.so\.[0-9]+\|' > INDEX-NEW
 		install_from_index INDEX-NEW || return 1
 		install_delete INDEX-OLD INDEX-NEW || return 1
+
+		# Restart host sshd if running (PR263489).  Note that this does
+		# not affect child sshd processes handling existing sessions.
+		if [ "$BASEDIR" = / ] && \
+		    service sshd status >/dev/null 2>/dev/null; then
+			echo
+			echo "Restarting sshd after upgrade"
+			service sshd restart
+		fi
 
 		# Rehash certs if we actually have certctl installed.
 		if which certctl>/dev/null; then
@@ -3478,6 +3505,9 @@ fi
 
 # Set LC_ALL in order to avoid problems with character ranges like [A-Z].
 export LC_ALL=C
+
+# Clear environment variables that may affect operation of tools that we use.
+unset GREP_OPTIONS
 
 get_params $@
 for COMMAND in ${COMMANDS}; do

@@ -19,8 +19,6 @@
  * CDDL HEADER END
  *
  * Portions Copyright 2010 The FreeBSD Foundation
- *
- * $FreeBSD$
  */
 
 /*
@@ -1666,7 +1664,7 @@ fasttrap_pid_probe(struct trapframe *tf)
 
 		ASSERT(i <= sizeof (scratch));
 
-		if (fasttrap_copyout(scratch, (char *)addr, i)) {
+		if (uwrite(curproc, scratch, i, addr) != 0) {
 			fasttrap_sigtrap(p, curthread, pc);
 			new_pc = pc;
 			break;

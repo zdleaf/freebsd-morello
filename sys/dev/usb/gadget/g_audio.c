@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2010 Hans Petter Selasky. All rights reserved.
  *
@@ -32,8 +32,6 @@
  */
 
 #include <sys/param.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/stdint.h>
 #include <sys/stddef.h>
 #include <sys/queue.h>
@@ -134,8 +132,6 @@ static usb_handle_request_t g_audio_handle_request;
 static usb_callback_t g_audio_isoc_read_callback;
 static usb_callback_t g_audio_isoc_write_callback;
 
-static devclass_t g_audio_devclass;
-
 static void g_audio_watchdog(void *arg);
 static void g_audio_timeout(void *arg);
 
@@ -157,7 +153,7 @@ static driver_t g_audio_driver = {
 	.size = sizeof(struct g_audio_softc),
 };
 
-DRIVER_MODULE(g_audio, uhub, g_audio_driver, g_audio_devclass, 0, 0);
+DRIVER_MODULE(g_audio, uhub, g_audio_driver, 0, 0);
 MODULE_DEPEND(g_audio, usb, 1, 1, 1);
 
 static const struct usb_config g_audio_config[G_AUDIO_N_TRANSFER] = {

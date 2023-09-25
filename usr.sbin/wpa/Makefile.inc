@@ -1,4 +1,3 @@
-# $FreeBSD$
 
 .include <src.opts.mk>
 
@@ -6,7 +5,7 @@ BINDIR?=	/usr/sbin
 
 WARNS?=		0
 
-WPA_DISTDIR?= 		${SRCTOP}/contrib/wpa/
+WPA_DISTDIR?= 		${SRCTOP}/contrib/wpa
 WPA_SUPPLICANT_DISTDIR?=${WPA_DISTDIR}/wpa_supplicant
 HOSTAPD_DISTDIR?=	${WPA_DISTDIR}/hostapd
 
@@ -66,6 +65,7 @@ CFLAGS+=-DCONFIG_WNM
 CFLAGS+=-DCONFIG_WNM_AP
 CFLAGS+=-DCONFIG_MBO
 CFLAGS+=-DCONFIG_RSN_PREAUTH
+CFLAGS+=-DCONFIG_WEP
 
 .if ${MK_WPA_SUPPLICANT_EAPOL} != "no"
 CFLAGS+=-DCONFIG_HS20 \

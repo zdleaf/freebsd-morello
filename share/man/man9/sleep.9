@@ -23,8 +23,6 @@
 .\" (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 .\" THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 .\"
-.\" $FreeBSD$
-.\"
 .Dd June 19, 2019
 .Dt SLEEP 9
 .Os
@@ -366,13 +364,13 @@ A non-zero timeout was specified and the timeout expired.
 .El
 .Sh SEE ALSO
 .Xr ps 1 ,
+.Xr callout 9 ,
 .Xr locking 9 ,
 .Xr malloc 9 ,
 .Xr mi_switch 9 ,
 .Xr mtx_sleep 9 ,
 .Xr rw_sleep 9 ,
-.Xr sx_sleep 9 ,
-.Xr timeout 9
+.Xr sx_sleep 9
 .Sh HISTORY
 The functions
 .Fn sleep

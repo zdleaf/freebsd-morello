@@ -25,8 +25,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
+#include <sys/param.h>
 #include <stand.h>
 #include <string.h>
 
@@ -41,6 +40,32 @@ static int	cons_check(const char *string);
 static int	cons_change(const char *string);
 static int	twiddle_set(struct env_var *ev, int flags, const void *value);
 
+#ifndef MODULE_VERBOSE
+# define MODULE_VERBOSE MODULE_VERBOSE_TWIDDLE
+#endif
+int module_verbose = MODULE_VERBOSE;
+
+static int
+module_verbose_set(struct env_var *ev, int flags, const void *value)
+{
+	u_long v;
+	char *eptr;
+
+	v = strtoul(value, &eptr, 0);
+	if (*(const char *)value == 0 || *eptr != 0) {
+		printf("invalid module_verbose '%s'\n", (const char *)value);
+		return (CMD_ERROR);
+	}
+	module_verbose = (int)v;
+	if (module_verbose < MODULE_VERBOSE_TWIDDLE) {
+		/* A hack for now; we do not want twiddling */
+		twiddle_divisor(UINT_MAX);
+	}
+	env_setenv(ev->ev_name, flags | EV_NOHOOK, value, NULL, NULL);
+
+	return (CMD_OK);
+}
+
 /*
  * Detect possible console(s) to use.  If preferred console(s) have been
  * specified, mark them as active. Else, mark the first probed console
@@ -52,10 +77,15 @@ cons_probe(void)
 	int	cons;
 	int	active;
 	char	*prefconsole;
+	char	module_verbose_buf[8];
 
 	TSENTER();
 
-	/* We want a callback to install the new value when this var changes. */
+	/* We want a callback to install the new value when these vars change. */
+	snprintf(module_verbose_buf, sizeof(module_verbose_buf), "%d",
+	    module_verbose);
+	env_setenv("module_verbose", EV_VOLATILE, module_verbose_buf,
+	    module_verbose_set, env_nounset);
 	env_setenv("twiddle_divisor", EV_VOLATILE, "16", twiddle_set,
 	    env_nounset);
 
@@ -206,7 +236,7 @@ cons_check(const char *string)
 		if (*curpos != '\0') {
 			cons = cons_find(curpos);
 			if (cons == -1) {
-				printf("console %s is invalid!\n", curpos);
+				printf("console %s is unavailable\n", curpos);
 				failed++;
 			} else {
 				found++;
@@ -219,7 +249,7 @@ cons_check(const char *string)
 	if (found == 0)
 		printf("no valid consoles!\n");
 
-	if (found == 0 || failed != 0) {
+	if (found == 0 && failed != 0) {
 		printf("Available consoles:\n");
 		for (cons = 0; consoles[cons] != NULL; cons++)
 			printf("    %s\n", consoles[cons]->c_name);

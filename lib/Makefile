@@ -1,5 +1,4 @@
 #	@(#)Makefile	8.1 (Berkeley) 6/4/93
-# $FreeBSD$
 
 .include <src.opts.mk>
 
@@ -15,8 +14,9 @@ SUBDIR_BOOTSTRAP= \
 	libc_nonshared \
 	libcompiler_rt \
 	${_libclang_rt} \
-	${_libcplusplus} \
-	${_libcxxrt} \
+	libc++ \
+	libc++experimental \
+	libcxxrt \
 	libelf \
 	libssp \
 	libssp_nonshared \
@@ -47,6 +47,7 @@ SUBDIR=	${SUBDIR_BOOTSTRAP} \
 	libcompat \
 	libcrypt \
 	libdevctl \
+	libdevdctl \
 	libdevinfo \
 	libdevstat \
 	libdl \
@@ -57,7 +58,6 @@ SUBDIR=	${SUBDIR_BOOTSTRAP} \
 	libexecinfo \
 	libexpat \
 	libfetch \
-	libfigpar \
 	libgcc_eh \
 	libgcc_s \
 	libgeom \
@@ -78,7 +78,6 @@ SUBDIR=	${SUBDIR_BOOTSTRAP} \
 	libnetmap \
 	libnv \
 	libopenbsd \
-	libopie \
 	libpam \
 	libpathconv \
 	libpcap \
@@ -109,7 +108,8 @@ SUBDIR=	${SUBDIR_BOOTSTRAP} \
 	liby \
 	libz \
 	libzstd \
-	ncurses
+	ncurses \
+	nss_tacplus
 
 # Inter-library dependencies.  When the makefile for a library contains LDADD
 # libraries, those libraries should be listed as build order dependencies here.
@@ -133,8 +133,7 @@ SUBDIR_DEPEND_libgeom= libexpat libsbuf
 SUBDIR_DEPEND_librpcsec_gss= libgssapi
 SUBDIR_DEPEND_libmagic= libz
 SUBDIR_DEPEND_libmemstat= libkvm
-SUBDIR_DEPEND_libopie= libmd
-SUBDIR_DEPEND_libpam= libcrypt libopie ${_libradius} librpcsvc libtacplus libutil ${_libypclnt} ${_libcom_err} 
+SUBDIR_DEPEND_libpam= libcrypt ${_libradius} librpcsvc libtacplus libutil ${_libypclnt} ${_libcom_err}
 SUBDIR_DEPEND_libpjdlog= libutil
 SUBDIR_DEPEND_libprocstat= libkvm libutil
 SUBDIR_DEPEND_libradius= libmd
@@ -146,21 +145,21 @@ SUBDIR_DEPEND_liblzma= libthr
 .if ${MK_OFED} != "no"
 SUBDIR_DEPEND_libpcap= ofed
 .endif
+SUBDIR_DEPEND_nss_tacplus= libtacplus
 
-.if !defined(COMPAT_32BIT)
+.if !defined(COMPAT_LIBCOMPAT)
 SUBDIR+=	flua
 SUBDIR_DEPEND_flua=	libjail
 .endif
 
 # NB: keep these sorted by MK_* knobs
 
-SUBDIR.${MK_ATM}+=	libngatm
 SUBDIR.${MK_BEARSSL}+=	libbearssl libsecureboot
 SUBDIR.${MK_BLACKLIST}+=libblacklist
 SUBDIR.${MK_BLUETOOTH}+=libbluetooth libsdp
 SUBDIR.${MK_BSNMP}+=	libbsnmp
 
-.if !defined(COMPAT_32BIT) && !defined(COMPAT_SOFTFP)
+.if !defined(COMPAT_LIBCOMPAT)
 .if ${MK_CLANG} != "no" || ${MK_LLD} != "no" || \
     ${MK_LLDB} != "no" || ${MK_LLVM_BINUTILS} != "no"
 SUBDIR+=	clang
@@ -168,9 +167,8 @@ SUBDIR+=	clang
 .endif
 
 SUBDIR.${MK_CUSE}+= 	libcuse
-SUBDIR.${MK_CXX}+=	libdevdctl
 SUBDIR.${MK_TOOLCHAIN}+=libpe
-SUBDIR.${MK_DIALOG}+=	libdpv
+SUBDIR.${MK_DIALOG}+=	libdpv libfigpar
 SUBDIR.${MK_FILE}+=	libmagic
 SUBDIR.${MK_GPIO}+=	libgpio
 SUBDIR.${MK_GSSAPI}+=	libgssapi librpcsec_gss
@@ -179,21 +177,11 @@ SUBDIR.${MK_KERBEROS_SUPPORT}+=	libcom_err
 SUBDIR.${MK_LDNS}+=	libldns
 SUBDIR.${MK_STATS}+=	libstats
 
-# The libraries under libclang_rt can only be built by clang and when we enable
-# C++ support.  Furthermore, they can only be built for certain architectures.
-.if ${COMPILER_TYPE} == "clang" && ${MK_CXX} != "no" && \
-    (${MACHINE_CPUARCH} == "aarch64" || ${MACHINE_CPUARCH} == "amd64" || \
-    ${MACHINE_CPUARCH} == "arm" || ${MACHINE_CPUARCH} == "i386" || \
-    ${MACHINE_CPUARCH} == "powerpc")
+# The libraries under libclang_rt can only be built by clang.
+.if ${COMPILER_TYPE} == "clang"
 _libclang_rt=	libclang_rt
 .elif (${MK_ASAN} != "no" || ${MK_UBSAN} != "no") && make(all)
 .error Requested build with sanitizers but cannot build runtime libraries!
-.endif
-
-.if ${MK_CXX} != "no"
-_libcxxrt=	libcxxrt
-_libcplusplus=	libc++
-_libcplusplus+=	libc++experimental
 .endif
 
 SUBDIR.${MK_EFI}+=	libefivar
@@ -214,10 +202,10 @@ SUBDIR.${MK_PMC}+=	libipt
 SUBDIR.${MK_BHYVE}+=	libvmmapi
 .endif
 
-.if ${MACHINE_ARCH} != "powerpc"
+.if ${MACHINE_ARCH} != "powerpc" && ${MACHINE_CPUARCH} != "arm"
 SUBDIR.${MK_OPENMP}+=	libomp
 .endif
-.if !defined(COMPAT_32BIT) && ${MK_USB} != "no"
+.if ${MK_USB} != "no"
 SUBDIR.${MK_OPENSSH}+=	libcbor libfido2
 .endif
 SUBDIR.${MK_OPENSSL}+=	libmp
@@ -227,7 +215,7 @@ SUBDIR.${MK_RADIUS_SUPPORT}+=	libradius
 SUBDIR.${MK_SENDMAIL}+=	libmilter libsm libsmdb libsmutil
 SUBDIR.${MK_TELNET}+=	libtelnet
 SUBDIR.${MK_TESTS_SUPPORT}+=	atf
-SUBDIR.${MK_TESTS_SUPPORT}.${MK_CXX}+=	liblutok
+SUBDIR.${MK_TESTS_SUPPORT}+=	liblutok
 SUBDIR.${MK_TESTS}+=	tests
 SUBDIR.${MK_UNBOUND}+=	libunbound
 SUBDIR.${MK_USB}+=	libusbhid libusb

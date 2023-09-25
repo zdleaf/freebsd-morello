@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2000 Matthew Jacob
  * All rights reserved.
@@ -27,8 +27,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 
 #include <sys/conf.h>
@@ -205,7 +203,7 @@ enc_dtor(struct cam_periph *periph)
 	if (enc->enc_vec.softc_cleanup != NULL)
 		enc->enc_vec.softc_cleanup(enc);
 
-	root_mount_rel(&enc->enc_rootmount);
+	cam_periph_release_boot(periph);
 
 	ENC_FREE(enc);
 }
@@ -842,7 +840,7 @@ enc_daemon(void *arg)
 			 * We've been through our state machine at least
 			 * once.  Allow the transition to userland.
 			 */
-			root_mount_rel(&enc->enc_rootmount);
+			cam_periph_release_boot(enc->periph);
 
 			callout_reset_sbt(&enc->status_updater, 60 * SBT_1S, 0,
 			    enc_status_updater, enc, C_PREL(1));
@@ -937,9 +935,8 @@ enc_ctor(struct cam_periph *periph, void *arg)
 	 * through our state machine so that physical path data is
 	 * present.
 	 */
-	if (enc->enc_vec.poll_status != NULL) {
-		root_mount_hold_token(periph->periph_name, &enc->enc_rootmount);
-	}
+	if (enc->enc_vec.poll_status != NULL)
+		cam_periph_hold_boot(periph);
 
 	/*
 	 * The softc field is set only once the enc is fully initialized

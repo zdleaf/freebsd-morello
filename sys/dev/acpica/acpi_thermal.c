@@ -26,8 +26,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include "opt_acpi.h"
 #include <sys/param.h>
 #include <sys/eventhandler.h>
@@ -60,7 +58,7 @@ ACPI_MODULE_NAME("THERMAL")
 #define TZ_NOTIFY_TEMPERATURE	0x80 /* Temperature changed. */
 #define TZ_NOTIFY_LEVELS	0x81 /* Cooling levels changed. */
 #define TZ_NOTIFY_DEVICES	0x82 /* Device lists changed. */
-#define TZ_NOTIFY_CRITICAL	0xcc /* Fake notify that _CRT/_HOT reached. */
+#define TZ_NOTIFY_CRITICAL	0xcc /* Fake notify that _CRT/_HOT/_CR3 reached. */
 
 /* Check for temperature changes every 10 seconds by default */
 #define TZ_POLLRATE	10
@@ -78,6 +76,7 @@ struct acpi_tz_zone {
     ACPI_BUFFER	al[TZ_NUMLEVELS];
     int		crt;
     int		hot;
+    int		cr3;
     ACPI_BUFFER	psl;
     int		psv;
     int		tc1;
@@ -97,8 +96,9 @@ struct acpi_tz_softc {
     int				tz_thflags;	/*Current temp-related flags*/
 #define TZ_THFLAG_NONE		0
 #define TZ_THFLAG_PSV		(1<<0)
-#define TZ_THFLAG_HOT		(1<<2)
-#define TZ_THFLAG_CRT		(1<<3)
+#define TZ_THFLAG_CR3		(1<<2)
+#define TZ_THFLAG_HOT		(1<<3)
+#define TZ_THFLAG_CRT		(1<<4)
     int				tz_flags;
 #define TZ_FLAG_NO_SCP		(1<<0)		/*No _SCP method*/
 #define TZ_FLAG_GETPROFILE	(1<<1)		/*Get power_profile in timeout*/
@@ -165,8 +165,7 @@ static driver_t acpi_tz_driver = {
 
 static char *acpi_tz_tmp_name = "_TMP";
 
-static devclass_t acpi_tz_devclass;
-DRIVER_MODULE(acpi_tz, acpi, acpi_tz_driver, acpi_tz_devclass, 0, 0);
+DRIVER_MODULE(acpi_tz, acpi, acpi_tz_driver, 0, 0);
 MODULE_DEPEND(acpi_tz, acpi, 1, 1, 1);
 
 static struct sysctl_ctx_list	acpi_tz_sysctl_ctx;
@@ -177,7 +176,7 @@ static int			acpi_tz_min_runtime;
 static int			acpi_tz_polling_rate = TZ_POLLRATE;
 static int			acpi_tz_override;
 
-/* Timezone polling thread */
+/* Thermal zone polling thread */
 static struct proc		*acpi_tz_proc;
 ACPI_LOCK_DECL(thermal, "ACPI thermal zone");
 
@@ -202,7 +201,7 @@ acpi_tz_attach(device_t dev)
     struct acpi_tz_softc	*sc;
     struct acpi_softc		*acpi_sc;
     int				error;
-    char			oidname[8];
+    char			oidname[16];
 
     ACPI_FUNCTION_TRACE((char *)(uintptr_t)__func__);
 
@@ -258,7 +257,7 @@ acpi_tz_attach(device_t dev)
 		       "allow override of thermal settings");
     }
     sysctl_ctx_init(&sc->tz_sysctl_ctx);
-    sprintf(oidname, "tz%d", device_get_unit(dev));
+    snprintf(oidname, sizeof(oidname), "tz%d", device_get_unit(dev));
     sc->tz_sysctl_tree = SYSCTL_ADD_NODE_WITH_LABEL(&sc->tz_sysctl_ctx,
         SYSCTL_CHILDREN(acpi_tz_sysctl_tree), OID_AUTO, oidname,
 	CTLFLAG_RD | CTLFLAG_MPSAFE, 0, "", "thermal_zone");
@@ -282,6 +281,10 @@ acpi_tz_attach(device_t dev)
         OID_AUTO, "_PSV", CTLTYPE_INT | CTLFLAG_RW | CTLFLAG_MPSAFE, sc,
 	offsetof(struct acpi_tz_softc, tz_zone.psv), acpi_tz_temp_sysctl, "IK",
 	"passive cooling temp setpoint");
+    SYSCTL_ADD_PROC(&sc->tz_sysctl_ctx, SYSCTL_CHILDREN(sc->tz_sysctl_tree),
+        OID_AUTO, "_CR3", CTLTYPE_INT | CTLFLAG_RW | CTLFLAG_MPSAFE, sc,
+	offsetof(struct acpi_tz_softc, tz_zone.cr3), acpi_tz_temp_sysctl, "IK",
+	"too warm temp setpoint (standby now)");
     SYSCTL_ADD_PROC(&sc->tz_sysctl_ctx, SYSCTL_CHILDREN(sc->tz_sysctl_tree),
         OID_AUTO, "_HOT", CTLTYPE_INT | CTLFLAG_RW | CTLFLAG_MPSAFE, sc,
 	offsetof(struct acpi_tz_softc, tz_zone.hot), acpi_tz_temp_sysctl, "IK",
@@ -331,7 +334,7 @@ acpi_tz_startup(void *arg __unused)
     device_t *devs;
     int devcount, error, i;
 
-    devclass_get_devices(acpi_tz_devclass, &devs, &devcount);
+    devclass_get_devices(devclass_find("acpi_tz"), &devs, &devcount);
     if (devcount == 0) {
 	free(devs, M_TEMP);
 	return;
@@ -421,6 +424,7 @@ acpi_tz_establish(struct acpi_tz_softc *sc)
     }
     acpi_tz_getparam(sc, "_CRT", &sc->tz_zone.crt);
     acpi_tz_getparam(sc, "_HOT", &sc->tz_zone.hot);
+    acpi_tz_getparam(sc, "_CR3", &sc->tz_zone.cr3);
     sc->tz_zone.psl.Length = ACPI_ALLOCATE_BUFFER;
     sc->tz_zone.psl.Pointer = NULL;
     AcpiEvaluateObject(sc->tz_handle, "_PSL", NULL, &sc->tz_zone.psl);
@@ -438,6 +442,7 @@ acpi_tz_establish(struct acpi_tz_softc *sc)
      */
     acpi_tz_sanity(sc, &sc->tz_zone.crt, "_CRT");
     acpi_tz_sanity(sc, &sc->tz_zone.hot, "_HOT");
+    acpi_tz_sanity(sc, &sc->tz_zone.cr3, "_CR3");
     acpi_tz_sanity(sc, &sc->tz_zone.psv, "_PSV");
     for (i = 0; i < TZ_NUMLEVELS; i++)
 	acpi_tz_sanity(sc, &sc->tz_zone.ac[i], "_ACx");
@@ -495,6 +500,7 @@ acpi_tz_get_temperature(struct acpi_tz_softc *sc)
 static void
 acpi_tz_monitor(void *Context)
 {
+    struct acpi_softc	 *acpi_sc;
     struct acpi_tz_softc *sc;
     struct	timespec curtime;
     int		temp;
@@ -545,6 +551,8 @@ acpi_tz_monitor(void *Context)
     newflags = TZ_THFLAG_NONE;
     if (sc->tz_zone.psv != -1 && temp >= sc->tz_zone.psv)
 	newflags |= TZ_THFLAG_PSV;
+    if (sc->tz_zone.cr3 != -1 && temp >= sc->tz_zone.cr3)
+	newflags |= TZ_THFLAG_CR3;
     if (sc->tz_zone.hot != -1 && temp >= sc->tz_zone.hot)
 	newflags |= TZ_THFLAG_HOT;
     if (sc->tz_zone.crt != -1 && temp >= sc->tz_zone.crt)
@@ -604,13 +612,18 @@ acpi_tz_monitor(void *Context)
      *
      * If we're almost at that threshold, notify the user through devd(8).
      */
-    if ((newflags & (TZ_THFLAG_HOT | TZ_THFLAG_CRT)) != 0) {
+    if ((newflags & (TZ_THFLAG_CR3 | TZ_THFLAG_HOT | TZ_THFLAG_CRT)) != 0) {
 	sc->tz_validchecks++;
 	if (sc->tz_validchecks == TZ_VALIDCHECKS) {
 	    device_printf(sc->tz_dev,
 		"WARNING - current temperature (%d.%dC) exceeds safe limits\n",
 		TZ_KELVTOC(sc->tz_temperature));
-	    shutdown_nice(RB_POWEROFF);
+	    if ((newflags & (TZ_THFLAG_HOT | TZ_THFLAG_CRT)) != 0)
+		shutdown_nice(RB_POWEROFF);
+	    else {
+		acpi_sc = acpi_device_get_parent_softc(sc->tz_dev);
+		acpi_ReqSleepState(acpi_sc, ACPI_STATE_S3);
+	    }
 	} else if (sc->tz_validchecks == TZ_NOTIFYCOUNT)
 	    acpi_UserNotify("Thermal", sc->tz_handle, TZ_NOTIFY_CRITICAL);
     } else {
@@ -949,6 +962,7 @@ acpi_tz_power_profile(void *arg)
 static void
 acpi_tz_thread(void *arg)
 {
+    devclass_t	acpi_tz_devclass;
     device_t	*devs;
     int		devcount, i;
     int		flags;
@@ -956,6 +970,7 @@ acpi_tz_thread(void *arg)
 
     ACPI_FUNCTION_TRACE((char *)(uintptr_t)__func__);
 
+    acpi_tz_devclass = devclass_find("acpi_tz");
     devs = NULL;
     devcount = 0;
     sc = NULL;

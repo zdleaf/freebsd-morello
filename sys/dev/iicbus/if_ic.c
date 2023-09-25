@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 1998, 2001 Nicolas Souchu
  * All rights reserved.
@@ -27,8 +27,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 /*
  * I2C bus IP driver
  */
@@ -72,7 +70,7 @@ __FBSDID("$FreeBSD$");
 #define ICMTU		1500		/* default mtu */
 
 struct ic_softc {
-	struct ifnet *ic_ifp;
+	if_t ic_ifp;
 	device_t ic_dev;
 
 	u_char ic_addr;			/* peer I2C address */
@@ -96,13 +94,11 @@ struct ic_softc {
 #define	IC_BUFFERS_BUSY		(IC_OBUF_BUSY | IC_IFBUF_BUSY)
 #define	IC_BUFFER_WAITER	0x0004
 
-static devclass_t ic_devclass;
-
 static int icprobe(device_t);
 static int icattach(device_t);
 
-static int icioctl(struct ifnet *, u_long, caddr_t);
-static int icoutput(struct ifnet *, struct mbuf *, const struct sockaddr *,
+static int icioctl(if_t, u_long, caddr_t);
+static int icoutput(if_t, struct mbuf *, const struct sockaddr *,
                struct route *);
 
 static int icintr(device_t, int, char *);
@@ -143,7 +139,7 @@ ic_alloc_buffers(struct ic_softc *sc, int mtu)
 	free(sc->ic_ifbuf, M_DEVBUF);
 	sc->ic_obuf = obuf;
 	sc->ic_ifbuf = ifbuf;
-	sc->ic_ifp->if_mtu = mtu;
+	if_setmtu(sc->ic_ifp, mtu);
 	mtx_unlock(&sc->ic_lock);
 }
 
@@ -163,7 +159,7 @@ static int
 icattach(device_t dev)
 {
 	struct ic_softc *sc = (struct ic_softc *)device_get_softc(dev);
-	struct ifnet *ifp;
+	if_t ifp;
 
 	ifp = sc->ic_ifp = if_alloc(IFT_PARA);
 	if (ifp == NULL)
@@ -174,14 +170,13 @@ icattach(device_t dev)
 	sc->ic_addr = PCF_MASTER_ADDRESS;	/* XXX only PCF masters */
 	sc->ic_dev = dev;
 
-	ifp->if_softc = sc;
+	if_setsoftc(ifp, sc);
 	if_initname(ifp, device_get_name(dev), device_get_unit(dev));
-	ifp->if_flags = IFF_SIMPLEX | IFF_POINTOPOINT | IFF_MULTICAST;
-	ifp->if_ioctl = icioctl;
-	ifp->if_output = icoutput;
-	ifp->if_hdrlen = 0;
-	ifp->if_addrlen = 0;
-	ifp->if_snd.ifq_maxlen = ifqmaxlen;
+	if_setflags(ifp, IFF_SIMPLEX | IFF_POINTOPOINT | IFF_MULTICAST);
+	if_setioctlfn(ifp, icioctl);
+	if_setoutputfn(ifp, icoutput);
+	if_setifheaderlen(ifp, 0);
+	if_setsendqlen(ifp, ifqmaxlen);
 
 	ic_alloc_buffers(sc, ICMTU);
 
@@ -196,9 +191,9 @@ icattach(device_t dev)
  * iciotcl()
  */
 static int
-icioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
+icioctl(if_t ifp, u_long cmd, caddr_t data)
 {
-	struct ic_softc *sc = ifp->if_softc;
+	struct ic_softc *sc = if_getsoftc(ifp);
 	device_t icdev = sc->ic_dev;
 	device_t parent = device_get_parent(icdev);
 	struct ifaddr *ifa = (struct ifaddr *)data;
@@ -212,31 +207,31 @@ icioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		if (ifa->ifa_addr->sa_family != AF_INET)
 			return (EAFNOSUPPORT);
 		mtx_lock(&sc->ic_lock);
-		ifp->if_flags |= IFF_UP;
+		if_setflagbits(ifp, IFF_UP, 0);
 		goto locked;
 	case SIOCSIFFLAGS:
 		mtx_lock(&sc->ic_lock);
 	locked:
-		if ((!(ifp->if_flags & IFF_UP)) &&
-		    (ifp->if_drv_flags & IFF_DRV_RUNNING)) {
+		if ((!(if_getflags(ifp) & IFF_UP)) &&
+		    (if_getdrvflags(ifp) & IFF_DRV_RUNNING)) {
 
 			/* XXX disable PCF */
-			ifp->if_drv_flags &= ~IFF_DRV_RUNNING;
+			if_setdrvflagbits(ifp, 0, IFF_DRV_RUNNING);
 			mtx_unlock(&sc->ic_lock);
 
 			/* IFF_UP is not set, try to release the bus anyway */
 			iicbus_release_bus(parent, icdev);
 			break;
 		}
-		if (((ifp->if_flags & IFF_UP)) &&
-		    (!(ifp->if_drv_flags & IFF_DRV_RUNNING))) {
+		if (((if_getflags(ifp) & IFF_UP)) &&
+		    (!(if_getdrvflags(ifp) & IFF_DRV_RUNNING))) {
 			mtx_unlock(&sc->ic_lock);
 			if ((error = iicbus_request_bus(parent, icdev,
 			    IIC_WAIT | IIC_INTR)))
 				return (error);
 			mtx_lock(&sc->ic_lock);
 			iicbus_reset(parent, IIC_FASTEST, 0, NULL);
-			ifp->if_drv_flags |= IFF_DRV_RUNNING;
+			if_setdrvflagbits(ifp, IFF_DRV_RUNNING, 0);
 		}
 		mtx_unlock(&sc->ic_lock);
 		break;
@@ -247,7 +242,7 @@ icioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 
 	case SIOCGIFMTU:
 		mtx_lock(&sc->ic_lock);
-		ifr->ifr_mtu = sc->ic_ifp->if_mtu;
+		ifr->ifr_mtu = if_getmtu(sc->ic_ifp);
 		mtx_unlock(&sc->ic_lock);
 		break;
 
@@ -312,7 +307,7 @@ icintr(device_t dev, int event, char *ptr)
 			struct epoch_tracker et;
 
 			mtx_unlock(&sc->ic_lock);
-			M_SETFIB(top, sc->ic_ifp->if_fib);
+			M_SETFIB(top, if_getfib(sc->ic_ifp));
 			NET_EPOCH_ENTER(et);
 			netisr_dispatch(NETISR_IP, top);
 			NET_EPOCH_EXIT(et);
@@ -326,7 +321,7 @@ icintr(device_t dev, int event, char *ptr)
 		break;
 
 	case INTR_RECEIVE:
-		if (sc->ic_xfercnt >= sc->ic_ifp->if_mtu + ICHDRLEN) {
+		if (sc->ic_xfercnt >= if_getmtu(sc->ic_ifp) + ICHDRLEN) {
 			sc->ic_iferrs++;
 		} else {
 			*sc->ic_cp++ = *ptr;
@@ -357,10 +352,10 @@ icintr(device_t dev, int event, char *ptr)
  * icoutput()
  */
 static int
-icoutput(struct ifnet *ifp, struct mbuf *m, const struct sockaddr *dst,
+icoutput(if_t ifp, struct mbuf *m, const struct sockaddr *dst,
     struct route *ro)
 {
-	struct ic_softc *sc = ifp->if_softc;
+	struct ic_softc *sc = if_getsoftc(ifp);
 	device_t icdev = sc->ic_dev;
 	device_t parent = device_get_parent(icdev);
 	int len, sent;
@@ -375,7 +370,7 @@ icoutput(struct ifnet *ifp, struct mbuf *m, const struct sockaddr *dst,
 		hdr = RO_GET_FAMILY(ro, dst);
 
 	mtx_lock(&sc->ic_lock);
-	ifp->if_drv_flags |= IFF_DRV_RUNNING;
+	if_setdrvflagbits(ifp, IFF_DRV_RUNNING, 0);
 
 	/* already sending? */
 	if (sc->ic_flags & IC_SENDING) {
@@ -390,7 +385,7 @@ icoutput(struct ifnet *ifp, struct mbuf *m, const struct sockaddr *dst,
 	len = 0;
 	mm = m;
 	do {
-		if (len + mm->m_len > sc->ic_ifp->if_mtu) {
+		if (len + mm->m_len > if_getmtu(sc->ic_ifp)) {
 			/* packet too large */
 			if_inc_counter(ifp, IFCOUNTER_OERRORS, 1);
 			goto error;
@@ -435,6 +430,6 @@ error:
 	return(0);
 }
 
-DRIVER_MODULE(ic, iicbus, ic_driver, ic_devclass, 0, 0);
+DRIVER_MODULE(ic, iicbus, ic_driver, 0, 0);
 MODULE_DEPEND(ic, iicbus, IICBUS_MINVER, IICBUS_PREFVER, IICBUS_MAXVER);
 MODULE_VERSION(ic, 1);

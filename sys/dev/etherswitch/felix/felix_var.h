@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2021 Alstom Group.
  * Copyright (c) 2021 Semihalf.
@@ -79,7 +79,7 @@ struct felix_pci_id {
 };
 
 struct felix_port {
-	struct ifnet            *ifp;
+	if_t			ifp;
 	device_t                miibus;
 	char                    *ifname;
 

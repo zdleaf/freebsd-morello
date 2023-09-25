@@ -25,8 +25,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 /*
  * Driver for acpi-wmi mapping, provides an interface for vendor specific
  * implementations (e.g. HP and Acer laptops).
@@ -196,8 +194,7 @@ static driver_t acpi_wmi_driver = {
 	sizeof(struct acpi_wmi_softc),
 };
 
-static devclass_t acpi_wmi_devclass;
-DRIVER_MODULE(acpi_wmi, acpi, acpi_wmi_driver, acpi_wmi_devclass, 0, 0);
+DRIVER_MODULE(acpi_wmi, acpi, acpi_wmi_driver, 0, 0);
 MODULE_VERSION(acpi_wmi, 1);
 MODULE_DEPEND(acpi_wmi, acpi, 1, 1, 1);
 static char *wmi_ids[] = {"PNP0C14", NULL};
@@ -979,8 +976,7 @@ acpi_wmi_wmistat_read(struct cdev *dev, struct uio *buf, int flag)
 	sc = dev->si_drv1;
 
 	ACPI_SERIAL_BEGIN(acpi_wmi);
-	if (sc->wmistat_open_pid != buf->uio_td->td_proc->p_pid ||
-			sc->wmistat_bufptr == -1) {
+	if (sc->wmistat_bufptr == -1) {
 		ret = EBADF;
 	}
 	else {

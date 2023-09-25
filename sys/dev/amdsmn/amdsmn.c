@@ -29,8 +29,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/bus.h>
 #include <sys/conf.h>
@@ -61,6 +59,7 @@ __FBSDID("$FreeBSD$");
 #define	PCI_DEVICE_ID_AMD_17H_M10H_ROOT		0x15d0
 #define	PCI_DEVICE_ID_AMD_17H_M30H_ROOT		0x1480	/* Also M70H, F19H M00H/M20H */
 #define	PCI_DEVICE_ID_AMD_17H_M60H_ROOT		0x1630
+#define	PCI_DEVICE_ID_AMD_19H_M60H_ROOT		0x14d8
 
 struct pciid;
 struct amdsmn_softc {
@@ -104,6 +103,12 @@ static const struct pciid {
 		.amdsmn_addr_reg = F17H_SMN_ADDR_REG,
 		.amdsmn_data_reg = F17H_SMN_DATA_REG,
 	},
+	{
+		.amdsmn_vendorid = CPU_VENDOR_AMD,
+		.amdsmn_deviceid = PCI_DEVICE_ID_AMD_19H_M60H_ROOT,
+		.amdsmn_addr_reg = F17H_SMN_ADDR_REG,
+		.amdsmn_data_reg = F17H_SMN_DATA_REG,
+	},
 };
 
 /*
@@ -129,8 +134,7 @@ static driver_t amdsmn_driver = {
 	sizeof(struct amdsmn_softc),
 };
 
-static devclass_t amdsmn_devclass;
-DRIVER_MODULE(amdsmn, hostb, amdsmn_driver, amdsmn_devclass, NULL, NULL);
+DRIVER_MODULE(amdsmn, hostb, amdsmn_driver, NULL, NULL);
 MODULE_VERSION(amdsmn, 1);
 MODULE_PNP_INFO("U16:vendor;U16:device", pci, amdsmn, amdsmn_ids,
     nitems(amdsmn_ids));

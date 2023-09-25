@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: (BSD-2-Clause-NetBSD AND BSD-3-Clause)
+ * SPDX-License-Identifier: (BSD-2-Clause AND BSD-3-Clause)
  *
  * Copyright (c) 2003 Poul-Henning Kamp.
  * Copyright (c) 1996, 1997 The NetBSD Foundation, Inc.
@@ -80,8 +80,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
@@ -226,8 +224,7 @@ g_ccd_freesc(struct ccd_s *sc)
 	g_free(sc->sc_cinfo);
 	if (sc->sc_itable != NULL) {
 		for (ii = sc->sc_itable; ii->ii_ndisk > 0; ii++)
-			if (ii->ii_index != NULL)
-				g_free(ii->ii_index);
+			g_free(ii->ii_index);
 		g_free(sc->sc_itable);
 	}
 	g_free(sc);

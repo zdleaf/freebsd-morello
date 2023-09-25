@@ -31,28 +31,17 @@
  *	from: svr4_util.c,v 1.5 1995/01/22 23:44:50 christos Exp
  */
 
-#include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/bus.h>
 #include <sys/conf.h>
 #include <sys/fcntl.h>
 #include <sys/jail.h>
 #include <sys/malloc.h>
-#include <sys/kernel.h>
-#include <sys/linker_set.h>
 #include <sys/namei.h>
 #include <sys/proc.h>
-#include <sys/sdt.h>
+#include <sys/stat.h>
 #include <sys/syscallsubr.h>
-#include <sys/sysctl.h>
-#include <sys/systm.h>
 #include <sys/vnode.h>
-
-#include <net/if.h>
-#include <net/if_var.h>
-#include <net/if_types.h>
 
 #include <machine/stdarg.h>
 
@@ -86,28 +75,38 @@ SYSCTL_STRING(_compat_linux, OID_AUTO, emul_path, CTLFLAG_RWTUN,
     linux_emul_path, sizeof(linux_emul_path),
     "Linux runtime environment path");
 
-static bool use_real_ifnames = false;
-SYSCTL_BOOL(_compat_linux, OID_AUTO, use_real_ifnames, CTLFLAG_RWTUN,
-    &use_real_ifnames, 0,
-    "Use FreeBSD interface names instead of generating ethN aliases");
-
-/*
- * Search an alternate path before passing pathname arguments on to
- * system calls. Useful for keeping a separate 'emulation tree'.
- *
- * If cflag is set, we check if an attempt can be made to create the
- * named file, i.e. we check if the directory it should be in exists.
- */
 int
-linux_emul_convpath(const char *path, enum uio_seg pathseg,
-    char **pbuf, int cflag, int dfd)
+linux_pwd_onexec(struct thread *td)
 {
-	int retval;
+	struct nameidata nd;
+	struct pwd *pwd;
+	int error;
 
-	retval = kern_alternate_path(linux_emul_path, path, pathseg, pbuf,
-	    cflag, dfd);
+	NDINIT(&nd, LOOKUP, FOLLOW, UIO_SYSSPACE, linux_emul_path);
+	error = namei(&nd);
+	if (error != 0) {
+		/*
+		 * Do not bother if we are in chroot or jail.
+		 */
+		pwd = pwd_hold(td);
+		if (pwd->pwd_rdir != rootvnode) {
+			pwd_drop(pwd);
+			return (0);
+		}
+		pwd_drop(pwd);
+		return (error);
+	}
+	NDFREE_PNBUF(&nd);
+	pwd_altroot(td, nd.ni_vp);
+	vrele(nd.ni_vp);
+	return (0);
+}
 
-	return (retval);
+void
+linux_pwd_onexec_native(struct thread *td)
+{
+
+	pwd_altroot(td, NULL);
 }
 
 void
@@ -239,8 +238,33 @@ linux_vn_get_major_minor(const struct vnode *vp, int *major, int *minor)
 	return (error);
 }
 
+void
+translate_vnhook_major_minor(struct vnode *vp, struct stat *sb)
+{
+	int major, minor;
+
+	if (vn_isdisk(vp)) {
+		sb->st_mode &= ~S_IFMT;
+		sb->st_mode |= S_IFBLK;
+	}
+
+	/*
+	 * Return the same st_dev for every devfs instance.  The reason
+	 * for this is to work around an idiosyncrasy of glibc getttynam()
+	 * implementation: it checks whether st_dev returned for fd 0
+	 * is the same as st_dev returned for the target of /proc/self/fd/0
+	 * symlink, and with linux chroots having their own devfs instance,
+	 * the check will fail if you chroot into it.
+	 */
+	if (rootdevmp != NULL && vp->v_mount->mnt_vfc == rootdevmp->mnt_vfc)
+		sb->st_dev = rootdevmp->mnt_stat.f_fsid.val[0];
+
+	if (linux_vn_get_major_minor(vp, &major, &minor) == 0)
+		sb->st_rdev = makedev(major, minor);
+}
+
 char *
-linux_get_char_devices()
+linux_get_char_devices(void)
 {
 	struct device_element *de;
 	char *temp, *string, *last;
@@ -323,10 +347,4 @@ linux_device_unregister_handler(struct linux_device_handler *d)
 	}
 
 	return (EINVAL);
-}
-
-bool
-linux_use_real_ifname(const struct ifnet *ifp)
-{
-	return (use_real_ifnames || !IFP_IS_ETH(ifp));
 }

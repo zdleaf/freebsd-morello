@@ -1,4 +1,3 @@
-# $FreeBSD$
 
 .include <bsd.init.mk>
 
@@ -10,9 +9,6 @@ SRCS=	bio.c biosacpi.c biosdisk.c biosmem.c biospnp.c \
 	elf64_freebsd.c multiboot.c multiboot_tramp.S relocater_tramp.S \
 	i386_copy.c i386_module.c nullconsole.c pxe.c pxetramp.S \
 	time.c vidconsole.c vbe.c amd64_tramp.S spinconsole.c
-.PATH:	${ZFSSRC}
-SRCS+=  devicename_stubs.c
-CFLAGS+= -I${ZFSSRC}
 
 .PATH:	${SYSDIR}/teken
 SRCS+=	teken.c
@@ -22,7 +18,7 @@ SRCS+=	teken.c
 BOOT_COMCONSOLE_PORT?= 0x3f8
 CFLAGS+=	-DCOMPORT=${BOOT_COMCONSOLE_PORT}
 
-BOOT_COMCONSOLE_SPEED?= 9600
+BOOT_COMCONSOLE_SPEED?= 115200
 CFLAGS+=	-DCOMSPEED=${BOOT_COMCONSOLE_SPEED}
 
 .ifdef(BOOT_BIOSDISK_DEBUG)
@@ -44,8 +40,6 @@ CFLAGS+= -Dalloca=__builtin_alloca
 
 CFLAGS+=	-I${BOOTSRC}/ficl -I${BOOTSRC}/ficl/i386 \
 		-I${LDRSRC} -I${BOOTSRC}/i386/common \
-		-I${SYSDIR}/cddl/boot/zfs \
-		-I${SYSDIR}/cddl/contrib/opensolaris/uts/common \
 		-I${SYSDIR}/contrib/dev/acpica/include
 
 # Handle FreeBSD specific %b and %D printf format specifiers

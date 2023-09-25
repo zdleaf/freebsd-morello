@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2020 Alexander V. Chernikov
  *
@@ -23,8 +23,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 #ifndef	_NET_ROUTE_NHOP_UTILS_H_
@@ -138,6 +136,11 @@ struct _HNAME##_head {				\
 	for (uint32_t _i = 0; _i < (_head)->hash_size; _i++) {		\
 		for (_x = CHT_FIRST(_head, _i); _x; _x = _PX##_next(_x))
 #define	CHT_SLIST_FOREACH_END	}
+
+#define	CHT_SLIST_FOREACH_SAFE(_head, _PX, _x, _tmp)			\
+	for (uint32_t _i = 0; _i < (_head)->hash_size; _i++) {		\
+		for (_x = CHT_FIRST(_head, _i); (_tmp = _PX##_next(_x), _x); _x = _tmp)
+#define	CHT_SLIST_FOREACH_SAFE_END	}
 
 #define	CHT_SLIST_RESIZE(_head, _PX, _new_void_ptr, _new_hsize)		\
 	uint32_t _new_idx;						\

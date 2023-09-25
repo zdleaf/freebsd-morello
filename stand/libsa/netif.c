@@ -32,8 +32,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/types.h>
 #include <sys/cdefs.h>
@@ -91,7 +89,7 @@ netif_match(struct netif *nif, void *machdep_hint)
 {
 	struct netif_driver *drv = nif->nif_driver;
 
-#if NETIF_DEBUG
+#ifdef NETIF_DEBUG
 	if (netif_debug)
 		printf("%s%d: netif_match (%d)\n", drv->netif_bname,
 		    nif->nif_unit, nif->nif_sel);

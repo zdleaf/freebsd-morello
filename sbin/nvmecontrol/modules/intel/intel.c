@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2013 EMC Corp.
  * All rights reserved.
@@ -30,8 +30,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/ioccom.h>
 
@@ -64,17 +62,17 @@ print_intel_temp_stats(const struct nvme_controller_data *cdata __unused, void *
 	printf("=====================\n");
 
 	printf("Current:                        ");
-	print_temp(temp->current);
+	print_temp_C(temp->current);
 	printf("Overtemp Last Flags             %#jx\n", (uintmax_t)temp->overtemp_flag_last);
 	printf("Overtemp Lifetime Flags         %#jx\n", (uintmax_t)temp->overtemp_flag_life);
 	printf("Max Temperature                 ");
-	print_temp(temp->max_temp);
+	print_temp_C(temp->max_temp);
 	printf("Min Temperature                 ");
-	print_temp(temp->min_temp);
+	print_temp_C(temp->min_temp);
 	printf("Max Operating Temperature       ");
-	print_temp(temp->max_oper_temp);
+	print_temp_C(temp->max_oper_temp);
 	printf("Min Operating Temperature       ");
-	print_temp(temp->min_oper_temp);
+	print_temp_C(temp->min_oper_temp);
 	printf("Estimated Temperature Offset:   %ju C/K\n", (uintmax_t)temp->est_offset);
 }
 

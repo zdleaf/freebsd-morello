@@ -25,8 +25,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/bus.h>
 #include <sys/kernel.h>
@@ -632,8 +630,6 @@ static device_method_t nfsmbsub_methods[] = {
 	{ 0, 0 }
 };
 
-static devclass_t nfsmb_devclass;
-
 static driver_t nfsmb_driver = {
 	"nfsmb",
 	nfsmb_methods,
@@ -646,9 +642,9 @@ static driver_t nfsmbsub_driver = {
 	sizeof(struct nfsmb_softc),
 };
 
-DRIVER_MODULE(nfsmb, pci, nfsmb_driver, nfsmb_devclass, 0, 0);
-DRIVER_MODULE(nfsmb, nfsmb, nfsmbsub_driver, nfsmb_devclass, 0, 0);
-DRIVER_MODULE(smbus, nfsmb, smbus_driver, smbus_devclass, 0, 0);
+DRIVER_MODULE(nfsmb, pci, nfsmb_driver, 0, 0);
+DRIVER_MODULE(nfsmb, nfsmb, nfsmbsub_driver, 0, 0);
+DRIVER_MODULE(smbus, nfsmb, smbus_driver, 0, 0);
 
 MODULE_DEPEND(nfsmb, pci, 1, 1, 1);
 MODULE_DEPEND(nfsmb, smbus, SMBUS_MINVER, SMBUS_PREFVER, SMBUS_MAXVER);

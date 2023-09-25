@@ -26,8 +26,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 /*
  * Driver for NXP real-time clock/calendar chips:
  *  - PCF8563 = low power, countdown timer
@@ -418,7 +416,7 @@ pcf8523_battery_check(struct nxprtc_softc *sc)
 		device_printf(sc->dev, "cannot write CS3 reg\n");
 		return (err);
 	}
-	pause_sbt("nxpbat", mstosbt(10), 0, 0);
+	pause_sbt("nxpbat", mstosbt(100), 0, 0);
 	if ((err = read_reg(sc, PCF8523_R_CS3, &cs3)) != 0) {
 		device_printf(sc->dev, "cannot read CS3 reg\n");
 		return (err);
@@ -1012,9 +1010,7 @@ static driver_t nxprtc_driver = {
 	sizeof(struct nxprtc_softc),
 };
 
-static devclass_t nxprtc_devclass;
-
-DRIVER_MODULE(nxprtc, iicbus, nxprtc_driver, nxprtc_devclass, NULL, NULL);
+DRIVER_MODULE(nxprtc, iicbus, nxprtc_driver, NULL, NULL);
 MODULE_VERSION(nxprtc, 1);
 MODULE_DEPEND(nxprtc, iicbus, IICBUS_MINVER, IICBUS_PREFVER, IICBUS_MAXVER);
 IICBUS_FDT_PNP_INFO(compat_data);

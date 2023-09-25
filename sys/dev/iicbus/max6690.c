@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2010 Andreas Tobler
  *
@@ -26,8 +26,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/bus.h>
 #include <sys/systm.h>
@@ -99,9 +97,7 @@ static driver_t max6690_driver = {
 	sizeof(struct max6690_softc)
 };
 
-static devclass_t max6690_devclass;
-
-DRIVER_MODULE(max6690, iicbus, max6690_driver, max6690_devclass, 0, 0);
+DRIVER_MODULE(max6690, iicbus, max6690_driver, 0, 0);
 static MALLOC_DEFINE(M_MAX6690, "max6690", "Temp-Monitor MAX6690");
 
 static int

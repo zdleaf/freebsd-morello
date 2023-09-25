@@ -36,8 +36,6 @@
  * STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING
  * IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGES.
- *
- * $FreeBSD$
  */
 
 VERSION = "$Id: //depot/aic7xxx/aic7xxx/aic79xx.seq#119 $"
@@ -1208,7 +1206,7 @@ mesgin_complete:
 complete_accepted:
 
 	/*
-	 * See if we attempted to deliver a message but the target ingnored us.
+	 * See if we attempted to deliver a message but the target ignored us.
 	 */
 	test	SCB_CONTROL, MK_MESSAGE jz complete_nomsg;
 	SET_SEQINTCODE(MKMSG_FAILED)

@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2014 Ruslan Bukin <br@bsdpad.com>
  * All rights reserved.
@@ -32,8 +32,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/bus.h>
@@ -150,6 +148,4 @@ static driver_t dmamux_driver = {
 	sizeof(struct dmamux_softc),
 };
 
-static devclass_t dmamux_devclass;
-
-DRIVER_MODULE(dmamux, simplebus, dmamux_driver, dmamux_devclass, 0, 0);
+DRIVER_MODULE(dmamux, simplebus, dmamux_driver, 0, 0);

@@ -24,7 +24,6 @@
 # OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 # SUCH DAMAGE.
 #
-# $FreeBSD$
 #
 
 # PROVIDE: hostid
@@ -50,9 +49,9 @@ hostid_set()
 
 	# Set both kern.hostuuid and kern.hostid.
 	#
-	check_startmsgs && echo "Setting hostuuid: ${uuid}."
+	startmsg "Setting hostuuid: ${uuid}."
 	${SYSCTL} kern.hostuuid="${uuid}" >/dev/null
-	check_startmsgs && echo "Setting hostid: ${id}."
+	startmsg "Setting hostid: ${id}."
 	${SYSCTL} kern.hostid=${id} >/dev/null
 }
 
@@ -106,6 +105,8 @@ hostid_hardware()
 
 	if valid_hostid $uuid; then
 		echo "${uuid}"
+	elif [ "$uuid" ]; then
+		echo "INVALID"
 	fi
 }
 
@@ -113,11 +114,18 @@ hostid_generate()
 {
 	# First look for UUID in hardware.
 	uuid=`hostid_hardware`
-	if [ -z "${uuid}" ]; then
+
+	# Warn about invalid UUIDs
+	if [ "${uuid}" = "INVALID" ]; then
 		warn "hostid: unable to figure out a UUID from DMI data, generating a new one"
 		sleep 2
+		uuid=""
+	fi
+
+	# Generate a random UUID if invalid or not found
+	if [ -z "${uuid}" ]; then
 		# If not found, fall back to software-generated UUID.
-		uuid=`uuidgen`
+		uuid=`uuidgen ${hostid_uuidgen_flags}`
 	fi
 	hostid_set $uuid
 }
@@ -138,7 +146,7 @@ hostid_start()
 	if [ -r ${hostid_file} ]; then
 		read saved_hostid < ${hostid_file}
 		if valid_hostid ${saved_hostid}; then
-			hostid_set `cat ${hostid_file}`
+			hostid_set ${saved_hostid}
 			exit 0
 		fi
 	fi

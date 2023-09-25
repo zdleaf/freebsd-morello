@@ -30,8 +30,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -40,7 +38,7 @@ __FBSDID("$FreeBSD$");
 #define	THUNK 42
 
 static int
-sorthelp_r(void *thunk, const void *a, const void *b)
+sorthelp_r(const void *a, const void *b, void *thunk)
 {
 	const int *oa, *ob;
 
@@ -70,8 +68,8 @@ ATF_TC_BODY(qsort_r_test, tc)
 			testvector[i] = sresvector[i] = initvector[i];
 
 		/* Sort using qsort_r(3) */
-		qsort_r(testvector, j, sizeof(testvector[0]), &thunk,
-		    sorthelp_r);
+		qsort_r(testvector, j, sizeof(testvector[0]), sorthelp_r,
+		    &thunk);
 		/* Sort using reference slow sorting routine */
 		ssort(sresvector, j);
 

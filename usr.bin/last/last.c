@@ -40,8 +40,6 @@ static const char copyright[] =
 static const char sccsid[] = "@(#)last.c	8.2 (Berkeley) 4/2/94";
 #endif /* not lint */
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/capsicum.h>
 #include <sys/queue.h>
@@ -287,7 +285,7 @@ doentry(struct utmpx *bp)
 		    "crash" : "shutdown";
 		/*
 		 * if we're in snapshot mode, we want to exit if this
-		 * shutdown/reboot appears while we we are tracking the
+		 * shutdown/reboot appears while we are tracking the
 		 * active range
 		 */
 		if (snaptime && snapfound)

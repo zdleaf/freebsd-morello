@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2003, 2004 Marcel Moolenaar
  * All rights reserved.
@@ -29,8 +29,6 @@
 #include "opt_acpi.h"
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/bus.h>
@@ -43,6 +41,8 @@ __FBSDID("$FreeBSD$");
 
 bus_space_tag_t uart_bus_space_io = X86_BUS_SPACE_IO;
 bus_space_tag_t uart_bus_space_mem = X86_BUS_SPACE_MEM;
+
+extern int late_console;
 
 int
 uart_cpu_eqres(struct uart_bas *b1, struct uart_bas *b2)
@@ -66,8 +66,12 @@ uart_cpu_getdev(int devtype, struct uart_devinfo *di)
 		return (0);
 
 #ifdef DEV_ACPI
-	/* Check if SPCR can tell us what console to use. */
-	if (uart_cpu_acpi_spcr(devtype, di) == 0)
+	/*
+	 * Check if SPCR can tell us what console to use.  If running with
+	 * !late_console, we haven't set up our own page tables yet, so we
+	 * can't map ACPI tables to look at them.
+	 */
+	if (late_console && uart_cpu_acpi_spcr(devtype, di) == 0)
 		return (0);
 #endif
 

@@ -35,8 +35,6 @@
  * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 #ifndef	_MAKEFS_H
@@ -58,7 +56,7 @@
  *
  *	name	"."		"bin"		"netbsd"
  *	type	S_IFDIR		S_IFDIR		S_IFREG
- *	next 	  >		  >		NULL
+ *	next	  >		  >		NULL
  *	parent	NULL		NULL		NULL
  *	child	NULL		  v
  *
@@ -78,12 +76,14 @@ enum fi_flags {
 	FI_SIZED =	1<<0,		/* inode sized */
 	FI_ALLOCATED =	1<<1,		/* fsinode->ino allocated */
 	FI_WRITTEN =	1<<2,		/* inode written */
+	FI_ROOT =	1<<3,		/* root of a ZFS dataset */
 };
 
 typedef struct {
 	uint32_t	 ino;		/* inode number used on target fs */
 	uint32_t	 nlink;		/* number of links to this entry */
 	enum fi_flags	 flags;		/* flags used by fs specific code */
+	void		*param;		/* for use by individual fs impls */
 	struct stat	 st;		/* stat entry */
 } fsinode;
 
@@ -186,6 +186,9 @@ void		fs ## _makefs(const char *, const char *, fsnode *, fsinfo_t *)
 DECLARE_FUN(cd9660);
 DECLARE_FUN(ffs);
 DECLARE_FUN(msdos);
+#ifdef HAVE_ZFS
+DECLARE_FUN(zfs);
+#endif
 
 extern	u_int		debug;
 extern	int		dupsok;

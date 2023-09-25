@@ -23,12 +23,8 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD$
- *
  */
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include "opt_inet.h"
 #include "opt_inet6.h"
 
@@ -127,9 +123,7 @@ static driver_t nicvf_driver = {
 	sizeof(struct nicvf),
 };
 
-static devclass_t nicvf_devclass;
-
-DRIVER_MODULE(vnicvf, pci, nicvf_driver, nicvf_devclass, 0, 0);
+DRIVER_MODULE(vnicvf, pci, nicvf_driver, 0, 0);
 MODULE_VERSION(vnicvf, 1);
 MODULE_DEPEND(vnicvf, pci, 1, 1, 1);
 MODULE_DEPEND(vnicvf, ether, 1, 1, 1);
@@ -149,17 +143,17 @@ static int nicvf_setup_ifnet(struct nicvf *);
 static int nicvf_setup_ifmedia(struct nicvf *);
 static void nicvf_hw_addr_random(uint8_t *);
 
-static int nicvf_if_ioctl(struct ifnet *, u_long, caddr_t);
+static int nicvf_if_ioctl(if_t, u_long, caddr_t);
 static void nicvf_if_init(void *);
 static void nicvf_if_init_locked(struct nicvf *);
-static int nicvf_if_transmit(struct ifnet *, struct mbuf *);
-static void nicvf_if_qflush(struct ifnet *);
-static uint64_t nicvf_if_getcounter(struct ifnet *, ift_counter);
+static int nicvf_if_transmit(if_t, struct mbuf *);
+static void nicvf_if_qflush(if_t);
+static uint64_t nicvf_if_getcounter(if_t, ift_counter);
 
 static int nicvf_stop_locked(struct nicvf *);
 
-static void nicvf_media_status(struct ifnet *, struct ifmediareq *);
-static int nicvf_media_change(struct ifnet *);
+static void nicvf_media_status(if_t, struct ifmediareq *);
+static int nicvf_media_change(if_t);
 
 static void nicvf_tick_stats(void *);
 
@@ -338,7 +332,7 @@ nicvf_hw_addr_random(uint8_t *hwaddr)
 static int
 nicvf_setup_ifnet(struct nicvf *nic)
 {
-	struct ifnet *ifp;
+	if_t ifp;
 
 	ifp = if_alloc(IFT_ETHER);
 	if (ifp == NULL) {
@@ -420,7 +414,7 @@ nicvf_setup_ifmedia(struct nicvf *nic)
 }
 
 static int
-nicvf_if_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
+nicvf_if_ioctl(if_t ifp, u_long cmd, caddr_t data)
 {
 	struct nicvf *nic;
 	struct rcv_queue *rq;
@@ -573,7 +567,7 @@ static void
 nicvf_if_init_locked(struct nicvf *nic)
 {
 	struct queue_set *qs = nic->qs;
-	struct ifnet *ifp;
+	if_t ifp;
 	int qidx;
 	int err;
 	caddr_t if_addr;
@@ -645,7 +639,7 @@ nicvf_if_init(void *if_softc)
 }
 
 static int
-nicvf_if_transmit(struct ifnet *ifp, struct mbuf *mbuf)
+nicvf_if_transmit(if_t ifp, struct mbuf *mbuf)
 {
 	struct nicvf *nic = if_getsoftc(ifp);
 	struct queue_set *qs = nic->qs;
@@ -701,7 +695,7 @@ nicvf_if_transmit(struct ifnet *ifp, struct mbuf *mbuf)
 }
 
 static void
-nicvf_if_qflush(struct ifnet *ifp)
+nicvf_if_qflush(if_t ifp)
 {
 	struct nicvf *nic;
 	struct queue_set *qs;
@@ -723,7 +717,7 @@ nicvf_if_qflush(struct ifnet *ifp)
 }
 
 static uint64_t
-nicvf_if_getcounter(struct ifnet *ifp, ift_counter cnt)
+nicvf_if_getcounter(if_t ifp, ift_counter cnt)
 {
 	struct nicvf *nic;
 	struct nicvf_hw_stats *hw_stats;
@@ -757,7 +751,7 @@ nicvf_if_getcounter(struct ifnet *ifp, ift_counter cnt)
 }
 
 static void
-nicvf_media_status(struct ifnet *ifp, struct ifmediareq *ifmr)
+nicvf_media_status(if_t ifp, struct ifmediareq *ifmr)
 {
 	struct nicvf *nic = if_getsoftc(ifp);
 
@@ -801,7 +795,7 @@ nicvf_media_status(struct ifnet *ifp, struct ifmediareq *ifmr)
 }
 
 static int
-nicvf_media_change(struct ifnet *ifp __unused)
+nicvf_media_change(if_t ifp __unused)
 {
 
 	return (0);
@@ -1251,7 +1245,7 @@ nicvf_release_all_interrupts(struct nicvf *nic)
 {
 	struct resource *res;
 	int irq;
-	int err;
+	int err __diagused;
 
 	/* Free registered interrupts */
 	for (irq = 0; irq < nic->num_vec; irq++) {
@@ -1525,7 +1519,7 @@ error:
 static int
 nicvf_stop_locked(struct nicvf *nic)
 {
-	struct ifnet *ifp;
+	if_t ifp;
 	int qidx;
 	struct queue_set *qs = nic->qs;
 	union nic_mbx mbx = {};

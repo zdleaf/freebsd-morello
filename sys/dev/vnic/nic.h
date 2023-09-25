@@ -23,8 +23,6 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD$
- *
  */
 
 #ifndef NIC_H
@@ -292,7 +290,7 @@ struct nicvf {
 	struct nicvf		*pnicvf;
 	device_t		dev;
 
-	struct ifnet *		ifp;
+	if_t 			ifp;
 	struct sx		core_sx;
 	struct ifmedia		if_media;
 	uint32_t		if_flags;

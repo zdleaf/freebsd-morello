@@ -28,24 +28,21 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
-#include <sys/pmc.h>
-#include <sys/proc.h>
 #include <sys/systm.h>
+#include <sys/pmc.h>
+
+#include <vm/vm.h>
+#include <vm/pmap.h>
 
 #include <machine/cpu.h>
 #include <machine/md_var.h>
 #include <machine/pmc_mdep.h>
 #include <machine/stack.h>
-
-#include <vm/vm.h>
-#include <vm/vm_param.h>
-#include <vm/pmap.h>
+#include <machine/vmparam.h>
 
 struct pmc_mdep *
-pmc_md_initialize()
+pmc_md_initialize(void)
 {
 
 	return (pmc_arm64_initialize());
@@ -59,49 +56,30 @@ pmc_md_finalize(struct pmc_mdep *md)
 }
 
 int
-pmc_save_kernel_callchain(uintptr_t *cc, int maxsamples,
-    struct trapframe *tf)
+pmc_save_kernel_callchain(uintptr_t *cc, int maxsamples, struct trapframe *tf)
 {
-	uintptr_t pc, r, stackstart, stackend, fp;
-	struct thread *td;
+	struct unwind_state frame;
 	int count;
 
-	KASSERT(TRAPF_USERMODE(tf) == 0,("[arm,%d] not a kernel backtrace",
+	KASSERT(TRAPF_USERMODE(tf) == 0,("[arm64,%d] not a kernel backtrace",
 	    __LINE__));
 
-	td = curthread;
-	pc = PMC_TRAPFRAME_TO_PC(tf);
-	*cc++ = pc;
+	frame.pc = PMC_TRAPFRAME_TO_PC(tf);
+	*cc++ = frame.pc;
 
 	if (maxsamples <= 1)
 		return (1);
 
-	stackstart = (uintptr_t) td->td_kstack;
-	stackend = (uintptr_t) td->td_kstack + td->td_kstack_pages * PAGE_SIZE;
-	fp = PMC_TRAPFRAME_TO_FP(tf);
-
-	if (!PMC_IN_KERNEL(pc) ||
-	    !PMC_IN_KERNEL_STACK(fp, stackstart, stackend))
+	frame.fp = PMC_TRAPFRAME_TO_FP(tf);
+	if (!PMC_IN_KERNEL(frame.pc) || !PMC_IN_KERNEL_STACK(frame.fp))
 		return (1);
 
 	for (count = 1; count < maxsamples; count++) {
-		/* Use saved lr as pc. */
-		r = fp + sizeof(uintptr_t);
-		if (!PMC_IN_KERNEL_STACK(r, stackstart, stackend))
+		if (!unwind_frame(curthread, &frame))
 			break;
-		pc = *(uintptr_t *)r;
-		if (!PMC_IN_KERNEL(pc))
+		if (!PMC_IN_KERNEL(frame.pc))
 			break;
-
-		*cc++ = pc;
-
-		/* Switch to next frame up */
-		r = fp;
-		if (!PMC_IN_KERNEL_STACK(r, stackstart, stackend))
-			break;
-		fp = *(uintptr_t *)r;
-		if (!PMC_IN_KERNEL_STACK(fp, stackstart, stackend))
-			break;
+		*cc++ = frame.pc;
 	}
 
 	return (count);
@@ -112,13 +90,11 @@ pmc_save_user_callchain(uintptr_t *cc, int maxsamples,
     struct trapframe *tf)
 {
 	uintptr_t pc, r, oldfp, fp;
-	struct thread *td;
 	int count;
 
-	KASSERT(TRAPF_USERMODE(tf), ("[x86,%d] Not a user trap frame tf=%p",
+	KASSERT(TRAPF_USERMODE(tf), ("[arm64,%d] Not a user trap frame tf=%p",
 	    __LINE__, (void *) tf));
 
-	td = curthread;
 	pc = PMC_TRAPFRAME_TO_PC(tf);
 	*cc++ = pc;
 

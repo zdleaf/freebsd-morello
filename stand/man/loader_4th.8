@@ -22,8 +22,6 @@
 .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 .\" SUCH DAMAGE.
 .\"
-.\" $FreeBSD$
-.\"
 .Dd September 29, 2021
 .Dt LOADER_4TH 8
 .Os
@@ -40,7 +38,7 @@ On IA32 (i386) architectures, it is a
 .Pa BTX
 client.
 It is linked statically to
-.Xr libstand 3
+.Xr libsa 3
 and usually located in the directory
 .Pa /boot .
 .Pp
@@ -530,7 +528,7 @@ executed.
 Unspecified error.
 .El
 .Sh SEE ALSO
-.Xr libstand 3 ,
+.Xr libsa 3 ,
 .Xr loader.conf 5 ,
 .Xr tuning 7 ,
 .Xr boot 8 ,

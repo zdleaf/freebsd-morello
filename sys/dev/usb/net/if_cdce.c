@@ -48,8 +48,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/gsb_crc32.h>
 #include <sys/eventhandler.h>
 #include <sys/stdint.h>
@@ -112,9 +110,9 @@ static uether_fn_t cdce_start;
 static uether_fn_t cdce_setmulti;
 static uether_fn_t cdce_setpromisc;
 static int cdce_attach_post_sub(struct usb_ether *);
-static int cdce_ioctl(struct ifnet *, u_long, caddr_t);
-static int cdce_media_change_cb(struct ifnet *);
-static void cdce_media_status_cb(struct ifnet *, struct ifmediareq *);
+static int cdce_ioctl(if_t, u_long, caddr_t);
+static int cdce_media_change_cb(if_t);
+static void cdce_media_status_cb(if_t, struct ifmediareq *);
 
 static uint32_t	cdce_m_crc32(struct mbuf *, uint32_t, uint32_t);
 static void	cdce_set_filter(struct usb_ether *);
@@ -259,13 +257,15 @@ static driver_t cdce_driver = {
 	.size = sizeof(struct cdce_softc),
 };
 
-static devclass_t cdce_devclass;
 static eventhandler_tag cdce_etag;
 
 static int  cdce_driver_loaded(struct module *, int, void *);
 
 static const STRUCT_USB_HOST_ID cdce_switch_devs[] = {
 	{USB_VPI(USB_VENDOR_HUAWEI, USB_PRODUCT_HUAWEI_E3272_INIT, MSC_EJECT_HUAWEI2)},
+	{USB_VPI(USB_VENDOR_HUAWEI, USB_PRODUCT_HUAWEI_E3372v153_INIT, MSC_EJECT_HUAWEI2)},
+	{USB_VPI(USB_VENDOR_HUAWEI, USB_PRODUCT_HUAWEI_E3372_INIT, MSC_EJECT_HUAWEI4)},
+	{USB_VPI(USB_VENDOR_HUAWEI, USB_PRODUCT_HUAWEI_E5573Cs322_ECM, MSC_EJECT_HUAWEI3)},
 };
 
 static const STRUCT_USB_HOST_ID cdce_host_devs[] = {
@@ -303,7 +303,7 @@ static const STRUCT_USB_DUAL_ID cdce_dual_devs[] = {
 	{USB_IF_CSI(UICLASS_CDC, UISUBCLASS_NETWORK_CONTROL_MODEL, 0)},
 };
 
-DRIVER_MODULE(cdce, uhub, cdce_driver, cdce_devclass, cdce_driver_loaded, 0);
+DRIVER_MODULE(cdce, uhub, cdce_driver, cdce_driver_loaded, NULL);
 MODULE_VERSION(cdce, 1);
 MODULE_DEPEND(cdce, uether, 1, 1, 1);
 MODULE_DEPEND(cdce, usb, 1, 1, 1);
@@ -572,16 +572,15 @@ static int
 cdce_attach_post_sub(struct usb_ether *ue)
 {
 	struct cdce_softc *sc = uether_getsc(ue);
-	struct ifnet *ifp = uether_getifp(ue);
+	if_t ifp = uether_getifp(ue);
 
 	/* mostly copied from usb_ethernet.c */
-	ifp->if_flags = IFF_BROADCAST | IFF_SIMPLEX | IFF_MULTICAST;
-	ifp->if_start = uether_start;
-	ifp->if_ioctl = cdce_ioctl;
-	ifp->if_init = uether_init;
-	IFQ_SET_MAXLEN(&ifp->if_snd, ifqmaxlen);
-	ifp->if_snd.ifq_drv_maxlen = ifqmaxlen;
-	IFQ_SET_READY(&ifp->if_snd);
+	if_setflags(ifp, IFF_BROADCAST | IFF_SIMPLEX | IFF_MULTICAST);
+	if_setstartfn(ifp, uether_start);
+	if_setioctlfn(ifp, cdce_ioctl);
+	if_setinitfn(ifp, uether_init);
+	if_setsendqlen(ifp, ifqmaxlen);
+	if_setsendqready(ifp);
 
 	if ((sc->sc_flags & CDCE_FLAG_VLAN) == CDCE_FLAG_VLAN)
 		if_setcapabilitiesbit(ifp, IFCAP_VLAN_MTU, 0);
@@ -809,9 +808,9 @@ cdce_start(struct usb_ether *ue)
 }
 
 static int
-cdce_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
+cdce_ioctl(if_t ifp, u_long command, caddr_t data)
 {
-	struct usb_ether *ue = ifp->if_softc;
+	struct usb_ether *ue = if_getsoftc(ifp);
 	struct cdce_softc *sc = uether_getsc(ue);
 	struct ifreq *ifr = (struct ifreq *)data;
 	int error;
@@ -844,14 +843,14 @@ cdce_free_queue(struct mbuf **ppm, uint8_t n)
 }
 
 static int
-cdce_media_change_cb(struct ifnet *ifp)
+cdce_media_change_cb(if_t ifp)
 {
 
 	return (EOPNOTSUPP);
 }
 
 static void
-cdce_media_status_cb(struct ifnet *ifp, struct ifmediareq *ifmr)
+cdce_media_status_cb(if_t ifp, struct ifmediareq *ifmr)
 {
 
 	if ((if_getflags(ifp) & IFF_UP) == 0)
@@ -860,14 +859,14 @@ cdce_media_status_cb(struct ifnet *ifp, struct ifmediareq *ifmr)
 	ifmr->ifm_active = IFM_ETHER;
 	ifmr->ifm_status = IFM_AVALID;
 	ifmr->ifm_status |=
-	    ifp->if_link_state == LINK_STATE_UP ? IFM_ACTIVE : 0;
+	    if_getlinkstate(ifp) == LINK_STATE_UP ? IFM_ACTIVE : 0;
 }
 
 static void
 cdce_bulk_write_callback(struct usb_xfer *xfer, usb_error_t error)
 {
 	struct cdce_softc *sc = usbd_xfer_softc(xfer);
-	struct ifnet *ifp = uether_getifp(&sc->sc_ue);
+	if_t ifp = uether_getifp(&sc->sc_ue);
 	struct mbuf *m;
 	struct mbuf *mt;
 	uint32_t crc;
@@ -892,7 +891,7 @@ cdce_bulk_write_callback(struct usb_xfer *xfer, usb_error_t error)
 	case USB_ST_SETUP:
 tr_setup:
 		for (x = 0; x != CDCE_FRAMES_MAX; x++) {
-			IFQ_DRV_DEQUEUE(&ifp->if_snd, m);
+			m = if_dequeue(ifp);
 
 			if (m == NULL)
 				break;
@@ -974,9 +973,8 @@ static uint32_t
 cdce_m_crc32(struct mbuf *m, uint32_t src_offset, uint32_t src_len)
 {
 	uint32_t crc = 0xFFFFFFFF;
-	int error;
 
-	error = m_apply(m, src_offset, src_len, cdce_m_crc32_cb, &crc);
+	(void)m_apply(m, src_offset, src_len, cdce_m_crc32_cb, &crc);
 	return (crc ^ 0xFFFFFFFF);
 }
 
@@ -984,11 +982,11 @@ static void
 cdce_init(struct usb_ether *ue)
 {
 	struct cdce_softc *sc = uether_getsc(ue);
-	struct ifnet *ifp = uether_getifp(ue);
+	if_t ifp = uether_getifp(ue);
 
 	CDCE_LOCK_ASSERT(sc, MA_OWNED);
 
-	ifp->if_drv_flags |= IFF_DRV_RUNNING;
+	if_setdrvflagbits(ifp, IFF_DRV_RUNNING, 0);
 
 	/* start interrupt transfer */
 	usbd_transfer_start(sc->sc_xfer[CDCE_INTR_RX]);
@@ -1011,11 +1009,11 @@ static void
 cdce_stop(struct usb_ether *ue)
 {
 	struct cdce_softc *sc = uether_getsc(ue);
-	struct ifnet *ifp = uether_getifp(ue);
+	if_t ifp = uether_getifp(ue);
 
 	CDCE_LOCK_ASSERT(sc, MA_OWNED);
 
-	ifp->if_drv_flags &= ~IFF_DRV_RUNNING;
+	if_setdrvflagbits(ifp, 0, IFF_DRV_RUNNING);
 
 	/*
 	 * stop all the transfers, if not already stopped:
@@ -1044,7 +1042,7 @@ static void
 cdce_set_filter(struct usb_ether *ue)
 {
 	struct cdce_softc *sc = uether_getsc(ue);
-	struct ifnet *ifp = uether_getifp(ue);
+	if_t ifp = uether_getifp(ue);
 	struct usb_device_request req;
 	uint16_t value;
 
@@ -1169,7 +1167,7 @@ cdce_intr_read_callback(struct usb_xfer *xfer, usb_error_t error)
 	u_char buf[CDCE_IND_SIZE_MAX];
 	struct usb_cdc_notification ucn;
 	struct cdce_softc *sc;
-	struct ifnet *ifp;
+	if_t ifp;
 	struct usb_page_cache *pc;
 	int off, actlen;
 	uint32_t downrate, uprate;
@@ -1379,7 +1377,7 @@ static uint8_t
 cdce_ncm_fill_tx_frames(struct usb_xfer *xfer, uint8_t index)
 {
 	struct cdce_softc *sc = usbd_xfer_softc(xfer);
-	struct ifnet *ifp = uether_getifp(&sc->sc_ue);
+	if_t ifp = uether_getifp(&sc->sc_ue);
 	struct usb_page_cache *pc = usbd_xfer_get_frame(xfer, index);
 	struct mbuf *m;
 	uint32_t rem;
@@ -1416,7 +1414,7 @@ cdce_ncm_fill_tx_frames(struct usb_xfer *xfer, uint8_t index)
 
 		rem = sc->sc_ncm.tx_max - offset;
 
-		IFQ_DRV_DEQUEUE(&(ifp->if_snd), m);
+		m = if_dequeue(ifp);
 
 		if (m == NULL) {
 			/* buffer not full */
@@ -1434,7 +1432,7 @@ cdce_ncm_fill_tx_frames(struct usb_xfer *xfer, uint8_t index)
 				continue;
 			}
 			/* Wait till next buffer becomes ready */
-			IFQ_DRV_PREPEND(&(ifp->if_snd), m);
+			if_sendq_prepend(ifp, m);
 			break;
 		}
 		usbd_m_copy_in(pc, offset, m, 0, m->m_pkthdr.len);
@@ -1531,7 +1529,7 @@ static void
 cdce_ncm_bulk_write_callback(struct usb_xfer *xfer, usb_error_t error)
 {
 	struct cdce_softc *sc = usbd_xfer_softc(xfer);
-	struct ifnet *ifp = uether_getifp(&sc->sc_ue);
+	if_t ifp = uether_getifp(&sc->sc_ue);
 	uint16_t x;
 	uint8_t temp;
 	int actlen;
@@ -1589,9 +1587,9 @@ cdce_ncm_bulk_read_callback(struct usb_xfer *xfer, usb_error_t error)
 {
 	struct cdce_softc *sc = usbd_xfer_softc(xfer);
 	struct usb_page_cache *pc = usbd_xfer_get_frame(xfer, 0);
-	struct ifnet *ifp = uether_getifp(&sc->sc_ue);
+	if_t ifp = uether_getifp(&sc->sc_ue);
 	struct mbuf *m;
-	int sumdata;
+	int sumdata __usbdebug_used;
 	int sumlen;
 	int actlen;
 	int aframes;

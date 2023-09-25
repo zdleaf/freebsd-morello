@@ -26,8 +26,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/stdint.h>
 #include <sys/stddef.h>
 #include <sys/param.h>
@@ -151,5 +149,5 @@ static driver_t ahci_driver = {
 	sizeof(struct ahci_controller)
 };
 
-DRIVER_MODULE(ahci_mv, simplebus, ahci_driver, ahci_devclass, NULL, NULL);
-DRIVER_MODULE(ahci_mv, ofwbus, ahci_driver, ahci_devclass, NULL, NULL);
+DRIVER_MODULE(ahci_mv, simplebus, ahci_driver, NULL, NULL);
+DRIVER_MODULE(ahci_mv, ofwbus, ahci_driver, NULL, NULL);

@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2008 TAKAHASHI Yoshihiro All rights reserved.
  * Copyright (c) 2008 Marcel Moolenaar All rights reserved.
@@ -27,8 +27,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/bus.h>
@@ -170,5 +168,5 @@ uart_isa_probe(device_t dev)
 	return (uart_bus_probe(dev, 0, 0, 0, 0, 0, 0));
 }
 
-DRIVER_MODULE(uart, isa, uart_isa_driver, uart_devclass, 0, 0);
+DRIVER_MODULE(uart, isa, uart_isa_driver, 0, 0);
 ISA_PNP_INFO(isa_ns8250_ids);

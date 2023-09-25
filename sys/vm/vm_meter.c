@@ -32,8 +32,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
@@ -243,7 +241,7 @@ vmtotal(SYSCTL_HANDLER_ARGS)
 			continue;
 		}
 		if (object->ref_count == 1 &&
-		    (object->flags & OBJ_ANON) == 0) {
+		    (object->flags & (OBJ_ANON | OBJ_SWAP)) == OBJ_SWAP) {
 			/*
 			 * Also skip otherwise unreferenced swap
 			 * objects backing tmpfs vnodes, and POSIX or

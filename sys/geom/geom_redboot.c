@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2009 Sam Leffler, Errno Consulting
  * All rights reserved.
@@ -30,8 +30,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/errno.h>
 #include <sys/endian.h>
@@ -298,15 +296,13 @@ again:
 	if (buf != NULL)
 		head = parse_fis_directory(buf, blksize, offset, offmask);
 	if (head == NULL && offset != 0) {
-		if (buf != NULL)
-			g_free(buf);
+		g_free(buf);
 		offset = 0;			/* check the front */
 		goto again;
 	}
 	g_topology_lock();
 	if (head == NULL) {
-		if (buf != NULL)
-			g_free(buf);
+		g_free(buf);
 		return NULL;
 	}
 	/*

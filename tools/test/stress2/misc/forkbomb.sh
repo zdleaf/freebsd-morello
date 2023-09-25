@@ -47,9 +47,8 @@ cd $odir
 mount | grep "on $mntpoint " | grep -q /dev/md && umount -f $mntpoint
 mdconfig -l | grep -q md$mdstart &&  mdconfig -d -u $mdstart
 mdconfig -a -t swap -s 512m -u $mdstart || exit 1
-bsdlabel -w md$mdstart auto
-newfs $newfs_flags md${mdstart}$part > /dev/null
-mount /dev/md${mdstart}$part $mntpoint
+newfs $newfs_flags md$mdstart > /dev/null
+mount /dev/md$mdstart $mntpoint
 
 su $testuser -c /tmp/forkbomb
 
@@ -82,7 +81,7 @@ volatile u_int *share;
 #define R4 4 /* fork failed */
 
 //#define DEBUG
-#define MXFAIL 100
+#define MXFAIL 2
 #define MAXPROC 40000	/* Arbitrary cap */
 #define PARALLEL 200
 
@@ -94,7 +93,7 @@ test(void)
 	alarm(1200);
 	atomic_add_int(&share[R1], 1);
 	while (share[R1] != PARALLEL)
-		;
+		usleep(100);
 	atomic_add_int(&share[R2], 1);
 
 	for (;;) {
@@ -104,6 +103,7 @@ test(void)
 		if ((r = fork()) == -1) {
 			atomic_add_int(&share[R4], 1);
 			atomic_add_int(&share[R2], -1);
+			usleep(arc4random() % 100000);
 			break;
 		}
 	}

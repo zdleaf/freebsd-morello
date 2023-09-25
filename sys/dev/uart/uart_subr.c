@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2004 Marcel Moolenaar
  * All rights reserved.
@@ -27,8 +27,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/bus.h>
@@ -54,9 +52,6 @@ __FBSDID("$FreeBSD$");
 static struct uart_class *uart_classes[] = {
 	&uart_ns8250_class,
 	&uart_z8530_class,
-#if defined(__arm__)
-	&uart_s3c2410_class,
-#endif
 };
 
 static bus_addr_t

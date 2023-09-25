@@ -32,7 +32,6 @@
  * SUCH DAMAGE.
  *
  *	@(#)cdefs.h	8.8 (Berkeley) 1/9/95
- * $FreeBSD$
  */
 
 #ifndef	_SYS_CDEFS_H_
@@ -312,6 +311,9 @@
  * __generic().  Unlike _Generic(), this macro can only distinguish
  * between a single type, so it requires nested invocations to
  * distinguish multiple cases.
+ *
+ * Note that the comma operator is used to force expr to decay in
+ * order to match _Generic().
  */
 
 #if (defined(__STDC_VERSION__) && __STDC_VERSION__ >= 201112L) || \
@@ -321,7 +323,7 @@
 #elif __GNUC_PREREQ__(3, 1) && !defined(__cplusplus)
 #define	__generic(expr, t, yes, no)					\
 	__builtin_choose_expr(						\
-	    __builtin_types_compatible_p(__typeof(expr), t), yes, no)
+	    __builtin_types_compatible_p(__typeof((0, (expr))), t), yes, no)
 #endif
 
 /*
@@ -400,17 +402,15 @@
 #endif
 
 /*
- * GCC 2.95 provides `__restrict' as an extension to C90 to support the
- * C99-specific `restrict' type qualifier.  We happen to use `__restrict' as
- * a way to define the `restrict' type qualifier without disturbing older
- * software that is unaware of C99 keywords.
+ * We use `__restrict' as a way to define the `restrict' type qualifier
+ * without disturbing older software that is unaware of C99 keywords.
+ * GCC also provides `__restrict' as an extension to support C99-style
+ * restricted pointers in other language modes.
  */
-#if !(__GNUC__ == 2 && __GNUC_MINOR__ == 95)
-#if !defined(__STDC_VERSION__) || __STDC_VERSION__ < 199901
-#define	__restrict
-#else
+#if defined(__STDC_VERSION__) && __STDC_VERSION__ >= 199901
 #define	__restrict	restrict
-#endif
+#elif !__GNUC_PREREQ__(2, 95)
+#define	__restrict
 #endif
 
 /*
@@ -577,7 +577,6 @@
  * Embed the rcs id of a source file in the resulting library.  Note that in
  * more recent ELF binutils, we use .ident allowing the ID to be stripped.
  * Usage:
- *	__FBSDID("$FreeBSD$");
  */
 #ifndef	__FBSDID
 #if !defined(STRIP_FBSDID)
@@ -637,15 +636,23 @@
  * POSIX.1 requires that the macros we test be defined before any standard
  * header file is included.
  *
- * Here's a quick run-down of the versions:
+ * Here's a quick run-down of the versions (and some informal names)
  *  defined(_POSIX_SOURCE)		1003.1-1988
+ *					encoded as 198808 below
  *  _POSIX_C_SOURCE == 1		1003.1-1990
+ *					encoded as 199009 below
  *  _POSIX_C_SOURCE == 2		1003.2-1992 C Language Binding Option
+ *					encoded as 199209 below
  *  _POSIX_C_SOURCE == 199309		1003.1b-1993
+ *					(1003.1 Issue 4, Single Unix Spec v1, Unix 93)
  *  _POSIX_C_SOURCE == 199506		1003.1c-1995, 1003.1i-1995,
  *					and the omnibus ISO/IEC 9945-1: 1996
- *  _POSIX_C_SOURCE == 200112		1003.1-2001
- *  _POSIX_C_SOURCE == 200809		1003.1-2008
+ *					(1003.1 Issue 5, Single	Unix Spec v2, Unix 95)
+ *  _POSIX_C_SOURCE == 200112		1003.1-2001 (1003.1 Issue 6, Unix 03)
+ *  _POSIX_C_SOURCE == 200809		1003.1-2008 (1003.1 Issue 7)
+ *					IEEE Std 1003.1-2017 (Rev of 1003.1-2008) is
+ *					1003.1-2008 with two TCs applied with
+ *					_POSIX_C_SOURCE=200809 and _XOPEN_SOURCE=700
  *
  * In addition, the X/Open Portability Guide, which is now the Single UNIX
  * Specification, defines a feature-test macro which indicates the version of
@@ -886,6 +893,16 @@
 #define __nosanitizeaddress
 #define __nosanitizememory
 #define __nosanitizethread
+#endif
+
+/*
+ * Make it possible to opt out of stack smashing protection.
+ */
+#if __has_attribute(no_stack_protector)
+#define	__nostackprotector	__attribute__((no_stack_protector))
+#else
+#define	__nostackprotector	\
+	__attribute__((__optimize__("-fno-stack-protector")))
 #endif
 
 /* Guard variables and structure members by lock. */

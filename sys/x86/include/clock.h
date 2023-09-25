@@ -2,8 +2,6 @@
  * Kernel interface to machine-dependent clock driver.
  * Garrett Wollman, September 1994.
  * This file is in the public domain.
- *
- * $FreeBSD$
  */
 
 #ifndef _MACHINE_CLOCK_H_
@@ -28,6 +26,7 @@ void	i8254_init(void);
 void	i8254_delay(int);
 void	clock_init(void);
 void	lapic_calibrate(void);
+void	tsc_init(void);
 void	tsc_calibrate(void);
 
 /*
@@ -35,7 +34,7 @@ void	tsc_calibrate(void);
  */
 
 void	startrtclock(void);
-void	init_TSC(void);
+void	start_TSC(void);
 void	resume_TSC(void);
 
 #define	HAS_TIMER_SPKR 1

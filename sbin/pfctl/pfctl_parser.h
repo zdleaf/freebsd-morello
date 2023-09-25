@@ -29,8 +29,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
  * ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 #ifndef _PFCTL_PARSER_H_
@@ -90,6 +88,10 @@ struct pfctl {
 	struct pfioc_queue *pqueue;
 	struct pfr_buffer *trans;
 	struct pfctl_anchor *anchor, *alast;
+	int eth_nr;
+	struct pfctl_eth_anchor *eanchor, *ealast;
+	struct pfctl_eth_anchor *eastack[PFCTL_ANCHOR_STACK_DEPTH];
+	u_int32_t eth_ticket;
 	const char *ruleset;
 
 	/* 'set foo' options */
@@ -97,6 +99,7 @@ struct pfctl {
 	u_int32_t	 limit[PF_LIMIT_MAX];
 	u_int32_t	 debug;
 	u_int32_t	 hostid;
+	u_int32_t	 reassemble;
 	char		*ifname;
 	bool		 keep_counters;
 	u_int8_t	 syncookies;
@@ -108,6 +111,7 @@ struct pfctl {
 	u_int8_t	 debug_set;
 	u_int8_t	 hostid_set;
 	u_int8_t	 ifname_set;
+	u_int8_t	 reass_set;
 };
 
 struct node_if {
@@ -130,6 +134,15 @@ struct node_host {
 	u_int			 ifa_flags;
 	struct node_host	*next;
 	struct node_host	*tail;
+};
+
+struct node_mac {
+	u_int8_t	 mac[ETHER_ADDR_LEN];
+	u_int8_t	 mask[ETHER_ADDR_LEN];
+	bool		 neg;
+	bool		 isset;
+	struct node_mac	*next;
+	struct node_mac	*tail;
 };
 
 struct node_os {
@@ -264,12 +277,15 @@ int	pfctl_rules(int, char *, int, int, char *, struct pfr_buffer *);
 int	pfctl_optimize_ruleset(struct pfctl *, struct pfctl_ruleset *);
 
 int	pfctl_append_rule(struct pfctl *, struct pfctl_rule *, const char *);
+int	pfctl_append_eth_rule(struct pfctl *, struct pfctl_eth_rule *,
+	    const char *);
 int	pfctl_add_altq(struct pfctl *, struct pf_altq *);
 int	pfctl_add_pool(struct pfctl *, struct pfctl_pool *, sa_family_t);
 void	pfctl_move_pool(struct pfctl_pool *, struct pfctl_pool *);
 void	pfctl_clear_pool(struct pfctl_pool *);
 
 int	pfctl_set_timeout(struct pfctl *, const char *, int, int);
+int	pfctl_set_reassembly(struct pfctl *, int, int);
 int	pfctl_set_optimization(struct pfctl *, const char *);
 int	pfctl_set_limit(struct pfctl *, const char *, unsigned int);
 int	pfctl_set_logif(struct pfctl *, char *);
@@ -284,6 +300,7 @@ int	pfctl_load_anchors(int, struct pfctl *, struct pfr_buffer *);
 
 void	print_pool(struct pfctl_pool *, u_int16_t, u_int16_t, sa_family_t, int);
 void	print_src_node(struct pf_src_node *, int);
+void	print_eth_rule(struct pfctl_eth_rule *, const char *, int);
 void	print_rule(struct pfctl_rule *, const char *, int, int);
 void	print_tabledef(const char *, int, int, struct node_tinithead *);
 void	print_status(struct pfctl_status *, struct pfctl_syncookies *, int);
@@ -321,10 +338,10 @@ struct icmpcodeent {
 	u_int8_t code;
 };
 
-const struct icmptypeent *geticmptypebynumber(u_int8_t, u_int8_t);
-const struct icmptypeent *geticmptypebyname(char *, u_int8_t);
-const struct icmpcodeent *geticmpcodebynumber(u_int8_t, u_int8_t, u_int8_t);
-const struct icmpcodeent *geticmpcodebyname(u_long, char *, u_int8_t);
+const struct icmptypeent *geticmptypebynumber(u_int8_t, sa_family_t);
+const struct icmptypeent *geticmptypebyname(char *, sa_family_t);
+const struct icmpcodeent *geticmpcodebynumber(u_int8_t, u_int8_t, sa_family_t);
+const struct icmpcodeent *geticmpcodebyname(u_long, char *, sa_family_t);
 
 struct pf_timeout {
 	const char	*name;
@@ -336,6 +353,7 @@ struct pf_timeout {
 #define PFCTL_FLAG_OPTION	0x08
 #define PFCTL_FLAG_ALTQ		0x10
 #define PFCTL_FLAG_TABLE	0x20
+#define PFCTL_FLAG_ETH		0x40
 
 extern const struct pf_timeout pf_timeouts[];
 

@@ -28,8 +28,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include "opt_acpi.h"
 #include <sys/param.h>
 #include <sys/kernel.h>
@@ -109,8 +107,7 @@ static driver_t acpi_cmbat_driver = {
     sizeof(struct acpi_cmbat_softc),
 };
 
-static devclass_t acpi_cmbat_devclass;
-DRIVER_MODULE(acpi_cmbat, acpi, acpi_cmbat_driver, acpi_cmbat_devclass, 0, 0);
+DRIVER_MODULE(acpi_cmbat, acpi, acpi_cmbat_driver, 0, 0);
 MODULE_DEPEND(acpi_cmbat, acpi, 1, 1, 1);
 
 static int
@@ -534,7 +531,7 @@ acpi_cmbat_init_battery(void *arg)
 
     dev = (device_t)arg;
     ACPI_VPRINT(dev, acpi_device_get_parent_softc(dev),
-	"battery enitialization start\n");
+	"battery initialization start\n");
 
     /*
      * Try repeatedly to get valid data from the battery.  Since the

@@ -34,8 +34,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include "opt_ddb.h"
 
 #include <sys/param.h>
@@ -449,17 +447,13 @@ _rm_rlock(struct rmlock *rm, struct rm_priotracker *tracker, int trylock)
 		THREAD_NO_SLEEPING();
 
 	td->td_critnest++;	/* critical_enter(); */
-
 	atomic_interrupt_fence();
 
-	pc = cpuid_to_pcpu[td->td_oncpu]; /* pcpu_find(td->td_oncpu); */
-
+	pc = cpuid_to_pcpu[td->td_oncpu];
 	rm_tracker_add(pc, tracker);
-
 	sched_pin();
 
 	atomic_interrupt_fence();
-
 	td->td_critnest--;
 
 	/*
@@ -517,8 +511,12 @@ _rm_runlock(struct rmlock *rm, struct rm_priotracker *tracker)
 		return;
 
 	td->td_critnest++;	/* critical_enter(); */
-	pc = cpuid_to_pcpu[td->td_oncpu]; /* pcpu_find(td->td_oncpu); */
+	atomic_interrupt_fence();
+
+	pc = cpuid_to_pcpu[td->td_oncpu];
 	rm_tracker_remove(pc, tracker);
+
+	atomic_interrupt_fence();
 	td->td_critnest--;
 	sched_unpin();
 
@@ -1025,7 +1023,7 @@ rms_rlock(struct rmslock *rms)
 {
 	struct rmslock_pcpu *pcpu;
 
-	WITNESS_WARN(WARN_GIANTOK | WARN_SLEEPOK, NULL, __func__);
+	rms_assert_rlock_ok(rms);
 	MPASS(atomic_load_ptr(&rms->owner) != curthread);
 
 	critical_enter();

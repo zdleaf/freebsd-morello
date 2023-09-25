@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2018 Advanced Micro Devices
  * All rights reserved.
@@ -27,8 +27,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include "opt_acpi.h"
 
 #include <sys/param.h>
@@ -469,8 +467,7 @@ static driver_t amdgpio_driver = {
 	sizeof(struct amdgpio_softc),
 };
 
-static devclass_t amdgpio_devclass;
-DRIVER_MODULE(amdgpio, acpi, amdgpio_driver, amdgpio_devclass, 0, 0);
+DRIVER_MODULE(amdgpio, acpi, amdgpio_driver, 0, 0);
 MODULE_DEPEND(amdgpio, acpi, 1, 1, 1);
 MODULE_DEPEND(amdgpio, gpiobus, 1, 1, 1);
 MODULE_VERSION(amdgpio, 1);

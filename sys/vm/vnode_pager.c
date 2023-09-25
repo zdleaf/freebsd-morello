@@ -53,8 +53,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include "opt_vm.h"
 
 #include <sys/param.h>
@@ -155,7 +153,6 @@ vnode_create_vobject(struct vnode *vp, off_t isize, struct thread *td)
 {
 	vm_object_t object;
 	vm_ooffset_t size = isize;
-	struct vattr va;
 	bool last;
 
 	if (!vn_isdisk(vp) && vn_canvmio(vp) == FALSE)
@@ -169,9 +166,8 @@ vnode_create_vobject(struct vnode *vp, off_t isize, struct thread *td)
 		if (vn_isdisk(vp)) {
 			size = IDX_TO_OFF(INT_MAX);
 		} else {
-			if (VOP_GETATTR(vp, &va, td->td_ucred))
+			if (vn_getsize_locked(vp, &size, td->td_ucred) != 0)
 				return (0);
-			size = va.va_size;
 		}
 	}
 
@@ -642,6 +638,13 @@ vnode_pager_addr(struct vnode *vp, vm_ooffset_t address, daddr_t *rtaddress,
 	return (err);
 }
 
+static void
+vnode_pager_input_bdone(struct buf *bp)
+{
+	runningbufwakeup(bp);
+	bdone(bp);
+}
+
 /*
  * small block filesystem vnode pager input
  */
@@ -688,7 +691,7 @@ vnode_pager_input_smlfs(vm_object_t object, vm_page_t m)
 
 			/* build a minimal buffer header */
 			bp->b_iocmd = BIO_READ;
-			bp->b_iodone = bdone;
+			bp->b_iodone = vnode_pager_input_bdone;
 			KASSERT(bp->b_rcred == NOCRED, ("leaking read ucred"));
 			KASSERT(bp->b_wcred == NOCRED, ("leaking write ucred"));
 			bp->b_rcred = crhold(curthread->td_ucred);
@@ -1206,6 +1209,8 @@ vnode_pager_generic_getpages_done(struct buf *bp)
 	error = (bp->b_ioflags & BIO_ERROR) != 0 ? bp->b_error : 0;
 	object = bp->b_vp->v_object;
 
+	runningbufwakeup(bp);
+
 	if (error == 0 && bp->b_bcount != bp->b_npages * PAGE_SIZE) {
 		if (!buf_mapped(bp)) {
 			bp->b_data = bp->b_kvabase;
@@ -1290,7 +1295,7 @@ static void
 vnode_pager_putpages(vm_object_t object, vm_page_t *m, int count,
     int flags, int *rtvals)
 {
-	int rtval;
+	int rtval __diagused;
 	struct vnode *vp;
 	int bytes = count * PAGE_SIZE;
 

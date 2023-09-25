@@ -34,7 +34,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
 __SCCSID("@(#)kvm.c	8.2 (Berkeley) 2/13/94");
 
 #include <sys/param.h>
@@ -303,7 +302,7 @@ kvm_close(kvm_t *kd)
 		free(kd->pt_map);
 	if (kd->page_map != NULL)
 		free(kd->page_map);
-	if (kd->sparse_map != MAP_FAILED)
+	if (kd->sparse_map != MAP_FAILED && kd->sparse_map != NULL)
 		munmap(kd->sparse_map, kd->pt_sparse_size);
 	free((void *)kd);
 

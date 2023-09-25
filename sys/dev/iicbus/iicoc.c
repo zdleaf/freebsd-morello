@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2003-2012 Broadcom Corporation
  * All Rights Reserved
@@ -29,8 +29,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/bus.h>
@@ -48,9 +46,7 @@ __FBSDID("$FreeBSD$");
 #include "iicbus_if.h"
 #include "iicoc.h"
 
-devclass_t iicoc_devclass;
-
-DRIVER_MODULE(iicbus, iicoc, iicbus_driver, iicbus_devclass, 0, 0);
+DRIVER_MODULE(iicbus, iicoc, iicbus_driver, 0, 0);
 
 static void
 iicoc_dev_write(device_t dev, int reg, int value)

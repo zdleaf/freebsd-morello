@@ -25,8 +25,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 /*
  * Thermometer and thermal zones driver for Tegra SoCs.
  * Calibration data and algo are taken from Linux, because this part of SoC
@@ -837,8 +835,7 @@ static device_method_t tegra_soctherm_methods[] = {
 	DEVMETHOD_END
 };
 
-static devclass_t tegra_soctherm_devclass;
 static DEFINE_CLASS_0(soctherm, tegra_soctherm_driver, tegra_soctherm_methods,
     sizeof(struct soctherm_softc));
 EARLY_DRIVER_MODULE(tegra_soctherm, simplebus, tegra_soctherm_driver,
-    tegra_soctherm_devclass, NULL, NULL, 79);
+    NULL, NULL, 79);

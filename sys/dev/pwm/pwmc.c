@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2018 Emmanuel Vadot <manu@FreeBSD.org>
  *
@@ -26,8 +26,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include "opt_platform.h"
 
 #include <sys/param.h>
@@ -216,8 +214,7 @@ static driver_t pwmc_driver = {
 	pwmc_methods,
 	sizeof(struct pwmc_softc),
 };
-static devclass_t pwmc_devclass;
 
-DRIVER_MODULE(pwmc, pwmbus, pwmc_driver, pwmc_devclass, 0, 0);
+DRIVER_MODULE(pwmc, pwmbus, pwmc_driver, 0, 0);
 MODULE_DEPEND(pwmc, pwmbus, 1, 1, 1);
 MODULE_VERSION(pwmc, 1);

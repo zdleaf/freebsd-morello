@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2001 Doug Rabson
  * All rights reserved.
@@ -24,8 +24,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 #ifndef _COMPAT_FREEBSD32_FREEBSD32_H_
@@ -442,7 +440,9 @@ struct kinfo_vm_layout32 {
 	uint32_t	kvm_stack_addr;
 	uint32_t	kvm_stack_size;
 	int		kvm_map_flags;
-	uint32_t	kvm_spare[14];
+	uint32_t	kvm_shp_addr;
+	uint32_t	kvm_shp_size;
+	uint32_t	kvm_spare[12];
 };
 
 struct kld_file_stat_1_32 {
@@ -490,10 +490,22 @@ struct timex32 {
 	int32_t	stbcnt;
 };
 
+struct ptrace_sc_ret32 {
+	uint32_t	sr_retval[2];
+	int		sr_error;
+};
+
 struct ptrace_coredump32 {
 	int		pc_fd;
 	uint32_t	pc_flags;
 	uint32_t	pc_limit1, pc_limit2;
+};
+
+struct ptrace_sc_remote32 {
+	struct ptrace_sc_ret32 pscr_ret;
+	u_int		pscr_syscall;
+	u_int		pscr_nargs;
+	uint32_t	pscr_args;
 };
 
 #endif /* !_COMPAT_FREEBSD32_FREEBSD32_H_ */

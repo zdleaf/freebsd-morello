@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2020 Vladimir Kondratyev <wulf@FreeBSD.org>
  *
@@ -26,8 +26,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 /*
  * HID spec: https://www.usb.org/sites/default/files/documents/hid1_11.pdf
  */
@@ -61,8 +59,6 @@ enum {
 	HMS_ABS_Z,
 	HMS_HWHEEL,
 	HMS_BTN,
-	HMS_BTN_MS1,
-	HMS_BTN_MS2,
 	HMS_FINAL_CB,
 };
 
@@ -95,8 +91,6 @@ static const struct hidmap_item hms_map[] = {
 	[HMS_ABS_Z]	= HMS_MAP_ABS(HUG_Z,		ABS_Z),
 	[HMS_HWHEEL]	= HMS_MAP_REL_CN(HUC_AC_PAN,	REL_HWHEEL),
 	[HMS_BTN]	= HMS_MAP_BUT_RG(1, 16,		BTN_MOUSE),
-	[HMS_BTN_MS1]	= HMS_MAP_BUT_MS(1,		BTN_RIGHT),
-	[HMS_BTN_MS2]	= HMS_MAP_BUT_MS(2,		BTN_MIDDLE),
 	[HMS_FINAL_CB]	= HMS_FINAL_CB(hms_final_cb),
 };
 
@@ -105,6 +99,11 @@ static const struct hidmap_item hms_map_wheel[] = {
 };
 static const struct hidmap_item hms_map_wheel_rev[] = {
 	HMS_MAP_REL_REV(HUG_WHEEL,	REL_WHEEL),
+};
+
+static const struct hidmap_item hms_map_kensington_slimblade[] = {
+	HMS_MAP_BUT_MS(1,	BTN_RIGHT),
+	HMS_MAP_BUT_MS(2,	BTN_MIDDLE),
 };
 
 /* A match on these entries will load hms */
@@ -218,7 +217,7 @@ hms_probe(device_t dev)
 
 	/* There should be at least one X or Y axis */
 	if (!hidmap_test_cap(sc->caps, HMS_REL_X) &&
-	    !hidmap_test_cap(sc->caps, HMS_REL_X) &&
+	    !hidmap_test_cap(sc->caps, HMS_REL_Y) &&
 	    !hidmap_test_cap(sc->caps, HMS_ABS_X) &&
 	    !hidmap_test_cap(sc->caps, HMS_ABS_Y))
 		return (ENXIO);
@@ -229,7 +228,7 @@ hms_probe(device_t dev)
 	else
 		hidbus_set_desc(dev, "Mouse");
 
-	return (BUS_PROBE_DEFAULT);
+	return (BUS_PROBE_GENERIC);
 }
 
 static int
@@ -260,6 +259,9 @@ hms_attach(device_t dev)
 		HIDMAP_ADD_MAP(&sc->hm, hms_map_wheel_rev, cap_wheel);
 	else
 		HIDMAP_ADD_MAP(&sc->hm, hms_map_wheel, cap_wheel);
+
+	if (hid_test_quirk(hw, HQ_MS_VENDOR_BTN))
+		HIDMAP_ADD_MAP(&sc->hm, hms_map_kensington_slimblade, NULL);
 
 #ifdef IICHID_SAMPLING
 	if (hid_test_quirk(hw, HQ_IICHID_SAMPLING) &&
@@ -317,7 +319,6 @@ hms_detach(device_t dev)
 	return (error);
 }
 
-static devclass_t hms_devclass;
 static device_method_t hms_methods[] = {
 	DEVMETHOD(device_identify,	hms_identify),
 	DEVMETHOD(device_probe,		hms_probe),
@@ -328,7 +329,7 @@ static device_method_t hms_methods[] = {
 };
 
 DEFINE_CLASS_0(hms, hms_driver, hms_methods, sizeof(struct hms_softc));
-DRIVER_MODULE(hms, hidbus, hms_driver, hms_devclass, NULL, 0);
+DRIVER_MODULE(hms, hidbus, hms_driver, NULL, NULL);
 MODULE_DEPEND(hms, hid, 1, 1, 1);
 MODULE_DEPEND(hms, hidbus, 1, 1, 1);
 MODULE_DEPEND(hms, hidmap, 1, 1, 1);

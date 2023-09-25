@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2012 Thomas Skibo
  * Copyright (c) 2008 Alexander Motin <mav@FreeBSD.org>
@@ -31,8 +31,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/bus.h>
@@ -52,13 +50,11 @@ __FBSDID("$FreeBSD$");
 #include <dev/ofw/ofw_bus.h>
 #include <dev/ofw/ofw_bus_subr.h>
 
-#ifdef EXT_RESOURCES
 #include <dev/ofw/ofw_subr.h>
 #include <dev/extres/clk/clk.h>
 #include <dev/extres/clk/clk_fixed.h>
 #include <dev/extres/syscon/syscon.h>
 #include <dev/extres/phy/phy.h>
-#endif
 
 #include <dev/mmc/bridge.h>
 
@@ -69,10 +65,8 @@ __FBSDID("$FreeBSD$");
 
 #include "opt_mmccam.h"
 
-#ifdef EXT_RESOURCES
 #include "clkdev_if.h"
 #include "syscon_if.h"
-#endif
 
 #define	MAX_SLOTS		6
 #define	SDHCI_FDT_ARMADA38X	1
@@ -80,8 +74,9 @@ __FBSDID("$FreeBSD$");
 #define	SDHCI_FDT_XLNX_ZY7	3
 #define	SDHCI_FDT_QUALCOMM	4
 #define	SDHCI_FDT_RK3399	5
+#define	SDHCI_FDT_RK3568	6
+#define	SDHCI_FDT_XLNX_ZMP	7
 
-#ifdef EXT_RESOURCES
 #define	RK3399_GRF_EMMCCORE_CON0		0xf000
 #define	 RK3399_CORECFG_BASECLKFREQ		0xff00
 #define	 RK3399_CORECFG_TIMEOUTCLKUNIT		(1 << 7)
@@ -89,11 +84,37 @@ __FBSDID("$FreeBSD$");
 #define	RK3399_GRF_EMMCCORE_CON11		0xf02c
 #define	 RK3399_CORECFG_CLOCKMULTIPLIER		0xff
 
+#define	RK3568_EMMC_HOST_CTRL			0x0508
+#define	RK3568_EMMC_EMMC_CTRL			0x052c
+#define	RK3568_EMMC_ATCTRL			0x0540
+#define	RK3568_EMMC_DLL_CTRL			0x0800
+#define	 DLL_CTRL_SRST				0x00000001
+#define	 DLL_CTRL_START				0x00000002
+#define	 DLL_CTRL_START_POINT_DEFAULT		0x00050000
+#define	 DLL_CTRL_INCREMENT_DEFAULT		0x00000200
+
+#define	RK3568_EMMC_DLL_RXCLK			0x0804
+#define	 DLL_RXCLK_DELAY_ENABLE			0x08000000
+#define	 DLL_RXCLK_NO_INV			0x20000000
+
+#define	RK3568_EMMC_DLL_TXCLK			0x0808
+#define	 DLL_TXCLK_DELAY_ENABLE			0x08000000
+#define	 DLL_TXCLK_TAPNUM_DEFAULT		0x00000008
+#define	 DLL_TXCLK_TAPNUM_FROM_SW		0x01000000
+
+#define	RK3568_EMMC_DLL_STRBIN			0x080c
+#define	 DLL_STRBIN_DELAY_ENABLE		0x08000000
+#define	 DLL_STRBIN_TAPNUM_DEFAULT		0x00000008
+#define	DLL_STRBIN_TAPNUM_FROM_SW		0x01000000
+
+#define	RK3568_EMMC_DLL_STATUS0			0x0840
+#define	 DLL_STATUS0_DLL_LOCK			0x00000100
+#define	 DLL_STATUS0_DLL_TIMEOUT		0x00000200
+
 #define	LOWEST_SET_BIT(mask)	((((mask) - 1) & (mask)) ^ (mask))
 #define	SHIFTIN(x, mask)	((x) * LOWEST_SET_BIT(mask))
 
 #define	EMMCCARDCLK_ID		1000
-#endif
 
 static struct ofw_compat_data compat_data[] = {
 	{ "marvell,armada-380-sdhci",	SDHCI_FDT_ARMADA38X },
@@ -101,6 +122,8 @@ static struct ofw_compat_data compat_data[] = {
 	{ "qcom,sdhci-msm-v4",		SDHCI_FDT_QUALCOMM },
 	{ "rockchip,rk3399-sdhci-5.1",	SDHCI_FDT_RK3399 },
 	{ "xlnx,zy7_sdhci",		SDHCI_FDT_XLNX_ZY7 },
+	{ "rockchip,rk3568-dwcmshc",	SDHCI_FDT_RK3568 },
+	{ "xlnx,zynqmp-8.9a",		SDHCI_FDT_XLNX_ZMP },
 	{ NULL, 0 }
 };
 
@@ -118,16 +141,15 @@ struct sdhci_fdt_softc {
 	struct resource	*mem_res[MAX_SLOTS];	/* Memory resource */
 
 	bool		wp_inverted;	/* WP pin is inverted */
+	bool		wp_disabled;	/* WP pin is not supported */
 	bool		no_18v;		/* No 1.8V support */
 
-#ifdef EXT_RESOURCES
 	clk_t		clk_xin;	/* xin24m fixed clock */
 	clk_t		clk_ahb;	/* ahb clock */
+	clk_t		clk_core;	/* core clock */
 	phy_t		phy;		/* phy to be used */
-#endif
 };
 
-#ifdef EXT_RESOURCES
 struct rk3399_emmccardclk_sc {
 	device_t	clkdev;
 	bus_addr_t	reg;
@@ -320,7 +342,6 @@ sdhci_init_rk3399(device_t dev)
 
 	return (0);
 }
-#endif
 
 static uint8_t
 sdhci_fdt_read_1(device_t dev, struct sdhci_slot *slot, bus_size_t off)
@@ -411,7 +432,69 @@ sdhci_fdt_get_ro(device_t bus, device_t dev)
 {
 	struct sdhci_fdt_softc *sc = device_get_softc(bus);
 
+	if (sc->wp_disabled)
+		return (false);
 	return (sdhci_generic_get_ro(bus, dev) ^ sc->wp_inverted);
+}
+
+static int
+sdhci_fdt_set_clock(device_t dev, struct sdhci_slot *slot, int clock)
+{
+	struct sdhci_fdt_softc *sc = device_get_softc(dev);
+	int32_t val;
+	int i;
+
+	if (ofw_bus_search_compatible(dev, compat_data)->ocd_data ==
+	    SDHCI_FDT_RK3568) {
+		if (clock == 400000)
+			clock = 375000;
+
+		if (clock) {
+			clk_set_freq(sc->clk_core, clock, 0);
+
+			if (clock <= 52000000) {
+				bus_write_4(sc->mem_res[slot->num],
+				    RK3568_EMMC_DLL_CTRL, 0x0);
+				bus_write_4(sc->mem_res[slot->num],
+				    RK3568_EMMC_DLL_RXCLK, DLL_RXCLK_NO_INV);
+				bus_write_4(sc->mem_res[slot->num],
+				    RK3568_EMMC_DLL_TXCLK, 0x0);
+				bus_write_4(sc->mem_res[slot->num],
+				    RK3568_EMMC_DLL_STRBIN, 0x0);
+				return (clock);
+			}
+
+			bus_write_4(sc->mem_res[slot->num],
+			    RK3568_EMMC_DLL_CTRL, DLL_CTRL_START);
+			DELAY(1000);
+			bus_write_4(sc->mem_res[slot->num],
+			    RK3568_EMMC_DLL_CTRL, 0);
+			bus_write_4(sc->mem_res[slot->num],
+			    RK3568_EMMC_DLL_CTRL, DLL_CTRL_START_POINT_DEFAULT |
+			    DLL_CTRL_INCREMENT_DEFAULT | DLL_CTRL_START);
+			for (i = 0; i < 500; i++) {
+				val = bus_read_4(sc->mem_res[slot->num],
+				    RK3568_EMMC_DLL_STATUS0);
+				if (val & DLL_STATUS0_DLL_LOCK &&
+				    !(val & DLL_STATUS0_DLL_TIMEOUT))
+					break;
+				DELAY(1000);
+			}
+			bus_write_4(sc->mem_res[slot->num], RK3568_EMMC_ATCTRL,
+			    (0x1 << 16 | 0x2 << 17 | 0x3 << 19));
+			bus_write_4(sc->mem_res[slot->num],
+			    RK3568_EMMC_DLL_RXCLK,
+			    DLL_RXCLK_DELAY_ENABLE | DLL_RXCLK_NO_INV);
+			bus_write_4(sc->mem_res[slot->num],
+			    RK3568_EMMC_DLL_TXCLK, DLL_TXCLK_DELAY_ENABLE |
+			    DLL_TXCLK_TAPNUM_DEFAULT|DLL_TXCLK_TAPNUM_FROM_SW);
+			bus_write_4(sc->mem_res[slot->num],
+			    RK3568_EMMC_DLL_STRBIN, DLL_STRBIN_DELAY_ENABLE |
+			    DLL_STRBIN_TAPNUM_DEFAULT |
+			    DLL_STRBIN_TAPNUM_FROM_SW);
+		}
+	}
+	return (clock);
 }
 
 static int
@@ -449,6 +532,12 @@ sdhci_fdt_probe(device_t dev)
 		sc->quirks = SDHCI_QUIRK_DATA_TIMEOUT_USES_SDCLK;
 		device_set_desc(dev, "Zynq-7000 generic fdt SDHCI controller");
 		break;
+	case SDHCI_FDT_RK3568:
+		device_set_desc(dev, "Rockchip RK3568 fdt SDHCI controller");
+		break;
+	case SDHCI_FDT_XLNX_ZMP:
+		device_set_desc(dev, "ZynqMP generic fdt SDHCI controller");
+		break;
 	default:
 		return (ENXIO);
 	}
@@ -466,6 +555,8 @@ sdhci_fdt_probe(device_t dev)
 		sc->no_18v = true;
 	if (OF_hasprop(node, "wp-inverted"))
 		sc->wp_inverted = true;
+	if (OF_hasprop(node, "disable-wp"))
+		sc->wp_disabled = true;
 
 	return (0);
 }
@@ -488,7 +579,6 @@ sdhci_fdt_attach(device_t dev)
 		return (ENOMEM);
 	}
 
-#ifdef EXT_RESOURCES
 	if (ofw_bus_search_compatible(dev, compat_data)->ocd_data ==
 	    SDHCI_FDT_RK3399) {
 		/* Initialize SDHCI */
@@ -498,7 +588,16 @@ sdhci_fdt_attach(device_t dev)
 			return (err);
 		}
 	}
-#endif
+
+	if (ofw_bus_search_compatible(dev, compat_data)->ocd_data ==
+	    SDHCI_FDT_RK3568) {
+		/* setup & enable clocks */
+		if (clk_get_by_ofw_name(dev, 0, "core", &sc->clk_core)) {
+			device_printf(dev, "cannot get core clock\n");
+			return (ENXIO);
+		}
+		clk_enable(sc->clk_core);
+	}
 
 	/* Scan all slots. */
 	slots = sc->num_slots;	/* number of slots determined in probe(). */
@@ -589,6 +688,7 @@ static device_method_t sdhci_fdt_methods[] = {
 	DEVMETHOD(sdhci_write_2,	sdhci_fdt_write_2),
 	DEVMETHOD(sdhci_write_4,	sdhci_fdt_write_4),
 	DEVMETHOD(sdhci_write_multi_4,	sdhci_fdt_write_multi_4),
+	DEVMETHOD(sdhci_set_clock,	sdhci_fdt_set_clock),
 
 	DEVMETHOD_END
 };
@@ -598,10 +698,8 @@ static driver_t sdhci_fdt_driver = {
 	sdhci_fdt_methods,
 	sizeof(struct sdhci_fdt_softc),
 };
-static devclass_t sdhci_fdt_devclass;
 
-DRIVER_MODULE(sdhci_fdt, simplebus, sdhci_fdt_driver, sdhci_fdt_devclass,
-    NULL, NULL);
+DRIVER_MODULE(sdhci_fdt, simplebus, sdhci_fdt_driver, NULL, NULL);
 SDHCI_DEPEND(sdhci_fdt);
 #ifndef MMCCAM
 MMC_DECLARE_BRIDGE(sdhci_fdt);

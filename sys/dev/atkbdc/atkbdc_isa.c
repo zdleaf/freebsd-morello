@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 1999 Kazutaka YOKOTA <yokota@zodiac.mech.utsunomiya-u.ac.jp>
  * All rights reserved.
@@ -27,8 +27,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include "opt_kbd.h"
 
 #include <sys/param.h>
@@ -319,6 +317,6 @@ atkbdc_isa_release_resource(device_t dev, device_t child, int type, int rid,
 	return (bus_generic_rl_release_resource(dev, child, type, rid, r));
 }
 
-DRIVER_MODULE(atkbdc, isa, atkbdc_isa_driver, atkbdc_devclass, 0, 0);
-DRIVER_MODULE(atkbdc, acpi, atkbdc_isa_driver, atkbdc_devclass, 0, 0);
+DRIVER_MODULE(atkbdc, isa, atkbdc_isa_driver, 0, 0);
+DRIVER_MODULE(atkbdc, acpi, atkbdc_isa_driver, 0, 0);
 ISA_PNP_INFO(atkbdc_ids);

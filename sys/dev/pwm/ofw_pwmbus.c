@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2019 Ian Lepore <ian@FreeBSD.org>
  *
@@ -26,8 +26,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/bus.h>
 #include <sys/kernel.h>
@@ -213,11 +211,9 @@ static device_method_t ofw_pwmbus_methods[] = {
 	DEVMETHOD_END
 };
 
-devclass_t ofw_pwmbus_devclass;
-
 DEFINE_CLASS_1(pwmbus, ofw_pwmbus_driver, ofw_pwmbus_methods,
     sizeof(struct pwmbus_softc), pwmbus_driver);
-EARLY_DRIVER_MODULE(ofw_pwmbus, pwm, ofw_pwmbus_driver, ofw_pwmbus_devclass,
-    0, 0, BUS_PASS_BUS + BUS_PASS_ORDER_MIDDLE);
+EARLY_DRIVER_MODULE(ofw_pwmbus, pwm, ofw_pwmbus_driver, 0, 0,
+    BUS_PASS_BUS + BUS_PASS_ORDER_MIDDLE);
 MODULE_VERSION(ofw_pwmbus, 1);
 MODULE_DEPEND(ofw_pwmbus, pwmbus, 1, 1, 1);

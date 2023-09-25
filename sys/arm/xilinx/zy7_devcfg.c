@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2013 Thomas Skibo
  * All rights reserved.
@@ -24,8 +24,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 /* 
@@ -38,8 +36,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/conf.h>
@@ -843,8 +839,6 @@ static driver_t zy7_devcfg_driver = {
 	zy7_devcfg_methods,
 	sizeof(struct zy7_devcfg_softc),
 };
-static devclass_t zy7_devcfg_devclass;
 
-DRIVER_MODULE(zy7_devcfg, simplebus, zy7_devcfg_driver, zy7_devcfg_devclass, \
-	      0, 0);
+DRIVER_MODULE(zy7_devcfg, simplebus, zy7_devcfg_driver, 0, 0);
 MODULE_DEPEND(zy7_devcfg, zy7_slcr, 1, 1, 1);

@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (C) 2013-2016 Universita` di Pisa
  * All rights reserved.
@@ -29,8 +29,6 @@
 
 #if defined(__FreeBSD__)
 #include <sys/cdefs.h> /* prerequisite */
-__FBSDID("$FreeBSD$");
-
 #include <sys/types.h>
 #include <sys/errno.h>
 #include <sys/param.h>	/* defines used in kernel.h */
@@ -84,10 +82,9 @@ __FBSDID("$FreeBSD$");
 
 /*
  * system parameters (most of them in netmap_kern.h)
- * NM_BDG_NAME	prefix for switch port names, default "vale"
+ * NM_BDG_NAME		prefix for switch port names, default "vale"
  * NM_BDG_MAXPORTS	number of ports
- * NM_BRIDGES	max number of switches in the system.
- *	XXX should become a sysctl or tunable
+ * NM_BRIDGES		max number of switches in the system.
  *
  * Switch ports are named valeX:Y where X is the switch name and Y
  * is the port. If Y matches a physical interface name, the port is
@@ -115,13 +112,19 @@ __FBSDID("$FreeBSD$");
  * last packet in the block may overflow the size.
  */
 static int bridge_batch = NM_BDG_BATCH; /* bridge batch size */
+
+/* Max number of vale bridges (loader tunable). */
+unsigned int vale_max_bridges = NM_BRIDGES;
+
 SYSBEGIN(vars_vale);
 SYSCTL_DECL(_dev_netmap);
 SYSCTL_INT(_dev_netmap, OID_AUTO, bridge_batch, CTLFLAG_RW, &bridge_batch, 0,
 		"Max batch size to be used in the bridge");
+SYSCTL_UINT(_dev_netmap, OID_AUTO, max_bridges, CTLFLAG_RDTUN, &vale_max_bridges, 0,
+		"Max number of vale bridges");
 SYSEND;
 
-static int netmap_vale_vp_create(struct nmreq_header *hdr, struct ifnet *,
+static int netmap_vale_vp_create(struct nmreq_header *hdr, if_t,
 		struct netmap_mem_d *nmd, struct netmap_vp_adapter **);
 static int netmap_vale_vp_bdg_attach(const char *, struct netmap_adapter *,
 		struct nm_bridge *);
@@ -366,7 +369,7 @@ netmap_vale_list(struct nmreq_header *hdr)
 		j = req->nr_port_idx;
 
 		NMG_LOCK();
-		for (error = ENOENT; i < NM_BRIDGES; i++) {
+		for (error = ENOENT; i < vale_max_bridges; i++) {
 			b = bridges + i;
 			for ( ; j < NM_BDG_MAXPORTS; j++) {
 				if (b->bdg_ports[j] == NULL)
@@ -406,7 +409,7 @@ netmap_vale_vp_dtor(struct netmap_adapter *na)
 	if (na->ifp != NULL && !nm_iszombie(na)) {
 		NM_DETACH_NA(na->ifp);
 		if (vpna->autodelete) {
-			nm_prdis("releasing %s", na->ifp->if_xname);
+			nm_prdis("releasing %s", if_name(na->ifp));
 			NMG_UNLOCK();
 			nm_os_vi_detach(na->ifp);
 			NMG_LOCK();
@@ -1134,7 +1137,7 @@ done:
  * Only persistent VALE ports have a non-null ifp.
  */
 static int
-netmap_vale_vp_create(struct nmreq_header *hdr, struct ifnet *ifp,
+netmap_vale_vp_create(struct nmreq_header *hdr, if_t ifp,
 		struct netmap_mem_d *nmd, struct netmap_vp_adapter **ret)
 {
 	struct nmreq_register *req = (struct nmreq_register *)(uintptr_t)hdr->nr_body;
@@ -1347,7 +1350,7 @@ nm_vi_create(struct nmreq_header *hdr)
 int
 nm_vi_destroy(const char *name)
 {
-	struct ifnet *ifp;
+	if_t ifp;
 	struct netmap_vp_adapter *vpna;
 	int error;
 
@@ -1379,7 +1382,7 @@ nm_vi_destroy(const char *name)
 	NMG_UNLOCK();
 
 	if (netmap_verbose)
-		nm_prinf("destroying a persistent vale interface %s", ifp->if_xname);
+		nm_prinf("destroying a persistent vale interface %s", if_name(ifp));
 	/* Linux requires all the references are released
 	 * before unregister
 	 */
@@ -1414,7 +1417,7 @@ int
 netmap_vi_create(struct nmreq_header *hdr, int autodelete)
 {
 	struct nmreq_register *req = (struct nmreq_register *)(uintptr_t)hdr->nr_body;
-	struct ifnet *ifp;
+	if_t ifp;
 	struct netmap_vp_adapter *vpna;
 	struct netmap_mem_d *nmd = NULL;
 	int error;
@@ -1478,7 +1481,7 @@ netmap_vi_create(struct nmreq_header *hdr, int autodelete)
 	if (nmd)
 		netmap_mem_put(nmd);
 	NMG_UNLOCK();
-	nm_prdis("created %s", ifp->if_xname);
+	nm_prdis("created %s", if_name(ifp));
 	return 0;
 
 err_2:

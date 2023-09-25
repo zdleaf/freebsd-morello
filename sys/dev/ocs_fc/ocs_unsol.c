@@ -27,8 +27,6 @@
  * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 /**
@@ -690,7 +688,7 @@ ocs_node_dispatch_frame(void *arg, ocs_hw_sequence_t *seq)
 			break;
 
 		case FC_RCTL_BLS:
-			if (sit_set) {
+			if ((sit_set) && (hdr->info == FC_INFO_ABTS)) {
 				rc = ocs_node_recv_abts_frame(node, seq);
 			}else {
 				rc = ocs_node_recv_bls_no_sit(node, seq);

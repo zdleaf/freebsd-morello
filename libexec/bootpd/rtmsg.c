@@ -40,8 +40,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 /*
  * Verify that we are at least 4.4 BSD
@@ -115,10 +113,8 @@ static struct	{
 /*
  * Set an individual arp entry
  */
-int bsd_arp_set(ia, eaddr, len)
-	struct in_addr *ia;
-	char *eaddr;
-	int len;
+int
+bsd_arp_set(struct in_addr *ia, char *eaddr, int len)
 {
 	struct sockaddr_in *sin = &sin_m;
 	struct sockaddr_dl *sdl;
@@ -176,8 +172,8 @@ overwrite:
 }
 
 
-static int rtmsg(cmd)
-	int cmd;
+static int
+rtmsg(int cmd)
 {
 	static int seq;
 	int rlen;

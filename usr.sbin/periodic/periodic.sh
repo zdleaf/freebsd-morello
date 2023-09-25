@@ -1,6 +1,5 @@
 #!/bin/sh -
 #
-# $FreeBSD$
 #
 # Run nightly periodic scripts
 #
@@ -30,9 +29,13 @@ if [ $# -lt 1 ] ; then
     usage
 fi
 
+_localbase=`/sbin/sysctl -n user.localbase 2> /dev/null`
+# Set default value of _localbase if not previously set
+: ${_localbase:="/usr/local"}
+
 # Use a deterministic path to match the preset from /etc/crontab in case
 # periodic is run interactively.
-export PATH=/sbin:/bin:/usr/sbin:/usr/bin:/usr/local/sbin:/usr/local/bin
+export PATH=/sbin:/bin:/usr/sbin:/usr/bin:${_localbase}/sbin:${_localbase}/bin
 
 # If possible, check the global system configuration file,
 # to see if there are additional dirs to check
@@ -53,7 +56,7 @@ if [ $1 != "LOCKED" ]; then
     ret=0
     for arg; do
         lockfile=/var/run/periodic.${arg##*/}.lock
-        lockf -t 0 "${lockfile}" /bin/sh $0 LOCKED "$arg"
+        lockf -s -t 0 "${lockfile}" /bin/sh $0 LOCKED "$arg"
         case $? in
         0) ;;
         73) #EX_CANTCREATE

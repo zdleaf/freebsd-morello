@@ -34,8 +34,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 /*
  * Broadcom BCM57xx(x)/BCM590x NetXtreme and NetLink family Ethernet driver
  *
@@ -130,7 +128,7 @@ MODULE_DEPEND(bge, miibus, 1, 1, 1);
 /*
  * Various supported device vendors/types and their names. Note: the
  * spec seems to indicate that the hardware still has Alteon's vendor
- * ID burned into it, though it will always be overriden by the vendor
+ * ID burned into it, though it will always be overridden by the vendor
  * ID in the EEPROM. Just to be safe, we cover all possibilities.
  */
 static const struct bge_type {
@@ -532,12 +530,10 @@ static driver_t bge_driver = {
 	sizeof(struct bge_softc)
 };
 
-static devclass_t bge_devclass;
-
-DRIVER_MODULE(bge, pci, bge_driver, bge_devclass, 0, 0);
+DRIVER_MODULE(bge, pci, bge_driver, 0, 0);
 MODULE_PNP_INFO("U16:vendor;U16:device", pci, bge, bge_devs,
     nitems(bge_devs) - 1);
-DRIVER_MODULE(miibus, bge, miibus_driver, miibus_devclass, 0, 0);
+DRIVER_MODULE(miibus, bge, miibus_driver, 0, 0);
 
 static int bge_allow_asf = 1;
 
@@ -1924,6 +1920,7 @@ bge_blockinit(struct bge_softc *sc)
 {
 	struct bge_rcb *rcb;
 	bus_size_t vrcb;
+	caddr_t	lladdr;
 	bge_hostaddr taddr;
 	uint32_t dmactl, rdmareg, val;
 	int i, limit;
@@ -2270,11 +2267,12 @@ bge_blockinit(struct bge_softc *sc)
 	RCB_WRITE_4(sc, vrcb, bge_maxlen_flags,
 	    BGE_RCB_MAXLEN_FLAGS(sc->bge_return_ring_cnt, 0));
 
+	lladdr = if_getlladdr(sc->bge_ifp);
 	/* Set random backoff seed for TX */
 	CSR_WRITE_4(sc, BGE_TX_RANDOM_BACKOFF,
-	    (IF_LLADDR(sc->bge_ifp)[0] + IF_LLADDR(sc->bge_ifp)[1] +
-	    IF_LLADDR(sc->bge_ifp)[2] + IF_LLADDR(sc->bge_ifp)[3] +
-	    IF_LLADDR(sc->bge_ifp)[4] + IF_LLADDR(sc->bge_ifp)[5]) &
+	    (lladdr[0] + lladdr[1] +
+	    lladdr[2] + lladdr[3] +
+	    lladdr[4] + lladdr[5]) &
 	    BGE_TX_BACKOFF_SEED_MASK);
 
 	/* Set inter-packet gap */
@@ -5452,7 +5450,7 @@ bge_init_locked(struct bge_softc *sc)
 	    (if_getcapenable(ifp) & IFCAP_VLAN_MTU ? ETHER_VLAN_ENCAP_LEN : 0));
 
 	/* Load our MAC address. */
-	m = (uint16_t *)IF_LLADDR(sc->bge_ifp);
+	m = (uint16_t *)if_getlladdr(sc->bge_ifp);
 	CSR_WRITE_4(sc, BGE_MAC_ADDR1_LO, htons(m[0]));
 	CSR_WRITE_4(sc, BGE_MAC_ADDR1_HI, (htons(m[1]) << 16) | htons(m[2]));
 
@@ -6783,7 +6781,14 @@ bge_debugnet_init(if_t ifp, int *nrxr, int *ncl, int *clsize)
 
 	sc = if_getsoftc(ifp);
 	BGE_LOCK(sc);
-	*nrxr = sc->bge_return_ring_cnt;
+	/*
+	 * There is only one logical receive ring, but it is backed
+	 * by two actual rings, for cluster- and jumbo-sized mbufs.
+	 * Debugnet expects only one size, so if jumbo is in use,
+	 * this says we have two rings of jumbo mbufs, but that's
+	 * only a little wasteful.
+	 */
+	*nrxr = 2;
 	*ncl = DEBUGNET_MAX_IN_FLIGHT;
 	if ((sc->bge_flags & BGE_FLAG_JUMBO_STD) != 0 &&
 	    (if_getmtu(sc->bge_ifp) + ETHER_HDR_LEN + ETHER_CRC_LEN +

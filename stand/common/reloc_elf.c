@@ -28,8 +28,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/types.h>
 #include <machine/elf.h>
 
@@ -56,7 +54,10 @@ __elfN(reloc)(struct elf_file *ef, symaddr_fn *symaddr, const void *reldata,
     __ELF_WORD_SIZE == 64
 	Elf64_Addr *where, val;
 	Elf_Addr addend, addr;
-	Elf_Size rtype, symidx;
+	Elf_Size rtype;
+#if defined(__amd64__) || defined(__i386__)
+	Elf_Size symidx;
+#endif
 	const Elf_Rel *rel;
 	const Elf_Rela *rela;
 
@@ -67,7 +68,9 @@ __elfN(reloc)(struct elf_file *ef, symaddr_fn *symaddr, const void *reldata,
 		    dataaddr);
 		addend = 0;
 		rtype = ELF_R_TYPE(rel->r_info);
+#if defined(__amd64__) || defined(__i386__)
 		symidx = ELF_R_SYM(rel->r_info);
+#endif
 		addend = 0;
 		break;
 	case ELF_RELOC_RELA:
@@ -76,7 +79,9 @@ __elfN(reloc)(struct elf_file *ef, symaddr_fn *symaddr, const void *reldata,
 		    dataaddr);
 		addend = rela->r_addend;
 		rtype = ELF_R_TYPE(rela->r_info);
+#if defined(__amd64__) || defined(__i386__)
 		symidx = ELF_R_SYM(rela->r_info);
+#endif
 		break;
 	default:
 		return (EINVAL);

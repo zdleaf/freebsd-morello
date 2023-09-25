@@ -1,7 +1,5 @@
 /*
  * dumptab.c - handles dumping the database
- *
- * $FreeBSD$
  */
 
 #include <sys/types.h>
@@ -29,8 +27,7 @@ static void list_ipaddresses(FILE *, struct in_addr_list *);
 
 #ifndef	DEBUG
 void
-dumptab(filename)
-	char *filename;
+dumptab(char *filename)
 {
 	report(LOG_INFO, "No dumptab support!");
 }
@@ -42,8 +39,7 @@ dumptab(filename)
  */
 
 void
-dumptab(filename)
-	char *filename;
+dumptab(char *filename)
 {
 	int n;
 	struct host *hp;
@@ -123,9 +119,7 @@ dumptab(filename)
  */
 
 static void
-dump_host(fp, hp)
-	FILE *fp;
-	struct host *hp;
+dump_host(FILE *fp, struct host *hp)
 {
 	/* Print symbols in alphabetical order for reader's convenience. */
 	if (hp) {
@@ -292,9 +286,7 @@ dump_host(fp, hp)
 
 
 static void
-dump_generic(fp, generic)
-	FILE *fp;
-	struct shared_bindata *generic;
+dump_generic(FILE *fp, struct shared_bindata *generic)
 {
 	u_char *bp = generic->data;
 	u_char *ep = bp + generic->length;
@@ -337,9 +329,7 @@ dump_generic(fp, generic)
  */
 
 static void
-list_ipaddresses(fp, ipptr)
-	FILE *fp;
-	struct in_addr_list *ipptr;
+list_ipaddresses(FILE *fp, struct in_addr_list *ipptr)
 {
 	unsigned count;
 	struct in_addr *addrptr;

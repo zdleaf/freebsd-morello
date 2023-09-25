@@ -58,8 +58,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #define SYM_DRIVER_NAME	"sym-1.6.5-20000902"
 
 /* #define SYM_DEBUG_GENERIC_SUPPORT */
@@ -571,7 +569,8 @@ static void sym_mfree(void *ptr, int size, char *name)
  * BUS handle. A reverse table (hashed) is maintained for virtual
  * to BUS address translation.
  */
-static void getbaddrcb(void *arg, bus_dma_segment_t *segs, int nseg, int error)
+static void getbaddrcb(void *arg, bus_dma_segment_t *segs, int nseg __diagused,
+    int error)
 {
 	bus_addr_t *baddr;
 
@@ -8242,9 +8241,7 @@ static driver_t sym_pci_driver = {
 	1	/* no softc */
 };
 
-static devclass_t sym_devclass;
-
-DRIVER_MODULE(sym, pci, sym_pci_driver, sym_devclass, NULL, NULL);
+DRIVER_MODULE(sym, pci, sym_pci_driver, NULL, NULL);
 MODULE_DEPEND(sym, cam, 1, 1, 1);
 MODULE_DEPEND(sym, pci, 1, 1, 1);
 

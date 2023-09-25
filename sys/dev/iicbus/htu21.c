@@ -27,8 +27,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include "opt_platform.h"
 
 #include <sys/param.h>
@@ -521,9 +519,7 @@ static driver_t htu21_driver = {
 	sizeof(struct htu21_softc)
 };
 
-static devclass_t htu21_devclass;
-
-DRIVER_MODULE(htu21, iicbus, htu21_driver, htu21_devclass, 0, 0);
+DRIVER_MODULE(htu21, iicbus, htu21_driver, 0, 0);
 MODULE_DEPEND(htu21, iicbus, IICBUS_MINVER, IICBUS_PREFVER, IICBUS_MAXVER);
 MODULE_VERSION(htu21, 1);
 IICBUS_FDT_PNP_INFO(compat_data);

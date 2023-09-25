@@ -22,8 +22,6 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 /*
@@ -38,8 +36,6 @@
 #include "opt_device_polling.h"
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/bus.h>
@@ -216,7 +212,7 @@ static void gen_set_enaddr(struct gen_softc *sc);
 static void gen_setup_rxfilter(struct gen_softc *sc);
 static void gen_reset(struct gen_softc *sc);
 static void gen_enable(struct gen_softc *sc);
-static void gen_dma_disable(device_t dev);
+static void gen_dma_disable(struct gen_softc *sc);
 static int gen_bus_dma_init(struct gen_softc *sc);
 static void gen_bus_dma_teardown(struct gen_softc *sc);
 static void gen_enable_intr(struct gen_softc *sc);
@@ -289,7 +285,7 @@ gen_attach(device_t dev)
 	/* reset core */
 	gen_reset(sc);
 
-	gen_dma_disable(dev);
+	gen_dma_disable(sc);
 
 	/* Setup DMA */
 	error = gen_bus_dma_init(sc);
@@ -484,6 +480,12 @@ gen_reset(struct gen_softc *sc)
 	WR4(sc, GENET_UMAC_MIB_CTRL, GENET_UMAC_MIB_RESET_RUNT |
 	    GENET_UMAC_MIB_RESET_RX | GENET_UMAC_MIB_RESET_TX);
 	WR4(sc, GENET_UMAC_MIB_CTRL, 0);
+}
+
+static void
+gen_enable(struct gen_softc *sc)
+{
+	u_int val;
 
 	WR4(sc, GENET_UMAC_MAX_FRAME_LEN, 1536);
 
@@ -492,12 +494,6 @@ gen_reset(struct gen_softc *sc)
 	WR4(sc, GENET_RBUF_CTRL, val);
 
 	WR4(sc, GENET_RBUF_TBUF_SIZE_CTRL, 1);
-}
-
-static void
-gen_enable(struct gen_softc *sc)
-{
-	u_int val;
 
 	/* Enable transmitter and receiver */
 	val = RD4(sc, GENET_UMAC_CMD);
@@ -509,6 +505,33 @@ gen_enable(struct gen_softc *sc)
 	gen_enable_intr(sc);
 	WR4(sc, GENET_INTRL2_CPU_CLEAR_MASK,
 	    GENET_IRQ_TXDMA_DONE | GENET_IRQ_RXDMA_DONE);
+}
+
+static void
+gen_disable_intr(struct gen_softc *sc)
+{
+	/* Disable interrupts */
+	WR4(sc, GENET_INTRL2_CPU_SET_MASK, 0xffffffff);
+	WR4(sc, GENET_INTRL2_CPU_CLEAR_MASK, 0xffffffff);
+}
+
+static void
+gen_disable(struct gen_softc *sc)
+{
+	uint32_t val;
+
+	/* Stop receiver */
+	val = RD4(sc, GENET_UMAC_CMD);
+	val &= ~GENET_UMAC_CMD_RXEN;
+	WR4(sc, GENET_UMAC_CMD, val);
+
+	/* Stop transmitter */
+	val = RD4(sc, GENET_UMAC_CMD);
+	val &= ~GENET_UMAC_CMD_TXEN;
+	WR4(sc, GENET_UMAC_CMD, val);
+
+	/* Disable Interrupt */
+	gen_disable_intr(sc);
 }
 
 static void
@@ -538,9 +561,8 @@ gen_enable_offload(struct gen_softc *sc)
 }
 
 static void
-gen_dma_disable(device_t dev)
+gen_dma_disable(struct gen_softc *sc)
 {
-	struct gen_softc *sc = device_get_softc(dev);
 	int val;
 
 	val = RD4(sc, GENET_TX_DMA_CTRL);
@@ -809,6 +831,44 @@ gen_init_rxrings(struct gen_softc *sc)
 }
 
 static void
+gen_stop(struct gen_softc *sc)
+{
+	int i;
+	struct gen_ring_ent *ent;
+
+	GEN_ASSERT_LOCKED(sc);
+
+	callout_stop(&sc->stat_ch);
+	if_setdrvflagbits(sc->ifp, 0, IFF_DRV_RUNNING);
+	gen_reset(sc);
+	gen_disable(sc);
+	gen_dma_disable(sc);
+
+	/* Clear the tx/rx ring buffer */
+	for (i = 0; i < TX_DESC_COUNT; i++) {
+		ent = &sc->tx_ring_ent[i];
+		if (ent->mbuf != NULL) {
+			bus_dmamap_sync(sc->tx_buf_tag, ent->map,
+				BUS_DMASYNC_POSTWRITE);
+			bus_dmamap_unload(sc->tx_buf_tag, ent->map);
+			m_freem(ent->mbuf);
+			ent->mbuf = NULL;
+		}
+	}
+
+	for (i = 0; i < RX_DESC_COUNT; i++) {
+		ent = &sc->rx_ring_ent[i];
+		if (ent->mbuf != NULL) {
+			bus_dmamap_sync(sc->rx_buf_tag, ent->map,
+			    BUS_DMASYNC_POSTREAD | BUS_DMASYNC_POSTWRITE);
+			bus_dmamap_unload(sc->rx_buf_tag, ent->map);
+			m_freem(ent->mbuf);
+			ent->mbuf = NULL;
+		}
+	}
+}
+
+static void
 gen_init_locked(struct gen_softc *sc)
 {
 	struct mii_data *mii;
@@ -886,7 +946,7 @@ gen_setup_multi(void *arg, struct sockaddr_dl *sdl, u_int count)
 static void
 gen_setup_rxfilter(struct gen_softc *sc)
 {
-	struct ifnet *ifp = sc->ifp;
+	if_t ifp = sc->ifp;
 	uint32_t cmd, mdf_ctrl;
 	u_int n;
 
@@ -902,17 +962,17 @@ gen_setup_rxfilter(struct gen_softc *sc)
 	n = if_llmaddr_count(ifp) + 2;
 
 	if (n > GENET_MAX_MDF_FILTER)
-		ifp->if_flags |= IFF_ALLMULTI;
+		if_setflagbits(ifp, IFF_ALLMULTI, 0);
 	else
-		ifp->if_flags &= ~IFF_ALLMULTI;
+		if_setflagbits(ifp, 0, IFF_ALLMULTI);
 
-	if ((ifp->if_flags & (IFF_PROMISC|IFF_ALLMULTI)) != 0) {
+	if ((if_getflags(ifp) & (IFF_PROMISC|IFF_ALLMULTI)) != 0) {
 		cmd |= GENET_UMAC_CMD_PROMISC;
 		mdf_ctrl = 0;
 	} else {
 		cmd &= ~GENET_UMAC_CMD_PROMISC;
 		gen_setup_rxfilter_mdf(sc, 0, ether_broadcastaddr);
-		gen_setup_rxfilter_mdf(sc, 1, IF_LLADDR(ifp));
+		gen_setup_rxfilter_mdf(sc, 1, if_getlladdr(ifp));
 		(void) if_foreach_llmaddr(ifp, gen_setup_multi, sc);
 		mdf_ctrl = (__BIT(GENET_MAX_MDF_FILTER) - 1)  &~
 		    (__BIT(GENET_MAX_MDF_FILTER - n) - 1);
@@ -934,7 +994,7 @@ gen_set_enaddr(struct gen_softc *sc)
 	ifp = sc->ifp;
 
 	/* Write our unicast address */
-	enaddr = IF_LLADDR(ifp);
+	enaddr = if_getlladdr(ifp);
 	/* Write hardware address */
 	val = enaddr[3] | (enaddr[2] << 8) | (enaddr[1] << 16) |
 	    (enaddr[0] << 24);
@@ -948,7 +1008,7 @@ gen_start_locked(struct gen_softc *sc)
 {
 	struct mbuf *m;
 	if_t ifp;
-	int cnt, err;
+	int err;
 
 	GEN_ASSERT_LOCKED(sc);
 
@@ -961,7 +1021,7 @@ gen_start_locked(struct gen_softc *sc)
 	    IFF_DRV_RUNNING)
 		return;
 
-	for (cnt = 0; ; cnt++) {
+	while (true) {
 		m = if_dequeue(ifp);
 		if (m == NULL)
 			break;
@@ -1020,7 +1080,7 @@ gen_encap(struct gen_softc *sc, struct mbuf **mp)
 	if (m->m_len == sizeof(struct ether_header)) {
 		m = m_pullup(m, MIN(m->m_pkthdr.len, gen_tx_hdr_min));
 		if (m == NULL) {
-			if (sc->ifp->if_flags & IFF_DEBUG)
+			if (if_getflags(sc->ifp) & IFF_DEBUG)
 				device_printf(sc->dev,
 				    "header pullup fail\n");
 			*mp = NULL;
@@ -1034,7 +1094,7 @@ gen_encap(struct gen_softc *sc, struct mbuf **mp)
 		csumdata = m->m_pkthdr.csum_data;
 		M_PREPEND(m, sizeof(struct statusblock), M_NOWAIT);
 		if (m == NULL) {
-			if (sc->ifp->if_flags & IFF_DEBUG)
+			if (if_getflags(sc->ifp) & IFF_DEBUG)
 				device_printf(sc->dev, "prepend fail\n");
 			*mp = NULL;
 			return (ENOMEM);
@@ -1190,11 +1250,10 @@ gen_parse_tx(struct mbuf *m, int csum_flags)
 			m0->m_data = m0->m_pktdat;			\
 			bcopy(p0, mtodo(m0, sizeof(struct statusblock)),\
 			    m0->m_len - sizeof(struct statusblock));	\
-			copy_p = mtodo(m0, sizeof(struct statusblock));	\
+			copy_p = mtodo(m0, m0->m_len);			\
 		}							\
 		bcopy(p, copy_p, hsize);				\
 		m0->m_len += hsize;					\
-		m0->m_pkthdr.len += hsize;	/* unneeded */		\
 		m->m_len -= hsize;					\
 		m->m_data += hsize;					\
 	}								\
@@ -1239,9 +1298,12 @@ gen_parse_tx(struct mbuf *m, int csum_flags)
 		offset += sizeof(struct ip6_hdr);
 	} else {
 		/*
-		 * Unknown whether other cases require moving a header;
-		 * ARP works without.
+		 * Unknown whether most other cases require moving a header;
+		 * ARP works without.  However, Wake On LAN packets sent
+		 * by wake(8) via BPF need something like this.
 		 */
+		COPY(MIN(gen_tx_hdr_min, m->m_len));
+		offset += MIN(gen_tx_hdr_min, m->m_len);
 	}
 	return (offset);
 #undef COPY
@@ -1311,7 +1373,7 @@ gen_rxintr(struct gen_softc *sc, struct rx_queue *q)
 		    (GENET_RX_DESC_STATUS_SOP | GENET_RX_DESC_STATUS_EOP |
 		    GENET_RX_DESC_STATUS_RX_ERROR)) !=
 		    (GENET_RX_DESC_STATUS_SOP | GENET_RX_DESC_STATUS_EOP)) {
-			if (ifp->if_flags & IFF_DEBUG)
+			if (if_getflags(ifp) & IFF_DEBUG)
 				device_printf(sc->dev,
 				    "error/frag %x csum %x\n", status,
 				    sb->rxcsum);
@@ -1322,7 +1384,7 @@ gen_rxintr(struct gen_softc *sc, struct rx_queue *q)
 		error = gen_newbuf_rx(sc, q, index);
 		if (error != 0) {
 			if_inc_counter(ifp, IFCOUNTER_IQDROPS, 1);
-			if (ifp->if_flags & IFF_DEBUG)
+			if (if_getflags(ifp) & IFF_DEBUG)
 				device_printf(sc->dev, "gen_newbuf_rx %d\n",
 				    error);
 			/* reuse previous mbuf */
@@ -1498,7 +1560,7 @@ gen_ioctl(if_t ifp, u_long cmd, caddr_t data)
 				gen_init_locked(sc);
 		} else {
 			if (if_getdrvflags(ifp) & IFF_DRV_RUNNING)
-				gen_reset(sc);
+				gen_stop(sc);
 		}
 		sc->if_flags = if_getflags(ifp);
 		GEN_UNLOCK(sc);
@@ -1758,9 +1820,7 @@ static driver_t gen_driver = {
 	sizeof(struct gen_softc),
 };
 
-static devclass_t gen_devclass;
-
-DRIVER_MODULE(genet, simplebus, gen_driver, gen_devclass, 0, 0);
-DRIVER_MODULE(miibus, genet, miibus_driver, miibus_devclass, 0, 0);
+DRIVER_MODULE(genet, simplebus, gen_driver, 0, 0);
+DRIVER_MODULE(miibus, genet, miibus_driver, 0, 0);
 MODULE_DEPEND(genet, ether, 1, 1, 1);
 MODULE_DEPEND(genet, miibus, 1, 1, 1);

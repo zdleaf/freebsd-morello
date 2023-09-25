@@ -1,8 +1,8 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2019 Vladimir Kondratyev <wulf@FreeBSD.org>
- * Copyright (c) 2019 Greg V <greg@unrelenting.technology>
+ * Copyright (c) 2019 Val Packett <val@packett.cool>
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -27,8 +27,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 /*
  * Generic / MS Windows compatible HID pen tablet driver:
  * https://docs.microsoft.com/en-us/windows-hardware/design/component-guidelines/required-hid-top-level-collections
@@ -114,7 +112,6 @@ static int
 hpen_battery_strenght_cb(HIDMAP_CB_ARGS)
 {
 	struct evdev_dev *evdev = HIDMAP_CB_GET_EVDEV();
-	int32_t data;
 
 	switch (HIDMAP_CB_GET_STATE()) {
 	case HIDMAP_CB_IS_ATTACHING:
@@ -122,7 +119,6 @@ hpen_battery_strenght_cb(HIDMAP_CB_ARGS)
 		/* TODO */
 		break;
 	case HIDMAP_CB_IS_RUNNING:
-		data = ctx.data;
 		/* TODO */
 		break;
 	default:
@@ -245,7 +241,6 @@ hpen_detach(device_t dev)
 }
 
 
-static devclass_t hpen_devclass;
 static device_method_t hpen_methods[] = {
 	DEVMETHOD(device_identify,	hpen_identify),
 	DEVMETHOD(device_probe,		hpen_probe),
@@ -256,7 +251,7 @@ static device_method_t hpen_methods[] = {
 };
 
 DEFINE_CLASS_0(hpen, hpen_driver, hpen_methods, sizeof(struct hidmap));
-DRIVER_MODULE(hpen, hidbus, hpen_driver, hpen_devclass, NULL, 0);
+DRIVER_MODULE(hpen, hidbus, hpen_driver, NULL, NULL);
 MODULE_DEPEND(hpen, hid, 1, 1, 1);
 MODULE_DEPEND(hpen, hidbus, 1, 1, 1);
 MODULE_DEPEND(hpen, hidmap, 1, 1, 1);

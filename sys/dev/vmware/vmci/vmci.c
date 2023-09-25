@@ -7,8 +7,6 @@
 /* Driver for VMware Virtual Machine Communication Interface (VMCI) device. */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/bus.h>
 #include <sys/kernel.h>
@@ -70,8 +68,7 @@ static driver_t vmci_driver = {
 	"vmci", vmci_methods, sizeof(struct vmci_softc)
 };
 
-static devclass_t vmci_devclass;
-DRIVER_MODULE(vmci, pci, vmci_driver, vmci_devclass, 0, 0);
+DRIVER_MODULE(vmci, pci, vmci_driver, 0, 0);
 MODULE_VERSION(vmci, VMCI_VERSION);
 const struct {
 	uint16_t vendor;

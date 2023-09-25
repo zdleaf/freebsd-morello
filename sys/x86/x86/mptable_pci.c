@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2003 John Baldwin <jhb@FreeBSD.org>
  *
@@ -31,8 +31,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/bus.h>
@@ -57,7 +55,7 @@ mptable_hostb_probe(device_t dev)
 
 	if (pci_cfgregopen() == 0)
 		return (ENXIO);
-	if (mptable_pci_probe_table(pcib_get_bus(dev)) != 0)
+	if (mptable_pci_probe_table(legacy_get_pcibus(dev)) != 0)
 		return (ENXIO);
 	device_set_desc(dev, "MPTable Host-PCI bridge");
 	return (0);
@@ -199,11 +197,9 @@ static device_method_t mptable_hostb_methods[] = {
 	DEVMETHOD_END
 };
 
-static devclass_t hostb_devclass;
-
 DEFINE_CLASS_0(pcib, mptable_hostb_driver, mptable_hostb_methods,
     sizeof(struct mptable_hostb_softc));
-DRIVER_MODULE(mptable_pcib, legacy, mptable_hostb_driver, hostb_devclass, 0, 0);
+DRIVER_MODULE(mptable_pcib, legacy, mptable_hostb_driver, 0, 0);
 
 /* PCI to PCI bridge driver. */
 
@@ -233,8 +229,6 @@ static device_method_t mptable_pcib_pci_methods[] = {
 	{0, 0}
 };
 
-static devclass_t pcib_devclass;
-
 DEFINE_CLASS_1(pcib, mptable_pcib_driver, mptable_pcib_pci_methods,
     sizeof(struct pcib_softc), pcib_driver);
-DRIVER_MODULE(mptable_pcib, pci, mptable_pcib_driver, pcib_devclass, 0, 0);
+DRIVER_MODULE(mptable_pcib, pci, mptable_pcib_driver, 0, 0);

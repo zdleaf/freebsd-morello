@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2011 NetApp, Inc.
  * All rights reserved.
@@ -24,13 +24,9 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/types.h>
 
 #include <time.h>
@@ -60,7 +56,7 @@ __FBSDID("$FreeBSD$");
  * Returns the current RTC time as number of seconds since 00:00:00 Jan 1, 1970
  */
 static time_t
-rtc_time(struct vmctx *ctx)
+rtc_time(void)
 {
 	struct tm tm;
 	time_t t;
@@ -102,7 +98,7 @@ rtc_init(struct vmctx *ctx)
 	err = vm_rtc_write(ctx, RTC_HMEM_MSB, himem >> 16);
 	assert(err == 0);
 
-	err = vm_rtc_settime(ctx, rtc_time(ctx));
+	err = vm_rtc_settime(ctx, rtc_time());
 	assert(err == 0);
 }
 

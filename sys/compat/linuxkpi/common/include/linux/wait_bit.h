@@ -24,8 +24,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 #ifndef __LINUXKPI_LINUX_WAITBIT_H__
@@ -62,6 +60,12 @@ wake_up_var(void *var)
 {
 
 	wake_up(&linux_var_waitq);
+}
+
+static inline wait_queue_head_t *
+__var_waitqueue(void *p)
+{
+	return (&linux_var_waitq);
 }
 
 #endif	/* __LINUXKPI_LINUX_WAITBIT_H__ */

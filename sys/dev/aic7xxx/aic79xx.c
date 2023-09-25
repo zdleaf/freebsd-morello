@@ -48,7 +48,6 @@
 #include "aicasm/aicasm_insformat.h"
 #else
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
 #include <dev/aic7xxx/aic79xx_osm.h>
 #include <dev/aic7xxx/aic79xx_inline.h>
 #include <dev/aic7xxx/aicasm/aicasm_insformat.h>
@@ -4845,7 +4844,7 @@ ahd_handle_msg_reject(struct ahd_softc *ahd, struct ahd_devinfo *devinfo)
 }
 
 /*
- * Process an ingnore wide residue message.
+ * Process an ignore wide residue message.
  */
 static void
 ahd_handle_ign_wide_residue(struct ahd_softc *ahd, struct ahd_devinfo *devinfo)
@@ -4887,7 +4886,6 @@ ahd_handle_ign_wide_residue(struct ahd_softc *ahd, struct ahd_devinfo *devinfo)
 			 */
 		} else {
 			uint32_t data_cnt;
-			uint64_t data_addr;
 			uint32_t sglen;
 
 			/* Pull in the rest of the sgptr */
@@ -4901,9 +4899,7 @@ ahd_handle_ign_wide_residue(struct ahd_softc *ahd, struct ahd_devinfo *devinfo)
 				 */
 				data_cnt &= ~AHD_SG_LEN_MASK;
 			}
-			data_addr = ahd_inq(ahd, SHADDR);
 			data_cnt += 1;
-			data_addr -= 1;
 			sgptr &= SG_PTR_MASK;
 			if ((ahd->flags & AHD_64BIT_ADDRESSING) != 0) {
 				struct ahd_dma64_seg *sg;
@@ -4925,9 +4921,6 @@ ahd_handle_ign_wide_residue(struct ahd_softc *ahd, struct ahd_devinfo *devinfo)
 					 * bits while setting the count to 1.
 					 */
 					data_cnt = 1|(sglen&(~AHD_SG_LEN_MASK));
-					data_addr = aic_le64toh(sg->addr)
-						  + (sglen & AHD_SG_LEN_MASK)
-						  - 1;
 
 					/*
 					 * Increment sg so it points to the
@@ -4957,9 +4950,6 @@ ahd_handle_ign_wide_residue(struct ahd_softc *ahd, struct ahd_devinfo *devinfo)
 					 * bits while setting the count to 1.
 					 */
 					data_cnt = 1|(sglen&(~AHD_SG_LEN_MASK));
-					data_addr = aic_le32toh(sg->addr)
-						  + (sglen & AHD_SG_LEN_MASK)
-						  - 1;
 
 					/*
 					 * Increment sg so it points to the
@@ -5492,7 +5482,7 @@ ahd_reset(struct ahd_softc *ahd, int reinit)
 		 * does not disable its parity logic prior to
 		 * the start of the reset.  This may cause a
 		 * parity error to be detected and thus a
-		 * spurious SERR or PERR assertion.  Disble
+		 * spurious SERR or PERR assertion.  Disable
 		 * PERR and SERR responses during the CHIPRST.
 		 */
 		mod_cmd = cmd & ~(PCIM_CMD_PERRESPEN|PCIM_CMD_SERRESPEN);
@@ -9451,7 +9441,7 @@ bus_reset:
 				/*
 				 * The sequencer will never re-reference the
 				 * in-core SCB.  To make sure we are notified
-				 * during reslection, set the MK_MESSAGE flag in
+				 * during reselection, set the MK_MESSAGE flag in
 				 * the card's copy of the SCB.
 				 */
 				ahd_outb(ahd, SCB_CONTROL,

@@ -31,8 +31,6 @@
 /* Generic ECAM PCIe driver */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include "opt_platform.h"
 
 #include <sys/param.h>
@@ -54,6 +52,14 @@ __FBSDID("$FreeBSD$");
 
 #include "pcib_if.h"
 
+#if defined(VM_MEMATTR_DEVICE_NP)
+#define	PCI_UNMAPPED
+#define	PCI_RF_FLAGS	RF_UNMAPPED
+#else
+#define	PCI_RF_FLAGS	0
+#endif
+
+
 /* Forward prototypes */
 
 static uint32_t generic_pcie_read_config(device_t dev, u_int bus, u_int slot,
@@ -69,6 +75,10 @@ static int generic_pcie_write_ivar(device_t dev, device_t child, int index,
 int
 pci_host_generic_core_attach(device_t dev)
 {
+#ifdef PCI_UNMAPPED
+	struct resource_map_request req;
+	struct resource_map map;
+#endif
 	struct generic_pcie_core_softc *sc;
 	uint64_t phys_base;
 	uint64_t pci_base;
@@ -94,15 +104,27 @@ pci_host_generic_core_attach(device_t dev)
 	if (error != 0)
 		return (error);
 
-	rid = 0;
-	sc->res = bus_alloc_resource_any(dev, SYS_RES_MEMORY, &rid, RF_ACTIVE);
-	if (sc->res == NULL) {
-		device_printf(dev, "could not map memory.\n");
-		return (ENXIO);
+	if ((sc->quirks & PCIE_CUSTOM_CONFIG_SPACE_QUIRK) == 0) {
+		rid = 0;
+		sc->res = bus_alloc_resource_any(dev, SYS_RES_MEMORY, &rid,
+		    PCI_RF_FLAGS | RF_ACTIVE);
+		if (sc->res == NULL) {
+			device_printf(dev, "could not allocate memory.\n");
+			error = ENXIO;
+			goto err_resource;
+		}
+#ifdef PCI_UNMAPPED
+		resource_init_map_request(&req);
+		req.memattr = VM_MEMATTR_DEVICE_NP;
+		error = bus_map_resource(dev, SYS_RES_MEMORY, sc->res, &req,
+		    &map);
+		if (error != 0) {
+			device_printf(dev, "could not map memory.\n");
+			return (error);
+		}
+		rman_set_mapping(sc->res, &map);
+#endif
 	}
-
-	sc->bst = rman_get_bustag(sc->res);
-	sc->bsh = rman_get_bushandle(sc->res);
 
 	sc->has_pmem = false;
 	sc->pmem_rman.rm_type = RMAN_ARRAY;
@@ -118,19 +140,19 @@ pci_host_generic_core_attach(device_t dev)
 	error = rman_init(&sc->pmem_rman);
 	if (error) {
 		device_printf(dev, "rman_init() failed. error = %d\n", error);
-		return (error);
+		goto err_pmem_rman;
 	}
 
 	error = rman_init(&sc->mem_rman);
 	if (error) {
 		device_printf(dev, "rman_init() failed. error = %d\n", error);
-		return (error);
+		goto err_mem_rman;
 	}
 
 	error = rman_init(&sc->io_rman);
 	if (error) {
 		device_printf(dev, "rman_init() failed. error = %d\n", error);
-		return (error);
+		goto err_io_rman;
 	}
 
 	for (tuple = 0; tuple < MAX_RANGES_TUPLES; tuple++) {
@@ -159,12 +181,44 @@ pci_host_generic_core_attach(device_t dev)
 		if (error) {
 			device_printf(dev, "rman_manage_region() failed."
 						"error = %d\n", error);
-			rman_fini(&sc->pmem_rman);
-			rman_fini(&sc->mem_rman);
-			rman_fini(&sc->io_rman);
-			return (error);
+			goto err_rman_manage;
 		}
 	}
+
+	return (0);
+
+err_rman_manage:
+	rman_fini(&sc->io_rman);
+err_io_rman:
+	rman_fini(&sc->mem_rman);
+err_mem_rman:
+	rman_fini(&sc->pmem_rman);
+err_pmem_rman:
+	if (sc->res != NULL)
+		bus_release_resource(dev, SYS_RES_MEMORY, 0, sc->res);
+err_resource:
+	bus_dma_tag_destroy(sc->dmat);
+	return (error);
+}
+
+int
+pci_host_generic_core_detach(device_t dev)
+{
+	struct generic_pcie_core_softc *sc;
+	int error;
+
+	sc = device_get_softc(dev);
+
+	error = bus_generic_detach(dev);
+	if (error != 0)
+		return (error);
+
+	rman_fini(&sc->io_rman);
+	rman_fini(&sc->mem_rman);
+	rman_fini(&sc->pmem_rman);
+	if (sc->res != NULL)
+		bus_release_resource(dev, SYS_RES_MEMORY, 0, sc->res);
+	bus_dma_tag_destroy(sc->dmat);
 
 	return (0);
 }
@@ -174,8 +228,6 @@ generic_pcie_read_config(device_t dev, u_int bus, u_int slot,
     u_int func, u_int reg, int bytes)
 {
 	struct generic_pcie_core_softc *sc;
-	bus_space_handle_t h;
-	bus_space_tag_t	t;
 	uint64_t offset;
 	uint32_t data;
 
@@ -189,18 +241,16 @@ generic_pcie_read_config(device_t dev, u_int bus, u_int slot,
 		return (~0U);
 
 	offset = PCIE_ADDR_OFFSET(bus - sc->bus_start, slot, func, reg);
-	t = sc->bst;
-	h = sc->bsh;
 
 	switch (bytes) {
 	case 1:
-		data = bus_space_read_1(t, h, offset);
+		data = bus_read_1(sc->res, offset);
 		break;
 	case 2:
-		data = le16toh(bus_space_read_2(t, h, offset));
+		data = le16toh(bus_read_2(sc->res, offset));
 		break;
 	case 4:
-		data = le32toh(bus_space_read_4(t, h, offset));
+		data = le32toh(bus_read_4(sc->res, offset));
 		break;
 	default:
 		return (~0U);
@@ -214,8 +264,6 @@ generic_pcie_write_config(device_t dev, u_int bus, u_int slot,
     u_int func, u_int reg, uint32_t val, int bytes)
 {
 	struct generic_pcie_core_softc *sc;
-	bus_space_handle_t h;
-	bus_space_tag_t t;
 	uint64_t offset;
 
 	sc = device_get_softc(dev);
@@ -227,18 +275,15 @@ generic_pcie_write_config(device_t dev, u_int bus, u_int slot,
 
 	offset = PCIE_ADDR_OFFSET(bus - sc->bus_start, slot, func, reg);
 
-	t = sc->bst;
-	h = sc->bsh;
-
 	switch (bytes) {
 	case 1:
-		bus_space_write_1(t, h, offset, val);
+		bus_write_1(sc->res, offset, val);
 		break;
 	case 2:
-		bus_space_write_2(t, h, offset, htole16(val));
+		bus_write_2(sc->res, offset, htole16(val));
 		break;
 	case 4:
-		bus_space_write_4(t, h, offset, htole32(val));
+		bus_write_4(sc->res, offset, htole32(val));
 		break;
 	default:
 		return;
@@ -405,7 +450,6 @@ pci_host_generic_core_alloc_resource(device_t dev, device_t child, int type,
 	struct generic_pcie_core_softc *sc;
 	struct resource *res;
 	struct rman *rm;
-	rman_res_t phys_start, phys_end;
 
 	sc = device_get_softc(dev);
 
@@ -420,16 +464,6 @@ pci_host_generic_core_alloc_resource(device_t dev, device_t child, int type,
 	if (rm == NULL)
 		return (BUS_ALLOC_RESOURCE(device_get_parent(dev), child,
 		    type, rid, start, end, count, flags));
-
-	/* Translate the address from a PCI address to a physical address */
-	if (generic_pcie_translate_resource_common(dev, type, start, end,
-	    &phys_start, &phys_end) != 0) {
-		device_printf(dev,
-		    "Failed to translate resource %jx-%jx type %x for %s\n",
-		    (uintmax_t)start, (uintmax_t)end, type,
-		    device_get_nameunit(child));
-		return (NULL);
-	}
 
 	if (bootverbose) {
 		device_printf(dev,
@@ -463,11 +497,8 @@ static int
 generic_pcie_activate_resource(device_t dev, device_t child, int type,
     int rid, struct resource *r)
 {
-	struct generic_pcie_core_softc *sc;
 	rman_res_t start, end;
 	int res;
-
-	sc = device_get_softc(dev);
 
 	if ((res = rman_activate_resource(r)) != 0)
 		return (res);
@@ -541,6 +572,8 @@ generic_pcie_get_dma_tag(device_t dev, device_t child)
 
 static device_method_t generic_pcie_methods[] = {
 	DEVMETHOD(device_attach,		pci_host_generic_core_attach),
+	DEVMETHOD(device_detach,		pci_host_generic_core_detach),
+
 	DEVMETHOD(bus_read_ivar,		generic_pcie_read_ivar),
 	DEVMETHOD(bus_write_ivar,		generic_pcie_write_ivar),
 	DEVMETHOD(bus_alloc_resource,		pci_host_generic_core_alloc_resource),

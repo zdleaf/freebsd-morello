@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2011 Semihalf.
  * All rights reserved.
@@ -24,8 +24,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 #include <sys/param.h>
@@ -121,7 +119,7 @@ mv_axp_platform_mp_start_ap(platform_t plat)
 	    src++, dst++) {
 		*dst = *src;
 	}
-	pmap_unmapdev((vm_offset_t)dst, PAGE_SIZE);
+	pmap_unmapdev(dst, PAGE_SIZE);
 	if (cputype == CPU_ID_MV88SV584X_V7) {
 		/* Core rev A0 */
 		div_val = read_cpu_clkdiv(CPU_DIVCLK_CTRL2_RATIO_FULL1);

@@ -1,6 +1,5 @@
 #!/bin/sh
 #
-# $FreeBSD$
 #
 
 # PROVIDE: ldconfig
@@ -37,13 +36,13 @@ ldconfig_start()
 				_LDC="${_LDC} ${i}"
 			fi
 		done
-		check_startmsgs && echo 'ELF ldconfig path:' ${_LDC}
+		startmsg 'ELF ldconfig path:' ${_LDC}
 		${ldconfig} -elf ${_ins} ${_LDC}
 
 		machine_arch=$(sysctl -n hw.machine_arch)
 
 		case ${machine_arch} in
-		amd64|mips64|powerpc64)
+		aarch64|amd64|powerpc64)
 			for i in ${ldconfig_local32_dirs}; do
 				if [ -d "${i}" ]; then
 					_files=`find ${i} -type f`
@@ -58,8 +57,7 @@ ldconfig_start()
 					_LDC="${_LDC} ${i}"
 				fi
 			done
-			check_startmsgs &&
-			    echo '32-bit compatibility ldconfig path:' ${_LDC}
+			startmsg '32-bit compatibility ldconfig path:' ${_LDC}
 			${ldconfig} -32 ${_ins} ${_LDC}
 			;;
 		esac

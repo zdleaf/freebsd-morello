@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2004-2006 Marcel Moolenaar
  * All rights reserved.
@@ -27,8 +27,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/bus.h>
@@ -114,4 +112,4 @@ uart_scc_probe(device_t dev)
 	return (uart_bus_probe(dev, rs, 0, cl, 0, ch, 0));
 }
 
-DRIVER_MODULE(uart, scc, uart_scc_driver, uart_devclass, 0, 0);
+DRIVER_MODULE(uart, scc, uart_scc_driver, 0, 0);

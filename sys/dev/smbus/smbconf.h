@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 1998 Nicolas Souchu
  * All rights reserved.
@@ -24,8 +24,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 #ifndef __DEV_SMBUS_SMBCONF_H
 #define	__DEV_SMBUS_SMBCONF_H
@@ -95,7 +93,6 @@ SMBUS_ACCESSOR(addr,		ADDR,		int)
 #undef SMBUS_ACCESSOR
 
 extern driver_t smbus_driver;
-extern devclass_t smbus_devclass;
 
 #define smbus_quick(bus,slave,how) \
 	(SMBUS_QUICK(device_get_parent(bus), slave, how))

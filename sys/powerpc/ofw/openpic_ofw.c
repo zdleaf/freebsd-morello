@@ -29,8 +29,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/module.h>
@@ -95,11 +93,11 @@ static driver_t openpic_ofw_driver = {
 	sizeof(struct openpic_softc),
 };
 
-EARLY_DRIVER_MODULE(openpic, ofwbus, openpic_ofw_driver, openpic_devclass,
-    0, 0, BUS_PASS_INTERRUPT);
-EARLY_DRIVER_MODULE(openpic, simplebus, openpic_ofw_driver, openpic_devclass,
-    0, 0, BUS_PASS_INTERRUPT);
-EARLY_DRIVER_MODULE(openpic, macio, openpic_ofw_driver, openpic_devclass, 0, 0,
+EARLY_DRIVER_MODULE(openpic, ofwbus, openpic_ofw_driver, 0, 0,
+    BUS_PASS_INTERRUPT);
+EARLY_DRIVER_MODULE(openpic, simplebus, openpic_ofw_driver, 0, 0,
+    BUS_PASS_INTERRUPT);
+EARLY_DRIVER_MODULE(openpic, macio, openpic_ofw_driver, 0, 0,
     BUS_PASS_INTERRUPT);
 
 static int

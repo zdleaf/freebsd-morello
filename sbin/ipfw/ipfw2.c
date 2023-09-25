@@ -16,8 +16,6 @@
  * This software is provided ``AS IS'' without any warranties of any kind.
  *
  * NEW command line interface for IP firewall facility
- *
- * $FreeBSD$
  */
 
 #include <sys/types.h>
@@ -190,6 +188,7 @@ struct _s_x f_ipdscp[] = {
 	{ "af42", IPTOS_DSCP_AF42 >> 2 },	/* 100100 */
 	{ "af43", IPTOS_DSCP_AF43 >> 2 },	/* 100110 */
 	{ "be", IPTOS_DSCP_CS0 >> 2 }, 	/* 000000 */
+	{ "va", IPTOS_DSCP_VA >> 2 },	/* 101100 */
 	{ "ef", IPTOS_DSCP_EF >> 2 },	/* 101110 */
 	{ "cs0", IPTOS_DSCP_CS0 >> 2 },	/* 000000 */
 	{ "cs1", IPTOS_DSCP_CS1 >> 2 },	/* 001000 */
@@ -287,6 +286,7 @@ static struct _s_x rule_actions[] = {
 	{ "return",		TOK_RETURN },
 	{ "eaction",		TOK_EACTION },
 	{ "tcp-setmss",		TOK_TCPSETMSS },
+	{ "setmark",		TOK_SETMARK },
 	{ NULL, 0 }	/* terminator */
 };
 
@@ -300,12 +300,21 @@ static struct _s_x rule_action_params[] = {
 
 /*
  * The 'lookup' instruction accepts one of the following arguments.
- * -1 is a terminator for the list.
  * Arguments are passed as v[1] in O_DST_LOOKUP options.
  */
-static int lookup_key[] = {
-	TOK_DSTIP, TOK_SRCIP, TOK_DSTPORT, TOK_SRCPORT,
-	TOK_UID, TOK_JAIL, TOK_DSCP, -1 };
+static struct _s_x lookup_keys[] = {
+	{ "dst-ip",		LOOKUP_DST_IP },
+	{ "src-ip",		LOOKUP_SRC_IP },
+	{ "dst-port",		LOOKUP_DST_PORT },
+	{ "src-port",		LOOKUP_SRC_PORT },
+	{ "dst-mac",		LOOKUP_DST_MAC },
+	{ "src-mac",		LOOKUP_SRC_MAC },
+	{ "uid",		LOOKUP_UID },
+	{ "jail",		LOOKUP_JAIL },
+	{ "dscp",		LOOKUP_DSCP },
+	{ "mark",		LOOKUP_MARK },
+	{ NULL,			0 },
+};
 
 static struct _s_x rule_options[] = {
 	{ "tagged",		TOK_TAGGED },
@@ -358,6 +367,8 @@ static struct _s_x rule_options[] = {
 	{ "src-ip",		TOK_SRCIP },
 	{ "dst-port",		TOK_DSTPORT },
 	{ "src-port",		TOK_SRCPORT },
+	{ "dst-mac",		TOK_DSTMAC },
+	{ "src-mac",		TOK_SRCMAC },
 	{ "proto",		TOK_PROTO },
 	{ "MAC",		TOK_MAC },
 	{ "mac",		TOK_MAC },
@@ -368,18 +379,19 @@ static struct _s_x rule_options[] = {
 	{ "ipsec",		TOK_IPSEC },
 	{ "icmp6type",		TOK_ICMP6TYPES },
 	{ "icmp6types",		TOK_ICMP6TYPES },
-	{ "ext6hdr",		TOK_EXT6HDR},
-	{ "flow-id",		TOK_FLOWID},
-	{ "ipv6",		TOK_IPV6},
-	{ "ip6",		TOK_IPV6},
-	{ "ipv4",		TOK_IPV4},
-	{ "ip4",		TOK_IPV4},
-	{ "dst-ipv6",		TOK_DSTIP6},
-	{ "dst-ip6",		TOK_DSTIP6},
-	{ "src-ipv6",		TOK_SRCIP6},
-	{ "src-ip6",		TOK_SRCIP6},
-	{ "lookup",		TOK_LOOKUP},
-	{ "flow",		TOK_FLOW},
+	{ "ext6hdr",		TOK_EXT6HDR },
+	{ "flow-id",		TOK_FLOWID },
+	{ "ipv6",		TOK_IPV6 },
+	{ "ip6",		TOK_IPV6 },
+	{ "ipv4",		TOK_IPV4 },
+	{ "ip4",		TOK_IPV4 },
+	{ "dst-ipv6",		TOK_DSTIP6 },
+	{ "dst-ip6",		TOK_DSTIP6 },
+	{ "src-ipv6",		TOK_SRCIP6 },
+	{ "src-ip6",		TOK_SRCIP6 },
+	{ "lookup",		TOK_LOOKUP },
+	{ "flow",		TOK_FLOW },
+	{ "mark",		TOK_MARK },
 	{ "defer-action",	TOK_SKIPACTION },
 	{ "defer-immediate-action",	TOK_SKIPACTION },
 	{ "//",			TOK_COMMENT },
@@ -573,6 +585,13 @@ stringnum_cmp(const char *a, const char *b)
 	return (strcmp(a, b));
 }
 
+struct debug_header {
+	uint16_t cmd_type;
+	uint16_t spare1;
+	uint32_t opt_name;
+	uint32_t total_len;
+	uint32_t spare2;
+};
 
 /*
  * conditionally runs the command.
@@ -583,8 +602,18 @@ do_cmd(int optname, void *optval, uintptr_t optlen)
 {
 	int i;
 
+	if (g_co.debug_only) {
+		struct debug_header dbg = {
+			.cmd_type = 1,
+			.opt_name = optname,
+			.total_len = optlen + sizeof(struct debug_header),
+		};
+		write(1, &dbg, sizeof(dbg));
+		write(1, optval, optlen);
+	}
+
 	if (g_co.test_only)
-		return 0;
+		return (0);
 
 	if (ipfw_socket == -1)
 		ipfw_socket = socket(AF_INET, SOCK_RAW, IPPROTO_RAW);
@@ -603,7 +632,7 @@ do_cmd(int optname, void *optval, uintptr_t optlen)
 	} else {
 		i = setsockopt(ipfw_socket, IPPROTO_IP, optname, optval, optlen);
 	}
-	return i;
+	return (i);
 }
 
 /*
@@ -620,6 +649,18 @@ int
 do_set3(int optname, ip_fw3_opheader *op3, size_t optlen)
 {
 
+	op3->opcode = optname;
+
+	if (g_co.debug_only) {
+		struct debug_header dbg = {
+			.cmd_type = 2,
+			.opt_name = optname,
+			.total_len = optlen, sizeof(struct debug_header),
+		};
+		write(1, &dbg, sizeof(dbg));
+		write(1, op3, optlen);
+	}
+
 	if (g_co.test_only)
 		return (0);
 
@@ -628,7 +669,6 @@ do_set3(int optname, ip_fw3_opheader *op3, size_t optlen)
 	if (ipfw_socket < 0)
 		err(EX_UNAVAILABLE, "socket");
 
-	op3->opcode = optname;
 
 	return (setsockopt(ipfw_socket, IPPROTO_IP, IP_FW3, op3, optlen));
 }
@@ -649,6 +689,18 @@ do_get3(int optname, ip_fw3_opheader *op3, size_t *optlen)
 	int error;
 	socklen_t len;
 
+	op3->opcode = optname;
+
+	if (g_co.debug_only) {
+		struct debug_header dbg = {
+			.cmd_type = 3,
+			.opt_name = optname,
+			.total_len = *optlen + sizeof(struct debug_header),
+		};
+		write(1, &dbg, sizeof(dbg));
+		write(1, op3, *optlen);
+	}
+
 	if (g_co.test_only)
 		return (0);
 
@@ -657,7 +709,6 @@ do_get3(int optname, ip_fw3_opheader *op3, size_t *optlen)
 	if (ipfw_socket < 0)
 		err(EX_UNAVAILABLE, "socket");
 
-	op3->opcode = optname;
 
 	len = *optlen;
 	error = getsockopt(ipfw_socket, IPPROTO_IP, IP_FW3, op3, &len);
@@ -1091,6 +1142,45 @@ fill_dscp(ipfw_insn *cmd, char *av, int cblen)
 	}
 }
 
+/*
+ * Fill the body of the command with mark value and mask.
+ */
+static void
+fill_mark(ipfw_insn *cmd, char *av, int cblen)
+{
+	uint32_t *value, *mask;
+	char *value_str;
+
+	cmd->opcode = O_MARK;
+	cmd->len |= F_INSN_SIZE(ipfw_insn_u32) + 1;
+
+	CHECK_CMDLEN;
+
+	value = (uint32_t *)(cmd + 1);
+	mask = value + 1;
+
+	value_str = strsep(&av, ":");
+
+	if (strcmp(value_str, "tablearg") == 0) {
+		cmd->arg1 = IP_FW_TARG;
+		*value = 0;
+	} else {
+		/* This is not a tablearg */
+		cmd->arg1 |= 0x8000;
+		*value = strtoul(value_str, NULL, 0);
+	}
+	if (av)
+		*mask = strtoul(av, NULL, 0);
+	else
+		*mask = 0xFFFFFFFF;
+
+	if ((*value & *mask) != *value)
+		errx(EX_DATAERR, "Static mark value: some bits in value are"
+		    " set that will be masked out by mask "
+		    "(%#x & %#x) = %#x != %#x",
+		    *value, *mask, (*value & *mask), *value);
+}
+
 static struct _s_x icmpcodes[] = {
       { "net",			ICMP_UNREACH_NET },
       { "host",			ICMP_UNREACH_HOST },
@@ -1111,8 +1201,8 @@ static struct _s_x icmpcodes[] = {
       { NULL, 0 }
 };
 
-static void
-fill_reject_code(u_short *codep, char *str)
+static uint16_t
+get_reject_code(const char *str)
 {
 	int val;
 	char *s;
@@ -1122,8 +1212,7 @@ fill_reject_code(u_short *codep, char *str)
 		val = match_token(icmpcodes, str);
 	if (val < 0)
 		errx(EX_DATAERR, "unknown ICMP unreachable code ``%s''", str);
-	*codep = val;
-	return;
+	return (val);
 }
 
 static void
@@ -1211,11 +1300,9 @@ print_ip(struct buf_pr *bp, const struct format_opts *fo,
 
 	bprintf(bp, " ");
 	if (cmd->o.opcode == O_IP_DST_LOOKUP && len > F_INSN_SIZE(ipfw_insn_u32)) {
-		uint32_t d = a[1];
-		const char *arg = "<invalid>";
+		const char *arg;
 
-		if (d < sizeof(lookup_key)/sizeof(lookup_key[0]))
-			arg = match_value(rule_options, lookup_key[d]);
+		arg = match_value(lookup_keys, a[1]);
 		t = table_search_ctlv(fo->tstate,
 		    ((const ipfw_insn *)cmd)->arg1);
 		bprintf(bp, "lookup %s %s", arg, t);
@@ -1329,6 +1416,22 @@ print_mac(struct buf_pr *bp, const ipfw_insn_mac *mac)
 	bprintf(bp, " MAC");
 	format_mac(bp, mac->addr, mac->mask);
 	format_mac(bp, mac->addr + 6, mac->mask + 6);
+}
+
+static void
+print_mac_lookup(struct buf_pr *bp, const struct format_opts *fo,
+    const ipfw_insn *cmd)
+{
+	uint32_t len = F_LEN(cmd);
+	char *t;
+
+	bprintf(bp, " ");
+
+	t = table_search_ctlv(fo->tstate, cmd->arg1);
+	bprintf(bp, "table(%s", t);
+	if (len == F_INSN_SIZE(ipfw_insn_u32))
+		bprintf(bp, ",%u", ((const ipfw_insn_u32 *)cmd)->d[0]);
+	bprintf(bp, ")");
 }
 
 static void
@@ -1517,6 +1620,14 @@ print_instruction(struct buf_pr *bp, const struct format_opts *fo,
 		if (state->flags & HAVE_DSTIP)
 			bprintf(bp, " dst-ip6");
 		print_ip6(bp, insntod(cmd, ip6));
+		break;
+	case O_MAC_SRC_LOOKUP:
+		bprintf(bp, " src-mac");
+		print_mac_lookup(bp, fo, cmd);
+		break;
+	case O_MAC_DST_LOOKUP:
+		bprintf(bp, " dst-mac");
+		print_mac_lookup(bp, fo, cmd);
 		break;
 	case O_FLOW6ID:
 		print_flow6id(bp, insntod(cmd, u32));
@@ -1755,6 +1866,19 @@ print_instruction(struct buf_pr *bp, const struct format_opts *fo,
 	case O_SKIP_ACTION:
 		bprintf(bp, " defer-immediate-action");
 		break;
+	case O_MARK:
+		bprintf(bp, " mark");
+		if (cmd->arg1 == IP_FW_TARG)
+			bprintf(bp, " tablearg");
+		else
+			bprintf(bp, " %#x",
+			    ((const ipfw_insn_u32 *)cmd)->d[0]);
+
+		if (((const ipfw_insn_u32 *)cmd)->d[1] != 0xFFFFFFFF)
+			bprintf(bp, ":%#x",
+			    ((const ipfw_insn_u32 *)cmd)->d[1]);
+		break;
+
 	default:
 		bprintf(bp, " [opcode %d len %d]", cmd->opcode,
 		    cmd->len);
@@ -1858,6 +1982,10 @@ print_action_instruction(struct buf_pr *bp, const struct format_opts *fo,
 			bprintf(bp, "abort");
 		else if (cmd->arg1 == ICMP_UNREACH_HOST)
 			bprintf(bp, "reject");
+		else if (cmd->arg1 == ICMP_UNREACH_NEEDFRAG &&
+		    cmd->len == F_INSN_SIZE(ipfw_insn_u16))
+			bprintf(bp, "needfrag %u",
+			    ((const ipfw_insn_u16 *)cmd)->ports[0]);
 		else
 			print_reject_code(bp, cmd->arg1);
 		break;
@@ -1993,6 +2121,13 @@ print_action_instruction(struct buf_pr *bp, const struct format_opts *fo,
 			bprintf(bp, "return");
 		else
 			bprint_uint_arg(bp, "call ", cmd->arg1);
+		break;
+	case O_SETMARK:
+		if (cmd->arg1 == IP_FW_TARG) {
+			bprintf(bp, "setmark tablearg");
+			break;
+		}
+		bprintf(bp, "setmark %#x", ((const ipfw_insn_u32 *)cmd)->d[0]);
 		break;
 	default:
 		bprintf(bp, "** unrecognized action %d len %d ",
@@ -2138,7 +2273,7 @@ static const int action_opcodes[] = {
 	O_CHECK_STATE, O_ACCEPT, O_COUNT, O_DENY, O_REJECT,
 	O_UNREACH6, O_SKIPTO, O_PIPE, O_QUEUE, O_DIVERT, O_TEE,
 	O_NETGRAPH, O_NGTEE, O_FORWARD_IP, O_FORWARD_IP6, O_NAT,
-	O_SETFIB, O_SETDSCP, O_REASS, O_CALLRETURN,
+	O_SETFIB, O_SETDSCP, O_REASS, O_CALLRETURN, O_SETMARK,
 	/* keep the following opcodes at the end of the list */
 	O_EXTERNAL_ACTION, O_EXTERNAL_INSTANCE, O_EXTERNAL_DATA
 };
@@ -2650,7 +2785,6 @@ list_static_range(struct cmdline_opts *co, struct format_opts *fo,
 	int n, seen;
 	struct ip_fw_rule *r;
 	struct ip_fw_bcounter *cntr;
-	int c = 0;
 
 	for (n = seen = 0; n < rcnt; n++,
 	    rtlv = (ipfw_obj_tlv *)((caddr_t)rtlv + rtlv->length)) {
@@ -2669,7 +2803,6 @@ list_static_range(struct cmdline_opts *co, struct format_opts *fo,
 		if (r->rulenum >= fo->first && r->rulenum <= fo->last) {
 			show_static_rule(co, fo, bp, r, cntr);
 			printf("%s", bp->buf);
-			c += rtlv->length;
 			bp_flush(bp);
 			seen++;
 		}
@@ -2754,7 +2887,7 @@ ipfw_list(int ac, char *av[], int show_counters)
 		}
 	}
 
-	/* get configuraion from kernel */
+	/* get configuration from kernel */
 	cfg = NULL;
 	sfo.show_counters = show_counters;
 	sfo.show_time = g_co.do_time;
@@ -2788,13 +2921,12 @@ ipfw_show_config(struct cmdline_opts *co, struct format_opts *fo,
 	char *endptr;
 	size_t readsz;
 	struct buf_pr bp;
-	ipfw_obj_ctlv *ctlv, *tstate;
+	ipfw_obj_ctlv *ctlv;
 	ipfw_obj_tlv *rbase;
 
 	/*
 	 * Handle tablenames TLV first, if any
 	 */
-	tstate = NULL;
 	rbase = NULL;
 	dynbase = NULL;
 	dynsz = 0;
@@ -3682,6 +3814,29 @@ add_dstip(ipfw_insn *cmd, char *av, int cblen, struct tidx *tstate)
 	return cmd;
 }
 
+static ipfw_insn *
+add_srcmac(ipfw_insn *cmd, char *av, struct tidx *tstate)
+{
+
+	if (strncmp(av, "table(", 6) == 0)
+		fill_table(cmd, av, O_MAC_SRC_LOOKUP, tstate);
+	else
+		errx(EX_DATAERR, "only mac table lookup is supported %s", av);
+	return cmd;
+}
+
+static ipfw_insn *
+add_dstmac(ipfw_insn *cmd, char *av, struct tidx *tstate)
+{
+
+	if (strncmp(av, "table(", 6) == 0)
+		fill_table(cmd, av, O_MAC_DST_LOOKUP, tstate);
+	else
+		errx(EX_DATAERR, "only mac table lookup is supported %s", av);
+	return cmd;
+}
+
+
 static struct _s_x f_reserved_keywords[] = {
 	{ "altq",	TOK_OR },
 	{ "//",		TOK_OR },
@@ -3777,6 +3932,50 @@ add_dst(ipfw_insn *cmd, char *av, u_char proto, int cblen, struct tidx *tstate)
 		ret = cmd;
 
 	return ret;
+}
+
+static inline int
+arg_or_targ_relaxed(const char *arg, const char *action)
+{
+	uint32_t arg1 = (uint32_t)(-1);
+
+	if (arg == NULL)
+		errx(EX_USAGE, "missing argument for %s", action);
+	if (isdigit(arg[0])) {
+		arg1 = strtoul(arg, NULL, 10);
+		if (arg1 <= 0 || arg1 >= IP_FW_TABLEARG)
+			errx(EX_DATAERR, "illegal argument %s(%u) for %s",
+			    arg, arg1, action);
+	} else if (_substrcmp(arg, "tablearg") == 0)
+		arg1 = IP_FW_TARG;
+	return (arg1);
+}
+
+static inline uint16_t
+arg_or_targ(const char *arg, const char *action)
+{
+	uint32_t arg1 = arg_or_targ_relaxed(arg, action);
+
+	if (arg1 == (uint32_t)(-1))
+		errx(EX_DATAERR, "illegal argument %s(%u) for %s",
+		    arg, arg1, action);
+	return (arg1);
+}
+
+static uint16_t
+get_divert_port(const char *arg, const char *action)
+{
+	uint32_t arg1 = arg_or_targ_relaxed(arg, action);
+
+	if (arg1 != (uint32_t)(-1))
+		return (arg1);
+
+	struct servent *s;
+	setservent(1);
+	s = getservbyname(arg, "divert");
+	if (s == NULL)
+		errx(EX_DATAERR, "illegal divert/tee port");
+	return (ntohs(s->s_port));
 }
 
 /*
@@ -3938,14 +4137,25 @@ compile_rule(char *av[], uint32_t *rbuf, int *rbufsize, struct tidx *tstate)
 	case TOK_UNREACH:
 		action->opcode = O_REJECT;
 		NEED1("missing reject code");
-		fill_reject_code(&action->arg1, *av);
+		action->arg1 = get_reject_code(*av);
 		av++;
+		if (action->arg1 == ICMP_UNREACH_NEEDFRAG && isdigit(**av)) {
+			uint16_t mtu;
+
+			mtu = strtoul(*av, NULL, 10);
+			if (mtu < 68 || mtu >= IP_MAXPACKET)
+				errx(EX_DATAERR, "illegal argument for %s",
+				    *(av - 1));
+			action->len = F_INSN_SIZE(ipfw_insn_u16);
+			((ipfw_insn_u16 *)action)->ports[0] = mtu;
+			av++;
+		}
 		break;
 
 	case TOK_UNREACH6:
 		action->opcode = O_UNREACH6;
 		NEED1("missing unreach code");
-		fill_unreach6_code(&action->arg1, *av);
+		action->arg1 = get_unreach6_code(*av);
 		av++;
 		break;
 
@@ -3957,55 +4167,50 @@ compile_rule(char *av[], uint32_t *rbuf, int *rbufsize, struct tidx *tstate)
 		action->opcode = O_NAT;
 		action->len = F_INSN_SIZE(ipfw_insn_nat);
 		CHECK_ACTLEN;
-		if (*av != NULL && _substrcmp(*av, "global") == 0) {
+		if (*av != NULL && _substrcmp(*av, "global") == 0)
 			action->arg1 = IP_FW_NAT44_GLOBAL;
-			av++;
-			break;
-		} else
-			goto chkarg;
+		else
+			action->arg1 = arg_or_targ(av[0], *(av - 1));
+		av++;
+		break;
 	case TOK_QUEUE:
 		action->opcode = O_QUEUE;
-		goto chkarg;
+		action->arg1 = arg_or_targ(av[0], *(av - 1));
+		av++;
+		break;
 	case TOK_PIPE:
 		action->opcode = O_PIPE;
-		goto chkarg;
+		action->arg1 = arg_or_targ(av[0], *(av - 1));
+		av++;
+		break;
 	case TOK_SKIPTO:
 		action->opcode = O_SKIPTO;
-		goto chkarg;
+		action->arg1 = arg_or_targ(av[0], *(av - 1));
+		av++;
+		break;
 	case TOK_NETGRAPH:
 		action->opcode = O_NETGRAPH;
-		goto chkarg;
+		action->arg1 = arg_or_targ(av[0], *(av - 1));
+		av++;
+		break;
 	case TOK_NGTEE:
 		action->opcode = O_NGTEE;
-		goto chkarg;
+		action->arg1 = arg_or_targ(av[0], *(av - 1));
+		av++;
+		break;
 	case TOK_DIVERT:
 		action->opcode = O_DIVERT;
-		goto chkarg;
+		action->arg1 = get_divert_port(av[0], *(av - 1));
+		av++;
+		break;
 	case TOK_TEE:
 		action->opcode = O_TEE;
-		goto chkarg;
+		action->arg1 = get_divert_port(av[0], *(av - 1));
+		av++;
+		break;
 	case TOK_CALL:
 		action->opcode = O_CALLRETURN;
-chkarg:
-		if (!av[0])
-			errx(EX_USAGE, "missing argument for %s", *(av - 1));
-		if (isdigit(**av)) {
-			action->arg1 = strtoul(*av, NULL, 10);
-			if (action->arg1 <= 0 || action->arg1 >= IP_FW_TABLEARG)
-				errx(EX_DATAERR, "illegal argument for %s",
-				    *(av - 1));
-		} else if (_substrcmp(*av, "tablearg") == 0) {
-			action->arg1 = IP_FW_TARG;
-		} else if (i == TOK_DIVERT || i == TOK_TEE) {
-			struct servent *s;
-			setservent(1);
-			s = getservbyname(av[0], "divert");
-			if (s != NULL)
-				action->arg1 = ntohs(s->s_port);
-			else
-				errx(EX_DATAERR, "illegal divert/tee port");
-		} else
-			errx(EX_DATAERR, "illegal argument for %s", *(av - 1));
+		action->arg1 = arg_or_targ(av[0], *(av - 1));
 		av++;
 		break;
 
@@ -4175,6 +4380,23 @@ chkarg:
 	case TOK_RETURN:
 		fill_cmd(action, O_CALLRETURN, F_NOT, 0);
 		break;
+
+	case TOK_SETMARK: {
+		action->opcode = O_SETMARK;
+		action->len = F_INSN_SIZE(ipfw_insn_u32);
+		NEED1("missing mark");
+		if (strcmp(*av, "tablearg") == 0) {
+			action->arg1 = IP_FW_TARG;
+		} else {
+		        ((ipfw_insn_u32 *)action)->d[0] =
+		            strtoul(*av, NULL, 0);
+			/* This is not a tablearg */
+			action->arg1 |= 0x8000;
+		}
+		av++;
+		CHECK_CMDLEN;
+		break;
+	}
 
 	case TOK_TCPSETMSS: {
 		u_long mss;
@@ -4912,6 +5134,21 @@ read_options:
 			}
 			break;
 
+
+		case TOK_SRCMAC:
+			NEED1("missing source MAC");
+			if (add_srcmac(cmd, *av, tstate)) {
+				av++;
+			}
+			break;
+
+		case TOK_DSTMAC:
+			NEED1("missing destination MAC");
+			if (add_dstmac(cmd, *av, tstate)) {
+				av++;
+			}
+			break;
+
 		case TOK_SRCPORT:
 			NEED1("missing source port");
 			if (_substrcmp(*av, "any") == 0 ||
@@ -5013,28 +5250,23 @@ read_options:
 
 		case TOK_LOOKUP: {
 			ipfw_insn_u32 *c = (ipfw_insn_u32 *)cmd;
-			int j;
 
 			if (!av[0] || !av[1])
 				errx(EX_USAGE, "format: lookup argument tablenum");
 			cmd->opcode = O_IP_DST_LOOKUP;
 			cmd->len |= F_INSN_SIZE(ipfw_insn) + 2;
-			i = match_token(rule_options, *av);
-			for (j = 0; lookup_key[j] >= 0 ; j++) {
-				if (i == lookup_key[j])
-					break;
-			}
-			if (lookup_key[j] <= 0)
+			i = match_token(lookup_keys, *av);
+			if (i == -1)
 				errx(EX_USAGE, "format: cannot lookup on %s", *av);
-			__PAST_END(c->d, 1) = j; // i converted to option
+			__PAST_END(c->d, 1) = i;
 			av++;
 
-			if ((j = pack_table(tstate, *av)) == 0)
+			if ((i = pack_table(tstate, *av)) == 0)
 				errx(EX_DATAERR, "Invalid table name: %s", *av);
 
-			cmd->arg1 = j;
+			cmd->arg1 = i;
 			av++;
-		    }
+			}
 			break;
 		case TOK_FLOW:
 			NEED1("missing table name");
@@ -5051,6 +5283,12 @@ read_options:
 					"is allowed");
 			have_skipcmd = cmd;
 			fill_cmd(cmd, O_SKIP_ACTION, 0, 0);
+			break;
+
+		case TOK_MARK:
+			NEED1("missing mark value:mask");
+			fill_mark(cmd, *av, cblen);
+			av++;
 			break;
 
 		default:

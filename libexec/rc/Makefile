@@ -1,4 +1,3 @@
-# $FreeBSD$
 
 .include <src.opts.mk>
 
@@ -10,9 +9,6 @@ CONFETCPACKAGE=	rc
 .if ${MK_IPFW} != "no"
 CONFETC+=	rc.firewall
 .endif
-.if ${MK_SENDMAIL} != "no"
-CONFETC+=	rc.sendmail
-.endif
 CONFETCMODE=	644
 CONFETCEXEC=	netstart pccard_ether rc.resume rc.suspend
 CONFETCEXECDIR=	/etc
@@ -23,5 +19,8 @@ CONFETCDEFAULTS=	rc.conf
 CONFETCDEFAULTSPACKAGE=	rc
 
 SUBDIR+=	rc.d
+
+HAS_TESTS=
+SUBDIR.${MK_TESTS}+=	tests
 
 .include <bsd.prog.mk>

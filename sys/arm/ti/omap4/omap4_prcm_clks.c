@@ -30,8 +30,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
@@ -1497,8 +1495,6 @@ static driver_t omap4_prcm_driver = {
 	sizeof(struct omap4_prcm_softc),
 };
 
-static devclass_t omap4_prcm_devclass;
-
-EARLY_DRIVER_MODULE(omap4_prcm, simplebus, omap4_prcm_driver,
-    omap4_prcm_devclass, 0, 0, BUS_PASS_BUS + BUS_PASS_ORDER_MIDDLE);
+EARLY_DRIVER_MODULE(omap4_prcm, simplebus, omap4_prcm_driver, 0, 0,
+    BUS_PASS_BUS + BUS_PASS_ORDER_MIDDLE);
 MODULE_VERSION(omap4_prcm, 1);

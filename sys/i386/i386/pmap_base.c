@@ -83,8 +83,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include "opt_apic.h"
 #include "opt_cpu.h"
 #include "opt_pmap.h"
@@ -807,10 +805,10 @@ pmap_mapbios(vm_paddr_t pa, vm_size_t size)
 }
 
 void
-pmap_unmapdev(vm_offset_t va, vm_size_t size)
+pmap_unmapdev(void *p, vm_size_t size)
 {
 
-	pmap_methods_ptr->pm_unmapdev(va, size);
+	pmap_methods_ptr->pm_unmapdev(p, size);
 }
 
 void
@@ -944,6 +942,12 @@ pmap_kremove(vm_offset_t va)
 {
 
 	pmap_methods_ptr->pm_kremove(va);
+}
+
+void
+pmap_active_cpus(pmap_t pmap, cpuset_t *res)
+{
+	*res = pmap->pm_active;
 }
 
 extern struct pmap_methods pmap_pae_methods, pmap_nopae_methods;

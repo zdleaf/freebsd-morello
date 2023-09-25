@@ -25,8 +25,6 @@
  * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 #ifndef	_LINUXKPI_ASM_ATOMIC_LONG_H_
 #define	_LINUXKPI_ASM_ATOMIC_LONG_H_
@@ -41,7 +39,7 @@ typedef struct {
 } atomic_long_t;
 
 #define	atomic_long_add(i, v)		atomic_long_add_return((i), (v))
-#define	atomic_long_sub(i, v)		atomic_long_add_return(-(i), (v))
+#define	atomic_long_sub(i, v)		atomic_long_sub_return((i), (v))
 #define	atomic_long_inc_return(v)	atomic_long_add_return(1, (v))
 #define	atomic_long_inc_not_zero(v)	atomic_long_add_unless((v), 1, 0)
 
@@ -49,6 +47,12 @@ static inline long
 atomic_long_add_return(long i, atomic_long_t *v)
 {
 	return i + atomic_fetchadd_long(&v->counter, i);
+}
+
+static inline long
+atomic_long_sub_return(long i, atomic_long_t *v)
+{
+	return atomic_fetchadd_long(&v->counter, -i) - i;
 }
 
 static inline void

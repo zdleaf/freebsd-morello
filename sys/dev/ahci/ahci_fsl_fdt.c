@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2020 Alstom Group
  * Copyright (c) 2020 Semihalf
@@ -29,8 +29,6 @@
 /* AHCI controller driver for NXP QorIQ Layerscape SoCs. */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/stdint.h>
 #include <sys/stddef.h>
 #include <sys/param.h>
@@ -417,8 +415,5 @@ static driver_t ahci_fsl_fdt_driver = {
 	sizeof(struct ahci_fsl_fdt_controller),
 };
 
-static devclass_t ahci_fsl_fdt_devclass;
-DRIVER_MODULE(ahci_fsl, simplebus, ahci_fsl_fdt_driver, ahci_fsl_fdt_devclass,
-    NULL, NULL);
-DRIVER_MODULE(ahci_fsl, ofwbus, ahci_fsl_fdt_driver, ahci_fsl_fdt_devclass,
-    NULL, NULL);
+DRIVER_MODULE(ahci_fsl, simplebus, ahci_fsl_fdt_driver, NULL, NULL);
+DRIVER_MODULE(ahci_fsl, ofwbus, ahci_fsl_fdt_driver, NULL, NULL);

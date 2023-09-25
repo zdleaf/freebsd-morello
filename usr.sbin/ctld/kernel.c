@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2003, 2004 Silicon Graphics International Corp.
  * Copyright (c) 1997-2007 Kenneth D. Merry
@@ -38,8 +38,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/capsicum.h>
 #include <sys/callout.h>
@@ -954,7 +952,7 @@ kernel_handoff(struct ctld_connection *conn)
 }
 
 void
-kernel_limits(const char *offload, int *max_recv_dsl, int *max_send_dsl,
+kernel_limits(const char *offload, int s, int *max_recv_dsl, int *max_send_dsl,
     int *max_burst_length, int *first_burst_length)
 {
 	struct ctl_iscsi req;
@@ -967,6 +965,7 @@ kernel_limits(const char *offload, int *max_recv_dsl, int *max_send_dsl,
 	if (offload != NULL) {
 		strlcpy(cilp->offload, offload, sizeof(cilp->offload));
 	}
+	cilp->socket = s;
 
 	if (ioctl(ctl_fd, CTL_ISCSI, &req) == -1) {
 		log_err(1, "error issuing CTL_ISCSI ioctl; "

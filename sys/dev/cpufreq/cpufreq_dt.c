@@ -22,8 +22,6 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 /*
@@ -31,8 +29,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/bus.h>
@@ -125,9 +121,6 @@ static void
 cpufreq_dt_opp_to_setting(device_t dev, const struct cpufreq_dt_opp *opp,
     struct cf_setting *set)
 {
-	struct cpufreq_dt_softc *sc;
-
-	sc = device_get_softc(dev);
 
 	memset(set, 0, sizeof(*set));
 	set->freq = opp->freq / 1000000;
@@ -622,7 +615,5 @@ static driver_t cpufreq_dt_driver = {
 	sizeof(struct cpufreq_dt_softc),
 };
 
-static devclass_t cpufreq_dt_devclass;
-
-DRIVER_MODULE(cpufreq_dt, cpu, cpufreq_dt_driver, cpufreq_dt_devclass, 0, 0);
+DRIVER_MODULE(cpufreq_dt, cpu, cpufreq_dt_driver, 0, 0);
 MODULE_VERSION(cpufreq_dt, 1);

@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2017 Tom Jones <tj@enoti.me>
  * All rights reserved.
@@ -43,8 +43,6 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/bus.h>
@@ -517,8 +515,7 @@ static driver_t chvgpio_driver = {
     .size = sizeof(struct chvgpio_softc)
 };
 
-static devclass_t chvgpio_devclass;
-DRIVER_MODULE(chvgpio, acpi, chvgpio_driver, chvgpio_devclass, NULL , NULL);
+DRIVER_MODULE(chvgpio, acpi, chvgpio_driver, NULL, NULL);
 MODULE_DEPEND(chvgpio, acpi, 1, 1, 1);
 MODULE_DEPEND(chvgpio, gpiobus, 1, 1, 1);
 

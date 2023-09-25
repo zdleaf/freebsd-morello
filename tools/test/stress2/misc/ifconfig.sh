@@ -1,6 +1,6 @@
 #!/bin/sh
 #
-# SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+# SPDX-License-Identifier: BSD-2-Clause
 #
 # Copyright (c) 2021 Peter Holm <pho@FreeBSD.org>
 #
@@ -50,7 +50,7 @@ start=`date +%s`
 while [ $((`date +%s` - start)) -lt 300 ]; do
 	for i in `jot 255`; do
 		(ifconfig $if.$i create
-		ifconfig $if.$i inet 224.0.0.$i
+		ifconfig $if.$i inet 224.0.0.$i netmask 255.255.255.0
 		ifconfig $if.$i destroy) > /dev/null 2>&1 &
 	done
 	wait

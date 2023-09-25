@@ -28,8 +28,6 @@
 .\" ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
 .\" THE POSSIBILITY OF SUCH DAMAGE.
 .\"
-.\" $FreeBSD$
-.\"
 .Dd November 14, 2011
 .Dt TI 4
 .Os
@@ -299,7 +297,7 @@ driver also includes a character device interface that can be used for
 additional diagnostics, configuration and debugging.
 With this character
 device interface, and a specially patched version of
-.Xr gdb 1 ,
+.Xr gdb 1 Pq Pa ports/devel/gdb ,
 the user can
 debug firmware running on the Tigon board.
 .Pp

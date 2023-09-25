@@ -59,8 +59,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include "opt_vm.h"
 #include "opt_kstack_pages.h"
 #include "opt_kstack_max_pages.h"
@@ -580,8 +578,7 @@ vm_forkproc(struct thread *td, struct proc *p2, struct thread *td2,
  * the process was still executing.
  */
 void
-vm_waitproc(p)
-	struct proc *p;
+vm_waitproc(struct proc *p)
 {
 
 	vmspace_exitfree(p);		/* and clean-out the vmspace */

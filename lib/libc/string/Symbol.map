@@ -1,5 +1,4 @@
 /*
- * $FreeBSD$
  */
 
 FBSD_1.0 {
@@ -116,6 +115,7 @@ FBSD_1.6 {
 
 FBSD_1.7 {
 	mempcpy;
+	strverscmp;
 	wmempcpy;
 };
 

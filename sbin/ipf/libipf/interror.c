@@ -17,7 +17,7 @@ typedef	struct	{
 
 static ipf_error_entry_t *find_error(int);
 
-#define	IPF_NUM_ERRORS	475
+#define	IPF_NUM_ERRORS	477
 
 /*
  * NO REUSE OF NUMBERS!
@@ -70,7 +70,7 @@ static ipf_error_entry_t ipf_errors[IPF_NUM_ERRORS] = {
 	{	42,	"ipfilter not enabled for NAT ioctl" },
 	{	43,	"ipfilter not enabled for state ioctl" },
 	{	44,	"ipfilter not enabled for auth ioctl" },
-	{	45,	"ipfilter not enbaled for sync ioctl" },
+	{	45,	"ipfilter not enabled for sync ioctl" },
 	{	46,	"ipfilter not enabled for scan ioctl" },
 	{	47,	"ipfilter not enabled for lookup ioctl" },
 	{	48,	"unrecognised device minor number for ioctl" },
@@ -206,7 +206,7 @@ static ipf_error_entry_t ipf_errors[IPF_NUM_ERRORS] = {
 	{	30002,	"could not malloc memory for new hash table" },
 	{	30003,	"error coping in hash table structure" },
 	{	30004,	"hash table already exists" },
-	{	30005,	"mismach between new hash table and operation unit" },
+	{	30005,	"mismatch between new hash table and operation unit" },
 	{	30006,	"could not malloc memory for hash table base" },
 	{	30007,	"could not find hash table" },
 	{	30008,	"mismatch between hash table and operation unit" },
@@ -229,7 +229,7 @@ static ipf_error_entry_t ipf_errors[IPF_NUM_ERRORS] = {
 	{	30025,	"hash table size must be at least 1"},
 	{	30026,	"cannot allocate memory for hash table context" },
 /* -------------------------------------------------------------------------- */
-	{	40001,	"invalid minor device numebr for log read" },
+	{	40001,	"invalid minor device number for log read" },
 	{	40002,	"read size too small" },
 	{	40003,	"interrupted waiting for log data to read" },
 	{	40004,	"interrupted waiting for log data to read" },
@@ -276,7 +276,7 @@ static ipf_error_entry_t ipf_errors[IPF_NUM_ERRORS] = {
 	{	50038,	"invalid unit for lookup iterator" },
 	{	50039,	"invalid unit for lookup iterator" },
 	{	50040,	"could not find token for lookup iterator" },
-	{	50041,	"unrecognised object type for lookup interator" },
+	{	50041,	"unrecognised object type for lookup iterator" },
 	{	50042,	"error copying in lookup delete node operation" },
 /* -------------------------------------------------------------------------- */
 	{	60001,	"insufficient privilege for NAT write operation" },
@@ -333,7 +333,7 @@ log" },
 	{	60051,	"iterator error copying out NAT entry data" },
 	{	60052,	"iterator data supplied with NULL pointer" },
 	{	60053,	"unknown NAT iterator type" },
-	{	60054,	"unknwon next address type" },
+	{	60054,	"unknown next address type" },
 	{	60055,	"iterator suppled with unknown type for get-next" },
 	{	60056,	"unknown lookup group for next address" },
 	{	60057,	"error copying out NAT log flush results" },
@@ -355,6 +355,7 @@ log" },
 	{	60073,	"unknown lookup group for next address (ipv6)" },
 	{	60074,	"unknown next address type (ipv6)" },
 	{	60075,	"one object at a time must be copied" },
+	{	60076,	"NAT ioctl denied in jail without VNET" },
 /* -------------------------------------------------------------------------- */
 	{	70001,	"incorrect object size to get pool stats" },
 	{	70002,	"could not malloc memory for new pool node" },
@@ -418,7 +419,7 @@ log" },
 	{	100006,	"" },
 	{	100007,	"" },
 	{	100008,	"need write permissions to flush state log" },
-	{	100009,	"erorr copyout results of flushing state log" },
+	{	100009,	"error copyout results of flushing state log" },
 	{	100010,	"need write permissions to turn state logging on/off" },
 	{	100011,	"error copying in new state logging state" },
 	{	100012,	"error copying out current state logging state" },
@@ -516,6 +517,7 @@ log" },
 	{	130015,	"ipf_init_all failed" },
 	{	130016,	"finding pfil head failed" },
 	{	130017,	"ipfilter is already initialised and running" },
+	{	130018,	"ioctl denied in jail without VNET" },
 };
 
 

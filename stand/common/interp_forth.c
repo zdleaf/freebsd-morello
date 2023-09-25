@@ -25,15 +25,12 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>		/* to pick up __FreeBSD_version */
 #include <string.h>
 #include <stand.h>
 #include "bootstrap.h"
 #include "ficl.h"
 
-extern unsigned bootprog_rev;
 INTERP_DEFINE("4th");
 
 /* #define BFORTH_DEBUG */

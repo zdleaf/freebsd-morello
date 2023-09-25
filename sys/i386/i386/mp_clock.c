@@ -10,8 +10,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 /*-
  * Just when we thought life were beautiful, reality pops its grim face over
  * the edge again:
@@ -148,6 +146,4 @@ static driver_t piix_driver = {
 	1,
 };
 
-static devclass_t piix_devclass;
-
-DRIVER_MODULE(piix, pci, piix_driver, piix_devclass, 0, 0);
+DRIVER_MODULE(piix, pci, piix_driver, 0, 0);

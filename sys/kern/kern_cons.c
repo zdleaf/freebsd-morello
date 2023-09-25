@@ -40,8 +40,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include "opt_ddb.h"
 #include "opt_syscons.h"
 
@@ -64,6 +62,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/reboot.h>
 #include <sys/sysctl.h>
 #include <sys/sbuf.h>
+#include <sys/tslog.h>
 #include <sys/tty.h>
 #include <sys/uio.h>
 #include <sys/vnode.h>
@@ -101,7 +100,7 @@ SYSCTL_INT(_kern, OID_AUTO, consmute, CTLFLAG_RW, &cn_mute, 0,
 static char *consbuf;			/* buffer used by `consmsgbuf' */
 static struct callout conscallout;	/* callout for outputting to constty */
 struct msgbuf consmsgbuf;		/* message buffer for console tty */
-static u_char console_pausing;		/* pause after each line during probe */
+static bool console_pausing;		/* pause after each line during probe */
 static const char console_pausestr[] =
 "<pause; press any key to proceed to next line or '.' to end pause mode>";
 struct tty *constty;			/* pointer to console "window" tty */
@@ -134,6 +133,7 @@ cninit(void)
 {
 	struct consdev *best_cn, *cn, **list;
 
+	TSENTER();
 	/*
 	 * Check if we should mute the console (for security reasons perhaps)
 	 * It can be changes dynamically using sysctl kern.consmute
@@ -183,7 +183,7 @@ cninit(void)
 		cnadd(best_cn);
 	}
 	if (boothowto & RB_PAUSE)
-		console_pausing = 1;
+		console_pausing = true;
 	/*
 	 * Make the best console the preferred console.
 	 */
@@ -195,12 +195,13 @@ cninit(void)
 	 */
 	early_putc = NULL;
 #endif
+	TSEXIT();
 }
 
 void
-cninit_finish()
+cninit_finish(void)
 {
-	console_pausing = 0;
+	console_pausing = false;
 } 
 
 /* add a new physical console to back the virtual console */
@@ -321,7 +322,8 @@ sysctl_kern_console(SYSCTL_HANDLER_ARGS)
 	struct cn_device *cnd;
 	struct consdev *cp, **list;
 	char *p;
-	int delete, error;
+	bool delete;
+	int error;
 	struct sbuf *sb;
 
 	sb = sbuf_new(NULL, NULL, CNDEVPATHMAX * 2, SBUF_AUTOEXTEND |
@@ -342,9 +344,9 @@ sysctl_kern_console(SYSCTL_HANDLER_ARGS)
 	if (error == 0 && req->newptr != NULL) {
 		p = sbuf_data(sb);
 		error = ENXIO;
-		delete = 0;
+		delete = false;
 		if (*p == '-') {
-			delete = 1;
+			delete = true;
 			p++;
 		}
 		SET_FOREACH(list, cons_set) {
@@ -372,7 +374,7 @@ SYSCTL_PROC(_kern, OID_AUTO, console,
     "Console device control");
 
 void
-cngrab()
+cngrab(void)
 {
 	struct cn_device *cnd;
 	struct consdev *cn;
@@ -385,7 +387,7 @@ cngrab()
 }
 
 void
-cnungrab()
+cnungrab(void)
 {
 	struct cn_device *cnd;
 	struct consdev *cn;
@@ -398,7 +400,7 @@ cnungrab()
 }
 
 void
-cnresume()
+cnresume(void)
 {
 	struct cn_device *cnd;
 	struct consdev *cn;
@@ -525,7 +527,7 @@ cnputc(int c)
 			cnputc(*cp);
 		cngrab();
 		if (cngetc() == '.')
-			console_pausing = 0;
+			console_pausing = false;
 		cnungrab();
 		cnputc('\r');
 		for (cp = console_pausestr; *cp != '\0'; cp++)
@@ -538,7 +540,7 @@ void
 cnputsn(const char *p, size_t n)
 {
 	size_t i;
-	int unlock_reqd = 0;
+	bool unlock_reqd = false;
 
 	if (mtx_initialized(&cnputs_mtx)) {
 		/*
@@ -549,7 +551,7 @@ cnputsn(const char *p, size_t n)
 		if (mtx_owned(&cnputs_mtx))
 			return;
 		mtx_lock_spin(&cnputs_mtx);
-		unlock_reqd = 1;
+		unlock_reqd = true;
 	}
 
 	for (i = 0; i < n; i++)

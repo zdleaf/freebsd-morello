@@ -29,8 +29,6 @@
 .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 .\" SUCH DAMAGE.
 .\"
-.\" $FreeBSD$
-.\"
 .Dd May 13, 2021
 .Dt MOD_CC 9
 .Os
@@ -252,7 +250,8 @@ function.
 This is because when switching from one congestion control
 module to another the socket option code will preallocate memory for the
 .Va cb_init
-function. If no memory is allocated by the modules
+function.
+If no memory is allocated by the modules
 .Va cb_init
 then the
 .Va cc_data_sz

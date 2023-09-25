@@ -20,7 +20,6 @@
 *******************************************************************************/
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
 #include <dev/pms/config.h>
 
 #define MAJOR_REVISION	    1
@@ -6621,15 +6620,13 @@ static device_method_t agtiapi_methods[] = {   // Device interface
   { 0, 0 }
 };
 
-static devclass_t pmspcv_devclass;
-
 static driver_t pmspcv_driver = {
   "pmspcv",
   agtiapi_methods,
   sizeof( struct agtiapi_softc )
 };
 
-DRIVER_MODULE( pmspcv, pci, pmspcv_driver, pmspcv_devclass, 0, 0 );
+DRIVER_MODULE( pmspcv, pci, pmspcv_driver, 0, 0 );
 MODULE_DEPEND( pmspcv, cam, 1, 1, 1 );
 MODULE_DEPEND( pmspcv, pci, 1, 1, 1 );
 

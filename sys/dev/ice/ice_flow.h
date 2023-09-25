@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: BSD-3-Clause */
-/*  Copyright (c) 2021, Intel Corporation
+/*  Copyright (c) 2023, Intel Corporation
  *  All rights reserved.
  *
  *  Redistribution and use in source and binary forms, with or without
@@ -28,7 +28,6 @@
  *  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  *  POSSIBILITY OF SUCH DAMAGE.
  */
-/*$FreeBSD$*/
 
 #ifndef _ICE_FLOW_H_
 #define _ICE_FLOW_H_
@@ -87,9 +86,10 @@ enum ice_flow_seg_hdr {
 	ICE_FLOW_SEG_HDR_SCTP		= 0x00000100,
 	ICE_FLOW_SEG_HDR_GRE		= 0x00000200,
 	/* The following is an additive bit for ICE_FLOW_SEG_HDR_IPV4 and
-	 * ICE_FLOW_SEG_HDR_IPV6 which include the IPV4 other PTYPEs
+	 * ICE_FLOW_SEG_HDR_IPV6.
 	 */
-	ICE_FLOW_SEG_HDR_IPV_OTHER	= 0x20000000,
+	ICE_FLOW_SEG_HDR_IPV_FRAG	= 0x40000000,
+	ICE_FLOW_SEG_HDR_IPV_OTHER	= 0x80000000,
 };
 
 enum ice_flow_field {
@@ -193,6 +193,10 @@ enum ice_rss_cfg_hdr_type {
 	/* take inner headers as inputset for packet with outer ipv6. */
 	ICE_RSS_INNER_HEADERS_W_OUTER_IPV6,
 	/* take outer headers first then inner headers as inputset */
+	/* take inner as inputset for GTPoGRE with outer ipv4 + gre. */
+	ICE_RSS_INNER_HEADERS_W_OUTER_IPV4_GRE,
+	/* take inner as inputset for GTPoGRE with outer ipv6 + gre. */
+	ICE_RSS_INNER_HEADERS_W_OUTER_IPV6_GRE,
 	ICE_RSS_ANY_HEADERS
 };
 
@@ -258,8 +262,10 @@ struct ice_flow_fld_info {
 
 struct ice_flow_seg_info {
 	u32 hdrs;	/* Bitmask indicating protocol headers present */
-	u64 match;	/* Bitmask indicating header fields to be matched */
-	u64 range;	/* Bitmask indicating header fields matched as ranges */
+	/* Bitmask indicating header fields to be matched */
+	ice_declare_bitmap(match, ICE_FLOW_FIELD_IDX_MAX);
+	/* Bitmask indicating header fields matched as ranges */
+	ice_declare_bitmap(range, ICE_FLOW_FIELD_IDX_MAX);
 
 	struct ice_flow_fld_info fields[ICE_FLOW_FIELD_IDX_MAX];
 };

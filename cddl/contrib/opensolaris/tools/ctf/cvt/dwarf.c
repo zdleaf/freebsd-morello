@@ -618,7 +618,7 @@ tdesc_intr_long(dwarf_t *dw)
  * caller can then use the copy as the type for a bitfield structure member.
  */
 static tdesc_t *
-tdesc_intr_clone(dwarf_t *dw, tdesc_t *old, size_t bitsz)
+tdesc_intr_clone(dwarf_t *dw, tdesc_t *old, size_t bitsz, const char *suffix)
 {
 	tdesc_t *new = xcalloc(sizeof (tdesc_t));
 
@@ -627,7 +627,7 @@ tdesc_intr_clone(dwarf_t *dw, tdesc_t *old, size_t bitsz)
 		    "unresolved type\n", old->t_id);
 	}
 
-	new->t_name = xstrdup(old->t_name);
+	xasprintf(&new->t_name, "%s %s", old->t_name, suffix);
 	new->t_size = old->t_size;
 	new->t_id = mfgtid_next(dw);
 	new->t_type = INTRINSIC;
@@ -1158,7 +1158,8 @@ die_sou_resolve(tdesc_t *tdp, tdesc_t **tdpp __unused, void *private)
 			debug(3, "tdp %u: creating bitfield for %d bits\n",
 			    tdp->t_id, ml->ml_size);
 
-			ml->ml_type = tdesc_intr_clone(dw, mt, ml->ml_size);
+			ml->ml_type = tdesc_intr_clone(dw, mt, ml->ml_size,
+			    "bitfield");
 		}
 	}
 
@@ -1366,7 +1367,7 @@ static const fp_size_map_t fp_encodings[] = {
 };
 
 static uint_t
-die_base_type2enc(dwarf_t *dw, Dwarf_Off off, Dwarf_Signed enc, size_t sz)
+die_base_type2enc(dwarf_t *dw, Dwarf_Off off, Dwarf_Unsigned enc, size_t sz)
 {
 	const fp_size_map_t *map = fp_encodings;
 	uint_t szidx = dw->dw_ptrsz == sizeof (uint64_t);
@@ -1397,9 +1398,9 @@ static intr_t *
 die_base_from_dwarf(dwarf_t *dw, Dwarf_Die base, Dwarf_Off off, size_t sz)
 {
 	intr_t *intr = xcalloc(sizeof (intr_t));
-	Dwarf_Signed enc;
+	Dwarf_Unsigned enc;
 
-	(void) die_signed(dw, base, DW_AT_encoding, &enc, DW_ATTR_REQ);
+	(void) die_unsigned(dw, base, DW_AT_encoding, &enc, DW_ATTR_REQ);
 
 	switch (enc) {
 	case DW_ATE_unsigned:

@@ -37,7 +37,6 @@
  * SUCH DAMAGE.
  *
  *	@(#)inode.h	8.9 (Berkeley) 5/14/95
- * $FreeBSD$
  */
 
 union dinode {
@@ -46,7 +45,7 @@ union dinode {
 };
 
 struct inode {
-	ino_t	  	i_number;	/* The identity of the inode. */
+	ino_t		i_number;	/* The identity of the inode. */
 	struct vnode	*i_devvp;	/* vnode pointer (contains fsopts) */
 	struct fs	*i_fs;		/* File system */
 	union dinode	i_din;

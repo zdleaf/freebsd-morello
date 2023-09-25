@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2021 The FreeBSD Foundation
  *
@@ -206,6 +206,80 @@ ATF_TC_BODY(path_capsicum, tc)
 		_exit(4);
 	}
 	waitchild(child, 4);
+}
+
+/*
+ * Check that a pathfd can be converted to a regular fd using openat() in
+ * capability mode, but that rights on the pathfd are respected.
+ */
+ATF_TC_WITHOUT_HEAD(path_capsicum_empty);
+ATF_TC_BODY(path_capsicum_empty, tc)
+{
+	char path[PATH_MAX];
+	cap_rights_t rights;
+	int dfd, fd, pathfd, pathdfd;
+
+	mktfile(path, "path_capsicum.XXXXXX");
+
+	pathdfd = open(".", O_PATH);
+	ATF_REQUIRE_MSG(pathdfd >= 0, FMT_ERR("open"));
+	pathfd = open(path, O_PATH);
+	ATF_REQUIRE_MSG(pathfd >= 0, FMT_ERR("open"));
+
+	ATF_REQUIRE(cap_enter() == 0);
+
+	dfd = openat(pathdfd, "", O_DIRECTORY | O_EMPTY_PATH);
+	ATF_REQUIRE(dfd >= 0);
+	CHECKED_CLOSE(dfd);
+
+	/*
+	 * CAP_READ and CAP_LOOKUP should be sufficient to open a directory.
+	 */
+	cap_rights_init(&rights, CAP_READ | CAP_LOOKUP);
+	ATF_REQUIRE(cap_rights_limit(pathdfd, &rights) == 0);
+	dfd = openat(pathdfd, "", O_DIRECTORY | O_EMPTY_PATH);
+	ATF_REQUIRE(dfd >= 0);
+	CHECKED_CLOSE(dfd);
+
+	/*
+	 * ... CAP_READ on its own is not.
+	 */
+	cap_rights_init(&rights, CAP_READ);
+	ATF_REQUIRE(cap_rights_limit(pathdfd, &rights) == 0);
+	dfd = openat(pathdfd, "", O_DIRECTORY | O_EMPTY_PATH);
+	ATF_REQUIRE_ERRNO(ENOTCAPABLE, dfd == -1);
+
+	/*
+	 * Now try with a regular file.
+	 */
+	fd = openat(pathfd, "", O_RDWR | O_EMPTY_PATH);
+	ATF_REQUIRE(fd >= 0);
+	CHECKED_CLOSE(fd);
+
+	cap_rights_init(&rights, CAP_READ | CAP_LOOKUP | CAP_WRITE);
+	ATF_REQUIRE(cap_rights_limit(pathfd, &rights) == 0);
+	fd = openat(pathfd, "", O_RDWR | O_EMPTY_PATH | O_APPEND);
+	ATF_REQUIRE(fd >= 0);
+	CHECKED_CLOSE(fd);
+
+	/*
+	 * CAP_SEEK is needed to open a file for writing without O_APPEND.
+	 */
+	cap_rights_init(&rights, CAP_READ | CAP_LOOKUP | CAP_WRITE);
+	ATF_REQUIRE(cap_rights_limit(pathfd, &rights) == 0);
+	fd = openat(pathfd, "", O_RDWR | O_EMPTY_PATH);
+	ATF_REQUIRE_ERRNO(ENOTCAPABLE, fd == -1);
+
+	/*
+	 * CAP_LOOKUP isn't sufficient to open a file for reading.
+	 */
+	cap_rights_init(&rights, CAP_LOOKUP);
+	ATF_REQUIRE(cap_rights_limit(pathfd, &rights) == 0);
+	fd = openat(pathfd, "", O_RDONLY | O_EMPTY_PATH);
+	ATF_REQUIRE_ERRNO(ENOTCAPABLE, fd == -1);
+
+	CHECKED_CLOSE(pathfd);
+	CHECKED_CLOSE(pathdfd);
 }
 
 /* Make sure that ptrace(PT_COREDUMP) cannot be used to write to a path fd. */
@@ -452,14 +526,17 @@ ATF_TC_BODY(path_event, tc)
 	ATF_REQUIRE_MSG(kevent(kq, &ev, 1, NULL, 0, NULL) == 0,
 	    FMT_ERR("kevent"));
 
-	/* Try to get a EVFILT_VNODE/NOTE_LINK event through a path fd. */
-	EV_SET(&ev, pathfd, EVFILT_VNODE, EV_ADD | EV_ENABLE, NOTE_LINK, 0, 0);
+	/* Try to get a EVFILT_VNODE/NOTE_DELETE event through a path fd. */
+	EV_SET(&ev, pathfd, EVFILT_VNODE, EV_ADD | EV_ENABLE, NOTE_DELETE, 0,
+	    0);
 	ATF_REQUIRE_MSG(kevent(kq, &ev, 1, NULL, 0, NULL) == 0,
 	    FMT_ERR("kevent"));
 	ATF_REQUIRE_MSG(funlinkat(AT_FDCWD, path, pathfd, 0) == 0,
 	    FMT_ERR("funlinkat"));
 	ATF_REQUIRE_MSG(kevent(kq, NULL, 0, &ev, 1, NULL) == 1,
 	    FMT_ERR("kevent"));
+	ATF_REQUIRE_MSG(ev.fflags == NOTE_DELETE,
+	    "unexpected fflags %#x", ev.fflags);
 	EV_SET(&ev, pathfd, EVFILT_VNODE, EV_DELETE, 0, 0, 0);
 	ATF_REQUIRE_MSG(kevent(kq, &ev, 1, NULL, 0, NULL) == 0,
 	    FMT_ERR("kevent"));
@@ -604,6 +681,7 @@ ATF_TC_BODY(path_io, tc)
 	char path[PATH_MAX], path2[PATH_MAX];
 	char buf[BUFSIZ];
 	struct iovec iov;
+	size_t page_size;
 	int error, fd, pathfd, sd[2];
 
 	/* It shouldn't be possible to create new files with O_PATH. */
@@ -667,14 +745,15 @@ ATF_TC_BODY(path_io, tc)
 	ATF_REQUIRE_MSG(error == ESPIPE, "posix_fadvise() returned %d", error);
 
 	/* mmap() is not allowed. */
+	page_size = getpagesize();
 	ATF_REQUIRE_ERRNO(ENODEV,
-	    mmap(NULL, PAGE_SIZE, PROT_READ, MAP_SHARED, pathfd, 0) ==
+	    mmap(NULL, page_size, PROT_READ, MAP_SHARED, pathfd, 0) ==
 	    MAP_FAILED);
 	ATF_REQUIRE_ERRNO(ENODEV,
-	    mmap(NULL, PAGE_SIZE, PROT_NONE, MAP_SHARED, pathfd, 0) ==
+	    mmap(NULL, page_size, PROT_NONE, MAP_SHARED, pathfd, 0) ==
 	    MAP_FAILED);
 	ATF_REQUIRE_ERRNO(ENODEV,
-	    mmap(NULL, PAGE_SIZE, PROT_READ, MAP_PRIVATE, pathfd, 0) ==
+	    mmap(NULL, page_size, PROT_READ, MAP_PRIVATE, pathfd, 0) ==
 	    MAP_FAILED);
 
 	/* No fsync() or fdatasync(). */
@@ -895,11 +974,44 @@ ATF_TC_BODY(path_unix, tc)
 	CHECKED_CLOSE(pathfd);
 }
 
+/*
+ * Check that we can perform operations using an O_PATH fd for an unlinked file.
+ */
+ATF_TC_WITHOUT_HEAD(path_unlinked);
+ATF_TC_BODY(path_unlinked, tc)
+{
+	char path[PATH_MAX];
+	struct stat sb;
+	int pathfd;
+
+	mktfile(path, "path_rights.XXXXXX");
+
+	pathfd = open(path, O_PATH);
+	ATF_REQUIRE_MSG(pathfd >= 0, FMT_ERR("open"));
+
+	ATF_REQUIRE_MSG(fstatat(pathfd, "", &sb, AT_EMPTY_PATH) == 0,
+	    FMT_ERR("fstatat"));
+	ATF_REQUIRE(sb.st_nlink == 1);
+	ATF_REQUIRE_MSG(fstat(pathfd, &sb) == 0, FMT_ERR("fstat"));
+	ATF_REQUIRE(sb.st_nlink == 1);
+
+	ATF_REQUIRE_MSG(unlink(path) == 0, FMT_ERR("unlink"));
+
+	ATF_REQUIRE_MSG(fstatat(pathfd, "", &sb, AT_EMPTY_PATH) == 0,
+	    FMT_ERR("fstatat"));
+	ATF_REQUIRE(sb.st_nlink == 0);
+	ATF_REQUIRE_MSG(fstat(pathfd, &sb) == 0, FMT_ERR("fstat"));
+	ATF_REQUIRE(sb.st_nlink == 0);
+
+	CHECKED_CLOSE(pathfd);
+}
+
 ATF_TP_ADD_TCS(tp)
 {
 	ATF_TP_ADD_TC(tp, path_access);
 	ATF_TP_ADD_TC(tp, path_aio);
 	ATF_TP_ADD_TC(tp, path_capsicum);
+	ATF_TP_ADD_TC(tp, path_capsicum_empty);
 	ATF_TP_ADD_TC(tp, path_coredump);
 	ATF_TP_ADD_TC(tp, path_directory);
 	ATF_TP_ADD_TC(tp, path_directory_not_root);
@@ -917,6 +1029,7 @@ ATF_TP_ADD_TCS(tp)
 	ATF_TP_ADD_TC(tp, path_pipe_fstatat);
 	ATF_TP_ADD_TC(tp, path_rights);
 	ATF_TP_ADD_TC(tp, path_unix);
+	ATF_TP_ADD_TC(tp, path_unlinked);
 
 	return (atf_no_error());
 }

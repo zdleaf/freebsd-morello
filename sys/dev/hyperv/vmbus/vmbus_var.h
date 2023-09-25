@@ -22,8 +22,6 @@
  * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 #ifndef _VMBUS_VAR_H_
@@ -34,7 +32,6 @@
 #include <sys/taskqueue.h>
 #include <sys/rman.h>
 
-#include <dev/hyperv/include/hyperv_busdma.h>
 #include <dev/pci/pcivar.h>
 #include <dev/pci/pcib_private.h>
 
@@ -74,16 +71,10 @@ struct vmbus_pcpu_data {
 	struct vmbus_evtflags	*event_flags;	/* event flags from host */
 
 	/* Rarely used fields */
-	struct hyperv_dma	message_dma;	/* busdma glue */
-	struct hyperv_dma	event_flags_dma;/* busdma glue */
 	struct taskqueue	*event_tq;	/* event taskq */
 	struct taskqueue	*message_tq;	/* message taskq */
 	struct task		message_task;	/* message task */
 } __aligned(CACHE_LINE_SIZE);
-
-#if __FreeBSD_version < 1100000
-typedef u_long rman_res_t;
-#endif
 
 struct vmbus_softc {
 	void			(*vmbus_event_proc)(struct vmbus_softc *, int);
@@ -109,11 +100,8 @@ struct vmbus_softc {
 
 	/* Shared memory for vmbus_{rx,tx}_evtflags */
 	void			*vmbus_evtflags;
-	struct hyperv_dma	vmbus_evtflags_dma;
 
 	void			*vmbus_mnf1;	/* monitored by VM, unused */
-	struct hyperv_dma	vmbus_mnf1_dma;
-	struct hyperv_dma	vmbus_mnf2_dma;
 
 	bool			vmbus_scandone;
 	struct task		vmbus_scandone_task;
@@ -135,6 +123,13 @@ struct vmbus_softc {
 	/* The list of usable MMIO ranges for PCIe pass-through */
 	struct pcib_host_resources vmbus_mmio_res;
 #endif
+
+#if defined(__aarch64__)
+	struct resource *ires;
+	void *icookie;
+	int vector;
+#endif
+	bus_dma_tag_t   dmat;
 };
 
 #define VMBUS_FLAG_ATTACHED	0x0001	/* vmbus was attached */
@@ -151,7 +146,9 @@ struct vmbus_msghc;
 void		vmbus_handle_intr(struct trapframe *);
 int		vmbus_add_child(struct vmbus_channel *);
 int		vmbus_delete_child(struct vmbus_channel *);
+#if !defined(__aarch64__)
 void		vmbus_et_intr(struct trapframe *);
+#endif
 uint32_t	vmbus_gpadl_alloc(struct vmbus_softc *);
 
 struct vmbus_msghc *
@@ -172,4 +169,11 @@ void		vmbus_msghc_wakeup(struct vmbus_softc *,
 		    const struct vmbus_message *);
 void		vmbus_msghc_reset(struct vmbus_msghc *, size_t);
 
+void    vmbus_handle_timer_intr1(struct vmbus_message *msg_base,
+        struct trapframe *frame);
+
+void    vmbus_synic_setup1(void *xsc);
+void    vmbus_synic_teardown1(void);
+int     vmbus_setup_intr1(struct vmbus_softc *sc);
+void    vmbus_intr_teardown1(struct vmbus_softc *sc);
 #endif	/* !_VMBUS_VAR_H_ */

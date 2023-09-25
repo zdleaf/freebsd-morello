@@ -32,14 +32,14 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include "opt_capsicum.h"
 #include "opt_kstack_pages.h"
+#include "opt_ktrace.h"
 
 #include <sys/param.h>
 #include <sys/capsicum.h>
 #include <sys/systm.h>
+#include <sys/ktrace.h>
 #include <sys/lock.h>
 #include <sys/malloc.h>
 #include <sys/mutex.h>
@@ -334,9 +334,7 @@ i386_extend_pcb(struct thread *td)
 }
 
 int
-i386_set_ioperm(td, uap)
-	struct thread *td;
-	struct i386_ioperm_args *uap;
+i386_set_ioperm(struct thread *td, struct i386_ioperm_args *uap)
 {
 	char *iomap;
 	u_int i;
@@ -372,9 +370,7 @@ i386_set_ioperm(td, uap)
 }
 
 int
-i386_get_ioperm(td, uap)
-	struct thread *td;
-	struct i386_ioperm_args *uap;
+i386_get_ioperm(struct thread *td, struct i386_ioperm_args *uap)
 {
 	int i, state;
 	char *iomap;

@@ -1,7 +1,7 @@
 #!/bin/sh
 
 #
-# SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+# SPDX-License-Identifier: BSD-2-Clause
 #
 # Copyright (c) 2020 Peter Holm <pho@FreeBSD.org>
 #
@@ -45,7 +45,6 @@ set -e
 mount | grep "on $mntpoint " | grep -q /dev/md && umount -f $mntpoint
 [ -c /dev/md$mdstart ] &&  mdconfig -d -u $mdstart
 mdconfig -a -t swap -s 1g -u $mdstart
-bsdlabel -w md$mdstart auto
 newfs_flags=""
 newfs $newfs_flags -n md$mdstart > /dev/null
 mount /dev/md$mdstart $mntpoint

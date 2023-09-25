@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2004 Mark R V Murray
  * All rights reserved.
@@ -28,13 +28,12 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/conf.h>
 #include <sys/fcntl.h>
 #include <sys/ioccom.h>
 #include <sys/kernel.h>
+#include <sys/kerneldump.h>
 #include <sys/lock.h>
 #include <sys/malloc.h>
 #include <sys/memrange.h>
@@ -96,6 +95,7 @@ memioctl(struct cdev *dev, u_long cmd, caddr_t data, int flags,
 {
 	vm_map_t map;
 	vm_map_entry_t entry;
+	const struct mem_livedump_arg *marg;
 	struct mem_extract *me;
 	int error;
 
@@ -119,6 +119,10 @@ memioctl(struct cdev *dev, u_long cmd, caddr_t data, int flags,
 			me->me_state = ME_STATE_INVALID;
 		}
 		vm_map_unlock_read(map);
+		break;
+	case MEM_KERNELDUMP:
+		marg = (const struct mem_livedump_arg *)data;
+		error = livedump_start(marg->fd, marg->flags, marg->compression);
 		break;
 	default:
 		error = memioctl_md(dev, cmd, data, flags, td);

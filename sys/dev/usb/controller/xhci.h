@@ -1,9 +1,8 @@
-/* $FreeBSD$ */
 
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
- * Copyright (c) 2010 Hans Petter Selasky. All rights reserved.
+ * Copyright (c) 2010-2022 Hans Petter Selasky
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -487,6 +486,11 @@ union xhci_hub_desc {
 
 typedef int (xhci_port_route_t)(device_t, uint32_t, uint32_t);
 
+enum xhci_quirks {
+	XHCI_QUIRK_DISABLE_PORT_PED			= 0x00000001,
+	XHCI_QUIRK_DMA_32B				= 0x00000002,
+};
+
 struct xhci_softc {
 	struct xhci_hw_softc	sc_hw;
 	/* base device */
@@ -555,11 +559,17 @@ struct xhci_softc {
 	/* size of context */
 	uint8_t			sc_ctx_is_64_byte;
 
+	/* deconfiguring USB device is not fully supported */
+	uint8_t			sc_no_deconfigure;
+
 	/* Isochronous Scheduling Threshold */
 	uint8_t			sc_ist;
 
 	/* vendor string for root HUB */
 	char			sc_vendor[16];
+
+	/* XHCI quirks. */
+	uint32_t		sc_quirks;
 };
 
 #define	XHCI_CMD_LOCK(sc)	sx_xlock(&(sc)->sc_cmd_sx)

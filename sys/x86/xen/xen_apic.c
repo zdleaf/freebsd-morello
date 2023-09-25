@@ -25,8 +25,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/bus.h>
 #include <sys/kernel.h>
@@ -54,8 +52,8 @@ __FBSDID("$FreeBSD$");
 #include <xen/hvm.h>
 #include <xen/xen_intr.h>
 
-#include <xen/interface/arch-x86/cpuid.h>
-#include <xen/interface/vcpu.h>
+#include <contrib/xen/arch-x86/cpuid.h>
+#include <contrib/xen/vcpu.h>
 
 /*--------------------------- Forward Declarations ---------------------------*/
 static driver_filter_t xen_smp_rendezvous_action;

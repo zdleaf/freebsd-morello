@@ -30,8 +30,6 @@
  * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 #define VGE_JUMBO_MTU	9000
@@ -177,7 +175,7 @@ struct vge_hw_stats {
 };
 
 struct vge_softc {
-	struct ifnet		*vge_ifp;	/* interface info */
+	if_t			vge_ifp;	/* interface info */
 	device_t		vge_dev;
 	struct resource		*vge_res;
 	struct resource		*vge_irq;

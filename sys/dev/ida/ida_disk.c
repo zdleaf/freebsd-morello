@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 1999,2000 Jonathan Lemon
  * All rights reserved.
@@ -24,8 +24,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 /*
@@ -64,8 +62,6 @@ static int idad_detach(device_t dev);
 static	d_strategy_t	idad_strategy;
 static	dumper_t	idad_dump;
 
-static devclass_t	idad_devclass;
-
 static device_method_t idad_methods[] = {
 	DEVMETHOD(device_probe,		idad_probe),
 	DEVMETHOD(device_attach,	idad_attach),
@@ -79,7 +75,7 @@ static driver_t idad_driver = {
 	sizeof(struct idad_softc)
 };
 
-DRIVER_MODULE(idad, ida, idad_driver, idad_devclass, 0, 0);
+DRIVER_MODULE(idad, ida, idad_driver, 0, 0);
 
 /*
  * Read/write routine for a buffer.  Finds the proper unit, range checks
@@ -127,7 +123,7 @@ bad:
 }
 
 static int
-idad_dump(void *arg, void *virtual, vm_offset_t physical, off_t offset, size_t length)
+idad_dump(void *arg, void *virtual, off_t offset, size_t length)
 {
 
 	struct idad_softc *drv;

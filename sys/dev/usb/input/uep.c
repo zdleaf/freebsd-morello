@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright 2010, Gleb Smirnoff <glebius@FreeBSD.org>
  * All rights reserved.
@@ -24,8 +24,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 /*
@@ -177,7 +175,7 @@ get_pkt_len(u_char *buf)
 static void
 uep_process_pkt(struct uep_softc *sc, u_char *buf)
 {
-	int32_t x, y;
+	int32_t x __usbdebug_used, y __usbdebug_used;
 #ifdef EVDEV_SUPPORT
 	int touch;
 #endif
@@ -517,8 +515,6 @@ uep_close(struct usb_fifo *fifo, int fflags)
 }
 #endif /* !EVDEV_SUPPORT */
 
-static devclass_t uep_devclass;
-
 static device_method_t uep_methods[] = {
 	DEVMETHOD(device_probe, uep_probe),
        	DEVMETHOD(device_attach, uep_attach),
@@ -532,7 +528,7 @@ static driver_t uep_driver = {
 	.size = sizeof(struct uep_softc),
 };
 
-DRIVER_MODULE(uep, uhub, uep_driver, uep_devclass, NULL, NULL);
+DRIVER_MODULE(uep, uhub, uep_driver, NULL, NULL);
 MODULE_DEPEND(uep, usb, 1, 1, 1);
 #ifdef EVDEV_SUPPORT
 MODULE_DEPEND(uep, evdev, 1, 1, 1);

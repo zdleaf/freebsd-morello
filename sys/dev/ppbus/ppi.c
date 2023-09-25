@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 1997, 1998, 1999 Nicolas Souchu, Michael Smith
  * All rights reserved.
@@ -29,7 +29,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
 #include "opt_ppb_1284.h"
 
 #include <sys/param.h>
@@ -81,8 +80,6 @@ struct ppi_data {
 
 #define DEVTOSOFTC(dev) \
 	((struct ppi_data *)device_get_softc(dev))
-
-static devclass_t ppi_devclass;
 
 #ifdef PERIPH_1284
 static void	ppiintr(void *arg);
@@ -149,12 +146,8 @@ ppi_identify(driver_t *driver, device_t parent)
 static int
 ppi_probe(device_t dev)
 {
-	struct ppi_data *ppi;
-
 	/* probe is always ok */
 	device_set_desc(dev, "Parallel I/O");
-
-	ppi = DEVTOSOFTC(dev);
 
 	return (0);
 }
@@ -620,5 +613,6 @@ static driver_t ppi_driver = {
 	ppi_methods,
 	sizeof(struct ppi_data),
 };
-DRIVER_MODULE(ppi, ppbus, ppi_driver, ppi_devclass, 0, 0);
+
+DRIVER_MODULE(ppi, ppbus, ppi_driver, 0, 0);
 MODULE_DEPEND(ppi, ppbus, 1, 1, 1);

@@ -35,8 +35,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/conf.h>
 #include <sys/eventhandler.h>
@@ -2368,6 +2366,7 @@ fw_modevent(module_t mode, int type, void *data)
 
 	switch (type) {
 	case MOD_LOAD:
+		firewire_devclass = devclass_create("firewire");
 		fwdev_ehtag = EVENTHANDLER_REGISTER(dev_clone,
 		    fwdev_clone, 0, 1000);
 		break;
@@ -2384,6 +2383,5 @@ fw_modevent(module_t mode, int type, void *data)
 }
 
 
-DRIVER_MODULE(firewire, fwohci, firewire_driver, firewire_devclass,
-    fw_modevent,0);
+DRIVER_MODULE(firewire, fwohci, firewire_driver, fw_modevent, NULL);
 MODULE_VERSION(firewire, 1);

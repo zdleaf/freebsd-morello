@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (C) 2011-2014 Matteo Landi, Luigi Rizzo. All rights reserved.
  *
@@ -27,7 +27,6 @@
  */
 
 /*
- * $FreeBSD$
  *
  * Definitions of constants and the structures used by the netmap
  * framework, for the part visible to both kernel and userspace.
@@ -783,7 +782,7 @@ struct nmreq_pools_info {
  */
 struct nmreq_sync_kloop_start {
 	/* Sleeping is the default synchronization method for the kloop.
-	 * The 'sleep_us' field specifies how many microsconds to sleep for
+	 * The 'sleep_us' field specifies how many microseconds to sleep for
 	 * when there is no work to do, before doing another kloop iteration.
 	 */
 	uint32_t	sleep_us;

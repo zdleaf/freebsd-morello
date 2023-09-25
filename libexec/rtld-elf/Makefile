@@ -1,4 +1,3 @@
-# $FreeBSD$
 
 # Use the following command to build local debug version of dynamic
 # linker:
@@ -14,13 +13,17 @@ MK_ASAN=	no
 MK_SSP=		no
 MK_UBSAN=	no
 
+.include <bsd.compat.pre.mk>
+
 .if !defined(NEED_COMPAT)
 CONFS=		libmap.conf
 .endif
 PROG?=		ld-elf.so.1
-.if (${PROG:M*ld-elf32*} != "")
-TAGS+=		lib32
+.for _libcompat in ${_ALL_libcompats}
+.if ${PROG:M*ld-elf${_libcompat}[-.]*} != ""
+TAGS+=		lib${_libcompat}
 .endif
+.endfor
 SRCS= \
 	crtbrand.S \
 	rtld_start.S \
@@ -57,9 +60,6 @@ CFLAGS+=	-fpic -DPIC $(DEBUG)
 LDFLAGS+=	-shared -Wl,-Bsymbolic -Wl,-z,defs -nostdlib -e ${RTLD_ENTRY}
 # Pull in the dependencies that we use from libc
 .include "rtld-libc/Makefile.inc"
-.if ${MK_TOOLCHAIN} == "no"
-LDFLAGS+=	-L${LIBCDIR}
-.endif
 
 VERSION_DEF=	${LIBCSRCDIR}/Versions.def
 SYMBOL_MAPS=	${RTLD_ELF_DIR}/Symbol.map

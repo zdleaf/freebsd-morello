@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2002, 2003 Sam Leffler, Errno Consulting
  * Copyright (c) 2016 Andrey V. Elsukov <ae@FreeBSD.org>
@@ -25,8 +25,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 /*
@@ -53,6 +51,7 @@
 #include <net/vnet.h>
 
 #include <netinet/in.h>
+#include <netinet/in_pcb.h>
 #include <netinet/in_systm.h>
 #include <netinet/ip.h>
 #include <netinet/ip_var.h>
@@ -84,6 +83,7 @@
 #ifdef INET6
 #include <netipsec/ipsec6.h>
 #endif
+#include <netipsec/ipsec_support.h>
 #include <netipsec/ah_var.h>
 #include <netipsec/esp_var.h>
 #include <netipsec/ipcomp_var.h>
@@ -1082,7 +1082,9 @@ ipsec_encap(struct mbuf **mp, struct secasindex *saidx)
 	struct ip6_hdr *ip6;
 #endif
 	struct ip *ip;
+#ifdef INET
 	int setdf;
+#endif
 	uint8_t itos, proto;
 
 	ip = mtod(*mp, struct ip *);
@@ -1110,7 +1112,6 @@ ipsec_encap(struct mbuf **mp, struct secasindex *saidx)
 		proto = IPPROTO_IPV6;
 		ip6 = mtod(*mp, struct ip6_hdr *);
 		itos = (ntohl(ip6->ip6_flow) >> 20) & 0xff;
-		setdf = V_ip4_ipsec_dfbit ? 1: 0;
 		/* scoped address handling */
 		in6_clearscope(&ip6->ip6_src);
 		in6_clearscope(&ip6->ip6_dst);

@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2013 Luiz Otavio O Souza.
  * Copyright (c) 2011-2012 Stefan Bethke.
@@ -26,8 +26,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 #ifndef	__IP17X_VAR_H__
@@ -59,7 +57,7 @@ struct ip17x_softc {
 	etherswitch_info_t	info;
 	ip17x_switch_type	sc_switchtype;
 	struct callout	callout_tick;
-	struct ifnet	**ifp;
+	if_t *ifp;
 	struct mtx	sc_mtx;		/* serialize access to softc */
 
 	struct ip17x_vlan	vlan[IP17X_MAX_VLANS];

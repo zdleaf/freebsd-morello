@@ -1,8 +1,9 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (C) 2018 Turing Robotic Industries Inc.
  * Copyright (C) 2020 Andrew Turner <andrew@FreeBSD.org>
+ * Copyright (C) 2022 Dmitry Chagin <dchagin@FreeBSD.org>
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -24,12 +25,10 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 /*
- * arm64 Linux VDSO implementation.
+ * arm64 Linux VDSO signal trampoline.
  */
 
 #include <machine/asm.h>
@@ -44,9 +43,11 @@ linux_platform:
 
 	.text
 
+EENTRY(__kernel_rt_sigreturn)
 	nop	/* This is what Linux calls a "Mysterious NOP". */
-ENTRY(__kernel_rt_sigreturn)
+
+	.globl __user_rt_sigreturn
+__user_rt_sigreturn:
 	mov	x8, #LINUX_SYS_linux_rt_sigreturn
 	svc	#0
-	ret
-END(__kernel_rt_sigreturn)
+EEND(__kernel_rt_sigreturn)

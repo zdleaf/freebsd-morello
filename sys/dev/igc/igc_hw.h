@@ -2,8 +2,6 @@
  * Copyright 2021 Intel Corp
  * Copyright 2021 Rubicon Communications, LLC (Netgate)
  * SPDX-License-Identifier: BSD-3-Clause
- *
- * $FreeBSD$
  */
 
 #ifndef _IGC_HW_H_
@@ -22,7 +20,8 @@ struct igc_hw;
 #define IGC_DEV_ID_I220_V			0x15F7
 #define IGC_DEV_ID_I225_K2			0x3101
 #define IGC_DEV_ID_I225_LMVP			0x5502
-#define IGC_DEV_ID_I226_K			0x5504
+#define IGC_DEV_ID_I226_K			0x3102
+#define IGC_DEV_ID_I226_LMVP			0x5503
 #define IGC_DEV_ID_I225_IT			0x0D9F
 #define IGC_DEV_ID_I226_LM			0x125B
 #define IGC_DEV_ID_I226_V			0x125C

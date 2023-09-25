@@ -23,8 +23,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 #include <disk.h>
@@ -50,7 +48,6 @@ struct uboot_devdesc {
 #endif
 
 int uboot_getdev(void **vdev, const char *devspec, const char **path);
-char *uboot_fmtdev(void *vdev);
 int uboot_setcurrdev(struct env_var *ev, int flags, const void *value);
 
 extern int devs_no;

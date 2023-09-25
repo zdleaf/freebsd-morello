@@ -44,8 +44,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include "opt_inet.h"
 #include "opt_inet6.h"
 
@@ -63,7 +61,9 @@ __FBSDID("$FreeBSD$");
 #include <sys/sx.h>
 #include <sys/priv.h>
 #include <sys/proc.h>
+#ifdef COMPAT_43
 #include <sys/sysent.h>
+#endif
 #include <sys/sysproto.h>
 #include <sys/jail.h>
 #include <sys/racct.h>
@@ -330,12 +330,13 @@ sys_setsid(struct thread *td, struct setsid_args *uap)
 	struct pgrp *newpgrp;
 	struct session *newsess;
 
-	error = 0;
 	pgrp = NULL;
 
 	newpgrp = uma_zalloc(pgrp_zone, M_WAITOK);
 	newsess = malloc(sizeof(struct session), M_SESSION, M_WAITOK | M_ZERO);
 
+again:
+	error = 0;
 	sx_xlock(&proctree_lock);
 
 	if (p->p_pgid == p->p_pid || (pgrp = pgfind(p->p_pid)) != NULL) {
@@ -343,7 +344,10 @@ sys_setsid(struct thread *td, struct setsid_args *uap)
 			PGRP_UNLOCK(pgrp);
 		error = EPERM;
 	} else {
-		(void)enterpgrp(p, p->p_pid, newpgrp, newsess);
+		error = enterpgrp(p, p->p_pid, newpgrp, newsess);
+		if (error == ERESTART)
+			goto again;
+		MPASS(error == 0);
 		td->td_retval[0] = p->p_pid;
 		newpgrp = NULL;
 		newsess = NULL;
@@ -389,9 +393,10 @@ sys_setpgid(struct thread *td, struct setpgid_args *uap)
 	if (uap->pgid < 0)
 		return (EINVAL);
 
-	error = 0;
-
 	newpgrp = uma_zalloc(pgrp_zone, M_WAITOK);
+
+again:
+	error = 0;
 
 	sx_xlock(&proctree_lock);
 	if (uap->pid != 0 && uap->pid != curp->p_pid) {
@@ -451,9 +456,11 @@ sys_setpgid(struct thread *td, struct setpgid_args *uap)
 		error = enterthispgrp(targp, pgrp);
 	}
 done:
-	sx_xunlock(&proctree_lock);
-	KASSERT((error == 0) || (newpgrp != NULL),
+	KASSERT(error == 0 || newpgrp != NULL,
 	    ("setpgid failed and newpgrp is NULL"));
+	if (error == ERESTART)
+		goto again;
+	sx_xunlock(&proctree_lock);
 	uma_zfree(pgrp_zone, newpgrp);
 	return (error);
 }
@@ -1680,7 +1687,7 @@ SYSCTL_PROC(_security_bsd, OID_AUTO, unprivileged_proc_debug,
 int
 p_candebug(struct thread *td, struct proc *p)
 {
-	int credentialchanged, error, grpsubset, i, uidsubset;
+	int error, grpsubset, i, uidsubset;
 
 	KASSERT(td == curthread, ("%s: td not curthread", __func__));
 	PROC_LOCK_ASSERT(p, MA_OWNED);
@@ -1723,11 +1730,6 @@ p_candebug(struct thread *td, struct proc *p)
 	    td->td_ucred->cr_uid == p->p_ucred->cr_ruid);
 
 	/*
-	 * Has the credential of the process changed since the last exec()?
-	 */
-	credentialchanged = (p->p_flag & P_SUGID);
-
-	/*
 	 * If p's gids aren't a subset, or the uids aren't a subset,
 	 * or the credential has changed, require appropriate privilege
 	 * for td to debug p.
@@ -1738,7 +1740,10 @@ p_candebug(struct thread *td, struct proc *p)
 			return (error);
 	}
 
-	if (credentialchanged) {
+	/*
+	 * Has the credential of the process changed since the last exec()?
+	 */
+	if ((p->p_flag & P_SUGID) != 0) {
 		error = priv_check(td, PRIV_DEBUG_SUGID);
 		if (error)
 			return (error);
@@ -1761,7 +1766,7 @@ p_candebug(struct thread *td, struct proc *p)
 	if ((p->p_flag & P_INEXEC) != 0)
 		return (EBUSY);
 
-	/* Denied explicitely */
+	/* Denied explicitly */
 	if ((p->p_flag2 & P2_NOTRACE) != 0) {
 		error = priv_check(td, PRIV_DEBUG_DENIED);
 		if (error != 0)
@@ -1877,7 +1882,7 @@ crunuse(struct thread *td)
 	    __func__, cr->cr_users, cr));
 	cr->cr_users--;
 	if (cr->cr_users == 0) {
-		KASSERT(cr->cr_ref > 0, ("%s: ref %d not > 0 on cred %p",
+		KASSERT(cr->cr_ref > 0, ("%s: ref %ld not > 0 on cred %p",
 		    __func__, cr->cr_ref, cr));
 		crold = cr;
 	} else {
@@ -1905,7 +1910,7 @@ crunusebatch(struct ucred *cr, int users, int ref)
 		mtx_unlock(&cr->cr_mtx);
 		return;
 	}
-	KASSERT(cr->cr_ref >= 0, ("%s: ref %d not >= 0 on cred %p",
+	KASSERT(cr->cr_ref >= 0, ("%s: ref %ld not >= 0 on cred %p",
 	    __func__, cr->cr_ref, cr));
 	if (cr->cr_ref > 0) {
 		mtx_unlock(&cr->cr_mtx);
@@ -2051,7 +2056,7 @@ crfree(struct ucred *cr)
 		mtx_unlock(&cr->cr_mtx);
 		return;
 	}
-	KASSERT(cr->cr_ref >= 0, ("%s: ref %d not >= 0 on cred %p",
+	KASSERT(cr->cr_ref >= 0, ("%s: ref %ld not >= 0 on cred %p",
 	    __func__, cr->cr_ref, cr));
 	if (cr->cr_ref > 0) {
 		mtx_unlock(&cr->cr_mtx);
@@ -2066,7 +2071,7 @@ crfree_final(struct ucred *cr)
 
 	KASSERT(cr->cr_users == 0, ("%s: users %d not == 0 on cred %p",
 	    __func__, cr->cr_users, cr));
-	KASSERT(cr->cr_ref == 0, ("%s: ref %d not == 0 on cred %p",
+	KASSERT(cr->cr_ref == 0, ("%s: ref %ld not == 0 on cred %p",
 	    __func__, cr->cr_ref, cr));
 
 	/*
@@ -2104,6 +2109,7 @@ crcopy(struct ucred *dest, struct ucred *src)
 	bcopy(&src->cr_startcopy, &dest->cr_startcopy,
 	    (unsigned)((caddr_t)&src->cr_endcopy -
 		(caddr_t)&src->cr_startcopy));
+	dest->cr_flags = src->cr_flags;
 	crsetgroups(dest, src->cr_ngroups, src->cr_groups);
 	uihold(dest->cr_uidinfo);
 	uihold(dest->cr_ruidinfo);
@@ -2210,7 +2216,7 @@ proc_unset_cred(struct proc *p)
 	mtx_lock(&cr->cr_mtx);
 	cr->cr_users--;
 	if (cr->cr_users == 0)
-		KASSERT(cr->cr_ref > 0, ("%s: ref %d not > 0 on cred %p",
+		KASSERT(cr->cr_ref > 0, ("%s: ref %ld not > 0 on cred %p",
 		    __func__, cr->cr_ref, cr));
 	mtx_unlock(&cr->cr_mtx);
 	crfree(cr);

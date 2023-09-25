@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2011 NetApp, Inc.
  * All rights reserved.
@@ -24,13 +24,9 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/types.h>
 
 #include <machine/cpufunc.h>
@@ -49,7 +45,7 @@ __FBSDID("$FreeBSD$");
 static int cpu_vendor_intel, cpu_vendor_amd, cpu_vendor_hygon;
 
 int
-emulate_wrmsr(struct vmctx *ctx, int vcpu, uint32_t num, uint64_t val)
+emulate_wrmsr(struct vcpu *vcpu __unused, uint32_t num, uint64_t val __unused)
 {
 
 	if (cpu_vendor_intel) {
@@ -103,7 +99,7 @@ emulate_wrmsr(struct vmctx *ctx, int vcpu, uint32_t num, uint64_t val)
 }
 
 int
-emulate_rdmsr(struct vmctx *ctx, int vcpu, uint32_t num, uint64_t *val)
+emulate_rdmsr(struct vcpu *vcpu __unused, uint32_t num, uint64_t *val)
 {
 	int error = 0;
 
@@ -115,6 +111,7 @@ emulate_rdmsr(struct vmctx *ctx, int vcpu, uint32_t num, uint64_t *val)
 		case MSR_PP0_ENERGY_STATUS:
 		case MSR_PP1_ENERGY_STATUS:
 		case MSR_DRAM_ENERGY_STATUS:
+		case MSR_MISC_FEATURE_ENABLES:
 			*val = 0;
 			break;
 		case MSR_RAPL_POWER_UNIT:

@@ -28,8 +28,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include "opt_kern_tls.h"
 
 #include <sys/param.h>
@@ -57,6 +55,9 @@ __FBSDID("$FreeBSD$");
 #include <net/vnet.h>
 #include <netinet/in.h>
 #include <netinet/tcp.h>
+#include <netinet/in_pcb.h>
+#include <netinet/tcp_var.h>
+#include <netinet/tcp_log_buf.h>
 
 #include <security/audit/audit.h>
 #include <security/mac/mac_framework.h>
@@ -377,7 +378,7 @@ sendfile_iodone(void *arg, vm_page_t *pa, int count, int error)
 		 * for read, so that application receives EIO on next
 		 * syscall and eventually closes the socket.
 		 */
-		so->so_proto->pr_usrreqs->pru_abort(so);
+		so->so_proto->pr_abort(so);
 		so->so_error = EIO;
 
 		mb_free_notready(sfio->m, sfio->npages);
@@ -396,8 +397,7 @@ sendfile_iodone(void *arg, vm_page_t *pa, int count, int error)
 		goto out_with_ref;
 #endif
 	} else
-		(void)(so->so_proto->pr_usrreqs->pru_ready)(so, sfio->m,
-		    sfio->npages);
+		(void)so->so_proto->pr_ready(so, sfio->m, sfio->npages);
 
 	sorele(so);
 #ifdef KERN_TLS
@@ -564,7 +564,6 @@ sendfile_getobj(struct thread *td, struct file *fp, vm_object_t *obj_res,
     struct vnode **vp_res, struct shmfd **shmfd_res, off_t *obj_size,
     int *bsize)
 {
-	struct vattr va;
 	vm_object_t obj;
 	struct vnode *vp;
 	struct shmfd *shmfd;
@@ -603,10 +602,9 @@ sendfile_getobj(struct thread *td, struct file *fp, vm_object_t *obj_res,
 			VM_OBJECT_RLOCK(obj);
 			*obj_size = obj->un_pager.vnp.vnp_size;
 		} else {
-			error = VOP_GETATTR(vp, &va, td->td_ucred);
+			error = vn_getsize_locked(vp, obj_size, td->td_ucred);
 			if (error != 0)
 				goto out;
-			*obj_size = va.va_size;
 			VM_OBJECT_RLOCK(obj);
 		}
 	} else if (fp->f_type == DTYPE_SHM) {
@@ -654,8 +652,7 @@ sendfile_getsock(struct thread *td, int s, struct file **sock_fp,
 	/*
 	 * The socket must be a stream socket and connected.
 	 */
-	error = getsock_cap(td, s, &cap_send_rights,
-	    sock_fp, NULL, NULL);
+	error = getsock(td, s, &cap_send_rights, sock_fp);
 	if (error != 0)
 		return (error);
 	*so = (*sock_fp)->f_data;
@@ -814,7 +811,7 @@ retry_space:
 			 * state may have changed and we retest
 			 * for it.
 			 */
-			error = sbwait(&so->so_snd);
+			error = sbwait(so, SO_SND);
 			/*
 			 * An error from sbwait usually indicates that we've
 			 * been interrupted by a signal. If we've sent anything
@@ -1172,8 +1169,8 @@ prepend_header:
 				sendfile_iodone(sfio, NULL, 0, 0);
 #ifdef KERN_TLS
 			if (tls != NULL && tls->mode == TCP_TLS_MODE_SW) {
-				error = (*so->so_proto->pr_usrreqs->pru_send)
-				    (so, PRUS_NOTREADY, m, NULL, NULL, td);
+				error = so->so_proto->pr_send(so,
+				    PRUS_NOTREADY, m, NULL, NULL, td);
 				if (error != 0) {
 					m_freem(m);
 				} else {
@@ -1182,16 +1179,22 @@ prepend_header:
 				}
 			} else
 #endif
-				error = (*so->so_proto->pr_usrreqs->pru_send)
-				    (so, 0, m, NULL, NULL, td);
+				error = so->so_proto->pr_send(so, 0, m, NULL,
+				    NULL, td);
 		} else {
 			sfio->so = so;
 			sfio->m = m0;
 			soref(so);
-			error = (*so->so_proto->pr_usrreqs->pru_send)
-			    (so, PRUS_NOTREADY, m, NULL, NULL, td);
+			error = so->so_proto->pr_send(so, PRUS_NOTREADY, m,
+			    NULL, NULL, td);
 			sendfile_iodone(sfio, NULL, 0, error);
 		}
+#ifdef TCP_REQUEST_TRK
+		if (so->so_proto->pr_protocol == IPPROTO_TCP) {
+			/* log the sendfile call to the TCP log, if enabled */
+			tcp_log_sendfile(so, offset, nbytes, flags);
+		}
+#endif
 		CURVNET_RESTORE();
 
 		m = NULL;

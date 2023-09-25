@@ -31,8 +31,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 #include "opt_ddb.h"
@@ -507,13 +505,6 @@ END(memcmp)
 	ALIGN_TEXT
 2256:
 	std
-.if \erms == 1
-	leaq	-1(%rdi,%rcx),%rdi
-	leaq	-1(%rsi,%rcx),%rsi
-	rep
-	movsb
-	cld
-.else
 	leaq	-8(%rdi,%rcx),%rdi
 	leaq	-8(%rsi,%rcx),%rsi
 	shrq	$3,%rcx
@@ -523,7 +514,6 @@ END(memcmp)
 	movq	%rdx,%rcx
 	andb	$7,%cl
 	jne	2004b
-.endif
 	\end
 	ret
 .endif
@@ -930,7 +920,8 @@ copy_fault:
 
 /*
  * casueword32.  Compare and set user integer.  Returns -1 on fault,
- *        0 if access was successful.  Old value is written to *oldp.
+ *        0 if access was successful, and 1 when comparison failed.
+ *        Old value is written to *oldp.
  *        dst = %rdi, old = %esi, oldp = %rdx, new = %ecx
  */
 ENTRY(casueword32_nosmap)
@@ -1009,7 +1000,8 @@ END(casueword32_smap)
 
 /*
  * casueword.  Compare and set user long.  Returns -1 on fault,
- *        0 if access was successful.  Old value is written to *oldp.
+ *        0 if access was successful, and 1 when comparison failed.
+ *        Old value is written to *oldp.
  *        dst = %rdi, old = %rsi, oldp = %rdx, new = %rcx
  */
 ENTRY(casueword_nosmap)
@@ -1977,3 +1969,24 @@ ENTRY(mds_handler_silvermont)
 	popq	%rax
 	retq
 END(mds_handler_silvermont)
+
+/*
+ * Do the same as Linux and execute IRET explicitly, despite IPI
+ * return does it as well.
+ */
+ENTRY(cpu_sync_core)
+/*
+ * Can utilize SERIALIZE when instruction is moved from
+ * 'future extensions' to SDM.
+ */
+	movq	(%rsp), %rdx
+	movl	%ss, %eax
+	pushq	%rax
+	pushq	%rsp
+	addq	$16, (%rsp)
+	pushfq
+	movl	%cs, %eax
+	pushq	%rax
+	pushq	%rdx
+	iretq
+END(cpu_sync_core)

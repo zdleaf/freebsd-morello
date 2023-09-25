@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2011 Nathan Whitehorn
  * All rights reserved.
@@ -27,7 +27,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/module.h>
@@ -99,10 +98,9 @@ struct rtaspci_softc {
 	int			sc_extended_config;
 };
 
-static devclass_t	rtaspci_devclass;
 DEFINE_CLASS_1(pcib, rtaspci_driver, rtaspci_methods,
     sizeof(struct rtaspci_softc), ofw_pcib_driver);
-DRIVER_MODULE(rtaspci, ofwbus, rtaspci_driver, rtaspci_devclass, 0, 0);
+DRIVER_MODULE(rtaspci, ofwbus, rtaspci_driver, 0, 0);
 
 static int
 rtaspci_probe(device_t dev)

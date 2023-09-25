@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2021 Alan Somers
  *
@@ -23,8 +23,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 extern "C" {
@@ -70,6 +68,7 @@ void expect_vop_stddeallocate(uint64_t ino, uint64_t off, uint64_t length)
 		}, Eq(true)),
 		_)
 	).WillOnce(Invoke(ReturnImmediate([=](auto in, auto& out) {
+		assert(in.body.read.size <= sizeof(out.body.bytes));
 		out.header.len = sizeof(struct fuse_out_header) +
 			in.body.read.size;
 		memset(out.body.bytes, 'X', in.body.read.size);
@@ -79,6 +78,8 @@ void expect_vop_stddeallocate(uint64_t ino, uint64_t off, uint64_t length)
 			const char *buf = (const char*)in.body.bytes +
 				sizeof(struct fuse_write_in);
 
+			assert(length <= sizeof(in.body.bytes) -
+				sizeof(struct fuse_write_in));
 			return (in.header.opcode == FUSE_WRITE &&
 				in.header.nodeid == ino &&
 				in.body.write.offset == off  &&
@@ -490,8 +491,8 @@ TEST_P(FspacectlCache, clears_cache)
 	leak(fd);
 }
 
-INSTANTIATE_TEST_CASE_P(FspacectlCache, FspacectlCache,
-	Values(Uncached, Writethrough, Writeback),
+INSTANTIATE_TEST_SUITE_P(FspacectlCache, FspacectlCache,
+	Values(Uncached, Writethrough, Writeback)
 );
 
 /*

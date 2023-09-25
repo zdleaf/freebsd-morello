@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2021 Adrian Chadd <adrian@FreeBSD.org>
  *
@@ -27,8 +27,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/bus.h>
@@ -257,7 +255,7 @@ qcom_tlmm_pin_set(device_t dev, uint32_t pin, unsigned int value)
 	ret = qcom_tlmm_ipq4018_hw_pin_set_output_value(sc, pin, value);
 	GPIO_UNLOCK(sc);
 
-	return (0);
+	return (ret);
 }
 
 int
@@ -273,7 +271,7 @@ qcom_tlmm_pin_get(device_t dev, uint32_t pin, unsigned int *val)
 	ret = qcom_tlmm_ipq4018_hw_pin_get_input_value(sc, pin, val);
 	GPIO_UNLOCK(sc);
 
-	return (0);
+	return (ret);
 }
 
 int
@@ -289,7 +287,7 @@ qcom_tlmm_pin_toggle(device_t dev, uint32_t pin)
 	ret = qcom_tlmm_ipq4018_hw_pin_toggle_output_value(sc, pin);
 	GPIO_UNLOCK(sc);
 
-	return (0);
+	return (ret);
 }
 
 int

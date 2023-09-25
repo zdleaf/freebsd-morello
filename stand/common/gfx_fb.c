@@ -25,8 +25,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 /*
@@ -1190,7 +1188,7 @@ gfx_fb_copy_line(teken_gfx_t *state, int ncol, teken_pos_t *s, teken_pos_t *d)
 			screen_buffer[doffset + x] = screen_buffer[soffset + x];
 			if (mark) {
 				/* update end point */
-				sr.tr_end.tp_col = s->tp_col + x;;
+				sr.tr_end.tp_col = s->tp_col + x;
 			} else {
 				/* set up new rectangle */
 				mark = true;

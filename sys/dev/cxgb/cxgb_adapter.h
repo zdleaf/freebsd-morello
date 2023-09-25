@@ -1,5 +1,5 @@
 /**************************************************************************
-SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+SPDX-License-Identifier: BSD-2-Clause
 
 Copyright (c) 2007-2009, Chelsio Inc.
 All rights reserved.
@@ -25,8 +25,6 @@ INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
 CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
 ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 POSSIBILITY OF SUCH DAMAGE.
-
-$FreeBSD$
 
 ***************************************************************************/
 
@@ -90,7 +88,7 @@ enum {
 
 struct port_info {
 	struct adapter	*adapter;
-	struct ifnet	*ifp;
+	if_t		ifp;
 	int		if_flags;
 	int		flags;
 	const struct port_type_info *port_type;
@@ -549,8 +547,8 @@ static inline int offload_running(adapter_t *adapter)
 }
 
 void cxgb_tx_watchdog(void *arg);
-int cxgb_transmit(struct ifnet *ifp, struct mbuf *m);
-void cxgb_qflush(struct ifnet *ifp);
+int cxgb_transmit(if_t ifp, struct mbuf *m);
+void cxgb_qflush(if_t ifp);
 void t3_iterate(void (*)(struct adapter *, void *), void *);
 void cxgb_refresh_stats(struct port_info *);
 

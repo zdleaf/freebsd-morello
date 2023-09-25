@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2013 Ganbold Tsagaankhuu <ganbold@freebsd.org>
  * All rights reserved.
@@ -24,13 +24,9 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/bus.h>
@@ -112,10 +108,8 @@ static driver_t a10_sramc_driver = {
 	sizeof(struct a10_sramc_softc),
 };
 
-static devclass_t a10_sramc_devclass;
-
-EARLY_DRIVER_MODULE(a10_sramc, simplebus, a10_sramc_driver, a10_sramc_devclass,
-    0, 0, BUS_PASS_SUPPORTDEV + BUS_PASS_ORDER_FIRST);
+EARLY_DRIVER_MODULE(a10_sramc, simplebus, a10_sramc_driver, 0, 0,
+    BUS_PASS_SUPPORTDEV + BUS_PASS_ORDER_FIRST);
 
 int
 a10_map_to_emac(void)

@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2013 Dmitry Chagin <dchagin@FreeBSD.org>
  *
@@ -25,13 +25,9 @@
  * SUCH DAMAGE.
  */
 
-#include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
-#include <sys/kernel.h>
-#include <sys/sdt.h>
 #include <sys/systm.h>
+#include <sys/sdt.h>
 #include <sys/proc.h>
 
 /*
@@ -79,8 +75,6 @@ DUMMY(add_key);
 DUMMY(request_key);
 DUMMY(keyctl);
 /* Linux 2.6.13: */
-DUMMY(ioprio_set);
-DUMMY(ioprio_get);
 DUMMY(inotify_add_watch);
 DUMMY(inotify_rm_watch);
 /* Linux 2.6.16: */
@@ -136,38 +130,14 @@ DUMMY(fsconfig);
 DUMMY(fsmount);
 DUMMY(fspick);
 DUMMY(pidfd_open);
-DUMMY(close_range);
 DUMMY(openat2);
 DUMMY(pidfd_getfd);
 DUMMY(process_madvise);
-DUMMY(epoll_pwait2);
 DUMMY(mount_setattr);
 /* Linux 4.18: */
 DUMMY(io_pgetevents);
-DUMMY(rseq);
 /* Linux 5.0: */
 DUMMY(pidfd_send_signal);
 DUMMY(io_uring_setup);
 DUMMY(io_uring_enter);
 DUMMY(io_uring_register);
-
-#define DUMMY_XATTR(s)						\
-int								\
-linux_ ## s ## xattr(						\
-    struct thread *td, struct linux_ ## s ## xattr_args *arg)	\
-{								\
-								\
-	return (EOPNOTSUPP);					\
-}
-DUMMY_XATTR(set);
-DUMMY_XATTR(lset);
-DUMMY_XATTR(fset);
-DUMMY_XATTR(get);
-DUMMY_XATTR(lget);
-DUMMY_XATTR(fget);
-DUMMY_XATTR(list);
-DUMMY_XATTR(llist);
-DUMMY_XATTR(flist);
-DUMMY_XATTR(remove);
-DUMMY_XATTR(lremove);
-DUMMY_XATTR(fremove);

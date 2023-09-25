@@ -1,4 +1,4 @@
-# $Id: meta.autodep.mk,v 1.55 2021/12/13 08:12:01 sjg Exp $
+# $Id: meta.autodep.mk,v 1.58 2023/05/25 22:33:23 sjg Exp $
 
 #
 #	@(#) Copyright (c) 2010, Simon J. Gerraty
@@ -139,6 +139,10 @@ FORCE_DPADD += ${_nonlibs:@x@${DPADD:M*/$x}@}
 .END:	gendirdeps
 .endif
 
+.if ${LOCAL_DEPENDS_GUARD:U} == "no"
+.depend:
+.endif
+
 # if we don't have OBJS, then .depend isn't useful
 .if !target(.depend) && (!empty(OBJS) || ${.ALLTARGETS:M*.o} != "")
 # some makefiles and/or targets contain
@@ -174,7 +178,7 @@ DEPEND_SUFFIXES += .c .h .cpp .hpp .cxx .hxx .cc .hh
 .endif
 .depend: .NOMETA $${.MAKE.META.CREATED} ${_this}
 	@echo "Updating $@: ${.OODATE:T:[1..8]}"
-	@egrep -i '^R .*\.(${DEPEND_SUFFIXES:tl:O:u:S,^.,,:ts|})$$' /dev/null ${.MAKE.META.FILES:T:O:u:${META_FILE_FILTER:ts:}:M*o.meta} | \
+	@${EGREP:Uegrep} -i '^R .*\.(${DEPEND_SUFFIXES:tl:O:u:S,^.,,:ts|})$$' /dev/null ${.MAKE.META.FILES:T:O:u:${META_FILE_FILTER:ts:}:M*o.meta} | \
 	sed -e 's, \./, ,${OBJDIR_REFS:O:u:@d@;s, $d/, ,@};/\//d' \
 		-e 's,^\([^/][^/]*\).meta...[0-9]* ,\1: ,' | \
 	sort -u | \
@@ -206,7 +210,8 @@ _depend =
 .endif
 
 .if ${UPDATE_DEPENDFILE} == "yes"
-gendirdeps:	${_DEPENDFILE}
+gendirdeps:	beforegendirdeps .WAIT ${_DEPENDFILE}
+beforegendirdeps:
 .endif
 
 .if !target(${_DEPENDFILE})

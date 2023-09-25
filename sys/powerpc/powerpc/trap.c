@@ -32,8 +32,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/kdb.h>
 #include <sys/proc.h>
@@ -254,7 +252,7 @@ trap(struct trapframe *frame)
 		td->td_pticks = 0;
 		td->td_frame = frame;
 		addr = frame->srr0;
-		if (td->td_cowgen != p->p_cowgen)
+		if (td->td_cowgen != atomic_load_int(&p->p_cowgen))
 			thread_cow_update(td);
 
 		/* User Mode Traps */
@@ -495,8 +493,6 @@ trap(struct trapframe *frame)
 	}
 
 	if (sig != 0) {
-		if (p->p_sysent->sv_transtrap != NULL)
-			sig = (p->p_sysent->sv_transtrap)(sig, type);
 		ksiginfo_init_trap(&ksi);
 		ksi.ksi_signo = sig;
 		ksi.ksi_code = (int) ucode; /* XXX, not POSIX */

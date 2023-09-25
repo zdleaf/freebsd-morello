@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2015 Landon Fuller <landon@landonf.org>
  * All rights reserved.
@@ -30,8 +30,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/kernel.h>
 #include <sys/bus.h>
@@ -168,7 +166,7 @@ static device_method_t bcma_bhndb_methods[] = {
 DEFINE_CLASS_2(bhnd, bcma_bhndb_driver, bcma_bhndb_methods,
     sizeof(struct bcma_softc), bhnd_bhndb_driver, bcma_driver);
 
-DRIVER_MODULE(bcma_bhndb, bhndb, bcma_bhndb_driver, bhnd_devclass, NULL, NULL);
+DRIVER_MODULE(bcma_bhndb, bhndb, bcma_bhndb_driver, NULL, NULL);
 
 MODULE_VERSION(bcma_bhndb, 1);
 MODULE_DEPEND(bcma_bhndb, bcma, 1, 1, 1);

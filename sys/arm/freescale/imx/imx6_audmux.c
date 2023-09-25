@@ -31,8 +31,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/bus.h>
@@ -152,6 +150,4 @@ static driver_t audmux_driver = {
 	sizeof(struct audmux_softc),
 };
 
-static devclass_t audmux_devclass;
-
-DRIVER_MODULE(audmux, simplebus, audmux_driver, audmux_devclass, 0, 0);
+DRIVER_MODULE(audmux, simplebus, audmux_driver, 0, 0);

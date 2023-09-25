@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2010 Alexander Motin <mav@FreeBSD.org>
  * All rights reserved.
@@ -27,8 +27,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/module.h>
 #include <sys/systm.h>
@@ -576,8 +574,6 @@ mvs_set_edma_mode(device_t dev, enum mvs_edma_mode mode)
 		ATA_OUTL(ch->r_mem, EDMA_CMD, EDMA_CMD_EENEDMA);
 }
 
-devclass_t mvs_devclass;
-devclass_t mvsch_devclass;
 static device_method_t mvsch_methods[] = {
 	DEVMETHOD(device_probe,     mvs_ch_probe),
 	DEVMETHOD(device_attach,    mvs_ch_attach),
@@ -591,8 +587,8 @@ static driver_t mvsch_driver = {
         mvsch_methods,
         sizeof(struct mvs_channel)
 };
-DRIVER_MODULE(mvsch, mvs, mvsch_driver, mvsch_devclass, 0, 0);
-DRIVER_MODULE(mvsch, sata, mvsch_driver, mvsch_devclass, 0, 0);
+DRIVER_MODULE(mvsch, mvs, mvsch_driver, 0, 0);
+DRIVER_MODULE(mvsch, sata, mvsch_driver, 0, 0);
 
 static void
 mvs_phy_check_events(device_t dev, u_int32_t serr)
@@ -774,7 +770,7 @@ mvs_ch_intr(void *data)
 			}
 			mvs_requeue_frozen(dev);
 			for (i = 0; i < MVS_MAX_SLOTS; i++) {
-				/* XXX: reqests in loading state. */
+				/* XXX: requests in loading state. */
 				if (((ch->rslots >> i) & 1) == 0)
 					continue;
 				if (port >= 0 &&
@@ -844,7 +840,6 @@ mvs_legacy_intr(device_t dev, int poll)
 	struct mvs_slot *slot = &ch->slot[0]; /* PIO is always in slot 0. */
 	union ccb *ccb = slot->ccb;
 	enum mvs_err_type et = MVS_ERR_NONE;
-	int port;
 	u_int length, resid, size;
 	uint8_t buf[2];
 	uint8_t status, ireason;
@@ -853,7 +848,6 @@ mvs_legacy_intr(device_t dev, int poll)
 	status = mvs_getstatus(dev, 1);
 	if (slot->state < MVS_SLOT_RUNNING)
 	    return;
-	port = ccb->ccb_h.target_id & 0x0f;
 	/* Wait a bit for late !BUSY status update. */
 	if (status & ATA_S_BUSY) {
 		if (poll)
@@ -1803,7 +1797,8 @@ completeall:
 		mvs_reset(dev);
 		return;
 	}
-	ccb->ccb_h = ch->hold[i]->ccb_h;	/* Reuse old header. */
+	xpt_setup_ccb(&ccb->ccb_h, ch->hold[i]->ccb_h.path,
+	    ch->hold[i]->ccb_h.pinfo.priority);
 	if (ccb->ccb_h.func_code == XPT_ATA_IO) {
 		/* READ LOG */
 		ccb->ccb_h.recovery_type = RECOVERY_READ_LOG;

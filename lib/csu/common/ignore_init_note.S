@@ -26,8 +26,6 @@
  */
 
 #include <machine/asm.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/elf_common.h>
 
 #include "notes.h"
@@ -41,3 +39,5 @@ __FBSDID("$FreeBSD$");
 2:	.p2align	2
 3:	.4byte		0
 4:
+
+	.section .note.GNU-stack,"",%progbits

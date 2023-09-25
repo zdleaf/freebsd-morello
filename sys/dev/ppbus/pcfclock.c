@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2000 Sascha Schumann. All rights reserved.
  *
@@ -27,8 +27,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include "opt_pcfclock.h"
 
 #include <sys/param.h>
@@ -57,8 +55,6 @@ struct pcfclock_data {
 	device_t dev;
 	struct cdev *cdev;
 };
-
-static devclass_t pcfclock_devclass;
 
 static	d_open_t		pcfclock_open;
 static	d_close_t		pcfclock_close;
@@ -334,4 +330,4 @@ static driver_t pcfclock_driver = {
 	sizeof(struct pcfclock_data),
 };
 
-DRIVER_MODULE(pcfclock, ppbus, pcfclock_driver, pcfclock_devclass, 0, 0);
+DRIVER_MODULE(pcfclock, ppbus, pcfclock_driver, 0, 0);

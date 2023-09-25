@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2012 Konstantin Belousov <kib@FreeBSD.org>
  * Copyright (c) 2016, 2017, 2019 The FreeBSD Foundation
@@ -29,19 +29,6 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-
-#include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
-#include <sys/param.h>
-
-#if defined(__i386__) || defined(COMPAT_LINUX32)
-#include <i386/include/atomic.h>
-#include <i386/include/cpufunc.h>
-#else
-#include <amd64/include/atomic.h>
-#include <amd64/include/cpufunc.h>
-#endif
 
 static inline u_int
 rdtsc_low(const struct vdso_timehands *th)

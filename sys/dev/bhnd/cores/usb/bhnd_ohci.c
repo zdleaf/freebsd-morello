@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-NetBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
  * Copyright (c) 2010, Aleksandr Rybalko <ray@ddteam.net>
@@ -32,8 +32,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 /*
  * USB Open Host Controller driver.
  *
@@ -218,7 +216,5 @@ static driver_t ohci_driver = {
 	.size = sizeof(struct ohci_softc),
 };
 
-static devclass_t ohci_devclass;
-
-DRIVER_MODULE(ohci, bhnd_usb, ohci_driver, ohci_devclass, 0, 0);
+DRIVER_MODULE(ohci, bhnd_usb, ohci_driver, 0, 0);
 MODULE_DEPEND(ohci, usb, 1, 1, 1);

@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2006 Stephane E. Potvin <sepotvin@videotron.ca>
  * Copyright (c) 2006 Ariff Abdullah <ariff@FreeBSD.org>
@@ -46,8 +46,6 @@
 
 #include "pin_patch.h"
 #include "pin_patch_realtek.h"
-
-SND_DECLARE_FILE("$FreeBSD$");
 
 static const struct {
 	uint32_t model;
@@ -302,6 +300,12 @@ hdac_pin_patch(struct hdaa_widget *w)
 			patch_str = "as=2";
 			break;
 		}
+	} else if (id == HDA_CODEC_ALC235 && subid == ASUS_GL553VE_SUBVENDOR) {
+		switch (nid) {
+		case 33:
+			patch_str = "as=1 seq=15";
+			break;
+		}
 	} else if (id == HDA_CODEC_ALC256 && (subid == DELL_I7577_SUBVENDOR ||
 	    subid == DELL_L7480_SUBVENDOR)) {
 		switch (nid) {
@@ -313,13 +317,25 @@ hdac_pin_patch(struct hdaa_widget *w)
 			break;
 		}
 	} else if (id == HDA_CODEC_ALC257 &&
-	    (subid == LENOVO_L5AMD_SUBVENDOR)) {
+	    (subid == LENOVO_L5AMD_SUBVENDOR ||
+	    subid == LENOVO_L5INTEL_SUBVENDOR)) {
 		switch (nid) {
 		case 20:
 			patch_str = "as=1 seq=0";
 			break;
 		case 33:
 			patch_str = "as=1 seq=15";
+			break;
+		}
+	} else if (id == HDA_CODEC_IDT92HD95B &&
+	    (subid == FRAMEWORK_LAPTOP_0001_SUBVENDOR ||
+	    subid == FRAMEWORK_LAPTOP_0002_SUBVENDOR)) {
+		switch (nid) {
+		case 10:
+			patch_str = "as=1 seq=15 color=Black loc=Left";
+			break;
+		case 11:
+			patch_str = "as=3 seq=15 color=Black loc=Left";
 			break;
 		}
 	} else {

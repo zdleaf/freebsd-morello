@@ -1,4 +1,3 @@
-# $FreeBSD$
 #
 # Disk geometry and partition layout tables.
 # See disktab(5) for format of this file.
@@ -9,7 +8,7 @@
 #
 # To make a filesystem on a floppy:
 #	fdformat [-f <size>] fd<drive>[.<size>]
-#	disklabel -B -r -w fd<drive>[.<size>] fd<size>
+#	disklabel -B -w fd<drive>[.<size>] fd<size>
 #	newfs <opts> fd<drive>[.<size>]
 #
 # with <opts>:

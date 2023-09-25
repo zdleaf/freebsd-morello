@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright 2020 Michal Meloun <mmel@FreeBSD.org>
  *
@@ -26,8 +26,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/bus.h>
@@ -249,9 +247,6 @@ tegra210_coretemp_attach(device_t dev)
 static int
 tegra210_coretemp_detach(device_t dev)
 {
-	struct tegra210_coretemp_softc *sc;
-
-	sc = device_get_softc(dev);
 	return (0);
 }
 
@@ -265,8 +260,6 @@ static device_method_t tegra210_coretemp_methods[] = {
 	DEVMETHOD_END
 };
 
-static devclass_t tegra210_coretemp_devclass;
 static DEFINE_CLASS_0(tegra210_coretemp, tegra210_coretemp_driver,
     tegra210_coretemp_methods, sizeof(struct tegra210_coretemp_softc));
-DRIVER_MODULE(tegra210_coretemp, cpu, tegra210_coretemp_driver,
-    tegra210_coretemp_devclass, NULL, NULL);
+DRIVER_MODULE(tegra210_coretemp, cpu, tegra210_coretemp_driver, NULL, NULL);

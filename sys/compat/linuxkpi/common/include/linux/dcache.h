@@ -22,15 +22,14 @@
  * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 #ifndef _LINUXKPI_LINUX_DCACHE_H
 #define	_LINUXKPI_LINUX_DCACHE_H
 
-struct vnode;
-struct pfs_node;
+#include <sys/vnode.h>
+
+#include <fs/pseudofs/pseudofs.h>
 
 struct dentry {
 	struct vnode *d_inode;

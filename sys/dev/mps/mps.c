@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2009 Yahoo! Inc.
  * Copyright (c) 2011-2015 LSI Corp.
@@ -28,13 +28,9 @@
  * SUCH DAMAGE.
  *
  * Avago Technologies (LSI) MPT-Fusion Host Adapter FreeBSD
- *
- * $FreeBSD$
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 /* Communications core for Avago Technologies (LSI) MPT2 */
 
 /* TODO Move headers to mpsvar */
@@ -1382,6 +1378,9 @@ mps_load_chains_cb(void *arg, bus_dma_segment_t *segs, int nsegs, int error)
 		return;
 
 	for (i = 0, o = 0, s = 0; s < nsegs; s++) {
+		KASSERT(segs[s].ds_addr + segs[s].ds_len - 1 <= BUS_SPACE_MAXADDR_32BIT,
+		    ("mps: Bad segment address %#jx len %#jx\n", (uintmax_t)segs[s].ds_addr,
+			(uintmax_t)segs[s].ds_len));
 		for (bo = 0; bo + sc->reqframesz <= segs[s].ds_len;
 		    bo += sc->reqframesz) {
 			chain = &sc->chains[i++];
@@ -2696,7 +2695,7 @@ mps_deregister_events(struct mps_softc *sc, struct mps_event_handle *handle)
 static int
 mps_add_chain(struct mps_command *cm)
 {
-	MPI2_SGE_CHAIN32 *sgc;
+	MPI2_SGE_CHAIN64 *sgc;
 	struct mps_chain *chain;
 	u_int space;
 
@@ -2715,17 +2714,18 @@ mps_add_chain(struct mps_command *cm)
 	 */
 	TAILQ_INSERT_TAIL(&cm->cm_chain_list, chain, chain_link);
 
-	sgc = (MPI2_SGE_CHAIN32 *)&cm->cm_sge->MpiChain;
+	sgc = (MPI2_SGE_CHAIN64 *)&cm->cm_sge->MpiChain;
 	sgc->Length = htole16(space);
 	sgc->NextChainOffset = 0;
 	/* TODO Looks like bug in Setting sgc->Flags. 
 	 *	sgc->Flags = ( MPI2_SGE_FLAGS_CHAIN_ELEMENT | MPI2_SGE_FLAGS_64_BIT_ADDRESSING |
 	 *	            MPI2_SGE_FLAGS_SYSTEM_ADDRESS) << MPI2_SGE_FLAGS_SHIFT
 	 *	This is fine.. because we are not using simple element. In case of 
-	 *	MPI2_SGE_CHAIN32, we have separate Length and Flags feild.
+	 *	MPI2_SGE_CHAIN64, we have separate Length and Flags field.
  	 */
-	sgc->Flags = MPI2_SGE_FLAGS_CHAIN_ELEMENT;
-	sgc->Address = htole32(chain->chain_busaddr);
+	sgc->Flags = MPI2_SGE_FLAGS_CHAIN_ELEMENT | MPI2_SGE_FLAGS_64_BIT_ADDRESSING;
+	sgc->Address.High = htole32(chain->chain_busaddr >> 32);
+	sgc->Address.Low = htole32(chain->chain_busaddr);
 
 	cm->cm_sge = (MPI2_SGE_IO_UNION *)&chain->chain->MpiSimple;
 	cm->cm_sglsize = space;
@@ -2757,7 +2757,7 @@ mps_push_sge(struct mps_command *cm, void *sgep, size_t len, int segsleft)
 		}
 		break;
 	case MPI2_SGE_FLAGS_CHAIN_ELEMENT:
-		/* Driver only uses 32-bit chain elements */
+		/* Driver only uses 64-bit chain elements */
 		if (len != MPS_SGC_SIZE)
 			panic("CHAIN %p length %u or %zu?", sgep,
 			    MPS_SGC_SIZE, len);
@@ -2979,6 +2979,12 @@ mps_data_cb(void *arg, bus_dma_segment_t *segs, int nsegs, int error)
 				mps_dprint(sc, MPS_INFO, "Out of chain frames, "
 				    "consider increasing hw.mps.max_chains.\n");
 			cm->cm_flags |= MPS_CM_FLAGS_CHAIN_FAILED;
+			/*
+			 * mpr_complete_command can only be called on commands
+			 * that are in the queue. Since this is an error path
+			 * which gets called before we enqueue, update the state
+			 * to meet this requirement before we complete it.
+			 */
 			cm->cm_state = MPS_CM_STATE_INQUEUE;
 			mps_complete_command(sc, cm);
 			return;

@@ -1,8 +1,6 @@
 /*
  * Linker script for 64-bit vDSO.
  * Copied from Linux kernel arch/x86/vdso/vdso-layout.lds.S
- *
- * $FreeBSD$
  */
 
 SECTIONS
@@ -68,6 +66,7 @@ VERSION
 		linux_platform;
 		kern_timekeep_base;
 		kern_tsc_selector;
+		kern_cpu_selector;
 	local: *;
 	};
 }

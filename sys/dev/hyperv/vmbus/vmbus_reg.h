@@ -22,8 +22,6 @@
  * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 #ifndef _VMBUS_REG_H_
@@ -32,7 +30,12 @@
 #include <sys/param.h>
 #include <dev/hyperv/include/hyperv.h> /* XXX for hyperv_guid */
 #include <dev/hyperv/include/vmbus.h>
-#include <dev/hyperv/vmbus/hyperv_reg.h>
+#if defined(__aarch64__)
+#include <dev/hyperv/vmbus/aarch64/hyperv_reg.h>
+#else
+#include <dev/hyperv/vmbus/x86/hyperv_reg.h>
+#endif
+#include <dev/hyperv/vmbus/hyperv_common_reg.h>
 
 /*
  * Hyper-V SynIC message format.

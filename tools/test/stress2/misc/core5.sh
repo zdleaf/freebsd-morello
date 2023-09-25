@@ -34,7 +34,7 @@
 
 # 20150714 Slowdown seen with core5 waiting in vlruwk.
 # sysctl vfs.vlru_allow_cache_src=1 used to resolve this.
-# For now change MAXVNODES from 1.000 to 4.000.
+# For now change MAXVNODES from 1.000 to 5.000.
 
 [ `id -u ` -ne 0 ] && echo "Must be root!" && exit 1
 . ../default.cfg
@@ -91,10 +91,9 @@ mount | grep -q "on $mntpoint " && umount $mntpoint
 [ -c /dev/md$mdstart ] && mdconfig -d -u $mdstart
 
 mdconfig -a -t malloc -s 1g -u $mdstart
-bsdlabel -w md$mdstart auto
 
-newfs -b 4096 -f 512 -i 2048 md${mdstart}$part > /dev/null
-mount -o async /dev/md${mdstart}$part $mntpoint || exit 1
+newfs -b 4096 -f 512 -i 2048 md$mdstart > /dev/null
+mount -o async /dev/md$mdstart $mntpoint || exit 1
 
 cp /tmp/core5 $mntpoint
 mkdir $mntpoint/dir
@@ -132,7 +131,7 @@ EOF
 #include <time.h>
 #include <unistd.h>
 
-#define MAXVNODES 4000
+#define MAXVNODES 5000
 #define NBFILES 10000
 #define PARALLEL 4
 #define RTIME (10 * 60)

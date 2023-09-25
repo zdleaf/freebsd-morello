@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2020, Scott Phillips <scottph@freebsd.org>
  *
@@ -23,8 +23,6 @@
  * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 #ifndef	_SYS_DUMPSET_H_
@@ -92,7 +90,7 @@ vm_page_dump_index_to_pa(int bit)
 			    (dump_avail[i] & ~PAGE_MASK));
 		bit -= tot;
 	}
-	return ((vm_paddr_t)NULL);
+	return (0);
 }
 
 #define VM_PAGE_DUMP_FOREACH(bitset, pa)				\

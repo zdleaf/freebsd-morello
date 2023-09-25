@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD AND BSD-3-Clause
+ * SPDX-License-Identifier: BSD-2-Clause AND BSD-3-Clause
  *
  * Copyright 2008 by Marco Trillo. All rights reserved.
  *
@@ -23,8 +23,6 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 /*-
  * Copyright (c) 2002, 2003 Tsubai Masanari.  All rights reserved.
@@ -120,7 +118,7 @@ static driver_t pcm_i2s_driver = {
 	PCM_SOFTC_SIZE
 };
 
-DRIVER_MODULE(pcm_i2s, macio, pcm_i2s_driver, pcm_devclass, 0, 0);
+DRIVER_MODULE(pcm_i2s, macio, pcm_i2s_driver, 0, 0);
 MODULE_DEPEND(pcm_i2s, sound, SOUND_MINVER, SOUND_PREFVER, SOUND_MAXVER);
 
 static int	aoagpio_probe(device_t);
@@ -146,9 +144,8 @@ static driver_t aoagpio_driver = {
 	aoagpio_methods,
 	sizeof(struct aoagpio_softc)
 };
-static devclass_t aoagpio_devclass;
 
-DRIVER_MODULE(aoagpio, macgpio, aoagpio_driver, aoagpio_devclass, 0, 0);
+DRIVER_MODULE(aoagpio, macgpio, aoagpio_driver, 0, 0);
 
 /*****************************************************************************
 			Probe and attachment routines.

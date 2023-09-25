@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2018 Rubicon Communications, LLC (Netgate)
  * All rights reserved.
@@ -30,13 +30,12 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/bus.h>
 #include <sys/kernel.h>
 #include <sys/lock.h>
+#include <sys/malloc.h>
 #include <sys/module.h>
 #include <sys/mutex.h>
 #include <sys/resource.h>
@@ -471,20 +470,21 @@ static void
 sdhci_xenon_parse_prop(device_t dev)
 {
 	struct sdhci_xenon_softc *sc;
-	uint64_t val;
+	uint32_t val;
 
 	sc = device_get_softc(dev);
 	val = 0;
 
-	if (device_get_property(dev, "quirks", &val, sizeof(val)) > 0)
+	if (device_get_property(dev, "quirks",
+	    &val, sizeof(val), DEVICE_PROP_UINT32) > 0)
 		sc->slot->quirks = val;
 	sc->znr = XENON_ZNR_DEF_VALUE;
 	if (device_get_property(dev, "marvell,xenon-phy-znr",
-	    &val, sizeof(val)) > 0)
+	    &val, sizeof(val), DEVICE_PROP_UINT32) > 0)
 		sc->znr = val & XENON_ZNR_MASK;
 	sc->zpr = XENON_ZPR_DEF_VALUE;
 	if (device_get_property(dev, "marvell,xenon-phy-zpr",
-	    &val, sizeof(val)) > 0)
+	    &val, sizeof(val), DEVICE_PROP_UINT32) > 0)
 		sc->zpr = val & XENON_ZPR_MASK;
 	if (device_has_property(dev, "marvell,xenon-phy-slow-mode"))
 		sc->slow_mode = true;

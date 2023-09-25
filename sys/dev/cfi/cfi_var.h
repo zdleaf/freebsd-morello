@@ -33,8 +33,6 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 #ifndef _DEV_CFI_VAR_H_
@@ -86,8 +84,6 @@ struct cfi_softc {
 };
 
 extern char cfi_driver_name[];
-extern devclass_t cfi_devclass;
-extern devclass_t cfi_diskclass;
 
 int cfi_probe(device_t);
 int cfi_attach(device_t);

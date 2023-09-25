@@ -1,5 +1,4 @@
 /*
- * $FreeBSD$
  */
 FBSD_1.0 {
 };
@@ -10,4 +9,9 @@ FBSD_1.3 {
 	fegetenv;
 	feholdexcept;
 	feupdateenv;
+};
+
+FBSD_1.7 {
+	feenableexcept;
+	fedisableexcept;
 };

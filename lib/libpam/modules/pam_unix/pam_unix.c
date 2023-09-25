@@ -37,8 +37,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/socket.h>
 #include <sys/time.h>
@@ -76,7 +74,7 @@ __FBSDID("$FreeBSD$");
 #define	LOCKED_PREFIX		"*LOCKED*"
 #define	LOCKED_PREFIX_LEN	(sizeof(LOCKED_PREFIX) - 1)
 
-static void makesalt(char []);
+static void makesalt(char [SALTSIZE + 1]);
 
 static char password_hash[] =		PASSWORD_HASH;
 
@@ -87,7 +85,7 @@ static char password_hash[] =		PASSWORD_HASH;
  * authentication management
  */
 PAM_EXTERN int
-pam_sm_authenticate(pam_handle_t *pamh, int flags __unused,
+pam_sm_authenticate(pam_handle_t *pamh, int flags,
     int argc __unused, const char *argv[] __unused)
 {
 	login_cap_t *lc;

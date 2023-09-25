@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2012, 2013 The FreeBSD Foundation
  *
@@ -29,8 +29,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/bus.h>
 #include <sys/eventhandler.h>
@@ -256,8 +254,5 @@ static driver_t imx_wdog_driver = {
 	sizeof(struct imx_wdog_softc),
 };
 
-static devclass_t imx_wdog_devclass;
-
-EARLY_DRIVER_MODULE(imx_wdog, simplebus, imx_wdog_driver,
-    imx_wdog_devclass, 0, 0, BUS_PASS_TIMER);
+EARLY_DRIVER_MODULE(imx_wdog, simplebus, imx_wdog_driver, 0, 0, BUS_PASS_TIMER);
 SIMPLEBUS_PNP_INFO(compat_data);

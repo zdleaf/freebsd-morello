@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2000,2001 Jonathan Chen All rights reserved.
  * Copyright (c) 2003-2004 M. Warner Losh <imp@FreeBSD.org>
@@ -24,8 +24,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 /*
@@ -108,7 +106,6 @@ struct cbb_softc {
 #define CARD_OFF	(CARD_VCC(0))
 
 extern int cbb_debug;
-extern devclass_t cbb_devclass;
 
 int	cbb_activate_resource(device_t brdev, device_t child,
 	    int type, int rid, struct resource *r);

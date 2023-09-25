@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 1997, 1998, 1999 Nicolas Souchu
  * All rights reserved.
@@ -29,7 +29,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
 #include "opt_ppb_1284.h"
 
 #include <sys/param.h>
@@ -575,8 +574,6 @@ ppb_release_bus(device_t bus, device_t dev)
 	return (0);
 }
 
-static devclass_t ppbus_devclass;
-
 static device_method_t ppbus_methods[] = {
 	/* device interface */
 	DEVMETHOD(device_probe,		ppbus_probe),
@@ -600,4 +597,5 @@ static driver_t ppbus_driver = {
 	ppbus_methods,
 	sizeof(struct ppb_data),
 };
-DRIVER_MODULE(ppbus, ppc, ppbus_driver, ppbus_devclass, 0, 0);
+
+DRIVER_MODULE(ppbus, ppc, ppbus_driver, 0, 0);

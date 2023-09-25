@@ -25,8 +25,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 /*
  * RTC driver for Tegra SoCs.
  */
@@ -294,8 +292,6 @@ static device_method_t tegra_rtc_methods[] = {
 	DEVMETHOD_END
 };
 
-static devclass_t tegra_rtc_devclass;
 static DEFINE_CLASS_0(rtc, tegra_rtc_driver, tegra_rtc_methods,
     sizeof(struct tegra_rtc_softc));
-DRIVER_MODULE(tegra_rtc, simplebus, tegra_rtc_driver, tegra_rtc_devclass,
-    NULL, NULL);
+DRIVER_MODULE(tegra_rtc, simplebus, tegra_rtc_driver, NULL, NULL);

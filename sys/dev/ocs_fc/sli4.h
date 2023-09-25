@@ -27,8 +27,6 @@
  * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 /**
@@ -794,7 +792,10 @@ typedef struct sli4_res_read_config_s {
 #if BYTE_ORDER == LITTLE_ENDIAN
 	uint32_t	:31,
 			ext:1;		/** Resource Extents */
-	uint32_t	:24,
+	uint32_t	:20,
+			pt:2,
+			tf:1,
+			ptv:1,
 			topology:8;
 	uint32_t	rsvd3;
 	uint32_t	e_d_tov:16,
@@ -2538,6 +2539,7 @@ typedef struct sli4_res_common_set_dump_location_s {
 #define SLI4_SET_FEATURES_ENABLE_MULTI_RECEIVE_QUEUE	0x0D
 #define SLI4_SET_FEATURES_SET_FTD_XFER_HINT		0x0F
 #define SLI4_SET_FEATURES_SLI_PORT_HEALTH_CHECK		0x11
+#define SLI4_SET_FEATURES_PERSISTENT_TOPOLOGY          0x20
 
 typedef struct sli4_req_common_set_features_s {
 	sli4_req_hdr_t	hdr;
@@ -2614,6 +2616,16 @@ typedef struct sli4_req_common_set_features_set_fdt_xfer_hint_s {
 #error big endian version not defined
 #endif
 } sli4_req_common_set_features_set_fdt_xfer_hint_t;
+
+typedef struct sli4_req_common_set_features_persistent_topo_param_s {
+#if BYTE_ORDER == LITTLE_ENDIAN
+       uint32_t        persistent_topo:2,
+                       topo_failover:1,
+                       :29;
+#else
+#error big endian version not defined
+#endif
+} sli4_req_common_set_features_persistent_topo_param_t;
 
 /**
  * @brief DMTF_EXEC_CLP_CMD
@@ -3228,6 +3240,10 @@ typedef struct sli4_s {
 		uint16_t		rq_min_buf_size;
 		uint32_t		rq_max_buf_size;
 		uint8_t			topology;
+		uint8_t                 pt:4,
+					tf:1,
+					ptv:1,
+					:2;
 		uint8_t			wwpn[8];
 		uint8_t			wwnn[8];
 		uint32_t		fw_rev[2];
@@ -3565,6 +3581,13 @@ sli_set_topology(sli4_t *sli4, uint32_t value)
 	return rc;
 }
 
+static inline void
+sli_config_persistent_topology(sli4_t *sli4, sli4_req_common_set_features_persistent_topo_param_t *req)
+{
+	sli4->config.pt = req->persistent_topo;
+	sli4->config.tf = req->topo_failover;
+}
+
 static inline uint16_t
 sli_get_link_module_type(sli4_t *sli4)
 {
@@ -3596,6 +3619,19 @@ sli_convert_mask_to_count(uint32_t method, uint32_t mask)
 	}
 
 	return count;
+}
+
+static inline bool
+sli_fcal_is_speed_supported(uint32_t link_speed)
+{
+	if ((link_speed == FC_LINK_SPEED_16G) ||
+	    (link_speed == FC_LINK_SPEED_32G) ||
+	    (link_speed >= FC_LINK_SPEED_AUTO_32_16)) {
+		ocs_log_err(NULL, "unsupported FC-AL speed (speed_code: %d)\n", link_speed);
+		return FALSE;
+	}
+
+	return TRUE;
 }
 
 /**
@@ -3637,7 +3673,7 @@ typedef struct {
 } sli4_cmd_rq_cfg_t;
 extern int32_t sli_cmd_reg_fcfi(sli4_t *, void *, size_t, uint16_t,
 				sli4_cmd_rq_cfg_t rq_cfg[SLI4_CMD_REG_FCFI_NUM_RQ_CFG], uint16_t);
-extern int32_t sli_cmd_reg_fcfi_mrq(sli4_t *, void *, size_t, uint8_t, uint16_t, uint16_t, uint8_t, uint8_t , uint16_t, sli4_cmd_rq_cfg_t *);
+extern int32_t sli_cmd_reg_fcfi_mrq(sli4_t *, void *, size_t, uint8_t, uint16_t, uint16_t, uint8_t, uint8_t , uint16_t, sli4_cmd_rq_cfg_t rq_cfg[SLI4_CMD_REG_FCFI_NUM_RQ_CFG]);
 
 extern int32_t sli_cmd_reg_rpi(sli4_t *, void *, size_t, uint32_t, uint16_t, uint16_t, ocs_dma_t *, uint8_t, uint8_t);
 extern int32_t sli_cmd_reg_vfi(sli4_t *, void *, size_t, ocs_domain_t *);
@@ -5569,6 +5605,8 @@ extern int32_t sli_xmit_bls_rsp64_wqe(sli4_t *, void *, size_t, sli_bls_payload_
 extern int32_t sli_xmit_els_rsp64_wqe(sli4_t *, void *, size_t, ocs_dma_t *, uint32_t, uint16_t, uint16_t, uint16_t, uint16_t, ocs_remote_node_t *, uint32_t, uint32_t);
 extern int32_t sli_requeue_xri_wqe(sli4_t *, void *, size_t, uint16_t, uint16_t, uint16_t);
 extern void sli4_cmd_lowlevel_set_watchdog(sli4_t *sli4, void *buf, size_t size, uint16_t timeout);
+extern bool sli_persist_topology_enabled(sli4_t *sli4);
+
 
 /**
  * @ingroup sli_fc

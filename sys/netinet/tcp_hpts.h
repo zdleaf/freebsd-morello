@@ -21,8 +21,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 #ifndef __tcp_hpts_h__
@@ -90,9 +88,8 @@ struct hpts_diag {
 				 * Note do not set this to 0.
 				 */
 #define DYNAMIC_MIN_SLEEP DEFAULT_MIN_SLEEP
-#define DYNAMIC_MAX_SLEEP 100000	/* 100ms */
-/* No of connections when wee start aligning to the cpu from syscalls */
-#define OLDEST_THRESHOLD 1200
+#define DYNAMIC_MAX_SLEEP 5000	/* 5ms */
+
 /* Thresholds for raising/lowering sleep */
 #define TICKS_INDICATE_MORE_SLEEP 100		/* This would be 1ms */
 #define TICKS_INDICATE_LESS_SLEEP 1000		/* This would indicate 10ms */
@@ -112,10 +109,14 @@ struct hpts_diag {
  *
  */
 
-
 #ifdef _KERNEL
-void tcp_hpts_remove(struct inpcb *);
-bool tcp_in_hpts(struct inpcb *);
+void tcp_hpts_init(struct tcpcb *);
+void tcp_hpts_remove(struct tcpcb *);
+static inline bool
+tcp_in_hpts(struct tcpcb *tp)
+{
+	return (tp->t_in_hpts == IHPTS_ONQUEUE);
+}
 
 /*
  * To insert a TCB on the hpts you *must* be holding the
@@ -130,7 +131,7 @@ bool tcp_in_hpts(struct inpcb *);
  * it to be 1 (so you wont call output) it may be transitioning
  * to 0 (by the hpts). That will be fine since that will just
  * mean an extra call to tcp_output that most likely will find
- * the call you executed (when the mis-match occured) will have
+ * the call you executed (when the mis-match occurred) will have
  * put the TCB back on the hpts and it will return. If your
  * call did not add it back to the hpts then you will either
  * over-send or the cwnd will block you from sending more.
@@ -141,19 +142,17 @@ bool tcp_in_hpts(struct inpcb *);
  * that INP_WLOCK() or from destroying your TCB where again
  * you should already have the INP_WLOCK().
  */
-uint32_t tcp_hpts_insert_diag(struct inpcb *inp, uint32_t slot, int32_t line,
+uint32_t tcp_hpts_insert_diag(struct tcpcb *tp, uint32_t slot, int32_t line,
     struct hpts_diag *diag);
 #define	tcp_hpts_insert(inp, slot)	\
 	tcp_hpts_insert_diag((inp), (slot), __LINE__, NULL)
 
-void __tcp_set_hpts(struct inpcb *inp, int32_t line);
+void __tcp_set_hpts(struct tcpcb *tp, int32_t line);
 #define tcp_set_hpts(a) __tcp_set_hpts(a, __LINE__)
 
 void tcp_set_inp_to_drop(struct inpcb *inp, uint16_t reason);
 
 void tcp_run_hpts(void);
-
-uint16_t hpts_random_cpu(struct inpcb *inp);
 
 extern int32_t tcp_min_hptsi_time;
 
@@ -188,6 +187,15 @@ tcp_tv_to_lusectick(const struct timeval *sv)
 }
 
 #ifdef _KERNEL
+
+extern int32_t tcp_min_hptsi_time;
+
+static inline int32_t
+get_hpts_min_sleep_time(void)
+{
+	return (tcp_min_hptsi_time + HPTS_TICKS_PER_SLOT);
+}
+
 static __inline uint32_t
 tcp_gethptstick(struct timeval *sv)
 {

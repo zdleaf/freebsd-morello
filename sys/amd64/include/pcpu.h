@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) Peter Wemm <peter@netplex.com.au>
  * All rights reserved.
@@ -24,17 +24,16 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
+
+#ifdef __i386__
+#include <i386/pcpu.h>
+#else /* !__i386__ */
 
 #ifndef _MACHINE_PCPU_H_
 #define	_MACHINE_PCPU_H_
 
-#ifndef _SYS_CDEFS_H_
-#error "sys/cdefs.h is a prerequisite for this file"
-#endif
-
+#include <machine/_pmap.h>
 #include <machine/segments.h>
 #include <machine/tss.h>
 
@@ -99,7 +98,10 @@ _Static_assert(sizeof(struct monitorbuf) == 128, "2x cache line");
 	uint32_t pc_smp_tlb_gen;					\
 	u_int	pc_smp_tlb_op;						\
 	uint64_t pc_ucr3_load_mask;					\
-	char	__pad[2916]		/* pad to UMA_PCPU_ALLOC_SIZE */
+	u_int	pc_small_core;						\
+	u_int	pc_pcid_invlpg_workaround;				\
+	struct pmap_pcid pc_kpmap_store;				\
+	char	__pad[2900]		/* pad to UMA_PCPU_ALLOC_SIZE */
 
 #define	PC_DBREG_CMD_NONE	0
 #define	PC_DBREG_CMD_LOAD	1
@@ -109,19 +111,73 @@ _Static_assert(sizeof(struct monitorbuf) == 128, "2x cache line");
 #define MONITOR_STOPSTATE_RUNNING	0
 #define MONITOR_STOPSTATE_STOPPED	1
 
-#if defined(__GNUCLIKE_ASM) && defined(__GNUCLIKE___TYPEOF)
-
-/*
- * Evaluates to the byte offset of the per-cpu variable name.
- */
-#define	__pcpu_offset(name)						\
-	__offsetof(struct pcpu, name)
-
 /*
  * Evaluates to the type of the per-cpu variable name.
  */
 #define	__pcpu_type(name)						\
 	__typeof(((struct pcpu *)0)->name)
+
+#ifdef __SEG_GS
+#define	get_pcpu() __extension__ ({					\
+	static struct pcpu __seg_gs *__pc = 0;				\
+									\
+	__pc->pc_prvspace;						\
+})
+
+/*
+ * Evaluates to the address of the per-cpu variable name.
+ */
+#define	__PCPU_PTR(name) __extension__ ({				\
+	struct pcpu *__pc = get_pcpu();					\
+									\
+	&__pc->name;							\
+})
+
+/*
+ * Evaluates to the value of the per-cpu variable name.
+ */
+#define	__PCPU_GET(name) __extension__ ({				\
+	static struct pcpu __seg_gs *__pc = 0;				\
+									\
+	__pc->name;							\
+})
+
+/*
+ * Adds the value to the per-cpu counter name.  The implementation
+ * must be atomic with respect to interrupts.
+ */
+#define	__PCPU_ADD(name, val) do {					\
+	static struct pcpu __seg_gs *__pc = 0;				\
+	__pcpu_type(name) __val;					\
+									\
+	__val = (val);							\
+	if (sizeof(__val) == 1 || sizeof(__val) == 2 ||			\
+	    sizeof(__val) == 4 || sizeof(__val) == 8) {			\
+		__pc->name += __val;					\
+	} else								\
+		*__PCPU_PTR(name) += __val;				\
+} while (0)
+
+/*
+ * Sets the value of the per-cpu variable name to value val.
+ */
+#define	__PCPU_SET(name, val) do {					\
+	static struct pcpu __seg_gs *__pc = 0;				\
+	__pcpu_type(name) __val;					\
+									\
+	__val = (val);							\
+	if (sizeof(__val) == 1 || sizeof(__val) == 2 ||			\
+	    sizeof(__val) == 4 || sizeof(__val) == 8) {			\
+		__pc->name = __val;					\
+	} else								\
+		*__PCPU_PTR(name) = __val;				\
+} while (0)
+#else /* !__SEG_GS */
+/*
+ * Evaluates to the byte offset of the per-cpu variable name.
+ */
+#define	__pcpu_offset(name)						\
+	__offsetof(struct pcpu, name)
 
 /*
  * Evaluates to the address of the per-cpu variable name.
@@ -208,6 +264,7 @@ _Static_assert(sizeof(struct monitorbuf) == 128, "2x cache line");
 	    : "m" (*(struct pcpu *)(__pcpu_offset(pc_prvspace))));	\
 	__pc;								\
 })
+#endif /* !__SEG_GS */
 
 #define	PCPU_GET(member)	__PCPU_GET(pc_ ## member)
 #define	PCPU_ADD(member, val)	__PCPU_ADD(pc_ ## member, val)
@@ -277,12 +334,8 @@ _Static_assert(sizeof(struct monitorbuf) == 128, "2x cache line");
 	}								\
 } while (0);
 
-#else /* !__GNUCLIKE_ASM || !__GNUCLIKE___TYPEOF */
-
-#error "this file needs to be ported to your compiler"
-
-#endif /* __GNUCLIKE_ASM && __GNUCLIKE___TYPEOF */
-
 #endif /* _KERNEL */
 
 #endif /* !_MACHINE_PCPU_H_ */
+
+#endif /* __i386__ */

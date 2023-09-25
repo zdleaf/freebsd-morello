@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright 2001 Jamey Wood
  *
@@ -23,8 +23,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 #include <sys/queue.h>
@@ -81,7 +79,7 @@ struct current_syscall {
 	struct syscall *sc;
 	unsigned int number;
 	unsigned int nargs;
-	unsigned long args[10];
+	syscallarg_t args[10];
 	char *s_args[10];	/* the printable arguments */
 };
 

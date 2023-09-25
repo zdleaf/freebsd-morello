@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 1997 John S. Dyson.  All rights reserved.
  *
@@ -14,8 +14,6 @@
  * DISCLAIMER:  This code isn't warranted to do anything useful.  Anything
  * bad that happens because of using this software isn't the responsibility
  * of the author.  This software is distributed AS-IS.
- *
- * $FreeBSD$
  */
 
 #ifndef _SYS_AIO_H_
@@ -151,7 +149,7 @@ struct kaiocb {
 	aio_handle_fn_t *handle_fn;	/* (c) backend handle function */
 	union {				/* Backend-specific data fields */
 		struct {		/* BIO backend */
-			int	nbio;	/* Number of remaining bios */
+			volatile u_int nbio; /* Number of remaining bios */
 			int	error;	/* Worst error of all bios */
 			long	nbytes;	/* Bytes completed so far */
 		};

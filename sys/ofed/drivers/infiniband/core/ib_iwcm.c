@@ -38,8 +38,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <linux/dma-mapping.h>
 #include <linux/err.h>
 #include <linux/idr.h>
@@ -424,9 +422,6 @@ static void destroy_cm_id(struct iw_cm_id *cm_id)
  */
 void iw_destroy_cm_id(struct iw_cm_id *cm_id)
 {
-	struct iwcm_id_private *cm_id_priv;
-
-	cm_id_priv = container_of(cm_id, struct iwcm_id_private, id);
 	destroy_cm_id(cm_id);
 }
 EXPORT_SYMBOL(iw_destroy_cm_id);

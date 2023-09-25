@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2015 Semihalf.
  * Copyright (c) 2015 Stormshield.
@@ -28,8 +28,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include "opt_bus.h"
 
 #include <sys/param.h>
@@ -53,18 +51,20 @@ __FBSDID("$FreeBSD$");
 #include <dev/ofw/ofw_bus.h>
 #include <dev/ofw/ofw_bus_subr.h>
 
-#ifdef EXT_RESOURCES
 #include <dev/extres/phy/phy.h>
-#endif
 
 #include "generic_xhci.h"
 
+/* Flags for the OFW compat data table */
+#define	XHCI_FDT_MATCH		0x01
+#define	XHCI_FDT_32BIT_DMA	0x02	/* Controller needs 32-bit DMA */
+
 static struct ofw_compat_data compat_data[] = {
-	{"marvell,armada-380-xhci",	true},
-	{"marvell,armada3700-xhci",	true},
-	{"marvell,armada-8k-xhci",	true},
-	{"generic-xhci",		true},
-	{NULL,				false}
+	{"marvell,armada-380-xhci",	XHCI_FDT_MATCH},
+	{"marvell,armada3700-xhci",	XHCI_FDT_MATCH},
+	{"marvell,armada-8k-xhci",	XHCI_FDT_MATCH},
+	{"generic-xhci",		XHCI_FDT_MATCH},
+	{NULL,				0}
 };
 
 static int
@@ -85,15 +85,19 @@ generic_xhci_fdt_probe(device_t dev)
 static int
 generic_xhci_fdt_attach(device_t dev)
 {
-#ifdef EXT_RESOURCES
+	struct xhci_softc *sc = device_get_softc(dev);
 	phandle_t node;
 	phy_t phy;
+	int flags;
 
 	node = ofw_bus_get_node(dev);
 	if (phy_get_by_ofw_property(dev, node, "usb-phy", &phy) == 0)
 		if (phy_enable(phy) != 0)
 			device_printf(dev, "Cannot enable phy\n");
-#endif
+
+	flags = ofw_bus_search_compatible(dev, compat_data)->ocd_data;
+	if ((flags & XHCI_FDT_32BIT_DMA) != 0)
+		sc->sc_quirks |= XHCI_QUIRK_DMA_32B;
 
 	return (generic_xhci_attach(dev));
 }
@@ -101,21 +105,17 @@ generic_xhci_fdt_attach(device_t dev)
 static int
 generic_xhci_fdt_detach(device_t dev)
 {
-#ifdef EXT_RESOURCES
 	phandle_t node;
 	phy_t phy;
-#endif
 	int err;
 
 	err = generic_xhci_detach(dev);
 	if (err != 0)
 		return (err);
 
-#ifdef EXT_RESOURCES
 	node = ofw_bus_get_node(dev);
 	if (phy_get_by_ofw_property(dev, node, "usb-phy", &phy) == 0)
 		phy_release(phy);
-#endif
 
 	return (0);
 }
@@ -132,7 +132,5 @@ static device_method_t xhci_fdt_methods[] = {
 DEFINE_CLASS_1(xhci, xhci_fdt_driver, xhci_fdt_methods,
     sizeof(struct xhci_softc), generic_xhci_driver);
 
-static devclass_t xhci_fdt_devclass;
-
-DRIVER_MODULE(xhci, simplebus, xhci_fdt_driver, xhci_fdt_devclass, 0, 0);
+DRIVER_MODULE(xhci, simplebus, xhci_fdt_driver, 0, 0);
 MODULE_DEPEND(xhci, usb, 1, 1, 1);

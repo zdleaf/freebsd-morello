@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2019 Oleksandr Tymoshenko <gonzo@FreeBSD.org>
  *
@@ -23,13 +23,9 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/bus.h>
@@ -92,6 +88,7 @@ __FBSDID("$FreeBSD$");
 static struct ofw_compat_data compat_data[] = {
 	{ "rockchip,rk3328-spi",		1 },
 	{ "rockchip,rk3399-spi",		1 },
+	{ "rockchip,rk3568-spi",		1 },
 	{ NULL,					0 }
 };
 
@@ -225,12 +222,10 @@ rk_spi_fill_txfifo(struct rk_spi_softc *sc)
 {
 	uint32_t txlevel;
 	txlevel = RK_SPI_READ_4(sc, RK_SPI_TXFLR);
-	int cnt = 0;
 
 	while (sc->txidx < sc->txlen && txlevel < sc->fifo_size) {
 		RK_SPI_WRITE_4(sc, RK_SPI_TXDR, sc->txbuf[sc->txidx++]);
 		txlevel++;
-		cnt++;
 	}
 
 	if (sc->txidx != sc->txlen)
@@ -476,9 +471,7 @@ static driver_t rk_spi_driver = {
 	sizeof(struct rk_spi_softc),
 };
 
-static devclass_t rk_spi_devclass;
-
-DRIVER_MODULE(rk_spi, simplebus, rk_spi_driver, rk_spi_devclass, 0, 0);
-DRIVER_MODULE(ofw_spibus, rk_spi, ofw_spibus_driver, ofw_spibus_devclass, 0, 0);
+DRIVER_MODULE(rk_spi, simplebus, rk_spi_driver, 0, 0);
+DRIVER_MODULE(ofw_spibus, rk_spi, ofw_spibus_driver, 0, 0);
 MODULE_DEPEND(rk_spi, ofw_spibus, 1, 1, 1);
 OFWBUS_PNP_INFO(compat_data);

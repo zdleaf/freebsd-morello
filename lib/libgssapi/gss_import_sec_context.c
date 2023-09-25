@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2005 Doug Rabson
  * All rights reserved.
@@ -24,8 +24,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- *	$FreeBSD$
  */
 
 #include <gssapi/gssapi.h>
@@ -65,7 +63,7 @@ gss_import_sec_context(OM_uint32 *minor_status,
 	mech_oid.elements = p + 2;
 	buf.length = len - 2 - mech_oid.length;
 	buf.value = p + 2 + mech_oid.length;
-	
+
 	m = _gss_find_mech_switch(&mech_oid);
 	if (!m)
 		return (GSS_S_DEFECTIVE_TOKEN);

@@ -1,5 +1,4 @@
 #	@(#)Makefile	8.8 (Berkeley) 3/28/97
-# $FreeBSD$
 
 .include <src.opts.mk>
 
@@ -61,6 +60,8 @@ LIBADD+=	ssl crypto
 CFLAGS+=	-DTCPWRAPPERS
 LIBADD+=	wrap
 .endif
+
+CFLAGS+=	${NO_WDEPRECATED_NON_PROTOTYPE}
 
 # User customizations to the sendmail build environment
 CFLAGS+=${SENDMAIL_CFLAGS}

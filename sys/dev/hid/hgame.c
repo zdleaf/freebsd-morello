@@ -1,8 +1,8 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2020 Vladimir Kondratyev <wulf@FreeBSD.org>
- * Copyright (c) 2020 Greg V <greg@unrelenting.technology>
+ * Copyright (c) 2020 Val Packett <val@packett.cool>
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -27,8 +27,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 /*
  * Generic HID game controller (joystick/gamepad) driver,
  */
@@ -217,7 +215,6 @@ hgame_detach(device_t dev)
 	return (hidmap_detach(&sc->hm));
 }
 
-static devclass_t hgame_devclass;
 static device_method_t hgame_methods[] = {
 	DEVMETHOD(device_probe,		hgame_probe),
 	DEVMETHOD(device_attach,	hgame_attach),
@@ -227,7 +224,7 @@ static device_method_t hgame_methods[] = {
 };
 
 DEFINE_CLASS_0(hgame, hgame_driver, hgame_methods, sizeof(struct hgame_softc));
-DRIVER_MODULE(hgame, hidbus, hgame_driver, hgame_devclass, NULL, 0);
+DRIVER_MODULE(hgame, hidbus, hgame_driver, NULL, NULL);
 MODULE_DEPEND(hgame, hid, 1, 1, 1);
 MODULE_DEPEND(hgame, hidbus, 1, 1, 1);
 MODULE_DEPEND(hgame, hidmap, 1, 1, 1);

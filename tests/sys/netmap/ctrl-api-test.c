@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (C) 2018 Vincenzo Maffione
  *
@@ -23,8 +23,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 /*
@@ -1012,15 +1010,33 @@ infinite_options(struct TestContext *ctx)
 {
 	struct nmreq_option opt;
 
-	printf("Testing infinite list of options on %s\n", ctx->ifname_ext);
+	printf("Testing infinite list of options on %s (invalid options)\n", ctx->ifname_ext);
 
-	opt.nro_reqtype = 1234;
+	memset(&opt, 0, sizeof(opt));
+	opt.nro_reqtype = NETMAP_REQ_OPT_MAX + 1;
 	push_option(&opt, ctx);
 	opt.nro_next = (uintptr_t)&opt;
 	if (port_register_hwall(ctx) >= 0)
 		return -1;
 	clear_options(ctx);
 	return (errno == EMSGSIZE ? 0 : -1);
+}
+
+static int
+infinite_options2(struct TestContext *ctx)
+{
+	struct nmreq_option opt;
+
+	printf("Testing infinite list of options on %s (valid options)\n", ctx->ifname_ext);
+
+	memset(&opt, 0, sizeof(opt));
+	opt.nro_reqtype = NETMAP_REQ_OPT_OFFSETS;
+	push_option(&opt, ctx);
+	opt.nro_next = (uintptr_t)&opt;
+	if (port_register_hwall(ctx) >= 0)
+		return -1;
+	clear_options(ctx);
+	return (errno == EINVAL ? 0 : -1);
 }
 
 #ifdef CONFIG_NETMAP_EXTMEM
@@ -1974,6 +1990,7 @@ nmreq_parsing(struct TestContext *ctx)
 			ret = -1;
 		}
 	}
+	ctx->nmctx = NULL;
 	return ret;
 }
 
@@ -2048,6 +2065,7 @@ static struct mytest tests[] = {
 	decltest(vale_polling_enable_disable),
 	decltest(unsupported_option),
 	decltest(infinite_options),
+	decltest(infinite_options2),
 #ifdef CONFIG_NETMAP_EXTMEM
 	decltest(extmem_option),
 	decltest(bad_extmem_option),

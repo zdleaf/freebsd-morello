@@ -6,7 +6,7 @@
  * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
- * or http://www.opensolaris.org/os/licensing.
+ * or https://opensource.org/licenses/CDDL-1.0.
  * See the License for the specific language governing permissions
  * and limitations under the License.
  *
@@ -193,7 +193,9 @@ qat_dc_init(void)
 		sd.huffType = CPA_DC_HT_FULL_DYNAMIC;
 		sd.sessDirection = CPA_DC_DIR_COMBINED;
 		sd.sessState = CPA_DC_STATELESS;
+#if (CPA_DC_API_VERSION_NUM_MAJOR == 1 && CPA_DC_API_VERSION_NUM_MINOR < 6)
 		sd.deflateWindowSize = 7;
+#endif
 		sd.checksum = CPA_DC_ADLER32;
 		status = cpaDcGetSessionSize(dc_inst_handles[i],
 		    &sd, &sess_size, &ctx_size);
@@ -247,7 +249,7 @@ qat_compress_impl(qat_compress_dir_t dir, char *src, int src_len,
 	Cpa8U *buffer_meta_src = NULL;
 	Cpa8U *buffer_meta_dst = NULL;
 	Cpa32U buffer_meta_size = 0;
-	CpaDcRqResults dc_results;
+	CpaDcRqResults dc_results = {.checksum = 1};
 	CpaStatus status = CPA_STATUS_FAIL;
 	Cpa32U hdr_sz = 0;
 	Cpa32U compressed_sz;

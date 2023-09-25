@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2002-2009 Luigi Rizzo, Universita` di Pisa
  *
@@ -26,8 +26,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 /*
  * Logging support for ipfw
  */
@@ -49,6 +47,7 @@ __FBSDID("$FreeBSD$");
 #include <net/ethernet.h> /* for ETHERTYPE_IP */
 #include <net/if.h>
 #include <net/if_var.h>
+#include <net/if_private.h>
 #include <net/vnet.h>
 
 #include <netinet/in.h>
@@ -103,7 +102,7 @@ ipfw_log(struct ip_fw_chain *chain, struct ip_fw *f, u_int hlen,
 {
 	char *action;
 	int limit_reached = 0;
-	char action2[92], proto[128], fragment[32];
+	char action2[92], proto[128], fragment[32], mark_str[24];
 
 	if (V_fw_verbose == 0) {
 		if (args->flags & IPFW_ARGS_LENMASK)
@@ -156,8 +155,7 @@ ipfw_log(struct ip_fw_chain *chain, struct ip_fw *f, u_int hlen,
 				altq->qid);
 			cmd += F_LEN(cmd);
 		}
-		if (cmd->opcode == O_PROB || cmd->opcode == O_TAG ||
-		    cmd->opcode == O_SETDSCP)
+		if (cmd->opcode == O_PROB || cmd->opcode == O_TAG)
 			cmd += F_LEN(cmd);
 
 		action = action2;
@@ -201,6 +199,10 @@ ipfw_log(struct ip_fw_chain *chain, struct ip_fw *f, u_int hlen,
 		case O_TEE:
 			snprintf(SNPARGS(action2, 0), "Tee %d",
 				TARG(cmd->arg1, divert));
+			break;
+		case O_SETDSCP:
+			snprintf(SNPARGS(action2, 0), "SetDscp %d",
+				TARG(cmd->arg1, dscp) & 0x3F);
 			break;
 		case O_SETFIB:
 			snprintf(SNPARGS(action2, 0), "SetFib %d",
@@ -271,6 +273,14 @@ ipfw_log(struct ip_fw_chain *chain, struct ip_fw *f, u_int hlen,
 			else
 				snprintf(SNPARGS(action2, 0), "Call %d",
 				    cmd->arg1);
+			break;
+		case O_SETMARK:
+			if (cmd->arg1 == IP_FW_TARG)
+				snprintf(SNPARGS(action2, 0), "SetMark %#x",
+				    TARG(cmd->arg1, mark));
+			else
+				snprintf(SNPARGS(action2, 0), "SetMark %#x",
+				    ((ipfw_insn_u32 *)cmd)->d[0]);
 			break;
 		case O_EXTERNAL_ACTION:
 			snprintf(SNPARGS(action2, 0), "Eaction %s",
@@ -406,14 +416,22 @@ ipfw_log(struct ip_fw_chain *chain, struct ip_fw *f, u_int hlen,
 				    (ipoff & IP_MF) ? "+" : "");
 		}
 	}
+
+	/* [fw]mark */
+	if (args->rule.pkt_mark)
+		snprintf(SNPARGS(mark_str, 0), " mark:%#x",
+		    args->rule.pkt_mark);
+	else
+		mark_str[0] = '\0';
+
 #ifdef __FreeBSD__
-	log(LOG_SECURITY | LOG_INFO, "ipfw: %d %s %s %s via %s%s\n",
-	    f ? f->rulenum : -1, action, proto,
+	log(LOG_SECURITY | LOG_INFO, "ipfw: %d %s %s%s %s via %s%s\n",
+	    f ? f->rulenum : -1, action, proto, mark_str,
 	    args->flags & IPFW_ARGS_OUT ? "out" : "in", args->ifp->if_xname,
 	    fragment);
 #else
-	log(LOG_SECURITY | LOG_INFO, "ipfw: %d %s %s [no if info]%s\n",
-	    f ? f->rulenum : -1, action, proto, fragment);
+	log(LOG_SECURITY | LOG_INFO, "ipfw: %d %s %s%s [no if info]%s\n",
+	    f ? f->rulenum : -1, action, proto, mark_str, fragment);
 #endif
 	if (limit_reached)
 		log(LOG_SECURITY | LOG_NOTICE,

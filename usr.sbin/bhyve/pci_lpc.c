@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2013 Neel Natu <neel@freebsd.org>
  * Copyright (c) 2013 Tycho Nightingale <tycho.nightingale@pluribusnetworks.com>
@@ -25,17 +25,14 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/types.h>
 #include <machine/vmm.h>
 #include <machine/vmm_snapshot.h>
 
+#include <err.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -50,7 +47,9 @@ __FBSDID("$FreeBSD$");
 #include "pci_emul.h"
 #include "pci_irq.h"
 #include "pci_lpc.h"
+#include "pci_passthru.h"
 #include "pctestdev.h"
+#include "tpm_device.h"
 #include "uart_emul.h"
 
 #define	IO_ICU1		0x20
@@ -95,13 +94,55 @@ lpc_device_parse(const char *opts)
 {
 	int unit, error;
 	char *str, *cpy, *lpcdev, *node_name;
+	const char *romfile, *varfile, *tpm_type, *tpm_path;
 
 	error = -1;
 	str = cpy = strdup(opts);
 	lpcdev = strsep(&str, ",");
 	if (lpcdev != NULL) {
 		if (strcasecmp(lpcdev, "bootrom") == 0) {
-			set_config_value("lpc.bootrom", str);
+			romfile = strsep(&str, ",");
+			if (romfile == NULL) {
+				errx(4, "invalid bootrom option \"%s\"", opts);
+			}
+			set_config_value("lpc.bootrom", romfile);
+
+			varfile = strsep(&str, ",");
+			if (varfile == NULL) {
+				error = 0;
+				goto done;
+			}
+			if (strchr(varfile, '=') == NULL) {
+				set_config_value("lpc.bootvars", varfile);
+			} else {
+				/* varfile doesn't exist, it's another config
+				 * option */
+				pci_parse_legacy_config(find_config_node("lpc"),
+				    varfile);
+			}
+
+			pci_parse_legacy_config(find_config_node("lpc"), str);
+			error = 0;
+			goto done;
+		}
+		if (strcasecmp(lpcdev, "tpm") == 0) {
+			nvlist_t *nvl = create_config_node("tpm");
+
+			tpm_type = strsep(&str, ",");
+			if (tpm_type == NULL) {
+				errx(4, "invalid tpm type \"%s\"", opts);
+			}
+			set_config_value_node(nvl, "type", tpm_type);
+
+			tpm_path = strsep(&str, ",");
+			if (tpm_path == NULL) {
+				errx(4, "invalid tpm path \"%s\"", opts);
+			}
+			set_config_value_node(nvl, "path", tpm_path);
+
+			pci_parse_legacy_config(find_config_node("tpm"), str);
+
+			set_config_value_node_if_unset(nvl, "version", "2.0");
 			error = 0;
 			goto done;
 		}
@@ -131,13 +172,14 @@ done:
 }
 
 void
-lpc_print_supported_devices()
+lpc_print_supported_devices(void)
 {
 	size_t i;
 
 	printf("bootrom\n");
 	for (i = 0; i < LPC_UART_NUM; i++)
 		printf("%s\n", lpc_uart_names[i]);
+	printf("tpm\n");
 	printf("%s\n", pctestdev_getname());
 }
 
@@ -146,6 +188,12 @@ lpc_bootrom(void)
 {
 
 	return (get_config_value("lpc.bootrom"));
+}
+
+const char *
+lpc_fwcfg(void)
+{
+	return (get_config_value("lpc.fwcfg"));
 }
 
 static void
@@ -159,7 +207,7 @@ lpc_uart_intr_assert(void *arg)
 }
 
 static void
-lpc_uart_intr_deassert(void *arg)
+lpc_uart_intr_deassert(void *arg __unused)
 {
 	/*
 	 * The COM devices on the LPC bus generate edge triggered interrupts,
@@ -168,8 +216,8 @@ lpc_uart_intr_deassert(void *arg)
 }
 
 static int
-lpc_uart_io_handler(struct vmctx *ctx, int vcpu, int in, int port, int bytes,
-		    uint32_t *eax, void *arg)
+lpc_uart_io_handler(struct vmctx *ctx __unused, int in,
+    int port, int bytes, uint32_t *eax, void *arg)
 {
 	int offset;
 	struct lpc_uart_softc *sc = arg;
@@ -204,13 +252,14 @@ lpc_init(struct vmctx *ctx)
 {
 	struct lpc_uart_softc *sc;
 	struct inout_port iop;
-	const char *backend, *name, *romfile;
+	const char *backend, *name;
 	char *node_name;
 	int unit, error;
+	const nvlist_t *nvl;
 
-	romfile = get_config_value("lpc.bootrom");
-	if (romfile != NULL) {
-		error = bootrom_loadrom(ctx, romfile);
+	nvl = find_config_node("lpc");
+	if (nvl != NULL && nvlist_exists(nvl, "bootrom")) {
+		error = bootrom_loadrom(ctx, nvl);
 		if (error)
 			return (error);
 	}
@@ -385,8 +434,7 @@ pci_lpc_uart_dsdt(void)
 LPC_DSDT(pci_lpc_uart_dsdt);
 
 static int
-pci_lpc_cfgwrite(struct vmctx *ctx, int vcpu, struct pci_devinst *pi,
-		  int coff, int bytes, uint32_t val)
+pci_lpc_cfgwrite(struct pci_devinst *pi, int coff, int bytes, uint32_t val)
 {
 	int pirq_pin;
 
@@ -397,7 +445,7 @@ pci_lpc_cfgwrite(struct vmctx *ctx, int vcpu, struct pci_devinst *pi,
 		if (coff >= 0x68 && coff <= 0x6b)
 			pirq_pin = coff - 0x68 + 5;
 		if (pirq_pin != 0) {
-			pirq_write(ctx, pirq_pin, val);
+			pirq_write(pi->pi_vmctx, pirq_pin, val);
 			pci_set_cfgdata8(pi, coff, pirq_read(pirq_pin));
 			return (0);
 		}
@@ -406,24 +454,63 @@ pci_lpc_cfgwrite(struct vmctx *ctx, int vcpu, struct pci_devinst *pi,
 }
 
 static void
-pci_lpc_write(struct vmctx *ctx, int vcpu, struct pci_devinst *pi,
-	       int baridx, uint64_t offset, int size, uint64_t value)
+pci_lpc_write(struct pci_devinst *pi __unused, int baridx __unused,
+    uint64_t offset __unused, int size __unused, uint64_t value __unused)
 {
 }
 
 static uint64_t
-pci_lpc_read(struct vmctx *ctx, int vcpu, struct pci_devinst *pi,
-	      int baridx, uint64_t offset, int size)
+pci_lpc_read(struct pci_devinst *pi __unused, int baridx __unused,
+    uint64_t offset __unused, int size __unused)
 {
 	return (0);
 }
 
 #define	LPC_DEV		0x7000
 #define	LPC_VENDOR	0x8086
+#define LPC_REVID	0x00
+#define LPC_SUBVEND_0	0x0000
+#define LPC_SUBDEV_0	0x0000
 
 static int
-pci_lpc_init(struct vmctx *ctx, struct pci_devinst *pi, nvlist_t *nvl)
+pci_lpc_get_sel(struct pcisel *const sel)
 {
+	assert(sel != NULL);
+
+	memset(sel, 0, sizeof(*sel));
+
+	for (uint8_t slot = 0; slot <= PCI_SLOTMAX; ++slot) {
+		uint8_t max_func = 0;
+
+		sel->pc_dev = slot;
+		sel->pc_func = 0;
+
+		if (read_config(sel, PCIR_HDRTYPE, 1) & PCIM_MFDEV)
+			max_func = PCI_FUNCMAX;
+
+		for (uint8_t func = 0; func <= max_func; ++func) {
+			sel->pc_func = func;
+
+			if ((read_config(sel, PCIR_CLASS, 1) == PCIC_BRIDGE) &&
+			    (read_config(sel, PCIR_SUBCLASS, 1) ==
+				PCIS_BRIDGE_ISA)) {
+				return (0);
+			}
+		}
+	}
+
+	warnx("%s: Unable to find host selector of LPC bridge.", __func__);
+
+	return (-1);
+}
+
+static int
+pci_lpc_init(struct pci_devinst *pi, nvlist_t *nvl)
+{
+	struct pcisel sel = { 0 };
+	struct pcisel *selp = NULL;
+	uint16_t device, subdevice, subvendor, vendor;
+	uint8_t revid;
 
 	/*
 	 * Do not allow more than one LPC bridge to be configured.
@@ -443,14 +530,28 @@ pci_lpc_init(struct vmctx *ctx, struct pci_devinst *pi, nvlist_t *nvl)
 		return (-1);
 	}
 
-	if (lpc_init(ctx) != 0)
+	if (lpc_init(pi->pi_vmctx) != 0)
 		return (-1);
 
+	if (pci_lpc_get_sel(&sel) == 0)
+		selp = &sel;
+
+	vendor = pci_config_read_reg(selp, nvl, PCIR_VENDOR, 2, LPC_VENDOR);
+	device = pci_config_read_reg(selp, nvl, PCIR_DEVICE, 2, LPC_DEV);
+	revid = pci_config_read_reg(selp, nvl, PCIR_REVID, 1, LPC_REVID);
+	subvendor = pci_config_read_reg(selp, nvl, PCIR_SUBVEND_0, 2,
+	    LPC_SUBVEND_0);
+	subdevice = pci_config_read_reg(selp, nvl, PCIR_SUBDEV_0, 2,
+	    LPC_SUBDEV_0);
+
 	/* initialize config space */
-	pci_set_cfgdata16(pi, PCIR_DEVICE, LPC_DEV);
-	pci_set_cfgdata16(pi, PCIR_VENDOR, LPC_VENDOR);
+	pci_set_cfgdata16(pi, PCIR_VENDOR, vendor);
+	pci_set_cfgdata16(pi, PCIR_DEVICE, device);
 	pci_set_cfgdata8(pi, PCIR_CLASS, PCIC_BRIDGE);
 	pci_set_cfgdata8(pi, PCIR_SUBCLASS, PCIS_BRIDGE_ISA);
+	pci_set_cfgdata8(pi, PCIR_REVID, revid);
+	pci_set_cfgdata16(pi, PCIR_SUBVEND_0, subvendor);
+	pci_set_cfgdata16(pi, PCIR_SUBDEV_0, subdevice);
 
 	lpc_bridge = pi;
 
@@ -502,7 +603,7 @@ done:
 }
 #endif
 
-struct pci_devemu pci_de_lpc = {
+static const struct pci_devemu pci_de_lpc = {
 	.pe_emu =	"lpc",
 	.pe_init =	pci_lpc_init,
 	.pe_write_dsdt = pci_lpc_write_dsdt,

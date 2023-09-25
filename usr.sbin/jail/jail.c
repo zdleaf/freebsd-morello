@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 1999 Poul-Henning Kamp.
  * Copyright (c) 2009-2012 James Gritton
@@ -28,8 +28,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/socket.h>
@@ -56,7 +54,6 @@ struct permspec {
 	int		rev;
 };
 
-const char *cfname;
 int iflag;
 int note_remove;
 int verbose;
@@ -74,7 +71,7 @@ static void print_jail(FILE *fp, struct cfjail *j, int oldcl, int running);
 static void print_param(FILE *fp, const struct cfparam *p, int sep, int doname);
 static void show_jails(void);
 static void quoted_print(FILE *fp, char *str);
-static void usage(void);
+static void usage(void) __dead2;
 
 static struct permspec perm_sysctl[] = {
     { "security.jail.set_hostname_allowed", KP_ALLOW_SET_HOSTNAME, 0 },
@@ -138,6 +135,7 @@ main(int argc, char **argv)
 	FILE *jfp;
 	struct cfjail *j;
 	char *JidFile;
+	const char *cfname;
 	size_t sysvallen;
 	unsigned op, pi;
 	int ch, docf, error, i, oldcl, sysval;
@@ -287,7 +285,7 @@ main(int argc, char **argv)
 	} else if (op == JF_STOP || op == JF_SHOW) {
 		/* Just print list of all configured non-wildcard jails */
 		if (op == JF_SHOW) {
-			load_config();
+			load_config(cfname);
 			show_jails();
 			exit(0);
 		}
@@ -300,7 +298,7 @@ main(int argc, char **argv)
 					usage();
 		if ((docf = !Rflag &&
 		     (!strcmp(cfname, "-") || stat(cfname, &st) == 0)))
-			load_config();
+			load_config(cfname);
 		note_remove = docf || argc > 1 || wild_jail_name(argv[0]);
 	} else if (argc > 1 || (argc == 1 && strchr(argv[0], '='))) {
 		/* Single jail specified on the command line */
@@ -348,7 +346,7 @@ main(int argc, char **argv)
 		/* From the config file, perhaps with a specified jail */
 		if (Rflag || !docf)
 			usage();
-		load_config();
+		load_config(cfname);
 	}
 
 	/* Find out which jails will be run. */
@@ -790,7 +788,9 @@ static int
 rdtun_params(struct cfjail *j, int dofail)
 {
 	struct jailparam *jp, *rtparams, *rtjp;
-	int nrt, rval;
+	const void *jp_value;
+	size_t jp_valuelen;
+	int nrt, rval, bool_true;
 
 	if (j->flags & JF_RDTUN)
 		return 0;
@@ -818,15 +818,25 @@ rdtun_params(struct cfjail *j, int dofail)
 		rtjp = rtparams + 1;
 		for (jp = j->jp; rtjp < rtparams + nrt; jp++) {
 			if (JP_RDTUN(jp) && strcmp(jp->jp_name, "jid")) {
-				if (!((jp->jp_flags & (JP_BOOL | JP_NOBOOL)) &&
-				    jp->jp_valuelen == 0 &&
-				    *(int *)jp->jp_value) &&
-				    !(rtjp->jp_valuelen == jp->jp_valuelen &&
-				    !((jp->jp_ctltype & CTLTYPE) ==
-				    CTLTYPE_STRING ? strncmp(rtjp->jp_value,
-				    jp->jp_value, jp->jp_valuelen) :
-				    memcmp(rtjp->jp_value, jp->jp_value,
-				    jp->jp_valuelen)))) {
+				jp_value = jp->jp_value;
+				jp_valuelen = jp->jp_valuelen;
+				if (jp_value == NULL && jp_valuelen > 0) {
+					if (jp->jp_flags & (JP_BOOL |
+					    JP_NOBOOL | JP_JAILSYS)) {
+						bool_true = 1;
+						jp_value = &bool_true;
+						jp_valuelen = sizeof(bool_true);
+					} else if ((jp->jp_ctltype & CTLTYPE) ==
+					    CTLTYPE_STRING)
+						jp_value = "";
+					else
+						jp_valuelen = 0;
+				}
+				if (rtjp->jp_valuelen != jp_valuelen ||
+				    (CTLTYPE_STRING ? strncmp(rtjp->jp_value,
+				    jp_value, jp_valuelen)
+				    : memcmp(rtjp->jp_value, jp_value,
+				    jp_valuelen))) {
 					if (dofail) {
 						jail_warnx(j, "%s cannot be "
 						    "changed after creation",

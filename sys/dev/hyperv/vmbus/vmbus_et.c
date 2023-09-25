@@ -25,8 +25,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/bus.h>
 #include <sys/kernel.h>
@@ -37,9 +35,14 @@ __FBSDID("$FreeBSD$");
 #include <sys/timeet.h>
 
 #include <dev/hyperv/include/hyperv.h>
-#include <dev/hyperv/vmbus/hyperv_reg.h>
+#if defined(__aarch64__)
+#include <dev/hyperv/vmbus/aarch64/hyperv_reg.h>
+#else
+#include <dev/hyperv/vmbus/x86/hyperv_reg.h>
+#endif
 #include <dev/hyperv/vmbus/hyperv_var.h>
 #include <dev/hyperv/vmbus/vmbus_var.h>
+#include <dev/hyperv/vmbus/hyperv_common_reg.h>
 
 #define VMBUS_ET_NAME			"hvet"
 
@@ -78,9 +81,7 @@ static driver_t vmbus_et_driver = {
 	0
 };
 
-static devclass_t vmbus_et_devclass;
-
-DRIVER_MODULE(hv_et, vmbus, vmbus_et_driver, vmbus_et_devclass, NULL, NULL);
+DRIVER_MODULE(hv_et, vmbus, vmbus_et_driver, NULL, NULL);
 MODULE_VERSION(hv_et, 1);
 
 static __inline uint64_t

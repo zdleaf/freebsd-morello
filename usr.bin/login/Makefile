@@ -1,5 +1,4 @@
 # 	@(#)Makefile	8.1 (Berkeley) 7/19/93
-# $FreeBSD$
 
 .include <src.opts.mk>
 .include <src.tools.mk>
@@ -30,7 +29,7 @@ PRECIOUSPROG=
 afterinstallconfig:
 	${CAP_MKDB_CMD} ${CAP_MKDB_ENDIAN} ${DESTDIR}/etc/login.conf
 .if defined(NO_ROOT) && defined(METALOG)
-	echo "./etc/login.conf.db type=file mode=0644 uname=root gname=wheel" | \
+	echo ".${DISTBASE}/etc/login.conf.db type=file mode=0644 uname=root gname=wheel" | \
 		cat -l >> ${METALOG}
 .endif
 

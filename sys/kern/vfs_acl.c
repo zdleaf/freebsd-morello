@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 1999-2006, 2016-2017 Robert N. M. Watson
  * All rights reserved.
@@ -40,8 +40,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/sysproto.h>
@@ -57,7 +55,6 @@ __FBSDID("$FreeBSD$");
 #include <sys/file.h>
 #include <sys/filedesc.h>
 #include <sys/proc.h>
-#include <sys/sysent.h>
 #include <sys/acl.h>
 
 #include <security/audit/audit.h>
@@ -237,7 +234,7 @@ vacl_set_acl(struct thread *td, struct vnode *vp, acl_type_t type,
 	error = acl_copyin(aclp, inkernelacl, type);
 	if (error != 0)
 		goto out;
-	error = vn_start_write(vp, &mp, V_WAIT | PCATCH);
+	error = vn_start_write(vp, &mp, V_WAIT | V_PCATCH);
 	if (error != 0)
 		goto out;
 	vn_lock(vp, LK_EXCLUSIVE | LK_RETRY);
@@ -301,7 +298,7 @@ vacl_delete(struct thread *td, struct vnode *vp, acl_type_t type)
 	int error;
 
 	AUDIT_ARG_VALUE(type);
-	error = vn_start_write(vp, &mp, V_WAIT | PCATCH);
+	error = vn_start_write(vp, &mp, V_WAIT | V_PCATCH);
 	if (error != 0)
 		return (error);
 	vn_lock(vp, LK_EXCLUSIVE | LK_RETRY);
@@ -381,7 +378,8 @@ kern___acl_get_path(struct thread *td, const char *path, acl_type_t type,
 	error = namei(&nd);
 	if (error == 0) {
 		error = vacl_get_acl(td, nd.ni_vp, type, aclp);
-		NDFREE(&nd, 0);
+		vrele(nd.ni_vp);
+		NDFREE_PNBUF(&nd);
 	}
 	return (error);
 }
@@ -419,7 +417,8 @@ kern___acl_set_path(struct thread *td, const char *path,
 	error = namei(&nd);
 	if (error == 0) {
 		error = vacl_set_acl(td, nd.ni_vp, type, aclp);
-		NDFREE(&nd, 0);
+		vrele(nd.ni_vp);
+		NDFREE_PNBUF(&nd);
 	}
 	return (error);
 }
@@ -435,7 +434,7 @@ sys___acl_get_fd(struct thread *td, struct __acl_get_fd_args *uap)
 	int error;
 
 	AUDIT_ARG_FD(uap->filedes);
-	error = getvnode(td, uap->filedes,
+	error = getvnode_path(td, uap->filedes,
 	    cap_rights_init_one(&rights, CAP_ACL_GET), &fp);
 	if (error == 0) {
 		error = vacl_get_acl(td, fp->f_vnode, uap->type, uap->aclp);
@@ -495,7 +494,8 @@ kern___acl_delete_path(struct thread *td, const char *path,
 	error = namei(&nd);
 	if (error == 0) {
 		error = vacl_delete(td, nd.ni_vp, type);
-		NDFREE(&nd, 0);
+		vrele(nd.ni_vp);
+		NDFREE_PNBUF(&nd);
 	}
 	return (error);
 }
@@ -552,7 +552,7 @@ kern___acl_aclcheck_path(struct thread *td, const char *path, acl_type_t type,
 	error = namei(&nd);
 	if (error == 0) {
 		error = vacl_aclcheck(td, nd.ni_vp, type, aclp);
-		NDFREE(&nd, 0);
+		NDFREE_PNBUF(&nd);
 	}
 	return (error);
 }
@@ -568,7 +568,7 @@ sys___acl_aclcheck_fd(struct thread *td, struct __acl_aclcheck_fd_args *uap)
 	int error;
 
 	AUDIT_ARG_FD(uap->filedes);
-	error = getvnode(td, uap->filedes,
+	error = getvnode_path(td, uap->filedes,
 	    cap_rights_init_one(&rights, CAP_ACL_CHECK), &fp);
 	if (error == 0) {
 		error = vacl_aclcheck(td, fp->f_vnode, uap->type, uap->aclp);

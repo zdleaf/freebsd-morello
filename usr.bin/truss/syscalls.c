@@ -32,8 +32,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 /*
  * This file has routines used to print out system calls and their
  * arguments.
@@ -183,6 +181,8 @@ static const struct syscall_decode decoded_syscalls[] = {
 	  .args = { { Int, 0 } } },
 	{ .name = "closefrom", .ret_type = 1, .nargs = 1,
 	  .args = { { Int, 0 } } },
+	{ .name = "close_range", .ret_type = 1, .nargs = 3,
+	  .args = { { Int, 0 }, { Int, 1 }, { Closerangeflags, 2 } } },
 	{ .name = "compat11.fstat", .ret_type = 1, .nargs = 2,
 	  .args = { { Int, 0 }, { Stat11 | OUT, 1 } } },
 	{ .name = "compat11.fstatat", .ret_type = 1, .nargs = 4,
@@ -294,7 +294,7 @@ static const struct syscall_decode decoded_syscalls[] = {
 	{ .name = "getfsstat", .ret_type = 1, .nargs = 3,
 	  .args = { { Ptr, 0 }, { Long, 1 }, { Getfsstatmode, 2 } } },
 	{ .name = "getitimer", .ret_type = 1, .nargs = 2,
-	  .args = { { Int, 0 }, { Itimerval | OUT, 2 } } },
+	  .args = { { Itimerwhich, 0 }, { Itimerval | OUT, 2 } } },
 	{ .name = "getpeername", .ret_type = 1, .nargs = 3,
 	  .args = { { Int, 0 }, { Sockaddr | OUT, 1 }, { Ptr | OUT, 2 } } },
 	{ .name = "getpgid", .ret_type = 1, .nargs = 1,
@@ -420,8 +420,14 @@ static const struct syscall_decode decoded_syscalls[] = {
 		    { Fadvice, 3 } } },
 	{ .name = "posix_openpt", .ret_type = 1, .nargs = 1,
 	  .args = { { Open, 0 } } },
+	{ .name = "ppoll", .ret_type = 1, .nargs = 4,
+	  .args = { { Pollfd, 0 }, { Int, 1 }, { Timespec | IN, 2 },
+ 		    { Sigset | IN, 3 } } },
 	{ .name = "pread", .ret_type = 1, .nargs = 4,
 	  .args = { { Int, 0 }, { BinString | OUT, 1 }, { Sizet, 2 },
+		    { QuadHex, 3 } } },
+	{ .name = "preadv", .ret_type = 1, .nargs = 4,
+	  .args = { { Int, 0 }, { Iovec | OUT, 1 }, { Int, 2 },
 		    { QuadHex, 3 } } },
 	{ .name = "procctl", .ret_type = 1, .nargs = 4,
 	  .args = { { Idtype, 0 }, { Quad, 1 }, { Procctl, 2 }, { Ptr, 3 } } },
@@ -429,6 +435,9 @@ static const struct syscall_decode decoded_syscalls[] = {
 	  .args = { { Ptraceop, 0 }, { Int, 1 }, { Ptr, 2 }, { Int, 3 } } },
 	{ .name = "pwrite", .ret_type = 1, .nargs = 4,
 	  .args = { { Int, 0 }, { BinString | IN, 1 }, { Sizet, 2 },
+		    { QuadHex, 3 } } },
+	{ .name = "pwritev", .ret_type = 1, .nargs = 4,
+	  .args = { { Int, 0 }, { Iovec | IN, 1 }, { Int, 2 },
 		    { QuadHex, 3 } } },
 	{ .name = "quotactl", .ret_type = 1, .nargs = 4,
 	  .args = { { Name, 0 }, { Quotactlcmd, 1 }, { Int, 2 }, { Ptr, 3 } } },
@@ -501,7 +510,8 @@ static const struct syscall_decode decoded_syscalls[] = {
 	            { Msgflags, 3 }, { Sockaddr | IN, 4 },
 	            { Socklent | IN, 5 } } },
 	{ .name = "setitimer", .ret_type = 1, .nargs = 3,
-	  .args = { { Int, 0 }, { Itimerval, 1 }, { Itimerval | OUT, 2 } } },
+	  .args = { { Itimerwhich, 0 }, { Itimerval, 1 },
+		    { Itimerval | OUT, 2 } } },
 	{ .name = "setpriority", .ret_type = 1, .nargs = 3,
 	  .args = { { Priowhich, 0 }, { Int, 1 }, { Int, 2 } } },
 	{ .name = "setrlimit", .ret_type = 1, .nargs = 2,
@@ -566,11 +576,6 @@ static const struct syscall_decode decoded_syscalls[] = {
 	  .args = { { Long, 0 }, { Name, 1 } } },
 	{ .name = "truncate", .ret_type = 1, .nargs = 2,
 	  .args = { { Name | IN, 0 }, { QuadHex | IN, 1 } } },
-#if 0
-	/* Does not exist */
-	{ .name = "umount", .ret_type = 1, .nargs = 2,
-	  .args = { { Name, 0 }, { Int, 2 } } },
-#endif
 	{ .name = "unlink", .ret_type = 1, .nargs = 1,
 	  .args = { { Name, 0 } } },
 	{ .name = "unlinkat", .ret_type = 1, .nargs = 3,
@@ -602,6 +607,8 @@ static const struct syscall_decode decoded_syscalls[] = {
 	{ .name = "linux_execve", .ret_type = 1, .nargs = 3,
 	  .args = { { Name | IN, 0 }, { ExecArgs | IN, 1 },
 		    { ExecEnv | IN, 2 } } },
+	{ .name = "linux_getitimer", .ret_type = 1, .nargs = 2,
+	  .args = { { Itimerwhich, 0 }, { Itimerval | OUT, 2 } } },
 	{ .name = "linux_lseek", .ret_type = 2, .nargs = 3,
 	  .args = { { Int, 0 }, { Int, 1 }, { Whence, 2 } } },
 	{ .name = "linux_mkdir", .ret_type = 1, .nargs = 2,
@@ -614,6 +621,9 @@ static const struct syscall_decode decoded_syscalls[] = {
 	  .args = { { Name, 0 }, { Hex, 1 }, { Octal, 2 } } },
 	{ .name = "linux_readlink", .ret_type = 1, .nargs = 3,
 	  .args = { { Name, 0 }, { Name | OUT, 1 }, { Sizet, 2 } } },
+	{ .name = "linux_setitimer", .ret_type = 1, .nargs = 3,
+	  .args = { { Itimerwhich, 0 }, { Itimerval, 1 },
+		    { Itimerval | OUT, 2 } } },
 	{ .name = "linux_socketcall", .ret_type = 1, .nargs = 2,
 	  .args = { { Int, 0 }, { LinuxSockArgs, 1 } } },
 	{ .name = "linux_stat64", .ret_type = 1, .nargs = 2,
@@ -1475,6 +1485,16 @@ print_cmsgs(FILE *fp, pid_t pid, bool receive, struct msghdr *msghdr)
 	for (cmsghdr = CMSG_FIRSTHDR(msghdr);
 	   cmsghdr != NULL;
 	   cmsghdr = CMSG_NXTHDR(msghdr, cmsghdr)) {
+		if (cmsghdr->cmsg_len < sizeof(*cmsghdr)) {
+			fprintf(fp, "{<invalid cmsg, len=%u>}",
+			    cmsghdr->cmsg_len);
+			if (cmsghdr->cmsg_len == 0) {
+				/* Avoid looping forever. */
+				break;
+			}
+			continue;
+		}
+
 		level = cmsghdr->cmsg_level;
 		type = cmsghdr->cmsg_type;
 		len = cmsghdr->cmsg_len;
@@ -1536,17 +1556,12 @@ print_sysctl(FILE *fp, int *oid, size_t len)
 }
 
 /*
- * Convert a 32-bit user-space pointer to psaddr_t. Currently, this
- * sign-extends on MIPS and zero-extends on all other architectures.
+ * Convert a 32-bit user-space pointer to psaddr_t by zero-extending.
  */
 static psaddr_t
 user_ptr32_to_psaddr(int32_t user_pointer)
 {
-#if defined(__mips__)
-	return ((psaddr_t)(intptr_t)user_pointer);
-#else
 	return ((psaddr_t)(uintptr_t)user_pointer);
-#endif
 }
 
 /*
@@ -1556,7 +1571,7 @@ user_ptr32_to_psaddr(int32_t user_pointer)
  * an array of all of the system call arguments.
  */
 char *
-print_arg(struct syscall_arg *sc, unsigned long *args, register_t *retval,
+print_arg(struct syscall_arg *sc, syscallarg_t *args, syscallarg_t *retval,
     struct trussinfo *trussinfo)
 {
 	FILE *fp;
@@ -1590,10 +1605,10 @@ print_arg(struct syscall_arg *sc, unsigned long *args, register_t *retval,
 		break;
 	}
 	case LongHex:
-		fprintf(fp, "0x%lx", args[sc->offset]);
+		fprintf(fp, "0x%lx", (long)args[sc->offset]);
 		break;
 	case Long:
-		fprintf(fp, "%ld", args[sc->offset]);
+		fprintf(fp, "%ld", (long)args[sc->offset]);
 		break;
 	case Sizet:
 		fprintf(fp, "%zu", (size_t)args[sc->offset]);
@@ -1982,6 +1997,9 @@ print_arg(struct syscall_arg *sc, unsigned long *args, register_t *retval,
 		break;
 	case Fcntl:
 		print_integer_arg(sysdecode_fcntl_cmd, fp, args[sc->offset]);
+		break;
+	case Closerangeflags:
+		print_mask_arg(sysdecode_close_range_flags, fp, args[sc->offset]);
 		break;
 	case Mprot:
 		print_mask_arg(sysdecode_mmap_prot, fp, args[sc->offset]);
@@ -2427,6 +2445,9 @@ print_arg(struct syscall_arg *sc, unsigned long *args, register_t *retval,
 		print_integer_arg(sysdecode_getfsstat_mode, fp,
 		    args[sc->offset]);
 		break;
+	case Itimerwhich:
+		print_integer_arg(sysdecode_itimer, fp, args[sc->offset]);
+		break;
 	case Kldsymcmd:
 		print_integer_arg(sysdecode_kldsym_cmd, fp, args[sc->offset]);
 		break;
@@ -2729,7 +2750,7 @@ print_syscall(struct trussinfo *trussinfo)
 }
 
 void
-print_syscall_ret(struct trussinfo *trussinfo, int error, register_t *retval)
+print_syscall_ret(struct trussinfo *trussinfo, int error, syscallarg_t *retval)
 {
 	struct timespec timediff;
 	struct threadinfo *t;

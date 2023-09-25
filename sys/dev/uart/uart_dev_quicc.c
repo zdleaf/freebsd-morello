@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2006 Juniper Networks
  * All rights reserved.
@@ -27,8 +27,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/bus.h>
@@ -450,10 +448,8 @@ quicc_bus_receive(struct uart_softc *sc)
 static int
 quicc_bus_setsig(struct uart_softc *sc, int sig)
 {
-	struct uart_bas *bas;
 	uint32_t new, old;
 
-	bas = &sc->sc_bas;
 	do {
 		old = sc->sc_hwsig;
 		new = old;

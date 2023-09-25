@@ -1,6 +1,6 @@
 #!/usr/libexec/flua
 
--- SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+-- SPDX-License-Identifier: BSD-2-Clause
 --
 -- Copyright(c) 2020 The FreeBSD Foundation.
 --
@@ -25,7 +25,6 @@
 -- OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 -- SUCH DAMAGE.
 
--- $FreeBSD$
 
 function main(args)
 	if #args == 0 then usage() end
@@ -86,13 +85,14 @@ function main(args)
 
 	local sess = Analysis_session(filename, verbose, w_notagdirs)
 
+	local errors
 	if printall then
 		io.write('--- PACKAGE REPORTS ---\n')
 		io.write(sess.pkg_report_full())
 		io.write('--- LINTING REPORTS ---\n')
-		print_lints(sess)
+		errors = print_lints(sess)
 	elseif checkonly then
-		print_lints(sess)
+		errors = print_lints(sess)
 	elseif pkgonly then
 		io.write(sess.pkg_report_simple(dcount, dsize, {
 			fuid and sess.pkg_issetuid or nil,
@@ -102,6 +102,10 @@ function main(args)
 	else
 		io.stderr:write('This text should not be displayed.')
 		usage()
+	end
+
+	if errors then
+		return 1
 	end
 end
 
@@ -151,6 +155,7 @@ function print_lints(sess)
 	local inodewarn, inodeerr = sess.inode_report()
 	io.write(inodewarn)
 	io.write(inodeerr)
+	return #duperr > 0 or #inodeerr > 0
 end
 
 --- @param t table
@@ -257,6 +262,7 @@ end
 --- @param verbose boolean
 --- @param w_notagdirs boolean turn on to also check directories
 function Analysis_session(metalog, verbose, w_notagdirs)
+	local stage_root = {}
 	local files = {} -- map<string, MetalogRow[]>
 	-- set is map<elem, bool>. if bool is true then elem exists
 	local pkgs = {} -- map<string, set<string>>
@@ -385,11 +391,17 @@ function Analysis_session(metalog, verbose, w_notagdirs)
 			if #rows == 1 then goto continue end
 			local iseq, offby = metalogrows_all_equal(rows)
 			if iseq then -- repeated line, just a warning
-				warn[#warn+1] = 'warning: '..filename
-					..' repeated with same meta: line '
-					..table.concat(
-						table_map(rows, function(e) return e.linenum end), ',')
-				warn[#warn+1] = '\n'
+				local dupmsg = filename .. ' ' ..
+				    rows[1].attrs.type ..
+				    ' repeated with same meta: line ' ..
+				    table.concat(table_map(rows, function(e) return e.linenum end), ',')
+				if rows[1].attrs.type == "dir" then
+					if verbose then
+						warn[#warn+1] = 'warning: ' .. dupmsg .. '\n'
+					end
+				else
+					errs[#errs+1] = 'error: ' .. dupmsg .. '\n'
+				end
 			elseif not metalogrows_all_equal(rows, false, true) then
 			-- same filename (possibly different tags), different metadata, an error
 				errs[#errs+1] = 'error: '..filename
@@ -418,17 +430,14 @@ function Analysis_session(metalog, verbose, w_notagdirs)
 			if files[filename][1].attrs.type ~= 'file' then
 				goto continue
 			end
-			-- make ./xxx become /xxx so that we can stat
-			filename = filename:sub(2)
-			local fs = attributes(filename)
+			local fs = attributes(stage_root .. filename)
 			if fs == nil then
 				unstatables[#unstatables+1] = filename
 				goto continue
 			end
 			local inode = fs.ino
 			inm[inode] = inm[inode] or {}
-			-- add back the dot prefix
-			table.insert(inm[inode], '.'..filename)
+			table.insert(inm[inode], filename)
 			::continue::
 		end
 
@@ -462,6 +471,9 @@ function Analysis_session(metalog, verbose, w_notagdirs)
 		return table.concat(warn, ''), table.concat(errs, '')
 	end
 
+	-- The METALOG file is assumed to be at the top of the stage directory.
+	stage_root = string.gsub(metalog, '/[^/]*$', '/')
+
 	do
 	local fp, errmsg, errcode = io.open(metalog, 'r')
 	if fp == nil then
@@ -475,7 +487,7 @@ function Analysis_session(metalog, verbose, w_notagdirs)
 	for line in fp:lines() do
 		-----local isinpkg = false
 		lineno = lineno + 1
-		-- skip lines begining with #
+		-- skip lines beginning with #
 		if line:match('^%s*#') then goto continue end
 		-- skip blank lines
 		if line:match('^%s*$') then goto continue end
@@ -518,4 +530,4 @@ function Analysis_session(metalog, verbose, w_notagdirs)
 	}
 end
 
-main(arg)
+os.exit(main(arg))

@@ -38,8 +38,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <dev/mrsas/mrsas.h>
 #include <dev/mrsas/mrsas_ioctl.h>
 
@@ -1166,6 +1164,7 @@ mrsas_shutdown(device_t dev)
 		if (sc->reset_in_progress) {
 			mrsas_dprint(sc, MRSAS_INFO,
 			    "gave up waiting for OCR to be finished\n");
+			return (0);
 		}
 	}
 
@@ -1448,7 +1447,14 @@ mrsas_ioctl(struct cdev *dev, u_long cmd, caddr_t arg, int flag,
 	int ret = 0, i = 0;
 	MRSAS_DRV_PCI_INFORMATION *pciDrvInfo;
 
-	sc = mrsas_get_softc_instance(dev, cmd, arg);
+	switch (cmd) {
+	case MFIIO_PASSTHRU:
+                sc = (struct mrsas_softc *)(dev->si_drv1);
+		break;
+	default:
+		sc = mrsas_get_softc_instance(dev, cmd, arg);
+		break;
+        }
 	if (!sc)
 		return ENOENT;
 
@@ -1509,6 +1515,10 @@ do_ioctl:
 		    pciDrvInfo->busNumber, pciDrvInfo->deviceNumber,
 		    pciDrvInfo->functionNumber, pciDrvInfo->domainID);
 		ret = 0;
+		break;
+
+	case MFIIO_PASSTHRU:
+		ret = mrsas_user_command(sc, (struct mfi_ioc_passthru *)arg);
 		break;
 
 	default:
@@ -3979,6 +3989,7 @@ mrsas_issue_blocked_cmd(struct mrsas_softc *sc, struct mrsas_mfi_cmd *cmd)
 			}
 		}
 	}
+	sc->chan = NULL;
 
 	if (cmd->cmd_status == 0xFF) {
 		device_printf(sc->mrsas_dev, "DCMD timed out after %d "
@@ -4749,7 +4760,7 @@ dcmd_timeout:
 
 /*
  * mrsas_alloc_tmp_dcmd:       Allocates memory for temporary command input:
- * Adapter soft state Temp command Size of alloction
+ * Adapter soft state Temp command Size of allocation
  *
  * Allocates DMAable memory for a temporary internal command. The allocated
  * memory is initialized to all zeros upon successful loading of the dma
@@ -5046,7 +5057,5 @@ static driver_t mrsas_driver = {
 	sizeof(struct mrsas_softc)
 };
 
-static devclass_t mrsas_devclass;
-
-DRIVER_MODULE(mrsas, pci, mrsas_driver, mrsas_devclass, 0, 0);
+DRIVER_MODULE(mrsas, pci, mrsas_driver, 0, 0);
 MODULE_DEPEND(mrsas, cam, 1, 1, 1);

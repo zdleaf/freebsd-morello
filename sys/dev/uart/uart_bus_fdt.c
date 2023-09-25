@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2009-2010 The FreeBSD Foundation
  *
@@ -29,8 +29,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include "opt_platform.h"
 
 #include <sys/param.h>
@@ -293,5 +291,5 @@ uart_fdt_probe(device_t dev)
 	return (uart_bus_probe(dev, (int)shift, (int)iowidth, (int)clock, 0, 0, 0));
 }
 
-DRIVER_MODULE(uart, simplebus, uart_fdt_driver, uart_devclass, 0, 0);
-DRIVER_MODULE(uart, ofwbus, uart_fdt_driver, uart_devclass, 0, 0);
+DRIVER_MODULE(uart, simplebus, uart_fdt_driver, 0, 0);
+DRIVER_MODULE(uart, ofwbus, uart_fdt_driver, 0, 0);

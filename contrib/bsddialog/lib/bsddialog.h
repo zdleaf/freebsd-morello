@@ -30,7 +30,7 @@
 
 #include <stdbool.h>
 
-#define LIBBSDDIALOG_VERSION     "0.1"
+#define LIBBSDDIALOG_VERSION     "0.4"
 
 /* Exit status */
 #define BSDDIALOG_ERROR          -1
@@ -64,17 +64,21 @@
 #define BSDDIALOG_MG_PENDING     -11
 
 /* Form */
-#define BSDDIALOG_FIELDHIDDEN    1U
-#define BSDDIALOG_FIELDREADONLY  2U
+#define BSDDIALOG_FIELDHIDDEN      1U
+#define BSDDIALOG_FIELDREADONLY    2U
+#define BSDDIALOG_FIELDNOCOLOR     4U
+#define BSDDIALOG_FIELDCURSOREND   8U
+#define BSDDIALOG_FIELDEXTEND      16U
+#define BSDDIALOG_FIELDSINGLEBYTE  32U
 
 struct bsddialog_conf {
 	bool ascii_lines;
 	unsigned int auto_minheight;
 	unsigned int auto_minwidth;
+	unsigned int auto_topmargin;
+	unsigned int auto_downmargin;
 	const char *bottomtitle;
 	bool clear;
-	const char *f1_file;
-	const char *f1_message;
 	int *get_height;
 	int *get_width;
 	bool no_lines;
@@ -85,8 +89,11 @@ struct bsddialog_conf {
 	int x;
 	struct {
 		bool enable_esc;
+		const char *f1_file;
+		const char *f1_message;
 	} key;
 	struct {
+		unsigned int cols_per_row;
 		bool highlight;
 		unsigned int tablen;
 	} text;
@@ -98,10 +105,13 @@ struct bsddialog_conf {
 		bool shortcut_buttons;
 	} menu;
 	struct {
-		int  securech;
+		char securech;
+		char *securembch;
+		bool value_wchar;
 		bool value_without_ok;
 	} form;
 	struct {
+		bool always_active;
 		bool without_ok;
 		const char *ok_label;
 		bool with_extra;
@@ -126,14 +136,14 @@ struct bsddialog_menuitem {
 	const char *bottomdesc;
 };
 
-enum bsddialog_grouptype {
+enum bsddialog_menutype {
 	BSDDIALOG_CHECKLIST,
 	BSDDIALOG_RADIOLIST,
 	BSDDIALOG_SEPARATOR,
 };
 
 struct bsddialog_menugroup {
-	enum bsddialog_grouptype type;
+	enum bsddialog_menutype type;
 	unsigned int nitems;
 	struct bsddialog_menuitem *items;
 };
@@ -155,6 +165,7 @@ struct bsddialog_formitem {
 };
 
 int bsddialog_init(void);
+int bsddialog_init_notheme(void);
 int bsddialog_end(void);
 int bsddialog_backtitle(struct bsddialog_conf *conf, const char *backtitle);
 int bsddialog_initconf(struct bsddialog_conf *conf);
@@ -162,6 +173,10 @@ int bsddialog_clearterminal(void);
 const char *bsddialog_geterror(void);
 
 /* Dialogs */
+int
+bsddialog_calendar(struct bsddialog_conf *conf, const char *text, int rows,
+    int cols, unsigned int *yy, unsigned int *mm, unsigned int *dd);
+
 int
 bsddialog_checklist(struct bsddialog_conf *conf, const char *text, int rows,
     int cols, unsigned int menurows, unsigned int nitems,

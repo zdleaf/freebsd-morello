@@ -29,8 +29,6 @@
  *
  * OpenBSD: abtn.c,v 1.12 2009/01/10 18:00:59 robert Exp
  * NetBSD: abtn.c,v 1.1 1999/07/12 17:48:26 tsubai Exp
- *
- * $FreeBSD$
  */
 
 #include <sys/param.h>
@@ -78,9 +76,7 @@ static driver_t abtn_driver = {
 	sizeof(struct abtn_softc),
 };
 
-static devclass_t abtn_devclass;
-
-DRIVER_MODULE(abtn, adb, abtn_driver, abtn_devclass, 0, 0);
+DRIVER_MODULE(abtn, adb, abtn_driver, 0, 0);
 
 static int
 abtn_probe(device_t dev)

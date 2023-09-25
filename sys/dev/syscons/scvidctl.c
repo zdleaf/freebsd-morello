@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 1998 Kazutaka YOKOTA <yokota@zodiac.mech.utsunomiya-u.ac.jp>
  * All rights reserved.
@@ -30,8 +30,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include "opt_syscons.h"
 
 #include <sys/param.h>
@@ -140,7 +138,9 @@ sc_set_text_mode(scr_stat *scp, struct tty *tp, int mode, int xsize, int ysize,
     video_info_t info;
     struct winsize wsz;
     u_char *font;
+#ifndef SC_NO_HISTORY
     int prev_ysize;
+#endif
     int error;
     int s;
 
@@ -200,8 +200,8 @@ sc_set_text_mode(scr_stat *scp, struct tty *tp, int mode, int xsize, int ysize,
 #ifndef SC_NO_HISTORY
     if (scp->history != NULL)
 	sc_hist_save(scp);
-#endif
     prev_ysize = scp->ysize;
+#endif
     /*
      * This is a kludge to fend off scrn_update() while we
      * muck around with scp. XXX
@@ -313,7 +313,9 @@ sc_set_pixel_mode(scr_stat *scp, struct tty *tp, int xsize, int ysize,
     video_info_t info;
     struct winsize wsz;
     u_char *font;
+#ifndef SC_NO_HISTORY
     int prev_ysize;
+#endif
     int error;
     int s;
 
@@ -384,8 +386,8 @@ sc_set_pixel_mode(scr_stat *scp, struct tty *tp, int xsize, int ysize,
 #ifndef SC_NO_HISTORY
     if (scp->history != NULL)
 	sc_hist_save(scp);
-#endif
     prev_ysize = scp->ysize;
+#endif
     scp->status |= (UNKNOWN_MODE | PIXEL_MODE | MOUSE_HIDDEN);
     scp->status &= ~(GRAPHICS_MODE | MOUSE_VISIBLE);
     scp->xsize = xsize;

@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD AND BSD-4-Clause
+ * SPDX-License-Identifier: BSD-2-Clause AND BSD-4-Clause
  *
  * Copyright (c) 2010 Justin T. Gibbs, Spectra Logic Corporation
  * All rights reserved.
@@ -91,8 +91,6 @@
  * SUCH DAMAGE.
  */
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 /**
  * \file control.c
  *
@@ -148,8 +146,8 @@ __FBSDID("$FreeBSD$");
 
 #include <xen/hvm.h>
 
-#include <xen/interface/event_channel.h>
-#include <xen/interface/grant_table.h>
+#include <contrib/xen/event_channel.h>
+#include <contrib/xen/grant_table.h>
 
 #include <xen/xenbus/xenbusvar.h>
 
@@ -185,26 +183,26 @@ struct xctrl_softc {
 
 /*------------------------------ Event Handlers ------------------------------*/
 static void
-xctrl_poweroff()
+xctrl_poweroff(void)
 {
 	shutdown_nice(RB_POWEROFF|RB_HALT);
 }
 
 static void
-xctrl_reboot()
+xctrl_reboot(void)
 {
 	shutdown_nice(0);
 }
 
 #if !defined(__amd64__) && !defined(__i386__)
 static void
-xctrl_suspend()
+xctrl_suspend(void)
 {
 	printf("WARNING: xen/control: Suspend not supported!\n");
 }
 #else /* __amd64__ || __i386__ */
 static void
-xctrl_suspend()
+xctrl_suspend(void)
 {
 #ifdef SMP
 	cpuset_t cpu_suspend_map;
@@ -341,7 +339,7 @@ xctrl_suspend()
 #endif /* __amd64__ || __i386__ */
 
 static void
-xctrl_crash()
+xctrl_crash(void)
 {
 	panic("Xen directed crash");
 }
@@ -487,6 +485,5 @@ static device_method_t xctrl_methods[] = {
 }; 
 
 DEFINE_CLASS_0(xctrl, xctrl_driver, xctrl_methods, sizeof(struct xctrl_softc));
-devclass_t xctrl_devclass; 
 
-DRIVER_MODULE(xctrl, xenstore, xctrl_driver, xctrl_devclass, NULL, NULL);
+DRIVER_MODULE(xctrl, xenstore, xctrl_driver, NULL, NULL);

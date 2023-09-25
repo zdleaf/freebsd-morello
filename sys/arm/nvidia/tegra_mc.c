@@ -25,8 +25,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 /*
  * Memory controller driver for Tegra SoCs.
  */
@@ -304,8 +302,6 @@ static device_method_t tegra_mc_methods[] = {
 	DEVMETHOD_END
 };
 
-static devclass_t tegra_mc_devclass;
 static DEFINE_CLASS_0(mc, tegra_mc_driver, tegra_mc_methods,
     sizeof(struct tegra_mc_softc));
-DRIVER_MODULE(tegra_mc, simplebus, tegra_mc_driver, tegra_mc_devclass,
-    NULL, NULL);
+DRIVER_MODULE(tegra_mc, simplebus, tegra_mc_driver, NULL, NULL);

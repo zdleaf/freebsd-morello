@@ -17,8 +17,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
@@ -91,6 +89,4 @@ static driver_t tpm_driver = {
 	"tpm", tpm_methods, sizeof(struct tpm_softc),
 };
 
-static devclass_t tpm_devclass;
-
-DRIVER_MODULE(tpm, isa, tpm_driver, tpm_devclass, 0, 0);
+DRIVER_MODULE(tpm, isa, tpm_driver, 0, 0);

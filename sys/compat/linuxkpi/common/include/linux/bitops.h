@@ -25,8 +25,6 @@
  * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 #ifndef	_LINUXKPI_LINUX_BITOPS_H_
 #define	_LINUXKPI_LINUX_BITOPS_H_
@@ -84,6 +82,12 @@ static inline int
 __ffsl(long mask)
 {
 	return (ffsl(mask) - 1);
+}
+
+static inline unsigned long
+__ffs64(uint64_t mask)
+{
+	return (ffsll(mask) - 1);
 }
 
 static inline int

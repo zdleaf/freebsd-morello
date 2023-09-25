@@ -25,8 +25,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <err.h>
 #include <getopt.h>
 #include <libgen.h>
@@ -116,8 +114,8 @@ boot_catalog_valid(char *entry)
 }
 
 static int
-dump_section(char *buffer, size_t offset, FILE *outfile, const char *filename,
-    struct outputter *outputter)
+dump_section(char *buffer, size_t bufsize, size_t offset, FILE *outfile,
+    const char *filename, struct outputter *outputter)
 {
 	boot_catalog_section_header *sh;
 	u_char platform_id;
@@ -125,6 +123,8 @@ dump_section(char *buffer, size_t offset, FILE *outfile, const char *filename,
 	size_t entry_offset;
 	boot_catalog_section_entry *entry;
 
+	if (offset + sizeof(boot_catalog_section_header) > bufsize)
+		errx(1, "%s: section header out of bounds", filename);
 	sh = (boot_catalog_section_header *)&buffer[offset];
 	if (outputter->output_section != NULL) {
 		outputter->output_section(outfile, filename, sh);
@@ -135,6 +135,10 @@ dump_section(char *buffer, size_t offset, FILE *outfile, const char *filename,
 	if (outputter->output_entry != NULL) {
 		for (i = 1; i <= (int)sh->num_section_entries[0]; i++) {
 			entry_offset = offset + i * ET_BOOT_ENTRY_SIZE;
+			if (entry_offset + sizeof(boot_catalog_section_entry) >
+			    bufsize)
+				errx(1, "%s: section entry out of bounds",
+				    filename);
 			entry =
 			    (boot_catalog_section_entry *)&buffer[entry_offset];
 			outputter->output_entry(outfile, filename, entry,
@@ -161,9 +165,8 @@ dump_eltorito(FILE *iso, const char *filename, FILE *outfile,
 	bvd = (boot_volume_descriptor *)buffer;
 	if (memcmp(bvd->identifier, ISO_VOLUME_DESCRIPTOR_STANDARD_ID, 5) != 0)
 		warnx("%s: not a valid ISO", filename);
-	if (bvd->boot_record_indicator[0] != ISO_VOLUME_DESCRIPTOR_BOOT)
-		warnx("%s: not an El Torito bootable ISO", filename);
-	if (memcmp(bvd->boot_system_identifier, ET_ID, 23) != 0)
+	if (bvd->boot_record_indicator[0] != ISO_VOLUME_DESCRIPTOR_BOOT ||
+	    memcmp(bvd->boot_system_identifier, ET_ID, 23) != 0)
 		warnx("%s: not an El Torito bootable ISO", filename);
 
 	boot_catalog = isonum_731(bvd->boot_catalog_pointer);
@@ -195,8 +198,8 @@ dump_eltorito(FILE *iso, const char *filename, FILE *outfile,
 		    (uint8_t)entry[0] != ET_SECTION_HEADER_LAST)
 			break;
 
-		entry_count = dump_section(buffer, offset, outfile, filename,
-		    outputter);
+		entry_count = dump_section(buffer, sizeof(buffer), offset,
+		    outfile, filename, outputter);
 
 		offset += entry_count * ET_BOOT_ENTRY_SIZE;
 	}

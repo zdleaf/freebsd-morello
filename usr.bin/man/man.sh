@@ -1,6 +1,6 @@
 #! /bin/sh
 #
-# SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+# SPDX-License-Identifier: BSD-2-Clause
 #
 #  Copyright (c) 2010 Gordon Tetlow
 #  All rights reserved.
@@ -26,7 +26,12 @@
 #  OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 #  SUCH DAMAGE.
 #
-# $FreeBSD$
+
+# Rendering a manual page is fast. Even a manual page several 100k in size
+# takes less than a CPU second. If it takes much longer, it is very likely
+# that a tool like mandoc(1) is running in an infinite loop. In this case
+# it is better to terminate it.
+ulimit -t 20
 
 # Usage: add_to_manpath path
 # Adds a variable to manpath while ensuring we don't have duplicates.
@@ -61,6 +66,25 @@ build_manlocales() {
 	MANLOCALES=${manlocales#:}
 
 	decho "Available manual locales: $MANLOCALES"
+}
+
+# Usage: build_mansect
+# Builds a correct MANSECT variable.
+build_mansect() {
+	# If the user has set mansect, who are we to argue.
+	if [ -n "$MANSECT" ]; then
+		return
+	fi
+
+	parse_configs
+
+	# Trim leading colon
+	MANSECT=${mansect#:}
+
+	if [ -z "$MANSECT" ]; then
+		MANSECT=$man_default_sections
+	fi
+	decho "Using manual sections: $MANSECT"
 }
 
 # Usage: build_manpath
@@ -542,10 +566,10 @@ man_find_and_display() {
 	fi
 }
 
-# Usage: man_parse_args "$@"
+# Usage: man_parse_opts "$@"
 # Parses commandline options for man.
-man_parse_args() {
-	local IFS cmd_arg
+man_parse_opts() {
+	local cmd_arg
 
 	OPTIND=1
 	while getopts 'K:M:P:S:adfhkm:op:tw' cmd_arg; do
@@ -595,19 +619,6 @@ man_parse_args() {
 		do_apropos "$@"
 		exit
 	fi
-
-	IFS=:
-	for sect in $man_default_sections; do
-		if [ "$sect" = "$1" ]; then
-			decho "Detected manual section as first arg: $1"
-			MANSECT="$1"
-			shift
-			break
-		fi
-	done
-	unset IFS
-
-	pages="$*"
 }
 
 # Usage: man_setup
@@ -627,14 +638,8 @@ man_setup() {
 	decho "Using architecture: $MACHINE_ARCH:$MACHINE"
 
 	setup_pager
-
-	# Setup manual sections to search.
-	if [ -z "$MANSECT" ]; then
-		MANSECT=$man_default_sections
-	fi
-	decho "Using manual sections: $MANSECT"
-
 	build_manpath
+	build_mansect
 	man_setup_locale
 	man_setup_width
 }
@@ -781,6 +786,10 @@ parse_file() {
 				trim "${line#MANCONFIG}"
 				config_local="$tstr"
 				;;
+		MANSECT*)	decho "    MANSECT" 3
+				trim "${line#MANSECT}"
+				mansect="$mansect:$tstr"
+				;;
 		# Set variables in the form of FOO_BAR
 		*_*[\ \	]*)	var="${line%%[\ \	]*}"
 				trim "${line#$var}"
@@ -900,9 +909,10 @@ setup_cattool() {
 	case "$1" in
 	*.bz)	cattool='/usr/bin/bzcat' ;;
 	*.bz2)	cattool='/usr/bin/bzcat' ;;
-	*.gz)	cattool='/usr/bin/zcat' ;;
+	*.gz)	cattool='/usr/bin/gzcat' ;;
 	*.lzma)	cattool='/usr/bin/lzcat' ;;
 	*.xz)	cattool='/usr/bin/xzcat' ;;
+	*.zst)	cattool='/usr/bin/zstdcat' ;;
 	*)	cattool='/usr/bin/zcat -f' ;;
 	esac
 }
@@ -989,11 +999,11 @@ do_full_search() {
 	gflags="${gflags} --label"
 
 	set +f
-	for mpath in $(echo "${MANPATH}" | tr : [:blank:]); do
-		for section in $(echo "${MANSECT}" | tr : [:blank:]); do
+	for mpath in $(echo "${MANPATH}" | tr : '[:blank:]'); do
+		for section in $(echo "${MANSECT}" | tr : '[:blank:]'); do
 			for manfile in ${mpath}/man${section}/*.${section}*; do
 				mandoc "${manfile}" 2>/dev/null |
-					grep -E ${gflags} "${manfile}" -e ${re}
+					grep -E ${gflags} "${manfile}" -e "${re}"
 			done
 		done
 	done
@@ -1001,12 +1011,28 @@ do_full_search() {
 }
 
 do_man() {
-	man_parse_args "$@"
+	local IFS
+
+	man_parse_opts "$@"
+	man_setup
+
+	shift $(( $OPTIND - 1 ))
+	IFS=:
+	for sect in $MANSECT; do
+		if [ "$sect" = "$1" ]; then
+			decho "Detected manual section as first arg: $1"
+			MANSECT="$1"
+			shift
+			break
+		fi
+	done
+	unset IFS
+	pages="$*"
+
 	if [ -z "$pages" -a -z "${Kflag}" ]; then
 		echo 'What manual page do you want?' >&2
 		exit 1
 	fi
-	man_setup
 
 	if [ ! -z "${Kflag}" ]; then
 		# Short circuit because -K flag does a sufficiently
@@ -1045,11 +1071,11 @@ do_whatis() {
 
 # User's PATH setting decides on the groff-suite to pick up.
 EQN=eqn
-NROFF='groff -S -P-h -Wall -mtty-char -man'
+NROFF='groff -S -P-h -Wall -mtty-char -mandoc'
 PIC=pic
 REFER=refer
 TBL=tbl
-TROFF='groff -S -man'
+TROFF='groff -S -mandoc'
 VGRIND=vgrind
 
 LOCALE=/usr/bin/locale

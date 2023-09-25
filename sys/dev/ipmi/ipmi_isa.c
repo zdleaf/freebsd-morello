@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2006 IronPort Systems Inc. <ambrisko@ironport.com>
  * All rights reserved.
@@ -27,8 +27,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/bus.h>
@@ -140,7 +138,7 @@ ipmi_hint_identify(device_t dev, struct ipmi_get_info *info)
 		bus_delete_resource(dev, SYS_RES_IOPORT, i);
 	}
 
-	/* Allow the I/O address to be overriden via hints. */
+	/* Allow the I/O address to be overridden via hints. */
 	if (resource_int_value(name, unit, "port", &val) == 0 && val != 0) {
 		info->address = val;
 		info->io_mode = 1;
@@ -150,7 +148,7 @@ ipmi_hint_identify(device_t dev, struct ipmi_get_info *info)
 		info->io_mode = 0;
 	}
 
-	/* Allow the spacing to be overriden. */
+	/* Allow the spacing to be overridden. */
 	if (resource_int_value(name, unit, "spacing", &val) == 0) {
 		switch (val) {
 		case 8:
@@ -188,16 +186,17 @@ ipmi_isa_attach(device_t dev)
 
 	switch (info.iface_type) {
 	case KCS_MODE:
-		count = 2;
+		count = IPMI_IF_KCS_NRES;
 		mode = "KCS";
 		break;
 	case SMIC_MODE:
-		count = 3;
+		count = IPMI_IF_SMIC_NRES;
 		mode = "SMIC";
 		break;
 	case BT_MODE:
-		device_printf(dev, "BT mode is unsupported\n");
-		return (ENXIO);
+		count = IPMI_IF_BT_NRES;
+		mode = "BT";
+		break;
 	default:
 		return (ENXIO);
 	}
@@ -248,19 +247,21 @@ ipmi_isa_attach(device_t dev)
 		    RF_SHAREABLE | RF_ACTIVE);
 	}
 
+	error = ENXIO;
 	switch (info.iface_type) {
 	case KCS_MODE:
 		error = ipmi_kcs_attach(sc);
-		if (error)
-			goto bad;
 		break;
 	case SMIC_MODE:
 		error = ipmi_smic_attach(sc);
-		if (error)
-			goto bad;
+		break;
+	case BT_MODE:
+		error = ipmi_bt_attach(sc);
 		break;
 	}
 
+	if (error)
+		goto bad;
 	error = ipmi_attach(dev);
 	if (error)
 		goto bad;
@@ -286,7 +287,7 @@ static driver_t ipmi_isa_driver = {
 	sizeof(struct ipmi_softc),
 };
 
-DRIVER_MODULE(ipmi_isa, isa, ipmi_isa_driver, ipmi_devclass, 0, 0);
+DRIVER_MODULE(ipmi_isa, isa, ipmi_isa_driver, 0, 0);
 #ifdef ARCH_MAY_USE_EFI
 MODULE_DEPEND(ipmi_isa, efirt, 1, 1, 1);
 #endif

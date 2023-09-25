@@ -8,7 +8,7 @@
  * Paul Borman at Krystal Technologies.
  *
  * Copyright (c) 2011 The FreeBSD Foundation
- * All rights reserved.
+ *
  * Portions of this software were developed by David Chisnall
  * under sponsorship from the FreeBSD Foundation.
  *
@@ -38,8 +38,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #define	__RUNETYPE_INTERNAL 1
 
 #include <runetype.h>
@@ -214,6 +212,8 @@ void *
 __ctype_load(const char *locale, locale_t unused __unused)
 {
 	struct xlocale_ctype *l = calloc(sizeof(struct xlocale_ctype), 1);
+	if (l == NULL)
+		return (NULL);
 
 	l->header.header.destructor = destruct_ctype;
 	if (__setrunelocale(l, locale)) {

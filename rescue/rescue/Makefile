@@ -1,7 +1,7 @@
-#$FreeBSD$
 #	@(#)Makefile	8.1 (Berkeley) 6/2/93
 
 .include <src.opts.mk>
+.include <bsd.linker.mk>
 
 PACKAGE=rescue
 MAN=
@@ -12,6 +12,12 @@ MK_SSP=	no
 MK_PIE=	no
 NO_SHARED=	yes
 CRUNCH_BUILDOPTS+=	MK_PIE=no NO_SHARED=yes
+
+# lld >= 16 became more strict about multiply defined symbols. Since there are
+# many of those in crunchgen'd programs, turn off the check.
+.if ${LINKER_TYPE} == "lld" && ${LINKER_VERSION} >= 160000
+LDFLAGS+=	-Wl,--allow-multiple-definition
+.endif
 
 PROG=	rescue
 BINDIR?=/rescue
@@ -135,10 +141,20 @@ CRUNCH_PROGS_usr.sbin+= zdb
 # crunchgen does not like C++ programs; this should be fixed someday
 # CRUNCH_PROGS+= devd
 
-CRUNCH_LIBS+= -l80211 -lalias -lcam -lncursesw_real -ldevstat -lipsec -llzma
+CRUNCH_LIBS+= -l80211 -lalias -lcam -lncursesw -ldevstat -lipsec -llzma
 .if ${MK_ZFS} != "no"
-CRUNCH_LIBS+= -lavl -lzpool -lzfs_core -lzfs -lnvpair -lpthread -luutil -lumem
-CRUNCH_LIBS+= -lbe -lzfsbootenv -lzutil -ltpool -lspl -licp_rescue
+CRUNCH_LIBS+= -lavl -lpthread -luutil -lumem -ltpool -lspl -lrt
+CRUNCH_LIBS_zfs+=	${LIBBE} \
+			${LIBZPOOL} \
+			${LIBZFS} \
+			${LIBZUTIL} \
+			${LIBZFS_CORE} \
+			${LIBZFSBOOTENV} \
+			${LIBICP_RESCUE} \
+			${LIBNVPAIR}
+CRUNCH_LIBS_bectl+=	${CRUNCH_LIBS_zfs}
+CRUNCH_LIBS_zpool+=	${CRUNCH_LIBS_zfs}
+CRUNCH_LIBS_zdb+=	${CRUNCH_LIBS_zfs}
 .else
 # liblzma needs pthread
 CRUNCH_LIBS+= -lpthread
@@ -150,7 +166,7 @@ CRUNCH_LIBS+= -lmd
 CRUNCH_LIBS+= -lmt -lsbuf -lufs -lz
 
 .if ${MACHINE_CPUARCH} == "i386"
-CRUNCH_PROGS_sbin+= bsdlabel sconfig fdisk
+CRUNCH_PROGS_sbin+= bsdlabel fdisk
 CRUNCH_ALIAS_bsdlabel= disklabel
 #CRUNCH_PROGS+= mount_smbfs
 #CRUNCH_LIBS+= -lsmb
@@ -202,10 +218,13 @@ CRUNCH_PROGS_usr.bin+= zstd
 CRUNCH_ALIAS_zstd= unzstd zstdcat zstdmt
 CRUNCH_LIBS+=	${LDADD_zstd}
 
+CRUNCH_PROGS_usr.bin+=	fetch
+CRUNCH_LIBS+=	-lfetch
+
 CRUNCH_PROGS_usr.bin+= tar
 CRUNCH_LIBS+= -larchive
 .if ${MK_OPENSSL} != "no"
-CRUNCH_LIBS+= -lcrypto
+CRUNCH_LIBS+= -lssl -lcrypto
 .endif
 CRUNCH_LIBS+= -lmd
 
@@ -234,6 +253,8 @@ CRUNCH_ALIAS_chown= chgrp
 
 CRUNCH_LIBS+=		${OBJTOP}/lib/libifconfig/libifconfig.a
 CRUNCH_BUILDOPTS+=	CRUNCH_CFLAGS+=-I${OBJTOP}/lib/libifconfig
+
+CRUNCH_LIBS_ifconfig+=	${LIBNV}
 
 CRUNCH_LIBS+= -lm
 

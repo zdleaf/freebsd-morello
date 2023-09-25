@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2021, Adrian Chadd <adrian@FreeBSD.org>
  *
@@ -27,8 +27,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 
@@ -228,13 +226,10 @@ static driver_t qcom_tcsr_driver = {
 	sizeof(struct qcom_tcsr_softc),
 };
 
-static devclass_t qcom_tcsr_devclass;
-
 /*
  * This has to be run early, before the rest of the hardware is potentially
  * probed/attached.
  */
-EARLY_DRIVER_MODULE(qcom_tcsr, simplebus, qcom_tcsr_driver,
-    qcom_tcsr_devclass, 0, 0,
+EARLY_DRIVER_MODULE(qcom_tcsr, simplebus, qcom_tcsr_driver, 0, 0,
     BUS_PASS_CPU + BUS_PASS_ORDER_EARLY);
 SIMPLEBUS_PNP_INFO(compat_data);

@@ -28,7 +28,6 @@
  *  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  *  POSSIBILITY OF SUCH DAMAGE.
  */
-/*$FreeBSD$*/
 
 /**
  * @file iavf_lib.h
@@ -204,35 +203,6 @@ MALLOC_DECLARE(M_IAVF);
 #define IAVF_DEFAULT_RSS_HENA_AVF (\
 	IAVF_DEFAULT_RSS_HENA_BASE |			\
 	IAVF_DEFAULT_ADV_RSS_HENA)
-
-/* Pre-11 counter(9) compatibility */
-#if __FreeBSD_version >= 1100036
-#define IAVF_SET_IPACKETS(vsi, count)	(vsi)->ipackets = (count)
-#define IAVF_SET_IERRORS(vsi, count)	(vsi)->ierrors = (count)
-#define IAVF_SET_OPACKETS(vsi, count)	(vsi)->opackets = (count)
-#define IAVF_SET_OERRORS(vsi, count)	(vsi)->oerrors = (count)
-#define IAVF_SET_COLLISIONS(vsi, count)	/* Do nothing; collisions is always 0. */
-#define IAVF_SET_IBYTES(vsi, count)	(vsi)->ibytes = (count)
-#define IAVF_SET_OBYTES(vsi, count)	(vsi)->obytes = (count)
-#define IAVF_SET_IMCASTS(vsi, count)	(vsi)->imcasts = (count)
-#define IAVF_SET_OMCASTS(vsi, count)	(vsi)->omcasts = (count)
-#define IAVF_SET_IQDROPS(vsi, count)	(vsi)->iqdrops = (count)
-#define IAVF_SET_OQDROPS(vsi, count)	(vsi)->oqdrops = (count)
-#define IAVF_SET_NOPROTO(vsi, count)	(vsi)->noproto = (count)
-#else
-#define IAVF_SET_IPACKETS(vsi, count)	(vsi)->ifp->if_ipackets = (count)
-#define IAVF_SET_IERRORS(vsi, count)	(vsi)->ifp->if_ierrors = (count)
-#define IAVF_SET_OPACKETS(vsi, count)	(vsi)->ifp->if_opackets = (count)
-#define IAVF_SET_OERRORS(vsi, count)	(vsi)->ifp->if_oerrors = (count)
-#define IAVF_SET_COLLISIONS(vsi, count)	(vsi)->ifp->if_collisions = (count)
-#define IAVF_SET_IBYTES(vsi, count)	(vsi)->ifp->if_ibytes = (count)
-#define IAVF_SET_OBYTES(vsi, count)	(vsi)->ifp->if_obytes = (count)
-#define IAVF_SET_IMCASTS(vsi, count)	(vsi)->ifp->if_imcasts = (count)
-#define IAVF_SET_OMCASTS(vsi, count)	(vsi)->ifp->if_omcasts = (count)
-#define IAVF_SET_IQDROPS(vsi, count)	(vsi)->ifp->if_iqdrops = (count)
-#define IAVF_SET_OQDROPS(vsi, odrops)	(vsi)->ifp->if_snd.ifq_drops = (odrops)
-#define IAVF_SET_NOPROTO(vsi, count)	(vsi)->noproto = (count)
-#endif
 
 /* For stats sysctl naming */
 #define IAVF_QUEUE_NAME_LEN 32
@@ -487,8 +457,8 @@ void iavf_add_sysctls_eth_stats(struct sysctl_ctx_list *ctx,
     struct sysctl_oid_list *child, struct iavf_eth_stats *eth_stats);
 void iavf_media_status_common(struct iavf_sc *sc,
     struct ifmediareq *ifmr);
-int iavf_media_change_common(struct ifnet *ifp);
-void iavf_set_initial_baudrate(struct ifnet *ifp);
+int iavf_media_change_common(if_t ifp);
+void iavf_set_initial_baudrate(if_t ifp);
 u64 iavf_max_vc_speed_to_value(u8 link_speeds);
 void iavf_config_rss_reg(struct iavf_sc *sc);
 void iavf_config_rss_pf(struct iavf_sc *sc);

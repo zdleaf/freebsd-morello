@@ -1,6 +1,5 @@
-# $FreeBSD$
 
-PACKAGE=runtime
+PACKAGE=geom
 .PATH: ${.CURDIR:H:H}/misc
 
 GEOM_CLASS=	shsec

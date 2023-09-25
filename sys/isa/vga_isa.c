@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 1999 Kazutaka YOKOTA <yokota@zodiac.mech.utsunomiya-u.ac.jp>
  * All rights reserved.
@@ -27,8 +27,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include "opt_vga.h"
 #include "opt_fb.h"
 #include "opt_syscons.h"	/* should be removed in the future, XXX */
@@ -131,34 +129,6 @@ vga_resume(device_t dev)
 	}
 }
 
-#define VGA_SOFTC(unit)		\
-	((vga_softc_t *)devclass_get_softc(isavga_devclass, unit))
-
-static devclass_t	isavga_devclass;
-
-#ifdef FB_INSTALL_CDEV
-
-static d_open_t		isavga_open;
-static d_close_t	isavga_close;
-static d_read_t		isavga_read;
-static d_write_t	isavga_write;
-static d_ioctl_t	isavga_ioctl;
-static d_mmap_t		isavga_mmap;
-
-static struct cdevsw isavga_cdevsw = {
-	.d_version =	D_VERSION,
-	.d_flags =	D_NEEDGIANT,
-	.d_open =	isavga_open,
-	.d_close =	isavga_close,
-	.d_read =	isavga_read,
-	.d_write =	isavga_write,
-	.d_ioctl =	isavga_ioctl,
-	.d_mmap =	isavga_mmap,
-	.d_name =	VGA_DRIVER_NAME,
-};
-
-#endif /* FB_INSTALL_CDEV */
-
 static void
 isavga_identify(driver_t *driver, device_t parent)
 {
@@ -216,13 +186,6 @@ isavga_attach(device_t dev)
 	if (error)
 		return (error);
 
-#ifdef FB_INSTALL_CDEV
-	/* attach a virtual frame buffer device */
-	error = fb_attach(VGA_MKMINOR(unit), sc->adp, &isavga_cdevsw);
-	if (error)
-		return (error);
-#endif /* FB_INSTALL_CDEV */
-
 	if (0 && bootverbose)
 		vidd_diag(sc->adp, bootverbose);
 
@@ -256,48 +219,6 @@ isavga_resume(device_t dev)
 	return (bus_generic_resume(dev));
 }
 
-#ifdef FB_INSTALL_CDEV
-
-static int
-isavga_open(struct cdev *dev, int flag, int mode, struct thread *td)
-{
-	return (vga_open(dev, VGA_SOFTC(VGA_UNIT(dev)), flag, mode, td));
-}
-
-static int
-isavga_close(struct cdev *dev, int flag, int mode, struct thread *td)
-{
-	return (vga_close(dev, VGA_SOFTC(VGA_UNIT(dev)), flag, mode, td));
-}
-
-static int
-isavga_read(struct cdev *dev, struct uio *uio, int flag)
-{
-	return (vga_read(dev, VGA_SOFTC(VGA_UNIT(dev)), uio, flag));
-}
-
-static int
-isavga_write(struct cdev *dev, struct uio *uio, int flag)
-{
-	return (vga_write(dev, VGA_SOFTC(VGA_UNIT(dev)), uio, flag));
-}
-
-static int
-isavga_ioctl(struct cdev *dev, u_long cmd, caddr_t arg, int flag, struct thread *td)
-{
-	return (vga_ioctl(dev, VGA_SOFTC(VGA_UNIT(dev)), cmd, arg, flag, td));
-}
-
-static int
-isavga_mmap(struct cdev *dev, vm_ooffset_t offset, vm_paddr_t *paddr,
-    int prot, vm_memattr_t *memattr)
-{
-	return (vga_mmap(dev, VGA_SOFTC(VGA_UNIT(dev)), offset, paddr, prot,
-	    memattr));
-}
-
-#endif /* FB_INSTALL_CDEV */
-
 static device_method_t isavga_methods[] = {
 	DEVMETHOD(device_identify,	isavga_identify),
 	DEVMETHOD(device_probe,		isavga_probe),
@@ -314,9 +235,7 @@ static driver_t isavga_driver = {
 	sizeof(vga_softc_t),
 };
 
-DRIVER_MODULE(vga, isa, isavga_driver, isavga_devclass, 0, 0);
-
-static devclass_t	vgapm_devclass;
+DRIVER_MODULE(vga, isa, isavga_driver, 0, 0);
 
 static void
 vgapm_identify(driver_t *driver, device_t parent)
@@ -355,7 +274,7 @@ vgapm_suspend(device_t dev)
 	error = bus_generic_suspend(dev);
 	if (error != 0)
 		return (error);
-	vga_dev = devclass_get_device(isavga_devclass, 0);
+	vga_dev = devclass_get_device(devclass_find(VGA_DRIVER_NAME), 0);
 	if (vga_dev == NULL)
 		return (0);
 	vga_suspend(vga_dev);
@@ -368,7 +287,7 @@ vgapm_resume(device_t dev)
 {
 	device_t vga_dev;
 
-	vga_dev = devclass_get_device(isavga_devclass, 0);
+	vga_dev = devclass_get_device(devclass_find(VGA_DRIVER_NAME), 0);
 	if (vga_dev != NULL)
 		vga_resume(vga_dev);
 
@@ -390,5 +309,5 @@ static driver_t vgapm_driver = {
 	0
 };
 
-DRIVER_MODULE(vgapm, vgapci, vgapm_driver, vgapm_devclass, 0, 0);
+DRIVER_MODULE(vgapm, vgapci, vgapm_driver, 0, 0);
 ISA_PNP_INFO(vga_ids);

@@ -21,13 +21,9 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/bus.h>
@@ -195,14 +191,12 @@ static void
 aw_clk_nkmp_set_freq_scale(struct clknode *clk, struct aw_clk_nkmp_sc *sc,
     uint32_t factor_n, uint32_t factor_k, uint32_t factor_m, uint32_t factor_p)
 {
-	uint32_t val, n, k, m, p;
+	uint32_t val, m, p;
 	int retry;
 
 	DEVICE_LOCK(clk);
 	READ4(clk, sc->offset, &val);
 
-	n = aw_clk_get_factor(val, &sc->n);
-	k = aw_clk_get_factor(val, &sc->k);
 	m = aw_clk_get_factor(val, &sc->m);
 	p = aw_clk_get_factor(val, &sc->p);
 

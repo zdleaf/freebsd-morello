@@ -34,8 +34,10 @@
  * SUCH DAMAGE.
  *
  *	@(#)iso.h	8.6 (Berkeley) 5/10/95
- * $FreeBSD$
  */
+
+#ifndef _ISOFS_CD9660_ISO_H_
+#define _ISOFS_CD9660_ISO_H_
 
 #define ISODCL(from, to) (to - from + 1)
 
@@ -365,3 +367,5 @@ isonum_733(const unsigned char *p)
  * Associated files have a leading '='.
  */
 #define	ASSOCCHAR	'='
+
+#endif /* _ISOFS_CD9660_ISO_H_ */

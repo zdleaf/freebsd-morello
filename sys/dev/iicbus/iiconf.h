@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 1998, 2001 Nicolas Souchu
  * All rights reserved.
@@ -24,8 +24,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 #ifndef __IICONF_H
 #define __IICONF_H
@@ -173,7 +171,6 @@ int iicdev_writeto(device_t _slavedev, uint8_t _regaddr, void *_buffer,
 #define IICBUS_PREFVER	IICBUS_MODVER
 
 extern driver_t iicbb_driver;
-extern devclass_t iicbb_devclass;
 
 #define IICBB_MODVER	1
 #define IICBB_MINVER	1

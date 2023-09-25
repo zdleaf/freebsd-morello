@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2012-2015 Ian Lepore
  * Copyright (c) 2010 Mark Tinguely
@@ -33,8 +33,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/malloc.h>
@@ -535,11 +533,12 @@ bus_dma_tag_set_domain(bus_dma_tag_t dmat, int domain)
 int
 bus_dma_tag_destroy(bus_dma_tag_t dmat)
 {
-	bus_dma_tag_t dmat_copy;
+#ifdef KTR
+	bus_dma_tag_t dmat_copy = dmat;
+#endif
 	int error;
 
 	error = 0;
-	dmat_copy = dmat;
 
 	if (dmat != NULL) {
 		if (dmat->map_count != 0) {
@@ -775,10 +774,10 @@ bus_dmamem_alloc(bus_dma_tag_t dmat, void **vaddr, int flags,
 	    howmany(dmat->maxsize, MIN(dmat->maxsegsz, PAGE_SIZE)) &&
 	    dmat->alignment <= PAGE_SIZE &&
 	    (dmat->boundary % PAGE_SIZE) == 0) {
-		*vaddr = (void *)kmem_alloc_attr(dmat->maxsize, mflags, 0,
+		*vaddr = kmem_alloc_attr(dmat->maxsize, mflags, 0,
 		    dmat->lowaddr, memattr);
 	} else {
-		*vaddr = (void *)kmem_alloc_contig(dmat->maxsize, mflags, 0,
+		*vaddr = kmem_alloc_contig(dmat->maxsize, mflags, 0,
 		    dmat->lowaddr, dmat->alignment, dmat->boundary, memattr);
 	}
 	if (*vaddr == NULL) {
@@ -821,7 +820,7 @@ bus_dmamem_free(bus_dma_tag_t dmat, void *vaddr, bus_dmamap_t map)
 	    !exclusion_bounce(dmat))
 		uma_zfree(bufzone->umazone, vaddr);
 	else
-		kmem_free((vm_offset_t)vaddr, dmat->maxsize);
+		kmem_free(vaddr, dmat->maxsize);
 
 	dmat->map_count--;
 	if (map->flags & DMAMAP_COHERENT)
@@ -1177,19 +1176,18 @@ _bus_dmamap_complete(bus_dma_tag_t dmat, bus_dmamap_t map,
 void
 bus_dmamap_unload(bus_dma_tag_t dmat, bus_dmamap_t map)
 {
-	struct bounce_page *bpage;
 	struct bounce_zone *bz;
 
 	if ((bz = dmat->bounce_zone) != NULL) {
-		while ((bpage = STAILQ_FIRST(&map->bpages)) != NULL) {
-			STAILQ_REMOVE_HEAD(&map->bpages, links);
-			free_bounce_page(dmat, bpage);
-		}
+		free_bounce_pages(dmat, map);
 
-		bz = dmat->bounce_zone;
-		bz->free_bpages += map->pagesreserved;
-		bz->reserved_bpages -= map->pagesreserved;
-		map->pagesreserved = 0;
+		if (map->pagesreserved != 0) {
+			mtx_lock(&bounce_lock);
+			bz->free_bpages += map->pagesreserved;
+			bz->reserved_bpages -= map->pagesreserved;
+			mtx_unlock(&bounce_lock);
+			map->pagesreserved = 0;
+		}
 		map->pagesneeded = 0;
 	}
 	map->sync_count = 0;

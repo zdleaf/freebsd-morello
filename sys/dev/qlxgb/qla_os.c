@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2011-2013 Qlogic Corporation
  * All rights reserved.
@@ -33,8 +33,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include "qla_os.h"
 #include "qla_reg.h"
 #include "qla_hw.h"
@@ -86,9 +84,9 @@ static int qla_pci_attach (device_t);
 static int qla_pci_detach (device_t);
 
 static void qla_init(void *arg);
-static int qla_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data);
-static int qla_media_change(struct ifnet *ifp);
-static void qla_media_status(struct ifnet *ifp, struct ifmediareq *ifmr);
+static int qla_ioctl(if_t ifp, u_long cmd, caddr_t data);
+static int qla_media_change(if_t ifp);
+static void qla_media_status(if_t ifp, struct ifmediareq *ifmr);
 
 static device_method_t qla_pci_methods[] = {
 	/* Device interface */
@@ -102,9 +100,7 @@ static driver_t qla_pci_driver = {
 	"ql", qla_pci_methods, sizeof (qla_host_t),
 };
 
-static devclass_t qla80xx_devclass;
-
-DRIVER_MODULE(qla80xx, pci, qla_pci_driver, qla80xx_devclass, 0, 0);
+DRIVER_MODULE(qla80xx, pci, qla_pci_driver, 0, 0);
 
 MODULE_DEPEND(qla80xx, pci, 1, 1, 1);
 MODULE_DEPEND(qla80xx, ether, 1, 1, 1);
@@ -210,7 +206,7 @@ qla_watchdog(void *arg)
 {
 	qla_host_t *ha = arg;
 	qla_hw_t *hw;
-	struct ifnet *ifp;
+	if_t ifp;
 
 	hw = &ha->hw;
 	ifp = ha->ifp;
@@ -221,7 +217,7 @@ qla_watchdog(void *arg)
 	if (!ha->flags.qla_watchdog_pause) {
 		if (qla_le32_to_host(*(hw->tx_cons)) != hw->txr_comp) {
 			taskqueue_enqueue(ha->tx_tq, &ha->tx_task);
-		} else if ((ifp->if_snd.ifq_head != NULL) && QL_RUNNING(ifp)) {
+		} else if (!if_sendq_empty(ifp) && QL_RUNNING(ifp)) {
 			taskqueue_enqueue(ha->tx_tq, &ha->tx_task);
 		}
 	}
@@ -409,7 +405,6 @@ static int
 qla_pci_detach(device_t dev)
 {
 	qla_host_t *ha = NULL;
-	struct ifnet *ifp;
 	int i;
 
 	QL_DPRINT2((dev, "%s: enter\n", __func__));
@@ -418,8 +413,6 @@ qla_pci_detach(device_t dev)
                 device_printf(dev, "cannot get softc\n");
                 return (ENOMEM);
         }
-
-	ifp = ha->ifp;
 
 	QLA_LOCK(ha, __func__);
 	qla_stop(ha);
@@ -659,7 +652,7 @@ qla_free_parent_dma_tag(qla_host_t *ha)
 static void
 qla_init_ifnet(device_t dev, qla_host_t *ha)
 {
-	struct ifnet *ifp;
+	if_t ifp;
 
 	QL_DPRINT2((dev, "%s: enter\n", __func__));
 
@@ -670,37 +663,31 @@ qla_init_ifnet(device_t dev, qla_host_t *ha)
 
 	if_initname(ifp, device_get_name(dev), device_get_unit(dev));
 
-	ifp->if_mtu = ETHERMTU;
-	ifp->if_baudrate = IF_Gbps(10);
-	ifp->if_init = qla_init;
-	ifp->if_softc = ha;
-	ifp->if_flags = IFF_BROADCAST | IFF_SIMPLEX | IFF_MULTICAST;
-	ifp->if_ioctl = qla_ioctl;
-	ifp->if_start = qla_start;
+	if_setmtu(ifp, ETHERMTU);
+	if_setbaudrate(ifp, IF_Gbps(10));
+	if_setinitfn(ifp, qla_init);
+	if_setsoftc(ifp, ha);
+	if_setflags(ifp, IFF_BROADCAST | IFF_SIMPLEX | IFF_MULTICAST);
+	if_setioctlfn(ifp, qla_ioctl);
+	if_setstartfn(ifp, qla_start);
 
-	IFQ_SET_MAXLEN(&ifp->if_snd, qla_get_ifq_snd_maxlen(ha));
-	ifp->if_snd.ifq_drv_maxlen = qla_get_ifq_snd_maxlen(ha);
-	IFQ_SET_READY(&ifp->if_snd);
+	if_setsendqlen(ifp, qla_get_ifq_snd_maxlen(ha));
+	if_setsendqready(ifp);
 
-	ha->max_frame_size = ifp->if_mtu + ETHER_HDR_LEN + ETHER_CRC_LEN;
+	ha->max_frame_size = if_getmtu(ifp) + ETHER_HDR_LEN + ETHER_CRC_LEN;
 
 	ether_ifattach(ifp, qla_get_mac_addr(ha));
 
-	ifp->if_capabilities = IFCAP_HWCSUM |
+	if_setcapabilities(ifp, IFCAP_HWCSUM |
 				IFCAP_TSO4 |
-				IFCAP_JUMBO_MTU;
+				IFCAP_JUMBO_MTU);
 
-	ifp->if_capabilities |= IFCAP_VLAN_HWTAGGING | IFCAP_VLAN_MTU;
-	ifp->if_capabilities |= IFCAP_LINKSTATE;
+	if_setcapabilitiesbit(ifp, IFCAP_VLAN_HWTAGGING | IFCAP_VLAN_MTU, 0);
+	if_setcapabilitiesbit(ifp, IFCAP_LINKSTATE, 0);
 
-#if defined(__FreeBSD_version) && (__FreeBSD_version < 900002)
-	ifp->if_timer = 0;
-	ifp->if_watchdog = NULL;
-#endif /* #if defined(__FreeBSD_version) && (__FreeBSD_version < 900002) */
+	if_setcapenable(ifp, if_getcapabilities(ifp));
 
-	ifp->if_capenable = ifp->if_capabilities;
-
-	ifp->if_hdrlen = sizeof(struct ether_vlan_header);
+	if_setifheaderlen(ifp, sizeof(struct ether_vlan_header));
 
 	ifmedia_init(&ha->media, IFM_IMASK, qla_media_change, qla_media_status);
 
@@ -718,7 +705,7 @@ qla_init_ifnet(device_t dev, qla_host_t *ha)
 static void
 qla_init_locked(qla_host_t *ha)
 {
-	struct ifnet *ifp = ha->ifp;
+	if_t ifp = ha->ifp;
 
 	qla_stop(ha);
 
@@ -731,15 +718,15 @@ qla_init_locked(qla_host_t *ha)
 	if (qla_config_lro(ha))
 		return;
 
-	bcopy(IF_LLADDR(ha->ifp), ha->hw.mac_addr, ETHER_ADDR_LEN);
+	bcopy(if_getlladdr(ha->ifp), ha->hw.mac_addr, ETHER_ADDR_LEN);
 
-	ifp->if_hwassist = CSUM_TCP | CSUM_UDP | CSUM_TSO;
+	if_sethwassist(ifp, CSUM_TCP | CSUM_UDP | CSUM_TSO);
 
 	ha->flags.stop_rcv = 0;
 	if (qla_init_hw_if(ha) == 0) {
 		ifp = ha->ifp;
-		ifp->if_drv_flags |= IFF_DRV_RUNNING;
-		ifp->if_drv_flags &= ~IFF_DRV_OACTIVE;
+		if_setdrvflagbits(ifp, IFF_DRV_RUNNING, 0);
+		if_setdrvflagbits(ifp, 0, IFF_DRV_OACTIVE);
 		ha->flags.qla_watchdog_pause = 0;
 	}
 
@@ -778,7 +765,7 @@ static void
 qla_set_multi(qla_host_t *ha, uint32_t add_multi)
 {
 	uint8_t mta[Q8_MAX_NUM_MULTICAST_ADDRS * Q8_MAC_ADDR_LEN];
-	struct ifnet *ifp = ha->ifp;
+	if_t ifp = ha->ifp;
 	int mcnt;
 
 	mcnt = if_foreach_llmaddr(ifp, qla_copy_maddr, mta);
@@ -788,23 +775,26 @@ qla_set_multi(qla_host_t *ha, uint32_t add_multi)
 }
 
 static int
-qla_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
+qla_ioctl(if_t ifp, u_long cmd, caddr_t data)
 {
 	int ret = 0;
 	struct ifreq *ifr = (struct ifreq *)data;
+#ifdef INET
 	struct ifaddr *ifa = (struct ifaddr *)data;
+#endif
 	qla_host_t *ha;
 
-	ha = (qla_host_t *)ifp->if_softc;
+	ha = (qla_host_t *)if_getsoftc(ifp);
 
 	switch (cmd) {
 	case SIOCSIFADDR:
 		QL_DPRINT4((ha->pci_dev, "%s: SIOCSIFADDR (0x%lx)\n",
 			__func__, cmd));
 
+#ifdef INET
 		if (ifa->ifa_addr->sa_family == AF_INET) {
-			ifp->if_flags |= IFF_UP;
-			if (!(ifp->if_drv_flags & IFF_DRV_RUNNING)) {
+			if_setflagbits(ifp, IFF_UP, 0);
+			if (!(if_getdrvflags(ifp) & IFF_DRV_RUNNING)) {
 				QLA_LOCK(ha, __func__);
 				qla_init_locked(ha);
 				QLA_UNLOCK(ha, __func__);
@@ -818,9 +808,10 @@ qla_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 				qla_config_ipv4_addr(ha,
 					(IA_SIN(ifa)->sin_addr.s_addr));
 			}
-		} else {
-			ether_ioctl(ifp, cmd, data);
+			break;
 		}
+#endif
+		ether_ioctl(ifp, cmd, data);
 		break;
 
 	case SIOCSIFMTU:
@@ -831,10 +822,10 @@ qla_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 			ret = EINVAL;
 		} else {
 			QLA_LOCK(ha, __func__);
-			ifp->if_mtu = ifr->ifr_mtu;
+			if_setmtu(ifp, ifr->ifr_mtu);
 			ha->max_frame_size =
-				ifp->if_mtu + ETHER_HDR_LEN + ETHER_CRC_LEN;
-			if ((ifp->if_drv_flags & IFF_DRV_RUNNING)) {
+				if_getmtu(ifp) + ETHER_HDR_LEN + ETHER_CRC_LEN;
+			if ((if_getdrvflags(ifp) & IFF_DRV_RUNNING)) {
 				ret = qla_set_max_mtu(ha, ha->max_frame_size,
 					(ha->hw.rx_cntxt_rsp)->rx_rsp.cntxt_id);
 			}
@@ -850,19 +841,19 @@ qla_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		QL_DPRINT4((ha->pci_dev, "%s: SIOCSIFFLAGS (0x%lx)\n",
 			__func__, cmd));
 
-		if (ifp->if_flags & IFF_UP) {
-			if ((ifp->if_drv_flags & IFF_DRV_RUNNING)) {
-				if ((ifp->if_flags ^ ha->if_flags) &
+		if (if_getflags(ifp) & IFF_UP) {
+			if ((if_getdrvflags(ifp) & IFF_DRV_RUNNING)) {
+				if ((if_getflags(ifp) ^ ha->if_flags) &
 					IFF_PROMISC) {
 					qla_set_promisc(ha);
-				} else if ((ifp->if_flags ^ ha->if_flags) &
+				} else if ((if_getflags(ifp) ^ ha->if_flags) &
 					IFF_ALLMULTI) {
 					qla_set_allmulti(ha);
 				}
 			} else {
 				QLA_LOCK(ha, __func__);
 				qla_init_locked(ha);
-				ha->max_frame_size = ifp->if_mtu +
+				ha->max_frame_size = if_getmtu(ifp) +
 					ETHER_HDR_LEN + ETHER_CRC_LEN;
 				ret = qla_set_max_mtu(ha, ha->max_frame_size,
 					(ha->hw.rx_cntxt_rsp)->rx_rsp.cntxt_id);
@@ -870,9 +861,9 @@ qla_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 			}
 		} else {
 			QLA_LOCK(ha, __func__);
-			if (ifp->if_drv_flags & IFF_DRV_RUNNING)
+			if (if_getdrvflags(ifp) & IFF_DRV_RUNNING)
 				qla_stop(ha);
-			ha->if_flags = ifp->if_flags;
+			ha->if_flags = if_getflags(ifp);
 			QLA_UNLOCK(ha, __func__);
 		}
 		break;
@@ -881,7 +872,7 @@ qla_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		QL_DPRINT4((ha->pci_dev,
 			"%s: %s (0x%lx)\n", __func__, "SIOCADDMULTI", cmd));
 
-		if (ifp->if_drv_flags & IFF_DRV_RUNNING) {
+		if (if_getdrvflags(ifp) & IFF_DRV_RUNNING) {
 			qla_set_multi(ha, 1);
 		}
 		break;
@@ -890,7 +881,7 @@ qla_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		QL_DPRINT4((ha->pci_dev,
 			"%s: %s (0x%lx)\n", __func__, "SIOCDELMULTI", cmd));
 
-		if (ifp->if_drv_flags & IFF_DRV_RUNNING) {
+		if (if_getdrvflags(ifp) & IFF_DRV_RUNNING) {
 			qla_set_multi(ha, 0);
 		}
 		break;
@@ -905,21 +896,21 @@ qla_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 
 	case SIOCSIFCAP:
 	{
-		int mask = ifr->ifr_reqcap ^ ifp->if_capenable;
+		int mask = ifr->ifr_reqcap ^ if_getcapenable(ifp);
 
 		QL_DPRINT4((ha->pci_dev, "%s: SIOCSIFCAP (0x%lx)\n",
 			__func__, cmd));
 
 		if (mask & IFCAP_HWCSUM)
-			ifp->if_capenable ^= IFCAP_HWCSUM;
+			if_togglecapenable(ifp, IFCAP_HWCSUM);
 		if (mask & IFCAP_TSO4)
-			ifp->if_capenable ^= IFCAP_TSO4;
+			if_togglecapenable(ifp, IFCAP_TSO4);
 		if (mask & IFCAP_TSO6)
-			ifp->if_capenable ^= IFCAP_TSO6;
+			if_togglecapenable(ifp, IFCAP_TSO6);
 		if (mask & IFCAP_VLAN_HWTAGGING)
-			ifp->if_capenable ^= IFCAP_VLAN_HWTAGGING;
+			if_togglecapenable(ifp, IFCAP_VLAN_HWTAGGING);
 
-		if (!(ifp->if_drv_flags & IFF_DRV_RUNNING))
+		if (!(if_getdrvflags(ifp) & IFF_DRV_RUNNING))
 			qla_init(ha);
 
 		VLAN_CAPABILITIES(ifp);
@@ -937,13 +928,13 @@ qla_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 }
 
 static int
-qla_media_change(struct ifnet *ifp)
+qla_media_change(if_t ifp)
 {
 	qla_host_t *ha;
 	struct ifmedia *ifm;
 	int ret = 0;
 
-	ha = (qla_host_t *)ifp->if_softc;
+	ha = (qla_host_t *)if_getsoftc(ifp);
 
 	QL_DPRINT2((ha->pci_dev, "%s: enter\n", __func__));
 
@@ -958,11 +949,11 @@ qla_media_change(struct ifnet *ifp)
 }
 
 static void
-qla_media_status(struct ifnet *ifp, struct ifmediareq *ifmr)
+qla_media_status(if_t ifp, struct ifmediareq *ifmr)
 {
 	qla_host_t *ha;
 
-	ha = (qla_host_t *)ifp->if_softc;
+	ha = (qla_host_t *)if_getsoftc(ifp);
 
 	QL_DPRINT2((ha->pci_dev, "%s: enter\n", __func__));
 
@@ -982,10 +973,10 @@ qla_media_status(struct ifnet *ifp, struct ifmediareq *ifmr)
 }
 
 void
-qla_start(struct ifnet *ifp)
+qla_start(if_t ifp)
 {
 	struct mbuf    *m_head;
-	qla_host_t *ha = (qla_host_t *)ifp->if_softc;
+	qla_host_t *ha = (qla_host_t *)if_getsoftc(ifp);
 
 	QL_DPRINT8((ha->pci_dev, "%s: enter\n", __func__));
 
@@ -995,7 +986,7 @@ qla_start(struct ifnet *ifp)
 		return;
 	}
 
-	if ((ifp->if_drv_flags & (IFF_DRV_RUNNING | IFF_DRV_OACTIVE)) != 
+	if ((if_getdrvflags(ifp) & (IFF_DRV_RUNNING | IFF_DRV_OACTIVE)) != 
 		IFF_DRV_RUNNING) {
 		QL_DPRINT8((ha->pci_dev, "%s: !IFF_DRV_RUNNING\n", __func__));
 		QLA_TX_UNLOCK(ha);
@@ -1011,8 +1002,8 @@ qla_start(struct ifnet *ifp)
 		return;
 	}
 
-	while (ifp->if_snd.ifq_head != NULL) {
-		IF_DEQUEUE(&ifp->if_snd, m_head);
+	while (!if_sendq_empty(ifp)) {
+		m_head = if_dequeue(ifp);
 
 		if (m_head == NULL) {
 			QL_DPRINT8((ha->pci_dev, "%s: m_head == NULL\n",
@@ -1024,8 +1015,8 @@ qla_start(struct ifnet *ifp)
 			if (m_head == NULL)
 				break;
 			QL_DPRINT8((ha->pci_dev, "%s: PREPEND\n", __func__));
-			ifp->if_drv_flags |= IFF_DRV_OACTIVE;
-			IF_PREPEND(&ifp->if_snd, m_head);
+			if_setdrvflagbits(ifp, IFF_DRV_OACTIVE, 0);
+			if_sendq_prepend(ifp, m_head);
 			break;
 		}
 		/* Send a copy of the frame to the BPF listener */
@@ -1129,10 +1120,7 @@ qla_send(qla_host_t *ha, struct mbuf **m_headp)
 static void
 qla_stop(qla_host_t *ha)
 {
-	struct ifnet *ifp = ha->ifp;
-	device_t	dev;
-
-	dev = ha->pci_dev;
+	if_t ifp = ha->ifp;
 
 	ha->flags.qla_watchdog_pause = 1;
 	qla_mdelay(__func__, 100);
@@ -1147,7 +1135,7 @@ qla_stop(qla_host_t *ha)
 	qla_free_xmt_bufs(ha);
 	qla_free_rcv_bufs(ha);
 
-	ifp->if_drv_flags &= ~(IFF_DRV_OACTIVE | IFF_DRV_RUNNING);
+	if_setdrvflagbits(ifp, 0, (IFF_DRV_OACTIVE | IFF_DRV_RUNNING));
 
 	return;
 }
@@ -1389,13 +1377,10 @@ qla_get_mbuf(qla_host_t *ha, qla_rx_buf_t *rxb, struct mbuf *nmp,
 	uint32_t jumbo)
 {
 	struct mbuf *mp = nmp;
-	struct ifnet   *ifp;
 	int             ret = 0;
 	uint32_t	offset;
 
 	QL_DPRINT2((ha->pci_dev, "%s: jumbo(0x%x) enter\n", __func__, jumbo));
-
-	ifp = ha->ifp;
 
 	if (mp == NULL) {
 		if (!jumbo) {

@@ -78,8 +78,6 @@ static char sccsid[] = "@(#)ping.c	8.1 (Berkeley) 6/5/93";
 #endif
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 /*
  * Using the InterNet Control Message Protocol (ICMP) "ECHO" facility,
  * measure round-trip-delays and packet loss across network paths.
@@ -201,6 +199,7 @@ struct tv32 {
 #define F_DONTFRAG	0x1000000
 #define F_NOUSERDATA	(F_NODEADDR | F_FQDN | F_FQDNOLD | F_SUPTYPES)
 #define	F_WAITTIME	0x2000000
+#define	F_DOT		0x4000000
 static u_int options;
 
 #define IN6LEN		sizeof(struct in6_addr)
@@ -227,7 +226,9 @@ static int srecv;		/* receive socket file descriptor */
 static u_char outpack[MAXPACKETLEN];
 static char BSPACE = '\b';	/* characters written for flood */
 static char BBELL = '\a';	/* characters written for AUDIBLE */
-static char DOT = '.';
+static const char *DOT = ".";
+static size_t DOTlen = 1;
+static size_t DOTidx = 0;
 static char *hostname;
 static int ident;		/* process id to identify our packets */
 static u_int8_t nonce[8];	/* nonce field for node information */
@@ -352,6 +353,13 @@ ping6(int argc, char *argv[])
 
 	while ((ch = getopt(argc, argv, PING6OPTS)) != -1) {
 		switch (ch) {
+		case '.':
+			options |= F_DOT;
+			if (optarg != NULL) {
+				DOT = optarg;
+				DOTlen = strlen(optarg);
+			}
+			break;
 		case '6':
 			/* This option is processed in main(). */
 			break;
@@ -437,6 +445,7 @@ ping6(int argc, char *argv[])
 				errx(1, "Must be superuser to flood ping");
 			}
 			options |= F_FLOOD;
+			options |= F_DOT;
 			setbuf(stdout, (char *)NULL);
 			break;
 		case 'e':
@@ -569,7 +578,7 @@ ping6(int argc, char *argv[])
 		case 'W':
 			t = strtod(optarg, &e);
 			if (*e || e == optarg || t > (double)INT_MAX)
-				err(EX_USAGE, "invalid timing interval: `%s'",
+				errx(EX_USAGE, "invalid timing interval: `%s'",
 				    optarg);
 			options |= F_WAITTIME;
 			waittime = (int)t;
@@ -1463,8 +1472,8 @@ pinger(void)
 		(void)printf("ping6: wrote %s %d chars, ret=%d\n",
 		    hostname, cc, i);
 	}
-	if (!(options & F_QUIET) && options & F_FLOOD)
-		(void)write(STDOUT_FILENO, &DOT, 1);
+	if (!(options & F_QUIET) && options & F_DOT)
+		(void)write(STDOUT_FILENO, &DOT[DOTidx++ % DOTlen], 1);
 
 	return(0);
 }
@@ -1504,7 +1513,7 @@ mynireply(const struct icmp6_nodeinfo *nip)
  *
  * Return value:
  *   Pointer to an octet immediately following the ending zero octet
- *   of the decoded label, or NULL if an error occured.
+ *   of the decoded label, or NULL if an error occurred.
  */
 static const char *
 dnsdecode(const u_char *sp, const u_char *ep, const u_char *base, char *buf,
@@ -1661,7 +1670,7 @@ pr_pack(u_char *buf, int cc, struct msghdr *mhdr)
 			return;
 		}
 
-		if (options & F_FLOOD)
+		if (options & F_DOT)
 			(void)write(STDOUT_FILENO, &BSPACE, 1);
 		else {
 			if (options & F_AUDIBLE)
@@ -1853,7 +1862,7 @@ pr_pack(u_char *buf, int cc, struct msghdr *mhdr)
 		pr_icmph(icp, end);
 	}
 
-	if (!(options & F_FLOOD)) {
+	if (!(options & F_DOT)) {
 		(void)putchar('\n');
 		if (options & F_VERBOSE)
 			pr_exthdrs(mhdr);

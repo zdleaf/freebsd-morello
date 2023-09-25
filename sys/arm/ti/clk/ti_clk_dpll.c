@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2019 Emmanuel Vadot <manu@freebsd.org>
  *
@@ -27,13 +27,9 @@
  * SUCH DAMAGE.
  *
  * based on sys/arm/allwinner/clkng/aw_clk_np.c
- *
- * $FreeBSD$
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/bus.h>
@@ -76,10 +72,6 @@ struct ti_dpll_clknode_sc {
 static int
 ti_dpll_clk_init(struct clknode *clk, device_t dev)
 {
-	struct ti_dpll_clknode_sc *sc;
-
-	sc = clknode_get_softc(clk);
-
 	clknode_init_parent_idx(clk, 0);
 	return (0);
 }

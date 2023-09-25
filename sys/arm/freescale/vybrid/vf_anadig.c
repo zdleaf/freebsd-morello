@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2013-2014 Ruslan Bukin <br@bsdpad.com>
  * All rights reserved.
@@ -32,8 +32,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/bus.h>
@@ -241,6 +239,4 @@ static driver_t anadig_driver = {
 	sizeof(struct anadig_softc),
 };
 
-static devclass_t anadig_devclass;
-
-DRIVER_MODULE(anadig, simplebus, anadig_driver, anadig_devclass, 0, 0);
+DRIVER_MODULE(anadig, simplebus, anadig_driver, 0, 0);

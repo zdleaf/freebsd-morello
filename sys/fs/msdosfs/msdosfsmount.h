@@ -1,4 +1,3 @@
-/* $FreeBSD$ */
 /*	$NetBSD: msdosfsmount.h,v 1.17 1997/11/17 15:37:07 ws Exp $	*/
 
 /*-
@@ -108,6 +107,7 @@ struct msdosfsmount {
 	u_int pm_fatmult;	/* these 2 values are used in FAT */
 	u_int pm_fatdiv;	/*	offset computation */
 	u_int pm_curfat;	/* current FAT for FAT32 (0 otherwise) */
+	int pm_rootdirfree;	/* number of free slots in FAT12/16 root directory */
 	u_int *pm_inusemap;	/* ptr to bitmap of in-use clusters */
 	uint64_t pm_flags;	/* see below */
 	void *pm_u2w;	/* Local->Unicode iconv handle */
@@ -221,6 +221,22 @@ struct msdosfs_fileno {
 	((dirclu) == MSDOSFSROOT \
 	 ? roottobn((pmp), (dirofs)) \
 	 : cntobn((pmp), (dirclu)))
+
+/*
+ * Increment the number of used entries in a fixed size FAT12/16 root
+ * directory
+ */
+#define rootde_alloced(dep)			   \
+	if ((dep)->de_StartCluster == MSDOSFSROOT) \
+		(dep)->de_pmp->pm_rootdirfree--;
+
+/*
+ * Decrement the number of used entries in a fixed size FAT12/16 root
+ * directory
+ */
+#define rootde_freed(dep)			   \
+	if ((dep)->de_StartCluster == MSDOSFSROOT) \
+		(dep)->de_pmp->pm_rootdirfree++;
 
 #define	MSDOSFS_LOCK_MP(pmp) \
 	lockmgr(&(pmp)->pm_fatlock, LK_EXCLUSIVE, NULL)

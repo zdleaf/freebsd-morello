@@ -27,8 +27,6 @@
  * LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
  * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 /*-
  * Copyright (C) 1995, 1996 Wolfgang Solfrank.
@@ -214,8 +212,9 @@ struct	pmap {
  * pv_entries are allocated in chunks per-process.  This avoids the
  * need to track per-pmap assignments.
  */
-#define	_NPCM	2
 #define	_NPCPV	126
+#define	_NPCM	howmany(_NPCPV, 64)
+
 #define	PV_CHUNK_HEADER							\
 	pmap_t			pc_pmap;				\
 	TAILQ_ENTRY(pv_chunk)	pc_list;				\
@@ -309,7 +308,7 @@ void		pmap_kenter_attr(vm_offset_t va, vm_paddr_t pa, vm_memattr_t);
 void		pmap_kremove(vm_offset_t);
 void		*pmap_mapdev(vm_paddr_t, vm_size_t);
 void		*pmap_mapdev_attr(vm_paddr_t, vm_size_t, vm_memattr_t);
-void		pmap_unmapdev(vm_offset_t, vm_size_t);
+void		pmap_unmapdev(void *, vm_size_t);
 void		pmap_page_set_memattr(vm_page_t, vm_memattr_t);
 int		pmap_change_attr(vm_offset_t, vm_size_t, vm_memattr_t);
 int		pmap_map_user_ptr(pmap_t pm, volatile const void *uaddr,
@@ -325,6 +324,7 @@ const char	*pmap_mmu_name(void);
 bool		pmap_ps_enabled(pmap_t pmap);
 int		pmap_nofault(pmap_t pmap, vm_offset_t va, vm_prot_t flags);
 boolean_t	pmap_page_is_mapped(vm_page_t m);
+#define	pmap_map_delete(pmap, sva, eva)	pmap_remove(pmap, sva, eva)
 
 void		pmap_page_array_startup(long count);
 

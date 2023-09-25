@@ -32,8 +32,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include "opt_ufs.h"
 #include "opt_quota.h"
 
@@ -95,9 +93,7 @@ ffs_inode_bwrite(struct vnode *vp, struct buf *bp, int flags)
  * for the write to complete.
  */
 int
-ffs_update(vp, waitfor)
-	struct vnode *vp;
-	int waitfor;
+ffs_update(struct vnode *vp, int waitfor)
 {
 	struct fs *fs;
 	struct buf *bp;
@@ -234,11 +230,10 @@ loop:
  * disk blocks.
  */
 int
-ffs_truncate(vp, length, flags, cred)
-	struct vnode *vp;
-	off_t length;
-	int flags;
-	struct ucred *cred;
+ffs_truncate(struct vnode *vp,
+	off_t length,
+	int flags,
+	struct ucred *cred)
 {
 	struct inode *ip;
 	ufs2_daddr_t bn, lbn, lastblock, lastiblock[UFS_NIADDR];
@@ -253,7 +248,7 @@ ffs_truncate(vp, length, flags, cred)
 	int needextclean, extblocks;
 	int offset, size, level, nblocks;
 	int i, error, allerror, indiroff, waitforupdate;
-	u_long key;
+	uint64_t key;
 	off_t osize;
 
 	ip = VTOI(vp);
@@ -342,7 +337,7 @@ ffs_truncate(vp, length, flags, cred)
 		if (length != 0)
 			panic("ffs_truncate: partial truncate of symlink");
 #endif
-		bzero(DIP(ip, i_shortlink), (u_int)ip->i_size);
+		bzero(DIP(ip, i_shortlink), (uint64_t)ip->i_size);
 		ip->i_size = 0;
 		DIP_SET(ip, i_size, 0);
 		UFS_INODE_SET_FLAG(ip, IN_SIZEMOD | IN_CHANGE | IN_UPDATE);
@@ -504,7 +499,7 @@ ffs_truncate(vp, length, flags, cred)
 		size = blksize(fs, ip, lbn);
 		if (vp->v_type != VDIR && offset != 0)
 			bzero((char *)bp->b_data + offset,
-			    (u_int)(size - offset));
+			    (uint64_t)(size - offset));
 		/* Kirk's code has reallocbuf(bp, size, 1) here */
 		allocbuf(bp, size);
 		if (bp->b_bufsize == fs->fs_bsize)
@@ -695,19 +690,19 @@ extclean:
  * blocks.
  */
 static int
-ffs_indirtrunc(ip, lbn, dbn, lastbn, level, countp)
-	struct inode *ip;
-	ufs2_daddr_t lbn, lastbn;
-	ufs2_daddr_t dbn;
-	int level;
-	ufs2_daddr_t *countp;
+ffs_indirtrunc(struct inode *ip,
+	ufs2_daddr_t lbn,
+	ufs2_daddr_t dbn,
+	ufs2_daddr_t lastbn,
+	int level,
+	ufs2_daddr_t *countp)
 {
 	struct buf *bp;
 	struct fs *fs;
 	struct ufsmount *ump;
 	struct vnode *vp;
 	caddr_t copy = NULL;
-	u_long key;
+	uint64_t key;
 	int i, nblocks, error = 0, allerror = 0;
 	ufs2_daddr_t nb, nlbn, last;
 	ufs2_daddr_t blkcount, factor, blocksreleased = 0;
@@ -750,7 +745,7 @@ ffs_indirtrunc(ip, lbn, dbn, lastbn, level, countp)
 		bap2 = (ufs2_daddr_t *)bp->b_data;
 	if (lastbn != -1) {
 		copy = malloc(fs->fs_bsize, M_TEMP, M_WAITOK);
-		bcopy((caddr_t)bp->b_data, copy, (u_int)fs->fs_bsize);
+		bcopy((caddr_t)bp->b_data, copy, (uint64_t)fs->fs_bsize);
 		for (i = last + 1; i < NINDIR(fs); i++)
 			if (I_IS_UFS1(ip))
 				bap1[i] = 0;

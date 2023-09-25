@@ -43,7 +43,9 @@
 #ifndef OUTSIDE_NETWORK_H
 #define OUTSIDE_NETWORK_H
 
+#include "util/alloc.h"
 #include "util/rbtree.h"
+#include "util/regional.h"
 #include "util/netevent.h"
 #include "dnstap/dnstap_config.h"
 struct pending;
@@ -111,6 +113,8 @@ struct outside_network {
 	/** if we perform udp-connect, connect() for UDP socket to mitigate
 	 * ICMP side channel leakage */
 	int udp_connect;
+	/** number of udp packets sent. */
+	size_t num_udp_outgoing;
 
 	/** array of outgoing IP4 interfaces */
 	struct port_if* ip4_ifs;
@@ -412,6 +416,8 @@ struct waiting_tcp {
 	char* tls_auth_name;
 	/** the packet was involved in an error, to stop looping errors */
 	int error_count;
+	/** if true, the item is at the cb_and_decommission stage */
+	int in_cb_and_decommission;
 #ifdef USE_DNSTAP
 	/** serviced query pointer for dnstap to get logging info, if nonNULL*/
 	struct serviced_query* sq;
@@ -512,6 +518,15 @@ struct serviced_query {
 	void* pending;
 	/** block size with which to pad encrypted queries (default: 128) */
 	size_t padding_block_size;
+	/** region for this serviced query. Will be cleared when this
+	 * serviced_query will be deleted */
+	struct regional* region;
+	/** allocation service for the region */
+	struct alloc_cache* alloc;
+	/** flash timer to start the net I/O as a separate event */
+	struct comm_timer* timer;
+	/** true if serviced_query is currently doing net I/O and may block */
+	int busy;
 };
 
 /**
@@ -619,6 +634,7 @@ void pending_delete(struct outside_network* outnet, struct pending* p);
  * @param want_dnssec: signatures are needed, without EDNS the answer is
  * 	likely to be useless.
  * @param nocaps: ignore use_caps_for_id and use unperturbed qname.
+ * @param check_ratelimit: if set, will check ratelimit before sending out.
  * @param tcp_upstream: use TCP for upstream queries.
  * @param ssl_upstream: use SSL for upstream queries.
  * @param tls_auth_name: when ssl_upstream is true, use this name to check
@@ -635,16 +651,18 @@ void pending_delete(struct outside_network* outnet, struct pending* p);
  * @param callback_arg: user argument to callback function.
  * @param buff: scratch buffer to create query contents in. Empty on exit.
  * @param env: the module environment.
+ * @param was_ratelimited: it will signal back if the query failed to pass the
+ *	ratelimit check.
  * @return 0 on error, or pointer to serviced query that is used to answer
  *	this serviced query may be shared with other callbacks as well.
  */
 struct serviced_query* outnet_serviced_query(struct outside_network* outnet,
 	struct query_info* qinfo, uint16_t flags, int dnssec, int want_dnssec,
-	int nocaps, int tcp_upstream, int ssl_upstream, char* tls_auth_name,
-	struct sockaddr_storage* addr, socklen_t addrlen, uint8_t* zone,
-	size_t zonelen, struct module_qstate* qstate,
+	int nocaps, int check_ratelimit, int tcp_upstream, int ssl_upstream,
+	char* tls_auth_name, struct sockaddr_storage* addr, socklen_t addrlen,
+	uint8_t* zone, size_t zonelen, struct module_qstate* qstate,
 	comm_point_callback_type* callback, void* callback_arg,
-	struct sldns_buffer* buff, struct module_env* env);
+	struct sldns_buffer* buff, struct module_env* env, int* was_ratelimited);
 
 /**
  * Remove service query callback.
@@ -699,6 +717,30 @@ struct reuse_tcp* reuse_tcp_lru_snip(struct outside_network* outnet);
 
 /** delete readwait waiting_tcp elements, deletes the elements in the list */
 void reuse_del_readwait(rbtree_type* tree_by_id);
+
+/** remove waiting tcp from the outnet waiting list */
+void outnet_waiting_tcp_list_remove(struct outside_network* outnet,
+	struct waiting_tcp* w);
+
+/** pop the first waiting tcp from the outnet waiting list */
+struct waiting_tcp* outnet_waiting_tcp_list_pop(struct outside_network* outnet);
+
+/** add waiting_tcp element to the outnet tcp waiting list */
+void outnet_waiting_tcp_list_add(struct outside_network* outnet,
+	struct waiting_tcp* w, int set_timer);
+
+/** add waiting_tcp element as first to the outnet tcp waiting list */
+void outnet_waiting_tcp_list_add_first(struct outside_network* outnet,
+	struct waiting_tcp* w, int reset_timer);
+
+/** pop the first element from the writewait list */
+struct waiting_tcp* reuse_write_wait_pop(struct reuse_tcp* reuse);
+
+/** remove the element from the writewait list */
+void reuse_write_wait_remove(struct reuse_tcp* reuse, struct waiting_tcp* w);
+
+/** push the element after the last on the writewait list */
+void reuse_write_wait_push_back(struct reuse_tcp* reuse, struct waiting_tcp* w);
 
 /** get TCP file descriptor for address, returns -1 on failure,
  * tcp_mss is 0 or maxseg size to set for TCP packets. */
@@ -784,6 +826,9 @@ void pending_udp_timer_delay_cb(void *arg);
 
 /** callback for outgoing TCP timer event */
 void outnet_tcptimer(void* arg);
+
+/** callback to send serviced queries */
+void serviced_timer_cb(void *arg);
 
 /** callback for serviced query UDP answers */
 int serviced_udp_callback(struct comm_point* c, void* arg, int error,

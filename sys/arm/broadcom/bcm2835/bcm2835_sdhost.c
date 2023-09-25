@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2018 Klaus P. Ohrhallinger <k@7he.at>
  * All rights reserved.
@@ -31,8 +31,6 @@
  *
  */
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 /*
  * pin 48-53 - card slot
  * pin 34-39 - radio module
@@ -1274,16 +1272,13 @@ static device_method_t bcm_sdhost_methods[] = {
 	DEVMETHOD_END
 };
 
-static devclass_t bcm_sdhost_devclass;
-
 static driver_t bcm_sdhost_driver = {
 	"sdhost_bcm",
 	bcm_sdhost_methods,
 	sizeof(struct bcm_sdhost_softc),
 };
 
-DRIVER_MODULE(sdhost_bcm, simplebus, bcm_sdhost_driver, bcm_sdhost_devclass,
-    NULL, NULL);
+DRIVER_MODULE(sdhost_bcm, simplebus, bcm_sdhost_driver, NULL, NULL);
 SDHCI_DEPEND(sdhost_bcm);
 #ifndef MMCCAM
 MMC_DECLARE_BRIDGE(sdhost_bcm);

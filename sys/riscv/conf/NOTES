@@ -4,7 +4,6 @@
 # This file contains machine dependent kernel configuration notes.  For
 # machine independent notes, look in /sys/conf/NOTES.
 #
-# $FreeBSD$
 #
 
 cpu		RISCV
@@ -16,15 +15,12 @@ options 	PRINTF_BUFR_SIZE=128	# Prevent printf output being interspersed.
 options 	KDTRACE_FRAME		# Ensure frames are compiled in
 options 	KDTRACE_HOOKS		# Kernel DTrace hooks
 options 	DDB_CTF			# Kernel ELF linker loads CTF data
-options 	FPE			# Floating-point extension support
 options 	RACCT_DEFAULT_TO_DISABLED # Set kern.racct.enable=0 by default
-options 	INTRNG			# Include INTRNG framework
 
 # RISC-V SBI console
 device		rcons
 
-# EXT_RESOURCES pseudo devices
-options 	EXT_RESOURCES
+# pseudo devices
 device		clk
 device		hwreset
 device		phy
@@ -58,6 +54,7 @@ device		uart_lowrisc	# lowRISC UART driver
 device		uart_ns8250	# ns8250-type UART driver
 
 # RTC
+device		da9063_rtc	# Dialog Semiconductor DA9063 RTC
 device		goldfish_rtc	# QEMU RTC
 
 # Ethernet drivers
@@ -69,6 +66,9 @@ device		axidma		# Xilinx AXI DMA Controller
 
 # SPI
 device		xilinx_spi	# Xilinx AXI Quad-SPI Controller
+
+# Power management controllers
+device		da9063_pmic	# Dialog Semiconductor DA9063 PMIC
 
 # SiFive device drivers
 device		fe310aon
@@ -99,3 +99,8 @@ nodevice	snd_cmi
 # Don't yet have hwpmc(4)
 nodevice	hwpmc
 nooptions 	HWPMC_HOOKS
+
+# riscv doesn't yet have atomic_testandset_int and atomic_testandclear_int.
+nodevice	ccr
+nodevice	cxgbe
+nodevice	cxgbev

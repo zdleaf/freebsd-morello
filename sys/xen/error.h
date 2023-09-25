@@ -22,14 +22,12 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 #ifndef __XEN_ERROR_H__
 #define __XEN_ERROR_H__
 
-#include <xen/interface/errno.h>
+#include <contrib/xen/errno.h>
 
 /* Translation table */
 static int xen_errors[] =

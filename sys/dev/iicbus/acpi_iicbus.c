@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2019-2020 Vladimir Kondratyev <wulf@FreeBSD.org>
  *
@@ -26,8 +26,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/bus.h>
 #include <sys/endian.h>
@@ -764,6 +762,7 @@ static device_method_t acpi_iicbus_methods[] = {
 	DEVMETHOD(bus_write_ivar,	acpi_iicbus_write_ivar),
 	DEVMETHOD(bus_child_location,	acpi_iicbus_child_location),
 	DEVMETHOD(bus_child_pnpinfo,	acpi_iicbus_child_pnpinfo),
+	DEVMETHOD(bus_get_device_path,	acpi_get_acpi_device_path),
 
 	DEVMETHOD_END,
 };

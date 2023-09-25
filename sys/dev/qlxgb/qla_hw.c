@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2011-2012 Qlogic Corporation
  * All rights reserved.
@@ -34,8 +34,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include "qla_os.h"
 #include "qla_reg.h"
 #include "qla_hw.h"
@@ -273,10 +271,7 @@ qla_init_cntxt_regions(qla_host_t *ha)
 	q80_rcv_cntxt_req_t	*rx_cntxt_req;
 	bus_addr_t		phys_addr;
 	uint32_t		i;
-        device_t                dev;
 	uint32_t		size;
-
-        dev = ha->pci_dev;
 
 	hw = &ha->hw;
 
@@ -1150,13 +1145,10 @@ qla_del_hw_if(qla_host_t *ha)
 int
 qla_init_hw_if(qla_host_t *ha)
 {
-	device_t	dev;
 	int		i;
 	uint8_t		bcast_mac[6];
 
 	qla_get_hw_caps(ha);
-
-	dev = ha->pci_dev;
 
 	for (i = 0; i < ha->hw.num_sds_rings; i++) {
 		bzero(ha->hw.dma_buf.sds_ring[i].dma_b,
@@ -1739,7 +1731,7 @@ qla_hw_tx_done(qla_host_t *ha)
 	qla_hw_tx_done_locked(ha);
 
 	if (ha->hw.txr_free > free_pkt_thres)
-		ha->ifp->if_drv_flags &= ~IFF_DRV_OACTIVE;
+		if_setdrvflagbits(ha->ifp, 0, IFF_DRV_OACTIVE);
 
 	mtx_unlock(&ha->tx_lock);
 	return;
@@ -1751,7 +1743,7 @@ qla_update_link_state(qla_host_t *ha)
 	uint32_t link_state;
 	uint32_t prev_link_state;
 
-	if (!(ha->ifp->if_drv_flags & IFF_DRV_RUNNING)) {
+	if (!(if_getdrvflags(ha->ifp) & IFF_DRV_RUNNING)) {
 		ha->hw.flags.link_up = 0;
 		return;
 	}
@@ -1776,6 +1768,7 @@ qla_update_link_state(qla_host_t *ha)
 int
 qla_config_lro(qla_host_t *ha)
 {
+#if defined(INET) || defined(INET6)
 	int i;
         qla_hw_t *hw = &ha->hw;
 	struct lro_ctrl *lro;
@@ -1792,12 +1785,14 @@ qla_config_lro(qla_host_t *ha)
 	ha->flags.lro_init = 1;
 
 	QL_DPRINT2((ha->pci_dev, "%s: LRO initialized\n", __func__));
+#endif
 	return (0);
 }
 
 void
 qla_free_lro(qla_host_t *ha)
 {
+#if defined(INET) || defined(INET6)
 	int i;
         qla_hw_t *hw = &ha->hw;
 	struct lro_ctrl *lro;
@@ -1810,6 +1805,7 @@ qla_free_lro(qla_host_t *ha)
 		tcp_lro_free(lro);
 	}
 	ha->flags.lro_init = 0;
+#endif
 }
 
 void

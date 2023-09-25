@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2021 Dmitry Chagin <dchagin@FreeBSD.org>
  *
@@ -25,10 +25,6 @@
  * SUCH DAMAGE.
  */
 
-
-#include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/elf.h>
 #include <sys/errno.h>
 #include <sys/proc.h>
@@ -38,19 +34,22 @@ __FBSDID("$FreeBSD$");
 #undef	_KERNEL
 #include <stdbool.h>
 
-#include <machine/atomic.h>
-#include <machine/stdarg.h>
+#include <i386/include/atomic.h>
+#include <i386/include/cpufunc.h>
+#include <i386/include/stdarg.h>
 
 #include <amd64/linux32/linux.h>
 #include <amd64/linux32/linux32_syscall.h>
 #include <compat/linux/linux_errno.h>
-#include <compat/linux/linux_timer.h>
+#include <compat/linux/linux_time.h>
 
 /* The kernel fixup this at vDSO install */
 uintptr_t *kern_timekeep_base = NULL;
 uint32_t kern_tsc_selector = 0;
+uint32_t kern_cpu_selector = 0;
 
 #include <x86/linux/linux_vdso_gettc_x86.inc>
+#include <x86/linux/linux_vdso_getcpu_x86.inc>
 
 static int
 write(int fd, const void *buf, size_t size)
@@ -61,7 +60,7 @@ write(int fd, const void *buf, size_t size)
 	(
 	    "int $0x80"
 	    : "=a"(res)
-	    : "a"(LINUX32_SYS_write), "b"(fd), "c"(buf), "d"(size)
+	    : "a"(LINUX32_SYS_linux_write), "b"(fd), "c"(buf), "d"(size)
 	    : "cc", "memory"
 	);
 	return (res);
@@ -122,6 +121,21 @@ __vdso_clock_getres_fallback(clockid_t clock_id, struct l_timespec *ts)
 	    "int $0x80"
 	    : "=a"(res)
 	    : "a"(LINUX32_SYS_linux_clock_getres), "b"(clock_id), "c"(ts)
+	    : "cc", "memory"
+	);
+	return (res);
+}
+
+static int
+__vdso_getcpu_fallback(uint32_t *cpu, uint32_t *node, void *cache)
+{
+	int res;
+
+	__asm__ __volatile__
+	(
+	    "int $0x80"
+	    : "=a"(res)
+	    : "a"(LINUX32_SYS_linux_getcpu), "D"(cpu), "S"(node), "d"(cache)
 	    : "cc", "memory"
 	);
 	return (res);

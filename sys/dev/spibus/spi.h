@@ -21,8 +21,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 struct spi_command {
@@ -34,8 +32,12 @@ struct spi_command {
 	uint32_t tx_data_sz;
 	void	*rx_data;
 	uint32_t rx_data_sz;
+	uint32_t flags;
 };
 #define	SPI_COMMAND_INITIALIZER	{ 0 }
+
+#define	SPI_FLAG_KEEP_CS	0x1		/* Keep chip select asserted */
+#define	SPI_FLAG_NO_SLEEP	0x2		/* Prevent driver from sleeping (use polling) */
 
 #define	SPI_CHIP_SELECT_HIGH	0x1		/* Chip select high (else low) */
 
@@ -43,4 +45,10 @@ struct spi_command {
 #define	SPIBUS_FDT_PNP_INFO(t)	FDTCOMPAT_PNP_INFO(t, spibus)
 #else
 #define	SPIBUS_FDT_PNP_INFO(t)
+#endif
+
+#ifdef DEV_ACPI
+#define	SPIBUS_ACPI_PNP_INFO(t)	ACPICOMPAT_PNP_INFO(t, spibus)
+#else
+#define	SPIBUS_ACPI_PNP_INFO(t)
 #endif

@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 1999 Cameron Grant <cg@freebsd.org>
  * All rights reserved.
@@ -36,8 +36,6 @@
 
 #include <dev/pci/pcireg.h>
 #include <dev/pci/pcivar.h>
-
-SND_DECLARE_FILE("$FreeBSD$");
 
 /* -------------------------------------------------------------------- */
 
@@ -1033,6 +1031,6 @@ static driver_t tr_driver = {
 	PCM_SOFTC_SIZE,
 };
 
-DRIVER_MODULE(snd_t4dwave, pci, tr_driver, pcm_devclass, 0, 0);
+DRIVER_MODULE(snd_t4dwave, pci, tr_driver, 0, 0);
 MODULE_DEPEND(snd_t4dwave, sound, SOUND_MINVER, SOUND_PREFVER, SOUND_MAXVER);
 MODULE_VERSION(snd_t4dwave, 1);

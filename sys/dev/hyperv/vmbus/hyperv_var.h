@@ -22,8 +22,6 @@
  * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 #ifndef _HYPERV_VAR_H_
@@ -31,6 +29,10 @@
 
 extern u_int	hyperv_recommends;
 
+struct hypercall_ctx {
+    void            *hc_addr;
+    vm_paddr_t      hc_paddr;
+};
 uint64_t	hypercall_post_message(bus_addr_t msg_paddr);
 uint64_t	hypercall_signal_event(bus_addr_t monprm_paddr);
 

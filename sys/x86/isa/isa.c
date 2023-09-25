@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: (BSD-2-Clause-FreeBSD AND ISC)
+ * SPDX-License-Identifier: (BSD-2-Clause AND ISC)
  *
  * Copyright (c) 1998 Doug Rabson
  * All rights reserved.
@@ -27,8 +27,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 /*-
  * Modifications for Intel architecture by Garrett A. Wollman.
  * Copyright 1998 Massachusetts Institute of Technology
@@ -144,9 +142,9 @@ isa_release_resource(device_t bus, device_t child, int type, int rid,
 /*
  * On this platform, isa can also attach to the legacy bus.
  */
-DRIVER_MODULE(isa, legacy, isa_driver, isa_devclass, 0, 0);
+DRIVER_MODULE(isa, legacy, isa_driver, 0, 0);
 
 /*
  * Attach the ISA bus to the xenpv bus in order to get syscons.
  */
-DRIVER_MODULE(isa, xenpv, isa_driver, isa_devclass, 0, 0);
+DRIVER_MODULE(isa, xenpv, isa_driver, 0, 0);

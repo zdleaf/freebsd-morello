@@ -1,7 +1,7 @@
 #!/bin/sh
 
 #
-# SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+# SPDX-License-Identifier: BSD-2-Clause
 #
 # Copyright (c) 2021 Peter Holm
 #
@@ -60,6 +60,10 @@ mount -t unionfs -o noatime $mp1 $mp2
 set +e
 mount | grep -E "$mp1|$mp2"
 
+set `df -ik $mp2 | tail -1 | awk '{print $4,$7}'`
+export KBLOCKS=$(($1 / 4))
+export INODES=$(($2 / 4))
+
 export CTRLDIR=$mp2/stressX.control
 export INCARNATIONS=10
 export LOAD=80
@@ -93,7 +97,10 @@ chmod 777 $mp2
 su $testuser -c \
 	"(cd $mp2/stress2; ./testcases/run/run $TESTPROGS)"
 
-umount $mp2	# The unionfs mount
+while mount | grep -Eq "on $mp2 .*unionfs"; do
+	umount $mp2 && break
+	sleep 5
+done
 umount $mp2
 n=`find $mp1/stressX | wc -l`
 [ $n -eq 1 ] && s=0 || { find $mp1/stressX -ls | head -12; s=1; }

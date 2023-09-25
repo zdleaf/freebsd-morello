@@ -34,10 +34,7 @@
 #include <machine/asmacros.h>
 #include <machine/armreg.h>
 #include <machine/sysreg.h>
-#include <machine/pte-v6.h>
-
-__FBSDID("$FreeBSD$");
-
+#include <machine/pte.h>
 /* We map 64MB of kernel unless overridden in assym.inc by the kernel option. */
 #ifndef LOCORE_MAP_MB
 #define	LOCORE_MAP_MB	64
@@ -293,6 +290,13 @@ ASENTRY_NP(init_mmu)
 	/* Set the Domain Access register */
 	mov	r0, #DOMAIN_CLIENT	/* Only domain #0 is used */
 	mcr	CP15_DACR(r0)
+
+	/*
+	 * Ensure that LPAE is disabled and that TTBR0 is used for translation,
+	 * use a 16KB translation table
+	 */
+	mov	r0, #0
+	mcr	CP15_TTBCR(r0)
 
 	/*
 	 * Set TEX remap registers

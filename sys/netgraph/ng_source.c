@@ -39,8 +39,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 /*
  * This node is used for high speed packet geneneration.  It queues
  * all data received on its 'input' hook and when told to start via
@@ -68,6 +66,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/syslog.h>
 #include <net/if.h>
 #include <net/if_var.h>
+#include <net/if_private.h>
 #include <netgraph/ng_message.h>
 #include <netgraph/netgraph.h>
 #include <netgraph/ng_parse.h>

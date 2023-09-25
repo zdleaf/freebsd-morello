@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2013-2014 Qlogic Corporation
  * All rights reserved.
@@ -31,8 +31,6 @@
  * Author : David C Somayajulu, Qlogic Corporation, Aliso Viejo, CA 92656.
  */
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include "qls_os.h"
 #include "qls_hw.h"
 #include "qls_def.h"
@@ -55,7 +53,7 @@ int
 qls_make_cdev(qla_host_t *ha)
 {
         ha->ioctl_dev = make_dev(&qla_cdevsw,
-				ha->ifp->if_dunit,
+				if_getdunit(ha->ifp),
                                 UID_ROOT,
                                 GID_WHEEL,
                                 0600,
@@ -84,14 +82,11 @@ qls_eioctl(struct cdev *dev, u_long cmd, caddr_t data, int fflag,
 {
         qla_host_t *ha;
         int rval = 0;
-	device_t pci_dev;
 
 	qls_mpi_dump_t *mpi_dump;
 
         if ((ha = (qla_host_t *)dev->si_drv1) == NULL)
                 return ENXIO;
-
-	pci_dev= ha->pci_dev;
 
         switch(cmd) {
 	case QLA_MPI_DUMP:

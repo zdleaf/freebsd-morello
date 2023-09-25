@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2019 The FreeBSD Foundation
  *
@@ -26,8 +26,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 struct _sem;
@@ -74,6 +72,8 @@ class FuseTest : public ::testing::Test {
 	MockFS *m_mock = NULL;
 	const static uint64_t FH = 0xdeadbeef1a7ebabe;
 	const char *reclaim_mib = "debug.try_reclaim_vnode";
+	const char *m_fsname;
+	const char *m_subtype;
 
 	public:
 	int m_maxbcachebuf;
@@ -94,6 +94,8 @@ class FuseTest : public ::testing::Test {
 		m_noclusterr(false),
 		m_nointr(false),
 		m_time_gran(1),
+		m_fsname(""),
+		m_subtype(""),
 		m_maxbcachebuf(0),
 		m_maxphys(0)
 	{}

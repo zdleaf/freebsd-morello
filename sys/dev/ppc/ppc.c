@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 1997-2000 Nicolas Souchu
  * Copyright (c) 2001 Alcove - Nicolas Souchu
@@ -28,8 +28,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include "opt_ppc.h"
 
 #include <sys/param.h>
@@ -88,7 +86,6 @@ static void ppcintr(void *arg);
 #define PPC_CONFIG_LOCK(ppc)		critical_enter()
 #define PPC_CONFIG_UNLOCK(ppc)		critical_exit()
 
-devclass_t ppc_devclass;
 const char ppc_driver_name[] = "ppc";
 
 static char *ppc_models[] = {
@@ -164,7 +161,7 @@ static int
 ppc_detect_fifo(struct ppc_data *ppc)
 {
 	char ecr_sav;
-	char ctr_sav, ctr, cc;
+	char ctr_sav, ctr;
 	short i;
 
 	/* save registers */
@@ -194,7 +191,7 @@ ppc_detect_fifo(struct ppc_data *ppc)
 	for (i=0; i<1024; i++) {
 		if (r_ecr(ppc) & PPC_FIFO_EMPTY)
 			break;
-		cc = r_fifo(ppc);
+		r_fifo(ppc);
 	}
 
 	if (i >= 1024) {
@@ -1657,12 +1654,12 @@ ppc_setmode(device_t dev, int mode)
 int
 ppc_probe(device_t dev, int rid)
 {
+	struct ppc_data *ppc;
 #ifdef __i386__
 	static short next_bios_ppc = 0;
-#endif
-	struct ppc_data *ppc;
 	int error;
 	rman_res_t port;
+#endif
 
 	/*
 	 * Allocate the ppc_data structure.
@@ -1672,10 +1669,10 @@ ppc_probe(device_t dev, int rid)
 
 	ppc->rid_ioport = rid;
 
+#ifdef __i386__
 	/* retrieve ISA parameters */
 	error = bus_get_resource(dev, SYS_RES_IOPORT, rid, &port, NULL);
 
-#ifdef __i386__
 	/*
 	 * If port not specified, use bios list.
 	 */

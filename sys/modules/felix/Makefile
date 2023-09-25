@@ -1,5 +1,5 @@
 #-
-# SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+# SPDX-License-Identifier: BSD-2-Clause
 #
 # Copyright (c) 2021 Alstom Group.
 # Copyright (c) 2021 Semihalf.
@@ -31,6 +31,6 @@
 
 KMOD	= felix
 SRCS	= felix.c enetc_mdio.c
-SRCS	+= bus_if.h device_if.h etherswitch_if.h miibus_if.h ofw_bus_if.h pci_if.h
+SRCS	+= bus_if.h device_if.h etherswitch_if.h miibus_if.h ofw_bus_if.h pci_if.h opt_platform.h
 
 .include <bsd.kmod.mk>

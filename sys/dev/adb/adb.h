@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (C) 2008 Nathan Whitehorn
  * All rights reserved.
@@ -23,8 +23,6 @@
  * WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR
  * OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 #ifndef	_POWERPC_ADB_H_
@@ -74,7 +72,6 @@ size_t	adb_read_register(device_t dev, u_char reg, void *data);
 size_t	adb_write_register(device_t dev, u_char reg, size_t len, void *data);
 
 /* Bits for implementing ADB host bus adapters */
-extern devclass_t adb_devclass;
 extern driver_t adb_driver;
 
 #endif

@@ -1,4 +1,3 @@
-/* $FreeBSD$ */
 /* $NetBSD: citrus_stdenc_local.h,v 1.4 2008/02/09 14:56:20 junyoung Exp $ */
 
 /*-
@@ -149,6 +148,8 @@ struct _citrus_stdenc_traits {
 	/* version 0x00000001 */
 	size_t				 et_state_size;
 	size_t				 et_mb_cur_max;
+	/* version 0x00000005 */
+	size_t				 et_mb_cur_min;
 };
 
 struct _citrus_stdenc {

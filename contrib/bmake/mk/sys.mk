@@ -1,4 +1,4 @@
-# $Id: sys.mk,v 1.53 2021/12/13 05:50:13 sjg Exp $
+# $Id: sys.mk,v 1.55 2023/05/10 19:23:26 sjg Exp $
 #
 #	@(#) Copyright (c) 2003-2009, Simon J. Gerraty
 #
@@ -68,6 +68,9 @@ SYS_OS_MK := ${_sys_mk}
 .export SYS_OS_MK
 .endif
 
+# some sys/ may have set this to grep -E
+EGREP ?= egrep
+
 # some options we need to know early
 OPTIONS_DEFAULT_NO += \
 	DIRDEPS_BUILD \
@@ -82,6 +85,9 @@ OPTIONS_DEFAULT_DEPENDENT += \
 .-include <options.mk>
 
 # :Uno incase options.mk not installed
+.if ${MK_DIRDEPS_BUILD:Uno} == "yes"
+.-include <sys.dirdeps.mk>
+.endif
 .if ${MK_META_MODE:Uno} == "yes"
 .-include <meta.sys.mk>
 .MAKE.MODE ?= meta verbose {META_MODE}

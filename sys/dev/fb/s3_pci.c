@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2000 Alcove - Nicolas Souchu <nsouch@freebsd.org>
  * All rights reserved.
@@ -29,8 +29,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 /* Enable LFB on S3 cards that has only VESA 1.2 BIOS */
 
 #include <sys/param.h>
@@ -564,6 +562,4 @@ static driver_t s3pci_driver = {
 	sizeof(struct s3pci_softc),
 };
 
-static devclass_t s3pci_devclass;
-
-DRIVER_MODULE(s3pci, pci, s3pci_driver, s3pci_devclass, 0, 0);
+DRIVER_MODULE(s3pci, pci, s3pci_driver, 0, 0);

@@ -33,8 +33,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/module.h>
@@ -89,7 +87,7 @@ static driver_t openpic_iobus_driver = {
 	sizeof(struct openpic_softc)
 };
 
-DRIVER_MODULE(openpic, iobus, openpic_iobus_driver, openpic_devclass, 0, 0);
+DRIVER_MODULE(openpic, iobus, openpic_iobus_driver, 0, 0);
 
 static int
 openpic_iobus_probe(device_t dev)

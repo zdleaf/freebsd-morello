@@ -31,8 +31,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include "opt_cpu.h"
 #include "opt_isa.h"
 #include "opt_npx.h"
@@ -79,8 +77,6 @@ __FBSDID("$FreeBSD$");
  * 387 and 287 Numeric Coprocessor Extension (NPX) Driver.
  */
 
-#if defined(__GNUCLIKE_ASM) && !defined(lint)
-
 #define	fldcw(cw)		__asm __volatile("fldcw %0" : : "m" (cw))
 #define	fnclex()		__asm __volatile("fnclex")
 #define	fninit()		__asm __volatile("fninit")
@@ -126,25 +122,6 @@ xsaveopt(char *addr, uint64_t mask)
 	__asm __volatile("xsaveopt %0" : "=m" (*addr) : "a" (low), "d" (hi) :
 	    "memory");
 }
-#else	/* !(__GNUCLIKE_ASM && !lint) */
-
-void	fldcw(u_short cw);
-void	fnclex(void);
-void	fninit(void);
-void	fnsave(caddr_t addr);
-void	fnstcw(caddr_t addr);
-void	fnstsw(caddr_t addr);
-void	fp_divide_by_0(void);
-void	frstor(caddr_t addr);
-void	fxsave(caddr_t addr);
-void	fxrstor(caddr_t addr);
-void	ldmxcsr(u_int csr);
-void	stmxcsr(u_int *csr);
-void	xrstor(char *addr, uint64_t mask);
-void	xsave(char *addr, uint64_t mask);
-void	xsaveopt(char *addr, uint64_t mask);
-
-#endif	/* __GNUCLIKE_ASM && !lint */
 
 #define	start_emulating()	load_cr0(rcr0() | CR0_TS)
 #define	stop_emulating()	clts()
@@ -196,6 +173,7 @@ SYSCTL_INT(_hw, OID_AUTO, lazy_fpu_switch, CTLFLAG_RWTUN | CTLFLAG_NOFETCH,
     &lazy_fpu_switch, 0,
     "Lazily load FPU context after context switch");
 
+u_int cpu_fxsr;		/* SSE enabled */
 int use_xsave;
 uint64_t xsave_mask;
 static	uma_zone_t fpu_save_area_zone;
@@ -340,22 +318,8 @@ fpusave_fnsave(union savefpu *addr)
 	fnsave((char *)addr);
 }
 
-static void
-init_xsave(void)
-{
-
-	if (use_xsave)
-		return;
-	if (!cpu_fxsr || (cpu_feature2 & CPUID2_XSAVE) == 0)
-		return;
-	use_xsave = 1;
-	TUNABLE_INT_FETCH("hw.use_xsave", &use_xsave);
-}
-
 DEFINE_IFUNC(, void, fpusave, (union savefpu *))
 {
-
-	init_xsave();
 	if (use_xsave)
 		return ((cpu_stdext_feature & CPUID_EXTSTATE_XSAVEOPT) != 0 ?
 		    fpusave_xsaveopt : fpusave_xsave);
@@ -600,14 +564,14 @@ npxformat(void)
 	return (_MC_FPFMT_387);
 }
 
-/* 
+/*
  * The following mechanism is used to ensure that the FPE_... value
  * that is passed as a trapcode to the signal handler of the user
  * process does not have more than one bit set.
- * 
+ *
  * Multiple bits may be set if the user process modifies the control
  * word while a status word bit is already set.  While this is a sign
- * of bad coding, we have no choise than to narrow them down to one
+ * of bad coding, we have no choice than to narrow them down to one
  * bit, since we must not send a trapcode that is not exactly one of
  * the FPE_ macros.
  *
@@ -1368,10 +1332,8 @@ static driver_t npxisa_driver = {
 	1,			/* no softc */
 };
 
-static devclass_t npxisa_devclass;
-
-DRIVER_MODULE(npxisa, isa, npxisa_driver, npxisa_devclass, 0, 0);
-DRIVER_MODULE(npxisa, acpi, npxisa_driver, npxisa_devclass, 0, 0);
+DRIVER_MODULE(npxisa, isa, npxisa_driver, 0, 0);
+DRIVER_MODULE(npxisa, acpi, npxisa_driver, 0, 0);
 ISA_PNP_INFO(npxisa_ids);
 #endif /* DEV_ISA */
 

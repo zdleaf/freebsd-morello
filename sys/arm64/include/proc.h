@@ -28,8 +28,11 @@
  *
  *      from: @(#)proc.h        7.1 (Berkeley) 5/15/91
  *	from: FreeBSD: src/sys/i386/include/proc.h,v 1.11 2001/06/29
- * $FreeBSD$
  */
+
+#ifdef __arm__
+#include <arm/proc.h>
+#else /* !__arm__ */
 
 #ifndef	_MACHINE_PROC_H_
 #define	_MACHINE_PROC_H_
@@ -63,6 +66,8 @@ struct mdthread {
 	struct {
 		struct ptrauth_key apia;
 	} md_ptrauth_kern;
+
+	uint64_t md_reserved[4];
 };
 
 struct mdproc {
@@ -72,16 +77,6 @@ struct mdproc {
 #define	KINFO_PROC_SIZE	1088
 #define	KINFO_PROC32_SIZE 816
 
-#ifdef _KERNEL
-
-#include <machine/pcb.h>
-
-#define	GET_STACK_USAGE(total, used) do {				\
-	struct thread *td = curthread;					\
-	(total) = td->td_kstack_pages * PAGE_SIZE - sizeof(struct pcb);	\
-	(used) = td->td_kstack + (total) - (vm_offset_t)&td;		\
-} while (0)
-
-#endif
-
 #endif /* !_MACHINE_PROC_H_ */
+
+#endif /* !__arm__ */

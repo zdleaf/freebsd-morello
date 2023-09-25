@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2003 David Xu <davidxu@freebsd.org>
  * All rights reserved.
@@ -27,8 +27,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include "namespace.h"
 #include <errno.h>
 #include <stdlib.h>
@@ -37,7 +35,7 @@ __FBSDID("$FreeBSD$");
 
 #include "thr_private.h"
 
-_Static_assert(sizeof(struct pthread_barrier) <= PAGE_SIZE,
+_Static_assert(sizeof(struct pthread_barrier) <= THR_PAGE_SIZE_MIN,
     "pthread_barrier is too large for off-page");
 
 __weak_reference(_pthread_barrier_init,		pthread_barrier_init);

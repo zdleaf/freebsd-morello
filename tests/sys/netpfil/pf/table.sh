@@ -1,6 +1,5 @@
-# $FreeBSD$
 #
-# SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+# SPDX-License-Identifier: BSD-2-Clause
 #
 # Copyright (c) 2020 Mark Johnston <markj@FreeBSD.org>
 #
@@ -52,7 +51,8 @@ v4_counters_body()
 	    "table <foo> counters { 192.0.2.1 }" \
 	    "block all" \
 	    "pass in from <foo> to any" \
-	    "pass out from any to <foo>"
+	    "pass out from any to <foo>" \
+	    "set skip on lo"
 
 	atf_check -s exit:0 -o ignore ping -c 3 192.0.2.2
 
@@ -91,7 +91,8 @@ v6_counters_body()
 	    "table <foo6> counters { 2001:db8:42::1 }" \
 	    "block all" \
 	    "pass in from <foo6> to any" \
-	    "pass out from any to <foo6>"
+	    "pass out from any to <foo6>" \
+	    "set skip on lo"
 
 	atf_check -s exit:0 -o ignore ping -6 -c 3 2001:db8:42::2
 
@@ -242,6 +243,83 @@ pr259689_cleanup()
 	pft_cleanup
 }
 
+atf_test_case "precreate" "cleanup"
+precreate_head()
+{
+	atf_set descr 'Test creating a table without counters, then loading rules that add counters'
+	atf_set require.user root
+}
+
+precreate_body()
+{
+	pft_init
+
+	vnet_mkjail alcatraz
+
+	jexec alcatraz pfctl -t foo -T add 192.0.2.1
+	jexec alcatraz pfctl -t foo -T show
+
+	pft_set_rules noflush alcatraz \
+		"table <foo> counters persist" \
+		"pass in from <foo>"
+
+	# Expect all counters to be zero
+	atf_check -s exit:0 -e ignore \
+	    -o match:'In/Block:.*'"$TABLE_STATS_ZERO_REGEXP" \
+	    -o match:'In/Pass:.*'"$TABLE_STATS_ZERO_REGEXP" \
+	    -o match:'Out/Block:.*'"$TABLE_STATS_ZERO_REGEXP" \
+	    -o match:'Out/Pass:.*'"$TABLE_STATS_ZERO_REGEXP" \
+	    jexec alcatraz pfctl -t foo -T show -vv
+
+}
+
+precreate_cleanup()
+{
+	pft_cleanup
+}
+
+atf_test_case "anchor" "cleanup"
+anchor_head()
+{
+	atf_set descr 'Test tables in anchors'
+	atf_set require.user root
+}
+
+anchor_body()
+{
+	pft_init
+
+	epair=$(vnet_mkepair)
+	ifconfig ${epair}a 192.0.2.1/24 up
+
+	vnet_mkjail alcatraz ${epair}b
+	jexec alcatraz ifconfig ${epair}b 192.0.2.2/24 up
+	jexec alcatraz pfctl -e
+
+	(echo "table <testtable> persist"
+	 echo "block in quick from <testtable> to any"
+	) | jexec alcatraz pfctl -a anchorage -f -
+
+	pft_set_rules noflush alcatraz \
+		"pass" \
+		"anchor anchorage"
+
+	atf_check -s exit:0 -o ignore ping -c 1 192.0.2.2
+
+	# Tables belong to anchors, so this is a different table and won't affect anything
+	jexec alcatraz pfctl -t testtable -T add 192.0.2.1
+	atf_check -s exit:0 -o ignore ping -c 1 192.0.2.2
+
+	# But when we add the address to the table in the anchor it does block traffic
+	jexec alcatraz pfctl -a anchorage -t testtable -T add 192.0.2.1
+	atf_check -s exit:2 -o ignore ping -c 1 192.0.2.2
+}
+
+anchor_cleanup()
+{
+	pft_cleanup
+}
+
 atf_init_test_cases()
 {
 	atf_add_test_case "v4_counters"
@@ -250,4 +328,6 @@ atf_init_test_cases()
 	atf_add_test_case "automatic"
 	atf_add_test_case "network"
 	atf_add_test_case "pr259689"
+	atf_add_test_case "precreate"
+	atf_add_test_case "anchor"
 }

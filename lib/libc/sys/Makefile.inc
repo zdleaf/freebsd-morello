@@ -1,5 +1,4 @@
 #	@(#)Makefile.inc	8.3 (Berkeley) 10/24/94
-# $FreeBSD$
 
 # sys sources
 .PATH: ${LIBC_SRCTOP}/${LIBC_ARCH}/sys ${LIBC_SRCTOP}/sys
@@ -128,7 +127,7 @@ SYM_MAPS+=	${LIBC_SRCTOP}/sys/Symbol.map
 CLEANFILES+=	${SASM} ${SPSEUDO}
 
 .if ${MACHINE_CPUARCH} == "amd64" || ${MACHINE_CPUARCH} == "i386" || \
-    ${MACHINE_CPUARCH} == "powerpc" || ${MACHINE_ARCH:Marmv[67]*}
+    ${MACHINE_CPUARCH} == "powerpc" || ${MACHINE_CPUARCH} == "arm"
 NOTE_GNU_STACK='\t.section .note.GNU-stack,"",%%progbits\n'
 .else
 NOTE_GNU_STACK=''
@@ -346,6 +345,7 @@ MAN+=	abort2.2 \
 	timer_create.2 \
 	timer_delete.2 \
 	timer_settime.2 \
+	timerfd.2 \
 	truncate.2 \
 	umask.2 \
 	undelete.2 \
@@ -407,6 +407,7 @@ MLINKS+=ffclock.2 ffclock_getcounter.2 \
 	ffclock.2 ffclock_setestimate.2
 MLINKS+=fhlink.2 fhlinkat.2
 MLINKS+=fhopen.2 fhstat.2 fhopen.2 fhstatfs.2
+MLINKS+=fork.2 _Fork.2
 MLINKS+=fsync.2 fdatasync.2
 MLINKS+=getdirentries.2 getdents.2
 MLINKS+=getfh.2 lgetfh.2 \
@@ -430,6 +431,7 @@ MLINKS+=jail.2 jail_attach.2 \
 	jail.2 jail_set.2
 MLINKS+=kldunload.2 kldunloadf.2
 MLINKS+=kqueue.2 kevent.2 \
+	kqueue.2 kqueuex.2 \
 	kqueue.2 EV_SET.3
 MLINKS+=link.2 linkat.2
 MLINKS+=madvise.2 posix_madvise.2
@@ -482,6 +484,7 @@ MLINKS+=setuid.2 setegid.2 \
 	setuid.2 setgid.2
 MLINKS+=shmat.2 shmdt.2
 MLINKS+=shm_open.2 memfd_create.3 \
+	shm_open.2 shm_create_largepage.3 \
 	shm_open.2 shm_unlink.2 \
 	shm_open.2 shm_rename.2
 MLINKS+=sigwaitinfo.2 sigtimedwait.2
@@ -494,6 +497,9 @@ MLINKS+=symlink.2 symlinkat.2
 MLINKS+=syscall.2 __syscall.2
 MLINKS+=timer_settime.2 timer_getoverrun.2 \
 	timer_settime.2 timer_gettime.2
+MLINKS+=timerfd.2 timerfd_create.2 \
+	timerfd.2 timerfd_gettime.2 \
+	timerfd.2 timerfd_settime.2
 MLINKS+=thr_kill.2 thr_kill2.2
 MLINKS+=truncate.2 ftruncate.2
 MLINKS+=unlink.2 unlinkat.2

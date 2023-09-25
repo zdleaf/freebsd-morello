@@ -5,10 +5,8 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-NetBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
  * All rights reserved.
@@ -218,6 +216,12 @@ uhid_intr_read_callback(struct usb_xfer *xfer, usb_error_t error)
 				actlen = sc->sc_isize;
 			usb_fifo_put_data(sc->sc_fifo.fp[USB_FIFO_RX], pc,
 			    0, actlen, 1);
+
+			/*
+			 * Do not do read-ahead, because this may lead
+			 * to data loss!
+			 */
+			return;
 		} else {
 			/* ignore it */
 			DPRINTF("ignored transfer, %d bytes\n", actlen);
@@ -912,10 +916,6 @@ uhid_detach(device_t dev)
 	return (0);
 }
 
-#ifndef HIDRAW_MAKE_UHID_ALIAS
-static devclass_t uhid_devclass;
-#endif
-
 static device_method_t uhid_methods[] = {
 	DEVMETHOD(device_probe, uhid_probe),
 	DEVMETHOD(device_attach, uhid_attach),
@@ -934,11 +934,7 @@ static driver_t uhid_driver = {
 	.size = sizeof(struct uhid_softc),
 };
 
-#ifdef HIDRAW_MAKE_UHID_ALIAS
-DRIVER_MODULE(uhid, uhub, uhid_driver, hidraw_devclass, NULL, 0);
-#else
-DRIVER_MODULE(uhid, uhub, uhid_driver, uhid_devclass, NULL, 0);
-#endif
+DRIVER_MODULE(uhid, uhub, uhid_driver, NULL, NULL);
 MODULE_DEPEND(uhid, usb, 1, 1, 1);
 MODULE_DEPEND(uhid, hid, 1, 1, 1);
 MODULE_VERSION(uhid, 1);

@@ -29,7 +29,6 @@
  * SUCH DAMAGE.
  *
  *	@(#)filedesc.h	8.1 (Berkeley) 6/2/93
- * $FreeBSD$
  */
 
 #ifndef _SYS_FILEDESC_H_
@@ -66,7 +65,17 @@ struct filedescent {
 #define	fde_fcntls	fde_caps.fc_fcntls
 #define	fde_ioctls	fde_caps.fc_ioctls
 #define	fde_nioctls	fde_caps.fc_nioctls
-#define	fde_change_size	(offsetof(struct filedescent, fde_seqc))
+
+#ifdef _KERNEL
+static inline void
+fde_copy(struct filedescent *from, struct filedescent *to)
+{
+
+	to->fde_file = from->fde_file;
+	to->fde_caps = from->fde_caps;
+	to->fde_flags = from->fde_flags;
+}
+#endif
 
 struct fdescenttbl {
 	int	fdt_nfiles;		/* number of open files allocated */
@@ -74,33 +83,36 @@ struct fdescenttbl {
 };
 #define	fd_seqc(fdt, fd)	(&(fdt)->fdt_ofiles[(fd)].fde_seqc)
 
-/*
- * This structure is used for the management of descriptors.  It may be
- * shared by multiple processes.
- */
 #define NDSLOTTYPE	u_long
 
 /*
  * This struct is copy-on-write and allocated from an SMR zone.
  * All fields are constant after initialization apart from the reference count.
+ * The ABI root directory is initialized as the root directory and changed
+ * during process transiting to or from non-native ABI.
  *
  * Check pwd_* routines for usage.
  */
 struct pwd {
-	volatile u_int pwd_refcount;
-	struct	vnode *pwd_cdir;		/* current directory */
-	struct	vnode *pwd_rdir;		/* root directory */
-	struct	vnode *pwd_jdir;		/* jail root directory */
+	u_int		pwd_refcount;
+	struct	vnode	*pwd_cdir;	/* current directory */
+	struct	vnode	*pwd_rdir;	/* root directory */
+	struct	vnode	*pwd_jdir;	/* jail root directory */
+	struct	vnode	*pwd_adir;	/* abi root directory */
 };
 typedef SMR_POINTER(struct pwd *) smrpwd_t;
 
 struct pwddesc {
 	struct mtx	pd_lock;	/* protects members of this struct */
 	smrpwd_t	pd_pwd;		/* directories */
-	volatile u_int	pd_refcount;
+	u_int		pd_refcount;
 	u_short		pd_cmask;	/* mask for file creation */
 };
 
+/*
+ * This structure is used for the management of descriptors.  It may be
+ * shared by multiple processes.
+ */
 struct filedesc {
 	struct	fdescenttbl *fd_files;	/* open files table */
 	NDSLOTTYPE *fd_map;		/* bitmap of free fds */
@@ -183,6 +195,7 @@ struct filedesc_to_leader {
 	MPASS(curproc->p_fd == _fdp);						\
 	(curproc->p_numthreads == 1 && refcount_load(&_fdp->fd_refcnt) == 1);	\
 })
+
 #else
 
 /*
@@ -214,6 +227,7 @@ enum {
 #define	falloc(td, resultfp, resultfd, flags) \
 	falloc_caps(td, resultfp, resultfd, flags, NULL)
 
+struct mount;
 struct thread;
 
 static __inline void
@@ -230,6 +244,7 @@ void	filecaps_free(struct filecaps *fcaps);
 
 int	closef(struct file *fp, struct thread *td);
 void	closef_nothread(struct file *fp);
+int	descrip_check_write_mp(struct filedesc *fdp, struct mount *mp);
 int	dupfdopen(struct thread *td, struct filedesc *fdp, int dfd, int mode,
 	    int openerror, int *indxp);
 int	falloc_caps(struct thread *td, struct file **resultfp, int *resultfd,
@@ -254,26 +269,26 @@ void	fdunshare(struct thread *td);
 void	fdescfree(struct thread *td);
 int	fdlastfile(struct filedesc *fdp);
 int	fdlastfile_single(struct filedesc *fdp);
-struct	filedesc *fdinit(struct filedesc *fdp, bool prepfiles, int *lastfile);
+struct	filedesc *fdinit(void);
 struct	filedesc *fdshare(struct filedesc *fdp);
 struct filedesc_to_leader *
 	filedesc_to_leader_alloc(struct filedesc_to_leader *old,
 	    struct filedesc *fdp, struct proc *leader);
+struct filedesc_to_leader *
+	filedesc_to_leader_share(struct filedesc_to_leader *fdtol,
+	    struct filedesc *fdp);
 int	getvnode(struct thread *td, int fd, cap_rights_t *rightsp,
 	    struct file **fpp);
 int	getvnode_path(struct thread *td, int fd, cap_rights_t *rightsp,
 	    struct file **fpp);
 void	mountcheckdirs(struct vnode *olddp, struct vnode *newdp);
 
-int	fget_cap_locked(struct filedesc *fdp, int fd, cap_rights_t *needrightsp,
+int	fget_cap_noref(struct filedesc *fdp, int fd, cap_rights_t *needrightsp,
 	    struct file **fpp, struct filecaps *havecapsp);
 int	fget_cap(struct thread *td, int fd, cap_rights_t *needrightsp,
 	    struct file **fpp, struct filecaps *havecapsp);
-
 /* Return a referenced file from an unlocked descriptor. */
-int	fget_unlocked_seq(struct filedesc *fdp, int fd, cap_rights_t *needrightsp,
-	    struct file **fpp, seqc_t *seqp);
-int	fget_unlocked(struct filedesc *fdp, int fd, cap_rights_t *needrightsp,
+int	fget_unlocked(struct thread *td, int fd, cap_rights_t *needrightsp,
 	    struct file **fpp);
 /* Return a file pointer without a ref. FILEDESC_IS_ONLY_USER must be true.  */
 int	fget_only_user(struct filedesc *fdp, int fd, cap_rights_t *needrightsp,
@@ -285,25 +300,25 @@ int	fget_only_user(struct filedesc *fdp, int fd, cap_rights_t *needrightsp,
 
 /* Requires a FILEDESC_{S,X}LOCK held and returns without a ref. */
 static __inline struct file *
-fget_locked(struct filedesc *fdp, int fd)
+fget_noref(struct filedesc *fdp, int fd)
 {
 
 	FILEDESC_LOCK_ASSERT(fdp);
 
-	if (__predict_false((u_int)fd >= fdp->fd_nfiles))
+	if (__predict_false((u_int)fd >= (u_int)fdp->fd_nfiles))
 		return (NULL);
 
 	return (fdp->fd_ofiles[fd].fde_file);
 }
 
 static __inline struct filedescent *
-fdeget_locked(struct filedesc *fdp, int fd)
+fdeget_noref(struct filedesc *fdp, int fd)
 {
 	struct filedescent *fde;
 
 	FILEDESC_LOCK_ASSERT(fdp);
 
-	if (__predict_false((u_int)fd >= fdp->fd_nfiles))
+	if (__predict_false((u_int)fd >= (u_int)fdp->fd_nfiles))
 		return (NULL);
 
 	fde = &fdp->fd_ofiles[fd];
@@ -329,6 +344,7 @@ struct pwddesc *pdinit(struct pwddesc *pdp, bool keeplock);
 struct pwddesc *pdshare(struct pwddesc *pdp);
 void	pdunshare(struct thread *td);
 
+void	pwd_altroot(struct thread *td, struct vnode *altroot_vp);
 void	pwd_chdir(struct thread *td, struct vnode *vp);
 int	pwd_chroot(struct thread *td, struct vnode *vp);
 int	pwd_chroot_chdir(struct thread *td, struct vnode *vp);

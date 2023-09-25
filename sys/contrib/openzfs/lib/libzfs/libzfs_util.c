@@ -6,7 +6,7 @@
  * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
- * or http://www.opensolaris.org/os/licensing.
+ * or https://opensource.org/licenses/CDDL-1.0.
  * See the License for the specific language governing permissions
  * and limitations under the License.
  *
@@ -170,6 +170,8 @@ libzfs_error_description(libzfs_handle_t *hdl)
 		return (dgettext(TEXT_DOMAIN, "I/O error"));
 	case EZFS_INTR:
 		return (dgettext(TEXT_DOMAIN, "signal received"));
+	case EZFS_CKSUM:
+		return (dgettext(TEXT_DOMAIN, "insufficient replicas"));
 	case EZFS_ISSPARE:
 		return (dgettext(TEXT_DOMAIN, "device is reserved as a hot "
 		    "spare"));
@@ -241,10 +243,20 @@ libzfs_error_description(libzfs_handle_t *hdl)
 		    "into a new one"));
 	case EZFS_SCRUB_PAUSED:
 		return (dgettext(TEXT_DOMAIN, "scrub is paused; "
-		    "use 'zpool scrub' to resume"));
+		    "use 'zpool scrub' to resume scrub"));
+	case EZFS_SCRUB_PAUSED_TO_CANCEL:
+		return (dgettext(TEXT_DOMAIN, "scrub is paused; "
+		    "use 'zpool scrub' to resume or 'zpool scrub -s' to "
+		    "cancel scrub"));
 	case EZFS_SCRUBBING:
 		return (dgettext(TEXT_DOMAIN, "currently scrubbing; "
-		    "use 'zpool scrub -s' to cancel current scrub"));
+		    "use 'zpool scrub -s' to cancel scrub"));
+	case EZFS_ERRORSCRUBBING:
+		return (dgettext(TEXT_DOMAIN, "currently error scrubbing; "
+		    "use 'zpool scrub -s' to cancel error scrub"));
+	case EZFS_ERRORSCRUB_PAUSED:
+		return (dgettext(TEXT_DOMAIN, "error scrub is paused; "
+		    "use 'zpool scrub -e' to resume error scrub"));
 	case EZFS_NO_SCRUB:
 		return (dgettext(TEXT_DOMAIN, "there is no active scrub"));
 	case EZFS_DIFF:
@@ -299,6 +311,12 @@ libzfs_error_description(libzfs_handle_t *hdl)
 	case EZFS_VDEV_NOTSUP:
 		return (dgettext(TEXT_DOMAIN, "operation not supported "
 		    "on this type of vdev"));
+	case EZFS_NOT_USER_NAMESPACE:
+		return (dgettext(TEXT_DOMAIN, "the provided file "
+		    "was not a user namespace file"));
+	case EZFS_RESUME_EXISTS:
+		return (dgettext(TEXT_DOMAIN, "Resuming recv on existing "
+		    "dataset without force"));
 	case EZFS_UNKNOWN:
 		return (dgettext(TEXT_DOMAIN, "unknown error"));
 	default:
@@ -393,6 +411,10 @@ zfs_common_error(libzfs_handle_t *hdl, int error, const char *fmt,
 	case EINTR:
 		zfs_verror(hdl, EZFS_INTR, fmt, ap);
 		return (-1);
+
+	case ECKSUM:
+		zfs_verror(hdl, EZFS_CKSUM, fmt, ap);
+		return (-1);
 	}
 
 	return (0);
@@ -484,6 +506,9 @@ zfs_standard_error_fmt(libzfs_handle_t *hdl, int error, const char *fmt, ...)
 		break;
 	case ZFS_ERR_BADPROP:
 		zfs_verror(hdl, EZFS_BADPROP, fmt, ap);
+		break;
+	case ZFS_ERR_NOT_USER_NAMESPACE:
+		zfs_verror(hdl, EZFS_NOT_USER_NAMESPACE, fmt, ap);
 		break;
 	default:
 		zfs_error_aux(hdl, "%s", strerror(error));
@@ -600,8 +625,8 @@ zfs_setprop_error(libzfs_handle_t *hdl, zfs_prop_t prop, int err,
 			(void) zfs_error(hdl, EZFS_VOLTOOBIG, errbuf);
 			break;
 		}
+		zfs_fallthrough;
 #endif
-		fallthrough;
 	default:
 		(void) zfs_standard_error(hdl, err, errbuf);
 	}
@@ -673,7 +698,7 @@ zpool_standard_error_fmt(libzfs_handle_t *hdl, int error, const char *fmt, ...)
 	case ENOSPC:
 	case EDQUOT:
 		zfs_verror(hdl, EZFS_NOSPC, fmt, ap);
-		return (-1);
+		break;
 
 	case EAGAIN:
 		zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
@@ -807,7 +832,7 @@ zfs_realloc(libzfs_handle_t *hdl, void *ptr, size_t oldsize, size_t newsize)
 		return (NULL);
 	}
 
-	bzero((char *)ret + oldsize, (newsize - oldsize));
+	memset((char *)ret + oldsize, 0, newsize - oldsize);
 	return (ret);
 }
 
@@ -993,16 +1018,13 @@ libzfs_free_str_array(char **strs, int count)
  *
  * Returns 0 otherwise.
  */
-int
-libzfs_envvar_is_set(char *envvar)
+boolean_t
+libzfs_envvar_is_set(const char *envvar)
 {
 	char *env = getenv(envvar);
-	if (env && (strtoul(env, NULL, 0) > 0 ||
+	return (env && (strtoul(env, NULL, 0) > 0 ||
 	    (!strncasecmp(env, "YES", 3) && strnlen(env, 4) == 3) ||
-	    (!strncasecmp(env, "ON", 2) && strnlen(env, 3) == 2)))
-		return (1);
-
-	return (0);
+	    (!strncasecmp(env, "ON", 2) && strnlen(env, 3) == 2)));
 }
 
 libzfs_handle_t *
@@ -1149,7 +1171,7 @@ zfs_path_to_zhandle(libzfs_handle_t *hdl, const char *path, zfs_type_t argtype)
  * Initialize the zc_nvlist_dst member to prepare for receiving an nvlist from
  * an ioctl().
  */
-int
+void
 zcmd_alloc_dst_nvlist(libzfs_handle_t *hdl, zfs_cmd_t *zc, size_t len)
 {
 	if (len == 0)
@@ -1157,10 +1179,6 @@ zcmd_alloc_dst_nvlist(libzfs_handle_t *hdl, zfs_cmd_t *zc, size_t len)
 	zc->zc_nvlist_dst_size = len;
 	zc->zc_nvlist_dst =
 	    (uint64_t)(uintptr_t)zfs_alloc(hdl, zc->zc_nvlist_dst_size);
-	if (zc->zc_nvlist_dst == 0)
-		return (-1);
-
-	return (0);
 }
 
 /*
@@ -1168,16 +1186,12 @@ zcmd_alloc_dst_nvlist(libzfs_handle_t *hdl, zfs_cmd_t *zc, size_t len)
  * expand the nvlist to the size specified in 'zc_nvlist_dst_size', which was
  * filled in by the kernel to indicate the actual required size.
  */
-int
+void
 zcmd_expand_dst_nvlist(libzfs_handle_t *hdl, zfs_cmd_t *zc)
 {
 	free((void *)(uintptr_t)zc->zc_nvlist_dst);
 	zc->zc_nvlist_dst =
 	    (uint64_t)(uintptr_t)zfs_alloc(hdl, zc->zc_nvlist_dst_size);
-	if (zc->zc_nvlist_dst == 0)
-		return (-1);
-
-	return (0);
 }
 
 /*
@@ -1194,38 +1208,33 @@ zcmd_free_nvlists(zfs_cmd_t *zc)
 	zc->zc_nvlist_dst = 0;
 }
 
-static int
+static void
 zcmd_write_nvlist_com(libzfs_handle_t *hdl, uint64_t *outnv, uint64_t *outlen,
     nvlist_t *nvl)
 {
 	char *packed;
-	size_t len;
 
-	verify(nvlist_size(nvl, &len, NV_ENCODE_NATIVE) == 0);
-
-	if ((packed = zfs_alloc(hdl, len)) == NULL)
-		return (-1);
+	size_t len = fnvlist_size(nvl);
+	packed = zfs_alloc(hdl, len);
 
 	verify(nvlist_pack(nvl, &packed, &len, NV_ENCODE_NATIVE, 0) == 0);
 
 	*outnv = (uint64_t)(uintptr_t)packed;
 	*outlen = len;
-
-	return (0);
 }
 
-int
+void
 zcmd_write_conf_nvlist(libzfs_handle_t *hdl, zfs_cmd_t *zc, nvlist_t *nvl)
 {
-	return (zcmd_write_nvlist_com(hdl, &zc->zc_nvlist_conf,
-	    &zc->zc_nvlist_conf_size, nvl));
+	zcmd_write_nvlist_com(hdl, &zc->zc_nvlist_conf,
+	    &zc->zc_nvlist_conf_size, nvl);
 }
 
-int
+void
 zcmd_write_src_nvlist(libzfs_handle_t *hdl, zfs_cmd_t *zc, nvlist_t *nvl)
 {
-	return (zcmd_write_nvlist_com(hdl, &zc->zc_nvlist_src,
-	    &zc->zc_nvlist_src_size, nvl));
+	zcmd_write_nvlist_com(hdl, &zc->zc_nvlist_src,
+	    &zc->zc_nvlist_src_size, nvl);
 }
 
 /*
@@ -1250,7 +1259,7 @@ zcmd_read_dst_nvlist(libzfs_handle_t *hdl, zfs_cmd_t *zc, nvlist_t **nvlp)
 static void
 zprop_print_headers(zprop_get_cbdata_t *cbp, zfs_type_t type)
 {
-	zprop_list_t *pl = cbp->cb_proplist;
+	zprop_list_t *pl;
 	int i;
 	char *title;
 	size_t len;
@@ -1289,7 +1298,7 @@ zprop_print_headers(zprop_get_cbdata_t *cbp, zfs_type_t type)
 		/*
 		 * 'PROPERTY' column
 		 */
-		if (pl->pl_prop != ZPROP_INVAL) {
+		if (pl->pl_prop != ZPROP_USERPROP) {
 			const char *propname = (type == ZFS_TYPE_POOL) ?
 			    zpool_prop_to_name(pl->pl_prop) :
 			    ((type == ZFS_TYPE_VDEV) ?
@@ -1596,13 +1605,13 @@ zfs_nicestrtonum(libzfs_handle_t *hdl, const char *value, uint64_t *num)
  */
 int
 zprop_parse_value(libzfs_handle_t *hdl, nvpair_t *elem, int prop,
-    zfs_type_t type, nvlist_t *ret, char **svalp, uint64_t *ivalp,
+    zfs_type_t type, nvlist_t *ret, const char **svalp, uint64_t *ivalp,
     const char *errbuf)
 {
 	data_type_t datatype = nvpair_type(elem);
 	zprop_type_t proptype;
 	const char *propname;
-	char *value;
+	const char *value;
 	boolean_t isnone = B_FALSE;
 	boolean_t isauto = B_FALSE;
 	int err = 0;
@@ -1683,6 +1692,18 @@ zprop_parse_value(libzfs_handle_t *hdl, nvpair_t *elem, int prop,
 		}
 
 		/*
+		 * Special handling for "checksum_*=none". In this case it's not
+		 * 0 but UINT64_MAX.
+		 */
+		if ((type & ZFS_TYPE_VDEV) && isnone &&
+		    (prop == VDEV_PROP_CHECKSUM_N ||
+		    prop == VDEV_PROP_CHECKSUM_T ||
+		    prop == VDEV_PROP_IO_N ||
+		    prop == VDEV_PROP_IO_T)) {
+			*ivalp = UINT64_MAX;
+		}
+
+		/*
 		 * Special handling for setting 'refreservation' to 'auto'.  Use
 		 * UINT64_MAX to tell the caller to use zfs_fix_auto_resv().
 		 * 'auto' is only allowed on volumes.
@@ -1751,14 +1772,10 @@ error:
 }
 
 static int
-addlist(libzfs_handle_t *hdl, char *propname, zprop_list_t **listp,
+addlist(libzfs_handle_t *hdl, const char *propname, zprop_list_t **listp,
     zfs_type_t type)
 {
-	int prop;
-	zprop_list_t *entry;
-
-	prop = zprop_name_to_prop(propname, type);
-
+	int prop = zprop_name_to_prop(propname, type);
 	if (prop != ZPROP_INVAL && !zprop_valid_for_type(prop, type, B_FALSE))
 		prop = ZPROP_INVAL;
 
@@ -1766,7 +1783,8 @@ addlist(libzfs_handle_t *hdl, char *propname, zprop_list_t **listp,
 	 * Return failure if no property table entry was found and this isn't
 	 * a user-defined property.
 	 */
-	if (prop == ZPROP_INVAL && ((type == ZFS_TYPE_POOL &&
+	if (prop == ZPROP_USERPROP && ((type == ZFS_TYPE_POOL &&
+	    !zfs_prop_user(propname) &&
 	    !zpool_prop_feature(propname) &&
 	    !zpool_prop_unsupported(propname)) ||
 	    ((type == ZFS_TYPE_DATASET) && !zfs_prop_user(propname) &&
@@ -1778,16 +1796,11 @@ addlist(libzfs_handle_t *hdl, char *propname, zprop_list_t **listp,
 		    dgettext(TEXT_DOMAIN, "bad property list")));
 	}
 
-	if ((entry = zfs_alloc(hdl, sizeof (zprop_list_t))) == NULL)
-		return (-1);
+	zprop_list_t *entry = zfs_alloc(hdl, sizeof (*entry));
 
 	entry->pl_prop = prop;
-	if (prop == ZPROP_INVAL) {
-		if ((entry->pl_user_prop = zfs_strdup(hdl, propname)) ==
-		    NULL) {
-			free(entry);
-			return (-1);
-		}
+	if (prop == ZPROP_USERPROP) {
+		entry->pl_user_prop = zfs_strdup(hdl, propname);
 		entry->pl_width = strlen(propname);
 	} else {
 		entry->pl_width = zprop_width(prop, &entry->pl_fixed,
@@ -1827,61 +1840,24 @@ zprop_get_list(libzfs_handle_t *hdl, char *props, zprop_list_t **listp,
 		    "bad property list")));
 	}
 
-	/*
-	 * It would be nice to use getsubopt() here, but the inclusion of column
-	 * aliases makes this more effort than it's worth.
-	 */
-	while (*props != '\0') {
-		size_t len;
-		char *p;
-		char c;
-
-		if ((p = strchr(props, ',')) == NULL) {
-			len = strlen(props);
-			p = props + len;
-		} else {
-			len = p - props;
-		}
-
-		/*
-		 * Check for empty options.
-		 */
-		if (len == 0) {
-			zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
-			    "empty property name"));
-			return (zfs_error(hdl, EZFS_BADPROP,
-			    dgettext(TEXT_DOMAIN, "bad property list")));
-		}
-
-		/*
-		 * Check all regular property names.
-		 */
-		c = props[len];
-		props[len] = '\0';
-
-		if (strcmp(props, "space") == 0) {
-			static char *spaceprops[] = {
+	for (char *p; (p = strsep(&props, ",")); )
+		if (strcmp(p, "space") == 0) {
+			static const char *const spaceprops[] = {
 				"name", "avail", "used", "usedbysnapshots",
 				"usedbydataset", "usedbyrefreservation",
-				"usedbychildren", NULL
+				"usedbychildren"
 			};
-			int i;
 
-			for (i = 0; spaceprops[i]; i++) {
+			for (int i = 0; i < ARRAY_SIZE(spaceprops); i++) {
 				if (addlist(hdl, spaceprops[i], listp, type))
 					return (-1);
 				listp = &(*listp)->pl_next;
 			}
 		} else {
-			if (addlist(hdl, props, listp, type))
+			if (addlist(hdl, p, listp, type))
 				return (-1);
 			listp = &(*listp)->pl_next;
 		}
-
-		props = p;
-		if (c == ',')
-			props++;
-	}
 
 	return (0);
 }
@@ -1911,8 +1887,7 @@ zprop_expand_list_cb(int prop, void *cb)
 	zprop_list_t *entry;
 	expand_data_t *edp = cb;
 
-	if ((entry = zfs_alloc(edp->hdl, sizeof (zprop_list_t))) == NULL)
-		return (ZPROP_INVAL);
+	entry = zfs_alloc(edp->hdl, sizeof (zprop_list_t));
 
 	entry->pl_prop = prop;
 	entry->pl_width = zprop_width(prop, &entry->pl_fixed, edp->type);
@@ -1951,9 +1926,7 @@ zprop_expand_list(libzfs_handle_t *hdl, zprop_list_t **plp, zfs_type_t type)
 		 * Add 'name' to the beginning of the list, which is handled
 		 * specially.
 		 */
-		if ((entry = zfs_alloc(hdl, sizeof (zprop_list_t))) == NULL)
-			return (-1);
-
+		entry = zfs_alloc(hdl, sizeof (zprop_list_t));
 		entry->pl_prop = ((type == ZFS_TYPE_POOL) ?  ZPOOL_PROP_NAME :
 		    ((type == ZFS_TYPE_VDEV) ? VDEV_PROP_NAME : ZFS_PROP_NAME));
 		entry->pl_width = zprop_width(entry->pl_prop,
@@ -1972,37 +1945,30 @@ zprop_iter(zprop_func func, void *cb, boolean_t show_all, boolean_t ordered,
 	return (zprop_iter_common(func, cb, show_all, ordered, type));
 }
 
-/*
- * Fill given version buffer with zfs userland version
- */
-void
-zfs_version_userland(char *version, int len)
+const char *
+zfs_version_userland(void)
 {
-	(void) strlcpy(version, ZFS_META_ALIAS, len);
+	return (ZFS_META_ALIAS);
 }
 
 /*
  * Prints both zfs userland and kernel versions
- * Returns 0 on success, and -1 on error (with errno set)
+ * Returns 0 on success, and -1 on error
  */
 int
 zfs_version_print(void)
 {
-	char zver_userland[128];
-	char zver_kernel[128];
+	(void) puts(ZFS_META_ALIAS);
 
-	zfs_version_userland(zver_userland, sizeof (zver_userland));
-
-	(void) printf("%s\n", zver_userland);
-
-	if (zfs_version_kernel(zver_kernel, sizeof (zver_kernel)) == -1) {
+	char *kver = zfs_version_kernel();
+	if (kver == NULL) {
 		fprintf(stderr, "zfs_version_kernel() failed: %s\n",
 		    strerror(errno));
 		return (-1);
 	}
 
-	(void) printf("zfs-kmod-%s\n", zver_kernel);
-
+	(void) printf("zfs-kmod-%s\n", kver);
+	free(kver);
 	return (0);
 }
 
@@ -2010,7 +1976,7 @@ zfs_version_print(void)
  * Return 1 if the user requested ANSI color output, and our terminal supports
  * it.  Return 0 for no color.
  */
-static int
+int
 use_color(void)
 {
 	static int use_color = -1;
@@ -2056,31 +2022,39 @@ use_color(void)
 }
 
 /*
- * color_start() and color_end() are used for when you want to colorize a block
- * of text.  For example:
+ * The functions color_start() and color_end() are used for when you want
+ * to colorize a block of text.
  *
- * color_start(ANSI_RED_FG)
+ * For example:
+ * color_start(ANSI_RED)
  * printf("hello");
  * printf("world");
  * color_end();
  */
 void
-color_start(char *color)
+color_start(const char *color)
 {
-	if (use_color())
-		printf("%s", color);
+	if (color && use_color()) {
+		fputs(color, stdout);
+		fflush(stdout);
+	}
 }
 
 void
 color_end(void)
 {
-	if (use_color())
-		printf(ANSI_RESET);
+	if (use_color()) {
+		fputs(ANSI_RESET, stdout);
+		fflush(stdout);
+	}
+
 }
 
-/* printf() with a color.  If color is NULL, then do a normal printf. */
+/*
+ * printf() with a color. If color is NULL, then do a normal printf.
+ */
 int
-printf_color(char *color, char *format, ...)
+printf_color(const char *color, const char *format, ...)
 {
 	va_list aptr;
 	int rc;

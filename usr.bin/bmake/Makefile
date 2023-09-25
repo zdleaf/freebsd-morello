@@ -1,7 +1,6 @@
 # This is a generated file, do NOT edit!
 # See contrib/bmake/bsd.after-import.mk
 #
-# $FreeBSD$
 
 SRCTOP?= ${.CURDIR:H:H}
 
@@ -12,7 +11,7 @@ CFLAGS+= -I${.CURDIR}
 CLEANDIRS+= FreeBSD
 CLEANFILES+= bootstrap
 
-#	$Id: Makefile,v 1.117 2021/12/04 18:51:30 sjg Exp $
+#	$Id: Makefile,v 1.125 2023/05/17 00:15:46 sjg Exp $
 
 PROG?=	${.CURDIR:T}
 
@@ -81,7 +80,9 @@ FILEMON_H ?= /usr/include/dev/filemon/filemon.h
 .if exists(${FILEMON_H}) && ${FILEMON_H:T} == "filemon.h"
 COPTS.filemon_dev.c += -DHAVE_FILEMON_H -I${FILEMON_H:H}
 .endif
-.endif				# USE_FILEMON == dev
+.elif ${USE_FILEMON} == "ktrace"
+COPTS.filemon_ktrace.c += -Wno-error=unused-parameter
+.endif
 
 .endif				# USE_FILEMON
 
@@ -140,17 +141,32 @@ SHAREDIR= ${SHAREDIR.bmake:U${prefix}/share}
 BINDIR= ${BINDIR.bmake:U${prefix}/bin}
 MANDIR= ${MANDIR.bmake:U${SHAREDIR}/man}
 
-.if !exists(.depend)
 ${OBJS}: config.h
-.endif
 
 
 # A simple unit-test driver to help catch regressions
 TEST_MAKE ?= ${.OBJDIR}/${PROG:T}
-accept test:
+accept test: .NOMETA
 	cd ${.CURDIR}/unit-tests && \
 	MAKEFLAGS= ${TEST_MAKE} -r -m / ${.TARGET} ${TESTS:DTESTS=${TESTS:Q}}
 
+
+.if make(test) && ${MK_AUTO_OBJ} == "yes"
+# The test target above visits unit-tests with -r -m /
+# which prevents MK_AUTO_OBJ doing its job
+# so do it here
+.if defined(MAKEOBJDIRPREFIX) || ${MAKEOBJDIR:U:M*/*} != ""
+_utobj = ${.OBJDIR}/unit-tests
+.else
+_utobj = ${.CURDIR}/unit-tests/${MAKEOBJDIR:Uobj}
+.endif
+utobj: .NOMETA
+	@test -d ${_utobj} && exit 0; \
+	echo "[Creating ${_utobj}...]"; \
+	umask ${OBJDIR_UMASK:U002}; \
+	mkdir -p ${_utobj}
+test: utobj
+.endif
 
 # override some simple things
 BINDIR= /usr/bin

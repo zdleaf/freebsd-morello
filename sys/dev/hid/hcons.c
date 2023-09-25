@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2020 Vladimir Kondratyev <wulf@FreeBSD.org>
  *
@@ -26,8 +26,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 /*
  * Consumer Controls usage page driver
  * https://www.usb.org/sites/default/files/documents/hut1_12v2.pdf
@@ -279,7 +277,6 @@ hcons_detach(device_t dev)
 	return (hidmap_detach(device_get_softc(dev)));
 }
 
-static devclass_t hcons_devclass;
 static device_method_t hcons_methods[] = {
 	DEVMETHOD(device_probe,		hcons_probe),
 	DEVMETHOD(device_attach,	hcons_attach),
@@ -289,7 +286,7 @@ static device_method_t hcons_methods[] = {
 };
 
 DEFINE_CLASS_0(hcons, hcons_driver, hcons_methods, sizeof(struct hidmap));
-DRIVER_MODULE(hcons, hidbus, hcons_driver, hcons_devclass, NULL, 0);
+DRIVER_MODULE(hcons, hidbus, hcons_driver, NULL, NULL);
 MODULE_DEPEND(hcons, hid, 1, 1, 1);
 MODULE_DEPEND(hcons, hidbus, 1, 1, 1);
 MODULE_DEPEND(hcons, hidmap, 1, 1, 1);

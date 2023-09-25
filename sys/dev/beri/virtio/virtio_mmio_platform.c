@@ -36,8 +36,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/bus.h>
@@ -306,7 +304,5 @@ static driver_t virtio_mmio_platform_driver = {
 	sizeof(struct virtio_mmio_platform_softc),
 };
 
-static devclass_t virtio_mmio_platform_devclass;
-
 DRIVER_MODULE(virtio_mmio_platform, simplebus, virtio_mmio_platform_driver,
-	virtio_mmio_platform_devclass, 0, 0);
+    0, 0);

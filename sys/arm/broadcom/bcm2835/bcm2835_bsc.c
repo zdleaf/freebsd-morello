@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2001 Tsubai Masanari.
  * Copyright (c) 2012 Oleksandr Tymoshenko <gonzo@freebsd.org>
@@ -30,8 +30,6 @@
  *
  */
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 /*
  * Driver for bcm2835 i2c-compatible two-wire bus, named 'BSC' on this SoC.
  *
@@ -715,13 +713,11 @@ static device_method_t bcm_bsc_methods[] = {
 	DEVMETHOD_END
 };
 
-static devclass_t bcm_bsc_devclass;
-
 static driver_t bcm_bsc_driver = {
 	"iichb",
 	bcm_bsc_methods,
 	sizeof(struct bcm_bsc_softc),
 };
 
-DRIVER_MODULE(iicbus, bcm2835_bsc, iicbus_driver, iicbus_devclass, 0, 0);
-DRIVER_MODULE(bcm2835_bsc, simplebus, bcm_bsc_driver, bcm_bsc_devclass, 0, 0);
+DRIVER_MODULE(iicbus, bcm2835_bsc, iicbus_driver, 0, 0);
+DRIVER_MODULE(bcm2835_bsc, simplebus, bcm_bsc_driver, 0, 0);

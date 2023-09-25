@@ -25,8 +25,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #define __ELF_WORD_SIZE 64
 
 #include <sys/param.h>
@@ -39,7 +37,10 @@ __FBSDID("$FreeBSD$");
 #include <stand.h>
 
 #include "bootstrap.h"
+#include "syscall_nr.h"
 #include "host_syscall.h"
+#include "modinfo.h"
+#include "kboot.h"
 
 extern char		end[];
 extern void		*kerneltramp;
@@ -53,8 +54,6 @@ struct trampoline_data {
 	uint32_t	mdp;
 	uint32_t	mdp_size;
 };
-
-vm_offset_t md_load64(char *args, vm_offset_t *modulep, vm_offset_t *dtb);
 
 int
 ppc64_elf_loadfile(char *filename, uint64_t dest,
@@ -148,16 +147,14 @@ ppc64_elf_exec(struct preloaded_file *fp)
 	archsw.arch_copyin(trampoline, trampolinebase, szkerneltramp);
 	free(trampoline);
 
-	if (archsw.arch_kexec_kseg_get == NULL)
-		panic("architecture did not provide kexec segment mapping");
-	archsw.arch_kexec_kseg_get(&nseg, &kseg);
+	kboot_kseg_get(&nseg, &kseg);
 
-	error = kexec_load(trampolinebase, nseg, (uintptr_t)kseg);
+	error = host_kexec_load(trampolinebase, nseg, kseg, HOST_KEXEC_ARCH_PPC64);
 	if (error != 0)
 		panic("kexec_load returned error: %d", error);
 
-	error = host_reboot(0xfee1dead, 672274793,
-	    0x45584543 /* LINUX_REBOOT_CMD_KEXEC */, (uintptr_t)NULL);
+	error = host_reboot(HOST_REBOOT_MAGIC1, HOST_REBOOT_MAGIC2, HOST_REBOOT_CMD_KEXEC,
+	    (uintptr_t)NULL);
 	if (error != 0)
 		panic("reboot returned error: %d", error);
 
@@ -168,4 +165,14 @@ struct file_format	ppc_elf64 =
 {
 	ppc64_elf_loadfile,
 	ppc64_elf_exec
+};
+
+/*
+ * Sort formats so that those that can detect based on arguments rather than
+ * reading the file first.
+ */
+
+struct file_format *file_formats[] = {
+    &ppc_elf64,
+    NULL
 };

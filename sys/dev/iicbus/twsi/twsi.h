@@ -27,16 +27,12 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 #ifndef _TWSI_H_
 #define	_TWSI_H_
 
-#ifdef EXT_RESOURCES
 #include <dev/extres/clk/clk.h>
-#endif
 
 struct twsi_baud_rate {
 	uint32_t	raw;
@@ -50,10 +46,8 @@ struct twsi_softc {
 	struct resource	*res[2];
 	struct mtx	mutex;
 	device_t	iicbus;
-#ifdef EXT_RESOURCES
 	clk_t		clk_core;
 	clk_t		clk_reg;
-#endif
 	void *			intrhand;
 	bool			have_intr;
 

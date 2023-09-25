@@ -14,8 +14,6 @@
  * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
  * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
- *
- * $FreeBSD$
  */
 
 /*
@@ -158,8 +156,6 @@ static device_method_t uark_methods[] = {
 	DEVMETHOD_END
 };
 
-static devclass_t uark_devclass;
-
 static driver_t uark_driver = {
 	.name = "uark",
 	.methods = uark_methods,
@@ -170,7 +166,7 @@ static const STRUCT_USB_HOST_ID uark_devs[] = {
 	{USB_VPI(USB_VENDOR_ARKMICRO, USB_PRODUCT_ARKMICRO_ARK3116, 0)},
 };
 
-DRIVER_MODULE(uark, uhub, uark_driver, uark_devclass, NULL, 0);
+DRIVER_MODULE(uark, uhub, uark_driver, NULL, NULL);
 MODULE_DEPEND(uark, ucom, 1, 1, 1);
 MODULE_DEPEND(uark, usb, 1, 1, 1);
 MODULE_VERSION(uark, 1);

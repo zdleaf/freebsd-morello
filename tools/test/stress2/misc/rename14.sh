@@ -1,7 +1,7 @@
 #!/bin/sh
 
 #
-# SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+# SPDX-License-Identifier: BSD-2-Clause
 #
 # Copyright (c) 2019 Dell EMC Isilon
 #
@@ -32,6 +32,9 @@
 # Fixed by r356714
 
 # Based on a syzkaller scenario reported by tuexen@freebsd.org
+
+# "panic: journal_jremref: Lost inodedep":
+# https://people.freebsd.org/~pho/stress/log/log0279.txt
 
 . ../default.cfg
 [ `id -u` -ne 0 ] && echo "Must be root!" && exit 1

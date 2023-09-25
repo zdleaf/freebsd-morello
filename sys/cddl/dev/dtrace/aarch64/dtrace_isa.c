@@ -18,8 +18,6 @@
  * information: Portions Copyright [yyyy] [name of copyright owner]
  *
  * CDDL HEADER END
- *
- * $FreeBSD$
  */
 /*
  * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
@@ -50,12 +48,6 @@
 
 #include "regset.h"
 
-/*
- * Wee need some reasonable default to prevent backtrace code
- * from wandering too far
- */
-#define	MAX_FUNCTION_SIZE 0x10000
-#define	MAX_PROLOGUE_SIZE 0x100
 #define	MAX_USTACK_DEPTH  2048
 
 uint8_t dtrace_fuword8_nocheck(void *);
@@ -139,7 +131,7 @@ dtrace_getustack_common(uint64_t *pcstack, int pcstack_limit, uintptr_t pc,
 			break;
 
 		pc = dtrace_fuword64((void *)(fp +
-		    offsetof(struct arm64_frame, f_retaddr)));
+		    offsetof(struct unwind_state, pc)));
 		fp = dtrace_fuword64((void *)fp);
 
 		if (fp == oldfp) {
@@ -284,12 +276,22 @@ dtrace_getstackdepth(int aframes)
 }
 
 ulong_t
-dtrace_getreg(struct trapframe *rp, uint_t reg)
+dtrace_getreg(struct trapframe *frame, uint_t reg)
 {
-
-	printf("IMPLEMENT ME: %s\n", __func__);
-
-	return (0);
+	switch (reg) {
+	case REG_X0 ... REG_X29:
+		return (frame->tf_x[reg]);
+	case REG_LR:
+		return (frame->tf_lr);
+	case REG_SP:
+		return (frame->tf_sp);
+	case REG_PC:
+		return (frame->tf_elr);
+	default:
+		DTRACE_CPUFLAG_SET(CPU_DTRACE_ILLOP);
+		return (0);
+	}
+	/* NOTREACHED */
 }
 
 static int

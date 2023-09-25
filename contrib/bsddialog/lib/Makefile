@@ -3,25 +3,24 @@
 #
 # Written in 2021 by Alfonso Sabato Siciliano
 
-VERSION = 0.1
+VERSION = 0.4
 LIBRARY = bsddialog
 LIBRARY_SO = lib${LIBRARY:=.so}
 LIBRARY_A = lib${LIBRARY:=.a}
 HEADERS = bsddialog.h bsddialog_theme.h bsddialog_progressview.h
-SOURCES = barbox.c formbox.c infobox.c libbsddialog.c lib_util.c menubox.c \
-	messagebox.c textbox.c theme.c timebox.c
+SOURCES = barbox.c calendarbox.c formbox.c infobox.c libbsddialog.c \
+	lib_util.c menubox.c messagebox.c textbox.c theme.c timebox.c
 OBJECTS = ${SOURCES:.c=.o}
-CFLAGS += -fPIC -Wall -Wextra
+CFLAGS += -D_XOPEN_SOURCE_EXTENDED -fPIC -Wall -Wextra
 LDFLAGS += -fstack-protector-strong -shared -Wl,-x -Wl,--fatal-warnings \
 	-Wl,--warn-shared-textrel -Wl,-soname,${LIBRARY_SO}.${VERSION} \
-	-L/usr/lib -lformw -lncursesw -ltinfow
+	-L/usr/lib -lncursesw -ltinfow
 
 .if defined(DEBUG)
 # `make -DDEBUG`
-CFLAGS = -g -fPIC -Wall -Wextra
+CFLAGS = -g -D_XOPEN_SOURCE_EXTENDED -fPIC -Wall -Wextra
 .else
-CFLAGS += -O2 -pipe -std=gnu99 -Wno-format-zero-length \
-	-fstack-protector-strong -Qunused-arguments
+CFLAGS += -std=gnu99 -fstack-protector-strong
 .endif
 
 LOCALBASE = /usr/local
@@ -66,7 +65,7 @@ install:
 	${INSTALL} -l rs ${LOCALBASE}/lib/${LIBRARY_SO}.${VERSION} ${LOCALBASE}/lib/${LIBRARY_SO}
 	${INSTALL} -m 644 ${LIBRARY_A} ${LOCALBASE}/lib
 	${LDCONFIG} ${LOCALBASE}/lib
-	${INSTALL} -m 644 ${LIBRARY}.3.gz ${MNADIR}
+	${INSTALL} -m 644 ${LIBRARY}.3.gz ${MANDIR}
 
 unistall:
 	${RM} ${LOCALBASE}/include/${LIBRARY}*.h

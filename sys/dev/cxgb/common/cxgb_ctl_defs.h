@@ -5,8 +5,6 @@
  * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
  * FITNESS FOR A PARTICULAR PURPOSE.  See the LICENSE file included in this
  * release for licensing terms and conditions.
- *
- * $FreeBSD$
  */
 
 #ifndef _CXGB3_OFFLOAD_CTL_DEFS_H
@@ -64,7 +62,7 @@ struct mtutab {
  * Structure used to request the ifnet that owns a given MAC address.
  */
 struct iff_mac {
-	struct ifnet *dev;
+	if_t dev;
 	const unsigned char *mac_addr;
 	u16 vlan_tag;
 };
@@ -83,7 +81,7 @@ struct ddp_params {
 
 struct adap_ports {
 	unsigned int nports;     /* number of ports on this adapter */
-	struct ifnet *lldevs[MAX_NPORTS];
+	if_t devs[MAX_NPORTS];
 };
 
 /*

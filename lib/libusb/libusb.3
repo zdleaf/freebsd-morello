@@ -1,8 +1,6 @@
 .\"
 .\" Copyright (c) 2009 Sylvestre Gallon
 .\"
-.\" All rights reserved.
-.\"
 .\" Redistribution and use in source and binary forms, with or without
 .\" modification, are permitted provided that the following conditions
 .\" are met:
@@ -24,9 +22,7 @@
 .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 .\" SUCH DAMAGE.
 .\"
-.\" $FreeBSD$
-.\"
-.Dd June 9, 2020
+.Dd January, 26, 2023
 .Dt LIBUSB 3
 .Os
 .Sh NAME
@@ -49,11 +45,26 @@ This function returns version information about LibUSB.
 .Pp
 .Ft int
 .Fn libusb_init "libusb_context **ctx"
-This function initialises libusb.
-It must be called at the beginning
-of the program, before other libusb routines are used.
-This function returns 0 on success or LIBUSB_ERROR on
-failure.
+Call this function before any other libusb v1.0 API function, to
+initialise a valid libusb v1.0 context.
+If the
+.Fa ctx
+argument is non-NULL, a pointer to the libusb context is stored at
+the given location.
+This function returns 0 upon success or LIBUSB_ERROR on failure.
+.Pp
+.Ft int
+.Fn libusb_init_context "libusb_context **ctx" "const struct libusb_init_option []" "int num_options"
+Call this function before any other libusb v1.0 API function, to
+initialise a valid libusb v1.0 context.
+If the
+.Fa ctx
+argument is non-NULL, a pointer to the libusb context is stored at
+the given location.
+Additional options, like the USB debug level, may be given using the
+second and third argument.
+If no options are needed, simply use libusb_init().
+This function returns 0 upon success or a LIBUSB_ERROR value on failure.
 .Pp
 .Ft void
 .Fn libusb_exit "libusb_context *ctx"
@@ -602,6 +613,15 @@ the events lock.
 Determine if an active thread is handling events.
 Returns 1 if there is a thread handling events and 0 if there
 are no threads currently handling events.
+.Pp
+.Ft void
+.Fn libusb_interrupt_event_handler "libusb_context *ctx"
+Causes the
+.Fn libusb_handle_events
+familiy of functions to return to the caller one time.
+The
+.Fn libusb_handle_events
+functions may be called again after calling this function.
 .Pp
 .Ft void
 .Fn libusb_lock_event_waiters "libusb_context *ctx"

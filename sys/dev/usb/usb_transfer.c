@@ -1,6 +1,5 @@
-/* $FreeBSD$ */
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2008-2021 Hans Petter Selasky. All rights reserved.
  *
@@ -1590,7 +1589,7 @@ usbd_setup_ctrl_transfer(struct usb_xfer *xfer)
 		 * parts a time.
 		 */
 		DPRINTFN(0, "Too many frames: %u\n",
-		    (unsigned int)xfer->nframes);
+		    (unsigned)xfer->nframes);
 		goto error;
 	}
 
@@ -3418,7 +3417,7 @@ usbd_clear_stall_callback(struct usb_xfer *xfer1,
  *	usbd_transfer_poll
  *
  * The following function gets called from the USB keyboard driver and
- * UMASS when the system has paniced.
+ * UMASS when the system has panicked.
  *
  * NOTE: It is currently not possible to resume normal operation on
  * the USB controller which has been polled, due to clearing of the

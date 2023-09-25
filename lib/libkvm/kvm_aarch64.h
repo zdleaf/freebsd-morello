@@ -21,8 +21,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 #ifndef __KVM_AARCH64_H__
@@ -35,9 +33,11 @@
 typedef uint64_t	aarch64_physaddr_t;
 typedef uint64_t	aarch64_pte_t;
 
-#define	AARCH64_PAGE_SHIFT	12
-#define	AARCH64_PAGE_SIZE	(1 << AARCH64_PAGE_SHIFT)
-#define	AARCH64_PAGE_MASK	(AARCH64_PAGE_SIZE - 1)
+#define	AARCH64_PAGE_SHIFT_4K	12
+#define	AARCH64_PAGE_SIZE_4K	(1 << AARCH64_PAGE_SHIFT_4K)
+
+#define	AARCH64_PAGE_SHIFT_16K	14
+#define	AARCH64_PAGE_SIZE_16K	(1 << AARCH64_PAGE_SHIFT_16K)
 
 /* Source: arm64/include/pte.h */
 #define	AARCH64_ATTR_MASK	0xfffc000000000fff
@@ -49,17 +49,14 @@ typedef uint64_t	aarch64_pte_t;
 
 #define	AARCH64_ATTR_DESCR_MASK	3
 
-#define	AARCH64_L3_SHIFT	12
+#define	AARCH64_L3_SHIFT_4K	12
+#define	AARCH64_L3_SHIFT_16K	14
 #define	AARCH64_L3_PAGE		0x3
 
 #ifdef __aarch64__
-_Static_assert(PAGE_SHIFT == AARCH64_PAGE_SHIFT, "PAGE_SHIFT mismatch");
-_Static_assert(PAGE_SIZE == AARCH64_PAGE_SIZE, "PAGE_SIZE mismatch");
-_Static_assert(PAGE_MASK == AARCH64_PAGE_MASK, "PAGE_MASK mismatch");
 _Static_assert(ATTR_MASK == AARCH64_ATTR_MASK, "ATTR_MASK mismatch");
 _Static_assert(ATTR_DESCR_MASK == AARCH64_ATTR_DESCR_MASK,
     "ATTR_DESCR_MASK mismatch");
-_Static_assert(L3_SHIFT == AARCH64_L3_SHIFT, "L3_SHIFT mismatch");
 _Static_assert(L3_PAGE == AARCH64_L3_PAGE, "L3_PAGE mismatch");
 #endif
 

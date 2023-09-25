@@ -29,7 +29,6 @@
  * SUCH DAMAGE.
  *
  *      @(#)extern.h	8.1 (Berkeley) 6/6/93
- * $FreeBSD$
  */
 
 #include <sys/cdefs.h>
@@ -88,6 +87,7 @@ void	 closepigs(WINDOW *);
 void	 closeswap(WINDOW *);
 void	 closetcp(WINDOW *);
 int	 cmdifstat(const char *, const char *);
+int	 cmdiolat(const char *, const char *);
 int	 cmdiostat(const char *, const char *);
 int	 cmdkre(const char *, const char *);
 int	 cmdnetstat(const char *, const char *);
@@ -188,3 +188,4 @@ void	 sysputwuint64(WINDOW* , int, int, int, uint64_t, int);
 
 SYSTAT_CMD( zarc );
 SYSTAT_CMD( sctp );
+SYSTAT_CMD( iolat );

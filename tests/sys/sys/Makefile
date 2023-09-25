@@ -1,4 +1,3 @@
-# $FreeBSD$
 
 .include <bsd.compiler.mk>
 
@@ -9,7 +8,8 @@ ATF_TESTS_C=	arb_test \
 		bitstring_test \
 		qmath_test \
 		rb_test \
-		splay_test
+		splay_test \
+		time_test
 
 .if ${COMPILER_TYPE} == "gcc"
 CFLAGS.bitstring_test=	-fno-strict-overflow

@@ -43,8 +43,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include "dhcpd.h"
 #include "dhctoken.h"
 
@@ -186,6 +184,7 @@ read_client_leases(void)
  *	hardware-declaration |
  *	REQUEST option-list |
  *	REQUIRE option-list |
+ *	IGNORE option-list |
  *	TIMEOUT number |
  *	RETRY number |
  *	REBOOT number |
@@ -248,6 +247,9 @@ parse_client_statement(FILE *cfile, struct interface_info *ip,
 		memset(config->required_options, 0,
 		    sizeof(config->required_options));
 		parse_option_list(cfile, config->required_options);
+		return;
+	case IGNORE:
+		parse_option_list(cfile, config->ignored_options);
 		return;
 	case TIMEOUT:
 		parse_lease_time(cfile, &config->timeout);

@@ -31,8 +31,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 
@@ -40,9 +38,7 @@
 #define _LOCATE_STATISTIC_
 
 void 
-statistic (fp, path_fcodes)
-	FILE *fp;               /* open database */
-	char *path_fcodes;  	/* for error message */
+statistic (FILE *fp, char *path_fcodes)
 {
 	long lines, chars, size, size_nbg, big, zwerg, umlaut;
 	u_char *p, *s;
@@ -128,11 +124,7 @@ fastfind_mmap_icase
 #else
 fastfind_mmap
 #endif /* FF_ICASE */
-(pathpart, paddr, len, database)
-	char *pathpart; 	/* search string */
-	caddr_t paddr;  	/* mmap pointer */
-	off_t len;        	/* length of database */
-	char *database; 	/* for error message */
+(char *pathpart, caddr_t paddr, off_t len, char *database)
 
 
 #else /* MMAP */
@@ -144,10 +136,7 @@ fastfind_icase
 fastfind
 #endif /* FF_ICASE */
 
-(fp, pathpart, database)
-	FILE *fp;               /* open database */
-	char *pathpart;		/* search string */
-	char *database;		/* for error message */
+(FILE *fp, char *pathpart, char *database)
 
 
 #endif /* MMAP */
@@ -296,7 +285,7 @@ fastfind
 			}
 
 			if (p - path >= LOCATE_PATH_MAX) 
-				errx(1, "corrupted database: %s %d", database, (int)(p - path));
+				errx(1, "corrupted database: %s %td", database, p - path);
 
 		}
 		

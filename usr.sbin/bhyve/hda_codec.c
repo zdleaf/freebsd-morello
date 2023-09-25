@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2016 Alex Teaca <iateaca@FreeBSD.org>
  * All rights reserved.
@@ -28,8 +28,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <pthread.h>
 #include <pthread_np.h>
 #include <unistd.h>
@@ -465,7 +463,7 @@ hda_codec_init(struct hda_codec_inst *hci, const char *play,
 static int
 hda_codec_reset(struct hda_codec_inst *hci)
 {
-	struct hda_ops *hops = NULL;
+	const struct hda_ops *hops = NULL;
 	struct hda_codec_softc *sc = NULL;
 	struct hda_codec_stream *st = NULL;
 	int i;
@@ -500,8 +498,8 @@ hda_codec_reset(struct hda_codec_inst *hci)
 static int
 hda_codec_command(struct hda_codec_inst *hci, uint32_t cmd_data)
 {
+	const struct hda_ops *hops = NULL;
 	struct hda_codec_softc *sc = NULL;
-	struct hda_ops *hops = NULL;
 	uint8_t cad = 0, nid = 0;
 	uint16_t verb = 0, payload = 0;
 	uint32_t res = 0;
@@ -677,9 +675,9 @@ hda_codec_audio_output_nid(struct hda_codec_softc *sc, uint16_t verb,
 static void
 hda_codec_audio_output_do_transfer(void *arg)
 {
+	const struct hda_ops *hops = NULL;
 	struct hda_codec_softc *sc = (struct hda_codec_softc *)arg;
 	struct hda_codec_inst *hci = NULL;
-	struct hda_ops *hops = NULL;
 	struct hda_codec_stream *st = NULL;
 	struct audio *aud = NULL;
 	int err;
@@ -738,9 +736,9 @@ hda_codec_audio_input_nid(struct hda_codec_softc *sc, uint16_t verb,
 static void
 hda_codec_audio_input_do_transfer(void *arg)
 {
+	const struct hda_ops *hops = NULL;
 	struct hda_codec_softc *sc = (struct hda_codec_softc *)arg;
 	struct hda_codec_inst *hci = NULL;
-	struct hda_ops *hops = NULL;
 	struct hda_codec_stream *st = NULL;
 	struct audio *aud = NULL;
 	int err;
@@ -845,16 +843,14 @@ hda_codec_audio_inout_nid(struct hda_codec_stream *st, uint16_t verb,
 	return (res);
 }
 
-struct hda_codec_class hda_codec  = {
+static const struct hda_codec_class hda_codec = {
 	.name		= "hda_codec",
 	.init		= hda_codec_init,
 	.reset		= hda_codec_reset,
 	.command	= hda_codec_command,
 	.notify		= hda_codec_notify,
 };
-
 HDA_EMUL_SET(hda_codec);
-
 
 /*
  * HDA Audio Context module function definitions

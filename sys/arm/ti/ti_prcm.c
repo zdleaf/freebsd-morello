@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2012 Damjan Marion <dmarion@Freebsd.org>
  * All rights reserved.
@@ -26,15 +26,11 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 /* Based on sys/arm/ti/am335x/am335x_prcm.c */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/bus.h>
@@ -275,12 +271,9 @@ static device_method_t ti_prcm_methods[] = {
 DEFINE_CLASS_1(ti_prcm, ti_prcm_driver, ti_prcm_methods,
     sizeof(struct ti_prcm_softc), simplebus_driver);
 
-static devclass_t ti_prcm_devclass;
-
-EARLY_DRIVER_MODULE(ti_prcm, ofwbus, ti_prcm_driver,
-	ti_prcm_devclass, 0, 0, BUS_PASS_BUS);
-EARLY_DRIVER_MODULE(ti_prcm, simplebus, ti_prcm_driver,
-	ti_prcm_devclass, 0, 0, BUS_PASS_BUS + BUS_PASS_ORDER_MIDDLE);
+EARLY_DRIVER_MODULE(ti_prcm, ofwbus, ti_prcm_driver, 0, 0, BUS_PASS_BUS);
+EARLY_DRIVER_MODULE(ti_prcm, simplebus, ti_prcm_driver, 0, 0,
+    BUS_PASS_BUS + BUS_PASS_ORDER_MIDDLE);
 MODULE_VERSION(ti_prcm, 1);
 MODULE_DEPEND(ti_prcm, ti_scm, 1, 1, 1);
 

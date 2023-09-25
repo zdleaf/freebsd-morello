@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2018 Emmanuel Vadot <manu@freebsd.org>
  *
@@ -26,8 +26,6 @@
 */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/bus.h>
@@ -615,11 +613,9 @@ static device_method_t if_dwc_rk_methods[] = {
 	DEVMETHOD_END
 };
 
-static devclass_t dwc_rk_devclass;
-
 extern driver_t dwc_driver;
 
 DEFINE_CLASS_1(dwc, dwc_rk_driver, if_dwc_rk_methods,
     sizeof(struct if_dwc_rk_softc), dwc_driver);
-DRIVER_MODULE(dwc_rk, simplebus, dwc_rk_driver, dwc_rk_devclass, 0, 0);
+DRIVER_MODULE(dwc_rk, simplebus, dwc_rk_driver, 0, 0);
 MODULE_DEPEND(dwc_rk, dwc, 1, 1, 1);

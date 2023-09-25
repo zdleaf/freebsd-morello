@@ -21,8 +21,6 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 /*
@@ -30,8 +28,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/eventhandler.h>
@@ -723,10 +719,7 @@ static driver_t aw_thermal_driver = {
 	sizeof(struct aw_thermal_softc),
 };
 
-static devclass_t aw_thermal_devclass;
-
-DRIVER_MODULE(aw_thermal, simplebus, aw_thermal_driver, aw_thermal_devclass,
-    0, 0);
+DRIVER_MODULE(aw_thermal, simplebus, aw_thermal_driver, 0, 0);
 MODULE_VERSION(aw_thermal, 1);
 MODULE_DEPEND(aw_thermal, aw_sid, 1, 1, 1);
 SIMPLEBUS_PNP_INFO(compat_data);

@@ -23,15 +23,11 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 #include "opt_platform.h"
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/bus.h>
@@ -75,8 +71,6 @@ static device_method_t powernv_xscom_methods[] = {
 
 	DEVMETHOD_END
 };
-
-static devclass_t powernv_xscom_devclass;
 
 static int
 powernv_xscom_probe(device_t dev)
@@ -125,5 +119,4 @@ powernv_xscom_get_devinfo(device_t dev, device_t child)
 
 DEFINE_CLASS_0(powernv_xscom, powernv_xscom_driver, powernv_xscom_methods,
     sizeof(struct powernv_xscom_softc));
-DRIVER_MODULE(powernv_xscom, ofwbus, powernv_xscom_driver, powernv_xscom_devclass, NULL,
-    NULL);
+DRIVER_MODULE(powernv_xscom, ofwbus, powernv_xscom_driver, NULL, NULL);

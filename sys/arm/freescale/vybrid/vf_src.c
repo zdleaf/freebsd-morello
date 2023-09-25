@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2013 Ruslan Bukin <br@bsdpad.com>
  * All rights reserved.
@@ -32,8 +32,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/bus.h>
@@ -145,6 +143,4 @@ static driver_t src_driver = {
 	sizeof(struct src_softc),
 };
 
-static devclass_t src_devclass;
-
-DRIVER_MODULE(src, simplebus, src_driver, src_devclass, 0, 0);
+DRIVER_MODULE(src, simplebus, src_driver, 0, 0);

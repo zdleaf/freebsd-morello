@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2004 John Baldwin <jhb@FreeBSD.org>
  *
@@ -58,8 +58,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include "opt_sleepqueue_profiling.h"
 #include "opt_ddb.h"
 #include "opt_sched.h"
@@ -146,12 +144,12 @@ struct sleepqueue_chain {
 } __aligned(CACHE_LINE_SIZE);
 
 #ifdef SLEEPQUEUE_PROFILING
-u_int sleepq_max_depth;
 static SYSCTL_NODE(_debug, OID_AUTO, sleepq, CTLFLAG_RD | CTLFLAG_MPSAFE, 0,
     "sleepq profiling");
 static SYSCTL_NODE(_debug_sleepq, OID_AUTO, chains,
     CTLFLAG_RD | CTLFLAG_MPSAFE, 0,
     "sleepq chain stats");
+static u_int sleepq_max_depth;
 SYSCTL_UINT(_debug_sleepq, OID_AUTO, max_depth, CTLFLAG_RD, &sleepq_max_depth,
     0, "maxmimum depth achieved of a single chain");
 
@@ -388,8 +386,9 @@ sleepq_add(const void *wchan, struct lock_object *lock, const char *wmesg,
 }
 
 /*
- * Sets a timeout that will remove the current thread from the specified
- * sleep queue after timo ticks if the thread has not already been awakened.
+ * Sets a timeout that will remove the current thread from the
+ * specified sleep queue at the specified time if the thread has not
+ * already been awakened.  Flags are from C_* (callout) namespace.
  */
 void
 sleepq_set_timeout_sbt(const void *wchan, sbintime_t sbt, sbintime_t pr,
@@ -452,7 +451,7 @@ sleepq_check_ast_sc_locked(struct thread *td, struct sleepqueue_chain *sc)
 	 * thread.  If not, we can switch immediately.
 	 */
 	thread_lock(td);
-	if ((td->td_flags & (TDF_NEEDSIGCHK | TDF_NEEDSUSPCHK)) == 0)
+	if (!td_ast_pending(td, TDA_SIG) && !td_ast_pending(td, TDA_SUSPEND))
 		return (0);
 
 	thread_unlock(td);
@@ -482,7 +481,7 @@ sleepq_check_ast_sc_locked(struct thread *td, struct sleepqueue_chain *sc)
 	 * Lock the per-process spinlock prior to dropping the
 	 * PROC_LOCK to avoid a signal delivery race.
 	 * PROC_LOCK, PROC_SLOCK, and thread_lock() are
-	 * currently held in tdsendsignal().
+	 * currently held in tdsendsignal() and thread_single().
 	 */
 	PROC_SLOCK(p);
 	mtx_lock_spin(&sc->sc_lock);
@@ -833,7 +832,8 @@ sleepq_remove_thread(struct sleepqueue *sq, struct thread *td)
 		td->td_sleepqueue = LIST_FIRST(&sq->sq_free);
 	LIST_REMOVE(td->td_sleepqueue, sq_hash);
 
-	if ((td->td_flags & TDF_TIMEOUT) == 0 && td->td_sleeptimo != 0)
+	if ((td->td_flags & TDF_TIMEOUT) == 0 && td->td_sleeptimo != 0 &&
+	    td->td_lock == &sc->sc_lock) {
 		/*
 		 * We ignore the situation where timeout subsystem was
 		 * unable to stop our callout.  The struct thread is
@@ -843,8 +843,16 @@ sleepq_remove_thread(struct sleepqueue *sq, struct thread *td)
 		 * sleepq_timeout() ensure that the thread does not
 		 * get spurious wakeups, even if the callout was reset
 		 * or thread reused.
+		 *
+		 * We also cannot safely stop the callout if a scheduler
+		 * lock is held since softclock_thread() forces a lock
+		 * order of callout lock -> scheduler lock.  The thread
+		 * lock will be a scheduler lock only if the thread is
+		 * preparing to go to sleep, so this is hopefully a rare
+		 * scenario.
 		 */
 		callout_stop(&td->td_slpcallout);
+	}
 
 	td->td_wmesg = NULL;
 	td->td_wchan = NULL;

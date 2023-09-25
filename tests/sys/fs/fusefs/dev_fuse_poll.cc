@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2019 The FreeBSD Foundation
  *
@@ -26,8 +26,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 /*
@@ -93,13 +91,12 @@ TEST_P(DevFusePoll, access)
 /* Ensure that we wake up pollers during unmount */
 TEST_P(DevFusePoll, destroy)
 {
-	expect_forget(FUSE_ROOT_ID, 1);
 	expect_destroy(0);
 
 	m_mock->unmount();
 }
 
-INSTANTIATE_TEST_CASE_P(PM, DevFusePoll,
+INSTANTIATE_TEST_SUITE_P(PM, DevFusePoll,
 		::testing::Values("BLOCKING", "KQ", "POLL", "SELECT"));
 
 static void* statter(void* arg) {

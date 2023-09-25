@@ -27,8 +27,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include "opt_platform.h"
 
 #include <sys/param.h>
@@ -369,7 +367,7 @@ bcm_lintc_ipi_dispatch(struct bcm_lintc_softc *sc, u_int cpu,
 #else
 		dsb();
 #endif
-		intr_ipi_dispatch(ipi, tf);
+		intr_ipi_dispatch(ipi);
 	}
 }
 #endif
@@ -739,7 +737,5 @@ static driver_t bcm_lintc_driver = {
 	sizeof(struct bcm_lintc_softc),
 };
 
-static devclass_t bcm_lintc_devclass;
-
-EARLY_DRIVER_MODULE(lintc, simplebus, bcm_lintc_driver, bcm_lintc_devclass,
-    0, 0, BUS_PASS_INTERRUPT);
+EARLY_DRIVER_MODULE(lintc, simplebus, bcm_lintc_driver, 0, 0,
+    BUS_PASS_INTERRUPT);

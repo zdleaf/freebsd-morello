@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2010, 2012 Konstantin Belousov <kib@FreeBSD.org>
  * Copyright (c) 2015 The FreeBSD Foundation
@@ -31,8 +31,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include "opt_vm.h"
 
 #include <sys/param.h>
@@ -305,10 +303,6 @@ void
 exec_sysvec_init(void *param)
 {
 	struct sysentvec *sv;
-	vm_offset_t sb;
-#ifdef RANDOM_FENESTRASX
-	ptrdiff_t base;
-#endif
 	u_int flags;
 	int res;
 
@@ -322,19 +316,18 @@ exec_sysvec_init(void *param)
 	sv->sv_shared_page_obj = shared_page_obj;
 	if ((flags & SV_ABI_MASK) == SV_ABI_FREEBSD) {
 		if ((flags & SV_DSO_SIG) != 0) {
-			sb = sv->sv_shared_page_base;
 			res = shared_page_fill((uintptr_t)sv->sv_szsigcode,
 			    16, sv->sv_sigcode);
 			if (res == -1)
-				panic("copying sigtramp to shared page");
-			sb += res;
-			sv->sv_vdso_base = sb;
-			sb += sv->sv_sigcodeoff;
-			sv->sv_sigcode_base = sb;
+				panic("copying vdso to shared page");
+			sv->sv_vdso_offset = res;
+			sv->sv_sigcode_offset = res + sv->sv_sigcodeoff;
 		} else {
-			sv->sv_sigcode_base = sv->sv_shared_page_base +
-			    shared_page_fill(*(sv->sv_szsigcode), 16,
-			    sv->sv_sigcode);
+			res = shared_page_fill(*(sv->sv_szsigcode),
+			    16, sv->sv_sigcode);
+			if (res == -1)
+				panic("copying sigtramp to shared page");
+			sv->sv_sigcode_offset = res;
 		}
 	}
 	if ((flags & SV_TIMEKEEP) != 0) {
@@ -348,8 +341,7 @@ exec_sysvec_init(void *param)
 				KASSERT(compat32_svtk != NULL,
 				    ("Compat32 not registered"));
 			}
-			sv->sv_timekeep_base = sv->sv_shared_page_base +
-			    compat32_svtk->sv_timekeep_off;
+			sv->sv_timekeep_offset = compat32_svtk->sv_timekeep_off;
 		} else {
 #endif
 			if ((flags & SV_ABI_MASK) == SV_ABI_FREEBSD) {
@@ -360,8 +352,7 @@ exec_sysvec_init(void *param)
 				KASSERT(host_svtk != NULL,
 				    ("Host not registered"));
 			}
-			sv->sv_timekeep_base = sv->sv_shared_page_base +
-			    host_svtk->sv_timekeep_off;
+			sv->sv_timekeep_offset = host_svtk->sv_timekeep_off;
 #ifdef COMPAT_FREEBSD32
 		}
 #endif
@@ -375,8 +366,8 @@ exec_sysvec_init(void *param)
 		 */
 		if (fxrng_shpage_mapping == NULL)
 			alloc_sv_fxrng_generation();
-		base = (char *)fxrng_shpage_mapping - shared_page_mapping;
-		sv->sv_fxrng_gen_base = sv->sv_shared_page_base + base;
+		sv->sv_fxrng_gen_offset =
+		    (char *)fxrng_shpage_mapping - shared_page_mapping;
 	}
 #endif
 }
@@ -392,20 +383,10 @@ exec_sysvec_init_secondary(struct sysentvec *sv, struct sysentvec *sv2)
 	    (sv->sv_flags & SV_RNG_SEED_VER));
 
 	sv2->sv_shared_page_obj = sv->sv_shared_page_obj;
-	sv2->sv_sigcode_base = sv2->sv_shared_page_base +
-	    (sv->sv_sigcode_base - sv->sv_shared_page_base);
-	if ((sv2->sv_flags & SV_DSO_SIG) != 0) {
-		sv2->sv_vdso_base = sv2->sv_shared_page_base +
-		    (sv->sv_vdso_base - sv->sv_shared_page_base);
-	}
+	sv2->sv_sigcode_offset = sv->sv_sigcode_offset;
+	sv2->sv_vdso_offset = sv->sv_vdso_offset;
 	if ((sv2->sv_flags & SV_ABI_MASK) != SV_ABI_FREEBSD)
 		return;
-	if ((sv2->sv_flags & SV_TIMEKEEP) != 0) {
-		sv2->sv_timekeep_base = sv2->sv_shared_page_base +
-		    (sv->sv_timekeep_base - sv->sv_shared_page_base);
-	}
-	if ((sv2->sv_flags & SV_RNG_SEED_VER) != 0) {
-		sv2->sv_fxrng_gen_base = sv2->sv_shared_page_base +
-		    (sv->sv_fxrng_gen_base - sv->sv_shared_page_base);
-	}
+	sv2->sv_timekeep_offset = sv->sv_timekeep_offset;
+	sv2->sv_fxrng_gen_offset = sv->sv_fxrng_gen_offset;
 }

@@ -1,6 +1,6 @@
 /* $FreeBSD$ */
 /*
- * Copyright (C) 1984-2021  Mark Nudelman
+ * Copyright (C) 1984-2023  Mark Nudelman
  *
  * You may distribute under the terms of either the GNU General Public
  * License or the Less License, as specified in the README file.
@@ -61,16 +61,15 @@ extern int      know_dumb;
 extern int      pr_type;
 extern int      quit_if_one_screen;
 extern int      no_init;
-extern int errmsgs;
-
+extern int      errmsgs;
+extern int      redraw_on_quit;
+extern int      term_init_done;
+extern int      first_time;
 
 /*
  * Entry point.
  */
-int
-main(argc, argv)
-	int argc;
-	char *argv[];
+int main(int argc, char *argv[])
 {
 	IFILE ifile;
 	char *s;
@@ -121,6 +120,7 @@ main(argc, argv)
 	is_tty = isatty(1);
 	init_mark();
 	init_cmds();
+	init_poll();
 	get_term();
 	init_charset();
 	init_line();
@@ -143,7 +143,7 @@ main(argc, argv)
 
 	s = lgetenv(less_is_more ? "MORE" : "LESS");
 	if (s != NULL)
-		scan_option(save(s));
+		scan_option(s);
 
 #define isoptstring(s)  less_is_more ? (((s)[0] == '-') && (s)[1] != '\0') : \
 			(((s)[0] == '-' || (s)[0] == '+') && (s)[1] != '\0')
@@ -318,9 +318,7 @@ main(argc, argv)
  * Copy a string to a "safe" place
  * (that is, to a buffer allocated by calloc).
  */
-	public char *
-save(s)
-	constant char *s;
+public char * save(constant char *s)
 {
 	char *p;
 
@@ -329,32 +327,30 @@ save(s)
 	return (p);
 }
 
+public void out_of_memory(void)
+{
+	error("Cannot allocate memory", NULL_PARG);
+	quit(QUIT_ERROR);
+}
+
 /*
  * Allocate memory.
  * Like calloc(), but never returns an error (NULL).
  */
-	public VOID_POINTER
-ecalloc(count, size)
-	int count;
-	unsigned int size;
+public void * ecalloc(int count, unsigned int size)
 {
-	VOID_POINTER p;
+	void * p;
 
-	p = (VOID_POINTER) calloc(count, size);
-	if (p != NULL)
-		return (p);
-	error("Cannot allocate memory", NULL_PARG);
-	quit(QUIT_ERROR);
-	/*NOTREACHED*/
-	return (NULL);
+	p = (void *) calloc(count, size);
+	if (p == NULL)
+		out_of_memory();
+	return p;
 }
 
 /*
  * Skip leading spaces in a string.
  */
-	public char *
-skipsp(s)
-	char *s;
+public char * skipsp(char *s)
 {
 	while (*s == ' ' || *s == '\t')
 		s++;
@@ -366,11 +362,7 @@ skipsp(s)
  * If uppercase is true, the first string must begin with an uppercase
  * character; the remainder of the first string may be either case.
  */
-	public int
-sprefix(ps, s, uppercase)
-	char *ps;
-	char *s;
-	int uppercase;
+public int sprefix(char *ps, char *s, int uppercase)
 {
 	int c;
 	int sc;
@@ -399,9 +391,7 @@ sprefix(ps, s, uppercase)
 /*
  * Exit the program.
  */
-	public void
-quit(status)
-	int status;
+public void quit(int status)
 {
 	static int save_status;
 
@@ -413,16 +403,25 @@ quit(status)
 		status = save_status;
 	else
 		save_status = status;
-#if LESSTEST
-	rstat('Q');
-#endif /*LESSTEST*/
 	quitting = 1;
-	edit((char*)NULL);
-	save_cmdhist();
+	check_altpipe_error();
 	if (interactive())
 		clear_bot();
 	deinit();
 	flush();
+	if (redraw_on_quit && term_init_done)
+	{
+		/*
+		 * The last file text displayed might have been on an 
+		 * alternate screen, which now (since deinit) cannot be seen.
+		 * redraw_on_quit tells us to redraw it on the main screen.
+		 */
+		first_time = 1; /* Don't print "skipping" or tildes */
+		repaint();
+		flush();
+	}
+	edit((char*)NULL);
+	save_cmdhist();
 	raw_mode(0);
 #if MSDOS_COMPILER && MSDOS_COMPILER != DJGPPC
 	/* 

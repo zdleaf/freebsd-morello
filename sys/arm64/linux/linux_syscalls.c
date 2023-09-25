@@ -2,7 +2,6 @@
  * System call names.
  *
  * DO NOT EDIT-- this file is automatically @generated.
- * $FreeBSD$
  */
 
 const char *linux_syscallnames[] = {
@@ -71,9 +70,9 @@ const char *linux_syscallnames[] = {
 	"linux_getdents64",			/* 61 = linux_getdents64 */
 	"linux_lseek",			/* 62 = linux_lseek */
 	"read",			/* 63 = read */
-	"write",			/* 64 = write */
+	"linux_write",			/* 64 = linux_write */
 	"readv",			/* 65 = readv */
-	"writev",			/* 66 = writev */
+	"linux_writev",			/* 66 = linux_writev */
 	"linux_pread",			/* 67 = linux_pread */
 	"linux_pwrite",			/* 68 = linux_pwrite */
 	"linux_preadv",			/* 69 = linux_preadv */
@@ -200,7 +199,7 @@ const char *linux_syscallnames[] = {
 	"linux_semget",			/* 190 = linux_semget */
 	"linux_semctl",			/* 191 = linux_semctl */
 	"linux_semtimedop",			/* 192 = linux_semtimedop */
-	"linux_semop",			/* 193 = linux_semop */
+	"semop",			/* 193 = semop */
 	"linux_shmget",			/* 194 = linux_shmget */
 	"linux_shmctl",			/* 195 = linux_shmctl */
 	"linux_shmat",			/* 196 = linux_shmat */

@@ -22,9 +22,7 @@
 .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 .\" SUCH DAMAGE.
 .\"
-.\" $FreeBSD$
-.\"
-.Dd August 25, 2020
+.Dd February 15, 2023
 .Dt EFIBOOTMGR 8
 .Os
 .Sh NAME
@@ -69,6 +67,7 @@
 .Fl t Ar timeout
 .Nm
 .Fl T
+.Nm Fl u Ar unix-path
 .Sh "DESCRIPTION"
 The
 .Nm
@@ -174,6 +173,9 @@ Set the bootmenu timeout value.
 Delete the
 .Cm BootTimeout
 variable.
+.It Fl u -efidev Ar unix-path
+Displays the UEFI device path of
+.Ar unix-path .
 .It Fl v -verbose
 Display the device path of boot entries in the output.
 .El
@@ -206,12 +208,12 @@ The
 program can be used to create new EFI boot variables.
 The following command may be used to create a new boot method, using
 the EFI partition mounted under
-.Pa /mnt ,
+.Pa /boot/efi ,
 mark the method active, using
 the given loader and label the method
 .Qq FreeBSD-11 :
 .Pp
-.Dl efibootmgr -a -c -l /mnt/EFI/freebsd/loader.efi -L FreeBSD-11
+.Dl efibootmgr -a -c -l /boot/efi/EFI/freebsd/loader.efi -L FreeBSD-11
 .Pp
 This will result in the next available bootnum being assigned to a
 new UEFI boot variable, and given the label

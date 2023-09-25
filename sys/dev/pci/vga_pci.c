@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2005 John Baldwin <jhb@FreeBSD.org>
  *
@@ -26,8 +26,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 /*
  * Simple driver for PCI VGA display devices.  Drivers such as agp(4) and
  * drm(4) should attach as children of this device.
@@ -285,7 +283,7 @@ vga_pci_unmap_bios(device_t dev, void *bios)
 #if defined(__amd64__) || defined(__i386__)
 	if (vga_pci_is_boot_display(dev)) {
 		/* We mapped the BIOS shadow copy located at 0xC0000. */
-		pmap_unmapdev((vm_offset_t)bios, VGA_PCI_BIOS_SHADOW_SIZE);
+		pmap_unmapdev(bios, VGA_PCI_BIOS_SHADOW_SIZE);
 
 		return;
 	}
@@ -373,8 +371,7 @@ vga_pci_attach(device_t dev)
 
 	bus_generic_probe(dev);
 
-	/* Always create a drm child for now to make it easier on drm. */
-	device_add_child(dev, "drm", -1);
+	/* Always create a drmn child for now to make it easier on drm. */
 	device_add_child(dev, "drmn", -1);
 	bus_generic_attach(dev);
 
@@ -787,7 +784,5 @@ static driver_t vga_pci_driver = {
 	sizeof(struct vga_pci_softc),
 };
 
-static devclass_t vga_devclass;
-
-DRIVER_MODULE(vgapci, pci, vga_pci_driver, vga_devclass, 0, 0);
+DRIVER_MODULE(vgapci, pci, vga_pci_driver, 0, 0);
 MODULE_DEPEND(vgapci, x86bios, 1, 1, 1);

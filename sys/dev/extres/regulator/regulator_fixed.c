@@ -25,15 +25,14 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include "opt_platform.h"
 #include <sys/param.h>
+#include <sys/systm.h>
+#include <sys/bus.h>
 #include <sys/conf.h>
 #include <sys/gpio.h>
 #include <sys/kernel.h>
 #include <sys/kobj.h>
-#include <sys/systm.h>
 #include <sys/module.h>
 #include <sys/mutex.h>
 
@@ -45,7 +44,9 @@ __FBSDID("$FreeBSD$");
 #include <dev/gpio/gpiobusvar.h>
 #include <dev/extres/regulator/regulator_fixed.h>
 
+#ifdef FDT
 #include "regdev_if.h"
+#endif
 
 MALLOC_DEFINE(M_FIXEDREGULATOR, "fixedregulator", "Fixed regulator");
 
@@ -507,10 +508,8 @@ static device_method_t regfix_methods[] = {
 	DEVMETHOD_END
 };
 
-static devclass_t regfix_devclass;
 DEFINE_CLASS_0(regfix, regfix_driver, regfix_methods,
     sizeof(struct regfix_softc));
-EARLY_DRIVER_MODULE(regfix, simplebus, regfix_driver,
-   regfix_devclass, 0, 0, BUS_PASS_BUS);
+EARLY_DRIVER_MODULE(regfix, simplebus, regfix_driver, 0, 0, BUS_PASS_BUS);
 
 #endif /* FDT */

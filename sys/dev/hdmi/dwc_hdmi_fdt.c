@@ -26,8 +26,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 /*
  * HDMI core module
  */
@@ -51,7 +49,7 @@ __FBSDID("$FreeBSD$");
 
 #include <dev/hdmi/dwc_hdmi.h>
 
-#include "hdmi_if.h"
+#include "crtc_if.h"
 
 struct dwc_hdmi_fdt_softc {
 	struct dwc_hdmi_softc	base;
@@ -196,7 +194,4 @@ static driver_t dwc_hdmi_fdt_driver = {
 	sizeof(struct dwc_hdmi_fdt_softc)
 };
 
-static devclass_t dwc_hdmi_fdt_devclass;
-
-DRIVER_MODULE(dwc_hdmi_fdt, simplebus, dwc_hdmi_fdt_driver,
-    dwc_hdmi_fdt_devclass, 0, 0);
+DRIVER_MODULE(dwc_hdmi_fdt, simplebus, dwc_hdmi_fdt_driver, 0, 0);

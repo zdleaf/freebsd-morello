@@ -1,5 +1,5 @@
 .\"
-.\" SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+.\" SPDX-License-Identifier: BSD-2-Clause
 .\"
 .\" Copyright (c) 2017 Kyle J. Kneitinger <kyle@kneit.in>
 .\"
@@ -15,9 +15,7 @@
 .\"
 .\"     @(#)be.1
 .\"
-.\" $FreeBSD$
-.\"
-.Dd January 6, 2021
+.Dd June 28, 2023
 .Dt BECTL 8
 .Os
 .Sh NAME
@@ -25,73 +23,104 @@
 .Nd Utility to manage boot environments on ZFS
 .Sh SYNOPSIS
 .Nm
+.Op Fl h\&?
+.Nm
+.Op Fl r Ar beroot
 .Cm activate
 .Op Fl t | Fl T
 .Ar beName
 .Nm
+.Op Fl r Ar beroot
 .Cm check
 .Nm
+.Op Fl r Ar beroot
 .Cm create
 .Op Fl r
 .Op Fl e Brq Ar nonActiveBe | Ar beName Ns Cm @ Ns Ar snapshot
 .Ar newBeName
 .Nm
+.Op Fl r Ar beroot
 .Cm create
 .Op Fl r
 .Ar beName@snapshot
 .Nm
+.Op Fl r Ar beroot
 .Cm destroy
 .Op Fl \&Fo
 .Ar beName Ns Op Cm @ Ns Ar snapshot
 .Nm
+.Op Fl r Ar beroot
 .Cm export
 .Ar sourceBe
 .Nm
+.Op Fl r Ar beroot
 .Cm import
 .Ar targetBe
 .Nm
+.Op Fl r Ar beroot
 .Cm jail
 .Op Fl bU
 .Oo Bro Fl o Ar key Ns Cm = Ns Ar value | Fl u Ar key Brc Oc Ns ...
 .Ar beName
 .Op Ar utility Op Ar argument ...
 .Nm
+.Op Fl r Ar beroot
 .Cm list
 .Op Fl aDHs
 .Op Fl c Ar property
 .Op Fl C Ar property
 .Oo Bro Fl c Ar property | Fl C Ar property Brc Oc
 .Nm
+.Op Fl r Ar beroot
 .Cm mount
 .Ar beName
 .Op Ar mountpoint
 .Nm
+.Op Fl r Ar beroot
 .Cm rename
 .Ar origBeName
 .Ar newBeName
 .Nm
+.Op Fl r Ar beroot
 .Brq Cm ujail | unjail
 .Brq Ar jailId | jailName | beName
 .Nm
+.Op Fl r Ar beroot
 .Brq Cm umount | unmount
 .Op Fl f
 .Ar beName
-.Pp
-.Nm
-.Op Fl h\&?
 .Sh DESCRIPTION
 The
 .Nm
 command is used to setup and interact with ZFS boot environments, which are
 bootable clones of datasets.
 .Pp
-Boot environments
-allow the system to be upgraded, while preserving the old system environment in
-a separate ZFS dataset.
+A boot environment allows the system to be upgraded, while preserving the
+pre-upgrade system environment.
 .Pp
-The following commands are supported by
-.Nm :
+.Nm
+itself accepts an
+.Fl r
+flag specified before the command to indicate the
+.Ar beroot
+that should be used as the boot environment root, or the dataset whose children
+are all boot environments.
+Normally this information is derived from the bootfs property of the pool that
+is mounted at
+.Pa / ,
+but it is useful when the system has not been booted into a ZFS root or a
+different pool should be operated on.
+For instance, booting into the recovery media and manually importing a pool from
+one of the system's resident disks will require the
+.Fl r
+flag to work.
+.Pp
+.Ss Supported Subcommands and Flags
 .Bl -tag -width activate
+.It Xo
+.Fl h |
+.Fl \&?
+Print usage information.
 .It Xo
 .Cm activate
 .Op Fl t | Fl T
@@ -131,6 +160,9 @@ Create a new boot environment named
 If the
 .Fl r
 flag is given, a recursive boot environment will be made.
+See
+.Sx Boot Environment Structures
+for a discussion on different layouts.
 .Pp
 If the
 .Fl e
@@ -138,11 +170,13 @@ flag is specified, the new environment will be cloned from the given
 .Ar nonActiveBe
 or
 .Ar beName Ns Cm @ Ns Ar snapshot .
-Otherwise, the new environment will be created from the currently booted environment.
+Otherwise, the new environment will be created from the currently booted
+environment.
 .Pp
 If
 .Nm
-is creating from another boot environment, a snapshot of that boot environment will be created to clone from.
+is creating from another boot environment, a snapshot of that boot environment
+will be created to clone from.
 .It Xo
 .Cm create
 .Op Fl r
@@ -155,8 +189,11 @@ If the
 .Fl r
 flag is given, a recursive snapshot of the boot environment will be created.
 A snapshot is created for each descendant dataset of the boot environment.
+See
+.Sx Boot Environment Structures
+for a discussion on different layouts.
 .Pp
-No new boot environment is created with this command.
+No new boot environment is created with this subcommand.
 .It Xo
 .Cm destroy
 .Op Fl \&Fo
@@ -270,7 +307,6 @@ is used on next boot once
 .Pq Em \&T ;
 or combination of
 .Pq Em \&NRT .
-.Pp
 .Bl -tag -width indent
 .It Fl a
 Display all datasets.
@@ -284,18 +320,20 @@ arbitrary white space.
 .It Fl s
 Display all snapshots as well.
 .It Fl c Ar property
-Sort boot environments by given property name.
+Sort boot environments by the given ZFS dataset property.
 The following properties are supported:
 .Pp
 .Bl -tag -width 4n -offset indent -compact
-.It name (default output)
+.It name (the default)
 .It creation
 .It origin
 .It used
-.It usedds
-.It usedsnap
-.It usedrefreserv
+.It usedbydataset
+.It usedbyrefreservation
+.It usedbysnapshots
 .El
+.Pp
+Short forms usedds, usedrefreserv and usedsnap are also supported.
 .It Fl C Ar property
 Same as the
 .Fl c
@@ -310,10 +348,28 @@ or
 .Fl a
 option is used.
 .It Cm mount Ar beName Op Ar mountpoint
-Temporarily mount the boot environment.
-Mount at the specified
+Mount the given boot environment.
+.Pp
+If a nonexistent
 .Ar mountpoint
-if provided.
+is given:
+.Nm
+will make the directory, including intermediate directories as required.
+.Pp
+If no
+.Ar mountpoint
+is given:
+.Nm
+will make a directory such as
+.Pa be_mount.c6Sf
+in
+.Pa /tmp .
+Randomness in the last four characters of the directory name will prevent
+mount point conflicts.
+Unmount of an environment, followed by mount of the same environment
+without giving a
+.Ar mountpoint ,
+will result in a different randomly-named mountpoint.
 .It Cm rename Ar origBeName newBeName
 Rename the given
 .Ar origBeName
@@ -337,14 +393,95 @@ Unmount the given boot environment, if it is mounted.
 Specifying
 .Fl f
 will force the unmount if busy.
+.Pp
+Unmount will not remove the mount point.
 .El
 .Pp
+.Ss Boot Environment Structures
+The traditional
+.Fx
+boot environment layout, as created by the Auto ZFS option to
+.Xr bsdinstall 8 ,
+is a
+.Dq shallow
+boot environment structure, where boot environment datasets do not have any
+directly subordinate datasets.
+Instead, they're organized off in
+.Pa zroot/ROOT ,
+and they rely on datasets elsewhere in the pool having
+.Dv canmount
+set to
+.Dv off .
+For instance, a simplified pool may be laid out as such:
+.Bd -literal -offset indent
+% zfs list -o name,canmount,mountpoint
+NAME			CANMOUNT	MOUNTPOINT
+zroot
+zroot/ROOT		noauto		none
+zroot/ROOT/default	noauto		none
+zroot/home		on		/home
+zroot/usr		off		/usr
+zroot/usr/src		on		/usr/src
+zroot/var		off		/var
+.Ed
+.Pp
+In that example,
+.Pa zroot/usr
+has
+.Dv canmount
+set to
+.Dv off ,
+thus files in
+.Pa /usr
+typically fall into the boot environment because this dataset is not mounted.
+.Pa zroot/usr/src
+is mounted, thus files in
+.Pa /usr/src
+are not in the boot environment.
+.Pp
+The other style of boot environments in use, frequently called
+.Dq deep boot environments ,
+organizes some or all of the boot environment as subordinate to the boot
+environment dataset.
+For example:
+.Bd -literal -offset indent
+% zfs list -o name,canmount,mountpoint
+NAME				CANMOUNT	MOUNTPOINT
+zroot
+zroot/ROOT			noauto		none
+zroot/ROOT/default		noauto		none
+zroot/ROOT/default/usr		noauto		/usr
+zroot/ROOT/default/usr/local	noauto		/usr/local
+zroot/var			on		/var
+.Ed
+.Pp
+Note that the subordinate datasets now have
+.Dv canmount
+set to
+.Dv noauto .
+These are more obviously a part of the boot environment, as indicated by their
+positioning in the layout.
+These subordinate datasets will be mounted by the
+.Dv zfsbe
+.Xr rc 8
+script at boot time.
+In this example,
+.Pa /var
+is excluded from the boot environment.
+.Pp
 .Nm
-prints usage information if
-.Fl h
-or
-.Fl \&?
-is specified.
+subcommands that have their own
+.Fl r
+operate on this second,
+.Dq deep
+style of boot environment, when the
+.Fl r
+flag is set.
+A future version of
+.Nm
+may default to handling both styles and deprecate the various
+.Fl r
+flags.
 \" .Sh EXAMPLES
 \" .Bl -bullet
 \" .It
@@ -352,6 +489,7 @@ is specified.
 \" .El
 .Sh SEE ALSO
 .Xr libbe 3 ,
+.Xr zfsprops 7 ,
 .Xr beinstall.sh 8 ,
 .Xr jail 8 ,
 .Xr zfs 8 ,

@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 1997, Stefan Esser <se@freebsd.org>
  * Copyright (c) 2000, Michael Smith <msmith@freebsd.org>
@@ -26,8 +26,6 @@
  * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- *
- * $FreeBSD$
  *
  */
 
@@ -138,6 +136,8 @@ int		pci_child_location_method(device_t cbdev, device_t child,
 		    struct sbuf *sb);
 int		pci_child_pnpinfo_method(device_t cbdev, device_t child,
 		    struct sbuf *sb);
+int		pci_get_device_path_method(device_t dev, device_t child,
+		    const char *locator, struct sbuf *sb);
 int		pci_assign_interrupt_method(device_t dev, device_t child);
 int		pci_resume(device_t dev);
 int		pci_resume_child(device_t dev, device_t child);

@@ -50,8 +50,6 @@
  * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 #ifndef _SCIC_SDS_REMOTE_NODE_CONTEXT_H_
 #define _SCIC_SDS_REMOTE_NODE_CONTEXT_H_
@@ -266,7 +264,7 @@ typedef struct SCIC_SDS_REMOTE_NODE_CONTEXT
    U16 remote_node_index;
 
    /**
-    * This field is the recored suspension code or the reason for the remote node
+    * This field is the recorded suspension code or the reason for the remote node
     * context suspension.
     */
    U32 suspension_code;

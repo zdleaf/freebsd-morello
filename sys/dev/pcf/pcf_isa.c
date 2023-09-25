@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2004 Joerg Wunsch
  *
@@ -30,8 +30,6 @@
  * SUCH DAMAGE.
  */
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 /*
  * Hardware driver for a Philips PCF8584 I2C bus controller sitting
  * on a generic ISA bus.
@@ -82,8 +80,6 @@ static device_method_t pcf_isa_methods[] = {
 	DEVMETHOD(iicbus_reset,		pcf_rst_card),
 	{ 0, 0 }
 };
-
-static devclass_t pcf_isa_devclass;
 
 static driver_t pcf_isa_driver = {
 	PCF_NAME,
@@ -210,4 +206,4 @@ pcf_isa_detach(device_t dev)
 	return (0);
 }
 
-DRIVER_MODULE(pcf_isa, isa, pcf_isa_driver, pcf_isa_devclass, 0, 0);
+DRIVER_MODULE(pcf_isa, isa, pcf_isa_driver, 0, 0);

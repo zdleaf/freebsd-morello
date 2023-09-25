@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2021 NVIDIA corporation & affiliates.
+ * Copyright (c) 2021-2022 NVIDIA corporation & affiliates.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -21,8 +21,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 #include "opt_kern_tls.h"
@@ -116,6 +114,16 @@ mlx5e_tls_rx_get_iq(struct mlx5e_priv *priv, uint32_t flowid, uint32_t flowtype)
 	return (&priv->channel[mlx5e_tls_rx_get_ch(priv, flowid, flowtype)].iq);
 }
 
+static void
+mlx5e_tls_rx_send_static_parameters_cb(void *arg)
+{
+	struct mlx5e_tls_rx_tag *ptag;
+
+	ptag = (struct mlx5e_tls_rx_tag *)arg;
+
+	m_snd_tag_rele(&ptag->tag);
+}
+
 /*
  * This function sends the so-called TLS RX static parameters to the
  * hardware. These parameters are temporarily stored in the
@@ -162,9 +170,11 @@ mlx5e_tls_rx_send_static_parameters(struct mlx5e_iq *iq, struct mlx5e_tls_rx_tag
 	memcpy(iq->doorbell.d32, &wqe->ctrl, sizeof(iq->doorbell.d32));
 
 	iq->data[pi].num_wqebbs = DIV_ROUND_UP(ds_cnt, MLX5_SEND_WQEBB_NUM_DS);
+	iq->data[pi].callback = &mlx5e_tls_rx_send_static_parameters_cb;
+	iq->data[pi].arg = ptag;
 
-	iq->data[pi].p_refcount = &ptag->refs;
-	atomic_add_int(&ptag->refs, 1);
+	m_snd_tag_ref(&ptag->tag);
+
 	iq->pc += iq->data[pi].num_wqebbs;
 
 	mlx5e_iq_notify_hw(iq);
@@ -229,8 +239,7 @@ mlx5e_tls_rx_send_progress_parameters_sync(struct mlx5e_iq *iq,
 	iq->data[pi].num_wqebbs = DIV_ROUND_UP(ds_cnt, MLX5_SEND_WQEBB_NUM_DS);
 	iq->data[pi].callback = &mlx5e_tls_rx_send_progress_parameters_cb;
 	iq->data[pi].arg = ptag;
-	iq->data[pi].p_refcount = &ptag->refs;
-	atomic_add_int(&ptag->refs, 1);
+
 	iq->pc += iq->data[pi].num_wqebbs;
 
 	init_completion(&ptag->progress_complete);
@@ -309,6 +318,8 @@ mlx5e_tls_rx_receive_progress_parameters_cb(void *arg)
 	}
 done:
 	MLX5E_TLS_RX_TAG_UNLOCK(ptag);
+
+	m_snd_tag_rele(&ptag->tag);
 }
 
 /*
@@ -355,10 +366,11 @@ mlx5e_tls_rx_receive_progress_parameters(struct mlx5e_iq *iq, struct mlx5e_tls_r
 	memcpy(iq->doorbell.d32, &wqe->ctrl, sizeof(iq->doorbell.d32));
 
 	iq->data[pi].num_wqebbs = DIV_ROUND_UP(ds_cnt, MLX5_SEND_WQEBB_NUM_DS);
-	iq->data[pi].p_refcount = &ptag->refs;
 	iq->data[pi].callback = &mlx5e_tls_rx_receive_progress_parameters_cb;
 	iq->data[pi].arg = ptag;
-	atomic_add_int(&ptag->refs, 1);
+
+	m_snd_tag_ref(&ptag->tag);
+
 	iq->pc += iq->data[pi].num_wqebbs;
 
 	mlx5e_iq_notify_hw(iq);
@@ -413,8 +425,10 @@ mlx5e_tls_rx_tag_release(void *arg, void **store, int cnt)
 static void
 mlx5e_tls_rx_tag_zfree(struct mlx5e_tls_rx_tag *ptag)
 {
+	/* make sure any unhandled taskqueue events are ignored */
+	ptag->state = MLX5E_TLS_RX_ST_FREED;
+
 	/* reset some variables */
-	ptag->state = MLX5E_TLS_RX_ST_INIT;
 	ptag->dek_index = 0;
 	ptag->dek_index_ok = 0;
 	ptag->tirn = 0;
@@ -459,7 +473,8 @@ mlx5e_tls_rx_init(struct mlx5e_priv *priv)
 
 	ptls->zone = uma_zcache_create(ptls->zname,
 	    sizeof(struct mlx5e_tls_rx_tag), NULL, NULL, NULL, NULL,
-	    mlx5e_tls_rx_tag_import, mlx5e_tls_rx_tag_release, priv->mdev, 0);
+	    mlx5e_tls_rx_tag_import, mlx5e_tls_rx_tag_release, priv->mdev,
+	    UMA_ZONE_UNMANAGED);
 
 	/* shared between RX and TX TLS */
 	ptls->max_resources = 1U << (MLX5_CAP_GEN(priv->mdev, log_max_dek) - 1);
@@ -554,14 +569,10 @@ mlx5e_tls_rx_work(struct work_struct *work)
 		MLX5E_TLS_RX_TAG_UNLOCK(ptag);
 		break;
 
-	case MLX5E_TLS_RX_ST_FREED:
+	case MLX5E_TLS_RX_ST_RELEASE:
 		/* remove flow rule for incoming traffic, if any */
 		if (ptag->flow_rule != NULL)
 			mlx5e_accel_fs_del_inpcb(ptag->flow_rule);
-
-		/* wait for all refs to go away */
-		while (ptag->refs != 0)
-			msleep(1);
 
 		/* try to destroy DEK context by ID */
 		if (ptag->dek_index_ok)
@@ -635,13 +646,13 @@ mlx5e_tls_rx_set_params(void *ctx, struct inpcb *inp, const struct tls_session_p
 CTASSERT(MLX5E_TLS_RX_ST_INIT == 0);
 
 /*
- * This functino is responsible for allocating a TLS RX tag. It is a
+ * This function is responsible for allocating a TLS RX tag. It is a
  * callback function invoked by the network stack.
  *
  * Returns zero on success else an error happened.
  */
 int
-mlx5e_tls_rx_snd_tag_alloc(struct ifnet *ifp,
+mlx5e_tls_rx_snd_tag_alloc(if_t ifp,
     union if_snd_tag_alloc_params *params,
     struct m_snd_tag **ppmt)
 {
@@ -653,7 +664,7 @@ mlx5e_tls_rx_snd_tag_alloc(struct ifnet *ifp,
 	uint32_t value;
 	int error;
 
-	priv = ifp->if_softc;
+	priv = if_getsoftc(ifp);
 
 	if (unlikely(priv->gone != 0 || priv->tls_rx.init == 0 ||
 	    params->hdr.flowtype == M_HASHTYPE_NONE))
@@ -665,7 +676,6 @@ mlx5e_tls_rx_snd_tag_alloc(struct ifnet *ifp,
 		return (ENOMEM);
 
 	/* sanity check default values */
-	MPASS(ptag->state == MLX5E_TLS_RX_ST_INIT);
 	MPASS(ptag->dek_index == 0);
 	MPASS(ptag->dek_index_ok == 0);
 
@@ -749,6 +759,9 @@ mlx5e_tls_rx_snd_tag_alloc(struct ifnet *ifp,
 	m_snd_tag_init(&ptag->tag, ifp, &mlx5e_tls_rx_snd_tag_sw);
 	*ppmt = &ptag->tag;
 
+	/* reset state */
+	ptag->state = MLX5E_TLS_RX_ST_INIT;
+
 	queue_work(priv->tls_rx.wq, &ptag->work);
 	flush_work(&ptag->work);
 
@@ -786,7 +799,7 @@ mlx5e_tls_rx_snd_tag_alloc(struct ifnet *ifp,
 		goto cleanup;
 	}
 
-	if (ifp->if_pcp != IFNET_PCP_NONE || params->tls_rx.vlan_id != 0) {
+	if (if_getpcp(ifp) != IFNET_PCP_NONE || params->tls_rx.vlan_id != 0) {
 		/* create flow rule for TLS RX traffic (tagged) */
 		flow_rule = mlx5e_accel_fs_add_inpcb(priv, params->tls_rx.inp,
 		    ptag->tirn, MLX5_FS_DEFAULT_FLOW_TAG, params->tls_rx.vlan_id);
@@ -807,12 +820,7 @@ mlx5e_tls_rx_snd_tag_alloc(struct ifnet *ifp,
 	return (0);
 
 cleanup:
-	MLX5E_TLS_RX_TAG_LOCK(ptag);
-	ptag->state = MLX5E_TLS_RX_ST_FREED;
-	MLX5E_TLS_RX_TAG_UNLOCK(ptag);
-
-	queue_work(priv->tls_rx.wq, &ptag->work);
-	flush_work(&ptag->work);
+	m_snd_tag_rele(&ptag->tag);
 	return (error);
 
 failure:
@@ -983,10 +991,10 @@ mlx5e_tls_rx_snd_tag_free(struct m_snd_tag *pmt)
 	struct mlx5e_priv *priv;
 
 	MLX5E_TLS_RX_TAG_LOCK(ptag);
-	ptag->state = MLX5E_TLS_RX_ST_FREED;
+	ptag->state = MLX5E_TLS_RX_ST_RELEASE;
 	MLX5E_TLS_RX_TAG_UNLOCK(ptag);
 
-	priv = ptag->tag.ifp->if_softc;
+	priv = if_getsoftc(ptag->tag.ifp);
 	queue_work(priv->tls_rx.wq, &ptag->work);
 }
 

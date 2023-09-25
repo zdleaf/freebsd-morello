@@ -16,8 +16,6 @@
  * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
  * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
- *
- * $FreeBSD$
  */
 #ifndef	__IF_OTUSREG_H__
 #define	__IF_OTUSREG_H__
@@ -1020,7 +1018,7 @@ struct otus_softc {
 	uint8_t				capflags;
 	uint8_t				rxmask;
 	uint8_t				txmask;
-	int				sc_running:1,
+	bool				sc_running:1,
 					sc_calibrating:1,
 					sc_scanning:1;
 

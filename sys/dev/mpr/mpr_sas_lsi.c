@@ -29,8 +29,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 /* Communications core for Avago Technologies (LSI) MPT3 */
 
 /* TODO Move headers to mprvar */
@@ -356,7 +354,7 @@ mprsas_fw_work(struct mpr_softc *sc, struct mpr_fw_event_work *fw_event)
 					 * need to do diag reset
 					 */
 					printf("%s: poll for page completed "
-					    "with error %d", __func__, error);
+					    "with error %d\n", __func__, error);
 				}
 				if (reply && (le16toh(reply->IOCStatus) &
 				    MPI2_IOCSTATUS_MASK) !=

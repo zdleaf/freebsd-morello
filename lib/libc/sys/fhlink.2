@@ -23,9 +23,7 @@
 .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 .\" SUCH DAMAGE.
 .\"
-.\" $FreeBSD$
-.\"
-.Dd February 23, 2021
+.Dd November 30, 2022
 .Dt FHLINK 2
 .Os
 .Sh NAME
@@ -248,3 +246,10 @@ nor a file descriptor associated with a directory.
 .Xr fhopen 2 ,
 .Xr fhreadlink 2 ,
 .Xr fhstat 2
+.Sh HISTORY
+The
+.Fn fhlink
+and
+.Fn fhlinkat
+system calls first appeared in
+.Fx 12.1 .

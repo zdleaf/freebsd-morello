@@ -27,8 +27,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/bus.h>
@@ -84,7 +82,7 @@ __FBSDID("$FreeBSD$");
 #define	 SMI_CLK_MODE			(1UL << 24)
 
 #define	SMI_EN				0x20
-#define	 SMI_EN_EN			(1UL << 0)	/* Enabele interface */
+#define	 SMI_EN_EN			(1UL << 0)	/* Enable interface */
 
 #define	SMI_DRV_CTL			0x28
 
@@ -93,8 +91,8 @@ static int thunder_mdio_detach(device_t);
 static int thunder_mdio_read(device_t, int, int);
 static int thunder_mdio_write(device_t, int, int, int);
 
-static int thunder_ifmedia_change_stub(struct ifnet *);
-static void thunder_ifmedia_status_stub(struct ifnet *, struct ifmediareq *);
+static int thunder_ifmedia_change_stub(if_t);
+static void thunder_ifmedia_status_stub(if_t, struct ifmediareq *);
 
 static int thunder_mdio_media_status(device_t, int, int *, int *, int *);
 static int thunder_mdio_media_change(device_t, int, int, int, int);
@@ -120,7 +118,7 @@ static device_method_t thunder_mdio_methods[] = {
 DEFINE_CLASS_0(thunder_mdio, thunder_mdio_driver, thunder_mdio_methods,
     sizeof(struct thunder_mdio_softc));
 
-DRIVER_MODULE(miibus, thunder_mdio, miibus_driver, miibus_devclass, 0, 0);
+DRIVER_MODULE(miibus, thunder_mdio, miibus_driver, 0, 0);
 MODULE_VERSION(thunder_mdio, 1);
 MODULE_DEPEND(thunder_mdio, ether, 1, 1, 1);
 MODULE_DEPEND(thunder_mdio, miibus, 1, 1, 1);
@@ -351,14 +349,14 @@ thunder_mdio_write(device_t dev, int phy, int reg, int data)
 }
 
 static int
-thunder_ifmedia_change_stub(struct ifnet *ifp __unused)
+thunder_ifmedia_change_stub(if_t ifp __unused)
 {
 	/* Will never be called by if_media */
 	return (0);
 }
 
 static void
-thunder_ifmedia_status_stub(struct ifnet *ifp __unused, struct ifmediareq
+thunder_ifmedia_status_stub(if_t ifp __unused, struct ifmediareq
     *ifmr __unused)
 {
 	/* Will never be called by if_media */

@@ -30,8 +30,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <err.h>
 #include <pwd.h>
 #include <signal.h>
@@ -56,7 +54,7 @@ __FBSDID("$FreeBSD$");
 void wallprog_1(struct svc_req *rqstp, SVCXPRT *transp);
 void possess(void);
 void killkids(int sig);
-static void usage(void);
+static void usage(void) __dead2;
 
 int nodaemon = 0;
 int from_inetd = 1;
@@ -167,9 +165,10 @@ wallprog_1(struct svc_req *rqstp, SVCXPRT *transp)
 	union {
 		char *wallproc_wall_1_arg;
 	} argument;
-	char *result;
-	bool_t (*xdr_argument)(), (*xdr_result)();
-	char *(*local)();
+	void *result;
+	xdrproc_t xdr_argument, xdr_result;
+	typedef void *(svc_cb)(void *arg, struct svc_req *rqstp);
+	svc_cb *local;
 
 	switch (rqstp->rq_proc) {
 	case NULLPROC:
@@ -177,9 +176,9 @@ wallprog_1(struct svc_req *rqstp, SVCXPRT *transp)
 		goto leave;
 
 	case WALLPROC_WALL:
-		xdr_argument = xdr_wrapstring;
-		xdr_result = xdr_void;
-		local = (char *(*)()) wallproc_wall_1_svc;
+		xdr_argument = (xdrproc_t)xdr_wrapstring;
+		xdr_result = (xdrproc_t)xdr_void;
+		local = (svc_cb *)wallproc_wall_1_svc;
 		break;
 
 	default:
@@ -187,16 +186,16 @@ wallprog_1(struct svc_req *rqstp, SVCXPRT *transp)
 		goto leave;
 	}
 	bzero(&argument, sizeof(argument));
-	if (!svc_getargs(transp, (xdrproc_t)xdr_argument, &argument)) {
+	if (!svc_getargs(transp, xdr_argument, &argument)) {
 		svcerr_decode(transp);
 		goto leave;
 	}
 	result = (*local)(&argument, rqstp);
 	if (result != NULL &&
-	    !svc_sendreply(transp, (xdrproc_t)xdr_result, result)) {
+	    !svc_sendreply(transp, xdr_result, result)) {
 		svcerr_systemerr(transp);
 	}
-	if (!svc_freeargs(transp, (xdrproc_t)xdr_argument, &argument)) {
+	if (!svc_freeargs(transp, xdr_argument, &argument)) {
 		syslog(LOG_ERR, "unable to free arguments");
 		exit(1);
 	}

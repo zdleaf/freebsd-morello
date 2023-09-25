@@ -1,4 +1,3 @@
-/*	$FreeBSD$	*/
 
 /*
  * Copyright (C) 2012 by Darren Reed.
@@ -1113,8 +1112,10 @@ ipf_pr_pullup(fr_info_t *fin, int plen)
 		if (M_LEN(fin->fin_m) < plen + fin->fin_ipoff) {
 #if defined(_KERNEL)
 			if (ipf_pullup(fin->fin_m, fin, plen) == NULL) {
-				DT(ipf_pullup_fail);
+				DT1(ipf_pullup_fail, fr_info_t *, fin);
 				LBUMP(ipf_stats[fin->fin_out].fr_pull[1]);
+				fin->fin_reason = FRB_PULLUP;
+				fin->fin_flx |= FI_BAD;
 				return (-1);
 			}
 			LBUMP(ipf_stats[fin->fin_out].fr_pull[0]);
@@ -1127,6 +1128,7 @@ ipf_pr_pullup(fr_info_t *fin, int plen)
 			*fin->fin_mp = NULL;
 			fin->fin_m = NULL;
 			fin->fin_ip = NULL;
+			fin->fin_flx |= FI_BAD;
 			return (-1);
 #endif
 		}
@@ -3179,6 +3181,14 @@ finished:
 	}
 
 	SPL_X(s);
+
+	if (fin->fin_m == NULL && fin->fin_flx & FI_BAD &&
+	    fin->fin_reason == FRB_PULLUP) {
+		/* m_pullup() has freed the mbuf */
+		LBUMP(ipf_stats[out].fr_blocked[fin->fin_reason]);
+		return (-1);
+	}
+
 
 #ifdef _KERNEL
 	if (FR_ISPASS(pass))
@@ -7121,7 +7131,7 @@ ipf_ipftune(ipf_main_softc_t *softc, ioctlcmd_t cmd, void *data)
 	case SIOCIPFSET :
 		/*
 		 * Search by name or by cookie value for a particular entry
-		 * in the tuning paramter table.
+		 * in the tuning parameter table.
 		 */
 		IPFERROR(77);
 		error = ESRCH;
@@ -7360,7 +7370,7 @@ ipf_token_expire(ipf_main_softc_t *softc)
 /* Loop through all of the existing tokens and call deref to see if they    */
 /* can be freed. Normally a function like this might just loop on           */
 /* ipf_token_head but there is a chance that a token might have a ref count */
-/* of greater than one and in that case the the reference would drop twice  */
+/* of greater than one and in that case the reference would drop twice      */
 /* by code that is only entitled to drop it once.                           */
 /* ------------------------------------------------------------------------ */
 static void
@@ -7385,7 +7395,7 @@ ipf_token_flush(ipf_main_softc_t *softc)
 /*              uid(I)  - uid owning the token                              */
 /*              ptr(I)  - context pointer for the token                     */
 /*                                                                          */
-/* This function looks for a a token in the current list that matches up    */
+/* This function looks for a token in the current list that matches up      */
 /* the fields (type, uid, ptr).  If none is found, ESRCH is returned, else  */
 /* call ipf_token_dewref() to remove it from the list. In the event that    */
 /* the token has a reference held elsewhere, setting ipt_complete to 2      */

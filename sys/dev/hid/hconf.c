@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2019 Vladimir Kondratyev <wulf@FreeBSD.org>
  * Copyright (c) 2020 Andriy Gapon <avg@FreeBSD.org>
@@ -27,8 +27,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 /*
  * Digitizer configuration top-level collection support.
  * https://docs.microsoft.com/en-us/windows-hardware/design/component-guidelines/windows-precision-touchpad-required-hid-top-level-collections
@@ -112,8 +110,6 @@ static device_probe_t		hconf_probe;
 static device_attach_t		hconf_attach;
 static device_detach_t		hconf_detach;
 static device_resume_t		hconf_resume;
-
-static devclass_t hconf_devclass;
 
 static device_method_t hconf_methods[] = {
 
@@ -323,7 +319,7 @@ hconf_set_input_mode(device_t dev, enum hconf_input_mode mode)
 	return (hconf_set_feature_control(sc, INPUT_MODE, mode));
 }
 
-DRIVER_MODULE(hconf, hidbus, hconf_driver, hconf_devclass, NULL, 0);
+DRIVER_MODULE(hconf, hidbus, hconf_driver, NULL, NULL);
 MODULE_DEPEND(hconf, hidbus, 1, 1, 1);
 MODULE_DEPEND(hconf, hid, 1, 1, 1);
 MODULE_VERSION(hconf, 1);

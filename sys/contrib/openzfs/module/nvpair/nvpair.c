@@ -6,7 +6,7 @@
  * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
- * or http://www.opensolaris.org/os/licensing.
+ * or https://opensource.org/licenses/CDDL-1.0.
  * See the License for the specific language governing permissions
  * and limitations under the License.
  *
@@ -40,7 +40,7 @@
 #include <sys/nvpair_impl.h>
 #include <sys/types.h>
 #include <sys/param.h>
-#include <sys/strings.h>
+#include <sys/string.h>
 #include <rpc/xdr.h>
 #include <sys/mod.h>
 
@@ -53,7 +53,7 @@
 #include <stddef.h>
 #endif
 
-#define	skip_whitespace(p)	while ((*(p) == ' ') || (*(p) == '\t')) p++
+#define	skip_whitespace(p)	while ((*(p) == ' ') || (*(p) == '\t')) (p)++
 
 /*
  * nvpair.c - Provides kernel & userland interfaces for manipulating
@@ -203,7 +203,7 @@ nv_mem_zalloc(nvpriv_t *nvp, size_t size)
 	void *buf;
 
 	if ((buf = nva->nva_ops->nv_ao_alloc(nva, size)) != NULL)
-		bzero(buf, size);
+		memset(buf, 0, size);
 
 	return (buf);
 }
@@ -219,7 +219,7 @@ nv_mem_free(nvpriv_t *nvp, void *buf, size_t size)
 static void
 nv_priv_init(nvpriv_t *priv, nv_alloc_t *nva, uint32_t stat)
 {
-	bzero(priv, sizeof (nvpriv_t));
+	memset(priv, 0, sizeof (nvpriv_t));
 
 	priv->nvp_nva = nva;
 	priv->nvp_stat = stat;
@@ -473,7 +473,7 @@ nvt_remove_nvpair(nvlist_t *nvl, const nvpair_t *nvp)
 	}
 	i_nvp_t **tab = priv->nvp_hashtable;
 
-	char *name = NVP_NAME(nvp);
+	const char *name = NVP_NAME(nvp);
 	uint64_t hash = nvt_hash(name);
 	uint64_t index = hash & (priv->nvp_nbuckets - 1);
 
@@ -528,7 +528,7 @@ nvt_add_nvpair(nvlist_t *nvl, nvpair_t *nvp)
 	}
 	i_nvp_t **tab = priv->nvp_hashtable;
 
-	char *name = NVP_NAME(nvp);
+	const char *name = NVP_NAME(nvp);
 	uint64_t hash = nvt_hash(name);
 	uint64_t index = hash & (priv->nvp_nbuckets - 1);
 
@@ -1203,7 +1203,7 @@ nvlist_add_common(nvlist_t *nvl, const char *name,
 	nvp->nvp_name_sz = name_sz;
 	nvp->nvp_value_elem = nelem;
 	nvp->nvp_type = type;
-	bcopy(name, NVP_NAME(nvp), name_sz);
+	memcpy(NVP_NAME(nvp), name, name_sz);
 
 	switch (type) {
 	case DATA_TYPE_BOOLEAN:
@@ -1217,7 +1217,7 @@ nvlist_add_common(nvlist_t *nvl, const char *name,
 		buf += nelem * sizeof (uint64_t);
 		for (i = 0; i < nelem; i++) {
 			int slen = strlen(strs[i]) + 1;
-			bcopy(strs[i], buf, slen);
+			memcpy(buf, strs[i], slen);
 			cstrs[i] = buf;
 			buf += slen;
 		}
@@ -1255,7 +1255,7 @@ nvlist_add_common(nvlist_t *nvl, const char *name,
 		break;
 	}
 	default:
-		bcopy(data, NVP_VALUE(nvp), value_sz);
+		memcpy(NVP_VALUE(nvp), data, value_sz);
 	}
 
 	/* if unique name, remove before add */
@@ -1517,7 +1517,7 @@ nvlist_empty(const nvlist_t *nvl)
 	return (priv->nvp_list == NULL);
 }
 
-char *
+const char *
 nvpair_name(const nvpair_t *nvp)
 {
 	return (NVP_NAME(nvp));
@@ -1588,7 +1588,7 @@ nvpair_value_common(const nvpair_t *nvp, data_type_t type, uint_t *nelem,
 			return (EINVAL);
 		if ((value_sz = i_get_value_size(type, NULL, 1)) < 0)
 			return (EINVAL);
-		bcopy(NVP_VALUE(nvp), data, (size_t)value_sz);
+		memcpy(data, NVP_VALUE(nvp), (size_t)value_sz);
 		if (nelem != NULL)
 			*nelem = 1;
 		break;
@@ -1731,7 +1731,7 @@ nvlist_lookup_double(const nvlist_t *nvl, const char *name, double *val)
 #endif
 
 int
-nvlist_lookup_string(nvlist_t *nvl, const char *name, char **val)
+nvlist_lookup_string(const nvlist_t *nvl, const char *name, const char **val)
 {
 	return (nvlist_lookup_common(nvl, name, DATA_TYPE_STRING, NULL, val));
 }
@@ -1917,7 +1917,7 @@ nvlist_lookup_pairs(nvlist_t *nvl, int flag, ...)
  */
 static int
 nvlist_lookup_nvpair_ei_sep(nvlist_t *nvl, const char *name, const char sep,
-    nvpair_t **ret, int *ip, char **ep)
+    nvpair_t **ret, int *ip, const char **ep)
 {
 	nvpair_t	*nvp;
 	const char	*np;
@@ -2057,8 +2057,11 @@ nvlist_lookup_nvpair_ei_sep(nvlist_t *nvl, const char *name, const char sep,
 				nvl = EMBEDDED_NVL(nvp);
 				break;
 			} else if (nvpair_type(nvp) == DATA_TYPE_NVLIST_ARRAY) {
-				(void) nvpair_value_nvlist_array(nvp,
-				    &nva, (uint_t *)&n);
+				if (nvpair_value_nvlist_array(nvp,
+				    &nva, (uint_t *)&n) != 0)
+					goto fail;
+				if (nva == NULL)
+					goto fail;
 				if ((n < 0) || (idx >= n))
 					goto fail;
 				nvl = nva[idx];
@@ -2094,7 +2097,7 @@ nvlist_lookup_nvpair(nvlist_t *nvl, const char *name, nvpair_t **ret)
  * description.
  */
 int nvlist_lookup_nvpair_embedded_index(nvlist_t *nvl,
-    const char *name, nvpair_t **ret, int *ip, char **ep)
+    const char *name, nvpair_t **ret, int *ip, const char **ep)
 {
 	return (nvlist_lookup_nvpair_ei_sep(nvl, name, '.', ret, ip, ep));
 }
@@ -2189,7 +2192,7 @@ nvpair_value_double(const nvpair_t *nvp, double *val)
 #endif
 
 int
-nvpair_value_string(nvpair_t *nvp, char **val)
+nvpair_value_string(const nvpair_t *nvp, const char **val)
 {
 	return (nvpair_value_common(nvp, DATA_TYPE_STRING, NULL, val));
 }
@@ -2261,7 +2264,7 @@ nvpair_value_uint64_array(nvpair_t *nvp, uint64_t **val, uint_t *nelem)
 }
 
 int
-nvpair_value_string_array(nvpair_t *nvp, char ***val, uint_t *nelem)
+nvpair_value_string_array(nvpair_t *nvp, const char ***val, uint_t *nelem)
 {
 	return (nvpair_value_common(nvp, DATA_TYPE_STRING_ARRAY, nelem, val));
 }
@@ -2540,7 +2543,7 @@ nvs_embedded_nvl_array(nvstream_t *nvs, nvpair_t *nvp, size_t *size)
 		size_t len = nelem * sizeof (uint64_t);
 		nvlist_t *embedded = (nvlist_t *)((uintptr_t)nvlp + len);
 
-		bzero(nvlp, len);	/* don't trust packed data */
+		memset(nvlp, 0, len);	/* don't trust packed data */
 		for (i = 0; i < nelem; i++) {
 			if (nvs_embedded(nvs, embedded) != 0) {
 				nvpair_free(nvp);
@@ -2808,7 +2811,7 @@ nvs_native_create(nvstream_t *nvs, nvs_native_t *native, char *buf,
 static void
 nvs_native_destroy(nvstream_t *nvs)
 {
-	(void) nvs;
+	nvs->nvs_private = NULL;
 }
 
 static int
@@ -2820,15 +2823,15 @@ native_cp(nvstream_t *nvs, void *buf, size_t size)
 		return (EFAULT);
 
 	/*
-	 * The bcopy() below eliminates alignment requirement
+	 * The memcpy() below eliminates alignment requirement
 	 * on the buffer (stream) and is preferred over direct access.
 	 */
 	switch (nvs->nvs_op) {
 	case NVS_OP_ENCODE:
-		bcopy(buf, native->n_curr, size);
+		memcpy(native->n_curr, buf, size);
 		break;
 	case NVS_OP_DECODE:
-		bcopy(native->n_curr, buf, size);
+		memcpy(buf, native->n_curr, size);
 		break;
 	default:
 		return (EINVAL);
@@ -2895,7 +2898,7 @@ nvs_native_nvl_fini(nvstream_t *nvs)
 		if (native->n_curr + sizeof (int) > native->n_end)
 			return (EFAULT);
 
-		bzero(native->n_curr, sizeof (int));
+		memset(native->n_curr, 0, sizeof (int));
 		native->n_curr += sizeof (int);
 	}
 
@@ -2912,10 +2915,10 @@ nvpair_native_embedded(nvstream_t *nvs, nvpair_t *nvp)
 		/*
 		 * Null out the pointer that is meaningless in the packed
 		 * structure. The address may not be aligned, so we have
-		 * to use bzero.
+		 * to use memset.
 		 */
-		bzero((char *)packed + offsetof(nvlist_t, nvl_priv),
-		    sizeof (uint64_t));
+		memset((char *)packed + offsetof(nvlist_t, nvl_priv),
+		    0, sizeof (uint64_t));
 	}
 
 	return (nvs_embedded(nvs, EMBEDDED_NVL(nvp)));
@@ -2933,18 +2936,18 @@ nvpair_native_embedded_array(nvstream_t *nvs, nvpair_t *nvp)
 		/*
 		 * Null out pointers that are meaningless in the packed
 		 * structure. The addresses may not be aligned, so we have
-		 * to use bzero.
+		 * to use memset.
 		 */
-		bzero(value, len);
+		memset(value, 0, len);
 
 		for (i = 0; i < NVP_NELEM(nvp); i++, packed++)
 			/*
 			 * Null out the pointer that is meaningless in the
 			 * packed structure. The address may not be aligned,
-			 * so we have to use bzero.
+			 * so we have to use memset.
 			 */
-			bzero((char *)packed + offsetof(nvlist_t, nvl_priv),
-			    sizeof (uint64_t));
+			memset((char *)packed + offsetof(nvlist_t, nvl_priv),
+			    0, sizeof (uint64_t));
 	}
 
 	return (nvs_embedded_nvl_array(nvs, nvp, NULL));
@@ -2961,9 +2964,9 @@ nvpair_native_string_array(nvstream_t *nvs, nvpair_t *nvp)
 		/*
 		 * Null out pointers that are meaningless in the packed
 		 * structure. The addresses may not be aligned, so we have
-		 * to use bzero.
+		 * to use memset.
 		 */
-		bzero(strp, NVP_NELEM(nvp) * sizeof (uint64_t));
+		memset(strp, 0, NVP_NELEM(nvp) * sizeof (uint64_t));
 		break;
 	}
 	case NVS_OP_DECODE: {
@@ -2988,9 +2991,9 @@ nvs_native_nvp_op(nvstream_t *nvs, nvpair_t *nvp)
 	int ret = 0;
 
 	/*
-	 * We do the initial bcopy of the data before we look at
+	 * We do the initial memcpy of the data before we look at
 	 * the nvpair type, because when we're decoding, we won't
-	 * have the correct values for the pair until we do the bcopy.
+	 * have the correct values for the pair until we do the memcpy.
 	 */
 	switch (nvs->nvs_op) {
 	case NVS_OP_ENCODE:
@@ -3086,7 +3089,7 @@ nvs_native_nvpair(nvstream_t *nvs, nvpair_t *nvp, size_t *size)
 		/* try to read the size value from the stream */
 		if (native->n_curr + sizeof (int32_t) > native->n_end)
 			return (EFAULT);
-		bcopy(native->n_curr, &decode_len, sizeof (int32_t));
+		memcpy(&decode_len, native->n_curr, sizeof (int32_t));
 
 		/* sanity check the size value */
 		if (decode_len < 0 ||
@@ -3189,7 +3192,7 @@ nvs_xdr_destroy(nvstream_t *nvs)
 	switch (nvs->nvs_op) {
 	case NVS_OP_ENCODE:
 	case NVS_OP_DECODE:
-		xdr_destroy((XDR *)nvs->nvs_private);
+		nvs->nvs_private = NULL;
 		break;
 	default:
 		break;
@@ -3451,7 +3454,7 @@ nvs_xdr_nvp_op(nvstream_t *nvs, nvpair_t *nvp)
 		int i;
 
 		if (nvs->nvs_op == NVS_OP_DECODE)
-			bzero(buf, len);	/* don't trust packed data */
+			memset(buf, 0, len);	/* don't trust packed data */
 
 		for (i = 0; i < nelem; i++) {
 			if (buflen <= len)
@@ -3677,27 +3680,6 @@ nvs_xdr(nvstream_t *nvs, nvlist_t *nvl, char *buf, size_t *buflen)
 
 	return (err);
 }
-
-#if defined(_KERNEL)
-static int __init
-nvpair_init(void)
-{
-	return (0);
-}
-
-static void __exit
-nvpair_fini(void)
-{
-}
-
-module_init(nvpair_init);
-module_exit(nvpair_fini);
-#endif
-
-ZFS_MODULE_DESCRIPTION("Generic name/value pair implementation");
-ZFS_MODULE_AUTHOR(ZFS_META_AUTHOR);
-ZFS_MODULE_LICENSE(ZFS_META_LICENSE);
-ZFS_MODULE_VERSION(ZFS_META_VERSION "-" ZFS_META_RELEASE);
 
 EXPORT_SYMBOL(nv_alloc_init);
 EXPORT_SYMBOL(nv_alloc_reset);

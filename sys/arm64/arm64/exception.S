@@ -27,8 +27,6 @@
 
 #include <machine/asm.h>
 #include <machine/armreg.h>
-__FBSDID("$FreeBSD$");
-
 #include "assym.inc"
 
 	.text
@@ -41,38 +39,39 @@ __FBSDID("$FreeBSD$");
 .macro	save_registers_head el
 .if \el == 1
 	mov	x18, sp
-	sub	sp, sp, #128
+	stp	x0,  x1,  [sp, #(TF_X - TF_SIZE - 128)]!
+.else
+	stp	x0,  x1,  [sp, #(TF_X - TF_SIZE)]!
 .endif
-	sub	sp, sp, #(TF_SIZE)
-	stp	x28, x29, [sp, #(TF_X + 28 * 8)]
-	stp	x26, x27, [sp, #(TF_X + 26 * 8)]
-	stp	x24, x25, [sp, #(TF_X + 24 * 8)]
-	stp	x22, x23, [sp, #(TF_X + 22 * 8)]
-	stp	x20, x21, [sp, #(TF_X + 20 * 8)]
-	stp	x18, x19, [sp, #(TF_X + 18 * 8)]
-	stp	x16, x17, [sp, #(TF_X + 16 * 8)]
-	stp	x14, x15, [sp, #(TF_X + 14 * 8)]
-	stp	x12, x13, [sp, #(TF_X + 12 * 8)]
-	stp	x10, x11, [sp, #(TF_X + 10 * 8)]
-	stp	x8,  x9,  [sp, #(TF_X + 8  * 8)]
-	stp	x6,  x7,  [sp, #(TF_X + 6  * 8)]
-	stp	x4,  x5,  [sp, #(TF_X + 4  * 8)]
-	stp	x2,  x3,  [sp, #(TF_X + 2  * 8)]
-	stp	x0,  x1,  [sp, #(TF_X + 0  * 8)]
-	mrs	x10, elr_el1
-	mrs	x11, spsr_el1
-	mrs	x12, esr_el1
+	stp	x2,  x3,  [sp, #(2  * 8)]
+	stp	x4,  x5,  [sp, #(4  * 8)]
+	stp	x6,  x7,  [sp, #(6  * 8)]
+	stp	x8,  x9,  [sp, #(8  * 8)]
+	stp	x10, x11, [sp, #(10 * 8)]
+	stp	x12, x13, [sp, #(12 * 8)]
+	stp	x14, x15, [sp, #(14 * 8)]
+	stp	x16, x17, [sp, #(16 * 8)]
+	stp	x18, x19, [sp, #(18 * 8)]
+	stp	x20, x21, [sp, #(20 * 8)]
+	stp	x22, x23, [sp, #(22 * 8)]
+	stp	x24, x25, [sp, #(24 * 8)]
+	stp	x26, x27, [sp, #(26 * 8)]
+	stp	x28, x29, [sp, #(28 * 8)]
 .if \el == 0
 	mrs	x18, sp_el0
 .endif
-	str	x10, [sp, #(TF_ELR)]
-	stp	w11, w12, [sp, #(TF_SPSR)]
-	stp	x18,  lr, [sp, #(TF_SP)]
+	mrs	x10, elr_el1
+	mrs	x11, spsr_el1
+	mrs	x12, esr_el1
+	mrs	x13, far_el1
+	stp	x18,  lr, [sp, #(TF_SP - TF_X)]!
+	stp	x10, x11, [sp, #(TF_ELR)]
+	stp	x12, x13, [sp, #(TF_ESR)]
 	mrs	x18, tpidr_el1
-	add	x29, sp, #(TF_SIZE)
 .endm
 
 .macro	save_registers el
+	add	x29, sp, #(TF_SIZE)
 .if \el == 0
 #if defined(PERTHREAD_SSP)
 	/* Load the SSP canary to sp_el0 */
@@ -175,15 +174,12 @@ __FBSDID("$FreeBSD$");
 	 */
 	msr	daifset, #(DAIF_INTR)
 
-	/* Read the current thread flags */
+	/* Read the current thread AST mask */
 	ldr	x1, [x18, #PC_CURTHREAD]	/* Load curthread */
-	ldr	x2, [x1, #TD_FLAGS]
+	ldr	w1, [x1, #(TD_AST)]
 
-	/* Check if we have either bits set */
-	mov	x3, #((TDF_ASTPENDING|TDF_NEEDRESCHED) >> 8)
-	lsl	x3, x3, #8
-	and	x2, x2, x3
-	cbz	x2, 2f
+	/* Check if we have a non-zero AST mask */
+	cbz	w1, 2f
 
 	/* Restore interrupts */
 	msr	daif, x19

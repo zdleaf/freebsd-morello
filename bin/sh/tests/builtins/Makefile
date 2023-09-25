@@ -1,4 +1,3 @@
-# $FreeBSD$
 
 PACKAGE=	tests
 
@@ -94,6 +93,7 @@ ${PACKAGE}FILES+=		exit3.0
 ${PACKAGE}FILES+=		export1.0
 ${PACKAGE}FILES+=		fc1.0
 ${PACKAGE}FILES+=		fc2.0
+${PACKAGE}FILES+=		fc3.0 fc3.0.stdout fc3.0.stderr
 ${PACKAGE}FILES+=		for1.0
 ${PACKAGE}FILES+=		for2.0
 ${PACKAGE}FILES+=		for3.0

@@ -33,8 +33,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #define	LINUXKPI_PARAM_PREFIX ibcore_
 
 #include <linux/completion.h>
@@ -723,7 +721,7 @@ EXPORT_SYMBOL(ib_sa_get_mcmember_rec);
 
 int ib_init_ah_from_mcmember(struct ib_device *device, u8 port_num,
 			     struct ib_sa_mcmember_rec *rec,
-			     struct ifnet *ndev,
+			     if_t ndev,
 			     enum ib_gid_type gid_type,
 			     struct ib_ah_attr *ah_attr)
 {

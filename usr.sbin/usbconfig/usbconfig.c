@@ -1,6 +1,5 @@
-/* $FreeBSD$ */
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2008-2009 Hans Petter Selasky. All rights reserved.
  *
@@ -182,7 +181,6 @@ be_dev_remove_quirk(struct libusb20_backend *pbe,
 	if (error) {
 		fprintf(stderr, "Removing quirk '%s' failed, continuing.\n", str);
 	}
-	return;
 }
 
 static void
@@ -205,7 +203,6 @@ be_dev_add_quirk(struct libusb20_backend *pbe,
 	if (error) {
 		fprintf(stderr, "Adding quirk '%s' failed, continuing.\n", str);
 	}
-	return;
 }
 
 static uint8_t
@@ -312,7 +309,6 @@ reset_options(struct options *opt)
 	if (opt->buffer)
 		free(opt->buffer);
 	memset(opt, 0, sizeof(*opt));
-	return;
 }
 
 static void
@@ -542,8 +538,6 @@ flush_command(struct libusb20_backend *pbe, struct options *opt)
 	}
 done:
 	reset_options(opt);
-
-	return;
 }
 
 int

@@ -24,8 +24,6 @@
  * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- *
- * $FreeBSD$
  *	NetBSD: ki2c.c,v 1.11 2007/12/06 17:00:33 ad Exp
  *	Id: ki2c.c,v 1.7 2002/10/05 09:56:05 tsubai Exp
  */
@@ -145,10 +143,9 @@ static driver_t kiic_driver = {
 	kiic_methods,
 	sizeof(struct kiic_softc)
 };
-static devclass_t kiic_devclass;
 
-DRIVER_MODULE(kiic, macio, kiic_driver, kiic_devclass, 0, 0);
-DRIVER_MODULE(kiic, unin, kiic_driver, kiic_devclass, 0, 0);
+DRIVER_MODULE(kiic, macio, kiic_driver, 0, 0);
+DRIVER_MODULE(kiic, unin, kiic_driver, 0, 0);
 
 static int
 kiic_probe(device_t self)

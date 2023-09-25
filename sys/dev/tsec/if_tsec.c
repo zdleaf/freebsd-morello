@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (C) 2007-2008 Semihalf, Rafal Jaworowski
  * Copyright (C) 2006-2007 Semihalf, Piotr Kruszynski
@@ -30,8 +30,6 @@
  * Freescale integrated Three-Speed Ethernet Controller (TSEC) driver.
  */
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #ifdef HAVE_KERNEL_OPTION_HEADERS
 #include "opt_device_polling.h"
 #endif
@@ -73,12 +71,12 @@ static int	tsec_alloc_dma_desc(device_t dev, bus_dma_tag_t *dtag,
     bus_dmamap_t *dmap, bus_size_t dsize, void **vaddr, void *raddr,
     const char *dname);
 static void	tsec_dma_ctl(struct tsec_softc *sc, int state);
-static void	 tsec_encap(struct ifnet *ifp, struct tsec_softc *sc,
+static void	 tsec_encap(if_t ifp, struct tsec_softc *sc,
     struct mbuf *m0, uint16_t fcb_flags, int *start_tx);
 static void	tsec_free_dma(struct tsec_softc *sc);
 static void	tsec_free_dma_desc(bus_dma_tag_t dtag, bus_dmamap_t dmap, void *vaddr);
-static int	tsec_ifmedia_upd(struct ifnet *ifp);
-static void	tsec_ifmedia_sts(struct ifnet *ifp, struct ifmediareq *ifmr);
+static int	tsec_ifmedia_upd(if_t ifp);
+static void	tsec_ifmedia_sts(if_t ifp, struct ifmediareq *ifmr);
 static int	tsec_new_rxbuf(bus_dma_tag_t tag, bus_dmamap_t map,
     struct mbuf **mbufp, uint32_t *paddr);
 static void	tsec_map_dma_addr(void *arg, bus_dma_segment_t *segs,
@@ -86,12 +84,12 @@ static void	tsec_map_dma_addr(void *arg, bus_dma_segment_t *segs,
 static void	tsec_intrs_ctl(struct tsec_softc *sc, int state);
 static void	tsec_init(void *xsc);
 static void	tsec_init_locked(struct tsec_softc *sc);
-static int	tsec_ioctl(struct ifnet *ifp, u_long command, caddr_t data);
+static int	tsec_ioctl(if_t ifp, u_long command, caddr_t data);
 static void	tsec_reset_mac(struct tsec_softc *sc);
 static void	tsec_setfilter(struct tsec_softc *sc);
 static void	tsec_set_mac_address(struct tsec_softc *sc);
-static void	tsec_start(struct ifnet *ifp);
-static void	tsec_start_locked(struct ifnet *ifp);
+static void	tsec_start(if_t ifp);
+static void	tsec_start_locked(if_t ifp);
 static void	tsec_stop(struct tsec_softc *sc);
 static void	tsec_tick(void *arg);
 static void	tsec_watchdog(struct tsec_softc *sc);
@@ -109,8 +107,7 @@ static void	tsec_offload_process_frame(struct tsec_softc *sc,
 static void	tsec_setup_multicast(struct tsec_softc *sc);
 static int	tsec_set_mtu(struct tsec_softc *sc, unsigned int mtu);
 
-devclass_t tsec_devclass;
-DRIVER_MODULE(miibus, tsec, miibus_driver, miibus_devclass, 0, 0);
+DRIVER_MODULE(miibus, tsec, miibus_driver, 0, 0);
 MODULE_DEPEND(tsec, ether, 1, 1, 1);
 MODULE_DEPEND(tsec, miibus, 1, 1, 1);
 
@@ -120,7 +117,7 @@ int
 tsec_attach(struct tsec_softc *sc)
 {
 	uint8_t hwaddr[ETHER_ADDR_LEN];
-	struct ifnet *ifp;
+	if_t ifp;
 	int error = 0;
 	int i;
 
@@ -248,26 +245,25 @@ tsec_attach(struct tsec_softc *sc)
 		return (ENOMEM);
 	}
 
-	ifp->if_softc = sc;
+	if_setsoftc(ifp, sc);
 	if_initname(ifp, device_get_name(sc->dev), device_get_unit(sc->dev));
-	ifp->if_flags = IFF_SIMPLEX | IFF_MULTICAST | IFF_BROADCAST;
-	ifp->if_init = tsec_init;
-	ifp->if_start = tsec_start;
-	ifp->if_ioctl = tsec_ioctl;
+	if_setflags(ifp, IFF_SIMPLEX | IFF_MULTICAST | IFF_BROADCAST);
+	if_setinitfn(ifp, tsec_init);
+	if_setstartfn(ifp, tsec_start);
+	if_setioctlfn(ifp, tsec_ioctl);
 
-	IFQ_SET_MAXLEN(&ifp->if_snd, TSEC_TX_NUM_DESC - 1);
-	ifp->if_snd.ifq_drv_maxlen = TSEC_TX_NUM_DESC - 1;
-	IFQ_SET_READY(&ifp->if_snd);
+	if_setsendqlen(ifp, TSEC_TX_NUM_DESC - 1);
+	if_setsendqready(ifp);
 
-	ifp->if_capabilities = IFCAP_VLAN_MTU;
+	if_setcapabilities(ifp, IFCAP_VLAN_MTU);
 	if (sc->is_etsec)
-		ifp->if_capabilities |= IFCAP_HWCSUM;
+		if_setcapabilitiesbit(ifp, IFCAP_HWCSUM, 0);
 
-	ifp->if_capenable = ifp->if_capabilities;
+	if_setcapenable(ifp, if_getcapabilities(ifp));
 
 #ifdef DEVICE_POLLING
 	/* Advertise that polling is supported */
-	ifp->if_capabilities |= IFCAP_POLLING;
+	if_setcapabilitiesbit(ifp, IFCAP_POLLING, 0);
 #endif
 
 	/* Attach PHY(s) */
@@ -296,7 +292,7 @@ tsec_detach(struct tsec_softc *sc)
 
 	if (sc->tsec_ifp != NULL) {
 #ifdef DEVICE_POLLING
-		if (sc->tsec_ifp->if_capenable & IFCAP_POLLING)
+		if (if_getcapenable(sc->tsec_ifp) & IFCAP_POLLING)
 			ether_poll_deregister(sc->tsec_ifp);
 #endif
 
@@ -361,7 +357,7 @@ tsec_mii_wait(struct tsec_softc *sc, uint32_t flags)
 	int timeout;
 
 	/*
-	 * The status indicators are not set immediatly after a command.
+	 * The status indicators are not set immediately after a command.
 	 * Discard the first value.
 	 */
 	TSEC_PHY_READ(sc, TSEC_REG_MIIMIND);
@@ -378,11 +374,11 @@ tsec_init_locked(struct tsec_softc *sc)
 {
 	struct tsec_desc *tx_desc = sc->tsec_tx_vaddr;
 	struct tsec_desc *rx_desc = sc->tsec_rx_vaddr;
-	struct ifnet *ifp = sc->tsec_ifp;
+	if_t ifp = sc->tsec_ifp;
 	uint32_t val, i;
 	int timeout;
 
-	if (ifp->if_drv_flags & IFF_DRV_RUNNING)
+	if (if_getdrvflags(ifp) & IFF_DRV_RUNNING)
 		return;
 
 	TSEC_GLOBAL_LOCK_ASSERT(sc);
@@ -459,7 +455,7 @@ tsec_init_locked(struct tsec_softc *sc)
 	 * ...only if polling is not turned on. Disable interrupts explicitly
 	 * if polling is enabled.
 	 */
-	if (ifp->if_capenable & IFCAP_POLLING )
+	if (if_getcapenable(ifp) & IFCAP_POLLING )
 		tsec_intrs_ctl(sc, 0);
 	else
 #endif /* DEVICE_POLLING */
@@ -524,7 +520,7 @@ tsec_init_locked(struct tsec_softc *sc)
 
 	/* Step 19: Configure ethernet frame sizes */
 	TSEC_WRITE(sc, TSEC_REG_MINFLR, TSEC_MIN_FRAME_SIZE);
-	tsec_set_mtu(sc, ifp->if_mtu);
+	tsec_set_mtu(sc, if_getmtu(ifp));
 
 	/* Step 20: Enable Rx and RxBD sdata snooping */
 	TSEC_WRITE(sc, TSEC_REG_ATTR, TSEC_ATTR_RDSEN | TSEC_ATTR_RBDSEN);
@@ -557,9 +553,9 @@ tsec_init_locked(struct tsec_softc *sc)
 	tsec_setup_multicast(sc);
 
 	/* Step 27: Activate network interface */
-	ifp->if_drv_flags |= IFF_DRV_RUNNING;
-	ifp->if_drv_flags &= ~IFF_DRV_OACTIVE;
-	sc->tsec_if_flags = ifp->if_flags;
+	if_setdrvflagbits(ifp, IFF_DRV_RUNNING, 0);
+	if_setdrvflagbits(ifp, 0, IFF_DRV_OACTIVE);
+	sc->tsec_if_flags = if_getflags(ifp);
 	sc->tsec_watchdog = 0;
 
 	/* Schedule watchdog timeout */
@@ -580,7 +576,7 @@ tsec_set_mac_address(struct tsec_softc *sc)
 	    sizeof(macbuf)));
 
 	macbufp = (char *)macbuf;
-	curmac = (char *)IF_LLADDR(sc->tsec_ifp);
+	curmac = (char *)if_getlladdr(sc->tsec_ifp);
 
 	/* Correct order of MAC address bytes */
 	for (i = 1; i <= ETHER_ADDR_LEN; i++)
@@ -694,7 +690,7 @@ tsec_reset_mac(struct tsec_softc *sc)
 static void
 tsec_watchdog(struct tsec_softc *sc)
 {
-	struct ifnet *ifp;
+	if_t ifp;
 
 	TSEC_GLOBAL_LOCK_ASSERT(sc);
 
@@ -710,9 +706,9 @@ tsec_watchdog(struct tsec_softc *sc)
 }
 
 static void
-tsec_start(struct ifnet *ifp)
+tsec_start(if_t ifp)
 {
-	struct tsec_softc *sc = ifp->if_softc;
+	struct tsec_softc *sc = if_getsoftc(ifp);
 
 	TSEC_TRANSMIT_LOCK(sc);
 	tsec_start_locked(ifp);
@@ -720,7 +716,7 @@ tsec_start(struct ifnet *ifp)
 }
 
 static void
-tsec_start_locked(struct ifnet *ifp)
+tsec_start_locked(if_t ifp)
 {
 	struct tsec_softc *sc;
 	struct mbuf *m0;
@@ -729,7 +725,7 @@ tsec_start_locked(struct ifnet *ifp)
 	int start_tx;
 	uint16_t fcb_flags;
 
-	sc = ifp->if_softc;
+	sc = if_getsoftc(ifp);
 	start_tx = 0;
 
 	TSEC_TRANSMIT_LOCK_ASSERT(sc);
@@ -743,12 +739,12 @@ tsec_start_locked(struct ifnet *ifp)
 	for (;;) {
 		if (TSEC_FREE_TX_DESC(sc) < TSEC_TX_MAX_DMA_SEGS) {
 			/* No free descriptors */
-			ifp->if_drv_flags |= IFF_DRV_OACTIVE;
+			if_setdrvflagbits(ifp, IFF_DRV_OACTIVE, 0);
 			break;
 		}
 
 		/* Get packet from the queue */
-		IFQ_DRV_DEQUEUE(&ifp->if_snd, m0);
+		m0 = if_dequeue(ifp);
 		if (m0 == NULL)
 			break;
 
@@ -791,7 +787,7 @@ tsec_start_locked(struct ifnet *ifp)
 }
 
 static void
-tsec_encap(struct ifnet *ifp, struct tsec_softc *sc, struct mbuf *m0,
+tsec_encap(if_t ifp, struct tsec_softc *sc, struct mbuf *m0,
     uint16_t fcb_flags, int *start_tx)
 {
 	bus_dma_segment_t segs[TSEC_TX_MAX_DMA_SEGS];
@@ -873,14 +869,14 @@ tsec_encap(struct ifnet *ifp, struct tsec_softc *sc, struct mbuf *m0,
 static void
 tsec_setfilter(struct tsec_softc *sc)
 {
-	struct ifnet *ifp;
+	if_t ifp;
 	uint32_t flags;
 
 	ifp = sc->tsec_ifp;
 	flags = TSEC_READ(sc, TSEC_REG_RCTRL);
 
 	/* Promiscuous mode */
-	if (ifp->if_flags & IFF_PROMISC)
+	if (if_getflags(ifp) & IFF_PROMISC)
 		flags |= TSEC_RCTRL_PROM;
 	else
 		flags &= ~TSEC_RCTRL_PROM;
@@ -892,16 +888,16 @@ tsec_setfilter(struct tsec_softc *sc)
 static poll_handler_t tsec_poll;
 
 static int
-tsec_poll(struct ifnet *ifp, enum poll_cmd cmd, int count)
+tsec_poll(if_t ifp, enum poll_cmd cmd, int count)
 {
 	uint32_t ie;
-	struct tsec_softc *sc = ifp->if_softc;
+	struct tsec_softc *sc = if_getsoftc(ifp);
 	int rx_npkts;
 
 	rx_npkts = 0;
 
 	TSEC_GLOBAL_LOCK(sc);
-	if (!(ifp->if_drv_flags & IFF_DRV_RUNNING)) {
+	if (!(if_getdrvflags(ifp) & IFF_DRV_RUNNING)) {
 		TSEC_GLOBAL_UNLOCK(sc);
 		return (rx_npkts);
 	}
@@ -927,9 +923,9 @@ tsec_poll(struct ifnet *ifp, enum poll_cmd cmd, int count)
 #endif /* DEVICE_POLLING */
 
 static int
-tsec_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
+tsec_ioctl(if_t ifp, u_long command, caddr_t data)
 {
-	struct tsec_softc *sc = ifp->if_softc;
+	struct tsec_softc *sc = if_getsoftc(ifp);
 	struct ifreq *ifr = (struct ifreq *)data;
 	int mask, error = 0;
 
@@ -937,33 +933,33 @@ tsec_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 	case SIOCSIFMTU:
 		TSEC_GLOBAL_LOCK(sc);
 		if (tsec_set_mtu(sc, ifr->ifr_mtu))
-			ifp->if_mtu = ifr->ifr_mtu;
+			if_setmtu(ifp, ifr->ifr_mtu);
 		else
 			error = EINVAL;
 		TSEC_GLOBAL_UNLOCK(sc);
 		break;
 	case SIOCSIFFLAGS:
 		TSEC_GLOBAL_LOCK(sc);
-		if (ifp->if_flags & IFF_UP) {
-			if (ifp->if_drv_flags & IFF_DRV_RUNNING) {
-				if ((sc->tsec_if_flags ^ ifp->if_flags) &
+		if (if_getflags(ifp) & IFF_UP) {
+			if (if_getdrvflags(ifp) & IFF_DRV_RUNNING) {
+				if ((sc->tsec_if_flags ^ if_getflags(ifp)) &
 				    IFF_PROMISC)
 					tsec_setfilter(sc);
 
-				if ((sc->tsec_if_flags ^ ifp->if_flags) &
+				if ((sc->tsec_if_flags ^ if_getflags(ifp)) &
 				    IFF_ALLMULTI)
 					tsec_setup_multicast(sc);
 			} else
 				tsec_init_locked(sc);
-		} else if (ifp->if_drv_flags & IFF_DRV_RUNNING)
+		} else if (if_getdrvflags(ifp) & IFF_DRV_RUNNING)
 			tsec_stop(sc);
 
-		sc->tsec_if_flags = ifp->if_flags;
+		sc->tsec_if_flags = if_getflags(ifp);
 		TSEC_GLOBAL_UNLOCK(sc);
 		break;
 	case SIOCADDMULTI:
 	case SIOCDELMULTI:
-		if (ifp->if_drv_flags & IFF_DRV_RUNNING) {
+		if (if_getdrvflags(ifp) & IFF_DRV_RUNNING) {
 			TSEC_GLOBAL_LOCK(sc);
 			tsec_setup_multicast(sc);
 			TSEC_GLOBAL_UNLOCK(sc);
@@ -974,11 +970,11 @@ tsec_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		    command);
 		break;
 	case SIOCSIFCAP:
-		mask = ifp->if_capenable ^ ifr->ifr_reqcap;
+		mask = if_getcapenable(ifp) ^ ifr->ifr_reqcap;
 		if ((mask & IFCAP_HWCSUM) && sc->is_etsec) {
 			TSEC_GLOBAL_LOCK(sc);
-			ifp->if_capenable &= ~IFCAP_HWCSUM;
-			ifp->if_capenable |= IFCAP_HWCSUM & ifr->ifr_reqcap;
+			if_setcapenablebit(ifp, 0, IFCAP_HWCSUM);
+			if_setcapenablebit(ifp, IFCAP_HWCSUM & ifr->ifr_reqcap, 0);
 			tsec_offload_setup(sc);
 			TSEC_GLOBAL_UNLOCK(sc);
 		}
@@ -992,14 +988,14 @@ tsec_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 				TSEC_GLOBAL_LOCK(sc);
 				/* Disable interrupts */
 				tsec_intrs_ctl(sc, 0);
-				ifp->if_capenable |= IFCAP_POLLING;
+				if_setcapenablebit(ifp, IFCAP_POLLING, 0);
 				TSEC_GLOBAL_UNLOCK(sc);
 			} else {
 				error = ether_poll_deregister(ifp);
 				TSEC_GLOBAL_LOCK(sc);
 				/* Enable interrupts */
 				tsec_intrs_ctl(sc, 1);
-				ifp->if_capenable &= ~IFCAP_POLLING;
+				if_setcapenablebit(ifp, 0, IFCAP_POLLING);
 				TSEC_GLOBAL_UNLOCK(sc);
 			}
 		}
@@ -1011,15 +1007,15 @@ tsec_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 	}
 
 	/* Flush buffers if not empty */
-	if (ifp->if_flags & IFF_UP)
+	if (if_getflags(ifp) & IFF_UP)
 		tsec_start(ifp);
 	return (error);
 }
 
 static int
-tsec_ifmedia_upd(struct ifnet *ifp)
+tsec_ifmedia_upd(if_t ifp)
 {
-	struct tsec_softc *sc = ifp->if_softc;
+	struct tsec_softc *sc = if_getsoftc(ifp);
 	struct mii_data *mii;
 
 	TSEC_TRANSMIT_LOCK(sc);
@@ -1032,9 +1028,9 @@ tsec_ifmedia_upd(struct ifnet *ifp)
 }
 
 static void
-tsec_ifmedia_sts(struct ifnet *ifp, struct ifmediareq *ifmr)
+tsec_ifmedia_sts(if_t ifp, struct ifmediareq *ifmr)
 {
-	struct tsec_softc *sc = ifp->if_softc;
+	struct tsec_softc *sc = if_getsoftc(ifp);
 	struct mii_data *mii;
 
 	TSEC_TRANSMIT_LOCK(sc);
@@ -1214,7 +1210,7 @@ tsec_free_dma(struct tsec_softc *sc)
 static void
 tsec_stop(struct tsec_softc *sc)
 {
-	struct ifnet *ifp;
+	if_t ifp;
 	uint32_t tmpval;
 
 	TSEC_GLOBAL_LOCK_ASSERT(sc);
@@ -1223,7 +1219,7 @@ tsec_stop(struct tsec_softc *sc)
 
 	/* Disable interface and watchdog timer */
 	callout_stop(&sc->tsec_callout);
-	ifp->if_drv_flags &= ~(IFF_DRV_RUNNING | IFF_DRV_OACTIVE);
+	if_setdrvflagbits(ifp, 0, (IFF_DRV_RUNNING | IFF_DRV_OACTIVE));
 	sc->tsec_watchdog = 0;
 
 	/* Disable all interrupts and stop DMA */
@@ -1253,7 +1249,7 @@ static void
 tsec_tick(void *arg)
 {
 	struct tsec_softc *sc = arg;
-	struct ifnet *ifp;
+	if_t ifp;
 	int link;
 
 	TSEC_GLOBAL_LOCK(sc);
@@ -1266,7 +1262,7 @@ tsec_tick(void *arg)
 	mii_tick(sc->tsec_mii);
 
 	if (link == 0 && sc->tsec_link == 1 &&
-	    (!IFQ_DRV_IS_EMPTY(&ifp->if_snd)))
+	    (!if_sendq_empty(ifp)))
 		tsec_start_locked(ifp);
 
 	/* Schedule another timeout one second from now. */
@@ -1285,7 +1281,7 @@ static int
 tsec_receive_intr_locked(struct tsec_softc *sc, int count)
 {
 	struct tsec_desc *rx_desc;
-	struct ifnet *ifp;
+	if_t ifp;
 	struct rx_data_type *rx_data;
 	struct mbuf *m;
 	uint32_t i;
@@ -1387,7 +1383,7 @@ tsec_receive_intr_locked(struct tsec_softc *sc, int count)
 				tsec_offload_process_frame(sc, m);
 
 			TSEC_RECEIVE_UNLOCK(sc);
-			(*ifp->if_input)(ifp, m);
+			if_input(ifp, m);
 			TSEC_RECEIVE_LOCK(sc);
 			rx_npkts++;
 		}
@@ -1416,7 +1412,7 @@ tsec_receive_intr(void *arg)
 	TSEC_RECEIVE_LOCK(sc);
 
 #ifdef DEVICE_POLLING
-	if (sc->tsec_ifp->if_capenable & IFCAP_POLLING) {
+	if (if_getcapenable(sc->tsec_ifp) & IFCAP_POLLING) {
 		TSEC_RECEIVE_UNLOCK(sc);
 		return;
 	}
@@ -1432,7 +1428,7 @@ tsec_receive_intr(void *arg)
 static void
 tsec_transmit_intr_locked(struct tsec_softc *sc)
 {
-	struct ifnet *ifp;
+	if_t ifp;
 	uint32_t tx_idx;
 
 	TSEC_TRANSMIT_LOCK_ASSERT(sc);
@@ -1482,7 +1478,7 @@ tsec_transmit_intr_locked(struct tsec_softc *sc)
 	bus_dmamap_sync(sc->tsec_tx_dtag, sc->tsec_tx_dmap,
 	    BUS_DMASYNC_PREREAD | BUS_DMASYNC_PREWRITE);
 
-	ifp->if_drv_flags &= ~IFF_DRV_OACTIVE;
+	if_setdrvflagbits(ifp, 0, IFF_DRV_OACTIVE);
 	tsec_start_locked(ifp);
 
 	if (sc->tx_idx_tail == sc->tx_idx_head)
@@ -1497,7 +1493,7 @@ tsec_transmit_intr(void *arg)
 	TSEC_TRANSMIT_LOCK(sc);
 
 #ifdef DEVICE_POLLING
-	if (sc->tsec_ifp->if_capenable & IFCAP_POLLING) {
+	if (if_getcapenable(sc->tsec_ifp) & IFCAP_POLLING) {
 		TSEC_TRANSMIT_UNLOCK(sc);
 		return;
 	}
@@ -1512,7 +1508,7 @@ tsec_transmit_intr(void *arg)
 static void
 tsec_error_intr_locked(struct tsec_softc *sc, int count)
 {
-	struct ifnet *ifp;
+	if_t ifp;
 	uint32_t eflags;
 
 	TSEC_GLOBAL_LOCK_ASSERT(sc);
@@ -1542,7 +1538,7 @@ tsec_error_intr_locked(struct tsec_softc *sc, int count)
 		if_inc_counter(ifp, IFCOUNTER_IQDROPS, 1);
 	}
 
-	if (ifp->if_flags & IFF_DEBUG)
+	if (if_getflags(ifp) & IFF_DEBUG)
 		if_printf(ifp, "tsec_error_intr(): event flags: 0x%x\n",
 		    eflags);
 
@@ -1818,7 +1814,7 @@ tsec_set_txic(struct tsec_softc *sc)
 static void
 tsec_offload_setup(struct tsec_softc *sc)
 {
-	struct ifnet *ifp = sc->tsec_ifp;
+	if_t ifp = sc->tsec_ifp;
 	uint32_t reg;
 
 	TSEC_GLOBAL_LOCK_ASSERT(sc);
@@ -1826,10 +1822,10 @@ tsec_offload_setup(struct tsec_softc *sc)
 	reg = TSEC_READ(sc, TSEC_REG_TCTRL);
 	reg |= TSEC_TCTRL_IPCSEN | TSEC_TCTRL_TUCSEN;
 
-	if (ifp->if_capenable & IFCAP_TXCSUM)
-		ifp->if_hwassist = TSEC_CHECKSUM_FEATURES;
+	if (if_getcapenable(ifp) & IFCAP_TXCSUM)
+		if_sethwassist(ifp, TSEC_CHECKSUM_FEATURES);
 	else
-		ifp->if_hwassist = 0;
+		if_sethwassist(ifp, 0);
 
 	TSEC_WRITE(sc, TSEC_REG_TCTRL, reg);
 
@@ -1837,7 +1833,7 @@ tsec_offload_setup(struct tsec_softc *sc)
 	reg &= ~(TSEC_RCTRL_IPCSEN | TSEC_RCTRL_TUCSEN | TSEC_RCTRL_PRSDEP);
 	reg |= TSEC_RCTRL_PRSDEP_PARSE_L2 | TSEC_RCTRL_VLEX;
 
-	if (ifp->if_capenable & IFCAP_RXCSUM)
+	if (if_getcapenable(ifp) & IFCAP_RXCSUM)
 		reg |= TSEC_RCTRL_IPCSEN | TSEC_RCTRL_TUCSEN |
 		    TSEC_RCTRL_PRSDEP_PARSE_L234;
 
@@ -1896,12 +1892,12 @@ static void
 tsec_setup_multicast(struct tsec_softc *sc)
 {
 	uint32_t hashtable[8] = { 0, 0, 0, 0, 0, 0, 0, 0 };
-	struct ifnet *ifp = sc->tsec_ifp;
+	if_t ifp = sc->tsec_ifp;
 	int i;
 
 	TSEC_GLOBAL_LOCK_ASSERT(sc);
 
-	if (ifp->if_flags & IFF_ALLMULTI) {
+	if (if_getflags(ifp) & IFF_ALLMULTI) {
 		for (i = 0; i < 8; i++)
 			TSEC_WRITE(sc, TSEC_REG_GADDR(i), 0xFFFFFFFF);
 

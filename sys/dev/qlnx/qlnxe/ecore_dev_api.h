@@ -24,8 +24,6 @@
  *  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  *  POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD$
- *
  */
 
 #ifndef __ECORE_DEV_API_H__
@@ -749,7 +747,7 @@ void ecore_llh_clear_ppfid_filters(struct ecore_dev *p_dev, u8 ppfid);
 void ecore_llh_clear_all_filters(struct ecore_dev *p_dev);
 
 /**
- * @brief ecore_llh_set_function_as_default - set function as defult per port
+ * @brief ecore_llh_set_function_as_default - set function as default per port
  *
  * @param p_hwfn
  * @param p_ptt

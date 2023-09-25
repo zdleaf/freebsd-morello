@@ -30,7 +30,6 @@
  *   (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  *   OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-/*$FreeBSD$*/
 
 #include "lio_bsd.h"
 #include "lio_common.h"
@@ -228,7 +227,7 @@ drop_packet:
 }
 
 int
-lio_mq_start_locked(struct ifnet *ifp, struct lio_instr_queue *iq)
+lio_mq_start_locked(if_t ifp, struct lio_instr_queue *iq)
 {
 	struct lio	*lio = if_getsoftc(ifp);
 	struct mbuf	*next;
@@ -260,7 +259,7 @@ lio_mq_start_locked(struct ifnet *ifp, struct lio_instr_queue *iq)
 }
 
 int
-lio_mq_start(struct ifnet *ifp, struct mbuf *m)
+lio_mq_start(if_t ifp, struct mbuf *m)
 {
 	struct lio		*lio = if_getsoftc(ifp);
 	struct octeon_device	*oct = lio->oct_dev;
@@ -300,7 +299,7 @@ lio_mq_start(struct ifnet *ifp, struct mbuf *m)
 }
 
 void
-lio_qflush(struct ifnet *ifp)
+lio_qflush(if_t ifp)
 {
 	struct lio		*lio = if_getsoftc(ifp);
 	struct octeon_device	*oct = lio->oct_dev;

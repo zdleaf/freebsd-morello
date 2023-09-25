@@ -26,8 +26,6 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 #ifndef _DEV_QUICC_BFE_H_
@@ -51,11 +49,10 @@ struct quicc_softc {
 
 	u_int		sc_clock;
 
-	int		sc_fastintr:1;
-	int		sc_polled:1;
+	bool		sc_fastintr:1;
+	bool		sc_polled:1;
 };
 
-extern devclass_t quicc_devclass;
 extern char quicc_driver_name[];
 
 int quicc_bfe_attach(device_t);

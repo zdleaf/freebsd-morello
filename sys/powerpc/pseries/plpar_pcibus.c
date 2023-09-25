@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2011 Nathan Whitehorn
  * All rights reserved.
@@ -27,8 +27,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/bus.h>
 #include <sys/kernel.h>
@@ -69,10 +67,9 @@ static device_method_t	plpar_pcibus_methods[] = {
 	DEVMETHOD_END
 };
 
-static devclass_t pci_devclass;
 DEFINE_CLASS_1(pci, plpar_pcibus_driver, plpar_pcibus_methods,
     sizeof(struct pci_softc), ofw_pcibus_driver);
-DRIVER_MODULE(plpar_pcibus, pcib, plpar_pcibus_driver, pci_devclass, 0, 0);
+DRIVER_MODULE(plpar_pcibus, pcib, plpar_pcibus_driver, 0, 0);
 
 static int
 plpar_pcibus_probe(device_t dev)

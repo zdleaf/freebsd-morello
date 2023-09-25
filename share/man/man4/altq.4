@@ -23,9 +23,7 @@
 .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 .\" SUCH DAMAGE.
 .\"
-.\" $FreeBSD$
-.\"
-.Dd January 26, 2021
+.Dd November 10, 2022
 .Dt ALTQ 4
 .Os
 .Sh NAME
@@ -138,7 +136,6 @@ They have been applied to the following hardware drivers:
 .Xr bge 4 ,
 .Xr bxe 4 ,
 .Xr cas 4 ,
-.Xr cxgbe 4 ,
 .Xr dc 4 ,
 .Xr em 4 ,
 .Xr epair 4 ,
@@ -173,21 +170,15 @@ and
 .Xr xl 4 .
 .Pp
 The
-.Xr tun 4
+.Xr tun 4 ,
+.Xr if_bridge 4 ,
+.Xr if_vlan 4 ,
 and
 .Xr ng_iface 4
 pseudo drivers also do support
 .Nm .
 .Pp
-The
-.Xr vlan 4
-driver does not directly support
-.Nm ,
-but as packets (mbufs) are passed to the underlying interface, a queue
-can be defined for the underlying interface, and any packets directed
-to the queue will be processed at the interface level.
 An example:
-.Pp
 .Bd -literal -offset indent
 altq on igb0 cbq queue { def aq }
 queue def bandwidth 90% cbq (default borrow)
@@ -205,7 +196,7 @@ pass in on igb0.10 proto udp all queue aq keep state
 The
 .Nm
 system first appeared in March 1997 and found home in the KAME project
-(http://www.kame.net).
+(https://www.kame.net).
 It was imported to
 .Fx
 in 5.3 .

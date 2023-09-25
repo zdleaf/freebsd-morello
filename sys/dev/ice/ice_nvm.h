@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: BSD-3-Clause */
-/*  Copyright (c) 2021, Intel Corporation
+/*  Copyright (c) 2023, Intel Corporation
  *  All rights reserved.
  *
  *  Redistribution and use in source and binary forms, with or without
@@ -28,7 +28,6 @@
  *  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  *  POSSIBILITY OF SUCH DAMAGE.
  */
-/*$FreeBSD$*/
 
 #ifndef _ICE_NVM_H_
 #define _ICE_NVM_H_
@@ -94,19 +93,6 @@ union ice_nvm_access_data {
 	struct ice_nvm_features drv_features; /* NVM features */
 };
 
-/* NVM Access registers */
-#define GL_HIDA(_i)			(0x00082000 + ((_i) * 4))
-#define GL_HIBA(_i)			(0x00081000 + ((_i) * 4))
-#define GL_HICR				0x00082040
-#define GL_HICR_EN			0x00082044
-#define GLGEN_CSR_DEBUG_C		0x00075750
-#define GLPCI_LBARCTRL			0x0009DE74
-#define GLNVM_GENS			0x000B6100
-#define GLNVM_FLA			0x000B6108
-
-#define ICE_NVM_ACCESS_GL_HIDA_MAX	15
-#define ICE_NVM_ACCESS_GL_HIBA_MAX	1023
-
 u32 ice_nvm_access_get_module(struct ice_nvm_access_cmd *cmd);
 u32 ice_nvm_access_get_flags(struct ice_nvm_access_cmd *cmd);
 u32 ice_nvm_access_get_adapter(struct ice_nvm_access_cmd *cmd);
@@ -168,5 +154,6 @@ enum ice_status ice_update_sr_checksum(struct ice_hw *hw);
 enum ice_status ice_validate_sr_checksum(struct ice_hw *hw, u16 *checksum);
 enum ice_status ice_nvm_validate_checksum(struct ice_hw *hw);
 enum ice_status ice_nvm_recalculate_checksum(struct ice_hw *hw);
-enum ice_status ice_nvm_write_activate(struct ice_hw *hw, u8 cmd_flags);
+enum ice_status
+ice_nvm_write_activate(struct ice_hw *hw, u16 cmd_flags, u8 *response_flags);
 #endif /* _ICE_NVM_H_ */

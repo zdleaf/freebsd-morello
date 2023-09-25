@@ -1,5 +1,6 @@
 /*-
  * Copyright (c) 2013-2021, Mellanox Technologies, Ltd.  All rights reserved.
+ * Copyright (c) 2022 NVIDIA corporation & affiliates.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -21,8 +22,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 #include "opt_rss.h"
@@ -50,6 +49,7 @@
 #include <dev/mlx5/mlx5_core/mlx5_core.h>
 #include <dev/mlx5/mlx5_core/eswitch.h>
 #include <dev/mlx5/mlx5_core/fs_core.h>
+#include <dev/mlx5/mlx5_core/diag_cnt.h>
 #ifdef PCI_IOV
 #include <sys/nv.h>
 #include <dev/pci/pci_iov.h>
@@ -83,6 +83,11 @@ static int mlx5_fast_unload_enabled = 1;
 SYSCTL_INT(_hw_mlx5, OID_AUTO, fast_unload_enabled, CTLFLAG_RWTUN,
     &mlx5_fast_unload_enabled, 0,
     "Set to enable fast unload. Clear to disable.");
+
+static int mlx5_core_comp_eq_size = 1024;
+SYSCTL_INT(_hw_mlx5, OID_AUTO, comp_eq_size, CTLFLAG_RDTUN | CTLFLAG_MPSAFE,
+    &mlx5_core_comp_eq_size, 0,
+    "Set default completion EQ size between 1024 and 16384 inclusivly. Value should be power of two.");
 
 static LIST_HEAD(intf_list);
 static LIST_HEAD(dev_list);
@@ -177,6 +182,22 @@ static struct mlx5_profile profiles[] = {
 		.log_max_qp	= 17,
 	},
 };
+
+static int
+mlx5_core_get_comp_eq_size(void)
+{
+	int value = mlx5_core_comp_eq_size;
+
+	if (value < 1024)
+		value = 1024;
+	else if (value > 16384)
+		value = 16384;
+
+	/* make value power of two, rounded down */
+	while (value & (value - 1))
+		value &= (value - 1);
+	return (value);
+}
 
 static void mlx5_set_driver_version(struct mlx5_core_dev *dev)
 {
@@ -686,7 +707,7 @@ static int alloc_comp_eqs(struct mlx5_core_dev *dev)
 
 	INIT_LIST_HEAD(&table->comp_eqs_list);
 	ncomp_vec = table->num_comp_vectors;
-	nent = MLX5_COMP_EQ_SIZE;
+	nent = mlx5_core_get_comp_eq_size();
 	for (i = 0; i < ncomp_vec; i++) {
 		eq = kzalloc_node(sizeof(*eq), GFP_KERNEL, dev->priv.numa_node);
 
@@ -891,11 +912,9 @@ mlx5_firmware_update(struct mlx5_core_dev *dev)
 static int mlx5_pci_init(struct mlx5_core_dev *dev, struct mlx5_priv *priv)
 {
 	struct pci_dev *pdev = dev->pdev;
-	device_t bsddev;
 	int err;
 
 	pdev = dev->pdev;
-	bsddev = pdev->dev.bsddev;
 	pci_set_drvdata(dev->pdev, dev);
 	strncpy(priv->name, dev_name(&pdev->dev), MLX5_MAX_NAME_LEN);
 	priv->name[MLX5_MAX_NAME_LEN - 1] = 0;
@@ -1190,10 +1209,16 @@ static int mlx5_load_one(struct mlx5_core_dev *dev, struct mlx5_priv *priv,
 		goto err_mpfs;
 	}
 
+	err = mlx5_diag_cnt_init(dev);
+	if (err) {
+		mlx5_core_err(dev, "diag cnt init failed %d\n", err);
+		goto err_fpga;
+	}
+
 	err = mlx5_register_device(dev);
 	if (err) {
 		mlx5_core_err(dev, "mlx5_register_device failed %d\n", err);
-		goto err_fpga;
+		goto err_diag_cnt;
 	}
 
 	set_bit(MLX5_INTERFACE_STATE_UP, &dev->intf_state);
@@ -1201,6 +1226,9 @@ static int mlx5_load_one(struct mlx5_core_dev *dev, struct mlx5_priv *priv,
 out:
 	mutex_unlock(&dev->intf_state_mutex);
 	return 0;
+
+err_diag_cnt:
+	mlx5_diag_cnt_cleanup(dev);
 
 err_fpga:
 	mlx5_fpga_device_stop(dev);
@@ -1272,6 +1300,7 @@ static int mlx5_unload_one(struct mlx5_core_dev *dev, struct mlx5_priv *priv,
 	mlx5_unregister_device(dev);
 
 	mlx5_eswitch_cleanup(dev->priv.eswitch);
+	mlx5_diag_cnt_cleanup(dev);
 	mlx5_fpga_device_stop(dev);
 	mlx5_mpfs_destroy(dev);
 	mlx5_cleanup_fs(dev);
@@ -2030,9 +2059,9 @@ static const struct pci_device_id mlx5_core_pci_table[] = {
 	{ PCI_VDEVICE(MELLANOX, 4126) }, /* ConnectX Family mlx5Gen Virtual Function */
 	{ PCI_VDEVICE(MELLANOX, 4127) }, /* ConnectX-6 LX */
 	{ PCI_VDEVICE(MELLANOX, 4128) },
-	{ PCI_VDEVICE(MELLANOX, 4129) },
+	{ PCI_VDEVICE(MELLANOX, 4129) }, /* ConnectX-7 */
 	{ PCI_VDEVICE(MELLANOX, 4130) },
-	{ PCI_VDEVICE(MELLANOX, 4131) },
+	{ PCI_VDEVICE(MELLANOX, 4131) }, /* ConnectX-8 */
 	{ PCI_VDEVICE(MELLANOX, 4132) },
 	{ PCI_VDEVICE(MELLANOX, 4133) },
 	{ PCI_VDEVICE(MELLANOX, 4134) },
@@ -2049,6 +2078,8 @@ static const struct pci_device_id mlx5_core_pci_table[] = {
 	{ PCI_VDEVICE(MELLANOX, 0xa2d2) }, /* BlueField integrated ConnectX-5 network controller */
 	{ PCI_VDEVICE(MELLANOX, 0xa2d3) }, /* BlueField integrated ConnectX-5 network controller VF */
 	{ PCI_VDEVICE(MELLANOX, 0xa2d6) }, /* BlueField-2 integrated ConnectX-6 Dx network controller */
+	{ PCI_VDEVICE(MELLANOX, 0xa2dc) }, /* BlueField-3 integrated ConnectX-7 network controller */
+	{ PCI_VDEVICE(MELLANOX, 0xa2df) }, /* BlueField-4 integrated ConnectX-8 network controller */
 	{ }
 };
 

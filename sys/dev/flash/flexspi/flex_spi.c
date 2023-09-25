@@ -24,8 +24,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include "opt_platform.h"
 
 #include <sys/param.h>
@@ -937,11 +935,9 @@ flex_spi_task(void *arg)
 {
 	struct flex_spi_softc *sc;
 	struct bio *bp;
-	device_t dev;
 
 	sc = (struct flex_spi_softc *)arg;
 	for (;;) {
-		dev = sc->dev;
 		mtx_lock(&sc->disk_mtx);
 		do {
 			if (sc->taskstate == TSTATE_STOPPING) {
@@ -974,7 +970,6 @@ flex_spi_task(void *arg)
 	}
 }
 
-static devclass_t flex_spi_devclass;
 static device_method_t flex_spi_methods[] = {
 	/* Device interface */
 	DEVMETHOD(device_probe,		flex_spi_probe),
@@ -990,5 +985,5 @@ static driver_t flex_spi_driver = {
 	sizeof(struct flex_spi_softc),
 };
 
-DRIVER_MODULE(flex_spi, simplebus, flex_spi_driver, flex_spi_devclass, 0, 0);
+DRIVER_MODULE(flex_spi, simplebus, flex_spi_driver, 0, 0);
 SIMPLEBUS_PNP_INFO(flex_spi_compat_data);

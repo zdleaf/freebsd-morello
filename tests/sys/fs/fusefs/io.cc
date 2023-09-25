@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2019 The FreeBSD Foundation
  *
@@ -26,8 +26,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 extern "C" {
@@ -141,6 +139,8 @@ void SetUp()
 		ssize_t isize = in.body.write.size;
 		off_t iofs = in.body.write.offset;
 
+		assert((size_t)isize <= sizeof(in.body.bytes) -
+			sizeof(struct fuse_write_in));
 		ASSERT_EQ(isize, pwrite(m_backing_fd, buf, isize, iofs))
 			<< strerror(errno);
 		SET_OUT_HEADER_LEN(out, write);
@@ -158,6 +158,7 @@ void SetUp()
 		void *buf = out.body.bytes;
 		ssize_t osize;
 
+		assert((size_t)isize <= sizeof(out.body.bytes));
 		osize = pread(m_backing_fd, buf, isize, iofs);
 		ASSERT_LE(0, osize) << strerror(errno);
 		out.header.len = sizeof(struct fuse_out_header) + osize;
@@ -506,14 +507,14 @@ TEST_P(Io, resize_a_valid_buffer_while_extending)
 	close(m_test_fd);
 }
 
-INSTANTIATE_TEST_CASE_P(Io, Io,
+INSTANTIATE_TEST_SUITE_P(Io, Io,
 	Combine(Bool(),					/* async read */
 		Values(0x1000, 0x10000, 0x20000),	/* m_maxwrite */
 		Values(Uncached, Writethrough, Writeback, WritebackAsync)
 	)
 );
 
-INSTANTIATE_TEST_CASE_P(Io, IoCacheable,
+INSTANTIATE_TEST_SUITE_P(Io, IoCacheable,
 	Combine(Bool(),					/* async read */
 		Values(0x1000, 0x10000, 0x20000),	/* m_maxwrite */
 		Values(Writethrough, Writeback, WritebackAsync)

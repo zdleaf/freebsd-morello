@@ -1,4 +1,3 @@
-# $FreeBSD$
 
 # Options set in the build system which affect the building of kernel
 # modules. These select which parts to compile in or out (eg INET) or which
@@ -35,6 +34,7 @@ __DEFAULT_YES_OPTIONS = \
     CDDL \
     CRYPT \
     CUSE \
+    DTRACE \
     EFI \
     FORMAT_EXTENSIONS \
     INET \
@@ -49,6 +49,7 @@ __DEFAULT_YES_OPTIONS = \
     SCTP_SUPPORT \
     SOURCELESS_HOST \
     SOURCELESS_UCODE \
+    SPLIT_KERNEL_DEBUG \
     TESTS \
     USB_GADGET_EXAMPLES \
     ZFS
@@ -60,7 +61,8 @@ __DEFAULT_NO_OPTIONS = \
     INIT_ALL_ZERO \
     KERNEL_RETPOLINE \
     RATELIMIT \
-    REPRODUCIBLE_BUILD
+    REPRODUCIBLE_BUILD \
+    VERIEXEC
 
 # Some options are totally broken on some architectures. We disable
 # them. If you need to enable them on an experimental basis, you
@@ -76,19 +78,8 @@ __DEFAULT_NO_OPTIONS = \
 BROKEN_OPTIONS+= INIT_ALL_ZERO
 .endif
 
+# Broken on 32-bit arm, kernel module compile errors
 .if ${MACHINE_CPUARCH} == "arm"
-. if ${MACHINE_ARCH:Marmv[67]*} == ""
-BROKEN_OPTIONS+= CDDL ZFS
-. endif
-.endif
-
-.if ${MACHINE_CPUARCH} == "powerpc" && ${MACHINE_ARCH} == "powerpc"
-BROKEN_OPTIONS+= ZFS
-.endif
-
-# Things that don't work because the kernel doesn't have the support
-# for them.
-.if ${MACHINE} != "i386" && ${MACHINE} != "amd64"
 BROKEN_OPTIONS+= OFED
 .endif
 
@@ -97,9 +88,15 @@ BROKEN_OPTIONS+= OFED
 BROKEN_OPTIONS+= KERNEL_RETPOLINE
 .endif
 
-# EFI doesn't exist on powerpc, or riscv
-.if ${MACHINE:Mpowerpc} || ${MACHINE:Mriscv}
+# EFI doesn't exist on powerpc or riscv and is broken on i386
+.if ${MACHINE:Mpowerpc} || ${MACHINE:Mriscv} || ${MACHINE} == "i386"
 BROKEN_OPTIONS+=EFI
+.endif
+
+.if ${MACHINE_CPUARCH} == "i386" || ${MACHINE_CPUARCH} == "amd64"
+__DEFAULT_NO_OPTIONS += FDT
+.else
+__DEFAULT_YES_OPTIONS += FDT
 .endif
 
 # expanded inline from bsd.mkopt.mk to avoid share/mk dependency
@@ -172,10 +169,23 @@ MK_${var}_SUPPORT:= yes
 .endif
 .endfor
 
+.if ${MK_SPLIT_KERNEL_DEBUG} == "no"
+MK_KERNEL_SYMBOLS:=	no
+.endif
+
+.if ${MK_CDDL} == "no"
+MK_DTRACE:=	no
+.endif
+
 # Some modules only compile successfully if option FDT is set, due to #ifdef FDT
 # wrapped around declarations.  Module makefiles can optionally compile such
 # things using .if !empty(OPT_FDT)
 .if !defined(OPT_FDT) && defined(KERNBUILDDIR)
 OPT_FDT!= sed -n '/FDT/p' ${KERNBUILDDIR}/opt_platform.h
 .export OPT_FDT
+.if empty(OPT_FDT)
+MK_FDT:=no
+.else
+MK_FDT:=yes
+.endif
 .endif

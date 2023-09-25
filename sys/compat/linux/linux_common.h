@@ -23,18 +23,21 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 #ifndef _LINUX_COMMON_H_
 #define _LINUX_COMMON_H_
 
-struct ifnet	*ifname_linux_to_bsd(struct thread *td,
-		    const char *lxname, char *bsdname);
-void		linux_ifflags(struct ifnet *ifp, short *flags);
+int	ifname_bsd_to_linux_ifp(struct ifnet *, char *, size_t);
+int	ifname_bsd_to_linux_idx(u_int, char *, size_t);
+int	ifname_bsd_to_linux_name(const char *, char *, size_t);
+struct ifnet *ifname_linux_to_ifp(struct thread *, const char *);
+int	ifname_linux_to_bsd(struct thread *, const char *, char *);
+
+unsigned short	linux_ifflags(struct ifnet *);
 int		linux_ifhwaddr(struct ifnet *ifp, struct l_sockaddr *lsa);
 
+unsigned short	bsd_to_linux_ifflags(int);
 int		linux_to_bsd_domain(int domain);
 int		bsd_to_linux_domain(int domain);
 int		bsd_to_linux_sockaddr(const struct sockaddr *sa,
@@ -44,6 +47,5 @@ int		linux_to_bsd_sockaddr(const struct l_sockaddr *lsa,
 void		linux_to_bsd_poll_events(struct thread *td, int fd,
 		    short lev, short *bev);
 void		bsd_to_linux_poll_events(short bev, short *lev);
-
 
 #endif /* _LINUX_COMMON_H_ */

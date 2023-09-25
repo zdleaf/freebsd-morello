@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2015 Neel Natu <neel@freebsd.org>
  * All rights reserved.
@@ -27,8 +27,6 @@
  */
 
 #include <sys/param.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/types.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
@@ -84,8 +82,8 @@ static struct bootrom_var_state {
  * that the Firmware Volume area is writable and persistent.
  */
 static int
-bootrom_var_mem_handler(struct vmctx *ctx, int vcpu, int dir, uint64_t addr,
-    int size, uint64_t *val, void *arg1, long arg2)
+bootrom_var_mem_handler(struct vcpu *vcpu __unused, int dir, uint64_t addr,
+    int size, uint64_t *val, void *arg1 __unused, long arg2 __unused)
 {
 	off_t offset;
 
@@ -191,19 +189,33 @@ bootrom_alloc(struct vmctx *ctx, size_t len, int prot, int flags,
 }
 
 int
-bootrom_loadrom(struct vmctx *ctx, const char *romfile)
+bootrom_loadrom(struct vmctx *ctx, const nvlist_t *nvl)
 {
 	struct stat sbuf;
 	ssize_t rlen;
 	off_t rom_size, var_size, total_size;
-	char *ptr, *varfile;
+	char *ptr, *romfile;
 	int fd, varfd, i, rv;
+	const char *bootrom, *varfile;
 
 	rv = -1;
 	varfd = -1;
 
-	varfile = strdup(romfile);
-	romfile = strsep(&varfile, ",");
+	bootrom = get_config_value_node(nvl, "bootrom");
+	if (bootrom == NULL) {
+		return (-1);
+	}
+
+	/*
+	 * get_config_value_node may use a thread local buffer to return
+	 * variables. So, when we query the second variable, the first variable
+	 * might get overwritten. For that reason, the bootrom should be
+	 * duplicated.
+	 */
+	romfile = strdup(bootrom);
+	if (romfile == NULL) {
+		return (-1);
+	}
 
 	fd = open(romfile, O_RDONLY);
 	if (fd < 0) {
@@ -212,6 +224,16 @@ bootrom_loadrom(struct vmctx *ctx, const char *romfile)
 		goto done;
 	}
 
+	if (fstat(fd, &sbuf) < 0) {
+		EPRINTLN("Could not fstat bootrom file \"%s\": %s", romfile,
+		    strerror(errno));
+		goto done;
+	}
+
+	rom_size = sbuf.st_size;
+
+	varfile = get_config_value_node(nvl, "bootvars");
+	var_size = 0;
 	if (varfile != NULL) {
 		varfd = open(varfile, O_RDWR);
 		if (varfd < 0) {
@@ -219,23 +241,14 @@ bootrom_loadrom(struct vmctx *ctx, const char *romfile)
 			    "\"%s\": %s\n", varfile, strerror(errno));
 			goto done;
 		}
-	}
 
-	if (fstat(fd, &sbuf) < 0) {
-		EPRINTLN("Could not fstat bootrom file \"%s\": %s",
-			romfile, strerror(errno));
-		goto done;
-	}
-
-	rom_size = sbuf.st_size;
-	if (varfd < 0) {
-		var_size = 0;
-	} else {
 		if (fstat(varfd, &sbuf) < 0) {
-			fprintf(stderr, "Could not fstat bootrom variable file \"%s\": %s\n",
-				varfile, strerror(errno));
+			fprintf(stderr,
+			    "Could not fstat bootrom variable file \"%s\": %s\n",
+			    varfile, strerror(errno));
 			goto done;
 		}
+
 		var_size = sbuf.st_size;
 	}
 
@@ -291,7 +304,10 @@ bootrom_loadrom(struct vmctx *ctx, const char *romfile)
 
 	rv = 0;
 done:
+	if (varfd >= 0)
+		close(varfd);
 	if (fd >= 0)
 		close(fd);
+	free(romfile);
 	return (rv);
 }

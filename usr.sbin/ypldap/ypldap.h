@@ -1,5 +1,4 @@
 /*	$OpenBSD: ypldap.h,v 1.16 2015/01/16 06:40:22 deraadt Exp $ */
-/*	$FreeBSD$ */
 
 /*
  * Copyright (c) 2008 Pierre-Yves Ritschard <pyr@openbsd.org>
@@ -197,7 +196,7 @@ int		 parse_config(struct env *, const char *, int);
 int		 cmdline_symset(char *);
 
 /* ldapclient.c */
-pid_t		 ldapclient(int []);
+pid_t		 ldapclient(int [2]);
 
 /* ypldap.c */
 void		 purge_config(struct env *);

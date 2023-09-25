@@ -112,8 +112,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include "xgbe.h"
 #include "xgbe-common.h"
 
@@ -3409,13 +3407,13 @@ xgbe_phy_reset(struct xgbe_prv_data *pdata)
 }
 
 static void
-axgbe_ifmedia_sts(struct ifnet *ifp, struct ifmediareq *ifmr)
+axgbe_ifmedia_sts(if_t ifp, struct ifmediareq *ifmr)
 {
 	struct axgbe_if_softc *sc;
 	struct xgbe_prv_data *pdata;
 	struct mii_data *mii;
 
-	sc = ifp->if_softc;
+	sc = if_getsoftc(ifp);
 	pdata = &sc->pdata;
 
 	axgbe_printf(2, "%s: Invoked\n", __func__);
@@ -3430,7 +3428,7 @@ axgbe_ifmedia_sts(struct ifnet *ifp, struct ifmediareq *ifmr)
 }
 
 static int
-axgbe_ifmedia_upd(struct ifnet *ifp)
+axgbe_ifmedia_upd(if_t ifp)
 {
 	struct xgbe_prv_data *pdata;
 	struct axgbe_if_softc *sc;
@@ -3438,7 +3436,7 @@ axgbe_ifmedia_upd(struct ifnet *ifp)
 	struct mii_softc *miisc;
 	int ret;
 
-	sc = ifp->if_softc;
+	sc = if_getsoftc(ifp);
 	pdata = &sc->pdata;
 
 	axgbe_printf(2, "%s: Invoked\n", __func__);

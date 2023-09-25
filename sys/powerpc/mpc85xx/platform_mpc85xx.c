@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2008-2012 Semihalf.
  * All rights reserved.
@@ -28,8 +28,6 @@
 
 #include "opt_platform.h"
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
@@ -622,16 +620,14 @@ static device_method_t mpc85xx_rcpm_methods[] = {
 	DEVMETHOD_END
 };
 
-static devclass_t mpc85xx_rcpm_devclass;
-
 static driver_t mpc85xx_rcpm_driver = {
 	"rcpm",
 	mpc85xx_rcpm_methods,
 	sizeof(struct mpc85xx_rcpm_softc)
 };
 
-EARLY_DRIVER_MODULE(mpc85xx_rcpm, simplebus, mpc85xx_rcpm_driver,
-	mpc85xx_rcpm_devclass, 0, 0, BUS_PASS_BUS);
+EARLY_DRIVER_MODULE(mpc85xx_rcpm, simplebus, mpc85xx_rcpm_driver, 0, 0,
+    BUS_PASS_BUS);
 
 /* "Global utilities" power management/Timebase management. */
 
@@ -704,7 +700,5 @@ static driver_t mpc85xx_guts_driver = {
 	sizeof(struct mpc85xx_guts_softc)
 };
 
-static devclass_t mpc85xx_guts_devclass;
-
-EARLY_DRIVER_MODULE(mpc85xx_guts, simplebus, mpc85xx_guts_driver,
-	mpc85xx_guts_devclass, 0, 0, BUS_PASS_BUS);
+EARLY_DRIVER_MODULE(mpc85xx_guts, simplebus, mpc85xx_guts_driver, 0, 0,
+    BUS_PASS_BUS);

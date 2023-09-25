@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2004, 2005 Jung-uk Kim <jkim@FreeBSD.org>
  * All rights reserved.
@@ -27,8 +27,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/malloc.h>
@@ -508,8 +506,6 @@ static driver_t agp_amd64_driver = {
 	sizeof(struct agp_amd64_softc),
 };
 
-static devclass_t agp_devclass;
-
-DRIVER_MODULE(agp_amd64, hostb, agp_amd64_driver, agp_devclass, 0, 0);
+DRIVER_MODULE(agp_amd64, hostb, agp_amd64_driver, 0, 0);
 MODULE_DEPEND(agp_amd64, agp, 1, 1, 1);
 MODULE_DEPEND(agp_amd64, pci, 1, 1, 1);

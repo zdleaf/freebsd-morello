@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (C) 2019 Jan Sucan <jansucan@FreeBSD.org>
  * All rights reserved.
@@ -24,8 +24,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 #ifndef MAIN_H
@@ -40,7 +38,7 @@
 #else
  #define PING4ADDOPTS
 #endif
-#define PING4OPTS "4AaC:c:DdfG:g:Hh:I:i:Ll:M:m:nop:QqRrS:s:T:t:vW:z:" PING4ADDOPTS
+#define PING4OPTS ".::4AaC:c:DdfG:g:Hh:I:i:Ll:M:m:nop:QqRrS:s:T:t:vW:z:" PING4ADDOPTS
 
 #if defined(INET6) && defined(IPSEC) && defined(IPSEC_POLICY_IPSEC)
  #define PING6ADDOPTS "P:"
@@ -49,7 +47,7 @@
 #else
  #define PING6ADDOPTS
 #endif
-#define PING6OPTS "6Aab:C:c:Dde:fHI:i:k:l:m:nNoOp:qS:s:t:uvyYW:z:" PING6ADDOPTS
+#define PING6OPTS ".::6Aab:C:c:Dde:fHI:i:k:l:m:nNoOp:qS:s:t:uvyYW:z:" PING6ADDOPTS
 
 void usage(void) __dead2;
 

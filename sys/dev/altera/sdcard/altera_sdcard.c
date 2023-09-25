@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2012 Robert N. M. Watson
  * All rights reserved.
@@ -31,8 +31,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include "opt_altera_sdcard.h"
 
 #include <sys/param.h>
@@ -74,7 +72,6 @@ __FBSDID("$FreeBSD$");
  * 3. Handle read-only SD Cards.
  * 4. Tune timeouts based on real-world SD Card speeds.
  */
-devclass_t	altera_sdcard_devclass;
 
 void
 altera_sdcard_attach(struct altera_sdcard_softc *sc)

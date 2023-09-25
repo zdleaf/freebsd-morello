@@ -38,8 +38,6 @@
  *
  * Authors: Archie Cobbs <archie@freebsd.org>
  *	    Julian Elischer <julian@freebsd.org>
- *
- * $FreeBSD$
  */
 
 /*
@@ -63,6 +61,7 @@
 #include <net/if_types.h>
 #include <net/if_arp.h>
 #include <net/if_var.h>
+#include <net/if_private.h>
 #include <net/ethernet.h>
 #include <net/if_bridgevar.h>
 #include <net/vnet.h>

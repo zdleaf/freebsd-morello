@@ -1,5 +1,4 @@
 /*	$NetBSD: uvisor.c,v 1.9 2001/01/23 14:04:14 augustss Exp $	*/
-/*      $FreeBSD$ */
 
 /* Also already merged from NetBSD:
  *	$NetBSD: uvisor.c,v 1.12 2001/11/13 06:24:57 lukem Exp $
@@ -14,7 +13,7 @@
  */
 
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-NetBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2000 The NetBSD Foundation, Inc.
  * All rights reserved.
@@ -245,8 +244,6 @@ static device_method_t uvisor_methods[] = {
 	DEVMETHOD_END
 };
 
-static devclass_t uvisor_devclass;
-
 static driver_t uvisor_driver = {
 	.name = "uvisor",
 	.methods = uvisor_methods,
@@ -285,7 +282,7 @@ static const STRUCT_USB_HOST_ID uvisor_devs[] = {
 #undef UVISOR_DEV
 };
 
-DRIVER_MODULE(uvisor, uhub, uvisor_driver, uvisor_devclass, NULL, 0);
+DRIVER_MODULE(uvisor, uhub, uvisor_driver, NULL, NULL);
 MODULE_DEPEND(uvisor, ucom, 1, 1, 1);
 MODULE_DEPEND(uvisor, usb, 1, 1, 1);
 MODULE_VERSION(uvisor, 1);

@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2011 Justin Hibbits
  * Copyright (c) 2005, Joseph Koshy
@@ -29,8 +29,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/pmc.h>
 #include <sys/pmckern.h>
@@ -348,17 +346,11 @@ mpc7xxx_pmcn_write(unsigned int pmc, uint32_t val)
 static void
 mpc7xxx_set_pmc(int cpu, int ri, int config)
 {
-	struct pmc *pm;
-	struct pmc_hw *phw;
 	register_t pmc_mmcr;
-	uint32_t config_mask;
 
-	phw    = &powerpc_pcpu[cpu]->pc_ppcpmcs[ri];
-	pm     = phw->phw_pmc;
 	/* The mask is inverted (enable is 1) compared to the flags in
 	 * MMCR0, which are Freeze flags.
 	 */
-	config_mask = ~config & POWERPC_PMC_ENABLE;
 	config &= ~POWERPC_PMC_ENABLE;
 
 	/* Enable/disable the PMC. */

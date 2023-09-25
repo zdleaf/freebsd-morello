@@ -26,8 +26,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 /*
@@ -65,14 +63,14 @@ struct dwc_softc {
 	int			mii_clk;
 	device_t		miibus;
 	struct mii_data *	mii_softc;
-	struct ifnet		*ifp;
+	if_t			ifp;
 	int			if_flags;
 	struct mtx		mtx;
 	void *			intr_cookie;
 	struct callout		dwc_callout;
-	boolean_t		link_is_up;
-	boolean_t		is_attached;
-	boolean_t		is_detaching;
+	bool			link_is_up;
+	bool			is_attached;
+	bool			is_detaching;
 	int			tx_watchdog_count;
 	int			stats_harvest_count;
 	int			phy_mode;

@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2019 Isilon Systems, LLC.
  * Copyright (c) 2005-2014 Sandvine Incorporated. All rights reserved.
@@ -29,8 +29,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include "opt_ddb.h"
 #include "opt_inet.h"
 
@@ -56,6 +54,7 @@ __FBSDID("$FreeBSD$");
 #include <net/if_dl.h>
 #include <net/if_types.h>
 #include <net/if_var.h>
+#include <net/if_private.h>
 #include <net/vnet.h>
 #include <net/route.h>
 #include <net/route/nhop.h>
@@ -112,6 +111,22 @@ debugnet_get_gw_mac(const struct debugnet_pcb *pcb)
 	MPASS(g_debugnet_pcb_inuse && pcb == &g_dnet_pcb &&
 	    pcb->dp_state >= DN_STATE_HAVE_GW_MAC);
 	return (pcb->dp_gw_mac.octet);
+}
+
+const in_addr_t *
+debugnet_get_server_addr(const struct debugnet_pcb *pcb)
+{
+	MPASS(g_debugnet_pcb_inuse && pcb == &g_dnet_pcb &&
+	    pcb->dp_state >= DN_STATE_GOT_HERALD_PORT);
+	return (&pcb->dp_server);
+}
+
+const uint16_t
+debugnet_get_server_port(const struct debugnet_pcb *pcb)
+{
+	MPASS(g_debugnet_pcb_inuse && pcb == &g_dnet_pcb &&
+	    pcb->dp_state >= DN_STATE_GOT_HERALD_PORT);
+	return (pcb->dp_server_port);
 }
 
 /*
@@ -364,6 +379,8 @@ debugnet_handle_rx_msg(struct debugnet_pcb *pcb, struct mbuf **mb)
 {
 	const struct debugnet_msg_hdr *dnh;
 	struct mbuf *m;
+	uint32_t hdr_type;
+	uint32_t seqno;
 	int error;
 
 	m = *mb;
@@ -382,10 +399,24 @@ debugnet_handle_rx_msg(struct debugnet_pcb *pcb, struct mbuf **mb)
 			return;
 		}
 	}
-	dnh = mtod(m, const void *);
 
+	dnh = mtod(m, const void *);
 	if (ntohl(dnh->mh_len) + sizeof(*dnh) > m->m_pkthdr.len) {
 		DNETDEBUG("Dropping short packet.\n");
+		return;
+	}
+
+	hdr_type = ntohl(dnh->mh_type);
+	if (hdr_type != DEBUGNET_DATA) {
+		if (hdr_type == DEBUGNET_FINISHED) {
+			printf("Remote shut down the connection on us!\n");
+			pcb->dp_state = DN_STATE_REMOTE_CLOSED;
+			if (pcb->dp_finish_handler != NULL) {
+				pcb->dp_finish_handler();
+			}
+		} else {
+			DNETDEBUG("Got unexpected debugnet message %u\n", hdr_type);
+		}
 		return;
 	}
 
@@ -394,21 +425,20 @@ debugnet_handle_rx_msg(struct debugnet_pcb *pcb, struct mbuf **mb)
 	 * non-transient (like driver objecting to rx -> tx from the same
 	 * thread), not much else we can do.
 	 */
-	error = debugnet_ack_output(pcb, dnh->mh_seqno);
-	if (error != 0)
+	seqno = dnh->mh_seqno; /* net endian */
+	m_adj(m, sizeof(*dnh));
+	dnh = NULL;
+	error = pcb->dp_rx_handler(m);
+	if (error != 0) {
+		DNETDEBUG("RX handler was not able to accept message, error %d. "
+		    "Skipping ack.\n", error);
 		return;
-
-	if (ntohl(dnh->mh_type) == DEBUGNET_FINISHED) {
-		printf("Remote shut down the connection on us!\n");
-		pcb->dp_state = DN_STATE_REMOTE_CLOSED;
-
-		/*
-		 * Continue through to the user handler so they are signalled
-		 * not to wait for further rx.
-		 */
 	}
 
-	pcb->dp_rx_handler(pcb, mb);
+	error = debugnet_ack_output(pcb, seqno);
+	if (error != 0) {
+		DNETDEBUG("Couldn't ACK rx packet %u; %d\n", ntohl(seqno), error);
+	}
 }
 
 static void
@@ -523,7 +553,7 @@ debugnet_handle_udp(struct debugnet_pcb *pcb, struct mbuf **mb)
  *	m	an mbuf containing the packet received
  */
 static void
-debugnet_pkt_in(struct ifnet *ifp, struct mbuf *m)
+debugnet_input_one(struct ifnet *ifp, struct mbuf *m)
 {
 	struct ifreq ifr;
 	struct ether_header *eh;
@@ -582,6 +612,19 @@ done:
 		m_freem(m);
 }
 
+static void
+debugnet_input(struct ifnet *ifp, struct mbuf *m)
+{
+	struct mbuf *n;
+
+	do {
+		n = m->m_nextpkt;
+		m->m_nextpkt = NULL;
+		debugnet_input_one(ifp, m);
+		m = n;
+	} while (m != NULL);
+}
+
 /*
  * Network polling primitive.
  *
@@ -605,8 +648,8 @@ debugnet_free(struct debugnet_pcb *pcb)
 {
 	struct ifnet *ifp;
 
-	MPASS(g_debugnet_pcb_inuse);
 	MPASS(pcb == &g_dnet_pcb);
+	MPASS(pcb->dp_drv_input == NULL || g_debugnet_pcb_inuse);
 
 	ifp = pcb->dp_ifp;
 	if (ifp != NULL) {
@@ -646,6 +689,7 @@ debugnet_connect(const struct debugnet_conn_params *dcp,
 		.dp_seqno = 1,
 		.dp_ifp = dcp->dc_ifp,
 		.dp_rx_handler = dcp->dc_rx_handler,
+		.dp_drv_input = NULL,
 	};
 
 	/* Switch to the debugnet mbuf zones. */
@@ -735,13 +779,13 @@ debugnet_connect(const struct debugnet_conn_params *dcp,
 	/*
 	 * We maintain the invariant that g_debugnet_pcb_inuse is always true
 	 * while the debugnet ifp's if_input is overridden with
-	 * debugnet_pkt_in.
+	 * debugnet_input().
 	 */
 	g_debugnet_pcb_inuse = true;
 
 	/* Make the card use *our* receive callback. */
 	pcb->dp_drv_input = ifp->if_input;
-	ifp->if_input = debugnet_pkt_in;
+	ifp->if_input = debugnet_input;
 
 	printf("%s: searching for %s MAC...\n", __func__,
 	    (dcp->dc_gateway == INADDR_ANY) ? "server" : "gateway");
@@ -841,6 +885,9 @@ debugnet_any_ifnet_update(struct ifnet *ifp)
 	 * dn_init method is available.
 	 */
 	if (nmbuf == 0 || ncl == 0 || clsize == 0) {
+#ifndef INVARIANTS
+		if (bootverbose)
+#endif
 		printf("%s: Bad dn_init result from %s (ifp %p), ignoring.\n",
 		    __func__, if_name(ifp), ifp);
 		return;
@@ -1035,6 +1082,7 @@ debugnet_parse_ddb_cmd(const char *cmd, struct debugnet_ddb_config *result)
 			if (ifp == NULL) {
 				db_printf("Could not locate interface %s\n",
 				    db_tok_string);
+				error = ENOENT;
 				goto cleanup;
 			}
 		} else {

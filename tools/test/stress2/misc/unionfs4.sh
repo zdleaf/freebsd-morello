@@ -1,7 +1,7 @@
 #!/bin/sh
 
 #
-# SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+# SPDX-License-Identifier: BSD-2-Clause
 #
 # Copyright (c) 2021 Peter Holm
 #
@@ -52,6 +52,8 @@ done
 
 mdconfig -a -t swap -s 2g -u $md1
 mdconfig -a -t swap -s 2g -u $md2
+[ "$newfs_flags" = "-U" ] &&
+    newfs_flags="-j"	# "out of inodes" work around
 newfs $newfs_flags -n md$md1 > /dev/null
 newfs $newfs_flags -n md$md2 > /dev/null
 mount /dev/md$md1 $mp1
@@ -67,7 +69,10 @@ export runRUNTIME=2m
 (cd ..; ./run.sh marcus.cfg)
 
 ../tools/killall.sh
-umount $mp2	# The unionfs mount
+while mount | grep -Eq "on $mp2 .*unionfs"; do
+	umount $mp2 && break
+	sleep 5
+done
 umount $mp2
 n=`find $mp1/stressX | wc -l`
 [ $n -eq 1 ] && s=0 || { find $mp1/stressX -ls | head -12; s=1; }

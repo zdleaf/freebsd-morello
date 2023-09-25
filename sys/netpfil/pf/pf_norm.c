@@ -29,8 +29,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include "opt_inet.h"
 #include "opt_inet6.h"
 #include "opt_pf.h"
@@ -52,9 +50,12 @@ __FBSDID("$FreeBSD$");
 #include <netinet/ip.h>
 #include <netinet/ip_var.h>
 #include <netinet6/ip6_var.h>
+#include <netinet6/scope6_var.h>
 #include <netinet/tcp.h>
 #include <netinet/tcp_fsm.h>
 #include <netinet/tcp_seq.h>
+#include <netinet/sctp_constants.h>
+#include <netinet/sctp_header.h>
 
 #ifdef INET6
 #include <netinet/ip6.h>
@@ -134,8 +135,7 @@ static RB_GENERATE(pf_frag_tree, pf_fragment, fr_entry, pf_frag_compare);
 static void	pf_flush_fragments(void);
 static void	pf_free_fragment(struct pf_fragment *);
 static void	pf_remove_fragment(struct pf_fragment *);
-static int	pf_normalize_tcpopt(struct pf_krule *, struct mbuf *,
-		    struct tcphdr *, int, sa_family_t);
+
 static struct pf_frent *pf_create_fragment(u_short *);
 static int	pf_frent_holes(struct pf_frent *frent);
 static struct pf_fragment *pf_find_fragment(struct pf_fragment_cmp *key,
@@ -151,13 +151,11 @@ static struct pf_fragment *pf_fillup_fragment(struct pf_fragment_cmp *,
 		    struct pf_frent *, u_short *);
 static struct mbuf *pf_join_fragment(struct pf_fragment *);
 #ifdef INET
-static void	pf_scrub_ip(struct mbuf **, uint32_t, uint8_t, uint8_t);
 static int	pf_reassemble(struct mbuf **, struct ip *, int, u_short *);
 #endif	/* INET */
 #ifdef INET6
 static int	pf_reassemble6(struct mbuf **, struct ip6_hdr *,
 		    struct ip6_frag *, uint16_t, uint16_t, u_short *);
-static void	pf_scrub_ip6(struct mbuf **, uint32_t, uint8_t, uint8_t);
 #endif	/* INET6 */
 
 #define	DPFPRINTF(x) do {				\
@@ -885,7 +883,7 @@ pf_reassemble6(struct mbuf **m0, struct ip6_hdr *ip6, struct ip6_frag *fraghdr,
 	/* Take protocol from first fragment header. */
 	m = m_getptr(m, hdrlen + offsetof(struct ip6_frag, ip6f_nxt), &off);
 	KASSERT(m, ("%s: short mbuf chain", __func__));
-	proto = *(mtod(m, caddr_t) + off);
+	proto = *(mtod(m, uint8_t *) + off);
 	m = *m0;
 
 	/* Delete frag6 header */
@@ -900,8 +898,8 @@ pf_reassemble6(struct mbuf **m0, struct ip6_hdr *ip6, struct ip6_frag *fraghdr,
 		m->m_pkthdr.len = plen;
 	}
 
-	if ((mtag = m_tag_get(PF_REASSEMBLED, sizeof(struct pf_fragment_tag),
-	    M_NOWAIT)) == NULL)
+	if ((mtag = m_tag_get(PACKET_TAG_PF_REASSEMBLED,
+	    sizeof(struct pf_fragment_tag), M_NOWAIT)) == NULL)
 		goto fail;
 	ftag = (struct pf_fragment_tag *)(mtag + 1);
 	ftag->ft_hdrlen = hdrlen;
@@ -942,9 +940,11 @@ fail:
 
 #ifdef INET6
 int
-pf_refragment6(struct ifnet *ifp, struct mbuf **m0, struct m_tag *mtag)
+pf_refragment6(struct ifnet *ifp, struct mbuf **m0, struct m_tag *mtag,
+    bool forward)
 {
 	struct mbuf		*m = *m0, *t;
+	struct ip6_hdr		*hdr;
 	struct pf_fragment_tag	*ftag = (struct pf_fragment_tag *)(mtag + 1);
 	struct pf_pdesc		 pd;
 	uint32_t		 frag_id;
@@ -967,16 +967,20 @@ pf_refragment6(struct ifnet *ifp, struct mbuf **m0, struct m_tag *mtag)
 		m = m_getptr(m, extoff + offsetof(struct ip6_ext, ip6e_nxt),
 		    &off);
 		KASSERT((m != NULL), ("pf_refragment6: short mbuf chain"));
-		proto = *(mtod(m, caddr_t) + off);
+		proto = *(mtod(m, uint8_t *) + off);
 		*(mtod(m, char *) + off) = IPPROTO_FRAGMENT;
 		m = *m0;
 	} else {
-		struct ip6_hdr *hdr;
-
 		hdr = mtod(m, struct ip6_hdr *);
 		proto = hdr->ip6_nxt;
 		hdr->ip6_nxt = IPPROTO_FRAGMENT;
 	}
+
+	/* In case of link-local traffic we'll need a scope set. */
+	hdr = mtod(m, struct ip6_hdr *);
+
+	in6_setscope(&hdr->ip6_src, ifp, NULL);
+	in6_setscope(&hdr->ip6_dst, ifp, NULL);
 
 	/* The MTU must be a multiple of 8 bytes, or we risk doing the
 	 * fragmentation wrong. */
@@ -1009,7 +1013,13 @@ pf_refragment6(struct ifnet *ifp, struct mbuf **m0, struct m_tag *mtag)
 		memset(&pd, 0, sizeof(pd));
 		pd.pf_mtag = pf_find_mtag(m);
 		if (error == 0)
-			ip6_forward(m, 0);
+			if (forward) {
+				MPASS(m->m_pkthdr.rcvif != NULL);
+				ip6_forward(m, 0);
+			} else {
+				(void)ip6_output(m, NULL, NULL, 0, NULL, NULL,
+				    NULL);
+			}
 		else
 			m_freem(m);
 	}
@@ -1020,7 +1030,7 @@ pf_refragment6(struct ifnet *ifp, struct mbuf **m0, struct m_tag *mtag)
 
 #ifdef INET
 int
-pf_normalize_ip(struct mbuf **m0, int dir, struct pfi_kkif *kif, u_short *reason,
+pf_normalize_ip(struct mbuf **m0, struct pfi_kkif *kif, u_short *reason,
     struct pf_pdesc *pd)
 {
 	struct mbuf		*m = *m0;
@@ -1033,15 +1043,19 @@ pf_normalize_ip(struct mbuf **m0, int dir, struct pfi_kkif *kif, u_short *reason
 	int			 ip_len;
 	int			 tag = -1;
 	int			 verdict;
+	int			 srs;
 
 	PF_RULES_RASSERT();
 
 	r = TAILQ_FIRST(pf_main_ruleset.rules[PF_RULESET_SCRUB].active.ptr);
+	/* Check if there any scrub rules. Lack of scrub rules means enforced
+	 * packet normalization operation just like in OpenBSD. */
+	srs = (r != NULL);
 	while (r != NULL) {
 		pf_counter_u64_add(&r->evaluations, 1);
 		if (pfi_kkif_match(r->kif, kif) == r->ifnot)
 			r = r->skip[PF_SKIP_IFP].ptr;
-		else if (r->direction && r->direction != dir)
+		else if (r->direction && r->direction != pd->dir)
 			r = r->skip[PF_SKIP_DIR].ptr;
 		else if (r->af && r->af != AF_INET)
 			r = r->skip[PF_SKIP_AF].ptr;
@@ -1062,13 +1076,24 @@ pf_normalize_ip(struct mbuf **m0, int dir, struct pfi_kkif *kif, u_short *reason
 			break;
 	}
 
-	if (r == NULL || r->action == PF_NOSCRUB)
-		return (PF_PASS);
+	if (srs) {
+		/* With scrub rules present IPv4 normalization happens only
+		 * if one of rules has matched and it's not a "no scrub" rule */
+		if (r == NULL || r->action == PF_NOSCRUB)
+			return (PF_PASS);
 
-	pf_counter_u64_critical_enter();
-	pf_counter_u64_add_protected(&r->packets[dir == PF_OUT], 1);
-	pf_counter_u64_add_protected(&r->bytes[dir == PF_OUT], pd->tot_len);
-	pf_counter_u64_critical_exit();
+		pf_counter_u64_critical_enter();
+		pf_counter_u64_add_protected(&r->packets[pd->dir == PF_OUT], 1);
+		pf_counter_u64_add_protected(&r->bytes[pd->dir == PF_OUT], pd->tot_len);
+		pf_counter_u64_critical_exit();
+		pf_rule_to_actions(r, &pd->act);
+	} else if ((!V_pf_status.reass && (h->ip_off & htons(IP_MF | IP_OFFMASK)))) {
+		/* With no scrub rules IPv4 fragment reassembly depends on the
+		 * global switch. Fragments can be dropped early if reassembly
+		 * is disabled. */
+		REASON_SET(reason, PFRES_NORM);
+		goto drop;
+	}
 
 	/* Check for illegal packets */
 	if (hlen < (int)sizeof(struct ip)) {
@@ -1081,8 +1106,10 @@ pf_normalize_ip(struct mbuf **m0, int dir, struct pfi_kkif *kif, u_short *reason
 		goto drop;
 	}
 
-	/* Clear IP_DF if the rule uses the no-df option */
-	if (r->rule_flag & PFRULE_NODF && h->ip_off & htons(IP_DF)) {
+	/* Clear IP_DF if the rule uses the no-df option or we're in no-df mode */
+	if ((((r && r->rule_flag & PFRULE_NODF) ||
+	    (V_pf_status.reass & PF_REASS_NODF)) && h->ip_off & htons(IP_DF)
+	)) {
 		u_int16_t ip_off = h->ip_off;
 
 		h->ip_off &= htons(~IP_DF);
@@ -1115,34 +1142,35 @@ pf_normalize_ip(struct mbuf **m0, int dir, struct pfi_kkif *kif, u_short *reason
 		DPFPRINTF(("max packet %d\n", fragoff + ip_len));
 		goto bad;
 	}
-	max = fragoff + ip_len;
 
-	/* Fully buffer all of the fragments
-	 * Might return a completely reassembled mbuf, or NULL */
-	PF_FRAG_LOCK();
-	DPFPRINTF(("reass frag %d @ %d-%d\n", h->ip_id, fragoff, max));
-	verdict = pf_reassemble(m0, h, dir, reason);
-	PF_FRAG_UNLOCK();
+	if (r==NULL || !(r->rule_flag & PFRULE_FRAGMENT_NOREASS)) {
+		max = fragoff + ip_len;
 
-	if (verdict != PF_PASS)
-		return (PF_DROP);
+		/* Fully buffer all of the fragments
+		 * Might return a completely reassembled mbuf, or NULL */
+		PF_FRAG_LOCK();
+		DPFPRINTF(("reass frag %d @ %d-%d\n", h->ip_id, fragoff, max));
+		verdict = pf_reassemble(m0, h, pd->dir, reason);
+		PF_FRAG_UNLOCK();
 
-	m = *m0;
-	if (m == NULL)
-		return (PF_DROP);
+		if (verdict != PF_PASS)
+			return (PF_DROP);
 
-	h = mtod(m, struct ip *);
+		m = *m0;
+		if (m == NULL)
+			return (PF_DROP);
+
+		h = mtod(m, struct ip *);
 
  no_fragment:
-	/* At this point, only IP_DF is allowed in ip_off */
-	if (h->ip_off & ~htons(IP_DF)) {
-		u_int16_t ip_off = h->ip_off;
+		/* At this point, only IP_DF is allowed in ip_off */
+		if (h->ip_off & ~htons(IP_DF)) {
+			u_int16_t ip_off = h->ip_off;
 
-		h->ip_off &= htons(IP_DF);
-		h->ip_sum = pf_cksum_fixup(h->ip_sum, ip_off, h->ip_off, 0);
+			h->ip_off &= htons(IP_DF);
+			h->ip_sum = pf_cksum_fixup(h->ip_sum, ip_off, h->ip_off, 0);
+		}
 	}
-
-	pf_scrub_ip(&m, r->rule_flag, r->min_ttl, r->set_tos);
 
 	return (PF_PASS);
 
@@ -1151,8 +1179,7 @@ pf_normalize_ip(struct mbuf **m0, int dir, struct pfi_kkif *kif, u_short *reason
 	REASON_SET(reason, PFRES_FRAG);
  drop:
 	if (r != NULL && r->log)
-		PFLOG_PACKET(kif, m, AF_INET, dir, *reason, r, NULL, NULL, pd,
-		    1);
+		PFLOG_PACKET(kif, m, AF_INET, *reason, r, NULL, NULL, pd, 1);
 
 	return (PF_DROP);
 }
@@ -1160,7 +1187,7 @@ pf_normalize_ip(struct mbuf **m0, int dir, struct pfi_kkif *kif, u_short *reason
 
 #ifdef INET6
 int
-pf_normalize_ip6(struct mbuf **m0, int dir, struct pfi_kkif *kif,
+pf_normalize_ip6(struct mbuf **m0, struct pfi_kkif *kif,
     u_short *reason, struct pf_pdesc *pd)
 {
 	struct mbuf		*m = *m0;
@@ -1176,15 +1203,19 @@ pf_normalize_ip6(struct mbuf **m0, int dir, struct pfi_kkif *kif,
 	int			 ooff;
 	u_int8_t		 proto;
 	int			 terminal;
+	int			 srs;
 
 	PF_RULES_RASSERT();
 
 	r = TAILQ_FIRST(pf_main_ruleset.rules[PF_RULESET_SCRUB].active.ptr);
+	/* Check if there any scrub rules. Lack of scrub rules means enforced
+	 * packet normalization operation just like in OpenBSD. */
+	srs = (r != NULL);
 	while (r != NULL) {
 		pf_counter_u64_add(&r->evaluations, 1);
 		if (pfi_kkif_match(r->kif, kif) == r->ifnot)
 			r = r->skip[PF_SKIP_IFP].ptr;
-		else if (r->direction && r->direction != dir)
+		else if (r->direction && r->direction != pd->dir)
 			r = r->skip[PF_SKIP_DIR].ptr;
 		else if (r->af && r->af != AF_INET6)
 			r = r->skip[PF_SKIP_AF].ptr;
@@ -1204,18 +1235,25 @@ pf_normalize_ip6(struct mbuf **m0, int dir, struct pfi_kkif *kif,
 			break;
 	}
 
-	if (r == NULL || r->action == PF_NOSCRUB)
-		return (PF_PASS);
+	if (srs) {
+		/* With scrub rules present IPv6 normalization happens only
+		 * if one of rules has matched and it's not a "no scrub" rule */
+		if (r == NULL || r->action == PF_NOSCRUB)
+			return (PF_PASS);
 
-	pf_counter_u64_critical_enter();
-	pf_counter_u64_add_protected(&r->packets[dir == PF_OUT], 1);
-	pf_counter_u64_add_protected(&r->bytes[dir == PF_OUT], pd->tot_len);
-	pf_counter_u64_critical_exit();
+		pf_counter_u64_critical_enter();
+		pf_counter_u64_add_protected(&r->packets[pd->dir == PF_OUT], 1);
+		pf_counter_u64_add_protected(&r->bytes[pd->dir == PF_OUT], pd->tot_len);
+		pf_counter_u64_critical_exit();
+		pf_rule_to_actions(r, &pd->act);
+	}
 
 	/* Check for illegal packets */
 	if (sizeof(struct ip6_hdr) + IPV6_MAXPACKET < m->m_pkthdr.len)
 		goto drop;
 
+again:
+	h = mtod(m, struct ip6_hdr *);
 	plen = ntohs(h->ip6_plen);
 	/* jumbo payload option not supported */
 	if (plen == 0)
@@ -1281,11 +1319,11 @@ pf_normalize_ip6(struct mbuf **m0, int dir, struct pfi_kkif *kif,
 	if (sizeof(struct ip6_hdr) + plen > m->m_pkthdr.len)
 		goto shortpkt;
 
-	pf_scrub_ip6(&m, r->rule_flag, r->min_ttl, r->set_tos);
-
 	return (PF_PASS);
 
  fragment:
+	if (pd->flags & PFDESC_IP_REAS)
+		return (PF_DROP);
 	if (sizeof(struct ip6_hdr) + plen > m->m_pkthdr.len)
 		goto shortpkt;
 
@@ -1303,26 +1341,24 @@ pf_normalize_ip6(struct mbuf **m0, int dir, struct pfi_kkif *kif,
 		return (PF_DROP);
 
 	pd->flags |= PFDESC_IP_REAS;
-	return (PF_PASS);
+	goto again;
 
  shortpkt:
 	REASON_SET(reason, PFRES_SHORT);
 	if (r != NULL && r->log)
-		PFLOG_PACKET(kif, m, AF_INET6, dir, *reason, r, NULL, NULL, pd,
-		    1);
+		PFLOG_PACKET(kif, m, AF_INET6, *reason, r, NULL, NULL, pd, 1);
 	return (PF_DROP);
 
  drop:
 	REASON_SET(reason, PFRES_NORM);
 	if (r != NULL && r->log)
-		PFLOG_PACKET(kif, m, AF_INET6, dir, *reason, r, NULL, NULL, pd,
-		    1);
+		PFLOG_PACKET(kif, m, AF_INET6, *reason, r, NULL, NULL, pd, 1);
 	return (PF_DROP);
 }
 #endif /* INET6 */
 
 int
-pf_normalize_tcp(int dir, struct pfi_kkif *kif, struct mbuf *m, int ipoff,
+pf_normalize_tcp(struct pfi_kkif *kif, struct mbuf *m, int ipoff,
     int off, void *h, struct pf_pdesc *pd)
 {
 	struct pf_krule	*r, *rm = NULL;
@@ -1331,15 +1367,19 @@ pf_normalize_tcp(int dir, struct pfi_kkif *kif, struct mbuf *m, int ipoff,
 	u_short		 reason;
 	u_int8_t	 flags;
 	sa_family_t	 af = pd->af;
+	int		 srs;
 
 	PF_RULES_RASSERT();
 
 	r = TAILQ_FIRST(pf_main_ruleset.rules[PF_RULESET_SCRUB].active.ptr);
+	/* Check if there any scrub rules. Lack of scrub rules means enforced
+	 * packet normalization operation just like in OpenBSD. */
+	srs = (r != NULL);
 	while (r != NULL) {
 		pf_counter_u64_add(&r->evaluations, 1);
 		if (pfi_kkif_match(r->kif, kif) == r->ifnot)
 			r = r->skip[PF_SKIP_IFP].ptr;
-		else if (r->direction && r->direction != dir)
+		else if (r->direction && r->direction != pd->dir)
 			r = r->skip[PF_SKIP_DIR].ptr;
 		else if (r->af && r->af != af)
 			r = r->skip[PF_SKIP_AF].ptr;
@@ -1367,15 +1407,20 @@ pf_normalize_tcp(int dir, struct pfi_kkif *kif, struct mbuf *m, int ipoff,
 		}
 	}
 
-	if (rm == NULL || rm->action == PF_NOSCRUB)
-		return (PF_PASS);
+	if (srs) {
+		/* With scrub rules present TCP normalization happens only
+		 * if one of rules has matched and it's not a "no scrub" rule */
+		if (rm == NULL || rm->action == PF_NOSCRUB)
+			return (PF_PASS);
 
-	pf_counter_u64_critical_enter();
-	pf_counter_u64_add_protected(&r->packets[dir == PF_OUT], 1);
-	pf_counter_u64_add_protected(&r->bytes[dir == PF_OUT], pd->tot_len);
-	pf_counter_u64_critical_exit();
+		pf_counter_u64_critical_enter();
+		pf_counter_u64_add_protected(&r->packets[pd->dir == PF_OUT], 1);
+		pf_counter_u64_add_protected(&r->bytes[pd->dir == PF_OUT], pd->tot_len);
+		pf_counter_u64_critical_exit();
+		pf_rule_to_actions(rm, &pd->act);
+	}
 
-	if (rm->rule_flag & PFRULE_REASSEMBLE_TCP)
+	if (rm && rm->rule_flag & PFRULE_REASSEMBLE_TCP)
 		pd->flags |= PFDESC_TCP_NORM;
 
 	flags = th->th_flags;
@@ -1423,10 +1468,6 @@ pf_normalize_tcp(int dir, struct pfi_kkif *kif, struct mbuf *m, int ipoff,
 		rewrite = 1;
 	}
 
-	/* Process options */
-	if (r->max_mss && pf_normalize_tcpopt(r, m, th, off, pd->af))
-		rewrite = 1;
-
 	/* copy back packet headers if we sanitized */
 	if (rewrite)
 		m_copyback(m, off, sizeof(*th), (caddr_t)th);
@@ -1436,8 +1477,7 @@ pf_normalize_tcp(int dir, struct pfi_kkif *kif, struct mbuf *m, int ipoff,
  tcp_drop:
 	REASON_SET(&reason, PFRES_NORM);
 	if (rm != NULL && r->log)
-		PFLOG_PACKET(kif, m, AF_INET, dir, reason, r, NULL, NULL, pd,
-		    1);
+		PFLOG_PACKET(kif, m, AF_INET, reason, r, NULL, NULL, pd, 1);
 	return (PF_DROP);
 }
 
@@ -1525,10 +1565,8 @@ pf_normalize_tcp_init(struct mbuf *m, int off, struct pf_pdesc *pd,
 void
 pf_normalize_tcp_cleanup(struct pf_kstate *state)
 {
-	if (state->src.scrub)
-		uma_zfree(V_pf_state_scrub_z, state->src.scrub);
-	if (state->dst.scrub)
-		uma_zfree(V_pf_state_scrub_z, state->dst.scrub);
+	uma_zfree(V_pf_state_scrub_z, state->src.scrub);
+	uma_zfree(V_pf_state_scrub_z, state->dst.scrub);
 
 	/* Someday... flush the TCP segment reassembly descriptors. */
 }
@@ -1928,14 +1966,13 @@ pf_normalize_tcp_stateful(struct mbuf *m, int off, struct pf_pdesc *pd,
 	return (0);
 }
 
-static int
-pf_normalize_tcpopt(struct pf_krule *r, struct mbuf *m, struct tcphdr *th,
-    int off, sa_family_t af)
+int
+pf_normalize_mss(struct mbuf *m, int off, struct pf_pdesc *pd)
 {
+	struct tcphdr	*th = &pd->hdr.tcp;
 	u_int16_t	*mss;
 	int		 thoff;
 	int		 opt, cnt, optlen = 0;
-	int		 rewrite = 0;
 	u_char		 opts[TCP_MAXOLEN];
 	u_char		*optp = opts;
 	size_t		 startoff;
@@ -1944,8 +1981,8 @@ pf_normalize_tcpopt(struct pf_krule *r, struct mbuf *m, struct tcphdr *th,
 	cnt = thoff - sizeof(struct tcphdr);
 
 	if (cnt > 0 && !pf_pull_hdr(m, off + sizeof(*th), opts, cnt,
-	    NULL, NULL, af))
-		return (rewrite);
+	    NULL, NULL, pd->af))
+		return (0);
 
 	for (; cnt > 0; cnt -= optlen, optp += optlen) {
 		startoff = optp - opts;
@@ -1964,13 +2001,15 @@ pf_normalize_tcpopt(struct pf_krule *r, struct mbuf *m, struct tcphdr *th,
 		switch (opt) {
 		case TCPOPT_MAXSEG:
 			mss = (u_int16_t *)(optp + 2);
-			if ((ntohs(*mss)) > r->max_mss) {
+			if ((ntohs(*mss)) > pd->act.max_mss) {
 				pf_patch_16_unaligned(m,
 				    &th->th_sum,
-				    mss, htons(r->max_mss),
+				    mss, htons(pd->act.max_mss),
 				    PF_ALGNMNT(startoff),
 				    0);
-				rewrite = 1;
+				m_copyback(m, off + sizeof(*th),
+				    thoff - sizeof(*th), opts);
+				m_copyback(m, off, sizeof(*th), (caddr_t)th);
 			}
 			break;
 		default:
@@ -1978,21 +2017,198 @@ pf_normalize_tcpopt(struct pf_krule *r, struct mbuf *m, struct tcphdr *th,
 		}
 	}
 
-	if (rewrite)
-		m_copyback(m, off + sizeof(*th), thoff - sizeof(*th), opts);
+	return (0);
+}
 
-	return (rewrite);
+static int
+pf_scan_sctp(struct mbuf *m, int ipoff, int off, struct pf_pdesc *pd)
+{
+	struct sctp_chunkhdr ch = { };
+	int chunk_off = sizeof(struct sctphdr);
+	int chunk_start;
+
+	while (off + chunk_off < pd->tot_len) {
+		if (!pf_pull_hdr(m, off + chunk_off, &ch, sizeof(ch), NULL,
+		    NULL, pd->af))
+			return (PF_DROP);
+
+		/* Length includes the header, this must be at least 4. */
+		if (ntohs(ch.chunk_length) < 4)
+			return (PF_DROP);
+
+		chunk_start = chunk_off;
+		chunk_off += roundup(ntohs(ch.chunk_length), 4);
+
+		switch (ch.chunk_type) {
+		case SCTP_INITIATION: {
+			struct sctp_init_chunk init;
+
+			if (!pf_pull_hdr(m, off + chunk_start, &init,
+			    sizeof(init), NULL, NULL, pd->af))
+				return (PF_DROP);
+
+			/*
+			 * RFC 9620, Section 3.3.2, "The Initiate Tag is allowed to have
+			 * any value except 0."
+			 */
+			if (init.init.initiate_tag == 0)
+				return (PF_DROP);
+			if (init.init.num_inbound_streams == 0)
+				return (PF_DROP);
+			if (init.init.num_outbound_streams == 0)
+				return (PF_DROP);
+			if (ntohl(init.init.a_rwnd) < SCTP_MIN_RWND)
+				return (PF_DROP);
+
+			/*
+			 * RFC 9260, Section 3.1, INIT chunks MUST have zero
+			 * verification tag.
+			 */
+			if (pd->hdr.sctp.v_tag != 0)
+				return (PF_DROP);
+
+			pd->sctp_initiate_tag = init.init.initiate_tag;
+
+			pd->sctp_flags |= PFDESC_SCTP_INIT;
+			break;
+		}
+		case SCTP_INITIATION_ACK:
+			pd->sctp_flags |= PFDESC_SCTP_INIT_ACK;
+			break;
+		case SCTP_ABORT_ASSOCIATION:
+			pd->sctp_flags |= PFDESC_SCTP_ABORT;
+			break;
+		case SCTP_SHUTDOWN:
+		case SCTP_SHUTDOWN_ACK:
+			pd->sctp_flags |= PFDESC_SCTP_SHUTDOWN;
+			break;
+		case SCTP_SHUTDOWN_COMPLETE:
+			pd->sctp_flags |= PFDESC_SCTP_SHUTDOWN_COMPLETE;
+			break;
+		case SCTP_COOKIE_ECHO:
+		case SCTP_COOKIE_ACK:
+			pd->sctp_flags |= PFDESC_SCTP_COOKIE;
+			break;
+		case SCTP_DATA:
+			pd->sctp_flags |= PFDESC_SCTP_DATA;
+			break;
+		default:
+			pd->sctp_flags |= PFDESC_SCTP_OTHER;
+			break;
+		}
+	}
+
+	/* Validate chunk lengths vs. packet length. */
+	if (off + chunk_off != pd->tot_len)
+		return (PF_DROP);
+
+	/*
+	 * INIT, INIT_ACK or SHUTDOWN_COMPLETE chunks must always be the only
+	 * one in a packet.
+	 */
+	if ((pd->sctp_flags & PFDESC_SCTP_INIT) &&
+	    (pd->sctp_flags & ~PFDESC_SCTP_INIT))
+		return (PF_DROP);
+	if ((pd->sctp_flags & PFDESC_SCTP_INIT_ACK) &&
+	    (pd->sctp_flags & ~PFDESC_SCTP_INIT_ACK))
+		return (PF_DROP);
+	if ((pd->sctp_flags & PFDESC_SCTP_SHUTDOWN_COMPLETE) &&
+	    (pd->sctp_flags & ~PFDESC_SCTP_SHUTDOWN_COMPLETE))
+		return (PF_DROP);
+
+	return (PF_PASS);
+}
+
+int
+pf_normalize_sctp(int dir, struct pfi_kkif *kif, struct mbuf *m, int ipoff,
+    int off, void *h, struct pf_pdesc *pd)
+{
+	struct pf_krule	*r, *rm = NULL;
+	struct sctphdr	*sh = &pd->hdr.sctp;
+	u_short		 reason;
+	sa_family_t	 af = pd->af;
+	int		 srs;
+
+	PF_RULES_RASSERT();
+
+	/* Unconditionally scan the SCTP packet, because we need to look for
+	 * things like shutdown and asconf chunks. */
+	if (pf_scan_sctp(m, ipoff, off, pd) != PF_PASS)
+		goto sctp_drop;
+
+	r = TAILQ_FIRST(pf_main_ruleset.rules[PF_RULESET_SCRUB].active.ptr);
+	/* Check if there any scrub rules. Lack of scrub rules means enforced
+	 * packet normalization operation just like in OpenBSD. */
+	srs = (r != NULL);
+	while (r != NULL) {
+		pf_counter_u64_add(&r->evaluations, 1);
+		if (pfi_kkif_match(r->kif, kif) == r->ifnot)
+			r = r->skip[PF_SKIP_IFP].ptr;
+		else if (r->direction && r->direction != dir)
+			r = r->skip[PF_SKIP_DIR].ptr;
+		else if (r->af && r->af != af)
+			r = r->skip[PF_SKIP_AF].ptr;
+		else if (r->proto && r->proto != pd->proto)
+			r = r->skip[PF_SKIP_PROTO].ptr;
+		else if (PF_MISMATCHAW(&r->src.addr, pd->src, af,
+		    r->src.neg, kif, M_GETFIB(m)))
+			r = r->skip[PF_SKIP_SRC_ADDR].ptr;
+		else if (r->src.port_op && !pf_match_port(r->src.port_op,
+			    r->src.port[0], r->src.port[1], sh->src_port))
+			r = r->skip[PF_SKIP_SRC_PORT].ptr;
+		else if (PF_MISMATCHAW(&r->dst.addr, pd->dst, af,
+		    r->dst.neg, NULL, M_GETFIB(m)))
+			r = r->skip[PF_SKIP_DST_ADDR].ptr;
+		else if (r->dst.port_op && !pf_match_port(r->dst.port_op,
+			    r->dst.port[0], r->dst.port[1], sh->dest_port))
+			r = r->skip[PF_SKIP_DST_PORT].ptr;
+		else {
+			rm = r;
+			break;
+		}
+	}
+
+	if (srs) {
+		/* With scrub rules present SCTP normalization happens only
+		 * if one of rules has matched and it's not a "no scrub" rule */
+		if (rm == NULL || rm->action == PF_NOSCRUB)
+			return (PF_PASS);
+
+		pf_counter_u64_critical_enter();
+		pf_counter_u64_add_protected(&r->packets[dir == PF_OUT], 1);
+		pf_counter_u64_add_protected(&r->bytes[dir == PF_OUT], pd->tot_len);
+		pf_counter_u64_critical_exit();
+	}
+
+	/* Verify we're a multiple of 4 bytes long */
+	if ((pd->tot_len - off - sizeof(struct sctphdr)) % 4)
+		goto sctp_drop;
+
+	/* INIT chunk needs to be the only chunk */
+	if (pd->sctp_flags & PFDESC_SCTP_INIT)
+		if (pd->sctp_flags & ~PFDESC_SCTP_INIT)
+			goto sctp_drop;
+
+	return (PF_PASS);
+
+sctp_drop:
+	REASON_SET(&reason, PFRES_NORM);
+	if (rm != NULL && r->log)
+		PFLOG_PACKET(kif, m, AF_INET, reason, r, NULL, NULL, pd,
+		    1);
+
+	return (PF_DROP);
 }
 
 #ifdef INET
-static void
-pf_scrub_ip(struct mbuf **m0, u_int32_t flags, u_int8_t min_ttl, u_int8_t tos)
+void
+pf_scrub_ip(struct mbuf **m0, struct pf_pdesc *pd)
 {
 	struct mbuf		*m = *m0;
 	struct ip		*h = mtod(m, struct ip *);
 
 	/* Clear IP_DF if no-df was requested */
-	if (flags & PFRULE_NODF && h->ip_off & htons(IP_DF)) {
+	if (pd->act.flags & PFSTATE_NODF && h->ip_off & htons(IP_DF)) {
 		u_int16_t ip_off = h->ip_off;
 
 		h->ip_off &= htons(~IP_DF);
@@ -2000,26 +2216,26 @@ pf_scrub_ip(struct mbuf **m0, u_int32_t flags, u_int8_t min_ttl, u_int8_t tos)
 	}
 
 	/* Enforce a minimum ttl, may cause endless packet loops */
-	if (min_ttl && h->ip_ttl < min_ttl) {
+	if (pd->act.min_ttl && h->ip_ttl < pd->act.min_ttl) {
 		u_int16_t ip_ttl = h->ip_ttl;
 
-		h->ip_ttl = min_ttl;
+		h->ip_ttl = pd->act.min_ttl;
 		h->ip_sum = pf_cksum_fixup(h->ip_sum, ip_ttl, h->ip_ttl, 0);
 	}
 
 	/* Enforce tos */
-	if (flags & PFRULE_SET_TOS) {
+	if (pd->act.flags & PFSTATE_SETTOS) {
 		u_int16_t	ov, nv;
 
 		ov = *(u_int16_t *)h;
-		h->ip_tos = tos | (h->ip_tos & IPTOS_ECN_MASK);
+		h->ip_tos = pd->act.set_tos | (h->ip_tos & IPTOS_ECN_MASK);
 		nv = *(u_int16_t *)h;
 
 		h->ip_sum = pf_cksum_fixup(h->ip_sum, ov, nv, 0);
 	}
 
 	/* random-id, but not for fragments */
-	if (flags & PFRULE_RANDOMID && !(h->ip_off & ~htons(IP_DF))) {
+	if (pd->act.flags & PFSTATE_RANDOMID && !(h->ip_off & ~htons(IP_DF))) {
 		uint16_t ip_id = h->ip_id;
 
 		ip_fillid(h);
@@ -2029,20 +2245,20 @@ pf_scrub_ip(struct mbuf **m0, u_int32_t flags, u_int8_t min_ttl, u_int8_t tos)
 #endif /* INET */
 
 #ifdef INET6
-static void
-pf_scrub_ip6(struct mbuf **m0, u_int32_t flags, u_int8_t min_ttl, u_int8_t tos)
+void
+pf_scrub_ip6(struct mbuf **m0, struct pf_pdesc *pd)
 {
 	struct mbuf		*m = *m0;
 	struct ip6_hdr		*h = mtod(m, struct ip6_hdr *);
 
 	/* Enforce a minimum ttl, may cause endless packet loops */
-	if (min_ttl && h->ip6_hlim < min_ttl)
-		h->ip6_hlim = min_ttl;
+	if (pd->act.min_ttl && h->ip6_hlim < pd->act.min_ttl)
+		h->ip6_hlim = pd->act.min_ttl;
 
 	/* Enforce tos. Set traffic class bits */
-	if (flags & PFRULE_SET_TOS) {
+	if (pd->act.flags & PFSTATE_SETTOS) {
 		h->ip6_flow &= IPV6_FLOWLABEL_MASK | IPV6_VERSION_MASK;
-		h->ip6_flow |= htonl((tos | IPV6_ECN(h)) << 20);
+		h->ip6_flow |= htonl((pd->act.set_tos | IPV6_ECN(h)) << 20);
 	}
 }
 #endif

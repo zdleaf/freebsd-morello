@@ -29,8 +29,6 @@
 #include "opt_platform.h"
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/ctype.h>
@@ -53,9 +51,10 @@ __FBSDID("$FreeBSD$");
 
 extern int *end;
 static char *loader_envp;
-static char static_kenv[4096];
 
 #ifdef FDT
+static char static_kenv[4096];
+
 #define	CMDLINE_GUARD "FreeBSD:"
 #define	LBABI_MAX_COMMAND_LINE 512
 static char linux_command_line[LBABI_MAX_COMMAND_LINE + 1];

@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2009 M. Warner Losh <imp@FreeBSD.org>
  *
@@ -26,8 +26,6 @@
  * SUCH DAMAGE.
  */
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 /*
  * driver for internal phy in the AX88x9x chips.
  */
@@ -60,15 +58,13 @@ static device_method_t axphy_methods[] = {
 	DEVMETHOD_END
 };
 
-static devclass_t axphy_devclass;
-
 static driver_t axphy_driver = {
 	"axphy",
 	axphy_methods,
 	sizeof(struct mii_softc)
 };
 
-DRIVER_MODULE(axphy, miibus, axphy_driver, axphy_devclass, 0, 0);
+DRIVER_MODULE(axphy, miibus, axphy_driver, 0, 0);
 
 static int	axphy_service(struct mii_softc *, struct mii_data *, int);
 static void	axphy_status(struct mii_softc *);

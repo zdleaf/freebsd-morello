@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2001-2003, Shunsuke Akiyama <akiyama@FreeBSD.org>.
  * All rights reserved.
@@ -28,8 +28,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 /*
  * driver for RealTek RTL8150 internal PHY
  */
@@ -66,15 +64,13 @@ static device_method_t ruephy_methods[] = {
 	DEVMETHOD_END
 };
 
-static devclass_t ruephy_devclass;
-
 static driver_t ruephy_driver = {
 	.name = "ruephy",
 	.methods = ruephy_methods,
 	.size = sizeof(struct mii_softc)
 };
 
-DRIVER_MODULE(ruephy, miibus, ruephy_driver, ruephy_devclass, 0, 0);
+DRIVER_MODULE(ruephy, miibus, ruephy_driver, 0, 0);
 
 static int ruephy_service(struct mii_softc *, struct mii_data *, int);
 static void ruephy_reset(struct mii_softc *);

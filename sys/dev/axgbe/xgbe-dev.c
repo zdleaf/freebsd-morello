@@ -112,8 +112,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include "xgbe.h"
 #include "xgbe-common.h"
 
@@ -973,8 +971,8 @@ xgbe_config_rx_mode(struct xgbe_prv_data *pdata)
 {
 	unsigned int pr_mode, am_mode;
 
-	pr_mode = ((pdata->netdev->if_flags & IFF_PPROMISC) != 0);
-	am_mode = ((pdata->netdev->if_flags & IFF_ALLMULTI) != 0);
+	pr_mode = ((if_getflags(pdata->netdev) & IFF_PPROMISC) != 0);
+	am_mode = ((if_getflags(pdata->netdev) & IFF_ALLMULTI) != 0);
 
 	xgbe_set_promiscuous_mode(pdata, pr_mode);
 	xgbe_set_all_multicast_mode(pdata, am_mode);
@@ -2029,7 +2027,7 @@ xgbe_config_queue_mapping(struct xgbe_prv_data *pdata)
 static void
 xgbe_config_mac_address(struct xgbe_prv_data *pdata)
 {
-	xgbe_set_mac_address(pdata, IF_LLADDR(pdata->netdev));
+	xgbe_set_mac_address(pdata, if_getlladdr(pdata->netdev));
 
 	/* Filtering is done using perfect filtering and hash filtering */
 	if (pdata->hw_feat.hash_table_size) {

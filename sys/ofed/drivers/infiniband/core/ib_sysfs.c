@@ -35,8 +35,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include "core_priv.h"
 
 #include <linux/slab.h>
@@ -276,6 +274,10 @@ static ssize_t rate_show(struct ib_port *p, struct port_attribute *unused,
 	case IB_SPEED_HDR:
 		speed = " HDR";
 		rate = 500;
+		break;
+	case IB_SPEED_NDR:
+		speed = " NDR";
+		rate = 1000;
 		break;
 	case IB_SPEED_SDR:
 	default:		/* default to SDR for invalid rates */
@@ -1362,7 +1364,7 @@ err_put:
 	free_port_list_attributes(device);
 
 err_unregister:
-	device_unregister(class_dev);
+	device_del(class_dev);
 
 err:
 	return ret;

@@ -24,8 +24,6 @@
  * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 #ifndef _HN_RNDIS_H_
@@ -46,5 +44,6 @@ int		hn_rndis_get_mtu(struct hn_softc *sc, uint32_t *mtu);
 int		hn_rndis_set_rxfilter(struct hn_softc *sc, uint32_t filter);
 void		hn_rndis_rx_ctrl(struct hn_softc *sc, const void *data,
 		    int dlen);
+int		hn_rndis_reconf_offload(struct hn_softc *sc, int mtu);
 
 #endif  /* !_HN_RNDIS_H_ */

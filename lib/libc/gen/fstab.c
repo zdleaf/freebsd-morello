@@ -31,8 +31,6 @@
 
 #include <sys/cdefs.h>
 __SCCSID("@(#)fstab.c	8.1 (Berkeley) 6/4/93");
-__FBSDID("$FreeBSD$");
-
 #include "namespace.h"
 #include <sys/param.h>
 #include <sys/mount.h>
@@ -259,12 +257,8 @@ setfsent(void)
 		LineNo = 0;
 		return (1);
 	}
-	if (fsp_set == 0) {
-		if (issetugid())
-			setfstab(NULL);
-		else
-			setfstab(getenv("PATH_FSTAB"));
-	}
+	if (fsp_set == 0)
+		setfstab(secure_getenv("PATH_FSTAB"));
 	if ((_fs_fp = fopen(path_fstab, "re")) != NULL) {
 		LineNo = 0;
 		return (1);

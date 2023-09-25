@@ -36,8 +36,6 @@
 #endif
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/kernel.h>
 #include <sys/libkern.h>
@@ -46,6 +44,8 @@ __FBSDID("$FreeBSD$");
 
 #include <machine/armreg.h>
 #include <machine/cpu.h>
+#include <machine/reg.h>
+#include <machine/vmparam.h>
 
 #define	SCTLR_PTRAUTH	(SCTLR_EnIA | SCTLR_EnIB | SCTLR_EnDA | SCTLR_EnDB)
 
@@ -56,6 +56,31 @@ void ptrauth_start(void);
 struct thread *ptrauth_switch(struct thread *);
 void ptrauth_exit_el0(struct thread *);
 void ptrauth_enter_el0(struct thread *);
+
+static bool
+ptrauth_disable(void)
+{
+	const char *family, *maker, *product;
+
+	family = kern_getenv("smbios.system.family");
+	maker = kern_getenv("smbios.system.maker");
+	product = kern_getenv("smbios.system.product");
+	if (family == NULL || maker == NULL || product == NULL)
+		return (false);
+
+	/*
+	 * The Dev Kit appears to be configured to trap upon access to PAC
+	 * registers, but the kernel boots at EL1 and so we have no way to
+	 * inspect or change this configuration.  As a workaround, simply
+	 * disable PAC on this platform.
+	 */
+	if (strcmp(maker, "Microsoft Corporation") == 0 &&
+	    strcmp(family, "Surface") == 0 &&
+	    strcmp(product, "Windows Dev Kit 2023") == 0)
+		return (true);
+
+	return (false);
+}
 
 void
 ptrauth_init(void)
@@ -75,15 +100,23 @@ ptrauth_init(void)
 		return;
 	}
 
-	get_kernel_reg(ID_AA64ISAR1_EL1, &isar1);
+	if (!get_kernel_reg(ID_AA64ISAR1_EL1, &isar1))
+		return;
+
+	if (ptrauth_disable())
+		return;
 
 	/*
 	 * This assumes if there is pointer authentication on the boot CPU
 	 * it will also be available on any non-boot CPUs. If this is ever
 	 * not the case we will have to add a quirk.
 	 */
-	if (ID_AA64ISAR1_APA_VAL(isar1) > 0 || ID_AA64ISAR1_API_VAL(isar1) > 0)
+	if (ID_AA64ISAR1_APA_VAL(isar1) > 0 ||
+	    ID_AA64ISAR1_API_VAL(isar1) > 0) {
 		enable_ptrauth = true;
+		elf64_addr_mask.code |= PAC_ADDR_MASK;
+		elf64_addr_mask.data |= PAC_ADDR_MASK;
+	}
 }
 
 /* Copy the keys when forking a new process */

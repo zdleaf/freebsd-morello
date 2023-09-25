@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2000-2001 Jonathan Chen All rights reserved.
  * Copyright (c) 2002-2004 M. Warner Losh <imp@FreeBSD.org>
@@ -73,8 +73,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/proc.h>
@@ -974,7 +972,7 @@ static driver_t cbb_driver = {
 	sizeof(struct cbb_softc)
 };
 
-DRIVER_MODULE(cbb, pci, cbb_driver, cbb_devclass, 0, 0);
+DRIVER_MODULE(cbb, pci, cbb_driver, 0, 0);
 MODULE_PNP_INFO("W32:vendor/device;D:#", pci, cbb, yc_chipsets,
     nitems(yc_chipsets) - 1);
 MODULE_DEPEND(cbb, exca, 1, 1, 1);

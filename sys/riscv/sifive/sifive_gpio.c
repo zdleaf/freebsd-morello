@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2021 Jessica Clarke <jrtc27@FreeBSD.org>
  *
@@ -29,8 +29,6 @@
 /* TODO: Provide interrupt controller interface */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/bus.h>
@@ -456,9 +454,8 @@ static device_method_t sfgpio_methods[] = {
 	DEVMETHOD_END
 };
 
-static devclass_t sfgpio_devclass;
 DEFINE_CLASS_0(gpio, sfgpio_driver, sfgpio_methods,
     sizeof(struct sfgpio_softc));
-EARLY_DRIVER_MODULE(gpio, simplebus, sfgpio_driver, sfgpio_devclass, 0, 0,
+EARLY_DRIVER_MODULE(gpio, simplebus, sfgpio_driver, 0, 0,
     BUS_PASS_INTERRUPT + BUS_PASS_ORDER_LATE);
 MODULE_DEPEND(sfgpio, gpiobus, 1, 1, 1);

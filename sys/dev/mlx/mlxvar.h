@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 1999 Michael Smith
  * All rights reserved.
@@ -24,8 +24,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- *	$FreeBSD$
  */
 
 #include <sys/lock.h>
@@ -205,9 +203,6 @@ extern int		mlx_resume(device_t dev);
 extern d_open_t		mlx_open;
 extern d_close_t	mlx_close;
 extern d_ioctl_t	mlx_ioctl;
-
-extern devclass_t	mlx_devclass;
-extern devclass_t	mlxd_devclass;
 
 /*
  * Mylex System Disk driver

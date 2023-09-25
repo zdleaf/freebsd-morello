@@ -22,8 +22,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 #include <sys/types.h>
@@ -254,6 +252,11 @@ test_diskread(void *arg, int unit, uint64_t offset, void *dst, size_t size,
 	if (unit > disk_index || disk_fd[unit] == -1)
 		return (EIO);
 	n = pread(disk_fd[unit], dst, size, offset);
+	if (n == 0) {
+		printf("%s: end of disk (%ju)\n", __func__, (intmax_t)offset);
+		return (EIO);
+	}
+
 	if (n < 0)
 		return (errno);
 	*resid_return = size - n;

@@ -42,7 +42,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/conf.h>
@@ -53,7 +52,7 @@ __FBSDID("$FreeBSD$");
 
 char machine[] = "arm";
 
-SYSCTL_STRING(_hw, HW_MACHINE, machine, CTLFLAG_RD,
+SYSCTL_STRING(_hw, HW_MACHINE, machine, CTLFLAG_RD | CTLFLAG_CAPRD,
 	machine, 0, "Machine class");
 
 static char cpu_model[64];

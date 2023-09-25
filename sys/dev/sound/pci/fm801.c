@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2000 Dmitry Dicky diwil@dataart.com
  * All rights reserved.
@@ -34,8 +34,6 @@
 #include <dev/sound/pcm/ac97.h>
 #include <dev/pci/pcireg.h>
 #include <dev/pci/pcivar.h>
-
-SND_DECLARE_FILE("$FreeBSD$");
 
 #define PCI_VENDOR_FORTEMEDIA	0x1319
 #define PCI_DEVICE_FORTEMEDIA1	0x08011319	/* Audio controller */
@@ -759,6 +757,6 @@ static driver_t fm801_driver = {
 	PCM_SOFTC_SIZE,
 };
 
-DRIVER_MODULE(snd_fm801, pci, fm801_driver, pcm_devclass, 0, 0);
+DRIVER_MODULE(snd_fm801, pci, fm801_driver, 0, 0);
 MODULE_DEPEND(snd_fm801, sound, SOUND_MINVER, SOUND_PREFVER, SOUND_MAXVER);
 MODULE_VERSION(snd_fm801, 1);

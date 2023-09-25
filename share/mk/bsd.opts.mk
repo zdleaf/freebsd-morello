@@ -1,4 +1,3 @@
-# $FreeBSD$
 #
 # Option file for bmake builds. These options are available to all users of
 # bmake (including the source tree userland and kernel builds). They generally
@@ -64,6 +63,7 @@ __DEFAULT_YES_OPTIONS = \
     NIS \
     NLS \
     OPENSSH \
+    RELRO \
     SSP \
     TESTS \
     TOOLCHAIN \
@@ -103,6 +103,8 @@ __DEFAULT_NO_OPTIONS+= PIE
 __DEFAULT_YES_OPTIONS+=PIE
 .endif
 
+.-include <local.opts.mk>
+
 .include <bsd.mkopt.mk>
 
 .if ${MK_INIT_ALL_PATTERN} == "yes" && ${MK_INIT_ALL_ZERO} == "yes"
@@ -124,7 +126,7 @@ __DEFAULT_YES_OPTIONS+=PIE
     WARNS \
     WERROR
 .if defined(NO_${var})
-.error "NO_${var} is defined, but deprecated. Please use MK_${var}=no instead."
+.error NO_${var} is defined, but deprecated. Please use MK_${var}=no instead.
 MK_${var}:=no
 .endif
 .endfor

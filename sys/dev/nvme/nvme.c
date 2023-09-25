@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (C) 2012-2014 Intel Corporation
  * All rights reserved.
@@ -27,8 +27,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/bus.h>
 #include <sys/conf.h>
@@ -52,8 +50,6 @@ struct nvme_consumer nvme_consumer[NVME_MAX_CONSUMERS];
 int32_t		nvme_retry_count;
 
 MALLOC_DEFINE(M_NVME, "nvme", "nvme(4) memory allocations");
-
-devclass_t nvme_devclass;
 
 static void
 nvme_init(void)
@@ -82,39 +78,6 @@ nvme_shutdown(device_t dev)
 	nvme_ctrlr_shutdown(ctrlr);
 
 	return (0);
-}
-
-void
-nvme_dump_command(struct nvme_command *cmd)
-{
-
-	printf(
-"opc:%x f:%x cid:%x nsid:%x r2:%x r3:%x mptr:%jx prp1:%jx prp2:%jx cdw:%x %x %x %x %x %x\n",
-	    cmd->opc, cmd->fuse, cmd->cid, le32toh(cmd->nsid),
-	    cmd->rsvd2, cmd->rsvd3,
-	    (uintmax_t)le64toh(cmd->mptr), (uintmax_t)le64toh(cmd->prp1), (uintmax_t)le64toh(cmd->prp2),
-	    le32toh(cmd->cdw10), le32toh(cmd->cdw11), le32toh(cmd->cdw12),
-	    le32toh(cmd->cdw13), le32toh(cmd->cdw14), le32toh(cmd->cdw15));
-}
-
-void
-nvme_dump_completion(struct nvme_completion *cpl)
-{
-	uint8_t p, sc, sct, m, dnr;
-	uint16_t status;
-
-	status = le16toh(cpl->status);
-
-	p = NVME_STATUS_GET_P(status);
-	sc = NVME_STATUS_GET_SC(status);
-	sct = NVME_STATUS_GET_SCT(status);
-	m = NVME_STATUS_GET_M(status);
-	dnr = NVME_STATUS_GET_DNR(status);
-
-	printf("cdw0:%08x sqhd:%04x sqid:%04x "
-	    "cid:%04x p:%x sc:%02x sct:%x m:%x dnr:%x\n",
-	    le32toh(cpl->cdw0), le16toh(cpl->sqhd), le16toh(cpl->sqid),
-	    cpl->cid, p, sc, sct, m, dnr);
 }
 
 int
@@ -178,8 +141,10 @@ nvme_notify(struct nvme_consumer *cons,
 	ctrlr->cons_cookie[cons->id] = ctrlr_cookie;
 
 	/* ctrlr_fn has failed.  Nothing to notify here any more. */
-	if (ctrlr_cookie == NULL)
+	if (ctrlr_cookie == NULL) {
+		(void)atomic_cmpset_32(&ctrlr->notification_sent, 1, 0);
 		return;
+	}
 
 	if (ctrlr->is_failed) {
 		ctrlr->cons_cookie[cons->id] = NULL;
@@ -220,7 +185,7 @@ nvme_notify_new_consumer(struct nvme_consumer *cons)
 	struct nvme_controller	*ctrlr;
 	int			dev_idx, devcount;
 
-	if (devclass_get_devices(nvme_devclass, &devlist, &devcount))
+	if (devclass_get_devices(devclass_find("nvme"), &devlist, &devcount))
 		return;
 
 	for (dev_idx = 0; dev_idx < devcount; dev_idx++) {

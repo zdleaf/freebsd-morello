@@ -24,8 +24,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/types.h>
 #include <sys/cpuset.h>
 #include <sys/elf.h>
@@ -34,7 +32,6 @@ __FBSDID("$FreeBSD$");
 #include <sys/time.h>
 #include <sys/procctl.h>
 #include <sys/procdesc.h>
-#define	_WANT_MIPS_REGNUM
 #include <sys/ptrace.h>
 #include <sys/procfs.h>
 #include <sys/queue.h>
@@ -59,8 +56,7 @@ __FBSDID("$FreeBSD$");
  * Architectures with a user-visible breakpoint().
  */
 #if defined(__aarch64__) || defined(__amd64__) || defined(__arm__) ||	\
-    defined(__i386__) || defined(__mips__) || defined(__riscv) ||	\
-    defined(__sparc64__)
+    defined(__i386__) || defined(__riscv)
 #define	HAVE_BREAKPOINT
 #endif
 
@@ -74,15 +70,8 @@ __FBSDID("$FreeBSD$");
 #define	SKIP_BREAK(reg)
 #elif defined(__arm__)
 #define	SKIP_BREAK(reg)	((reg)->r_pc += 4)
-#elif defined(__mips__)
-#define	SKIP_BREAK(reg)	((reg)->r_regs[PC] += 4)
 #elif defined(__riscv)
 #define	SKIP_BREAK(reg)	((reg)->sepc += 4)
-#elif defined(__sparc64__)
-#define	SKIP_BREAK(reg)	do {						\
-	(reg)->r_tpc = (reg)->r_tnpc + 4;				\
-	(reg)->r_tnpc += 8;						\
-} while (0)
 #endif
 #endif
 
@@ -3204,6 +3193,9 @@ ATF_TC_BODY(ptrace__PT_CONTINUE_with_signal_thread_sigmask, tc)
 ATF_TC_WITHOUT_HEAD(ptrace__PT_REGSET);
 ATF_TC_BODY(ptrace__PT_REGSET, tc)
 {
+#if defined(__aarch64__)
+	struct arm64_addr_mask addr_mask;
+#endif
 	struct prstatus prstatus;
 	struct iovec vec;
 	pid_t child, wpid;
@@ -3241,6 +3233,16 @@ ATF_TC_BODY(ptrace__PT_REGSET, tc)
 	/* Write the registers back. */
 	ATF_REQUIRE(ptrace(PT_SETREGSET, wpid, (caddr_t)&vec, NT_PRSTATUS) !=
 	    -1);
+
+#if defined(__aarch64__)
+	vec.iov_base = &addr_mask;
+	vec.iov_len = sizeof(addr_mask);
+	ATF_REQUIRE(ptrace(PT_GETREGSET, wpid, (caddr_t)&vec,
+	    NT_ARM_ADDR_MASK) != -1);
+	REQUIRE_EQ(addr_mask.code, addr_mask.data);
+	ATF_REQUIRE(addr_mask.code == 0 ||
+	    addr_mask.code == 0xff7f000000000000UL);
+#endif
 
 	REQUIRE_EQ(ptrace(PT_CONTINUE, child, (caddr_t)1, 0), 0);
 
@@ -4314,9 +4316,61 @@ ATF_TC_BODY(ptrace__procdesc_reparent_wait_child, tc)
 	REQUIRE_EQ(close(pd), 0);
 }
 
+/*
+ * Try using PT_SC_REMOTE to get the PID of a traced child process.
+ */
+ATF_TC_WITHOUT_HEAD(ptrace__PT_SC_REMOTE_getpid);
+ATF_TC_BODY(ptrace__PT_SC_REMOTE_getpid, tc)
+{
+	struct ptrace_sc_remote pscr;
+	pid_t fpid, wpid;
+	int status;
+
+	ATF_REQUIRE((fpid = fork()) != -1);
+	if (fpid == 0) {
+		trace_me();
+		exit(0);
+	}
+
+	attach_child(fpid);
+
+	pscr.pscr_syscall = SYS_getpid;
+	pscr.pscr_nargs = 0;
+	pscr.pscr_args = NULL;
+	ATF_REQUIRE(ptrace(PT_SC_REMOTE, fpid, (caddr_t)&pscr, sizeof(pscr)) !=
+	    -1);
+	ATF_REQUIRE_MSG(pscr.pscr_ret.sr_error == 0,
+	    "remote getpid failed with error %d", pscr.pscr_ret.sr_error);
+	ATF_REQUIRE_MSG(pscr.pscr_ret.sr_retval[0] == fpid,
+	    "unexpected return value %jd instead of %d",
+	    (intmax_t)pscr.pscr_ret.sr_retval[0], fpid);
+
+	wpid = waitpid(fpid, &status, 0);
+	REQUIRE_EQ(wpid, fpid);
+	ATF_REQUIRE(WIFSTOPPED(status));
+	REQUIRE_EQ(WSTOPSIG(status), SIGSTOP);
+
+	pscr.pscr_syscall = SYS_getppid;
+	pscr.pscr_nargs = 0;
+	pscr.pscr_args = NULL;
+	ATF_REQUIRE(ptrace(PT_SC_REMOTE, fpid, (caddr_t)&pscr, sizeof(pscr)) !=
+	    -1);
+	ATF_REQUIRE_MSG(pscr.pscr_ret.sr_error == 0,
+	    "remote getppid failed with error %d", pscr.pscr_ret.sr_error);
+	ATF_REQUIRE_MSG(pscr.pscr_ret.sr_retval[0] == getpid(),
+	    "unexpected return value %jd instead of %d",
+	    (intmax_t)pscr.pscr_ret.sr_retval[0], fpid);
+
+	wpid = waitpid(fpid, &status, 0);
+	REQUIRE_EQ(wpid, fpid);
+	ATF_REQUIRE(WIFSTOPPED(status));
+	REQUIRE_EQ(WSTOPSIG(status), SIGSTOP);
+
+	ATF_REQUIRE(ptrace(PT_DETACH, fpid, (caddr_t)1, 0) != -1);
+}
+
 ATF_TP_ADD_TCS(tp)
 {
-
 	ATF_TP_ADD_TC(tp, ptrace__parent_wait_after_trace_me);
 	ATF_TP_ADD_TC(tp, ptrace__parent_wait_after_attach);
 	ATF_TP_ADD_TC(tp, ptrace__parent_sees_exit_after_child_debugger);
@@ -4380,6 +4434,7 @@ ATF_TP_ADD_TCS(tp)
 	ATF_TP_ADD_TC(tp, ptrace__proc_reparent);
 	ATF_TP_ADD_TC(tp, ptrace__procdesc_wait_child);
 	ATF_TP_ADD_TC(tp, ptrace__procdesc_reparent_wait_child);
+	ATF_TP_ADD_TC(tp, ptrace__PT_SC_REMOTE_getpid);
 
 	return (atf_no_error());
 }

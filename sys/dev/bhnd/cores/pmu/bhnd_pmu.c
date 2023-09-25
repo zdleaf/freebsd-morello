@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2015-2016 Landon Fuller <landon@landonf.org>
  * Copyright (c) 2017 The FreeBSD Foundation
@@ -34,8 +34,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/kernel.h>
 #include <sys/lock.h>
@@ -70,8 +68,6 @@ __FBSDID("$FreeBSD$");
  * On earlier chipsets, these register blocks are found at the same
  * offsets within the ChipCommon core.
  */
-
-devclass_t bhnd_pmu_devclass;	/**< bhnd(4) PMU device class */
 
 static int	bhnd_pmu_sysctl_bus_freq(SYSCTL_HANDLER_ARGS);
 static int	bhnd_pmu_sysctl_cpu_freq(SYSCTL_HANDLER_ARGS);

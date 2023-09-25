@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Written by: David Jeffery
  * Copyright (c) 2002 Adaptec Inc.
@@ -28,8 +28,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <dev/ips/ipsreg.h>
 #include <dev/ips/ips.h>
 #include <dev/ips/ips_disk.h>
@@ -39,8 +37,7 @@ static int ipsd_probe(device_t dev);
 static int ipsd_attach(device_t dev);
 static int ipsd_detach(device_t dev);
 
-static int ipsd_dump(void *arg, void *virtual, vm_offset_t physical,
-		     off_t offset, size_t length);
+static int ipsd_dump(void *arg, void *virtual, off_t offset, size_t length);
 static void ipsd_dump_map_sg(void *arg, bus_dma_segment_t *segs, int nsegs,
 			     int error);
 static void ipsd_dump_block_complete(ips_command_t *command);
@@ -62,8 +59,7 @@ static driver_t ipsd_driver = {
 	sizeof(ipsdisk_softc_t)
 };
 
-static devclass_t ipsd_devclass;
-DRIVER_MODULE(ipsd, ips, ipsd_driver, ipsd_devclass, 0, 0);
+DRIVER_MODULE(ipsd, ips, ipsd_driver, 0, 0);
 
 /* handle opening of disk device.  It must set up all
    information about the geometry and size of the disk */
@@ -186,8 +182,7 @@ static int ipsd_detach(device_t dev)
 }
 
 static int
-ipsd_dump(void *arg, void *virtual, vm_offset_t physical, off_t offset,
-	  size_t length)
+ipsd_dump(void *arg, void *virtual, off_t offset, size_t length)
 {
 	ipsdisk_softc_t *dsc;
 	ips_softc_t *sc;

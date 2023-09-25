@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2010 Nathan Whitehorn
  * All rights reserved.
@@ -24,8 +24,6 @@
  * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 #include <sys/param.h>
@@ -535,7 +533,7 @@ slb_zone_init(void *dummy)
 struct slb **
 slb_alloc_user_cache(void)
 {
-	return (uma_zalloc(slb_cache_zone, M_ZERO));
+	return (uma_zalloc(slb_cache_zone, M_WAITOK | M_ZERO));
 }
 
 void

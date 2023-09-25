@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright 2008 by Marco Trillo. All rights reserved.
  *
@@ -23,8 +23,6 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 /*
@@ -87,7 +85,7 @@ static driver_t pcm_davbus_driver = {
 	PCM_SOFTC_SIZE
 };
 
-DRIVER_MODULE(pcm_davbus, macio, pcm_davbus_driver, pcm_devclass, 0, 0);
+DRIVER_MODULE(pcm_davbus, macio, pcm_davbus_driver, 0, 0);
 MODULE_DEPEND(pcm_davbus, sound, SOUND_MINVER, SOUND_PREFVER, SOUND_MAXVER);
 
 /*****************************************************************************

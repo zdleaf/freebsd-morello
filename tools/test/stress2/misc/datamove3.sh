@@ -161,7 +161,7 @@ mapBuffer(void *ar)
 	char *buffer;
 	int i;
 
-	i = (int )ar;
+	i = (intptr_t)ar;
 	addr = mmap(NULL, pagesize * 2, PROT_READ | PROT_WRITE, MAP_SHARED, a[i].fd1, 0);
 	if (addr == MAP_FAILED) {
 		err(1, "Mmap failed");
@@ -192,7 +192,7 @@ startIO(int fd, char *buffer)
 }
 
 int
-main(int argc, char *argv[], char *envp[])
+main(void)
 {
 
 	int fdA, fdB, fdDelayA, fdDelayB;

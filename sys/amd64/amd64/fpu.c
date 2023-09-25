@@ -33,8 +33,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/bus.h>
@@ -48,6 +46,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/proc.h>
 #include <sys/sysctl.h>
 #include <sys/sysent.h>
+#include <sys/tslog.h>
 #include <machine/bus.h>
 #include <sys/rman.h>
 #include <sys/signalvar.h>
@@ -68,8 +67,6 @@ __FBSDID("$FreeBSD$");
 /*
  * Floating point support.
  */
-
-#if defined(__GNUCLIKE_ASM) && !defined(lint)
 
 #define	fldcw(cw)		__asm __volatile("fldcw %0" : : "m" (cw))
 #define	fnclex()		__asm __volatile("fnclex")
@@ -144,26 +141,6 @@ xsaveopt64(char *addr, uint64_t mask)
 	__asm __volatile("xsaveopt64 %0" : "=m" (*addr) : "a" (low), "d" (hi) :
 	    "memory");
 }
-
-#else	/* !(__GNUCLIKE_ASM && !lint) */
-
-void	fldcw(u_short cw);
-void	fnclex(void);
-void	fninit(void);
-void	fnstcw(caddr_t addr);
-void	fnstsw(caddr_t addr);
-void	fxsave(caddr_t addr);
-void	fxrstor(caddr_t addr);
-void	ldmxcsr(u_int csr);
-void	stmxcsr(u_int *csr);
-void	xrstor32(char *addr, uint64_t mask);
-void	xrstor64(char *addr, uint64_t mask);
-void	xsave32(char *addr, uint64_t mask);
-void	xsave64(char *addr, uint64_t mask);
-void	xsaveopt32(char *addr, uint64_t mask);
-void	xsaveopt64(char *addr, uint64_t mask);
-
-#endif	/* __GNUCLIKE_ASM && !lint */
 
 #define	start_emulating()	load_cr0(rcr0() | CR0_TS)
 #define	stop_emulating()	clts()
@@ -260,22 +237,8 @@ fpurestore_fxrstor(void *addr)
 	fxrstor((char *)addr);
 }
 
-static void
-init_xsave(void)
-{
-
-	if (use_xsave)
-		return;
-	if ((cpu_feature2 & CPUID2_XSAVE) == 0)
-		return;
-	use_xsave = 1;
-	TUNABLE_INT_FETCH("hw.use_xsave", &use_xsave);
-}
-
 DEFINE_IFUNC(, void, fpusave, (void *))
 {
-
-	init_xsave();
 	if (!use_xsave)
 		return (fpusave_fxsave);
 	if ((cpu_stdext_feature & CPUID_EXTSTATE_XSAVEOPT) != 0) {
@@ -288,8 +251,6 @@ DEFINE_IFUNC(, void, fpusave, (void *))
 
 DEFINE_IFUNC(, void, fpurestore, (void *))
 {
-
-	init_xsave();
 	if (!use_xsave)
 		return (fpurestore_fxrstor);
 	return ((cpu_stdext_feature & CPUID_STDEXT_NFPUSG) != 0 ?
@@ -394,14 +355,31 @@ void
 fpuinit(void)
 {
 	register_t saveintr;
+	uint64_t cr4;
 	u_int mxcsr;
 	u_short control;
 
+	TSENTER();
 	if (IS_BSP())
 		fpuinit_bsp1();
 
 	if (use_xsave) {
-		load_cr4(rcr4() | CR4_XSAVE);
+		cr4 = rcr4();
+
+		/*
+		 * Revert enablement of PKRU if user disabled its
+		 * saving on context switches by clearing the bit in
+		 * the xsave mask.  Also redundantly clear the bit in
+		 * cpu_stdext_feature2 to prevent pmap from ever
+		 * trying to set the page table bits.
+		 */
+		if ((cpu_stdext_feature2 & CPUID_STDEXT2_PKU) != 0 &&
+		    (xsave_mask & XFEATURE_ENABLED_PKRU) == 0) {
+			cr4 &= ~CR4_PKE;
+			cpu_stdext_feature2 &= ~CPUID_STDEXT2_PKU;
+		}
+
+		load_cr4(cr4 | CR4_XSAVE);
 		load_xcr(XCR0, xsave_mask);
 	}
 
@@ -423,6 +401,7 @@ fpuinit(void)
 	ldmxcsr(mxcsr);
 	start_emulating();
 	intr_restore(saveintr);
+	TSEXIT();
 }
 
 /*
@@ -524,14 +503,14 @@ fpuformat(void)
 	return (_MC_FPFMT_XMM);
 }
 
-/* 
+/*
  * The following mechanism is used to ensure that the FPE_... value
  * that is passed as a trapcode to the signal handler of the user
  * process does not have more than one bit set.
- * 
+ *
  * Multiple bits may be set if the user process modifies the control
  * word while a status word bit is already set.  While this is a sign
- * of bad coding, we have no choise than to narrow them down to one
+ * of bad coding, we have no choice than to narrow them down to one
  * bit, since we must not send a trapcode that is not exactly one of
  * the FPE_ macros.
  *
@@ -1082,9 +1061,7 @@ static driver_t fpupnp_driver = {
 	1,			/* no softc */
 };
 
-static devclass_t fpupnp_devclass;
-
-DRIVER_MODULE(fpupnp, acpi, fpupnp_driver, fpupnp_devclass, 0, 0);
+DRIVER_MODULE(fpupnp, acpi, fpupnp_driver, 0, 0);
 ISA_PNP_INFO(fpupnp_ids);
 #endif	/* DEV_ISA */
 

@@ -32,8 +32,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include "opt_ddb.h"
 #include "opt_ktrace.h"
 #include "opt_kstack_pages.h"
@@ -246,8 +244,7 @@ proc_dtor(void *mem, int size, void *arg)
 #endif
 		/* Free all OSD associated to this thread. */
 		osd_thread_exit(td);
-		td_softdep_cleanup(td);
-		MPASS(td->td_su == NULL);
+		ast_kclear(td);
 
 		/* Make sure all thread destructors are executed */
 		EVENTHANDLER_DIRECT_INVOKE(thread_dtor, td);
@@ -311,6 +308,7 @@ pgrp_init(void *mem, int size, int flags)
 
 	pg = mem;
 	mtx_init(&pg->pg_mtx, "process group", NULL, MTX_DEF | MTX_DUPOK);
+	sx_init(&pg->pg_killsx, "killpg racer");
 	return (0);
 }
 
@@ -574,6 +572,7 @@ errout:
 int
 enterpgrp(struct proc *p, pid_t pgid, struct pgrp *pgrp, struct session *sess)
 {
+	struct pgrp *old_pgrp;
 
 	sx_assert(&proctree_lock, SX_XLOCKED);
 
@@ -584,6 +583,15 @@ enterpgrp(struct proc *p, pid_t pgid, struct pgrp *pgrp, struct session *sess)
 	    ("enterpgrp: pgrp with pgid exists"));
 	KASSERT(!SESS_LEADER(p),
 	    ("enterpgrp: session leader attempted setpgrp"));
+
+	old_pgrp = p->p_pgrp;
+	if (!sx_try_xlock(&old_pgrp->pg_killsx)) {
+		sx_xunlock(&proctree_lock);
+		sx_xlock(&old_pgrp->pg_killsx);
+		sx_xunlock(&old_pgrp->pg_killsx);
+		return (ERESTART);
+	}
+	MPASS(old_pgrp == p->p_pgrp);
 
 	if (sess != NULL) {
 		/*
@@ -626,6 +634,7 @@ enterpgrp(struct proc *p, pid_t pgid, struct pgrp *pgrp, struct session *sess)
 
 	doenterpgrp(p, pgrp);
 
+	sx_xunlock(&old_pgrp->pg_killsx);
 	return (0);
 }
 
@@ -635,6 +644,7 @@ enterpgrp(struct proc *p, pid_t pgid, struct pgrp *pgrp, struct session *sess)
 int
 enterthispgrp(struct proc *p, struct pgrp *pgrp)
 {
+	struct pgrp *old_pgrp;
 
 	sx_assert(&proctree_lock, SX_XLOCKED);
 	PROC_LOCK_ASSERT(p, MA_NOTOWNED);
@@ -647,8 +657,26 @@ enterthispgrp(struct proc *p, struct pgrp *pgrp)
 	KASSERT(pgrp != p->p_pgrp,
 	    ("%s: p %p belongs to pgrp %p", __func__, p, pgrp));
 
+	old_pgrp = p->p_pgrp;
+	if (!sx_try_xlock(&old_pgrp->pg_killsx)) {
+		sx_xunlock(&proctree_lock);
+		sx_xlock(&old_pgrp->pg_killsx);
+		sx_xunlock(&old_pgrp->pg_killsx);
+		return (ERESTART);
+	}
+	MPASS(old_pgrp == p->p_pgrp);
+	if (!sx_try_xlock(&pgrp->pg_killsx)) {
+		sx_xunlock(&old_pgrp->pg_killsx);
+		sx_xunlock(&proctree_lock);
+		sx_xlock(&pgrp->pg_killsx);
+		sx_xunlock(&pgrp->pg_killsx);
+		return (ERESTART);
+	}
+
 	doenterpgrp(p, pgrp);
 
+	sx_xunlock(&pgrp->pg_killsx);
+	sx_xunlock(&old_pgrp->pg_killsx);
 	return (0);
 }
 
@@ -997,7 +1025,7 @@ db_print_pgrp_one(struct pgrp *pgrp, struct proc *p)
 	    p->p_pptr == NULL ? 0 : isjobproc(p->p_pptr, pgrp));
 }
 
-DB_SHOW_COMMAND(pgrpdump, pgrpdump)
+DB_SHOW_COMMAND_FLAGS(pgrpdump, pgrpdump, DB_CMD_MEMSAFE)
 {
 	struct pgrp *pgrp;
 	struct proc *p;
@@ -2281,7 +2309,7 @@ proc_get_binpath(struct proc *p, char *binname, char **retbuf,
 				if (nd.ni_vp == vp)
 					do_fullpath = false;
 				vrele(nd.ni_vp);
-				NDFREE(&nd, NDF_ONLY_PNBUF);
+				NDFREE_PNBUF(&nd);
 			}
 		}
 	}
@@ -3096,9 +3124,9 @@ sysctl_kern_proc_sigtramp(SYSCTL_HANDLER_ARGS)
 	if ((req->flags & SCTL_MASK32) != 0) {
 		bzero(&kst32, sizeof(kst32));
 		if (SV_PROC_FLAG(p, SV_ILP32)) {
-			if (sv->sv_sigcode_base != 0) {
-				kst32.ksigtramp_start = sv->sv_sigcode_base;
-				kst32.ksigtramp_end = sv->sv_sigcode_base +
+			if (PROC_HAS_SHP(p)) {
+				kst32.ksigtramp_start = PROC_SIGCODE(p);
+				kst32.ksigtramp_end = kst32.ksigtramp_start +
 				    ((sv->sv_flags & SV_DSO_SIG) == 0 ?
 				    *sv->sv_szsigcode :
 				    (uintptr_t)sv->sv_szsigcode);
@@ -3114,9 +3142,9 @@ sysctl_kern_proc_sigtramp(SYSCTL_HANDLER_ARGS)
 	}
 #endif
 	bzero(&kst, sizeof(kst));
-	if (sv->sv_sigcode_base != 0) {
-		kst.ksigtramp_start = (char *)sv->sv_sigcode_base;
-		kst.ksigtramp_end = (char *)sv->sv_sigcode_base +
+	if (PROC_HAS_SHP(p)) {
+		kst.ksigtramp_start = (char *)PROC_SIGCODE(p);
+		kst.ksigtramp_end = (char *)kst.ksigtramp_start +
 		    ((sv->sv_flags & SV_DSO_SIG) == 0 ? *sv->sv_szsigcode :
 		    (uintptr_t)sv->sv_szsigcode);
 	} else {
@@ -3235,6 +3263,8 @@ sysctl_kern_proc_vm_layout(SYSCTL_HANDLER_ARGS)
 	kvm.kvm_data_size = vmspace->vm_dsize;
 	kvm.kvm_stack_addr = (uintptr_t)vmspace->vm_maxsaddr;
 	kvm.kvm_stack_size = vmspace->vm_ssize;
+	kvm.kvm_shp_addr = vmspace->vm_shp_base;
+	kvm.kvm_shp_size = p->p_sysent->sv_shared_page_len;
 	if ((vmspace->vm_map.flags & MAP_WIREFUTURE) != 0)
 		kvm.kvm_map_flags |= KMAP_FLAG_WIREFUTURE;
 	if ((vmspace->vm_map.flags & MAP_ASLR) != 0)
@@ -3245,6 +3275,9 @@ sysctl_kern_proc_vm_layout(SYSCTL_HANDLER_ARGS)
 		kvm.kvm_map_flags |= KMAP_FLAG_WXORX;
 	if ((vmspace->vm_map.flags & MAP_ASLR_STACK) != 0)
 		kvm.kvm_map_flags |= KMAP_FLAG_ASLR_STACK;
+	if (vmspace->vm_shp_base != p->p_sysent->sv_shared_page_base &&
+	    PROC_HAS_SHP(p))
+		kvm.kvm_map_flags |= KMAP_FLAG_ASLR_SHARED_PAGE;
 
 #ifdef COMPAT_FREEBSD32
 	if (SV_CURPROC_FLAG(SV_ILP32)) {
@@ -3259,8 +3292,9 @@ sysctl_kern_proc_vm_layout(SYSCTL_HANDLER_ARGS)
 		kvm32.kvm_data_size = (uint32_t)kvm.kvm_data_size;
 		kvm32.kvm_stack_addr = (uint32_t)kvm.kvm_stack_addr;
 		kvm32.kvm_stack_size = (uint32_t)kvm.kvm_stack_size;
+		kvm32.kvm_shp_addr = (uint32_t)kvm.kvm_shp_addr;
+		kvm32.kvm_shp_size = (uint32_t)kvm.kvm_shp_size;
 		kvm32.kvm_map_flags = kvm.kvm_map_flags;
-		vmspace_free(vmspace);
 		error = SYSCTL_OUT(req, &kvm32, sizeof(kvm32));
 		goto out;
 	}
@@ -3396,6 +3430,21 @@ static SYSCTL_NODE(_kern_proc, KERN_PROC_VM_LAYOUT, vm_layout, CTLFLAG_RD |
 	CTLFLAG_ANYBODY | CTLFLAG_MPSAFE, sysctl_kern_proc_vm_layout,
 	"Process virtual address space layout info");
 
+static struct sx stop_all_proc_blocker;
+SX_SYSINIT(stop_all_proc_blocker, &stop_all_proc_blocker, "sapblk");
+
+bool
+stop_all_proc_block(void)
+{
+	return (sx_xlock_sig(&stop_all_proc_blocker) == 0);
+}
+
+void
+stop_all_proc_unblock(void)
+{
+	sx_xunlock(&stop_all_proc_blocker);
+}
+
 int allproc_gen;
 
 /*
@@ -3410,6 +3459,9 @@ stop_all_proc(void)
 	struct proc *cp, *p;
 	int r, gen;
 	bool restart, seen_stopped, seen_exiting, stopped_some;
+
+	if (!stop_all_proc_block())
+		return;
 
 	cp = curproc;
 allproc_loop:
@@ -3429,7 +3481,7 @@ allproc_loop:
 			PROC_UNLOCK(p);
 			continue;
 		}
-		if ((p->p_flag & P_WEXIT) != 0) {
+		if ((p->p_flag2 & P2_WEXIT) != 0) {
 			seen_exiting = true;
 			PROC_UNLOCK(p);
 			continue;
@@ -3502,6 +3554,8 @@ again:
 			goto again;
 	}
 	sx_xunlock(&allproc_lock);
+
+	stop_all_proc_unblock();
 }
 
 /* #define	TOTAL_STOP_DEBUG	1 */

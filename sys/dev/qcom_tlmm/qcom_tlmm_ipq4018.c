@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2021 Adrian Chadd <adrian@FreeBSD.org>
  *
@@ -31,8 +31,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/bus.h>
@@ -390,11 +388,9 @@ static driver_t qcom_tlmm_ipq4018_driver = {
 	qcom_tlmm_ipq4018_methods,
 	sizeof(struct qcom_tlmm_softc),
 };
-static devclass_t qcom_tlmm_ipq4018_devclass;
-
 
 EARLY_DRIVER_MODULE(qcom_tlmm_ipq4018, simplebus, qcom_tlmm_ipq4018_driver,
-    qcom_tlmm_ipq4018_devclass, NULL, 0, BUS_PASS_INTERRUPT + BUS_PASS_ORDER_LATE);
+    NULL, NULL, BUS_PASS_INTERRUPT + BUS_PASS_ORDER_LATE);
 EARLY_DRIVER_MODULE(qcom_tlmm_ipq4018, ofwbus, qcom_tlmm_ipq4018_driver,
-    qcom_tlmm_ipq4018_devclass, NULL, 0, BUS_PASS_INTERRUPT + BUS_PASS_ORDER_LATE);
+    NULL, NULL, BUS_PASS_INTERRUPT + BUS_PASS_ORDER_LATE);
 MODULE_VERSION(qcom_tlmm_ipq4018, 1);

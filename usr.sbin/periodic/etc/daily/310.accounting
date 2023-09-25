@@ -1,6 +1,5 @@
 #!/bin/sh
 #
-# $FreeBSD$
 #
 
 # If there is a global system configuration file, suck it in.
@@ -17,6 +16,11 @@ case "$daily_accounting_enable" in
 	then
 	    echo '$daily_accounting_enable is set but /var/account/acct' \
 		"doesn't exist"
+	    rc=2
+	elif [ $(sysctl -n kern.acct_configured) -eq 0 ]
+	then
+	    echo '$daily_accounting_enable is set but' \
+	    'process accounting is not active'
 	    rc=2
 	elif [ -z "$daily_accounting_save" ]
 	then

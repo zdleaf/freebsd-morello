@@ -25,8 +25,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
@@ -59,7 +57,7 @@ __FBSDID("$FreeBSD$");
 #include <arm/freescale/imx/imx_ccmvar.h>
 
 #include "fb_if.h"
-#include "hdmi_if.h"
+#include "crtc_if.h"
 
 static int have_ipu = 0;
 
@@ -1120,7 +1118,7 @@ ipu_hdmi_event(void *arg, device_t hdmi_dev)
 
 	edid = NULL;
 	edid_len = 0;
-	if (HDMI_GET_EDID(hdmi_dev, &edid, &edid_len) != 0) {
+	if (CRTC_GET_EDID(hdmi_dev, &edid, &edid_len) != 0) {
 		device_printf(sc->sc_dev, "failed to get EDID info from HDMI framer\n");
 	}
 
@@ -1150,7 +1148,7 @@ ipu_hdmi_event(void *arg, device_t hdmi_dev)
 
 	ipu_init(sc);
 
-	HDMI_SET_VIDEOMODE(hdmi_dev, sc->sc_mode);
+	CRTC_SET_VIDEOMODE(hdmi_dev, sc->sc_mode);
 }
 
 static int
@@ -1265,8 +1263,6 @@ static driver_t ipu_driver = {
 	sizeof(struct ipu_softc),
 };
 
-static devclass_t ipu_devclass;
-
-DRIVER_MODULE(ipu, simplebus, ipu_driver, ipu_devclass, 0, 0);
+DRIVER_MODULE(ipu, simplebus, ipu_driver, 0, 0);
 MODULE_VERSION(ipu, 1);
 MODULE_DEPEND(ipu, simplebus, 1, 1, 1);

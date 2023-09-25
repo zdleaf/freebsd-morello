@@ -34,8 +34,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 /*
  * These functions support the macros and help fiddle mbuf chains for
  * the nfs op functions. They do things like create the rpc header and
@@ -45,13 +43,13 @@ __FBSDID("$FreeBSD$");
 
 extern struct nfsstatsv1 nfsstatsv1;
 extern int ncl_mbuf_mlen;
-extern enum vtype newnv2tov_type[8];
-extern enum vtype nv34tov_type[8];
+extern __enum_uint8(vtype) newnv2tov_type[8];
+extern __enum_uint8(vtype) nv34tov_type[8];
 NFSCLSTATEMUTEX;
 
 /*
  * copies a uio scatter/gather list to an mbuf chain.
- * NOTE: can ony handle iovcnt == 1
+ * NOTE: can only handle iovcnt == 1
  */
 void
 nfsm_uiombuf(struct nfsrv_descript *nd, struct uio *uiop, int siz)
@@ -155,7 +153,7 @@ nfsm_uiombuf(struct nfsrv_descript *nd, struct uio *uiop, int siz)
 /*
  * copies a uio scatter/gather list to an mbuf chain.
  * This version returns the mbuf list and does not use "nd".
- * NOTE: can ony handle iovcnt == 1
+ * NOTE: can only handle iovcnt == 1
  */
 struct mbuf *
 nfsm_uiombuflist(struct uio *uiop, int siz, u_int maxext)

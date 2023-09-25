@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2009-2013, 2016 Chelsio, Inc. All rights reserved.
  *
@@ -32,8 +32,6 @@
  * SOFTWARE.
  */
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #define	LINUXKPI_PARAM_PREFIX iw_cxgbe_
 
 #include "opt_inet.h"
@@ -201,8 +199,8 @@ static int c4iw_mmap(struct ib_ucontext *context, struct vm_area_struct *vma)
 			addr < rdev->bar2_pa + rdev->bar2_len)
 		vma->vm_page_prot = t4_pgprot_wc(vma->vm_page_prot);
 
-	ret = io_remap_pfn_range(vma, vma->vm_start, addr >> PAGE_SHIFT,
-			len, vma->vm_page_prot);
+	ret = rdma_user_mmap_io(context, vma, addr >> PAGE_SHIFT, len,
+	    vma->vm_page_prot, NULL);
 	CTR4(KTR_IW_CXGBE, "%s:4 ctx %p vma %p ret %u", __func__, context, vma,
 	    ret);
 	return ret;
@@ -337,7 +335,7 @@ c4iw_query_port(struct ib_device *ibdev, u8 port, struct ib_port_attr *props)
 	struct c4iw_dev *dev;
 	struct adapter *sc;
 	struct port_info *pi;
-	struct ifnet *ifp;
+	if_t ifp;
 
 	CTR4(KTR_IW_CXGBE, "%s ibdev %p, port %d, props %p", __func__, ibdev,
 	    port, props);
@@ -351,13 +349,13 @@ c4iw_query_port(struct ib_device *ibdev, u8 port, struct ib_port_attr *props)
 
 	memset(props, 0, sizeof(struct ib_port_attr));
 	props->max_mtu = IB_MTU_4096;
-	if (ifp->if_mtu >= 4096)
+	if (if_getmtu(ifp) >= 4096)
 		props->active_mtu = IB_MTU_4096;
-	else if (ifp->if_mtu >= 2048)
+	else if (if_getmtu(ifp) >= 2048)
 		props->active_mtu = IB_MTU_2048;
-	else if (ifp->if_mtu >= 1024)
+	else if (if_getmtu(ifp) >= 1024)
 		props->active_mtu = IB_MTU_1024;
-	else if (ifp->if_mtu >= 512)
+	else if (if_getmtu(ifp) >= 512)
 		props->active_mtu = IB_MTU_512;
 	else
 		props->active_mtu = IB_MTU_256;

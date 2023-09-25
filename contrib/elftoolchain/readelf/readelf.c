@@ -1195,8 +1195,11 @@ note_type_freebsd_core(unsigned int nt)
 	case 17: return "NT_PTLWPINFO";
 	case 0x100: return "NT_PPC_VMX (ppc Altivec registers)";
 	case 0x102: return "NT_PPC_VSX (ppc VSX registers)";
+	case 0x200: return "NT_X86_SEGBASES (x86 segment base registers)";
 	case 0x202: return "NT_X86_XSTATE (x86 XSAVE extended state)";
 	case 0x400: return "NT_ARM_VFP (arm VFP registers)";
+	case 0x401: return "NT_ARM_TLS (arm TLS register)";
+	case 0x406: return "NT_ARM_ADDR_MASK (arm address mask)";
 	default: return (note_type_unknown(nt));
 	}
 }
@@ -1226,6 +1229,16 @@ note_type_linux_core(unsigned int nt)
 	case 0x304: return "NT_S390_CTRS (s390 control registers)";
 	case 0x305: return "NT_S390_PREFIX (s390 prefix register)";
 	case 0x400: return "NT_ARM_VFP (arm VFP registers)";
+	case 0x401: return "NT_ARM_TLS (arm TLS register)";
+	case 0x402: return "NT_ARM_HW_BREAK (arm hardware breakpoint registers)";
+	case 0x403: return "NT_ARM_HW_WATCH (arm hardware watchpoint registers)";
+	case 0x404: return "NT_ARM_SYSTEM_CALL (arm system call number)";
+	case 0x405: return "NT_ARM_SVE (arm scalable vector extension registers)";
+	case 0x406: return "NT_ARM_PAC_MASK (arm pointer authentication code mask)";
+	case 0x407: return "NT_ARM_PACA_KEYS (arm pointer authentication address keys)";
+	case 0x408: return "NT_ARM_PACG_KEYS (arm pointer authentication generic keys)";
+	case 0x409: return "NT_ARM_TAGGED_ADDR_CTRL (arm64 tagged address control)";
+	case 0x40a: return "NT_ARM_PAC_ENABLED_KEYS (arm64 ptr auth enabled keys)";
 	case 0x46494c45UL: return "NT_FILE (mapped files)";
 	case 0x46E62B7FUL: return "NT_PRXFPREG (Linux user_xfpregs structure)";
 	case 0x53494749UL: return "NT_SIGINFO (siginfo_t data)";
@@ -3250,8 +3263,7 @@ dump_symtab(struct readelf *re, int i)
 		return;
 	if (!get_ent_count(s, &len))
 		return;
-	printf("Symbol table (%s)", s->name);
-	printf(" contains %d entries:\n", len);
+	printf("\nSymbol table '%s' contains %d entries:\n", s->name, len);
 	printf("%7s%9s%14s%5s%8s%6s%9s%5s\n", "Num:", "Value", "Size", "Type",
 	    "Bind", "Vis", "Ndx", "Name");
 
@@ -4926,8 +4938,10 @@ dump_dwarf_line(struct readelf *re)
 			return;
 		}
 		if (dwarf_attrval_unsigned(die, DW_AT_stmt_list, &offset,
-		    &de) != DW_DLV_OK)
+		    &de) != DW_DLV_OK) {
+			dwarf_dealloc(re->dbg, die, DW_DLA_DIE);
 			continue;
+		}
 
 		length = re->dw_read(d, &offset, 4);
 		if (length == 0xffffffff) {
@@ -4938,6 +4952,7 @@ dump_dwarf_line(struct readelf *re)
 
 		if (length > d->d_size - offset) {
 			warnx("invalid .dwarf_line section");
+			dwarf_dealloc(re->dbg, die, DW_DLA_DIE);
 			continue;
 		}
 
@@ -5135,9 +5150,8 @@ dump_dwarf_line(struct readelf *re)
 				    (uintmax_t) line);
 				p++;
 			}
-
-
 		}
+		dwarf_dealloc(re->dbg, die, DW_DLA_DIE);
 	}
 	if (ret == DW_DLV_ERROR)
 		warnx("dwarf_next_cu_header: %s", dwarf_errmsg(de));
@@ -5180,9 +5194,9 @@ dump_dwarf_line_decoded(struct readelf *re)
 		printf("%-37s %11s   %s\n", "Filename", "Line Number",
 		    "Starting Address");
 		if (dwarf_srclines(die, &linebuf, &linecount, &de) != DW_DLV_OK)
-			continue;
+			goto done;
 		if (dwarf_srcfiles(die, &srcfiles, &srccount, &de) != DW_DLV_OK)
-			continue;
+			goto done;
 		for (i = 0; i < linecount; i++) {
 			ln = linebuf[i];
 			if (dwarf_line_srcfileno(ln, &fn, &de) != DW_DLV_OK)
@@ -5196,6 +5210,8 @@ dump_dwarf_line_decoded(struct readelf *re)
 			    (uintmax_t) lineaddr);
 		}
 		putchar('\n');
+done:
+		dwarf_dealloc(re->dbg, die, DW_DLA_DIE);
 	}
 }
 
@@ -5828,7 +5844,8 @@ dump_dwarf_ranges_foreach(struct readelf *re, Dwarf_Die die, Dwarf_Addr base)
 	Dwarf_Addr base0;
 	Dwarf_Half attr;
 	Dwarf_Signed attr_count, cnt;
-	Dwarf_Unsigned off, bytecnt;
+	Dwarf_Unsigned bytecnt;
+	Dwarf_Off off;
 	int i, j, ret;
 
 	if ((ret = dwarf_attrlist(die, &attr_list, &attr_count, &de)) !=
@@ -5845,11 +5862,12 @@ dump_dwarf_ranges_foreach(struct readelf *re, Dwarf_Die die, Dwarf_Addr base)
 		}
 		if (attr != DW_AT_ranges)
 			continue;
-		if (dwarf_formudata(attr_list[i], &off, &de) != DW_DLV_OK) {
-			warnx("dwarf_formudata failed: %s", dwarf_errmsg(de));
+		if (dwarf_global_formref(attr_list[i], &off, &de) != DW_DLV_OK) {
+			warnx("dwarf_global_formref failed: %s",
+			    dwarf_errmsg(de));
 			continue;
 		}
-		if (dwarf_get_ranges(re->dbg, (Dwarf_Off) off, &ranges, &cnt,
+		if (dwarf_get_ranges(re->dbg, off, &ranges, &cnt,
 		    &bytecnt, &de) != DW_DLV_OK)
 			continue;
 		base0 = base;
@@ -5888,6 +5906,8 @@ cont_search:
 		warnx("dwarf_siblingof: %s", dwarf_errmsg(de));
 	else if (ret == DW_DLV_OK)
 		dump_dwarf_ranges_foreach(re, ret_die, base);
+
+	dwarf_dealloc(re->dbg, die, DW_DLA_DIE);
 }
 
 static void
@@ -6192,7 +6212,7 @@ dump_dwarf_frame_section(struct readelf *re, struct section *s, int alt)
 	Dwarf_Small cie_version;
 	Dwarf_Ptr fde_addr, fde_inst, cie_inst;
 	char *cie_aug, c;
-	int i, eh_frame;
+	int i, ret, eh_frame;
 	Dwarf_Error de;
 
 	printf("\nThe section %s contains:\n\n", s->name);
@@ -6207,10 +6227,13 @@ dump_dwarf_frame_section(struct readelf *re, struct section *s, int alt)
 		}
 	} else if (!strcmp(s->name, ".eh_frame")) {
 		eh_frame = 1;
-		if (dwarf_get_fde_list_eh(re->dbg, &cie_list, &cie_count,
-		    &fde_list, &fde_count, &de) != DW_DLV_OK) {
-			warnx("dwarf_get_fde_list_eh failed: %s",
-			    dwarf_errmsg(de));
+		ret = dwarf_get_fde_list_eh(re->dbg, &cie_list, &cie_count,
+		    &fde_list, &fde_count, &de);
+		if (ret != DW_DLV_OK) {
+			if (ret == DW_DLV_ERROR) {
+				warnx("dwarf_get_fde_list_eh failed: %s",
+				    dwarf_errmsg(de));
+			}
 			return;
 		}
 	} else

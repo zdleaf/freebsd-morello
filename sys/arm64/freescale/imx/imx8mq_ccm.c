@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2020 Oleksandr Tymoshenko <gonzo@FreeBSD.org>
  *
@@ -26,8 +26,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 /*
  * Clocks driver for Freescale i.MX8MQ SoC
  */
@@ -480,7 +478,5 @@ static driver_t ccm_driver = {
 	sizeof(struct ccm_softc)
 };
 
-static devclass_t ccm_devclass;
-
-EARLY_DRIVER_MODULE(ccm, simplebus, ccm_driver, ccm_devclass, 0, 0, 
+EARLY_DRIVER_MODULE(ccm, simplebus, ccm_driver, 0, 0, 
     BUS_PASS_CPU + BUS_PASS_ORDER_EARLY);

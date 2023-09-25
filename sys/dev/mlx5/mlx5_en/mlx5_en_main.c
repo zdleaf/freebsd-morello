@@ -1,5 +1,6 @@
 /*-
  * Copyright (c) 2015-2021 Mellanox Technologies. All rights reserved.
+ * Copyright (c) 2022 NVIDIA corporation & affiliates.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -21,8 +22,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 #include "opt_kern_tls.h"
@@ -390,7 +389,7 @@ mlx5e_update_carrier(struct mlx5e_priv *priv)
 	    MLX5_PTYS_EN, 1);
 	if (error) {
 		priv->media_active_last = IFM_ETHER;
-		priv->ifp->if_baudrate = 1;
+		if_setbaudrate(priv->ifp, 1);
 		mlx5_en_err(priv->ifp, "query port ptys failed: 0x%x\n",
 		    error);
 		return;
@@ -448,15 +447,15 @@ mlx5e_update_carrier(struct mlx5e_priv *priv)
 		break;
 	}
 	priv->media_active_last = media_entry.subtype | IFM_ETHER | IFM_FDX;
-	priv->ifp->if_baudrate = media_entry.baudrate;
+	if_setbaudrate(priv->ifp, media_entry.baudrate);
 
 	if_link_state_change(priv->ifp, LINK_STATE_UP);
 }
 
 static void
-mlx5e_media_status(struct ifnet *dev, struct ifmediareq *ifmr)
+mlx5e_media_status(if_t dev, struct ifmediareq *ifmr)
 {
-	struct mlx5e_priv *priv = dev->if_softc;
+	struct mlx5e_priv *priv = if_getsoftc(dev);
 
 	ifmr->ifm_status = priv->media_status_last;
 	ifmr->ifm_current = ifmr->ifm_active = priv->media_active_last |
@@ -529,9 +528,9 @@ mlx5e_set_port_pfc(struct mlx5e_priv *priv)
 }
 
 static int
-mlx5e_media_change(struct ifnet *dev)
+mlx5e_media_change(if_t dev)
 {
-	struct mlx5e_priv *priv = dev->if_softc;
+	struct mlx5e_priv *priv = if_getsoftc(dev);
 	struct mlx5_core_dev *mdev = priv->mdev;
 	u32 eth_proto_cap;
 	u32 link_mode;
@@ -1362,7 +1361,7 @@ mlx5e_enable_rq(struct mlx5e_rq *rq, struct mlx5e_rq_param *param)
 	if (priv->counter_set_id >= 0)
 		MLX5_SET(rqc, rqc, counter_set_id, priv->counter_set_id);
 	MLX5_SET(wq, wq, log_wq_pg_sz, rq->wq_ctrl.buf.page_shift -
-	    PAGE_SHIFT);
+	    MLX5_ADAPTER_PAGE_SHIFT);
 	MLX5_SET64(wq, wq, dbr_addr, rq->wq_ctrl.db.dma);
 
 	mlx5_fill_page_array(&rq->wq_ctrl.buf,
@@ -1413,23 +1412,6 @@ mlx5e_disable_rq(struct mlx5e_rq *rq)
 	struct mlx5_core_dev *mdev = priv->mdev;
 
 	mlx5_core_destroy_rq(mdev, rq->rqn);
-}
-
-static int
-mlx5e_wait_for_min_rx_wqes(struct mlx5e_rq *rq)
-{
-	struct mlx5e_channel *c = rq->channel;
-	struct mlx5e_priv *priv = c->priv;
-	struct mlx5_wq_ll *wq = &rq->wq;
-	int i;
-
-	for (i = 0; i < 1000; i++) {
-		if (wq->cur_sz >= priv->params.min_rx_wqes)
-			return (0);
-
-		msleep(4);
-	}
-	return (-ETIMEDOUT);
 }
 
 static int
@@ -1582,13 +1564,13 @@ mlx5e_free_sq_db(struct mlx5e_sq *sq)
 	int x;
 
 	for (x = 0; x != wq_sz; x++) {
-		if (unlikely(sq->mbuf[x].p_refcount != NULL)) {
-			atomic_add_int(sq->mbuf[x].p_refcount, -1);
-			sq->mbuf[x].p_refcount = NULL;
-		}
 		if (sq->mbuf[x].mbuf != NULL) {
 			bus_dmamap_unload(sq->dma_tag, sq->mbuf[x].dma_map);
 			m_freem(sq->mbuf[x].mbuf);
+		}
+		if (sq->mbuf[x].mst != NULL) {
+			m_snd_tag_rele(sq->mbuf[x].mst);
+			sq->mbuf[x].mst = NULL;
 		}
 		bus_dmamap_destroy(sq->dma_tag, sq->mbuf[x].dma_map);
 	}
@@ -1778,7 +1760,7 @@ mlx5e_enable_sq(struct mlx5e_sq *sq, struct mlx5e_sq_param *param,
 	MLX5_SET(wq, wq, wq_type, MLX5_WQ_TYPE_CYCLIC);
 	MLX5_SET(wq, wq, uar_page, bfreg->index);
 	MLX5_SET(wq, wq, log_wq_pg_sz, sq->wq_ctrl.buf.page_shift -
-	    PAGE_SHIFT);
+	    MLX5_ADAPTER_PAGE_SHIFT);
 	MLX5_SET64(wq, wq, dbr_addr, sq->wq_ctrl.db.dma);
 
 	mlx5_fill_page_array(&sq->wq_ctrl.buf,
@@ -2066,7 +2048,7 @@ mlx5e_enable_cq(struct mlx5e_cq *cq, struct mlx5e_cq_param *param, int eq_ix)
 
 	MLX5_SET(cqc, cqc, c_eqn, eqn);
 	MLX5_SET(cqc, cqc, log_page_size, cq->wq_ctrl.buf.page_shift -
-	    PAGE_SHIFT);
+	    MLX5_ADAPTER_PAGE_SHIFT);
 	MLX5_SET64(cqc, cqc, dbr_addr, cq->wq_ctrl.db.dma);
 
 	err = mlx5_core_create_cq(cq->priv->mdev, mcq, in, inlen, out, sizeof(out));
@@ -2258,7 +2240,7 @@ mlx5e_open_channel(struct mlx5e_priv *priv,
 	struct epoch_tracker et;
 	int i, err;
 
-	/* zero non-persistant data */
+	/* zero non-persistent data */
 	MLX5E_ZERO(&c->rq, mlx5e_rq_zero_start);
 	for (i = 0; i != priv->num_tc; i++)
 		MLX5E_ZERO(&c->sq[i], mlx5e_sq_zero_start);
@@ -2331,7 +2313,7 @@ mlx5e_get_wqe_sz(struct mlx5e_priv *priv, u32 *wqe_sz, u32 *nsegs)
 	u32 r, n;
 
 	r = priv->params.hw_lro_en ? priv->params.lro_wqe_sz :
-	    MLX5E_SW2MB_MTU(priv->ifp->if_mtu);
+	    MLX5E_SW2MB_MTU(if_getmtu(priv->ifp));
 	if (r > MJUM16BYTES)
 		return (-ENOMEM);
 
@@ -2517,7 +2499,6 @@ mlx5e_open_channels(struct mlx5e_priv *priv)
 	struct mlx5e_channel_param *cparam;
 	int err;
 	int i;
-	int j;
 
 	cparam = malloc(sizeof(*cparam), M_MLX5EN, M_WAITOK);
 
@@ -2550,12 +2531,6 @@ mlx5e_open_channels(struct mlx5e_priv *priv)
 			CPU_SET(cpu, &cpuset);
 			intr_setaffinity(irq, CPU_WHICH_INTRHANDLER, &cpuset);
 		}
-	}
-
-	for (j = 0; j < priv->params.num_channels; j++) {
-		err = mlx5e_wait_for_min_rx_wqes(&priv->channel[j].rq);
-		if (err)
-			goto err_close_channels;
 	}
 	free(cparam, M_MLX5EN);
 	return (0);
@@ -3206,9 +3181,9 @@ mlx5e_close_tirs(struct mlx5e_priv *priv)
  * HW MTU includes all headers and checksums.
  */
 static int
-mlx5e_set_dev_port_mtu(struct ifnet *ifp, int sw_mtu)
+mlx5e_set_dev_port_mtu(if_t ifp, int sw_mtu)
 {
-	struct mlx5e_priv *priv = ifp->if_softc;
+	struct mlx5e_priv *priv = if_getsoftc(ifp);
 	struct mlx5_core_dev *mdev = priv->mdev;
 	int hw_mtu;
 	int err;
@@ -3230,7 +3205,7 @@ mlx5e_set_dev_port_mtu(struct ifnet *ifp, int sw_mtu)
 		    err);
 	}
 
-	ifp->if_mtu = sw_mtu;
+	if_setmtu(ifp, sw_mtu);
 
 	err = mlx5_query_vport_mtu(mdev, &hw_mtu);
 	if (err || !hw_mtu) {
@@ -3263,9 +3238,9 @@ mlx5e_set_dev_port_mtu(struct ifnet *ifp, int sw_mtu)
 }
 
 int
-mlx5e_open_locked(struct ifnet *ifp)
+mlx5e_open_locked(if_t ifp)
 {
-	struct mlx5e_priv *priv = ifp->if_softc;
+	struct mlx5e_priv *priv = if_getsoftc(ifp);
 	int err;
 	u16 set_id;
 
@@ -3337,14 +3312,14 @@ mlx5e_open(void *arg)
 		    "Setting port status to up failed\n");
 
 	mlx5e_open_locked(priv->ifp);
-	priv->ifp->if_drv_flags |= IFF_DRV_RUNNING;
+	if_setdrvflagbits(priv->ifp, IFF_DRV_RUNNING, 0);
 	PRIV_UNLOCK(priv);
 }
 
 int
-mlx5e_close_locked(struct ifnet *ifp)
+mlx5e_close_locked(if_t ifp)
 {
-	struct mlx5e_priv *priv = ifp->if_softc;
+	struct mlx5e_priv *priv = if_getsoftc(ifp);
 
 	/* check if already closed */
 	if (test_bit(MLX5E_STATE_OPENED, &priv->state) == 0)
@@ -3364,9 +3339,9 @@ mlx5e_close_locked(struct ifnet *ifp)
 }
 
 static uint64_t
-mlx5e_get_counter(struct ifnet *ifp, ift_counter cnt)
+mlx5e_get_counter(if_t ifp, ift_counter cnt)
 {
-	struct mlx5e_priv *priv = ifp->if_softc;
+	struct mlx5e_priv *priv = if_getsoftc(ifp);
 	u64 retval;
 
 	/* PRIV_LOCK(priv); XXX not allowed */
@@ -3417,15 +3392,15 @@ mlx5e_get_counter(struct ifnet *ifp, ift_counter cnt)
 }
 
 static void
-mlx5e_set_rx_mode(struct ifnet *ifp)
+mlx5e_set_rx_mode(if_t ifp)
 {
-	struct mlx5e_priv *priv = ifp->if_softc;
+	struct mlx5e_priv *priv = if_getsoftc(ifp);
 
 	queue_work(priv->wq, &priv->set_rx_mode_work);
 }
 
 static int
-mlx5e_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
+mlx5e_ioctl(if_t ifp, u_long command, caddr_t data)
 {
 	struct mlx5e_priv *priv;
 	struct ifreq *ifr;
@@ -3433,15 +3408,16 @@ mlx5e_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 	struct ifi2creq i2c;
 	struct ifrsskey *ifrk;
 	struct ifrsshash *ifrh;
+	struct siocsifcapnv_driver_data *drv_ioctl_data, drv_ioctl_data_d;
 	int error = 0;
-	int mask = 0;
+	int mask;
 	int size_read = 0;
 	int module_status;
 	int module_num;
 	int max_mtu;
 	uint8_t read_addr;
 
-	priv = ifp->if_softc;
+	priv = if_getsoftc(ifp);
 
 	/* check if detaching */
 	if (priv == NULL || priv->gone != 0)
@@ -3476,27 +3452,27 @@ mlx5e_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		PRIV_UNLOCK(priv);
 		break;
 	case SIOCSIFFLAGS:
-		if ((ifp->if_flags & IFF_UP) &&
-		    (ifp->if_drv_flags & IFF_DRV_RUNNING)) {
+		if ((if_getflags(ifp) & IFF_UP) &&
+		    (if_getdrvflags(ifp) & IFF_DRV_RUNNING)) {
 			mlx5e_set_rx_mode(ifp);
 			break;
 		}
 		PRIV_LOCK(priv);
-		if (ifp->if_flags & IFF_UP) {
-			if ((ifp->if_drv_flags & IFF_DRV_RUNNING) == 0) {
+		if (if_getflags(ifp) & IFF_UP) {
+			if ((if_getdrvflags(ifp) & IFF_DRV_RUNNING) == 0) {
 				if (test_bit(MLX5E_STATE_OPENED, &priv->state) == 0)
 					mlx5e_open_locked(ifp);
-				ifp->if_drv_flags |= IFF_DRV_RUNNING;
+				if_setdrvflagbits(ifp, IFF_DRV_RUNNING, 0);
 				mlx5_set_port_status(priv->mdev, MLX5_PORT_UP);
 			}
 		} else {
-			if (ifp->if_drv_flags & IFF_DRV_RUNNING) {
+			if (if_getdrvflags(ifp) & IFF_DRV_RUNNING) {
 				mlx5_set_port_status(priv->mdev,
 				    MLX5_PORT_DOWN);
 				if (test_bit(MLX5E_STATE_OPENED, &priv->state) != 0)
 					mlx5e_close_locked(ifp);
 				mlx5e_update_carrier(priv);
-				ifp->if_drv_flags &= ~IFF_DRV_RUNNING;
+				if_setdrvflagbits(ifp, 0, IFF_DRV_RUNNING);
 			}
 		}
 		PRIV_UNLOCK(priv);
@@ -3511,94 +3487,106 @@ mlx5e_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		ifr = (struct ifreq *)data;
 		error = ifmedia_ioctl(ifp, ifr, &priv->media, command);
 		break;
+	case SIOCGIFCAPNV:
+		error = 0;
+		break;
 	case SIOCSIFCAP:
 		ifr = (struct ifreq *)data;
+		drv_ioctl_data = &drv_ioctl_data_d;
+		drv_ioctl_data->reqcap = ifr->ifr_reqcap;
 		PRIV_LOCK(priv);
-		mask = ifr->ifr_reqcap ^ ifp->if_capenable;
+		drv_ioctl_data->reqcap2 = if_getcapenable2(ifp);
+		drv_ioctl_data->nvcap = NULL;
+		goto siocsifcap_driver;
+	case SIOCSIFCAPNV:
+		drv_ioctl_data = (struct siocsifcapnv_driver_data *)data;
+		PRIV_LOCK(priv);
+siocsifcap_driver:
+		mask = drv_ioctl_data->reqcap ^ if_getcapenable(ifp);
 
 		if (mask & IFCAP_TXCSUM) {
-			ifp->if_capenable ^= IFCAP_TXCSUM;
-			ifp->if_hwassist ^= (CSUM_TCP | CSUM_UDP | CSUM_IP);
+			if_togglecapenable(ifp, IFCAP_TXCSUM);
+			if_togglehwassist(ifp, (CSUM_TCP | CSUM_UDP | CSUM_IP));
 
-			if (IFCAP_TSO4 & ifp->if_capenable &&
-			    !(IFCAP_TXCSUM & ifp->if_capenable)) {
+			if (IFCAP_TSO4 & if_getcapenable(ifp) &&
+			    !(IFCAP_TXCSUM & if_getcapenable(ifp))) {
 				mask &= ~IFCAP_TSO4;
-				ifp->if_capenable &= ~IFCAP_TSO4;
-				ifp->if_hwassist &= ~CSUM_IP_TSO;
+				if_setcapenablebit(ifp, 0, IFCAP_TSO4);
+				if_sethwassistbits(ifp, 0, CSUM_IP_TSO);
 				mlx5_en_err(ifp,
 				    "tso4 disabled due to -txcsum.\n");
 			}
 		}
 		if (mask & IFCAP_TXCSUM_IPV6) {
-			ifp->if_capenable ^= IFCAP_TXCSUM_IPV6;
-			ifp->if_hwassist ^= (CSUM_UDP_IPV6 | CSUM_TCP_IPV6);
+			if_togglecapenable(ifp, IFCAP_TXCSUM_IPV6);
+			if_togglehwassist(ifp, (CSUM_UDP_IPV6 | CSUM_TCP_IPV6));
 
-			if (IFCAP_TSO6 & ifp->if_capenable &&
-			    !(IFCAP_TXCSUM_IPV6 & ifp->if_capenable)) {
+			if (IFCAP_TSO6 & if_getcapenable(ifp) &&
+			    !(IFCAP_TXCSUM_IPV6 & if_getcapenable(ifp))) {
 				mask &= ~IFCAP_TSO6;
-				ifp->if_capenable &= ~IFCAP_TSO6;
-				ifp->if_hwassist &= ~CSUM_IP6_TSO;
+				if_setcapenablebit(ifp, 0, IFCAP_TSO6);
+				if_sethwassistbits(ifp, 0, CSUM_IP6_TSO);
 				mlx5_en_err(ifp,
 				    "tso6 disabled due to -txcsum6.\n");
 			}
 		}
 		if (mask & IFCAP_MEXTPG)
-			ifp->if_capenable ^= IFCAP_MEXTPG;
+			if_togglecapenable(ifp, IFCAP_MEXTPG);
 		if (mask & IFCAP_TXTLS4)
-			ifp->if_capenable ^= IFCAP_TXTLS4;
+			if_togglecapenable(ifp, IFCAP_TXTLS4);
 		if (mask & IFCAP_TXTLS6)
-			ifp->if_capenable ^= IFCAP_TXTLS6;
+			if_togglecapenable(ifp, IFCAP_TXTLS6);
 #ifdef RATELIMIT
 		if (mask & IFCAP_TXTLS_RTLMT)
-			ifp->if_capenable ^= IFCAP_TXTLS_RTLMT;
+			if_togglecapenable(ifp, IFCAP_TXTLS_RTLMT);
 #endif
 		if (mask & IFCAP_RXCSUM)
-			ifp->if_capenable ^= IFCAP_RXCSUM;
+			if_togglecapenable(ifp, IFCAP_RXCSUM);
 		if (mask & IFCAP_RXCSUM_IPV6)
-			ifp->if_capenable ^= IFCAP_RXCSUM_IPV6;
+			if_togglecapenable(ifp, IFCAP_RXCSUM_IPV6);
 		if (mask & IFCAP_TSO4) {
-			if (!(IFCAP_TSO4 & ifp->if_capenable) &&
-			    !(IFCAP_TXCSUM & ifp->if_capenable)) {
+			if (!(IFCAP_TSO4 & if_getcapenable(ifp)) &&
+			    !(IFCAP_TXCSUM & if_getcapenable(ifp))) {
 				mlx5_en_err(ifp, "enable txcsum first.\n");
 				error = EAGAIN;
 				goto out;
 			}
-			ifp->if_capenable ^= IFCAP_TSO4;
-			ifp->if_hwassist ^= CSUM_IP_TSO;
+			if_togglecapenable(ifp, IFCAP_TSO4);
+			if_togglehwassist(ifp, CSUM_IP_TSO);
 		}
 		if (mask & IFCAP_TSO6) {
-			if (!(IFCAP_TSO6 & ifp->if_capenable) &&
-			    !(IFCAP_TXCSUM_IPV6 & ifp->if_capenable)) {
+			if (!(IFCAP_TSO6 & if_getcapenable(ifp)) &&
+			    !(IFCAP_TXCSUM_IPV6 & if_getcapenable(ifp))) {
 				mlx5_en_err(ifp, "enable txcsum6 first.\n");
 				error = EAGAIN;
 				goto out;
 			}
-			ifp->if_capenable ^= IFCAP_TSO6;
-			ifp->if_hwassist ^= CSUM_IP6_TSO;
+			if_togglecapenable(ifp, IFCAP_TSO6);
+			if_togglehwassist(ifp, CSUM_IP6_TSO);
 		}
 		if (mask & IFCAP_VLAN_HWTSO)
-			ifp->if_capenable ^= IFCAP_VLAN_HWTSO;
+			if_togglecapenable(ifp, IFCAP_VLAN_HWTSO);
 		if (mask & IFCAP_VLAN_HWFILTER) {
-			if (ifp->if_capenable & IFCAP_VLAN_HWFILTER)
+			if (if_getcapenable(ifp) & IFCAP_VLAN_HWFILTER)
 				mlx5e_disable_vlan_filter(priv);
 			else
 				mlx5e_enable_vlan_filter(priv);
 
-			ifp->if_capenable ^= IFCAP_VLAN_HWFILTER;
+			if_togglecapenable(ifp, IFCAP_VLAN_HWFILTER);
 		}
 		if (mask & IFCAP_VLAN_HWTAGGING)
-			ifp->if_capenable ^= IFCAP_VLAN_HWTAGGING;
+			if_togglecapenable(ifp, IFCAP_VLAN_HWTAGGING);
 		if (mask & IFCAP_WOL_MAGIC)
-			ifp->if_capenable ^= IFCAP_WOL_MAGIC;
+			if_togglecapenable(ifp, IFCAP_WOL_MAGIC);
 		if (mask & IFCAP_VXLAN_HWCSUM) {
 			const bool was_enabled =
-			    (ifp->if_capenable & IFCAP_VXLAN_HWCSUM) != 0;
+			    (if_getcapenable(ifp) & IFCAP_VXLAN_HWCSUM) != 0;
 			if (was_enabled)
 				mlx5e_del_all_vxlan_rules(priv);
-			ifp->if_capenable ^= IFCAP_VXLAN_HWCSUM;
-			ifp->if_hwassist ^= CSUM_INNER_IP | CSUM_INNER_IP_UDP |
+			if_togglecapenable(ifp, IFCAP_VXLAN_HWCSUM);
+			if_togglehwassist(ifp, CSUM_INNER_IP | CSUM_INNER_IP_UDP |
 			    CSUM_INNER_IP_TCP | CSUM_INNER_IP6_UDP |
-			    CSUM_INNER_IP6_TCP;
+			    CSUM_INNER_IP6_TCP);
 			if (!was_enabled) {
 				int err = mlx5e_add_all_vxlan_rules(priv);
 				if (err != 0) {
@@ -3608,9 +3596,9 @@ mlx5e_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 			}
 		}
 		if (mask & IFCAP_VXLAN_HWTSO) {
-			ifp->if_capenable ^= IFCAP_VXLAN_HWTSO;
-			ifp->if_hwassist ^= CSUM_INNER_IP_TSO |
-			    CSUM_INNER_IP6_TSO;
+			if_togglecapenable(ifp, IFCAP_VXLAN_HWTSO);
+			if_togglehwassist(ifp, CSUM_INNER_IP_TSO |
+			    CSUM_INNER_IP6_TSO);
 		}
 
 		VLAN_CAPABILITIES(ifp);
@@ -3619,10 +3607,10 @@ mlx5e_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 			int was_opened = test_bit(MLX5E_STATE_OPENED, &priv->state);
 			bool need_restart = false;
 
-			ifp->if_capenable ^= IFCAP_LRO;
+			if_togglecapenable(ifp, IFCAP_LRO);
 
 			/* figure out if updating HW LRO is needed */
-			if (!(ifp->if_capenable & IFCAP_LRO)) {
+			if (!(if_getcapenable(ifp) & IFCAP_LRO)) {
 				if (priv->params.hw_lro_en) {
 					priv->params.hw_lro_en = false;
 					need_restart = true;
@@ -3640,8 +3628,8 @@ mlx5e_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 			}
 		}
 		if (mask & IFCAP_HWRXTSTMP) {
-			ifp->if_capenable ^= IFCAP_HWRXTSTMP;
-			if (ifp->if_capenable & IFCAP_HWRXTSTMP) {
+			if_togglecapenable(ifp, IFCAP_HWRXTSTMP);
+			if (if_getcapenable(ifp) & IFCAP_HWRXTSTMP) {
 				if (priv->clbr_done == 0)
 					mlx5e_reset_calibration_callout(priv);
 			} else {
@@ -3649,6 +3637,11 @@ mlx5e_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 				priv->clbr_done = 0;
 			}
 		}
+		mask = drv_ioctl_data->reqcap2 ^ if_getcapenable2(ifp);
+		if ((mask & IFCAP2_BIT(IFCAP2_RXTLS4)) != 0)
+			if_togglecapenable2(ifp, IFCAP2_BIT(IFCAP2_RXTLS4));
+		if ((mask & IFCAP2_BIT(IFCAP2_RXTLS6)) != 0)
+			if_togglecapenable2(ifp, IFCAP2_BIT(IFCAP2_RXTLS6));
 out:
 		PRIV_UNLOCK(priv);
 		break;
@@ -3830,8 +3823,6 @@ mlx5e_build_ifp_priv(struct mlx5_core_dev *mdev,
 	    MLX5E_PARAMS_DEFAULT_TX_CQ_MODERATION_USEC;
 	priv->params.tx_cq_moderation_pkts =
 	    MLX5E_PARAMS_DEFAULT_TX_CQ_MODERATION_PKTS;
-	priv->params.min_rx_wqes =
-	    MLX5E_PARAMS_DEFAULT_MIN_RX_WQES;
 	priv->params.rx_hash_log_tbl_sz =
 	    (order_base_2(num_comp_vectors) >
 	    MLX5E_PARAMS_DEFAULT_RX_HASH_LOG_TBL_SZ) ?
@@ -3854,9 +3845,10 @@ mlx5e_build_ifp_priv(struct mlx5_core_dev *mdev,
 	priv->params.lro_wqe_sz = MLX5E_PARAMS_DEFAULT_LRO_WQE_SZ;
 
 	/*
-	 * CQE zipping is currently defaulted to off. when it won't
-	 * anymore we will consider the HW capability:
-	 * "!!MLX5_CAP_GEN(mdev, cqe_compression)"
+	 * CQE zipping is off, because the per-packet 32-bit Toeplitz hash
+	 * is then not supported. The 32-bit Toeplitz hash is needed to
+	 * correctly demultiplex incoming traffic into the expected
+	 * network queues.
 	 */
 	priv->params.cqe_zipping_en = false;
 
@@ -3892,7 +3884,7 @@ static int
 mlx5e_create_mkey(struct mlx5e_priv *priv, u32 pdn,
 		  struct mlx5_core_mkey *mkey)
 {
-	struct ifnet *ifp = priv->ifp;
+	if_t ifp = priv->ifp;
 	struct mlx5_core_dev *mdev = priv->mdev;
 	int inlen = MLX5_ST_SZ_BYTES(create_mkey_in);
 	void *mkc;
@@ -4313,14 +4305,14 @@ mlx5e_setup_pauseframes(struct mlx5e_priv *priv)
 }
 
 static int
-mlx5e_ul_snd_tag_alloc(struct ifnet *ifp,
+mlx5e_ul_snd_tag_alloc(if_t ifp,
     union if_snd_tag_alloc_params *params,
     struct m_snd_tag **ppmt)
 {
 	struct mlx5e_priv *priv;
 	struct mlx5e_channel *pch;
 
-	priv = ifp->if_softc;
+	priv = if_getsoftc(ifp);
 
 	if (unlikely(priv->gone || params->hdr.flowtype == M_HASHTYPE_NONE)) {
 		return (EOPNOTSUPP);
@@ -4375,7 +4367,7 @@ mlx5e_ul_snd_tag_free(struct m_snd_tag *pmt)
 }
 
 static int
-mlx5e_snd_tag_alloc(struct ifnet *ifp,
+mlx5e_snd_tag_alloc(if_t ifp,
     union if_snd_tag_alloc_params *params,
     struct m_snd_tag **ppmt)
 {
@@ -4421,7 +4413,7 @@ static const uint64_t adapter_rates_mlx[NUM_HDWR_RATES_MLX] = {
 };
 
 static void
-mlx5e_ratelimit_query(struct ifnet *ifp __unused, struct if_ratelimit_query_results *q)
+mlx5e_ratelimit_query(if_t ifp __unused, struct if_ratelimit_query_results *q)
 {
 	/*
 	 * This function needs updating by the driver maintainer!
@@ -4466,7 +4458,7 @@ mlx5e_ifm_add(struct mlx5e_priv *priv, int type)
 static void *
 mlx5e_create_ifp(struct mlx5_core_dev *mdev)
 {
-	struct ifnet *ifp;
+	if_t ifp;
 	struct mlx5e_priv *priv;
 	u8 dev_addr[ETHER_ADDR_LEN] __aligned(4);
 	struct sysctl_oid_list *child;
@@ -4503,67 +4495,70 @@ mlx5e_create_ifp(struct mlx5_core_dev *mdev)
 		goto err_free_ifp;
 	}
 
-	ifp->if_softc = priv;
+	if_setsoftc(ifp, priv);
 	if_initname(ifp, "mce", device_get_unit(mdev->pdev->dev.bsddev));
-	ifp->if_mtu = ETHERMTU;
-	ifp->if_init = mlx5e_open;
-	ifp->if_flags = IFF_BROADCAST | IFF_SIMPLEX | IFF_MULTICAST |
-	    IFF_KNOWSEPOCH;
-	ifp->if_ioctl = mlx5e_ioctl;
-	ifp->if_transmit = mlx5e_xmit;
-	ifp->if_qflush = if_qflush;
-	ifp->if_get_counter = mlx5e_get_counter;
-	ifp->if_snd.ifq_maxlen = ifqmaxlen;
+	if_setmtu(ifp, ETHERMTU);
+	if_setinitfn(ifp, mlx5e_open);
+	if_setflags(ifp, IFF_BROADCAST | IFF_SIMPLEX | IFF_MULTICAST);
+	if_setioctlfn(ifp, mlx5e_ioctl);
+	if_settransmitfn(ifp, mlx5e_xmit);
+	if_setqflushfn(ifp, if_qflush);
+	if_setgetcounterfn(ifp, mlx5e_get_counter);
+	if_setsendqlen(ifp, ifqmaxlen);
 	/*
          * Set driver features
          */
-	ifp->if_capabilities |= IFCAP_HWCSUM | IFCAP_HWCSUM_IPV6;
-	ifp->if_capabilities |= IFCAP_VLAN_MTU | IFCAP_VLAN_HWTAGGING;
-	ifp->if_capabilities |= IFCAP_VLAN_HWCSUM | IFCAP_VLAN_HWFILTER;
-	ifp->if_capabilities |= IFCAP_LINKSTATE | IFCAP_JUMBO_MTU;
-	ifp->if_capabilities |= IFCAP_LRO;
-	ifp->if_capabilities |= IFCAP_TSO | IFCAP_VLAN_HWTSO;
-	ifp->if_capabilities |= IFCAP_HWSTATS | IFCAP_HWRXTSTMP;
-	ifp->if_capabilities |= IFCAP_MEXTPG;
-	ifp->if_capabilities |= IFCAP_TXTLS4 | IFCAP_TXTLS6;
+	if_setcapabilities(ifp, IFCAP_NV);
+	if_setcapabilitiesbit(ifp, IFCAP_HWCSUM | IFCAP_HWCSUM_IPV6, 0);
+	if_setcapabilitiesbit(ifp, IFCAP_VLAN_MTU | IFCAP_VLAN_HWTAGGING, 0);
+	if_setcapabilitiesbit(ifp, IFCAP_VLAN_HWCSUM | IFCAP_VLAN_HWFILTER, 0);
+	if_setcapabilitiesbit(ifp, IFCAP_LINKSTATE | IFCAP_JUMBO_MTU, 0);
+	if_setcapabilitiesbit(ifp, IFCAP_LRO, 0);
+	if_setcapabilitiesbit(ifp, IFCAP_TSO | IFCAP_VLAN_HWTSO, 0);
+	if_setcapabilitiesbit(ifp, IFCAP_HWSTATS | IFCAP_HWRXTSTMP, 0);
+	if_setcapabilitiesbit(ifp, IFCAP_MEXTPG, 0);
+	if_setcapabilitiesbit(ifp, IFCAP_TXTLS4 | IFCAP_TXTLS6, 0);
 #ifdef RATELIMIT
-	ifp->if_capabilities |= IFCAP_TXRTLMT | IFCAP_TXTLS_RTLMT;
+	if_setcapabilitiesbit(ifp, IFCAP_TXRTLMT | IFCAP_TXTLS_RTLMT, 0);
 #endif
-	ifp->if_capabilities |= IFCAP_VXLAN_HWCSUM | IFCAP_VXLAN_HWTSO;
-	ifp->if_snd_tag_alloc = mlx5e_snd_tag_alloc;
+	if_setcapabilitiesbit(ifp, IFCAP_VXLAN_HWCSUM | IFCAP_VXLAN_HWTSO, 0);
+	if_setcapabilities2bit(ifp, IFCAP2_BIT(IFCAP2_RXTLS4) |
+	    IFCAP2_BIT(IFCAP2_RXTLS6), 0);
+	if_setsndtagallocfn(ifp, mlx5e_snd_tag_alloc);
 #ifdef RATELIMIT
-	ifp->if_ratelimit_query = mlx5e_ratelimit_query;
+	if_setratelimitqueryfn(ifp, mlx5e_ratelimit_query);
 #endif
 	/* set TSO limits so that we don't have to drop TX packets */
-	ifp->if_hw_tsomax = MLX5E_MAX_TX_PAYLOAD_SIZE - (ETHER_HDR_LEN + ETHER_VLAN_ENCAP_LEN);
-	ifp->if_hw_tsomaxsegcount = MLX5E_MAX_TX_MBUF_FRAGS - 1 /* hdr */;
-	ifp->if_hw_tsomaxsegsize = MLX5E_MAX_TX_MBUF_SIZE;
+	if_sethwtsomax(ifp, MLX5E_MAX_TX_PAYLOAD_SIZE - (ETHER_HDR_LEN + ETHER_VLAN_ENCAP_LEN));
+	if_sethwtsomaxsegcount(ifp, MLX5E_MAX_TX_MBUF_FRAGS - 1 /* hdr */);
+	if_sethwtsomaxsegsize(ifp, MLX5E_MAX_TX_MBUF_SIZE);
 
-	ifp->if_capenable = ifp->if_capabilities;
-	ifp->if_hwassist = 0;
-	if (ifp->if_capenable & IFCAP_TSO)
-		ifp->if_hwassist |= CSUM_TSO;
-	if (ifp->if_capenable & IFCAP_TXCSUM)
-		ifp->if_hwassist |= (CSUM_TCP | CSUM_UDP | CSUM_IP);
-	if (ifp->if_capenable & IFCAP_TXCSUM_IPV6)
-		ifp->if_hwassist |= (CSUM_UDP_IPV6 | CSUM_TCP_IPV6);
-	if (ifp->if_capabilities & IFCAP_VXLAN_HWCSUM)
-		ifp->if_hwassist |= CSUM_INNER_IP6_UDP | CSUM_INNER_IP6_TCP |
+	if_setcapenable(ifp, if_getcapabilities(ifp));
+	if_setcapenable2(ifp, if_getcapabilities2(ifp));
+	if_sethwassist(ifp, 0);
+	if (if_getcapenable(ifp) & IFCAP_TSO)
+		if_sethwassistbits(ifp, CSUM_TSO, 0);
+	if (if_getcapenable(ifp) & IFCAP_TXCSUM)
+		if_sethwassistbits(ifp, (CSUM_TCP | CSUM_UDP | CSUM_IP), 0);
+	if (if_getcapenable(ifp) & IFCAP_TXCSUM_IPV6)
+		if_sethwassistbits(ifp, (CSUM_UDP_IPV6 | CSUM_TCP_IPV6), 0);
+	if (if_getcapabilities(ifp) & IFCAP_VXLAN_HWCSUM)
+		if_sethwassistbits(ifp, CSUM_INNER_IP6_UDP | CSUM_INNER_IP6_TCP |
 		    CSUM_INNER_IP | CSUM_INNER_IP_UDP | CSUM_INNER_IP_TCP |
-		    CSUM_ENCAP_VXLAN;
-	if (ifp->if_capabilities  & IFCAP_VXLAN_HWTSO)
-		ifp->if_hwassist |= CSUM_INNER_IP6_TSO | CSUM_INNER_IP_TSO;
+		    CSUM_ENCAP_VXLAN, 0);
+	if (if_getcapabilities(ifp) & IFCAP_VXLAN_HWTSO)
+		if_sethwassistbits(ifp, CSUM_INNER_IP6_TSO | CSUM_INNER_IP_TSO, 0);
 
 	/* ifnet sysctl tree */
 	sysctl_ctx_init(&priv->sysctl_ctx);
 	priv->sysctl_ifnet = SYSCTL_ADD_NODE(&priv->sysctl_ctx, SYSCTL_STATIC_CHILDREN(_dev),
-	    OID_AUTO, ifp->if_dname, CTLFLAG_RD | CTLFLAG_MPSAFE, 0,
+	    OID_AUTO, if_getdname(ifp), CTLFLAG_RD | CTLFLAG_MPSAFE, 0,
 	    "MLX5 ethernet - interface name");
 	if (priv->sysctl_ifnet == NULL) {
 		mlx5_core_err(mdev, "SYSCTL_ADD_NODE() failed\n");
 		goto err_free_sysctl;
 	}
-	snprintf(unit, sizeof(unit), "%d", ifp->if_dunit);
+	snprintf(unit, sizeof(unit), "%d", if_getdunit(ifp));
 	priv->sysctl_ifnet = SYSCTL_ADD_NODE(&priv->sysctl_ctx, SYSCTL_CHILDREN(priv->sysctl_ifnet),
 	    OID_AUTO, unit, CTLFLAG_RD | CTLFLAG_MPSAFE, 0,
 	    "MLX5 ethernet - interface unit");
@@ -4659,7 +4654,7 @@ mlx5e_create_ifp(struct mlx5_core_dev *mdev)
 	}
 
 	/* set default MTU */
-	mlx5e_set_dev_port_mtu(ifp, ifp->if_mtu);
+	mlx5e_set_dev_port_mtu(ifp, if_getmtu(ifp));
 
 	/* Set default media status */
 	priv->media_status_last = IFM_AVALID;
@@ -4775,12 +4770,14 @@ mlx5e_create_ifp(struct mlx5_core_dev *mdev)
 	    &priv->clbr_done, 0,
 	    "RX timestamps calibration state");
 	callout_init(&priv->tstmp_clbr, 1);
+	/* Pull out the frequency of the clock in hz */
+	priv->cclk = (uint64_t)MLX5_CAP_GEN(mdev, device_frequency_khz) * 1000ULL;
 	mlx5e_reset_calibration_callout(priv);
 
 	pa.pa_version = PFIL_VERSION;
 	pa.pa_flags = PFIL_IN;
 	pa.pa_type = PFIL_TYPE_ETHERNET;
-	pa.pa_headname = ifp->if_xname;
+	pa.pa_headname = if_name(ifp);
 	priv->pfil = pfil_head_register(&pa);
 
 	PRIV_LOCK(priv);
@@ -4841,7 +4838,7 @@ static void
 mlx5e_destroy_ifp(struct mlx5_core_dev *mdev, void *vpriv)
 {
 	struct mlx5e_priv *priv = vpriv;
-	struct ifnet *ifp = priv->ifp;
+	if_t ifp = priv->ifp;
 
 	/* don't allow more IOCTLs */
 	priv->gone = 1;
@@ -4939,7 +4936,7 @@ mlx5e_destroy_ifp(struct mlx5_core_dev *mdev, void *vpriv)
 
 #ifdef DEBUGNET
 static void
-mlx5_en_debugnet_init(struct ifnet *dev, int *nrxr, int *ncl, int *clsize)
+mlx5_en_debugnet_init(if_t dev, int *nrxr, int *ncl, int *clsize)
 {
 	struct mlx5e_priv *priv = if_getsoftc(dev);
 
@@ -4951,12 +4948,12 @@ mlx5_en_debugnet_init(struct ifnet *dev, int *nrxr, int *ncl, int *clsize)
 }
 
 static void
-mlx5_en_debugnet_event(struct ifnet *dev, enum debugnet_ev event)
+mlx5_en_debugnet_event(if_t dev, enum debugnet_ev event)
 {
 }
 
 static int
-mlx5_en_debugnet_transmit(struct ifnet *dev, struct mbuf *m)
+mlx5_en_debugnet_transmit(if_t dev, struct mbuf *m)
 {
 	struct mlx5e_priv *priv = if_getsoftc(dev);
 	struct mlx5e_sq *sq;
@@ -4986,7 +4983,7 @@ mlx5_en_debugnet_transmit(struct ifnet *dev, struct mbuf *m)
 }
 
 static int
-mlx5_en_debugnet_poll(struct ifnet *dev, int count)
+mlx5_en_debugnet_poll(if_t dev, int count)
 {
 	struct mlx5e_priv *priv = if_getsoftc(dev);
 

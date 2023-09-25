@@ -25,8 +25,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
@@ -42,8 +40,6 @@ __FBSDID("$FreeBSD$");
 #include <machine/tlb.h>
 
 #include "bman.h"
-
-devclass_t bman_devclass;
 
 static struct bman_softc *bman_sc;
 

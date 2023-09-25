@@ -22,8 +22,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 #ifndef	__LIBRSS_H__
@@ -45,21 +43,6 @@ typedef enum {
 } rss_bucket_type_t;
 
 typedef void rss_bucket_rebalance_cb_t(void *arg);
-
-/*
- * Enable/disable whether to allow for multiple bind()s to the
- * given PCB entry.
- *
- * This must be done before bind().
- */
-extern	int rss_sock_set_bindmulti(int fd, int af, int val);
-
-/*
- * Set the RSS bucket for the given file descriptor.
- *
- * This must be done before bind().
- */
-extern	int rss_sock_set_rss_bucket(int fd, int af, int rss_bucket);
 
 /*
  * Enable or disable receiving RSS/flowid information on

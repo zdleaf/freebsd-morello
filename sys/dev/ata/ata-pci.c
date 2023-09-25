@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 1998 - 2008 Søren Schmidt <sos@FreeBSD.org>
  * All rights reserved.
@@ -27,8 +27,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
@@ -601,15 +599,13 @@ static device_method_t ata_pci_methods[] = {
     DEVMETHOD_END
 };
 
-devclass_t ata_pci_devclass;
-
 static driver_t ata_pci_driver = {
     "atapci",
     ata_pci_methods,
     sizeof(struct ata_pci_controller),
 };
 
-DRIVER_MODULE(atapci, pci, ata_pci_driver, ata_pci_devclass, NULL, NULL);
+DRIVER_MODULE(atapci, pci, ata_pci_driver, NULL, NULL);
 MODULE_VERSION(atapci, 1);
 MODULE_DEPEND(atapci, ata, 1, 1, 1);
 
@@ -767,10 +763,10 @@ driver_t ata_pcichannel_driver = {
     sizeof(struct ata_channel),
 };
 
-DRIVER_MODULE(ata, atapci, ata_pcichannel_driver, ata_devclass, NULL, NULL);
+DRIVER_MODULE(ata, atapci, ata_pcichannel_driver, NULL, NULL);
 
 /*
- * misc support fucntions
+ * misc support functions
  */
 int
 ata_legacy(device_t dev)

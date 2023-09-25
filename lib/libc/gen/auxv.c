@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright 2010, 2012 Konstantin Belousov <kib@FreeBSD.ORG>.
  * All rights reserved.
@@ -27,8 +27,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include "namespace.h"
 #include <elf.h>
 #include <errno.h>
@@ -39,7 +37,6 @@ __FBSDID("$FreeBSD$");
 #include "un-namespace.h"
 #include "libc_private.h"
 
-extern char **environ;
 extern int _DYNAMIC;
 #pragma weak _DYNAMIC
 
@@ -73,6 +70,7 @@ static char *canary, *pagesizes, *execpath;
 static void *ps_strings, *timekeep;
 static u_long hwcap, hwcap2;
 static void *fxrng_seed_version;
+static u_long usrstackbase, usrstacklim;
 
 #ifdef __powerpc__
 static int powerpc_new_auxv_format = 0;
@@ -143,6 +141,14 @@ init_aux(void)
 
 		case AT_FXRNG:
 			fxrng_seed_version = aux->a_un.a_ptr;
+			break;
+
+		case AT_USRSTACKBASE:
+			usrstackbase = aux->a_un.a_val;
+			break;
+
+		case AT_USRSTACKLIM:
+			usrstacklim = aux->a_un.a_val;
 			break;
 #ifdef __powerpc__
 		/*
@@ -364,6 +370,26 @@ _elf_aux_info(int aux, void *buf, int buflen)
 		if (buflen == sizeof(void *)) {
 			if (fxrng_seed_version != NULL) {
 				*(void **)buf = fxrng_seed_version;
+				res = 0;
+			} else
+				res = ENOENT;
+		} else
+			res = EINVAL;
+		break;
+	case AT_USRSTACKBASE:
+		if (buflen == sizeof(u_long)) {
+			if (usrstackbase != 0) {
+				*(u_long *)buf = usrstackbase;
+				res = 0;
+			} else
+				res = ENOENT;
+		} else
+			res = EINVAL;
+		break;
+	case AT_USRSTACKLIM:
+		if (buflen == sizeof(u_long)) {
+			if (usrstacklim != 0) {
+				*(u_long *)buf = usrstacklim;
 				res = 0;
 			} else
 				res = ENOENT;

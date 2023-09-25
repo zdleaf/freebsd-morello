@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2018-2021 Emmanuel Vadot <manu@FreeBSD.org>
  *
@@ -26,8 +26,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/bus.h>
 #include <sys/systm.h>
@@ -48,7 +46,7 @@ static int rk8xx_regnode_set_voltage(struct regnode *regnode, int min_uvolt,
 static int rk8xx_regnode_get_voltage(struct regnode *regnode, int *uvolt);
 
 /* #define	dprintf(sc, format, arg...)	device_printf(sc->base_dev, "%s: " format, __func__, arg) */
-#define	dprintf(sc, format, arg...)
+#define	dprintf(sc, format, arg...) (sc = sc)
 
 static int
 rk8xx_regnode_init(struct regnode *regnode)
@@ -113,11 +111,38 @@ rk8xx_regnode_enable(struct regnode *regnode, bool enable, int *udelay)
 static void
 rk8xx_regnode_reg_to_voltage(struct rk8xx_reg_sc *sc, uint8_t val, int *uv)
 {
-	if (val < sc->def->voltage_nstep)
-		*uv = sc->def->voltage_min + val * sc->def->voltage_step;
-	else
-		*uv = sc->def->voltage_min +
-		       (sc->def->voltage_nstep * sc->def->voltage_step);
+	struct rk8xx_softc *sc1;
+
+	sc1 = device_get_softc(sc->base_dev);
+	if (sc1->type == RK809 || sc1->type == RK817) {
+		if (sc->def->voltage_step2) {
+			int change;
+
+			change =
+			    ((sc->def->voltage_min2 - sc->def->voltage_min) /
+			    sc->def->voltage_step);
+			if (val > change) {
+				if (val < sc->def->voltage_nstep) {
+					*uv = sc->def->voltage_min2 +
+					    (val - change) *
+					    sc->def->voltage_step2;
+				} else
+					*uv = sc->def->voltage_max2;
+				return;
+			}
+		}
+		if (val < sc->def->voltage_nstep)
+			*uv = sc->def->voltage_min + val * sc->def->voltage_step;
+		else
+			*uv = sc->def->voltage_max;
+
+	} else {
+		if (val < sc->def->voltage_nstep)
+			*uv = sc->def->voltage_min + val * sc->def->voltage_step;
+		else
+			*uv = sc->def->voltage_min +
+			    (sc->def->voltage_nstep * sc->def->voltage_step);
+	}
 }
 
 static int
@@ -126,14 +151,25 @@ rk8xx_regnode_voltage_to_reg(struct rk8xx_reg_sc *sc, int min_uvolt,
 {
 	uint8_t nval;
 	int nstep, uvolt;
+	struct rk8xx_softc *sc1;
 
+	sc1 = device_get_softc(sc->base_dev);
 	nval = 0;
 	uvolt = sc->def->voltage_min;
 
 	for (nstep = 0; nstep < sc->def->voltage_nstep && uvolt < min_uvolt;
 	     nstep++) {
 		++nval;
-		uvolt += sc->def->voltage_step;
+		if (sc1->type == RK809 || sc1->type == RK817) {
+			if (sc->def->voltage_step2) {
+				if (uvolt < sc->def->voltage_min2)
+					uvolt += sc->def->voltage_step;
+				else
+					uvolt += sc->def->voltage_step2;
+			} else
+				uvolt += sc->def->voltage_step;
+		} else
+			uvolt += sc->def->voltage_step;
 	}
 	if (uvolt > max_uvolt)
 		return (EINVAL);
@@ -163,10 +199,12 @@ rk8xx_regnode_set_voltage(struct regnode *regnode, int min_uvolt,
     int max_uvolt, int *udelay)
 {
 	struct rk8xx_reg_sc *sc;
-	uint8_t val;
+	uint8_t val, old;
 	int uvolt;
+	struct rk8xx_softc *sc1;
 
 	sc = regnode_get_softc(regnode);
+	sc1 = device_get_softc(sc->base_dev);
 
 	if (!sc->def->voltage_step)
 		return (ENXIO);
@@ -176,8 +214,12 @@ rk8xx_regnode_set_voltage(struct regnode *regnode, int min_uvolt,
 	    min_uvolt,
 	    max_uvolt);
 	rk8xx_read(sc->base_dev, sc->def->voltage_reg, &val, 1);
+	old = val;
 	if (rk8xx_regnode_voltage_to_reg(sc, min_uvolt, max_uvolt, &val) != 0)
 		return (ERANGE);
+
+	if (sc1->type == RK809 || sc1->type == RK817)
+		val |= (old &= ~sc->def->voltage_mask);
 
 	rk8xx_write(sc->base_dev, sc->def->voltage_reg, &val, 1);
 

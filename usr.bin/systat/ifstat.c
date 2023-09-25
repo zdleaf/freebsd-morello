@@ -26,8 +26,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 #include <sys/types.h>
@@ -290,7 +288,7 @@ fetchifstat(void)
 			SLIST_REMOVE(&curlist, ifp, if_stat, link);
 			free(ifp);
 			needsort = 1;
-			clearifstat();
+			continue;
 		} else if (strcmp(ifp->dev_name, ifp->if_mib.ifmd_name) != 0 ) {
 			/* a device was removed and another one was added */
 			format_device_name(ifp);

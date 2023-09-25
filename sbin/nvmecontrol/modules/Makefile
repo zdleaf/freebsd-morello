@@ -1,5 +1,4 @@
-# $FreeBSD$
 
-SUBDIR=	intel wdc
+SUBDIR=	intel wdc samsung
 
 .include <bsd.subdir.mk>

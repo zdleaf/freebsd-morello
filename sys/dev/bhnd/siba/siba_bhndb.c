@@ -32,8 +32,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/kernel.h>
 #include <sys/bus.h>
@@ -290,7 +288,7 @@ static device_method_t siba_bhndb_methods[] = {
 DEFINE_CLASS_2(bhnd, siba_bhndb_driver, siba_bhndb_methods,
     sizeof(struct siba_softc), bhnd_bhndb_driver, siba_driver);
 
-DRIVER_MODULE(siba_bhndb, bhndb, siba_bhndb_driver, bhnd_devclass, NULL, NULL);
+DRIVER_MODULE(siba_bhndb, bhndb, siba_bhndb_driver, NULL, NULL);
 
 MODULE_VERSION(siba_bhndb, 1);
 MODULE_DEPEND(siba_bhndb, siba, 1, 1, 1);

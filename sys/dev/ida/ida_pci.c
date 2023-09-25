@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 1999,2000 Jonathan Lemon
  * All rights reserved.
@@ -27,8 +27,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
@@ -201,8 +199,6 @@ static driver_t ida_pci_driver = {
 	sizeof(struct ida_softc)
 };
 
-static devclass_t ida_devclass;
-
 static struct ida_board *
 ida_pci_match(device_t dev)
 {
@@ -307,6 +303,6 @@ ida_pci_attach(device_t dev)
 	return (0);
 }
 
-DRIVER_MODULE(ida, pci, ida_pci_driver, ida_devclass, 0, 0);
+DRIVER_MODULE(ida, pci, ida_pci_driver, 0, 0);
 MODULE_PNP_INFO("W32:vendor/device;D:#", pci, ida, board_id,
     nitems(board_id) - 1);

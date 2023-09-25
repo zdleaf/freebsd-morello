@@ -27,8 +27,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/rwlock.h>
@@ -47,7 +45,7 @@ __FBSDID("$FreeBSD$");
 struct page *
 linux_shmem_read_mapping_page_gfp(vm_object_t obj, int pindex, gfp_t gfp)
 {
-	vm_page_t page;
+	struct page *page;
 	int rv;
 
 	if ((gfp & GFP_NOWAIT) != 0)
@@ -84,7 +82,7 @@ linux_shmem_file_setup(const char *name, loff_t size, unsigned long flags)
 
 	filp->f_count = 1;
 	filp->f_vnode = vp;
-	filp->f_shmem = vm_pager_allocate(OBJT_DEFAULT, NULL, size,
+	filp->f_shmem = vm_pager_allocate(OBJT_SWAP, NULL, size,
 	    VM_PROT_READ | VM_PROT_WRITE, 0, curthread->td_ucred);
 	if (filp->f_shmem == NULL) {
 		error = -ENOMEM;

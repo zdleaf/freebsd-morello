@@ -26,8 +26,6 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD$
- *
  * Host Resources MIB for SNMPd. Implementation for hrSWRunTable
  */
 
@@ -479,7 +477,7 @@ invalidate_swrun_entry(struct swrun_entry *entry, int commit)
 
 	if (entry->index >= NO_PID + 1)	{
 		/* this is a kernel item */
-		HRDBG("atempt to unload KLD %d",
+		HRDBG("attempt to unload KLD %d",
 		    entry->index -  NO_PID - 1);
 
 		if (entry->index == SWOSIndex) {
@@ -548,7 +546,7 @@ invalidate_swrun_entry(struct swrun_entry *entry, int commit)
 }
 
 /**
- * Popuplate the hrSWRunTable.
+ * Populate the hrSWRunTable.
  */
 void
 init_swrun_tbl(void)
@@ -575,7 +573,7 @@ fini_swrun_tbl(void)
 /*
  * This is the implementation for a generated (by a SNMP tool)
  * function prototype, see hostres_tree.h
- * It hanldes the SNMP operations for hrSWRunTable
+ * It handles the SNMP operations for hrSWRunTable
  */
 int
 op_hrSWRunTable(struct snmp_context *ctx __unused, struct snmp_value *value,

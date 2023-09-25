@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2011 Nathan Whitehorn
  * All rights reserved.
@@ -27,8 +27,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/module.h>
@@ -74,9 +72,7 @@ static driver_t rtasdev_driver = {
 	0
 };
 
-static devclass_t rtasdev_devclass;
-
-DRIVER_MODULE(rtasdev, ofwbus, rtasdev_driver, rtasdev_devclass, 0, 0);
+DRIVER_MODULE(rtasdev, ofwbus, rtasdev_driver, 0, 0);
 
 static int
 rtasdev_probe(device_t dev)

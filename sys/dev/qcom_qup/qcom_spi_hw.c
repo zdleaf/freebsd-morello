@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2021, Adrian Chadd <adrian@FreeBSD.org>
  *
@@ -27,8 +27,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 
@@ -723,14 +721,14 @@ qcom_spi_hw_ack_write_pio_fifo(struct qcom_spi_softc *sc)
 int
 qcom_spi_hw_ack_opmode(struct qcom_spi_softc *sc)
 {
-	uint32_t reg;
 
 	QCOM_SPI_ASSERT_LOCKED(sc);
 
 	QCOM_SPI_BARRIER_READ(sc);
-	reg = QCOM_SPI_READ_4(sc, QUP_OPERATIONAL);
+	QCOM_SPI_READ_4(sc, QUP_OPERATIONAL);
 	QCOM_SPI_WRITE_4(sc, QUP_OPERATIONAL, QUP_OP_OUT_SERVICE_FLAG);
 	QCOM_SPI_BARRIER_WRITE(sc);
+
 	return (0);
 
 }
@@ -841,7 +839,7 @@ qcom_spi_hw_write_pio_block(struct qcom_spi_softc *sc)
 }
 
 /*
- * Read data into the the RX buffer and increment the RX offset.
+ * Read data into the RX buffer and increment the RX offset.
  *
  * Return true if the byte was saved into the RX buffer, else
  * return false.

@@ -15,8 +15,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include "vmci_kernel_api.h"
 #include "vmci_kernel_defs.h"
 #include "vmci_kernel_if.h"
@@ -148,8 +146,6 @@ vmci_qpair_alloc(struct vmci_qpair **qpair, struct vmci_handle *handle,
     uint32_t flags, vmci_privilege_flags priv_flags)
 {
 	struct vmci_qpair *my_qpair;
-	vmci_event_release_cb wakeup_cb;
-	void *client_data;
 	int retval;
 
 	/*
@@ -181,9 +177,6 @@ vmci_qpair_alloc(struct vmci_qpair **qpair, struct vmci_handle *handle,
 	my_qpair->peer = peer;
 	my_qpair->flags = flags;
 	my_qpair->priv_flags = priv_flags;
-
-	client_data = NULL;
-	wakeup_cb = NULL;
 
 	retval = vmci_queue_pair_alloc(handle, &my_qpair->produce_q,
 	    my_qpair->produce_q_size, &my_qpair->consume_q,
@@ -491,7 +484,7 @@ vmci_qpair_consume_buf_ready(const struct vmci_qpair *qpair)
  *     VMCI_ERROR_QUEUEPAIR_NOSPACE if no space was available to enqueue data.
  *     VMCI_ERROR_INVALID_SIZE, if any queue pointer is outside the queue
  *     (as defined by the queue size).
- *     VMCI_ERROR_INVALID_ARGS, if an error occured when accessing the buffer.
+ *     VMCI_ERROR_INVALID_ARGS, if an error occurred when accessing the buffer.
  *     VMCI_ERROR_QUEUEPAIR_NOTATTACHED, if the queue pair pages aren't
  *     available.
  *     Otherwise, the number of bytes written to the queue is returned.
@@ -562,7 +555,7 @@ enqueue(struct vmci_queue *produce_q, struct vmci_queue *consume_q,
  *     VMCI_ERROR_QUEUEPAIR_NODATA if no data was available to dequeue.
  *     VMCI_ERROR_INVALID_SIZE, if any queue pointer is outside the queue
  *     (as defined by the queue size).
- *     VMCI_ERROR_INVALID_ARGS, if an error occured when accessing the buffer.
+ *     VMCI_ERROR_INVALID_ARGS, if an error occurred when accessing the buffer.
  *     VMCI_ERROR_NOT_FOUND, if the vmm_world registered with the queue pair
  *     cannot be found.
  *     Otherwise the number of bytes dequeued is returned.

@@ -26,8 +26,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/conf.h>
@@ -463,5 +461,4 @@ static device_method_t omap_uhh_methods[] = {
 
 DEFINE_CLASS_1(omap_uhh, omap_uhh_driver, omap_uhh_methods,
     sizeof(struct omap_uhh_softc), simplebus_driver);
-static devclass_t omap_uhh_devclass;
-DRIVER_MODULE(omap_uhh, simplebus, omap_uhh_driver, omap_uhh_devclass, 0, 0);
+DRIVER_MODULE(omap_uhh, simplebus, omap_uhh_driver, 0, 0);

@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2005 Peter Grehan
  * All rights reserved.
@@ -28,8 +28,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 /*
  * Dispatch MI pmap calls to the appropriate MMU implementation
  * through a previously registered kernel object.
@@ -150,7 +148,7 @@ DEFINE_PMAP_IFUNC(void, qenter, (vm_offset_t, vm_page_t *, int));
 DEFINE_PMAP_IFUNC(void, qremove, (vm_offset_t, int));
 DEFINE_PMAP_IFUNC(vm_offset_t, quick_enter_page, (vm_page_t));
 DEFINE_PMAP_IFUNC(void, quick_remove_page, (vm_offset_t));
-DEFINE_PMAP_IFUNC(boolean_t, ts_referenced, (vm_page_t));
+DEFINE_PMAP_IFUNC(int, ts_referenced, (vm_page_t));
 DEFINE_PMAP_IFUNC(void, release, (pmap_t));
 DEFINE_PMAP_IFUNC(void, remove, (pmap_t, vm_offset_t, vm_offset_t));
 DEFINE_PMAP_IFUNC(void, remove_all, (vm_page_t));
@@ -175,11 +173,11 @@ DEFINE_PMAP_IFUNC(void, cpu_bootstrap, (int));
 DEFINE_PMAP_IFUNC(void *, mapdev, (vm_paddr_t, vm_size_t));
 DEFINE_PMAP_IFUNC(void *, mapdev_attr, (vm_paddr_t, vm_size_t, vm_memattr_t));
 DEFINE_PMAP_IFUNC(void, page_set_memattr, (vm_page_t, vm_memattr_t));
-DEFINE_PMAP_IFUNC(void, unmapdev, (vm_offset_t, vm_size_t));
+DEFINE_PMAP_IFUNC(void, unmapdev, (void *, vm_size_t));
 DEFINE_PMAP_IFUNC(int, map_user_ptr,
     (pmap_t, volatile const void *, void **, size_t, size_t *));
 DEFINE_PMAP_IFUNC(int, decode_kernel_ptr, (vm_offset_t, int *, vm_offset_t *));
-DEFINE_PMAP_IFUNC(boolean_t, dev_direct_mapped, (vm_paddr_t, vm_size_t));
+DEFINE_PMAP_IFUNC(int, dev_direct_mapped, (vm_paddr_t, vm_size_t));
 DEFINE_PMAP_IFUNC(void, sync_icache, (pmap_t, vm_offset_t, vm_size_t));
 DEFINE_PMAP_IFUNC(int, change_attr, (vm_offset_t, vm_size_t, vm_memattr_t));
 DEFINE_PMAP_IFUNC(void, page_array_startup, (long));
@@ -224,7 +222,7 @@ pmap_mmu_install(char *name, int prio)
 
 /* MMU "pre-bootstrap" init, used to install extra resolvers, etc. */
 void
-pmap_mmu_init()
+pmap_mmu_init(void)
 {
 	if (mmu_obj->funcs->install != NULL)
 		(mmu_obj->funcs->install)();
@@ -254,4 +252,10 @@ pmap_is_valid_memattr(pmap_t pmap __unused, vm_memattr_t mode)
 	default:
 		return (FALSE);
 	}
+}
+
+void
+pmap_active_cpus(pmap_t pmap, cpuset_t *res)
+{
+	*res = pmap->pm_active;
 }

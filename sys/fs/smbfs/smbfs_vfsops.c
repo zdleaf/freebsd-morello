@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2000-2001 Boris Popov
  * All rights reserved.
@@ -24,8 +24,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 #include <sys/param.h>
@@ -299,9 +297,6 @@ smbfs_unmount(struct mount *mp, int mntflags)
 	mp->mnt_data = NULL;
 	SMB_UNLOCK();
 	free(smp, M_SMBFSDATA);
-	MNT_ILOCK(mp);
-	mp->mnt_flag &= ~MNT_LOCAL;
-	MNT_IUNLOCK(mp);
 out:
 	smbfs_free_scred(scred);
 	return error;
@@ -352,12 +347,7 @@ out:
  */
 /* ARGSUSED */
 static int
-smbfs_quotactl(mp, cmd, uid, arg, mp_busy)
-	struct mount *mp;
-	int cmd;
-	uid_t uid;
-	void *arg;
-	bool *mp_busy;
+smbfs_quotactl(struct mount *mp, int cmd, uid_t uid, void *arg, bool *mp_busy)
 {
 	SMBVDEBUG("return EOPNOTSUPP\n");
 	return EOPNOTSUPP;

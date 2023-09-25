@@ -52,8 +52,6 @@
 
 %{
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/types.h>
 #include <sys/param.h>
 #include <sys/socket.h>
@@ -213,8 +211,7 @@ addresses
 %%
 
 void
-yyerror(msg)
-	char *msg;
+yyerror(char *msg)
 {
 	fprintf(stderr, "libipsec: %s while parsing \"%s\"\n",
 		msg, __libipsecyytext);
@@ -223,8 +220,7 @@ yyerror(msg)
 }
 
 static struct sockaddr *
-parse_sockaddr(buf)
-	struct _val *buf;
+parse_sockaddr(struct _val *buf)
 {
 	struct addrinfo hints, *res;
 	char *serv = NULL;
@@ -262,7 +258,7 @@ parse_sockaddr(buf)
 }
 
 static int
-rule_check()
+rule_check(void)
 {
 	if (p_type == IPSEC_POLICY_IPSEC) {
 		if (p_protocol == IPPROTO_IP) {
@@ -293,7 +289,7 @@ rule_check()
 }
 
 static int
-init_x_policy()
+init_x_policy(void)
 {
 	struct sadb_x_policy *p;
 
@@ -319,8 +315,7 @@ init_x_policy()
 }
 
 static int
-set_x_request(src, dst)
-	struct sockaddr *src, *dst;
+set_x_request(struct sockaddr *src, struct sockaddr *dst)
 {
 	struct sadb_x_ipsecrequest *p;
 	int reqlen;
@@ -351,8 +346,7 @@ set_x_request(src, dst)
 }
 
 static int
-set_sockaddr(addr)
-	struct sockaddr *addr;
+set_sockaddr(struct sockaddr *addr)
 {
 	if (addr == NULL) {
 		__ipsec_errcode = EIPSEC_NO_ERROR;
@@ -370,7 +364,7 @@ set_sockaddr(addr)
 }
 
 static void
-policy_parse_request_init()
+policy_parse_request_init(void)
 {
 	p_protocol = IPPROTO_IP;
 	p_mode = IPSEC_MODE_ANY;
@@ -389,9 +383,7 @@ policy_parse_request_init()
 }
 
 static caddr_t
-policy_parse(msg, msglen)
-	char *msg;
-	int msglen;
+policy_parse(char *msg, int msglen)
 {
 	int error;
 	pbuf = NULL;
@@ -421,9 +413,7 @@ policy_parse(msg, msglen)
 }
 
 caddr_t
-ipsec_set_policy(msg, msglen)
-	char *msg;
-	int msglen;
+ipsec_set_policy(char *msg, int msglen)
 {
 	caddr_t policy;
 

@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-4-Clause AND BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-4-Clause AND BSD-2-Clause
  *
  * Copyright (C) 1995, 1996 Wolfgang Solfrank.
  * Copyright (C) 1995, 1996 TooLs GmbH.
@@ -58,8 +58,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
@@ -190,7 +188,7 @@ decr_init(void)
 	ticks_per_sec = platform_timebase_freq(&cpu);
 	ps_per_tick = 1000000000000 / ticks_per_sec;
 
-	set_cputicker(mftb, ticks_per_sec, 0);
+	set_cputicker(mftb, ticks_per_sec, false);
 	snprintf(buf, sizeof(buf), "cpu%d:decrementer", curcpu);
 	intrcnt_add(buf, &decr_counts[curcpu]);
 	decr_et_stop(NULL);

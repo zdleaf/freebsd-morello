@@ -22,8 +22,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 #ifndef _NTB_H_
@@ -31,7 +29,6 @@
 
 #include "ntb_if.h"
 
-extern devclass_t ntb_hw_devclass;
 SYSCTL_DECL(_hw_ntb);
 
 int ntb_register_device(device_t ntb);

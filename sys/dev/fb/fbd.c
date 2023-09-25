@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2013 The FreeBSD Foundation
  *
@@ -26,8 +26,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 /* Generic framebuffer */
@@ -35,8 +33,6 @@
 /* TODO done normal /dev/fb methods */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/bus.h>
@@ -202,7 +198,7 @@ fb_init(struct fb_list_entry *entry, int unit)
 }
 
 int
-fbd_list()
+fbd_list(void)
 {
 	struct fb_list_entry *entry;
 
@@ -210,8 +206,8 @@ fbd_list()
 		return (ENOENT);
 
 	LIST_FOREACH(entry, &fb_list_head, fb_list) {
-		printf("FB %s @%p\n", entry->fb_info->fb_name,
-		    (void *)entry->fb_info->fb_pbase);
+		printf("FB %s @%#jx\n", entry->fb_info->fb_name,
+		    (uintmax_t)entry->fb_info->fb_pbase);
 	}
 
 	return (0);
@@ -362,10 +358,8 @@ driver_t fbd_driver = {
 	sizeof(struct fbd_softc)
 };
 
-devclass_t	fbd_devclass;
-
-DRIVER_MODULE(fbd, fb, fbd_driver, fbd_devclass, 0, 0);
-DRIVER_MODULE(fbd, drmn, fbd_driver, fbd_devclass, 0, 0);
-DRIVER_MODULE(fbd, udl, fbd_driver, fbd_devclass, 0, 0);
+DRIVER_MODULE(fbd, fb, fbd_driver, 0, 0);
+DRIVER_MODULE(fbd, drmn, fbd_driver, 0, 0);
+DRIVER_MODULE(fbd, udl, fbd_driver, 0, 0);
 MODULE_VERSION(fbd, 1);
 

@@ -22,8 +22,6 @@
  * CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 #pragma once
@@ -38,13 +36,13 @@ struct errstate {
 	ifconfig_errtype errtype;
 
 	/**
-	 * The error occured in this ioctl() request.
+	 * The error occurred in this ioctl() request.
 	 * Populated if errtype = IOCTL
 	 */
 	unsigned long ioctl_request;
 
 	/**
-	 * The value of the global errno variable when the error occured.
+	 * The value of the global errno variable when the error occurred.
 	 */
 	int errcode;
 };
@@ -83,3 +81,6 @@ int ifconfig_socket(ifconfig_handle_t *h, const int addressfamily, int *s);
 /** Function to wrap ioctl() and automatically populate ifconfig_errstate when appropriate.*/
 int ifconfig_ioctlwrap(ifconfig_handle_t *h, const int addressfamily,
     unsigned long request, void *data);
+
+void ifconfig_error_clear(ifconfig_handle_t *h);
+void ifconfig_error(ifconfig_handle_t *h, ifconfig_errtype type, int error);

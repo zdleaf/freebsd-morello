@@ -23,13 +23,9 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 /* Based on sys/arm/ti/ti_sysc.c */
 
 #include <sys/param.h>
@@ -152,9 +148,7 @@ static device_method_t ti_scm_methods[] = {
 DEFINE_CLASS_1(ti_scm, ti_scm_driver, ti_scm_methods,
     sizeof(struct ti_scm_softc), simplebus_driver);
 
-static devclass_t ti_scm_devclass;
-
-EARLY_DRIVER_MODULE(ti_scm, simplebus, ti_scm_driver,
-    ti_scm_devclass, 0, 0, BUS_PASS_BUS + BUS_PASS_ORDER_FIRST);
+EARLY_DRIVER_MODULE(ti_scm, simplebus, ti_scm_driver, 0, 0,
+    BUS_PASS_BUS + BUS_PASS_ORDER_FIRST);
 MODULE_VERSION(ti_scm, 1);
 MODULE_DEPEND(ti_scm, ti_sysc, 1, 1, 1);

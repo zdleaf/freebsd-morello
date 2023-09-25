@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Written by: David Jeffery
  * Copyright (c) 2002 Adaptec Inc.
@@ -28,8 +28,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/types.h>
 #include <sys/lock.h>
 #include <sys/mutex.h>
@@ -642,15 +640,13 @@ exit:
 int ips_copperhead_reinit(ips_softc_t *sc, int force)
 {
 	int i, j;
-	u_int32_t postcode = 0, configstatus = 0;
+	u_int32_t configstatus = 0;
 	ips_write_1(sc, COPPER_REG_SCPR, 0x80);
 	ips_write_1(sc, COPPER_REG_SCPR, 0);
 	device_printf(sc->dev, "reinitializing adapter, this could take several minutes.\n");
 	for(j = 0; j < 2; j++){
-		postcode <<= 8;
 		for(i = 0; i < 45; i++){
 			if(ips_read_1(sc, COPPER_REG_HISR) & COPPER_GHI_BIT){
-				postcode |= ips_read_1(sc, COPPER_REG_ISPR);
 				ips_write_1(sc, COPPER_REG_HISR, 
 					    COPPER_GHI_BIT);
 				break;

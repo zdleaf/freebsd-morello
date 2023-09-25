@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2001 Scott Long <scottl@freebsd.org>
  * Copyright (c) 2001 Darrell Anderson <anderson@cs.duke.edu>
@@ -68,8 +68,6 @@
 
 #include <dev/sound/pci/allegro_reg.h>
 #include <dev/sound/pci/allegro_code.h>
-
-SND_DECLARE_FILE("$FreeBSD$");
 
 /* -------------------------------------------------------------------- */
 
@@ -1794,6 +1792,6 @@ static driver_t m3_driver = {
 	PCM_SOFTC_SIZE,
 };
 
-DRIVER_MODULE(snd_maestro3, pci, m3_driver, pcm_devclass, 0, 0);
+DRIVER_MODULE(snd_maestro3, pci, m3_driver, 0, 0);
 MODULE_DEPEND(snd_maestro3, sound, SOUND_MINVER, SOUND_PREFVER, SOUND_MAXVER);
 MODULE_VERSION(snd_maestro3, 1);

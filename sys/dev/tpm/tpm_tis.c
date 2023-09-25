@@ -26,8 +26,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include "tpm20.h"
 
 /*
@@ -514,9 +512,9 @@ static device_method_t tpmtis_methods[] = {
 	DEVMETHOD(device_suspend,	tpm20_suspend),
 	{0, 0}
 };
+
 static driver_t	tpmtis_driver = {
 	"tpmtis", tpmtis_methods, sizeof(struct tpm_sc),
 };
 
-devclass_t tpmtis_devclass;
-DRIVER_MODULE(tpmtis, acpi, tpmtis_driver, tpmtis_devclass, 0, 0);
+DRIVER_MODULE(tpmtis, acpi, tpmtis_driver, 0, 0);

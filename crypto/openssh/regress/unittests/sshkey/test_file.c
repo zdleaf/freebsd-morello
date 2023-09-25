@@ -1,4 +1,4 @@
-/* 	$OpenBSD: test_file.c,v 1.9 2020/06/19 03:48:49 djm Exp $ */
+/* 	$OpenBSD: test_file.c,v 1.10 2021/12/14 21:25:27 deraadt Exp $ */
 /*
  * Regress test for sshkey.h key management API
  *
@@ -8,7 +8,6 @@
 #include "includes.h"
 
 #include <sys/types.h>
-#include <sys/param.h>
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <stdio.h>
@@ -267,6 +266,7 @@ sshkey_file_tests(void)
 	ASSERT_STRING_EQ((const char *)sshbuf_ptr(buf),
 	    OBJ_nid2sn(k1->ecdsa_nid));
 	sshbuf_free(buf);
+#ifndef OPENSSL_IS_BORINGSSL /* lacks EC_POINT_point2bn() */
 	a = load_bignum("ecdsa_1.param.priv");
 	b = load_bignum("ecdsa_1.param.pub");
 	c = EC_POINT_point2bn(EC_KEY_get0_group(k1->ecdsa),
@@ -278,6 +278,7 @@ sshkey_file_tests(void)
 	BN_free(a);
 	BN_free(b);
 	BN_free(c);
+#endif /* OPENSSL_IS_BORINGSSL */
 	TEST_DONE();
 
 	TEST_START("parse ECDSA from private w/ passphrase");
@@ -422,6 +423,7 @@ sshkey_file_tests(void)
 
 	sshkey_free(k1);
 
+#ifdef ENABLE_SK
 #if defined(WITH_OPENSSL) && defined(OPENSSL_HAS_ECC)
 	TEST_START("parse ECDSA-SK from private");
 	buf = load_file("ecdsa_sk1");
@@ -552,6 +554,7 @@ sshkey_file_tests(void)
 	TEST_DONE();
 
 	sshkey_free(k1);
+#endif /* ENABLE_SK */
 
 	sshbuf_free(pw);
 

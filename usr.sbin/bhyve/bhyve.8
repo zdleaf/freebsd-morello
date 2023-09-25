@@ -22,9 +22,7 @@
 .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 .\" SUCH DAMAGE.
 .\"
-.\" $FreeBSD$
-.\"
-.Dd November 28, 2021
+.Dd May 5, 2023
 .Dt BHYVE 8
 .Os
 .Sh NAME
@@ -45,6 +43,15 @@
 .Op Cm ,threads= Ar n
 .Oc
 .Sm on
+.Oo Fl f
+.Sm off
+.Ar name Cm \&,
+.Oo
+.Cm string No | Cm file
+.Oc
+.Cm \&= Ar data
+.Sm on
+.Oc
 .Oo
 .Sm off
 .Fl G\~
@@ -145,6 +152,16 @@ Force
 .Nm
 to exit when a guest issues an access to an I/O port that is not emulated.
 This is intended for debug purposes.
+.It Fl f Ar name Ns Cm \&, Ns Oo Cm string Ns No | Ns Cm file Ns Oc Ns Cm \&= Ns Ar data
+Add a fw_cfg file
+.Ar name
+to the fw_cfg interface.
+If a
+.Cm string
+is specified, the fw_cfg file contains the string as data.
+If a
+.Cm file
+is specified, bhyve reads the file and adds the file content as fw_cfg data.
 .It Fl G Xo
 .Sm off
 .Oo Ar w Oc
@@ -198,9 +215,13 @@ The only supported devices are the TTY-class devices
 .Cm com1 , com2 , com3 ,
 and
 .Cm com4 ,
+the TPM module
+.Cm tpm ,
 the boot ROM device
 .Cm bootrom ,
-and the debug/test device
+the
+.Cm fwcfg
+type and the debug/test device
 .Cm pc-testdev .
 .Pp
 The possible values for the
@@ -345,7 +366,7 @@ PCI 16550 serial device.
 .It Cm lpc
 LPC PCI-ISA bridge with COM1, COM2, COM3, and COM4 16550 serial ports,
 a boot ROM, and,
-optionally, the debug/test device.
+optionally, a fwcfg type and the debug/test device.
 The LPC bridge emulation can only be configured on bus 0.
 .It Cm fbuf
 Raw framebuffer device attached to VNC server.
@@ -390,6 +411,7 @@ Network device backends:
 .Xc
 .El
 .Sm on
+.Pp
 If
 .Cm mac
 is not specified, the MAC address is derived from a fixed OUI and the
@@ -460,6 +482,12 @@ if not explicitly specified.
 Disable emulation of guest trim requests via
 .Dv DIOCGDELETE
 requests.
+.It Li bootindex= Ns Ar index
+Add the device to the bootorder at
+.Ar index .
+A fwcfg file is used to specify the bootorder.
+The guest firmware may ignore or doesn't support this fwcfg file.
+In that case, this feature doesn't work as expected.
 .El
 .Pp
 SCSI device backends:
@@ -477,6 +505,12 @@ are:
 .It Cm iid= Ns Ar IID
 Initiator ID to use when sending requests to specified CTL port.
 The default value is 0.
+.It Li bootindex= Ns Ar index
+Add the device to the bootorder at
+.Ar index .
+A fwcfg file is used to specify the bootorder.
+The guest firmware may ignore or doesn't support this fwcfg file.
+In that case, this feature doesn't work as expected.
 .El
 .Pp
 9P device backends:
@@ -506,6 +540,23 @@ process.
 Use the host TTY device for serial port I/O.
 .El
 .Pp
+TPM device backends:
+.Bl -tag -width 10n
+.It Ar type Ns \&, Ns Ar path Ns Op Cm \&, Ns Ar tpm-device-options
+Emulate a TPM device.
+.El
+.Pp
+The
+.Ar tpm-device-options
+are:
+.Bl -tag -width 10n
+.It Cm version= Ns Ar version
+Version of the TPM device according to the TCG specification.
+Defaults to
+.Cm 2.0
+.El
+.El
+.Pp
 Boot ROM device backends:
 .Bl -tag -width 10n
 .It Ar romfile Ns Op Cm \&, Ns Ar varfile
@@ -519,15 +570,67 @@ address space, and any modifications the guest makes will be saved
 to that file.
 .El
 .Pp
-Pass-through device backends:
+Fwcfg types:
 .Bl -tag -width 10n
-.It Ns Ar slot Ns Cm \&/ Ns Ar bus Ns Cm \&/ Ns Ar function
-Connect to a PCI device on the host at the selector described by
+.It Ar fwcfg
+The fwcfg interface is used to pass information such as the CPU count or ACPI tables to the guest firmware.
+Supported values are
+.Ql bhyve
+and
+.Ql qemu .
+Due to backward compatibility reasons,
+.Ql bhyve
+is the default option.
+When
+.Ql bhyve
+is used, bhyve's fwctl interface is used.
+It currently reports only the CPU count to the guest firmware.
+The
+.Ql qemu
+option uses QEMU's fwcfg interface.
+This interface is widely used and allows user-defined information to be passed to the guest.
+It is used for passing the CPU count, ACPI tables, a boot order and many other things to the guest.
+Some operating systems such as Fedora CoreOS can be configured by qemu's fwcfg interface as well.
+.El
+.Pp
+Pass-through device backends:
+.Sm off
+.Bl -bullet
+.It
+.Cm ppt Ar N Oo , Ar passthru-device-options Oc
+.It
+.Ns Ar bus Cm \&/ Ar slot Cm \&/ Ar function
+.Op , Ar passthru-device-options
+.It
+.Cm pci Ar bus Cm : Ar slot Cm : Ns Ar function
+.Op , Ar passthru-device-options
+.El
+.Sm on
+.Pp
+Connect to a PCI device on the host either named ppt
+.Ns Ar N
+or at the selector described by
 .Ar slot ,
 .Ar bus ,
 and
 .Ar function
 numbers.
+.Pp
+The
+.Ar passthru-device-options
+are:
+.Bl -tag -width 10n
+.It Cm rom= Ns Ar romfile
+Add
+.Ar romfile
+as option ROM to the PCI device.
+The ROM will be loaded by firmware and should be capable of initializing the device.
+.It Li bootindex= Ns Ar index
+Add the device to the bootorder at
+.Ar index .
+A fwcfg file is used to specify the bootorder.
+The guest firmware may ignore or doesn't support this fwcfg file.
+In that case, this feature doesn't work as expected.
 .El
 .Pp
 Guest memory must be wired using the
@@ -538,6 +641,26 @@ The host device must have been reserved at boot-time using the
 .Va pptdevs
 loader variable as described in
 .Xr vmm 4 .
+.Pp
+TPM devices:
+.Bl -tag -width 10n
+.It Ns Ar type
+Specifies the type of the TPM device.
+.Pp
+Supported types:
+.Bl -tag -width 10n
+.It Cm passthru
+.El
+.It Cm version= Ns Ar version
+The
+.Ar version
+of the emulated TPM device according to the TCG specification.
+.Pp
+Supported versions:
+.Bl -tag -width 10n
+.It Cm 2.0
+.El
+.El
 .Pp
 Virtio console device backends:
 .Bl -bullet
@@ -939,7 +1062,7 @@ Be sure to create a per-guest copy of the template VARS file from
 .Bd -literal -offset indent
 bhyve -c 2 -m 4g -w -H \\
   -s 0,hostbridge \\
-  -s 31,lpc -p com1,stdio \\
+  -s 31,lpc -l com1,stdio \\
   -l bootrom,/usr/local/share/uefi-firmware/BHYVE_UEFI_CODE.fd,BHYVE_UEFI_VARS.fd
    uefivm
 .Ed

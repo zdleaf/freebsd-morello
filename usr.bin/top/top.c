@@ -8,8 +8,6 @@
  *  Copyright (c) 1989 - 1994, William LeFebvre, Northwestern University
  *  Copyright (c) 1994, 1995, William LeFebvre, Argonne National Laboratory
  *  Copyright (c) 1996, William LeFebvre, Group sys Consulting
- *
- * $FreeBSD$
  */
 
 #include <sys/types.h>
@@ -652,7 +650,7 @@ restart:
 	{
 	    /* determine number of processes to actually display */
 	    /* this number will be the smallest of:  active processes,
-	       number user requested, number current screen accomodates */
+	       number user requested, number current screen accommodates */
 	    active_procs = system_info.p_pactive;
 	    if (active_procs > topn)
 	    {

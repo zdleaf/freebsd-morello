@@ -1,31 +1,39 @@
 # RCSid:
-#	$Id: host-target.mk,v 1.13 2020/08/05 23:32:08 sjg Exp $
+#	$Id: host-target.mk,v 1.18 2023/05/22 23:08:31 sjg Exp $
 
 # Host platform information; may be overridden
+.if !target(__${.PARSEFILE}__)
+__${.PARSEFILE}__: .NOTMAIN
+
 .if !defined(_HOST_OSNAME)
-_HOST_OSNAME !=	uname -s
+# use .MAKE.OS if available
+_HOST_OSNAME := ${.MAKE.OS:U${uname -s:L:sh}}
 .export _HOST_OSNAME
 .endif
 .if !defined(_HOST_OSREL)
 _HOST_OSREL  !=	uname -r
 .export _HOST_OSREL
 .endif
-.if !defined(_HOST_MACHINE)
-_HOST_MACHINE != uname -m
-.export _HOST_MACHINE
-.endif
 .if !defined(_HOST_ARCH)
-# for NetBSD prefer $MACHINE (amd64 rather than x86_64)
-.if ${_HOST_OSNAME:NDarwin:NNetBSD} == ""
-_HOST_ARCH := ${_HOST_MACHINE}
-.else
 _HOST_ARCH != uname -p 2> /dev/null || uname -m
 # uname -p may produce garbage on linux
 .if ${_HOST_ARCH:[\#]} > 1 || ${_HOST_ARCH:Nunknown} == ""
-_HOST_ARCH := ${_HOST_MACHINE}
-.endif
+_HOST_ARCH = ${_HOST_MACHINE}
+.elif ${_HOST_OSNAME:NDarwin} == "" && ${_HOST_ARCH:Narm:Ni386} == ""
+# _HOST_MACHINE is more explicit/useful
+_HOST_ARCH = ${_HOST_MACHINE}
 .endif
 .export _HOST_ARCH
+.endif
+.if !defined(_HOST_MACHINE)
+_HOST_MACHINE != uname -m
+# just in case
+_HOST_ARCH := ${_HOST_ARCH}
+# uname -m may produce garbage on darwin ppc
+.if ${_HOST_MACHINE:[\#]} > 1
+_HOST_MACHINE := ${_HOST_ARCH}
+.endif
+.export _HOST_MACHINE
 .endif
 .if !defined(HOST_MACHINE)
 HOST_MACHINE := ${_HOST_MACHINE}
@@ -47,3 +55,5 @@ HOST_TARGET32 := ${host_os:S,/,,g}${HOST_OSMAJOR}-${_HOST_ARCH32}
 TR ?= tr
 toLower = ${TR} 'ABCDEFGHIJKLMNOPQRSTUVWXYZ' 'abcdefghijklmnopqrstuvwxyz'
 toUpper = ${TR} 'abcdefghijklmnopqrstuvwxyz' 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
+
+.endif

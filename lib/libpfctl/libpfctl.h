@@ -27,8 +27,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
  * ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 #ifndef _PFCTL_IOCTL_H_
@@ -37,6 +35,7 @@
 #include <netpfil/pf/pf.h>
 
 struct pfctl_anchor;
+struct pfctl_eth_anchor;
 
 struct pfctl_status_counter {
 	uint64_t	 id;
@@ -56,6 +55,8 @@ struct pfctl_status {
 	uint64_t	src_nodes;
 	char		ifname[IFNAMSIZ];
 	uint8_t		pf_chksum[PF_MD5_DIGEST_LENGTH];
+	bool		syncookies_active;
+	uint32_t	reass;
 
 	struct pfctl_status_counters	 counters;
 	struct pfctl_status_counters	 lcounters;
@@ -63,6 +64,83 @@ struct pfctl_status {
 	struct pfctl_status_counters	 scounters;
 	uint64_t	pcounters[2][2][3];
 	uint64_t	bcounters[2][2];
+};
+
+struct pfctl_eth_rulesets_info {
+	uint32_t	nr;
+};
+
+struct pfctl_eth_rules_info {
+	uint32_t	nr;
+	uint32_t	ticket;
+};
+
+struct pfctl_eth_addr {
+	uint8_t	addr[ETHER_ADDR_LEN];
+	uint8_t	mask[ETHER_ADDR_LEN];
+	bool	neg;
+	bool	isset;
+};
+
+struct pfctl_eth_rule {
+	uint32_t		 nr;
+
+	char			label[PF_RULE_MAX_LABEL_COUNT][PF_RULE_LABEL_SIZE];
+	uint32_t		ridentifier;
+
+	bool			 quick;
+
+	/* Filter */
+	char			 ifname[IFNAMSIZ];
+	uint8_t			 ifnot;
+	uint8_t			 direction;
+	uint16_t		 proto;
+	struct pfctl_eth_addr	 src, dst;
+	struct pf_rule_addr	 ipsrc, ipdst;
+	char			 match_tagname[PF_TAG_NAME_SIZE];
+	uint16_t		 match_tag;
+	bool			 match_tag_not;
+
+	/* Stats */
+	uint64_t		 evaluations;
+	uint64_t		 packets[2];
+	uint64_t		 bytes[2];
+	time_t			 last_active_timestamp;
+
+	/* Action */
+	char			 qname[PF_QNAME_SIZE];
+	char			 tagname[PF_TAG_NAME_SIZE];
+	uint16_t		 dnpipe;
+	uint32_t		 dnflags;
+	char			 bridge_to[IFNAMSIZ];
+	uint8_t			 action;
+
+	struct pfctl_eth_anchor	*anchor;
+	uint8_t			 anchor_relative;
+	uint8_t			 anchor_wildcard;
+
+	TAILQ_ENTRY(pfctl_eth_rule)	 entries;
+};
+TAILQ_HEAD(pfctl_eth_rules, pfctl_eth_rule);
+
+struct pfctl_eth_ruleset_info {
+	uint32_t	nr;
+	char		name[PF_ANCHOR_NAME_SIZE];
+	char		path[MAXPATHLEN];
+};
+
+struct pfctl_eth_ruleset {
+	struct pfctl_eth_rules	 rules;
+	struct pfctl_eth_anchor	*anchor;
+};
+
+struct pfctl_eth_anchor {
+	struct pfctl_eth_anchor		*parent;
+	char				 name[PF_ANCHOR_NAME_SIZE];
+	char				 path[MAXPATHLEN];
+	struct pfctl_eth_ruleset	 ruleset;
+	int				 refcnt;	/* anchor rules */
+	int				 match;	/* XXX: used for pfctl black magic */
 };
 
 struct pfctl_pool {
@@ -74,6 +152,11 @@ struct pfctl_pool {
 	int			 tblidx;
 	uint16_t		 proxy_port[2];
 	uint8_t			 opts;
+};
+
+struct pfctl_rules_info {
+	uint32_t	nr;
+	uint32_t	ticket;
 };
 
 struct pfctl_rule {
@@ -96,6 +179,7 @@ struct pfctl_rule {
 	uint64_t		 evaluations;
 	uint64_t		 packets[2];
 	uint64_t		 bytes[2];
+	time_t			 last_active_timestamp;
 
 	struct pfi_kif		*kif;
 	struct pfctl_anchor	*anchor;
@@ -265,8 +349,20 @@ struct pfctl_state {
 	uint32_t		 creation;
 	uint32_t		 expire;
 	uint32_t		 pfsync_time;
-	uint8_t			 state_flags;
+	uint16_t		 state_flags;
 	uint32_t		 sync_flags;
+	uint16_t		 qid;
+	uint16_t		 pqid;
+	uint16_t		 dnpipe;
+	uint16_t		 dnrpipe;
+	uint8_t			 log;
+	int32_t			 rtableid;
+	uint8_t			 min_ttl;
+	uint8_t			 set_tos;
+	uint16_t		 max_mss;
+	uint8_t			 set_prio[2];
+	uint8_t			 rt;
+	char			 rt_ifname[IFNAMSIZ];
 };
 
 TAILQ_HEAD(pfctl_statelist, pfctl_state);
@@ -289,8 +385,24 @@ struct pfctl_syncookies {
 };
 
 struct pfctl_status* pfctl_get_status(int dev);
+uint64_t pfctl_status_counter(struct pfctl_status *status, int id);
+uint64_t pfctl_status_fcounter(struct pfctl_status *status, int id);
+uint64_t pfctl_status_scounter(struct pfctl_status *status, int id);
 void	pfctl_free_status(struct pfctl_status *status);
 
+int	pfctl_get_eth_rulesets_info(int dev,
+	    struct pfctl_eth_rulesets_info *ri, const char *path);
+int	pfctl_get_eth_ruleset(int dev, const char *path, int nr,
+	    struct pfctl_eth_ruleset_info *ri);
+int	pfctl_get_eth_rules_info(int dev, struct pfctl_eth_rules_info *rules,
+	    const char *path);
+int	pfctl_get_eth_rule(int dev, uint32_t nr, uint32_t ticket,
+	    const char *path, struct pfctl_eth_rule *rule, bool clear,
+	    char *anchor_call);
+int	pfctl_add_eth_rule(int dev, const struct pfctl_eth_rule *r,
+	    const char *anchor, const char *anchor_call, uint32_t ticket);
+int	pfctl_get_rules_info(int dev, struct pfctl_rules_info *rules,
+	    uint32_t ruleset, const char *path);
 int	pfctl_get_rule(int dev, uint32_t nr, uint32_t ticket,
 	    const char *anchor, uint32_t ruleset, struct pfctl_rule *rule,
 	    char *anchor_call);
@@ -307,7 +419,18 @@ int	pfctl_clear_states(int dev, const struct pfctl_kill *kill,
 	    unsigned int *killed);
 int	pfctl_kill_states(int dev, const struct pfctl_kill *kill,
 	    unsigned int *killed);
+int	pfctl_clear_rules(int dev, const char *anchorname);
+int	pfctl_clear_nat(int dev, const char *anchorname);
+int	pfctl_clear_eth_rules(int dev, const char *anchorname);
 int	pfctl_set_syncookies(int dev, const struct pfctl_syncookies *s);
 int	pfctl_get_syncookies(int dev, struct pfctl_syncookies *s);
-
+int	pfctl_table_add_addrs(int dev, struct pfr_table *tbl, struct pfr_addr
+	    *addr, int size, int *nadd, int flags);
+int	pfctl_table_del_addrs(int dev, struct pfr_table *tbl, struct pfr_addr
+	    *addr, int size, int *ndel, int flags);
+int     pfctl_table_set_addrs(int dev, struct pfr_table *tbl, struct pfr_addr
+	    *addr, int size, int *size2, int *nadd, int *ndel, int *nchange,
+	    int flags);
+int	pfctl_table_get_addrs(int dev, struct pfr_table *tbl, struct pfr_addr
+	    *addr, int *size, int flags);
 #endif

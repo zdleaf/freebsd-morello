@@ -1,9 +1,8 @@
-/* $FreeBSD$ */
 /*-
  * Generic defines for LSI '909 FC  adapters.
  * FreeBSD Version.
  *
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD AND BSD-3-Clause
+ * SPDX-License-Identifier: BSD-2-Clause AND BSD-3-Clause
  *
  * Copyright (c)  2000, 2001 by Greg Ansley
  *
@@ -805,7 +804,7 @@ mpt_read(struct mpt_softc *mpt, int offset)
 }
 
 /*
- * Some operations (e.g. diagnostic register writes while the ARM proccessor
+ * Some operations (e.g. diagnostic register writes while the ARM processor
  * is disabled), must be performed using "PCI pio" operations.  On non-PCI
  * buses, these operations likely map to normal register accesses.
  */

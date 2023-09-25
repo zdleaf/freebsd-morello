@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2020 Oleksandr Tymoshenko <gonzo@FreeBSD.org>
  *
@@ -23,13 +23,9 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/bus.h>
@@ -200,7 +196,5 @@ static driver_t simple_amp_driver = {
 	sizeof(struct simple_amp_softc),
 };
 
-static devclass_t simple_amp_devclass;
-
-DRIVER_MODULE(simple_amp, simplebus, simple_amp_driver, simple_amp_devclass, 0, 0);
+DRIVER_MODULE(simple_amp, simplebus, simple_amp_driver, 0, 0);
 SIMPLEBUS_PNP_INFO(compat_data);

@@ -23,19 +23,14 @@
 # OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 # SUCH DAMAGE.
 #
-# $FreeBSD$
 #
 
-#ifdef FDT
 #include <sys/types.h>
 #include <dev/ofw/ofw_bus.h>
-#endif
 
 #include <machine/bus.h>
 
 INTERFACE regdev;
-
-#ifdef FDT
 
 HEADER {
 int regdev_default_ofw_map(device_t , phandle_t, int, pcell_t *, intptr_t *);
@@ -52,5 +47,3 @@ METHOD int map {
 	pcell_t		*cells;
 	intptr_t	*id;
 } DEFAULT regdev_default_ofw_map;
-
-#endif

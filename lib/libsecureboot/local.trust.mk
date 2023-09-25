@@ -1,4 +1,3 @@
-# $FreeBSD$
 
 # Consider this file an example.
 #
@@ -36,6 +35,9 @@ VE_SIGNATURE_EXT_LIST+= \
 # add OpenPGP support - possibly dormant
 VE_SIGNATURE_LIST+= OPENPGP
 VE_SIGNATURE_EXT_LIST+= asc
+
+# allow site override of all the above
+.-include "site.trust.mk"
 
 SIGNER ?= ${SB_TOOLS_PATH:U/volume/buildtools/bin}/sign.py
 
@@ -109,7 +111,7 @@ ta.h: vc_rsa.pem
 TRUST_ANCHORS!= cd ${.CURDIR} && 'ls' -1 *.pem t*.asc 2> /dev/null
 .endif
 .if empty(TRUST_ANCHORS) && ${MK_LOADER_EFI_SECUREBOOT} != "yes"
-.error Need TRUST_ANCHORS see ${.CURDIR}/README.rst
+.error Need TRUST_ANCHORS see ${.PARSEDIR}/README.rst
 .endif
 .if ${TRUST_ANCHORS:T:Mt*.pem} != ""
 ta.h: ${TRUST_ANCHORS:M*.pem}

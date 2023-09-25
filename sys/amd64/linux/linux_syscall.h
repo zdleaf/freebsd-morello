@@ -2,11 +2,10 @@
  * System call numbers.
  *
  * DO NOT EDIT-- this file is automatically @generated.
- * $FreeBSD$
  */
 
 #define	LINUX_SYS_read	0
-#define	LINUX_SYS_write	1
+#define	LINUX_SYS_linux_write	1
 #define	LINUX_SYS_linux_open	2
 #define	LINUX_SYS_close	3
 #define	LINUX_SYS_linux_newstat	4
@@ -25,7 +24,7 @@
 #define	LINUX_SYS_linux_pread	17
 #define	LINUX_SYS_linux_pwrite	18
 #define	LINUX_SYS_readv	19
-#define	LINUX_SYS_writev	20
+#define	LINUX_SYS_linux_writev	20
 #define	LINUX_SYS_linux_access	21
 #define	LINUX_SYS_linux_pipe	22
 #define	LINUX_SYS_linux_select	23
@@ -70,7 +69,7 @@
 #define	LINUX_SYS_linux_kill	62
 #define	LINUX_SYS_linux_newuname	63
 #define	LINUX_SYS_linux_semget	64
-#define	LINUX_SYS_linux_semop	65
+#define	LINUX_SYS_semop	65
 #define	LINUX_SYS_linux_semctl	66
 #define	LINUX_SYS_linux_shmdt	67
 #define	LINUX_SYS_linux_msgget	68

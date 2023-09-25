@@ -36,8 +36,6 @@
 static char sccsid[] = "@(#)tmpfile.c	8.1 (Berkeley) 6/4/93";
 #endif /* LIBC_SCCS and not lint */
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include "namespace.h"
 #include <sys/types.h>
 #include <signal.h>
@@ -60,9 +58,7 @@ tmpfile(void)
 	char *buf;
 	const char *tmpdir;
 
-	tmpdir = NULL;
-	if (issetugid() == 0)
-		tmpdir = getenv("TMPDIR");
+	tmpdir = secure_getenv("TMPDIR");
 	if (tmpdir == NULL)
 		tmpdir = _PATH_TMP;
 

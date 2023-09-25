@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2019 The FreeBSD Foundation
  *
@@ -26,8 +26,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 extern "C" {
@@ -141,7 +139,6 @@ TEST_F(Destroy, ok)
 	uint64_t ino = 42;
 
 	expect_lookup(RELPATH, ino, S_IFREG | 0644, 0, 2);
-	expect_forget(FUSE_ROOT_ID, 1);
 	expect_forget(ino, 2);
 	expect_destroy(0);
 

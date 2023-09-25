@@ -24,8 +24,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
@@ -264,8 +262,6 @@ ow_temp_detach(device_t dev)
 	return 0;
 }
 
-devclass_t ow_temp_devclass;
-
 static device_method_t ow_temp_methods[] = {
 	/* Device interface */
 	DEVMETHOD(device_probe,		ow_temp_probe),
@@ -280,5 +276,5 @@ static driver_t ow_temp_driver = {
 	sizeof(struct ow_temp_softc),
 };
 
-DRIVER_MODULE(ow_temp, ow, ow_temp_driver, ow_temp_devclass, 0, 0);
+DRIVER_MODULE(ow_temp, ow, ow_temp_driver, 0, 0);
 MODULE_DEPEND(ow_temp, ow, 1, 1, 1);

@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2010-2011 Monthadar Al Jaberi, TerraNet AB
  * All rights reserved.
@@ -27,8 +27,6 @@
  * IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGES.
- *
- * $FreeBSD$
  */
 
 #ifndef _DEV_WTAP_WTAPVAR_H
@@ -134,6 +132,7 @@ struct wtap_softc {
 	int32_t			id;
 	int32_t			up;
 	struct wtap_medium	*sc_md;		/* interface medium */
+	struct wtap_hal		*hal;
 	struct ieee80211_node*	(* sc_node_alloc)
 	    (struct ieee80211vap *, const uint8_t [IEEE80211_ADDR_LEN]);
 	void (*sc_node_free)(struct ieee80211_node *);

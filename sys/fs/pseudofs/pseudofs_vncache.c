@@ -1,7 +1,7 @@
 /*-
  * SPDX-License-Identifier: BSD-3-Clause
  *
- * Copyright (c) 2001 Dag-Erling Coïdan Smørgrav
+ * Copyright (c) 2001 Dag-Erling Smørgrav
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -29,8 +29,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include "opt_pseudofs.h"
 
 #include <sys/param.h>
@@ -207,6 +205,7 @@ alloc:
 		*vpp = NULLVP;
 		return (error);
 	}
+	vn_set_state(*vpp, VSTATE_CONSTRUCTED);
 retry2:
 	mtx_lock(&pfs_vncache_mutex);
 	/*
@@ -218,9 +217,9 @@ retry2:
 		if (pvd2->pvd_pn == pn && pvd2->pvd_pid == pid &&
 		    pvd2->pvd_vnode->v_mount == mp) {
 			vp = pvd2->pvd_vnode;
-			VI_LOCK(vp);
+			vs = vget_prep(vp);
 			mtx_unlock(&pfs_vncache_mutex);
-			if (vget(vp, LK_EXCLUSIVE | LK_INTERLOCK) == 0) {
+			if (vget_finish(vp, LK_EXCLUSIVE, vs) == 0) {
 				++pfs_vncache_hits;
 				vgone(*vpp);
 				vput(*vpp);

@@ -22,8 +22,6 @@
  * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 #ifndef _LINUXKPI_LINUX_MM_TYPES_H_
@@ -45,6 +43,7 @@ struct mm_struct {
 	atomic_t mm_count;
 	atomic_t mm_users;
 	size_t pinned_vm;
+	/* Renamed to mmap_lock in v5.8 */
 	struct rw_semaphore mmap_sem;
 };
 

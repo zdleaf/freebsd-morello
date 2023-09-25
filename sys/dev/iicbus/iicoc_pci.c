@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2003-2012 Broadcom Corporation
  * All rights reserved.
@@ -27,8 +27,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
@@ -68,11 +66,9 @@ iicoc_detach(device_t dev)
 static int
 iicoc_attach(device_t dev)
 {
-	int bus;
 	struct iicoc_softc *sc;
 
 	sc = device_get_softc(dev);
-	bus = device_get_unit(dev);
 
 	sc->dev = dev;
 	mtx_init(&sc->sc_mtx, "iicoc", "iicoc", MTX_DEF);
@@ -140,4 +136,4 @@ static driver_t iicoc_driver = {
 	sizeof(struct iicoc_softc),
 };
 
-DRIVER_MODULE(iicoc, pci, iicoc_driver, iicoc_devclass, 0, 0);
+DRIVER_MODULE(iicoc, pci, iicoc_driver, 0, 0);

@@ -25,8 +25,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include "opt_acpi.h"
 #include <sys/param.h>
 #include <sys/kernel.h>
@@ -104,10 +102,7 @@ static driver_t	acpi_sony_driver = {
 	sizeof(struct acpi_sony_softc),
 };
 
-static devclass_t acpi_sony_devclass;
-
-DRIVER_MODULE(acpi_sony, acpi, acpi_sony_driver, acpi_sony_devclass,
-	      0, 0);
+DRIVER_MODULE(acpi_sony, acpi, acpi_sony_driver, 0, 0);
 MODULE_DEPEND(acpi_sony, acpi, 1, 1, 1);
 static char    *sny_id[] = {"SNY5001", NULL};
 

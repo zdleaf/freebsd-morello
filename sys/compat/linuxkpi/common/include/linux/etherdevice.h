@@ -21,13 +21,12 @@
  * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 #ifndef _LINUXKPI_LINUX_ETHERDEVICE_H_
 #define	_LINUXKPI_LINUX_ETHERDEVICE_H_
 
 #include <linux/types.h>
+#include <linux/device.h>
 
 #include <sys/random.h>
 #include <sys/libkern.h>
@@ -107,12 +106,27 @@ eth_zero_addr(u8 *pa)
 }
 
 static inline void
-random_ether_addr(u8 * dst)
+random_ether_addr(u8 *dst)
 {
 	arc4random_buf(dst, 6);
 
 	dst[0] &= 0xfe;
 	dst[0] |= 0x02;
+}
+
+static inline void
+eth_random_addr(u8 *dst)
+{
+
+	random_ether_addr(dst);
+}
+
+static inline int
+device_get_mac_address(struct device *dev, char *dst)
+{
+
+	/* XXX get mac address from FDT? */
+	return (-ENOENT);
 }
 
 #endif					/* _LINUXKPI_LINUX_ETHERDEVICE_H_ */

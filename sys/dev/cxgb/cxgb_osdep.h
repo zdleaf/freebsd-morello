@@ -1,5 +1,5 @@
 /**************************************************************************
-SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+SPDX-License-Identifier: BSD-2-Clause
 
 Copyright (c) 2007, Chelsio Inc.
 All rights reserved.
@@ -25,9 +25,6 @@ INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
 CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
 ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 POSSIBILITY OF SUCH DAMAGE.
-
-
-$FreeBSD$
 
 ***************************************************************************/
 
@@ -123,8 +120,8 @@ static const int debug_flags = DBG_RX;
 
 #include <sys/syslog.h>
 
-#define promisc_rx_mode(rm)  ((rm)->port->ifp->if_flags & IFF_PROMISC) 
-#define allmulti_rx_mode(rm) ((rm)->port->ifp->if_flags & IFF_ALLMULTI) 
+#define promisc_rx_mode(rm)  (if_getflags((rm)->port->ifp) & IFF_PROMISC)
+#define allmulti_rx_mode(rm) (if_getflags((rm)->port->ifp) & IFF_ALLMULTI)
 
 #define CH_ERR(adap, fmt, ...) log(LOG_ERR, fmt, ##__VA_ARGS__)
 #define CH_WARN(adap, fmt, ...)	log(LOG_WARNING, fmt, ##__VA_ARGS__)

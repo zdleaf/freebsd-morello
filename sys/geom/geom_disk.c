@@ -36,8 +36,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include "opt_geom.h"
 
 #include <sys/param.h>
@@ -71,6 +69,7 @@ struct g_disk_softc {
 	char			led[64];
 	uint32_t		state;
 	struct mtx		 done_mtx;
+	bool                    flush_notsup_succeed;
 };
 
 static g_access_t g_disk_access;
@@ -539,7 +538,7 @@ g_disk_start(struct bio *bp)
 		g_trace(G_T_BIO, "g_disk_flushcache(%s)",
 		    bp->bio_to->name);
 		if (!(dp->d_flags & DISKFLAG_CANFLUSHCACHE)) {
-			error = EOPNOTSUPP;
+			error = (sc->flush_notsup_succeed) ? 0 : EOPNOTSUPP;
 			break;
 		}
 		/*FALLTHROUGH*/
@@ -721,6 +720,11 @@ g_disk_create(void *arg, int flag)
 	sc = g_malloc(sizeof(*sc), M_WAITOK | M_ZERO);
 	mtx_init(&sc->done_mtx, "g_disk_done", NULL, MTX_DEF);
 	sc->dp = dp;
+	if (dp->d_devstat == NULL) {
+		dp->d_devstat = devstat_new_entry(dp->d_name, dp->d_unit,
+		    dp->d_sectorsize, DEVSTAT_ALL_SUPPORTED,
+		    DEVSTAT_TYPE_DIRECT, DEVSTAT_PRIORITY_MAX);
+	}
 	sc->d_devstat = dp->d_devstat;
 	gp = g_new_geomf(&g_disk_class, "%s%d", dp->d_name, dp->d_unit);
 	gp->softc = sc;
@@ -755,6 +759,10 @@ g_disk_create(void *arg, int flag)
 		    SYSCTL_CHILDREN(sc->sysctl_tree), OID_AUTO, "flags",
 		    CTLTYPE_STRING | CTLFLAG_RD | CTLFLAG_MPSAFE, dp, 0,
 		    g_disk_sysctl_flags, "A", "Report disk flags");
+		SYSCTL_ADD_BOOL(&sc->sysctl_ctx,
+		    SYSCTL_CHILDREN(sc->sysctl_tree), OID_AUTO, "flush_notsup_succeed",
+		    CTLFLAG_RWTUN, &sc->flush_notsup_succeed, sizeof(sc->flush_notsup_succeed),
+		    "Do not return EOPNOTSUPP if there is no cache to flush");
 	}
 	pp->private = sc;
 	dp->d_geom = gp;
@@ -862,6 +870,9 @@ disk_alloc(void)
 
 	dp = g_malloc(sizeof(struct disk), M_WAITOK | M_ZERO);
 	LIST_INIT(&dp->d_aliases);
+	dp->d_init_level = DISK_INIT_NONE;
+	dp->d_cevent = g_alloc_event(M_WAITOK);
+	dp->d_devent = g_alloc_event(M_WAITOK);
 	return (dp);
 }
 
@@ -888,31 +899,40 @@ disk_create(struct disk *dp, int version)
 	KASSERT(dp->d_name != NULL, ("disk_create need d_name"));
 	KASSERT(*dp->d_name != 0, ("disk_create need d_name"));
 	KASSERT(strlen(dp->d_name) < SPECNAMELEN - 4, ("disk name too long"));
-	if (dp->d_devstat == NULL)
-		dp->d_devstat = devstat_new_entry(dp->d_name, dp->d_unit,
-		    dp->d_sectorsize, DEVSTAT_ALL_SUPPORTED,
-		    DEVSTAT_TYPE_DIRECT, DEVSTAT_PRIORITY_MAX);
-	dp->d_geom = NULL;
-	dp->d_event = g_alloc_event(M_WAITOK);
-
-	dp->d_init_level = DISK_INIT_NONE;
-
 	g_disk_ident_adjust(dp->d_ident, sizeof(dp->d_ident));
-	g_post_event(g_disk_create, dp, M_WAITOK, dp, NULL);
+
+	dp->d_init_level = DISK_INIT_CREATE;
+
+	KASSERT(dp->d_cevent != NULL,
+	    ("Disk create for %p with event NULL", dp));
+	g_post_event_ep(g_disk_create, dp, dp->d_cevent, dp, NULL);
 }
 
 void
 disk_destroy(struct disk *dp)
 {
+	struct disk_alias *dap, *daptmp;
 
-	KASSERT(dp->d_event != NULL,
+	/* If disk_create() was never called, just free the resources. */
+	if (dp->d_init_level < DISK_INIT_CREATE) {
+		if (dp->d_devstat != NULL)
+			devstat_remove_entry(dp->d_devstat);
+		LIST_FOREACH_SAFE(dap, &dp->d_aliases, da_next, daptmp)
+			g_free(dap);
+		g_free(dp->d_cevent);
+		g_free(dp->d_devent);
+		g_free(dp);
+		return;
+	}
+
+	KASSERT(dp->d_devent != NULL,
 	    ("Disk destroy for %p with event NULL", dp));
 	disk_gone(dp);
 	dp->d_destroyed = 1;
 	g_cancel_event(dp);
 	if (dp->d_devstat != NULL)
 		devstat_remove_entry(dp->d_devstat);
-	g_post_event_ep(g_disk_destroy, dp, dp->d_event, NULL);
+	g_post_event_ep(g_disk_destroy, dp, dp->d_devent, NULL);
 }
 
 void
@@ -979,14 +999,14 @@ disk_gone(struct disk *dp)
 void
 disk_attr_changed(struct disk *dp, const char *attr, int flag)
 {
-	struct g_geom *gp;
+	struct g_geom *gp = dp->d_geom;
 	struct g_provider *pp;
 	char devnamebuf[128];
 
-	gp = dp->d_geom;
-	if (gp != NULL)
-		LIST_FOREACH(pp, &gp->provider, provider)
-			(void)g_attr_changed(pp, attr, flag);
+	if (gp == NULL)
+		return;
+	LIST_FOREACH(pp, &gp->provider, provider)
+		(void)g_attr_changed(pp, attr, flag);
 	snprintf(devnamebuf, sizeof(devnamebuf), "devname=%s%d", dp->d_name,
 	    dp->d_unit);
 	devctl_notify("GEOM", "disk", attr, devnamebuf);
@@ -995,34 +1015,32 @@ disk_attr_changed(struct disk *dp, const char *attr, int flag)
 void
 disk_media_changed(struct disk *dp, int flag)
 {
-	struct g_geom *gp;
+	struct g_geom *gp = dp->d_geom;
 	struct g_provider *pp;
 
-	gp = dp->d_geom;
-	if (gp != NULL) {
-		pp = LIST_FIRST(&gp->provider);
-		if (pp != NULL) {
-			KASSERT(LIST_NEXT(pp, provider) == NULL,
-			    ("geom %p has more than one provider", gp));
-			g_media_changed(pp, flag);
-		}
+	if (gp == NULL)
+		return;
+	pp = LIST_FIRST(&gp->provider);
+	if (pp != NULL) {
+		KASSERT(LIST_NEXT(pp, provider) == NULL,
+		    ("geom %p has more than one provider", gp));
+		g_media_changed(pp, flag);
 	}
 }
 
 void
 disk_media_gone(struct disk *dp, int flag)
 {
-	struct g_geom *gp;
+	struct g_geom *gp = dp->d_geom;
 	struct g_provider *pp;
 
-	gp = dp->d_geom;
-	if (gp != NULL) {
-		pp = LIST_FIRST(&gp->provider);
-		if (pp != NULL) {
-			KASSERT(LIST_NEXT(pp, provider) == NULL,
-			    ("geom %p has more than one provider", gp));
-			g_media_gone(pp, flag);
-		}
+	if (gp == NULL)
+		return;
+	pp = LIST_FIRST(&gp->provider);
+	if (pp != NULL) {
+		KASSERT(LIST_NEXT(pp, provider) == NULL,
+		    ("geom %p has more than one provider", gp));
+		g_media_gone(pp, flag);
 	}
 }
 

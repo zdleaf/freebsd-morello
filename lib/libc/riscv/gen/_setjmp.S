@@ -33,8 +33,6 @@
  */
 
 #include <machine/asm.h>
-__FBSDID("$FreeBSD$");
-
 #include <machine/setjmp.h>
 
 ENTRY(_setjmp)
@@ -131,6 +129,9 @@ ENTRY(_longjmp)
 
 	/* Load the return value */
 	mv	a0, a1
+	bnez	a1, 1f
+	li	a0, 1
+1:
 	ret
 
 botch:

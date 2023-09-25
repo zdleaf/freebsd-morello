@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2003 Mathew Kanner
  * Copyright (c) 1993 Hannu Savolainen
@@ -32,8 +32,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/ioccom.h>
@@ -1092,7 +1090,7 @@ mseq_write(struct cdev *i_dev, struct uio *uio, int ioflag)
 				/*
 			         * For now, try to make midimoutain work by
 			         * forcing these events to be processed
-				 * immediatly.
+				 * immediately.
 			         */
 				seq_processevent(scp, event);
 			} else

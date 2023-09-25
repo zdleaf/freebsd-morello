@@ -37,8 +37,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #ifdef _KERNEL
 #include "opt_ddb.h"
 #include "opt_printf.h"
@@ -58,6 +56,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/proc.h>
 #include <sys/stddef.h>
 #include <sys/sysctl.h>
+#include <sys/tslog.h>
 #include <sys/tty.h>
 #include <sys/syslog.h>
 #include <sys/cons.h>
@@ -1037,6 +1036,7 @@ msgbufinit(void *ptr, int size)
 	static struct msgbuf *oldp = NULL;
 	bool print_boot_tag;
 
+	TSENTER();
 	size -= sizeof(*msgbufp);
 	cp = (char *)ptr;
 	print_boot_tag = !msgbufmapped;
@@ -1052,15 +1052,17 @@ msgbufinit(void *ptr, int size)
 	if (print_boot_tag && *current_boot_tag != '\0')
 		printf("%s\n", current_boot_tag);
 	oldp = msgbufp;
+	TSEXIT();
 }
 
 /* Sysctls for accessing/clearing the msgbuf */
 static int
 sysctl_kern_msgbuf(SYSCTL_HANDLER_ARGS)
 {
-	char buf[128];
+	char buf[128], *bp;
 	u_int seq;
 	int error, len;
+	bool wrap;
 
 	error = priv_check(req->td, PRIV_MSGBUF);
 	if (error)
@@ -1069,13 +1071,29 @@ sysctl_kern_msgbuf(SYSCTL_HANDLER_ARGS)
 	/* Read the whole buffer, one chunk at a time. */
 	mtx_lock(&msgbuf_lock);
 	msgbuf_peekbytes(msgbufp, NULL, 0, &seq);
+	wrap = (seq != 0);
 	for (;;) {
 		len = msgbuf_peekbytes(msgbufp, buf, sizeof(buf), &seq);
 		mtx_unlock(&msgbuf_lock);
 		if (len == 0)
 			return (SYSCTL_OUT(req, "", 1)); /* add nulterm */
-
-		error = sysctl_handle_opaque(oidp, buf, len, req);
+		if (wrap) {
+			/* Skip the first line, as it is probably incomplete. */
+			bp = memchr(buf, '\n', len);
+			if (bp == NULL) {
+				mtx_lock(&msgbuf_lock);
+				continue;
+			}
+			wrap = false;
+			bp++;
+			len -= bp - buf;
+			if (len == 0) {
+				mtx_lock(&msgbuf_lock);
+				continue;
+			}
+		} else
+			bp = buf;
+		error = sysctl_handle_opaque(oidp, bp, len, req);
 		if (error)
 			return (error);
 
@@ -1110,7 +1128,7 @@ SYSCTL_PROC(_kern, OID_AUTO, msgbuf_clear,
 
 #ifdef DDB
 
-DB_SHOW_COMMAND(msgbuf, db_show_msgbuf)
+DB_SHOW_COMMAND_FLAGS(msgbuf, db_show_msgbuf, DB_CMD_MEMSAFE)
 {
 	int i, j;
 

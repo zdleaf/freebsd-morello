@@ -2,7 +2,6 @@
  * System call names.
  *
  * DO NOT EDIT-- this file is automatically @generated.
- * $FreeBSD$
  */
 
 const char *linux32_syscallnames[] = {
@@ -11,7 +10,7 @@ const char *linux32_syscallnames[] = {
 	"linux_exit",			/* 1 = linux_exit */
 	"linux_fork",			/* 2 = linux_fork */
 	"read",			/* 3 = read */
-	"write",			/* 4 = write */
+	"linux_write",			/* 4 = linux_write */
 	"linux_open",			/* 5 = linux_open */
 	"close",			/* 6 = close */
 	"linux_waitpid",			/* 7 = linux_waitpid */
@@ -448,7 +447,7 @@ const char *linux32_syscallnames[] = {
 	"linux_pidfd_getfd",			/* 438 = linux_pidfd_getfd */
 	"linux_faccessat2",			/* 439 = linux_faccessat2 */
 	"linux_process_madvise",			/* 440 = linux_process_madvise */
-	"linux_epoll_pwait2",			/* 441 = linux_epoll_pwait2 */
+	"linux_epoll_pwait2_64",			/* 441 = linux_epoll_pwait2_64 */
 	"linux_mount_setattr",			/* 442 = linux_mount_setattr */
 	"#443",			/* 443 = nosys */
 };

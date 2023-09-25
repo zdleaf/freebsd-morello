@@ -22,8 +22,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 #ifndef _DEV_OFW_OFWPCI_H_
@@ -78,6 +76,7 @@ struct ofw_pci_softc {
 };
 
 int ofw_pcib_init(device_t);
+void ofw_pcib_fini(device_t);
 int ofw_pcib_attach(device_t);
 int ofw_pcib_read_ivar(device_t, device_t, int, uintptr_t *);
 int ofw_pcib_write_ivar(device_t, device_t, int, uintptr_t);

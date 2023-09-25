@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2006, Myricom Inc.
  * Copyright (c) 2008, Intel Corporation.
@@ -26,14 +26,15 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 #ifndef _TCP_LRO_H_
 #define _TCP_LRO_H_
 
 #include <sys/time.h>
+#include <sys/param.h>
+
+#include <netinet/in.h>
 
 #ifndef TCP_LRO_ENTRIES
 /* Define default number of LRO entries per RX queue */
@@ -42,20 +43,20 @@
 
 /*
  * Flags for ACK entry for compression
- * the bottom 8 bits has the th_flags.
+ * the bottom 12 bits has the th_x2|th_flags.
  * LRO itself adds only the TSTMP flags
  * to indicate if either of the types
  * of timestamps are filled and the
  * HAS_TSTMP option to indicate if the
  * TCP timestamp option is valid.
  *
- * The other 5 flag bits are for processing
+ * The other 1 flag bits are for processing
  * by a stack.
  *
  */
-#define TSTMP_LRO		0x0100
-#define TSTMP_HDWR		0x0200
-#define HAS_TSTMP		0x0400
+#define TSTMP_LRO		0x1000
+#define TSTMP_HDWR		0x2000
+#define HAS_TSTMP		0x4000
 /*
  * Default number of interrupts on the same cpu in a row
  * that will cause us to declare a "affinity cpu".
@@ -64,8 +65,12 @@
 
 struct inpcb;
 
+/* Precompute the LRO_RAW_ADDRESS_MAX value: */
+#define	LRO_RAW_ADDRESS_MAX \
+	howmany(12 + 2 * sizeof(struct in6_addr), sizeof(u_long))
+
 union lro_address {
-	u_long raw[1];
+	u_long raw[LRO_RAW_ADDRESS_MAX];
 	struct {
 		uint8_t lro_type;	/* internal */
 #define	LRO_TYPE_NONE     0
@@ -80,26 +85,18 @@ union lro_address {
 		uint16_t d_port;	/* destination TCP/UDP port */
 		uint32_t vxlan_vni;	/* VXLAN virtual network identifier */
 		union {
-#ifdef INET
 			struct in_addr v4;
-#endif
-#ifdef INET6
 			struct in6_addr v6;
-#endif
 		} s_addr;	/* source IPv4/IPv6 address */
 		union {
-#ifdef INET
 			struct in_addr v4;
-#endif
-#ifdef INET6
 			struct in6_addr v6;
-#endif
 		} d_addr;	/* destination IPv4/IPv6 address */
 	};
-} __aligned(sizeof(u_long));
+};
 
-#define	LRO_RAW_ADDRESS_MAX \
-    (sizeof(union lro_address) / sizeof(u_long))
+_Static_assert(sizeof(union lro_address) == sizeof(u_long) * LRO_RAW_ADDRESS_MAX,
+    "The raw field in the lro_address union does not cover the whole structure.");
 
 /* Optimize address comparison by comparing one unsigned long at a time: */
 
@@ -146,9 +143,10 @@ struct lro_entry {
 	uint16_t		compressed;
 	uint16_t		uncompressed;
 	uint16_t		window;
-	uint8_t			flags;
-	uint8_t			timestamp : 1;
-	uint8_t			needs_merge : 1;
+	uint16_t		flags : 12,	/* 12 TCP header bits */
+				timestamp : 1,
+				needs_merge : 1,
+				reserved : 2;	/* unused */
 	struct bintime		alloc_time;	/* time when entry was allocated */
 };
 

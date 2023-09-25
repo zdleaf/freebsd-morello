@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (C) 2002 Benno Rice.
  * All rights reserved.
@@ -26,8 +26,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/module.h>
@@ -97,12 +95,9 @@ static device_method_t	uninorth_methods[] = {
 	DEVMETHOD_END
 };
 
-static devclass_t	uninorth_devclass;
-
 DEFINE_CLASS_1(pcib, uninorth_driver, uninorth_methods,
     sizeof(struct uninorth_softc), ofw_pcib_driver);
-EARLY_DRIVER_MODULE(uninorth, ofwbus, uninorth_driver, uninorth_devclass, 0, 0,
-    BUS_PASS_BUS);
+EARLY_DRIVER_MODULE(uninorth, ofwbus, uninorth_driver, 0, 0, BUS_PASS_BUS);
 
 static int
 uninorth_probe(device_t dev)

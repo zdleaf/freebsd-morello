@@ -27,16 +27,11 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 #include "defs.h"
 #include "pathnames.h"
 #include <sys/stat.h>
-
-__RCSID("$FreeBSD$");
-
 
 static struct parm *parms;
 struct intnet *intnets;
@@ -1019,7 +1014,7 @@ gethost(char *name,
 	 * might be sick because routing is.
 	 */
 	if (inet_aton(name, &in) == 1) {
-		/* get a good number, but check that it it makes some
+		/* get a good number, but check that it makes some
 		 * sense.
 		 */
 		if (ntohl(in.s_addr)>>24 == 0

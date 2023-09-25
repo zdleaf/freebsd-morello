@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2019 Axiado Corporation
  * All rights reserved.
@@ -30,8 +30,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/bus.h>
@@ -313,6 +311,4 @@ static driver_t feaon_driver = {
 	sizeof(struct feaon_softc)
 };
 
-static devclass_t feaon_devclass;
-
-DRIVER_MODULE(fe310aon, simplebus, feaon_driver, feaon_devclass, 0, 0);
+DRIVER_MODULE(fe310aon, simplebus, feaon_driver, 0, 0);

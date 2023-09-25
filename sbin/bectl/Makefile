@@ -1,8 +1,7 @@
-# $FreeBSD$
 
 .include <src.opts.mk>
 
-PACKAGE=runtime
+PACKAGE=zfs
 PROG=	bectl
 MAN=	bectl.8
 

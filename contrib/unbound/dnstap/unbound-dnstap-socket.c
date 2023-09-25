@@ -272,7 +272,7 @@ static int make_tcp_accept(char* ip)
 
 	memset(&addr, 0, sizeof(addr));
 	len = (socklen_t)sizeof(addr);
-	if(!extstrtoaddr(ip, &addr, &len)) {
+	if(!extstrtoaddr(ip, &addr, &len, UNBOUND_DNS_PORT)) {
 		log_err("could not parse IP '%s'", ip);
 		return -1;
 	}
@@ -617,7 +617,7 @@ static void log_data_frame(uint8_t* pkt, size_t len)
 static ssize_t receive_bytes(struct tap_data* data, int fd, void* buf,
 	size_t len)
 {
-	ssize_t ret = recv(fd, buf, len, 0);
+	ssize_t ret = recv(fd, buf, len, MSG_DONTWAIT);
 	if(ret == 0) {
 		/* closed */
 		if(verbosity) log_info("dnstap client stream closed from %s",
@@ -1413,11 +1413,12 @@ void worker_sighandler(int ATTR_UNUSED(sig), void* ATTR_UNUSED(arg))
 struct outbound_entry* worker_send_query(
 	struct query_info* ATTR_UNUSED(qinfo), uint16_t ATTR_UNUSED(flags),
 	int ATTR_UNUSED(dnssec), int ATTR_UNUSED(want_dnssec),
-	int ATTR_UNUSED(nocaps), struct sockaddr_storage* ATTR_UNUSED(addr),
+	int ATTR_UNUSED(nocaps), int ATTR_UNUSED(check_ratelimit),
+	struct sockaddr_storage* ATTR_UNUSED(addr),
 	socklen_t ATTR_UNUSED(addrlen), uint8_t* ATTR_UNUSED(zone),
 	size_t ATTR_UNUSED(zonelen), int ATTR_UNUSED(tcp_upstream),
 	int ATTR_UNUSED(ssl_upstream), char* ATTR_UNUSED(tls_auth_name),
-	struct module_qstate* ATTR_UNUSED(q))
+	struct module_qstate* ATTR_UNUSED(q), int* ATTR_UNUSED(was_ratelimited))
 {
 	log_assert(0);
 	return 0;
@@ -1446,11 +1447,12 @@ worker_alloc_cleanup(void* ATTR_UNUSED(arg))
 struct outbound_entry* libworker_send_query(
 	struct query_info* ATTR_UNUSED(qinfo), uint16_t ATTR_UNUSED(flags),
 	int ATTR_UNUSED(dnssec), int ATTR_UNUSED(want_dnssec),
-	int ATTR_UNUSED(nocaps), struct sockaddr_storage* ATTR_UNUSED(addr),
+	int ATTR_UNUSED(nocaps), int ATTR_UNUSED(check_ratelimit),
+	struct sockaddr_storage* ATTR_UNUSED(addr),
 	socklen_t ATTR_UNUSED(addrlen), uint8_t* ATTR_UNUSED(zone),
 	size_t ATTR_UNUSED(zonelen), int ATTR_UNUSED(tcp_upstream),
 	int ATTR_UNUSED(ssl_upstream), char* ATTR_UNUSED(tls_auth_name),
-	struct module_qstate* ATTR_UNUSED(q))
+	struct module_qstate* ATTR_UNUSED(q), int* ATTR_UNUSED(was_ratelimited))
 {
 	log_assert(0);
 	return 0;

@@ -1,7 +1,7 @@
 /*-
  * SPDX-License-Identifier: BSD-3-Clause
  *
- * Copyright (c) 2001 Dag-Erling Coïdan Smørgrav
+ * Copyright (c) 2001 Dag-Erling Smørgrav
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -26,8 +26,6 @@
  * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- *
- *      $FreeBSD$
  */
 
 #ifndef _PSEUDOFS_INTERNAL_H_INCLUDED
@@ -156,9 +154,10 @@ pn_vis(PFS_VIS_ARGS)
 {
 
 	PFS_TRACE(("%s", pn->pn_name));
-	KASSERT(pn->pn_vis != NULL, ("%s(): no callback", __func__));
-	KASSERT(p != NULL, ("%s(): no process", __func__));
-	PROC_LOCK_ASSERT(p, MA_OWNED);
+	if (pn->pn_vis == NULL)
+		return (1);
+	if (p != NULL)
+		PROC_LOCK_ASSERT(p, MA_OWNED);
 	pfs_assert_not_owned(pn);
 	return ((pn->pn_vis)(PFS_VIS_ARGNAMES));
 }

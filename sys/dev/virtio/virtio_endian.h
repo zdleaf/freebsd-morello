@@ -24,8 +24,6 @@
  * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 #ifndef _VIRTIO_ENDIAN_H_
@@ -42,20 +40,10 @@
  * and the Host's (device's) endianness when needed.
  */
 
-static inline bool
-virtio_swap_endian(bool modern)
-{
-#if _BYTE_ORDER == _LITTLE_ENDIAN
-	return (false);
-#else
-	return (modern);
-#endif
-}
-
 static inline uint16_t
 virtio_htog16(bool modern, uint16_t val)
 {
-	if (virtio_swap_endian(modern))
+	if (modern)
 		return (le16toh(val));
 	else
 		return (val);
@@ -64,7 +52,7 @@ virtio_htog16(bool modern, uint16_t val)
 static inline uint16_t
 virtio_gtoh16(bool modern, uint16_t val)
 {
-	if (virtio_swap_endian(modern))
+	if (modern)
 		return (htole16(val));
 	else
 		return (val);
@@ -73,7 +61,7 @@ virtio_gtoh16(bool modern, uint16_t val)
 static inline uint32_t
 virtio_htog32(bool modern, uint32_t val)
 {
-	if (virtio_swap_endian(modern))
+	if (modern)
 		return (le32toh(val));
 	else
 		return (val);
@@ -82,7 +70,7 @@ virtio_htog32(bool modern, uint32_t val)
 static inline uint32_t
 virtio_gtoh32(bool modern, uint32_t val)
 {
-	if (virtio_swap_endian(modern))
+	if (modern)
 		return (htole32(val));
 	else
 		return (val);
@@ -91,7 +79,7 @@ virtio_gtoh32(bool modern, uint32_t val)
 static inline uint64_t
 virtio_htog64(bool modern, uint64_t val)
 {
-	if (virtio_swap_endian(modern))
+	if (modern)
 		return (le64toh(val));
 	else
 		return (val);
@@ -100,7 +88,7 @@ virtio_htog64(bool modern, uint64_t val)
 static inline uint64_t
 virtio_gtoh64(bool modern, uint64_t val)
 {
-	if (virtio_swap_endian(modern))
+	if (modern)
 		return (htole64(val));
 	else
 		return (val);

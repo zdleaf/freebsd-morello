@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2012 Andreas Tobler
  *
@@ -26,8 +26,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/bus.h>
 #include <sys/systm.h>
@@ -113,9 +111,7 @@ static driver_t ds1631_driver = {
 	sizeof(struct ds1631_softc)
 };
 
-static devclass_t ds1631_devclass;
-
-DRIVER_MODULE(ds1631, iicbus, ds1631_driver, ds1631_devclass, 0, 0);
+DRIVER_MODULE(ds1631, iicbus, ds1631_driver, 0, 0);
 
 static int
 ds1631_write(device_t dev, uint32_t addr, uint8_t reg, uint8_t *buff, int len)

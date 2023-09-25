@@ -25,8 +25,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 /*
@@ -120,7 +118,7 @@ struct e6060sw_softc {
 	int		*portphy;
 	char		**ifname;
 	device_t	**miibus;
-	struct ifnet	**ifp;
+	if_t *ifp;
 	struct callout	callout_tick;
 	etherswitch_info_t	info;
 	int		smi_offset;
@@ -150,8 +148,8 @@ struct e6060sw_softc {
 
 static inline int e6060sw_portforphy(struct e6060sw_softc *, int);
 static void e6060sw_tick(void *);
-static int e6060sw_ifmedia_upd(struct ifnet *);
-static void e6060sw_ifmedia_sts(struct ifnet *, struct ifmediareq *);
+static int e6060sw_ifmedia_upd(if_t);
+static void e6060sw_ifmedia_sts(if_t, struct ifmediareq *);
 
 static void e6060sw_setup(device_t dev);
 static int e6060sw_read_vtu(device_t dev, int num, int *data1, int *data2);
@@ -300,7 +298,7 @@ e6060sw_attach(device_t dev)
 
 	e6060sw_setup(dev);
 
-	sc->ifp = malloc(sizeof(struct ifnet *) * sc->numports, M_E6060SW,
+	sc->ifp = malloc(sizeof(if_t) * sc->numports, M_E6060SW,
 	    M_WAITOK | M_ZERO);
 	sc->ifname = malloc(sizeof(char *) * sc->numports, M_E6060SW,
 	    M_WAITOK | M_ZERO);
@@ -383,7 +381,7 @@ e6060sw_miiforport(struct e6060sw_softc *sc, int port)
 	return (device_get_softc(*sc->miibus[port]));
 }
 
-static inline struct ifnet *
+static inline if_t 
 e6060sw_ifpforport(struct e6060sw_softc *sc, int port)
 {
 
@@ -516,7 +514,7 @@ e6060sw_setport(device_t dev, etherswitch_port_t *p)
 	struct e6060sw_softc *sc;
 	struct ifmedia *ifm;
 	struct mii_data *mii;
-	struct ifnet *ifp;
+	if_t ifp;
 	int err;
 	int data;
 
@@ -883,13 +881,13 @@ e6060sw_statchg(device_t dev)
 }
 
 static int
-e6060sw_ifmedia_upd(struct ifnet *ifp)
+e6060sw_ifmedia_upd(if_t ifp)
 {
 	struct e6060sw_softc *sc;
 	struct mii_data *mii;
 
-	sc = ifp->if_softc;
-	mii = e6060sw_miiforport(sc, ifp->if_dunit);
+	sc = if_getsoftc(ifp);
+	mii = e6060sw_miiforport(sc, if_getdunit(ifp));
 
 	DPRINTF(sc->sc_dev, "%s\n", __func__);
 	if (mii == NULL)
@@ -899,13 +897,13 @@ e6060sw_ifmedia_upd(struct ifnet *ifp)
 }
 
 static void
-e6060sw_ifmedia_sts(struct ifnet *ifp, struct ifmediareq *ifmr)
+e6060sw_ifmedia_sts(if_t ifp, struct ifmediareq *ifmr)
 {
 	struct e6060sw_softc *sc;
 	struct mii_data *mii;
 
-	sc = ifp->if_softc;
-	mii = e6060sw_miiforport(sc, ifp->if_dunit);
+	sc = if_getsoftc(ifp);
+	mii = e6060sw_miiforport(sc, if_getdunit(ifp));
 
 	DPRINTF(sc->sc_dev, "%s\n", __func__);
 
@@ -1022,12 +1020,11 @@ static device_method_t e6060sw_methods[] = {
 
 DEFINE_CLASS_0(e6060sw, e6060sw_driver, e6060sw_methods,
     sizeof(struct e6060sw_softc));
-static devclass_t e6060sw_devclass;
 
-DRIVER_MODULE(e6060sw, mdio, e6060sw_driver, e6060sw_devclass, 0, 0);
-DRIVER_MODULE(miibus, e6060sw, miibus_driver, miibus_devclass, 0, 0);
-DRIVER_MODULE(mdio, e6060sw, mdio_driver, mdio_devclass, 0, 0);
-DRIVER_MODULE(etherswitch, e6060sw, etherswitch_driver, etherswitch_devclass, 0, 0);
+DRIVER_MODULE(e6060sw, mdio, e6060sw_driver, 0, 0);
+DRIVER_MODULE(miibus, e6060sw, miibus_driver, 0, 0);
+DRIVER_MODULE(mdio, e6060sw, mdio_driver, 0, 0);
+DRIVER_MODULE(etherswitch, e6060sw, etherswitch_driver, 0, 0);
 MODULE_VERSION(e6060sw, 1);
 MODULE_DEPEND(e6060sw, miibus, 1, 1, 1); /* XXX which versions? */
 MODULE_DEPEND(e6060sw, etherswitch, 1, 1, 1); /* XXX which versions? */

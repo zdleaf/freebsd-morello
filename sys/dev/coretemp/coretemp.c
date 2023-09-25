@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2007, 2008 Rui Paulo <rpaulo@FreeBSD.org>
  * All rights reserved.
@@ -32,8 +32,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/bus.h>
 #include <sys/conf.h>
@@ -53,6 +51,8 @@ __FBSDID("$FreeBSD$");
 
 #define	TZ_ZEROC			2731
 
+#define	THERM_CRITICAL_STATUS_LOG       0x20
+#define	THERM_CRITICAL_STATUS           0x10
 #define	THERM_STATUS_LOG		0x02
 #define	THERM_STATUS			0x01
 #define	THERM_STATUS_TEMP_SHIFT		16
@@ -104,9 +104,7 @@ enum therm_info {
 	CORETEMP_TJMAX,
 };
 
-static devclass_t coretemp_devclass;
-DRIVER_MODULE(coretemp, cpu, coretemp_driver, coretemp_devclass, NULL,
-    NULL);
+DRIVER_MODULE(coretemp, cpu, coretemp_driver, NULL, NULL);
 
 static void
 coretemp_identify(driver_t *driver, device_t parent)
@@ -395,7 +393,7 @@ coretemp_get_val_sysctl(SYSCTL_HANDLER_ARGS)
 		 * If we reach a critical level, allow devctl(4)
 		 * to catch this and shutdown the system.
 		 */
-		if (msr & THERM_STATUS) {
+		if (msr & THERM_CRITICAL_STATUS) {
 			tmp = (msr >> THERM_STATUS_TEMP_SHIFT) &
 			    THERM_STATUS_TEMP_MASK;
 			tmp = (sc->sc_tjmax - tmp) * 10 + TZ_ZEROC;

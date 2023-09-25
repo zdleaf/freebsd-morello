@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2011-2013 Qlogic Corporation
  * All rights reserved.
@@ -25,8 +25,6 @@
  *  CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
  *  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  *  POSSIBILITY OF SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 /*
@@ -146,7 +144,7 @@ struct qla_host {
 	bus_dma_tag_t           parent_tag;
 
 	/* interface to o.s */
-	struct ifnet		*ifp;
+	if_t			ifp;
 
 	struct ifmedia		media;
 	uint16_t		max_frame_size;
@@ -206,7 +204,7 @@ typedef struct qla_host qla_host_t;
 #define QL_MIN(x, y) ((x < y) ? x : y)
 
 #define QL_RUNNING(ifp) \
-		((ifp->if_drv_flags & (IFF_DRV_RUNNING | IFF_DRV_OACTIVE)) == \
+		((if_getdrvflags(ifp) & (IFF_DRV_RUNNING | IFF_DRV_OACTIVE)) == \
 			IFF_DRV_RUNNING)
 
 #endif /* #ifndef _QLA_DEF_H_ */

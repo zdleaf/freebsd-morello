@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2017 Poul-Henning Kamp <phk@FreeBSD.org>
  * All rights reserved.
@@ -28,8 +28,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/bus.h>
@@ -500,13 +498,11 @@ static device_method_t bcm_pwm_methods[] = {
 	DEVMETHOD_END
 };
 
-static devclass_t bcm_pwm_devclass;
-
 static driver_t bcm_pwm_driver = {
 	"pwm",
 	bcm_pwm_methods,
 	sizeof(struct bcm_pwm_softc),
 };
 
-DRIVER_MODULE(bcm2835_pwm, simplebus, bcm_pwm_driver, bcm_pwm_devclass, 0, 0);
+DRIVER_MODULE(bcm2835_pwm, simplebus, bcm_pwm_driver, 0, 0);
 MODULE_DEPEND(bcm2835_pwm, bcm2835_clkman, 1, 1, 1);

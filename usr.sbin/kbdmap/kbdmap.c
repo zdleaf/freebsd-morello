@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2002 Jonathan Belson <jon@witchspace.com>
  * All rights reserved.
@@ -27,8 +27,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/types.h>
 #include <sys/queue.h>
 #include <sys/sysctl.h>
@@ -225,7 +223,7 @@ get_extension(const char *name)
 static char *
 get_font(void)
 {
-	char line[256], buf[20];
+	char line[256], buf[21];
 	char *fnt = NULL;
 
 	FILE *fp = fopen(sysconfig, "r");
@@ -566,7 +564,7 @@ menu_read(void)
 	char *p;
 	int mark, num_keymaps, items, i;
 	char buffer[256], filename[PATH_MAX];
-	char keym[64], lng[64], desc[256];
+	char keym[65], lng[65], desc[257];
 	char dialect[64], lang_abk[64];
 	struct keymap *km;
 	struct keymap **km_sorted;

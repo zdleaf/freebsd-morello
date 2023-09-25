@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 1997 John S. Dyson.  All rights reserved.
  *
@@ -21,8 +21,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/malloc.h>
@@ -52,7 +50,6 @@ __FBSDID("$FreeBSD$");
 #include <sys/socket.h>
 #include <sys/socketvar.h>
 #include <sys/syscall.h>
-#include <sys/sysent.h>
 #include <sys/sysctl.h>
 #include <sys/syslog.h>
 #include <sys/sx.h>
@@ -105,7 +102,7 @@ FEATURE(aio, "Asynchronous I/O");
 SYSCTL_DECL(_p1003_1b);
 
 static MALLOC_DEFINE(M_LIO, "lio", "listio aio control block list");
-static MALLOC_DEFINE(M_AIOS, "aios", "aio_suspend aio control block list");
+static MALLOC_DEFINE(M_AIO, "aio", "structures for asynchronous I/O");
 
 static SYSCTL_NODE(_vfs, OID_AUTO, aio, CTLFLAG_RW | CTLFLAG_MPSAFE, 0,
     "Async IO management");
@@ -340,11 +337,10 @@ static int	filt_lio(struct knote *kn, long hint);
 /*
  * Zones for:
  * 	kaio	Per process async io info
- *	aiop	async io process data
  *	aiocb	async io jobs
  *	aiolio	list io jobs
  */
-static uma_zone_t kaio_zone, aiop_zone, aiocb_zone, aiolio_zone;
+static uma_zone_t kaio_zone, aiocb_zone, aiolio_zone;
 
 /* kqueue filters for aio */
 static struct filterops aio_filtops = {
@@ -413,13 +409,11 @@ aio_onceonly(void)
 	TAILQ_INIT(&aio_jobs);
 	aiod_unr = new_unrhdr(1, INT_MAX, NULL);
 	kaio_zone = uma_zcreate("AIO", sizeof(struct kaioinfo), NULL, NULL,
-	    NULL, NULL, UMA_ALIGN_PTR, UMA_ZONE_NOFREE);
-	aiop_zone = uma_zcreate("AIOP", sizeof(struct aioproc), NULL,
-	    NULL, NULL, NULL, UMA_ALIGN_PTR, UMA_ZONE_NOFREE);
+	    NULL, NULL, UMA_ALIGN_PTR, 0);
 	aiocb_zone = uma_zcreate("AIOCB", sizeof(struct kaiocb), NULL, NULL,
-	    NULL, NULL, UMA_ALIGN_PTR, UMA_ZONE_NOFREE);
+	    NULL, NULL, UMA_ALIGN_PTR, 0);
 	aiolio_zone = uma_zcreate("AIOLIO", sizeof(struct aioliojob), NULL,
-	    NULL, NULL, NULL, UMA_ALIGN_PTR, UMA_ZONE_NOFREE);
+	    NULL, NULL, NULL, UMA_ALIGN_PTR, 0);
 	aiod_lifetime = AIOD_LIFETIME_DEFAULT;
 	jobrefid = 1;
 	p31b_setcfg(CTL_P1003_1B_ASYNCHRONOUS_IO, _POSIX_ASYNCHRONOUS_IO);
@@ -728,7 +722,7 @@ aio_fsync_vnode(struct thread *td, struct vnode *vp, int op)
 	int error;
 
 	for (;;) {
-		error = vn_start_write(vp, &mp, V_WAIT | PCATCH);
+		error = vn_start_write(vp, &mp, V_WAIT | V_PCATCH);
 		if (error != 0)
 			break;
 		vn_lock(vp, LK_EXCLUSIVE | LK_RETRY);
@@ -1092,7 +1086,7 @@ aio_daemon(void *_id)
 	 * Allocate and ready the aio control info.  There is one aiop structure
 	 * per daemon.
 	 */
-	aiop = uma_zalloc(aiop_zone, M_WAITOK);
+	aiop = malloc(sizeof(*aiop), M_AIO, M_WAITOK);
 	aiop->aioproc = p;
 	aiop->aioprocflags = 0;
 
@@ -1158,7 +1152,7 @@ aio_daemon(void *_id)
 	TAILQ_REMOVE(&aio_freeproc, aiop, list);
 	num_aio_procs--;
 	mtx_unlock(&aio_job_mtx);
-	uma_zfree(aiop_zone, aiop);
+	free(aiop, M_AIO);
 	free_unr(aiod_unr, id);
 	vmspace_free(myvm);
 
@@ -1285,7 +1279,7 @@ aio_qbio(struct proc *p, struct kaiocb *job)
 	}
 
 	bios = malloc(sizeof(struct bio *) * iovcnt, M_TEMP, M_WAITOK);
-	atomic_store_int(&job->nbio, iovcnt);
+	refcount_init(&job->nbio, iovcnt);
 	for (i = 0; i < iovcnt; i++) {
 		struct vm_page** pages;
 		struct bio *bp;
@@ -2035,11 +2029,11 @@ sys_aio_suspend(struct thread *td, struct aio_suspend_args *uap)
 	} else
 		tsp = NULL;
 
-	ujoblist = malloc(uap->nent * sizeof(ujoblist[0]), M_AIOS, M_WAITOK);
+	ujoblist = malloc(uap->nent * sizeof(ujoblist[0]), M_AIO, M_WAITOK);
 	error = copyin(uap->aiocbp, ujoblist, uap->nent * sizeof(ujoblist[0]));
 	if (error == 0)
 		error = kern_aio_suspend(td, uap->nent, ujoblist, tsp);
-	free(ujoblist, M_AIOS);
+	free(ujoblist, M_AIO);
 	return (error);
 }
 
@@ -2484,25 +2478,25 @@ aio_biowakeup(struct bio *bp)
 
 	aio_biocleanup(bp);
 
-	nbytes =bcount - resid;
+	nbytes = bcount - resid;
 	atomic_add_acq_long(&job->nbytes, nbytes);
 	nblks = btodb(nbytes);
+
 	/*
 	 * If multiple bios experienced an error, the job will reflect the
 	 * error of whichever failed bio completed last.
 	 */
 	if (flags & BIO_ERROR)
-		atomic_set_int(&job->error, bio_error);
+		atomic_store_int(&job->error, bio_error);
 	if (opcode & LIO_WRITE)
 		atomic_add_int(&job->outblock, nblks);
 	else
 		atomic_add_int(&job->inblock, nblks);
-	atomic_subtract_int(&job->nbio, 1);
 
-
-	if (atomic_load_int(&job->nbio) == 0) {
-		if (atomic_load_int(&job->error))
-			aio_complete(job, -1, job->error);
+	if (refcount_release(&job->nbio)) {
+		bio_error = atomic_load_int(&job->error);
+		if (bio_error != 0)
+			aio_complete(job, -1, bio_error);
 		else
 			aio_complete(job, atomic_load_long(&job->nbytes), 0);
 	}
@@ -2723,6 +2717,7 @@ filt_lio(struct knote *kn, long hint)
 #ifdef COMPAT_FREEBSD32
 #include <sys/mount.h>
 #include <sys/socket.h>
+#include <sys/sysent.h>
 #include <compat/freebsd32/freebsd32.h>
 #include <compat/freebsd32/freebsd32_proto.h>
 #include <compat/freebsd32/freebsd32_signal.h>
@@ -2957,7 +2952,7 @@ freebsd32_aio_suspend(struct thread *td, struct freebsd32_aio_suspend_args *uap)
 	} else
 		tsp = NULL;
 
-	ujoblist = malloc(uap->nent * sizeof(ujoblist[0]), M_AIOS, M_WAITOK);
+	ujoblist = malloc(uap->nent * sizeof(ujoblist[0]), M_AIO, M_WAITOK);
 	ujoblist32 = (uint32_t *)ujoblist;
 	error = copyin(uap->aiocbp, ujoblist32, uap->nent *
 	    sizeof(ujoblist32[0]));
@@ -2967,7 +2962,7 @@ freebsd32_aio_suspend(struct thread *td, struct freebsd32_aio_suspend_args *uap)
 
 		error = kern_aio_suspend(td, uap->nent, ujoblist, tsp);
 	}
-	free(ujoblist, M_AIOS);
+	free(ujoblist, M_AIO);
 	return (error);
 }
 

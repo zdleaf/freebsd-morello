@@ -23,9 +23,7 @@
 .\" out of the use of this software, even if advised of the possibility of
 .\" such damage.
 .\"
-.\" $FreeBSD$
-.\"
-.Dd August 17, 2020
+.Dd May 31, 2023
 .Dt PMCSTAT 8
 .Os
 .Sh NAME
@@ -57,7 +55,6 @@
 .Op Fl f Ar pluginopt
 .Op Fl g
 .Op Fl i Ar lwp
-.Op Fl k Ar kerneldir
 .Op Fl l Ar secs
 .Op Fl m Ar pathname
 .Op Fl n Ar rate
@@ -107,6 +104,10 @@ counting and sampling flavors.
 The values of all counting PMCs are printed in human readable form
 at regular intervals by
 .Nm .
+The format of
+.Nm Ns 's
+human-readable textual output is not stable, and could change
+in the future.
 The output of sampling PMCs may be configured to go to a log file for
 subsequent offline analysis, or, at the expense of greater
 overhead, may be configured to be printed in text form on the fly.
@@ -226,8 +227,8 @@ specified in
 .It Fl T
 Use a
 .Xr top 1 Ns -like
-mode for sampling PMCs. The following hotkeys
-can be used:
+mode for sampling PMCs.
+The following hotkeys can be used:
 .Pp
 .Bl -tag -compact -width "Ctrl+a" -offset 4n
 .It Ic A
@@ -332,17 +333,6 @@ which you can get from
 .Xr ps 1
 .Fl o
 .Li lwp .
-.It Fl k Ar kerneldir
-Set the pathname of the kernel directory to argument
-.Ar kerneldir .
-This directory specifies where
-.Nm
-should look for the kernel and its modules.
-The default is to use the path of the running kernel obtained from the
-.Va kern.bootfile
-sysctl.
-Modules will also be searched for in /boot/modules if not found in
-.Ar kerneldir .
 .It Fl l Ar secs
 Set system-wide performance measurement duration for
 .Ar secs
@@ -544,8 +534,6 @@ The
 .Nm
 utility first appeared in
 .Fx 6.0 .
-It is
-.Ud
 .Sh AUTHORS
 .An Joseph Koshy Aq Mt jkoshy@FreeBSD.org
 .Sh BUGS

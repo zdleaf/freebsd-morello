@@ -29,8 +29,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
@@ -129,6 +127,4 @@ static driver_t pst_pci_driver = {
     sizeof(struct iop_softc),
 };
 
-static devclass_t pst_pci_devclass;
-
-DRIVER_MODULE(pstpci, pci, pst_pci_driver, pst_pci_devclass, 0, 0);
+DRIVER_MODULE(pstpci, pci, pst_pci_driver, 0, 0);

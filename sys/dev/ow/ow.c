@@ -24,8 +24,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
@@ -699,8 +697,6 @@ ow_release_bus(device_t ndev, device_t pdev)
 	OW_UNLOCK(sc);
 }
 
-devclass_t ow_devclass;
-
 static device_method_t ow_methods[] = {
 	/* Device interface */
 	DEVMETHOD(device_probe,		ow_probe),
@@ -728,5 +724,5 @@ static driver_t ow_driver = {
 	sizeof(struct ow_softc),
 };
 
-DRIVER_MODULE(ow, owc, ow_driver, ow_devclass, 0, 0);
+DRIVER_MODULE(ow, owc, ow_driver, 0, 0);
 MODULE_VERSION(ow, 1);

@@ -25,8 +25,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/buf.h>
@@ -66,7 +64,7 @@ static driver_t nvme_pci_driver = {
 	sizeof(struct nvme_controller),
 };
 
-DRIVER_MODULE(nvme, pci, nvme_pci_driver, nvme_devclass, NULL, 0);
+DRIVER_MODULE(nvme, pci, nvme_pci_driver, NULL, NULL);
 
 static struct _pcsid
 {
@@ -94,6 +92,8 @@ static struct _pcsid
 	{ 0x05401c5f,		0, 0, "Memblaze Pblaze4", QUIRK_DELAY_B4_CHK_RDY },
 	{ 0xa821144d,		0, 0, "Samsung PM1725", QUIRK_DELAY_B4_CHK_RDY },
 	{ 0xa822144d,		0, 0, "Samsung PM1725a", QUIRK_DELAY_B4_CHK_RDY },
+	{ 0x07f015ad,		0, 0, "VMware NVMe Controller" },
+	{ 0x2003106b,		0, 0, "Apple S3X NVMe Controller" },
 	{ 0x00000000,		0, 0, NULL  }
 };
 

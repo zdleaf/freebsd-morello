@@ -1,6 +1,5 @@
 #!/bin/sh
 #
-# $FreeBSD$
 #
 # This script is used by release/Makefile to build the (optional) ISO images
 # for a FreeBSD release.  It is considered architecture dependent since each
@@ -37,8 +36,23 @@ if [ -z $MKIMG ]; then
 fi
 
 if [ "$1" = "-b" ]; then
-	BASEBITSDIR="$4"
+	MAKEFSARG="$4"
+else
+	MAKEFSARG="$3"
+fi
 
+if [ -f ${MAKEFSARG} ]; then
+	BASEBITSDIR=`dirname ${MAKEFSARG}`
+	METALOG=${MAKEFSARG}
+elif [ -d ${MAKEFSARG} ]; then
+	BASEBITSDIR=${MAKEFSARG}
+	METALOG=
+else
+	echo "${MAKEFSARG} must exist"
+	exit 1
+fi
+
+if [ "$1" = "-b" ]; then
 	# Make an EFI system partition.
 	espfilename=$(mktemp /tmp/efiboot.XXXXXX)
 	# ESP file size in KB.
@@ -49,7 +63,6 @@ if [ "$1" = "-b" ]; then
 
 	shift
 else
-	BASEBITSDIR="$3"
 	bootable=""
 fi
 
@@ -60,12 +73,23 @@ fi
 
 LABEL=`echo "$1" | tr '[:lower:]' '[:upper:]'`; shift
 NAME="$1"; shift
+# MAKEFSARG extracted already
+shift
 
 publisher="The FreeBSD Project.  https://www.FreeBSD.org/"
 echo "/dev/iso9660/$LABEL / cd9660 ro 0 0" > "$BASEBITSDIR/etc/fstab"
-$MAKEFS -t cd9660 $bootable -o rockridge -o label="$LABEL" -o publisher="$publisher" "$NAME" "$@"
+if [ -n "${METALOG}" ]; then
+	metalogfilename=$(mktemp /tmp/metalog.XXXXXX)
+	cat ${METALOG} > ${metalogfilename}
+	echo "./etc/fstab type=file uname=root gname=wheel mode=0644" >> ${metalogfilename}
+	MAKEFSARG=${metalogfilename}
+fi
+$MAKEFS -D -N ${BASEBITSDIR}/etc -t cd9660 $bootable -o rockridge -o label="$LABEL" -o publisher="$publisher" "$NAME" "$MAKEFSARG" "$@"
 rm -f "$BASEBITSDIR/etc/fstab"
 rm -f ${espfilename}
+if [ -n "${METALOG}" ]; then
+	rm ${metalogfilename}
+fi
 
 if [ "$bootable" != "" ]; then
 	# Look for the EFI System Partition image we dropped in the ISO image.
@@ -81,13 +105,18 @@ if [ "$bootable" != "" ]; then
 	done
 
 	# Create a GPT image containing the EFI partition.
-	imgsize=`stat -f %z "$NAME"`
+	efifilename=$(mktemp /tmp/efi.img.XXXXXX)
+	if [ "$(uname -s)" = "Linux" ]; then
+		imgsize=`stat -c %s "$NAME"`
+	else
+		imgsize=`stat -f %z "$NAME"`
+	fi
 	$MKIMG -s gpt \
 	    --capacity $imgsize \
 	    $espparam \
-	    -o efi.img
+	    -o $efifilename
 
 	# Drop the GPT into the System Area of the ISO.
-	dd if=efi.img of="$NAME" bs=32k count=1 conv=notrunc
-	rm -f efi.img
+	dd if=$efifilename of="$NAME" bs=32k count=1 conv=notrunc
+	rm -f $efifilename
 fi

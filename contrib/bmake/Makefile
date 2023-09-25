@@ -1,4 +1,4 @@
-#	$Id: Makefile,v 1.117 2021/12/04 18:51:30 sjg Exp $
+#	$Id: Makefile,v 1.125 2023/05/17 00:15:46 sjg Exp $
 
 PROG=	bmake
 
@@ -68,7 +68,9 @@ FILEMON_H ?= /usr/include/dev/filemon/filemon.h
 .if exists(${FILEMON_H}) && ${FILEMON_H:T} == "filemon.h"
 COPTS.filemon_dev.c += -DHAVE_FILEMON_H -I${FILEMON_H:H}
 .endif
-.endif				# USE_FILEMON == dev
+.elif ${USE_FILEMON} == "ktrace"
+COPTS.filemon_ktrace.c += -Wno-error=unused-parameter
+.endif
 
 .endif				# USE_FILEMON
 
@@ -88,7 +90,7 @@ OS := ${.MAKE.OS:U${uname -s:L:sh}}
 # are we 4.4BSD ?
 isBSD44:=${BSD44_LIST:M${OS}}
 
-.if ${isBSD44} == ""
+.if ${isBSD44} == "" && ${OS:NDarwin:NLinux} != ""
 MANTARGET= cat
 INSTALL?=${srcdir}/install-sh
 .if ${MACHINE} == "sun386"
@@ -176,9 +178,7 @@ SHAREDIR= ${SHAREDIR.bmake:U${prefix}/share}
 BINDIR= ${BINDIR.bmake:U${prefix}/bin}
 MANDIR= ${MANDIR.bmake:U${SHAREDIR}/man}
 
-.if !exists(.depend)
 ${OBJS}: config.h
-.endif
 
 # start-delete2 for bsd.after-import.mk
 
@@ -201,13 +201,13 @@ install: install-mk
 .endif
 
 beforeinstall:
-	test -d ${DESTDIR}${BINDIR} || ${INSTALL} -m 775 -d ${DESTDIR}${BINDIR}
-	test -d ${DESTDIR}${MANDEST} || ${INSTALL} -m 775 -d ${DESTDIR}${MANDEST}
+	test -d ${DESTDIR}${BINDIR} || ${INSTALL} -m ${DIRMODE} -d ${DESTDIR}${BINDIR}
+	test -d ${DESTDIR}${MANDEST} || ${INSTALL} -m ${DIRMODE} -d ${DESTDIR}${MANDEST}
 
 install-mk:
 .if exists(${MKSRC}/install-mk)
-	test -d ${DESTDIR}${SHARE_MK} || ${INSTALL} -m 775 -d ${DESTDIR}${SHARE_MK}
-	sh ${MKSRC}/install-mk -v -m 644 ${DESTDIR}${SHARE_MK}
+	test -d ${DESTDIR}${SHARE_MK} || ${INSTALL} -m ${DIRMODE} -d ${DESTDIR}${SHARE_MK}
+	sh ${MKSRC}/install-mk -v -m ${NONBINMODE} ${DESTDIR}${SHARE_MK}
 .else
 	@echo need to unpack mk.tar.gz under ${srcdir} or set MKSRC; false
 .endif
@@ -215,7 +215,24 @@ install-mk:
 
 # A simple unit-test driver to help catch regressions
 TEST_MAKE ?= ${.OBJDIR}/${PROG:T}
-accept test:
+accept test: .NOMETA
 	cd ${.CURDIR}/unit-tests && \
 	MAKEFLAGS= ${TEST_MAKE} -r -m / ${.TARGET} ${TESTS:DTESTS=${TESTS:Q}}
 
+
+.if make(test) && ${MK_AUTO_OBJ} == "yes"
+# The test target above visits unit-tests with -r -m /
+# which prevents MK_AUTO_OBJ doing its job
+# so do it here
+.if defined(MAKEOBJDIRPREFIX) || ${MAKEOBJDIR:U:M*/*} != ""
+_utobj = ${.OBJDIR}/unit-tests
+.else
+_utobj = ${.CURDIR}/unit-tests/${MAKEOBJDIR:Uobj}
+.endif
+utobj: .NOMETA
+	@test -d ${_utobj} && exit 0; \
+	echo "[Creating ${_utobj}...]"; \
+	umask ${OBJDIR_UMASK:U002}; \
+	mkdir -p ${_utobj}
+test: utobj
+.endif

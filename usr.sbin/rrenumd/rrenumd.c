@@ -29,8 +29,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 #include <sys/param.h>
@@ -348,8 +346,6 @@ sock6_open(struct flags *flags
 	}
 #endif /* IPSEC_POLICY_IPSEC */
 #endif /* IPSEC */
-
-	return;
 }
 
 static void
@@ -414,8 +410,6 @@ sock4_open(struct flags *flags
 	}
 #endif /* IPSEC_POLICY_IPSEC */
 #endif /* IPSEC */
-
-	return;
 }
 
 static void

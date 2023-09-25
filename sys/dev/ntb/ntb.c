@@ -25,8 +25,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/kernel.h>
 #include <sys/systm.h>
@@ -39,7 +37,6 @@ __FBSDID("$FreeBSD$");
 
 #include "ntb.h"
 
-devclass_t ntb_hw_devclass;
 SYSCTL_NODE(_hw, OID_AUTO, ntb, CTLFLAG_RW | CTLFLAG_MPSAFE, 0,
     "NTB sysctls");
 

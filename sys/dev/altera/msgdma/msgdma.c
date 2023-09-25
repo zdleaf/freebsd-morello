@@ -31,8 +31,6 @@
 /* Altera mSGDMA driver. */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include "opt_platform.h"
 #include <sys/param.h>
 #include <sys/endian.h>
@@ -640,7 +638,5 @@ static driver_t msgdma_driver = {
 	sizeof(struct msgdma_softc),
 };
 
-static devclass_t msgdma_devclass;
-
-EARLY_DRIVER_MODULE(msgdma, simplebus, msgdma_driver, msgdma_devclass, 0, 0,
+EARLY_DRIVER_MODULE(msgdma, simplebus, msgdma_driver, 0, 0,
     BUS_PASS_INTERRUPT + BUS_PASS_ORDER_LATE);

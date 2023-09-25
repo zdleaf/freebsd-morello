@@ -32,7 +32,7 @@
  *    must display the following acknowledgement:
  *    "This product includes cryptographic software written by
  *     Eric Young (eay@cryptsoft.com)"
- *    The word 'cryptographic' can be left out if the rouines from the library
+ *    The word 'cryptographic' can be left out if the routines from the library
  *    being used are not cryptographic related :-).
  * 4. If you include any Windows specific code (or a derivative thereof) from 
  *    the apps directory (application code) you must include an acknowledgement:
@@ -57,8 +57,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/types.h>
 
 #include <stdio.h>
@@ -88,8 +86,7 @@ void ripemd160_block_x86(RIPEMD160_CTX *c, const u_int32_t *p,int num);
 void ripemd160_block(RIPEMD160_CTX *c, const u_int32_t *p,int num);
 #endif
 
-void RIPEMD160_Init(c)
-RIPEMD160_CTX *c;
+void RIPEMD160_Init(RIPEMD160_CTX *c)
 	{
 	c->A=RIPEMD160_A;
 	c->B=RIPEMD160_B;
@@ -101,10 +98,7 @@ RIPEMD160_CTX *c;
 	c->num=0;
 	}
 
-void RIPEMD160_Update(c, in, len)
-RIPEMD160_CTX *c;
-const void *in;
-size_t len;
+void RIPEMD160_Update(RIPEMD160_CTX *c, const void *in, size_t len)
 	{
 	u_int32_t *p;
 	int sw,sc;
@@ -233,9 +227,7 @@ size_t len;
 		}
 	}
 
-void RIPEMD160_Transform(c,b)
-RIPEMD160_CTX *c;
-unsigned char *b;
+void RIPEMD160_Transform(RIPEMD160_CTX *c, unsigned char *b)
 	{
 	u_int32_t p[16];
 #if BYTE_ORDER != LITTLE_ENDIAN
@@ -272,10 +264,7 @@ unsigned char *b;
 
 #ifndef RMD160_ASM
 
-void ripemd160_block(ctx, X, num)
-RIPEMD160_CTX *ctx;
-const u_int32_t *X;
-int num;
+void ripemd160_block(RIPEMD160_CTX *ctx, const u_int32_t *X, int num)
 	{
 	u_int32_t A,B,C,D,E;
 	u_int32_t a,b,c,d,e;
@@ -472,9 +461,7 @@ int num;
 	}
 #endif
 
-void RIPEMD160_Final(md, c)
-unsigned char *md;
-RIPEMD160_CTX *c;
+void RIPEMD160_Final(unsigned char *md, RIPEMD160_CTX *c)
 	{
 	int i,j;
 	u_int32_t l;
@@ -528,8 +515,7 @@ RIPEMD160_CTX *c;
 	}
 
 #ifdef undef
-int printit(l)
-unsigned long *l;
+int printit(unsigned long *l)
 	{
 	int i,ii;
 

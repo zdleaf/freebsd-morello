@@ -68,7 +68,6 @@
  * SUCH DAMAGE.
  *
  *	@(#)config.y	8.1 (Berkeley) 6/6/93
- * $FreeBSD$
  */
 
 #include <assert.h>
@@ -188,8 +187,6 @@ Config_spec:
 		|
 	NOMAKEOPTION Save_id { rmopt_schedule(&mkopt, $2); } |
 	IDENT ID { ident = $2; } |
-	System_spec
-		|
 	MAXUSERS NUMBER { maxusers = $2; } |
 	ENV ID { newenvvar($2, true); } |
 	ENVVAR ENVLINE { newenvvar($2, false); } |

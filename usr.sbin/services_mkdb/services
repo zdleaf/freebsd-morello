@@ -17,7 +17,6 @@
 # port number for both TCP and UDP; hence, most entries here have two entries
 # even if the protocol doesn't support UDP operations.
 #
-# $FreeBSD$
 #	From: @(#)services	5.8 (Berkeley) 5/9/91
 #
 # WELL KNOWN PORT NUMBERS
@@ -2000,6 +1999,7 @@ bacula-sd	9103/udp   #Bacula Storage Daemon
 prom-sysctl	9124/tcp   #prometheus_sysctl_exporter(8)
 git		9418/tcp   #git pack transfer service
 git		9418/udp   #git pack transfer service
+prom-ctl	9572/tcp   #CTL prometheus
 odbcpathway	9628/tcp   #ODBC Pathway Service
 odbcpathway	9628/udp   #ODBC Pathway Service
 davsrc		9800/tcp   #WebDav Source Port

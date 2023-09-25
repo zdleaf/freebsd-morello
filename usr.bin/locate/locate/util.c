@@ -31,8 +31,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 #include <sys/param.h>
@@ -41,8 +39,10 @@
 #include <err.h>
 #include <arpa/inet.h>
 #include <stdio.h>
+#include <sys/stat.h>
 
 #include "locate.h"
+#include "pathnames.h"
 
 char 	**colon(char **, char*, char*);
 char 	*patprep(char *);
@@ -56,13 +56,12 @@ int	check_bigram_char(int);
  * or the database is obviously not a locate database.
  */
 int
-check_bigram_char(ch)
-	int ch;
+check_bigram_char(int ch)
 {
 	/* legal bigram: 0, ASCII_MIN ... ASCII_MAX */
 	if (ch == 0 ||
 	    (ch >= ASCII_MIN && ch <= ASCII_MAX))
-		return(ch);
+		return (ch);
 
 	errx(1,
 		"locate database header corrupt, bigram char outside 0, %d-%d: %d",  
@@ -94,7 +93,7 @@ colon(char **dbv, char *path, char *dot)
 	/* empty string */
 	if (*path == '\0') {
 		warnx("empty database name, ignored");
-		return(dbv);
+		return (dbv);
 	}
 
 	/* length of string vector */
@@ -136,8 +135,7 @@ colon(char **dbv, char *path, char *dot)
 static char globfree[100];
 
 char *
-patprep(name)
-	char *name;
+patprep(char *name)
 {
 	char *endmark, *p, *subp;
 
@@ -185,20 +183,19 @@ patprep(name)
 			*subp++ = *p++;
 	}
 	*subp = '\0';
-	return(--subp);
+	return (--subp);
 }
 
 /* tolower word */
 u_char *
-tolower_word(word)
-	u_char *word;
+tolower_word(u_char *word)
 {
 	u_char *p;
 
 	for(p = word; *p != '\0'; p++)
 		*p = TOLOWER(*p);
 
-	return(word);
+	return (word);
 }
 
 
@@ -213,8 +210,7 @@ tolower_word(word)
  */
 
 int
-getwm(p)
-	caddr_t p;
+getwm(caddr_t p)
 {
 	union {
 		char buf[INTSIZE];
@@ -236,9 +232,9 @@ getwm(p)
 		if (hi >= i_max || hi <= i_min)
 			errx(1, "integer out of range: %d < %d < %d",
 			    i_min, abs(i) < abs(hi) ? i : hi, i_max);
-		return(hi);
+		return (hi);
 	}
-	return(i);
+	return (i);
 }
 
 /*
@@ -250,8 +246,7 @@ getwm(p)
  */
 
 int
-getwf(fp)
-	FILE *fp;
+getwf(FILE *fp)
 {
 	int word, hword;
         int i_max = LOCATE_PATH_MAX + OFFSET;
@@ -264,7 +259,39 @@ getwf(fp)
 		if (hword >= i_max || hword <= i_min)
 			errx(1, "integer out of range: %d < %d < %d",
 			    i_min, abs(word) < abs(hword) ? word : hword, i_max);
-		return(hword);
+		return (hword);
 	}
-	return(word);
+	return (word);
+}
+
+void
+rebuild_message(char *db)
+{
+	/* only for the default locate database */
+	if (strcmp(_PATH_FCODES, db) == 0) {
+		fprintf(stderr, "\nTo create a new database, please run the following command as root:\n\n");
+		fprintf(stderr, "  /etc/periodic/weekly/310.locate\n\n");
+	}
+}
+
+int
+check_size(char *db) 
+{
+        struct stat sb;
+        off_t len;
+
+	if (stat(db, &sb) == -1) {
+		warnx("the locate database '%s' does not exist.", db);
+		rebuild_message(db);
+		return (0);
+	}
+	len = sb.st_size;
+
+	if (len < (2 * NBG)) {
+		warnx("the locate database '%s' is smaller than %d bytes large.", db, (2 * NBG));
+		rebuild_message(db);
+		return (0);
+	}
+
+	return (1);
 }

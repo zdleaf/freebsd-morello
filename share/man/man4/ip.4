@@ -26,7 +26,6 @@
 .\" SUCH DAMAGE.
 .\"
 .\"     @(#)ip.4	8.2 (Berkeley) 11/30/93
-.\" $FreeBSD$
 .\"
 .Dd August 9, 2021
 .Dt IP 4
@@ -90,10 +89,13 @@ setsockopt(s, IPPROTO_IP, IP_OPTIONS, NULL, 0);
 .Ed
 .Pp
 .Dv IP_TOS
-and
+may be used to set the differential service codepoint (DSCP) and the
+explicit congestion notfication (ECN) codepoint.
+Setting the ECN codepoint - the two least significant bits - on a
+socket using a transport protocol implementing ECN has no effect.
+.Pp
 .Dv IP_TTL
-may be used to set the type-of-service and time-to-live
-fields in the
+configures the time-to-live (TTL) field in the
 .Tn IP
 header for
 .Dv SOCK_STREAM , SOCK_DGRAM ,
@@ -102,7 +104,7 @@ and certain types of
 sockets.
 For example,
 .Bd -literal
-int tos = IPTOS_LOWDELAY;       /* see <netinet/ip.h> */
+int tos = IPTOS_DSCP_EF;       /* see <netinet/ip.h> */
 setsockopt(s, IPPROTO_IP, IP_TOS, &tos, sizeof(tos));
 
 int ttl = 60;                   /* max = 255 */
@@ -450,21 +452,6 @@ In scenarios such as benchmarking, this behavior may be undesirable.
 In these cases,
 .Va net.inet.ip.portrange.randomized
 can be used to toggle randomization off.
-If more than
-.Va net.inet.ip.portrange.randomcps
-ports have been allocated in the last second, then return to sequential
-port allocation.
-Return to random allocation only once the current port allocation rate
-drops below
-.Va net.inet.ip.portrange.randomcps
-for at least
-.Va net.inet.ip.portrange.randomtime
-seconds.
-The default values for
-.Va net.inet.ip.portrange.randomcps
-and
-.Va net.inet.ip.portrange.randomtime
-are 10 port allocations per second and 45 seconds correspondingly.
 .Ss "Multicast Options"
 .Tn IP
 multicasting is supported only on

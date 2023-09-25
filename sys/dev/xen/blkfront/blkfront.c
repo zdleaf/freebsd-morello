@@ -29,8 +29,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/malloc.h>
@@ -53,8 +51,8 @@ __FBSDID("$FreeBSD$");
 #include <xen/hypervisor.h>
 #include <xen/xen_intr.h>
 #include <xen/gnttab.h>
-#include <xen/interface/grant_table.h>
-#include <xen/interface/io/protocols.h>
+#include <contrib/xen/grant_table.h>
+#include <contrib/xen/io/protocols.h>
 #include <xen/xenbus/xenbusvar.h>
 
 #include <machine/_inttypes.h>
@@ -593,14 +591,12 @@ xbd_dump_complete(struct xbd_command *cm)
 }
 
 static int
-xbd_dump(void *arg, void *virtual, vm_offset_t physical, off_t offset,
-    size_t length)
+xbd_dump(void *arg, void *virtual, off_t offset, size_t length)
 {
 	struct disk *dp = arg;
 	struct xbd_softc *sc = dp->d_drv1;
 	struct xbd_command *cm;
 	size_t chunk;
-	int sbp;
 	int rc = 0;
 
 	if (length == 0)
@@ -615,7 +611,7 @@ xbd_dump(void *arg, void *virtual, vm_offset_t physical, off_t offset,
 	mtx_lock(&sc->xbd_io_lock);
 
 	/* Split the 64KB block as needed */
-	for (sbp=0; length > 0; sbp++) {
+	while (length > 0) {
 		cm = xbd_dequeue_cm(sc, XBD_Q_FREE);
 		if (cm == NULL) {
 			mtx_unlock(&sc->xbd_io_lock);
@@ -1646,6 +1642,5 @@ static driver_t xbd_driver = {
 	xbd_methods, 
 	sizeof(struct xbd_softc),                      
 }; 
-devclass_t xbd_devclass; 
 
-DRIVER_MODULE(xbd, xenbusb_front, xbd_driver, xbd_devclass, 0, 0); 
+DRIVER_MODULE(xbd, xenbusb_front, xbd_driver, 0, 0); 

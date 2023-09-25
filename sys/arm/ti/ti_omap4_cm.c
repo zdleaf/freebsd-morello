@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2019 Emmanuel Vadot <manu@FreeBSD.org>
  * Copyright (c) 2020 Oskar Holmlund <oskar.holmlund@ohdata.se>
@@ -26,13 +26,9 @@
  * SUCH DAMAGE.
  *
  * Based on sys/arm/ti/ti_sysc.c
- *
- * $FreeBSD$
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/bus.h>
@@ -141,10 +137,8 @@ static device_method_t ti_omap4_cm_methods[] = {
 DEFINE_CLASS_1(ti_omap4_cm, ti_omap4_cm_driver, ti_omap4_cm_methods,
     sizeof(struct ti_omap4_cm_softc), simplebus_driver);
 
-static devclass_t ti_omap4_cm_devclass;
+EARLY_DRIVER_MODULE(ti_omap4_cm, simplebus, ti_omap4_cm_driver, 0, 0,
+    BUS_PASS_BUS + BUS_PASS_ORDER_FIRST);
 
-EARLY_DRIVER_MODULE(ti_omap4_cm, simplebus, ti_omap4_cm_driver,
-ti_omap4_cm_devclass, 0, 0, BUS_PASS_BUS + BUS_PASS_ORDER_FIRST);
-
-EARLY_DRIVER_MODULE(ti_omap4_cm, ofwbus, ti_omap4_cm_driver,
-ti_omap4_cm_devclass, 0, 0, BUS_PASS_BUS + BUS_PASS_ORDER_FIRST);
+EARLY_DRIVER_MODULE(ti_omap4_cm, ofwbus, ti_omap4_cm_driver, 0, 0,
+    BUS_PASS_BUS + BUS_PASS_ORDER_FIRST);

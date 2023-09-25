@@ -1,4 +1,3 @@
-# $FreeBSD$
 # All the dts files for rockchip systems we support.
 
 .if ${MACHINE_ARCH} == "armv7"
@@ -22,7 +21,6 @@ DTS=	\
 DTSO=	rk3328-analog-sound.dtso \
 	rk3328-i2c0.dtso \
 	rk3328-uart1.dtso \
-	rk3328-dwc3.dtso \
 	rk3399-mmc0-disable.dtso \
 	rk3399-mmc1-disable.dtso \
 	rk3399-sdhci-disable.dtso

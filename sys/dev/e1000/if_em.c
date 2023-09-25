@@ -26,7 +26,6 @@
  * SUCH DAMAGE.
  */
 
-/* $FreeBSD$ */
 #include "if_em.h"
 #include <sys/sbuf.h>
 #include <machine/_inttypes.h>
@@ -37,7 +36,8 @@
 /*********************************************************************
  *  Driver version:
  *********************************************************************/
-char em_driver_version[] = "7.6.1-k";
+static const char em_driver_version[] = "7.7.8-fbsd";
+static const char igb_driver_version[] = "2.5.19-fbsd";
 
 /*********************************************************************
  *  PCI Device ID Table
@@ -49,7 +49,7 @@ char em_driver_version[] = "7.6.1-k";
  *  { Vendor ID, Device ID, SubVendor ID, SubDevice ID, String Index }
  *********************************************************************/
 
-static pci_vendor_info_t em_vendor_info_array[] =
+static const pci_vendor_info_t em_vendor_info_array[] =
 {
 	/* Intel(R) - lem-class legacy devices */
 	PVID(0x8086, E1000_DEV_ID_82540EM, "Intel(R) Legacy PRO/1000 MT 82540EM"),
@@ -194,11 +194,27 @@ static pci_vendor_info_t em_vendor_info_array[] =
 	PVID(0x8086, E1000_DEV_ID_PCH_MTP_I219_V18, "Intel(R) I219-V MTP(18)"),
 	PVID(0x8086, E1000_DEV_ID_PCH_MTP_I219_LM19, "Intel(R) I219-LM MTP(19)"),
 	PVID(0x8086, E1000_DEV_ID_PCH_MTP_I219_V19, "Intel(R) I219-V MTP(19)"),
+	PVID(0x8086, E1000_DEV_ID_PCH_LNL_I219_LM20, "Intel(R) I219-LM LNL(20)"),
+	PVID(0x8086, E1000_DEV_ID_PCH_LNL_I219_V20, "Intel(R) I219-V LNL(20)"),
+	PVID(0x8086, E1000_DEV_ID_PCH_LNL_I219_LM21, "Intel(R) I219-LM LNL(21)"),
+	PVID(0x8086, E1000_DEV_ID_PCH_LNL_I219_V21, "Intel(R) I219-V LNL(21)"),
+	PVID(0x8086, E1000_DEV_ID_PCH_RPL_I219_LM22, "Intel(R) I219-LM RPL(22)"),
+	PVID(0x8086, E1000_DEV_ID_PCH_RPL_I219_V22, "Intel(R) I219-V RPL(22)"),
+	PVID(0x8086, E1000_DEV_ID_PCH_RPL_I219_LM23, "Intel(R) I219-LM RPL(23)"),
+	PVID(0x8086, E1000_DEV_ID_PCH_RPL_I219_V23, "Intel(R) I219-V RPL(23)"),
+	PVID(0x8086, E1000_DEV_ID_PCH_ARL_I219_LM24, "Intel(R) I219-LM ARL(24)"),
+	PVID(0x8086, E1000_DEV_ID_PCH_ARL_I219_V24, "Intel(R) I219-V ARL(24)"),
+	PVID(0x8086, E1000_DEV_ID_PCH_PTP_I219_LM25, "Intel(R) I219-LM PTP(25)"),
+	PVID(0x8086, E1000_DEV_ID_PCH_PTP_I219_V25, "Intel(R) I219-V PTP(25)"),
+	PVID(0x8086, E1000_DEV_ID_PCH_PTP_I219_LM26, "Intel(R) I219-LM PTP(26)"),
+	PVID(0x8086, E1000_DEV_ID_PCH_PTP_I219_V26, "Intel(R) I219-V PTP(26)"),
+	PVID(0x8086, E1000_DEV_ID_PCH_PTP_I219_LM27, "Intel(R) I219-LM PTP(27)"),
+	PVID(0x8086, E1000_DEV_ID_PCH_PTP_I219_V27, "Intel(R) I219-V PTP(27)"),
 	/* required last entry */
 	PVID_END
 };
 
-static pci_vendor_info_t igb_vendor_info_array[] =
+static const pci_vendor_info_t igb_vendor_info_array[] =
 {
 	/* Intel(R) - igb-class devices */
 	PVID(0x8086, E1000_DEV_ID_82575EB_COPPER, "Intel(R) PRO/1000 82575EB (Copper)"),
@@ -313,6 +329,7 @@ static int	em_sysctl_debug_info(SYSCTL_HANDLER_ARGS);
 static int	em_get_rs(SYSCTL_HANDLER_ARGS);
 static void	em_print_debug_info(struct e1000_softc *);
 static int 	em_is_valid_ether_addr(u8 *);
+static bool	em_automask_tso(if_ctx_t);
 static int	em_sysctl_int_delay(SYSCTL_HANDLER_ARGS);
 static void	em_add_int_delay_sysctl(struct e1000_softc *, const char *,
 		    const char *, struct em_int_delay_info *, int, int);
@@ -343,6 +360,7 @@ static int	em_get_regs(SYSCTL_HANDLER_ARGS);
 
 static void	lem_smartspeed(struct e1000_softc *);
 static void	igb_configure_queues(struct e1000_softc *);
+static void	em_flush_desc_rings(struct e1000_softc *);
 
 
 /*********************************************************************
@@ -377,8 +395,7 @@ static driver_t em_driver = {
 	"em", em_methods, sizeof(struct e1000_softc),
 };
 
-static devclass_t em_devclass;
-DRIVER_MODULE(em, pci, em_driver, em_devclass, 0, 0);
+DRIVER_MODULE(em, pci, em_driver, 0, 0);
 
 MODULE_DEPEND(em, pci, 1, 1, 1);
 MODULE_DEPEND(em, ether, 1, 1, 1);
@@ -390,8 +407,7 @@ static driver_t igb_driver = {
 	"igb", igb_methods, sizeof(struct e1000_softc),
 };
 
-static devclass_t igb_devclass;
-DRIVER_MODULE(igb, pci, igb_driver, igb_devclass, 0, 0);
+DRIVER_MODULE(igb, pci, igb_driver, 0, 0);
 
 MODULE_DEPEND(igb, pci, 1, 1, 1);
 MODULE_DEPEND(igb, ether, 1, 1, 1);
@@ -517,6 +533,10 @@ static int em_smart_pwr_down = false;
 SYSCTL_INT(_hw_em, OID_AUTO, smart_pwr_down, CTLFLAG_RDTUN, &em_smart_pwr_down,
     0, "Set to true to leave smart power down enabled on newer adapters");
 
+static bool em_unsupported_tso = false;
+SYSCTL_BOOL(_hw_em, OID_AUTO, unsupported_tso, CTLFLAG_RDTUN,
+    &em_unsupported_tso, 0, "Allow unsupported em(4) TSO configurations");
+
 /* Controls whether promiscuous also shows bad packets */
 static int em_debug_sbp = false;
 SYSCTL_INT(_hw_em, OID_AUTO, sbp, CTLFLAG_RDTUN, &em_debug_sbp, 0,
@@ -592,7 +612,7 @@ static struct if_shared_ctx igb_sctx_init = {
 	.isc_ntxqs = 1,
 	.isc_admin_intrcnt = 1,
 	.isc_vendor_info = igb_vendor_info_array,
-	.isc_driver_version = em_driver_version,
+	.isc_driver_version = igb_driver_version,
 	.isc_driver = &igb_if_driver,
 	.isc_flags = IFLIB_NEED_SCRATCH | IFLIB_TSO_INIT_IP | IFLIB_NEED_ZERO_CSUM,
 
@@ -765,19 +785,21 @@ em_set_num_queues(if_ctx_t ctx)
 	return (maxqueues);
 }
 
-#define	LEM_CAPS							\
-    IFCAP_HWCSUM | IFCAP_VLAN_MTU | IFCAP_VLAN_HWTAGGING |		\
-    IFCAP_VLAN_HWCSUM | IFCAP_WOL | IFCAP_VLAN_HWFILTER
+#define LEM_CAPS \
+    IFCAP_HWCSUM | IFCAP_VLAN_MTU | IFCAP_VLAN_HWTAGGING | \
+    IFCAP_VLAN_HWCSUM | IFCAP_WOL | IFCAP_VLAN_HWFILTER | IFCAP_TSO4 | \
+    IFCAP_LRO | IFCAP_VLAN_HWTSO | IFCAP_JUMBO_MTU | IFCAP_HWCSUM_IPV6
 
-#define	EM_CAPS								\
-    IFCAP_HWCSUM | IFCAP_VLAN_MTU | IFCAP_VLAN_HWTAGGING |		\
-    IFCAP_VLAN_HWCSUM | IFCAP_WOL | IFCAP_VLAN_HWFILTER | IFCAP_TSO4 |	\
-    IFCAP_LRO | IFCAP_VLAN_HWTSO
+#define EM_CAPS \
+    IFCAP_HWCSUM | IFCAP_VLAN_MTU | IFCAP_VLAN_HWTAGGING | \
+    IFCAP_VLAN_HWCSUM | IFCAP_WOL | IFCAP_VLAN_HWFILTER | IFCAP_TSO4 | \
+    IFCAP_LRO | IFCAP_VLAN_HWTSO | IFCAP_JUMBO_MTU | IFCAP_HWCSUM_IPV6 | \
+    IFCAP_TSO6
 
-#define	IGB_CAPS							\
-    IFCAP_HWCSUM | IFCAP_VLAN_MTU | IFCAP_VLAN_HWTAGGING |		\
-    IFCAP_VLAN_HWCSUM | IFCAP_WOL | IFCAP_VLAN_HWFILTER | IFCAP_TSO4 |	\
-    IFCAP_LRO | IFCAP_VLAN_HWTSO | IFCAP_JUMBO_MTU | IFCAP_HWCSUM_IPV6 |\
+#define IGB_CAPS \
+    IFCAP_HWCSUM | IFCAP_VLAN_MTU | IFCAP_VLAN_HWTAGGING | \
+    IFCAP_VLAN_HWCSUM | IFCAP_WOL | IFCAP_VLAN_HWFILTER | IFCAP_TSO4 | \
+    IFCAP_LRO | IFCAP_VLAN_HWTSO | IFCAP_JUMBO_MTU | IFCAP_HWCSUM_IPV6 | \
     IFCAP_TSO6
 
 /*********************************************************************
@@ -880,30 +902,25 @@ em_if_attach_pre(if_ctx_t ctx)
 		scctx->isc_tx_tso_size_max = EM_TSO_SIZE;
 		scctx->isc_tx_tso_segsize_max = EM_TSO_SEG_SIZE;
 		scctx->isc_capabilities = scctx->isc_capenable = EM_CAPS;
+		scctx->isc_tx_csum_flags = CSUM_TCP | CSUM_UDP | CSUM_IP_TSO |
+		    CSUM_IP6_TCP | CSUM_IP6_UDP;
+
+		/* Disable TSO on all em(4) until ring stalls can be debugged */
+		scctx->isc_capenable &= ~IFCAP_TSO;
+
 		/*
-		 * For EM-class devices, don't enable IFCAP_{TSO4,VLAN_HWTSO}
-		 * by default as we don't have workarounds for all associated
-		 * silicon errata.  E. g., with several MACs such as 82573E,
-		 * TSO only works at Gigabit speed and otherwise can cause the
-		 * hardware to hang (which also would be next to impossible to
-		 * work around given that already queued TSO-using descriptors
-		 * would need to be flushed and vlan(4) reconfigured at runtime
-		 * in case of a link speed change).  Moreover, MACs like 82579
-		 * still can hang at Gigabit even with all publicly documented
-		 * TSO workarounds implemented.  Generally, the penality of
-		 * these workarounds is rather high and may involve copying
-		 * mbuf data around so advantages of TSO lapse.  Still, TSO may
-		 * work for a few MACs of this class - at least when sticking
-		 * with Gigabit - in which case users may enable TSO manually.
+		 * Disable TSO on SPT due to errata that downclocks DMA performance
+		 * i218-i219 Specification Update 1.5.4.5
 		 */
-		scctx->isc_capenable &= ~(IFCAP_TSO4 | IFCAP_VLAN_HWTSO);
-		scctx->isc_tx_csum_flags = CSUM_TCP | CSUM_UDP | CSUM_IP_TSO;
+		if (hw->mac.type == e1000_pch_spt)
+			scctx->isc_capenable &= ~IFCAP_TSO;
+
 		/*
 		 * We support MSI-X with 82574 only, but indicate to iflib(4)
 		 * that it shall give MSI at least a try with other devices.
 		 */
 		if (hw->mac.type == e1000_82574) {
-			scctx->isc_msix_bar = pci_msix_table_bar(dev);;
+			scctx->isc_msix_bar = pci_msix_table_bar(dev);
 		} else {
 			scctx->isc_msix_bar = -1;
 			scctx->isc_disable_msix = 1;
@@ -913,17 +930,50 @@ em_if_attach_pre(if_ctx_t ctx)
 		scctx->isc_rxqsizes[0] = roundup2((scctx->isc_nrxd[0] + 1) * sizeof(struct e1000_rx_desc), EM_DBA_ALIGN);
 		scctx->isc_txd_size[0] = sizeof(struct e1000_tx_desc);
 		scctx->isc_rxd_size[0] = sizeof(struct e1000_rx_desc);
-		scctx->isc_tx_csum_flags = CSUM_TCP | CSUM_UDP;
 		scctx->isc_txrx = &lem_txrx;
-		scctx->isc_capabilities = LEM_CAPS;
-		if (hw->mac.type < e1000_82543)
-			scctx->isc_capabilities &= ~(IFCAP_HWCSUM|IFCAP_VLAN_HWCSUM);
+		scctx->isc_tx_tso_segments_max = EM_MAX_SCATTER;
+		scctx->isc_tx_tso_size_max = EM_TSO_SIZE;
+		scctx->isc_tx_tso_segsize_max = EM_TSO_SEG_SIZE;
+		scctx->isc_capabilities = scctx->isc_capenable = LEM_CAPS;
+		if (em_unsupported_tso)
+			scctx->isc_capabilities |= IFCAP_TSO6;
+		scctx->isc_tx_csum_flags = CSUM_TCP | CSUM_UDP | CSUM_IP_TSO |
+		    CSUM_IP6_TCP | CSUM_IP6_UDP;
+
+		/* Disable TSO on all lem(4) until ring stalls can be debugged */
+		scctx->isc_capenable &= ~IFCAP_TSO;
+
 		/* 82541ER doesn't do HW tagging */
-		if (hw->device_id == E1000_DEV_ID_82541ER || hw->device_id == E1000_DEV_ID_82541ER_LOM)
+		if (hw->device_id == E1000_DEV_ID_82541ER ||
+		    hw->device_id == E1000_DEV_ID_82541ER_LOM) {
 			scctx->isc_capabilities &= ~IFCAP_VLAN_HWTAGGING;
+			scctx->isc_capenable = scctx->isc_capabilities;
+		}
+		/* This is the first e1000 chip and it does not do offloads */
+		if (hw->mac.type == e1000_82542) {
+			scctx->isc_capabilities &= ~(IFCAP_HWCSUM | IFCAP_VLAN_HWCSUM |
+			    IFCAP_HWCSUM_IPV6 | IFCAP_VLAN_HWTAGGING |
+			    IFCAP_VLAN_HWFILTER | IFCAP_TSO | IFCAP_VLAN_HWTSO);
+			scctx->isc_capenable = scctx->isc_capabilities;
+		}
+		/* These can't do TSO for various reasons */
+		if (hw->mac.type < e1000_82544 || hw->mac.type == e1000_82547 ||
+		    hw->mac.type == e1000_82547_rev_2) {
+			scctx->isc_capabilities &= ~(IFCAP_TSO | IFCAP_VLAN_HWTSO);
+			scctx->isc_capenable = scctx->isc_capabilities;
+		}
+		/* XXXKB: No IPv6 before this? */
+		if (hw->mac.type < e1000_82545){
+			scctx->isc_capabilities &= ~IFCAP_HWCSUM_IPV6;
+			scctx->isc_capenable = scctx->isc_capabilities;
+		}
+		/* "PCI/PCI-X SDM 4.0" page 33 (b) - FDX requirement on these chips */
+		if (hw->mac.type == e1000_82547 || hw->mac.type == e1000_82547_rev_2)
+			scctx->isc_capenable &= ~(IFCAP_HWCSUM | IFCAP_VLAN_HWCSUM |
+			    IFCAP_HWCSUM_IPV6);
+
 		/* INTx only */
 		scctx->isc_msix_bar = 0;
-		scctx->isc_capenable = scctx->isc_capabilities;
 	}
 
 	/* Setup PCI resources */
@@ -1046,6 +1096,9 @@ em_if_attach_pre(if_ctx_t ctx)
 		goto err_late;
 	}
 
+	/* Clear the IFCAP_TSO auto mask */
+	sc->tso_automasked = 0;
+
 	/* Check SOL/IDER usage */
 	if (e1000_check_reset_block(hw))
 		device_printf(dev, "PHY reset is blocked"
@@ -1102,9 +1155,6 @@ em_if_attach_pre(if_ctx_t ctx)
 	em_fw_version_locked(ctx);
 
 	em_print_fw_version(sc);
-
-	/* Disable ULP support */
-	e1000_disable_ulp_lpt_lp(hw, true);
 
 	/*
 	 * Get Wake-on-Lan and Management info for later use
@@ -1251,6 +1301,7 @@ em_if_mtu_set(if_ctx_t ctx, uint32_t mtu)
 	case e1000_pch_tgp:
 	case e1000_pch_adp:
 	case e1000_pch_mtp:
+	case e1000_pch_ptp:
 	case e1000_82574:
 	case e1000_82583:
 	case e1000_80003es2lan:
@@ -1294,7 +1345,7 @@ em_if_init(if_ctx_t ctx)
 {
 	struct e1000_softc *sc = iflib_get_softc(ctx);
 	if_softc_ctx_t scctx = sc->shared;
-	struct ifnet *ifp = iflib_get_ifp(ctx);
+	if_t ifp = iflib_get_ifp(ctx);
 	struct em_tx_queue *tx_que;
 	int i;
 
@@ -1318,7 +1369,6 @@ em_if_init(if_ctx_t ctx)
 		e1000_rar_set(&sc->hw, sc->hw.mac.addr,
 		    E1000_RAR_ENTRIES - 1);
 	}
-
 
 	/* Initialize the hardware */
 	em_reset(ctx);
@@ -1656,7 +1706,7 @@ static int
 em_if_set_promisc(if_ctx_t ctx, int flags)
 {
 	struct e1000_softc *sc = iflib_get_softc(ctx);
-	struct ifnet *ifp = iflib_get_ifp(ctx);
+	if_t ifp = iflib_get_ifp(ctx);
 	u32 reg_rctl;
 	int mcnt = 0;
 
@@ -1713,7 +1763,7 @@ static void
 em_if_multi_set(if_ctx_t ctx)
 {
 	struct e1000_softc *sc = iflib_get_softc(ctx);
-	struct ifnet *ifp = iflib_get_ifp(ctx);
+	if_t ifp = iflib_get_ifp(ctx);
 	u8  *mta; /* Multicast array memory */
 	u32 reg_rctl = 0;
 	int mcnt = 0;
@@ -1735,6 +1785,9 @@ em_if_multi_set(if_ctx_t ctx)
 
 	mcnt = if_foreach_llmaddr(ifp, em_copy_maddr, mta);
 
+	if (mcnt < MAX_NUM_MULTICAST_ADDRESSES)
+		e1000_update_mc_addr_list(&sc->hw, mta, mcnt);
+
 	reg_rctl = E1000_READ_REG(&sc->hw, E1000_RCTL);
 
 	if (if_getflags(ifp) & IFF_PROMISC)
@@ -1747,9 +1800,6 @@ em_if_multi_set(if_ctx_t ctx)
 		reg_rctl &= ~(E1000_RCTL_UPE | E1000_RCTL_MPE);
 
 	E1000_WRITE_REG(&sc->hw, E1000_RCTL, reg_rctl);
-
-	if (mcnt < MAX_NUM_MULTICAST_ADDRESSES)
-		e1000_update_mc_addr_list(&sc->hw, mta, mcnt);
 
 	if (sc->hw.mac.type == e1000_82542 &&
 	    sc->hw.revision_id == E1000_REVISION_2) {
@@ -1787,6 +1837,7 @@ em_if_update_admin_status(if_ctx_t ctx)
 	struct e1000_hw *hw = &sc->hw;
 	device_t dev = iflib_get_dev(ctx);
 	u32 link_check, thstat, ctrl;
+	bool automasked = false;
 
 	link_check = thstat = ctrl = 0;
 	/* Get the cached link value or read phy for real */
@@ -1864,8 +1915,14 @@ em_if_update_admin_status(if_ctx_t ctx)
 			sc->flags |= IGB_MEDIA_RESET;
 			em_reset(ctx);
 		}
-		iflib_link_state_change(ctx, LINK_STATE_UP,
-		    IF_Mbps(sc->link_speed));
+		/* Only do TSO on gigabit Ethernet for older chips due to errata */
+		if (hw->mac.type < igb_mac_min)
+			automasked = em_automask_tso(ctx);
+
+		/* Automasking resets the interface, so don't mark it up yet */
+		if (!automasked)
+			iflib_link_state_change(ctx, LINK_STATE_UP,
+			    IF_Mbps(sc->link_speed));
 	} else if (!link_check && (sc->link_active == 1)) {
 		sc->link_speed = 0;
 		sc->link_duplex = 0;
@@ -1906,6 +1963,10 @@ em_if_stop(if_ctx_t ctx)
 	struct e1000_softc *sc = iflib_get_softc(ctx);
 
 	INIT_DEBUGOUT("em_if_stop: begin");
+
+	/* I219 needs special flushing to avoid hangs */
+	if (sc->hw.mac.type >= e1000_pch_spt && sc->hw.mac.type < igb_mac_min)
+		em_flush_desc_rings(sc);
 
 	e1000_reset_hw(&sc->hw);
 	if (sc->hw.mac.type >= e1000_82544)
@@ -1972,8 +2033,7 @@ em_allocate_pci_resources(if_ctx_t ctx)
 	sc->hw.hw_addr = (u8 *)&sc->osdep.mem_bus_space_handle;
 
 	/* Only older adapters use IO mapping */
-	if (sc->hw.mac.type < em_mac_min &&
-	    sc->hw.mac.type > e1000_82543) {
+	if (sc->hw.mac.type < em_mac_min && sc->hw.mac.type > e1000_82543) {
 		/* Figure our where our IO BAR is ? */
 		for (rid = PCIR_BAR(0); rid < PCIR_CIS;) {
 			val = pci_read_config(dev, rid, 4);
@@ -2461,6 +2521,113 @@ igb_init_dmac(struct e1000_softc *sc, u32 pba)
 		E1000_WRITE_REG(hw, E1000_DMACR, 0);
 	}
 }
+/*********************************************************************
+ * The 3 following flush routines are used as a workaround in the
+ * I219 client parts and only for them.
+ *
+ * em_flush_tx_ring - remove all descriptors from the tx_ring
+ *
+ * We want to clear all pending descriptors from the TX ring.
+ * zeroing happens when the HW reads the regs. We assign the ring itself as
+ * the data of the next descriptor. We don't care about the data we are about
+ * to reset the HW.
+ **********************************************************************/
+static void
+em_flush_tx_ring(struct e1000_softc *sc)
+{
+	struct e1000_hw		*hw = &sc->hw;
+	struct tx_ring		*txr = &sc->tx_queues->txr;
+	struct e1000_tx_desc	*txd;
+	u32			tctl, txd_lower = E1000_TXD_CMD_IFCS;
+	u16			size = 512;
+
+	tctl = E1000_READ_REG(hw, E1000_TCTL);
+	E1000_WRITE_REG(hw, E1000_TCTL, tctl | E1000_TCTL_EN);
+
+	txd = &txr->tx_base[txr->tx_cidx_processed];
+
+	/* Just use the ring as a dummy buffer addr */
+	txd->buffer_addr = txr->tx_paddr;
+	txd->lower.data = htole32(txd_lower | size);
+	txd->upper.data = 0;
+
+	/* flush descriptors to memory before notifying the HW */
+	wmb();
+
+	E1000_WRITE_REG(hw, E1000_TDT(0), txr->tx_cidx_processed);
+	mb();
+	usec_delay(250);
+}
+
+/*********************************************************************
+ * em_flush_rx_ring - remove all descriptors from the rx_ring
+ *
+ * Mark all descriptors in the RX ring as consumed and disable the rx ring
+ **********************************************************************/
+static void
+em_flush_rx_ring(struct e1000_softc *sc)
+{
+	struct e1000_hw	*hw = &sc->hw;
+	u32		rctl, rxdctl;
+
+	rctl = E1000_READ_REG(hw, E1000_RCTL);
+	E1000_WRITE_REG(hw, E1000_RCTL, rctl & ~E1000_RCTL_EN);
+	E1000_WRITE_FLUSH(hw);
+	usec_delay(150);
+
+	rxdctl = E1000_READ_REG(hw, E1000_RXDCTL(0));
+	/* zero the lower 14 bits (prefetch and host thresholds) */
+	rxdctl &= 0xffffc000;
+	/*
+	 * update thresholds: prefetch threshold to 31, host threshold to 1
+	 * and make sure the granularity is "descriptors" and not "cache lines"
+	 */
+	rxdctl |= (0x1F | (1 << 8) | E1000_RXDCTL_THRESH_UNIT_DESC);
+	E1000_WRITE_REG(hw, E1000_RXDCTL(0), rxdctl);
+
+	/* momentarily enable the RX ring for the changes to take effect */
+	E1000_WRITE_REG(hw, E1000_RCTL, rctl | E1000_RCTL_EN);
+	E1000_WRITE_FLUSH(hw);
+	usec_delay(150);
+	E1000_WRITE_REG(hw, E1000_RCTL, rctl & ~E1000_RCTL_EN);
+}
+
+/*********************************************************************
+ * em_flush_desc_rings - remove all descriptors from the descriptor rings
+ *
+ * In I219, the descriptor rings must be emptied before resetting the HW
+ * or before changing the device state to D3 during runtime (runtime PM).
+ *
+ * Failure to do this will cause the HW to enter a unit hang state which can
+ * only be released by PCI reset on the device
+ *
+ **********************************************************************/
+static void
+em_flush_desc_rings(struct e1000_softc *sc)
+{
+	struct e1000_hw	*hw = &sc->hw;
+	device_t dev = sc->dev;
+	u16		hang_state;
+	u32		fext_nvm11, tdlen;
+
+	/* First, disable MULR fix in FEXTNVM11 */
+	fext_nvm11 = E1000_READ_REG(hw, E1000_FEXTNVM11);
+	fext_nvm11 |= E1000_FEXTNVM11_DISABLE_MULR_FIX;
+	E1000_WRITE_REG(hw, E1000_FEXTNVM11, fext_nvm11);
+
+	/* do nothing if we're not in faulty state, or if the queue is empty */
+	tdlen = E1000_READ_REG(hw, E1000_TDLEN(0));
+	hang_state = pci_read_config(dev, PCICFG_DESC_RING_STATUS, 2);
+	if (!(hang_state & FLUSH_DESC_REQUIRED) || !tdlen)
+		return;
+	em_flush_tx_ring(sc);
+
+	/* recheck, maybe the fault is caused by the rx ring */
+	hang_state = pci_read_config(dev, PCICFG_DESC_RING_STATUS, 2);
+	if (hang_state & FLUSH_DESC_REQUIRED)
+		em_flush_rx_ring(sc);
+}
+
 
 /*********************************************************************
  *
@@ -2473,9 +2640,9 @@ em_reset(if_ctx_t ctx)
 {
 	device_t dev = iflib_get_dev(ctx);
 	struct e1000_softc *sc = iflib_get_softc(ctx);
-	struct ifnet *ifp = iflib_get_ifp(ctx);
+	if_t ifp = iflib_get_ifp(ctx);
 	struct e1000_hw *hw = &sc->hw;
-	u16 rx_buffer_size;
+	u32 rx_buffer_size;
 	u32 pba;
 
 	INIT_DEBUGOUT("em_reset: begin");
@@ -2540,6 +2707,7 @@ em_reset(if_ctx_t ctx)
 	case e1000_pch_tgp:
 	case e1000_pch_adp:
 	case e1000_pch_mtp:
+	case e1000_pch_ptp:
 		pba = E1000_PBA_26K;
 		break;
 	case e1000_82575:
@@ -2570,7 +2738,7 @@ em_reset(if_ctx_t ctx)
 	}
 
 	/* Special needs in case of Jumbo frames */
-	if ((hw->mac.type == e1000_82575) && (ifp->if_mtu > ETHERMTU)) {
+	if ((hw->mac.type == e1000_82575) && (if_getmtu(ifp) > ETHERMTU)) {
 		u32 tx_space, min_tx, min_rx;
 		pba = E1000_READ_REG(hw, E1000_PBA);
 		tx_space = pba >> 16;
@@ -2653,6 +2821,7 @@ em_reset(if_ctx_t ctx)
 	case e1000_pch_tgp:
 	case e1000_pch_adp:
 	case e1000_pch_mtp:
+	case e1000_pch_ptp:
 		hw->fc.high_water = 0x5C20;
 		hw->fc.low_water = 0x5048;
 		hw->fc.pause_time = 0x0650;
@@ -2691,6 +2860,10 @@ em_reset(if_ctx_t ctx)
 			hw->fc.pause_time = 0xFFFF;
 		break;
 	}
+
+	/* I219 needs some special flushing to avoid hangs */
+	if (sc->hw.mac.type >= e1000_pch_spt && sc->hw.mac.type < igb_mac_min)
+		em_flush_desc_rings(sc);
 
 	/* Issue a global reset */
 	e1000_reset_hw(hw);
@@ -2868,7 +3041,7 @@ igb_initialize_rss_mapping(struct e1000_softc *sc)
 static int
 em_setup_interface(if_ctx_t ctx)
 {
-	struct ifnet *ifp = iflib_get_ifp(ctx);
+	if_t ifp = iflib_get_ifp(ctx);
 	struct e1000_softc *sc = iflib_get_softc(ctx);
 	if_softc_ctx_t scctx = sc->shared;
 
@@ -3173,7 +3346,7 @@ em_initialize_receive_unit(if_ctx_t ctx)
 {
 	struct e1000_softc *sc = iflib_get_softc(ctx);
 	if_softc_ctx_t scctx = sc->shared;
-	struct ifnet *ifp = iflib_get_ifp(ctx);
+	if_t ifp = iflib_get_ifp(ctx);
 	struct e1000_hw	*hw = &sc->hw;
 	struct em_rx_queue *que;
 	int i;
@@ -3322,7 +3495,7 @@ em_initialize_receive_unit(if_ctx_t ctx)
 		if (if_getmtu(ifp) > ETHERMTU) {
 			psize = scctx->isc_max_frame_size;
 			/* are we on a vlan? */
-			if (ifp->if_vlantrunk != NULL)
+			if (if_vlantrunkinuse(ifp))
 				psize += VLAN_TAG_SIZE;
 
 			if (sc->vf_ifp)
@@ -3522,7 +3695,7 @@ em_setup_vlan_hw_support(if_ctx_t ctx)
 {
 	struct e1000_softc *sc = iflib_get_softc(ctx);
 	struct e1000_hw *hw = &sc->hw;
-	struct ifnet *ifp = iflib_get_ifp(ctx);
+	if_t ifp = iflib_get_ifp(ctx);
 	u32 reg;
 
 	/* XXXKB: Return early if we are a VF until VF decap and filter management
@@ -3551,8 +3724,10 @@ em_setup_vlan_hw_support(if_ctx_t ctx)
 	/*
 	 * A soft reset zero's out the VFTA, so
 	 * we need to repopulate it now.
+	 * We also insert VLAN 0 in the filter list, so we pass VLAN 0 tagged
+	 * traffic through. This will write the entire table.
 	 */
-	em_if_vlan_filter_write(sc);
+	em_if_vlan_register(ctx, 0);
 
 	/* Enable the Filter Table */
 	em_if_vlan_filter_enable(sc);
@@ -3726,6 +3901,35 @@ em_is_valid_ether_addr(u8 *addr)
 	}
 
 	return (true);
+}
+
+static bool
+em_automask_tso(if_ctx_t ctx)
+{
+	struct e1000_softc *sc = iflib_get_softc(ctx);
+	if_softc_ctx_t scctx = iflib_get_softc_ctx(ctx);
+	if_t ifp = iflib_get_ifp(ctx);
+
+	if (!em_unsupported_tso && sc->link_speed &&
+	    sc->link_speed != SPEED_1000 && scctx->isc_capenable & IFCAP_TSO) {
+		device_printf(sc->dev, "Disabling TSO for 10/100 Ethernet.\n");
+		sc->tso_automasked = scctx->isc_capenable & IFCAP_TSO;
+		scctx->isc_capenable &= ~IFCAP_TSO;
+		if_setcapenablebit(ifp, 0, IFCAP_TSO);
+		/* iflib_init_locked handles ifnet hwassistbits */
+		iflib_request_reset(ctx);
+		return true;
+	} else if (sc->link_speed == SPEED_1000 && sc->tso_automasked) {
+		device_printf(sc->dev, "Re-enabling TSO for GbE.\n");
+		scctx->isc_capenable |= sc->tso_automasked;
+		if_setcapenablebit(ifp, sc->tso_automasked, 0);
+		sc->tso_automasked = 0;
+		/* iflib_init_locked handles ifnet hwassistbits */
+		iflib_request_reset(ctx);
+		return true;
+	}
+
+	return false;
 }
 
 /*
@@ -4157,7 +4361,7 @@ static uint64_t
 em_if_get_counter(if_ctx_t ctx, ift_counter cnt)
 {
 	struct e1000_softc *sc = iflib_get_softc(ctx);
-	struct ifnet *ifp = iflib_get_ifp(ctx);
+	if_t ifp = iflib_get_ifp(ctx);
 
 	switch (cnt) {
 	case IFCOUNTER_COLLISIONS:
@@ -4179,7 +4383,7 @@ em_if_get_counter(if_ctx_t ctx, ift_counter cnt)
  * @ctx: iflib context
  * @event: event code to check
  *
- * Defaults to returning true for unknown events.
+ * Defaults to returning false for unknown events.
  *
  * @returns true if iflib needs to reinit the interface
  */
@@ -4188,9 +4392,8 @@ em_if_needs_restart(if_ctx_t ctx __unused, enum iflib_restart_event event)
 {
 	switch (event) {
 	case IFLIB_RESTART_VLAN_CONFIG:
-		return (false);
 	default:
-		return (true);
+		return (false);
 	}
 }
 
@@ -4832,7 +5035,7 @@ static void
 em_print_debug_info(struct e1000_softc *sc)
 {
 	device_t dev = iflib_get_dev(sc->ctx);
-	struct ifnet *ifp = iflib_get_ifp(sc->ctx);
+	if_t ifp = iflib_get_ifp(sc->ctx);
 	struct tx_ring *txr = &sc->tx_queues->txr;
 	struct rx_ring *rxr = &sc->rx_queues->rxr;
 

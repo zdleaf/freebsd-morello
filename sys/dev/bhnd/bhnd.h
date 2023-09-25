@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2015-2016 Landon Fuller <landon@landonf.org>
  * Copyright (c) 2017 The FreeBSD Foundation
@@ -32,7 +32,6 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGES.
  * 
- * $FreeBSD$
  */
 
 #ifndef _BHND_BHND_H_
@@ -53,10 +52,6 @@
 #include "bhnd_match.h"
 
 #include "nvram/bhnd_nvram.h"
-
-extern devclass_t bhnd_devclass;
-extern devclass_t bhnd_hostb_devclass;
-extern devclass_t bhnd_nvram_devclass;
 
 #define	BHND_CHIPID_MAX_NAMELEN	32	/**< maximum buffer required for a
 					     bhnd_format_chip_id() */
@@ -823,7 +818,7 @@ bhnd_read_iost(device_t dev, uint16_t *iost)
  * @param dev The device to query.
  *
  * @retval true If @p dev is held in RESET or not clocked (BHND_IOCTL_CLK_EN),
- * or an error occured determining @p dev's hardware state.
+ * or an error occurred determining @p dev's hardware state.
  * @retval false If @p dev is clocked and is not held in RESET.
  */
 static inline bool

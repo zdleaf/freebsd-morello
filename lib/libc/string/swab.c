@@ -36,22 +36,21 @@
 static char sccsid[] = "@(#)swab.c	8.1 (Berkeley) 6/4/93";
 #endif /* LIBC_SCCS and not lint */
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <unistd.h>
 
 void
 swab(const void * __restrict from, void * __restrict to, ssize_t len)
 {
-	unsigned long temp;
-	int n;
-	char *fp, *tp;
+	unsigned char temp;
+	size_t n;
+	const unsigned char *fp;
+	unsigned char *tp;
 
 	if (len <= 0)
 		return;
-	n = len >> 1;
-	fp = (char *)from;
-	tp = (char *)to;
+	n  = (size_t)len >> 1;
+	fp = (const unsigned char *)from;
+	tp = (unsigned char *)to;
 #define	STEP	temp = *fp++,*tp++ = *fp++,*tp++ = temp
 	/* round to multiple of 8 */
 	for (; n & 0x7; --n)

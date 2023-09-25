@@ -1,4 +1,3 @@
-/*	$FreeBSD$	*/
 
 /*-
  * Copyright (c) 2005-2007 Damien Bergamini <damien.bergamini@free.fr>
@@ -20,8 +19,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 /*-
  * Ralink Technology RT2501USB/RT2601USB chipset driver
  * http://www.ralinktech.com.tw/
@@ -1076,7 +1073,7 @@ rum_bulk_write_callback(struct usb_xfer *xfer, usb_error_t error)
 	struct rum_tx_data *data;
 	struct mbuf *m;
 	struct usb_page_cache *pc;
-	unsigned int len;
+	unsigned len;
 	int actlen, sumlen;
 
 	usbd_xfer_status(xfer, &actlen, &sumlen, NULL, NULL);
@@ -2490,7 +2487,7 @@ rum_read_eeprom(struct rum_softc *sc)
 static int
 rum_bbp_wakeup(struct rum_softc *sc)
 {
-	unsigned int ntries;
+	unsigned ntries;
 
 	for (ntries = 0; ntries < 100; ntries++) {
 		if (rum_read(sc, RT2573_MAC_CSR12) & 8)
@@ -3294,9 +3291,7 @@ static driver_t rum_driver = {
 	.size = sizeof(struct rum_softc),
 };
 
-static devclass_t rum_devclass;
-
-DRIVER_MODULE(rum, uhub, rum_driver, rum_devclass, NULL, 0);
+DRIVER_MODULE(rum, uhub, rum_driver, NULL, NULL);
 MODULE_DEPEND(rum, wlan, 1, 1, 1);
 MODULE_DEPEND(rum, usb, 1, 1, 1);
 MODULE_VERSION(rum, 1);

@@ -32,8 +32,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 #include <sys/param.h>
@@ -331,7 +329,7 @@ dcons_drv_init(int stage)
 #ifdef __amd64__
 		dg.buf = (struct dcons_buf *)(vm_offset_t)(KERNBASE + addr);
 #else /* __i386__ */
-		dg.buf = (struct dcons_buf *)((vm_offset_t)PMAP_MAP_LOW +
+		dg.buf = (struct dcons_buf *)(vm_offset_t)(PMAP_MAP_LOW +
 		    addr);
 #endif
 		dg.size = size;

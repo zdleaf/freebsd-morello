@@ -25,8 +25,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/ctype.h>
 #include <sys/eventhandler.h>
@@ -242,9 +240,9 @@ open_file(const char *path, struct nameidata *nid)
 
 	pwd_ensure_dirs();
 
-	NDINIT(nid, LOOKUP, 0, UIO_SYSSPACE, path, curthread);
+	NDINIT(nid, LOOKUP, 0, UIO_SYSSPACE, path);
 	rc = vn_open(nid, &flags, 0, NULL);
-	NDFREE(nid, NDF_ONLY_PNBUF);
+	NDFREE_PNBUF(nid);
 	if (rc != 0)
 		return (rc);
 
@@ -349,7 +347,7 @@ parse_entry(char *entry, char *prefix)
 	}
 
 	rc = open_file(path, &nid);
-	NDFREE(&nid, NDF_ONLY_PNBUF);
+	NDFREE_PNBUF(&nid);
 	if (rc != 0)
 		return (rc);
 

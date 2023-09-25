@@ -4,7 +4,6 @@
 # Custom kernel for arm64 plus MMCCAM as opposed to the prior MMC stack. It is
 # present to keep it building in tree since it wouldn't work in LINT.
 #
-# $FreeBSD$
 
 #NO_UNIVERSE
 
@@ -17,7 +16,7 @@ options 	CAM_DEBUG_FLAGS=(CAM_DEBUG_INFO|CAM_DEBUG_PROBE|CAM_DEBUG_PERIPH)
 
 # pass(4) device
 device		pass
-options		MMCCAM
+options 	MMCCAM
 
 nodevice	mmc
 nodevice	mmcsd

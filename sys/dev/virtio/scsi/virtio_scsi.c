@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2012, Bryan Venteicher <bryanv@FreeBSD.org>
  * All rights reserved.
@@ -29,8 +29,6 @@
 /* Driver for VirtIO SCSI devices. */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
@@ -237,10 +235,8 @@ static driver_t vtscsi_driver = {
 	vtscsi_methods,
 	sizeof(struct vtscsi_softc)
 };
-static devclass_t vtscsi_devclass;
 
-VIRTIO_DRIVER_MODULE(virtio_scsi, vtscsi_driver, vtscsi_devclass,
-    vtscsi_modevent, 0);
+VIRTIO_DRIVER_MODULE(virtio_scsi, vtscsi_driver, vtscsi_modevent, NULL);
 MODULE_VERSION(virtio_scsi, 1);
 MODULE_DEPEND(virtio_scsi, virtio, 1, 1, 1);
 MODULE_DEPEND(virtio_scsi, cam, 1, 1, 1);
@@ -1795,7 +1791,7 @@ vtscsi_transport_reset_event(struct vtscsi_softc *sc,
 static void
 vtscsi_handle_event(struct vtscsi_softc *sc, struct virtio_scsi_event *event)
 {
-	int error;
+	int error __diagused;
 
 	if ((event->event & VIRTIO_SCSI_T_EVENTS_MISSED) == 0) {
 		switch (event->event) {

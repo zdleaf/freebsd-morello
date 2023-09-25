@@ -5,7 +5,6 @@
 # this stuff is worth it, you can buy me a beer in return.   Poul-Henning Kamp
 # ----------------------------------------------------------------------------
 #
-# $FreeBSD$
 #
 
 This directory contains various stuff relating to the FreeBSD daemon
@@ -34,6 +33,10 @@ beastie.eps
 		patch < eps.patch
 	Before committing this, clean out the comment brought
 	over from the .fig file to avoid Dollar-FreeBSD-Dollar junk
+
+beastie.svg
+	Created from beastie.eps using an unholy mix of python code
+	and manual editing.
 
 beastie2.eps
 	Written by Rahul Siddharthan beaste2.eps is a

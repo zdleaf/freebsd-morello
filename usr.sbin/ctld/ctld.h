@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2012 The FreeBSD Foundation
  *
@@ -26,8 +26,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 #ifndef CTLD_H
@@ -356,7 +354,7 @@ int			kernel_lun_add(struct lun *lun);
 int			kernel_lun_modify(struct lun *lun);
 int			kernel_lun_remove(struct lun *lun);
 void			kernel_handoff(struct ctld_connection *conn);
-void			kernel_limits(const char *offload,
+void			kernel_limits(const char *offload, int s,
 			    int *max_recv_data_segment_length,
 			    int *max_send_data_segment_length,
 			    int *max_burst_length,

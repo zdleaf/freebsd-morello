@@ -45,8 +45,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/bus.h>
@@ -459,11 +457,9 @@ static driver_t arm_tmr_driver = {
 	sizeof(struct arm_tmr_softc),
 };
 
-static devclass_t arm_tmr_devclass;
-
-EARLY_DRIVER_MODULE(mp_tmr, simplebus, arm_tmr_driver, arm_tmr_devclass, 0, 0,
+EARLY_DRIVER_MODULE(mp_tmr, simplebus, arm_tmr_driver, 0, 0,
     BUS_PASS_TIMER + BUS_PASS_ORDER_MIDDLE);
-EARLY_DRIVER_MODULE(mp_tmr, ofwbus, arm_tmr_driver, arm_tmr_devclass, 0, 0,
+EARLY_DRIVER_MODULE(mp_tmr, ofwbus, arm_tmr_driver, 0, 0,
     BUS_PASS_TIMER + BUS_PASS_ORDER_MIDDLE);
 
 /*

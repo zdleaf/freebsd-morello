@@ -25,8 +25,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 /*
  * file/module function dispatcher, support, etc.
  */
@@ -114,10 +112,14 @@ command_load(int argc, char *argv[])
 	char	*typestr;
 #ifdef LOADER_VERIEXEC
 	char	*prefix, *skip;
+	int	dflag = 0;
+	char	*args = "dkp:s:t:";
+#else
+	char	*args = "kt:";
 #endif
-	int		dflag, dofile, dokld, ch, error;
+	int	dofile, dokld, ch, error;
 
-	dflag = dokld = dofile = 0;
+	dokld = dofile = 0;
 	optind = 1;
 	optreset = 1;
 	typestr = NULL;
@@ -129,11 +131,13 @@ command_load(int argc, char *argv[])
 	prefix = NULL;
 	skip = NULL;
 #endif
-	while ((ch = getopt(argc, argv, "dkp:s:t:")) != -1) {
+	while ((ch = getopt(argc, argv, args)) != -1) {
 		switch(ch) {
+#ifdef LOADER_VERIEXEC
 		case 'd':
 			dflag++;
 			break;
+#endif
 		case 'k':
 			dokld = 1;
 			break;
@@ -605,7 +609,8 @@ file_load_dependencies(struct preloaded_file *base_file)
 		verinfo = (struct mod_depend*)md->md_data;
 		dmodname = (char *)(verinfo + 1);
 		if (file_findmodule(NULL, dmodname, verinfo) == NULL) {
-			printf("loading required module '%s'\n", dmodname);
+			if (module_verbose > MODULE_VERBOSE_SILENT)
+				printf("loading required module '%s'\n", dmodname);
 			error = mod_load(dmodname, verinfo, 0, NULL);
 			if (error)
 				break;
@@ -797,7 +802,8 @@ file_loadraw(const char *fname, char *type, int insert)
 	if (archsw.arch_loadaddr != NULL)
 		loadaddr = archsw.arch_loadaddr(LOAD_RAW, name, loadaddr);
 
-	printf("%s ", name);
+	if (module_verbose > MODULE_VERBOSE_SILENT)
+		printf("%s ", name);
 
 	laddr = loadaddr;
 	for (;;) {
@@ -819,7 +825,8 @@ file_loadraw(const char *fname, char *type, int insert)
 		laddr += got;
 	}
 
-	printf("size=%#jx\n", (uintmax_t)(laddr - loadaddr));
+	if (module_verbose > MODULE_VERBOSE_SILENT)
+		printf("size=%#jx\n", (uintmax_t)(laddr - loadaddr));
 #ifdef LOADER_VERIEXEC_VECTX
 	verror = vectx_close(vctx, VE_MUST, __func__);
 	if (verror) {

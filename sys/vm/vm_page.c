@@ -67,8 +67,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include "opt_vm.h"
 
 #include <sys/param.h>
@@ -327,7 +325,7 @@ vm_page_blacklist_add(vm_paddr_t pa, bool verbose)
 {
 	struct vm_domain *vmd;
 	vm_page_t m;
-	int ret;
+	bool found;
 
 	m = vm_phys_paddr_to_vm_page(pa);
 	if (m == NULL)
@@ -335,15 +333,15 @@ vm_page_blacklist_add(vm_paddr_t pa, bool verbose)
 
 	vmd = vm_pagequeue_domain(m);
 	vm_domain_free_lock(vmd);
-	ret = vm_phys_unfree_page(m);
+	found = vm_phys_unfree_page(m);
 	vm_domain_free_unlock(vmd);
-	if (ret != 0) {
+	if (found) {
 		vm_domain_freecnt_inc(vmd, -1);
 		TAILQ_INSERT_TAIL(&blacklist_head, m, listq);
 		if (verbose)
 			printf("Skipping page with pa 0x%jx\n", (uintmax_t)pa);
 	}
-	return (ret);
+	return (found);
 }
 
 /*
@@ -1483,6 +1481,7 @@ vm_page_insert_after(vm_page_t m, vm_object_t object, vm_pindex_t pindex,
 		return (1);
 	}
 	vm_page_insert_radixdone(m, object, mpred);
+	vm_pager_page_inserted(object, m);
 	return (0);
 }
 
@@ -1545,7 +1544,7 @@ static void
 vm_page_object_remove(vm_page_t m)
 {
 	vm_object_t object;
-	vm_page_t mrem;
+	vm_page_t mrem __diagused;
 
 	vm_page_assert_xbusied(m);
 	object = m->object;
@@ -1556,6 +1555,8 @@ vm_page_object_remove(vm_page_t m)
 	/* Deferred free of swap space. */
 	if ((m->a.flags & PGA_SWAP_FREE) != 0)
 		vm_pager_page_unswapped(m);
+
+	vm_pager_page_removed(object, m);
 
 	m->object = NULL;
 	mrem = vm_radix_remove(&object->rtree, m->pindex);
@@ -1770,7 +1771,7 @@ static bool
 vm_page_replace_hold(vm_page_t mnew, vm_object_t object, vm_pindex_t pindex,
     vm_page_t mold)
 {
-	vm_page_t mret;
+	vm_page_t mret __diagused;
 	bool dropped;
 
 	VM_OBJECT_ASSERT_WLOCKED(object);
@@ -1879,6 +1880,7 @@ vm_page_rename(vm_page_t m, vm_object_t new_object, vm_pindex_t new_pindex)
 
 	vm_page_insert_radixdone(m, new_object, mpred);
 	vm_page_dirty(m);
+	vm_pager_page_inserted(new_object, m);
 	return (0);
 }
 
@@ -2023,6 +2025,8 @@ vm_page_alloc_domain_after(vm_object_t object, vm_pindex_t pindex, int domain,
 
 	flags = 0;
 	m = NULL;
+	if (!vm_pager_can_alloc_page(object, pindex))
+		return (NULL);
 again:
 #if VM_NRESERVLEVEL > 0
 	/*
@@ -2548,7 +2552,7 @@ vm_page_alloc_check(vm_page_t m)
 	KASSERT(pmap_page_get_memattr(m) == VM_MEMATTR_DEFAULT,
 	    ("page %p has unexpected memattr %d",
 	    m, pmap_page_get_memattr(m)));
-	KASSERT(m->valid == 0, ("free page %p is valid", m));
+	KASSERT(vm_page_none_valid(m), ("free page %p is valid", m));
 	pmap_vm_page_alloc_check(m);
 }
 
@@ -2621,7 +2625,7 @@ vm_page_zone_release(void *arg, void **store, int cnt)
  *	span a hole (or discontiguity) in the physical address space.  Both
  *	"alignment" and "boundary" must be a power of two.
  */
-vm_page_t
+static vm_page_t
 vm_page_scan_contig(u_long npages, vm_page_t m_start, vm_page_t m_end,
     u_long alignment, vm_paddr_t boundary, int options)
 {
@@ -2693,8 +2697,7 @@ retry:
 				goto retry;
 			}
 			/* Don't care: PG_NODUMP, PG_ZERO. */
-			if (object->type != OBJT_DEFAULT &&
-			    (object->flags & OBJ_SWAP) == 0 &&
+			if ((object->flags & OBJ_SWAP) == 0 &&
 			    object->type != OBJT_VNODE) {
 				run_ext = 0;
 #if VM_NRESERVLEVEL > 0
@@ -2831,8 +2834,7 @@ vm_page_reclaim_run(int req_class, int domain, u_long npages, vm_page_t m_run,
 			VM_OBJECT_WLOCK(object);
 			/* Don't care: PG_NODUMP, PG_ZERO. */
 			if (m->object != object ||
-			    (object->type != OBJT_DEFAULT &&
-			    (object->flags & OBJ_SWAP) == 0 &&
+			    ((object->flags & OBJ_SWAP) == 0 &&
 			    object->type != OBJT_VNODE))
 				error = EINVAL;
 			else if (object->memattr != VM_MEMATTR_DEFAULT)
@@ -2991,9 +2993,7 @@ unlock:
 
 #define	NRUNS	16
 
-CTASSERT(powerof2(NRUNS));
-
-#define	RUN_INDEX(count)	((count) & (NRUNS - 1))
+#define	RUN_INDEX(count, nruns)	((count) % (nruns))
 
 #define	MIN_RECLAIM	8
 
@@ -3021,18 +3021,40 @@ CTASSERT(powerof2(NRUNS));
  *	must be a power of two.
  */
 bool
-vm_page_reclaim_contig_domain(int domain, int req, u_long npages,
-    vm_paddr_t low, vm_paddr_t high, u_long alignment, vm_paddr_t boundary)
+vm_page_reclaim_contig_domain_ext(int domain, int req, u_long npages,
+    vm_paddr_t low, vm_paddr_t high, u_long alignment, vm_paddr_t boundary,
+    int desired_runs)
 {
 	struct vm_domain *vmd;
-	vm_paddr_t curr_low;
-	vm_page_t m_run, m_runs[NRUNS];
+	vm_page_t bounds[2], m_run, _m_runs[NRUNS], *m_runs;
 	u_long count, minalign, reclaimed;
-	int error, i, options, req_class;
+	int error, i, min_reclaim, nruns, options, req_class, segind;
+	bool ret;
 
 	KASSERT(npages > 0, ("npages is 0"));
 	KASSERT(powerof2(alignment), ("alignment is not a power of 2"));
 	KASSERT(powerof2(boundary), ("boundary is not a power of 2"));
+
+	ret = false;
+
+	/*
+	 * If the caller wants to reclaim multiple runs, try to allocate
+	 * space to store the runs.  If that fails, fall back to the old
+	 * behavior of just reclaiming MIN_RECLAIM pages.
+	 */
+	if (desired_runs > 1)
+		m_runs = malloc((NRUNS + desired_runs) * sizeof(*m_runs),
+		    M_TEMP, M_NOWAIT);
+	else
+		m_runs = NULL;
+
+	if (m_runs == NULL) {
+		m_runs = _m_runs;
+		nruns = NRUNS;
+	} else {
+		nruns = NRUNS + desired_runs - 1;
+	}
+	min_reclaim = MAX(desired_runs * npages, MIN_RECLAIM);
 
 	/*
 	 * The caller will attempt an allocation after some runs have been
@@ -3062,7 +3084,7 @@ vm_page_reclaim_contig_domain(int domain, int req, u_long npages,
 	if (count < npages + vmd->vmd_free_reserved || (count < npages +
 	    vmd->vmd_interrupt_free_min && req_class == VM_ALLOC_SYSTEM) ||
 	    (count < npages && req_class == VM_ALLOC_INTERRUPT))
-		return (false);
+		goto done;
 
 	/*
 	 * Scan up to three times, relaxing the restrictions ("options") on
@@ -3073,35 +3095,38 @@ vm_page_reclaim_contig_domain(int domain, int req, u_long npages,
 		 * Find the highest runs that satisfy the given constraints
 		 * and restrictions, and record them in "m_runs".
 		 */
-		curr_low = low;
 		count = 0;
-		for (;;) {
-			m_run = vm_phys_scan_contig(domain, npages, curr_low,
-			    high, alignment, boundary, options);
-			if (m_run == NULL)
-				break;
-			curr_low = VM_PAGE_TO_PHYS(m_run) + ptoa(npages);
-			m_runs[RUN_INDEX(count)] = m_run;
-			count++;
+		segind = vm_phys_lookup_segind(low);
+		while ((segind = vm_phys_find_range(bounds, segind, domain,
+		    npages, low, high)) != -1) {
+			while ((m_run = vm_page_scan_contig(npages, bounds[0],
+			    bounds[1], alignment, boundary, options))) {
+				bounds[0] = m_run + npages;
+				m_runs[RUN_INDEX(count, nruns)] = m_run;
+				count++;
+			}
+			segind++;
 		}
 
 		/*
 		 * Reclaim the highest runs in LIFO (descending) order until
 		 * the number of reclaimed pages, "reclaimed", is at least
-		 * MIN_RECLAIM.  Reset "reclaimed" each time because each
+		 * "min_reclaim".  Reset "reclaimed" each time because each
 		 * reclamation is idempotent, and runs will (likely) recur
 		 * from one scan to the next as restrictions are relaxed.
 		 */
 		reclaimed = 0;
-		for (i = 0; count > 0 && i < NRUNS; i++) {
+		for (i = 0; count > 0 && i < nruns; i++) {
 			count--;
-			m_run = m_runs[RUN_INDEX(count)];
+			m_run = m_runs[RUN_INDEX(count, nruns)];
 			error = vm_page_reclaim_run(req_class, domain, npages,
 			    m_run, high);
 			if (error == 0) {
 				reclaimed += npages;
-				if (reclaimed >= MIN_RECLAIM)
-					return (true);
+				if (reclaimed >= min_reclaim) {
+					ret = true;
+					goto done;
+				}
 			}
 		}
 
@@ -3113,9 +3138,23 @@ vm_page_reclaim_contig_domain(int domain, int req, u_long npages,
 			options = VPSC_NOSUPER;
 		else if (options == VPSC_NOSUPER)
 			options = VPSC_ANY;
-		else if (options == VPSC_ANY)
-			return (reclaimed != 0);
+		else if (options == VPSC_ANY) {
+			ret = reclaimed != 0;
+			goto done;
+		}
 	}
+done:
+	if (m_runs != _m_runs)
+		free(m_runs, M_TEMP);
+	return (ret);
+}
+
+bool
+vm_page_reclaim_contig_domain(int domain, int req, u_long npages,
+    vm_paddr_t low, vm_paddr_t high, u_long alignment, vm_paddr_t boundary)
+{
+	return (vm_page_reclaim_contig_domain_ext(domain, req, npages, low, high,
+	    alignment, boundary, 1));
 }
 
 bool
@@ -3265,6 +3304,8 @@ vm_wait_doms(const domainset_t *wdoms, int mflags)
 		 */
 		mtx_lock(&vm_domainset_lock);
 		if (vm_page_count_min_set(wdoms)) {
+			if (pageproc == NULL)
+				panic("vm_wait in early boot");
 			vm_min_waiters++;
 			error = msleep(&vm_min_domains, &vm_domainset_lock,
 			    PVM | PDROP | mflags, "vmwait", 0);
@@ -3298,8 +3339,6 @@ vm_wait_domain(int domain)
 		} else
 			mtx_unlock(&vm_domainset_lock);
 	} else {
-		if (pageproc == NULL)
-			panic("vm_wait in early boot");
 		DOMAINSET_ZERO(&wdom);
 		DOMAINSET_SET(vmd->vmd_domain, &wdom);
 		vm_wait_doms(&wdom, 0);
@@ -3658,18 +3697,31 @@ vm_page_pqbatch_submit(vm_page_t m, uint8_t queue)
 {
 	struct vm_batchqueue *bq;
 	struct vm_pagequeue *pq;
-	int domain;
+	int domain, slots_remaining;
 
 	KASSERT(queue < PQ_COUNT, ("invalid queue %d", queue));
 
 	domain = vm_page_domain(m);
 	critical_enter();
 	bq = DPCPU_PTR(pqbatch[domain][queue]);
-	if (vm_batchqueue_insert(bq, m)) {
+	slots_remaining = vm_batchqueue_insert(bq, m);
+	if (slots_remaining > (VM_BATCHQUEUE_SIZE >> 1)) {
+		/* keep building the bq */
+		critical_exit();
+		return;
+	} else if (slots_remaining > 0 ) {
+		/* Try to process the bq if we can get the lock */
+		pq = &VM_DOMAIN(domain)->vmd_pagequeues[queue];
+		if (vm_pagequeue_trylock(pq)) {
+			vm_pqbatch_process(pq, bq, queue);
+			vm_pagequeue_unlock(pq);
+		}
 		critical_exit();
 		return;
 	}
 	critical_exit();
+
+	/* if we make it here, the bq is full so wait for the lock */
 
 	pq = &VM_DOMAIN(domain)->vmd_pagequeues[queue];
 	vm_pagequeue_lock(pq);
@@ -4143,7 +4195,12 @@ vm_page_mvqueue(vm_page_t m, const uint8_t nqueue, const uint16_t nflag)
 		if (nqueue == PQ_ACTIVE)
 			new.act_count = max(old.act_count, ACT_INIT);
 		if (old.queue == nqueue) {
-			if (nqueue != PQ_ACTIVE)
+			/*
+			 * There is no need to requeue pages already in the
+			 * active queue.
+			 */
+			if (nqueue != PQ_ACTIVE ||
+			    (old.flags & PGA_ENQUEUED) == 0)
 				new.flags |= nflag;
 		} else {
 			new.flags |= nflag;
@@ -4197,7 +4254,8 @@ void
 vm_page_unswappable(vm_page_t m)
 {
 
-	KASSERT(!vm_page_wired(m) && (m->oflags & VPO_UNMANAGED) == 0,
+	VM_OBJECT_ASSERT_LOCKED(m->object);
+	KASSERT((m->oflags & VPO_UNMANAGED) == 0,
 	    ("page %p already unswappable", m));
 
 	vm_page_dequeue(m);
@@ -4223,7 +4281,7 @@ vm_page_release_toq(vm_page_t m, uint8_t nqueue, const bool noreuse)
 	 * If we were asked to not cache the page, place it near the head of the
 	 * inactive queue so that is reclaimed sooner.
 	 */
-	if (noreuse || m->valid == 0) {
+	if (noreuse || vm_page_none_valid(m)) {
 		nqueue = PQ_INACTIVE;
 		nflag = PGA_REQUEUE_HEAD;
 	} else {
@@ -4240,7 +4298,8 @@ vm_page_release_toq(vm_page_t m, uint8_t nqueue, const bool noreuse)
 		 * referenced and avoid any queue operations.
 		 */
 		new.flags &= ~PGA_QUEUE_OP_MASK;
-		if (nflag != PGA_REQUEUE_HEAD && old.queue == PQ_ACTIVE)
+		if (nflag != PGA_REQUEUE_HEAD && old.queue == PQ_ACTIVE &&
+		    (old.flags & PGA_ENQUEUED) != 0)
 			new.flags |= PGA_REFERENCED;
 		else {
 			new.flags |= nflag;
@@ -4689,6 +4748,10 @@ retrylookup:
 		*mp = NULL;
 		return (VM_PAGER_FAIL);
 	} else if ((m = vm_page_alloc(object, pindex, pflags)) == NULL) {
+		if (!vm_pager_can_alloc_page(object, pindex)) {
+			*mp = NULL;
+			return (VM_PAGER_AGAIN);
+		}
 		goto retrylookup;
 	}
 
@@ -4700,7 +4763,8 @@ retrylookup:
 		ma[0] = m;
 		for (i = 1; i < after; i++) {
 			if ((ma[i] = vm_page_next(ma[i - 1])) != NULL) {
-				if (ma[i]->valid || !vm_page_tryxbusy(ma[i]))
+				if (vm_page_any_valid(ma[i]) ||
+				    !vm_page_tryxbusy(ma[i]))
 					break;
 			} else {
 				ma[i] = vm_page_alloc(object, m->pindex + i,
@@ -5364,7 +5428,7 @@ vm_page_zero_invalid(vm_page_t m, boolean_t setvalid)
 
 	/*
 	 * setvalid is TRUE when we can safely set the zero'd areas
-	 * as being valid.  We can do this if there are no cache consistancy
+	 * as being valid.  We can do this if there are no cache consistency
 	 * issues.  e.g. it is ok to do with UFS, but not ok to do with NFS.
 	 */
 	if (setvalid)
@@ -5388,7 +5452,7 @@ vm_page_is_valid(vm_page_t m, int base, int size)
 	vm_page_bits_t bits;
 
 	bits = vm_page_bits(base, size);
-	return (m->valid != 0 && (m->valid & bits) == bits);
+	return (vm_page_any_valid(m) && (m->valid & bits) == bits);
 }
 
 /*
@@ -5535,7 +5599,7 @@ vm_page_assert_pga_writeable(vm_page_t m, uint16_t bits)
 
 #include <ddb/ddb.h>
 
-DB_SHOW_COMMAND(page, vm_page_print_page_info)
+DB_SHOW_COMMAND_FLAGS(page, vm_page_print_page_info, DB_CMD_MEMSAFE)
 {
 
 	db_printf("vm_cnt.v_free_count: %d\n", vm_free_count());
@@ -5549,7 +5613,7 @@ DB_SHOW_COMMAND(page, vm_page_print_page_info)
 	db_printf("vm_cnt.v_inactive_target: %d\n", vm_cnt.v_inactive_target);
 }
 
-DB_SHOW_COMMAND(pageq, vm_page_print_pageq_info)
+DB_SHOW_COMMAND_FLAGS(pageq, vm_page_print_pageq_info, DB_CMD_MEMSAFE)
 {
 	int dom;
 

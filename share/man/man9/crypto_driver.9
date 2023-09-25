@@ -28,8 +28,6 @@
 .\"
 .\" * Other names and brands may be claimed as the property of others.
 .\"
-.\" $FreeBSD$
-.\"
 .Dd April 12, 2021
 .Dt CRYPTO_DRIVER 9
 .Os
@@ -290,7 +288,6 @@ indicates which types of requests the driver is able to handle again:
 indicates that the driver is able to handle symmetric requests passed to
 .Fn CRYPTODEV_PROCESS .
 .El
-.Pp
 .Pp
 .Fn hmac_init_ipad
 prepares an authentication context to generate the inner hash of an HMAC.

@@ -69,9 +69,7 @@ MODULE_DEPEND(krping, linuxkpi, 1, 1, 1);
 static __inline uint64_t
 get_cycles(void)
 {
-	uint32_t low, high;
-	__asm __volatile("rdtsc" : "=a" (low), "=d" (high));
-	return (low | ((u_int64_t)high << 32));
+	return (get_cyclecount());
 }
 
 typedef uint64_t cycles_t;
@@ -1135,7 +1133,7 @@ done:
 
 static void bw_test(struct krping_cb *cb)
 {
-	int ccnt, scnt, rcnt;
+	int ccnt, scnt;
 	int iters=cb->count;
 	struct timeval start_tv, stop_tv;
 	cycles_t *post_cycles_start = NULL;
@@ -1149,7 +1147,6 @@ static void bw_test(struct krping_cb *cb)
 
 	ccnt = 0;
 	scnt = 0;
-	rcnt = 0;
 
 	post_cycles_start = kmalloc(cycle_iters * sizeof(cycles_t), GFP_KERNEL);
 	if (!post_cycles_start) {
@@ -1991,7 +1988,7 @@ krping_get_ipv6_scope_id(char *name)
 	CURVNET_RESTORE();
 	if (ifp == NULL)
 		return (0);
-	retval = ifp->if_index;
+	retval = if_getindex(ifp);
 	if_rele(ifp);
 	return (retval);
 }

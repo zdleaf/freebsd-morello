@@ -23,8 +23,6 @@
 .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 .\" SUCH DAMAGE.
 .\"
-.\" $FreeBSD$
-.\"
 .Dd April 24, 2016
 .Dt JEXEC 8
 .Os
@@ -55,6 +53,8 @@ Execute in a clean environment.
 The environment is discarded except for
 .Ev HOME , SHELL , TERM , USER ,
 and anything from the login class capability database for the user.
+.Ev PATH
+is set to "/bin:/usr/bin".
 .It Fl u Ar username
 The user name from host environment as whom the
 .Ar command

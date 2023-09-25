@@ -1,4 +1,3 @@
-# $FreeBSD$
 
 .include <src.opts.mk>
 
@@ -6,6 +5,8 @@ PROG_CXX=	llvm-size
 
 SRCDIR=		llvm/tools/llvm-size
 SRCS+=		llvm-size.cpp
+
+CFLAGS.llvm-size.cpp+=	-Dllvm_size_main=main
 
 .include "${SRCTOP}/lib/clang/llvm.pre.mk"
 
@@ -24,8 +25,8 @@ DPSRCS+=	${TGHDRS}
 CLEANFILES+=	${TGHDRS} ${TGHDRS:C/$/.d/}
 
 .if ${MK_LLVM_BINUTILS} != "no"
-LINKS=		${BINDIR}/llvm-size ${BINDIR}/size
-MLINKS=		llvm-size.1 size.1
+LINKS+=		${BINDIR}/llvm-size ${BINDIR}/size
+MLINKS+=	llvm-size.1 size.1
 .endif
 
 .include "../llvm.prog.mk"

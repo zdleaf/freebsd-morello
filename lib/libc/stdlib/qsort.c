@@ -33,8 +33,6 @@
 static char sccsid[] = "@(#)qsort.c	8.1 (Berkeley) 6/4/93";
 #endif /* LIBC_SCCS and not lint */
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <errno.h>
 #include <stdint.h>
 #include <stdlib.h>
@@ -42,6 +40,8 @@ __FBSDID("$FreeBSD$");
 #include "libc_private.h"
 
 #if defined(I_AM_QSORT_R)
+typedef int		 cmp_t(const void *, const void *, void *);
+#elif defined(I_AM_QSORT_R_COMPAT)
 typedef int		 cmp_t(void *, const void *, const void *);
 #elif defined(I_AM_QSORT_S)
 typedef int		 cmp_t(const void *, const void *, void *);
@@ -72,6 +72,8 @@ swapfunc(char *a, char *b, size_t es)
 	if ((n) > 0) swapfunc(a, b, n)
 
 #if defined(I_AM_QSORT_R)
+#define	CMP(t, x, y) (cmp((x), (y), (t)))
+#elif defined(I_AM_QSORT_R_COMPAT)
 #define	CMP(t, x, y) (cmp((t), (x), (y)))
 #elif defined(I_AM_QSORT_S)
 #define	CMP(t, x, y) (cmp((x), (y), (t)))
@@ -81,7 +83,7 @@ swapfunc(char *a, char *b, size_t es)
 
 static inline char *
 med3(char *a, char *b, char *c, cmp_t *cmp, void *thunk
-#if !defined(I_AM_QSORT_R) && !defined(I_AM_QSORT_S)
+#if !defined(I_AM_QSORT_R) && !defined(I_AM_QSORT_R_COMPAT) && !defined(I_AM_QSORT_S)
 __unused
 #endif
 )
@@ -97,6 +99,8 @@ __unused
  */
 #if defined(I_AM_QSORT_R)
 #define local_qsort local_qsort_r
+#elif defined(I_AM_QSORT_R_COMPAT)
+#define local_qsort local_qsort_r_compat
 #elif defined(I_AM_QSORT_S)
 #define local_qsort local_qsort_s
 #endif
@@ -108,7 +112,8 @@ local_qsort(void *a, size_t n, size_t es, cmp_t *cmp, void *thunk)
 	int cmp_result;
 	int swap_cnt;
 
-	if (__predict_false(n == 0))
+	/* if there are less than 2 elements, then sorting is not needed */
+	if (__predict_false(n < 2))
 		return;
 loop:
 	swap_cnt = 0;
@@ -211,9 +216,15 @@ loop:
 
 #if defined(I_AM_QSORT_R)
 void
-qsort_r(void *a, size_t n, size_t es, void *thunk, cmp_t *cmp)
+(qsort_r)(void *a, size_t n, size_t es, cmp_t *cmp, void *thunk)
 {
 	local_qsort_r(a, n, es, cmp, thunk);
+}
+#elif defined(I_AM_QSORT_R_COMPAT)
+void
+__qsort_r_compat(void *a, size_t n, size_t es, void *thunk, cmp_t *cmp)
+{
+	local_qsort_r_compat(a, n, es, cmp, thunk);
 }
 #elif defined(I_AM_QSORT_S)
 errno_t
@@ -233,6 +244,10 @@ qsort_s(void *a, rsize_t n, rsize_t es, cmp_t *cmp, void *thunk)
 			return (EINVAL);
 		} else if (cmp == NULL) {
 			__throw_constraint_handler_s("qsort_s : cmp == NULL",
+			    EINVAL);
+			return (EINVAL);
+		} else if (es <= 0) {
+			__throw_constraint_handler_s("qsort_s : es <= 0",
 			    EINVAL);
 			return (EINVAL);
 		}
