@@ -1,4 +1,3 @@
-# $FreeBSD$
 
 .if !target(__${_this}__)
 __${_this}__:
@@ -14,12 +13,15 @@ __${_this}__:
 
 # XXX: This should be combined with external compiler support in Makefile.inc1
 # and local.meta.sys.mk (CROSS_TARGET_FLAGS)
-.if ${MK_SYSROOT} == "yes" && !empty(SYSROOT) && ${MACHINE} != "host"
+.if ${MK_SYSROOT} == "yes" && !empty(SYSROOT) && ${MACHINE:Nhost*} != ""
 CFLAGS_LAST+= --sysroot=${SYSROOT}
 CXXFLAGS_LAST+= --sysroot=${SYSROOT}
 LDADD+= --sysroot=${SYSROOT}
 .elif ${MK_STAGING} == "yes"
-CFLAGS+= -isystem ${STAGE_INCLUDEDIR}
+ISYSTEM?= ${STAGE_INCLUDEDIR}
+# no space after -isystem makes it easier to
+# grep the flag out of command lines (in meta files) to see its value.
+CFLAGS+= -isystem${ISYSTEM}
 # XXX: May be needed for GCC to build with libc++ rather than libstdc++. See Makefile.inc1
 #CXXFLAGS+= -std=gnu++11
 #LDADD+= -L${STAGE_LIBDIR}/libc++
@@ -27,8 +29,8 @@ CFLAGS+= -isystem ${STAGE_INCLUDEDIR}
 LDADD+= -L${STAGE_LIBDIR}
 .endif
 
-.if ${MACHINE} == "host"
-.if ${.MAKE.DEPENDFILE:E} != "host"
+.if ${MACHINE:Nhost*} == ""
+.if ${.MAKE.DEPENDFILE:E:Nhost*} != ""
 UPDATE_DEPENDFILE?= no
 .endif
 HOST_CFLAGS+= -DHOSTPROG
@@ -36,5 +38,6 @@ CFLAGS+= ${HOST_CFLAGS}
 .endif
 
 .-include "src.init.mk"
+.-include <site.init.mk>
 .-include "${.CURDIR}/local.init.mk"
 .endif

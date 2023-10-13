@@ -1,6 +1,5 @@
 #!/bin/sh
 #
-# $FreeBSD$
 #
 
 # PROVIDE: motd
@@ -26,7 +25,7 @@ motd_start()
 	#	Must be done *before* interactive logins are possible
 	#	to prevent possible race conditions.
 	#
-	check_startmsgs && echo -n 'Updating motd:'
+	startmsg -n 'Updating motd:'
 	if [ ! -f "${TEMPLATE}" ]; then
 		# Create missing template from existing regular motd file, if
 		# one exists.
@@ -38,20 +37,21 @@ motd_start()
 			# Otherwise, create an empty template file.
 			install -c -o root -g wheel -m ${PERMS} /dev/null "${TEMPLATE}"
 		fi
-		# Provide compatibility symlink:
-		if [ ! -h "${COMPAT_MOTD}" ]; then
-			ln -sF "${TARGET}" "${COMPAT_MOTD}"
-		fi
+	fi
+	# Provide compatibility symlink:
+	if [ ! -h "${COMPAT_MOTD}" ]; then
+		ln -sF "${TARGET}" "${COMPAT_MOTD}"
 	fi
 
 	T=`mktemp -t motd`
-	uname -v | sed -e 's,^\([^#]*\) #\(.* [1-2][0-9][0-9][0-9]\).*/\([^\]*\) $,\1 (\3) #\2,' > ${T}
+	uname -v | sed -e 's,^\([^#]*\) #\(.* [1-2][0-9][0-9][0-9]\).*/\([^\]*\)$,\1 (\3) #\2,' \
+	    -e 's,^\([^ ]*\) \([^ ]*\) \([^ ]*\) \([^ ]*\)$,\1 \2 (\4) \3,' > ${T}
 	cat "${TEMPLATE}" >> ${T}
 
 	install -C -o root -g wheel -m "${PERMS}" "$T" "${TARGET}"
 	rm -f "$T"
 
-	check_startmsgs && echo '.'
+	startmsg '.'
 }
 
 load_rc_config $name

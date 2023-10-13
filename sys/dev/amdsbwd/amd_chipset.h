@@ -22,8 +22,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 /*
@@ -53,7 +51,7 @@
  *     "KERNCZ" or "CZ")
  *
  * The register definitions are compatible within the classes and may be
- * incompatible accross them.
+ * incompatible across them.
  */
 
 /*

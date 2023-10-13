@@ -25,9 +25,8 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
+#include <sys/systm.h>
 #include <sys/kernel.h>
 #include <sys/lock.h>
 #include <sys/queue.h>
@@ -36,8 +35,6 @@ __FBSDID("$FreeBSD$");
 
 #include <dev/extres/phy/phy_usb.h>
 #include <dev/extres/phy/phy_internal.h>
-
-#include "phydev_if.h"
 
 /*
  * USB phy controller methods.

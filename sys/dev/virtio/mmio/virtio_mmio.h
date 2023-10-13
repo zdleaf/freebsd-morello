@@ -26,8 +26,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 #ifndef	_VIRTIO_MMIO_H
@@ -83,7 +81,7 @@ int vtmmio_attach(device_t);
 #define	VIRTIO_MMIO_QUEUE_AVAIL_HIGH	0x094	/* requires version 2 */
 #define	VIRTIO_MMIO_QUEUE_USED_LOW	0x0a0	/* requires version 2 */
 #define	VIRTIO_MMIO_QUEUE_USED_HIGH	0x0a4	/* requires version 2 */
-#define	VIRTIO_MMIO_CONFIG_GENERATION	0x100	/* requires version 2 */
+#define	VIRTIO_MMIO_CONFIG_GENERATION	0x0fc	/* requires version 2 */
 #define	VIRTIO_MMIO_CONFIG		0x100
 #define	VIRTIO_MMIO_MAGIC_VIRT		0x74726976
 #define	VIRTIO_MMIO_INT_VRING		(1 << 0)

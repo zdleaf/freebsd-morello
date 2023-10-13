@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2009-2020 Alexander Motin <mav@FreeBSD.org>
  * Copyright (c) 1997-2008 by Matthew Jacob
@@ -31,8 +31,6 @@
  * FreeBSD Version.
  */
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
@@ -99,6 +97,16 @@ static struct ispmdvec mdvec_2700 = {
 	NULL
 };
 
+static struct ispmdvec mdvec_2800 = {
+	isp_pci_run_isr_2400,
+	isp_pci_rd_reg_2600,
+	isp_pci_wr_reg_2600,
+	isp_pci_mbxdma,
+	isp_send_cmd,
+	isp_pci_irqsetup,
+	NULL
+};
+
 #ifndef	PCIM_CMD_INVEN
 #define	PCIM_CMD_INVEN			0x10
 #endif
@@ -143,6 +151,8 @@ static struct ispmdvec mdvec_2700 = {
 #define	PCI_PRODUCT_QLOGIC_ISP2692	0x2b61
 #define	PCI_PRODUCT_QLOGIC_ISP2714	0x2071
 #define	PCI_PRODUCT_QLOGIC_ISP2722	0x2261
+#define	PCI_PRODUCT_QLOGIC_ISP2812	0x2281
+#define	PCI_PRODUCT_QLOGIC_ISP2814	0x2081
 
 #define	PCI_QLOGIC_ISP2422	\
 	((PCI_PRODUCT_QLOGIC_ISP2422 << 16) | PCI_VENDOR_QLOGIC)
@@ -164,6 +174,10 @@ static struct ispmdvec mdvec_2700 = {
 	((PCI_PRODUCT_QLOGIC_ISP2714 << 16) | PCI_VENDOR_QLOGIC)
 #define	PCI_QLOGIC_ISP2722	\
 	((PCI_PRODUCT_QLOGIC_ISP2722 << 16) | PCI_VENDOR_QLOGIC)
+#define	PCI_QLOGIC_ISP2812	\
+	((PCI_PRODUCT_QLOGIC_ISP2812 << 16) | PCI_VENDOR_QLOGIC)
+#define	PCI_QLOGIC_ISP2814	\
+	((PCI_PRODUCT_QLOGIC_ISP2814 << 16) | PCI_VENDOR_QLOGIC)
 
 #define	PCI_DFLT_LTNCY	0x40
 #define	PCI_DFLT_LNSZ	0x10
@@ -205,8 +219,8 @@ static device_method_t isp_pci_methods[] = {
 static driver_t isp_pci_driver = {
 	"isp", isp_pci_methods, sizeof (struct isp_pcisoftc)
 };
-static devclass_t isp_devclass;
-DRIVER_MODULE(isp, pci, isp_pci_driver, isp_devclass, 0, 0);
+
+DRIVER_MODULE(isp, pci, isp_pci_driver, 0, 0);
 MODULE_DEPEND(isp, cam, 1, 1, 1);
 MODULE_DEPEND(isp, firmware, 1, 1, 1);
 static int isp_nvports = 0;
@@ -244,6 +258,12 @@ isp_pci_probe(device_t dev)
 		break;
 	case PCI_QLOGIC_ISP2722:
 		device_set_desc(dev, "Qlogic ISP 2722 PCI FC Adapter");
+		break;
+	case PCI_QLOGIC_ISP2812:
+		device_set_desc(dev, "Qlogic ISP 2812 PCI FC Adapter");
+		break;
+	case PCI_QLOGIC_ISP2814:
+		device_set_desc(dev, "Qlogic ISP 2814 PCI FC Adapter");
 		break;
 	default:
 		return (ENXIO);
@@ -493,6 +513,12 @@ isp_pci_attach(device_t dev)
 		isp->isp_mdvec = &mdvec_2700;
 		isp->isp_type = ISP_HA_FC_2700;
 		break;
+	case PCI_QLOGIC_ISP2812:
+	case PCI_QLOGIC_ISP2814:
+		did = 0x2800;
+		isp->isp_mdvec = &mdvec_2800;
+		isp->isp_type = ISP_HA_FC_2800;
+		break;
 	default:
 		device_printf(dev, "unknown device type\n");
 		goto bad;
@@ -627,7 +653,7 @@ bad:
 	if (isp->isp_osinfo.fw == NULL && !IS_26XX(isp)) {
 		/*
 		 * Failure to attach at boot time might have been caused
-		 * by a missing ispfw(4).  Except for for 16Gb adapters,
+		 * by a missing ispfw(4).  Except for 16Gb adapters,
 		 * there's no loadable firmware for them.
 		 */
 		isp_prt(isp, ISP_LOGWARN, "See the ispfw(4) man page on "

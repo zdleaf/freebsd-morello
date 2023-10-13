@@ -30,7 +30,6 @@
   POSSIBILITY OF SUCH DAMAGE.
 
 ******************************************************************************/
-/*$FreeBSD$*/
 
 #ifndef _IXL_IW_H_
 #define _IXL_IW_H_
@@ -52,7 +51,7 @@ struct ixl_iw_msix {
 
 struct ixl_iw_pf {
 	void		*handle;
-	struct ifnet	*ifp;
+	if_t		ifp;
 	device_t	dev;
 	struct resource	*pci_mem;
 	u8		pf_id;

@@ -69,8 +69,6 @@
 #include "opt_mac.h"
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/condvar.h>
@@ -145,6 +143,7 @@ FPFLAG_RARE(vnode_check_access);
 FPFLAG_RARE(vnode_check_readlink);
 FPFLAG_RARE(pipe_check_stat);
 FPFLAG_RARE(pipe_check_poll);
+FPFLAG_RARE(pipe_check_read);
 FPFLAG_RARE(ifnet_create_mbuf);
 FPFLAG_RARE(ifnet_check_transmit);
 
@@ -447,6 +446,8 @@ struct mac_policy_fastpath_elem mac_policy_fastpath_array[] = {
 		.flag = &mac_pipe_check_stat_fp_flag },
 	{ .offset = FPO(pipe_check_poll),
 		.flag = &mac_pipe_check_poll_fp_flag },
+	{ .offset = FPO(pipe_check_read),
+		.flag = &mac_pipe_check_read_fp_flag },
 	{ .offset = FPO(ifnet_create_mbuf),
 		.flag = &mac_ifnet_create_mbuf_fp_flag },
 	{ .offset = FPO(ifnet_check_transmit),
@@ -516,7 +517,8 @@ mac_policy_fastpath_unregister(struct mac_policy_conf *mpc)
 static int
 mac_policy_register(struct mac_policy_conf *mpc)
 {
-	struct mac_policy_conf *tmpc;
+	struct mac_policy_list_head *mpc_list;
+	struct mac_policy_conf *last_mpc, *tmpc;
 	int error, slot, static_entry;
 
 	error = 0;
@@ -536,19 +538,14 @@ mac_policy_register(struct mac_policy_conf *mpc)
 	static_entry = (!mac_late &&
 	    !(mpc->mpc_loadtime_flags & MPC_LOADTIME_FLAG_UNLOADOK));
 
-	if (static_entry) {
-		LIST_FOREACH(tmpc, &mac_static_policy_list, mpc_list) {
-			if (strcmp(tmpc->mpc_name, mpc->mpc_name) == 0) {
-				error = EEXIST;
-				goto out;
-			}
-		}
-	} else {
-		LIST_FOREACH(tmpc, &mac_policy_list, mpc_list) {
-			if (strcmp(tmpc->mpc_name, mpc->mpc_name) == 0) {
-				error = EEXIST;
-				goto out;
-			}
+	mpc_list = (static_entry) ? &mac_static_policy_list :
+	    &mac_policy_list;
+	last_mpc = NULL;
+	LIST_FOREACH(tmpc, mpc_list, mpc_list) {
+		last_mpc = tmpc;
+		if (strcmp(tmpc->mpc_name, mpc->mpc_name) == 0) {
+			error = EEXIST;
+			goto out;
 		}
 	}
 	if (mpc->mpc_field_off != NULL) {
@@ -564,16 +561,14 @@ mac_policy_register(struct mac_policy_conf *mpc)
 	mpc->mpc_runtime_flags |= MPC_RUNTIME_FLAG_REGISTERED;
 
 	/*
-	 * If we're loading a MAC module after the framework has initialized,
-	 * it has to go into the dynamic list.  If we're loading it before
-	 * we've finished initializing, it can go into the static list with
-	 * weaker locker requirements.
+	 * Some modules may depend on the operations of its dependencies.
+	 * Inserting modules in order of registration ensures operations
+	 * that work on the module list retain dependency order.
 	 */
-	if (static_entry)
-		LIST_INSERT_HEAD(&mac_static_policy_list, mpc, mpc_list);
+	if (last_mpc == NULL)
+		LIST_INSERT_HEAD(mpc_list, mpc, mpc_list);
 	else
-		LIST_INSERT_HEAD(&mac_policy_list, mpc, mpc_list);
-
+		LIST_INSERT_AFTER(last_mpc, mpc, mpc_list);
 	/*
 	 * Per-policy initialization.  Currently, this takes place under the
 	 * exclusive lock, so policies must not sleep in their init method.

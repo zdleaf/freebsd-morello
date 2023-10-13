@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 1992, 1993, 1995
  *	The Regents of the University of California.  All rights reserved.
@@ -32,8 +32,6 @@
  *
  *	@(#)kernfs_vfsops.c	8.10 (Berkeley) 5/14/95
  * From: FreeBSD: src/sys/miscfs/kernfs/kernfs_vfsops.c 1.36
- *
- * $FreeBSD$
  */
 
 #include <sys/param.h>
@@ -226,12 +224,12 @@ static int
 devfs_statfs(struct mount *mp, struct statfs *sbp)
 {
 
-	sbp->f_flags = 0;
+	sbp->f_flags = mp->mnt_flag & MNT_IGNORE;
 	sbp->f_bsize = DEV_BSIZE;
 	sbp->f_iosize = DEV_BSIZE;
 	sbp->f_blocks = 2;		/* 1K to keep df happy */
-	sbp->f_bfree = 0;
-	sbp->f_bavail = 0;
+	sbp->f_bfree = 2;
+	sbp->f_bavail = 2;
 	sbp->f_files = 0;
 	sbp->f_ffree = 0;
 	return (0);

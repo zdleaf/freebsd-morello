@@ -1,6 +1,5 @@
 #!/bin/sh
 #
-# $FreeBSD$
 #
 
 # PROVIDE: jail
@@ -127,7 +126,9 @@ parse_options()
 		if [ -r "$_jconf" ]; then
 			_conf="$_jconf"
 			return 0
-		elif [ -r "$_jconfdir" ]; then
+		elif [ -r "$_jconfdir" ] && ! egrep -q \
+		    '^\s*\.include\s*["'\'']?/etc/jail.conf.d/' "$jail_conf" \
+		    2>/dev/null; then
 			_conf="$_jconfdir"
 			return 0
 		elif [ -r "$jail_conf" ]; then
@@ -450,7 +451,7 @@ jail_start()
 	if [ $# = 0 ]; then
 		return
 	fi
-	echo -n 'Starting jails:'
+	startmsg -n 'Starting jails:'
 	case $1 in
 	_ALL)
 		command=$jail_program
@@ -462,14 +463,14 @@ jail_start()
 		_tmp=`mktemp -t jail` || exit 3
 		if $command $rc_flags $command_args >> $_tmp 2>&1; then
 			$jail_jls jid name | while read _id _name; do
-				echo -n " $_name"
+				startmsg -n " $_name"
 				echo $_id > /var/run/jail_${_name}.id
 			done
 		else
 			cat $_tmp
 		fi
 		rm -f $_tmp
-		echo '.'
+		startmsg '.'
 		return
 	;;
 	esac
@@ -490,11 +491,11 @@ jail_start()
 				_tmp=`mktemp -t jail_${_j}` || exit 3
 				if $command $rc_flags $command_args \
 				    >> $_tmp 2>&1 </dev/null; then
-					echo -n " ${_hostname:-${_j}}"
+					startmsg -n " ${_hostname:-${_j}}"
 					_jid=$($jail_jls -j $_j jid)
 					echo $_jid > /var/run/jail_${_j}.id
 				else
-					echo " cannot start jail " \
+					startmsg " cannot start jail " \
 					    "\"${_hostname:-${_j}}\": "
 					cat $_tmp
 				fi
@@ -517,18 +518,18 @@ jail_start()
 			_tmp=`mktemp -t jail` || exit 3
 			if $command $rc_flags $command_args \
 			    >> $_tmp 2>&1 </dev/null; then
-				echo -n " ${_hostname:-${_j}}"
+				startmsg -n " ${_hostname:-${_j}}"
 				_jid=$($jail_jls -j $_j jid)
 				echo $_jid > /var/run/jail_${_j}.id
 			else
-				echo " cannot start jail " \
+				startmsg " cannot start jail " \
 				    "\"${_hostname:-${_j}}\": "
 				cat $_tmp
 			fi
 			rm -f $_tmp
 		done
 	fi
-	echo '.'
+	startmsg '.'
 }
 
 jail_stop()

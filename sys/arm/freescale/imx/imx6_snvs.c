@@ -25,8 +25,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 /*
  * Driver for imx6 Secure Non-Volatile Storage system, which really means "all
  * the stuff that's powered by a battery when main power is off".  This includes
@@ -229,7 +227,5 @@ static driver_t snvs_driver = {
 	sizeof(struct snvs_softc),
 };
 
-static devclass_t snvs_devclass;
-
-DRIVER_MODULE(snvs, simplebus, snvs_driver, snvs_devclass, 0, 0);
+DRIVER_MODULE(snvs, simplebus, snvs_driver, 0, 0);
 SIMPLEBUS_PNP_INFO(compat_data);

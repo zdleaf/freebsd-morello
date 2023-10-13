@@ -75,7 +75,7 @@ static void execute_one(void);
 
 static void loop(void)
 {
-  int iter = 0;
+  int iter __unused = 0;
   for (;; iter++) {
     int pid = fork();
     if (pid < 0)
@@ -120,5 +120,5 @@ mycc -o /tmp/syzkaller42 -Wall -Wextra -O0 /tmp/syzkaller42.c -lpthread ||
 
 (cd /tmp; timeout 3m ./syzkaller42)
 
-rm -rf /tmp/syzkaller42 syzkaller42.c /tmp/syzkaller.*
+rm -rf /tmp/syzkaller42 /tmp/syzkaller42.c /tmp/syzkaller.*
 exit 0

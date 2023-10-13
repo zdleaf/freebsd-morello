@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 1999 Seigo Tanimura
  * All rights reserved.
@@ -54,8 +54,6 @@
 
 #include <dev/sound/pci/cs461x_dsp.h>
 
-SND_DECLARE_FILE("$FreeBSD$");
-
 /* This is the pci device id. */
 #define CS4610_PCI_ID 0x60011013
 #define CS4614_PCI_ID 0x60031013
@@ -97,8 +95,6 @@ static driver_intr_t csa_intr;
 static int csa_initialize(sc_p scp);
 static int csa_downloadimage(csa_res *resp);
 static int csa_transferimage(csa_res *resp, u_int32_t *src, u_long dest, u_long len);
-
-static devclass_t csa_devclass;
 
 static void
 amp_none(void)
@@ -468,7 +464,7 @@ csa_setup_intr(device_t bus, device_t child,
 
 	/*
 	 * Look at the function code of the child to determine
-	 * the appropriate hander for it.
+	 * the appropriate handler for it.
 	 */
 	func = device_get_ivars(child);
 	if (func == NULL || irq != resp->irq)
@@ -508,7 +504,7 @@ csa_teardown_intr(device_t bus, device_t child,
 
 	/*
 	 * Look at the function code of the child to determine
-	 * the appropriate hander for it.
+	 * the appropriate handler for it.
 	 */
 	func = device_get_ivars(child);
 	if (func == NULL || irq != resp->irq || cookie != scp)
@@ -1107,6 +1103,6 @@ static driver_t csa_driver = {
 /*
  * csa can be attached to a pci bus.
  */
-DRIVER_MODULE(snd_csa, pci, csa_driver, csa_devclass, 0, 0);
+DRIVER_MODULE(snd_csa, pci, csa_driver, 0, 0);
 MODULE_DEPEND(snd_csa, sound, SOUND_MINVER, SOUND_PREFVER, SOUND_MAXVER);
 MODULE_VERSION(snd_csa, 1);

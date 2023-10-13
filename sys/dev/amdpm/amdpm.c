@@ -33,8 +33,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/bus.h>
 #include <sys/kernel.h>
@@ -634,8 +632,6 @@ error:
 	return (error);
 }
 
-static devclass_t amdpm_devclass;
-
 static device_method_t amdpm_methods[] = {
 	/* Device interface */
 	DEVMETHOD(device_probe,		amdpm_probe),
@@ -662,8 +658,8 @@ static driver_t amdpm_driver = {
 	sizeof(struct amdpm_softc),
 };
 
-DRIVER_MODULE(amdpm, pci, amdpm_driver, amdpm_devclass, 0, 0);
-DRIVER_MODULE(smbus, amdpm, smbus_driver, smbus_devclass, 0, 0);
+DRIVER_MODULE(amdpm, pci, amdpm_driver, 0, 0);
+DRIVER_MODULE(smbus, amdpm, smbus_driver, 0, 0);
 
 MODULE_DEPEND(amdpm, pci, 1, 1, 1);
 MODULE_DEPEND(amdpm, smbus, SMBUS_MINVER, SMBUS_PREFVER, SMBUS_MAXVER);

@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2002 Adaptec Inc.
  * All rights reserved.
@@ -29,8 +29,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <dev/ips/ipsreg.h>
 #include <dev/ips/ips.h>
 
@@ -219,5 +217,4 @@ static driver_t ips_pci_driver = {
         sizeof(ips_softc_t),
 };
 
-static devclass_t ips_devclass;
-DRIVER_MODULE(ips, pci, ips_pci_driver, ips_devclass, 0, 0);
+DRIVER_MODULE(ips, pci, ips_pci_driver, 0, 0);

@@ -24,8 +24,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/bus.h>
@@ -120,5 +118,5 @@ proto_isa_attach(device_t dev)
 	return (proto_attach(dev));
 }
 
-DRIVER_MODULE(proto, acpi, proto_isa_driver, proto_devclass, NULL, NULL);
-DRIVER_MODULE(proto, isa, proto_isa_driver, proto_devclass, NULL, NULL);
+DRIVER_MODULE(proto, acpi, proto_isa_driver, NULL, NULL);
+DRIVER_MODULE(proto, isa, proto_isa_driver, NULL, NULL);

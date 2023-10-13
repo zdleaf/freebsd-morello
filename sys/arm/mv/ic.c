@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2006 Benno Rice.
  * Copyright (C) 2007-2008 MARVELL INTERNATIONAL LTD.
@@ -31,8 +31,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/bus.h>
@@ -146,9 +144,7 @@ static driver_t mv_ic_driver = {
 	sizeof(struct mv_ic_softc),
 };
 
-static devclass_t mv_ic_devclass;
-
-DRIVER_MODULE(ic, simplebus, mv_ic_driver, mv_ic_devclass, 0, 0);
+DRIVER_MODULE(ic, simplebus, mv_ic_driver, 0, 0);
 
 int
 arm_get_next_irq(int last)

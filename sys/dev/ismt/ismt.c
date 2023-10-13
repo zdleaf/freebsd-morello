@@ -28,8 +28,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/bus.h>
@@ -772,10 +770,8 @@ static driver_t ismt_pci_driver = {
 	sizeof(struct ismt_softc)
 };
 
-static devclass_t ismt_pci_devclass;
-
-DRIVER_MODULE(ismt, pci, ismt_pci_driver, ismt_pci_devclass, 0, 0);
-DRIVER_MODULE(smbus, ismt, smbus_driver, smbus_devclass, 0, 0);
+DRIVER_MODULE(ismt, pci, ismt_pci_driver, 0, 0);
+DRIVER_MODULE(smbus, ismt, smbus_driver, 0, 0);
 
 MODULE_DEPEND(ismt, pci, 1, 1, 1);
 MODULE_DEPEND(ismt, smbus, SMBUS_MINVER, SMBUS_PREFVER, SMBUS_MAXVER);

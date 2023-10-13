@@ -29,8 +29,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/bus.h>
@@ -224,6 +222,5 @@ static driver_t aw_ts_driver = {
 	aw_ts_methods,
 	sizeof(struct aw_ts_softc),
 };
-static devclass_t aw_ts_devclass;
 
-DRIVER_MODULE(aw_ts, simplebus, aw_ts_driver, aw_ts_devclass, 0, 0);
+DRIVER_MODULE(aw_ts, simplebus, aw_ts_driver, 0, 0);

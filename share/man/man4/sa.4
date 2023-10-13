@@ -23,8 +23,6 @@
 .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 .\" SUCH DAMAGE.
 .\"
-.\" $FreeBSD$
-.\"
 .Dd January 18, 2022
 .Dt SA 4
 .Os
@@ -340,7 +338,7 @@ driver will use the drive's recommended timeouts for commands.
 .Pp
 The timeouts in use are reported in units of
 .Sy thousandths
-of a second via the 
+of a second via the
 .Va kern.cam.sa.%d.timeout.*
 .Xr sysctl 8
 variables.

@@ -40,8 +40,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 /*
  * Print multicast routing structures and statistics.
  *
@@ -236,7 +234,7 @@ print_mfc(struct mfc *m, int maxvif, int *banner_printed)
 }
 
 void
-mroutepr()
+mroutepr(void)
 {
 	struct sockaddr_in sin;
 	struct sockaddr *sa = (struct sockaddr *)&sin;
@@ -411,7 +409,7 @@ mroutepr()
 }
 
 void
-mrt_stats()
+mrt_stats(void)
 {
 	struct mrtstat mrtstat;
 	u_long mstaddr;

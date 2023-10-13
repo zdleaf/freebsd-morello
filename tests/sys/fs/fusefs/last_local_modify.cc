@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2021 Alan Somers
  *
@@ -23,8 +23,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 extern "C" {
@@ -119,6 +117,7 @@ static void* allocate_th(void* arg) {
 		return (void*)(intptr_t)errno;
 
 	r = posix_fallocate(fd, 0, 15);
+	LastLocalModify::leak(fd);
 	if (r >= 0)
 		return 0;
 	else
@@ -160,6 +159,7 @@ static void* setattr_th(void* arg) {
 		return (void*)(intptr_t)errno;
 
 	r = ftruncate(fd, 15);
+	LastLocalModify::leak(fd);
 	if (r >= 0)
 		return 0;
 	else
@@ -504,7 +504,7 @@ TEST_P(LastLocalModify, vfs_vget)
 }
 
 
-INSTANTIATE_TEST_CASE_P(LLM, LastLocalModify,
+INSTANTIATE_TEST_SUITE_P(LLM, LastLocalModify,
 	Values(
 		"VOP_ALLOCATE",
 		"VOP_COPY_FILE_RANGE",

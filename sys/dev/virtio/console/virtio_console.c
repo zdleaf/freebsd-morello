@@ -27,8 +27,6 @@
 /* Driver for VirtIO console devices. */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/ctype.h>
 #include <sys/systm.h>
@@ -261,10 +259,8 @@ static driver_t vtcon_driver = {
 	vtcon_methods,
 	sizeof(struct vtcon_softc)
 };
-static devclass_t vtcon_devclass;
 
-VIRTIO_DRIVER_MODULE(virtio_console, vtcon_driver, vtcon_devclass,
-    vtcon_modevent, 0);
+VIRTIO_DRIVER_MODULE(virtio_console, vtcon_driver, vtcon_modevent, NULL);
 MODULE_VERSION(virtio_console, 1);
 MODULE_DEPEND(virtio_console, virtio, 1, 1, 1);
 
@@ -547,7 +543,7 @@ vtcon_alloc_virtqueues(struct vtcon_softc *sc)
 		portidx++;
 	}
 
-	error = virtio_alloc_virtqueues(dev, 0, nvqs, info);
+	error = virtio_alloc_virtqueues(dev, nvqs, info);
 	free(info, M_TEMP);
 
 	return (error);

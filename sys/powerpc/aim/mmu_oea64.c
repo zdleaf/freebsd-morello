@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2008-2015 Nathan Whitehorn
  * All rights reserved.
@@ -27,8 +27,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 /*
  * Manages physical address maps.
  *
@@ -425,12 +423,12 @@ void moea64_activate(struct thread *);
 void moea64_deactivate(struct thread *);
 void *moea64_mapdev(vm_paddr_t, vm_size_t);
 void *moea64_mapdev_attr(vm_paddr_t, vm_size_t, vm_memattr_t);
-void moea64_unmapdev(vm_offset_t, vm_size_t);
+void moea64_unmapdev(void *, vm_size_t);
 vm_paddr_t moea64_kextract(vm_offset_t);
 void moea64_page_set_memattr(vm_page_t m, vm_memattr_t ma);
 void moea64_kenter_attr(vm_offset_t, vm_paddr_t, vm_memattr_t ma);
 void moea64_kenter(vm_offset_t, vm_paddr_t);
-boolean_t moea64_dev_direct_mapped(vm_paddr_t, vm_size_t);
+int moea64_dev_direct_mapped(vm_paddr_t, vm_size_t);
 static void moea64_sync_icache(pmap_t, vm_offset_t, vm_size_t);
 void moea64_dumpsys_map(vm_paddr_t pa, size_t sz,
     void **va);
@@ -1944,7 +1942,7 @@ moea64_uma_page_alloc(uma_zone_t zone, vm_size_t bytes, int domain,
 extern int elf32_nxstack;
 
 void
-moea64_init()
+moea64_init(void)
 {
 
 	CTR0(KTR_PMAP, "moea64_init");
@@ -2449,7 +2447,7 @@ moea64_get_unique_vsid(void) {
 		u_int	n;
 
 		/*
-		 * Create a new value by mutiplying by a prime and adding in
+		 * Create a new value by multiplying by a prime and adding in
 		 * entropy from the timebase register.  This is to make the
 		 * VSID more random so that the PT hash function collides
 		 * less often.  (Note that the prime casues gcc to do shifts
@@ -3142,7 +3140,7 @@ moea64_clear_bit(vm_page_t m, u_int64_t ptebit)
 	return (count);
 }
 
-boolean_t
+int
 moea64_dev_direct_mapped(vm_paddr_t pa, vm_size_t size)
 {
 	struct pvo_entry *pvo, key;
@@ -3206,10 +3204,11 @@ moea64_mapdev(vm_paddr_t pa, vm_size_t size)
 }
 
 void
-moea64_unmapdev(vm_offset_t va, vm_size_t size)
+moea64_unmapdev(void *p, vm_size_t size)
 {
-	vm_offset_t base, offset;
+	vm_offset_t base, offset, va;
 
+	va = (vm_offset_t)p;
 	base = trunc_page(va);
 	offset = va & PAGE_MASK;
 	size = roundup2(offset + size, PAGE_SIZE);
@@ -3254,7 +3253,7 @@ moea64_dumpsys_map(vm_paddr_t pa, size_t sz, void **va)
 extern struct dump_pa dump_map[PHYS_AVAIL_SZ + 1];
 
 void
-moea64_scan_init()
+moea64_scan_init(void)
 {
 	struct pvo_entry *pvo;
 	vm_offset_t va;
@@ -3430,7 +3429,6 @@ moea64_page_array_startup(long pages)
 	vm_paddr_t pa;
 	vm_offset_t va, vm_page_base;
 	vm_size_t needed, size;
-	long page;
 	int domain;
 	int i;
 
@@ -3447,7 +3445,6 @@ moea64_page_array_startup(long pages)
 		return;
 	}
 
-	page = 0;
 	for (i = 0; i < MAXMEMDOM; i++)
 		dom_pages[i] = 0;
 
@@ -3685,7 +3682,7 @@ moea64_sp_enter(pmap_t pmap, vm_offset_t va, vm_page_t m,
 	vm_paddr_t pa, spa;
 	bool sync;
 	struct pvo_dlist tofree;
-	int error, i;
+	int error __diagused, i;
 	uint16_t aflags;
 
 	KASSERT((va & HPT_SP_MASK) == 0, ("%s: va %#jx unaligned",
@@ -3926,7 +3923,7 @@ moea64_sp_demote_aligned(struct pvo_entry *sp)
 	vm_offset_t va, va_end;
 	vm_paddr_t pa;
 	vm_page_t m;
-	pmap_t pmap;
+	pmap_t pmap __diagused;
 	int64_t refchg;
 
 	CTR2(KTR_PMAP, "%s: va=%#jx", __func__, (uintmax_t)PVO_VADDR(sp));
@@ -4086,7 +4083,7 @@ moea64_sp_remove(struct pvo_entry *sp, struct pvo_dlist *tofree)
 {
 	struct pvo_entry *pvo, *tpvo;
 	vm_offset_t eva;
-	pmap_t pm;
+	pmap_t pm __diagused;
 
 	CTR2(KTR_PMAP, "%s: va=%#jx", __func__, (uintmax_t)PVO_VADDR(sp));
 

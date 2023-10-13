@@ -24,8 +24,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
@@ -88,6 +86,21 @@ efidev_ioctl(struct cdev *dev __unused, u_long cmd, caddr_t addr,
 		struct efi_tm *tm = (struct efi_tm *)addr;
 
 		error = efi_set_time(tm);
+		break;
+	}
+	case EFIIOC_GET_WAKETIME:
+	{
+		struct efi_waketime_ioc *wt = (struct efi_waketime_ioc *)addr;
+
+		error = efi_get_waketime(&wt->enabled, &wt->pending,
+		    &wt->waketime);
+		break;
+	}
+	case EFIIOC_SET_WAKETIME:
+	{
+		struct efi_waketime_ioc *wt = (struct efi_waketime_ioc *)addr;
+
+		error = efi_set_waketime(wt->enabled, &wt->waketime);
 		break;
 	}
 	case EFIIOC_VAR_GET:

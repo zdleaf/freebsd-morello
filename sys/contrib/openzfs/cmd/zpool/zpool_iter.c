@@ -6,7 +6,7 @@
  * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
- * or http://www.opensolaris.org/os/licensing.
+ * or https://opensource.org/licenses/CDDL-1.0.
  * See the License for the specific language governing permissions
  * and limitations under the License.
  *
@@ -32,7 +32,7 @@
 #include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <strings.h>
+#include <string.h>
 #include <thread_pool.h>
 
 #include <libzfs.h>
@@ -442,39 +442,23 @@ static void
 vdev_run_cmd(vdev_cmd_data_t *data, char *cmd)
 {
 	int rc;
-	char *argv[2] = {cmd, 0};
-	char *env[5] = {"PATH=/bin:/sbin:/usr/bin:/usr/sbin", NULL, NULL, NULL,
-	    NULL};
+	char *argv[2] = {cmd};
+	char **env;
 	char **lines = NULL;
 	int lines_cnt = 0;
 	int i;
 
-	/* Setup our custom environment variables */
-	rc = asprintf(&env[1], "VDEV_PATH=%s",
-	    data->path ? data->path : "");
-	if (rc == -1) {
-		env[1] = NULL;
+	env = zpool_vdev_script_alloc_env(data->pool, data->path, data->upath,
+	    data->vdev_enc_sysfs_path, NULL, NULL);
+	if (env == NULL)
 		goto out;
-	}
-
-	rc = asprintf(&env[2], "VDEV_UPATH=%s",
-	    data->upath ? data->upath : "");
-	if (rc == -1) {
-		env[2] = NULL;
-		goto out;
-	}
-
-	rc = asprintf(&env[3], "VDEV_ENC_SYSFS_PATH=%s",
-	    data->vdev_enc_sysfs_path ?
-	    data->vdev_enc_sysfs_path : "");
-	if (rc == -1) {
-		env[3] = NULL;
-		goto out;
-	}
 
 	/* Run the command */
 	rc = libzfs_run_process_get_stdout_nopath(cmd, argv, env, &lines,
 	    &lines_cnt);
+
+	zpool_vdev_script_free_env(env);
+
 	if (rc != 0)
 		goto out;
 
@@ -486,10 +470,6 @@ vdev_run_cmd(vdev_cmd_data_t *data, char *cmd)
 out:
 	if (lines != NULL)
 		libzfs_free_str_array(lines, lines_cnt);
-
-	/* Start with i = 1 since env[0] was statically allocated */
-	for (i = 1; i < ARRAY_SIZE(env); i++)
-		free(env[i]);
 }
 
 /*
@@ -565,9 +545,9 @@ for_each_vdev_run_cb(void *zhp_data, nvlist_t *nv, void *cb_vcdl)
 {
 	vdev_cmd_data_list_t *vcdl = cb_vcdl;
 	vdev_cmd_data_t *data;
-	char *path = NULL;
+	const char *path = NULL;
 	char *vname = NULL;
-	char *vdev_enc_sysfs_path = NULL;
+	const char *vdev_enc_sysfs_path = NULL;
 	int i, match = 0;
 	zpool_handle_t *zhp = zhp_data;
 

@@ -1,5 +1,5 @@
 #-
-# SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+# SPDX-License-Identifier: BSD-2-Clause
 #
 # Copyright (c) 2021 Beckhoff Automation GmbH & Co. KG
 #
@@ -34,4 +34,8 @@ HEADER {
 METHOD int add_adapter {
 	device_t dev;
 	struct i2c_adapter *adapter;
+};
+
+METHOD struct i2c_adapter * get_adapter {
+	device_t dev;
 };

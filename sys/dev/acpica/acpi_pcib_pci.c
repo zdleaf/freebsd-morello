@@ -26,8 +26,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include "opt_acpi.h"
 
 #include <sys/param.h>
@@ -89,11 +87,9 @@ static device_method_t acpi_pcib_pci_methods[] = {
     DEVMETHOD_END
 };
 
-static devclass_t pcib_devclass;
-
 DEFINE_CLASS_1(pcib, acpi_pcib_pci_driver, acpi_pcib_pci_methods,
     sizeof(struct acpi_pcib_softc), pcib_driver);
-DRIVER_MODULE(acpi_pcib, pci, acpi_pcib_pci_driver, pcib_devclass, 0, 0);
+DRIVER_MODULE(acpi_pcib, pci, acpi_pcib_pci_driver, 0, 0);
 MODULE_DEPEND(acpi_pcib, acpi, 1, 1, 1);
 
 static int

@@ -32,8 +32,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/stat.h>
 
@@ -1123,7 +1121,7 @@ prog_makefile_rules(FILE *outmk, prog_t *p)
 		fprintf(outmk, " $(%s_LIBS)", p->ident);
 
 	fprintf(outmk, "\n");
-	fprintf(outmk, "\t$(CC) -nostdlib -Wl,-dc -r -o %s.lo %s_stub.o $(%s_OBJPATHS)",
+	fprintf(outmk, "\t$(CC) -nostdlib -r -o %s.lo %s_stub.o $(%s_OBJPATHS)",
 	    p->name, p->name, p->ident);
 	if (p->libs)
 		fprintf(outmk, " $(%s_LIBS)", p->ident);

@@ -1,6 +1,7 @@
-# $FreeBSD$
 
 .include <src.opts.mk>
+
+PACKAGE=	elftoolchain
 
 ELFTCDIR=	${SRCTOP}/contrib/elftoolchain
 ELFCOPYDIR=	${ELFTCDIR}/elfcopy

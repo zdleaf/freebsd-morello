@@ -25,8 +25,6 @@
  * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 #ifndef	_LINUXKPI_LINUX_IF_VLAN_H_
 #define	_LINUXKPI_LINUX_IF_VLAN_H_
@@ -44,7 +42,7 @@
 static inline int
 is_vlan_dev(struct ifnet *ifp)
 {
-	return (ifp->if_type == IFT_L2VLAN);
+	return (if_gettype(ifp) == IFT_L2VLAN);
 }
 
 static inline uint16_t

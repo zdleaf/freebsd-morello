@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2012-2016 Ruslan Bukin <br@bsdpad.com>
  * All rights reserved.
@@ -39,8 +39,6 @@
 #include <dev/pci/pcivar.h>
 
 #include <mixer_if.h>
-
-SND_DECLARE_FILE("$FreeBSD$");
 
 static struct hdspe_channel chan_map_aio[] = {
 	{  0,  1,   "line", 1, 1 },
@@ -122,10 +120,6 @@ hdspe_intr(void *p)
 static void
 hdspe_dmapsetmap(void *arg, bus_dma_segment_t *segs, int nseg, int error)
 {
-	struct sc_info *sc;
-
-	sc = (struct sc_info *)arg;
-
 #if 0
 	device_printf(sc->dev, "hdspe_dmapsetmap()\n");
 #endif
@@ -401,6 +395,4 @@ static driver_t hdspe_driver = {
 	PCM_SOFTC_SIZE,
 };
 
-static devclass_t hdspe_devclass;
-
-DRIVER_MODULE(snd_hdspe, pci, hdspe_driver, hdspe_devclass, 0, 0);
+DRIVER_MODULE(snd_hdspe, pci, hdspe_driver, 0, 0);

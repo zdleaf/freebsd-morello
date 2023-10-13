@@ -26,8 +26,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 #ifndef RTLD_MACHDEP_H
@@ -64,7 +62,7 @@ Elf_Addr reloc_jmpslot(Elf_Addr *where, Elf_Addr target,
  * Pass zeros into the ifunc resolver so we can change them later. The first
  * 8 arguments on arm64 are passed in registers so make them known values
  * if we decide to use them later. Because of this ifunc resolvers can assume
- * no arguments are passeed in, and if this changes later will be able to
+ * no arguments are passed in, and if this changes later will be able to
  * compare the argument with 0 to see if it is set.
  */
 #define	call_ifunc_resolver(ptr) \
@@ -86,9 +84,6 @@ typedef struct {
 } tls_index;
 
 extern void *__tls_get_addr(tls_index *ti);
-
-#define	RTLD_DEFAULT_STACK_PF_EXEC	PF_X
-#define	RTLD_DEFAULT_STACK_EXEC		PROT_EXEC
 
 #define md_abi_variant_hook(x)
 

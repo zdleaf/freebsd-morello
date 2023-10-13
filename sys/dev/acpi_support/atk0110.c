@@ -18,8 +18,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <machine/_inttypes.h>
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -109,9 +107,7 @@ static driver_t aibs_driver = {
 	sizeof(struct aibs_softc)
 };
 
-static devclass_t aibs_devclass;
-
-DRIVER_MODULE(aibs, acpi, aibs_driver, aibs_devclass, NULL, NULL);
+DRIVER_MODULE(aibs, acpi, aibs_driver, NULL, NULL);
 MODULE_DEPEND(aibs, acpi, 1, 1, 1);
 
 static char* aibs_hids[] = {

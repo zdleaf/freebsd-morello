@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2012 Alexander Motin <mav@FreeBSD.org>
  * All rights reserved.
@@ -27,8 +27,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/module.h>
 #include <sys/systm.h>
@@ -274,7 +272,6 @@ ahci_em_resume(device_t dev)
 	return (0);
 }
 
-devclass_t ahciem_devclass;
 static device_method_t ahciem_methods[] = {
 	DEVMETHOD(device_probe,     ahci_em_probe),
 	DEVMETHOD(device_attach,    ahci_em_attach),
@@ -288,7 +285,7 @@ static driver_t ahciem_driver = {
         ahciem_methods,
         sizeof(struct ahci_enclosure)
 };
-DRIVER_MODULE(ahciem, ahci, ahciem_driver, ahciem_devclass, NULL, NULL);
+DRIVER_MODULE(ahciem, ahci, ahciem_driver, NULL, NULL);
 
 static void
 ahci_em_setleds(device_t dev, int c)

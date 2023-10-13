@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2010-2011 Alexander V. Chernikov <melifaro@ipfw.ru>
  * Copyright (c) 2004-2005 Gleb Smirnoff <glebius@FreeBSD.org>
@@ -31,8 +31,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include "opt_inet.h"
 #include "opt_inet6.h"
 #include "opt_route.h"
@@ -51,6 +49,7 @@ __FBSDID("$FreeBSD$");
 #include <net/if.h>
 #include <net/if_dl.h>
 #include <net/if_var.h>
+#include <net/if_private.h>
 #include <net/route.h>
 #include <net/route/nhop.h>
 #include <net/route/route_ctl.h>
@@ -660,7 +659,6 @@ ng_netflow_flow_add(priv_p priv, fib_export_p fe, struct ip *ip,
 	struct flow_rec		r;
 	int			hlen, plen;
 	int			error = 0;
-	uint16_t		eproto;
 	uint8_t			tcp_flags = 0;
 
 	bzero(&r, sizeof(r));
@@ -672,7 +670,6 @@ ng_netflow_flow_add(priv_p priv, fib_export_p fe, struct ip *ip,
 	if (hlen < sizeof(struct ip))
 		return (EINVAL);
 
-	eproto = ETHERTYPE_IP;
 	/* Assume L4 template by default */
 	r.flow_type = NETFLOW_V9_FLOW_V4_L4;
 

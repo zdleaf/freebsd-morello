@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 1999, 2000, 2001, 2002 Robert N. M. Watson
  * Copyright (c) 2002, 2003 Networks Associates Technology, Inc.
@@ -35,8 +35,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/types.h>
 #include <sys/queue.h>
 #include <sys/sysctl.h>
@@ -177,9 +175,8 @@ mac_init_internal(int ignore_errors)
 
 	LIST_INIT(&label_default_head);
 
-	if (!issetugid() && getenv("MAC_CONFFILE") != NULL)
-		filename = getenv("MAC_CONFFILE");
-	else
+	filename = secure_getenv("MAC_CONFFILE");
+	if (filename == NULL)
 		filename = MAC_CONFFILE;
 	file = fopen(filename, "re");
 	if (file == NULL)

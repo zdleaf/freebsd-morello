@@ -1,4 +1,3 @@
-# $FreeBSD$
 #
 # All library objects contain FreeBSD revision strings by default; they may be
 # excluded as a space-saving measure.  To produce a library that does
@@ -19,7 +18,6 @@ CFLAGS+=-DPTHREAD_KERNEL
 CFLAGS+=-I${SRCTOP}/lib/libc/include
 CFLAGS+=-I${SRCTOP}/lib/libc/${MACHINE_CPUARCH}
 CFLAGS+=-I${.CURDIR}/thread
-CFLAGS+=-I${SRCTOP}/include
 CFLAGS+=-I${.CURDIR}/arch/${MACHINE_CPUARCH}/include
 CFLAGS+=-I${.CURDIR}/sys
 CFLAGS+=-I${SRCTOP}/libexec/rtld-elf
@@ -36,6 +34,10 @@ CFLAGS.thr_symbols.c+=	-Wno-missing-variable-declarations
 CFLAGS.thr_sig.c+=	-fno-sanitize=address
 .endif
 
+.if ${MACHINE_CPUARCH} == "arm"
+NO_THREAD_UNWIND_STACK= yes
+.endif
+
 .ifndef NO_THREAD_UNWIND_STACK
 CFLAGS+=-fexceptions
 CFLAGS+=-D_PTHREAD_FORCED_UNWIND
@@ -48,8 +50,10 @@ SYMBOL_MAPS=${.CURDIR}/pthread.map
 
 MAN=	libthr.3
 
+.if ${MK_PTHREADS_ASSERTIONS} != "no"
 # enable extra internal consistency checks
 CFLAGS+=-D_PTHREADS_INVARIANTS
+.endif
 
 PRECIOUSLIB=
 

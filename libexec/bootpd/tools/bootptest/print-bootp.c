@@ -23,8 +23,6 @@
  *
  * This file was copied from tcpdump-2.1.1 and modified.
  * There is an e-mail list for tcpdump: <tcpdump@ee.lbl.gov>
- *
- * $FreeBSD$
  */
 
 #include <stdio.h>
@@ -53,10 +51,7 @@ static void dump_hex(u_char *bp, int len);
  * Print bootp requests
  */
 void
-bootp_print(bp, length, sport, dport)
-	struct bootp *bp;
-	int length;
-	u_short sport, dport;
+bootp_print(struct bootp *bp, int length, u_short sport, u_short dport)
 {
 	static char tstr[] = " [|bootp]";
 	static unsigned char vm_cmu[4] = VM_CMU;
@@ -70,7 +65,7 @@ bootp_print(bp, length, sport, dport)
 	if (length != sizeof(struct bootp))
 		(void) printf(" [len=%d]", length);
 
-	/* 'ep' points to the end of avaible data. */
+	/* 'ep' points to the end of available data. */
 	ep = (u_char *) snapend;
 
 	switch (bp->bp_op) {
@@ -274,9 +269,7 @@ rfc1048_opts[] = {
 #define	KNOWN_OPTIONS (sizeof(rfc1048_opts) / sizeof(rfc1048_opts[0]))
 
 static void
-rfc1048_print(bp, length)
-	u_char *bp;
-	int length;
+rfc1048_print(u_char *bp, int length)
 {
 	u_char tag;
 	u_char *ep;
@@ -376,9 +369,7 @@ rfc1048_print(bp, length)
 }
 
 static void
-cmu_print(bp, length)
-	u_char *bp;
-	int length;
+cmu_print(u_char *bp, int length)
 {
 	struct cmu_vend *v;
 
@@ -424,9 +415,7 @@ cmu_print(bp, length)
  */
 
 static void
-other_print(bp, length)
-	u_char *bp;
-	int length;
+other_print(u_char *bp, int length)
 {
 	u_char *ep;					/* end pointer */
 	u_char *zp;					/* points one past last non-zero byte */
@@ -464,9 +453,7 @@ other_print(bp, length)
 }
 
 static void
-dump_hex(bp, len)
-	u_char *bp;
-	int len;
+dump_hex(u_char *bp, int len)
 {
 	while (len > 0) {
 		printf("%02X", *bp);

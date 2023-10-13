@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 1999 Kazutaka YOKOTA <yokota@zodiac.mech.utsunomiya-u.ac.jp>
  * All rights reserved.
@@ -28,8 +28,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include "opt_kbd.h"
 #include "opt_atkbd.h"
 #include "opt_evdev.h"
@@ -684,6 +682,16 @@ next_code:
 #ifdef EVDEV_SUPPORT
 	/* push evdev event */
 	if (evdev_rcpt_mask & EVDEV_RCPT_HW_KBD && state->ks_evdev != NULL) {
+		/* "hancha" and "han/yong" korean keys handling */
+		if (state->ks_evdev_state == 0 &&
+		    (scancode == 0xF1 || scancode == 0xF2)) {
+			keycode = evdev_scancode2key(&state->ks_evdev_state,
+				scancode & 0x7F);
+			evdev_push_event(state->ks_evdev, EV_KEY,
+			    (uint16_t)keycode, 1);
+			evdev_sync(state->ks_evdev);
+		}
+
 		keycode = evdev_scancode2key(&state->ks_evdev_state,
 		    scancode);
 
@@ -693,6 +701,9 @@ next_code:
 			evdev_sync(state->ks_evdev);
 		}
 	}
+
+	if (state->ks_evdev != NULL && evdev_is_grabbed(state->ks_evdev))
+		return (NOKEY);
 #endif
 
 	/* return the byte as is for the K_RAW mode */
@@ -1075,9 +1086,12 @@ atkbd_ioctl(keyboard_t *kbd, u_long cmd, caddr_t arg)
 		return error;
 
 	case PIO_KEYMAP:	/* set keyboard translation table */
-	case OPIO_KEYMAP:	/* set keyboard translation table (compat) */
 	case PIO_KEYMAPENT:	/* set keyboard translation table entry */
 	case PIO_DEADKEYMAP:	/* set accent key translation table */
+#ifdef COMPAT_FREEBSD13
+	case OPIO_KEYMAP:	/* set keyboard translation table (compat) */
+	case OPIO_DEADKEYMAP:	/* set accent key translation table (compat) */
+#endif /* COMPAT_FREEBSD13 */
 		state->ks_accents = 0;
 		/* FALLTHROUGH */
 	default:
@@ -1555,22 +1569,16 @@ get_kbd_id(KBDC kbdc)
 	return ((id2 << 8) | id1);
 }
 
-static int delays[] = { 250, 500, 750, 1000 };
-static int rates[] = {  34,  38,  42,  46,  50,  55,  59,  63,
-			68,  76,  84,  92, 100, 110, 118, 126,
-		       136, 152, 168, 184, 200, 220, 236, 252,
-		       272, 304, 336, 368, 400, 440, 472, 504 };
-
 static int
 typematic_delay(int i)
 {
-	return delays[(i >> 5) & 3];
+	return (kbdelays[(i >> 5) & 3]);
 }
 
 static int
 typematic_rate(int i)
 {
-	return rates[i & 0x1f];
+	return (kbrates[i & 0x1f]);
 }
 
 static int
@@ -1579,13 +1587,13 @@ typematic(int delay, int rate)
 	int value;
 	int i;
 
-	for (i = nitems(delays) - 1; i > 0; --i) {
-		if (delay >= delays[i])
+	for (i = nitems(kbdelays) - 1; i > 0; --i) {
+		if (delay >= kbdelays[i])
 			break;
 	}
 	value = i << 5;
-	for (i = nitems(rates) - 1; i > 0; --i) {
-		if (rate >= rates[i])
+	for (i = nitems(kbrates) - 1; i > 0; --i) {
+		if (rate >= kbrates[i])
 			break;
 	}
 	value |= i;

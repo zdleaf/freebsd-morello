@@ -24,8 +24,6 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/bus.h>
@@ -89,9 +87,7 @@ static driver_t ti_wdt_driver = {
 	sizeof(struct ti_wdt_softc)
 };
 
-static devclass_t ti_wdt_devclass;
-
-DRIVER_MODULE(ti_wdt, simplebus, ti_wdt_driver, ti_wdt_devclass, 0, 0);
+DRIVER_MODULE(ti_wdt, simplebus, ti_wdt_driver, 0, 0);
 MODULE_DEPEND(ti_wdt, ti_sysc, 1, 1, 1);
 
 static __inline uint32_t

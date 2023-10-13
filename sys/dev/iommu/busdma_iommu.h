@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2013 The FreeBSD Foundation
  *
@@ -26,8 +26,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 #ifndef __X86_IOMMU_BUSDMA_DMAR_H
@@ -49,6 +47,7 @@ struct bus_dmamap_iommu {
 	struct memdesc mem;
 	bus_dmamap_callback_t *callback;
 	void *callback_arg;
+	struct mtx lock;
 	struct iommu_map_entries_tailq map_entries;
 	TAILQ_ENTRY(bus_dmamap_iommu) delay_link;
 	bool locked;
@@ -58,6 +57,12 @@ struct bus_dmamap_iommu {
 	struct memdesc kmsan_mem;
 #endif
 };
+
+#define	IOMMU_DMAMAP_INIT(map)		mtx_init(&(map)->lock, \
+					    "iommu dmamap", NULL, MTX_DEF)
+#define	IOMMU_DMAMAP_DESTROY(map)	mtx_destroy(&(map)->lock)
+#define	IOMMU_DMAMAP_LOCK(map)		mtx_lock(&(map)->lock)
+#define	IOMMU_DMAMAP_UNLOCK(map)	mtx_unlock(&(map)->lock)
 
 #define	BUS_DMAMAP_IOMMU_MALLOC	0x0001
 #define	BUS_DMAMAP_IOMMU_KMEM_ALLOC 0x0002

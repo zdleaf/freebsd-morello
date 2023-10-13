@@ -25,8 +25,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/disk.h>
 #include <sys/disklabel.h>
 #include <sys/diskmbr.h>
@@ -258,7 +256,7 @@ static int decimal(const char *str, int *num, int deflt, uint32_t maxval);
 static int read_config(char *config_file);
 static void reset_boot(void);
 static int sanitize_partition(struct dos_partition *);
-static void usage(void);
+static void usage(void) __dead2;
 
 int
 main(int argc, char *argv[])
@@ -449,7 +447,7 @@ main(int argc, char *argv[])
 }
 
 static void
-usage()
+usage(void)
 {
 	fprintf(stderr, "%s%s",
 		"usage: fdisk [-BIaipqstu] [-b bootcode] [-1234] [disk]\n",
@@ -610,7 +608,7 @@ change_part(int i)
 }
 
 static void
-print_params()
+print_params(void)
 {
 	printf("parameters extracted from in-core disklabel are:\n");
 	printf("cylinders=%d heads=%d sectors/track=%d (%d blks/cyl)\n\n"
@@ -661,14 +659,14 @@ setactive:
 }
 
 static void
-change_code()
+change_code(void)
 {
 	if (ok("Do you want to change the boot code?"))
 		init_boot();
 }
 
 void
-get_params_to_use()
+get_params_to_use(void)
 {
 	int	tmp;
 	print_params();
@@ -807,7 +805,7 @@ write_disk(off_t sector, void *buf)
 }
 
 static int
-get_params()
+get_params(void)
 {
 	int error;
 	u_int u;
@@ -845,7 +843,7 @@ get_params()
 }
 
 static int
-read_s0()
+read_s0(void)
 {
 	int i;
 
@@ -874,7 +872,7 @@ read_s0()
 }
 
 static int
-write_s0()
+write_s0(void)
 {
 	int	sector, i;
 

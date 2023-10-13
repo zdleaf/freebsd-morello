@@ -1,4 +1,3 @@
-# $FreeBSD$
 
 . $(atf_get_srcdir)/../common/vnet.subr
 
@@ -28,6 +27,17 @@ basic_body()
 	jexec singsing ifconfig ${epair_vlan}b up
 	jexec singsing ifconfig ${vlan1} 10.0.0.2/24 up
 
+	atf_check -s exit:0 -o ignore jexec singsing ping -c 1 10.0.0.1
+
+	# Test changing the vlan ID
+	atf_check -s exit:0 \
+	    jexec singsing ifconfig ${vlan1} vlandev ${epair_vlan}b vlan 43
+	atf_check -s exit:2 -o ignore jexec singsing ping -c 1 10.0.0.1
+
+	# And change back
+	# Test changing the vlan ID
+	atf_check -s exit:0 \
+	    jexec singsing ifconfig ${vlan1} vlandev ${epair_vlan}b vlan 42
 	atf_check -s exit:0 -o ignore jexec singsing ping -c 1 10.0.0.1
 }
 
@@ -210,11 +220,38 @@ qinq_dot_cleanup()
 	vnet_cleanup
 }
 
+atf_test_case "qinq_setflags" "cleanup"
+qinq_setflags_head()
+{
+	atf_set descr 'Test setting flags on a QinQ device'
+	atf_set require.user root
+}
+
+qinq_setflags_body()
+{
+	vnet_init
+
+	epair=$(vnet_mkepair)
+
+	ifconfig ${epair}a up
+	vlan1=$(ifconfig vlan create)
+	ifconfig $vlan1 vlan 1 vlandev ${epair}a
+	vlan2=$(ifconfig vlan create)
+	ifconfig $vlan2 vlan 2 vlandev $vlan1
+
+	# This panics, incorrect locking
+	ifconfig $vlan2 promisc
+}
+
+qinq_setflags_cleanup()
+{
+	vnet_cleanup
+}
+
 atf_test_case "bpf_pcp" "cleanup"
 bpf_pcp_head()
 {
 	atf_set descr 'Set VLAN PCP through BPF'
-	atf_set require.config 'allow_sysctl_side_effects'
 	atf_set require.user root
 	atf_set require.progs scapy
 }
@@ -233,7 +270,7 @@ bpf_pcp_body()
 	jexec alcatraz ifconfig ${vlan} up
 	jexec alcatraz ifconfig ${epair}b up
 
-	sysctl net.link.vlan.mtag_pcp=1
+	jexec alcatraz sysctl net.link.vlan.mtag_pcp=1
 
 	jexec alcatraz dhclient ${vlan} &
 	atf_check -s exit:1 -o ignore -e ignore $(atf_get_srcdir)/pcp.py \
@@ -263,5 +300,6 @@ atf_init_test_cases()
 	atf_add_test_case "qinq_deep"
 	atf_add_test_case "qinq_legacy"
 	atf_add_test_case "qinq_dot"
+	atf_add_test_case "qinq_setflags"
 	atf_add_test_case "bpf_pcp"
 }

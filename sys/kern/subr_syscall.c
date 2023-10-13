@@ -42,9 +42,6 @@
 
 #include "opt_capsicum.h"
 #include "opt_ktrace.h"
-
-__FBSDID("$FreeBSD$");
-
 #include <sys/capsicum.h>
 #include <sys/ktr.h>
 #include <sys/vmmeter.h>
@@ -68,11 +65,12 @@ syscallenter(struct thread *td)
 	sa = &td->td_sa;
 
 	td->td_pticks = 0;
-	if (__predict_false(td->td_cowgen != p->p_cowgen))
+	if (__predict_false(td->td_cowgen != atomic_load_int(&p->p_cowgen)))
 		thread_cow_update(td);
 	traced = (p->p_flag & P_TRACED) != 0;
 	if (__predict_false(traced || td->td_dbgflags & TDB_USERWR)) {
 		PROC_LOCK(p);
+		MPASS((td->td_dbgflags & TDB_BOUNDARY) == 0);
 		td->td_dbgflags &= ~TDB_USERWR;
 		if (traced)
 			td->td_dbgflags |= TDB_SCE;
@@ -146,7 +144,8 @@ syscallenter(struct thread *td)
 	    AUDIT_SYSCALL_ENTER(sa->code, td) ||
 	    !sy_thr_static)) {
 		if (!sy_thr_static) {
-			error = syscall_thread_enter(td, se);
+			error = syscall_thread_enter(td, &se);
+			sy_thr_static = (se->sy_thrcnt & SY_THR_STATIC) != 0;
 			if (error != 0) {
 				td->td_errno = error;
 				goto retval;
@@ -201,7 +200,7 @@ syscallenter(struct thread *td)
 	    td->td_retval[1]);
 	if (__predict_false(traced)) {
 		PROC_LOCK(p);
-		td->td_dbgflags &= ~TDB_SCE;
+		td->td_dbgflags &= ~(TDB_SCE | TDB_BOUNDARY);
 		PROC_UNLOCK(p);
 	}
 	(p->p_sysent->sv_set_syscall_retval)(td, error);
@@ -280,9 +279,13 @@ syscallret(struct thread *td)
 		 */
 		if (traced &&
 		    ((td->td_dbgflags & (TDB_FORK | TDB_EXEC)) != 0 ||
-		    (p->p_ptevents & PTRACE_SCX) != 0))
+		    (p->p_ptevents & PTRACE_SCX) != 0)) {
+			MPASS((td->td_dbgflags & TDB_BOUNDARY) == 0);
+			td->td_dbgflags |= TDB_BOUNDARY;
 			ptracestop(td, SIGTRAP, NULL);
-		td->td_dbgflags &= ~(TDB_SCX | TDB_EXEC | TDB_FORK);
+		}
+		td->td_dbgflags &= ~(TDB_SCX | TDB_EXEC | TDB_FORK |
+		    TDB_BOUNDARY);
 		PROC_UNLOCK(p);
 	}
 }

@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2009-2013 The FreeBSD Foundation
  * Copyright (c) 2013-2015 Mariusz Zaborski <oshogbo@FreeBSD.org>
@@ -552,7 +552,7 @@ unsigned char *
 nvpair_pack_string_array(const nvpair_t *nvp, unsigned char *ptr, size_t *leftp)
 {
 	unsigned int ii;
-	size_t size, len;
+	size_t size __unused, len;
 	const char * const *array;
 
 	NVPAIR_ASSERT(nvp);

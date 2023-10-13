@@ -36,16 +36,10 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 #ifndef MACHINE_ARMREG_H
 #define MACHINE_ARMREG_H
-
-#ifndef _SYS_CDEFS_H_
-#error Please include sys/cdefs.h before including machine/armreg.h
-#endif
 
 #define INSN_SIZE	4
 #define INSN_COND_MASK	0xf0000000	/* Condition mask */

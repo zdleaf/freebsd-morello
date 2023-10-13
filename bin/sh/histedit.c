@@ -36,8 +36,6 @@ static char sccsid[] = "@(#)histedit.c	8.2 (Berkeley) 5/4/95";
 #endif
 #endif /* not lint */
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/stat.h>
 #include <dirent.h>
@@ -45,12 +43,15 @@ __FBSDID("$FreeBSD$");
 #include <fcntl.h>
 #include <limits.h>
 #include <paths.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
 /*
  * Editline and history functions (and glue).
  */
+#include "alias.h"
+#include "exec.h"
 #include "shell.h"
 #include "parser.h"
 #include "var.h"
@@ -73,12 +74,14 @@ EditLine *el;	/* editline cookie */
 int displayhist;
 static int savehist;
 static FILE *el_in, *el_out;
+static bool in_command_completion;
 
 static char *fc_replace(const char *, char *, char *);
 static int not_fcnumber(const char *);
 static int str_to_event(const char *, int);
 static int comparator(const void *, const void *, void *);
 static char **sh_matches(const char *, int, int);
+static const char *append_char_function(const char *);
 static unsigned char sh_complete(EditLine *, int);
 
 static const char *
@@ -87,7 +90,7 @@ get_histfile(void)
 	const char *histfile;
 
 	/* don't try to save if the history size is 0 */
-	if (hist == NULL || histsizeval() == 0)
+	if (hist == NULL || !strcmp(histsizeval(), "0"))
 		return (NULL);
 	histfile = expandstr("${HISTFILE-${HOME-}/.sh_history}");
 
@@ -187,7 +190,7 @@ histedit(void)
 			if (el != NULL) {
 				if (hist)
 					el_set(el, EL_HIST, history, hist);
-				el_set(el, EL_PROMPT, getprompt);
+				el_set(el, EL_PROMPT_ESC, getprompt, '\001');
 				el_set(el, EL_ADDFN, "sh-complete",
 				    "Filename completion",
 				    sh_complete);
@@ -252,7 +255,6 @@ setterm(const char *term)
 int
 histcmd(int argc, char **argv __unused)
 {
-	int ch;
 	const char *editor = NULL;
 	HistEvent he;
 	int lflg = 0, nflg = 0, rflg = 0, sflg = 0;
@@ -274,25 +276,29 @@ histcmd(int argc, char **argv __unused)
 	if (argc == 1)
 		error("missing history argument");
 
-	while (not_fcnumber(*argptr) && (ch = nextopt("e:lnrs")) != '\0')
-		switch ((char)ch) {
-		case 'e':
-			editor = shoptarg;
-			break;
-		case 'l':
-			lflg = 1;
-			break;
-		case 'n':
-			nflg = 1;
-			break;
-		case 'r':
-			rflg = 1;
-			break;
-		case 's':
-			sflg = 1;
-			break;
-		}
-
+	while (not_fcnumber(*argptr))
+		do {
+			switch (nextopt("e:lnrs")) {
+			case 'e':
+				editor = shoptarg;
+				break;
+			case 'l':
+				lflg = 1;
+				break;
+			case 'n':
+				nflg = 1;
+				break;
+			case 'r':
+				rflg = 1;
+				break;
+			case 's':
+				sflg = 1;
+				break;
+			case '\0':
+				goto operands;
+			}
+		} while (nextopt_optptr != NULL);
+operands:
 	savehandler = handler;
 	/*
 	 * If executing...
@@ -583,27 +589,45 @@ static int
 comparator(const void *a, const void *b, void *thunk)
 {
 	size_t curpos = (intptr_t)thunk;
+
 	return (strcmp(*(char *const *)a + curpos,
 		*(char *const *)b + curpos));
 }
 
+static char
+**add_match(char **matches, size_t i, size_t *size, char *match_copy)
+{
+	if (match_copy == NULL)
+		return (NULL);
+	matches[i] = match_copy;
+	if (i >= *size - 1) {
+		*size *= 2;
+		matches = reallocarray(matches, *size, sizeof(matches[0]));
+	}
+
+	return (matches);
+}
+
 /*
- * This function is passed to libedit's fn_complete2(). The library will
- * use it instead of its standard function that finds matching files in
- * current directory. If we're at the start of the line, we want to look
- * for available commands from all paths in $PATH.
+ * This function is passed to libedit's fn_complete2(). The library will use
+ * it instead of its standard function that finds matching files in current
+ * directory. If we're at the start of the line, we want to look for
+ * available commands from all paths in $PATH.
  */
 static char
 **sh_matches(const char *text, int start, int end)
 {
 	char *free_path = NULL, *path;
 	const char *dirname;
-	char **matches = NULL;
+	char **matches = NULL, **rmatches;
 	size_t i = 0, size = 16, uniq;
 	size_t curpos = end - start, lcstring = -1;
+	struct cmdentry e;
 
+	in_command_completion = false;
 	if (start > 0 || memchr("/.~", text[0], 3) != NULL)
 		return (NULL);
+	in_command_completion = true;
 	if ((free_path = path = strdup(pathval())) == NULL)
 		goto out;
 	if ((matches = malloc(size * sizeof(matches[0]))) == NULL)
@@ -622,7 +646,6 @@ static char
 		}
 		while ((entry = readdir(dir)) != NULL) {
 			struct stat statb;
-			char **rmatches;
 
 			if (strncmp(entry->d_name, text, curpos) != 0)
 				continue;
@@ -633,11 +656,8 @@ static char
 					continue;
 			} else if (entry->d_type != DT_REG)
 				continue;
-			matches[++i] = strdup(entry->d_name);
-			if (i < size - 1)
-				continue;
-			size *= 2;
-			rmatches = reallocarray(matches, size, sizeof(matches[0]));
+			rmatches = add_match(matches, ++i, &size,
+				strdup(entry->d_name));
 			if (rmatches == NULL) {
 				closedir(dir);
 				goto out;
@@ -645,6 +665,32 @@ static char
 			matches = rmatches;
 		}
 		closedir(dir);
+	}
+	for (const unsigned char *bp = builtincmd; *bp != 0; bp += 2 + bp[0]) {
+		if (curpos > bp[0] || memcmp(bp + 2, text, curpos) != 0)
+			continue;
+		rmatches = add_match(matches, ++i, &size, strndup(bp + 2, bp[0]));
+		if (rmatches == NULL)
+			goto out;
+		matches = rmatches;
+	}
+	for (const struct alias *ap = NULL; (ap = iteralias(ap)) != NULL;) {
+		if (strncmp(ap->name, text, curpos) != 0)
+			continue;
+		rmatches = add_match(matches, ++i, &size, strdup(ap->name));
+		if (rmatches == NULL)
+			goto out;
+		matches = rmatches;
+	}
+	for (const void *a = NULL; (a = itercmd(a, &e)) != NULL;) {
+		if (e.cmdtype != CMDFUNCTION)
+			continue;
+		if (strncmp(e.cmdname, text, curpos) != 0)
+			continue;
+		rmatches = add_match(matches, ++i, &size, strdup(e.cmdname));
+		if (rmatches == NULL)
+			goto out;
+		matches = rmatches;
 	}
 out:
 	free(free_path);
@@ -673,13 +719,13 @@ out:
 	}
 	matches[uniq + 1] = NULL;
 	/*
-	 * matches[0] is special: it's not a real matching file name but a common
-	 * prefix for all matching names. It can't be null, unlike any other
-	 * element of the array. When strings matches[0] and matches[1] compare
-	 * equal and matches[2] is null that means to libedit that there is only
-	 * a single match. It will then replace user input with possibly escaped
-	 * string in matches[0] which is the reason to copy the full name of the
-	 * only match.
+	 * matches[0] is special: it's not a real matching file name but
+	 * a common prefix for all matching names. It can't be null, unlike
+	 * any other element of the array. When strings matches[0] and
+	 * matches[1] compare equal and matches[2] is null that means to
+	 * libedit that there is only a single match. It will then replace
+	 * user input with possibly escaped string in matches[0] which is the
+	 * reason to copy the full name of the only match.
 	 */
 	if (uniq == 1)
 		matches[0] = strdup(matches[1]);
@@ -697,6 +743,32 @@ out:
 }
 
 /*
+ * If we don't specify this function as app_func in the call to fn_complete2,
+ * libedit will use the default one, which adds a " " to plain files and
+ * a "/" to directories regardless of whether it's a command name or a plain
+ * path (relative or absolute). We never want to add "/" to commands.
+ *
+ * For example, after I did "mkdir rmdir", "rmdi" would be autocompleted to
+ * "rmdir/" instead of "rmdir ".
+ */
+static const char *
+append_char_function(const char *name)
+{
+	struct stat stbuf;
+	char *expname = name[0] == '~' ? fn_tilde_expand(name) : NULL;
+	const char *rs;
+
+	if (!in_command_completion &&
+	    stat(expname ? expname : name, &stbuf) == 0 &&
+	    S_ISDIR(stbuf.st_mode))
+		rs = "/";
+	else
+		rs = " ";
+	free(expname);
+	return (rs);
+}
+
+/*
  * This is passed to el_set(el, EL_ADDFN, ...) so that it's possible to
  * bind a key (tab by default) to execute the function.
  */
@@ -704,8 +776,8 @@ unsigned char
 sh_complete(EditLine *sel, int ch __unused)
 {
 	return (unsigned char)fn_complete2(sel, NULL, sh_matches,
-		L" \t\n\"\\'`@$><=;|&{(", NULL, NULL, (size_t)100,
-		NULL, &((int) {0}), NULL, NULL, FN_QUOTE_MATCH);
+		L" \t\n\"\\'`@$><=;|&{(", NULL, append_char_function,
+		(size_t)100, NULL, &((int) {0}), NULL, NULL, FN_QUOTE_MATCH);
 }
 
 #else

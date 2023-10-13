@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2012 The FreeBSD Foundation
  *
@@ -35,8 +35,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/condvar.h>
 #include <sys/conf.h>
@@ -60,7 +58,8 @@ struct icl_module {
 	char				*im_name;
 	bool				im_iser;
 	int				im_priority;
-	int				(*im_limits)(struct icl_drv_limits *idl);
+	int				(*im_limits)(struct icl_drv_limits *idl,
+					    int socket);
 	struct icl_conn			*(*im_new_conn)(const char *name,
 					    struct mtx *lock);
 };
@@ -184,7 +183,8 @@ icl_new_conn(const char *offload, bool iser, const char *name, struct mtx *lock)
 }
 
 int
-icl_limits(const char *offload, bool iser, struct icl_drv_limits *idl)
+icl_limits(const char *offload, bool iser, int socket,
+    struct icl_drv_limits *idl)
 {
 	struct icl_module *im;
 	int error;
@@ -197,7 +197,7 @@ icl_limits(const char *offload, bool iser, struct icl_drv_limits *idl)
 		return (ENXIO);
 	}
 
-	error = im->im_limits(idl);
+	error = im->im_limits(idl, socket);
 	sx_sunlock(&sc->sc_lock);
 
 	/*
@@ -232,7 +232,7 @@ icl_limits(const char *offload, bool iser, struct icl_drv_limits *idl)
 
 int
 icl_register(const char *offload, bool iser, int priority,
-    int (*limits)(struct icl_drv_limits *),
+    int (*limits)(struct icl_drv_limits *, int),
     struct icl_conn *(*new_conn)(const char *, struct mtx *))
 {
 	struct icl_module *im;

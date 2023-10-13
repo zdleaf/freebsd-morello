@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2003 Matthew N. Dodd <winter@jurai.net>
  * All rights reserved.
@@ -27,8 +27,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
@@ -66,8 +64,6 @@ struct smbios_softc {
 };
 
 #define	RES2EPS(res)	((struct smbios_eps *)rman_get_virtual(res))
-
-static devclass_t	smbios_devclass;
 
 static void	smbios_identify	(driver_t *, device_t);
 static int	smbios_probe	(device_t);
@@ -126,7 +122,7 @@ smbios_identify (driver_t *driver, device_t parent)
 		device_set_driver(child, driver);
 		bus_set_resource(child, SYS_RES_MEMORY, rid, addr, length);
 		device_set_desc(child, "System Management BIOS");
-		pmap_unmapbios((vm_offset_t)eps, 0x1f);
+		pmap_unmapbios(eps, 0x1f);
 	}
 
 	return;
@@ -209,10 +205,7 @@ smbios_detach (device_t dev)
 }
 
 static int
-smbios_modevent (mod, what, arg)
-        module_t        mod;
-        int             what;
-        void *          arg;
+smbios_modevent (module_t mod, int what, void *arg)
 {
 	device_t *	devs;
 	int		count;
@@ -222,7 +215,7 @@ smbios_modevent (mod, what, arg)
 	case MOD_LOAD:
 		break;
 	case MOD_UNLOAD:
-		devclass_get_devices(smbios_devclass, &devs, &count);
+		devclass_get_devices(devclass_find("smbios"), &devs, &count);
 		for (i = 0; i < count; i++) {
 			device_delete_child(device_get_parent(devs[i]), devs[i]);
 		}
@@ -250,7 +243,7 @@ static driver_t smbios_driver = {
 	sizeof(struct smbios_softc),
 };
 
-DRIVER_MODULE(smbios, nexus, smbios_driver, smbios_devclass, smbios_modevent, 0);
+DRIVER_MODULE(smbios, nexus, smbios_driver, smbios_modevent, NULL);
 #ifdef ARCH_MAY_USE_EFI
 MODULE_DEPEND(smbios, efirt, 1, 1, 1);
 #endif

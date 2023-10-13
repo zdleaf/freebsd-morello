@@ -1,4 +1,3 @@
-# $FreeBSD$
 
 SHLIBDIR?= /lib
 
@@ -6,7 +5,10 @@ SHLIBDIR?= /lib
 
 PACKAGE=	runtime
 LIB=	nv
-SHLIB_MAJOR= 0
+SHLIB_MAJOR= 1
+
+VERSION_DEF=	${SRCTOP}/lib/libc/Versions.def
+VERSION_MAP=	${.CURDIR}/Version.map
 
 .PATH: ${SRCTOP}/sys/contrib/libnv ${SRCTOP}/sys/sys
 CFLAGS+=-I${.CURDIR}

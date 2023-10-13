@@ -25,8 +25,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/types.h>
 #include <sys/cpuset.h>
 #include <sys/param.h>
@@ -119,13 +117,23 @@ pmcstat_image_add_symbols(struct pmcstat_image *image, Elf *e,
 		if ((fnname = elf_strptr(e, sh->sh_link, sym.st_name))
 		    == NULL)
 			continue;
-#ifdef __arm__
-		/* Remove spurious ARM function name. */
+
+#if defined(__aarch64__) || defined(__arm__)
+		/* Ignore ARM mapping symbols. */
 		if (fnname[0] == '$' &&
 		    (fnname[1] == 'a' || fnname[1] == 't' ||
-		    fnname[1] == 'd') &&
-		    fnname[2] == '\0')
+		    fnname[1] == 'd' || fnname[1] == 'x'))
 			continue;
+
+		/*
+		 * Clear LSB from starting addresses for functions
+		 * which execute in Thumb mode.  We should perhaps
+		 * only do this for functions in a $t mapping symbol
+		 * range, but parsing mapping symbols would be a lot
+		 * of work and function addresses shouldn't have the
+		 * LSB set otherwise.
+		 */
+		sym.st_value &= ~1;
 #endif
 
 		symptr->ps_name  = pmcstat_string_intern(fnname);
@@ -305,7 +313,6 @@ pmcstat_image_get_elf_params(struct pmcstat_image *image,
 	GElf_Shdr sh;
 	enum pmcstat_image_type image_type;
 	char buffer[PATH_MAX];
-	char buffer_modules[PATH_MAX];
 
 	assert(image->pi_type == PMCSTAT_IMAGE_UNKNOWN);
 
@@ -320,32 +327,19 @@ pmcstat_image_get_elf_params(struct pmcstat_image *image,
 	assert(path != NULL);
 
 	/*
-	 * Look for kernel modules under FSROOT/KERNELPATH/NAME and
-	 * FSROOT/boot/modules/NAME, and user mode executable objects
-	 * under FSROOT/PATHNAME.
+	 * Look for files under FSROOT/PATHNAME.
 	 */
-	if (image->pi_iskernelmodule) {
-		(void) snprintf(buffer, sizeof(buffer), "%s%s/%s",
-		    args->pa_fsroot, args->pa_kernel, path);
-		(void) snprintf(buffer_modules, sizeof(buffer_modules),
-		    "%s/boot/modules/%s", args->pa_fsroot, path);
-	} else {
-		(void) snprintf(buffer, sizeof(buffer), "%s%s",
-		    args->pa_fsroot, path);
-	}
+	(void) snprintf(buffer, sizeof(buffer), "%s%s",
+	    args->pa_fsroot, path);
 
 	e = NULL;
 	fd = open(buffer, O_RDONLY, 0);
-	if (fd < 0 && !image->pi_iskernelmodule) {
+	if (fd < 0) {
 		warnx("WARNING: Cannot open \"%s\".",
 		    buffer);
 		goto done;
 	}
-	if (fd < 0 && (fd = open(buffer_modules, O_RDONLY, 0)) < 0) {
-		warnx("WARNING: Cannot open \"%s\" or \"%s\".",
-		    buffer, buffer_modules);
-		goto done;
-	}
+
 	if (elf_version(EV_CURRENT) == EV_NONE) {
 		warnx("WARNING: failed to init elf\n");
 		goto done;

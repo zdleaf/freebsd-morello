@@ -21,12 +21,10 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 /*
- * differnt routines to dump data.
+ * different routines to dump data.
  */
 
 void asciidump(uint8_t *data, size_t datalen);

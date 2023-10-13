@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2009 Marcel Moolenaar
  *
@@ -26,8 +26,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/bus.h>
@@ -110,14 +108,12 @@ static driver_t atpic_isa_driver = {
 	sizeof(struct atpic_softc)
 };
 
-static devclass_t atpic_devclass;
-
 static struct isa_pnp_id atpic_ids[] = {
 	{ 0x0000d041 /* PNP0000 */, "AT interrupt controller" },
 	{ 0 }
 };
 
-DRIVER_MODULE(atpic, isa, atpic_isa_driver, atpic_devclass, 0, 0);
+DRIVER_MODULE(atpic, isa, atpic_isa_driver, 0, 0);
 ISA_PNP_INFO(atpic_ids);
 
 static __inline uint8_t

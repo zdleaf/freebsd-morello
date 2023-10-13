@@ -1,7 +1,7 @@
 /*-
  * SPDX-License-Identifier: BSD-2-Clause
  *
- * Copyright (c) 2021-2022 Alfonso Sabato Siciliano
+ * Copyright (c) 2021-2023 Alfonso Sabato Siciliano
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -25,200 +25,246 @@
  * SUCH DAMAGE.
  */
 
-#include <sys/param.h>
-
 #include <curses.h>
-#include <string.h>
 
 #include "bsddialog.h"
 #include "bsddialog_theme.h"
 #include "lib_util.h"
 
-extern struct bsddialog_theme t;
+struct scrolltext {
+	WINDOW *pad;
+	int ypad;
+	int xpad;
+	int ys;
+	int ye;
+	int xs;
+	int xe;
+	int hpad;
+	int wpad;
+	int margin;    /* 2 with multicolumn char, 0 otherwise */
+	int printrows; /* d.h - BORDERS - HBUTTONS */
+};
 
-static void
-textbox_autosize(struct bsddialog_conf *conf, int rows, int cols, int *h,
-    int *w, int hpad, int wpad, struct buttons bs)
+static void updateborders(struct dialog *d, struct scrolltext *st)
 {
-	if (cols == BSDDIALOG_AUTOSIZE)
-		*w = widget_min_width(conf, 0, wpad, &bs);
+	chtype arrowch, borderch;
 
-	if (rows == BSDDIALOG_AUTOSIZE)
-		*h = widget_min_height(conf, 0, hpad, true);
+	if (d->conf->no_lines)
+		borderch = ' ';
+	else if (d->conf->ascii_lines)
+		borderch = '|';
+	else
+		borderch = ACS_VLINE;
+
+	if (st->xpad > 0) {
+		arrowch = d->conf->ascii_lines ? '<' : ACS_LARROW;
+		arrowch |= t.dialog.arrowcolor;
+	} else {
+		arrowch = borderch;
+		arrowch |= t.dialog.lineraisecolor;
+	}
+	mvwvline(d->widget, (d->h / 2) - 2, 0, arrowch, 4);
+
+	if (st->xpad + d->w - 2 - st->margin < st->wpad) {
+		arrowch = d->conf->ascii_lines ? '>' : ACS_RARROW;
+		arrowch |= t.dialog.arrowcolor;
+	} else {
+		arrowch = borderch;
+		arrowch |= t.dialog.linelowercolor;
+	}
+	mvwvline(d->widget, (d->h / 2) - 2, d->w - 1, arrowch, 4);
+
+	if (st->hpad > d->h - 4) {
+		wattron(d->widget, t.dialog.arrowcolor);
+		mvwprintw(d->widget, d->h - 3, d->w - 6,
+		    "%3d%%", 100 * (st->ypad + d->h - 4) / st->hpad);
+		wattroff(d->widget, t.dialog.arrowcolor);
+	}
 }
 
-static int
-textbox_checksize(int rows, int cols, int hpad, struct buttons bs)
+static int textbox_size_position(struct dialog *d, struct scrolltext *st)
 {
-	int mincols;
+	int minw;
 
-	mincols = VBORDERS + bs.sizebutton;
+	if (set_widget_size(d->conf, d->rows, d->cols, &d->h, &d->w) != 0)
+		return (BSDDIALOG_ERROR);
+	if (set_widget_autosize(d->conf, d->rows, d->cols, &d->h, &d->w,
+	    d->text, NULL, &d->bs, st->hpad, st->wpad + st->margin) != 0)
+		return (BSDDIALOG_ERROR);
+	minw = (st->wpad > 0) ? 2 /*multicolumn char*/ + st->margin : 0 ;
+	if (widget_checksize(d->h, d->w, &d->bs, MIN(st->hpad, 1), minw) != 0)
+		return (BSDDIALOG_ERROR);
+	if (set_widget_position(d->conf, &d->y, &d->x, d->h, d->w) != 0)
+		return (BSDDIALOG_ERROR);
 
-	if (cols < mincols)
-		RETURN_ERROR("Few cols for the textbox");
+	return (0);
+}
 
-	if (rows < 4 /* HBORDERS + button*/ + (hpad > 0 ? 1 : 0))
-		RETURN_ERROR("Few rows for the textbox");
+static int textbox_draw(struct dialog *d, struct scrolltext *st)
+{
+	if (d->built) {
+		hide_dialog(d);
+		refresh(); /* Important for decreasing screen */
+	}
+	if (textbox_size_position(d, st) != 0)
+		return (BSDDIALOG_ERROR);
+	if (draw_dialog(d) != 0)
+		return (BSDDIALOG_ERROR);
+	if (d->built)
+		refresh(); /* Important to fix grey lines expanding screen */
+
+	st->ys = d->y + 1;
+	st->xs = (st->margin == 0) ? d->x + 1 : d->x + 2;
+	st->ye = st->ys + d->h - 5;
+	st->xe = st->xs + d->w - 3 - st->margin;
+	st->ypad = st->xpad = 0;
+	st->printrows = d->h-4;
 
 	return (0);
 }
 
 /* API */
 int
-bsddialog_textbox(struct bsddialog_conf *conf, const char* file, int rows,
+bsddialog_textbox(struct bsddialog_conf *conf, const char *file, int rows,
     int cols)
 {
-	bool loop;
-	int i, output, input;
-	int y, x, h, w, hpad, wpad, ypad, xpad, ys, ye, xs, xe, printrows;
+	bool loop, has_multicol_ch;
+	int i, retval;
+	unsigned int defaulttablen, linecols;
+	wint_t input;
 	char buf[BUFSIZ];
 	FILE *fp;
-	struct buttons bs;
-	WINDOW *shadow, *widget, *pad;
+	struct scrolltext st;
+	struct dialog d;
 
+	if (file == NULL)
+		RETURN_ERROR("*file is NULL");
 	if ((fp = fopen(file, "r")) == NULL)
-		RETURN_ERROR("Cannot open file");
+		RETURN_FMTERROR("Cannot open file \"%s\"", file);
 
-	hpad = 1;
-	wpad = 1;
-	pad = newpad(hpad, wpad);
-	wbkgd(pad, t.dialog.color);
+	if (prepare_dialog(conf, "" /* fake */, rows, cols, &d) != 0)
+		return (BSDDIALOG_ERROR);
+	set_buttons(&d, true, "EXIT", NULL);
+
+	defaulttablen = TABSIZE;
+	if (conf->text.tablen > 0)
+		set_tabsize(conf->text.tablen);
+	st.hpad = 1;
+	st.wpad = 1;
+	st.pad = newpad(st.hpad, st.wpad);
+	wbkgd(st.pad, t.dialog.color);
+	st.margin = 0;
 	i = 0;
 	while (fgets(buf, BUFSIZ, fp) != NULL) {
-		if ((int) strlen(buf) > wpad) {
-			wpad = strlen(buf);
-			wresize(pad, hpad, wpad);
+		if (str_props(buf, &linecols, &has_multicol_ch) != 0)
+			continue;
+		if ((int)linecols > st.wpad) {
+			st.wpad = linecols;
+			wresize(st.pad, st.hpad, st.wpad);
 		}
-		if (i > hpad-1) {
-			hpad++;
-			wresize(pad, hpad, wpad);
+		if (i > st.hpad-1) {
+			st.hpad++;
+			wresize(st.pad, st.hpad, st.wpad);
 		}
-		mvwaddstr(pad, i, 0, buf);
+		mvwaddstr(st.pad, i, 0, buf);
 		i++;
+		if (has_multicol_ch)
+			st.margin = 2;
 	}
 	fclose(fp);
+	set_tabsize(defaulttablen); /* reset because it is curses global */
 
-	bs.nbuttons = 1;
-	bs.label[0] = "EXIT";
-	if (conf->button.ok_label != NULL)
-		bs.label[0] = conf->button.ok_label;
-	bs.value[0] = BSDDIALOG_OK;
-	bs.curr = 0;
-	bs.sizebutton = strlen(bs.label[0]) + 2;
-
-	if (set_widget_size(conf, rows, cols, &h, &w) != 0)
-		return (BSDDIALOG_ERROR);
-	textbox_autosize(conf, rows, cols, &h, &w, hpad, wpad, bs);
-	if (textbox_checksize(h, w, hpad, bs) != 0)
-		return (BSDDIALOG_ERROR);
-	if (set_widget_position(conf, &y, &x, h, w) != 0)
+	if (textbox_draw(&d, &st) != 0)
 		return (BSDDIALOG_ERROR);
 
-	if (new_dialog(conf, &shadow, &widget, y, x, h, w, NULL, NULL, &bs,
-	    true) != 0)
-		return (BSDDIALOG_ERROR);
-
-	ys = y + 1;
-	xs = x + 1;
-	ye = ys + h - 5;
-	xe = xs + w - 3;
-	ypad = xpad = 0;
-	printrows = h-4;
 	loop = true;
 	while (loop) {
-		wnoutrefresh(widget);
-		pnoutrefresh(pad, ypad, xpad, ys, xs, ye, xe);
-		doupdate();
-		input = getch();
+		updateborders(&d, &st);
+		/*
+		 * Overflow multicolumn charchter right border:
+		 * wnoutrefresh(widget);
+		 * pnoutrefresh(pad, ypad, xpad, ys, xs, ye, xe);
+		 * doupdate();
+		 */
+		wrefresh(d.widget);
+		prefresh(st.pad, st.ypad, st.xpad, st.ys, st.xs, st.ye, st.xe);
+		if (get_wch(&input) == ERR)
+			continue;
+		if (shortcut_buttons(input, &d.bs)) {
+			DRAW_BUTTONS(d);
+			doupdate();
+			retval = BUTTONVALUE(d.bs);
+			break; /* loop */
+		}
 		switch(input) {
 		case KEY_ENTER:
 		case 10: /* Enter */
-			output = BSDDIALOG_OK;
+			retval = BSDDIALOG_OK;
 			loop = false;
 			break;
 		case 27: /* Esc */
 			if (conf->key.enable_esc) {
-				output = BSDDIALOG_ESC;
+				retval = BSDDIALOG_ESC;
 				loop = false;
 			}
 			break;
+		case '\t': /* TAB */
+			d.bs.curr = (d.bs.curr + 1) % d.bs.nbuttons;
+			DRAW_BUTTONS(d);
+			break;
 		case KEY_HOME:
-			ypad = 0;
+			st.ypad = 0;
 			break;
 		case KEY_END:
-			ypad = hpad - printrows;
-			ypad = ypad < 0 ? 0 : ypad;
+			st.ypad = MAX(st.hpad - st.printrows, 0);
 			break;
 		case KEY_PPAGE:
-			ypad -= printrows;
-			ypad = ypad < 0 ? 0 : ypad;
+			st.ypad = MAX(st.ypad - st.printrows, 0);
 			break;
 		case KEY_NPAGE:
-			ypad += printrows;
-			if (ypad + printrows > hpad)
-				ypad = hpad - printrows;
+			st.ypad += st.printrows;
+			if (st.ypad + st.printrows > st.hpad)
+				st.ypad = st.hpad - st.printrows;
 			break;
 		case '0':
-			xpad = 0;
+			st.xpad = 0;
+			break;
 		case KEY_LEFT:
 		case 'h':
-			xpad = xpad > 0 ? xpad - 1 : 0;
+			st.xpad = MAX(st.xpad - 1, 0);
 			break;
 		case KEY_RIGHT:
 		case 'l':
-			xpad = (xpad + w-2) < wpad-1 ? xpad + 1 : xpad;
+			if (st.xpad + d.w - 2 - st.margin < st.wpad)
+				st.xpad++;
 			break;
 		case KEY_UP:
 		case 'k':
-			ypad = ypad > 0 ? ypad - 1 : 0;
+			st.ypad = MAX(st.ypad - 1, 0);
 			break;
 		case KEY_DOWN:
 		case'j':
-			ypad = ypad + printrows <= hpad -1 ? ypad + 1 : ypad;
+			if (st.ypad + st.printrows <= st.hpad -1)
+				st.ypad++;
 			break;
 		case KEY_F(1):
-			if (conf->f1_file == NULL && conf->f1_message == NULL)
+			if (conf->key.f1_file == NULL &&
+			    conf->key.f1_message == NULL)
 				break;
-			if (f1help(conf) != 0)
+			if (f1help_dialog(conf) != 0)
 				return (BSDDIALOG_ERROR);
-			/* No break, screen size can change */
-		case KEY_RESIZE:
-			/* Important for decreasing screen */
-			hide_widget(y, x, h, w, conf->shadow);
-			refresh();
-
-			if (set_widget_size(conf, rows, cols, &h, &w) != 0)
+			if (textbox_draw(&d, &st) != 0)
 				return (BSDDIALOG_ERROR);
-			textbox_autosize(conf, rows, cols, &h, &w, hpad, wpad,
-			    bs);
-			if (textbox_checksize(h, w, hpad, bs) != 0)
-				return (BSDDIALOG_ERROR);
-			if (set_widget_position(conf, &y, &x, h, w) != 0)
-				return (BSDDIALOG_ERROR);
-
-			ys = y + 1;
-			xs = x + 1;
-			ye = ys + h - 5;
-			xe = xs + w - 3;
-			ypad = xpad = 0;
-			printrows = h - 4;
-
-			if (update_dialog(conf, shadow, widget, y, x, h, w,
-			    NULL, NULL, &bs, true) != 0)
-				return (BSDDIALOG_ERROR);
-
-			/* Important to fix grey lines expanding screen */
-			refresh();
 			break;
-		default:
-			if (shortcut_buttons(input, &bs)) {
-				output = bs.value[bs.curr];
-				loop = false;
-			}
+		case KEY_RESIZE:
+			if (textbox_draw(&d, &st) != 0)
+				return (BSDDIALOG_ERROR);
+			break;
 		}
 	}
 
-	end_dialog(conf, shadow, widget, pad);
+	delwin(st.pad);
+	end_dialog(&d);
 
-	return (output);
+	return (retval);
 }

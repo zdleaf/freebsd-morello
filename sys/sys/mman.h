@@ -29,7 +29,6 @@
  * SUCH DAMAGE.
  *
  *	@(#)mman.h	8.2 (Berkeley) 1/9/95
- * $FreeBSD$
  */
 
 #ifndef _SYS_MMAN_H_
@@ -104,9 +103,7 @@
 #define	MAP_EXCL	 0x00004000 /* for MAP_FIXED, fail if address is used */
 #define	MAP_NOCORE	 0x00020000 /* dont include these pages in a coredump */
 #define	MAP_PREFAULT_READ 0x00040000 /* prefault mapping for reading */
-#ifdef __LP64__
 #define	MAP_32BIT	 0x00080000 /* map in the low 2GB of address space */
-#endif
 
 /*
  * Request specific alignment (n == log2 of the desired alignment).
@@ -268,6 +265,7 @@ struct file;
 struct shmfd {
 	vm_ooffset_t	shm_size;
 	vm_object_t	shm_object;
+	vm_pindex_t	shm_pages;	/* allocated pages */
 	int		shm_refs;
 	uid_t		shm_uid;
 	gid_t		shm_gid;
@@ -300,6 +298,8 @@ struct shmfd {
 #endif
 
 #ifdef _KERNEL
+struct prison;
+
 int	shm_map(struct file *fp, size_t size, off_t offset, void **memp);
 int	shm_unmap(struct file *fp, void *mem, size_t size);
 
@@ -309,6 +309,7 @@ struct shmfd *shm_hold(struct shmfd *shmfd);
 void	shm_drop(struct shmfd *shmfd);
 int	shm_dotruncate(struct shmfd *shmfd, off_t length);
 bool	shm_largepage(struct shmfd *shmfd);
+void	shm_remove_prison(struct prison *pr);
 
 extern struct fileops shm_ops;
 

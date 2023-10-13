@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD AND BSD-4-Clause
+ * SPDX-License-Identifier: BSD-2-Clause AND BSD-4-Clause
  *
  * Copyright (c) 2001 The NetBSD Foundation, Inc.
  * All rights reserved.
@@ -86,8 +86,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 /*
  * Native 64-bit page table operations for running without a hypervisor.
  */
@@ -303,7 +301,7 @@ static struct moea64_funcs moea64_native_funcs = {
 MMU_DEF_INHERIT(oea64_mmu_native, MMU_TYPE_G5, moea64_native_methods, oea64_mmu);
 
 static void
-moea64_install_native()
+moea64_install_native(void)
 {
 
 	/* Install the MOEA64 ops. */
@@ -925,14 +923,12 @@ moea64_pte_unset_sp_locked(struct pvo_entry *pvo)
 	volatile struct lpte *pt;
 	uint64_t ptehi, refchg, vpn;
 	vm_offset_t eva;
-	pmap_t pm;
 
-	pm = pvo->pvo_pmap;
 	refchg = 0;
 	eva = PVO_VADDR(pvo) + HPT_SP_SIZE;
 
 	for (; pvo != NULL && PVO_VADDR(pvo) < eva;
-	    pvo = RB_NEXT(pvo_tree, &pm->pmap_pvo, pvo)) {
+	    pvo = RB_NEXT(pvo_tree, &pvo->pvo_pmap->pmap_pvo, pvo)) {
 		pt = moea64_pteg_table + pvo->pvo_pte.slot;
 		ptehi = be64toh(pt->pte_hi);
 		if ((ptehi & LPTE_AVPN_MASK) !=
@@ -975,13 +971,11 @@ moea64_pte_insert_sp_locked(struct pvo_entry *pvo)
 	struct lpte insertpt;
 	int64_t ret;
 	vm_offset_t eva;
-	pmap_t pm;
 
-	pm = pvo->pvo_pmap;
 	eva = PVO_VADDR(pvo) + HPT_SP_SIZE;
 
 	for (; pvo != NULL && PVO_VADDR(pvo) < eva;
-	    pvo = RB_NEXT(pvo_tree, &pm->pmap_pvo, pvo)) {
+	    pvo = RB_NEXT(pvo_tree, &pvo->pvo_pmap->pmap_pvo, pvo)) {
 		moea64_pte_from_pvo(pvo, &insertpt);
 		pvo->pvo_pte.slot &= ~7ULL; /* Base slot address */
 

@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2018 Rubicon Communications, LLC (Netgate)
  *
@@ -23,13 +23,9 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/bus.h>
@@ -358,13 +354,11 @@ static device_method_t mv_cp110_clock_methods[] = {
 	DEVMETHOD_END
 };
 
-static devclass_t mv_cp110_clock_devclass;
-
 static driver_t mv_cp110_clock_driver = {
 	"mv_cp110_clock",
 	mv_cp110_clock_methods,
 	sizeof(struct mv_cp110_clock_softc),
 };
 
-EARLY_DRIVER_MODULE(mv_cp110_clock, simplebus, mv_cp110_clock_driver,
-    mv_cp110_clock_devclass, 0, 0, BUS_PASS_RESOURCE + BUS_PASS_ORDER_LATE);
+EARLY_DRIVER_MODULE(mv_cp110_clock, simplebus, mv_cp110_clock_driver, 0, 0,
+    BUS_PASS_RESOURCE + BUS_PASS_ORDER_LATE);

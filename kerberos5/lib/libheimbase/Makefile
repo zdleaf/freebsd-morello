@@ -1,6 +1,5 @@
-#$FreeBSD$
 
-PACKAGE=	kerberos
+PACKAGE=	kerberos-lib
 
 LIB=	heimbase
 LDFLAGS=	-Wl,--no-undefined

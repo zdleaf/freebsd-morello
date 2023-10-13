@@ -25,8 +25,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/bus.h>
@@ -193,6 +191,7 @@ struct am335x_ehrpwm_softc {
 };
 
 static struct ofw_compat_data compat_data[] = {
+	{"ti,am3352-ehrpwm",    true},
 	{"ti,am33xx-ehrpwm",    true},
 	{NULL,                  false},
 };
@@ -594,9 +593,7 @@ static driver_t am335x_ehrpwm_driver = {
 	sizeof(struct am335x_ehrpwm_softc),
 };
 
-static devclass_t am335x_ehrpwm_devclass;
-
-DRIVER_MODULE(am335x_ehrpwm, am335x_pwmss, am335x_ehrpwm_driver, am335x_ehrpwm_devclass, 0, 0);
+DRIVER_MODULE(am335x_ehrpwm, am335x_pwmss, am335x_ehrpwm_driver, 0, 0);
 MODULE_VERSION(am335x_ehrpwm, 1);
 MODULE_DEPEND(am335x_ehrpwm, am335x_pwmss, 1, 1, 1);
 MODULE_DEPEND(am335x_ehrpwm, pwmbus, 1, 1, 1);

@@ -34,7 +34,6 @@
  * SUCH DAMAGE.
  * 
  * $DragonFly: src/sys/dev/netif/mii_layer/truephy.c,v 1.3 2008/02/10 07:29:27 sephe Exp $
- * $FreeBSD$
  */
 
 #include <sys/param.h>
@@ -84,15 +83,13 @@ static const struct mii_phydesc truephys[] = {
 	MII_PHY_END
 };
 
-static devclass_t truephy_devclass;
-
 static driver_t truephy_driver = {
 	"truephy",
 	truephy_methods,
 	sizeof(struct mii_softc)
 };
 
-DRIVER_MODULE(truephy, miibus, truephy_driver, truephy_devclass, 0, 0);
+DRIVER_MODULE(truephy, miibus, truephy_driver, 0, 0);
 
 static const struct mii_phy_funcs truephy_funcs = {
 	truephy_service,

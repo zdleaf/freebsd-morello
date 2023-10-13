@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (C) 2019 Jan Sucan <jansucan@FreeBSD.org>
  * All rights reserved.
@@ -24,8 +24,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 #ifndef MAIN_H
@@ -40,7 +38,7 @@
 #else
  #define PING4ADDOPTS
 #endif
-#define PING4OPTS "4AaC:c:DdfG:g:Hh:I:i:Ll:M:m:nop:QqRrS:s:T:t:vW:z:" PING4ADDOPTS
+#define PING4OPTS ".::4AaC:c:DdfG:g:Hh:I:i:Ll:M:m:nop:QqRrS:s:T:t:vW:z:" PING4ADDOPTS
 
 #if defined(INET6) && defined(IPSEC) && defined(IPSEC_POLICY_IPSEC)
  #define PING6ADDOPTS "P:"
@@ -49,8 +47,33 @@
 #else
  #define PING6ADDOPTS
 #endif
-#define PING6OPTS "6Aab:C:c:Dde:fHI:i:k:l:m:nNoOp:qS:s:t:uvyYW:z:" PING6ADDOPTS
+#define PING6OPTS ".::6Aab:C:c:Dde:fHI:i:k:l:m:nNoOp:qS:s:t:uvyYW:z:" PING6ADDOPTS
 
+/* various options */
+extern u_int options;
+#define	F_HOSTNAME	0x0004
+
+extern char *hostname;
+
+/* counters */
+extern long nreceived;		/* # of packets we got back */
+extern long nrepeats;		/* number of duplicates */
+extern long ntransmitted;	/* sequence # for outbound packets = #sent */
+extern long nrcvtimeout;	/* # of packets we got back after waittime */
+
+/* nonzero if we've been told to finish up */
+extern volatile sig_atomic_t seenint;
+extern volatile sig_atomic_t seeninfo;
+
+/* timing */
+extern int timing;		/* flag to do timing */
+extern double tmin;		/* minimum round trip time */
+extern double tmax;		/* maximum round trip time */
+extern double tsum;		/* sum of all times, for doing average */
+extern double tsumsq;		/* sum of all times squared, for std. dev. */
+
+void onsignal(int);
+void pr_summary(FILE * __restrict);
 void usage(void) __dead2;
 
 #endif

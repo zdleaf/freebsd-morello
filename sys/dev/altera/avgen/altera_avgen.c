@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2012-2013, 2016 Robert N. M. Watson
  * All rights reserved.
@@ -31,8 +31,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/bio.h>
 #include <sys/bus.h>
@@ -63,8 +61,6 @@ __FBSDID("$FreeBSD$");
  * Avalon, so conceivably this should just be soc_dev or similar, since many
  * system-on-chip bus environments would work fine with the same code.
  */
-
-devclass_t altera_avgen_devclass;
 
 static d_mmap_t altera_avgen_mmap;
 static d_read_t altera_avgen_read;

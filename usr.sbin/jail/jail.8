@@ -23,34 +23,45 @@
 .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 .\" SUCH DAMAGE.
 .\"
-.\" $FreeBSD$
-.\"
-.Dd April 4, 2021
+.Dd September 1, 2023
 .Dt JAIL 8
 .Os
 .Sh NAME
 .Nm jail
 .Nd "manage system jails"
 .Sh SYNOPSIS
+.Ss From Configuration File
 .Nm
+.Op Fl cm
+.Op Fl dqv
+.Op Fl f Ar conf_file
+.Op Fl p Ar limit
+.Op Ar jail
+.Nm
+.Op Fl r
+.Op Fl qv
+.Op Fl f Ar conf_file
+.Op Fl p Ar limit
+.Op Cm * | Ar jail ...
+.Ss Without Configuration File
+.Nm
+.Op Fl cm
 .Op Fl dhilqv
 .Op Fl J Ar jid_file
 .Op Fl u Ar username
 .Op Fl U Ar username
-.Op Fl cmr
 .Ar param Ns = Ns Ar value ...
 .Op Cm command Ns = Ns Ar command ...
 .Nm
-.Op Fl dqv
-.Op Fl f Ar conf_file
-.Op Fl p Ar limit
-.Op Fl cmr
-.Op Ar jail
-.Nm
-.Op Fl qv
-.Op Fl f Ar conf_file
 .Op Fl rR
+.Op Fl qv
 .Op Cm * | Ar jail ...
+.Ss Show Parameters
+.Nm
+.Op Fl f Ar conf_file
+.Fl e
+.Ar separator
+.Ss Backward Compatibility
 .Nm
 .Op Fl dhilqv
 .Op Fl J Ar jid_file
@@ -58,11 +69,8 @@
 .Op Fl U Ar username
 .Op Fl n Ar jailname
 .Op Fl s Ar securelevel
-.Ar path hostname ip Ns [ Ns Ar ,... Ns ] Ar command ...
-.Nm
-.Op Fl f Ar conf_file
-.Fl e
-.Ar separator
+.Ar path hostname ip Ns Op Cm \&, Ns Ar ...
+.Ar command ...
 .Sh DESCRIPTION
 The
 .Nm
@@ -239,10 +247,10 @@ would apply to jails with names like
 and
 .Dq foo.bar.baz .
 .Pp
-A jail may be specified with parameters directly on the command line.
-In this case, the
-.Xr jail.conf 5
-file will not be used.
+A jail may also be specified via parameters directly on the command line in
+.Dq name=value
+form, ignoring the contents of
+.Xr jail.conf 5 .
 For backward compatibility, the command line may also have four fixed
 parameters, without names:
 .Ar path ,
@@ -250,11 +258,6 @@ parameters, without names:
 .Ar ip ,
 and
 .Ar command .
-This mode will always create a new jail, and the
-.Fl c
-and
-.Fl m
-options do not apply (and must not be present).
 .Ss Jail Parameters
 Parameters in the
 .Xr jail.conf 5
@@ -571,8 +574,9 @@ If the
 MIB entry is zero, this will be restricted to the root user.
 .It Va allow.socket_af
 Sockets within a jail are normally restricted to IPv4, IPv6, local
-(UNIX), and route.  This allows access to other protocol stacks that
-have not had jail functionality added to them.
+(UNIX), and route.
+This allows access to other protocol stacks that have not had jail
+functionality added to them.
 .It Va allow.mlock
 Locking or unlocking physical pages in memory are normally not available
 within a jail.
@@ -583,6 +587,51 @@ or
 memory subject to
 .Va security.bsd.unprivileged_mlock
 and resource limits.
+.It Va allow.nfsd
+The
+.Xr mountd 8 ,
+.Xr nfsd 8 ,
+.Xr nfsuserd 8 ,
+.Xr gssd 8
+and
+.Xr rpc.tlsservd 8
+daemons are permitted to run inside a properly configured vnet-enabled jail.
+The jail's root must be a file system mount point and
+.Va enforce_statfs
+must not be set to 0, so that
+.Xr mountd 8
+can export file systems visible within the jail.
+.Va enforce_statfs
+must be set to 1 if file systems mounted under the
+jail's file system need to be exported by
+.Xr mount 8 .
+For exporting only the jail's file system, a setting of 2
+is sufficient.
+If the kernel configuration does not include the
+.Sy NFSD
+option,
+.Pa nfsd.ko
+must be loaded outside of the jails.
+This is normally done by adding
+.Dq nfsd
+to
+.Va kld_list
+in the
+.Xr rc.conf 5
+file outside of the jails.
+Similarily, if the
+.Xr gssd 8
+is to be run in a jail, either the kernel
+.Sy KGSSAPI
+option needs to be specified or
+.Dq kgssapi
+and
+.Dq kgssapi_krb5
+need to be in
+.Va kld_list
+in the
+.Xr rc.conf 5
+file outside of the jails.
 .It Va allow.reserved_ports
 The jail root may bind to ports lower than 1024.
 .It Va allow.unprivileged_proc_debug
@@ -594,6 +643,9 @@ sysctl.
 The super-user will be disabled automatically if its parent system has it
 disabled.
 The super-user is enabled by default.
+.It Va allow.extattr
+Allow privileged process in the jail to manipulate filesystem extended
+attributes in the system namespace.
 .El
 .El
 .Pp
@@ -620,7 +672,7 @@ and only when
 .Va enforce_statfs
 is set to a value lower than 2.
 .It Va allow.mount.fusefs
-privileged users inside the jail will be able to mount and unmount 
+privileged users inside the jail will be able to mount and unmount
 fuse-based file systems.
 This permission is effective only together with
 .Va allow.mount
@@ -713,7 +765,7 @@ the jail cannot perform any sysvmsg-related system calls.
 .It Va sysvsem, sysvshm
 Allow access to SYSV IPC semaphore and shared memory primitives, in the
 same manner as
-.Va sysvmsg.
+.Va sysvmsg .
 .El
 .Pp
 There are pseudo-parameters that are not passed to the kernel, but are
@@ -941,7 +993,7 @@ To set up a jail directory tree containing an entire
 distribution, the following
 .Xr sh 1
 command script can be used:
-.Bd -literal
+.Bd -literal -offset indent
 D=/here/is/the/jail
 cd /usr/src
 mkdir -p $D
@@ -1020,11 +1072,6 @@ To configure
 .Xr sendmail 8 ,
 it is necessary to modify
 .Pa /etc/mail/sendmail.cf .
-.Pp
-For
-.Xr named 8 ,
-it is necessary to modify
-.Pa /etc/namedb/named.conf .
 .Pp
 In addition, a number of services must be recompiled in order to run
 them in the host environment.
@@ -1200,9 +1247,11 @@ the intended use of the jail, you may also want to run
 .Pa /etc/rc.shutdown
 from within the jail.
 .Pp
-To shut down the jail from the outside, simply remove it with
-.Nm
-.Ar -r ,
+To shut down the jail from the outside, simply remove it with:
+.Bd -literal -offset indent
+jail -r
+.Ed
+.Pp
 which will run any commands specified by
 .Va exec.stop ,
 and then send
@@ -1265,7 +1314,7 @@ can be used to determine if a process is running inside a jail (value
 is one) or not (value is zero).
 .Pp
 The variable
-.Va security.jail.max_af_ips
+.Va security.jail.jail_max_af_ips
 determines how may address per address family a jail may have.
 The default is 255.
 .Pp
@@ -1361,14 +1410,16 @@ environment of the first jail.
 .Xr jexec 8 ,
 .Xr jls 8 ,
 .Xr mount 8 ,
-.Xr named 8 ,
+.Xr mountd 8 ,
+.Xr nfsd 8 ,
 .Xr reboot 8 ,
 .Xr rpcbind 8 ,
 .Xr sendmail 8 ,
 .Xr shutdown 8 ,
 .Xr sysctl 8 ,
 .Xr syslogd 8 ,
-.Xr umount 8
+.Xr umount 8 ,
+.Xr extattr 9
 .Sh HISTORY
 The
 .Nm

@@ -22,9 +22,7 @@
 .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 .\" SUCH DAMAGE.
 .\"
-.\" $FreeBSD$
-.\"
-.Dd November 3, 2021
+.Dd May 8, 2023
 .Dt "VT" 4
 .Os
 .Sh NAME
@@ -58,6 +56,7 @@ In
 .Cd kern.vt.kbd_reboot=1
 .Cd kern.vt.kbd_debug=1
 .Cd kern.vt.kbd_panic=0
+.Cd kern.vt.enable_altgr=0
 .Cd kern.vt.enable_bell=1
 .Sh DESCRIPTION
 The
@@ -117,6 +116,8 @@ The Home and End keys jump to the beginning or end of the scrollback
 buffer.
 When finished reviewing, press the Scroll Lock key again to return to
 normal use.
+Some laptop keyboards lack a Scroll Lock key, and use a special function key
+sequence (such as Fn + K) to access Scroll Lock.
 .Sh DRIVER CONFIGURATION
 .Ss Kernel Configuration Options
 These kernel options control the
@@ -197,10 +198,16 @@ prompt or in
 Set to 1 to use virtual terminals in text mode instead of graphics mode.
 Features that require graphics mode, like loadable fonts, will be
 disabled.
+.Pp
+If a KMS driver is loaded the console will switch to (and remain in)
+graphics mode.
 .It Va hw.vga.acpi_ignore_no_vga
 Set to 1 to force the usage of the VGA driver regardless of whether
 ACPI IAPC_BOOT_ARCH signals no VGA support.
 Can be used to workaround firmware bugs in the ACPI tables.
+Note no VGA support is only acknowledged when running virtualized.
+There is too many broken firmware that wrongly reports no VGA support on
+physical hardware.
 .It Va kern.vty
 Set this value to
 .Ql vt
@@ -222,6 +229,10 @@ HTML-like hex triplet.
 See
 .Sx EXAMPLES
 below.
+.Pp
+Note: The
+.Nm
+VGA hardware driver does not support palette configuration.
 .It Va kern.vt.fb.default_mode
 Set this value to a graphic mode to override the default mode picked by the
 .Nm
@@ -262,6 +273,8 @@ and can also be changed at runtime with the
 .Xr sysctl 8
 command.
 .Bl -tag -width indent
+.It Va kern.vt.enable_altgr
+Enable AltGr key (do not assume right Alt key as Alt).
 .It Va kern.vt.kbd_halt
 Enable halt keyboard combination.
 .It Va kern.vt.kbd_poweroff
@@ -311,7 +324,6 @@ Notification that the console bell has rung.
 .It Li hushed Ta true or false indicating whether or not the bell was quieted by the user when rung.
 .It Li hz Ta Tone that was requested in Hz.
 .El
-.Pp
 .Sh EXAMPLES
 This example changes the default color of normal text to green on a
 black background, or black on a green background when reversed.

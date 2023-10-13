@@ -22,8 +22,6 @@
  * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 #ifndef	_LINUXKPI_LINUX_XARRAY_H_
 #define	_LINUXKPI_LINUX_XARRAY_H_
@@ -31,6 +29,7 @@
 #include <linux/gfp.h>
 #include <linux/radix-tree.h>
 #include <linux/err.h>
+#include <linux/kconfig.h>
 
 #include <sys/lock.h>
 #include <sys/mutex.h>
@@ -44,6 +43,9 @@
 
 #define	XA_ERROR(x) \
 	ERR_PTR(x)
+
+#define	xa_is_err(x) \
+	IS_ERR(x)
 
 #define	xa_limit_32b XA_LIMIT(0, 0xFFFFFFFF)
 
@@ -86,6 +88,24 @@ int __xa_insert(struct xarray *, uint32_t, void *, gfp_t);
 void *__xa_store(struct xarray *, uint32_t, void *, gfp_t);
 bool __xa_empty(struct xarray *);
 void *__xa_next(struct xarray *, unsigned long *, bool);
+
+#define	xa_store_irq(xa, index, ptr, gfp) \
+	xa_store((xa), (index), (ptr), (gfp))
+
+#define	xa_erase_irq(xa, index) \
+	xa_erase((xa), (index))
+
+#define	xa_lock_irqsave(xa, flags) \
+	do { \
+		xa_lock((xa)); \
+		flags = 0; \
+	} while (0)
+
+#define	xa_unlock_irqrestore(xa, flags) \
+	do { \
+		xa_unlock((xa)); \
+		flags == 0; \
+	} while (0)
 
 static inline int
 xa_err(void *ptr)

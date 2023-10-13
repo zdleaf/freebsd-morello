@@ -32,8 +32,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/kernel.h>
 #include <sys/systm.h>
@@ -1091,6 +1089,6 @@ static device_method_t ntb_plx_methods[] = {
 
 static DEFINE_CLASS_0(ntb_hw, ntb_plx_driver, ntb_plx_methods,
     sizeof(struct ntb_plx_softc));
-DRIVER_MODULE(ntb_hw_plx, pci, ntb_plx_driver, ntb_hw_devclass, NULL, NULL);
+DRIVER_MODULE(ntb_hw_plx, pci, ntb_plx_driver, NULL, NULL);
 MODULE_DEPEND(ntb_hw_plx, ntb, 1, 1, 1);
 MODULE_VERSION(ntb_hw_plx, 1);

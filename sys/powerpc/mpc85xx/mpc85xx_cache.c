@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2018 Justin Hibbits
  * All rights reserved.
@@ -24,13 +24,9 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/bus.h>
 #include <sys/kernel.h>
@@ -157,8 +153,6 @@ static driver_t mpc85xx_cache_driver = {
 	mpc85xx_cache_methods,
 	sizeof(struct mpc85xx_cache_softc),
 };
-static devclass_t mpc85xx_cache_devclass;
 
-EARLY_DRIVER_MODULE(mpc85xx_cache, simplebus, mpc85xx_cache_driver,
-    mpc85xx_cache_devclass, NULL, NULL,
+EARLY_DRIVER_MODULE(mpc85xx_cache, simplebus, mpc85xx_cache_driver, NULL, NULL,
     BUS_PASS_RESOURCE + BUS_PASS_ORDER_MIDDLE);

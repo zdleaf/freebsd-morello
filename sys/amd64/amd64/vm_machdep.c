@@ -43,8 +43,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include "opt_isa.h"
 #include "opt_cpu.h"
 
@@ -169,6 +167,8 @@ copy_thread(struct thread *td1, struct thread *td2)
 		bcopy(get_pcb_user_save_td(td1), get_pcb_user_save_pcb(pcb2),
 		    cpu_max_ext_state_size);
 	}
+
+	td2->td_frame = (struct trapframe *)td2->td_md.md_stack_base - 1;
 
 	/*
 	 * Set registers for trampoline to user mode.  Leave space for the
@@ -371,7 +371,7 @@ cpu_thread_clean(struct thread *td)
 	if (pcb->pcb_tssp != NULL) {
 		pmap_pti_remove_kva((vm_offset_t)pcb->pcb_tssp,
 		    (vm_offset_t)pcb->pcb_tssp + ctob(IOPAGES + 1));
-		kmem_free((vm_offset_t)pcb->pcb_tssp, ctob(IOPAGES + 1));
+		kmem_free(pcb->pcb_tssp, ctob(IOPAGES + 1));
 		pcb->pcb_tssp = NULL;
 	}
 }
@@ -689,29 +689,4 @@ cpu_set_user_tls(struct thread *td, void *tls_base)
 #endif
 	pcb->pcb_fsbase = (register_t)tls_base;
 	return (0);
-}
-
-/*
- * Tell whether this address is in some physical memory region.
- * Currently used by the kernel coredump code in order to avoid
- * dumping the ``ISA memory hole'' which could cause indefinite hangs,
- * or other unpredictable behaviour.
- */
-
-int
-is_physical_memory(vm_paddr_t addr)
-{
-
-#ifdef DEV_ISA
-	/* The ISA ``memory hole''. */
-	if (addr >= 0xa0000 && addr < 0x100000)
-		return 0;
-#endif
-
-	/*
-	 * stuff other tests for known memory-mapped devices (PCI?)
-	 * here
-	 */
-
-	return 1;
 }

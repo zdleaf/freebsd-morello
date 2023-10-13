@@ -34,8 +34,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 /*
  * Socket operations for use by nfs
  */
@@ -160,6 +158,87 @@ static int nfsv2_procid[NFS_V3NPROCS] = {
 	NFSV2PROC_NOOP,
 	NFSV2PROC_NOOP,
 	NFSV2PROC_NOOP,
+};
+
+/*
+ * This static array indicates that a NFSv4 RPC should use
+ * RPCSEC_GSS, if the mount indicates that via sec=krb5[ip].
+ * System RPCs that do not use file handles will be false
+ * in this array so that they will use AUTH_SYS when the
+ * "syskrb5" mount option is specified, along with
+ * "sec=krb5[ip]".
+ */
+static bool nfscl_use_gss[NFSV42_NPROCS] = {
+	true,
+	true,
+	true,
+	true,
+	true,
+	true,
+	true,
+	true,
+	true,
+	true,
+	true,
+	true,
+	true,
+	true,
+	true,
+	true,
+	true,
+	true,
+	true,
+	true,
+	true,
+	true,
+	true,
+	false,		/* SetClientID */
+	false,		/* SetClientIDConfirm */
+	true,
+	true,
+	true,
+	true,
+	true,
+	true,
+	true,
+	false,		/* Renew */
+	true,
+	false,		/* ReleaseLockOwn */
+	true,
+	true,
+	true,
+	true,
+	true,
+	true,
+	false,		/* ExchangeID */
+	false,		/* CreateSession */
+	false,		/* DestroySession */
+	false,		/* DestroyClientID */
+	false,		/* FreeStateID */
+	true,
+	true,
+	true,
+	true,
+	false,		/* ReclaimComplete */
+	true,
+	true,
+	true,
+	true,
+	true,
+	true,
+	true,
+	true,
+	true,
+	true,
+	true,
+	true,
+	true,
+	true,
+	false,		/* BindConnectionToSession */
+	true,
+	true,
+	true,
+	true,
 };
 
 /*
@@ -679,7 +758,8 @@ newnfs_request(struct nfsrv_descript *nd, struct nfsmount *nmp,
 		}
 		NFSUNLOCKSTATE();
 	} else if (nmp != NULL && NFSHASKERB(nmp) &&
-	     nd->nd_procnum != NFSPROC_NULL) {
+	     nd->nd_procnum != NFSPROC_NULL && (!NFSHASSYSKRB5(nmp) ||
+	     nfscl_use_gss[nd->nd_procnum])) {
 		if (NFSHASALLGSSNAME(nmp) && nmp->nm_krbnamelen > 0)
 			nd->nd_flag |= ND_USEGSSNAME;
 		if ((nd->nd_flag & ND_USEGSSNAME) != 0) {
@@ -720,7 +800,7 @@ newnfs_request(struct nfsrv_descript *nd, struct nfsmount *nmp,
 		else
 			secflavour = RPCSEC_GSS_KRB5;
 		srv_principal = NFSMNT_SRVKRBNAME(nmp);
-	} else if (nmp != NULL && !NFSHASKERB(nmp) &&
+	} else if (nmp != NULL && (!NFSHASKERB(nmp) || NFSHASSYSKRB5(nmp)) &&
 	    nd->nd_procnum != NFSPROC_NULL &&
 	    (nd->nd_flag & ND_USEGSSNAME) != 0) {
 		/*
@@ -925,10 +1005,8 @@ tryagain:
 	} else if (stat == RPC_PROGVERSMISMATCH) {
 		NFSINCRGLOBAL(nfsstatsv1.rpcinvalid);
 		error = EPROTONOSUPPORT;
-	} else if (stat == RPC_INTR) {
-		error = EINTR;
 	} else if (stat == RPC_CANTSEND || stat == RPC_CANTRECV ||
-	     stat == RPC_SYSTEMERROR) {
+	     stat == RPC_SYSTEMERROR || stat == RPC_INTR) {
 		/* Check for a session slot that needs to be free'd. */
 		if ((nd->nd_flag & (ND_NFSV41 | ND_HASSLOTID)) ==
 		    (ND_NFSV41 | ND_HASSLOTID) && nmp != NULL &&
@@ -951,12 +1029,17 @@ tryagain:
 			 */
 			mtx_lock(&sep->nfsess_mtx);
 			sep->nfsess_slotseq[nd->nd_slotid] += 10;
+			sep->nfsess_badslots |= (0x1ULL << nd->nd_slotid);
 			mtx_unlock(&sep->nfsess_mtx);
 			/* And free the slot. */
 			nfsv4_freeslot(sep, nd->nd_slotid, false);
 		}
-		NFSINCRGLOBAL(nfsstatsv1.rpcinvalid);
-		error = ENXIO;
+		if (stat == RPC_INTR)
+			error = EINTR;
+		else {
+			NFSINCRGLOBAL(nfsstatsv1.rpcinvalid);
+			error = ENXIO;
+		}
 	} else {
 		NFSINCRGLOBAL(nfsstatsv1.rpcinvalid);
 		error = EACCES;
@@ -1019,8 +1102,16 @@ tryagain:
 			 * If the first op is Sequence, free up the slot.
 			 */
 			if ((nmp != NULL && i == NFSV4OP_SEQUENCE && j != 0) ||
-			    (clp != NULL && i == NFSV4OP_CBSEQUENCE && j != 0))
+			   (clp != NULL && i == NFSV4OP_CBSEQUENCE && j != 0)) {
 				NFSCL_DEBUG(1, "failed seq=%d\n", j);
+				if (sep != NULL && i == NFSV4OP_SEQUENCE &&
+				    j == NFSERR_SEQMISORDERED) {
+					mtx_lock(&sep->nfsess_mtx);
+					sep->nfsess_badslots |=
+					    (0x1ULL << nd->nd_slotid);
+					mtx_unlock(&sep->nfsess_mtx);
+				}
+			}
 			if (((nmp != NULL && i == NFSV4OP_SEQUENCE && j == 0) ||
 			    (clp != NULL && i == NFSV4OP_CBSEQUENCE &&
 			    j == 0)) && sep != NULL) {
@@ -1039,18 +1130,42 @@ tryagain:
 					retseq = fxdr_unsigned(uint32_t, *tl++);
 					slot = fxdr_unsigned(int, *tl++);
 					if ((nd->nd_flag & ND_HASSLOTID) != 0) {
-						if (slot != nd->nd_slotid) {
+						if (slot >= NFSV4_SLOTS ||
+						    (i == NFSV4OP_CBSEQUENCE &&
+						     slot >= NFSV4_CBSLOTS)) {
 							printf("newnfs_request:"
-							    " Wrong session "
-							    "slot=%d\n", slot);
+							    " Bogus slot\n");
 							slot = nd->nd_slotid;
+						} else if (slot !=
+						    nd->nd_slotid) {
+						    printf("newnfs_request:"
+							" Wrong session "
+							"srvslot=%d "
+							"slot=%d\n", slot,
+							nd->nd_slotid);
+						    if (i == NFSV4OP_SEQUENCE) {
+							/*
+							 * Mark both slots as
+							 * bad, because we do
+							 * not know if the
+							 * server has advanced
+							 * the sequence# for
+							 * either of them.
+							 */
+							sep->nfsess_badslots |=
+							    (0x1ULL << slot);
+							sep->nfsess_badslots |=
+							    (0x1ULL <<
+							     nd->nd_slotid);
+						    }
+						    slot = nd->nd_slotid;
 						}
+						freeslot = slot;
 					} else if (slot != 0) {
 						printf("newnfs_request: Bad "
 						    "session slot=%d\n", slot);
 						slot = 0;
 					}
-					freeslot = slot;
 					if (retseq != sep->nfsess_slotseq[slot])
 						printf("retseq diff 0x%x\n",
 						    retseq);
@@ -1096,6 +1211,10 @@ tryagain:
 				sep = NFSMNT_MDSSESSION(nmp);
 				if (bcmp(sep->nfsess_sessionid, nd->nd_sequence,
 				    NFSX_V4SESSIONID) == 0) {
+					printf("Initiate recovery. If server "
+					    "has not rebooted, "
+					    "check NFS clients for unique "
+					    "/etc/hostid's\n");
 					/* Initiate recovery. */
 					sep->nfsess_defunct = 1;
 					NFSCL_DEBUG(1, "Marked defunct\n");
@@ -1121,7 +1240,7 @@ tryagain:
 				if ((nd->nd_flag & ND_LOOPBADSESS) != 0) {
 					reterr = nfsv4_sequencelookup(nmp, sep,
 					    &slotpos, &maxslot, &slotseq,
-					    sessionid);
+					    sessionid, true);
 					if (reterr == 0) {
 						/* Fill in new session info. */
 						NFSCL_DEBUG(1,
@@ -1134,6 +1253,8 @@ tryagain:
 						*tl++ = txdr_unsigned(slotseq);
 						*tl++ = txdr_unsigned(slotpos);
 						*tl = txdr_unsigned(maxslot);
+						nd->nd_slotid = slotpos;
+						nd->nd_flag |= ND_HASSLOTID;
 					}
 					if (reterr == NFSERR_BADSESSION ||
 					    reterr == 0) {

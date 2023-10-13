@@ -1,4 +1,3 @@
-# $FreeBSD$
 
 COMPILERRTDIR=	${SRCTOP}/contrib/llvm-project/compiler-rt
 UNWINDINCDIR=	${SRCTOP}/contrib/llvm-project/libunwind/include
@@ -34,7 +33,6 @@ CXXFLAGS.${file}+=	-fno-sanitize=address
 .endfor
 
 CFLAGS+=	-I${UNWINDINCDIR}
-CFLAGS+=	-I${.CURDIR}
 CFLAGS+=	-D_LIBUNWIND_IS_NATIVE_ONLY
 CFLAGS+=	-D_LIBUNWIND_USE_FRAME_HEADER_CACHE
 CXXFLAGS+=	-fno-rtti
@@ -44,4 +42,10 @@ STATIC_CXXFLAGS+= -fvisibility=hidden -fPIC
 .if ${MK_DIRDEPS_BUILD} == "yes"
 # Avoid dependency on lib/libc++
 CFLAGS+=	-isystem ${SRCTOP}/contrib/llvm-project/libcxx/include -nostdinc++
+
+# we need this for __config_site
+CFLAGS+=	-I${SRCTOP}/lib/libc++
+.if ${.MAKE.LEVEL} > 0
+GENDIRDEPS_FILTER+= Nlib/libc++
+.endif
 .endif

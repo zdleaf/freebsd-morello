@@ -28,15 +28,10 @@
  *
  *	from: NetBSD: profile.h,v 1.9 1997/04/06 08:47:37 cgd Exp
  *	from: FreeBSD: src/sys/alpha/include/profile.h,v 1.4 1999/12/29
- * $FreeBSD$
  */
 
 #ifndef _MACHINE_PROFILE_H_
 #define	_MACHINE_PROFILE_H_
-
-#if !defined(_KERNEL) && !defined(_SYS_CDEFS_H_)
-#error this file needs sys/cdefs.h as a prerequisite
-#endif
 
 #define	FUNCTION_ALIGNMENT	32
 

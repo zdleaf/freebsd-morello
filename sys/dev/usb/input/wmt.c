@@ -25,8 +25,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 /*
  * MS Windows 7/8/10 compatible USB HID Multi-touch Device driver.
  * https://msdn.microsoft.com/en-us/library/windows/hardware/jj151569(v=vs.85).aspx
@@ -261,22 +259,12 @@ static device_probe_t	wmt_probe;
 static device_attach_t	wmt_attach;
 static device_detach_t	wmt_detach;
 
-#if __FreeBSD_version >= 1200077
 static evdev_open_t	wmt_ev_open;
 static evdev_close_t	wmt_ev_close;
-#else
-static evdev_open_t	wmt_ev_open_11;
-static evdev_close_t	wmt_ev_close_11;
-#endif
 
 static const struct evdev_methods wmt_evdev_methods = {
-#if __FreeBSD_version >= 1200077
 	.ev_open = &wmt_ev_open,
 	.ev_close = &wmt_ev_close,
-#else
-	.ev_open = &wmt_ev_open_11,
-	.ev_close = &wmt_ev_close_11,
-#endif
 };
 
 static const struct usb_config wmt_config[WMT_N_TRANSFER] = {
@@ -719,7 +707,6 @@ wmt_ev_open_11(struct evdev_dev *evdev, void *ev_softc)
 	return (0);
 }
 
-#if __FreeBSD_version >= 1200077
 static int
 wmt_ev_close(struct evdev_dev *evdev)
 {
@@ -738,7 +725,6 @@ wmt_ev_open(struct evdev_dev *evdev)
 	return (wmt_ev_open_11(evdev, sc));
 
 }
-#endif
 
 static enum wmt_type
 wmt_hid_parse(struct wmt_softc *sc, const void *d_ptr, uint16_t d_len)
@@ -1001,8 +987,6 @@ static const STRUCT_USB_HOST_ID wmt_devs[] = {
 	 USB_IFACE_SUBCLASS(0),},
 };
 
-static devclass_t wmt_devclass;
-
 static device_method_t wmt_methods[] = {
 	DEVMETHOD(device_probe, wmt_probe),
 	DEVMETHOD(device_attach, wmt_attach),
@@ -1017,7 +1001,7 @@ static driver_t wmt_driver = {
 	.size = sizeof(struct wmt_softc),
 };
 
-DRIVER_MODULE(wmt, uhub, wmt_driver, wmt_devclass, NULL, 0);
+DRIVER_MODULE(wmt, uhub, wmt_driver, NULL, NULL);
 MODULE_DEPEND(wmt, usb, 1, 1, 1);
 MODULE_DEPEND(wmt, hid, 1, 1, 1);
 MODULE_DEPEND(wmt, evdev, 1, 1, 1);

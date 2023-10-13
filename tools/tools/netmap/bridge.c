@@ -5,8 +5,6 @@
  *
  * A netmap application to bridge two network interfaces,
  * or one interface and the host stack.
- *
- * $FreeBSD$
  */
 
 #include <libnetmap.h>
@@ -205,8 +203,6 @@ main(int argc, char **argv)
 	int pa_sw_rings, pb_sw_rings;
 	int loopback = 0;
 	int ch;
-
-	fprintf(stderr, "%s built %s %s\n\n", argv[0], __DATE__, __TIME__);
 
 	while ((ch = getopt(argc, argv, "hb:ci:vw:L")) != -1) {
 		switch (ch) {

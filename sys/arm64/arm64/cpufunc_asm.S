@@ -34,9 +34,6 @@
 #include <machine/param.h>
 
 #include "assym.inc"
-
-__FBSDID("$FreeBSD$");
-
 /*
  * FIXME:
  * Need big.LITTLE awareness at some point.
@@ -142,6 +139,18 @@ ENTRY(arm64_dic_idc_icache_sync_range)
 	isb
 	ret
 END(arm64_dic_idc_icache_sync_range)
+
+/*
+ * void arm64_idc_aliasing_icache_sync_range(vm_offset_t, vm_size_t)
+ * When the CTR_EL0.IDC bit is set cleaning to PoU becomes a dsb.
+ */
+ENTRY(arm64_idc_aliasing_icache_sync_range)
+	dsb	ishst
+	ic	ialluis
+	dsb	ish
+	isb
+	ret
+END(arm64_idc_aliasing_icache_sync_range)
 
 /*
  * void arm64_aliasing_icache_sync_range(vm_offset_t, vm_size_t)

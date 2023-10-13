@@ -25,8 +25,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #define __ELF_WORD_SIZE 64
 
 #include <sys/param.h>
@@ -40,10 +38,7 @@ __FBSDID("$FreeBSD$");
 
 #include "bootstrap.h"
 #include "libuboot.h"
-
-vm_offset_t md_load64(char *args, vm_offset_t *modulep, vm_offset_t *dtb);
-extern char		end[];
-extern vm_offset_t	reloc;	/* From <arch>/conf.c */
+#include "modinfo.h"
 
 int
 ppc64_uboot_elf_loadfile(char *filename, uint64_t dest,

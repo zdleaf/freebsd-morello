@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2013  Peter Grehan <grehan@freebsd.org>
  * All rights reserved.
@@ -25,13 +25,9 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #ifndef WITHOUT_CAPSICUM
 #include <sys/capsicum.h>
@@ -97,7 +93,7 @@ struct blockif_elem {
 };
 
 struct blockif_ctxt {
-	int			bc_magic;
+	unsigned int		bc_magic;
 	int			bc_fd;
 	int			bc_ischr;
 	int			bc_isgeom;
@@ -109,11 +105,9 @@ struct blockif_ctxt {
 	int			bc_psectoff;
 	int			bc_closing;
 	int			bc_paused;
-	int			bc_work_count;
 	pthread_t		bc_btid[BLOCKIF_NUMTHR];
 	pthread_mutex_t		bc_mtx;
 	pthread_cond_t		bc_cond;
-	pthread_cond_t		bc_paused_cond;
 	pthread_cond_t		bc_work_done_cond;
 	blockif_resize_cb	*bc_resize_cb;
 	void			*bc_resize_cb_arg;
@@ -124,6 +118,7 @@ struct blockif_ctxt {
 	TAILQ_HEAD(, blockif_elem) bc_pendq;
 	TAILQ_HEAD(, blockif_elem) bc_busyq;
 	struct blockif_elem	bc_reqs[BLOCKIF_MAXREQ];
+	int			bc_bootindex;
 };
 
 static pthread_once_t blockif_once = PTHREAD_ONCE_INIT;
@@ -235,40 +230,44 @@ blockif_flush_bc(struct blockif_ctxt *bc)
 static void
 blockif_proc(struct blockif_ctxt *bc, struct blockif_elem *be, uint8_t *buf)
 {
+	struct spacectl_range range;
 	struct blockif_req *br;
 	off_t arg[2];
-	ssize_t clen, len, off, boff, voff;
+	ssize_t n;
+	size_t clen, len, off, boff, voff;
 	int i, err;
-	struct spacectl_range range;
 
 	br = be->be_req;
+	assert(br->br_resid >= 0);
+
 	if (br->br_iovcnt <= 1)
 		buf = NULL;
 	err = 0;
 	switch (be->be_op) {
 	case BOP_READ:
 		if (buf == NULL) {
-			if ((len = preadv(bc->bc_fd, br->br_iov, br->br_iovcnt,
-				   br->br_offset)) < 0)
+			if ((n = preadv(bc->bc_fd, br->br_iov, br->br_iovcnt,
+			    br->br_offset)) < 0)
 				err = errno;
 			else
-				br->br_resid -= len;
+				br->br_resid -= n;
 			break;
 		}
 		i = 0;
 		off = voff = 0;
 		while (br->br_resid > 0) {
 			len = MIN(br->br_resid, MAXPHYS);
-			if (pread(bc->bc_fd, buf, len, br->br_offset +
-			    off) < 0) {
+			n = pread(bc->bc_fd, buf, len, br->br_offset + off);
+			if (n < 0) {
 				err = errno;
 				break;
 			}
+			len = (size_t)n;
 			boff = 0;
 			do {
 				clen = MIN(len - boff, br->br_iov[i].iov_len -
 				    voff);
-				memcpy(br->br_iov[i].iov_base + voff,
+				memcpy((uint8_t *)br->br_iov[i].iov_base + voff,
 				    buf + boff, clen);
 				if (clen < br->br_iov[i].iov_len - voff)
 					voff += clen;
@@ -288,11 +287,11 @@ blockif_proc(struct blockif_ctxt *bc, struct blockif_elem *be, uint8_t *buf)
 			break;
 		}
 		if (buf == NULL) {
-			if ((len = pwritev(bc->bc_fd, br->br_iov, br->br_iovcnt,
-				    br->br_offset)) < 0)
+			if ((n = pwritev(bc->bc_fd, br->br_iov, br->br_iovcnt,
+			    br->br_offset)) < 0)
 				err = errno;
 			else
-				br->br_resid -= len;
+				br->br_resid -= n;
 			break;
 		}
 		i = 0;
@@ -304,7 +303,8 @@ blockif_proc(struct blockif_ctxt *bc, struct blockif_elem *be, uint8_t *buf)
 				clen = MIN(len - boff, br->br_iov[i].iov_len -
 				    voff);
 				memcpy(buf + boff,
-				    br->br_iov[i].iov_base + voff, clen);
+				    (uint8_t *)br->br_iov[i].iov_base + voff,
+				    clen);
 				if (clen < br->br_iov[i].iov_len - voff)
 					voff += clen;
 				else {
@@ -313,13 +313,14 @@ blockif_proc(struct blockif_ctxt *bc, struct blockif_elem *be, uint8_t *buf)
 				}
 				boff += clen;
 			} while (boff < len);
-			if (pwrite(bc->bc_fd, buf, len, br->br_offset +
-			    off) < 0) {
+
+			n = pwrite(bc->bc_fd, buf, len, br->br_offset + off);
+			if (n < 0) {
 				err = errno;
 				break;
 			}
-			off += len;
-			br->br_resid -= len;
+			off += n;
+			br->br_resid -= n;
 		}
 		break;
 	case BOP_FLUSH:
@@ -362,6 +363,12 @@ blockif_proc(struct blockif_ctxt *bc, struct blockif_elem *be, uint8_t *buf)
 	(*br->br_callback)(br, err);
 }
 
+static inline bool
+blockif_empty(const struct blockif_ctxt *bc)
+{
+	return (TAILQ_EMPTY(&bc->bc_pendq) && TAILQ_EMPTY(&bc->bc_busyq));
+}
+
 static void *
 blockif_thr(void *arg)
 {
@@ -379,29 +386,20 @@ blockif_thr(void *arg)
 
 	pthread_mutex_lock(&bc->bc_mtx);
 	for (;;) {
-		bc->bc_work_count++;
-
-		/* We cannot process work if the interface is paused */
-		while (!bc->bc_paused && blockif_dequeue(bc, t, &be)) {
+		while (blockif_dequeue(bc, t, &be)) {
 			pthread_mutex_unlock(&bc->bc_mtx);
 			blockif_proc(bc, be, buf);
 			pthread_mutex_lock(&bc->bc_mtx);
 			blockif_complete(bc, be);
 		}
 
-		bc->bc_work_count--;
-
-		/* If none of the workers are busy, notify the main thread */
-		if (bc->bc_work_count == 0)
+		/* If none to work, notify the main thread */
+		if (blockif_empty(bc))
 			pthread_cond_broadcast(&bc->bc_work_done_cond);
 
 		/* Check ctxt status here to see if exit requested */
 		if (bc->bc_closing)
 			break;
-
-		/* Make all worker threads wait here if the device is paused */
-		while (bc->bc_paused)
-			pthread_cond_wait(&bc->bc_paused_cond, &bc->bc_mtx);
 
 		pthread_cond_wait(&bc->bc_cond, &bc->bc_mtx);
 	}
@@ -414,7 +412,8 @@ blockif_thr(void *arg)
 }
 
 static void
-blockif_sigcont_handler(int signal, enum ev_type type, void *arg)
+blockif_sigcont_handler(int signal __unused, enum ev_type type __unused,
+    void *arg __unused)
 {
 	struct blockif_sig_elem *bse;
 
@@ -464,12 +463,22 @@ blockif_legacy_config(nvlist_t *nvl, const char *opts)
 	return (pci_parse_legacy_config(nvl, cp + 1));
 }
 
+int
+blockif_add_boot_device(struct pci_devinst *const pi,
+    struct blockif_ctxt *const bc)
+{
+	if (bc->bc_bootindex < 0)
+		return (0);
+
+	return (pci_emul_add_boot_device(pi, bc->bc_bootindex));
+}
+
 struct blockif_ctxt *
 blockif_open(nvlist_t *nvl, const char *ident)
 {
 	char tname[MAXCOMLEN + 1];
 	char name[MAXPATHLEN];
-	const char *path, *pssval, *ssval;
+	const char *path, *pssval, *ssval, *bootindex_val;
 	char *cp;
 	struct blockif_ctxt *bc;
 	struct stat sbuf;
@@ -478,6 +487,7 @@ blockif_open(nvlist_t *nvl, const char *ident)
 	int extra, fd, i, sectsz;
 	int ro, candelete, geom, ssopt, pssopt;
 	int nodelete;
+	int bootindex;
 
 #ifndef WITHOUT_CAPSICUM
 	cap_rights_t rights;
@@ -491,6 +501,7 @@ blockif_open(nvlist_t *nvl, const char *ident)
 	ssopt = 0;
 	ro = 0;
 	nodelete = 0;
+	bootindex = -1;
 
 	if (get_config_bool_node_default(nvl, "nocache", false))
 		extra |= O_DIRECT;
@@ -521,6 +532,11 @@ blockif_open(nvlist_t *nvl, const char *ident)
 			EPRINTLN("Invalid sector size \"%s\"", ssval);
 			goto err;
 		}
+	}
+
+	bootindex_val = get_config_value_node(nvl, "bootindex");
+	if (bootindex_val != NULL) {
+		bootindex = atoi(bootindex_val);
 	}
 
 	path = get_config_value_node(nvl, "path");
@@ -638,12 +654,11 @@ blockif_open(nvlist_t *nvl, const char *ident)
 	pthread_mutex_init(&bc->bc_mtx, NULL);
 	pthread_cond_init(&bc->bc_cond, NULL);
 	bc->bc_paused = 0;
-	bc->bc_work_count = 0;
-	pthread_cond_init(&bc->bc_paused_cond, NULL);
 	pthread_cond_init(&bc->bc_work_done_cond, NULL);
 	TAILQ_INIT(&bc->bc_freeq);
 	TAILQ_INIT(&bc->bc_pendq);
 	TAILQ_INIT(&bc->bc_busyq);
+	bc->bc_bootindex = bootindex;
 	for (i = 0; i < BLOCKIF_MAXREQ; i++) {
 		bc->bc_reqs[i].be_status = BST_FREE;
 		TAILQ_INSERT_HEAD(&bc->bc_freeq, &bc->bc_reqs[i], be_link);
@@ -663,7 +678,7 @@ err:
 }
 
 static void
-blockif_resized(int fd, enum ev_type type, void *arg)
+blockif_resized(int fd, enum ev_type type __unused, void *arg)
 {
 	struct blockif_ctxt *bc;
 	struct stat sb;
@@ -699,6 +714,8 @@ blockif_register_resize_callback(struct blockif_ctxt *bc, blockif_resize_cb *cb,
 
 	if (cb == NULL)
 		return (EINVAL);
+
+	err = 0;
 
 	pthread_mutex_lock(&bc->bc_mtx);
 	if (bc->bc_resize_cb != NULL) {
@@ -737,6 +754,7 @@ blockif_request(struct blockif_ctxt *bc, struct blockif_req *breq,
 	err = 0;
 
 	pthread_mutex_lock(&bc->bc_mtx);
+	assert(!bc->bc_paused);
 	if (!TAILQ_EMPTY(&bc->bc_freeq)) {
 		/*
 		 * Enqueue and inform the block i/o thread
@@ -761,7 +779,6 @@ blockif_request(struct blockif_ctxt *bc, struct blockif_req *breq,
 int
 blockif_read(struct blockif_ctxt *bc, struct blockif_req *breq)
 {
-
 	assert(bc->bc_magic == BLOCKIF_SIG);
 	return (blockif_request(bc, breq, BOP_READ));
 }
@@ -769,7 +786,6 @@ blockif_read(struct blockif_ctxt *bc, struct blockif_req *breq)
 int
 blockif_write(struct blockif_ctxt *bc, struct blockif_req *breq)
 {
-
 	assert(bc->bc_magic == BLOCKIF_SIG);
 	return (blockif_request(bc, breq, BOP_WRITE));
 }
@@ -777,7 +793,6 @@ blockif_write(struct blockif_ctxt *bc, struct blockif_req *breq)
 int
 blockif_flush(struct blockif_ctxt *bc, struct blockif_req *breq)
 {
-
 	assert(bc->bc_magic == BLOCKIF_SIG);
 	return (blockif_request(bc, breq, BOP_FLUSH));
 }
@@ -785,7 +800,6 @@ blockif_flush(struct blockif_ctxt *bc, struct blockif_req *breq)
 int
 blockif_delete(struct blockif_ctxt *bc, struct blockif_req *breq)
 {
-
 	assert(bc->bc_magic == BLOCKIF_SIG);
 	return (blockif_request(bc, breq, BOP_DELETE));
 }
@@ -917,10 +931,10 @@ blockif_chs(struct blockif_ctxt *bc, uint16_t *c, uint8_t *h, uint8_t *s)
 	sectors = bc->bc_size / bc->bc_sectsz;
 
 	/* Clamp the size to the largest possible with CHS */
-	if (sectors > 65535UL*16*255)
-		sectors = 65535UL*16*255;
+	if (sectors > 65535L * 16 * 255)
+		sectors = 65535L * 16 * 255;
 
-	if (sectors >= 65536UL*16*63) {
+	if (sectors >= 65536L * 16 * 63) {
 		secpt = 255;
 		heads = 16;
 		hcyl = sectors / secpt;
@@ -955,7 +969,6 @@ blockif_chs(struct blockif_ctxt *bc, uint16_t *c, uint8_t *h, uint8_t *s)
 off_t
 blockif_size(struct blockif_ctxt *bc)
 {
-
 	assert(bc->bc_magic == BLOCKIF_SIG);
 	return (bc->bc_size);
 }
@@ -963,7 +976,6 @@ blockif_size(struct blockif_ctxt *bc)
 int
 blockif_sectsz(struct blockif_ctxt *bc)
 {
-
 	assert(bc->bc_magic == BLOCKIF_SIG);
 	return (bc->bc_sectsz);
 }
@@ -971,7 +983,6 @@ blockif_sectsz(struct blockif_ctxt *bc)
 void
 blockif_psectsz(struct blockif_ctxt *bc, int *size, int *off)
 {
-
 	assert(bc->bc_magic == BLOCKIF_SIG);
 	*size = bc->bc_psectsz;
 	*off = bc->bc_psectoff;
@@ -980,7 +991,6 @@ blockif_psectsz(struct blockif_ctxt *bc, int *size, int *off)
 int
 blockif_queuesz(struct blockif_ctxt *bc)
 {
-
 	assert(bc->bc_magic == BLOCKIF_SIG);
 	return (BLOCKIF_MAXREQ - 1);
 }
@@ -988,7 +998,6 @@ blockif_queuesz(struct blockif_ctxt *bc)
 int
 blockif_is_ro(struct blockif_ctxt *bc)
 {
-
 	assert(bc->bc_magic == BLOCKIF_SIG);
 	return (bc->bc_rdonly);
 }
@@ -996,7 +1005,6 @@ blockif_is_ro(struct blockif_ctxt *bc)
 int
 blockif_candelete(struct blockif_ctxt *bc)
 {
-
 	assert(bc->bc_magic == BLOCKIF_SIG);
 	return (bc->bc_candelete);
 }
@@ -1012,11 +1020,11 @@ blockif_pause(struct blockif_ctxt *bc)
 	bc->bc_paused = 1;
 
 	/* The interface is paused. Wait for workers to finish their work */
-	while (bc->bc_work_count)
+	while (!blockif_empty(bc))
 		pthread_cond_wait(&bc->bc_work_done_cond, &bc->bc_mtx);
 	pthread_mutex_unlock(&bc->bc_mtx);
 
-	if (blockif_flush_bc(bc))
+	if (!bc->bc_rdonly && blockif_flush_bc(bc))
 		fprintf(stderr, "%s: [WARN] failed to flush backing file.\r\n",
 			__func__);
 }
@@ -1029,71 +1037,6 @@ blockif_resume(struct blockif_ctxt *bc)
 
 	pthread_mutex_lock(&bc->bc_mtx);
 	bc->bc_paused = 0;
-	/* resume the threads waiting for paused */
-	pthread_cond_broadcast(&bc->bc_paused_cond);
-	/* kick the threads after restore */
-	pthread_cond_broadcast(&bc->bc_cond);
 	pthread_mutex_unlock(&bc->bc_mtx);
 }
-
-int
-blockif_snapshot_req(struct blockif_req *br, struct vm_snapshot_meta *meta)
-{
-	int i;
-	struct iovec *iov;
-	int ret;
-
-	SNAPSHOT_VAR_OR_LEAVE(br->br_iovcnt, meta, ret, done);
-	SNAPSHOT_VAR_OR_LEAVE(br->br_offset, meta, ret, done);
-	SNAPSHOT_VAR_OR_LEAVE(br->br_resid, meta, ret, done);
-
-	/*
-	 * XXX: The callback and parameter must be filled by the virtualized
-	 * device that uses the interface, during its init; we're not touching
-	 * them here.
-	 */
-
-	/* Snapshot the iovecs. */
-	for (i = 0; i < br->br_iovcnt; i++) {
-		iov = &br->br_iov[i];
-
-		SNAPSHOT_VAR_OR_LEAVE(iov->iov_len, meta, ret, done);
-
-		/* We assume the iov is a guest-mapped address. */
-		SNAPSHOT_GUEST2HOST_ADDR_OR_LEAVE(iov->iov_base, iov->iov_len,
-			false, meta, ret, done);
-	}
-
-done:
-	return (ret);
-}
-
-int
-blockif_snapshot(struct blockif_ctxt *bc, struct vm_snapshot_meta *meta)
-{
-	int ret;
-
-	if (bc->bc_paused == 0) {
-		fprintf(stderr, "%s: Snapshot failed: "
-			"interface not paused.\r\n", __func__);
-		return (ENXIO);
-	}
-
-	pthread_mutex_lock(&bc->bc_mtx);
-
-	SNAPSHOT_VAR_OR_LEAVE(bc->bc_magic, meta, ret, done);
-	SNAPSHOT_VAR_OR_LEAVE(bc->bc_ischr, meta, ret, done);
-	SNAPSHOT_VAR_OR_LEAVE(bc->bc_isgeom, meta, ret, done);
-	SNAPSHOT_VAR_OR_LEAVE(bc->bc_candelete, meta, ret, done);
-	SNAPSHOT_VAR_OR_LEAVE(bc->bc_rdonly, meta, ret, done);
-	SNAPSHOT_VAR_OR_LEAVE(bc->bc_size, meta, ret, done);
-	SNAPSHOT_VAR_OR_LEAVE(bc->bc_sectsz, meta, ret, done);
-	SNAPSHOT_VAR_OR_LEAVE(bc->bc_psectsz, meta, ret, done);
-	SNAPSHOT_VAR_OR_LEAVE(bc->bc_psectoff, meta, ret, done);
-	SNAPSHOT_VAR_OR_LEAVE(bc->bc_closing, meta, ret, done);
-
-done:
-	pthread_mutex_unlock(&bc->bc_mtx);
-	return (ret);
-}
-#endif
+#endif	/* BHYVE_SNAPSHOT */

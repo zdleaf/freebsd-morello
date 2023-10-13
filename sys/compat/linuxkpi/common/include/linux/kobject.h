@@ -25,8 +25,6 @@
  * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 #ifndef	_LINUXKPI_LINUX_KOBJECT_H_
 #define	_LINUXKPI_LINUX_KOBJECT_H_
@@ -47,6 +45,7 @@ struct kobj_type {
 	void (*release)(struct kobject *kobj);
 	const struct sysfs_ops *sysfs_ops;
 	struct attribute **default_attrs;
+	const struct attribute_group **default_groups;
 };
 
 extern const struct kobj_type linux_kfree_type;
@@ -107,22 +106,10 @@ kobject_get(struct kobject *kobj)
 	return kobj;
 }
 
+struct kobject *kobject_create(void);
 int	kobject_set_name_vargs(struct kobject *kobj, const char *fmt, va_list);
 int	kobject_add(struct kobject *kobj, struct kobject *parent,
 	    const char *fmt, ...);
-
-static inline struct kobject *
-kobject_create(void)
-{
-	struct kobject *kobj;
-
-	kobj = kzalloc(sizeof(*kobj), GFP_KERNEL);
-	if (kobj == NULL)
-		return (NULL);
-	kobject_init(kobj, &linux_kfree_type);
-
-	return (kobj);
-}
 
 static inline struct kobject *
 kobject_create_and_add(const char *name, struct kobject *parent)

@@ -1,4 +1,4 @@
-# $NetBSD: var-op-expand.mk,v 1.15 2021/11/30 23:52:19 rillig Exp $
+# $NetBSD: var-op-expand.mk,v 1.18 2023/06/01 20:56:35 rillig Exp $
 #
 # Tests for the := variable assignment operator, which expands its
 # right-hand side.
@@ -9,7 +9,7 @@
 # Force the test results to be independent of the default value of this
 # setting, which is 'yes' for NetBSD's usr.bin/make but 'no' for the bmake
 # distribution and pkgsrc/devel/bmake.
-.MAKE.SAVE_DOLLARS:=      yes
+.MAKE.SAVE_DOLLARS:=	yes
 
 # If the right-hand side does not contain a dollar sign, the ':=' assignment
 # operator has the same effect as the '=' assignment operator.
@@ -37,7 +37,7 @@ VAR:=		$$ $$$$ $$$$$$$$
 .endif
 
 
-# reference to a variable containing a literal dollar sign
+# reference to a variable containing literal dollar signs
 REF=		$$ $$$$ $$$$$$$$
 VAR:=		${REF}
 REF=		too late
@@ -49,6 +49,9 @@ REF=		too late
 # reference to an undefined variable
 .undef UNDEF
 VAR:=		<${UNDEF}>
+.if ${VAR} != "<>"
+.  error
+.endif
 UNDEF=		after
 .if ${VAR} != "<after>"
 .  error
@@ -68,6 +71,9 @@ REF=		too late
 # expression with an indirect modifier referring to an undefined variable
 .undef UNDEF
 VAR:=		${:${UNDEF}}
+.if ${VAR} != ""
+.  error
+.endif
 UNDEF=		Uwas undefined
 .if ${VAR} != "was undefined"
 .  error
@@ -99,6 +105,9 @@ UNDEF=		Uwas undefined
 REF2=		<${REF3}>
 REF=		${REF2}
 VAR:=		${REF}
+.if ${VAR} != "<>"
+.  error
+.endif
 REF3=		too late
 .if ${VAR} != "<too late>"
 .  error
@@ -265,12 +274,14 @@ indirect:=	${INDIRECT:tl}
 .if ${indirect} != " ok "
 .  error
 .else
+# expect+1: warning: XXX Neither branch should be taken.
 .  warning	XXX Neither branch should be taken.
 .endif
 LATER=	uppercase-value
 later=	lowercase-value
 # expect+1: Unknown modifier "s,value,replaced,"
 .if ${indirect} != "uppercase-replaced ok uppercase-sysv"
+# expect+1: warning: XXX Neither branch should be taken.
 .  warning	XXX Neither branch should be taken.
 .else
 .  error

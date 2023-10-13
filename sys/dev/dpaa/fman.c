@@ -25,8 +25,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
@@ -123,14 +121,12 @@ int
 fman_release_resource(device_t bus, device_t child, int type, int rid,
     struct resource *res)
 {
-	struct fman_softc *sc;
 	struct resource_list *rl;
 	struct resource_list_entry *rle;
 	int passthrough, rv;
 
 	passthrough = (device_get_parent(child) != bus);
 	rl = BUS_GET_RESOURCE_LIST(bus, child);
-	sc = device_get_softc(bus);
 	if (type != SYS_RES_IRQ) {
 		if ((rman_get_flags(res) & RF_ACTIVE) != 0 ){
 			rv = bus_deactivate_resource(child, type, rid, res);
@@ -475,7 +471,7 @@ fman_attach(device_t dev)
 	sc->fm_handle = fman_init(sc, &cfg);
 	if (sc->fm_handle == NULL) {
 		device_printf(dev, "could not be configured\n");
-		return (ENXIO);
+		goto err;
 	}
 
 	return (bus_generic_attach(dev));

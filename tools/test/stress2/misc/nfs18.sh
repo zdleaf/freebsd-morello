@@ -1,7 +1,7 @@
 #!/bin/sh
 
 #
-# SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+# SPDX-License-Identifier: BSD-2-Clause
 #
 # Copyright (c) 2021 Peter Holm
 #
@@ -47,7 +47,9 @@ kill -HUP `pgrep mountd` # loopback workaround
 mdconfig -a -t swap -s 1g -u $mdstart
 set -e
 
-bsdlabel -w md$mdstart auto
+gpart create -s bsd md$mdstart
+gpart add -t freebsd-ufs md$mdstart
+part=a
 newfs_msdos -F 32 -b 8192 /dev/md${mdstart}$part > /dev/null
 mkdir -p $mp1; chmod 777 $mp1
 mount -t msdosfs -o rw /dev/md${mdstart}$part $mp1

@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2012,2013 Bjoern A. Zeeb
  * All rights reserved.
@@ -31,8 +31,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include "opt_device_polling.h"
 
 #include <sys/param.h>
@@ -156,5 +154,5 @@ static driver_t atse_driver_nexus = {
 	sizeof(struct atse_softc)
 };
 
-DRIVER_MODULE(atse, nexus, atse_driver_nexus, atse_devclass, 0, 0);
-DRIVER_MODULE(miibus, atse, miibus_driver, miibus_devclass, 0, 0);
+DRIVER_MODULE(atse, nexus, atse_driver_nexus, 0, 0);
+DRIVER_MODULE(miibus, atse, miibus_driver, 0, 0);

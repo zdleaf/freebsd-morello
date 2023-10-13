@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2012 The FreeBSD Foundation
  *
@@ -30,8 +30,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/ioctl.h>
 #include <sys/param.h>
 #include <sys/linker.h>
@@ -88,6 +86,8 @@ target_new(struct conf *conf)
 	targ->t_conf = conf;
 	targ->t_dscp = -1;
 	targ->t_pcp = -1;
+	targ->t_pingtimeout = -1;
+	targ->t_logintimeout = -1;
 	TAILQ_INSERT_TAIL(&conf->conf_targets, targ, t_next);
 
 	return (targ);
@@ -361,6 +361,8 @@ conf_from_target(struct iscsi_session_conf *conf,
 		conf->isc_data_digest = ISCSI_DIGEST_NONE;
 	conf->isc_dscp = targ->t_dscp;
 	conf->isc_pcp = targ->t_pcp;
+	conf->isc_ping_timeout = targ->t_pingtimeout;
+	conf->isc_login_timeout = targ->t_logintimeout;
 }
 
 static int
@@ -544,6 +546,14 @@ kernel_list(int iscsi_fd, const struct target *targ __unused,
 			if (conf->isc_pcp != -1)
 				xo_emit("{L:/%-26s}{V:pcp/0x%02x}\n",
 				    "Target PCP:", conf->isc_pcp);
+			if (conf->isc_ping_timeout != -1)
+				xo_emit("{L:/%-26s}{V:PingTimeout/%d}\n",
+				    "Target PingTimeout:",
+				    conf->isc_ping_timeout);
+			if (conf->isc_login_timeout != -1)
+				xo_emit("{L:/%-26s}{V:LoginTimeout/%d}\n",
+				    "Target LoginTimeout:",
+				    conf->isc_login_timeout);
 			xo_close_container("target");
 
 			xo_open_container("auth");
@@ -733,6 +743,9 @@ main(int argc, char **argv)
 	struct target *targ;
 
 	argc = xo_parse_args(argc, argv);
+        if (argc < 0)
+                exit(1);
+
 	xo_open_container("iscsictl");
 
 	while ((ch = getopt(argc, argv, "AMRLac:d:e:i:n:p:rt:u:s:vw:")) != -1) {

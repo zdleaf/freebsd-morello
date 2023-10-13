@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2019 The FreeBSD Foundation
  *
@@ -26,9 +26,11 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
+
+#ifdef __i386__
+#include <i386/pcpu_aux.h>
+#else /* !__i386__ */
 
 #ifndef _MACHINE_PCPU_AUX_H_
 #define	_MACHINE_PCPU_AUX_H_
@@ -60,3 +62,5 @@ __curthread(void)
 #define	curpcb			(&curthread->td_md.md_pcb)
 
 #endif	/* _MACHINE_PCPU_AUX_H_ */
+
+#endif /* __i386__ */

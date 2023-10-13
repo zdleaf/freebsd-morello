@@ -25,8 +25,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include "opt_stack.h"
 #include "opt_ddb.h"
 
@@ -74,12 +72,11 @@ xendebug_filter(void *arg __unused)
 #if defined(STACK) && defined(DDB)
 	struct stack st;
 
-	stack_zero(&st);
 	stack_save(&st);
 
 	mtx_lock_spin(&lock);
 	sbuf_clear(buf);
-	xc_printf("Printing stack trace vCPU%d\n", PCPU_GET(vcpu_id));
+	xc_printf("Printing stack trace vCPU%u\n", XEN_VCPUID());
 	stack_sbuf_print_ddb(buf, &st);
 	sbuf_finish(buf);
 	mtx_unlock_spin(&lock);
@@ -151,7 +148,5 @@ static driver_t xendebug_driver = {
 	0,
 };
 
-devclass_t xendebug_devclass;
-
-DRIVER_MODULE(xendebug, xenpv, xendebug_driver, xendebug_devclass, 0, 0);
+DRIVER_MODULE(xendebug, xenpv, xendebug_driver, 0, 0);
 MODULE_DEPEND(xendebug, xenpv, 1, 1, 1);

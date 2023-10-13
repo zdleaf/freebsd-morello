@@ -1,5 +1,4 @@
 /*	$NetBSD: setjmp.h,v 1.5 2013/01/11 13:56:32 matt Exp $	*/
-/* $FreeBSD$ */
 
 /*
  * machine/setjmp.h: machine dependent setjmp-related information.
@@ -44,7 +43,7 @@
  *	44-45	d14		(vfp register d14)
  *	46-47	d15		(vfp register d15)
  *
- * The magic number number identifies the jmp_buf and
+ * The magic number identifies the jmp_buf and
  * how the buffer was created as well as providing
  * a sanity check
  *

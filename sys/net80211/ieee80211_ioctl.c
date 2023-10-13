@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2001 Atsushi Onoe
  * Copyright (c) 2002-2009 Sam Leffler, Errno Consulting
@@ -27,8 +27,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 /*
  * IEEE 802.11 ioctl support (FreeBSD-specific)
  */
@@ -48,6 +46,7 @@ __FBSDID("$FreeBSD$");
 #include <net/if_var.h>
 #include <net/if_dl.h>
 #include <net/if_media.h>
+#include <net/if_private.h>
 #include <net/ethernet.h>
 
 #ifdef INET
@@ -332,7 +331,7 @@ ieee80211_ioctl_getscanresults(struct ieee80211vap *vap,
 		void *p;
 
 		space = req.space;
-		/* XXX M_WAITOK after driver lock released */
+		/* XXX IEEE80211_M_WAITOK after driver lock released */
 		p = IEEE80211_MALLOC(space, M_TEMP,
 		    IEEE80211_M_NOWAIT | IEEE80211_M_ZERO);
 		if (p == NULL)
@@ -478,7 +477,7 @@ getstainfo_common(struct ieee80211vap *vap, struct ieee80211req *ireq,
 		req.space = ireq->i_len;
 	if (req.space > 0) {
 		space = req.space;
-		/* XXX M_WAITOK after driver lock released */
+		/* XXX IEEE80211_M_WAITOK after driver lock released */
 		p = IEEE80211_MALLOC(space, M_TEMP,
 		    IEEE80211_M_NOWAIT | IEEE80211_M_ZERO);
 		if (p == NULL) {
@@ -2591,8 +2590,10 @@ ieee80211_scanreq(struct ieee80211vap *vap, struct ieee80211_scan_req *sr)
 		sr->sr_flags |= IEEE80211_IOC_SCAN_NOPICK;
 
 	IEEE80211_DPRINTF(vap, IEEE80211_MSG_SCAN,
-	    "%s: flags 0x%x%s duration 0x%x mindwell %u maxdwell %u nssid %d\n",
-	    __func__, sr->sr_flags,
+	    "%s: vap %p iv_state %#x (%s) flags 0x%x%s "
+	    "duration 0x%x mindwell %u maxdwell %u nssid %d\n",
+	    __func__, vap, vap->iv_state, ieee80211_state_name[vap->iv_state],
+	    sr->sr_flags,
 	    (vap->iv_ifp->if_flags & IFF_UP) == 0 ? " (!IFF_UP)" : "",
 	    sr->sr_duration, sr->sr_mindwell, sr->sr_maxdwell, sr->sr_nssid);
 	/*

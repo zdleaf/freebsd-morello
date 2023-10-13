@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2015-2016 Landon Fuller <landon@landonf.org>
  * Copyright (c) 2017 The FreeBSD Foundation
@@ -34,8 +34,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/bus.h>
 #include <sys/refcount.h>
@@ -602,7 +600,8 @@ bhnd_find_bridge_root(device_t dev, devclass_t bus_class)
 	devclass_t	bhndb_class;
 	device_t	parent;
 
-	KASSERT(device_get_devclass(device_get_parent(dev)) == bhnd_devclass,
+	KASSERT(device_get_devclass(device_get_parent(dev)) ==
+	    devclass_find("bhnd"),
 	   ("%s not a bhnd device", device_get_nameunit(dev)));
 
 	bhndb_class = devclass_find("bhndb");
@@ -864,7 +863,7 @@ bhnd_device_matches(device_t dev, const struct bhnd_device_match *desc)
 	if (m_core.m.match_flags) {
 		/* Only applicable to bhnd-attached cores */
 		parent = device_get_parent(dev);
-		if (device_get_devclass(parent) != bhnd_devclass) {
+		if (device_get_devclass(parent) != devclass_find("bhnd")) {
 			device_printf(dev, "attempting to match core "
 			    "attributes against non-core device\n");
 			return (false);

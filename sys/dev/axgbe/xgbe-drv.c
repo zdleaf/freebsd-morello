@@ -112,13 +112,11 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include "xgbe.h"
 #include "xgbe-common.h"
 
 int
-xgbe_calc_rx_buf_size(struct ifnet *netdev, unsigned int mtu)
+xgbe_calc_rx_buf_size(if_t netdev, unsigned int mtu)
 {
 	unsigned int rx_buf_size;
 

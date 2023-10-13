@@ -1,6 +1,6 @@
-# $FreeBSD$
 cddl/dev/dtrace/riscv/dtrace_asm.S			optional dtrace compile-with "${DTRACE_S}"
 cddl/dev/dtrace/riscv/dtrace_subr.c			optional dtrace compile-with "${DTRACE_C}"
+cddl/dev/dtrace/riscv/instr_size.c			optional dtrace compile-with "${DTRACE_C}"
 cddl/dev/fbt/riscv/fbt_isa.c				optional dtrace_fbt | dtraceall compile-with "${FBT_C}"
 crypto/des/des_enc.c		optional	netsmb
 dev/ofw/ofw_cpu.c		optional	fdt
@@ -22,15 +22,11 @@ kern/subr_dummy_vdso_tc.c	standard
 kern/subr_intr.c		standard
 kern/subr_physmem.c		standard
 libkern/bcopy.c			standard
-libkern/ffs.c			standard
-libkern/ffsl.c			standard
-libkern/ffsll.c			standard
-libkern/fls.c			standard
-libkern/flsl.c			standard
-libkern/flsll.c			standard
 libkern/memcmp.c		standard
 libkern/memset.c		standard
+libkern/strcmp.c		standard
 libkern/strlen.c		standard
+libkern/strncmp.c		standard
 riscv/riscv/autoconf.c		standard
 riscv/riscv/bus_machdep.c	standard
 riscv/riscv/bus_space_asm.S	standard
@@ -60,7 +56,7 @@ riscv/riscv/plic.c		standard
 riscv/riscv/pmap.c		standard
 riscv/riscv/ptrace_machdep.c	standard
 riscv/riscv/riscv_console.c	optional	rcons
-riscv/riscv/riscv_syscon.c	optional	ext_resources syscon riscv_syscon fdt
+riscv/riscv/riscv_syscon.c	optional	syscon riscv_syscon fdt
 riscv/riscv/sbi.c		standard
 riscv/riscv/stack_machdep.c	optional	ddb | stack
 riscv/riscv/support.S		standard

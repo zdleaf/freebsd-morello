@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 1998, 2001 Nicolas Souchu
  * All rights reserved.
@@ -24,8 +24,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  *
  */
 #include <sys/param.h>
@@ -73,8 +71,6 @@ static void iicdtor(void *data);
 static int iicuio_move(struct iic_cdevpriv *priv, struct uio *uio, int last);
 static int iicuio(struct cdev *dev, struct uio *uio, int ioflag);
 static int iicrdwr(struct iic_cdevpriv *priv, struct iic_rdwr_data *d, int flags);
-
-static devclass_t iic_devclass;
 
 static device_method_t iic_methods[] = {
 	/* device interface */
@@ -499,6 +495,6 @@ iicioctl(struct cdev *dev, u_long cmd, caddr_t data, int flags, struct thread *t
 	return (error);
 }
 
-DRIVER_MODULE(iic, iicbus, iic_driver, iic_devclass, 0, 0);
+DRIVER_MODULE(iic, iicbus, iic_driver, 0, 0);
 MODULE_DEPEND(iic, iicbus, IICBUS_MINVER, IICBUS_PREFVER, IICBUS_MAXVER);
 MODULE_VERSION(iic, 1);

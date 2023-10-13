@@ -35,7 +35,6 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  * 
- * $FreeBSD$
  */
 
 #ifndef _NET_IF_FWIPVAR_H_
@@ -57,7 +56,7 @@ struct fwip_softc {
 	struct crom_chunk spec6;	/* specifier description IPv6 */
 	struct crom_chunk ver6;		/* version description IPv6 */
 	struct fwip_eth_softc {
-		struct ifnet *fwip_ifp;
+		if_t fwip_ifp;
 		struct fwip_softc *fwip;
 	} fw_softc;
 	struct mtx mtx;

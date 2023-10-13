@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright 2021 Jessica Clarke <jrtc27@FreeBSD.org>
  *
@@ -29,8 +29,6 @@
 /* SiFive FU740 DesignWare PCIe driver */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/bus.h>
@@ -460,6 +458,4 @@ static device_method_t fupci_methods[] = {
 
 DEFINE_CLASS_1(pcib, fupci_driver, fupci_methods,
     sizeof(struct fupci_softc), pci_dw_driver);
-static devclass_t fupci_devclass;
-DRIVER_MODULE(fu740_pci_dw, simplebus, fupci_driver, fupci_devclass,
-    NULL, NULL);
+DRIVER_MODULE(fu740_pci_dw, simplebus, fupci_driver, NULL, NULL);

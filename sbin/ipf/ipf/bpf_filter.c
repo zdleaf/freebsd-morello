@@ -1,4 +1,3 @@
-/*	$FreeBSD$	*/
 
 /*-
  * Copyright (c) 1990, 1991, 1992, 1993, 1994, 1995, 1996, 1997
@@ -117,9 +116,7 @@ static int m_xhalf(mb_t *, int, int *);
 }
 
 static int
-m_xword(m, k, err)
-	register mb_t *m;
-	register int k, *err;
+m_xword(mb_t *m, int k, int *err)
 {
 	register int len;
 	register u_char *cp, *np;
@@ -153,9 +150,7 @@ m_xword(m, k, err)
 }
 
 static int
-m_xhalf(m, k, err)
-	register mb_t *m;
-	register int k, *err;
+m_xhalf(mb_t *m, int k, int *err)
 {
 	register int len;
 	register u_char *cp;
@@ -185,11 +180,7 @@ m_xhalf(m, k, err)
  * in all other cases, p is a pointer to a buffer and buflen is its size.
  */
 u_int
-bpf_filter(pc, p, wirelen, buflen)
-	register struct bpf_insn *pc;
-	register u_char *p;
-	u_int wirelen;
-	register u_int buflen;
+bpf_filter(struct bpf_insn *pc, u_char *p, u_int wirelen, u_int buflen)
 {
 	register u_int32 A, X;
 	register int k;
@@ -478,9 +469,7 @@ bpf_filter(pc, p, wirelen, buflen)
  * Otherwise, a bogus program could easily crash the system.
  */
 int
-bpf_validate(f, len)
-	struct bpf_insn *f;
-	int len;
+bpf_validate(struct bpf_insn *f, int len)
 {
 	u_int i, from;
 	const struct bpf_insn *p;

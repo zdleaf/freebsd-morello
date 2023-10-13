@@ -1,7 +1,8 @@
 #	@(#)Makefile	8.1 (Berkeley) 6/4/93
-# $FreeBSD$
 
 .include <src.opts.mk>
+
+.include <bsd.compat.pre.mk>
 
 SUBDIR=	${_atf} \
 	${_atrun} \
@@ -10,6 +11,7 @@ SUBDIR=	${_atf} \
 	${_dma} \
 	flua \
 	getty \
+	${_hyperv} \
 	${_mail.local} \
 	${_makewhatis.local} \
 	${_mknetid} \
@@ -27,7 +29,6 @@ SUBDIR=	${_atf} \
 	${_rtld-elf} \
 	save-entropy \
 	${_smrsh} \
-	${_telnetd} \
 	${_tests} \
 	${_tftp-proxy} \
 	ulog-helper \
@@ -49,7 +50,7 @@ SUBDIR+=	bootpd
 SUBDIR+=	fingerd
 .endif
 
-.if ${MK_FREEBSD_UPDATE} != "no" || ${MK_PORTSNAP} != "no"
+.if ${MK_FREEBSD_UPDATE} != "no"
 _phttpget=	phttpget
 .endif
 
@@ -63,6 +64,10 @@ _comsat=	comsat
 
 .if ${MK_DMAGENT} != "no"
 _dma=		dma
+.endif
+
+.if ${MK_HYPERV} != "no"
+_hyperv+=	hyperv
 .endif
 
 .if ${MK_NIS} != "no"
@@ -80,7 +85,9 @@ _tftp-proxy=	tftp-proxy
 
 .if !defined(NO_PIC) && !defined(NO_RTLD)
 _rtld-elf=	rtld-elf
-SUBDIR.${MK_LIB32}+=	rtld-elf32
+.for LIBCOMPAT libcompat in ${_ALL_LIBCOMPATS_libcompats}
+SUBDIR.${MK_LIB${LIBCOMPAT}}+=	rtld-elf${libcompat}
+.endfor
 .endif
 
 .if ${MK_RBOOTD} != "no"
@@ -102,10 +109,6 @@ SUBDIR+=	talkd
 
 .if ${MK_TCP_WRAPPERS} != "no"
 SUBDIR+=	tcpd
-.endif
-
-.if ${MK_TELNET} != "no"
-_telnetd=	telnetd
 .endif
 
 .if ${MK_TFTP} != "no"

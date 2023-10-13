@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Authors: Joe Kloss; Ravi Pokala (rpokala@freebsd.org)
  *
@@ -25,8 +25,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 #include <sys/param.h>
@@ -318,9 +316,6 @@ imcsmb_pci_request_bus(device_t dev)
 	return (rc);
 }
 
-/* Our device class */
-static devclass_t imcsmb_pci_devclass;
-
 /* Device methods */
 static device_method_t imcsmb_pci_methods[] = {
 	/* Device interface */
@@ -337,7 +332,7 @@ static driver_t imcsmb_pci_driver = {
 	.size = sizeof(struct imcsmb_pci_softc),
 };
 
-DRIVER_MODULE(imcsmb_pci, pci, imcsmb_pci_driver, imcsmb_pci_devclass, 0, 0);
+DRIVER_MODULE(imcsmb_pci, pci, imcsmb_pci_driver, 0, 0);
 MODULE_DEPEND(imcsmb_pci, pci, 1, 1, 1);
 MODULE_VERSION(imcsmb_pci, 1);
 

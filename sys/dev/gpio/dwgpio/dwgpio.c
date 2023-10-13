@@ -36,8 +36,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/bus.h>
@@ -419,7 +417,4 @@ static driver_t dwgpio_driver = {
 	sizeof(struct dwgpio_softc),
 };
 
-static devclass_t dwgpio_devclass;
-
-DRIVER_MODULE(dwgpio, dwgpiobus, dwgpio_driver,
-    dwgpio_devclass, 0, 0);
+DRIVER_MODULE(dwgpio, dwgpiobus, dwgpio_driver, 0, 0);

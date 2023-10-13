@@ -24,8 +24,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <ctype.h>
 #include <efivar.h>
 #include <efivar-dp.h>
@@ -38,7 +36,7 @@ __FBSDID("$FreeBSD$");
 #include <string.h>
 #include <unistd.h>
 
-#define MAXSIZE 65536	/* Everyting will be smaller than this, most 1000x smaller */
+#define MAXSIZE 65536	/* Everything will be smaller than this, most 1000x smaller */
 
 /* options descriptor */
 static struct option longopts[] = {
@@ -169,14 +167,13 @@ efi_to_unix(void)
 	char buffer[MAXSIZE];
 	char dpbuf[MAXSIZE];
 	efidp dp;
-	size_t dplen;
 	char *walker, *dev, *relpath, *abspath;
 	int rv;
 
 	dp = (efidp)dpbuf;
 	while (fgets(buffer, sizeof(buffer), stdin)) {
 		walker= trim(buffer);
-		dplen = efidp_parse_device_path(walker, dp, sizeof(dpbuf));
+		efidp_parse_device_path(walker, dp, sizeof(dpbuf));
 		rv = efivar_device_path_to_unix_path(dp, &dev, &relpath, &abspath);
 		if (rv == 0)
 			printf("%s:%s %s\n", dev, relpath, abspath);

@@ -43,8 +43,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <ctype.h>
 
 #include "dhcpd.h"
@@ -413,6 +411,8 @@ intern(char *atom, int dfv)
 			return (HOSTNAME);
 		break;
 	case 'i':
+		if (!strcasecmp(atom + 1, "gnore"))
+			return (IGNORE);
 		if (!strcasecmp(atom + 1, "nitial-interval"))
 			return (INITIAL_INTERVAL);
 		if (!strcasecmp(atom + 1, "nterface"))

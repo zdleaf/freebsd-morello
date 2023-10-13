@@ -3,7 +3,7 @@
  */
 
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2001-2002 Maksim Yevmenkin <m_evmenkin@yahoo.com>
  * All rights reserved.
@@ -30,7 +30,6 @@
  * SUCH DAMAGE.
  *
  * $Id: ng_btsocket_sco.h,v 1.3 2005/10/31 18:08:52 max Exp $
- * $FreeBSD$
  */
 
 #ifndef _NETGRAPH_BTSOCKET_SCO_H_
@@ -113,7 +112,7 @@ int  ng_btsocket_sco_bind       (struct socket *, struct sockaddr *,
                                    struct thread *);
 int  ng_btsocket_sco_connect    (struct socket *, struct sockaddr *,
                                    struct thread *);
-int  ng_btsocket_sco_control    (struct socket *, u_long, caddr_t,
+int  ng_btsocket_sco_control    (struct socket *, u_long, void *,
                                    struct ifnet *, struct thread *);
 int  ng_btsocket_sco_ctloutput  (struct socket *, struct sockopt *);
 void ng_btsocket_sco_detach     (struct socket *);

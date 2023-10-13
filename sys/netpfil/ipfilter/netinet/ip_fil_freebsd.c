@@ -1,4 +1,3 @@
-/*	$FreeBSD$	*/
 
 /*
  * Copyright (C) 2012 by Darren Reed.
@@ -39,7 +38,6 @@ static const char rcsid[] = "@(#)$Id$";
 #include <sys/sockopt.h>
 #include <sys/socket.h>
 #include <sys/selinfo.h>
-#include <netinet/tcp_var.h>
 #include <net/if.h>
 #include <net/if_var.h>
 #include <net/netisr.h>
@@ -47,11 +45,13 @@ static const char rcsid[] = "@(#)$Id$";
 #include <net/route/nhop.h>
 #include <netinet/in.h>
 #include <netinet/in_fib.h>
+#include <netinet/in_pcb.h>
 #include <netinet/in_var.h>
 #include <netinet/in_systm.h>
 #include <netinet/ip.h>
 #include <netinet/ip_var.h>
 #include <netinet/tcp.h>
+#include <netinet/tcp_var.h>
 #include <net/vnet.h>
 #include <netinet/udp.h>
 #include <netinet/tcpip.h>
@@ -279,6 +279,12 @@ ipfioctl(struct cdev *dev, ioctlcmd_t cmd, caddr_t data,
 		V_ipfmain.ipf_interror = 130001;
 		CURVNET_RESTORE();
 		return (EPERM);
+	}
+
+	if (jailed_without_vnet(p->p_cred)) {
+		V_ipfmain.ipf_interror = 130018;
+		CURVNET_RESTORE();
+		return (EOPNOTSUPP);
 	}
 
 	unit = GET_MINOR(dev);
@@ -917,8 +923,7 @@ bad:
 
 
 int
-ipf_verifysrc(fin)
-	fr_info_t *fin;
+ipf_verifysrc(fr_info_t *fin)
 {
 	struct nhop_object *nh;
 
@@ -931,7 +936,7 @@ ipf_verifysrc(fin)
 
 
 /*
-* return the first IP Address associated with an interface
+ * return the first IP Address associated with an interface
  */
 int
 ipf_ifpaddr(ipf_main_softc_t *softc, int v, int atype, void *ifptr,
@@ -1003,8 +1008,7 @@ ipf_ifpaddr(ipf_main_softc_t *softc, int v, int atype, void *ifptr,
 
 
 u_32_t
-ipf_newisn(fin)
-	fr_info_t *fin;
+ipf_newisn(fr_info_t *fin)
 {
 	u_32_t newiss;
 	newiss = arc4random();
@@ -1171,17 +1175,17 @@ mbufchainlen(struct mbuf *m0)
 /* We assume that 'xmin' is a pointer to a buffer that is part of the chain */
 /* of buffers that starts at *fin->fin_mp.                                  */
 /* ------------------------------------------------------------------------ */
-void *
+ip_t *
 ipf_pullup(mb_t *xmin, fr_info_t *fin, int len)
 {
 	int dpoff, ipoff;
 	mb_t *m = xmin;
-	char *ip;
+	ip_t *ip;
 
 	if (m == NULL)
 		return (NULL);
 
-	ip = (char *)fin->fin_ip;
+	ip = fin->fin_ip;
 	if ((fin->fin_flx & FI_COALESCE) != 0)
 		return (ip);
 
@@ -1226,6 +1230,7 @@ ipf_pullup(mb_t *xmin, fr_info_t *fin, int len)
 #endif
 		} else
 		{
+
 			m = m_pullup(m, len);
 		}
 		if (n != NULL)
@@ -1252,9 +1257,9 @@ ipf_pullup(mb_t *xmin, fr_info_t *fin, int len)
 			m = m->m_next;
 		}
 		fin->fin_m = m;
-		ip = MTOD(m, char *) + ipoff;
+		ip = MTOD(m, ip_t *) + ipoff;
 
-		fin->fin_ip = (ip_t *)ip;
+		fin->fin_ip = ip;
 		if (fin->fin_dp != NULL)
 			fin->fin_dp = (char *)fin->fin_ip + dpoff;
 		if (fin->fin_fraghdr != NULL)
@@ -1305,31 +1310,31 @@ int ipf_pfil_unhook(void) {
 }
 
 int ipf_pfil_hook(void) {
-	struct pfil_hook_args pha;
-	struct pfil_link_args pla;
 	int error, error6;
 
-	pha.pa_version = PFIL_VERSION;
-	pha.pa_flags = PFIL_IN | PFIL_OUT;
-	pha.pa_modname = "ipfilter";
-	pha.pa_rulname = "default-ip4";
-	pha.pa_func = ipf_check_wrapper;
-	pha.pa_ruleset = NULL;
-	pha.pa_type = PFIL_TYPE_IP4;
+	struct pfil_hook_args pha = {
+		.pa_version = PFIL_VERSION,
+		.pa_flags = PFIL_IN | PFIL_OUT,
+		.pa_modname = "ipfilter",
+		.pa_rulname = "default-ip4",
+		.pa_mbuf_chk = ipf_check_wrapper,
+		.pa_type = PFIL_TYPE_IP4,
+	};
 	V_ipf_inet_hook = pfil_add_hook(&pha);
 
 #ifdef USE_INET6
 	pha.pa_rulname = "default-ip6";
-	pha.pa_func = ipf_check_wrapper6;
+	pha.pa_mbuf_chk = ipf_check_wrapper6;
 	pha.pa_type = PFIL_TYPE_IP6;
 	V_ipf_inet6_hook = pfil_add_hook(&pha);
 #endif
 
-	pla.pa_version = PFIL_VERSION;
-	pla.pa_flags = PFIL_IN | PFIL_OUT |
-	    PFIL_HEADPTR | PFIL_HOOKPTR;
-	pla.pa_head = V_inet_pfil_head;
-	pla.pa_hook = V_ipf_inet_hook;
+	struct pfil_link_args pla = {
+		.pa_version = PFIL_VERSION,
+		.pa_flags = PFIL_IN | PFIL_OUT | PFIL_HEADPTR | PFIL_HOOKPTR,
+		.pa_head = V_inet_pfil_head,
+		.pa_hook = V_ipf_inet_hook,
+	};
 	error = pfil_link(&pla);
 
 	error6 = 0;

@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2012 Olivier Houchard <cognet@FreeBSD.org>
  * All rights reserved.
@@ -24,8 +24,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 #ifndef	_MACHINE_ASMACROS_H_
@@ -41,7 +39,7 @@
     	mrc	p15, 0, tmp, c13, c0, 4
 
 #define	ELFNOTE(section, type, vendor, desctype, descdata...)	  \
-	.pushsection section					; \
+	.pushsection section, "a", %note			; \
 	    .balign 4						; \
 	    .long 2f - 1f		/* namesz */		; \
 	    .long 4f - 3f		/* descsz */		; \

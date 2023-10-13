@@ -26,8 +26,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 /*
  * Driver for realtime clock HAOYU HYM8563
  */
@@ -305,10 +303,9 @@ static device_method_t hym8563_methods[] = {
 	DEVMETHOD_END,
 };
 
-static devclass_t hym8563_devclass;
 static DEFINE_CLASS_0(hym8563_rtc, hym8563_driver, hym8563_methods,
     sizeof(struct hym8563_softc));
-DRIVER_MODULE(hym8563, iicbus, hym8563_driver, hym8563_devclass, NULL, NULL);
+DRIVER_MODULE(hym8563, iicbus, hym8563_driver, NULL, NULL);
 MODULE_VERSION(hym8563, 1);
 MODULE_DEPEND(hym8563, iicbus, IICBUS_MINVER, IICBUS_PREFVER, IICBUS_MAXVER);
 IICBUS_FDT_PNP_INFO(compat_data);

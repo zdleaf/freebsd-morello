@@ -29,8 +29,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 #ifndef __IF_MGE_H__
@@ -67,7 +65,7 @@ struct mge_desc_wrapper {
 };
 
 struct mge_softc {
-	struct ifnet	*ifp;		/* per-interface network data */
+	if_t		ifp;		/* per-interface network data */
 
 	phandle_t	node;
 

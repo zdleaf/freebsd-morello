@@ -1,7 +1,7 @@
 /*	$NetBSD: gentbi.c,v 1.15 2006/03/29 07:05:24 thorpej Exp $	*/
 
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-NetBSD AND BSD-2-Clause
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 1998, 1999, 2000, 2001 The NetBSD Foundation, Inc.
  * All rights reserved.
@@ -64,8 +64,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 /*
  * Driver for generic unknown ten-bit interfaces(1000BASE-{LX,SX}
  * fiber interfaces).
@@ -100,15 +98,13 @@ static device_method_t gentbi_methods[] = {
 	DEVMETHOD_END
 };
 
-static devclass_t gentbi_devclass;
-
 static driver_t gentbi_driver = {
 	"gentbi",
 	gentbi_methods,
 	sizeof(struct mii_softc)
 };
 
-DRIVER_MODULE(gentbi, miibus, gentbi_driver, gentbi_devclass, 0, 0);
+DRIVER_MODULE(gentbi, miibus, gentbi_driver, 0, 0);
 
 static int	gentbi_service(struct mii_softc *, struct mii_data *, int);
 static void	gentbi_status(struct mii_softc *);

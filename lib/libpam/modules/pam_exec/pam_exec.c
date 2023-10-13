@@ -37,8 +37,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/types.h>
 #include <sys/poll.h>
 #include <sys/procdesc.h>
@@ -261,6 +259,13 @@ _pam_exec(pam_handle_t *pamh,
 			/* don't prompt, only expose existing token */
 			rc = pam_get_item(pamh, PAM_AUTHTOK, &item);
 			authtok = item;
+			if (authtok == NULL && rc == PAM_SUCCESS) {
+				openpam_log(PAM_LOG_ERROR, 
+				    "%s: pam_get_authtok(): %s",
+				    func, "authentication token not available");
+				OUT(PAM_SYSTEM_ERR);
+			}
+
 		} else {
 			rc = pam_get_authtok(pamh, PAM_AUTHTOK, &authtok, NULL);
 		}

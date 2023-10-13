@@ -1,5 +1,4 @@
 #	from @(#)Makefile.inc	8.3 (Berkeley) 2/4/95
-# $FreeBSD$
 
 # machine-independent stdlib sources
 .PATH: ${LIBC_SRCTOP}/${LIBC_ARCH}/stdlib ${LIBC_SRCTOP}/stdlib
@@ -11,8 +10,8 @@ MISRCS+=C99_Exit.c a64l.c abort.c abs.c atexit.c atof.c atoi.c atol.c atoll.c \
 	getsubopt.c hcreate.c hcreate_r.c hdestroy_r.c heapsort.c heapsort_b.c \
 	hsearch_r.c imaxabs.c imaxdiv.c \
 	insque.c l64a.c labs.c ldiv.c llabs.c lldiv.c lsearch.c \
-	merge.c mergesort_b.c ptsname.c qsort.c qsort_r.c qsort_s.c \
-	quick_exit.c radixsort.c rand.c \
+	merge.c mergesort_b.c ptsname.c qsort.c qsort_r.c qsort_r_compat.c \
+	qsort_s.c quick_exit.c radixsort.c rand.c \
 	random.c reallocarray.c reallocf.c realpath.c remque.c \
 	set_constraint_handler_s.c strfmon.c strtoimax.c \
 	strtol.c strtold.c strtoll.c strtoq.c strtoul.c strtonum.c strtoull.c \
@@ -28,6 +27,8 @@ C99_Exit.c: ${LIBC_SRCTOP}/stdlib/_Exit.c .NOMETA
 	ln -sf ${.ALLSRC} ${.TARGET}
 
 SYM_MAPS+= ${LIBC_SRCTOP}/stdlib/Symbol.map
+
+.include "${LIBC_SRCTOP}/stdlib/malloc/Makefile.inc"
 
 # machine-dependent stdlib sources
 .sinclude "${LIBC_SRCTOP}/${LIBC_ARCH}/stdlib/Makefile.inc"
@@ -46,8 +47,8 @@ MAN+=	a64l.3 abort.3 abs.3 alloca.3 atexit.3 atof.3 \
 MLINKS+=a64l.3 l64a.3 a64l.3 l64a_r.3
 MLINKS+=atol.3 atoll.3
 MLINKS+=exit.3 _Exit.3
-MLINKS+=getenv.3 clearenv.3 getenv.3 putenv.3 getenv.3 setenv.3 \
-	getenv.3 unsetenv.3
+MLINKS+=getenv.3 clearenv.3 getenv.3 putenv.3 getenv.3 secure_getenv.3 \
+	getenv.3 setenv.3 getenv.3 unsetenv.3
 MLINKS+=getopt_long.3 getopt_long_only.3
 MLINKS+=hcreate.3 hdestroy.3 hcreate.3 hsearch.3
 MLINKS+=hcreate.3 hcreate_r.3 hcreate.3 hdestroy_r.3 hcreate.3 hsearch_r.3

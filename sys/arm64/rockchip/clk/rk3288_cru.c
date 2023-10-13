@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2018 Emmanuel Vadot <manu@freebsd.org>
  * All rights reserved.
@@ -24,13 +24,9 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/bus.h>
@@ -529,7 +525,6 @@ static struct rk_clk_armclk_rates rk3288_armclk_rates[] = {
 	},								\
 }
 
-#define PLIST(_name) static const char *_name[]
 PLIST(pll_src_p) = {"xin24m", "xin24m", "xin32k"};
 PLIST(armclk_p)= {"apll_core", "gpll_core"};
 PLIST(ddrphy_p) = {"dpll_ddr", "gpll_ddr"};
@@ -918,10 +913,8 @@ static device_method_t rk3288_cru_methods[] = {
 	DEVMETHOD_END
 };
 
-static devclass_t rk3288_cru_devclass;
-
 DEFINE_CLASS_1(rk3288_cru, rk3288_cru_driver, rk3288_cru_methods,
   sizeof(struct rk_cru_softc), rk_cru_driver);
 
-EARLY_DRIVER_MODULE(rk3288_cru, simplebus, rk3288_cru_driver,
-    rk3288_cru_devclass, 0, 0, BUS_PASS_BUS + BUS_PASS_ORDER_MIDDLE + 1);
+EARLY_DRIVER_MODULE(rk3288_cru, simplebus, rk3288_cru_driver, 0, 0,
+    BUS_PASS_BUS + BUS_PASS_ORDER_MIDDLE + 1);

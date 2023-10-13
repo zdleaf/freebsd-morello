@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 1998-2003 Poul-Henning Kamp
  * All rights reserved.
@@ -27,8 +27,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include "opt_clock.h"
 
 #include <sys/param.h>
@@ -147,6 +145,21 @@ tsc_freq_vmware(void)
 	tsc_early_calib_exact = 1;
 }
 
+static void
+tsc_freq_xen(void)
+{
+	u_int regs[4];
+
+	/*
+	 * Must run *after* generic tsc_freq_cpuid_vm, so that when Xen is
+	 * emulating Viridian support the Viridian leaf is used instead.
+	 */
+	KASSERT(hv_high >= 0x40000003, ("Invalid max hypervisor leaf on Xen"));
+	cpuid_count(0x40000003, 0, regs);
+	tsc_freq = (uint64_t)(regs[2]) * 1000;
+	tsc_early_calib_exact = 1;
+}
+
 /*
  * Calculate TSC frequency using information from the CPUID leaf 0x15 'Time
  * Stamp Counter and Nominal Core Crystal Clock'.  If leaf 0x15 is not
@@ -240,7 +253,7 @@ tsc_freq_intel_brand(uint64_t *res)
 }
 
 static void
-tsc_freq_8254(uint64_t *res)
+tsc_freq_tc(uint64_t *res)
 {
 	uint64_t tsc1, tsc2;
 	int64_t overhead;
@@ -262,20 +275,52 @@ tsc_freq_8254(uint64_t *res)
 	tsc_freq = (tsc2 - tsc1 - overhead) * 10;
 }
 
+/*
+ * Try to determine the TSC frequency using CPUID or hypercalls.  If successful,
+ * this lets use the TSC for early DELAY() calls instead of the 8254 timer,
+ * which may be unreliable or entirely absent on contemporary systems.  However,
+ * avoid calibrating using the 8254 here so as to give hypervisors a chance to
+ * register a timecounter that can be used instead.
+ */
 static void
-probe_tsc_freq(void)
+probe_tsc_freq_early(void)
 {
-	if (cpu_power_ecx & CPUID_PERF_STAT) {
-		/*
-		 * XXX Some emulators expose host CPUID without actual support
-		 * for these MSRs.  We must test whether they really work.
-		 */
-		wrmsr(MSR_MPERF, 0);
-		wrmsr(MSR_APERF, 0);
-		DELAY(10);
-		if (rdmsr(MSR_MPERF) > 0 && rdmsr(MSR_APERF) > 0)
-			tsc_perf_stat = 1;
+#ifdef __i386__
+	/* The TSC is known to be broken on certain CPUs. */
+	switch (cpu_vendor_id) {
+	case CPU_VENDOR_AMD:
+		switch (cpu_id & 0xFF0) {
+		case 0x500:
+			/* K5 Model 0 */
+			tsc_disabled = 1;
+			return;
+		}
+		break;
+	case CPU_VENDOR_CENTAUR:
+		switch (cpu_id & 0xff0) {
+		case 0x540:
+			/*
+			 * http://www.centtech.com/c6_data_sheet.pdf
+			 *
+			 * I-12 RDTSC may return incoherent values in EDX:EAX
+			 * I-13 RDTSC hangs when certain event counters are used
+			 */
+			tsc_disabled = 1;
+			return;
+		}
+		break;
+	case CPU_VENDOR_NSC:
+		switch (cpu_id & 0xff0) {
+		case 0x540:
+			if ((cpu_id & CPUID_STEPPING) == 0) {
+				tsc_disabled = 1;
+				return;
+			}
+			break;
+		}
+		break;
 	}
+#endif
 
 	switch (cpu_vendor_id) {
 	case CPU_VENDOR_AMD:
@@ -315,15 +360,24 @@ probe_tsc_freq(void)
 		break;
 	}
 
-	if (tsc_freq_cpuid_vm())
-		return;
-
-	if (vm_guest == VM_GUEST_VMWARE) {
+	if (tsc_freq_cpuid_vm()) {
+		if (bootverbose)
+			printf(
+		    "Early TSC frequency %juHz derived from hypervisor CPUID\n",
+			    (uintmax_t)tsc_freq);
+	} else if (vm_guest == VM_GUEST_VMWARE) {
 		tsc_freq_vmware();
-		return;
-	}
-
-	if (tsc_freq_cpuid(&tsc_freq)) {
+		if (bootverbose)
+			printf(
+		    "Early TSC frequency %juHz derived from VMWare hypercall\n",
+			    (uintmax_t)tsc_freq);
+	} else if (vm_guest == VM_GUEST_XEN) {
+		tsc_freq_xen();
+		if (bootverbose)
+			printf(
+			"Early TSC frequency %juHz derived from Xen CPUID\n",
+			    (uintmax_t)tsc_freq);
+	} else if (tsc_freq_cpuid(&tsc_freq)) {
 		/*
 		 * If possible, use the value obtained from CPUID as the initial
 		 * frequency.  This will be refined later during boot but is
@@ -336,7 +390,20 @@ probe_tsc_freq(void)
 		if (bootverbose)
 			printf("Early TSC frequency %juHz derived from CPUID\n",
 			    (uintmax_t)tsc_freq);
-	} else if (tsc_skip_calibration) {
+	}
+}
+
+/*
+ * If we were unable to determine the TSC frequency via CPU registers, try
+ * to calibrate against a known clock.
+ */
+static void
+probe_tsc_freq_late(void)
+{
+	if (tsc_freq != 0)
+		return;
+
+	if (tsc_skip_calibration) {
 		/*
 		 * Try to parse the brand string to obtain the nominal TSC
 		 * frequency.
@@ -352,10 +419,10 @@ probe_tsc_freq(void)
 		}
 	} else {
 		/*
-		 * Calibrate against the 8254 PIT.  This estimate will be
-		 * refined later in tsc_calib().
+		 * Calibrate against a timecounter or the 8254 PIT.  This
+		 * estimate will be refined later in tsc_calib().
 		 */
-		tsc_freq_8254(&tsc_freq);
+		tsc_freq_tc(&tsc_freq);
 		if (bootverbose)
 			printf(
 		    "Early TSC frequency %juHz calibrated from 8254 PIT\n",
@@ -364,46 +431,24 @@ probe_tsc_freq(void)
 }
 
 void
-init_TSC(void)
+start_TSC(void)
 {
-
 	if ((cpu_feature & CPUID_TSC) == 0 || tsc_disabled)
 		return;
 
-#ifdef __i386__
-	/* The TSC is known to be broken on certain CPUs. */
-	switch (cpu_vendor_id) {
-	case CPU_VENDOR_AMD:
-		switch (cpu_id & 0xFF0) {
-		case 0x500:
-			/* K5 Model 0 */
-			return;
-		}
-		break;
-	case CPU_VENDOR_CENTAUR:
-		switch (cpu_id & 0xff0) {
-		case 0x540:
-			/*
-			 * http://www.centtech.com/c6_data_sheet.pdf
-			 *
-			 * I-12 RDTSC may return incoherent values in EDX:EAX
-			 * I-13 RDTSC hangs when certain event counters are used
-			 */
-			return;
-		}
-		break;
-	case CPU_VENDOR_NSC:
-		switch (cpu_id & 0xff0) {
-		case 0x540:
-			if ((cpu_id & CPUID_STEPPING) == 0)
-				return;
-			break;
-		}
-		break;
-	}
-#endif
+	probe_tsc_freq_late();
 
-	probe_tsc_freq();
+	if (cpu_power_ecx & CPUID_PERF_STAT) {
+		/*
+		 * XXX Some emulators expose host CPUID without actual support
+		 * for these MSRs.  We must test whether they really work.
+		 */
+		wrmsr(MSR_MPERF, 0);
+		wrmsr(MSR_APERF, 0);
+		DELAY(10);
+		if (rdmsr(MSR_MPERF) > 0 && rdmsr(MSR_APERF) > 0)
+			tsc_perf_stat = 1;
+	}
 
 	/*
 	 * Inform CPU accounting about our boot-time clock rate.  This will
@@ -708,6 +753,15 @@ tsc_update_freq(uint64_t new_freq)
 	    new_freq >> (int)(intptr_t)tsc_timecounter.tc_priv);
 }
 
+void
+tsc_init(void)
+{
+	if ((cpu_feature & CPUID_TSC) == 0 || tsc_disabled)
+		return;
+
+	probe_tsc_freq_early();
+}
+
 /*
  * Perform late calibration of the TSC frequency once ACPI-based timecounters
  * are available.  At this point timehands are not set up, so we read the
@@ -790,7 +844,7 @@ tsc_levels_changed(void *arg, int unit)
 	error = CPUFREQ_LEVELS(cf_dev, levels, &count);
 	if (error == 0 && count != 0) {
 		max_freq = (uint64_t)levels[0].total_set.freq * 1000000;
-		set_cputicker(rdtsc, max_freq, 1);
+		set_cputicker(rdtsc, max_freq, true);
 	} else
 		printf("tsc_levels_changed: no max freq found\n");
 	free(levels, M_TEMP);
@@ -934,7 +988,8 @@ x86_tsc_vdso_timehands32(struct vdso_timehands32 *vdso_th32,
 	vdso_th32->th_algo = VDSO_TH_ALGO_X86_TSC;
 	vdso_th32->th_x86_shift = (int)(intptr_t)tc->tc_priv;
 	vdso_th32->th_x86_hpet_idx = 0xffffffff;
-	vdso_th32->th_x86_pvc_last_systime = 0;
+	vdso_th32->th_x86_pvc_last_systime[0] = 0;
+	vdso_th32->th_x86_pvc_last_systime[1] = 0;
 	vdso_th32->th_x86_pvc_stable_mask = 0;
 	bzero(vdso_th32->th_res, sizeof(vdso_th32->th_res));
 	return (1);

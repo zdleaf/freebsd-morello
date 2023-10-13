@@ -6,7 +6,7 @@
  * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
- * or http://www.opensolaris.org/os/licensing.
+ * or https://opensource.org/licenses/CDDL-1.0.
  * See the License for the specific language governing permissions
  * and limitations under the License.
  *
@@ -128,6 +128,14 @@ zil_prt_rec_rename(zilog_t *zilog, int txtype, const void *arg)
 	(void) printf("%ssdoid %llu, tdoid %llu\n", tab_prefix,
 	    (u_longlong_t)lr->lr_sdoid, (u_longlong_t)lr->lr_tdoid);
 	(void) printf("%ssrc %s tgt %s\n", tab_prefix, snm, tnm);
+	switch (txtype) {
+	case TX_RENAME_EXCHANGE:
+		(void) printf("%sflags RENAME_EXCHANGE\n", tab_prefix);
+		break;
+	case TX_RENAME_WHITEOUT:
+		(void) printf("%sflags RENAME_WHITEOUT\n", tab_prefix);
+		break;
+	}
 }
 
 static int
@@ -182,6 +190,7 @@ zil_prt_rec_write(zilog_t *zilog, int txtype, const void *arg)
 			return;
 		}
 
+		ASSERT3U(BP_GET_LSIZE(bp), !=, 0);
 		SET_BOOKMARK(&zb, dmu_objset_id(zilog->zl_os),
 		    lr->lr_foid, ZB_ZIL_LEVEL,
 		    lr->lr_offset / BP_GET_LSIZE(bp));
@@ -266,6 +275,29 @@ zil_prt_rec_setattr(zilog_t *zilog, int txtype, const void *arg)
 }
 
 static void
+zil_prt_rec_setsaxattr(zilog_t *zilog, int txtype, const void *arg)
+{
+	(void) zilog, (void) txtype;
+	const lr_setsaxattr_t *lr = arg;
+
+	char *name = (char *)(lr + 1);
+	(void) printf("%sfoid %llu\n", tab_prefix,
+	    (u_longlong_t)lr->lr_foid);
+
+	(void) printf("%sXAT_NAME  %s\n", tab_prefix, name);
+	if (lr->lr_size == 0) {
+		(void) printf("%sXAT_VALUE  NULL\n", tab_prefix);
+	} else {
+		(void) printf("%sXAT_VALUE  ", tab_prefix);
+		char *val = name + (strlen(name) + 1);
+		for (int i = 0; i < lr->lr_size; i++) {
+			(void) printf("%c", *val);
+			val++;
+		}
+	}
+}
+
+static void
 zil_prt_rec_acl(zilog_t *zilog, int txtype, const void *arg)
 {
 	(void) zilog, (void) txtype;
@@ -273,6 +305,23 @@ zil_prt_rec_acl(zilog_t *zilog, int txtype, const void *arg)
 
 	(void) printf("%sfoid %llu, aclcnt %llu\n", tab_prefix,
 	    (u_longlong_t)lr->lr_foid, (u_longlong_t)lr->lr_aclcnt);
+}
+
+static void
+zil_prt_rec_clone_range(zilog_t *zilog, int txtype, const void *arg)
+{
+	(void) zilog, (void) txtype;
+	const lr_clone_range_t *lr = arg;
+
+	(void) printf("%sfoid %llu, offset %llx, length %llx, blksize %llx\n",
+	    tab_prefix, (u_longlong_t)lr->lr_foid, (u_longlong_t)lr->lr_offset,
+	    (u_longlong_t)lr->lr_length, (u_longlong_t)lr->lr_blksz);
+
+	for (unsigned int i = 0; i < lr->lr_nbps; i++) {
+		(void) printf("%s[%u/%llu] ", tab_prefix, i + 1,
+		    (u_longlong_t)lr->lr_nbps);
+		print_log_bp(&lr->lr_bps[i], "");
+	}
 }
 
 typedef void (*zil_prt_rec_func_t)(zilog_t *, int, const void *);
@@ -304,6 +353,12 @@ static zil_rec_info_t zil_rec_info[TX_MAX_TYPE] = {
 	{.zri_print = zil_prt_rec_create,   .zri_name = "TX_MKDIR_ATTR      "},
 	{.zri_print = zil_prt_rec_create,   .zri_name = "TX_MKDIR_ACL_ATTR  "},
 	{.zri_print = zil_prt_rec_write,    .zri_name = "TX_WRITE2          "},
+	{.zri_print = zil_prt_rec_setsaxattr,
+	    .zri_name = "TX_SETSAXATTR      "},
+	{.zri_print = zil_prt_rec_rename,   .zri_name = "TX_RENAME_EXCHANGE "},
+	{.zri_print = zil_prt_rec_rename,   .zri_name = "TX_RENAME_WHITEOUT "},
+	{.zri_print = zil_prt_rec_clone_range,
+	    .zri_name = "TX_CLONE_RANGE     "},
 };
 
 static int

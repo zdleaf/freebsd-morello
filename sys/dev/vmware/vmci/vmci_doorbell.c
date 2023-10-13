@@ -7,8 +7,6 @@
 /* This file implements the VMCI doorbell API. */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/types.h>
 
 #include "vmci_doorbell.h"
@@ -717,13 +715,9 @@ vmci_doorbell_notify_as_guest(struct vmci_handle handle,
 int
 vmci_doorbell_notify(struct vmci_handle dst, vmci_privilege_flags priv_flags)
 {
-	struct vmci_handle src;
-
 	if (VMCI_HANDLE_INVALID(dst) ||
 	    (priv_flags & ~VMCI_PRIVILEGE_ALL_FLAGS))
 		return (VMCI_ERROR_INVALID_ARGS);
-
-	src = VMCI_INVALID_HANDLE;
 
 	return (vmci_doorbell_notify_as_guest(dst, priv_flags));
 }

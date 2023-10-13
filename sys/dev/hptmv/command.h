@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2004-2005 HighPoint Technologies, Inc.
  * All rights reserved.
@@ -24,8 +24,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 #ifndef _COMMAND_H_
 #define _COMMAND_H_
@@ -240,7 +238,7 @@ DPC_ROUTINE;
  * Maximum command blocks needed for each VBus:
  *   Each OS command requests 1+MAX_MEMBERS*2 command blocks (RAID1/0 case)
  *   This space is allocated by platform dependent part, either static or 
- *   dynamic, continuous or non-continous.
+ *   dynamic, continuous or non-continuous.
  *   The code only needs _vbus_(pFreeCommands) to be set.
  *
  * PendingRoutines[] size:

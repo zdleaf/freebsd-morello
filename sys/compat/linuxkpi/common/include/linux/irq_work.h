@@ -24,8 +24,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 #ifndef _LINUXKPI_LINUX_IRQ_WORK_H_
@@ -34,11 +32,29 @@
 #include <sys/param.h>
 #include <sys/taskqueue.h>
 
+#include <linux/llist.h>
+#include <linux/workqueue.h>
+
+#define	LKPI_IRQ_WORK_STD_TQ	system_wq->taskqueue
+#define	LKPI_IRQ_WORK_FAST_TQ	linux_irq_work_tq
+
+#ifdef LKPI_IRQ_WORK_USE_FAST_TQ
+#define	LKPI_IRQ_WORK_TQ	LKPI_IRQ_WORK_FAST_TQ
+#else
+#define	LKPI_IRQ_WORK_TQ	LKPI_IRQ_WORK_STD_TQ
+#endif
+
 struct irq_work;
 typedef void (*irq_work_func_t)(struct irq_work *);
 
 struct irq_work {
 	struct task irq_task;
+	union {
+		struct llist_node llnode;
+		struct {
+			struct llist_node llist;
+		} node;
+	};
 	irq_work_func_t func;
 };
 
@@ -58,16 +74,17 @@ init_irq_work(struct irq_work *irqw, irq_work_func_t func)
 	irqw->func = func;
 }
 
-static inline void
+static inline bool
 irq_work_queue(struct irq_work *irqw)
 {
-	taskqueue_enqueue(linux_irq_work_tq, &irqw->irq_task);
+	return (taskqueue_enqueue_flags(LKPI_IRQ_WORK_TQ, &irqw->irq_task,
+	    TASKQUEUE_FAIL_IF_PENDING) == 0);
 }
 
 static inline void
 irq_work_sync(struct irq_work *irqw)
 {
-	taskqueue_drain(linux_irq_work_tq, &irqw->irq_task);
+	taskqueue_drain(LKPI_IRQ_WORK_TQ, &irqw->irq_task);
 }
 
 #endif /* _LINUXKPI_LINUX_IRQ_WORK_H_ */

@@ -6,7 +6,7 @@
  * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
- * or http://www.opensolaris.org/os/licensing.
+ * or https://opensource.org/licenses/CDDL-1.0.
  * See the License for the specific language governing permissions
  * and limitations under the License.
  *
@@ -144,6 +144,7 @@
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <strings.h>
 #include <unistd.h>
 
@@ -159,7 +160,7 @@
 libzfs_handle_t *g_zfs;
 int zfs_fd;
 
-static const char *errtable[TYPE_INVAL] = {
+static const char *const errtable[TYPE_INVAL] = {
 	"data",
 	"dnode",
 	"mos",

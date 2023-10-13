@@ -25,7 +25,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
 /*
 * NXP TDA19988 HDMI encoder 
 */
@@ -53,7 +52,7 @@ __FBSDID("$FreeBSD$");
 #include <dev/videomode/edidvar.h>
 
 #include "iicbus_if.h"
-#include "hdmi_if.h"
+#include "crtc_if.h"
 
 #define	MKREG(page, addr)	(((page) << 8) | (addr))
 
@@ -782,9 +781,9 @@ static device_method_t tda_methods[] = {
 	DEVMETHOD(device_attach,	tda19988_attach),
 	DEVMETHOD(device_detach,	tda19988_detach),
 
-	/* HDMI methods */
-	DEVMETHOD(hdmi_get_edid,	tda19988_get_edid),
-	DEVMETHOD(hdmi_set_videomode,	tda19988_set_videomode),
+	/* CRTC methods */
+	DEVMETHOD(crtc_get_edid,	tda19988_get_edid),
+	DEVMETHOD(crtc_set_videomode,	tda19988_set_videomode),
 	{0, 0},
 };
 
@@ -794,8 +793,6 @@ static driver_t tda_driver = {
 	sizeof(struct tda19988_softc),
 };
 
-static devclass_t tda_devclass;
-
-DRIVER_MODULE(tda, iicbus, tda_driver, tda_devclass, 0, 0);
+DRIVER_MODULE(tda, iicbus, tda_driver, 0, 0);
 MODULE_VERSION(tda, 1);
 MODULE_DEPEND(tda, iicbus, 1, 1, 1);

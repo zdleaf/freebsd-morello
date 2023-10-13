@@ -44,6 +44,9 @@
 #ifdef HAVE_NET_IF_H
 #include <net/if.h>
 #endif
+#ifdef HAVE_NETIOAPI_H
+#include <netioapi.h>
+#endif
 #include "util/net_help.h"
 #include "util/log.h"
 #include "util/data/dname.h"
@@ -52,6 +55,7 @@
 #include "util/config_file.h"
 #include "sldns/parseutil.h"
 #include "sldns/wire2str.h"
+#include "sldns/str2wire.h"
 #include <fcntl.h>
 #ifdef HAVE_OPENSSL_SSL_H
 #include <openssl/ssl.h>
@@ -229,12 +233,11 @@ log_addr(enum verbosity_value v, const char* str,
 	else	verbose(v, "%s %s port %d", str, dest, (int)port);
 }
 
-int 
+int
 extstrtoaddr(const char* str, struct sockaddr_storage* addr,
-	socklen_t* addrlen)
+	socklen_t* addrlen, int port)
 {
 	char* s;
-	int port = UNBOUND_DNS_PORT;
 	if((s=strchr(str, '@'))) {
 		char buf[MAX_ADDR_STRLEN];
 		if(s-str >= MAX_ADDR_STRLEN) {
@@ -250,7 +253,6 @@ extstrtoaddr(const char* str, struct sockaddr_storage* addr,
 	}
 	return ipstrtoaddr(str, port, addr, addrlen);
 }
-
 
 int 
 ipstrtoaddr(const char* ip, int port, struct sockaddr_storage* addr,
@@ -474,6 +476,42 @@ int authextstrtoaddr(char* str, struct sockaddr_storage* addr,
 	}
 	*auth_name = NULL;
 	return ipstrtoaddr(str, port, addr, addrlen);
+}
+
+uint8_t* authextstrtodname(char* str, int* port, char** auth_name)
+{
+	char* s;
+	uint8_t* dname;
+	size_t dname_len;
+	*port = UNBOUND_DNS_PORT;
+	*auth_name = NULL;
+	if((s=strchr(str, '@'))) {
+		char* hash = strchr(s+1, '#');
+		if(hash) {
+			*auth_name = hash+1;
+		} else {
+			*auth_name = NULL;
+		}
+		*port = atoi(s+1);
+		if(*port == 0) {
+			if(!hash && strcmp(s+1,"0")!=0)
+				return 0;
+			if(hash && strncmp(s+1,"0#",2)!=0)
+				return 0;
+		}
+		*s = 0;
+		dname = sldns_str2wire_dname(str, &dname_len);
+		*s = '@';
+	} else if((s=strchr(str, '#'))) {
+		*port = UNBOUND_DNS_OVER_TLS_PORT;
+		*auth_name = s+1;
+		*s = 0;
+		dname = sldns_str2wire_dname(str, &dname_len);
+		*s = '#';
+	} else {
+		dname = sldns_str2wire_dname(str, &dname_len);
+	}
+	return dname;
 }
 
 /** store port number into sockaddr structure */
@@ -741,8 +779,8 @@ addr_in_common(struct sockaddr_storage* addr1, int net1,
 	return match;
 }
 
-void 
-addr_to_str(struct sockaddr_storage* addr, socklen_t addrlen, 
+void
+addr_to_str(struct sockaddr_storage* addr, socklen_t addrlen,
 	char* buf, size_t len)
 {
 	int af = (int)((struct sockaddr_in*)addr)->sin_family;
@@ -754,7 +792,50 @@ addr_to_str(struct sockaddr_storage* addr, socklen_t addrlen,
 	}
 }
 
-int 
+int
+prefixnet_is_nat64(int prefixnet)
+{
+	return (prefixnet == 32 || prefixnet == 40 ||
+		prefixnet == 48 || prefixnet == 56 ||
+		prefixnet == 64 || prefixnet == 96);
+}
+
+void
+addr_to_nat64(const struct sockaddr_storage* addr,
+	const struct sockaddr_storage* nat64_prefix,
+	socklen_t nat64_prefixlen, int nat64_prefixnet,
+	struct sockaddr_storage* nat64_addr, socklen_t* nat64_addrlen)
+{
+	struct sockaddr_in *sin = (struct sockaddr_in *)addr;
+	struct sockaddr_in6 *sin6;
+	uint8_t *v4_byte;
+
+	/* This needs to be checked by the caller */
+	log_assert(addr->ss_family == AF_INET);
+	/* Current usage is only from config values; prefix lengths enforced
+	 * during config validation */
+	log_assert(prefixnet_is_nat64(nat64_prefixnet));
+
+	*nat64_addr = *nat64_prefix;
+	*nat64_addrlen = nat64_prefixlen;
+
+	sin6 = (struct sockaddr_in6 *)nat64_addr;
+	sin6->sin6_flowinfo = 0;
+	sin6->sin6_port = sin->sin_port;
+
+	nat64_prefixnet = nat64_prefixnet / 8;
+
+	v4_byte = (uint8_t *)&sin->sin_addr.s_addr;
+	for(int i = 0; i < 4; i++) {
+		if(nat64_prefixnet == 8) {
+			/* bits 64...71 are MBZ */
+			sin6->sin6_addr.s6_addr[nat64_prefixnet++] = 0;
+		}
+		sin6->sin6_addr.s6_addr[nat64_prefixnet++] = *v4_byte++;
+	}
+}
+
+int
 addr_is_ip4mapped(struct sockaddr_storage* addr, socklen_t addrlen)
 {
 	/* prefix for ipv4 into ipv6 mapping is ::ffff:x.x.x.x */
@@ -967,6 +1048,16 @@ listen_sslctx_setup(void* ctxt)
 			log_crypto_err("could not set cipher list with SSL_CTX_set_cipher_list");
 	}
 #endif
+#if defined(SSL_OP_IGNORE_UNEXPECTED_EOF)
+	/* ignore errors when peers do not send the mandatory close_notify
+	 * alert on shutdown.
+	 * Relevant for openssl >= 3 */
+	if((SSL_CTX_set_options(ctx, SSL_OP_IGNORE_UNEXPECTED_EOF) &
+		SSL_OP_IGNORE_UNEXPECTED_EOF) != SSL_OP_IGNORE_UNEXPECTED_EOF) {
+		log_crypto_err("could not set SSL_OP_IGNORE_UNEXPECTED_EOF");
+		return 0;
+	}
+#endif
 
 	if((SSL_CTX_set_options(ctx, SSL_OP_CIPHER_SERVER_PREFERENCE) &
 		SSL_OP_CIPHER_SERVER_PREFERENCE) !=
@@ -1122,10 +1213,11 @@ add_WIN_cacerts_to_openssl_store(SSL_CTX* tls_ctx)
 			(const unsigned char **)&pTargetCert->pbCertEncoded,
 			pTargetCert->cbCertEncoded);
 		if (!cert1) {
+			unsigned long error = ERR_get_error();
 			/* return error if a cert fails */
 			verbose(VERB_ALGO, "%s %d:%s",
 				"Unable to parse certificate in memory",
-				(int)ERR_get_error(), ERR_error_string(ERR_get_error(), NULL));
+				(int)error, ERR_error_string(error, NULL));
 			return 0;
 		}
 		else {
@@ -1136,10 +1228,11 @@ add_WIN_cacerts_to_openssl_store(SSL_CTX* tls_ctx)
 				/* Ignore error X509_R_CERT_ALREADY_IN_HASH_TABLE which means the
 				* certificate is already in the store.  */
 				if(ERR_GET_LIB(error) != ERR_LIB_X509 ||
-				   ERR_GET_REASON(error) != X509_R_CERT_ALREADY_IN_HASH_TABLE) {
+					ERR_GET_REASON(error) != X509_R_CERT_ALREADY_IN_HASH_TABLE) {
+					error = ERR_get_error();
 					verbose(VERB_ALGO, "%s %d:%s\n",
-					    "Error adding certificate", (int)ERR_get_error(),
-					     ERR_error_string(ERR_get_error(), NULL));
+					    "Error adding certificate", (int)error,
+					     ERR_error_string(error, NULL));
 					X509_free(cert1);
 					return 0;
 				}
@@ -1194,6 +1287,17 @@ void* connect_sslctx_create(char* key, char* pem, char* verifypem, int wincert)
 		return 0;
 	}
 #endif
+#if defined(SSL_OP_IGNORE_UNEXPECTED_EOF)
+	/* ignore errors when peers do not send the mandatory close_notify
+	 * alert on shutdown.
+	 * Relevant for openssl >= 3 */
+	if((SSL_CTX_set_options(ctx, SSL_OP_IGNORE_UNEXPECTED_EOF) &
+		SSL_OP_IGNORE_UNEXPECTED_EOF) != SSL_OP_IGNORE_UNEXPECTED_EOF) {
+		log_crypto_err("could not set SSL_OP_IGNORE_UNEXPECTED_EOF");
+		SSL_CTX_free(ctx);
+		return 0;
+	}
+#endif
 	if(key && key[0]) {
 		if(!SSL_CTX_use_certificate_chain_file(ctx, pem)) {
 			log_err("error in client certificate %s", pem);
@@ -1231,7 +1335,13 @@ void* connect_sslctx_create(char* key, char* pem, char* verifypem, int wincert)
 			}
 		}
 #else
-		(void)wincert;
+		if(wincert) {
+			if(!SSL_CTX_set_default_verify_paths(ctx)) {
+				log_crypto_err("error in default_verify_paths");
+				SSL_CTX_free(ctx);
+				return NULL;
+			}
+		}
 #endif
 		SSL_CTX_set_verify(ctx, SSL_VERIFY_PEER, NULL);
 	}

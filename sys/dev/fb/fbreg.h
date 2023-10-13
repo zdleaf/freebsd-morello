@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 1999 Kazutaka YOKOTA <yokota@zodiac.mech.utsunomiya-u.ac.jp>
  * All rights reserved.
@@ -24,8 +24,6 @@
  * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 #ifndef _DEV_FB_FBREG_H_
@@ -67,16 +65,8 @@ void ofwfb_fillw(int pat, void *base, size_t cnt);
 u_int16_t ofwfb_readw(u_int16_t *addr);
 void ofwfb_writew(u_int16_t *addr, u_int16_t val);
 
-#elif defined(__mips__) || defined(__arm__)
+#elif defined(__arm__)
 
-/*
- * Use amd64/i386-like settings under the assumption that MIPS-based display
- * drivers will have to add a level of indirection between a syscons-managed
- * frame buffer and the actual video hardware.  We are forced to do this
- * because syscons doesn't carry around required busspace handles and tags to
- * use here.  This is only really a problem for true VGA devices hooked up to
- * MIPS, as others will be performing a translation anyway.
- */
 #define bcopy_io(s, d, c)	memcpy((void *)(d), (void *)(s), (c))
 #define bcopy_toio(s, d, c)	memcpy((void *)(d), (void *)(s), (c))
 #define bcopy_fromio(s, d, c)	memcpy((void *)(d), (void *)(s), (c))
@@ -90,10 +80,8 @@ fillw(int val, uint16_t *buf, size_t size)
 }
 #define fillw_io(p, d, c)	fillw((p), (void *)(d), (c))
 
-#if defined(__arm__)
 #define	readw(a)		(*(uint16_t*)(a))
 #define	writew(a, v)		(*(uint16_t*)(a) = (v))
-#endif
 
 #else /* !__i386__ && !__amd64__ && !__powerpc__ */
 #define bcopy_io(s, d, c)	memcpy_io((d), (s), (c))
@@ -293,37 +281,6 @@ video_adapter_t	*vid_get_adapter(int index);
 /* a backdoor for the console driver to tickle the video driver XXX */
 int		vid_configure(int flags);
 #define VIO_PROBE_ONLY	(1 << 0)	/* probe only, don't initialize */
-
-#ifdef FB_INSTALL_CDEV
-
-/* virtual frame buffer driver functions */
-int		fb_attach(int unit, video_adapter_t *adp,
-			  struct cdevsw *cdevsw);
-int		fb_detach(int unit, video_adapter_t *adp,
-			  struct cdevsw *cdevsw);
-
-/* generic frame buffer cdev driver functions */
-
-typedef struct genfb_softc {
-	int		gfb_flags;	/* flag/status bits */
-#define FB_OPEN		(1 << 0)
-} genfb_softc_t;
-
-int		genfbopen(genfb_softc_t *sc, video_adapter_t *adp,
-			  int flag, int mode, struct thread *td);
-int		genfbclose(genfb_softc_t *sc, video_adapter_t *adp,
-			   int flag, int mode, struct thread *td);
-int		genfbread(genfb_softc_t *sc, video_adapter_t *adp,
-			  struct uio *uio, int flag);
-int		genfbwrite(genfb_softc_t *sc, video_adapter_t *adp,
-			   struct uio *uio, int flag);
-int		genfbioctl(genfb_softc_t *sc, video_adapter_t *adp,
-			   u_long cmd, caddr_t arg, int flag, struct thread *td);
-int		genfbmmap(genfb_softc_t *sc, video_adapter_t *adp,
-			  vm_ooffset_t offset, vm_paddr_t *paddr,
-			  int prot, vm_memattr_t *memattr);
-
-#endif /* FB_INSTALL_CDEV */
 
 /* generic low-level driver functions */
 

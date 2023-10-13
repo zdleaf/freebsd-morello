@@ -22,8 +22,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 #ifndef IF_DTSEC_H_
@@ -49,7 +47,7 @@ enum eth_dev_type {
 
 struct dtsec_softc {
 	/* XXX MII bus requires that struct ifnet is first!!! */
-	struct ifnet			*sc_ifnet;
+	if_t				sc_ifnet;
 
 	device_t			sc_dev;
 	struct resource			*sc_mem;

@@ -24,8 +24,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/conf.h>
@@ -127,8 +125,7 @@ static driver_t cpld_driver = {
 	sizeof(struct cpld_softc)
 };
 
-static devclass_t cpld_devclass;
-DRIVER_MODULE(cpld, lbc, cpld_driver, cpld_devclass, 0, 0);
+DRIVER_MODULE(cpld, lbc, cpld_driver, 0, 0);
 
 static void
 cpld_write(struct cpld_softc *sc, int addr, int data)

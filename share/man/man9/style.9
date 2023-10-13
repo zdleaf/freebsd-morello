@@ -1,5 +1,5 @@
 .\"-
-.\" Copyright (c) 1995-2019 The FreeBSD Project
+.\" Copyright (c) 1995-2022 The FreeBSD Project
 .\"
 .\" Redistribution and use in source and binary forms, with or without
 .\" modification, are permitted provided that the following conditions
@@ -23,9 +23,8 @@
 .\" SUCH DAMAGE.
 .\"
 .\"	From: @(#)style	1.14 (Berkeley) 4/28/95
-.\" $FreeBSD$
 .\"
-.Dd October 28, 2020
+.Dd July 28, 2022
 .Dt STYLE 9
 .Os
 .Sh NAME
@@ -38,7 +37,7 @@ source tree.
 It is also a guide for the preferred userland code style.
 The preferred line width is 80 characters, but some exceptions are
 made when a slightly longer line is clearer or easier to read.
-Anything that is frequently grepped for, such as diagnostic, error or panic
+Anything that is frequently grepped for, such as diagnostic, error, or panic
 messages, should not be broken up over multiple lines despite this rule.
 Many of the style rules are implicit in the examples.
 Be careful to check the examples before assuming that
@@ -49,7 +48,6 @@ is silent on an issue.
  * Style guide for FreeBSD.  Based on the CSRG's KNF (Kernel Normal Form).
  *
  *	@(#)style	1.14 (Berkeley) 4/28/95
- * $FreeBSD$
  */
 
 /*
@@ -68,7 +66,7 @@ The copyright header should be a multi-line comment, with the first
 line of the comment having a dash after the star like so:
 .Bd -literal
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 1984-2025 John Q. Public
  *
@@ -113,15 +111,12 @@ lines should only be added when making substantial changes to the file,
 not for trivial changes.
 .Pp
 After any copyright and license comment, there is a blank line.
-If your code needs to be merged into stable/12 or earlier, it
-needs to have the
+Include
 .Li $\&FreeBSD$
-tag.
-Otherwise, this tag should be omitted in new code.
-Legacy code will have the tag removed in the future.
-For non C/C++ language source files,
-.Li $\&FreeBSD$
-is next, if applicable.
+or
+.Li __FBSDID("$\&FreeBSD$");
+only if you are certain the new code will be merged to stable/12.
+The tag will be removed from legacy code in the future.
 Non-C/C++ source files follow the example above, while C/C++ source files
 follow the one below.
 Version control system ID tags should only exist once in a file
@@ -146,9 +141,6 @@ from another FreeBSD file and include relevant copyright info
 from the original file.
 .Bd -literal
 /* From: @(#)style	1.14 (Berkeley) 4/28/95 */
-
-#include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
 .Ed
 .Pp
 Leave one blank line before the header files.
@@ -474,10 +466,6 @@ Functions that are used locally in more than one module go into a
 separate header file, e.g.,
 .Qq Pa extern.h .
 .Pp
-Do not use the
-.Dv __P
-macro.
-.Pp
 In general code can be considered
 .Dq "new code"
 when it makes up about 50% or more of the file(s) involved.
@@ -712,8 +700,7 @@ then in alphabetical order; multiple ones per line are okay.
 If a line overflows reuse the type keyword.
 Variables may be initialized where declared especially when they
 are constant for the rest of the scope.
-Declarations may be placed before executable lines at the start
-of any block.
+Declarations may be in any block, but must be placed before statements.
 Calls to complicated functions should be avoided when initializing variables.
 .Bd -literal
 	struct foo one, *two;
@@ -804,7 +791,10 @@ do not roll your own.
 }
 .Ed
 .Pp
-When converting K&R style declarations to ANSI style, preserve
+Do not use K&R style declarations or definitions, they are obsolete
+and are forbidden in C23.
+Compilers warn of their use and some treat them as an error by default.
+When converting K&R style definitions to ANSI style, preserve
 any comments about parameters.
 .Pp
 Long parameter lists are wrapped with a normal four space indent.

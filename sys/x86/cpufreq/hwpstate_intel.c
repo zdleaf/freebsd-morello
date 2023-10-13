@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2018 Intel Corporation
  *
@@ -26,8 +26,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/types.h>
 #include <sys/param.h>
 #include <sys/sbuf.h>
@@ -102,15 +100,13 @@ struct hwp_softc {
 	uint8_t			low;
 };
 
-static devclass_t hwpstate_intel_devclass;
 static driver_t hwpstate_intel_driver = {
 	"hwpstate_intel",
 	intel_hwpstate_methods,
 	sizeof(struct hwp_softc),
 };
 
-DRIVER_MODULE(hwpstate_intel, cpu, hwpstate_intel_driver,
-    hwpstate_intel_devclass, NULL, NULL);
+DRIVER_MODULE(hwpstate_intel, cpu, hwpstate_intel_driver, NULL, NULL);
 MODULE_VERSION(hwpstate_intel, 1);
 
 static bool hwpstate_pkg_ctrl_enable = true;

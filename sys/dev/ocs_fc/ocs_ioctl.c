@@ -27,8 +27,6 @@
  * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 #include "ocs.h"
@@ -612,7 +610,7 @@ ocs_ioctl(struct cdev *cdev, u_long cmd, caddr_t addr, int flag, struct thread *
 			return -EFAULT;
 		}
 
-		req->result = ocs_mgmt_set(ocs, req->name, req->value);
+		req->result = ocs_mgmt_set(ocs, name, value);
 
 		break;
 	}

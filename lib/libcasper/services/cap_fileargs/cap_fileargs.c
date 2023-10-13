@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2018-2021 Mariusz Zaborski <oshogbo@FreeBSD.org>
  * All rights reserved.
@@ -27,8 +27,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/types.h>
 #include <sys/capsicum.h>
 #include <sys/sysctl.h>
@@ -275,8 +273,7 @@ fileargs_cinitnv(cap_channel_t *cas, nvlist_t *limits)
 {
 	cap_channel_t *chann;
 	fileargs_t *fa;
-	int serrno, ret;
-	int flags, operations;
+	int flags, ret, serrno;
 
 	assert(cas != NULL);
 
@@ -294,7 +291,7 @@ fileargs_cinitnv(cap_channel_t *cas, nvlist_t *limits)
 	}
 
 	flags = nvlist_get_number(limits, "flags");
-	operations = nvlist_get_number(limits, "operations");
+	(void)nvlist_get_number(limits, "operations");
 
 	/* Limits are consumed no need to free them. */
 	ret = cap_limit_set(chann, limits);

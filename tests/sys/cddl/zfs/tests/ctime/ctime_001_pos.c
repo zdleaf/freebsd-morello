@@ -17,7 +17,6 @@
  * information: Portions Copyright [yyyy] [name of copyright owner]
  *
  * CDDL HEADER END
- * $FreeBSD$
  */
 
 /*
@@ -227,7 +226,7 @@ do_read(const char *pfile)
 	(void) close(fd);
 
 	if (ret != 0) {
-		fprintf(stderr, "read(%d, buf, %d)\n", fd, sizeof (buf));
+		fprintf(stderr, "read(%d, buf, %zu)\n", fd, sizeof (buf));
 		exit(1);
 	}
 
@@ -253,7 +252,7 @@ do_write(const char *pfile)
 	(void) close(fd);
 
 	if (ret != 0) {
-		fprintf(stderr, "write(%d, buf, %d)\n", fd, strlen(buf));
+		fprintf(stderr, "write(%d, buf, %zu)\n", fd, strlen(buf));
 		exit(1);
 	}
 

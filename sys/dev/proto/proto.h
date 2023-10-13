@@ -22,8 +22,6 @@
  * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 #ifndef _DEV_PROTO_H_
@@ -58,7 +56,6 @@ struct proto_softc {
 	struct mtx	sc_mtx;
 };
 
-extern devclass_t proto_devclass;
 extern char proto_driver_name[];
 
 int proto_add_resource(struct proto_softc *, int, int, struct resource *);

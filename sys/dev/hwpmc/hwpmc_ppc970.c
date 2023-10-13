@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2013 Justin Hibbits
  * All rights reserved.
@@ -28,8 +28,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/pmc.h>
 #include <sys/pmckern.h>
@@ -256,13 +254,8 @@ static size_t ppc970_event_codes_size = nitems(ppc970_event_codes);
 static void
 ppc970_set_pmc(int cpu, int ri, int config)
 {
-	struct pmc *pm;
-	struct pmc_hw *phw;
 	register_t pmc_mmcr;
 	int config_mask;
-
-	phw = &powerpc_pcpu[cpu]->pc_ppcpmcs[ri];
-	pm = phw->phw_pmc;
 
 	if (config == PMCN_NONE)
 		config = PMC970N_NONE;

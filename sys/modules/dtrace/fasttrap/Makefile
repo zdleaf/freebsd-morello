@@ -1,4 +1,3 @@
-# $FreeBSD$
 
 SYSDIR?=	${SRCTOP}/sys
 
@@ -26,6 +25,5 @@ SRCS+=		u8_textprep.c
 
 CFLAGS+=	-include ${SYSDIR}/cddl/compat/opensolaris/sys/debug_compat.h
 
-CWARNFLAGS+=	${OPENZFS_CWARNFLAGS}
 CWARNFLAGS+=	-Wno-cast-qual
 CWARNFLAGS+=	-Wno-unused

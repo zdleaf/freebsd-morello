@@ -2,7 +2,7 @@
  * PCI specific probe and attach routines for LSI Fusion Adapters
  * FreeBSD Version.
  *
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD AND BSD-3-Clause
+ * SPDX-License-Identifier: BSD-2-Clause AND BSD-3-Clause
  *
  * Copyright (c) 2000, 2001 by Greg Ansley
  * Partially derived from Matt Jacob's ISP driver.
@@ -101,8 +101,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <dev/mpt/mpt.h>
 #include <dev/mpt/mpt_cam.h>
 #include <dev/mpt/mpt_raid.h>
@@ -169,8 +167,7 @@ static driver_t mpt_driver = {
 	"mpt", mpt_methods, sizeof(struct mpt_softc)
 };
 
-static devclass_t mpt_devclass;
-DRIVER_MODULE(mpt, pci, mpt_driver, mpt_devclass, NULL, NULL);
+DRIVER_MODULE(mpt, pci, mpt_driver, NULL, NULL);
 MODULE_DEPEND(mpt, pci, 1, 1, 1);
 MODULE_VERSION(mpt, 1);
 
@@ -291,7 +288,7 @@ mpt_link_peer(struct mpt_softc *mpt)
 	/*
 	 * XXX: depends on probe order
 	 */
-	mpt2 = (struct mpt_softc *)devclass_get_softc(mpt_devclass,mpt->unit-1);
+	mpt2 = devclass_get_softc(device_get_devclass(mpt->dev), mpt->unit - 1);
 
 	if (mpt2 == NULL) {
 		return;

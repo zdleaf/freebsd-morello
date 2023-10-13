@@ -25,8 +25,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/conf.h>
 #include <sys/bus.h>
@@ -40,8 +38,6 @@ __FBSDID("$FreeBSD$");
 
 #include <machine/bus.h>
 
-#include <dev/ofw/ofw_bus.h>
-#include <dev/ofw/ofw_bus_subr.h>
 #include <dev/extres/clk/clk_link.h>
 
 static int clknode_link_init(struct clknode *clk, device_t dev);

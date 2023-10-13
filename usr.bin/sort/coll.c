@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (C) 2009 Gabor Kovesdan <gabor@FreeBSD.org>
  * Copyright (C) 2012 Oleg Moskalenko <mom040267@gmail.com>
@@ -28,8 +28,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/types.h>
 
 #include <errno.h>
@@ -73,8 +71,7 @@ keys_array_alloc(void)
 	size_t sz;
 
 	sz = keys_array_size();
-	ka = sort_malloc(sz);
-	memset(ka, 0, sz);
+	ka = sort_calloc(1, sz);
 
 	return (ka);
 }
@@ -157,8 +154,7 @@ sort_list_item_alloc(void)
 	size_t sz;
 
 	sz = sizeof(struct sort_list_item) + keys_array_size();
-	si = sort_malloc(sz);
-	memset(si, 0, sz);
+	si = sort_calloc(1, sz);
 
 	return (si);
 }

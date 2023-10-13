@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2006 Marcel Moolenaar
  * All rights reserved.
@@ -27,8 +27,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/kernel.h>
 #include <sys/module.h>
@@ -113,4 +111,4 @@ ppc_pci_probe(device_t dev)
 	return (ppc_probe(dev, id->rid));
 }
 
-DRIVER_MODULE(ppc, pci, ppc_pci_driver, ppc_devclass, 0, 0);
+DRIVER_MODULE(ppc, pci, ppc_pci_driver, 0, 0);

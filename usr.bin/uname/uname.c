@@ -34,9 +34,6 @@
  * SUCH DAMAGE.
  */
 
-#include <sys/cdefs.h>
-
-__FBSDID("$FreeBSD$");
 
 #ifndef lint
 static const char copyright[] =
@@ -85,7 +82,7 @@ static void native_uservers(void);
 static void native_buildid(void);
 static void print_uname(u_int);
 static void setup_get(void);
-static void usage(void);
+static void usage(void) __dead2;
 
 static char *buildid, *ident, *platform, *hostname, *arch, *release, *sysname,
     *version, *kernvers, *uservers;
@@ -256,8 +253,12 @@ NATIVE_SYSCTL2_GET(version, CTL_KERN, KERN_VERSION) {
 	p = NATIVE_BUFFER;
 	n = NATIVE_LENGTH;
 	for (; n--; ++p)
-		if (*p == '\n' || *p == '\t')
-			*p = ' ';
+		if (*p == '\n' || *p == '\t') {
+			if (n > 1)
+				*p = ' ';
+			else
+				*p = '\0';
+		}
 } NATIVE_SET;
 
 NATIVE_SYSCTL2_GET(platform, CTL_HW, HW_MACHINE) {

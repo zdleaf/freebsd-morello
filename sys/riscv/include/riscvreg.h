@@ -30,8 +30,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 #ifndef _MACHINE_RISCVREG_H_
@@ -150,11 +148,11 @@
 #define	SIP_STIP	(1 << 5)
 
 #define	SATP_PPN_S	0
-#define	SATP_PPN_M	(0xfffffffffff << SATP_PPN_S)
+#define	SATP_PPN_M	(0xfffffffffffUL << SATP_PPN_S)
 #define	SATP_ASID_S	44
-#define	SATP_ASID_M	(0xffff << SATP_ASID_S)
+#define	SATP_ASID_M	(0xffffUL << SATP_ASID_S)
 #define	SATP_MODE_S	60
-#define	SATP_MODE_M	(0xf << SATP_MODE_S)
+#define	SATP_MODE_M	(0xfUL << SATP_MODE_S)
 #define	SATP_MODE_SV39	(8ULL << SATP_MODE_S)
 #define	SATP_MODE_SV48	(9ULL << SATP_MODE_S)
 

@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2021 The FreeBSD Foundation
  *
@@ -29,8 +29,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/bus.h>
 #include <sys/kernel.h>
@@ -178,8 +176,6 @@ ivhd_teardown_intr(device_t dev)
 	return (0);
 }
 
-static devclass_t amdiommu_devclass;
-
 /* This driver has to be loaded before ivhd */
-DRIVER_MODULE(amdiommu, pci, amdiommu_driver, amdiommu_devclass, 0, 0);
+DRIVER_MODULE(amdiommu, pci, amdiommu_driver, 0, 0);
 MODULE_DEPEND(amdiommu, pci, 1, 1, 1);

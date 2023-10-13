@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2012 The FreeBSD Foundation
  *
@@ -163,7 +163,7 @@ keys_add(struct keys *keys, const char *name, const char *value)
 
 	/*
 	 * Note that we don't check for duplicates here, as they are perfectly
-	 * fine in responses, e.g. the "TargetName" keys in discovery sesion
+	 * fine in responses, e.g. the "TargetName" keys in discovery session
 	 * response.
 	 */
 	for (i = 0; i < KEYS_MAX; i++) {

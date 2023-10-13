@@ -2,7 +2,6 @@
  * System call numbers.
  *
  * DO NOT EDIT-- this file is automatically @generated.
- * $FreeBSD$
  */
 
 #define	LINUX_SYS_linux_setxattr	5
@@ -61,9 +60,9 @@
 #define	LINUX_SYS_linux_getdents64	61
 #define	LINUX_SYS_linux_lseek	62
 #define	LINUX_SYS_read	63
-#define	LINUX_SYS_write	64
+#define	LINUX_SYS_linux_write	64
 #define	LINUX_SYS_readv	65
-#define	LINUX_SYS_writev	66
+#define	LINUX_SYS_linux_writev	66
 #define	LINUX_SYS_linux_pread	67
 #define	LINUX_SYS_linux_pwrite	68
 #define	LINUX_SYS_linux_preadv	69
@@ -188,7 +187,7 @@
 #define	LINUX_SYS_linux_semget	190
 #define	LINUX_SYS_linux_semctl	191
 #define	LINUX_SYS_linux_semtimedop	192
-#define	LINUX_SYS_linux_semop	193
+#define	LINUX_SYS_semop	193
 #define	LINUX_SYS_linux_shmget	194
 #define	LINUX_SYS_linux_shmctl	195
 #define	LINUX_SYS_linux_shmat	196
@@ -292,4 +291,14 @@
 #define	LINUX_SYS_linux_process_madvise	440
 #define	LINUX_SYS_linux_epoll_pwait2	441
 #define	LINUX_SYS_linux_mount_setattr	442
-#define	LINUX_SYS_MAXSYSCALL	444
+#define	LINUX_SYS_linux_quotactl_fd	443
+#define	LINUX_SYS_linux_landlock_create_ruleset	444
+#define	LINUX_SYS_linux_landlock_add_rule	445
+#define	LINUX_SYS_linux_landlock_restrict_self	446
+#define	LINUX_SYS_linux_memfd_secret	447
+#define	LINUX_SYS_linux_process_mrelease	448
+#define	LINUX_SYS_linux_futex_waitv	449
+#define	LINUX_SYS_linux_set_mempolicy_home_node	450
+#define	LINUX_SYS_linux_cachestat	451
+#define	LINUX_SYS_linux_fchmodat2	452
+#define	LINUX_SYS_MAXSYSCALL	453

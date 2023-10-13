@@ -56,8 +56,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include "dhcpd.h"
 #include "privsep.h"
 
@@ -798,7 +796,7 @@ dhcpack(struct packet *packet)
             ACTION_SUPERSEDE)
 		ip->client->new->expiry = getULong(
 		    ip->client->config->defaults[DHO_DHCP_LEASE_TIME].data);
-        else if (ip->client->new->options[DHO_DHCP_LEASE_TIME].data)
+        else if (ip->client->new->options[DHO_DHCP_LEASE_TIME].len >= 4)
 		ip->client->new->expiry = getULong(
 		    ip->client->new->options[DHO_DHCP_LEASE_TIME].data);
 	else
@@ -821,7 +819,7 @@ dhcpack(struct packet *packet)
             ACTION_SUPERSEDE)
 		ip->client->new->renewal = getULong(
 		    ip->client->config->defaults[DHO_DHCP_RENEWAL_TIME].data);
-        else if (ip->client->new->options[DHO_DHCP_RENEWAL_TIME].len)
+        else if (ip->client->new->options[DHO_DHCP_RENEWAL_TIME].len >= 4)
 		ip->client->new->renewal = getULong(
 		    ip->client->new->options[DHO_DHCP_RENEWAL_TIME].data);
 	else
@@ -835,7 +833,7 @@ dhcpack(struct packet *packet)
             ACTION_SUPERSEDE)
 		ip->client->new->rebind = getULong(
 		    ip->client->config->defaults[DHO_DHCP_REBINDING_TIME].data);
-        else if (ip->client->new->options[DHO_DHCP_REBINDING_TIME].len)
+        else if (ip->client->new->options[DHO_DHCP_REBINDING_TIME].len >= 4)
 		ip->client->new->rebind = getULong(
 		    ip->client->new->options[DHO_DHCP_REBINDING_TIME].data);
 	else
@@ -1039,7 +1037,6 @@ dhcpoffer(struct packet *packet)
 
 	note("%s from %s", name, piaddr(packet->client_addr));
 
-
 	/* If this lease doesn't supply the minimum required parameters,
 	   blow it off. */
 	for (i = 0; ip->client->config->required_options[i]; i++) {
@@ -1141,8 +1138,9 @@ dhcpoffer(struct packet *packet)
 struct client_lease *
 packet_to_lease(struct packet *packet)
 {
+	struct interface_info *ip = packet->interface;
 	struct client_lease *lease;
-	int i;
+	int i, j;
 
 	lease = malloc(sizeof(struct client_lease));
 
@@ -1156,6 +1154,15 @@ packet_to_lease(struct packet *packet)
 	/* Copy the lease options. */
 	for (i = 0; i < 256; i++) {
 		if (packet->options[i].len) {
+			int ignored = 0;
+			for (j = 0; ip->client->config->ignored_options[j]; j++)
+				if (i ==
+				    ip->client->config->ignored_options[j]) {
+					ignored = 1;
+					break;
+				}
+			if (ignored)
+			    continue;
 			lease->options[i].data =
 			    malloc(packet->options[i].len + 1);
 			if (!lease->options[i].data) {

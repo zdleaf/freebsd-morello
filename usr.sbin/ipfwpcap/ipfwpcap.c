@@ -20,8 +20,6 @@
  * accept no liability for this software.
  *
  * From: Header: /local/src/local.lib/SRC/ipfwpcap/RCS/ipfwpcap.c,v 1.4 2004/01/15 16:19:07 pkern Exp
- *
- * $FreeBSD$
  */
 
 #include <stdio.h>
@@ -202,7 +200,7 @@ main(int ac, char *av[])
 
 if (debug) fprintf(stderr, "bind to %d.\ndump to '%s'.\n", portnum, dumpf);
 
-	if ((r = socket(PF_INET, SOCK_RAW, IPPROTO_DIVERT)) == -1) {
+	if ((r = socket(PF_DIVERT, SOCK_RAW, 0)) == -1) {
 		perror("socket(DIVERT)");
 		exit(2);
 	}

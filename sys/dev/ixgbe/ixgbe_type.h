@@ -31,7 +31,6 @@
   POSSIBILITY OF SUCH DAMAGE.
 
 ******************************************************************************/
-/*$FreeBSD$*/
 
 #ifndef _IXGBE_TYPE_H_
 #define _IXGBE_TYPE_H_
@@ -100,6 +99,7 @@
 #define IXGBE_DEV_ID_82599_KR			0x1517
 #define IXGBE_DEV_ID_82599_COMBO_BACKPLANE	0x10F8
 #define IXGBE_SUBDEV_ID_82599_KX4_KR_MEZZ	0x000C
+#define IXGBE_DEV_ID_82599_LS			0x154F
 #define IXGBE_DEV_ID_82599_CX4			0x10F9
 #define IXGBE_DEV_ID_82599_SFP			0x10FB
 #define IXGBE_SUBDEV_ID_82599_SFP		0x11A9
@@ -3758,6 +3758,7 @@ enum ixgbe_media_type {
 	ixgbe_media_type_fiber,
 	ixgbe_media_type_fiber_fixed,
 	ixgbe_media_type_fiber_qsfp,
+	ixgbe_media_type_fiber_lco,
 	ixgbe_media_type_copper,
 	ixgbe_media_type_backplane,
 	ixgbe_media_type_cx4,
@@ -4012,6 +4013,7 @@ struct ixgbe_mac_operations {
 				   ixgbe_mc_addr_itr);
 	s32 (*update_mc_addr_list)(struct ixgbe_hw *, u8 *, u32,
 				   ixgbe_mc_addr_itr, bool clear);
+	s32 (*get_link_state)(struct ixgbe_hw *hw, bool *link_state);
 	s32 (*enable_mc)(struct ixgbe_hw *);
 	s32 (*disable_mc)(struct ixgbe_hw *);
 	s32 (*clear_vfta)(struct ixgbe_hw *);

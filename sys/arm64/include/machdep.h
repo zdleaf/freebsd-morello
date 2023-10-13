@@ -22,8 +22,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 #ifndef _MACHINE_MACHDEP_H_
@@ -33,11 +31,10 @@
 
 struct arm64_bootparams {
 	vm_offset_t	modulep;
-	vm_offset_t	kern_l1pt;	/* L1 page table for the kernel */
 	uint64_t	kern_delta;
 	vm_offset_t	kern_stack;
-	vm_offset_t	kern_l0pt;	/* L1 page table for the kernel */
 	vm_paddr_t	kern_ttbr0;
+	uint64_t	hcr_el2;
 	int		boot_el;	/* EL the kernel booted from */
 	int		pad;
 };

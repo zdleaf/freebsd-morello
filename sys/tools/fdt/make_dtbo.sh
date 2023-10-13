@@ -1,6 +1,5 @@
 #!/bin/sh
 #
-# $FreeBSD$
 
 # Script generates dtbo file ($3) from dtso source ($2) in build tree S ($1)
 S=$1
@@ -22,7 +21,6 @@ fi
 
 for d in ${dtso}; do
     dtb="${dtbo_path}/$(basename "$d" .dtso).dtbo"
-    ${ECHO} "converting $d -> $dtb"
     ${CPP} -P -x assembler-with-cpp -I "$S/contrib/device-tree/include" -I "$S/dts/${MACHINE}" -I "$S/contrib/device-tree/src/${MACHINE}" -include "$d" /dev/null |
 	${DTC} -@ -O dtb -o "$dtb" -i "$S/dts/${MACHINE}" -i "$S/contrib/device-tree/src/${MACHINE}"
 done

@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: BSD-3-Clause */
-/*  Copyright (c) 2021, Intel Corporation
+/*  Copyright (c) 2023, Intel Corporation
  *  All rights reserved.
  *
  *  Redistribution and use in source and binary forms, with or without
@@ -28,7 +28,6 @@
  *  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  *  POSSIBILITY OF SUCH DAMAGE.
  */
-/*$FreeBSD$*/
 
 /**
  * @file ice_iflib.h
@@ -137,6 +136,8 @@ struct ice_irq_vector {
  * @tx_paddr: the physical address for this queue
  * @q_teid: the Tx queue TEID returned from firmware
  * @stats: queue statistics
+ * @tc: traffic class queue belongs to
+ * @q_handle: qidx in tc; used in TXQ enable functions
  *
  * Other parameters may be iflib driver specific
  */
@@ -151,6 +152,8 @@ struct ice_tx_queue {
 	struct ice_irq_vector	*irqv;
 	u32			q_teid;
 	u32			me;
+	u16			q_handle;
+	u8			tc;
 
 	/* descriptor writeback status */
 	qidx_t			*tx_rsq;
@@ -171,6 +174,7 @@ struct ice_tx_queue {
  * @rx_paddr: the physical address for this queue
  * @tail: the tail register address for this queue
  * @stats: queue statistics
+ * @tc: traffic class queue belongs to
  *
  * Other parameters may be iflib driver specific
  */
@@ -183,6 +187,7 @@ struct ice_rx_queue {
 	u32				tail;
 	struct ice_irq_vector		*irqv;
 	u32				me;
+	u8				tc;
 
 	struct if_irq			que_irq;
 };
@@ -230,6 +235,11 @@ struct ice_softc {
 	struct mtx admin_mtx; /* mutex to protect the admin timer */
 	struct callout admin_timer; /* timer to trigger admin task */
 
+	/* iRDMA peer interface */
+	struct ice_rdma_entry rdma_entry;
+	int irdma_vectors;
+	u16 *rdma_imap;
+
 	struct ice_vsi **all_vsi;	/* Array of VSI pointers */
 	u16 num_available_vsi;		/* Size of VSI array */
 
@@ -274,9 +284,15 @@ struct ice_softc {
 	/* Ethertype filters enabled */
 	bool enable_tx_fc_filter;
 	bool enable_tx_lldp_filter;
-	
+
 	/* Other tunable flags */
 	bool enable_health_events;
+
+	/* 5-layer scheduler topology enabled */
+	bool tx_balance_en;
+
+	/* Allow additional non-standard FEC mode */
+	bool allow_no_fec_mod_in_auto;
 
 	int rebuild_ticks;
 
@@ -285,6 +301,8 @@ struct ice_softc {
 
 	/* NVM link override settings */
 	struct ice_link_default_override_tlv ldo_tlv;
+
+	u16 fw_debug_dump_cluster_mask;
 
 	struct sx *iflib_ctx_lock;
 

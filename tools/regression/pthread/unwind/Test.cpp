@@ -1,7 +1,6 @@
-/* $FreeBSD$ */
 
-int destructed;
-int destructed2;
+static int destructed;
+static int destructed2;
 
 class Test {
 public:
@@ -10,7 +9,7 @@ public:
 };
 
 void
-cleanup_handler(void *arg)
+cleanup_handler(void *arg __unused)
 {
 	destructed2 = 1;
 	printf("%s()\n", __func__);

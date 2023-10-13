@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2002, Jeffrey Roberson <jeff@freebsd.org>
  * Copyright (c) 2008-2009, Lawrence Stewart <lstewart@freebsd.org>
@@ -33,8 +33,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include "opt_mac.h"
 
 #include <sys/param.h>
@@ -447,7 +445,7 @@ alq_open_flags(struct alq **alqp, const char *file, struct ucred *cred, int cmod
 	if (error)
 		return (error);
 
-	NDFREE(&nd, NDF_ONLY_PNBUF);
+	NDFREE_PNBUF(&nd);
 	/* We just unlock so we hold a reference */
 	VOP_UNLOCK(nd.ni_vp);
 

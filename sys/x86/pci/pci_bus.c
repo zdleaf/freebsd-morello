@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 1997, Stefan Esser <se@freebsd.org>
  * All rights reserved.
@@ -27,8 +27,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include "opt_cpu.h"
 
 #include <sys/param.h>
@@ -488,11 +486,13 @@ legacy_pcib_identify(driver_t *driver, device_t parent)
 	 * Note that pci_cfgregopen() thinks we have PCI devices..
 	 */
 	if (!found) {
+#ifndef NO_LEGACY_PCIB
 		if (bootverbose)
 			printf(
 	"legacy_pcib_identify: no bridge found, adding pcib0 anyway\n");
 		child = BUS_ADD_CHILD(parent, 100, "pcib", 0);
 		legacy_set_pcibus(child, 0);
+#endif
 	}
 }
 
@@ -667,10 +667,8 @@ static device_method_t legacy_pcib_methods[] = {
 	DEVMETHOD_END
 };
 
-static devclass_t hostb_devclass;
-
 DEFINE_CLASS_0(pcib, legacy_pcib_driver, legacy_pcib_methods, 1);
-DRIVER_MODULE(pcib, legacy, legacy_pcib_driver, hostb_devclass, 0, 0);
+DRIVER_MODULE(pcib, legacy, legacy_pcib_driver, 0, 0);
 
 /*
  * Install placeholder to claim the resources owned by the
@@ -714,10 +712,8 @@ static device_method_t pcibus_pnp_methods[] = {
 	{ 0, 0 }
 };
 
-static devclass_t pcibus_pnp_devclass;
-
 DEFINE_CLASS_0(pcibus_pnp, pcibus_pnp_driver, pcibus_pnp_methods, 1);
-DRIVER_MODULE(pcibus_pnp, isa, pcibus_pnp_driver, pcibus_pnp_devclass, 0, 0);
+DRIVER_MODULE(pcibus_pnp, isa, pcibus_pnp_driver, 0, 0);
 
 #ifdef __HAVE_PIR
 /*
@@ -736,11 +732,9 @@ static device_method_t pcibios_pcib_pci_methods[] = {
 	{0, 0}
 };
 
-static devclass_t pcib_devclass;
-
 DEFINE_CLASS_1(pcib, pcibios_pcib_driver, pcibios_pcib_pci_methods,
     sizeof(struct pcib_softc), pcib_driver);
-DRIVER_MODULE(pcibios_pcib, pci, pcibios_pcib_driver, pcib_devclass, 0, 0);
+DRIVER_MODULE(pcibios_pcib, pci, pcibios_pcib_driver, 0, 0);
 ISA_PNP_INFO(pcibus_pnp_ids);
 
 static int

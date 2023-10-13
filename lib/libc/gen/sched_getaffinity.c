@@ -26,31 +26,31 @@
  * SUCH DAMAGE.
  */
 
+#define	_WANT_P_OSREL
+#include <sys/param.h>
 #include <errno.h>
 #include <sched.h>
 #include <string.h>
 
+#include "libc_private.h"
+
 int
 sched_getaffinity(pid_t pid, size_t cpusetsz, cpuset_t *cpuset)
 {
-	/*
-	 * Be more Linux-compatible:
-	 * - return EINVAL in passed size is less than size of cpuset_t
-	 *   in advance, instead of ERANGE from the syscall
-	 * - if passed size is larger than the size of cpuset_t, be
-	 *   permissive by claming it back to sizeof(cpuset_t) and
-	 *   zeroing the rest.
-	 */
-	if (cpusetsz < sizeof(cpuset_t)) {
-		errno = EINVAL;
-		return (-1);
-	}
-	if (cpusetsz > sizeof(cpuset_t)) {
-		memset((char *)cpuset + sizeof(cpuset_t), 0,
-		    cpusetsz - sizeof(cpuset_t));
-		cpusetsz = sizeof(cpuset_t);
-	}
+	cpuwhich_t which;
+	int error;
 
-	return (cpuset_getaffinity(CPU_LEVEL_WHICH, CPU_WHICH_PID,
-	    pid == 0 ? -1 : pid, cpusetsz, cpuset));
+	if (__getosreldate() < P_OSREL_TIDPID) {
+		if (pid == 0 || pid > _PID_MAX)
+			which = CPU_WHICH_TID;
+		else
+			which = CPU_WHICH_PID;
+	} else
+		which = CPU_WHICH_TIDPID;
+
+	error = cpuset_getaffinity(CPU_LEVEL_WHICH, which,
+	    pid == 0 ? -1 : pid, cpusetsz, cpuset);
+	if (error == -1 && errno == ERANGE)
+		errno = EINVAL;
+	return (error);
 }

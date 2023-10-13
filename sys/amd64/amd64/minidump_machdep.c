@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2006 Peter Wemm
  * All rights reserved.
@@ -27,8 +27,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include "opt_pmap.h"
 #include "opt_watchdog.h"
 
@@ -75,7 +73,7 @@ blk_flush(struct dumperinfo *di)
 	if (fragsz == 0)
 		return (0);
 
-	error = dump_append(di, dump_va, 0, fragsz);
+	error = dump_append(di, dump_va, fragsz);
 	fragsz = 0;
 	return (error);
 }
@@ -128,7 +126,7 @@ blk_write(struct dumperinfo *di, char *ptr, vm_paddr_t pa, size_t sz)
 		}
 
 		if (ptr) {
-			error = dump_append(di, ptr, 0, len);
+			error = dump_append(di, ptr, len);
 			if (error)
 				return (error);
 			ptr += len;

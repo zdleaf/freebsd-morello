@@ -41,8 +41,6 @@ static char sccsid[] = "@(#)lastcomm.c	8.1 (Berkeley) 6/6/93";
 #endif
 #endif /* not lint */
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/stat.h>
 #include <sys/acct.h>
@@ -193,7 +191,7 @@ main(int argc, char *argv[])
 				    localtime(&ab.ac_btime));
 				(void)printf(" %s", buf);
 			} else
-				(void)printf(" %.16s", ctime(&ab.ac_btime));
+				(void)printf(" %.19s", ctime(&ab.ac_btime));
 		}
 		
 		/* exit time (starting time + elapsed time )*/
@@ -205,7 +203,7 @@ main(int argc, char *argv[])
 				    localtime(&t));
 				(void)printf(" %s", buf);
 			} else
-				(void)printf(" %.16s", ctime(&t));
+				(void)printf(" %.19s", ctime(&t));
 		}
 		printf("\n");
  	}

@@ -2,8 +2,6 @@
  * Copyright (c) 2018 VMware, Inc.
  *
  * SPDX-License-Identifier: (BSD-2-Clause OR GPL-2.0)
- *
- * $FreeBSD$
  */
 
 #ifndef _PVSCSI_H_
@@ -120,8 +118,8 @@ struct pvscsi_ring_req_desc {
 	uint8_t		tag;
 	uint8_t		bus;
 	uint8_t		target;
-	uint8_t		vcpu_hint;
-	uint8_t		unused[59];
+	uint16_t	vcpu_hint;
+	uint8_t		unused[58];
 };
 
 struct pvscsi_ring_cmp_desc {

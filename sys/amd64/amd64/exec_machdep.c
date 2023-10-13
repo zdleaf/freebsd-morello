@@ -41,8 +41,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include "opt_cpu.h"
 #include "opt_ddb.h"
 #include "opt_kstack_pages.h"
@@ -77,6 +75,7 @@ __FBSDID("$FreeBSD$");
 #include <vm/vm_param.h>
 #include <vm/vm_extern.h>
 #include <vm/pmap.h>
+#include <vm/vm_map.h>
 
 #ifdef DDB
 #ifndef KDB
@@ -94,6 +93,10 @@ __FBSDID("$FreeBSD$");
 #include <machine/sigframe.h>
 #include <machine/specialreg.h>
 #include <machine/trap.h>
+
+_Static_assert(sizeof(mcontext_t) == 800, "mcontext_t size incorrect");
+_Static_assert(sizeof(ucontext_t) == 880, "ucontext_t size incorrect");
+_Static_assert(sizeof(siginfo_t) == 80, "siginfo_t size incorrect");
 
 /*
  * Send an interrupt to process.
@@ -199,7 +202,7 @@ sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 
 	fpstate_drop(td);
 	regs->tf_rsp = (long)sfp;
-	regs->tf_rip = p->p_sysent->sv_sigcode_base;
+	regs->tf_rip = PROC_SIGCODE(p);
 	regs->tf_rflags &= ~(PSL_T | PSL_D);
 	regs->tf_cs = _ucodesel;
 	regs->tf_ds = _udatasel;

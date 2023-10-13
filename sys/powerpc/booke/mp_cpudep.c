@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2008-2009 Semihalf, Rafal Jaworowski
  * All rights reserved.
@@ -27,8 +27,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
@@ -51,7 +49,7 @@ extern void icache_inval(void);
 volatile void *ap_pcpu;
 
 uintptr_t
-cpudep_ap_bootstrap()
+cpudep_ap_bootstrap(void)
 {
 	uint32_t msr, csr;
 	uintptr_t sp;
@@ -94,6 +92,6 @@ cpudep_ap_bootstrap()
 }
 
 void
-cpudep_ap_setup()
+cpudep_ap_setup(void)
 {
 }

@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2012 Robert N. M. Watson
  * All rights reserved.
@@ -28,8 +28,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 #ifndef _DEV_ALTERA_SDCARD_H_
@@ -245,7 +243,5 @@ void	altera_sdcard_start(struct altera_sdcard_softc *sc);
  */
 void	altera_sdcard_disk_insert(struct altera_sdcard_softc *sc);
 void	altera_sdcard_disk_remove(struct altera_sdcard_softc *sc);
-
-extern devclass_t	altera_sdcard_devclass;
 
 #endif	/* _DEV_ALTERA_SDCARD_H_ */

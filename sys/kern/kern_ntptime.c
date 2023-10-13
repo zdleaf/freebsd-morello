@@ -31,8 +31,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include "opt_ntp.h"
 
 #include <sys/param.h>
@@ -73,7 +71,13 @@ typedef int64_t l_fp;
 #define L_MPY(v, a)	((v) *= (a))
 #define L_CLR(v)	((v) = 0)
 #define L_ISNEG(v)	((v) < 0)
-#define L_LINT(v, a)	((v) = (int64_t)(a) << 32)
+#define L_LINT(v, a) \
+	do { \
+		if ((a) < 0) \
+			((v) = -((int64_t)(-(a)) << 32)); \
+		else \
+			((v) = (int64_t)(a) << 32); \
+	} while (0)
 #define L_GINT(v)	((v) < 0 ? -(-(v) >> 32) : (v) >> 32)
 
 /*
@@ -207,7 +211,6 @@ static long pps_errcnt;			/* calibration errors */
  * End of phase/frequency-lock loop (PLL/FLL) definitions
  */
 
-static void ntp_init(void);
 static void hardupdate(long offset);
 static void ntp_gettime1(struct ntptimeval *ntvp);
 static bool ntp_is_time_error(int tsl);
@@ -633,39 +636,6 @@ ntp_update_second(int64_t *adjustment, time_t *newsec)
 }
 
 /*
- * ntp_init() - initialize variables and structures
- *
- * This routine must be called after the kernel variables hz and tick
- * are set or changed and before the next tick interrupt. In this
- * particular implementation, these values are assumed set elsewhere in
- * the kernel. The design allows the clock frequency and tick interval
- * to be changed while the system is running. So, this routine should
- * probably be integrated with the code that does that.
- */
-static void
-ntp_init(void)
-{
-
-	/*
-	 * The following variables are initialized only at startup. Only
-	 * those structures not cleared by the compiler need to be
-	 * initialized, and these only in the simulator. In the actual
-	 * kernel, any nonzero values here will quickly evaporate.
-	 */
-	L_CLR(time_offset);
-	L_CLR(time_freq);
-#ifdef PPS_SYNC
-	pps_tf[0].tv_sec = pps_tf[0].tv_nsec = 0;
-	pps_tf[1].tv_sec = pps_tf[1].tv_nsec = 0;
-	pps_tf[2].tv_sec = pps_tf[2].tv_nsec = 0;
-	pps_fcount = 0;
-	L_CLR(pps_freq);
-#endif /* PPS_SYNC */	   
-}
-
-SYSINIT(ntpclocks, SI_SUB_CLOCKS, SI_ORDER_MIDDLE, ntp_init, NULL);
-
-/*
  * hardupdate() - local clock update
  *
  * This routine is called by ntp_adjtime() to update the local clock
@@ -687,8 +657,7 @@ SYSINIT(ntpclocks, SI_SUB_CLOCKS, SI_ORDER_MIDDLE, ntp_init, NULL);
  * is selected by the STA_MODE status bit.
  */
 static void
-hardupdate(offset)
-	long offset;		/* clock offset (ns) */
+hardupdate(long offset /* clock offset (ns) */)
 {
 	long mtemp;
 	l_fp ftemp;
@@ -767,11 +736,11 @@ hardupdate(offset)
  * variables, except for the actual time and frequency variables, which
  * are determined by this routine and updated atomically.
  *
- * tsp  - time at PPS
- * nsec - hardware counter at PPS
+ * tsp  - time at current PPS event
+ * delta_nsec - time elapsed between the previous and current PPS event
  */
 void
-hardpps(struct timespec *tsp, long nsec)
+hardpps(struct timespec *tsp, long delta_nsec)
 {
 	long u_sec, u_nsec, v_nsec; /* temps */
 	l_fp ftemp;
@@ -806,19 +775,10 @@ hardpps(struct timespec *tsp, long nsec)
 	pps_tf[0].tv_nsec = u_nsec;
 
 	/*
-	 * Compute the difference between the current and previous
-	 * counter values. If the difference exceeds 0.5 s, assume it
-	 * has wrapped around, so correct 1.0 s. If the result exceeds
-	 * the tick interval, the sample point has crossed a tick
-	 * boundary during the last second, so correct the tick. Very
-	 * intricate.
+	 * Update the frequency accumulator using the difference between the
+	 * current and previous PPS event measured directly by the timecounter.
 	 */
-	u_nsec = nsec;
-	if (u_nsec > (NANOSECOND >> 1))
-		u_nsec -= NANOSECOND;
-	else if (u_nsec < -(NANOSECOND >> 1))
-		u_nsec += NANOSECOND;
-	pps_fcount += u_nsec;
+	pps_fcount += delta_nsec - NANOSECOND;
 	if (v_nsec > MAXFREQ || v_nsec < -MAXFREQ)
 		goto out;
 	time_status &= ~STA_PPSJITTER;

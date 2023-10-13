@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2018 Turing Robotic Industries Inc.
  * Copyright (c) 2000 Marcel Moolenaar
@@ -24,66 +24,23 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
-#include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
-#include <sys/fcntl.h>
-#include <sys/imgact.h>
-#include <sys/ktr.h>
 #include <sys/proc.h>
 #include <sys/ptrace.h>
 #include <sys/reg.h>
-#include <sys/sdt.h>
 
-#include <security/audit/audit.h>
+#include <vm/vm_param.h>
 
 #include <arm64/linux/linux.h>
 #include <arm64/linux/linux_proto.h>
-#include <compat/linux/linux_dtrace.h>
-#include <compat/linux/linux_emul.h>
 #include <compat/linux/linux_fork.h>
 #include <compat/linux/linux_misc.h>
-#include <compat/linux/linux_mmap.h>
 #include <compat/linux/linux_util.h>
 
 #define	LINUX_ARCH_AARCH64		0xc00000b7
 
-/* DTrace init */
-LIN_SDT_PROVIDER_DECLARE(LINUX_DTRACE);
-
-/* DTrace probes */
-LIN_SDT_PROBE_DEFINE0(machdep, linux_mmap2, todo);
-
-/*
- * LINUXTODO: deduplicate; linux_execve is common across archs, except that on
- * amd64 compat linuxulator it calls freebsd32_exec_copyin_args.
- */
-int
-linux_execve(struct thread *td, struct linux_execve_args *uap)
-{
-	struct image_args eargs;
-	char *path;
-	int error;
-
-	if (!LUSECONVPATH(td)) {
-		error = exec_copyin_args(&eargs, uap->path, UIO_USERSPACE,
-		    uap->argp, uap->envp);
-	} else {
-		LCONVPATHEXIST(uap->path, &path);
-		error = exec_copyin_args(&eargs, path, UIO_SYSSPACE,
-		    uap->argp, uap->envp);
-		LFREEPATH(path);
-	}
-	if (error == 0)
-		error = linux_common_execve(td, &eargs);
-	AUDIT_SYSCALL_EXIT(error == EJUSTRETURN ? 0 : error, td);
-	return (error);
-}
 
 int
 linux_set_upcall(struct thread *td, register_t stack)
@@ -98,31 +55,6 @@ linux_set_upcall(struct thread *td, register_t stack)
 	 */
 	td->td_frame->tf_x[0] = 0;
 	return (0);
-}
-
-/* LINUXTODO: deduplicate arm64 linux_mmap2 */
-int
-linux_mmap2(struct thread *td, struct linux_mmap2_args *uap)
-{
-
-	LIN_SDT_PROBE0(machdep, linux_mmap2, todo);
-	return (linux_mmap_common(td, PTROUT(uap->addr), uap->len, uap->prot,
-	    uap->flags, uap->fd, uap->pgoff));
-}
-
-int
-linux_mprotect(struct thread *td, struct linux_mprotect_args *uap)
-{
-
-	return (linux_mprotect_common(td, PTROUT(uap->addr), uap->len,
-	    uap->prot));
-}
-
-int
-linux_madvise(struct thread *td, struct linux_madvise_args *uap)
-{
-
-	return (linux_madvise_common(td, PTROUT(uap->addr), uap->len, uap->behav));
 }
 
 int
@@ -180,3 +112,20 @@ linux_ptrace_getregs_machdep(struct thread *td __unused, pid_t pid __unused,
 	return (0);
 }
 
+int
+linux_ptrace_peekuser(struct thread *td, pid_t pid, void *addr, void *data)
+{
+
+	LINUX_RATELIMIT_MSG_OPT1("PTRACE_PEEKUSER offset %ld not implemented; "
+	    "returning EINVAL", (uintptr_t)addr);
+	return (EINVAL);
+}
+
+int
+linux_ptrace_pokeuser(struct thread *td, pid_t pid, void *addr, void *data)
+{
+
+	LINUX_RATELIMIT_MSG_OPT1("PTRACE_POKEUSER offset %ld "
+	    "not implemented; returning EINVAL", (uintptr_t)addr);
+	return (EINVAL);
+}

@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2019, 2020 Yoshihiro Ota
  *
@@ -26,8 +26,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/types.h>
 #include <sys/sysctl.h>
 
@@ -76,10 +74,9 @@ sysputXs(WINDOW *wd __unused, int row, int lcol, int width)
 void
 sysputuint64(WINDOW *wd, int row, int lcol, int width, uint64_t val, int flags)
 {
-	char unit, *start, wrtbuf[width + width + 1];
+	char *start, wrtbuf[width + width + 1];
 	int len;
 
-	unit = 0;
 	start = wrtbuf;
 	flags |= HN_NOSPACE;
 

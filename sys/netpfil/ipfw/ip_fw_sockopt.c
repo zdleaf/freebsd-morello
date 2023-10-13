@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2002-2009 Luigi Rizzo, Universita` di Pisa
  * Copyright (c) 2014 Yandex LLC
@@ -30,8 +30,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 /*
  * Control socket and rule management routines for ipfw.
  * Control is currently implemented via IP_FW3 setsockopt() code.
@@ -184,7 +182,7 @@ VNET_DEFINE_STATIC(uma_zone_t, ipfw_cntr_zone);
 #define	V_ipfw_cntr_zone		VNET(ipfw_cntr_zone)
 
 void
-ipfw_init_counters()
+ipfw_init_counters(void)
 {
 
 	V_ipfw_cntr_zone = uma_zcreate("IPFW counters",
@@ -193,7 +191,7 @@ ipfw_init_counters()
 }
 
 void
-ipfw_destroy_counters()
+ipfw_destroy_counters(void)
 {
 
 	uma_zdestroy(V_ipfw_cntr_zone);
@@ -566,6 +564,8 @@ import_rule0(struct rule_check_info *ci)
 			break;
 		case O_SETFIB:
 		case O_SETDSCP:
+		case O_SETMARK:
+		case O_MARK:
 			if (cmd->arg1 == IP_FW_TABLEARG)
 				cmd->arg1 = IP_FW_TARG;
 			else
@@ -650,6 +650,8 @@ export_rule0(struct ip_fw *krule, struct ip_fw_rule0 *urule, int len)
 			break;
 		case O_SETFIB:
 		case O_SETDSCP:
+		case O_SETMARK:
+		case O_MARK:
 			if (cmd->arg1 == IP_FW_TARG)
 				cmd->arg1 = IP_FW_TABLEARG;
 			else
@@ -1909,6 +1911,8 @@ check_ipfw_rule_body(ipfw_insn *cmd, int cmd_len, struct rule_check_info *ci)
 			ci->object_opcodes++;
 			break;
 		case O_IP_FLOW_LOOKUP:
+		case O_MAC_DST_LOOKUP:
+		case O_MAC_SRC_LOOKUP:
 			if (cmd->arg1 >= V_fw_tables_max) {
 				printf("ipfw: invalid table number %d\n",
 				    cmd->arg1);
@@ -1937,6 +1941,7 @@ check_ipfw_rule_body(ipfw_insn *cmd, int cmd_len, struct rule_check_info *ci)
 			break;
 
 		case O_DSCP:
+		case O_MARK:
 			if (cmdlen != F_INSN_SIZE(ipfw_insn_u32) + 1)
 				goto bad_size;
 			break;
@@ -1998,12 +2003,21 @@ check_ipfw_rule_body(ipfw_insn *cmd, int cmd_len, struct rule_check_info *ci)
  			goto check_action;
 		case O_CHECK_STATE:
 			ci->object_opcodes++;
+			goto check_size;
+		case O_SETMARK:
+			if (cmdlen != F_INSN_SIZE(ipfw_insn_u32))
+				goto bad_size;
+			goto check_action;
+		case O_REJECT:
+			/* "unreach needfrag" has variable len. */
+			if ((cmdlen == F_INSN_SIZE(ipfw_insn) ||
+			    cmdlen == F_INSN_SIZE(ipfw_insn_u16)))
+				goto check_action;
 			/* FALLTHROUGH */
 		case O_FORWARD_MAC: /* XXX not implemented yet */
 		case O_COUNT:
 		case O_ACCEPT:
 		case O_DENY:
-		case O_REJECT:
 		case O_SETDSCP:
 #ifdef INET6
 		case O_UNREACH6:
@@ -3236,7 +3250,7 @@ update_opcode_kidx(ipfw_insn *cmd, uint16_t idx)
 }
 
 void
-ipfw_init_obj_rewriter()
+ipfw_init_obj_rewriter(void)
 {
 
 	ctl3_rewriters = NULL;
@@ -3244,7 +3258,7 @@ ipfw_init_obj_rewriter()
 }
 
 void
-ipfw_destroy_obj_rewriter()
+ipfw_destroy_obj_rewriter(void)
 {
 
 	if (ctl3_rewriters != NULL)
@@ -3472,7 +3486,7 @@ find_unref_sh(struct ipfw_sopt_handler *psh)
 }
 
 void
-ipfw_init_sopt_handler()
+ipfw_init_sopt_handler(void)
 {
 
 	CTL3_LOCK_INIT();
@@ -3480,7 +3494,7 @@ ipfw_init_sopt_handler()
 }
 
 void
-ipfw_destroy_sopt_handler()
+ipfw_destroy_sopt_handler(void)
 {
 
 	IPFW_DEL_SOPT_HANDLER(1, scodes);
@@ -4388,7 +4402,8 @@ objhash_hash_idx(struct namedobj_instance *ni, uint32_t val)
 }
 
 struct named_object *
-ipfw_objhash_lookup_name(struct namedobj_instance *ni, uint32_t set, char *name)
+ipfw_objhash_lookup_name(struct namedobj_instance *ni, uint32_t set,
+    const char *name)
 {
 	struct named_object *no;
 	uint32_t hash;

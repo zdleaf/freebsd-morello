@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2020 Amazon.com, Inc. or its affiliates.
  * All rights reserved.
@@ -29,8 +29,6 @@
 #include "opt_acpi.h"
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/bus.h>
@@ -96,9 +94,7 @@ static device_method_t pl061_acpi_methods[] = {
 DEFINE_CLASS_1(gpio, pl061_acpi_driver, pl061_acpi_methods,
     sizeof(struct pl061_softc), pl061_driver);
 
-static devclass_t pl061_devclass;
-
-EARLY_DRIVER_MODULE(pl061, acpi, pl061_acpi_driver, pl061_devclass, NULL, NULL,
+EARLY_DRIVER_MODULE(pl061, acpi, pl061_acpi_driver, NULL, NULL,
     BUS_PASS_INTERRUPT + BUS_PASS_ORDER_LATE);
 MODULE_DEPEND(pl061, acpi, 1, 1, 1);
 MODULE_DEPEND(pl061, gpiobus, 1, 1, 1);

@@ -1,8 +1,6 @@
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2003 Scott Long
  * All rights reserved.
@@ -219,15 +217,13 @@ static device_method_t umct_methods[] = {
 	DEVMETHOD_END
 };
 
-static devclass_t umct_devclass;
-
 static driver_t umct_driver = {
 	.name = "umct",
 	.methods = umct_methods,
 	.size = sizeof(struct umct_softc),
 };
 
-DRIVER_MODULE(umct, uhub, umct_driver, umct_devclass, NULL, 0);
+DRIVER_MODULE(umct, uhub, umct_driver, NULL, NULL);
 MODULE_DEPEND(umct, ucom, 1, 1, 1);
 MODULE_DEPEND(umct, usb, 1, 1, 1);
 MODULE_VERSION(umct, 1);

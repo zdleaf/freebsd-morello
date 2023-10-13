@@ -30,8 +30,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 #ifndef _NFSCLIENT_NFS_H_
@@ -107,7 +105,7 @@ void ncl_nodeunlock(struct nfsnode *);
 int ncl_getattrcache(struct vnode *, struct vattr *);
 int ncl_readrpc(struct vnode *, struct uio *, struct ucred *);
 int ncl_writerpc(struct vnode *, struct uio *, struct ucred *, int *, int *,
-    int);
+    int, int);
 int ncl_readlinkrpc(struct vnode *, struct uio *, struct ucred *);
 int ncl_readdirrpc(struct vnode *, struct uio *, struct ucred *,
     struct thread *);

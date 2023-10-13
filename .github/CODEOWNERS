@@ -35,7 +35,7 @@
 /contrib/atf		@ngie-eign
 /contrib/capsicum-test	@ngie-eign
 /contrib/googletest	@ngie-eign
-/contrib/ipfilter	@cschuber
+/sbin/ipf		@cschuber
 /contrib/libcxxrt	@DimitryAndric @emaste
 /contrib/llvm-project	@DimitryAndric
 /contrib/llvm-project/libunwind @DimitryAndric @emaste @bsdjhb
@@ -51,6 +51,7 @@
 /etc/mail	@gshapiro
 /etc/sendmail	@gshapiro
 /lib/libc/sys/kevent.c	@jmgurney
+/lib/libefivar/	@bsdimp
 /lib/libfetch	@dag-erling
 /lib/libfigpar	@dag-erling
 /lib/libpam/		@dag-erling
@@ -59,14 +60,17 @@
 /sbin/mount_fusefs @asomers
 /secure/usr.bin/openssl/	@juikim
 /share/mk	@bsdimp @bapt @bdrewery @emaste
+/stand		@bsdimp
 /stand/lua	@kevans91
 /sys/amd64/pci	@bsdimp @bsdjhb
 /sys/amd64/vmm/	@bsdjhb @grehan-freebsd
 /sys/arm/allwinner	@evadot
+/sys/arm64/arm64	@zxombie
+/sys/arm64/include	@zxombie
 /sys/arm64/rockchip	@evadot
 /sys/compat/linprocfs/	@dag-erling
 /sys/compat/linuxkpi	@hselasky
-/sys/contrib/ipfilter	@cschuber
+/sys/netpfil/ipfilter	@cschuber
 /sys/crypto/openssl/	@juikim
 /sys/dev/drm2	@bsdimp
 /sys/dev/iscsi/	@trasz

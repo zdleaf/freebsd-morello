@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 1998 - 2008 Søren Schmidt <sos@FreeBSD.org>
  * All rights reserved.
@@ -27,8 +27,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/ata.h>
@@ -204,6 +202,6 @@ static driver_t ata_isa_driver = {
     sizeof(struct ata_channel),
 };
 
-DRIVER_MODULE(ata, isa, ata_isa_driver, ata_devclass, NULL, NULL);
+DRIVER_MODULE(ata, isa, ata_isa_driver, NULL, NULL);
 MODULE_DEPEND(ata, ata, 1, 1, 1);
 ISA_PNP_INFO(ata_ids);

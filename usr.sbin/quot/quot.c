@@ -32,8 +32,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/stdint.h>
 #include <sys/mount.h>
@@ -550,7 +548,7 @@ quot(char *name, char *mp)
 		close(fd);
 		return;
 	}
-	switch (sbget(fd, &fs, STDSB)) {
+	switch (errno = sbget(fd, &fs, UFS_STDSB, UFS_NOCSUM)) {
 	case 0:
 		break;
 	case ENOENT:
@@ -567,8 +565,6 @@ quot(char *name, char *mp)
 		printf(" (%s)",mp);
 	putchar('\n');
 	(*func)(fd, fs, name);
-	free(fs->fs_csp);
-	free(fs->fs_si);
 	free(fs);
 	close(fd);
 }

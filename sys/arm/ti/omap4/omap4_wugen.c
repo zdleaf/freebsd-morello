@@ -26,8 +26,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/bus.h>
 #include <sys/conf.h>
@@ -241,9 +239,8 @@ static device_method_t omap4_wugen_methods[] = {
 #endif
 	DEVMETHOD_END
 };
-devclass_t omap4_wugen_devclass;
+
 DEFINE_CLASS_0(omap4_wugen, omap4_wugen_driver, omap4_wugen_methods,
     sizeof(struct omap4_wugen_sc));
-EARLY_DRIVER_MODULE(omap4_wugen, simplebus, omap4_wugen_driver,
-    omap4_wugen_devclass, NULL, NULL,
+EARLY_DRIVER_MODULE(omap4_wugen, simplebus, omap4_wugen_driver, NULL, NULL,
     BUS_PASS_INTERRUPT + BUS_PASS_ORDER_MIDDLE + 1);

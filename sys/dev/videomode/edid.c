@@ -1,5 +1,4 @@
 /* $NetBSD: edid.c,v 1.12 2013/02/08 16:35:10 skrll Exp $ */
-/* $FreeBSD$ */
 
 /*-
  * Copyright (c) 2006 Itronix Inc.
@@ -33,8 +32,6 @@
  */ 
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
@@ -187,7 +184,7 @@ edid_print(struct edid_info *edid)
 		if (edid->edid_video_input & EDID_VIDEO_INPUT_BLANK_TO_BLACK)
 			printf("\tBlank-to-black setup\n");
 		if (edid->edid_video_input & EDID_VIDEO_INPUT_SEPARATE_SYNCS)
-			printf("\tSeperate syncs\n");
+			printf("\tSeparate syncs\n");
 		if (edid->edid_video_input & EDID_VIDEO_INPUT_COMPOSITE_SYNC)
 			printf("\tComposite sync\n");
 		if (edid->edid_video_input & EDID_VIDEO_INPUT_SYNC_ON_GRN)

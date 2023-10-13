@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2001 Orion Hodson <O.Hodson@cs.ucl.ac.uk>
  * All rights reserved.
@@ -43,8 +43,6 @@
 #include <dev/pci/pcivar.h>
 
 #include "mixer_if.h"
-
-SND_DECLARE_FILE("$FreeBSD$");
 
 /* ------------------------------------------------------------------------- */
 /* Constants */
@@ -939,6 +937,6 @@ static driver_t sonicvibes_driver = {
         PCM_SOFTC_SIZE
 };
 
-DRIVER_MODULE(snd_vibes, pci, sonicvibes_driver, pcm_devclass, 0, 0);
+DRIVER_MODULE(snd_vibes, pci, sonicvibes_driver, 0, 0);
 MODULE_DEPEND(snd_vibes, sound, SOUND_MINVER, SOUND_PREFVER, SOUND_MAXVER);
 MODULE_VERSION(snd_vibes, 1);

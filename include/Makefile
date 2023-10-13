@@ -1,18 +1,26 @@
 #	@(#)Makefile	8.2 (Berkeley) 1/4/94
-# $FreeBSD$
 #
 # Doing a "make install" builds /usr/include.
 
 .include <src.opts.mk>
 
-PACKAGE=runtime
+PACKAGE=clibs
 CLEANFILES= osreldate.h version
 SUBDIR= arpa protocols rpcsvc rpc xlocale
+.if ${MACHINE_CPUARCH} == "amd64"
+SUBDIR+=		i386
+INCLUDE_SUBDIRS+=	i386
+.endif
+.if ${MACHINE_CPUARCH} == "aarch64"
+SUBDIR+=		arm
+INCLUDE_SUBDIRS+=	arm
+.endif
 SUBDIR_PARALLEL=
-INCS=	a.out.h ar.h assert.h bitstring.h complex.h cpio.h _ctype.h ctype.h \
+INCS=	a.out.h ar.h assert.h bitstring.h byteswap.h \
+	complex.h cpio.h _ctype.h ctype.h \
 	db.h \
-	dirent.h dlfcn.h elf.h elf-hints.h err.h fmtmsg.h fnmatch.h fstab.h \
-	fts.h ftw.h getopt.h glob.h grp.h \
+	dirent.h dlfcn.h elf.h elf-hints.h endian.h err.h fmtmsg.h fnmatch.h \
+	fstab.h fts.h ftw.h getopt.h glob.h grp.h \
 	ieeefp.h ifaddrs.h \
 	inttypes.h iso646.h kenv.h langinfo.h libgen.h limits.h link.h \
 	locale.h malloc.h malloc_np.h memory.h monetary.h mpool.h mqueue.h \
@@ -22,7 +30,7 @@ INCS=	a.out.h ar.h assert.h bitstring.h complex.h cpio.h _ctype.h ctype.h \
 	pthread_np.h pwd.h ranlib.h readpassphrase.h regex.h \
 	res_update.h resolv.h runetype.h sched.h \
 	search.h semaphore.h setjmp.h \
-	signal.h spawn.h stab.h stdalign.h stdbool.h stddef.h \
+	signal.h spawn.h stab.h stdalign.h stdbool.h stdckdint.h stddef.h \
 	stdnoreturn.h stdio.h stdlib.h string.h stringlist.h \
 	strings.h sysexits.h tar.h termios.h tgmath.h \
 	time.h timeconv.h timers.h ttyent.h \
@@ -40,25 +48,28 @@ LHDRS=	aio.h errno.h fcntl.h linker_set.h poll.h stdatomic.h stdint.h \
 	syslog.h ucontext.h
 
 LDIRS=	geom net net80211 netgraph netinet netinet6 \
-	netipsec netsmb nfs nfsclient nfsserver sys vm
+	netipsec netlink netsmb nfs nfsclient nfsserver sys vm
 
 LSUBDIRS=	dev/acpica dev/agp dev/ciss dev/filemon dev/firewire \
 	dev/hwpmc dev/hyperv \
-	dev/ic dev/iicbus dev/io dev/mfi dev/mmc dev/nvme \
+	dev/ic dev/iicbus dev/io dev/mfi dev/mmc \
 	dev/ofw dev/pbio dev/pci ${_dev_powermac_nvram} dev/ppbus dev/pwm \
-	dev/smbus dev/speaker dev/tcp_log dev/veriexec dev/vkbd \
+	dev/smbus dev/speaker dev/tcp_log dev/veriexec dev/vkbd dev/wg \
 	fs/devfs fs/fdescfs fs/msdosfs fs/nfs fs/nullfs \
 	fs/procfs fs/smbfs fs/udf fs/unionfs \
 	geom/cache geom/concat geom/eli geom/gate geom/journal geom/label \
 	geom/mirror geom/mountver geom/multipath geom/nop \
-	geom/raid geom/raid3 geom/shsec geom/stripe geom/virstor \
+	geom/raid geom/raid3 geom/shsec geom/stripe geom/union geom/virstor \
 	net/altq \
 	net/route \
-	netgraph/atm netgraph/netflow \
+	netgraph/netflow \
 	netinet/cc \
 	netinet/netdump \
 	netinet/tcp_stacks \
-	security/mac_biba security/mac_bsdextended security/mac_lomac \
+	netlink/route \
+	security/mac_biba security/mac_bsdextended \
+	security/mac_grantbylabel \
+	security/mac_lomac \
 	security/mac_mls security/mac_partition \
 	security/mac_veriexec \
 	sys/disk \
@@ -169,6 +180,10 @@ HYPERVDIR=	${INCLUDEDIR}/dev/hyperv
 OPENCRYPTO=	cryptodev.h
 OPENCRYPTODIR=	${INCLUDEDIR}/crypto
 
+.PATH: ${SRCTOP}/sys/dev/nvme
+NVME=		nvme.h
+NVMEDIR=	${INCLUDEDIR}/dev/nvme
+
 .PATH: ${SRCTOP}/sys/dev/pci
 PCI=		pcireg.h
 PCIDIR=		${INCLUDEDIR}/dev/pci
@@ -200,7 +215,8 @@ IPFILTERDIR=	${INCLUDEDIR}/netinet
 .PATH: ${SRCTOP}/sys/netpfil/pf
 PF=		pf.h \
 		pf_altq.h \
-		pf_mtag.h
+		pf_mtag.h \
+		pf_nl.h
 PFPACKAGE=	pf
 PFDIR=	${INCLUDEDIR}/netpfil/pf
 
@@ -221,6 +237,10 @@ NVPAIRDIR=	${INCLUDEDIR}/sys
 MLX5=		mlx5io.h
 MLX5DIR=	${INCLUDEDIR}/dev/mlx5
 
+.PATH: ${SRCTOP}/sys/dev/wg
+WG=		if_wg.h
+WGDIR=		${INCLUDEDIR}/dev/wg
+
 INCSGROUPS=	INCS \
 		ACPICA \
 		AGP \
@@ -236,11 +256,13 @@ INCSGROUPS=	INCS \
 		HID \
 		HYPERV \
 		OPENCRYPTO \
+		NVME \
 		PCI \
 		RPC \
 		SECAUDIT \
 		TEKEN \
-		VERIEXEC
+		VERIEXEC \
+		WG
 
 .if ${MK_IPFILTER} != "no"
 INCSGROUPS+=	IPFILTER
@@ -338,36 +360,40 @@ compat:
 	mtree -deU ${NO_ROOT:D-W} ${MTREE_FOLLOWS_SYMLINKS} \
 	    -f ${SRCTOP}/etc/mtree/BSD.include.dist \
 	    -p ${SDESTDIR}${INCLUDEDIR} > /dev/null
+.for d in ${INCLUDE_SUBDIRS}
+	${INSTALL} -d ${TAG_ARGS} -o ${BINOWN} -g ${BINGRP} -m 755 \
+	    ${SDESTDIR}${INCLUDEDIR}/${d}
+.endfor
 
 copies: .PHONY .META
 	cd ${SDESTDIR}${INCLUDEDIR}; find ${LDIRS} ${LSUBDIRS} ${LSUBSUBDIRS} crypto \
 	    machine machine/pc ${_MARCHS} -maxdepth 1 -mindepth 1 -type l \
 	    -name "*.h" -print -delete || true
-.for i in ${LDIRS} ${LSUBDIRS:Ndev/agp:Ndev/acpica:Ndev/evdev:Ndev/hid:Ndev/hyperv:Ndev/pci:Ndev/veriexec} ${LSUBSUBDIRS}
+.for i in ${LDIRS} ${LSUBDIRS:Ndev/agp:Ndev/acpica:Ndev/evdev:Ndev/hid:Ndev/hyperv:Ndev/pci:Ndev/veriexec:Ndev/wg} ${LSUBSUBDIRS}
 	cd ${SRCTOP}/sys; \
-	${INSTALL} -C ${TAG_ARGS} -o ${BINOWN} -g ${BINGRP} -m 444 $i/*.h \
+	${INSTALL} -C ${TAG_ARGS:D${TAG_ARGS},dev} -o ${BINOWN} -g ${BINGRP} -m 444 $i/*.h \
 	    ${SDESTDIR}${INCLUDEDIR}/$i
 .endfor
 	cd ${SRCTOP}/sys/${MACHINE}/include; \
-	${INSTALL} -C ${TAG_ARGS} -o ${BINOWN} -g ${BINGRP} -m 444 *.h \
+	${INSTALL} -C ${TAG_ARGS:D${TAG_ARGS},dev} -o ${BINOWN} -g ${BINGRP} -m 444 *.h \
 	    ${SDESTDIR}${INCLUDEDIR}/machine
 .if exists(${SRCTOP}/sys/${MACHINE}/include/pc)
 	cd ${SRCTOP}/sys/${MACHINE}/include/pc; \
-	${INSTALL} -C ${TAG_ARGS} -o ${BINOWN} -g ${BINGRP} -m 444 *.h \
+	${INSTALL} -C ${TAG_ARGS:D${TAG_ARGS},dev} -o ${BINOWN} -g ${BINGRP} -m 444 *.h \
 	    ${SDESTDIR}${INCLUDEDIR}/machine/pc
 .endif
 .for _MARCH in ${_MARCHS}
 .if exists(${SRCTOP}/sys/${_MARCH}/include)
-	${INSTALL} -d ${TAG_ARGS} -o ${BINOWN} -g ${BINGRP} -m 755 \
+	${INSTALL} -d ${TAG_ARGS:D${TAG_ARGS},dev} -o ${BINOWN} -g ${BINGRP} -m 755 \
 	    ${SDESTDIR}${INCLUDEDIR}/${_MARCH}; \
 	cd ${SRCTOP}/sys/${_MARCH}/include; \
-	${INSTALL} -C ${TAG_ARGS} -o ${BINOWN} -g ${BINGRP} -m 444 *.h \
+	${INSTALL} -C ${TAG_ARGS:D${TAG_ARGS},dev} -o ${BINOWN} -g ${BINGRP} -m 444 *.h \
 	    ${SDESTDIR}${INCLUDEDIR}/${_MARCH}
 .if exists(${SRCTOP}/sys/${_MARCH}/include/pc)
-	${INSTALL} -d ${TAG_ARGS} -o ${BINOWN} -g ${BINGRP} -m 755 \
+	${INSTALL} -d ${TAG_ARGS:D${TAG_ARGS},dev} -o ${BINOWN} -g ${BINGRP} -m 755 \
 	    ${SDESTDIR}${INCLUDEDIR}/${_MARCH}/pc; \
 	cd ${SRCTOP}/sys/${_MARCH}/include/pc; \
-	${INSTALL} -C ${TAG_ARGS} -o ${BINOWN} -g ${BINGRP} -m 444 *.h \
+	${INSTALL} -C ${TAG_ARGS:D${TAG_ARGS},dev} -o ${BINOWN} -g ${BINGRP} -m 444 *.h \
 	    ${SDESTDIR}${INCLUDEDIR}/${_MARCH}/pc
 .endif
 .endif
@@ -379,7 +405,7 @@ symlinks: .PHONY .META
 	cd ${SRCTOP}; ${INSTALL_SYMLINK} ${TAG_ARGS:D${TAG_ARGS},dev} \
 	    $$(printf '../../../%s ' sys/$i/*.h) ${SDESTDIR}${INCLUDEDIR}/$i
 .endfor
-.for i in ${LSUBDIRS:Ndev/agp:Ndev/acpica:Ndev/evdev:Ndev/hid:Ndev/hyperv:Ndev/pci:Ndev/veriexec}
+.for i in ${LSUBDIRS:Ndev/agp:Ndev/acpica:Ndev/evdev:Ndev/hid:Ndev/hyperv:Ndev/pci:Ndev/veriexec:Ndev/wg}
 	cd ${SRCTOP}; ${INSTALL_SYMLINK} ${TAG_ARGS:D${TAG_ARGS},dev} \
 	    $$(printf '../../../../%s ' sys/$i/*.h) ${SDESTDIR}${INCLUDEDIR}/$i
 .endfor
@@ -472,3 +498,16 @@ HOST_MACHINE_ARCH!= uname -p
 MACHINE:= ${HOST_MACHINE}
 MACHINE_ARCH:= ${HOST_MACHINE_ARCH}
 .endif
+
+check-ldirs:
+	missing_dirs=""; \
+	for dir in ${LDIRS} ${LSUBDIRS} ${LSUBSUBDIRS}; do \
+		if [ ! -d ${SRCTOP}/sys/$$dir ]; then \
+			echo "${SRCTOP}/sys/$$dir"; \
+			missing_dirs="$$missing_dirs $$dir"; \
+		fi; \
+	done; \
+	if [ -n "$$missing_dirs" ]; then \
+		echo "Nonexistant directories:" $$missing_dirs; \
+		false; \
+	fi

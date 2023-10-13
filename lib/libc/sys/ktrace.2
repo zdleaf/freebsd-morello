@@ -26,9 +26,8 @@
 .\" SUCH DAMAGE.
 .\"
 .\"     @(#)ktrace.2	8.1 (Berkeley) 6/4/93
-.\" $FreeBSD$
 .\"
-.Dd March 30, 2020
+.Dd November 2, 2022
 .Dt KTRACE 2
 .Os
 .Sh NAME
@@ -96,6 +95,7 @@ generate much output).
 .It KTRFAC_CAPFAIL Ta "Trace capability failures."
 .It KTRFAC_FAULT Ta "Trace page faults."
 .It KTRFAC_FAULTEND Ta "Trace the end of page faults."
+.It KTRFAC_STRUCT_ARRAY Ta "Trace arrays of certain data structures."
 .It KTRFAC_INHERIT Ta "Inherit tracing to future children."
 .El
 .Pp
@@ -109,7 +109,7 @@ struct ktr_header {
 	pid_t		ktr_pid;		/* process id */
 	char		ktr_comm[MAXCOMLEN+1];	/* command name */
 	struct timeval	ktr_time;		/* timestamp */
-	intptr_t	ktr_tid;		/* was ktr_buffer */
+	long		ktr_tid;		/* thread id */
 };
 .Ed
 .Pp
@@ -145,7 +145,7 @@ The following
 tunables influence the behaviour of
 .Fn ktrace :
 .Bl -tag -width indent
-.It Va kern.ktrace.geniosize
+.It Va kern.ktrace.genio_size
 bounds the amount of data a traced I/O request will log
 to the trace file.
 .It Va kern.ktrace.request_pool

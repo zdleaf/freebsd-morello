@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2000-2001 Jonathan Chen All rights reserved.
  * Copyright (c) 2002-2004 M. Warner Losh <imp@FreeBSD.org>
@@ -73,8 +73,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/bus.h>
 #include <sys/condvar.h>
@@ -123,8 +121,6 @@ __FBSDID("$FreeBSD$");
 #define CBB_START_MEM	0x88000000
 #define CBB_START_32_IO 0x1000
 #define CBB_START_16_IO 0x100
-
-devclass_t cbb_devclass;
 
 /* sysctl vars */
 static SYSCTL_NODE(_hw, OID_AUTO, cbb, CTLFLAG_RD | CTLFLAG_MPSAFE, 0,

@@ -23,7 +23,6 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 /*
- * $FreeBSD$
  */
 #ifndef _LIBSECUREBOOT_H_
 #define _LIBSECUREBOOT_H_
@@ -48,14 +47,18 @@ unsigned char * read_file(const char *, size_t *);
 #endif
 
 extern int DebugVe;
+extern int VerifyFlags;
 
+#ifndef DEBUG_PRINTF
 #define DEBUG_PRINTF(n, x) if (DebugVe >= n) printf x
+#endif
 
 int ve_trust_init(void);
 size_t ve_trust_anchors_add_buf(unsigned char *, size_t);
 size_t ve_trust_anchors_revoke(unsigned char *, size_t);
 int ve_trust_add(const char *);
 void ve_debug_set(int);
+void ve_enforce_validity_set(int);
 void ve_anchor_verbose_set(int);
 int ve_anchor_verbose_get(void);
 void ve_utc_set(time_t utc);

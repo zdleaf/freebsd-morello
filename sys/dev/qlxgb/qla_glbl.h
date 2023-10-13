@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2011-2013 Qlogic Corporation
  * All rights reserved.
@@ -25,8 +25,6 @@
  *  CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
  *  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  *  POSSIBILITY OF SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 /*
  * File: qla_glbl.h
@@ -54,7 +52,7 @@ extern uint32_t free_pkt_thres;
 
 extern int qla_alloc_dmabuf(qla_host_t *ha, qla_dma_t *dma_buf);
 extern void qla_free_dmabuf(qla_host_t *ha, qla_dma_t *dma_buf);
-extern void qla_start(struct ifnet *ifp);
+extern void qla_start(if_t ifp);
 extern int qla_get_mbuf(qla_host_t *ha, qla_rx_buf_t *rxb, struct mbuf *nmp,
 	        uint32_t jumbo);
 

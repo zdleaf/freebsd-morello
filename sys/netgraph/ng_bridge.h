@@ -36,8 +36,6 @@
  * OF SUCH DAMAGE.
  *
  * Author: Archie Cobbs <archie@freebsd.org>
- *
- * $FreeBSD$
  */
 
 #ifndef _NETGRAPH_NG_BRIDGE_H_
@@ -148,6 +146,7 @@ struct ng_bridge_move_host {
 #define NG_BRIDGE_MOVE_HOST_TYPE_INFO(entype)	{		\
 	  { "addr",		(entype)		},	\
 	  { "hook",		&ng_parse_hookbuf_type	},	\
+	  { NULL }						\
 }
 
 /* Netgraph control messages */

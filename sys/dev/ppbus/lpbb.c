@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 1998, 2001 Nicolas Souchu, Marc Bouget
  * All rights reserved.
@@ -29,8 +29,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 /*
  * I2C Bit-Banging over parallel port
  *
@@ -238,8 +236,6 @@ lpbb_reset(device_t dev, u_char speed, u_char addr, u_char * oldaddr)
 	return (IIC_ENOADDR);
 }
 
-static devclass_t lpbb_devclass;
-
 static device_method_t lpbb_methods[] = {
 	/* device interface */
 	DEVMETHOD(device_identify,	lpbb_identify),
@@ -263,8 +259,8 @@ static driver_t lpbb_driver = {
 	1,
 };
 
-DRIVER_MODULE(lpbb, ppbus, lpbb_driver, lpbb_devclass, 0, 0);
-DRIVER_MODULE(iicbb, lpbb, iicbb_driver, iicbb_devclass, 0, 0);
+DRIVER_MODULE(lpbb, ppbus, lpbb_driver, 0, 0);
+DRIVER_MODULE(iicbb, lpbb, iicbb_driver, 0, 0);
 MODULE_DEPEND(lpbb, ppbus, 1, 1, 1);
 MODULE_DEPEND(lpbb, iicbb, IICBB_MINVER, IICBB_PREFVER, IICBB_MAXVER);
 MODULE_VERSION(lpbb, 1);

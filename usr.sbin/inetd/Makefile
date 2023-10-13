@@ -1,10 +1,10 @@
 #	@(#)Makefile	8.1 (Berkeley) 6/6/93
-# $FreeBSD$
 
 .include <src.opts.mk>
 
 CONFS=	inetd.conf
 PROG=	inetd
+PACKAGE=	inetd
 MAN=	inetd.8
 MLINKS=	inetd.8 inetd.conf.5
 SRCS=	inetd.c builtins.c

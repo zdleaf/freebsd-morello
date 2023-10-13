@@ -27,7 +27,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
+#include "opt_platform.h"
 
 #include <sys/param.h>
 #include <sys/bus.h>
@@ -47,8 +47,12 @@ __FBSDID("$FreeBSD$");
 #include <dev/mii/mii.h>
 #include <dev/mii/miivar.h>
 
+#ifdef FDT
 #include <dev/ofw/ofw_bus.h>
 #include <dev/ofw/ofw_bus_subr.h>
+#else
+#include <machine/stdarg.h>
+#endif
 
 #include "e6000swreg.h"
 #include "etherswitch_if.h"
@@ -74,10 +78,12 @@ MALLOC_DEFINE(M_E6000SW, "e6000sw", "e6000sw switch");
 
 typedef struct e6000sw_softc {
 	device_t		dev;
+#ifdef FDT
 	phandle_t		node;
+#endif
 
 	struct sx		sx;
-	struct ifnet		*ifp[E6000SW_MAX_PORTS];
+	if_t ifp[E6000SW_MAX_PORTS];
 	char			*ifname[E6000SW_MAX_PORTS];
 	device_t		miibus[E6000SW_MAX_PORTS];
 	struct taskqueue	*sc_tq;
@@ -104,14 +110,18 @@ static etherswitch_info_t etherswitch_info = {
 
 static void e6000sw_identify(driver_t *, device_t);
 static int e6000sw_probe(device_t);
+#ifdef FDT
 static int e6000sw_parse_fixed_link(e6000sw_softc_t *, phandle_t, uint32_t);
 static int e6000sw_parse_ethernet(e6000sw_softc_t *, phandle_t, uint32_t);
+#endif
 static int e6000sw_attach(device_t);
 static int e6000sw_detach(device_t);
 static int e6000sw_read_xmdio(device_t, int, int, int);
 static int e6000sw_write_xmdio(device_t, int, int, int, int);
 static int e6000sw_readphy(device_t, int, int);
 static int e6000sw_writephy(device_t, int, int, int);
+static int e6000sw_readphy_locked(device_t, int, int);
+static int e6000sw_writephy_locked(device_t, int, int, int);
 static etherswitch_info_t* e6000sw_getinfo(device_t);
 static int e6000sw_getconf(device_t, etherswitch_conf_t *);
 static int e6000sw_setconf(device_t, etherswitch_conf_t *);
@@ -134,8 +144,8 @@ static int e6000sw_vtu_flush(e6000sw_softc_t *);
 static int e6000sw_vtu_update(e6000sw_softc_t *, int, int, int, int, int);
 static __inline void e6000sw_writereg(e6000sw_softc_t *, int, int, int);
 static __inline uint32_t e6000sw_readreg(e6000sw_softc_t *, int, int);
-static int e6000sw_ifmedia_upd(struct ifnet *);
-static void e6000sw_ifmedia_sts(struct ifnet *, struct ifmediareq *);
+static int e6000sw_ifmedia_upd(if_t);
+static void e6000sw_ifmedia_sts(if_t, struct ifmediareq *);
 static int e6000sw_atu_mac_table(device_t, e6000sw_softc_t *, struct atu_opt *,
     int);
 static int e6000sw_get_pvid(e6000sw_softc_t *, int, int *);
@@ -159,8 +169,8 @@ static device_method_t e6000sw_methods[] = {
 	DEVMETHOD(bus_add_child,		device_add_child_ordered),
 
 	/* mii interface */
-	DEVMETHOD(miibus_readreg,		e6000sw_readphy),
-	DEVMETHOD(miibus_writereg,		e6000sw_writephy),
+	DEVMETHOD(miibus_readreg,		e6000sw_readphy_locked),
+	DEVMETHOD(miibus_writereg,		e6000sw_writephy_locked),
 
 	/* etherswitch interface */
 	DEVMETHOD(etherswitch_getinfo,		e6000sw_getinfo),
@@ -180,15 +190,12 @@ static device_method_t e6000sw_methods[] = {
 	DEVMETHOD_END
 };
 
-static devclass_t e6000sw_devclass;
-
 DEFINE_CLASS_0(e6000sw, e6000sw_driver, e6000sw_methods,
     sizeof(e6000sw_softc_t));
 
-DRIVER_MODULE(e6000sw, mdio, e6000sw_driver, e6000sw_devclass, 0, 0);
-DRIVER_MODULE(etherswitch, e6000sw, etherswitch_driver, etherswitch_devclass, 0,
-    0);
-DRIVER_MODULE(miibus, e6000sw, miibus_driver, miibus_devclass, 0, 0);
+DRIVER_MODULE(e6000sw, mdio, e6000sw_driver, 0, 0);
+DRIVER_MODULE(etherswitch, e6000sw, etherswitch_driver, 0, 0);
+DRIVER_MODULE(miibus, e6000sw, miibus_driver, 0, 0);
 MODULE_DEPEND(e6000sw, mdio, 1, 1, 1);
 
 
@@ -205,9 +212,16 @@ e6000sw_probe(device_t dev)
 {
 	e6000sw_softc_t *sc;
 	const char *description;
+#ifdef FDT
 	phandle_t switch_node;
+#else
+	int is_6190;
+#endif
 
 	sc = device_get_softc(dev);
+	sc->dev = dev;
+
+#ifdef FDT
 	switch_node = ofw_bus_find_compatible(OF_finddevice("/"),
 	    "marvell,mv88e6085");
 	if (switch_node == 0) {
@@ -227,12 +241,26 @@ e6000sw_probe(device_t dev)
 	if (bootverbose)
 		device_printf(dev, "Found switch_node: 0x%x\n", switch_node);
 
-	sc->dev = dev;
 	sc->node = switch_node;
 
 	if (OF_getencprop(sc->node, "reg", &sc->sw_addr,
 	    sizeof(sc->sw_addr)) < 0)
 		return (ENXIO);
+#else
+	if (resource_int_value(device_get_name(sc->dev),
+	    device_get_unit(sc->dev), "addr", &sc->sw_addr) != 0)
+		return (ENXIO);
+	if (resource_int_value(device_get_name(sc->dev),
+	    device_get_unit(sc->dev), "is6190", &is_6190) != 0)
+		/*
+		 * Check "is8190" to keep backward compatibility with
+		 * older setups.
+		 */
+		resource_int_value(device_get_name(sc->dev),
+		    device_get_unit(sc->dev), "is8190", &is_6190);
+	if (is_6190 != 0)
+		sc->swid = MV88E6190;
+#endif
 	if (sc->sw_addr < 0 || sc->sw_addr > 32)
 		return (ENXIO);
 
@@ -283,6 +311,7 @@ e6000sw_probe(device_t dev)
 	return (BUS_PROBE_DEFAULT);
 }
 
+#ifdef FDT
 static int
 e6000sw_parse_fixed_link(e6000sw_softc_t *sc, phandle_t node, uint32_t port)
 {
@@ -358,6 +387,63 @@ e6000sw_parse_child_fdt(e6000sw_softc_t *sc, phandle_t child, int *pport)
 
 	return (0);
 }
+#else
+
+static int
+e6000sw_check_hint_val(device_t dev, int *val, char *fmt, ...)
+{
+	char *resname;
+	int err, len;
+	va_list ap;
+
+	len = min(strlen(fmt) * 2, 128);
+	if (len == 0)
+		return (-1);
+	resname = malloc(len, M_E6000SW, M_WAITOK);
+	memset(resname, 0, len);
+	va_start(ap, fmt);
+	vsnprintf(resname, len - 1, fmt, ap);
+	va_end(ap);
+	err = resource_int_value(device_get_name(dev), device_get_unit(dev),
+	    resname, val);
+	free(resname, M_E6000SW);
+
+	return (err);
+}
+
+static int
+e6000sw_parse_hinted_port(e6000sw_softc_t *sc, int port)
+{
+	int err, val;
+
+	err = e6000sw_check_hint_val(sc->dev, &val, "port%ddisabled", port);
+	if (err == 0 && val != 0)
+		return (1);
+
+	err = e6000sw_check_hint_val(sc->dev, &val, "port%dcpu", port);
+	if (err == 0 && val != 0) {
+		sc->cpuports_mask |= (1 << port);
+		sc->fixed_mask |= (1 << port);
+		if (bootverbose)
+			device_printf(sc->dev, "CPU port at %d\n", port);
+	}
+	err = e6000sw_check_hint_val(sc->dev, &val, "port%dspeed", port);
+	if (err == 0 && val != 0) {
+		sc->fixed_mask |= (1 << port);
+		if (val == 2500)
+			sc->fixed25_mask |= (1 << port);
+	}
+
+	if (bootverbose) {
+		if ((sc->fixed_mask & (1 << port)) != 0)
+			device_printf(sc->dev, "fixed port at %d\n", port);
+		else
+			device_printf(sc->dev, "PHY at port %d\n", port);
+	}
+
+	return (0);
+}
+#endif
 
 static int
 e6000sw_init_interface(e6000sw_softc_t *sc, int port)
@@ -369,9 +455,9 @@ e6000sw_init_interface(e6000sw_softc_t *sc, int port)
 	sc->ifp[port] = if_alloc(IFT_ETHER);
 	if (sc->ifp[port] == NULL)
 		return (ENOMEM);
-	sc->ifp[port]->if_softc = sc;
-	sc->ifp[port]->if_flags |= IFF_UP | IFF_BROADCAST |
-	    IFF_DRV_RUNNING | IFF_SIMPLEX;
+	if_setsoftc(sc->ifp[port], sc);
+	if_setflagbits(sc->ifp[port], IFF_UP | IFF_BROADCAST |
+	    IFF_DRV_RUNNING | IFF_SIMPLEX, 0);
 	sc->ifname[port] = malloc(strlen(name) + 1, M_E6000SW, M_NOWAIT);
 	if (sc->ifname[port] == NULL) {
 		if_free(sc->ifp[port]);
@@ -428,7 +514,9 @@ e6000sw_attach(device_t dev)
 {
 	bool sgmii;
 	e6000sw_softc_t *sc;
+#ifdef FDT
 	phandle_t child, ports;
+#endif
 	int err, port;
 	uint32_t reg;
 
@@ -450,7 +538,7 @@ e6000sw_attach(device_t dev)
 
 	E6000SW_LOCK(sc);
 	e6000sw_setup(dev, sc);
-	ports = ofw_bus_find_child(sc->node, "ports");
+
 	sc->sc_tq = taskqueue_create("e6000sw_taskq", M_NOWAIT,
 	    taskqueue_thread_enqueue, &sc->sc_tq);
 
@@ -458,6 +546,8 @@ e6000sw_attach(device_t dev)
 	taskqueue_start_threads(&sc->sc_tq, 1, PI_NET, "%s taskq",
 	    device_get_nameunit(dev));
 
+#ifdef FDT
+	ports = ofw_bus_find_child(sc->node, "ports");
 	if (ports == 0) {
 		device_printf(dev, "failed to parse DTS: no ports found for "
 		    "switch\n");
@@ -471,6 +561,12 @@ e6000sw_attach(device_t dev)
 			device_printf(sc->dev, "failed to parse DTS\n");
 			goto out_fail;
 		}
+#else
+	for (port = 0; port < sc->num_ports; port++) {
+		err = e6000sw_parse_hinted_port(sc, port);
+		if (err != 0)
+			continue;
+#endif
 
 		/* Port is in use. */
 		sc->ports_mask |= (1 << port);
@@ -530,20 +626,11 @@ e6000sw_attach(device_t dev)
 		if (!e6000sw_is_phyport(sc, port))
 			continue;
 
-		/*
-		 * It's necessary to unlock mutex, because e6000sw_attach_miibus
-		 * calls functions, which try to lock mutex.That leads
-		 * to recursive lock on non recursive mutex.
-		 */
-		E6000SW_UNLOCK(sc);
-
 		err = e6000sw_attach_miibus(sc, port);
 		if (err != 0) {
 			device_printf(sc->dev, "failed to attach miibus\n");
 			goto out_fail;
 		}
-
-		E6000SW_LOCK(sc);
 	}
 
 	etherswitch_info.es_nports = sc->num_ports;
@@ -657,29 +744,41 @@ e6000sw_write_xmdio(device_t dev, int phy, int devaddr, int devreg, int val)
 	return (0);
 }
 
+static int e6000sw_readphy(device_t dev, int phy, int reg)
+{
+	e6000sw_softc_t *sc;
+	int ret;
+
+	sc = device_get_softc(dev);
+	E6000SW_LOCK_ASSERT(sc, SA_UNLOCKED);
+
+	E6000SW_LOCK(sc);
+	ret = e6000sw_readphy_locked(dev, phy, reg);
+	E6000SW_UNLOCK(sc);
+
+	return (ret);
+}
+
 /*
  * PHY registers are paged. Put page index in reg 22 (accessible from every
  * page), then access specific register.
  */
 static int
-e6000sw_readphy(device_t dev, int phy, int reg)
+e6000sw_readphy_locked(device_t dev, int phy, int reg)
 {
 	e6000sw_softc_t *sc;
 	uint32_t val;
 
 	sc = device_get_softc(dev);
-	E6000SW_LOCK_ASSERT(sc, SA_UNLOCKED);
+	E6000SW_LOCK_ASSERT(sc, SA_XLOCKED);
 
 	if (!e6000sw_is_phyport(sc, phy) || reg >= E6000SW_NUM_PHY_REGS) {
 		device_printf(dev, "Wrong register address.\n");
 		return (EINVAL);
 	}
 
-	E6000SW_LOCK(sc);
-
 	if (E6000SW_WAITREADY2(sc, SMI_PHY_CMD_REG, SMI_CMD_BUSY)) {
 		device_printf(dev, "Timeout while waiting for switch\n");
-		E6000SW_UNLOCK(sc);
 		return (ETIMEDOUT);
 	}
 
@@ -688,35 +787,44 @@ e6000sw_readphy(device_t dev, int phy, int reg)
 	    ((phy << SMI_CMD_DEV_ADDR) & SMI_CMD_DEV_ADDR_MASK));
 	if (E6000SW_WAITREADY2(sc, SMI_PHY_CMD_REG, SMI_CMD_BUSY)) {
 		device_printf(dev, "Timeout while waiting for switch\n");
-		E6000SW_UNLOCK(sc);
 		return (ETIMEDOUT);
 	}
 
 	val = e6000sw_readreg(sc, REG_GLOBAL2, SMI_PHY_DATA_REG);
 
-	E6000SW_UNLOCK(sc);
-
 	return (val & PHY_DATA_MASK);
 }
 
+static int e6000sw_writephy(device_t dev, int phy, int reg, int data)
+{
+	e6000sw_softc_t *sc;
+	int ret;
+
+	sc = device_get_softc(dev);
+	E6000SW_LOCK_ASSERT(sc, SA_UNLOCKED);
+
+	E6000SW_LOCK(sc);
+	ret = e6000sw_writephy_locked(dev, phy, reg, data);
+	E6000SW_UNLOCK(sc);
+
+	return (ret);
+}
+
 static int
-e6000sw_writephy(device_t dev, int phy, int reg, int data)
+e6000sw_writephy_locked(device_t dev, int phy, int reg, int data)
 {
 	e6000sw_softc_t *sc;
 
 	sc = device_get_softc(dev);
-	E6000SW_LOCK_ASSERT(sc, SA_UNLOCKED);
+	E6000SW_LOCK_ASSERT(sc, SA_XLOCKED);
 
 	if (!e6000sw_is_phyport(sc, phy) || reg >= E6000SW_NUM_PHY_REGS) {
 		device_printf(dev, "Wrong register address.\n");
 		return (EINVAL);
 	}
 
-	E6000SW_LOCK(sc);
-
 	if (E6000SW_WAITREADY2(sc, SMI_PHY_CMD_REG, SMI_CMD_BUSY)) {
 		device_printf(dev, "Timeout while waiting for switch\n");
-		E6000SW_UNLOCK(sc);
 		return (ETIMEDOUT);
 	}
 
@@ -725,8 +833,6 @@ e6000sw_writephy(device_t dev, int phy, int reg, int data)
 	e6000sw_writereg(sc, REG_GLOBAL2, SMI_PHY_CMD_REG,
 	    SMI_CMD_OP_C22_WRITE | (reg & SMI_CMD_REG_ADDR_MASK) |
 	    ((phy << SMI_CMD_DEV_ADDR) & SMI_CMD_DEV_ADDR_MASK));
-
-	E6000SW_UNLOCK(sc);
 
 	return (0);
 }
@@ -948,7 +1054,7 @@ e6000sw_init_vlan(struct e6000sw_softc *sc)
 		ret &= ~(PORT_CONTROL_EGRESS | PORT_CONTROL_FRAME);
 		e6000sw_writereg(sc, REG_PORT(sc, port), PORT_CONTROL, ret);
 
-		/* Set the the 802.1q mode. */
+		/* Set the 802.1q mode. */
 		ret = e6000sw_readreg(sc, REG_PORT(sc, port), PORT_CONTROL2);
 		ret &= ~PORT_CONTROL2_DOT1Q;
 		if (sc->vlan_mode == ETHERSWITCH_VLAN_DOT1Q)
@@ -1064,7 +1170,7 @@ e6000sw_writereg_wrapper(device_t dev, int addr_reg, int val)
 		device_printf(dev, "Wrong register address.\n");
 		return (EINVAL);
 	}
-	e6000sw_writereg(device_get_softc(dev), addr_reg / 5,
+	e6000sw_writereg(device_get_softc(dev), addr_reg / 32,
 	    addr_reg % 32, val);
 
 	return (0);
@@ -1271,13 +1377,13 @@ e6000sw_miiforphy(e6000sw_softc_t *sc, unsigned int phy)
 }
 
 static int
-e6000sw_ifmedia_upd(struct ifnet *ifp)
+e6000sw_ifmedia_upd(if_t ifp)
 {
 	e6000sw_softc_t *sc;
 	struct mii_data *mii;
 
-	sc = ifp->if_softc;
-	mii = e6000sw_miiforphy(sc, ifp->if_dunit);
+	sc = if_getsoftc(ifp);
+	mii = e6000sw_miiforphy(sc, if_getdunit(ifp));
 	if (mii == NULL)
 		return (ENXIO);
 	mii_mediachg(mii);
@@ -1286,13 +1392,13 @@ e6000sw_ifmedia_upd(struct ifnet *ifp)
 }
 
 static void
-e6000sw_ifmedia_sts(struct ifnet *ifp, struct ifmediareq *ifmr)
+e6000sw_ifmedia_sts(if_t ifp, struct ifmediareq *ifmr)
 {
 	e6000sw_softc_t *sc;
 	struct mii_data *mii;
 
-	sc = ifp->if_softc;
-	mii = e6000sw_miiforphy(sc, ifp->if_dunit);
+	sc = if_getsoftc(ifp);
+	mii = e6000sw_miiforphy(sc, if_getdunit(ifp));
 
 	if (mii == NULL)
 		return;
@@ -1529,9 +1635,8 @@ e6000sw_setup(device_t dev, e6000sw_softc_t *sc)
 static void
 e6000sw_set_atustat(device_t dev, e6000sw_softc_t *sc, int bin, int flag)
 {
-	uint16_t ret;
 
-	ret = e6000sw_readreg(sc, REG_GLOBAL2, ATU_STATS);
+	e6000sw_readreg(sc, REG_GLOBAL2, ATU_STATS);
 	e6000sw_writereg(sc, REG_GLOBAL2, ATU_STATS, (bin << ATU_STATS_BIN ) |
 	    (flag << ATU_STATS_FLAG));
 }

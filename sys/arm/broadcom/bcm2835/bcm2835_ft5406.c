@@ -26,8 +26,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/bus.h>
@@ -325,12 +323,11 @@ static device_method_t ft5406ts_methods[] = {
 	DEVMETHOD_END
 };
 
-static devclass_t ft5406ts_devclass;
 static driver_t ft5406ts_driver = {
 	"ft5406ts",
 	ft5406ts_methods,
 	sizeof(struct ft5406ts_softc),
 };
 
-DRIVER_MODULE(ft5406ts, simplebus, ft5406ts_driver, ft5406ts_devclass, 0, 0);
+DRIVER_MODULE(ft5406ts, simplebus, ft5406ts_driver, 0, 0);
 MODULE_DEPEND(ft5406ts, evdev, 1, 1, 1);

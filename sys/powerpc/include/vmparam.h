@@ -31,7 +31,6 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
  *	$NetBSD: vmparam.h,v 1.11 2000/02/11 19:25:16 thorpej Exp $
- * $FreeBSD$
  */
 
 #ifndef _MACHINE_VMPARAM_H_
@@ -256,14 +255,6 @@ extern	int vm_level_0_order;
 #define	ZERO_REGION_SIZE	(2 * 1024 * 1024)	/* 2MB */
 #else
 #define	ZERO_REGION_SIZE	(64 * 1024)	/* 64KB */
-#endif
-
-/*
- * Use a fairly large batch size since we expect ppc64 systems to have lots of
- * memory.
- */
-#ifdef __powerpc64__
-#define	VM_BATCHQUEUE_SIZE	31
 #endif
 
 /*

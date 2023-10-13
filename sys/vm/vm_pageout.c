@@ -75,8 +75,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include "opt_vm.h"
 
 #include <sys/param.h>
@@ -713,38 +711,6 @@ unlock_mp:
 }
 
 /*
- * Check if the object is active.  Non-anonymous swap objects are
- * always referenced by the owner, for them require ref_count > 1 in
- * order to ignore the ownership ref.
- *
- * Perform an unsynchronized object ref count check.  While
- * the page lock ensures that the page is not reallocated to
- * another object, in particular, one with unmanaged mappings
- * that cannot support pmap_ts_referenced(), two races are,
- * nonetheless, possible:
- * 1) The count was transitioning to zero, but we saw a non-
- *    zero value.  pmap_ts_referenced() will return zero
- *    because the page is not mapped.
- * 2) The count was transitioning to one, but we saw zero.
- *    This race delays the detection of a new reference.  At
- *    worst, we will deactivate and reactivate the page.
- */
-static bool
-vm_pageout_object_act(vm_object_t object)
-{
-	return (object->ref_count >
-	    ((object->flags & (OBJ_SWAP | OBJ_ANON)) == OBJ_SWAP ? 1 : 0));
-}
-
-static int
-vm_pageout_page_ts_referenced(vm_object_t object, vm_page_t m)
-{
-	if (!vm_pageout_object_act(object))
-		return (0);
-	return (pmap_ts_referenced(m));
-}
-
-/*
  * Attempt to launder the specified number of pages.
  *
  * Returns the number of pages successfully laundered.
@@ -838,7 +804,7 @@ scan:
 		if (vm_page_none_valid(m))
 			goto free_page;
 
-		refs = vm_pageout_page_ts_referenced(object, m);
+		refs = object->ref_count != 0 ? pmap_ts_referenced(m) : 0;
 
 		for (old = vm_page_astate_load(m);;) {
 			/*
@@ -858,7 +824,7 @@ scan:
 			}
 			if (act_delta == 0) {
 				;
-			} else if (vm_pageout_object_act(object)) {
+			} else if (object->ref_count != 0) {
 				/*
 				 * Increase the activation count if the page was
 				 * referenced while in the laundry queue.  This
@@ -928,11 +894,8 @@ free_page:
 			vm_page_free(m);
 			VM_CNT_INC(v_dfree);
 		} else if ((object->flags & OBJ_DEAD) == 0) {
-			if ((object->flags & OBJ_SWAP) == 0 &&
-			    object->type != OBJT_DEFAULT)
-				pageout_ok = true;
-			else if (disable_swap_pageouts)
-				pageout_ok = false;
+			if ((object->flags & OBJ_SWAP) != 0)
+				pageout_ok = disable_swap_pageouts == 0;
 			else
 				pageout_ok = true;
 			if (!pageout_ok) {
@@ -1295,8 +1258,20 @@ act_scan:
 		 * Test PGA_REFERENCED after calling pmap_ts_referenced() so
 		 * that a reference from a concurrently destroyed mapping is
 		 * observed here and now.
+		 *
+		 * Perform an unsynchronized object ref count check.  While
+		 * the page lock ensures that the page is not reallocated to
+		 * another object, in particular, one with unmanaged mappings
+		 * that cannot support pmap_ts_referenced(), two races are,
+		 * nonetheless, possible:
+		 * 1) The count was transitioning to zero, but we saw a non-
+		 *    zero value.  pmap_ts_referenced() will return zero
+		 *    because the page is not mapped.
+		 * 2) The count was transitioning to one, but we saw zero.
+		 *    This race delays the detection of a new reference.  At
+		 *    worst, we will deactivate and reactivate the page.
 		 */
-		refs = vm_pageout_page_ts_referenced(object, m);
+		refs = object->ref_count != 0 ? pmap_ts_referenced(m) : 0;
 
 		old = vm_page_astate_load(m);
 		do {
@@ -1428,7 +1403,7 @@ vm_pageout_reinsert_inactive(struct scan_state *ss, struct vm_batchqueue *bq,
 	pq = ss->pq;
 
 	if (m != NULL) {
-		if (vm_batchqueue_insert(bq, m))
+		if (vm_batchqueue_insert(bq, m) != 0)
 			return;
 		vm_pagequeue_lock(pq);
 		delta += vm_pageout_reinsert_inactive_page(pq, marker, m);
@@ -1546,7 +1521,7 @@ vm_pageout_scan_inactive(struct vm_domain *vmd, int page_shortage)
 		if (vm_page_none_valid(m))
 			goto free_page;
 
-		refs = vm_pageout_page_ts_referenced(object, m);
+		refs = object->ref_count != 0 ? pmap_ts_referenced(m) : 0;
 
 		for (old = vm_page_astate_load(m);;) {
 			/*
@@ -1566,7 +1541,7 @@ vm_pageout_scan_inactive(struct vm_domain *vmd, int page_shortage)
 			}
 			if (act_delta == 0) {
 				;
-			} else if (vm_pageout_object_act(object)) {
+			} else if (object->ref_count != 0) {
 				/*
 				 * Increase the activation count if the
 				 * page was referenced while in the
@@ -1604,7 +1579,7 @@ vm_pageout_scan_inactive(struct vm_domain *vmd, int page_shortage)
 		 * mappings allow write access, then the page may still be
 		 * modified until the last of those mappings are removed.
 		 */
-		if (vm_pageout_object_act(object)) {
+		if (object->ref_count != 0) {
 			vm_page_test_dirty(m);
 			if (m->dirty == 0 && !vm_page_try_remove_all(m))
 				goto skip_page;
@@ -1906,8 +1881,8 @@ vm_pageout_oom_pagecount(struct vmspace *vmspace)
 		if ((entry->eflags & MAP_ENTRY_NEEDS_COPY) != 0 &&
 		    obj->ref_count != 1)
 			continue;
-		if (obj->type == OBJT_DEFAULT || obj->type == OBJT_PHYS ||
-		    obj->type == OBJT_VNODE || (obj->flags & OBJ_SWAP) != 0)
+		if (obj->type == OBJT_PHYS || obj->type == OBJT_VNODE ||
+		    (obj->flags & OBJ_SWAP) != 0)
 			res += obj->resident_page_count;
 	}
 	return (res);

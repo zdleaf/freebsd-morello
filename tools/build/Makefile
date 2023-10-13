@@ -1,4 +1,3 @@
-# $FreeBSD$
 
 .PATH: ${.CURDIR}/../../include
 
@@ -68,13 +67,17 @@ INCS+=		stdlib.h
 SRCS+=		reallocarray.c
 .endif
 
+.if exists(${HOST_INCLUDE_ROOT}/sys/stat.h)
 _WITH_UTIMENS!= grep -c utimensat ${HOST_INCLUDE_ROOT}/sys/stat.h || true
+.else
+_WITH_UTIMENS= 0
+.endif
 .if ${_WITH_UTIMENS} == 0
 SYSINCS+=	stat.h
 SRCS+=		futimens.c utimensat.c
 .endif
 
-_WITH_EXPLICIT_BZERO!= grep -c explicit_bzero ${HOST_INCLUDE_ROOT}/strings.h || true
+_WITH_EXPLICIT_BZERO!= cat ${HOST_INCLUDE_ROOT}/strings.h ${HOST_INCLUDE_ROOT}/string.h | grep -c explicit_bzero || true
 .if ${_WITH_EXPLICIT_BZERO} == 0
 # .PATH: ${SRCTOP}/sys/libkern
 # Adding sys/libkern to .PATH breaks building the cross-build compat library
@@ -121,7 +124,13 @@ CHACHA20INCSDIR=	${INCLUDEDIR}/crypto/chacha20
 CHACHA20INCS+=	${SRCTOP}/sys/crypto/chacha20/_chacha.h \
 	${SRCTOP}/sys/crypto/chacha20/chacha.h
 
+.if ${MACHINE} == "host"
+_host_arch= ${_HOST_ARCH}
+.elif ${MACHINE} == "host32"
+_host_arch= ${_HOST_ARCH32}
+.else
 _host_arch=${MACHINE}
+.endif
 .if ${_host_arch} == "x86_64"
 # bmake on Linux/mac often prints that instead of amd64
 _host_arch=amd64
@@ -150,9 +159,18 @@ INCS+=	${SRCTOP}/include/nlist.h
 SYSINCS+=	${SRCTOP}/sys/sys/imgact_aout.h
 SYSINCS+=	${SRCTOP}/sys/sys/nlist_aout.h
 
+# macOS's bitstring lacks FreeBSD-specific additions used by makefs's ZFS code
+# and Linux doesn't have it at all.  Older FreeBSD versions lack recent
+# additions.
+INCS+=	${SRCTOP}/include/bitstring.h
+SYSINCS+=	${SRCTOP}/sys/sys/bitstring.h
 
 .if ${.MAKE.OS} != "FreeBSD"
 .PATH: ${.CURDIR}/cross-build
+
+# Needed by our sys/types.h wrapper
+SYSINCS+=	${SRCTOP}/sys/sys/bitcount.h
+
 # dbopen() behaves differently on Linux and FreeBSD so we ensure that we
 # bootstrap the FreeBSD db code. The cross-build headers #define dbopen() to
 # __freebsd_dbopen() so that we don't ever use the host version
@@ -181,6 +199,8 @@ SRCS+=	rpmatch.c
 # On Linux, glibc does not provide strlcpy,strlcat or strmode.
 .PATH: ${LIBC_SRCTOP}/string
 SRCS+=	strlcpy.c strlcat.c strmode.c
+# On Linux, glibc provides ffs* but not fls*
+SRCS+=	fls.c flsl.c flsll.c
 # Compile the fgetln/fgetwln/closefrom fallback code from libbsd:
 SRCS+=	fgetln_fallback.c fgetwln_fallback.c closefrom.c
 CFLAGS.closefrom.c+=	-DSTDC_HEADERS -DHAVE_SYS_DIR_H -DHAVE_DIRENT_H \
@@ -189,7 +209,14 @@ CFLAGS.closefrom.c+=	-DSTDC_HEADERS -DHAVE_SYS_DIR_H -DHAVE_DIRENT_H \
 SRCS+=	progname.c
 # Stub implementations of fflagstostr/strtofflags
 SRCS+=	fflags.c
-.endif
+
+.endif # ${MAKE.OS} == "Linux"
+
+.if ${.MAKE.OS} == "Darwin"
+# Standalone implementation of secure_getenv(), not available on MacOS.
+SRCS+=	secure_getenv.c
+.endif # ${MAKE.OS} == "Darwin"
+
 # Provide the same arc4random implementation on Linux/macOS
 CFLAGS.arc4random.c+=	-I${SRCTOP}/sys/crypto/chacha20 -D__isthreaded=1
 SRCS+=	arc4random.c arc4random_uniform.c
@@ -212,7 +239,7 @@ subr_capability.c: ${SRCTOP}/sys/kern/subr_capability.c
 	cp ${.ALLSRC} ${.TARGET}
 SRCS+=	subr_capability.c
 CLEANFILES+=	subr_capability.c
-.endif
+.endif # ${MAKE.OS} != "FreeBSD"
 
 CASPERINC+=	${SRCTOP}/lib/libcasper/services/cap_fileargs/cap_fileargs.h
 CASPERINC+=	${SRCTOP}/lib/libcasper/services/cap_net/cap_net.h
@@ -240,7 +267,7 @@ DISKINCS+=	${SRCTOP}/sys/sys/disk/bsd.h
 
 # Needed to build config (since it uses libnv)
 SYSINCS+=	${SRCTOP}/sys/sys/nv.h ${SRCTOP}/sys/sys/cnv.h \
-		${SRCTOP}/sys/sys/dnv.h
+		${SRCTOP}/sys/sys/dnv.h ${SRCTOP}/sys/sys/nv_namespace.h
 
 # Needed when bootstrapping ldd (since it uses DF_1_PIE)
 SYSINCS+=	${SRCTOP}/sys/sys/elf32.h
@@ -263,6 +290,9 @@ SYSINCS+=	${SRCTOP}/sys/sys/fnv_hash.h
 # opensolaris compatibility
 INCS+=	${SRCTOP}/include/elf.h
 SYSINCS+=	${SRCTOP}/sys/sys/elf.h
+SYSINCS+=	${SRCTOP}/sys/sys/ctf.h
+# for kbdcontrol:
+SYSINCS+=	${SRCTOP}/sys/sys/kbio.h
 
 # We want to run the build with only ${WORLDTMP} in $PATH to ensure we don't
 # accidentally run tools that are incompatible but happen to be in $PATH.
@@ -285,28 +315,55 @@ _host_tools_to_symlink=	basename bzip2 bunzip2 chmod chown cmp comm cp date dd \
 _make_abs!=	which "${MAKE}"
 _host_abs_tools_to_symlink=	${_make_abs}:make ${_make_abs}:bmake
 
+_LINK_HOST_TOOL=	ln -sfn
+
 .if ${.MAKE.OS} == "FreeBSD"
 # When building on FreeBSD we always copy the host tools instead of linking
 # into WORLDTMP to avoid issues with incompatible libraries (see r364030).
 # Note: we could create links if we don't intend to update the current machine.
-_COPY_HOST_TOOL=cp -pf
+_COPY_HOST_TOOL=	cp -pf
 .else
 # However, this is not necessary on Linux/macOS. Additionally, copying the host
 # tools to another directory with cp -p results in freezes on macOS Big Sur for
 # some unknown reason. It can also break building inside docker containers if
 # there are ACLs on shared volumes.
-_COPY_HOST_TOOL=ln -sfn
-_make_abs!=	which "${MAKE}"
-_host_abs_tools_to_symlink+=	${_make_abs}:make ${_make_abs}:bmake
+_COPY_HOST_TOOL=	${_LINK_HOST_TOOL}
+
 .if ${.MAKE.OS} == "Darwin"
 # /usr/bin/cpp may invoke xcrun:
-_host_tools_to_symlink+=xcrun
+_host_tools_to_symlink+=	xcrun
 .endif  # ${.MAKE.OS} == "Darwin"
-# On Ubuntu /bin/sh is dash which is totally useless. Let's just link bash
-# as the build sh since that will work fine.
+
+# On Ubuntu /bin/sh is dash which is totally useless, and the same for modern
+# macOS. Let's just link bash as the build sh since that will work fine.
 _host_abs_tools_to_symlink+=	/bin/bash:sh
-_host_tools_to_symlink:=${_host_tools_to_symlink:Nsh}
+_host_tools_to_symlink:=	${_host_tools_to_symlink:Nsh}
 .endif
+
+# We also need to symlink any non-absolute toolchain commands. Clang finds its
+# resource directory relative to itself, so CC/CXX/CPP cannot be copied, and
+# there should be no concerns about installing over the current system since we
+# don't use the toolchain during install, so that's not an issue. However,
+# before Clang 13 there was no symlink detection for FreeBSD so that was broken
+# in the same way as copying (https://reviews.llvm.org/D103346), thus create a
+# wrapper script for each to work around this and behave like a symlink.
+# Remove this hack and just use a symlink once Clang 13 can be assumed.
+# For consistency, we use the same strategy for LD.
+.include <bsd.compiler.mk>
+.if ${.MAKE.OS} == "FreeBSD" && ${COMPILER_TYPE} == "clang" && \
+    ${COMPILER_VERSION} < 130000
+_WRAP_HOST_TOOL=	sh -c "printf '\#!/bin/sh\nexec \"\%s\" \"\$$@\"\n' \"\$$0\" > \"\$$1\" && chmod +x \"\$$1\""
+.else
+_WRAP_HOST_TOOL=	${_LINK_HOST_TOOL}
+.endif
+.for var in CC CXX CPP LD
+.for X in $${_empty_var_} X
+.if !empty(${X}${var}) && !${${X}${var}:M/*} && \
+	!${_toolchain_tools_to_symlink:U:M${${X}${var}}}
+_toolchain_tools_to_symlink+=	${${X}${var}}
+.endif
+.endfor
+.endfor
 
 host-symlinks:
 	@echo "Linking host tools into ${DESTDIR}/bin"
@@ -332,13 +389,21 @@ host-symlinks:
 	rm -f ${DESTDIR}/usr/libexec/flua
 	${_COPY_HOST_TOOL} /usr/libexec/flua ${DESTDIR}/usr/libexec/flua
 .endif
+.for _tool in ${_toolchain_tools_to_symlink}
+	@export PATH=$${PATH}:/usr/local/bin; \
+	source_path=`which ${_tool} || echo /dev/null/no/such`; \
+	if [ ! -e "$${source_path}" ] ; then \
+		echo "Cannot find host tool '${_tool}' in PATH ($$PATH)." >&2; false; \
+	fi; \
+	rm -f "${DESTDIR}/bin/${_tool}"; \
+	${_WRAP_HOST_TOOL} "$${source_path}" "${DESTDIR}/bin/${_tool}"
+.endfor
 
 # Create all the directories that are needed during the legacy, bootstrap-tools
 # and cross-tools stages. We do this here using mkdir since mtree may not exist
 # yet (this happens if we are crossbuilding from Linux/Mac).
 INSTALLDIR_LIST= \
 	bin \
-	lib/casper \
 	lib/geom \
 	usr/include/casper \
 	usr/include/private/ucl \

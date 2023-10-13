@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2010-2016 Solarflare Communications Inc.
  * All rights reserved.
@@ -60,8 +60,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include "opt_rss.h"
 
 #include <sys/param.h>
@@ -331,10 +329,10 @@ sfxge_tx_qreap(struct sfxge_txq *txq)
 static void
 sfxge_tx_qlist_post(struct sfxge_txq *txq)
 {
-	unsigned int old_added;
+	unsigned int old_added __diagused;
 	unsigned int block_level;
 	unsigned int level;
-	int rc;
+	int rc __diagused;
 
 	SFXGE_TXQ_LOCK_ASSERT_OWNED(txq);
 
@@ -780,12 +778,12 @@ sfxge_tx_qdpl_flush(struct sfxge_txq *txq)
 }
 
 void
-sfxge_if_qflush(struct ifnet *ifp)
+sfxge_if_qflush(if_t ifp)
 {
 	struct sfxge_softc *sc;
 	unsigned int i;
 
-	sc = ifp->if_softc;
+	sc = if_getsoftc(ifp);
 
 	for (i = 0; i < sc->txq_count; i++)
 		sfxge_tx_qdpl_flush(sc->txq[i]);
@@ -872,13 +870,13 @@ static void sfxge_parse_tx_packet(struct mbuf *mbuf)
  * TX start -- called by the stack.
  */
 int
-sfxge_if_transmit(struct ifnet *ifp, struct mbuf *m)
+sfxge_if_transmit(if_t ifp, struct mbuf *m)
 {
 	struct sfxge_softc *sc;
 	struct sfxge_txq *txq;
 	int rc;
 
-	sc = (struct sfxge_softc *)ifp->if_softc;
+	sc = (struct sfxge_softc *)if_getsoftc(ifp);
 
 	/*
 	 * Transmit may be called when interface is up from the kernel
@@ -888,7 +886,7 @@ sfxge_if_transmit(struct ifnet *ifp, struct mbuf *m)
 	 * point of view, but already down from the kernel point of
 	 * view. I.e. Rx when interface shutdown is in progress.
 	 */
-	KASSERT((ifp->if_flags & IFF_UP) || (sc->if_flags & IFF_UP),
+	KASSERT((if_getflags(ifp) & IFF_UP) || (sc->if_flags & IFF_UP),
 		("interface not up"));
 
 	/* Pick the desired transmit queue. */
@@ -1433,7 +1431,7 @@ static void
 sfxge_tx_qunblock(struct sfxge_txq *txq)
 {
 	struct sfxge_softc *sc;
-	struct sfxge_evq *evq;
+	struct sfxge_evq *evq __diagused;
 
 	sc = txq->sc;
 	evq = sc->evq[txq->evq_index];
@@ -1811,7 +1809,6 @@ sfxge_tx_qinit(struct sfxge_softc *sc, unsigned int txq_index,
 	struct sysctl_ctx_list *ctx = device_get_sysctl_ctx(sc->dev);
 	struct sysctl_oid *txq_node;
 	struct sfxge_txq *txq;
-	struct sfxge_evq *evq;
 	struct sfxge_tx_dpl *stdp;
 	struct sysctl_oid *dpl_node;
 	efsys_mem_t *esmp;
@@ -1825,8 +1822,6 @@ sfxge_tx_qinit(struct sfxge_softc *sc, unsigned int txq_index,
 
 	sc->txq[txq_index] = txq;
 	esmp = &txq->mem;
-
-	evq = sc->evq[evq_index];
 
 	/* Allocate and zero DMA space for the descriptor ring. */
 	if ((rc = sfxge_dma_alloc(sc, EFX_TXQ_SIZE(sc->txq_entries), esmp)) != 0)
@@ -2004,7 +1999,7 @@ int
 sfxge_tx_init(struct sfxge_softc *sc)
 {
 	const efx_nic_cfg_t *encp = efx_nic_cfg_get(sc->enp);
-	struct sfxge_intr *intr;
+	struct sfxge_intr *intr __diagused;
 	int index;
 	int rc;
 

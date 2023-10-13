@@ -23,7 +23,6 @@
 # OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 # SUCH DAMAGE.
 #
-# $FreeBSD$
 
 # This script is used to submit a series of git commits to Differential.  Each
 # commit is submitted as a separate review.  For each review, this script will
@@ -35,8 +34,8 @@
 #
 # When your reviews are complete, merge all of the review_DXXXX branches
 # together, and then do a git rebase -ik to meld the code review fixes into the
-# commit that they fixed.  Now you have a clean series of patches to commit to
-# svn.
+# commit that they fixed.  Now you have a clean series of patches to push to
+# git.
 
 usage()
 {

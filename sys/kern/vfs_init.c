@@ -37,8 +37,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/fnv_hash.h>
@@ -80,7 +78,7 @@ SX_SYSINIT(vfsconf, &vfsconf_sx, "vfsconf");
 static int	vfs_typenumhash = 1;
 SYSCTL_INT(_vfs, OID_AUTO, typenumhash, CTLFLAG_RDTUN, &vfs_typenumhash, 0,
     "Set vfc_typenum using a hash calculation on vfc_name, so that it does not"
-    "change when file systems are loaded in a different order.");
+    " change when file systems are loaded in a different order.");
 
 /*
  * A Zen vnode attribute structure.
@@ -352,6 +350,17 @@ vfs_purge_sigdefer(struct mount *mp)
 	sigallowstop(prev_stops);
 }
 
+static int
+vfs_report_lockf_sigdefer(struct mount *mp, struct sbuf *sb)
+{
+	int prev_stops, rc;
+
+	prev_stops = sigdeferstop(SIGDEFERSTOP_SILENT);
+	rc = (*mp->mnt_vfc->vfc_vfsops_sd->vfs_report_lockf)(mp, sb);
+	sigallowstop(prev_stops);
+	return (rc);
+}
+
 static struct vfsops vfsops_sigdefer = {
 	.vfs_mount =		vfs_mount_sigdefer,
 	.vfs_unmount =		vfs_unmount_sigdefer,
@@ -369,7 +378,7 @@ static struct vfsops vfsops_sigdefer = {
 	.vfs_reclaim_lowervp =	vfs_reclaim_lowervp_sigdefer,
 	.vfs_unlink_lowervp =	vfs_unlink_lowervp_sigdefer,
 	.vfs_purge =		vfs_purge_sigdefer,
-
+	.vfs_report_lockf =	vfs_report_lockf_sigdefer,
 };
 
 /* Register a new filesystem type in the global table */
@@ -483,6 +492,8 @@ vfs_register(struct vfsconf *vfc)
 		vfsops->vfs_extattrctl = vfs_stdextattrctl;
 	if (vfsops->vfs_sysctl == NULL)
 		vfsops->vfs_sysctl = vfs_stdsysctl;
+	if (vfsops->vfs_report_lockf == NULL)
+		vfsops->vfs_report_lockf = vfs_report_lockf;
 
 	if ((vfc->vfc_flags & VFCF_SBDRY) != 0) {
 		vfc->vfc_vfsops_sd = vfc->vfc_vfsops;
@@ -512,7 +523,7 @@ vfs_register(struct vfsconf *vfc)
 	 * number.
 	 */
 	sysctl_wlock();
-	SLIST_FOREACH(oidp, SYSCTL_CHILDREN(&sysctl___vfs), oid_link) {
+	RB_FOREACH(oidp, sysctl_oid_list, SYSCTL_CHILDREN(&sysctl___vfs)) {
 		if (strcmp(oidp->oid_name, vfc->vfc_name) == 0) {
 			sysctl_unregister_oid(oidp);
 			oidp->oid_number = vfc->vfc_typenum;
@@ -547,13 +558,12 @@ vfs_unregister(struct vfsconf *vfc)
 		if (vfc->vfc_vfsops_sd->vfs_uninit != NULL)
 			error = vfc->vfc_vfsops_sd->vfs_uninit(vfsp);
 	} else {
-		if (vfc->vfc_vfsops->vfs_uninit != NULL) {
+		if (vfc->vfc_vfsops->vfs_uninit != NULL)
 			error = vfc->vfc_vfsops->vfs_uninit(vfsp);
 	}
 	if (error != 0) {
 		vfsconf_unlock();
 		return (error);
-	}
 	}
 	TAILQ_REMOVE(&vfsconf, vfsp, vfc_list);
 	maxtypenum = VFS_GENERIC;

@@ -26,8 +26,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 /*
  *	New-style Interrupt Framework
  *
@@ -42,31 +40,33 @@ __FBSDID("$FreeBSD$");
 
 #include <sys/param.h>
 #include <sys/systm.h>
-#include <sys/kernel.h>
-#include <sys/lock.h>
-#include <sys/mutex.h>
-#include <sys/syslog.h>
-#include <sys/malloc.h>
-#include <sys/proc.h>
-#include <sys/queue.h>
+#include <sys/asan.h>
+#include <sys/bitstring.h>
 #include <sys/bus.h>
-#include <sys/interrupt.h>
-#include <sys/taskqueue.h>
-#include <sys/tree.h>
 #include <sys/conf.h>
 #include <sys/cpuset.h>
+#include <sys/interrupt.h>
+#include <sys/kernel.h>
+#include <sys/lock.h>
+#include <sys/malloc.h>
+#include <sys/mutex.h>
+#include <sys/proc.h>
+#include <sys/queue.h>
 #include <sys/rman.h>
 #include <sys/sched.h>
 #include <sys/smp.h>
 #include <sys/sysctl.h>
+#include <sys/syslog.h>
+#include <sys/taskqueue.h>
+#include <sys/tree.h>
 #include <sys/vmmeter.h>
 #ifdef HWPMC_HOOKS
 #include <sys/pmckern.h>
 #endif
 
 #include <machine/atomic.h>
-#include <machine/intr.h>
 #include <machine/cpu.h>
+#include <machine/intr.h>
 #include <machine/smp.h>
 #include <machine/stdarg.h>
 
@@ -133,7 +133,7 @@ static struct intr_pic *pic_lookup(device_t dev, intptr_t xref, int flags);
 /* Interrupt source definition. */
 static struct mtx isrc_table_lock;
 static struct intr_irqsrc **irq_sources;
-u_int irq_next_free;
+static u_int irq_next_free;
 
 #ifdef SMP
 #ifdef EARLY_AP_STARTUP
@@ -152,7 +152,8 @@ u_long *intrcnt;
 char *intrnames;
 size_t sintrcnt;
 size_t sintrnames;
-static u_int intrcnt_index;
+int nintrcnt;
+static bitstr_t *intrcnt_bitmap;
 
 static struct intr_irqsrc *intr_map_get_isrc(u_int res_id);
 static void intr_map_set_isrc(u_int res_id, struct intr_irqsrc *isrc);
@@ -166,7 +167,6 @@ static void intr_map_copy_map_data(u_int res_id, device_t *dev, intptr_t *xref,
 static void
 intr_irq_init(void *dummy __unused)
 {
-	u_int intrcnt_count;
 
 	SLIST_INIT(&pic_list);
 	mtx_init(&pic_list_lock, "intr pic list", NULL, MTX_DEF);
@@ -175,19 +175,23 @@ intr_irq_init(void *dummy __unused)
 
 	/*
 	 * - 2 counters for each I/O interrupt.
-	 * - MAXCPU counters for each IPI counters for SMP.
+	 * - mp_maxid + 1 counters for each IPI counters for SMP.
 	 */
-	intrcnt_count = intr_nirq * 2;
+	nintrcnt = intr_nirq * 2;
 #ifdef SMP
-	intrcnt_count += INTR_IPI_COUNT * MAXCPU;
+	nintrcnt += INTR_IPI_COUNT * (mp_maxid + 1);
 #endif
 
-	intrcnt = mallocarray(intrcnt_count, sizeof(u_long), M_INTRNG,
+	intrcnt = mallocarray(nintrcnt, sizeof(u_long), M_INTRNG,
 	    M_WAITOK | M_ZERO);
-	intrnames = mallocarray(intrcnt_count, INTRNAME_LEN, M_INTRNG,
+	intrnames = mallocarray(nintrcnt, INTRNAME_LEN, M_INTRNG,
 	    M_WAITOK | M_ZERO);
-	sintrcnt = intrcnt_count * sizeof(u_long);
-	sintrnames = intrcnt_count * INTRNAME_LEN;
+	sintrcnt = nintrcnt * sizeof(u_long);
+	sintrnames = nintrcnt * INTRNAME_LEN;
+
+	/* Allocate the bitmap tracking counter allocations. */
+	intrcnt_bitmap = bit_alloc(nintrcnt, M_INTRNG, M_WAITOK | M_ZERO);
+
 	irq_sources = mallocarray(intr_nirq, sizeof(struct intr_irqsrc*),
 	    M_INTRNG, M_WAITOK | M_ZERO);
 }
@@ -266,13 +270,17 @@ isrc_update_name(struct intr_irqsrc *isrc, const char *name)
 static void
 isrc_setup_counters(struct intr_irqsrc *isrc)
 {
-	u_int index;
+	int index;
+
+	mtx_assert(&isrc_table_lock, MA_OWNED);
 
 	/*
-	 *  XXX - it does not work well with removable controllers and
-	 *        interrupt sources !!!
+	 * Allocate two counter values, the second tracking "stray" interrupts.
 	 */
-	index = atomic_fetchadd_int(&intrcnt_index, 2);
+	bit_ffc_area(intrcnt_bitmap, nintrcnt, 2, &index);
+	if (index == -1)
+		panic("Failed to allocate 2 counters. Array exhausted?");
+	bit_nset(intrcnt_bitmap, index, index + 1);
 	isrc->isrc_index = index;
 	isrc->isrc_count = &intrcnt[index];
 	isrc_update_name(isrc, NULL);
@@ -284,8 +292,11 @@ isrc_setup_counters(struct intr_irqsrc *isrc)
 static void
 isrc_release_counters(struct intr_irqsrc *isrc)
 {
+	int idx = isrc->isrc_index;
 
-	panic("%s: not implemented", __func__);
+	mtx_assert(&isrc_table_lock, MA_OWNED);
+
+	bit_nclear(intrcnt_bitmap, idx, idx + 1);
 }
 
 #ifdef SMP
@@ -298,11 +309,25 @@ intr_ipi_setup_counters(const char *name)
 	u_int index, i;
 	char str[INTRNAME_LEN];
 
-	index = atomic_fetchadd_int(&intrcnt_index, MAXCPU);
-	for (i = 0; i < MAXCPU; i++) {
+	mtx_lock(&isrc_table_lock);
+
+	/*
+	 * We should never have a problem finding mp_maxid + 1 contiguous
+	 * counters, in practice. Interrupts will be allocated sequentially
+	 * during boot, so the array should fill from low to high index. Once
+	 * reserved, the IPI counters will never be released. Similarly, we
+	 * will not need to allocate more IPIs once the system is running.
+	 */
+	bit_ffc_area(intrcnt_bitmap, nintrcnt, mp_maxid + 1, &index);
+	if (index == -1)
+		panic("Failed to allocate %d counters. Array exhausted?",
+		    mp_maxid + 1);
+	bit_nset(intrcnt_bitmap, index, index + mp_maxid);
+	for (i = 0; i < mp_maxid + 1; i++) {
 		snprintf(str, INTRNAME_LEN, "cpu%d:%s", i, name);
 		intrcnt_setname(str, index + i);
 	}
+	mtx_unlock(&isrc_table_lock);
 	return (&intrcnt[index]);
 }
 #endif
@@ -318,6 +343,8 @@ intr_irq_handler(struct trapframe *tf)
 	struct thread * td;
 
 	KASSERT(irq_root_filter != NULL, ("%s: no filter", __func__));
+
+	kasan_mark(tf, sizeof(*tf), sizeof(*tf), 0);
 
 	VM_CNT_INC(v_intr);
 	critical_enter();
@@ -1546,7 +1573,7 @@ intr_pic_init_secondary(void)
 #endif
 
 #ifdef DDB
-DB_SHOW_COMMAND(irqs, db_show_irqs)
+DB_SHOW_COMMAND_FLAGS(irqs, db_show_irqs, DB_CMD_MEMSAFE)
 {
 	u_int i, irqsum;
 	u_long num;
@@ -1684,6 +1711,14 @@ intr_map_irq(device_t dev, intptr_t xref, struct intr_map_data *data)
 
 	mtx_lock(&irq_map_lock);
 	for (i = irq_map_first_free_idx; i < irq_map_count; i++) {
+		if (irq_map[i] == NULL) {
+			irq_map[i] = entry;
+			irq_map_first_free_idx = i + 1;
+			mtx_unlock(&irq_map_lock);
+			return (i);
+		}
+	}
+	for (i = 0; i < irq_map_first_free_idx; i++) {
 		if (irq_map[i] == NULL) {
 			irq_map[i] = entry;
 			irq_map_first_free_idx = i + 1;

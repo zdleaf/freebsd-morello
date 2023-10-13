@@ -26,7 +26,6 @@
 .\" SUCH DAMAGE.
 .\"
 .\"	@(#)gcore.1	8.2 (Berkeley) 4/18/94
-.\" $FreeBSD$
 .\"
 .Dd April 24, 2021
 .Dt GCORE 1
@@ -46,7 +45,7 @@ The
 .Nm
 utility creates a core image of the specified process,
 suitable for use with
-.Xr gdb 1 .
+.Xr gdb 1 Pq Pa ports/devel/gdb .
 By default, the core is written to the file
 .Dq Pa core.<pid> .
 The process identifier,
@@ -96,7 +95,7 @@ usage
 may not work with processes which are actively being investigated with
 .Xr truss 1
 or
-.Xr gdb 1 .
+.Xr gdb 1 Pq Pa ports/devel/gdb .
 Additionally, interruptable sleeps may exit with EINTR.
 .Pp
 The

@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2019 Conrad Meyer <cem@FreeBSD.org>.  All rights reserved.
  *
@@ -42,8 +42,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/bus.h>
 #include <sys/eventhandler.h>
@@ -256,7 +254,6 @@ static driver_t vmgenc_driver = {
 	sizeof(struct vmgenc_softc),
 };
 
-static devclass_t vmgenc_devclass;
-DRIVER_MODULE(vmgenc, acpi, vmgenc_driver, vmgenc_devclass, NULL, NULL);
+DRIVER_MODULE(vmgenc, acpi, vmgenc_driver, NULL, NULL);
 MODULE_DEPEND(vmgenc, acpi, 1, 1, 1);
 MODULE_DEPEND(vemgenc, random_harvestq, 1, 1, 1);

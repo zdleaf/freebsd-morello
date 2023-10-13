@@ -25,8 +25,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #ifdef SAN_NEEDS_INTERCEPTORS
 #define	SAN_RUNTIME
 #endif
@@ -59,5 +57,5 @@ bus_space_unmap(bus_space_tag_t tag, bus_space_handle_t bsh, bus_size_t size)
 {
 
 	if (tag == X86_BUS_SPACE_MEM)
-		pmap_unmapdev(bsh, size);
+		pmap_unmapdev((void *)bsh, size);
 }

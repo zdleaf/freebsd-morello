@@ -35,8 +35,6 @@ static char sccsid[] = "@(#)edit.c	8.1 (Berkeley) 6/6/93";
 #endif
 #endif /* not lint */
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include "rcv.h"
 #include <fcntl.h>
 #include "extern.h"
@@ -51,7 +49,7 @@ __FBSDID("$FreeBSD$");
  * Edit a message list.
  */
 int
-editor(int *msgvec)
+editor(void *msgvec)
 {
 
 	return (edit1(msgvec, 'e'));
@@ -61,7 +59,7 @@ editor(int *msgvec)
  * Invoke the visual editor on a message list.
  */
 int
-visual(int *msgvec)
+visual(void *msgvec)
 {
 
 	return (edit1(msgvec, 'v'));

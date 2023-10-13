@@ -1,4 +1,3 @@
-# $FreeBSD$
 
 # avoid duplication
 DIRDEPS.AUDIT.yes= lib/libbsm
@@ -13,7 +12,7 @@ DIRDEPS.KERBEROS_SUPPORT.yes+= \
 	kerberos5/lib/libhx509 \
 	kerberos5/lib/libkrb5 \
 	kerberos5/lib/libroken \
-	kerberos5/lib/libwind \
+	kerberos5/lib/libwind
 
 DIRDEPS.NIS.yes+= \
 	include/rpc \
@@ -25,4 +24,4 @@ DIRDEPS.OPENSSL.no+= lib/libmd
 DIRDEPS.PAM_SUPPORT.yes+= lib/libpam/libpam
 DIRDEPS.TCP_WRAPPERS.yes+= lib/libwrap
 
-
+.-include <site.dirdeps-options.mk>

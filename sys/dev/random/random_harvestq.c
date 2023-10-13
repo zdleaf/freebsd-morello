@@ -30,8 +30,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/ck.h>
@@ -254,6 +252,28 @@ random_sources_feed(void)
 	 */
 	npools = howmany(p_random_alg_context->ra_poolcount, RANDOM_KTHREAD_HZ);
 
+	/*-
+	 * If we're not seeded yet, attempt to perform a "full seed", filling
+	 * all of the PRNG's pools with entropy; if there is enough entropy
+	 * available from "fast" entropy sources this will allow us to finish
+	 * seeding and unblock the boot process immediately rather than being
+	 * stuck for a few seconds with random_kthread gradually collecting a
+	 * small chunk of entropy every 1 / RANDOM_KTHREAD_HZ seconds.
+	 *
+	 * The value 64 below is RANDOM_FORTUNA_DEFPOOLSIZE, i.e. chosen to
+	 * fill Fortuna's pools in the default configuration.  With another
+	 * PRNG or smaller pools for Fortuna, we might collect more entropy
+	 * than needed to fill the pools, but this is harmless; alternatively,
+	 * a different PRNG, larger pools, or fast entropy sources which are
+	 * not able to provide as much entropy as we request may result in the
+	 * not being fully seeded (and thus remaining blocked) but in that
+	 * case we will return here after 1 / RANDOM_KTHREAD_HZ seconds and
+	 * try again for a large amount of entropy.
+	 */
+	if (!p_random_alg_context->ra_seeded())
+		npools = howmany(p_random_alg_context->ra_poolcount * 64,
+		    sizeof(entropy));
+
 	/*
 	 * Step over all of live entropy sources, and feed their output
 	 * to the system-wide RNG.
@@ -349,7 +369,8 @@ static const char *random_source_descr[ENTROPYSOURCE] = {
 	[RANDOM_INTERRUPT] = "INTERRUPT",
 	[RANDOM_SWI] = "SWI",
 	[RANDOM_FS_ATIME] = "FS_ATIME",
-	[RANDOM_UMA] = "UMA", /* ENVIRONMENTAL_END */
+	[RANDOM_UMA] = "UMA",
+	[RANDOM_CALLOUT] = "CALLOUT", /* ENVIRONMENTAL_END */
 	[RANDOM_PURE_OCTEON] = "PURE_OCTEON", /* PURE_START */
 	[RANDOM_PURE_SAFE] = "PURE_SAFE",
 	[RANDOM_PURE_GLXSB] = "PURE_GLXSB",
@@ -362,7 +383,8 @@ static const char *random_source_descr[ENTROPYSOURCE] = {
 	[RANDOM_PURE_CCP] = "PURE_CCP",
 	[RANDOM_PURE_DARN] = "PURE_DARN",
 	[RANDOM_PURE_TPM] = "PURE_TPM",
-	[RANDOM_PURE_VMGENID] = "VMGENID",
+	[RANDOM_PURE_VMGENID] = "PURE_VMGENID",
+	[RANDOM_PURE_QUALCOMM] = "PURE_QUALCOMM",
 	/* "ENTROPYSOURCE" */
 };
 
@@ -486,6 +508,14 @@ random_harvestq_prime(void *unused __unused)
 			    size);
 		else
 			printf("random: no preloaded entropy cache\n");
+	}
+	size = random_prime_loader_file(RANDOM_PLATFORM_BOOT_ENTROPY_MODULE);
+	if (bootverbose) {
+		if (size > 0)
+			printf("random: read %zu bytes from platform bootloader\n",
+			    size);
+		else
+			printf("random: no platform bootloader entropy\n");
 	}
 }
 SYSINIT(random_device_prime, SI_SUB_RANDOM, SI_ORDER_MIDDLE, random_harvestq_prime, NULL);

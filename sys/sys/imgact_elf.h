@@ -26,8 +26,6 @@
  * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 #ifndef _SYS_IMGACT_ELF_H_
@@ -83,13 +81,12 @@ typedef struct {
 	int brand;
 	int machine;
 	const char *compat_3_brand;	/* pre Binutils 2.10 method (FBSD 3) */
-	const char *emul_path;
 	const char *interp_path;
 	struct sysentvec *sysvec;
 	const char *interp_newpath;
 	int flags;
 	Elf_Brandnote *brand_note;
-	boolean_t	(*header_supported)(struct image_params *,
+	bool		(*header_supported)(struct image_params *,
 	    int32_t *, uint32_t *);
 		/* High 8 bits of flags is private to the ABI */
 #define	BI_CAN_EXEC_DYN		0x0001

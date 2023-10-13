@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2001 Atsushi Onoe
  * Copyright (c) 2002-2009 Sam Leffler, Errno Consulting
@@ -24,8 +24,6 @@
  * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 #ifndef _NET80211_IEEE80211_VAR_H_
 #define _NET80211_IEEE80211_VAR_H_
@@ -565,6 +563,9 @@ struct ieee80211vap {
 	/* state machine processing */
 	int			(*iv_newstate)(struct ieee80211vap *,
 				    enum ieee80211_state, int);
+	struct ieee80211_node *	(*iv_update_bss)(struct ieee80211vap *,
+				    struct ieee80211_node *);
+
 	/* 802.3 output method for raw frame xmit */
 	int			(*iv_output)(struct ifnet *, struct mbuf *,
 				    const struct sockaddr *, struct route *);
@@ -692,7 +693,8 @@ MALLOC_DECLARE(M_80211_VAP);
 	"\20\2INACT\3SCANWAIT\4BGSCAN\5WPS\6TSN\7SCANREQ\10RESUME" \
 	"\0114ADDR\12NONEPR_PR\13SWBMISS\14DFS\15DOTD\16STATEWAIT\17REINIT" \
 	"\20BPF\21WDSLEGACY\22PROBECHAN\23UNIQMAC\24SCAN_OFFLOAD\25SEQNO_OFFLOAD" \
-	"\26VHT\27QUIET_IE"
+	    "\26FRAG_OFFLOAD\27VHT" \
+	"\30QUIET_IE\31UAPSD"
 
 /* ic_flags_ht/iv_flags_ht */
 #define	IEEE80211_FHT_NONHT_PR	 0x00000001	/* STATUS: non-HT sta present */
@@ -930,10 +932,10 @@ static __inline int
 ieee80211_vhtchanflags(const struct ieee80211_channel *c)
 {
 
-	if (IEEE80211_IS_CHAN_VHT80P80(c))
-		return IEEE80211_FVHT_USEVHT80P80;
 	if (IEEE80211_IS_CHAN_VHT160(c))
 		return IEEE80211_FVHT_USEVHT160;
+	if (IEEE80211_IS_CHAN_VHT80P80(c))
+		return IEEE80211_FVHT_USEVHT80P80;
 	if (IEEE80211_IS_CHAN_VHT80(c))
 		return IEEE80211_FVHT_USEVHT80;
 	if (IEEE80211_IS_CHAN_VHT40(c))

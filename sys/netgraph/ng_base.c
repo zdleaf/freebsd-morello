@@ -33,8 +33,6 @@
  *
  * Authors: Julian Elischer <julian@freebsd.org>
  *          Archie Cobbs <archie@freebsd.org>
- *
- * $FreeBSD$
  * $Whistle: ng_base.c,v 1.39 1999/01/28 23:54:53 julian Exp $
  */
 
@@ -65,6 +63,8 @@
 #include <sys/unistd.h>
 #include <machine/cpu.h>
 #include <vm/uma.h>
+
+#include <machine/stack.h>
 
 #include <net/netisr.h>
 #include <net/vnet.h>
@@ -787,7 +787,7 @@ ng_rmnode(node_p node, hook_p dummy1, void *dummy2, int dummy3)
 
 /*
  * Remove a reference to the node, possibly the last.
- * deadnode always acts as it it were the last.
+ * deadnode always acts as it were the last.
  */
 void
 ng_unref_node(node_p node)
@@ -978,7 +978,7 @@ ng_unname(node_p node)
  * Allocate a bigger name hash.
  */
 static void
-ng_name_rehash()
+ng_name_rehash(void)
 {
 	struct nodehash *new;
 	uint32_t hash;
@@ -1009,7 +1009,7 @@ ng_name_rehash()
  * Allocate a bigger ID hash.
  */
 static void
-ng_ID_rehash()
+ng_ID_rehash(void)
 {
 	struct nodehash *new;
 	uint32_t hash;
@@ -3374,10 +3374,8 @@ sysctl_debug_ng_dump_items(SYSCTL_HANDLER_ARGS)
 {
 	int error;
 	int val;
-	int i;
 
 	val = allocated;
-	i = 1;
 	error = sysctl_handle_int(oidp, &val, 0, req);
 	if (error != 0 || req->newptr == NULL)
 		return (error);
@@ -3441,7 +3439,19 @@ ngthread(void *arg)
 			} else {
 				NG_QUEUE_UNLOCK(&node->nd_input_queue);
 				NGI_GET_NODE(item, node); /* zaps stored node */
-				ng_apply_item(node, item, rw);
+
+				if ((item->el_flags & NGQF_TYPE) == NGQF_MESG) {
+					/*
+					 * NGQF_MESG items should never be processed in
+					 * NET_EPOCH context. So, temporary exit from EPOCH.
+					 */
+					NET_EPOCH_EXIT(et);
+					ng_apply_item(node, item, rw);
+					NET_EPOCH_ENTER(et);
+				} else {
+					ng_apply_item(node, item, rw);
+				}
+
 				NG_NODE_UNREF(node);
 			}
 		}

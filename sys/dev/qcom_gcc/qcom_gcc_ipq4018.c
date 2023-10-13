@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2021, Adrian Chadd <adrian@FreeBSD.org>
  *
@@ -28,8 +28,6 @@
 /* Driver for Qualcomm IPQ4018 clock and reset device */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/kernel.h>
 #include <sys/malloc.h>
@@ -173,12 +171,9 @@ static driver_t qcom_gcc_ipq4018_driver = {
 	qcom_gcc_ipq4018_methods,
 	sizeof(struct qcom_gcc_ipq4018_softc)
 };
-static devclass_t qcom_gcc_ipq4018_devclass;
 
 EARLY_DRIVER_MODULE(qcom_gcc_ipq4018, simplebus, qcom_gcc_ipq4018_driver,
-    qcom_gcc_ipq4018_devclass, qcom_gcc_ipq4018_modevent, 0,
-    BUS_PASS_CPU + BUS_PASS_ORDER_EARLY);
+    qcom_gcc_ipq4018_modevent, NULL, BUS_PASS_CPU + BUS_PASS_ORDER_EARLY);
 EARLY_DRIVER_MODULE(qcom_gcc_ipq4018, ofwbus, qcom_gcc_ipq4018_driver,
-    qcom_gcc_ipq4018_devclass, qcom_gcc_ipq4018_modevent, 0,
-    BUS_PASS_CPU + BUS_PASS_ORDER_EARLY);
+    qcom_gcc_ipq4018_modevent, NULL, BUS_PASS_CPU + BUS_PASS_ORDER_EARLY);
 MODULE_VERSION(qcom_gcc_ipq4018, 1);

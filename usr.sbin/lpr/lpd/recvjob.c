@@ -43,8 +43,6 @@ static char sccsid[] = "@(#)recvjob.c	8.2 (Berkeley) 4/27/95";
 #endif
 
 #include "lp.cdefs.h"		/* A cross-platform version of <sys/cdefs.h> */
-__FBSDID("$FreeBSD$");
-
 /*
  * Receive printer jobs from the network, queue them and
  * start the printer daemon.
@@ -68,7 +66,7 @@ __FBSDID("$FreeBSD$");
 #include "extern.h"
 #include "pathnames.h"
 
-#define ack()	(void) write(STDOUT_FILENO, sp, (size_t)1);
+#define ack()	(void) write(STDOUT_FILENO, sp, (size_t)1)
 
 /*
  * The buffer size to use when reading/writing spool files.

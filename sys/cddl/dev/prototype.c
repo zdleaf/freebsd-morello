@@ -2,8 +2,6 @@
  * This file is freeware. You are free to use it and add your own
  * license.
  *
- * $FreeBSD$
- *
  */
 
 #include <sys/cdefs.h>
@@ -82,7 +80,10 @@ prototype_disable(void *arg, dtrace_id_t id, void *parg)
 static void
 prototype_load(void *dummy)
 {
-	/* Create the /dev/dtrace/prototype entry. */
+	/*
+	 * Create the /dev/dtrace/prototype entry.
+	 * XXX: Remove this if the provider does not need any customs ioctls.
+	 */
 	prototype_cdev = make_dev(&prototype_cdevsw, 0, UID_ROOT, GID_WHEEL, 0600,
 	    "dtrace/prototype");
 
@@ -93,7 +94,7 @@ prototype_load(void *dummy)
 
 
 static int
-prototype_unload()
+prototype_unload(void)
 {
 	int error = 0;
 

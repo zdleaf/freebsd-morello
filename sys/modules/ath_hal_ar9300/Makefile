@@ -26,7 +26,6 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
 # THE POSSIBILITY OF SUCH DAMAGES.
 #
-# $FreeBSD$
 #
 
 .PATH:	${SRCTOP}/sys/dev/ath
@@ -57,3 +56,4 @@ CFLAGS+=  -I. -I${SRCTOP}/sys/contrib/dev/ath/ath_hal/
 # AR9300 HAL build overrides, as there's still some code to tidy up
 CWARNFLAGS.ar9300_eeprom.c=	${NO_WCONSTANT_CONVERSION}
 CWARNFLAGS.ar9300_reset.c=	${NO_WSOMETIMES_UNINITIALIZED} -Wno-unused-function
+CWARNFLAGS+=	${NO_WUNUSED_BUT_SET_VARIABLE}

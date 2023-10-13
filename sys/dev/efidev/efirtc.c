@@ -29,8 +29,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/bus.h>
@@ -195,13 +193,12 @@ static device_method_t efirtc_methods[] = {
 	DEVMETHOD_END
 };
 
-static devclass_t efirtc_devclass;
 static driver_t efirtc_driver = {
 	"efirtc",
 	efirtc_methods,
 	0
 };
 
-DRIVER_MODULE(efirtc, nexus, efirtc_driver, efirtc_devclass, 0, 0);
+DRIVER_MODULE(efirtc, nexus, efirtc_driver, 0, 0);
 MODULE_VERSION(efirtc, 1);
 MODULE_DEPEND(efirtc, efirt, 1, 1, 1);

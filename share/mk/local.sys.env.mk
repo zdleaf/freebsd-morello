@@ -1,4 +1,3 @@
-# $FreeBSD$
 
 # This makefile is for customizations that should be done early
 
@@ -49,3 +48,12 @@ ECHO_TRACE?=	true
 .endif
 
 .include "src.sys.env.mk"
+.-include <site.sys.env.mk>
+
+.if !defined(HOST_TARGET) || !defined(HOST_MACHINE)
+# we need HOST_TARGET etc below.
+.include <host-target.mk>
+.export HOST_TARGET
+.endif
+
+.include <local.sys.machine.mk>

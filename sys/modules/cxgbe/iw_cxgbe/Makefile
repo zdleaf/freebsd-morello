@@ -1,4 +1,3 @@
-# $FreeBSD$
 
 CXGBE=	${SRCTOP}/sys/dev/cxgbe
 .PATH: ${CXGBE}/iw_cxgbe
@@ -18,7 +17,7 @@ SRCS+=	opt_inet.h opt_inet6.h opt_kern_tls.h opt_ktr.h opt_ofed.h
 
 CFLAGS+= -I${CXGBE} -I${SRCTOP}/sys/ofed/include -DLINUX_TYPES_DEFINED
 CFLAGS+= -I${SRCTOP}/sys/ofed/include/uapi
-CFLAGS+= -I${SRCTOP}/sys/compat/linuxkpi/common/include
+CFLAGS+= ${LINUXKPI_INCLUDES}
 CFLAGS+= -DCONFIG_INFINIBAND_USER_MEM
 CFLAGS+= -DINET6 -DINET
 

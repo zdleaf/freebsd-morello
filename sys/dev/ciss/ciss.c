@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2001 Michael Smith
  * Copyright (c) 2004 Paul Saab
@@ -25,8 +25,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- *	$FreeBSD$
  */
 
 /*
@@ -279,7 +277,7 @@ TUNABLE_INT("hw.ciss.force_interrupt", &ciss_force_interrupt);
  * stick with matching against subvendor/subdevice, and thus have to
  * be updated for every new CISS adapter that appears.
  */
-#define CISS_BOARD_UNKNWON	0
+#define CISS_BOARD_UNKNOWN	0
 #define CISS_BOARD_SA5		1
 #define CISS_BOARD_SA5B		2
 #define CISS_BOARD_NOMSI	(1<<4)
@@ -367,8 +365,7 @@ static struct
     { 0, 0, 0, NULL }
 };
 
-static devclass_t	ciss_devclass;
-DRIVER_MODULE(ciss, pci, ciss_pci_driver, ciss_devclass, 0, 0);
+DRIVER_MODULE(ciss, pci, ciss_pci_driver, 0, 0);
 MODULE_PNP_INFO("U16:vendor;U16:device;", pci, ciss, ciss_vendor_data,
     nitems(ciss_vendor_data) - 1);
 MODULE_DEPEND(ciss, cam, 1, 1, 1);
@@ -2076,11 +2073,9 @@ ciss_free(struct ciss_softc *sc)
 static int
 ciss_start(struct ciss_request *cr)
 {
-    struct ciss_command	*cc __diagused;
     int			error;
 
-    cc = cr->cr_cc;
-    debug(2, "post command %d tag %d ", cr->cr_tag, cc->header.host_tag);
+    debug(2, "post command %d tag %d ", cr->cr_tag, cr->cr_cc->header.host_tag);
 
     /*
      * Map the request's data.
@@ -3061,14 +3056,11 @@ ciss_cam_action(struct cam_sim *sim, union ccb *ccb)
     case XPT_GET_TRAN_SETTINGS:
     {
 	struct ccb_trans_settings	*cts = &ccb->cts;
-	int				bus __diagused, target __diagused;
 	struct ccb_trans_settings_spi *spi = &cts->xport_specific.spi;
 	struct ccb_trans_settings_scsi *scsi = &cts->proto_specific.scsi;
 
-	bus = cam_sim_bus(sim);
-	target = cts->ccb_h.target_id;
-
-	debug(1, "XPT_GET_TRAN_SETTINGS %d:%d", bus, target);
+	debug(1, "XPT_GET_TRAN_SETTINGS %d:%d", cam_sim_bus(sim),
+	    ctl->ccb_h.target_id);
 	/* disconnect always OK */
 	cts->protocol = PROTO_SCSI;
 	cts->protocol_version = SCSI_REV_2;

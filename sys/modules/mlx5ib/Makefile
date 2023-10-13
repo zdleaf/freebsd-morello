@@ -1,4 +1,3 @@
-# $FreeBSD$
 .PATH:	${SRCTOP}/sys/dev/mlx5/mlx5_ib
 
 KMOD=mlx5ib
@@ -17,11 +16,11 @@ mlx5_ib_qp.c \
 mlx5_ib_srq.c \
 mlx5_ib_virt.c
 SRCS+=	${LINUXKPI_GENSRCS}
-SRCS+= 	opt_inet.h opt_inet6.h opt_ratelimit.h
+SRCS+= 	opt_inet.h opt_inet6.h opt_ratelimit.h opt_rss.h
 
 CFLAGS+= -I${SRCTOP}/sys/ofed/include
 CFLAGS+= -I${SRCTOP}/sys/ofed/include/uapi
-CFLAGS+= -I${SRCTOP}/sys/compat/linuxkpi/common/include
+CFLAGS+= ${LINUXKPI_INCLUDES}
 CFLAGS+= -DCONFIG_INFINIBAND_USER_MEM
 
 .if defined(CONFIG_BUILD_FPGA)

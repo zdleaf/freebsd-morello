@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2007-2008 Sam Leffler, Errno Consulting
  * All rights reserved.
@@ -27,7 +27,6 @@
 
 #include <sys/cdefs.h>
 #ifdef __FreeBSD__
-__FBSDID("$FreeBSD$");
 #endif
 
 /*
@@ -53,6 +52,7 @@ __FBSDID("$FreeBSD$");
 #include <net/if_var.h>
 #include <net/if_media.h>
 #include <net/if_llc.h>
+#include <net/if_private.h>
 #include <net/ethernet.h>
 
 #include <net/bpf.h>
@@ -179,8 +179,7 @@ ieee80211_create_wds(struct ieee80211vap *vap, struct ieee80211_channel *chan)
 			/*
 			 * Committed to new node, setup state.
 			 */
-			obss = vap->iv_bss;
-			vap->iv_bss = ni;
+			obss = vap->iv_update_bss(vap, ni);
 			ni->ni_wdsvap = vap;
 		}
 		IEEE80211_NODE_UNLOCK(nt);
@@ -201,8 +200,7 @@ ieee80211_create_wds(struct ieee80211vap *vap, struct ieee80211_channel *chan)
 		 */
 		ni = ieee80211_node_create_wds(vap, vap->iv_des_bssid, chan);
 		if (ni != NULL) {
-			obss = vap->iv_bss;
-			vap->iv_bss = ieee80211_ref_node(ni);
+			obss = vap->iv_update_bss(vap, ieee80211_ref_node(ni));
 			ni->ni_flags |= IEEE80211_NODE_AREF;
 			if (obss != NULL)
 				ieee80211_free_node(obss);
@@ -259,7 +257,7 @@ ieee80211_dwds_mcast(struct ieee80211vap *vap0, struct mbuf *m)
 		/*
 		 * Duplicate the frame and send it.
 		 */
-		mcopy = m_copypacket(m, M_NOWAIT);
+		mcopy = m_copypacket(m, IEEE80211_M_NOWAIT);
 		if (mcopy == NULL) {
 			if_inc_counter(ifp, IFCOUNTER_OERRORS, 1);
 			/* XXX stat + msg */
@@ -444,7 +442,7 @@ wds_input(struct ieee80211_node *ni, struct mbuf *m,
 		wh = mtod(m, struct ieee80211_frame *);
 		type = IEEE80211_FC0_TYPE_DATA;
 		dir = wh->i_fc[1] & IEEE80211_FC1_DIR_MASK;
-		subtype = IEEE80211_FC0_SUBTYPE_QOS;
+		subtype = IEEE80211_FC0_SUBTYPE_QOS_DATA;
 		hdrspace = ieee80211_hdrspace(ic, wh);	/* XXX optimize? */
 		goto resubmit_ampdu;
 	}
@@ -558,7 +556,7 @@ wds_input(struct ieee80211_node *ni, struct mbuf *m,
 		 * crypto cipher modules used to do delayed update
 		 * of replay sequence numbers.
 		 */
-		if (is_hw_decrypted || wh->i_fc[1] & IEEE80211_FC1_PROTECTED) {
+		if (is_hw_decrypted || IEEE80211_IS_PROTECTED(wh)) {
 			if ((vap->iv_flags & IEEE80211_F_PRIVACY) == 0) {
 				/*
 				 * Discard encrypted frames when privacy is off.
@@ -585,7 +583,7 @@ wds_input(struct ieee80211_node *ni, struct mbuf *m,
 		/*
 		 * Save QoS bits for use below--before we strip the header.
 		 */
-		if (subtype == IEEE80211_FC0_SUBTYPE_QOS)
+		if (subtype == IEEE80211_FC0_SUBTYPE_QOS_DATA)
 			qos = ieee80211_getqos(wh)[0];
 		else
 			qos = 0;
@@ -714,7 +712,7 @@ wds_input(struct ieee80211_node *ni, struct mbuf *m,
 			    ether_sprintf(wh->i_addr2), rssi);
 		}
 #endif
-		if (wh->i_fc[1] & IEEE80211_FC1_PROTECTED) {
+		if (IEEE80211_IS_PROTECTED(wh)) {
 			IEEE80211_DISCARD(vap, IEEE80211_MSG_INPUT,
 			    wh, NULL, "%s", "WEP set but not permitted");
 			vap->iv_stats.is_rx_mgtdiscard++; /* XXX */

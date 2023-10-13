@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2006 IronPort Systems Inc. <ambrisko@ironport.com>
  * All rights reserved.
@@ -27,11 +27,10 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/bus.h>
+#include <sys/conf.h>
 #include <sys/condvar.h>
 #include <sys/eventhandler.h>
 #include <sys/kernel.h>
@@ -93,11 +92,10 @@ kcs_wait_for_obf(struct ipmi_softc *sc, bool level)
 static void
 kcs_clear_obf(struct ipmi_softc *sc, int status)
 {
-	int data;
 
 	/* Clear OBF */
 	if (status & KCS_STATUS_OBF) {
-		data = INB(sc, KCS_DATA);
+		INB(sc, KCS_DATA);
 	}
 }
 
@@ -266,7 +264,6 @@ static int
 kcs_read_byte(struct ipmi_softc *sc, u_char *data)
 {
 	int status;
-	u_char dummy;
 
 	/* Wait for IBF = 0 */
 	status = kcs_wait_for_ibf(sc, 0);
@@ -296,7 +293,7 @@ kcs_read_byte(struct ipmi_softc *sc, u_char *data)
 			return (0);
 
 		/* Read Dummy */
-		dummy = INB(sc, KCS_DATA);
+		INB(sc, KCS_DATA);
 		return (2);
 	}
 
@@ -492,7 +489,21 @@ kcs_startup(struct ipmi_softc *sc)
 }
 
 static int
-kcs_driver_request(struct ipmi_softc *sc, struct ipmi_request *req, int timo)
+kcs_driver_request_queue(struct ipmi_softc *sc, struct ipmi_request *req, int timo)
+{
+	int error;
+
+	IPMI_LOCK(sc);
+	ipmi_polled_enqueue_request_highpri(sc, req);
+	error = msleep(req, &sc->ipmi_requests_lock, 0, "ipmireq", timo);
+	if (error == 0)
+		error = req->ir_error;
+	IPMI_UNLOCK(sc);
+	return (error);
+}
+
+static int
+kcs_driver_request_poll(struct ipmi_softc *sc, struct ipmi_request *req)
 {
 	int i, ok;
 
@@ -505,6 +516,17 @@ kcs_driver_request(struct ipmi_softc *sc, struct ipmi_request *req, int timo)
 		req->ir_error = EIO;
 	return (req->ir_error);
 }
+
+static int
+kcs_driver_request(struct ipmi_softc *sc, struct ipmi_request *req, int timo)
+{
+
+	if (KERNEL_PANICKED() || dumping)
+		return (kcs_driver_request_poll(sc, req));
+	else
+		return (kcs_driver_request_queue(sc, req, timo));
+}
+
 
 int
 ipmi_kcs_attach(struct ipmi_softc *sc)
@@ -545,7 +567,7 @@ ipmi_kcs_attach(struct ipmi_softc *sc)
 int
 ipmi_kcs_probe_align(struct ipmi_softc *sc)
 {
-	int data, status;
+	int status;
 
 	sc->ipmi_io_spacing = 1;
 retry:
@@ -587,7 +609,7 @@ retry:
 
 	/* Clear OBF */
 	if (status & KCS_STATUS_OBF)
-		data = INB(sc, KCS_DATA);
+		INB(sc, KCS_DATA);
 
 	/* 0x00 to DATA_IN */
 	OUTB(sc, KCS_DATA, 0);
@@ -607,7 +629,7 @@ retry:
 		}
 
 		/* Read error status. */
-		data = INB(sc, KCS_DATA);
+		INB(sc, KCS_DATA);
 
 		/* Write dummy READ to DATA_IN. */
 		OUTB(sc, KCS_DATA, KCS_DATA_IN_READ);
@@ -629,7 +651,7 @@ retry:
 
 		/* Clear OBF */
 		if (status & KCS_STATUS_OBF)
-			data = INB(sc, KCS_DATA);
+			INB(sc, KCS_DATA);
 	} else
 		device_printf(sc->ipmi_dev, "KCS probe: end state %x\n",
 		    KCS_STATUS_STATE(status));

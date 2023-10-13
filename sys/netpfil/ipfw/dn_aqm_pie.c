@@ -1,7 +1,5 @@
 /*
  * PIE - Proportional Integral controller Enhanced AQM algorithm.
- *
- * $FreeBSD$
  * 
  * Copyright (C) 2016 Centre for Advanced Internet Architectures,
  *  Swinburne University of Technology, Melbourne, Australia.
@@ -441,10 +439,10 @@ aqm_pie_dequeue(struct dn_queue *q)
 				if(pst->avg_dq_time == 0)
 					pst->avg_dq_time = dq_time;
 				else {
-					/* 
-					 * weight = PIE_DQ_THRESHOLD/2^6, but we scaled 
-					 * weight by 2^8. Thus, scaled 
-					 * weight = PIE_DQ_THRESHOLD /2^8 
+					/*
+					 * weight = PIE_DQ_THRESHOLD/2^6, but we scaled
+					 * weight by 2^8. Thus, scaled
+					 * weight = PIE_DQ_THRESHOLD /2^8
 					 * */
 					w = PIE_DQ_THRESHOLD >> 8;
 					pst->avg_dq_time = (dq_time* w
@@ -454,11 +452,11 @@ aqm_pie_dequeue(struct dn_queue *q)
 			}
 		}
 
-		/* 
-		 * Start new measurment cycle when the queue has
-		 *  PIE_DQ_THRESHOLD worth of bytes.
+		/*
+		 * Start new measurement cycle when the queue has
+		 * PIE_DQ_THRESHOLD worth of bytes.
 		 */
-		if(!(pst->sflags & PIE_INMEASUREMENT) && 
+		if(!(pst->sflags & PIE_INMEASUREMENT) &&
 			q->ni.len_bytes >= PIE_DQ_THRESHOLD) {
 			pst->sflags |= PIE_INMEASUREMENT;
 			pst->measurement_start = now;
@@ -469,7 +467,7 @@ aqm_pie_dequeue(struct dn_queue *q)
 	else
 		pst->current_qdelay = now - pkt_ts;
 
-	return m;	
+	return m;
 }
 
 /*
@@ -597,8 +595,10 @@ aqm_pie_init(struct dn_queue *q)
 		}
 
 		pst = q->aqm_status;
+		dummynet_sched_lock();
 		/* increase reference count for PIE module */
 		pie_desc.ref_count++;
+		dummynet_sched_unlock();
 		
 		pst->pq = q;
 		pst->parms = pprms;
@@ -632,9 +632,9 @@ pie_callout_cleanup(void *x)
 	mtx_unlock(&pst->lock_mtx);
 	mtx_destroy(&pst->lock_mtx);
 	free(x, M_DUMMYNET);
-	DN_BH_WLOCK();
+	dummynet_sched_lock();
 	pie_desc.ref_count--;
-	DN_BH_WUNLOCK();
+	dummynet_sched_unlock();
 }
 
 /* 

@@ -6,7 +6,7 @@
  * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
- * or http://www.opensolaris.org/os/licensing.
+ * or https://opensource.org/licenses/CDDL-1.0.
  * See the License for the specific language governing permissions
  * and limitations under the License.
  *
@@ -31,6 +31,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <limits.h>
 #include <libzutil.h>
 #include <sys/crypto/icp.h>
 #include <sys/processor.h>
@@ -53,7 +54,7 @@
  */
 
 uint64_t physmem;
-char hw_serial[HW_HOSTID_LEN];
+uint32_t hostid;
 struct utsname hw_utsname;
 
 /* If set, all blocks read will be copied to the specified directory. */
@@ -75,12 +76,28 @@ struct proc p0;
 #define	TS_STACK_MIN	MAX(PTHREAD_STACK_MIN, 32768)
 #define	TS_STACK_MAX	(256 * 1024)
 
+struct zk_thread_wrapper {
+	void (*func)(void *);
+	void *arg;
+};
+
+static void *
+zk_thread_wrapper(void *arg)
+{
+	struct zk_thread_wrapper ztw;
+	memcpy(&ztw, arg, sizeof (ztw));
+	free(arg);
+	ztw.func(ztw.arg);
+	return (NULL);
+}
+
 kthread_t *
 zk_thread_create(void (*func)(void *), void *arg, size_t stksize, int state)
 {
 	pthread_attr_t attr;
 	pthread_t tid;
 	char *stkstr;
+	struct zk_thread_wrapper *ztw;
 	int detachstate = PTHREAD_CREATE_DETACHED;
 
 	VERIFY0(pthread_attr_init(&attr));
@@ -117,7 +134,10 @@ zk_thread_create(void (*func)(void *), void *arg, size_t stksize, int state)
 	VERIFY0(pthread_attr_setstacksize(&attr, stksize));
 	VERIFY0(pthread_attr_setguardsize(&attr, PAGESIZE));
 
-	VERIFY0(pthread_create(&tid, &attr, (void *(*)(void *))func, arg));
+	VERIFY(ztw = malloc(sizeof (*ztw)));
+	ztw->func = func;
+	ztw->arg = arg;
+	VERIFY0(pthread_create(&tid, &attr, zk_thread_wrapper, ztw));
 	VERIFY0(pthread_attr_destroy(&attr));
 
 	return ((void *)(uintptr_t)tid);
@@ -280,7 +300,7 @@ zone_get_hostid(void *zonep)
 	 * We're emulating the system's hostid in userland.
 	 */
 	(void) zonep;
-	return (strtoul(hw_serial, NULL, 10));
+	return (hostid);
 }
 
 int
@@ -614,7 +634,7 @@ __dprintf(boolean_t dprint, const char *file, const char *func,
 static char ce_prefix[CE_IGNORE][10] = { "", "NOTICE: ", "WARNING: ", "" };
 static char ce_suffix[CE_IGNORE][2] = { "", "\n", "\n", "" };
 
-void
+__attribute__((noreturn)) void
 vpanic(const char *fmt, va_list adx)
 {
 	(void) fprintf(stderr, "error: ");
@@ -624,7 +644,7 @@ vpanic(const char *fmt, va_list adx)
 	abort();	/* think of it as a "user-level crash dump" */
 }
 
-void
+__attribute__((noreturn)) void
 panic(const char *fmt, ...)
 {
 	va_list adx;
@@ -748,24 +768,10 @@ random_get_pseudo_bytes(uint8_t *ptr, size_t len)
 }
 
 int
-ddi_strtoul(const char *hw_serial, char **nptr, int base, unsigned long *result)
-{
-	(void) nptr;
-	char *end;
-
-	*result = strtoul(hw_serial, &end, base);
-	if (*result == 0)
-		return (errno);
-	return (0);
-}
-
-int
 ddi_strtoull(const char *str, char **nptr, int base, u_longlong_t *result)
 {
-	(void) nptr;
-	char *end;
-
-	*result = strtoull(str, &end, base);
+	errno = 0;
+	*result = strtoull(str, nptr, base);
 	if (*result == 0)
 		return (errno);
 	return (0);
@@ -804,8 +810,7 @@ kernel_init(int mode)
 	dprintf("physmem = %llu pages (%.2f GB)\n", (u_longlong_t)physmem,
 	    (double)physmem * sysconf(_SC_PAGE_SIZE) / (1ULL << 30));
 
-	(void) snprintf(hw_serial, sizeof (hw_serial), "%ld",
-	    (mode & SPA_MODE_WRITE) ? get_system_hostid() : 0);
+	hostid = (mode & SPA_MODE_WRITE) ? get_system_hostid() : 0;
 
 	random_init();
 
@@ -950,6 +955,35 @@ kmem_asprintf(const char *fmt, ...)
 	return (buf);
 }
 
+/*
+ * kmem_scnprintf() will return the number of characters that it would have
+ * printed whenever it is limited by value of the size variable, rather than
+ * the number of characters that it did print. This can cause misbehavior on
+ * subsequent uses of the return value, so we define a safe version that will
+ * return the number of characters actually printed, minus the NULL format
+ * character.  Subsequent use of this by the safe string functions is safe
+ * whether it is snprintf(), strlcat() or strlcpy().
+ */
+int
+kmem_scnprintf(char *restrict str, size_t size, const char *restrict fmt, ...)
+{
+	int n;
+	va_list ap;
+
+	/* Make the 0 case a no-op so that we do not return -1 */
+	if (size == 0)
+		return (0);
+
+	va_start(ap, fmt);
+	n = vsnprintf(str, size, fmt, ap);
+	va_end(ap);
+
+	if (n >= size)
+		n = size - 1;
+
+	return (n);
+}
+
 zfs_file_t *
 zfs_onexit_fd_hold(int fd, minor_t *minorp)
 {
@@ -966,7 +1000,7 @@ zfs_onexit_fd_rele(zfs_file_t *fp)
 
 int
 zfs_onexit_add_cb(minor_t minor, void (*func)(void *), void *data,
-    uint64_t *action_handle)
+    uintptr_t *action_handle)
 {
 	(void) minor, (void) func, (void) data, (void) action_handle;
 	return (0);
@@ -995,8 +1029,6 @@ kmem_cache_reap_active(void)
 {
 	return (0);
 }
-
-void *zvol_tag = "zvol_tag";
 
 void
 zvol_create_minor(const char *name)
@@ -1404,4 +1436,28 @@ void
 zfsvfs_update_fromname(const char *oldname, const char *newname)
 {
 	(void) oldname, (void) newname;
+}
+
+void
+spa_import_os(spa_t *spa)
+{
+	(void) spa;
+}
+
+void
+spa_export_os(spa_t *spa)
+{
+	(void) spa;
+}
+
+void
+spa_activate_os(spa_t *spa)
+{
+	(void) spa;
+}
+
+void
+spa_deactivate_os(spa_t *spa)
+{
+	(void) spa;
 }

@@ -31,8 +31,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 #ifndef RTLD_MACHDEP_H
@@ -98,9 +96,6 @@ typedef struct {
 } tls_index;
 
 extern void *__tls_get_addr(tls_index* ti);
-
-#define	RTLD_DEFAULT_STACK_PF_EXEC	PF_X
-#define	RTLD_DEFAULT_STACK_EXEC		PROT_EXEC
 
 #define	md_abi_variant_hook(x)
 

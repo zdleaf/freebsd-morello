@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2013-2014 Ruslan Bukin <br@bsdpad.com>
  * All rights reserved.
@@ -32,8 +32,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/bus.h>
@@ -496,6 +494,4 @@ static driver_t ccm_driver = {
 	sizeof(struct ccm_softc),
 };
 
-static devclass_t ccm_devclass;
-
-DRIVER_MODULE(ccm, simplebus, ccm_driver, ccm_devclass, 0, 0);
+DRIVER_MODULE(ccm, simplebus, ccm_driver, 0, 0);

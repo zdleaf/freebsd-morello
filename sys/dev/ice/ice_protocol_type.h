@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: BSD-3-Clause */
-/*  Copyright (c) 2021, Intel Corporation
+/*  Copyright (c) 2023, Intel Corporation
  *  All rights reserved.
  *
  *  Redistribution and use in source and binary forms, with or without
@@ -28,7 +28,6 @@
  *  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  *  POSSIBILITY OF SUCH DAMAGE.
  */
-/*$FreeBSD$*/
 
 #ifndef _ICE_PROTOCOL_TYPE_H_
 #define _ICE_PROTOCOL_TYPE_H_
@@ -59,6 +58,7 @@ enum ice_protocol_type {
 	ICE_MAC_OFOS = 0,
 	ICE_MAC_IL,
 	ICE_ETYPE_OL,
+	ICE_ETYPE_IL,
 	ICE_VLAN_OFOS,
 	ICE_IPV4_OFOS,
 	ICE_IPV4_IL,
@@ -73,6 +73,9 @@ enum ice_protocol_type {
 	ICE_VXLAN_GPE,
 	ICE_NVGRE,
 	ICE_GTP,
+	ICE_GTP_NO_PAY,
+	ICE_PPPOE,
+	ICE_L2TPV3,
 	ICE_PROTOCOL_LAST
 };
 
@@ -88,18 +91,8 @@ enum ice_sw_tunnel_type {
 	ICE_SW_TUN_UDP, /* This means all "UDP" tunnel types: VXLAN-GPE, VXLAN
 			 * and GENEVE
 			 */
-	ICE_SW_TUN_IPV4_GTP_IPV4_TCP,
-	ICE_SW_TUN_IPV4_GTP_IPV4_UDP,
-	ICE_SW_TUN_IPV4_GTP_IPV6_TCP,
-	ICE_SW_TUN_IPV4_GTP_IPV6_UDP,
-	ICE_SW_TUN_IPV6_GTP_IPV4_TCP,
-	ICE_SW_TUN_IPV6_GTP_IPV4_UDP,
-	ICE_SW_TUN_IPV6_GTP_IPV6_TCP,
-	ICE_SW_TUN_IPV6_GTP_IPV6_UDP,
-	ICE_SW_TUN_IPV4_GTPU_IPV4,
-	ICE_SW_TUN_IPV4_GTPU_IPV6,
-	ICE_SW_TUN_IPV6_GTPU_IPV4,
-	ICE_SW_TUN_IPV6_GTPU_IPV6,
+	ICE_SW_TUN_GTPU,
+	ICE_SW_TUN_GTPC,
 	ICE_ALL_TUNNELS /* All tunnel types including NVGRE */
 };
 
@@ -127,8 +120,11 @@ enum ice_prot_id {
 	ICE_PROT_MPLS_IL	= 29,
 	ICE_PROT_IPV4_OF_OR_S	= 32,
 	ICE_PROT_IPV4_IL	= 33,
+	ICE_PROT_IPV4_IL_IL	= 34,
 	ICE_PROT_IPV6_OF_OR_S	= 40,
 	ICE_PROT_IPV6_IL	= 41,
+	ICE_PROT_IPV6_IL_IL	= 42,
+	ICE_PROT_IPV6_NEXT_PROTO = 43,
 	ICE_PROT_IPV6_FRAG	= 47,
 	ICE_PROT_TCP_IL		= 49,
 	ICE_PROT_UDP_OF		= 52,
@@ -153,9 +149,11 @@ enum ice_prot_id {
 
 #define ICE_VNI_OFFSET		12 /* offset of VNI from ICE_PROT_UDP_OF */
 
+#define ICE_NAN_OFFSET		511
 #define ICE_MAC_OFOS_HW		1
 #define ICE_MAC_IL_HW		4
 #define ICE_ETYPE_OL_HW		9
+#define ICE_ETYPE_IL_HW		10
 #define ICE_VLAN_OF_HW		16
 #define ICE_VLAN_OL_HW		17
 #define ICE_IPV4_OFOS_HW	32
@@ -165,6 +163,8 @@ enum ice_prot_id {
 #define ICE_TCP_IL_HW		49
 #define ICE_UDP_ILOS_HW		53
 #define ICE_SCTP_IL_HW		96
+#define ICE_PPPOE_HW		103
+#define ICE_L2TPV3_HW		104
 
 /* ICE_UDP_OF is used to identify all 3 tunnel types
  * VXLAN, GENEVE and VXLAN_GPE. To differentiate further
@@ -172,14 +172,21 @@ enum ice_prot_id {
  */
 #define ICE_UDP_OF_HW	52 /* UDP Tunnels */
 #define ICE_GRE_OF_HW	64 /* NVGRE */
-#define ICE_META_DATA_ID_HW 255 /* this is used for tunnel type */
+#define ICE_META_DATA_ID_HW 255 /* this is used for tunnel and VLAN type */
 
 #define ICE_MDID_SIZE 2
-#define ICE_TUN_FLAG_MDID 21
-#define ICE_TUN_FLAG_MDID_OFF (ICE_MDID_SIZE * ICE_TUN_FLAG_MDID)
+#define ICE_TUN_FLAG_MDID 20
+#define ICE_TUN_FLAG_MDID_OFF(word) \
+	(ICE_MDID_SIZE * (ICE_TUN_FLAG_MDID + (word)))
 #define ICE_TUN_FLAG_MASK 0xFF
+#define ICE_DIR_FLAG_MASK 0x10
+#define ICE_TUN_FLAG_IN_VLAN_MASK 0x80 /* VLAN inside tunneled header */
 #define ICE_TUN_FLAG_VLAN_MASK 0x01
 #define ICE_TUN_FLAG_FV_IND 2
+
+#define ICE_VLAN_FLAG_MDID 20
+#define ICE_VLAN_FLAG_MDID_OFF (ICE_MDID_SIZE * ICE_VLAN_FLAG_MDID)
+#define ICE_PKT_FLAGS_0_TO_15_VLAN_FLAGS_MASK 0xD000
 
 #define ICE_PROTOCOL_MAX_ENTRIES 16
 
@@ -205,8 +212,8 @@ struct ice_ether_vlan_hdr {
 };
 
 struct ice_vlan_hdr {
-	__be16 vlan;
 	__be16 type;
+	__be16 vlan;
 };
 
 struct ice_ipv4_hdr {
@@ -275,6 +282,18 @@ struct ice_udp_gtp_hdr {
 	u8 qfi;
 	u8 rsvrd;
 };
+struct ice_pppoe_hdr {
+	u8 rsrvd_ver_type;
+	u8 rsrvd_code;
+	__be16 session_id;
+	__be16 length;
+	__be16 ppp_prot_id; /* control and data only */
+};
+
+struct ice_l2tpv3_sess_hdr {
+	__be32 session_id;
+	__be64 cookie;
+};
 
 struct ice_nvgre {
 	__be16 flags;
@@ -293,6 +312,8 @@ union ice_prot_hdr {
 	struct ice_udp_tnl_hdr tnl_hdr;
 	struct ice_nvgre nvgre_hdr;
 	struct ice_udp_gtp_hdr gtp_hdr;
+	struct ice_pppoe_hdr pppoe_hdr;
+	struct ice_l2tpv3_sess_hdr l2tpv3_sess_hdr;
 };
 
 /* This is mapping table entry that maps every word within a given protocol

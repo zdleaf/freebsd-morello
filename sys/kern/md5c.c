@@ -30,8 +30,6 @@
  * This file should be kept in sync with src/lib/libmd/md5c.c
  */
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/types.h>
 
 #ifdef _KERNEL
@@ -131,8 +129,7 @@ static unsigned char PADDING[64] = {
 /* MD5 initialization. Begins an MD5 operation, writing a new context. */
 
 void
-MD5Init (context)
-	MD5_CTX *context;
+MD5Init(MD5_CTX *context)
 {
 
 	context->count[0] = context->count[1] = 0;
@@ -151,10 +148,7 @@ MD5Init (context)
  */
 
 void
-MD5Update (context, in, inputLen)
-	MD5_CTX *context;
-	const void *in;
-	unsigned int inputLen;
+MD5Update(MD5_CTX *context, const void *in, unsigned int inputLen)
 {
 	unsigned int i, index, partLen;
 	const unsigned char *input = in;
@@ -194,7 +188,7 @@ MD5Update (context, in, inputLen)
  */
 
 static void
-MD5Pad (MD5_CTX *context)
+MD5Pad(MD5_CTX *context)
 {
 	unsigned char bits[8];
 	unsigned int index, padLen;
@@ -232,9 +226,7 @@ MD5Final(unsigned char digest[static MD5_DIGEST_LENGTH], MD5_CTX *context)
 /* MD5 basic transformation. Transforms state based on block. */
 
 static void
-MD5Transform (state, block)
-	uint32_t state[4];
-	const unsigned char block[64];
+MD5Transform(uint32_t state[4], const unsigned char block[64])
 {
 	uint32_t a = state[0], b = state[1], c = state[2], d = state[3], x[16];
 

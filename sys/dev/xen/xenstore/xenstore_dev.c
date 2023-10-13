@@ -30,8 +30,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/types.h>
 #include <sys/cdefs.h>
 #include <sys/errno.h>
@@ -544,7 +542,5 @@ static device_method_t xs_dev_methods[] = {
 };
 
 DEFINE_CLASS_0(xs_dev, xs_dev_driver, xs_dev_methods, 0);
-devclass_t xs_dev_devclass;
 
-DRIVER_MODULE(xs_dev, xenstore, xs_dev_driver, xs_dev_devclass,
-    NULL, NULL);
+DRIVER_MODULE(xs_dev, xenstore, xs_dev_driver, NULL, NULL);

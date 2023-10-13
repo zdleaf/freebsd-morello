@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2007-2009 Robert N. M. Watson
  * Copyright (c) 2010-2011 Juniper Networks, Inc.
@@ -31,8 +31,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 /*
  * netisr is a packet dispatch service, allowing synchronous (directly
  * dispatched) and asynchronous (deferred dispatch) processing of packets by
@@ -93,6 +91,7 @@ __FBSDID("$FreeBSD$");
 #define	_WANT_NETISR_INTERNAL	/* Enable definitions from netisr_internal.h */
 #include <net/if.h>
 #include <net/if_var.h>
+#include <net/if_private.h>
 #include <net/netisr.h>
 #include <net/netisr_internal.h>
 #include <net/vnet.h>
@@ -134,7 +133,7 @@ static SYSCTL_NODE(_net, OID_AUTO, isr, CTLFLAG_RW | CTLFLAG_MPSAFE, 0,
  * Three global direct dispatch policies are supported:
  *
  * NETISR_DISPATCH_DEFERRED: All work is deferred for a netisr, regardless of
- * context (may be overriden by protocols).
+ * context (may be overridden by protocols).
  *
  * NETISR_DISPATCH_HYBRID: If the executing context allows direct dispatch,
  * and we're running on the CPU the work would be performed on, then direct

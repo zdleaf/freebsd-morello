@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2006 Benno Rice.  All rights reserved.
  *
@@ -25,8 +25,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 /*
  * Driver for the SMSC LAN8710A
  */
@@ -67,15 +65,13 @@ static device_method_t smscphy_methods[] = {
 	DEVMETHOD_END
 };
 
-static devclass_t smscphy_devclass;
-
 static driver_t smscphy_driver = {
 	"smscphy",
 	smscphy_methods,
 	sizeof(struct mii_softc)
 };
 
-DRIVER_MODULE(smscphy, miibus, smscphy_driver, smscphy_devclass, 0, 0);
+DRIVER_MODULE(smscphy, miibus, smscphy_driver, 0, 0);
 
 static const struct mii_phydesc smscphys[] = {
 	MII_PHY_DESC(SMC, LAN8710A),

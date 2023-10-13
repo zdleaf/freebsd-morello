@@ -34,7 +34,6 @@
  * SUCH DAMAGE.
  *
  * 	from: @(#) ieeefp.h 	1.0 (Berkeley) 9/23/93
- * $FreeBSD$
  */
 
 #ifndef _MACHINE_IEEEFP_H_
@@ -43,8 +42,6 @@
 /* Deprecated historical FPU control interface */
 
 #include <x86/x86_ieeefp.h>
-
-#ifdef __GNUCLIKE_ASM
 
 static __inline fp_rnd_t
 fpgetround(void)
@@ -155,7 +152,5 @@ fpresetsticky(fp_except_t _m)
 	__fldenv(&_env);
 	return (_p);
 }
-
-#endif /* __GNUCLIKE_ASM */
 
 #endif /* !_MACHINE_IEEEFP_H_ */

@@ -31,7 +31,6 @@
   POSSIBILITY OF SUCH DAMAGE.
 
 ******************************************************************************/
-/*$FreeBSD$*/
 
 #ifndef _IXGBE_OSDEP_H_
 #define _IXGBE_OSDEP_H_
@@ -135,7 +134,7 @@ enum {
 #define IXGBE_CPU_TO_LE16 htole16
 #define IXGBE_CPU_TO_LE32 htole32
 #define IXGBE_LE32_TO_CPU le32toh
-#define IXGBE_LE32_TO_CPUS(x)
+#define IXGBE_LE32_TO_CPUS(x) *(x) = le32dec(x)
 #define IXGBE_CPU_TO_BE16 htobe16
 #define IXGBE_CPU_TO_BE32 htobe32
 #define IXGBE_BE32_TO_CPU be32toh
@@ -160,18 +159,6 @@ typedef boolean_t	bool;
 #define __be64  u64
 
 #define le16_to_cpu
-
-#if __FreeBSD_version < 800000
-#if defined(__i386__) || defined(__amd64__)
-#define mb()	__asm volatile("mfence" ::: "memory")
-#define wmb()	__asm volatile("sfence" ::: "memory")
-#define rmb()	__asm volatile("lfence" ::: "memory")
-#else
-#define mb()
-#define rmb()
-#define wmb()
-#endif
-#endif
 
 #if defined(__i386__) || defined(__amd64__)
 static __inline

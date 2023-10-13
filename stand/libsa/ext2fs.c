@@ -25,8 +25,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 /*-
  * Copyright (c) 1993
  *	The Regents of the University of California.  All rights reserved.
@@ -108,14 +106,14 @@ static int dtmap[] = { DT_UNKNOWN, DT_REG, DT_DIR, DT_CHR,
 			DT_UNKNOWN : dtmap[x]
 
 struct fs_ops ext2fs_fsops = {
-	"ext2fs",
-	ext2fs_open,
-	ext2fs_close,
-	ext2fs_read,
-	null_write,
-	ext2fs_seek,
-	ext2fs_stat,
-	ext2fs_readdir
+	.fs_name = "ext2fs",
+	.fo_open = ext2fs_open,
+	.fo_close = ext2fs_close,
+	.fo_read = ext2fs_read,
+	.fo_write = null_write,
+	.fo_seek = ext2fs_seek,
+	.fo_stat = ext2fs_stat,
+	.fo_readdir = ext2fs_readdir,
 };
 
 #define	EXT2_SBSIZE	1024
@@ -796,9 +794,10 @@ ext2fs_close(struct open_file *f)
 	struct file *fp = (struct file *)f->f_fsdata;
 	int level;
 
-	f->f_fsdata = (void *)0;
-	if (fp == (struct file *)0)
+	if (fp == NULL)
 		return (0);
+
+	f->f_fsdata = NULL;
 
 	for (level = 0; level < EXT2_NIADDR; level++) {
 		if (fp->f_blk[level])
@@ -891,16 +890,17 @@ ext2fs_readdir(struct open_file *f, struct dirent *d)
 	/*
 	 * assume that a directory entry will not be split across blocks
 	 */
-again:
-	if (fp->f_seekp >= fp->f_di.di_size)
-		return (ENOENT);
-	error = buf_read_file(f, &buf, &buf_size);
-	if (error)
-		return (error);
-	ed = (struct ext2dirent *)buf;
-	fp->f_seekp += ed->d_reclen;
-	if (ed->d_ino == (ino_t)0)
-		goto again;
+
+	do {
+		if (fp->f_seekp >= fp->f_di.di_size)
+			return (ENOENT);
+		error = buf_read_file(f, &buf, &buf_size);
+		if (error)
+			return (error);
+		ed = (struct ext2dirent *)buf;
+		fp->f_seekp += ed->d_reclen;
+	} while (ed->d_ino == (ino_t)0);
+
 	d->d_type = EXTFTODT(ed->d_type);
 	strncpy(d->d_name, ed->d_name, ed->d_namlen);
 	d->d_name[ed->d_namlen] = '\0';

@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2013 EMC Corp.
  * All rights reserved.
@@ -31,8 +31,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/ioccom.h>
 
@@ -319,11 +317,16 @@ print_log_error(const struct nvme_controller_data *cdata __unused, void *buf, ui
 }
 
 void
-print_temp(uint16_t t)
+print_temp_K(uint16_t t)
 {
 	printf("%u K, %2.2f C, %3.2f F\n", t, (float)t - 273.15, (float)t * 9 / 5 - 459.67);
 }
 
+void
+print_temp_C(uint16_t t)
+{
+	printf("%2.2f K, %u C, %3.2f F\n", (float)t + 273.15, t, (float)t * 9 / 5 + 32);
+}
 
 static void
 print_log_health(const struct nvme_controller_data *cdata __unused, void *buf, uint32_t size __unused)
@@ -350,7 +353,7 @@ print_log_health(const struct nvme_controller_data *cdata __unused, void *buf, u
 	printf(" Volatile memory backup:        %d\n",
 	    !!(warning & NVME_CRIT_WARN_ST_VOLATILE_MEMORY_BACKUP));
 	printf("Temperature:                    ");
-	print_temp(health->temperature);
+	print_temp_K(health->temperature);
 	printf("Available spare:                %u\n",
 	    health->available_spare);
 	printf("Available spare threshold:      %u\n",
@@ -385,7 +388,7 @@ print_log_health(const struct nvme_controller_data *cdata __unused, void *buf, u
 		if (health->temp_sensor[i] == 0)
 			continue;
 		printf("Temperature Sensor %d:           ", i + 1);
-		print_temp(health->temp_sensor[i]);
+		print_temp_K(health->temp_sensor[i]);
 	}
 	printf("Temperature 1 Transition Count: %d\n", health->tmt1tc);
 	printf("Temperature 2 Transition Count: %d\n", health->tmt2tc);
@@ -729,7 +732,7 @@ NVME_LOGPAGE(ple,
     NVME_LOG_PREDICTABLE_LATENCY_EVENT_AGGREGATE,	NULL,	"Predictable Latency Event Aggregate",
     NULL,				DEFAULT_SIZE);
 NVME_LOGPAGE(ana,
-    NVME_LOG_ASYMMETRIC_NAMESPAVE_ACCESS,	NULL,	"Asymmetric Namespace Access",
+    NVME_LOG_ASYMMETRIC_NAMESPACE_ACCESS,	NULL,	"Asymmetric Namespace Access",
     NULL,				DEFAULT_SIZE);
 NVME_LOGPAGE(pel,
     NVME_LOG_PERSISTENT_EVENT_LOG,	NULL,	"Persistent Event Log",
@@ -806,7 +809,7 @@ logpage(const struct cmd *f, int argc, char *argv[])
 		NVME_CTRLR_DATA_LPA_NS_SMART_MASK;
 
 	/*
-	 * The log page attribtues indicate whether or not the controller
+	 * The log page attributes indicate whether or not the controller
 	 * supports the SMART/Health information log page on a per
 	 * namespace basis.
 	 */

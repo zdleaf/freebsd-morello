@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 1998 Robert Nordier
  * All rights reserved.
@@ -27,11 +27,6 @@
  * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef lint
-static const char rcsid[] =
-  "$FreeBSD$";
-#endif /* not lint */
-
 #include <sys/param.h>
 #include <sys/stat.h>
 #include <err.h>
@@ -51,7 +46,7 @@ static const char rcsid[] =
 
 static u_int argtou(const char *, u_int, u_int, const char *);
 static off_t argtooff(const char *, const char *);
-static void usage(void);
+static void usage(void) __dead2;
 
 static time_t
 get_tstamp(const char *b)

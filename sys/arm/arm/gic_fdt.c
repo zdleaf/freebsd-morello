@@ -37,8 +37,6 @@
 #include "opt_platform.h"
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/bus.h>
@@ -90,6 +88,7 @@ static device_method_t gic_fdt_methods[] = {
 
 	/* Bus interface */
 	DEVMETHOD(bus_get_resource_list,gic_fdt_get_resource_list),
+	DEVMETHOD(bus_get_device_path, ofw_bus_gen_get_device_path),
 
 	/* ofw_bus interface */
 	DEVMETHOD(ofw_bus_get_devinfo,	gic_ofw_get_devinfo),
@@ -105,11 +104,9 @@ static device_method_t gic_fdt_methods[] = {
 DEFINE_CLASS_1(gic, gic_fdt_driver, gic_fdt_methods,
     sizeof(struct arm_gic_fdt_softc), arm_gic_driver);
 
-static devclass_t gic_fdt_devclass;
-
-EARLY_DRIVER_MODULE(gic, simplebus, gic_fdt_driver, gic_fdt_devclass, 0, 0,
+EARLY_DRIVER_MODULE(gic, simplebus, gic_fdt_driver, 0, 0,
     BUS_PASS_INTERRUPT + BUS_PASS_ORDER_MIDDLE);
-EARLY_DRIVER_MODULE(gic, ofwbus, gic_fdt_driver, gic_fdt_devclass, 0, 0,
+EARLY_DRIVER_MODULE(gic, ofwbus, gic_fdt_driver, 0, 0,
     BUS_PASS_INTERRUPT + BUS_PASS_ORDER_MIDDLE);
 
 static int
@@ -357,7 +354,5 @@ static device_method_t arm_gicv2m_fdt_methods[] = {
 DEFINE_CLASS_1(gicv2m, arm_gicv2m_fdt_driver, arm_gicv2m_fdt_methods,
     sizeof(struct arm_gicv2m_softc), arm_gicv2m_driver);
 
-static devclass_t arm_gicv2m_fdt_devclass;
-
-EARLY_DRIVER_MODULE(gicv2m, gic, arm_gicv2m_fdt_driver,
-    arm_gicv2m_fdt_devclass, 0, 0, BUS_PASS_INTERRUPT + BUS_PASS_ORDER_MIDDLE);
+EARLY_DRIVER_MODULE(gicv2m, gic, arm_gicv2m_fdt_driver, 0, 0,
+    BUS_PASS_INTERRUPT + BUS_PASS_ORDER_MIDDLE);

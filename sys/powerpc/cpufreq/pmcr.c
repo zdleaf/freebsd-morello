@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2018 Justin Hibbits
  *
@@ -26,8 +26,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/bus.h>
@@ -111,8 +109,7 @@ static driver_t pmcr_driver = {
 	sizeof(struct pmcr_softc)
 };
 
-static devclass_t pmcr_devclass;
-DRIVER_MODULE(pmcr, cpu, pmcr_driver, pmcr_devclass, 0, 0);
+DRIVER_MODULE(pmcr, cpu, pmcr_driver, 0, 0);
 
 static void
 pmcr_identify(driver_t *driver, device_t parent)
@@ -158,10 +155,8 @@ pmcr_attach(device_t dev)
 static int
 pmcr_settings(device_t dev, struct cf_setting *sets, int *count)
 {
-	struct pmcr_softc *sc;
 	int i;
 
-	sc = device_get_softc(dev);
 	if (sets == NULL || count == NULL)
 		return (EINVAL);
 	if (*count < npstates)
@@ -205,13 +200,11 @@ pmcr_set(device_t dev, const struct cf_setting *set)
 static int
 pmcr_get(device_t dev, struct cf_setting *set)
 {
-	struct pmcr_softc *sc;
 	register_t pmcr;
 	int i, pstate;
 
 	if (set == NULL)
 		return (EINVAL);
-	sc = device_get_softc(dev);
 
 	memset(set, CPUFREQ_VAL_UNKNOWN, sizeof(*set));
 

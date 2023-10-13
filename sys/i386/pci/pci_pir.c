@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 1997, Stefan Esser <se@freebsd.org>
  * Copyright (c) 2000, Michael Smith <msmith@freebsd.org>
@@ -30,8 +30,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/bus.h>
@@ -740,6 +738,4 @@ static driver_t pir_driver = {
 	1,
 };
 
-static devclass_t pir_devclass;
-
-DRIVER_MODULE(pir, legacy, pir_driver, pir_devclass, 0, 0);
+DRIVER_MODULE(pir, legacy, pir_driver, 0, 0);

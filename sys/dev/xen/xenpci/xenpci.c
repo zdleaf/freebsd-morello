@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2008 Citrix Systems, Inc.
  * All rights reserved.
@@ -27,8 +27,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/bus.h>
 #include <sys/kernel.h>
@@ -52,18 +50,6 @@ __FBSDID("$FreeBSD$");
 
 #include <dev/xen/xenpci/xenpcivar.h>
 
-/*
- * This is used to find our platform device instance.
- */
-static devclass_t xenpci_devclass;
-
-static int
-xenpci_intr_filter(void *trap_frame)
-{
-	xen_intr_handle_upcall(trap_frame);
-	return (FILTER_HANDLED);
-}
-
 static int
 xenpci_irq_init(device_t device, struct xenpci_softc *scp)
 {
@@ -71,7 +57,7 @@ xenpci_irq_init(device_t device, struct xenpci_softc *scp)
 
 	error = BUS_SETUP_INTR(device_get_parent(device), device,
 			       scp->res_irq, INTR_MPSAFE|INTR_TYPE_MISC,
-			       xenpci_intr_filter, NULL, /*trap_frame*/NULL,
+			       xen_intr_handle_upcall, NULL, NULL,
 			       &scp->intr_cookie);
 	if (error)
 		return error;
@@ -236,4 +222,4 @@ static driver_t xenpci_driver = {
 	sizeof(struct xenpci_softc),
 };
 
-DRIVER_MODULE(xenpci, pci, xenpci_driver, xenpci_devclass, 0, 0);
+DRIVER_MODULE(xenpci, pci, xenpci_driver, 0, 0);

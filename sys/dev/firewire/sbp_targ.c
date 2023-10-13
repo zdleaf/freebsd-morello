@@ -32,8 +32,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 #include <sys/param.h>
@@ -1663,7 +1661,7 @@ sbp_targ_mgm_handler(struct fw_xfer *xfer)
 		} else {
 			orbi->status.dead = 1;
 			orbi->status.status = STATUS_ACCESS_DENY;
-			printf("%s: reconnection faild id=%d\n",
+			printf("%s: reconnection failed id=%d\n",
 			    __func__, orb4->id);
 		}
 		break;
@@ -2032,8 +2030,6 @@ sbp_targ_detach(device_t dev)
 	return 0;
 }
 
-static devclass_t sbp_targ_devclass;
-
 static device_method_t sbp_targ_methods[] = {
 	/* device interface */
 	DEVMETHOD(device_identify,	sbp_targ_identify),
@@ -2049,7 +2045,7 @@ static driver_t sbp_targ_driver = {
 	sizeof(struct sbp_targ_softc),
 };
 
-DRIVER_MODULE(sbp_targ, firewire, sbp_targ_driver, sbp_targ_devclass, 0, 0);
+DRIVER_MODULE(sbp_targ, firewire, sbp_targ_driver, 0, 0);
 MODULE_VERSION(sbp_targ, 1);
 MODULE_DEPEND(sbp_targ, firewire, 1, 1, 1);
 MODULE_DEPEND(sbp_targ, cam, 1, 1, 1);

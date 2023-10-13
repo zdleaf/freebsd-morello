@@ -34,14 +34,11 @@
  * SUCH DAMAGE.
  *
  *	from: @(#)asm.h	5.5 (Berkeley) 5/7/91
- *
- * $FreeBSD$
  */
 
 #ifndef _MACHINE_ASM_H_
 #define _MACHINE_ASM_H_
 #include <sys/cdefs.h>
-#include <machine/sysreg.h>
 
 #define	_C_LABEL(x)	x
 #define	_ASM_LABEL(x)	x
@@ -68,15 +65,6 @@
  */
 #define	_ASM_TYPE_FUNCTION	#function
 #define	_ASM_TYPE_OBJECT	#object
-
-/* XXX Is this still the right prologue for profiling? */
-#ifdef GPROF
-#define	_PROF_PROLOGUE	\
-	mov ip, lr;	\
-	bl __mcount
-#else
-#define	_PROF_PROLOGUE
-#endif
 
 /*
  * EENTRY()/EEND() mark "extra" entry/exit points from a function.
@@ -106,14 +94,14 @@
 #define	_ENTRY(x)	.text; _ALIGN_TEXT; _EENTRY(x); _FNSTART
 #define	_END(x)		_LEND(x)
 
-#define	ENTRY(y)	_ENTRY(_C_LABEL(y)); _PROF_PROLOGUE
+#define	ENTRY(y)	_ENTRY(_C_LABEL(y));
 #define	EENTRY(y)	_EENTRY(_C_LABEL(y));
 #define	ENTRY_NP(y)	_ENTRY(_C_LABEL(y))
 #define	EENTRY_NP(y)	_EENTRY(_C_LABEL(y))
 #define	END(y)		_END(_C_LABEL(y))
 #define	EEND(y)		_EEND(_C_LABEL(y))
-#define	ASENTRY(y)	_ENTRY(_ASM_LABEL(y)); _PROF_PROLOGUE
-#define	ASLENTRY(y)	_LENTRY(_ASM_LABEL(y)); _PROF_PROLOGUE
+#define	ASENTRY(y)	_ENTRY(_ASM_LABEL(y));
+#define	ASLENTRY(y)	_LENTRY(_ASM_LABEL(y));
 #define	ASEENTRY(y)	_EENTRY(_ASM_LABEL(y));
 #define	ASLEENTRY(y)	_LEENTRY(_ASM_LABEL(y));
 #define	ASENTRY_NP(y)	_ENTRY(_ASM_LABEL(y))
@@ -203,6 +191,7 @@
 #endif
 
 #elif __ARM_ARCH == 6
+#include <machine/sysreg.h>
 #define ISB	mcr CP15_CP15ISB
 #define DSB	mcr CP15_CP15DSB
 #define DMB	mcr CP15_CP15DMB

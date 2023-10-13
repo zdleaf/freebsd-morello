@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2000-2001 Boris Popov
  * All rights reserved.
@@ -27,8 +27,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/endian.h>
@@ -581,10 +579,8 @@ smb_iod_main(struct smbiod *iod)
 /*	struct smb_vc *vcp = iod->iod_vc;*/
 	struct smbiod_event *evp;
 /*	struct timespec tsnow;*/
-	int error;
 
 	SMBIODEBUG("\n");
-	error = 0;
 
 	/*
 	 * Check all interesting events

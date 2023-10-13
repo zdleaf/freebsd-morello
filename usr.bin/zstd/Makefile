@@ -1,4 +1,3 @@
-# $FreeBSD$
 
 PROG=	zstd
 SRCS=	\
@@ -9,7 +8,8 @@ SRCS=	\
 	fileio.c \
 	timefn.c \
 	util.c \
-	zstdcli.c
+	zstdcli.c \
+	zstdcli_trace.c
 
 CFLAGS+=	-I${SRCTOP}/sys/contrib/zstd/programs \
 		-I${SRCTOP}/sys/contrib/zstd/lib/common \
@@ -26,6 +26,7 @@ MLINKS=	zstd.1 unzstd.1 \
 	zstd.1 zstdcat.1 \
 	zstd.1 zstdmt.1
 
+CSTD=c11
 WARNS?=	2
 LIBADD=	zstd
 .PATH: ${SRCTOP}/sys/contrib/zstd/programs

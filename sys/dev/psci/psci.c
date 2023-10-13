@@ -41,8 +41,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include "opt_acpi.h"
 #include "opt_platform.h"
 
@@ -84,6 +82,7 @@ static int psci_v0_1_init(device_t dev, int default_version);
 static int psci_v0_2_init(device_t dev, int default_version);
 
 struct psci_softc *psci_softc = NULL;
+bool psci_present;
 
 #ifdef __arm__
 #define	USE_ACPI	0
@@ -145,6 +144,7 @@ psci_init(void *dummy)
 	}
 
 	psci_callfn = new_callfn;
+	psci_present = true;
 }
 /* This needs to be before cpu_mp at SI_SUB_CPU, SI_ORDER_THIRD */
 SYSINIT(psci_start, SI_SUB_CPU, SI_ORDER_FIRST, psci_init, NULL);
@@ -177,11 +177,9 @@ static driver_t psci_fdt_driver = {
 	sizeof(struct psci_softc),
 };
 
-static devclass_t psci_fdt_devclass;
-
-EARLY_DRIVER_MODULE(psci, simplebus, psci_fdt_driver, psci_fdt_devclass, 0, 0,
+EARLY_DRIVER_MODULE(psci, simplebus, psci_fdt_driver, 0, 0,
     BUS_PASS_CPU + BUS_PASS_ORDER_FIRST);
-EARLY_DRIVER_MODULE(psci, ofwbus, psci_fdt_driver, psci_fdt_devclass, 0, 0,
+EARLY_DRIVER_MODULE(psci, ofwbus, psci_fdt_driver, 0, 0,
     BUS_PASS_CPU + BUS_PASS_ORDER_FIRST);
 
 static psci_callfn_t
@@ -253,9 +251,7 @@ static driver_t psci_acpi_driver = {
 	sizeof(struct psci_softc),
 };
 
-static devclass_t psci_acpi_devclass;
-
-EARLY_DRIVER_MODULE(psci, acpi, psci_acpi_driver, psci_acpi_devclass, 0, 0,
+EARLY_DRIVER_MODULE(psci, acpi, psci_acpi_driver, 0, 0,
     BUS_PASS_CPU + BUS_PASS_ORDER_FIRST);
 
 static int
@@ -345,6 +341,10 @@ psci_attach(device_t dev, psci_initfn_t psci_init, int default_version)
 	KASSERT(psci_init != NULL, ("PSCI init function cannot be NULL"));
 	if (psci_init(dev, default_version))
 		return (ENXIO);
+
+#ifdef __aarch64__
+	smccc_init();
+#endif
 
 	psci_softc = sc;
 

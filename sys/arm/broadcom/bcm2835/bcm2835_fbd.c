@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2012 Oleksandr Tymoshenko <gonzo@freebsd.org>
  * Copyright (c) 2012, 2013 The FreeBSD Foundation
@@ -31,8 +31,6 @@
  *
  */
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/bio.h>
@@ -152,12 +150,12 @@ bcm_fb_setup_fbd(struct bcmsc_softc *sc)
 	fbd = device_add_child(sc->dev, "fbd", device_get_unit(sc->dev));
 	if (fbd == NULL) {
 		device_printf(sc->dev, "Failed to add fbd child\n");
-		pmap_unmapdev(sc->info.fb_vbase, sc->info.fb_size);
+		pmap_unmapdev((void *)sc->info.fb_vbase, sc->info.fb_size);
 		return (ENXIO);
 	} else if (device_probe_and_attach(fbd) != 0) {
 		device_printf(sc->dev, "Failed to attach fbd device\n");
 		device_delete_child(sc->dev, fbd);
-		pmap_unmapdev(sc->info.fb_vbase, sc->info.fb_size);
+		pmap_unmapdev((void *)sc->info.fb_vbase, sc->info.fb_size);
 		return (ENXIO);
 	}
 
@@ -275,13 +273,11 @@ static device_method_t bcm_fb_methods[] = {
 	DEVMETHOD_END
 };
 
-static devclass_t bcm_fb_devclass;
-
 static driver_t bcm_fb_driver = {
 	"fb",
 	bcm_fb_methods,
 	sizeof(struct bcmsc_softc),
 };
 
-DRIVER_MODULE(bcm2835fb, ofwbus, bcm_fb_driver, bcm_fb_devclass, 0, 0);
-DRIVER_MODULE(bcm2835fb, simplebus, bcm_fb_driver, bcm_fb_devclass, 0, 0);
+DRIVER_MODULE(bcm2835fb, ofwbus, bcm_fb_driver, 0, 0);
+DRIVER_MODULE(bcm2835fb, simplebus, bcm_fb_driver, 0, 0);

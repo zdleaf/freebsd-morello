@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2020 Alexander V. Chernikov
  *
@@ -26,7 +26,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
 #include "opt_inet.h"
 #include "opt_inet6.h"
 #include "opt_route.h"
@@ -1135,7 +1134,9 @@ destroy_fd_instance_epoch(epoch_context_t ctx)
 
 	fd = __containerof(ctx, struct fib_data, fd_epoch_ctx);
 
+	CURVNET_SET(fd->fd_vnet);
 	destroy_fd_instance(fd);
+	CURVNET_RESTORE();
 }
 
 /*
@@ -1509,7 +1510,7 @@ set_fib_algo(uint32_t fibnum, int family, struct sysctl_oid *oidp, struct sysctl
 	fib_cleanup_algo(rh, true, false);
 
 	/* Drain cb so user can unload the module after userret if so desired */
-	epoch_drain_callbacks(net_epoch_preempt);
+	NET_EPOCH_DRAIN_CALLBACKS();
 
 	return (0);
 }
@@ -1736,7 +1737,7 @@ fib_set_algo_ptr(struct fib_data *fd, void *algo_data)
 void
 fib_epoch_call(epoch_callback_t callback, epoch_context_t ctx)
 {
-	epoch_call(net_epoch_preempt, callback, ctx);
+	NET_EPOCH_CALL(callback, ctx);
 }
 
 /*

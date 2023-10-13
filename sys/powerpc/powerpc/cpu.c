@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-4-Clause AND BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-4-Clause AND BSD-2-Clause
  *
  * Copyright (c) 2001 Matt Thomas.
  * Copyright (c) 2001 Tsubai Masanari.
@@ -57,7 +57,6 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
  * from $NetBSD: cpu_subr.c,v 1.1 2003/02/03 17:10:09 matt Exp $
- * $FreeBSD$
  */
 
 #include <sys/param.h>
@@ -267,7 +266,7 @@ SYSCTL_PROC(_hw, OID_AUTO, altivec, CTLTYPE_INT | CTLFLAG_RD | CTLFLAG_MPSAFE,
  * so they can be used during platform and MMU bringup.
  */
 void
-cpu_feature_setup()
+cpu_feature_setup(void)
 {
 	u_int		pvr;
 	uint16_t	vers;
@@ -715,8 +714,7 @@ cpu_idle(int busy)
 	}
 #endif
 
-	CTR2(KTR_SPARE2, "cpu_idle(%d) at %d",
-	    busy, curcpu);
+	CTR1(KTR_SPARE2, "cpu_idle(%d)", busy);
 
 	if (cpu_idle_hook != NULL) {
 		if (!busy) {
@@ -730,23 +728,24 @@ cpu_idle(int busy)
 		}
 	}
 
-	CTR2(KTR_SPARE2, "cpu_idle(%d) at %d done",
-	    busy, curcpu);
+	CTR1(KTR_SPARE2, "cpu_idle(%d) done", busy);
 }
 
 static void
 cpu_idle_60x(sbintime_t sbt)
 {
+#ifdef AIM
 	register_t msr;
 	uint16_t vers;
+#endif
 
 	if (!powerpc_pow_enabled)
 		return;
 
+#ifdef AIM
 	msr = mfmsr();
 	vers = mfpvr() >> 16;
 
-#ifdef AIM
 	switch (vers) {
 	case IBM970:
 	case IBM970FX:
@@ -784,11 +783,11 @@ cpu_idle_e500mc(sbintime_t sbt)
 static void
 cpu_idle_booke(sbintime_t sbt)
 {
+#ifdef BOOKE_E500
 	register_t msr;
 
 	msr = mfmsr();
 
-#ifdef BOOKE_E500
 	powerpc_sync();
 	mtmsr(msr | PSL_WE);
 #endif

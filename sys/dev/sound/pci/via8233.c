@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2002 Orion Hodson <orion@freebsd.org>
  * Portions of this code derived from via82c686.c:
@@ -49,8 +49,6 @@
 #include <sys/sysctl.h>
 
 #include <dev/sound/pci/via8233.h>
-
-SND_DECLARE_FILE("$FreeBSD$");
 
 #define VIA8233_PCI_ID 0x30591106
 
@@ -1440,6 +1438,6 @@ static driver_t via_driver = {
 	PCM_SOFTC_SIZE,
 };
 
-DRIVER_MODULE(snd_via8233, pci, via_driver, pcm_devclass, 0, 0);
+DRIVER_MODULE(snd_via8233, pci, via_driver, 0, 0);
 MODULE_DEPEND(snd_via8233, sound, SOUND_MINVER, SOUND_PREFVER, SOUND_MAXVER);
 MODULE_VERSION(snd_via8233, 1);

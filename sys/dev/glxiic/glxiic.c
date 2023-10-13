@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2011 Henrik Brix Andersen <brix@FreeBSD.org>
  * All rights reserved.
@@ -26,7 +26,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
 /*
  * AMD Geode LX CS5536 System Management Bus controller.
  *
@@ -276,10 +275,8 @@ static driver_t glxiic_driver = {
 	sizeof(struct glxiic_softc),
 };
 
-static devclass_t glxiic_devclass;
-
-DRIVER_MODULE(glxiic, isab, glxiic_driver, glxiic_devclass, 0, 0);
-DRIVER_MODULE(iicbus, glxiic, iicbus_driver, iicbus_devclass, 0, 0);
+DRIVER_MODULE(glxiic, isab, glxiic_driver, 0, 0);
+DRIVER_MODULE(iicbus, glxiic, iicbus_driver, 0, 0);
 MODULE_DEPEND(glxiic, iicbus, 1, 1, 1);
 
 static void

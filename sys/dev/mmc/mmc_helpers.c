@@ -26,8 +26,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/bus.h>
 #include <sys/kernel.h>
@@ -89,10 +87,11 @@ mmc_parse_mmc_speed(device_t dev, struct mmc_host *host)
 int
 mmc_parse(device_t dev, struct mmc_helper *helper, struct mmc_host *host)
 {
-	uint64_t bus_width, max_freq;
+	uint32_t bus_width, max_freq;
 
 	bus_width = 0;
-	if (device_get_property(dev, "bus-width", &bus_width, sizeof(uint64_t)) <= 0)
+	if (device_get_property(dev, "bus-width", &bus_width,
+	    sizeof(bus_width), DEVICE_PROP_UINT32) <= 0)
 		bus_width = 1;
 
 	if (bus_width >= 4)
@@ -106,7 +105,7 @@ mmc_parse(device_t dev, struct mmc_helper *helper, struct mmc_host *host)
 	 * operates on
 	 */
 	if (device_get_property(dev, "max-frequency", &max_freq,
-	    sizeof(uint64_t)) > 0)
+	    sizeof(max_freq), DEVICE_PROP_UINT32) > 0)
 		host->f_max = max_freq;
 
 	if (device_has_property(dev, "broken-cd"))

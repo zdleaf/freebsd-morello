@@ -29,13 +29,14 @@
  * SUCH DAMAGE.
  *
  *	@(#)ktrace.h	8.1 (Berkeley) 6/2/93
- * $FreeBSD$
  */
 
 #ifndef _SYS_KTRACE_H_
 #define _SYS_KTRACE_H_
 
 #include <sys/caprights.h>
+#include <sys/signal.h>
+#include <sys/_uio.h>
 
 /*
  * operations to ktrace system call  (KTROP(op))
@@ -52,15 +53,31 @@
 /*
  * ktrace record header
  */
-struct ktr_header {
+struct ktr_header_v0 {
 	int	ktr_len;		/* length of buf */
 	short	ktr_type;		/* trace record type */
 	pid_t	ktr_pid;		/* process id */
 	char	ktr_comm[MAXCOMLEN + 1];/* command name */
 	struct	timeval ktr_time;	/* timestamp */
-	intptr_t	ktr_tid;	/* was ktr_buffer */
+	long	ktr_tid;		/* thread id */
 };
 
+struct ktr_header {
+	int	ktr_len;		/* length of buf */
+	short	ktr_type;		/* trace record type */
+	short	ktr_version;		/* ktr_header version */
+	pid_t	ktr_pid;		/* process id */
+	char	ktr_comm[MAXCOMLEN + 1];/* command name */
+	struct	timespec ktr_time;	/* timestamp */
+	/* XXX: make ktr_tid an lwpid_t on next ABI break */
+	long	ktr_tid;		/* thread id */
+	int	ktr_cpu;		/* cpu id */
+};
+
+#define	KTR_VERSION0	0
+#define	KTR_VERSION1	1
+#define	KTR_OFFSET_V0	sizeof(struct ktr_header_v0) - \
+			    sizeof(struct ktr_header)
 /*
  * Test for kernel trace point (MP SAFE).
  *
@@ -236,6 +253,13 @@ struct ktr_struct_array {
  * between the previous record and this record was dropped.
  */
 #define	KTR_DROP	0x8000
+/*
+ * KTR_VERSIONED - If this bit is set in ktr_type, then the kernel
+ * exposes the new struct ktr_header (versioned), otherwise the old
+ * struct ktr_header_v0 is exposed.
+ */
+#define	KTR_VERSIONED	0x4000
+#define	KTR_TYPE	(KTR_DROP | KTR_VERSIONED)
 
 /*
  * kernel trace points (in p_traceflag)
@@ -284,7 +308,7 @@ void	ktrpsig(int, sig_t, sigset_t *, int);
 void	ktrfault(vm_offset_t, int);
 void	ktrfaultend(int);
 void	ktrgenio(int, enum uio_rw, struct uio *, int);
-void	ktrsyscall(int, int narg, register_t args[]);
+void	ktrsyscall(int, int narg, syscallarg_t args[]);
 void	ktrsysctl(int *name, u_int namelen);
 void	ktrsysret(int, int, register_t);
 void	ktrprocctor(struct proc *);
@@ -307,6 +331,8 @@ void	ktrcapfail(enum ktr_cap_fail_type, const cap_rights_t *,
 	ktrstruct("stat", (s), sizeof(struct stat))
 #define ktrstat_error(s, error) \
 	ktrstruct_error("stat", (s), sizeof(struct stat), error)
+#define ktrcpuset(s, l) \
+	ktrstruct("cpuset_t", (s), l)
 extern u_int ktr_geniosize;
 #ifdef	KTRACE
 extern int ktr_filesize_limit_signal;

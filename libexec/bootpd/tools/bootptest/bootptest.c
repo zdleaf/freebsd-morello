@@ -34,8 +34,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 char *usage = "bootptest [-h] server-name [vendor-data-template-file]";
 
 #include <sys/types.h>
@@ -128,9 +126,7 @@ short secs;						/* How long client has waited */
  */
 
 int
-main(argc, argv)
-	int argc;
-	char **argv;
+main(int argc, char **argv)
 {
 	struct bootp *bp;
 	struct servent *sep;
@@ -439,8 +435,7 @@ main(argc, argv)
 }
 
 static void
-send_request(s)
-	int s;
+send_request(int s)
 {
 	/* Print the request packet. */
 	printf("Sending to %s", inet_ntoa(sin_server.sin_addr));
@@ -462,8 +457,7 @@ send_request(s)
  * Return true if truncated.
  */
 int
-printfn(s, ep)
-	u_char *s, *ep;
+printfn(u_char *s, u_char *ep)
 {
 	u_char c;
 
@@ -493,8 +487,7 @@ printfn(s, ep)
  * (like inet_ntoa, but ina is a pointer)
  */
 char *
-ipaddr_string(ina)
-	struct in_addr *ina;
+ipaddr_string(struct in_addr *ina)
 {
 	static char b[24];
 	u_char *p;

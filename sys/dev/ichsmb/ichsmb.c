@@ -36,8 +36,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 /*
  * Support for the SMBus controller logical device which is part of the
  * Intel 81801AA (ICH) and 81801AB (ICH0) I/O controller hub chips.
@@ -69,7 +67,7 @@ __FBSDID("$FreeBSD$");
  * Enable debugging by defining ICHSMB_DEBUG to a non-zero value.
  */
 #define ICHSMB_DEBUG	0
-#if ICHSMB_DEBUG != 0 && defined(__CC_SUPPORTS___FUNC__)
+#if ICHSMB_DEBUG != 0
 #define DBG(fmt, args...)	\
 	do { printf("%s: " fmt, __func__ , ## args); } while (0)
 #else
@@ -510,7 +508,8 @@ ichsmb_device_intr(void *cookie)
 			DBG("%d stat=0x%02x\n", count, status);
 		}
 #endif
-		status &= ~(ICH_HST_STA_INUSE_STS | ICH_HST_STA_HOST_BUSY);
+		status &= ~(ICH_HST_STA_INUSE_STS | ICH_HST_STA_HOST_BUSY |
+		    ICH_HST_STA_SMBALERT_STS);
 		if (status == 0)
 			break;
 
@@ -529,18 +528,6 @@ ichsmb_device_intr(void *cookie)
 			bus_write_1(sc->io_res,
 			    ICH_HST_STA, (status & ~ok_bits));
 			continue;
-		}
-
-		/* Handle SMBALERT interrupt */
-		if (status & ICH_HST_STA_SMBALERT_STS) {
-			static int smbalert_count = 16;
-			if (smbalert_count > 0) {
-				device_printf(dev, "SMBALERT# rec'd\n");
-				if (--smbalert_count == 0) {
-					device_printf(dev,
-					    "not logging anymore\n");
-				}
-			}
 		}
 
 		/* Check for bus error */
@@ -690,4 +677,4 @@ ichsmb_detach(device_t dev)
 	return 0;
 }
 
-DRIVER_MODULE(smbus, ichsmb, smbus_driver, smbus_devclass, 0, 0);
+DRIVER_MODULE(smbus, ichsmb, smbus_driver, 0, 0);

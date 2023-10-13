@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2006 Peter Wemm
  * Copyright (c) 2008 Semihalf, Grzegorz Bernacki
@@ -30,8 +30,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include "opt_watchdog.h"
 
 #include <sys/param.h>
@@ -41,9 +39,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/kernel.h>
 #include <sys/kerneldump.h>
 #include <sys/msgbuf.h>
-#ifdef SW_WATCHDOG
 #include <sys/watchdog.h>
-#endif
 #include <vm/vm.h>
 #include <vm/vm_param.h>
 #include <vm/vm_page.h>
@@ -72,7 +68,7 @@ blk_flush(struct dumperinfo *di)
 	if (fragsz == 0)
 		return (0);
 
-	error = dump_append(di, dump_va, 0, fragsz);
+	error = dump_append(di, dump_va, fragsz);
 	fragsz = 0;
 	return (error);
 }
@@ -114,11 +110,10 @@ blk_write(struct dumperinfo *di, char *ptr, vm_paddr_t pa, size_t sz)
 			len = sz;
 
 		dumpsys_pb_progress(len);
-#ifdef SW_WATCHDOG
 		wdog_kern_pat(WD_LASTVAL);
-#endif
+
 		if (ptr) {
-			error = dump_append(di, ptr, 0, len);
+			error = dump_append(di, ptr, len);
 			if (error)
 				return (error);
 			ptr += len;

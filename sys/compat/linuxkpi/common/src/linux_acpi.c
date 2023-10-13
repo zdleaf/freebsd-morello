@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2018 Johannes Lundberg <johalun@FreeBSD.org>
  * Copyright (c) 2020 Vladimir Kondratyev <wulf@FreeBSD.org>
@@ -25,8 +25,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 #include "opt_acpi.h"
@@ -40,6 +38,7 @@
 #include <dev/acpica/acpivar.h>
 
 #include <linux/notifier.h>
+#include <linux/suspend.h>
 
 #include <acpi/acpi_bus.h>
 #include <acpi/video.h>
@@ -57,6 +56,8 @@ _Static_assert(LINUX_ACPI_TAGS <= LINUX_NOTIFY_TAGS,
     "Not enough space for tags in notifier_block structure");
 
 #ifdef DEV_ACPI
+
+suspend_state_t pm_suspend_target_state = PM_SUSPEND_ON;
 
 static uint32_t linux_acpi_target_sleep_state = ACPI_STATE_S0;
 

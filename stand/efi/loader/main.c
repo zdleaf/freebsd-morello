@@ -28,8 +28,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <stand.h>
 
 #include <sys/disk.h>
@@ -52,6 +50,7 @@ __FBSDID("$FreeBSD$");
 #include <efi.h>
 #include <efilib.h>
 #include <efichar.h>
+#include <efirng.h>
 
 #include <uuid.h>
 
@@ -59,6 +58,7 @@ __FBSDID("$FreeBSD$");
 #include <smbios.h>
 
 #include "efizfs.h"
+#include "framebuffer.h"
 
 #include "loader_efi.h"
 
@@ -184,25 +184,11 @@ out:
 }
 
 static void
-set_currdev(const char *devname)
-{
-
-	env_setenv("currdev", EV_VOLATILE, devname, efi_setcurrdev,
-	    env_nounset);
-	/*
-	 * Don't execute hook here; the loaddev hook makes it immutable
-	 * once we've determined what the proper currdev is.
-	 */
-	env_setenv("loaddev", EV_VOLATILE | EV_NOHOOK, devname, env_noset,
-	    env_nounset);
-}
-
-static void
 set_currdev_devdesc(struct devdesc *currdev)
 {
 	const char *devname;
 
-	devname = efi_fmtdev(currdev);
+	devname = devformat(currdev);
 	printf("Setting currdev to %s\n", devname);
 	set_currdev(devname);
 }
@@ -262,34 +248,26 @@ sanity_check_currdev(void)
 static bool
 probe_zfs_currdev(uint64_t guid)
 {
+	char buf[VDEV_PAD_SIZE];
 	char *devname;
 	struct zfs_devdesc currdev;
-	char *buf = NULL;
-	bool rv;
 
 	currdev.dd.d_dev = &zfs_dev;
 	currdev.dd.d_unit = 0;
 	currdev.pool_guid = guid;
 	currdev.root_guid = 0;
 	set_currdev_devdesc((struct devdesc *)&currdev);
-	devname = efi_fmtdev(&currdev);
+	devname = devformat(&currdev.dd);
 	init_zfs_boot_options(devname);
 
-	rv = sanity_check_currdev();
-	if (rv) {
-		buf = malloc(VDEV_PAD_SIZE);
-		if (buf != NULL) {
-			if (zfs_get_bootonce(&currdev, OS_BOOTONCE, buf,
-			    VDEV_PAD_SIZE) == 0) {
-				printf("zfs bootonce: %s\n", buf);
-				set_currdev(buf);
-				setenv("zfs-bootonce", buf, 1);
-			}
-			free(buf);
-			(void) zfs_attach_nvstore(&currdev);
-		}
+	if (zfs_get_bootonce(&currdev, OS_BOOTONCE, buf, sizeof(buf)) == 0) {
+		printf("zfs bootonce: %s\n", buf);
+		set_currdev(buf);
+		setenv("zfs-bootonce", buf, 1);
 	}
-	return (rv);
+	(void)zfs_attach_nvstore(&currdev);
+
+	return (sanity_check_currdev());
 }
 #endif
 
@@ -700,8 +678,7 @@ interactive_interrupt(const char *msg)
 static int
 parse_args(int argc, CHAR16 *argv[])
 {
-	int i, j, howto;
-	bool vargood;
+	int i, howto;
 	char var[128];
 
 	/*
@@ -718,7 +695,7 @@ parse_args(int argc, CHAR16 *argv[])
 	 * method is flawed for non-ASCII characters).
 	 */
 	howto = 0;
-	for (i = 1; i < argc; i++) {
+	for (i = 0; i < argc; i++) {
 		cpy16to8(argv[i], var, sizeof(var));
 		howto |= boot_parse_arg(var);
 	}
@@ -759,8 +736,20 @@ parse_uefi_con_out(void)
 	if (rv != EFI_SUCCESS)
 		rv = efi_global_getenv("ConOutDev", buf, &sz);
 	if (rv != EFI_SUCCESS) {
-		/* If we don't have any ConOut default to serial */
-		how = RB_SERIAL;
+		/*
+		 * If we don't have any ConOut default to both. If we have GOP
+		 * make video primary, otherwise just make serial primary. In
+		 * either case, try to use both the 'efi' console which will use
+		 * the GOP, if present and serial. If there's an EFI BIOS that
+		 * omits this, but has a serial port redirect, we'll
+		 * unavioidably get doubled characters (but we'll be right in
+		 * all the other more common cases).
+		 */
+		if (efi_has_gop())
+			how = RB_MULTIPLE;
+		else
+			how = RB_MULTIPLE | RB_SERIAL;
+		setenv("console", "efi,comconsole", 1);
 		goto out;
 	}
 	ep = buf + sz;
@@ -934,6 +923,22 @@ main(int argc, CHAR16 *argv[])
 	archsw.arch_readin = efi_readin;
 	archsw.arch_zfs_probe = efi_zfs_probe;
 
+#if !defined(__arm__)
+	for (k = 0; k < ST->NumberOfTableEntries; k++) {
+		guid = &ST->ConfigurationTable[k].VendorGuid;
+		if (!memcmp(guid, &smbios, sizeof(EFI_GUID)) ||
+		    !memcmp(guid, &smbios3, sizeof(EFI_GUID))) {
+			char buf[40];
+
+			snprintf(buf, sizeof(buf), "%p",
+			    ST->ConfigurationTable[k].VendorTable);
+			setenv("hint.smbios.0.mem", buf, 1);
+			smbios_detect(ST->ConfigurationTable[k].VendorTable);
+			break;
+		}
+	}
+#endif
+
         /* Get our loaded image protocol interface structure. */
 	(void) OpenProtocolByHandle(IH, &imgid, (void **)&boot_img);
 
@@ -948,13 +953,16 @@ main(int argc, CHAR16 *argv[])
 	setenv("console", "efi", 1);
 	uhowto = parse_uefi_con_out();
 #if defined(__riscv)
+	/*
+	 * This workaround likely is papering over a real issue
+	 */
 	if ((uhowto & RB_SERIAL) != 0)
 		setenv("console", "comconsole", 1);
 #endif
 	cons_probe();
 
 	/* Set up currdev variable to have hooks in place. */
-	env_setenv("currdev", EV_VOLATILE, "", efi_setcurrdev, env_nounset);
+	env_setenv("currdev", EV_VOLATILE, "", gen_setcurrdev, env_nounset);
 
 	/* Init the time source */
 	efi_time_init();
@@ -974,9 +982,7 @@ main(int argc, CHAR16 *argv[])
 		    "failures\n", i);
 	}
 
-	for (i = 0; devsw[i] != NULL; i++)
-		if (devsw[i]->dv_init != NULL)
-			(devsw[i]->dv_init)();
+	devinit();
 
 	/*
 	 * Detect console settings two different ways: one via the command
@@ -1054,10 +1060,8 @@ main(int argc, CHAR16 *argv[])
 	 */
 	boot_howto_to_env(howto);
 
-	if (efi_copy_init()) {
-		printf("failed to allocate staging area\n");
+	if (efi_copy_init())
 		return (EFI_BUFFER_TOO_SMALL);
-	}
 
 	if ((s = getenv("fail_timeout")) != NULL)
 		fail_timeout = strtol(s, NULL, 10);
@@ -1184,24 +1188,50 @@ main(int argc, CHAR16 *argv[])
 	autoload_font(false);	/* Set up the font list for console. */
 	efi_init_environment();
 
-#if !defined(__arm__)
-	for (k = 0; k < ST->NumberOfTableEntries; k++) {
-		guid = &ST->ConfigurationTable[k].VendorGuid;
-		if (!memcmp(guid, &smbios, sizeof(EFI_GUID))) {
-			char buf[40];
-
-			snprintf(buf, sizeof(buf), "%p",
-			    ST->ConfigurationTable[k].VendorTable);
-			setenv("hint.smbios.0.mem", buf, 1);
-			smbios_detect(ST->ConfigurationTable[k].VendorTable);
-			break;
-		}
-	}
-#endif
-
 	interact();			/* doesn't return */
 
 	return (EFI_SUCCESS);		/* keep compiler happy */
+}
+
+COMMAND_SET(efi_seed_entropy, "efi-seed-entropy", "try to get entropy from the EFI RNG", command_seed_entropy);
+
+static int
+command_seed_entropy(int argc, char *argv[])
+{
+	EFI_STATUS status;
+	EFI_RNG_PROTOCOL *rng;
+	unsigned int size = 2048;
+	void *buf;
+
+	if (argc > 1) {
+		size = strtol(argv[1], NULL, 0);
+	}
+
+	status = BS->LocateProtocol(&rng_guid, NULL, (VOID **)&rng);
+	if (status != EFI_SUCCESS) {
+		command_errmsg = "RNG protocol not found";
+		return (CMD_ERROR);
+	}
+
+	if ((buf = malloc(size)) == NULL) {
+		command_errmsg = "out of memory";
+		return (CMD_ERROR);
+	}
+
+	status = rng->GetRNG(rng, NULL, size, (UINT8 *)buf);
+	if (status != EFI_SUCCESS) {
+		free(buf);
+		command_errmsg = "GetRNG failed";
+		return (CMD_ERROR);
+	}
+
+	if (file_addbuf("efi_rng_seed", "boot_entropy_platform", size, buf) != 0) {
+		free(buf);
+		return (CMD_ERROR);
+	}
+
+	free(buf);
+	return (CMD_OK);
 }
 
 COMMAND_SET(poweroff, "poweroff", "power off the system", command_poweroff);
@@ -1236,15 +1266,6 @@ command_reboot(int argc, char *argv[])
 
 	/* NOTREACHED */
 	return (CMD_ERROR);
-}
-
-COMMAND_SET(quit, "quit", "exit the loader", command_quit);
-
-static int
-command_quit(int argc, char *argv[])
-{
-	exit(0);
-	return (CMD_OK);
 }
 
 COMMAND_SET(memmap, "memmap", "print memory map", command_memmap);

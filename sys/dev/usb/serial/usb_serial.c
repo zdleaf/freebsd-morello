@@ -1,7 +1,7 @@
 /*	$NetBSD: ucom.c,v 1.40 2001/11/13 06:24:54 lukem Exp $	*/
 
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD AND BSD-2-Clause-NetBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2001-2003, 2005, 2008
  *	Shunsuke Akiyama <akiyama@jp.FreeBSD.org>.
@@ -30,8 +30,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 /*-
  * Copyright (c) 1998, 2000 The NetBSD Foundation, Inc.
  * All rights reserved.
@@ -124,15 +122,15 @@ SYSCTL_INT(_hw_usb_ucom, OID_AUTO, debug, CTLFLAG_RWTUN,
 static uint8_t ucom_cons_rx_buf[UCOM_CONS_BUFSIZE];
 static uint8_t ucom_cons_tx_buf[UCOM_CONS_BUFSIZE];
 
-static unsigned int ucom_cons_rx_low = 0;
-static unsigned int ucom_cons_rx_high = 0;
+static unsigned ucom_cons_rx_low = 0;
+static unsigned ucom_cons_rx_high = 0;
 
-static unsigned int ucom_cons_tx_low = 0;
-static unsigned int ucom_cons_tx_high = 0;
+static unsigned ucom_cons_tx_low = 0;
+static unsigned ucom_cons_tx_high = 0;
 
 static int ucom_cons_unit = -1;
 static int ucom_cons_subunit = 0;
-static int ucom_cons_baud = 9600;
+static int ucom_cons_baud = 115200;
 static struct ucom_softc *ucom_cons_softc = NULL;
 
 SYSCTL_INT(_hw_usb_ucom, OID_AUTO, cons_unit, CTLFLAG_RWTUN,
@@ -628,9 +626,9 @@ ucom_queue_command(struct ucom_softc *sc,
 		task->termios_copy = *pt;
 
 	/*
-	 * Closing the device should be synchronous.
+	 * Closing or opening the device should be synchronous.
 	 */
-	if (fn == ucom_cfg_close)
+	if (fn == ucom_cfg_close || fn == ucom_cfg_open)
 		usb_proc_mwait(&ssc->sc_tq, t0, t1);
 
 	/*
@@ -1392,7 +1390,7 @@ ucom_get_data(struct ucom_softc *sc, struct usb_page_cache *pc,
 	UCOM_MTX_ASSERT(sc, MA_OWNED);
 
 	if (sc->sc_flag & UCOM_FLAG_CONSOLE) {
-		unsigned int temp;
+		unsigned temp;
 
 		/* get total TX length */
 
@@ -1470,7 +1468,7 @@ ucom_put_data(struct ucom_softc *sc, struct usb_page_cache *pc,
 	UCOM_MTX_ASSERT(sc, MA_OWNED);
 
 	if (sc->sc_flag & UCOM_FLAG_CONSOLE) {
-		unsigned int temp;
+		unsigned temp;
 
 		/* get maximum RX length */
 
@@ -1652,7 +1650,7 @@ static void
 ucom_cnputc(struct consdev *cd, int c)
 {
 	struct ucom_softc *sc = ucom_cons_softc;
-	unsigned int temp;
+	unsigned temp;
 
 	if (sc == NULL)
 		return;

@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2006 Marcel Moolenaar
  * All rights reserved.
@@ -27,8 +27,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
@@ -61,7 +59,7 @@ struct puc_port {
 	int		p_type;
 	int		p_rclk;
 
-	int		p_hasintr:1;
+	bool		p_hasintr:1;
 
 	serdev_intr_t	*p_ihsrc[PUC_ISRCCNT];
 	void		*p_iharg;
@@ -69,13 +67,12 @@ struct puc_port {
 	int		p_ipend;
 };
 
-devclass_t puc_devclass;
 const char puc_driver_name[] = "puc";
 
 static MALLOC_DEFINE(M_PUC, "PUC", "PUC driver");
 
 SYSCTL_NODE(_hw, OID_AUTO, puc, CTLFLAG_RD | CTLFLAG_MPSAFE, 0,
-    "puc(9) driver configuration");
+    "puc(4) driver configuration");
 
 struct puc_bar *
 puc_get_bar(struct puc_softc *sc, int rid)

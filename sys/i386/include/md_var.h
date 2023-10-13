@@ -27,8 +27,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 #ifndef _MACHINE_MD_VAR_H_
@@ -36,6 +34,7 @@
 
 #include <x86/x86_var.h>
 
+extern	u_int	cpu_fxsr;
 extern	u_int	cyrix_did;
 #if defined(I586_CPU) && !defined(NO_F00F_HACK)
 extern	int	has_f00f_bug;

@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2016 Michael Zhilin <mizhka@gmail.com>
  * Copyright (c) 2016 Landon Fuller <landonf@FreeBSD.org>
@@ -31,8 +31,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
@@ -276,7 +274,4 @@ static driver_t chipc_spi_driver = {
 	sizeof(struct chipc_spi_softc),
 };
 
-static devclass_t chipc_spi_devclass;
-
-DRIVER_MODULE(chipc_spi, bhnd_chipc, chipc_spi_driver, chipc_spi_devclass,
-    0, 0);
+DRIVER_MODULE(chipc_spi, bhnd_chipc, chipc_spi_driver, 0, 0);

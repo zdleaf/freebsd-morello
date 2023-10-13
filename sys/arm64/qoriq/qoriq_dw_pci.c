@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright 2020 Michal Meloun <mmel@FreeBSD.org>
  *
@@ -29,9 +29,6 @@
 /* Layerscape DesignWare PCIe driver */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/bus.h>
@@ -188,6 +185,8 @@ qorif_dw_pci_probe(device_t dev)
 static int
 qorif_dw_pci_attach(device_t dev)
 {
+	struct resource_map_request req;
+	struct resource_map map;
 	struct qorif_dw_pci_softc *sc;
 	phandle_t node;
 	int rv;
@@ -202,12 +201,22 @@ qorif_dw_pci_attach(device_t dev)
 
 	rid = 0;
 	sc->dw_sc.dbi_res = bus_alloc_resource_any(dev, SYS_RES_MEMORY, &rid,
-	    RF_ACTIVE);
+	    RF_ACTIVE | RF_UNMAPPED);
 	if (sc->dw_sc.dbi_res == NULL) {
 		device_printf(dev, "Cannot allocate DBI memory\n");
 		rv = ENXIO;
 		goto out;
 	}
+
+	resource_init_map_request(&req);
+	req.memattr = VM_MEMATTR_DEVICE_NP;
+	rv = bus_map_resource(dev, SYS_RES_MEMORY, sc->dw_sc.dbi_res, &req,
+	    &map);
+	if (rv != 0) {
+		device_printf(dev, "could not map memory.\n");
+		return (rv);
+	}
+	rman_set_mapping(sc->dw_sc.dbi_res, &map);
 
 	/* PCI interrupt */
 	rid = 0;
@@ -251,6 +260,4 @@ static device_method_t qorif_dw_pci_methods[] = {
 
 DEFINE_CLASS_1(pcib, qorif_dw_pci_driver, qorif_dw_pci_methods,
     sizeof(struct qorif_dw_pci_softc), pci_dw_driver);
-static devclass_t qorif_dw_pci_devclass;
-DRIVER_MODULE( qorif_dw_pci, simplebus, qorif_dw_pci_driver, qorif_dw_pci_devclass,
-    NULL, NULL);
+DRIVER_MODULE( qorif_dw_pci, simplebus, qorif_dw_pci_driver, NULL, NULL);

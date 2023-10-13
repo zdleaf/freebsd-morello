@@ -32,8 +32,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/bus.h>
 #include <sys/kernel.h>
@@ -1260,10 +1258,7 @@ siba_add_child(device_t dev, u_int order, const char *name, int unit)
 static void
 siba_child_deleted(device_t dev, device_t child)
 {
-	struct bhnd_softc	*sc;
 	struct siba_devinfo	*dinfo;
-
-	sc = device_get_softc(dev);
 
 	/* Call required bhnd(4) implementation */
 	bhnd_generic_child_deleted(dev, child);

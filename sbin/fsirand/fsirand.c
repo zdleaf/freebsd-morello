@@ -1,7 +1,7 @@
 /*	$OpenBSD: fsirand.c,v 1.9 1997/02/28 00:46:33 millert Exp $	*/
 
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 1997 Todd C. Miller <Todd.Miller@courtesan.com>
  * All rights reserved.
@@ -31,11 +31,6 @@
  * OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-
-#ifndef lint
-static const char rcsid[] =
-  "$FreeBSD$";
-#endif /* not lint */
 
 #include <sys/param.h>
 #include <sys/resource.h>
@@ -112,7 +107,7 @@ fsirand(char *device)
 	struct fs *sblock;
 	ino_t inumber;
 	ufs2_daddr_t dblk;
-	int devfd, n, cg, ret;
+	int devfd, n, cg;
 	u_int32_t bsize = DEV_BSIZE;
 
 	if ((devfd = open(device, printonly ? O_RDONLY : O_RDWR)) < 0) {
@@ -124,10 +119,10 @@ fsirand(char *device)
 	dp2 = NULL;
 
 	/* Read in master superblock */
-	if ((ret = sbget(devfd, &sblock, STDSB)) != 0) {
-		switch (ret) {
+	if ((errno = sbget(devfd, &sblock, UFS_STDSB, UFS_NOCSUM)) != 0) {
+		switch (errno) {
 		case ENOENT:
-			warn("Cannot find file system superblock");
+			warnx("Cannot find file system superblock");
 			return (1);
 		default:
 			warn("Unable to read file system superblock");

@@ -1,7 +1,7 @@
 /*-
  * SPDX-License-Identifier: BSD-3-Clause
  *
- * Copyright (c) 2001 Dag-Erling Coïdan Smørgrav
+ * Copyright (c) 2001 Dag-Erling Smørgrav
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -26,8 +26,6 @@
  * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- *
- *      $FreeBSD$
  */
 
 #ifndef _PSEUDOFS_H_INCLUDED
@@ -219,7 +217,6 @@ struct pfs_info {
  * is not enforcable by WITNESS.
  */
 struct pfs_node {
-	char			 pn_name[PFS_NAMELEN];
 	pfs_type_t		 pn_type;
 	int			 pn_flags;
 	struct mtx		 pn_mutex;
@@ -240,6 +237,7 @@ struct pfs_node {
 	struct pfs_node		*pn_nodes;		/* (o) */
 	struct pfs_node		*pn_last_node;		/* (o) */
 	struct pfs_node		*pn_next;		/* (p) */
+	char			 pn_name[];		/* Keep it last */
 };
 
 /*

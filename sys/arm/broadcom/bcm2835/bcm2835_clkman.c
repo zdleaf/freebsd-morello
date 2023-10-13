@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2017 Poul-Henning Kamp <phk@FreeBSD.org>
  *
@@ -27,8 +27,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/bus.h>
@@ -51,6 +49,7 @@ __FBSDID("$FreeBSD$");
 #include <arm/broadcom/bcm2835/bcm2835_clkman.h>
 
 static struct ofw_compat_data compat_data[] = {
+	{"brcm,bcm2711-cprman",		1},
 	{"brcm,bcm2835-cprman",		1},
 	{"broadcom,bcm2835-cprman",	1},
 	{NULL,				0}
@@ -201,13 +200,11 @@ static device_method_t bcm2835_clkman_methods[] = {
 	DEVMETHOD_END
 };
 
-static devclass_t bcm2835_clkman_devclass;
 static driver_t bcm2835_clkman_driver = {
 	"bcm2835_clkman",
 	bcm2835_clkman_methods,
 	sizeof(struct bcm2835_clkman_softc),
 };
 
-DRIVER_MODULE(bcm2835_clkman, simplebus, bcm2835_clkman_driver,
-    bcm2835_clkman_devclass, 0, 0);
+DRIVER_MODULE(bcm2835_clkman, simplebus, bcm2835_clkman_driver, 0, 0);
 MODULE_VERSION(bcm2835_clkman, 1);

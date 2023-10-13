@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2018 Rubicon Communications, LLC (Netgate)
  *
@@ -27,8 +27,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/bus.h>
@@ -89,7 +87,7 @@ simple_mfd_syscon_read_4(struct syscon *syscon, bus_size_t offset)
 	uint32_t val;
 
 	sc = device_get_softc(syscon->pdev);
-	SYSCON_ASSERT_LOCKED(sc);;
+	SYSCON_ASSERT_LOCKED(sc);
 	val = bus_read_4(sc->mem_res, offset);
 	return (val);
 }
@@ -320,8 +318,6 @@ static device_method_t simple_mfd_methods[] = {
 DEFINE_CLASS_1(simple_mfd, simple_mfd_driver, simple_mfd_methods,
   sizeof(struct simple_mfd_softc), simplebus_driver);
 
-static devclass_t simple_mfd_devclass;
-
-EARLY_DRIVER_MODULE(simple_mfd, simplebus, simple_mfd_driver,
-    simple_mfd_devclass, 0, 0, BUS_PASS_BUS + BUS_PASS_ORDER_LATE);
+EARLY_DRIVER_MODULE(simple_mfd, simplebus, simple_mfd_driver, 0, 0,
+    BUS_PASS_BUS + BUS_PASS_ORDER_LATE);
 MODULE_VERSION(simple_mfd, 1);

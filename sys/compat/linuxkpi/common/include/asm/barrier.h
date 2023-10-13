@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2021 Vladimir Kondratyev <wulf@FreeBSD.org>
  *
@@ -54,5 +54,8 @@
 #ifndef	smp_store_mb
 #define	smp_store_mb(x, v)	do { WRITE_ONCE(x, v); smp_mb(); } while (0)
 #endif
+
+#define	smp_mb__before_atomic()	barrier()
+#define	smp_mb__after_atomic()	barrier()
 
 #endif	/* _LINUXKPI_ASM_BARRIER_H_ */

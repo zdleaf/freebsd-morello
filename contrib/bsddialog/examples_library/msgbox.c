@@ -8,10 +8,8 @@
  *   <http://creativecommons.org/publicdomain/zero/1.0/>.
  */
 
-#include <stdio.h>
-#include <string.h>
-
 #include <bsddialog.h>
+#include <stdio.h>
 
 int main()
 {
@@ -22,21 +20,19 @@ int main()
 		printf("Error: %s\n", bsddialog_geterror());
 		return (1);
 	}
-
 	bsddialog_initconf(&conf);
 	conf.title = "msgbox";
 	output = bsddialog_msgbox(&conf, "Example", 7, 20);
-
 	bsddialog_end();
 
 	switch (output) {
 	case BSDDIALOG_ERROR:
 		printf("Error %s\n", bsddialog_geterror());
-		break;
+		return (1);
 	case BSDDIALOG_OK:
-		printf("OK\n");
+		printf("[OK]\n");
 		break;
 	}
 
-	return (output);
+	return (0);
 }

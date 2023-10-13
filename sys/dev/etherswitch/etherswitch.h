@@ -1,5 +1,4 @@
 /*
- * $FreeBSD$
  */
 
 #ifndef __SYS_DEV_ETHERSWITCH_ETHERSWITCH_H
@@ -9,7 +8,6 @@
 #include <net/ethernet.h>
 
 #ifdef _KERNEL
-extern devclass_t       etherswitch_devclass;
 extern driver_t         etherswitch_driver;
 #endif /* _KERNEL */
 

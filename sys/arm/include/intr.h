@@ -34,8 +34,6 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD$
- *
  */
 
 #ifndef _MACHINE_INTR_H_
@@ -55,7 +53,7 @@
 typedef void intr_ipi_send_t(void *, cpuset_t, u_int);
 typedef void intr_ipi_handler_t(void *);
 
-void intr_ipi_dispatch(u_int, struct trapframe *);
+void intr_ipi_dispatch(u_int);
 void intr_ipi_send(cpuset_t, u_int);
 
 void intr_ipi_setup(u_int, const char *, intr_ipi_handler_t *, void *,

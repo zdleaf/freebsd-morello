@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2010 Fredrik Lindberg <fli@shapeshifter.se>
  * All rights reserved.
@@ -26,8 +26,6 @@
  *
  */
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/eventhandler.h>
 #include <sys/sockio.h>
@@ -95,7 +93,7 @@ struct uhso_softc {
 
 	/* Network */
 	struct usb_xfer		*sc_if_xfer[2];
-	struct ifnet		*sc_ifp;
+	if_t			sc_ifp;
 	struct mbuf		*sc_mwait;	/* Partial packet */
 	size_t			sc_waitlen;	/* No. of outstanding bytes */
 	struct mbufq		sc_rxq;
@@ -470,10 +468,10 @@ static void uhso_ucom_cfg_get_status(struct ucom_softc *, uint8_t *, uint8_t *);
 static void uhso_ucom_cfg_set_dtr(struct ucom_softc *, uint8_t);
 static void uhso_ucom_cfg_set_rts(struct ucom_softc *, uint8_t);
 static void uhso_if_init(void *);
-static void uhso_if_start(struct ifnet *);
+static void uhso_if_start(if_t);
 static void uhso_if_stop(struct uhso_softc *);
-static int  uhso_if_ioctl(struct ifnet *, u_long, caddr_t);
-static int  uhso_if_output(struct ifnet *, struct mbuf *,
+static int  uhso_if_ioctl(if_t, u_long, caddr_t);
+static int  uhso_if_output(if_t, struct mbuf *,
     const struct sockaddr *, struct route *);
 static void uhso_if_rxflush(void *);
 
@@ -495,8 +493,7 @@ static driver_t uhso_driver = {
 	.size = sizeof(struct uhso_softc)
 };
 
-static devclass_t uhso_devclass;
-DRIVER_MODULE(uhso, uhub, uhso_driver, uhso_devclass, uhso_driver_loaded, 0);
+DRIVER_MODULE(uhso, uhub, uhso_driver, uhso_driver_loaded, NULL);
 MODULE_DEPEND(uhso, ucom, 1, 1, 1);
 MODULE_DEPEND(uhso, usb, 1, 1, 1);
 MODULE_VERSION(uhso, 1);
@@ -688,7 +685,7 @@ uhso_detach(device_t self)
 
 	if (sc->sc_ifp != NULL) {
 		callout_drain(&sc->sc_c);
-		free_unr(uhso_ifnet_unit, sc->sc_ifp->if_dunit);
+		free_unr(uhso_ifnet_unit, if_getdunit(sc->sc_ifp));
 		mtx_lock(&sc->sc_mtx);
 		uhso_if_stop(sc);
 		mtx_unlock(&sc->sc_mtx);
@@ -1102,7 +1099,7 @@ uhso_mux_intr_callback(struct usb_xfer *xfer, usb_error_t error)
 	struct usb_page_cache *pc;
 	struct usb_page_search res;
 	struct uhso_softc *sc = usbd_xfer_softc(xfer);
-	unsigned int i, mux;
+	unsigned i, mux;
 
 	UHSO_DPRINTF(3, "status %d\n", USB_GET_STATE(xfer));
 
@@ -1553,11 +1550,11 @@ uhso_ucom_stop_write(struct ucom_softc *ucom)
 static int
 uhso_attach_ifnet(struct uhso_softc *sc, struct usb_interface *iface, int type)
 {
-	struct ifnet *ifp;
+	if_t ifp;
 	usb_error_t uerr;
 	struct sysctl_ctx_list *sctx;
 	struct sysctl_oid *soid;
-	unsigned int devunit;
+	unsigned devunit;
 
 	uerr = usbd_transfer_setup(sc->sc_udev,
 	    &iface->idesc->bInterfaceNumber, sc->sc_if_xfer,
@@ -1587,16 +1584,15 @@ uhso_attach_ifnet(struct uhso_softc *sc, struct usb_interface *iface, int type)
 	devunit = alloc_unr(uhso_ifnet_unit);
 
 	if_initname(ifp, device_get_name(sc->sc_dev), devunit);
-	ifp->if_mtu = UHSO_MAX_MTU;
-	ifp->if_ioctl = uhso_if_ioctl;
-	ifp->if_init = uhso_if_init;
-	ifp->if_start = uhso_if_start;
-	ifp->if_output = uhso_if_output;
-	ifp->if_flags = IFF_BROADCAST | IFF_MULTICAST | IFF_NOARP;
-	ifp->if_softc = sc;
-	IFQ_SET_MAXLEN(&ifp->if_snd, ifqmaxlen);
-	ifp->if_snd.ifq_drv_maxlen = ifqmaxlen;
-	IFQ_SET_READY(&ifp->if_snd);
+	if_setmtu(ifp, UHSO_MAX_MTU);
+	if_setioctlfn(ifp, uhso_if_ioctl);
+	if_setinitfn(ifp, uhso_if_init);
+	if_setstartfn(ifp, uhso_if_start);
+	if_setoutputfn(ifp, uhso_if_output);
+	if_setflags(ifp, IFF_BROADCAST | IFF_MULTICAST | IFF_NOARP);
+	if_setsoftc(ifp, sc);
+	if_setsendqlen(ifp, ifqmaxlen);
+	if_setsendqready(ifp);
 
 	if_attach(ifp);
 	bpfattach(ifp, DLT_RAW, 0);
@@ -1604,8 +1600,8 @@ uhso_attach_ifnet(struct uhso_softc *sc, struct usb_interface *iface, int type)
 	sctx = device_get_sysctl_ctx(sc->sc_dev);
 	soid = device_get_sysctl_tree(sc->sc_dev);
 	/* Unlocked read... */
-	SYSCTL_ADD_STRING(sctx, SYSCTL_CHILDREN(soid), OID_AUTO, "netif",
-	    CTLFLAG_RD, ifp->if_xname, 0, "Attached network interface");
+	SYSCTL_ADD_CONST_STRING(sctx, SYSCTL_CHILDREN(soid), OID_AUTO, "netif",
+	    CTLFLAG_RD, if_name(ifp), "Attached network interface");
 
 	return (0);
 }
@@ -1624,7 +1620,7 @@ uhso_ifnet_read_callback(struct usb_xfer *xfer, usb_error_t error)
 
 	switch (USB_GET_STATE(xfer)) {
 	case USB_ST_TRANSFERRED:
-		if (actlen > 0 && (sc->sc_ifp->if_drv_flags & IFF_DRV_RUNNING)) {
+		if (actlen > 0 && (if_getdrvflags(sc->sc_ifp) & IFF_DRV_RUNNING)) {
 			pc = usbd_xfer_get_frame(xfer, 0);
 			if (mbufq_full(&sc->sc_rxq))
 				break;
@@ -1665,7 +1661,7 @@ uhso_if_rxflush(void *arg)
 {
 	struct epoch_tracker et;
 	struct uhso_softc *sc = arg;
-	struct ifnet *ifp = sc->sc_ifp;
+	if_t ifp = sc->sc_ifp;
 	uint8_t *cp;
 	struct mbuf *m, *m0, *mwait;
 	struct ip *ip;
@@ -1783,7 +1779,7 @@ uhso_if_rxflush(void *arg)
 
 		/* Dispatch to IP layer */
 		BPF_MTAP(sc->sc_ifp, m);
-		M_SETFIB(m, ifp->if_fib);
+		M_SETFIB(m, if_getfib(ifp));
 		netisr_dispatch(isr, m);
 		m = m0 != NULL ? m0 : NULL;
 		mtx_lock(&sc->sc_mtx);
@@ -1796,7 +1792,7 @@ static void
 uhso_ifnet_write_callback(struct usb_xfer *xfer, usb_error_t error)
 {
 	struct uhso_softc *sc = usbd_xfer_softc(xfer);
-	struct ifnet *ifp = sc->sc_ifp;
+	if_t ifp = sc->sc_ifp;
 	struct usb_page_cache *pc;
 	struct mbuf *m;
 	int actlen;
@@ -1808,14 +1804,14 @@ uhso_ifnet_write_callback(struct usb_xfer *xfer, usb_error_t error)
 	switch (USB_GET_STATE(xfer)) {
 	case USB_ST_TRANSFERRED:
 		if_inc_counter(ifp, IFCOUNTER_OPACKETS, 1);
-		ifp->if_drv_flags &= ~IFF_DRV_OACTIVE;
+		if_setdrvflagbits(ifp, 0, IFF_DRV_OACTIVE);
 	case USB_ST_SETUP:
 tr_setup:
-		IFQ_DRV_DEQUEUE(&ifp->if_snd, m);
+		m = if_dequeue(ifp);
 		if (m == NULL)
 			break;
 
-		ifp->if_drv_flags |= IFF_DRV_OACTIVE;
+		if_setdrvflagbits(ifp, IFF_DRV_OACTIVE, 0);
 
 		if (m->m_pkthdr.len > MCLBYTES)
 			m->m_pkthdr.len = MCLBYTES;
@@ -1838,21 +1834,21 @@ tr_setup:
 }
 
 static int
-uhso_if_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
+uhso_if_ioctl(if_t ifp, u_long cmd, caddr_t data)
 {
 	struct uhso_softc *sc;
 
-	sc = ifp->if_softc;
+	sc = if_getsoftc(ifp);
 
 	switch (cmd) {
 	case SIOCSIFFLAGS:
-		if (ifp->if_flags & IFF_UP) {
-			if (!(ifp->if_drv_flags & IFF_DRV_RUNNING)) {
+		if (if_getflags(ifp) & IFF_UP) {
+			if (!(if_getdrvflags(ifp) & IFF_DRV_RUNNING)) {
 				uhso_if_init(sc);
 			}
 		}
 		else {
-			if (ifp->if_drv_flags & IFF_DRV_RUNNING) {
+			if (if_getdrvflags(ifp) & IFF_DRV_RUNNING) {
 				mtx_lock(&sc->sc_mtx);
 				uhso_if_stop(sc);
 				mtx_unlock(&sc->sc_mtx);
@@ -1873,20 +1869,20 @@ static void
 uhso_if_init(void *priv)
 {
 	struct uhso_softc *sc = priv;
-	struct ifnet *ifp = sc->sc_ifp;
+	if_t ifp = sc->sc_ifp;
 
 	mtx_lock(&sc->sc_mtx);
 	uhso_if_stop(sc);
 	ifp = sc->sc_ifp;
-	ifp->if_flags |= IFF_UP;
-	ifp->if_drv_flags |= IFF_DRV_RUNNING;
+	if_setflagbits(ifp, IFF_UP, 0);
+	if_setdrvflagbits(ifp, IFF_DRV_RUNNING, 0);
 	mtx_unlock(&sc->sc_mtx);
 
 	UHSO_DPRINTF(2, "ifnet initialized\n");
 }
 
 static int
-uhso_if_output(struct ifnet *ifp, struct mbuf *m0, const struct sockaddr *dst,
+uhso_if_output(if_t ifp, struct mbuf *m0, const struct sockaddr *dst,
     struct route *ro)
 {
 	int error;
@@ -1900,7 +1896,7 @@ uhso_if_output(struct ifnet *ifp, struct mbuf *m0, const struct sockaddr *dst,
 		return (EAFNOSUPPORT);
 	}
 
-	error = (ifp->if_transmit)(ifp, m0);
+	error = if_transmit(ifp, m0);
 	if (error) {
 		if_inc_counter(ifp, IFCOUNTER_OERRORS, 1);
 		return (ENOBUFS);
@@ -1910,11 +1906,11 @@ uhso_if_output(struct ifnet *ifp, struct mbuf *m0, const struct sockaddr *dst,
 }
 
 static void
-uhso_if_start(struct ifnet *ifp)
+uhso_if_start(if_t ifp)
 {
-	struct uhso_softc *sc = ifp->if_softc;
+	struct uhso_softc *sc = if_getsoftc(ifp);
 
-	if ((ifp->if_drv_flags & IFF_DRV_RUNNING) == 0) {
+	if ((if_getdrvflags(ifp) & IFF_DRV_RUNNING) == 0) {
 		UHSO_DPRINTF(1, "Not running\n");
 		return;
 	}
@@ -1932,5 +1928,5 @@ uhso_if_stop(struct uhso_softc *sc)
 
 	usbd_transfer_stop(sc->sc_if_xfer[UHSO_IFNET_READ]);
 	usbd_transfer_stop(sc->sc_if_xfer[UHSO_IFNET_WRITE]);
-	sc->sc_ifp->if_drv_flags &= ~(IFF_DRV_RUNNING | IFF_DRV_OACTIVE);
+	if_setdrvflagbits(sc->sc_ifp, 0, (IFF_DRV_RUNNING | IFF_DRV_OACTIVE));
 }

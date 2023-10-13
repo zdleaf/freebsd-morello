@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2004-2005 HighPoint Technologies, Inc.
  * All rights reserved.
@@ -27,8 +27,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
- 
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
@@ -98,10 +96,8 @@ static driver_t hpt_pci_driver = {
 	sizeof(IAL_ADAPTER_T)
 };
 
-static devclass_t	hpt_devclass;
-
-#define __DRIVER_MODULE(p1, p2, p3, p4, p5, p6) DRIVER_MODULE(p1, p2, p3, p4, p5, p6)
-__DRIVER_MODULE(PROC_DIR_NAME, pci, hpt_pci_driver, hpt_devclass, 0, 0);
+#define __DRIVER_MODULE(p1, p2, p3, p4, p5) DRIVER_MODULE(p1, p2, p3, p4, p5)
+__DRIVER_MODULE(PROC_DIR_NAME, pci, hpt_pci_driver, 0, 0);
 MODULE_DEPEND(PROC_DIR_NAME, cam, 1, 1, 1);
 
 #define ccb_ccb_ptr spriv_ptr0

@@ -24,8 +24,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 #include <sys/param.h>
@@ -77,16 +75,25 @@ linux_dmi_match(enum dmi_field f, const char *str)
 static bool
 linux_dmi_matches(const struct dmi_system_id *dsi)
 {
+	enum dmi_field slot;
 	int i;
 
 	for (i = 0; i < nitems(dsi->matches); i++) {
-		if (dsi->matches[i].slot == DMI_NONE)
+		slot = dsi->matches[i].slot;
+		if (slot == DMI_NONE)
 			break;
-		if (dmi_match(dsi->matches[i].slot,
-		    dsi->matches[i].substr) == false)
+		if (slot >= DMI_STRING_MAX ||
+		    dmi_data[slot] == NULL)
 			return (false);
+		if (dsi->matches[i].exact_match) {
+			if (dmi_match(slot, dsi->matches[i].substr))
+				continue;
+		} else if (strstr(dmi_data[slot],
+			dsi->matches[i].substr) != NULL) {
+			continue;
+		}
+		return (false);
 	}
-
 	return (true);
 }
 

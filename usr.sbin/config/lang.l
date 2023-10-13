@@ -30,7 +30,6 @@
  * SUCH DAMAGE.
  *
  *	@(#)lang.l	8.1 (Berkeley) 6/6/93
- * $FreeBSD$
  */
 
 #include <assert.h>
@@ -297,6 +296,8 @@ include(const char *fname, int ateof)
 		return (-1);
 	}
 	cfgfile_add(fnamebuf == NULL ? fname : fnamebuf);
+	free(fnamebuf);
+
 	in = malloc(sizeof(*in));
 	assert(in != NULL);
 	in->in_prev = inclp;

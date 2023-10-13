@@ -31,8 +31,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/bus.h>
@@ -159,8 +157,6 @@ static device_method_t dwgpiobus_methods[] = {
 DEFINE_CLASS_1(dwgpiobus, dwgpiobus_driver, dwgpiobus_methods,
     sizeof(struct dwgpiobus_softc), simplebus_driver);
 
-static devclass_t dwgpiobus_devclass;
-
-EARLY_DRIVER_MODULE(dwgpiobus, simplebus, dwgpiobus_driver, dwgpiobus_devclass,
-    0, 0, BUS_PASS_INTERRUPT + BUS_PASS_ORDER_MIDDLE);
+EARLY_DRIVER_MODULE(dwgpiobus, simplebus, dwgpiobus_driver, 0, 0,
+    BUS_PASS_INTERRUPT + BUS_PASS_ORDER_MIDDLE);
 MODULE_VERSION(dwgpiobus, 1);

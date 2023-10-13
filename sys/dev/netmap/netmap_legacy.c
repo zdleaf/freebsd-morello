@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (C) 2018 Vincenzo Maffione
  * All rights reserved.
@@ -26,7 +26,6 @@
  * SUCH DAMAGE.
  */
 
-/* $FreeBSD$ */
 
 #if defined(__FreeBSD__)
 #include <sys/cdefs.h> /* prerequisite */
@@ -414,14 +413,14 @@ netmap_ioctl_legacy(struct netmap_priv_d *priv, u_long cmd, caddr_t data,
 	default:	/* allow device-specific ioctls */
 	    {
 		struct nmreq *nmr = (struct nmreq *)data;
-		struct ifnet *ifp = ifunit_ref(nmr->nr_name);
+		if_t ifp = ifunit_ref(nmr->nr_name);
 		if (ifp == NULL) {
 			error = ENXIO;
 		} else {
 			struct socket so;
 
 			bzero(&so, sizeof(so));
-			so.so_vnet = ifp->if_vnet;
+			so.so_vnet = if_getvnet(ifp);
 			// so->so_proto not null.
 			error = ifioctl(&so, cmd, data, td);
 			if_rele(ifp);

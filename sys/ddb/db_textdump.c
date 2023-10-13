@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2007 Robert N. M. Watson
  * All rights reserved.
@@ -59,8 +59,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include "opt_config.h"
 
 #include "opt_ddb.h"
@@ -248,7 +246,7 @@ textdump_writeblock(struct dumperinfo *di, off_t offset, char *buffer)
 		return (EIO);
 	if (offset < SIZEOF_METADATA)
 		return (ENOSPC);
-	textdump_error = dump_write(di, buffer, 0, offset + di->mediaoffset,
+	textdump_error = dump_write(di, buffer, offset + di->mediaoffset,
 	    TEXTDUMP_BLOCKSIZE);
 	if (textdump_error)
 		printf("textdump_writeblock: offset %jd, error %d\n", (intmax_t)offset,
@@ -501,7 +499,7 @@ textdump_dumpsys(struct dumperinfo *di)
 	 * Terminate the dump, report any errors, and clear the pending flag.
 	 */
 	if (textdump_error == 0)
-		(void)dump_write(di, NULL, 0, 0, 0);
+		(void)dump_write(di, NULL, 0, 0);
 	if (textdump_error == ENOSPC)
 		printf("Textdump: Insufficient space on dump partition\n");
 	else if (textdump_error != 0)

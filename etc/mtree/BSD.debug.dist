@@ -1,4 +1,3 @@
-# $FreeBSD$
 #
 # Please see the file src/etc/mtree/README before making changes to this file.
 #
@@ -15,8 +14,6 @@
             ..
         ..
         lib
-            casper
-            ..
             geom
             ..
             nvmecontrol
@@ -31,14 +28,14 @@
             ..
             lib
                 clang
-                    13.0.0
+                    16
                         lib
                             freebsd
                             ..
                         ..
                     ..
                 ..
-                engines
+                engines-3
                 ..
                 i18n
                 ..

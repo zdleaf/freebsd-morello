@@ -18,8 +18,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 /*
  * Driver for Intel PRO/Wireless 3945ABG 802.11 network adapters.
  *
@@ -302,9 +300,8 @@ static driver_t wpi_driver = {
 	wpi_methods,
 	sizeof (struct wpi_softc)
 };
-static devclass_t wpi_devclass;
 
-DRIVER_MODULE(wpi, pci, wpi_driver, wpi_devclass, NULL, NULL);
+DRIVER_MODULE(wpi, pci, wpi_driver, NULL, NULL);
 
 MODULE_VERSION(wpi, 1);
 
@@ -2771,7 +2768,7 @@ wpi_cmd2(struct wpi_softc *sc, struct wpi_buf *buf)
 		ring->pending = 0;
 		sc->sc_update_tx_ring(sc, ring);
 	} else
-		ieee80211_node_incref(data->ni);
+		(void) ieee80211_ref_node(data->ni);
 
 end:	DPRINTF(sc, WPI_DEBUG_TRACE, error ? TRACE_STR_END_ERR : TRACE_STR_END,
 	    __func__);

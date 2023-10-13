@@ -32,14 +32,10 @@
  * THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #ifndef _NETINET_SCTP_OS_BSD_H_
 #define _NETINET_SCTP_OS_BSD_H_
-/*
- * includes
- */
+
+#include <sys/cdefs.h>
 #include "opt_inet6.h"
 #include "opt_inet.h"
 #include "opt_sctp.h"
@@ -73,6 +69,7 @@ __FBSDID("$FreeBSD$");
 #include <net/if.h>
 #include <net/if_types.h>
 #include <net/if_var.h>
+#include <net/if_private.h>
 #include <net/route.h>
 #include <net/route/nhop.h>
 #include <net/vnet.h>
@@ -92,7 +89,6 @@ __FBSDID("$FreeBSD$");
 #include <netinet6/in6_fib.h>
 #include <netinet6/ip6_var.h>
 #include <netinet6/in6_pcb.h>
-#include <netinet6/ip6protosw.h>
 #include <netinet6/nd6.h>
 #include <netinet6/scope6_var.h>
 #endif				/* INET6 */
@@ -313,9 +309,8 @@ typedef struct callout sctp_os_timer_t;
 /*************************/
 /*      MTU              */
 /*************************/
-#define SCTP_GATHER_MTU_FROM_IFN_INFO(ifn, ifn_index, af) ((struct ifnet *)ifn)->if_mtu
+#define SCTP_GATHER_MTU_FROM_IFN_INFO(ifn, ifn_index) ((ifn != NULL) ? ((struct ifnet *)ifn)->if_mtu : 0)
 #define SCTP_GATHER_MTU_FROM_ROUTE(sctp_ifa, sa, nh) ((uint32_t)((nh != NULL) ? nh->nh_mtu : 0))
-#define SCTP_GATHER_MTU_FROM_INTFC(sctp_ifn) ((sctp_ifn->ifn_p != NULL) ? ((struct ifnet *)(sctp_ifn->ifn_p))->if_mtu : 0)
 
 /*************************/
 /* These are for logging */
@@ -373,18 +368,26 @@ typedef struct callout sctp_os_timer_t;
 #define SCTP_CLEAR_SO_NBIO(so)	((so)->so_state &= ~SS_NBIO)
 /* get the socket type */
 #define SCTP_SO_TYPE(so)	((so)->so_type)
-/* Use a macro for renaming sb_cc to sb_acc.
- * Initially sb_ccc was used, but this broke select() when used
- * with SCTP sockets.
- */
-#define sb_cc sb_acc
 /* reserve sb space for a socket */
 #define SCTP_SORESERVE(so, send, recv)	soreserve(so, send, recv)
 /* wakeup a socket */
 #define SCTP_SOWAKEUP(so)	wakeup(&(so)->so_timeo)
+/* number of bytes ready to read */
+#define SCTP_SBAVAIL(sb)	sbavail(sb)
 /* clear the socket buffer state */
+#define SCTP_SB_INCR(sb, incr)			\
+{						\
+	atomic_add_int(&(sb)->sb_acc, incr);	\
+	atomic_add_int(&(sb)->sb_ccc, incr);	\
+}
+#define SCTP_SB_DECR(sb, decr)					\
+{								\
+	SCTP_SAVE_ATOMIC_DECREMENT(&(sb)->sb_acc, decr);	\
+	SCTP_SAVE_ATOMIC_DECREMENT(&(sb)->sb_ccc, decr);	\
+}
 #define SCTP_SB_CLEAR(sb)	\
-	(sb).sb_cc = 0;		\
+	(sb).sb_acc = 0;	\
+	(sb).sb_ccc = 0;	\
 	(sb).sb_mb = NULL;	\
 	(sb).sb_mbcnt = 0;
 
@@ -429,9 +432,11 @@ typedef struct route sctp_route_t;
 	                                                                     \
 	m_clrprotoflags(o_pak);                                              \
 	if (local_inp != NULL) {                                             \
+		INP_RLOCK(&local_inp->ip_inp.inp);                           \
 		result = ip6_output(o_pak,                                   \
 		                    local_inp->ip_inp.inp.in6p_outputopts,   \
 		                    (ro), 0, 0, ifp, NULL);                  \
+		INP_RUNLOCK(&local_inp->ip_inp.inp);                         \
 	} else {                                                             \
 		result = ip6_output(o_pak, NULL, (ro), 0, 0, ifp, NULL);     \
 	}                                                                    \

@@ -1,10 +1,9 @@
 /*	$NetBSD: umodem.c,v 1.45 2002/09/23 05:51:23 simonb Exp $	*/
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
 #define UFOMA_HANDSFREE
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD AND BSD-2-Clause-NetBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2005, Takanori Watanabe All rights reserved.
  * Copyright (c) 2003 M. Warner Losh <imp@FreeBSD.org>
@@ -308,8 +307,6 @@ static device_method_t ufoma_methods[] = {
 	DEVMETHOD_END
 };
 
-static devclass_t ufoma_devclass;
-
 static driver_t ufoma_driver = {
 	.name = "ufoma",
 	.methods = ufoma_methods,
@@ -321,7 +318,7 @@ static const STRUCT_USB_HOST_ID ufoma_devs[] = {
 	 USB_IFACE_SUBCLASS(UISUBCLASS_MCPC),},
 };
 
-DRIVER_MODULE(ufoma, uhub, ufoma_driver, ufoma_devclass, NULL, 0);
+DRIVER_MODULE(ufoma, uhub, ufoma_driver, NULL, NULL);
 MODULE_DEPEND(ufoma, ucom, 1, 1, 1);
 MODULE_DEPEND(ufoma, usb, 1, 1, 1);
 MODULE_VERSION(ufoma, 1);

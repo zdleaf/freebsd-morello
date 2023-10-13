@@ -22,8 +22,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 #ifndef	__MTKSWITCHVAR_H__
@@ -68,7 +66,7 @@ struct mtkswitch_softc {
 	mtk_switch_type	sc_switchtype;
 	char		*ifname[MTKSWITCH_MAX_PHYS];
 	device_t	miibus[MTKSWITCH_MAX_PHYS];
-	struct ifnet	*ifp[MTKSWITCH_MAX_PHYS];
+	if_t ifp[MTKSWITCH_MAX_PHYS];
 	struct callout	callout_tick;
 	etherswitch_info_t info;
 

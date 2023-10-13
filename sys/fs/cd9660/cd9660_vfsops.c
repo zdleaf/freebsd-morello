@@ -37,8 +37,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/namei.h>
@@ -162,7 +160,7 @@ cd9660_mount(struct mount *mp)
 	NDINIT(&ndp, LOOKUP, FOLLOW | LOCKLEAF, UIO_SYSSPACE, fspec);
 	if ((error = namei(&ndp)))
 		return (error);
-	NDFREE(&ndp, NDF_ONLY_PNBUF);
+	NDFREE_PNBUF(&ndp);
 	devvp = ndp.ni_vp;
 
 	if (!vn_isdisk_error(devvp, &error)) {
@@ -202,9 +200,7 @@ cd9660_mount(struct mount *mp)
  * Common code for mount and mountroot
  */
 static int
-iso_mountfs(devvp, mp)
-	struct vnode *devvp;
-	struct mount *mp;
+iso_mountfs(struct vnode *devvp, struct mount *mp)
 {
 	struct iso_mnt *isomp = NULL;
 	struct buf *bp = NULL;
@@ -334,6 +330,13 @@ iso_mountfs(devvp, mp)
 
 	if (logical_block_size < DEV_BSIZE || logical_block_size > MAXBSIZE
 	    || (logical_block_size & (logical_block_size - 1)) != 0) {
+		error = EINVAL;
+		goto out;
+	}
+
+	if (logical_block_size < cp->provider->sectorsize) {
+		printf("cd9660: Unsupported logical block size %u\n",
+		    logical_block_size);
 		error = EINVAL;
 		goto out;
 	}
@@ -500,9 +503,7 @@ out:
  * unmount system call
  */
 static int
-cd9660_unmount(mp, mntflags)
-	struct mount *mp;
-	int mntflags;
+cd9660_unmount(struct mount *mp, int mntflags)
 {
 	struct iso_mnt *isomp;
 	int error, flags = 0;
@@ -527,9 +528,6 @@ cd9660_unmount(mp, mntflags)
 	dev_rel(isomp->im_dev);
 	free(isomp, M_ISOFSMNT);
 	mp->mnt_data = NULL;
-	MNT_ILOCK(mp);
-	mp->mnt_flag &= ~MNT_LOCAL;
-	MNT_IUNLOCK(mp);
 	return (error);
 }
 
@@ -537,10 +535,7 @@ cd9660_unmount(mp, mntflags)
  * Return root of a filesystem
  */
 static int
-cd9660_root(mp, flags, vpp)
-	struct mount *mp;
-	int flags;
-	struct vnode **vpp;
+cd9660_root(struct mount *mp, int flags, struct vnode **vpp)
 {
 	struct iso_mnt *imp = VFSTOISOFS(mp);
 	struct iso_directory_record *dp =
@@ -559,9 +554,7 @@ cd9660_root(mp, flags, vpp)
  * Get filesystem statistics.
  */
 static int
-cd9660_statfs(mp, sbp)
-	struct mount *mp;
-	struct statfs *sbp;
+cd9660_statfs(struct mount *mp, struct statfs *sbp)
 {
 	struct iso_mnt *isomp;
 
@@ -589,11 +582,7 @@ cd9660_statfs(mp, sbp)
 
 /* ARGSUSED */
 static int
-cd9660_fhtovp(mp, fhp, flags, vpp)
-	struct mount *mp;
-	struct fid *fhp;
-	int flags;
-	struct vnode **vpp;
+cd9660_fhtovp(struct mount *mp, struct fid *fhp, int flags, struct vnode **vpp)
 {
 	struct ifid ifh;
 	struct iso_node *ip;
@@ -628,11 +617,7 @@ cd9660_fhtovp(mp, fhp, flags, vpp)
  * needed for anything other than nfsd, and who exports a mounted DVD over NFS?
  */
 static int
-cd9660_vget(mp, ino, flags, vpp)
-	struct mount *mp;
-	ino_t ino;
-	int flags;
-	struct vnode **vpp;
+cd9660_vget(struct mount *mp, ino_t ino, int flags, struct vnode **vpp)
 {
 
 	/*
@@ -652,9 +637,7 @@ cd9660_vget(mp, ino, flags, vpp)
 
 /* Use special comparator for full 64-bit ino comparison. */
 static int
-cd9660_vfs_hash_cmp(vp, pino)
-	struct vnode *vp;
-	void *pino;
+cd9660_vfs_hash_cmp(struct vnode *vp, void *pino)
 {
 	struct iso_node *ip;
 	cd_ino_t ino;
@@ -665,13 +648,8 @@ cd9660_vfs_hash_cmp(vp, pino)
 }
 
 int
-cd9660_vget_internal(mp, ino, flags, vpp, relocated, isodir)
-	struct mount *mp;
-	cd_ino_t ino;
-	int flags;
-	struct vnode **vpp;
-	int relocated;
-	struct iso_directory_record *isodir;
+cd9660_vget_internal(struct mount *mp, cd_ino_t ino, int flags,
+    struct vnode **vpp, int relocated, struct iso_directory_record *isodir)
 {
 	struct iso_mnt *imp;
 	struct iso_node *ip;
@@ -846,6 +824,7 @@ cd9660_vget_internal(mp, ino, flags, vpp, relocated, isodir)
 	 * XXX need generation number?
 	 */
 
+	vn_set_state(vp, VSTATE_CONSTRUCTED);
 	*vpp = vp;
 	return (0);
 }

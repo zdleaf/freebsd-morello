@@ -31,7 +31,6 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* $FreeBSD$ */
 
 #include <gssapi/gssapi.h>
 #include <errno.h>
@@ -40,7 +39,7 @@
 
 /* RCSID("$Id: gss_buffer_set.c 18885 2006-10-24 21:53:02Z lha $"); */
 
-OM_uint32 
+OM_uint32
 gss_create_empty_buffer_set(OM_uint32 * minor_status,
     gss_buffer_set_t *buffer_set)
 {

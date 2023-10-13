@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (C) 2009-2011 Semihalf.
  * All rights reserved.
@@ -24,8 +24,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 #ifndef _DEV_CESA_H_
@@ -259,7 +257,7 @@ struct cesa_softc {
 
 	/* CESA SRAM Address */
 	bus_addr_t			sc_sram_base_pa;
-	vm_offset_t			sc_sram_base_va;
+	void				*sc_sram_base_va;
 	bus_size_t			sc_sram_size;
 };
 

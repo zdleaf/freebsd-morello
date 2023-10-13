@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 1998 Doug Rabson
  * All rights reserved.
@@ -24,8 +24,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 #ifndef _ISA_ISAVAR_H_
@@ -164,9 +162,6 @@ ISA_ACCESSOR(configattr, CONFIGATTR, int)
 ISA_ACCESSOR(pnp_csn, PNP_CSN, int)
 ISA_ACCESSOR(pnp_ldn, PNP_LDN, int)
 ISA_ACCESSOR(pnpbios_handle, PNPBIOS_HANDLE, int)
-
-/* Device class for ISA bridges. */
-extern devclass_t isab_devclass;
 
 extern void	isa_probe_children(device_t dev);
 

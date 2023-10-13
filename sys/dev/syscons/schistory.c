@@ -30,8 +30,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include "opt_syscons.h"
 
 #ifndef SC_NO_HISTORY
@@ -44,7 +42,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/kernel.h>
 #include <sys/malloc.h>
 
-#if defined(__arm__) || defined(__mips__) || defined(__powerpc__)
+#if defined(__arm__) || defined(__powerpc__)
 #include <machine/sc_machdep.h>
 #else
 #include <machine/pc/display.h>

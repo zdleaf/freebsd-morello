@@ -36,8 +36,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/mount.h>
 #include <sys/namei.h>
@@ -818,7 +816,7 @@ sys_auditctl(struct thread *td, struct auditctl_args *uap)
 #else
 	VOP_UNLOCK(vp);
 #endif
-	NDFREE(&nd, NDF_ONLY_PNBUF);
+	NDFREE_PNBUF(&nd);
 	if (vp->v_type != VREG) {
 		vn_close(vp, AUDIT_CLOSE_FLAGS, td->td_ucred, td);
 		return (EINVAL);

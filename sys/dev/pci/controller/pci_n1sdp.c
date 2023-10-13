@@ -32,8 +32,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/malloc.h>
@@ -113,8 +111,8 @@ n1sdp_init(struct generic_pcie_n1sdp_softc *sc)
 
 	shared_data = (struct pcie_discovery_data *)vaddr;
 	paddr_rc = (vm_offset_t)shared_data->rc_base_addr;
-	error = bus_space_map(sc->acpi.base.bst, paddr_rc, PCI_CFG_SPACE_SIZE,
-	    0, &sc->n1_bsh);
+	error = bus_space_map(sc->acpi.base.res->r_bustag, paddr_rc,
+	    PCI_CFG_SPACE_SIZE, 0, &sc->n1_bsh);
 	if (error != 0)
 		goto out_pmap;
 
@@ -245,10 +243,10 @@ n1sdp_get_bus_space(device_t dev, u_int bus, u_int slot, u_int func, u_int reg,
 			return (EINVAL);
 		*bsh = sc->n1_bsh;
 	} else {
-		*bsh = sc->acpi.base.bsh;
+		*bsh = rman_get_bushandle(sc->acpi.base.res);
 	}
 
-	*bst = sc->acpi.base.bst;
+	*bst = rman_get_bustag(sc->acpi.base.res);
 	*offset = PCIE_ADDR_OFFSET(bus - sc->acpi.base.bus_start, slot, func,
 	    reg);
 
@@ -361,7 +359,4 @@ static device_method_t n1sdp_pcie_acpi_methods[] = {
 DEFINE_CLASS_1(pcib, n1sdp_pcie_acpi_driver, n1sdp_pcie_acpi_methods,
     sizeof(struct generic_pcie_n1sdp_softc), generic_pcie_acpi_driver);
 
-static devclass_t n1sdp_pcie_acpi_devclass;
-
-DRIVER_MODULE(n1sdp_pcib, acpi, n1sdp_pcie_acpi_driver,
-    n1sdp_pcie_acpi_devclass, 0, 0);
+DRIVER_MODULE(n1sdp_pcib, acpi, n1sdp_pcie_acpi_driver, 0, 0);

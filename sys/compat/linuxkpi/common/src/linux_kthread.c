@@ -25,8 +25,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <linux/compat.h>
 #include <linux/kthread.h>
 #include <linux/sched.h>
@@ -164,4 +162,20 @@ linux_kthread_fn(void *arg __unused)
 		complete(&task->exited);
 	}
 	kthread_exit();
+}
+
+void
+lkpi_kthread_work_fn(void *context, int pending __unused)
+{
+	struct kthread_work *work = context;
+
+	work->func(work);
+}
+
+void
+lkpi_kthread_worker_init_fn(void *context, int pending __unused)
+{
+	struct kthread_worker *worker = context;
+
+	worker->task = current;
 }

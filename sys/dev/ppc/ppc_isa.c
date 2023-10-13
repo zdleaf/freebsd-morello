@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 1997-2000 Nicolas Souchu
  * Copyright (c) 2001 Alcove - Nicolas Souchu
@@ -29,8 +29,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
@@ -271,5 +269,5 @@ error:
 	return (error);
 }
 
-DRIVER_MODULE(ppc, isa, ppc_isa_driver, ppc_devclass, 0, 0);
+DRIVER_MODULE(ppc, isa, ppc_isa_driver, 0, 0);
 ISA_PNP_INFO(lpc_ids);

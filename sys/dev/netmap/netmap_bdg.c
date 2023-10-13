@@ -58,8 +58,6 @@ ports attached to the switch)
 
 #if defined(__FreeBSD__)
 #include <sys/cdefs.h> /* prerequisite */
-__FBSDID("$FreeBSD$");
-
 #include <sys/types.h>
 #include <sys/errno.h>
 #include <sys/param.h>	/* defines used in kernel.h */
@@ -390,7 +388,7 @@ netmap_get_bdg_na(struct nmreq_header *hdr, struct netmap_adapter **na,
 {
 	char *nr_name = hdr->nr_name;
 	const char *ifname;
-	struct ifnet *ifp = NULL;
+	if_t ifp = NULL;
 	int error = 0;
 	struct netmap_vp_adapter *vpna, *hostna = NULL;
 	struct nm_bridge *b;
@@ -1777,7 +1775,7 @@ netmap_bwrap_attach_common(struct netmap_adapter *na,
 		na->na_flags |= NAF_MOREFRAG;
 
 	nm_prdis("%s<->%s txr %d txd %d rxr %d rxd %d",
-		na->name, ifp->if_xname,
+		na->name, if_name(ifp),
 		na->num_tx_rings, na->num_tx_desc,
 		na->num_rx_rings, na->num_rx_desc);
 
@@ -1828,7 +1826,7 @@ netmap_init_bridges(void)
 #ifdef CONFIG_NET_NS
 	return netmap_bns_register();
 #else
-	nm_bridges = netmap_init_bridges2(NM_BRIDGES);
+	nm_bridges = netmap_init_bridges2(vale_max_bridges);
 	if (nm_bridges == NULL)
 		return ENOMEM;
 	return 0;
@@ -1841,6 +1839,6 @@ netmap_uninit_bridges(void)
 #ifdef CONFIG_NET_NS
 	netmap_bns_unregister();
 #else
-	netmap_uninit_bridges2(nm_bridges, NM_BRIDGES);
+	netmap_uninit_bridges2(nm_bridges, vale_max_bridges);
 #endif
 }

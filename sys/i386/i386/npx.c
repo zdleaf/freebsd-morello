@@ -31,8 +31,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include "opt_cpu.h"
 #include "opt_isa.h"
 #include "opt_npx.h"
@@ -79,8 +77,6 @@ __FBSDID("$FreeBSD$");
  * 387 and 287 Numeric Coprocessor Extension (NPX) Driver.
  */
 
-#if defined(__GNUCLIKE_ASM) && !defined(lint)
-
 #define	fldcw(cw)		__asm __volatile("fldcw %0" : : "m" (cw))
 #define	fnclex()		__asm __volatile("fnclex")
 #define	fninit()		__asm __volatile("fninit")
@@ -126,28 +122,6 @@ xsaveopt(char *addr, uint64_t mask)
 	__asm __volatile("xsaveopt %0" : "=m" (*addr) : "a" (low), "d" (hi) :
 	    "memory");
 }
-#else	/* !(__GNUCLIKE_ASM && !lint) */
-
-void	fldcw(u_short cw);
-void	fnclex(void);
-void	fninit(void);
-void	fnsave(caddr_t addr);
-void	fnstcw(caddr_t addr);
-void	fnstsw(caddr_t addr);
-void	fp_divide_by_0(void);
-void	frstor(caddr_t addr);
-void	fxsave(caddr_t addr);
-void	fxrstor(caddr_t addr);
-void	ldmxcsr(u_int csr);
-void	stmxcsr(u_int *csr);
-void	xrstor(char *addr, uint64_t mask);
-void	xsave(char *addr, uint64_t mask);
-void	xsaveopt(char *addr, uint64_t mask);
-
-#endif	/* __GNUCLIKE_ASM && !lint */
-
-#define	start_emulating()	load_cr0(rcr0() | CR0_TS)
-#define	stop_emulating()	clts()
 
 #define GET_FPU_CW(thread) \
 	(cpu_fxsr ? \
@@ -196,6 +170,7 @@ SYSCTL_INT(_hw, OID_AUTO, lazy_fpu_switch, CTLFLAG_RWTUN | CTLFLAG_NOFETCH,
     &lazy_fpu_switch, 0,
     "Lazily load FPU context after context switch");
 
+u_int cpu_fxsr;		/* SSE enabled */
 int use_xsave;
 uint64_t xsave_mask;
 static	uma_zone_t fpu_save_area_zone;
@@ -246,7 +221,7 @@ npx_probe(void)
 	/*
 	 * Don't trap while we're probing.
 	 */
-	stop_emulating();
+	fpu_enable();
 
 	/*
 	 * Finish resetting the coprocessor, if any.  If there is an error
@@ -340,22 +315,8 @@ fpusave_fnsave(union savefpu *addr)
 	fnsave((char *)addr);
 }
 
-static void
-init_xsave(void)
-{
-
-	if (use_xsave)
-		return;
-	if (!cpu_fxsr || (cpu_feature2 & CPUID2_XSAVE) == 0)
-		return;
-	use_xsave = 1;
-	TUNABLE_INT_FETCH("hw.use_xsave", &use_xsave);
-}
-
 DEFINE_IFUNC(, void, fpusave, (union savefpu *))
 {
-
-	init_xsave();
 	if (use_xsave)
 		return ((cpu_stdext_feature & CPUID_EXTSTATE_XSAVEOPT) != 0 ?
 		    fpusave_xsaveopt : fpusave_xsave);
@@ -449,7 +410,7 @@ npxinit(bool bsp)
 	 * It is too early for critical_enter() to work on AP.
 	 */
 	saveintr = intr_disable();
-	stop_emulating();
+	fpu_enable();
 	if (cpu_fxsr)
 		fninit();
 	else
@@ -460,7 +421,7 @@ npxinit(bool bsp)
 		mxcsr = __INITIAL_MXCSR__;
 		ldmxcsr(mxcsr);
 	}
-	start_emulating();
+	fpu_disable();
 	intr_restore(saveintr);
 }
 
@@ -494,7 +455,7 @@ npxinitstate(void *arg __unused)
 	}
 
 	saveintr = intr_disable();
-	stop_emulating();
+	fpu_enable();
 
 	if (cpu_fxsr)
 		fpusave_fxsave(npx_initialstate);
@@ -551,7 +512,7 @@ npxinitstate(void *arg __unused)
 		}
 	}
 
-	start_emulating();
+	fpu_disable();
 	intr_restore(saveintr);
 }
 SYSINIT(npxinitstate, SI_SUB_CPU, SI_ORDER_ANY, npxinitstate, NULL);
@@ -565,9 +526,9 @@ npxexit(struct thread *td)
 
 	critical_enter();
 	if (curthread == PCPU_GET(fpcurthread)) {
-		stop_emulating();
+		fpu_enable();
 		fpusave(curpcb->pcb_save);
-		start_emulating();
+		fpu_disable();
 		PCPU_SET(fpcurthread, NULL);
 	}
 	critical_exit();
@@ -600,14 +561,14 @@ npxformat(void)
 	return (_MC_FPFMT_387);
 }
 
-/* 
+/*
  * The following mechanism is used to ensure that the FPE_... value
  * that is passed as a trapcode to the signal handler of the user
  * process does not have more than one bit set.
- * 
+ *
  * Multiple bits may be set if the user process modifies the control
  * word while a status word bit is already set.  While this is a sign
- * of bad coding, we have no choise than to narrow them down to one
+ * of bad coding, we have no choice than to narrow them down to one
  * bit, since we must not send a trapcode that is not exactly one of
  * the FPE_ macros.
  *
@@ -846,7 +807,7 @@ restore_npx_curthread(struct thread *td, struct pcb *pcb)
 	 */
 	PCPU_SET(fpcurthread, td);
 
-	stop_emulating();
+	fpu_enable();
 	if (cpu_fxsr)
 		fpu_clean_state();
 
@@ -899,7 +860,7 @@ npxdna(void)
 		 * regardless of the eager/lazy FPU context switch
 		 * mode.
 		 */
-		stop_emulating();
+		fpu_enable();
 	} else {
 		if (__predict_false(PCPU_GET(fpcurthread) != NULL)) {
 			printf(
@@ -927,7 +888,7 @@ void
 npxsave(union savefpu *addr)
 {
 
-	stop_emulating();
+	fpu_enable();
 	fpusave(addr);
 }
 
@@ -938,7 +899,7 @@ npxswitch(struct thread *td, struct pcb *pcb)
 
 	if (lazy_fpu_switch || (td->td_pflags & TDP_KTHREAD) != 0 ||
 	    !PCB_USER_FPU(pcb)) {
-		start_emulating();
+		fpu_disable();
 		PCPU_SET(fpcurthread, NULL);
 	} else if (PCPU_GET(fpcurthread) != td) {
 		restore_npx_curthread(td, pcb);
@@ -961,7 +922,7 @@ npxsuspend(union savefpu *addr)
 		return;
 	}
 	cr0 = rcr0();
-	stop_emulating();
+	fpu_enable();
 	fpusave(addr);
 	load_cr0(cr0);
 }
@@ -976,7 +937,7 @@ npxresume(union savefpu *addr)
 
 	cr0 = rcr0();
 	npxinit(false);
-	stop_emulating();
+	fpu_enable();
 	fpurstor(addr);
 	load_cr0(cr0);
 }
@@ -998,7 +959,7 @@ npxdrop(void)
 	CRITICAL_ASSERT(td);
 	PCPU_SET(fpcurthread, NULL);
 	td->td_pcb->pcb_flags &= ~PCB_NPXINITDONE;
-	start_emulating();
+	fpu_disable();
 }
 
 /*
@@ -1368,10 +1329,8 @@ static driver_t npxisa_driver = {
 	1,			/* no softc */
 };
 
-static devclass_t npxisa_devclass;
-
-DRIVER_MODULE(npxisa, isa, npxisa_driver, npxisa_devclass, 0, 0);
-DRIVER_MODULE(npxisa, acpi, npxisa_driver, npxisa_devclass, 0, 0);
+DRIVER_MODULE(npxisa, isa, npxisa_driver, 0, 0);
+DRIVER_MODULE(npxisa, acpi, npxisa_driver, 0, 0);
 ISA_PNP_INFO(npxisa_ids);
 #endif /* DEV_ISA */
 
@@ -1435,7 +1394,7 @@ fpu_kern_enter(struct thread *td, struct fpu_kern_ctx *ctx, u_int flags)
 
 	if ((flags & FPU_KERN_NOCTX) != 0) {
 		critical_enter();
-		stop_emulating();
+		fpu_enable();
 		if (curthread == PCPU_GET(fpcurthread)) {
 			fpusave(curpcb->pcb_save);
 			PCPU_SET(fpcurthread, NULL);
@@ -1486,7 +1445,7 @@ fpu_kern_leave(struct thread *td, struct fpu_kern_ctx *ctx)
 		CRITICAL_ASSERT(td);
 
 		pcb->pcb_flags &= ~(PCB_NPXNOSAVE | PCB_NPXINITDONE);
-		start_emulating();
+		fpu_disable();
 	} else {
 		KASSERT((ctx->flags & FPU_KERN_CTX_INUSE) != 0,
 		    ("leaving not inuse ctx"));

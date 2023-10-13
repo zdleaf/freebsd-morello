@@ -25,8 +25,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/bus.h>
@@ -397,12 +395,10 @@ static device_method_t mv_spi_methods[] = {
 	DEVMETHOD_END
 };
 
-static devclass_t mv_spi_devclass;
-
 static driver_t mv_spi_driver = {
 	"spi",
 	mv_spi_methods,
 	sizeof(struct mv_spi_softc),
 };
 
-DRIVER_MODULE(mv_spi, simplebus, mv_spi_driver, mv_spi_devclass, 0, 0);
+DRIVER_MODULE(mv_spi, simplebus, mv_spi_driver, 0, 0);

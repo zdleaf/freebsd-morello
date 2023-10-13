@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 1999 Cameron Grant <cg@freebsd.org>
  * Copyright (c) 2003-2007 Yuriy Tsibizov <yuriy.tsibizov@gfk.ru>
@@ -25,8 +25,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 #include <sys/param.h>
@@ -732,7 +730,6 @@ emu_wr_p16vptr(struct emu_sc_info *sc, uint16_t chn, uint16_t reg, uint32_t data
 static void
 emu_wr_cbptr(struct emu_sc_info *sc, uint32_t data)
 {
-	uint32_t val;
 
 	/*
 	 * 0x38 is IPE3 (CD S/PDIF interrupt pending register) on CA0102. Seems
@@ -740,9 +737,9 @@ emu_wr_cbptr(struct emu_sc_info *sc, uint32_t data)
 	 * CA0108, with value(?) in top 16 bit, address(?) in low 16
 	 */
 
-	val = emu_rd_nolock(sc, 0x38, 4);
+	emu_rd_nolock(sc, 0x38, 4);
 	emu_wr_nolock(sc, 0x38, data, 4);
-	val = emu_rd_nolock(sc, 0x38, 4);
+	emu_rd_nolock(sc, 0x38, 4);
 
 }
 
@@ -1267,10 +1264,9 @@ emu_valloc(struct emu_sc_info *sc)
 void
 emu_vfree(struct emu_sc_info *sc, struct emu_voice *v)
 {
-	int i, r;
 
 	mtx_lock(&sc->lock);
-	for (i = 0; i < NUM_G; i++) {
+	for (int i = 0; i < NUM_G; i++) {
 		if (v == &sc->voice[i] && sc->voice[i].busy) {
 			v->busy = 0;
 			/*
@@ -1279,7 +1275,7 @@ emu_vfree(struct emu_sc_info *sc, struct emu_voice *v)
 			 * this problem
 			 */
 			if (v->slave != NULL)
-				r = emu_memfree(&sc->mem, v->vbuf);
+				emu_memfree(&sc->mem, v->vbuf);
 		}
 	}
 	mtx_unlock(&sc->lock);
@@ -3541,7 +3537,5 @@ emu_modevent(module_t mod __unused, int cmd, void *data __unused)
 
 }
 
-static devclass_t emu_devclass;
-
-DRIVER_MODULE(snd_emu10kx, pci, emu_driver, emu_devclass, emu_modevent, NULL);
+DRIVER_MODULE(snd_emu10kx, pci, emu_driver, emu_modevent, NULL);
 MODULE_VERSION(snd_emu10kx, SND_EMU10KX_PREFVER);

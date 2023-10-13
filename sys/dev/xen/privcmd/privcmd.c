@@ -25,8 +25,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/uio.h>
@@ -315,7 +313,7 @@ privcmd_ioctl(struct cdev *dev, unsigned long cmd, caddr_t arg,
 	}
 	case IOCTL_PRIVCMD_MMAPBATCH: {
 		struct ioctl_privcmd_mmapbatch *mmap;
-		struct xen_add_to_physmap_range add;
+		struct xen_add_to_physmap_batch add;
 		xen_ulong_t *idxs;
 		xen_pfn_t *gpfns;
 		int *errs;
@@ -338,7 +336,7 @@ privcmd_ioctl(struct cdev *dev, unsigned long cmd, caddr_t arg,
 
 		add.domid = DOMID_SELF;
 		add.space = XENMAPSPACE_gmfn_foreign;
-		add.foreign_domid = mmap->dom;
+		add.u.foreign_domid = mmap->dom;
 
 		/*
 		 * The 'size' field in the xen_add_to_physmap_range only
@@ -370,7 +368,7 @@ privcmd_ioctl(struct cdev *dev, unsigned long cmd, caddr_t arg,
 			bzero(errs, sizeof(*errs) * num);
 
 			error = HYPERVISOR_memory_op(
-			    XENMEM_add_to_physmap_range, &add);
+			    XENMEM_add_to_physmap_batch, &add);
 			if (error != 0) {
 				error = xen_translate_error(error);
 				goto mmap_out;
@@ -607,7 +605,5 @@ static driver_t privcmd_driver = {
 	0,
 };
 
-devclass_t privcmd_devclass;
-
-DRIVER_MODULE(privcmd, xenpv, privcmd_driver, privcmd_devclass, 0, 0);
+DRIVER_MODULE(privcmd, xenpv, privcmd_driver, 0, 0);
 MODULE_DEPEND(privcmd, xenpv, 1, 1, 1);

@@ -37,8 +37,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include "opt_ktrace.h"
 #include "opt_kstack_pages.h"
 
@@ -307,8 +305,8 @@ retry:
 static int
 fork_norfproc(struct thread *td, int flags)
 {
-	int error;
 	struct proc *p1;
+	int error;
 
 	KASSERT((flags & RFPROC) == 0,
 	    ("fork_norfproc called with RFPROC set"));
@@ -330,17 +328,18 @@ fork_norfproc(struct thread *td, int flags)
 	}
 
 	error = vm_forkproc(td, NULL, NULL, NULL, flags);
-	if (error)
+	if (error != 0)
 		goto fail;
 
 	/*
 	 * Close all file descriptors.
 	 */
-	if (flags & RFCFDG) {
+	if ((flags & RFCFDG) != 0) {
 		struct filedesc *fdtmp;
 		struct pwddesc *pdtmp;
+
 		pdtmp = pdinit(td->td_proc->p_pd, false);
-		fdtmp = fdinit(td->td_proc->p_fd, false, NULL);
+		fdtmp = fdinit();
 		pdescfree(td);
 		fdescfree(td);
 		p1->p_fd = fdtmp;
@@ -350,7 +349,7 @@ fork_norfproc(struct thread *td, int flags)
 	/*
 	 * Unshare file descriptors (from parent).
 	 */
-	if (flags & RFFDG) {
+	if ((flags & RFFDG) != 0) {
 		fdunshare(td);
 		pdunshare(td);
 	}
@@ -397,6 +396,7 @@ do_fork(struct thread *td, struct fork_req *fr, struct proc *p2, struct thread *
 	sx_xlock(&allproc_lock);
 	LIST_INSERT_HEAD(&allproc, p2, p_list);
 	allproc_gen++;
+	prison_proc_link(p2->p_ucred->cr_prison, p2);
 	sx_xunlock(&allproc_lock);
 
 	sx_xlock(PIDHASHLOCK(p2->p_pid));
@@ -418,7 +418,7 @@ do_fork(struct thread *td, struct fork_req *fr, struct proc *p2, struct thread *
 	 */
 	if (fr->fr_flags & RFCFDG) {
 		pd = pdinit(p1->p_pd, false);
-		fd = fdinit(p1->p_fd, false, NULL);
+		fd = fdinit();
 		fdtol = NULL;
 	} else if (fr->fr_flags & RFFDG) {
 		if (fr->fr_flags2 & FR2_SHARE_PATHS)
@@ -441,10 +441,7 @@ do_fork(struct thread *td, struct fork_req *fr, struct proc *p2, struct thread *
 			 * Shared file descriptor table, and shared
 			 * process leaders.
 			 */
-			fdtol = p1->p_fdtol;
-			FILEDESC_XLOCK(p1->p_fd);
-			fdtol->fdl_refcount++;
-			FILEDESC_XUNLOCK(p1->p_fd);
+			fdtol = filedesc_to_leader_share(p1->p_fdtol, p1->p_fd);
 		} else {
 			/*
 			 * Shared file descriptor table, and different
@@ -489,7 +486,7 @@ do_fork(struct thread *td, struct fork_req *fr, struct proc *p2, struct thread *
 	 * to avoid calling thread_lock() again.
 	 */
 	if ((fr->fr_flags & RFPPWAIT) != 0)
-		td->td_flags |= TDF_ASTPENDING;
+		ast_sched_locked(td, TDA_VFORK);
 	thread_unlock(td);
 
 	/*
@@ -804,8 +801,8 @@ do_fork(struct thread *td, struct fork_req *fr, struct proc *p2, struct thread *
 	}
 }
 
-void
-fork_rfppwait(struct thread *td)
+static void
+ast_vfork(struct thread *td, int tda __unused)
 {
 	struct proc *p, *p2;
 
@@ -857,11 +854,13 @@ fork1(struct thread *td, struct fork_req *fr)
 	struct vmspace *vm2;
 	struct ucred *cred;
 	struct file *fp_procdesc;
+	struct pgrp *pg;
 	vm_ooffset_t mem_charged;
 	int error, nprocs_new;
 	static int curfail;
 	static struct timeval lastfail;
 	int flags, pages;
+	bool killsx_locked, singlethreaded;
 
 	flags = fr->fr_flags;
 	pages = fr->fr_pages;
@@ -918,6 +917,8 @@ fork1(struct thread *td, struct fork_req *fr)
 	fp_procdesc = NULL;
 	newproc = NULL;
 	vm2 = NULL;
+	killsx_locked = false;
+	singlethreaded = false;
 
 	/*
 	 * Increment the nprocs resource before allocations occur.
@@ -945,6 +946,52 @@ fork1(struct thread *td, struct fork_req *fr)
 			sx_xunlock(&allproc_lock);
 			goto fail2;
 		}
+	}
+
+	/*
+	 * If we are possibly multi-threaded, and there is a process
+	 * sending a signal to our group right now, ensure that our
+	 * other threads cannot be chosen for the signal queueing.
+	 * Otherwise, this might delay signal action, and make the new
+	 * child escape the signaling.
+	 */
+	pg = p1->p_pgrp;
+	if (p1->p_numthreads > 1) {
+		if (sx_try_slock(&pg->pg_killsx) != 0) {
+			killsx_locked = true;
+		} else {
+			PROC_LOCK(p1);
+			if (thread_single(p1, SINGLE_BOUNDARY)) {
+				PROC_UNLOCK(p1);
+				error = ERESTART;
+				goto fail2;
+			}
+			PROC_UNLOCK(p1);
+			singlethreaded = true;
+		}
+	}
+
+	/*
+	 * Atomically check for signals and block processes from sending
+	 * a signal to our process group until the child is visible.
+	 */
+	if (!killsx_locked && sx_slock_sig(&pg->pg_killsx) != 0) {
+		error = ERESTART;
+		goto fail2;
+	}
+	if (__predict_false(p1->p_pgrp != pg || sig_intr() != 0)) {
+		/*
+		 * Either the process was moved to other process
+		 * group, or there is pending signal.  sx_slock_sig()
+		 * does not check for signals if not sleeping for the
+		 * lock.
+		 */
+		sx_sunlock(&pg->pg_killsx);
+		killsx_locked = false;
+		error = ERESTART;
+		goto fail2;
+	} else {
+		killsx_locked = true;
 	}
 
 	/*
@@ -1038,7 +1085,8 @@ fork1(struct thread *td, struct fork_req *fr)
 	}
 
 	do_fork(td, fr, newproc, td2, vm2, fp_procdesc);
-	return (0);
+	error = 0;
+	goto cleanup;
 fail0:
 	error = EAGAIN;
 #ifdef MAC
@@ -1056,7 +1104,16 @@ fail2:
 		fdrop(fp_procdesc, td);
 	}
 	atomic_add_int(&nprocs, -1);
-	pause("fork", hz / 2);
+cleanup:
+	if (killsx_locked)
+		sx_sunlock(&pg->pg_killsx);
+	if (singlethreaded) {
+		PROC_LOCK(p1);
+		thread_single_end(p1, SINGLE_BOUNDARY);
+		PROC_UNLOCK(p1);
+	}
+	if (error != 0)
+		pause("fork", hz / 2);
 	return (error);
 }
 
@@ -1082,11 +1139,12 @@ fork_exit(void (*callout)(void *, struct trapframe *), void *arg,
 	    td, td_get_sched(td), p->p_pid, td->td_name);
 
 	sched_fork_exit(td);
+
 	/*
-	* Processes normally resume in mi_switch() after being
-	* cpu_switch()'ed to, but when children start up they arrive here
-	* instead, so we must do much the same things as mi_switch() would.
-	*/
+	 * Processes normally resume in mi_switch() after being
+	 * cpu_switch()'ed to, but when children start up they arrive here
+	 * instead, so we must do much the same things as mi_switch() would.
+	 */
 	if ((dtd = PCPU_GET(deadthread))) {
 		PCPU_SET(deadthread, NULL);
 		thread_stash(dtd);
@@ -1144,7 +1202,7 @@ fork_return(struct thread *td, struct trapframe *frame)
 			td->td_dbgflags &= ~TDB_STOPATFORK;
 		}
 		PROC_UNLOCK(p);
-	} else if (p->p_flag & P_TRACED || td->td_dbgflags & TDB_BORN) {
+	} else if (p->p_flag & P_TRACED) {
  		/*
 		 * This is the start of a new thread in a traced
 		 * process.  Report a system call exit event.
@@ -1168,6 +1226,14 @@ fork_return(struct thread *td, struct trapframe *frame)
 
 #ifdef KTRACE
 	if (KTRPOINT(td, KTR_SYSRET))
-		ktrsysret(SYS_fork, 0, 0);
+		ktrsysret(td->td_sa.code, 0, 0);
 #endif
 }
+
+static void
+fork_init(void *arg __unused)
+{
+	ast_register(TDA_VFORK, ASTR_ASTF_REQUIRED | ASTR_TDP, TDP_RFPPWAIT,
+	    ast_vfork);
+}
+SYSINIT(fork, SI_SUB_INTRINSIC, SI_ORDER_ANY, fork_init, NULL);

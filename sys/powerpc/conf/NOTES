@@ -1,4 +1,3 @@
-# $FreeBSD$
 #
 # This file contains machine dependent kernel configuration notes.  For
 # machine independent notes, look in /sys/conf/NOTES.
@@ -41,10 +40,10 @@ options 	FPU_EMU
 
 #options 	MPC85XX
 options 	POWERMAC		#NewWorld Apple PowerMacs
-#options	PS3			#Sony Playstation 3
+#options 	PS3			#Sony Playstation 3
 options 	PSIM			#GDB PSIM ppc simulator
 options 	MAMBO			#IBM Mambo Full System Simulator
-options		QEMU			#QEMU processor emulator
+options 	QEMU			#QEMU processor emulator
 
 # The cpufreq(4) driver provides support for CPU frequency control
 device		cpufreq

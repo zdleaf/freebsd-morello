@@ -25,8 +25,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/jail.h>
@@ -47,6 +45,7 @@ __FBSDID("$FreeBSD$");
 #include <net/ethernet.h>
 #include <net/if.h>
 #include <net/if_var.h>
+#include <net/if_private.h>
 #include <net/if_clone.h>
 #include <net/if_types.h>
 #include <net/netisr.h>
@@ -322,7 +321,7 @@ me_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		ifr->ifr_fib = sc->me_fibnum;
 		break;
 	case SIOCSTUNFIB:
-		if ((error = priv_check(curthread, PRIV_NET_GRE)) != 0)
+		if ((error = priv_check(curthread, PRIV_NET_ME)) != 0)
 			break;
 		if (ifr->ifr_fib >= rt_numfibs)
 			error = EINVAL;

@@ -25,8 +25,6 @@
  * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 #ifndef _LINUXKPI_LINUX_LIST_H_
 #define _LINUXKPI_LINUX_LIST_H_
@@ -85,14 +83,6 @@
 
 #define LINUX_LIST_HEAD(name) \
 	struct list_head name = LINUX_LIST_HEAD_INIT(name)
-
-#ifndef LIST_HEAD_DEF
-#define	LIST_HEAD_DEF
-struct list_head {
-	struct list_head *next;
-	struct list_head *prev;
-};
-#endif
 
 static inline void
 INIT_LIST_HEAD(struct list_head *list)
@@ -267,6 +257,13 @@ list_move_tail(struct list_head *entry, struct list_head *head)
 
 	list_del(entry);
 	list_add_tail(entry, head);
+}
+
+static inline void
+list_rotate_to_front(struct list_head *entry, struct list_head *head)
+{
+
+	list_move_tail(entry, head);
 }
 
 static inline void
@@ -467,6 +464,20 @@ static inline int list_is_last(const struct list_head *list,
 	return list->next == head;
 }
 
+static inline size_t
+list_count_nodes(const struct list_head *list)
+{
+	const struct list_head *lh;
+	size_t count;
+
+	count = 0;
+	list_for_each(lh, list) {
+		count++;
+	}
+
+	return (count);
+}
+
 #define	hlist_entry(ptr, type, field)	container_of(ptr, type, field)
 
 #define	hlist_for_each(p, head)						\
@@ -497,7 +508,12 @@ static inline int list_is_last(const struct list_head *list,
 	     (pos) && ({ n = (pos)->member.next; 1; });			\
 	     pos = hlist_entry_safe(n, typeof(*(pos)), member))
 
+#if defined(LINUXKPI_VERSION) && LINUXKPI_VERSION >= 51300
+extern void list_sort(void *priv, struct list_head *head, int (*cmp)(void *priv,
+    const struct list_head *a, const struct list_head *b));
+#else
 extern void list_sort(void *priv, struct list_head *head, int (*cmp)(void *priv,
     struct list_head *a, struct list_head *b));
+#endif
 
 #endif /* _LINUXKPI_LINUX_LIST_H_ */

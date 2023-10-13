@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2014 The FreeBSD Foundation
  *
@@ -29,8 +29,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
@@ -159,5 +157,5 @@ vt_vbefb_fini(struct vt_device *vd, void *softc)
 	struct fb_info	*info = softc;
 
 	vt_fb_fini(vd, softc);
-	pmap_unmapdev(info->fb_vbase, info->fb_size);
+	pmap_unmapdev((void *)info->fb_vbase, info->fb_size);
 }

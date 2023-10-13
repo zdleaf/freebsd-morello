@@ -36,12 +36,15 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 /*
  * Routines to handle clock hardware.
  */
 
+#ifdef __amd64__
+#define	DEV_APIC
+#else
+#include "opt_apic.h"
+#endif
 #include "opt_clock.h"
 #include "opt_isa.h"
 
@@ -64,10 +67,10 @@ __FBSDID("$FreeBSD$");
 #include <machine/clock.h>
 #include <machine/cpu.h>
 #include <machine/intr_machdep.h>
-#include <machine/ppireg.h>
-#include <machine/timerreg.h>
 #include <x86/apicvar.h>
 #include <x86/init.h>
+#include <x86/ppireg.h>
+#include <x86/timerreg.h>
 
 #include <isa/rtc.h>
 #ifdef DEV_ISA
@@ -129,6 +132,7 @@ clock_init(void)
 	mtx_init(&clock_lock, "clk", NULL, MTX_SPIN | MTX_NOPROFILE);
 	/* Init the clock in order to use DELAY */
 	init_ops.early_clock_source_init();
+	tsc_init();
 }
 
 static int
@@ -398,23 +402,24 @@ i8254_init(void)
 }
 
 void
-startrtclock()
+startrtclock(void)
 {
 
-	init_TSC();
+	start_TSC();
 }
 
 void
 cpu_initclocks(void)
 {
-#ifdef EARLY_AP_STARTUP
 	struct thread *td;
 	int i;
 
 	td = curthread;
 
 	tsc_calibrate();
+#ifdef DEV_APIC
 	lapic_calibrate_timer();
+#endif
 	cpu_initclocks_bsp();
 	CPU_FOREACH(i) {
 		if (i == 0)
@@ -428,11 +433,6 @@ cpu_initclocks(void)
 	if (sched_is_bound(td))
 		sched_unbind(td);
 	thread_unlock(td);
-#else
-	tsc_calibrate();
-	lapic_calibrate_timer();
-	cpu_initclocks_bsp();
-#endif
 }
 
 static int
@@ -650,10 +650,8 @@ static driver_t attimer_driver = {
 	sizeof(struct attimer_softc),
 };
 
-static devclass_t attimer_devclass;
-
-DRIVER_MODULE(attimer, isa, attimer_driver, attimer_devclass, 0, 0);
-DRIVER_MODULE(attimer, acpi, attimer_driver, attimer_devclass, 0, 0);
+DRIVER_MODULE(attimer, isa, attimer_driver, 0, 0);
+DRIVER_MODULE(attimer, acpi, attimer_driver, 0, 0);
 ISA_PNP_INFO(attimer_ids);
 
 #endif /* DEV_ISA */

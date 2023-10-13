@@ -41,7 +41,6 @@
  *
  *	@(#)ufs_vnops.c	8.7 (Berkeley) 2/3/94
  *	@(#)ufs_vnops.c 8.27 (Berkeley) 5/27/95
- * $FreeBSD$
  */
 
 #include "opt_suiddir.h"
@@ -709,10 +708,6 @@ ext2_link(struct vop_link_args *ap)
 	struct inode *ip;
 	int error;
 
-#ifdef INVARIANTS
-	if ((cnp->cn_flags & HASBUF) == 0)
-		panic("ext2_link: no name");
-#endif
 	ip = VTOI(vp);
 	if ((nlink_t)ip->i_nlink >= EXT4_LINK_MAX) {
 		error = EMLINK;
@@ -801,11 +796,6 @@ ext2_rename(struct vop_rename_args *ap)
 	int error = 0;
 	u_char namlen;
 
-#ifdef INVARIANTS
-	if ((tcnp->cn_flags & HASBUF) == 0 ||
-	    (fcnp->cn_flags & HASBUF) == 0)
-		panic("ext2_rename: no name");
-#endif
 	/*
 	 * Check for cross-device rename.
 	 */
@@ -919,7 +909,7 @@ abortit:
 		if (error)
 			goto out;
 		VREF(tdvp);
-		error = relookup(tdvp, &tvp, tcnp);
+		error = vfs_relookup(tdvp, &tvp, tcnp, true);
 		if (error)
 			goto out;
 		vrele(tdvp);
@@ -1045,7 +1035,7 @@ abortit:
 	fcnp->cn_flags &= ~MODMASK;
 	fcnp->cn_flags |= LOCKPARENT | LOCKLEAF;
 	VREF(fdvp);
-	error = relookup(fdvp, &fvp, fcnp);
+	error = vfs_relookup(fdvp, &fvp, fcnp, true);
 	if (error == 0)
 		vrele(fdvp);
 	if (fvp != NULL) {
@@ -1097,6 +1087,15 @@ abortit:
 				if (namlen != 2 ||
 				    dirbuf->dotdot_name[0] != '.' ||
 				    dirbuf->dotdot_name[1] != '.') {
+					/*
+					 * The filesystem is in corrupted state,
+					 * need to run fsck to fix mangled dir
+					 * entry. From other side this error
+					 * need to be ignored because it is
+					 * too difficult to revert directories
+					 * to state before rename from this
+					 * point.
+					 */
 					ext2_dirbad(xp, (doff_t)12,
 					    "rename: mangled dir");
 				} else {
@@ -1315,10 +1314,6 @@ ext2_mkdir(struct vop_mkdir_args *ap)
 	char *buf = NULL;
 	int error, dmode;
 
-#ifdef INVARIANTS
-	if ((cnp->cn_flags & HASBUF) == 0)
-		panic("ext2_mkdir: no name");
-#endif
 	dp = VTOI(dvp);
 	if ((nlink_t)dp->i_nlink >= EXT4_LINK_MAX &&
 	    !EXT2_HAS_RO_COMPAT_FEATURE(dp->i_e2fs, EXT2F_ROCOMPAT_DIR_NLINK)) {
@@ -1946,10 +1941,6 @@ ext2_makeinode(int mode, struct vnode *dvp, struct vnode **vpp,
 	int error;
 
 	pdir = VTOI(dvp);
-#ifdef INVARIANTS
-	if ((cnp->cn_flags & HASBUF) == 0)
-		panic("ext2_makeinode: no name");
-#endif
 	*vpp = NULL;
 	if ((mode & IFMT) == 0)
 		mode |= IFREG;
@@ -2224,8 +2215,9 @@ ext2_write(struct vop_write_args *ap)
 	 * Maybe this should be above the vnode op call, but so long as
 	 * file servers have no limits, I don't think it matters.
 	 */
-	if (vn_rlimit_fsize(vp, uio, uio->uio_td))
-		return (EFBIG);
+	error = vn_rlimit_fsize(vp, uio, uio->uio_td);
+	if (error != 0)
+		return (error);
 
 	resid = uio->uio_resid;
 	osize = ip->i_size;

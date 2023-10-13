@@ -40,8 +40,6 @@
 #endif
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/cdefs.h>
 #include <sys/param.h>
 #include <sys/kernel.h>
@@ -105,7 +103,7 @@ xenbus_strstate(XenbusState state)
 void
 xenbus_dev_verror(device_t dev, int err, const char *fmt, va_list ap)
 {
-	int ret;
+	int ret __diagused;
 	unsigned int len;
 	char *printf_buffer = NULL, *path_buffer = NULL;
 

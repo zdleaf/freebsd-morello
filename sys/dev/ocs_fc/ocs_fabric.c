@@ -27,8 +27,6 @@
  * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 /**
@@ -228,10 +226,18 @@ __ocs_fabric_flogi_wait_rsp(ocs_sm_ctx_t *ctx, ocs_sm_event_t evt, void *arg)
 		if (node_check_els_req(ctx, evt, arg, FC_ELS_CMD_FLOGI, __ocs_fabric_common, __func__)) {
 			return NULL;
 		}
-		node_printf(node, "FLOGI failed evt=%s, shutting down sport [%s]\n", ocs_sm_event_name(evt),
-			sport->display_name);
 		ocs_assert(node->els_req_cnt, NULL);
 		node->els_req_cnt--;
+
+		if (node->sport->topology == OCS_SPORT_TOPOLOGY_P2P && !node->sport->p2p_winner) {
+			node_printf(node, "FLOGI failed, peer p2p winner, shutdown node\n");
+			node->shutdown_reason = OCS_NODE_SHUTDOWN_DEFAULT;
+			ocs_fabric_initiate_shutdown(node);
+			break;
+		}
+
+		node_printf(node, "FLOGI failed evt=%s, shutting down sport [%s]\n", ocs_sm_event_name(evt),
+			sport->display_name);
 		ocs_sm_post_event(&sport->sm, OCS_EVT_SHUTDOWN, NULL);
 		break;
 	}

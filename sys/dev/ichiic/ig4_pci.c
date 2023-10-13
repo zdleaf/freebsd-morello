@@ -34,8 +34,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 /*
  * Intel fourth generation mobile cpus integrated I2C device.
  *
@@ -316,7 +314,7 @@ ig4iic_pci_attach(device_t dev)
 		ig4iic_pci_detach(dev);
 		return (ENXIO);
 	}
-	sc->platform_attached = 1;
+	sc->platform_attached = true;
 
 	error = ig4iic_attach(sc);
 	if (error)
@@ -335,7 +333,7 @@ ig4iic_pci_detach(device_t dev)
 		error = ig4iic_detach(sc);
 		if (error)
 			return (error);
-		sc->platform_attached = 0;
+		sc->platform_attached = false;
 	}
 
 	if (sc->intr_res) {
@@ -401,8 +399,7 @@ static driver_t ig4iic_pci_driver = {
 	sizeof(struct ig4iic_softc)
 };
 
-DRIVER_MODULE_ORDERED(ig4iic, pci, ig4iic_pci_driver, ig4iic_devclass, 0, 0,
-    SI_ORDER_ANY);
+DRIVER_MODULE_ORDERED(ig4iic, pci, ig4iic_pci_driver, 0, 0, SI_ORDER_ANY);
 MODULE_DEPEND(ig4iic, pci, 1, 1, 1);
 MODULE_PNP_INFO("W32:vendor/device", pci, ig4iic, ig4iic_pci_devices,
     nitems(ig4iic_pci_devices));

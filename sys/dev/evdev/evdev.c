@@ -23,8 +23,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 #include "opt_evdev.h"
@@ -1092,6 +1090,19 @@ evdev_release_client(struct evdev_dev *evdev, struct evdev_client *client)
 	evdev->ev_grabber = NULL;
 
 	return (0);
+}
+
+bool
+evdev_is_grabbed(struct evdev_dev *evdev)
+{
+	if (kdb_active || SCHEDULER_STOPPED())
+		return (false);
+	/*
+	 * The function is intended to be called from evdev-unrelated parts of
+	 * code like syscons-compatible parts of mouse and keyboard drivers.
+	 * That makes unlocked read-only access acceptable.
+	 */
+	return (evdev->ev_grabber != NULL);
 }
 
 static void

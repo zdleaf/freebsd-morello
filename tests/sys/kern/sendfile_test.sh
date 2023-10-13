@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+# SPDX-License-Identifier: BSD-2-Clause
 #
 # Copyright (c) 2020 Netflix, Inc.
 #
@@ -23,7 +23,6 @@
 # OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 # SUCH DAMAGE.
 #
-# $FreeBSD$
 
 #
 # These tests exercise a few basic cases for the sendfile() syscall:
@@ -37,7 +36,7 @@
 #
 
 MD_DEVS="md.devs"
-MNT=/mnt
+MNT=mnt
 FILE=$MNT/file
 HELPER="$(atf_get_srcdir)/sendfile_helper"
 BSIZE=4096
@@ -51,6 +50,10 @@ io_success_head()
 }
 io_success_body()
 {
+	if [ "$(atf_config_get qemu false)" = "true" ]; then
+	    atf_skip "Sendfile(4) unimplemented. https://github.com/qemu-bsd-user/qemu-bsd-user/issues/25"
+	fi
+
 	md=$(alloc_md)
 	common_body_setup $md
 
@@ -70,6 +73,10 @@ io_fail_sync_head()
 }
 io_fail_sync_body()
 {
+	if [ "$(atf_config_get qemu false)" = "true" ]; then
+	    atf_skip "Sendfile(4) unimplemented. https://github.com/qemu-bsd-user/qemu-bsd-user/issues/25"
+	fi
+
 	md=$(alloc_md)
 	common_body_setup $md
 
@@ -90,6 +97,10 @@ io_fail_async_head()
 }
 io_fail_async_body()
 {
+	if [ "$(atf_config_get qemu false)" = "true" ]; then
+	    atf_skip "Sendfile(4) unimplemented. https://github.com/qemu-bsd-user/qemu-bsd-user/issues/25"
+	fi
+
 	md=$(alloc_md)
 	common_body_setup $md
 
@@ -113,6 +124,7 @@ alloc_md()
 {
 	local md
 
+	[ -c /dev/mdctl ] || atf_skip "no /dev/mdctl to create md devices"
 	md=$(mdconfig -a -t swap -s 256M) || atf_fail "mdconfig -a failed"
 	echo ${md} >> $MD_DEVS
 	echo ${md}
@@ -122,10 +134,11 @@ common_body_setup()
 {
 	us=$1
 
+	atf_check mkdir $MNT
 	atf_check -o ignore -e ignore newfs -b $BSIZE -U -j /dev/${us}
 	atf_check mount /dev/${us} $MNT
 	atf_check -e ignore dd if=/dev/zero of=$FILE bs=1m count=1
-	atf_check umount /mnt
+	atf_check umount $MNT
 
 	load_gnop
 	atf_check gnop create /dev/${us}

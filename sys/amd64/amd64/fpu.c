@@ -33,8 +33,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/bus.h>
@@ -48,6 +46,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/proc.h>
 #include <sys/sysctl.h>
 #include <sys/sysent.h>
+#include <sys/tslog.h>
 #include <machine/bus.h>
 #include <sys/rman.h>
 #include <sys/signalvar.h>
@@ -68,8 +67,6 @@ __FBSDID("$FreeBSD$");
 /*
  * Floating point support.
  */
-
-#if defined(__GNUCLIKE_ASM) && !defined(lint)
 
 #define	fldcw(cw)		__asm __volatile("fldcw %0" : : "m" (cw))
 #define	fnclex()		__asm __volatile("fnclex")
@@ -144,29 +141,6 @@ xsaveopt64(char *addr, uint64_t mask)
 	__asm __volatile("xsaveopt64 %0" : "=m" (*addr) : "a" (low), "d" (hi) :
 	    "memory");
 }
-
-#else	/* !(__GNUCLIKE_ASM && !lint) */
-
-void	fldcw(u_short cw);
-void	fnclex(void);
-void	fninit(void);
-void	fnstcw(caddr_t addr);
-void	fnstsw(caddr_t addr);
-void	fxsave(caddr_t addr);
-void	fxrstor(caddr_t addr);
-void	ldmxcsr(u_int csr);
-void	stmxcsr(u_int *csr);
-void	xrstor32(char *addr, uint64_t mask);
-void	xrstor64(char *addr, uint64_t mask);
-void	xsave32(char *addr, uint64_t mask);
-void	xsave64(char *addr, uint64_t mask);
-void	xsaveopt32(char *addr, uint64_t mask);
-void	xsaveopt64(char *addr, uint64_t mask);
-
-#endif	/* __GNUCLIKE_ASM && !lint */
-
-#define	start_emulating()	load_cr0(rcr0() | CR0_TS)
-#define	stop_emulating()	clts()
 
 CTASSERT(sizeof(struct savefpu) == 512);
 CTASSERT(sizeof(struct xstate_hdr) == 64);
@@ -260,22 +234,8 @@ fpurestore_fxrstor(void *addr)
 	fxrstor((char *)addr);
 }
 
-static void
-init_xsave(void)
-{
-
-	if (use_xsave)
-		return;
-	if ((cpu_feature2 & CPUID2_XSAVE) == 0)
-		return;
-	use_xsave = 1;
-	TUNABLE_INT_FETCH("hw.use_xsave", &use_xsave);
-}
-
 DEFINE_IFUNC(, void, fpusave, (void *))
 {
-
-	init_xsave();
 	if (!use_xsave)
 		return (fpusave_fxsave);
 	if ((cpu_stdext_feature & CPUID_EXTSTATE_XSAVEOPT) != 0) {
@@ -288,8 +248,6 @@ DEFINE_IFUNC(, void, fpusave, (void *))
 
 DEFINE_IFUNC(, void, fpurestore, (void *))
 {
-
-	init_xsave();
 	if (!use_xsave)
 		return (fpurestore_fxrstor);
 	return ((cpu_stdext_feature & CPUID_STDEXT_NFPUSG) != 0 ?
@@ -302,7 +260,7 @@ fpususpend(void *addr)
 	u_long cr0;
 
 	cr0 = rcr0();
-	stop_emulating();
+	fpu_enable();
 	fpusave(addr);
 	load_cr0(cr0);
 }
@@ -313,7 +271,7 @@ fpuresume(void *addr)
 	u_long cr0;
 
 	cr0 = rcr0();
-	stop_emulating();
+	fpu_enable();
 	fninit();
 	if (use_xsave)
 		load_xcr(XCR0, xsave_mask);
@@ -394,14 +352,31 @@ void
 fpuinit(void)
 {
 	register_t saveintr;
+	uint64_t cr4;
 	u_int mxcsr;
 	u_short control;
 
+	TSENTER();
 	if (IS_BSP())
 		fpuinit_bsp1();
 
 	if (use_xsave) {
-		load_cr4(rcr4() | CR4_XSAVE);
+		cr4 = rcr4();
+
+		/*
+		 * Revert enablement of PKRU if user disabled its
+		 * saving on context switches by clearing the bit in
+		 * the xsave mask.  Also redundantly clear the bit in
+		 * cpu_stdext_feature2 to prevent pmap from ever
+		 * trying to set the page table bits.
+		 */
+		if ((cpu_stdext_feature2 & CPUID_STDEXT2_PKU) != 0 &&
+		    (xsave_mask & XFEATURE_ENABLED_PKRU) == 0) {
+			cr4 &= ~CR4_PKE;
+			cpu_stdext_feature2 &= ~CPUID_STDEXT2_PKU;
+		}
+
+		load_cr4(cr4 | CR4_XSAVE);
 		load_xcr(XCR0, xsave_mask);
 	}
 
@@ -415,14 +390,15 @@ fpuinit(void)
 	 * It is too early for critical_enter() to work on AP.
 	 */
 	saveintr = intr_disable();
-	stop_emulating();
+	fpu_enable();
 	fninit();
 	control = __INITIAL_FPUCW__;
 	fldcw(control);
 	mxcsr = __INITIAL_MXCSR__;
 	ldmxcsr(mxcsr);
-	start_emulating();
+	fpu_disable();
 	intr_restore(saveintr);
+	TSEXIT();
 }
 
 /*
@@ -451,7 +427,7 @@ fpuinitstate(void *arg __unused)
 	cpu_thread_alloc(&thread0);
 
 	saveintr = intr_disable();
-	stop_emulating();
+	fpu_enable();
 
 	fpusave_fxsave(fpu_initialstate);
 	if (fpu_initialstate->sv_env.en_mxcsr_mask)
@@ -494,7 +470,7 @@ fpuinitstate(void *arg __unused)
 		}
 	}
 
-	start_emulating();
+	fpu_disable();
 	intr_restore(saveintr);
 }
 /* EFIRT needs this to be initialized before we can enter our EFI environment */
@@ -509,9 +485,9 @@ fpuexit(struct thread *td)
 
 	critical_enter();
 	if (curthread == PCPU_GET(fpcurthread)) {
-		stop_emulating();
+		fpu_enable();
 		fpusave(curpcb->pcb_save);
-		start_emulating();
+		fpu_disable();
 		PCPU_SET(fpcurthread, NULL);
 	}
 	critical_exit();
@@ -524,14 +500,14 @@ fpuformat(void)
 	return (_MC_FPFMT_XMM);
 }
 
-/* 
+/*
  * The following mechanism is used to ensure that the FPE_... value
  * that is passed as a trapcode to the signal handler of the user
  * process does not have more than one bit set.
- * 
+ *
  * Multiple bits may be set if the user process modifies the control
  * word while a status word bit is already set.  While this is a sign
- * of bad coding, we have no choise than to narrow them down to one
+ * of bad coding, we have no choice than to narrow them down to one
  * bit, since we must not send a trapcode that is not exactly one of
  * the FPE_ macros.
  *
@@ -762,7 +738,7 @@ restore_fpu_curthread(struct thread *td)
 	 */
 	PCPU_SET(fpcurthread, td);
 
-	stop_emulating();
+	fpu_enable();
 	fpu_clean_state();
 	pcb = td->td_pcb;
 
@@ -824,7 +800,7 @@ fpudna(void)
 		 * regardless of the eager/lazy FPU context switch
 		 * mode.
 		 */
-		stop_emulating();
+		fpu_enable();
 	} else {
 		if (__predict_false(PCPU_GET(fpcurthread) != NULL)) {
 			panic(
@@ -844,7 +820,7 @@ fpu_activate_sw(struct thread *td)
 
 	if ((td->td_pflags & TDP_KTHREAD) != 0 || !PCB_USER_FPU(td->td_pcb)) {
 		PCPU_SET(fpcurthread, NULL);
-		start_emulating();
+		fpu_disable();
 	} else if (PCPU_GET(fpcurthread) != td) {
 		restore_fpu_curthread(td);
 	}
@@ -860,7 +836,7 @@ fpudrop(void)
 	CRITICAL_ASSERT(td);
 	PCPU_SET(fpcurthread, NULL);
 	clear_pcb_flags(td->td_pcb, PCB_FPUINITDONE);
-	start_emulating();
+	fpu_disable();
 }
 
 /*
@@ -1082,9 +1058,7 @@ static driver_t fpupnp_driver = {
 	1,			/* no softc */
 };
 
-static devclass_t fpupnp_devclass;
-
-DRIVER_MODULE(fpupnp, acpi, fpupnp_driver, fpupnp_devclass, 0, 0);
+DRIVER_MODULE(fpupnp, acpi, fpupnp_driver, 0, 0);
 ISA_PNP_INFO(fpupnp_ids);
 #endif	/* DEV_ISA */
 
@@ -1162,7 +1136,7 @@ fpu_kern_enter(struct thread *td, struct fpu_kern_ctx *ctx, u_int flags)
 
 	if ((flags & FPU_KERN_NOCTX) != 0) {
 		critical_enter();
-		stop_emulating();
+		fpu_enable();
 		if (curthread == PCPU_GET(fpcurthread)) {
 			fpusave(curpcb->pcb_save);
 			PCPU_SET(fpcurthread, NULL);
@@ -1213,7 +1187,7 @@ fpu_kern_leave(struct thread *td, struct fpu_kern_ctx *ctx)
 		CRITICAL_ASSERT(td);
 
 		clear_pcb_flags(pcb,  PCB_FPUNOSAVE | PCB_FPUINITDONE);
-		start_emulating();
+		fpu_disable();
 	} else {
 		KASSERT((ctx->flags & FPU_KERN_CTX_INUSE) != 0,
 		    ("leaving not inuse ctx"));

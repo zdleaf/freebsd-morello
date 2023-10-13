@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2015 Landon Fuller <landon@landonf.org>
  * All rights reserved.
@@ -30,8 +30,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 /*
  * Broadcom BHND PCIe-Gen2 PCI-Host Bridge.
  * 
@@ -240,7 +238,7 @@ DEFINE_CLASS_1(bhnd_hostb, bhnd_pcie2_hostb_driver,
     bhnd_pcie2_hostb_methods, sizeof(struct bhnd_pcie2hb_softc),
     bhnd_pcie2_driver);
 
-DRIVER_MODULE(bhnd_pcie2_hostb, bhnd, bhnd_pcie2_hostb_driver, bhnd_hostb_devclass, 0, 0);
+DRIVER_MODULE(bhnd_pcie2_hostb, bhnd, bhnd_pcie2_hostb_driver, 0, 0);
 
 MODULE_VERSION(bhnd_pcie2_hostb, 1);
 MODULE_DEPEND(bhnd_pcie2_hostb, bhnd, 1, 1, 1);

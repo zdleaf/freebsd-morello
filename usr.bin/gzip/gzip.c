@@ -1,7 +1,7 @@
 /*	$NetBSD: gzip.c,v 1.116 2018/10/27 11:39:12 skrll Exp $	*/
 
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-NetBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 1997, 1998, 2003, 2004, 2006, 2008, 2009, 2010, 2011, 2015, 2017
  *    Matthew R. Green
@@ -34,7 +34,6 @@
 #ifndef lint
 __COPYRIGHT("@(#) Copyright (c) 1997, 1998, 2003, 2004, 2006, 2008,\
  2009, 2010, 2011, 2015, 2017 Matthew R. Green.  All rights reserved.");
-__FBSDID("$FreeBSD$");
 #endif /* not lint */
 
 /*
@@ -87,6 +86,9 @@ enum filetype {
 #ifndef NO_LZ_SUPPORT
 	FT_LZ,
 #endif
+#ifndef NO_ZSTD_SUPPORT
+	FT_ZSTD,
+#endif
 	FT_LAST,
 	FT_UNKNOWN
 };
@@ -116,6 +118,12 @@ enum filetype {
 #ifndef NO_LZ_SUPPORT
 #define LZ_SUFFIX	".lz"
 #define LZ_MAGIC	"LZIP"
+#endif
+
+#ifndef NO_ZSTD_SUPPORT
+#include <zstd.h>
+#define ZSTD_SUFFIX	".zst"
+#define ZSTD_MAGIC	"\050\265\057\375"
 #endif
 
 #define GZ_SUFFIX	".gz"
@@ -164,6 +172,9 @@ static suffixes_t suffixes[] = {
 #endif
 #ifndef NO_LZ_SUPPORT
 	SUFFIX(LZ_SUFFIX,	""),
+#endif
+#ifndef NO_ZSTD_SUPPORT
+	SUFFIX(ZSTD_SUFFIX,	""),
 #endif
 	SUFFIX(GZ_SUFFIX,	""),	/* Overwritten by -S "" */
 #undef SUFFIX
@@ -221,7 +232,7 @@ static	const char *infile;		/* name of file coming in */
 
 static	void	maybe_err(const char *fmt, ...) __printflike(1, 2) __dead2;
 #if !defined(NO_BZIP2_SUPPORT) || !defined(NO_PACK_SUPPORT) ||	\
-    !defined(NO_XZ_SUPPORT)
+    !defined(NO_XZ_SUPPORT) || !defined(NO_ZSTD_SUPPORT)
 static	void	maybe_errx(const char *fmt, ...) __printflike(1, 2) __dead2;
 #endif
 static	void	maybe_warn(const char *fmt, ...) __printflike(1, 2);
@@ -282,6 +293,10 @@ static	off_t	unxz_len(int);
 
 #ifndef NO_LZ_SUPPORT
 static	off_t	unlz(int, int, char *, size_t, off_t *);
+#endif
+
+#ifndef NO_ZSTD_SUPPORT
+static	off_t	unzstd(int, int, char *, size_t, off_t *);
 #endif
 
 static const struct option longopts[] = {
@@ -467,7 +482,7 @@ maybe_err(const char *fmt, ...)
 }
 
 #if !defined(NO_BZIP2_SUPPORT) || !defined(NO_PACK_SUPPORT) ||	\
-    !defined(NO_XZ_SUPPORT)
+    !defined(NO_XZ_SUPPORT) || !defined(NO_ZSTD_SUPPORT)
 /* ... without an errno. */
 void
 maybe_errx(const char *fmt, ...)
@@ -1098,33 +1113,32 @@ file_gettype(u_char *buf)
 	if (buf[0] == GZIP_MAGIC0 &&
 	    (buf[1] == GZIP_MAGIC1 || buf[1] == GZIP_OMAGIC1))
 		return FT_GZIP;
-	else
 #ifndef NO_BZIP2_SUPPORT
-	if (memcmp(buf, BZIP2_MAGIC, 3) == 0 &&
+	else if (memcmp(buf, BZIP2_MAGIC, 3) == 0 &&
 	    buf[3] >= '0' && buf[3] <= '9')
 		return FT_BZIP2;
-	else
 #endif
 #ifndef NO_COMPRESS_SUPPORT
-	if (memcmp(buf, Z_MAGIC, 2) == 0)
+	else if (memcmp(buf, Z_MAGIC, 2) == 0)
 		return FT_Z;
-	else
 #endif
 #ifndef NO_PACK_SUPPORT
-	if (memcmp(buf, PACK_MAGIC, 2) == 0)
+	else if (memcmp(buf, PACK_MAGIC, 2) == 0)
 		return FT_PACK;
-	else
 #endif
 #ifndef NO_XZ_SUPPORT
-	if (memcmp(buf, XZ_MAGIC, 4) == 0)	/* XXX: We only have 4 bytes */
+	else if (memcmp(buf, XZ_MAGIC, 4) == 0)	/* XXX: We only have 4 bytes */
 		return FT_XZ;
-	else
 #endif
 #ifndef NO_LZ_SUPPORT
-	if (memcmp(buf, LZ_MAGIC, 4) == 0)
+	else if (memcmp(buf, LZ_MAGIC, 4) == 0)
 		return FT_LZ;
-	else
 #endif
+#ifndef NO_ZSTD_SUPPORT
+	else if (memcmp(buf, ZSTD_MAGIC, 4) == 0)
+		return FT_ZSTD;
+#endif
+	else
 		return FT_UNKNOWN;
 }
 
@@ -1586,6 +1600,16 @@ file_uncompress(char *file, char *outfile, size_t outsize)
 		size = unlz(fd, zfd, NULL, 0, NULL);
 		break;
 #endif
+
+#ifndef NO_ZSTD_SUPPORT
+	case FT_ZSTD:
+		if (lflag) {
+			maybe_warnx("no -l with zstd files");
+			goto lose;
+		}
+		size = unzstd(fd, zfd, NULL, 0, NULL);
+		break;
+#endif
 	case FT_UNKNOWN:
 		if (lflag) {
 			maybe_warnx("no -l for unknown filetypes");
@@ -1812,6 +1836,12 @@ handle_stdin(void)
 	case FT_LZ:
 		usize = unlz(STDIN_FILENO, STDOUT_FILENO,
 			     (char *)fourbytes, sizeof fourbytes, &gsize);
+		break;
+#endif
+#ifndef NO_ZSTD_SUPPORT
+	case FT_ZSTD:
+		usize = unzstd(STDIN_FILENO, STDOUT_FILENO,
+			       (char *)fourbytes, sizeof fourbytes, &gsize);
 		break;
 #endif
 	}
@@ -2187,6 +2217,9 @@ display_version(void)
 #endif
 #ifndef NO_LZ_SUPPORT
 #include "unlz.c"
+#endif
+#ifndef NO_ZSTD_SUPPORT
+#include "unzstd.c"
 #endif
 
 static ssize_t

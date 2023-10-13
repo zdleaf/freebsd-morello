@@ -1,4 +1,3 @@
-/*	$FreeBSD$	*/
 /*	$OpenBSD: ip_esp.c,v 1.69 2001/06/26 06:18:59 angelos Exp $ */
 /*-
  * The authors of this code are John Ioannidis (ji@tla.org),
@@ -169,7 +168,8 @@ esp_init(struct secasvar *sav, struct xformsw *xsp)
 	}
 
 	/* subtract off the salt, RFC4106, 8.1 and RFC3686, 5.1 */
-	keylen = _KEYLEN(sav->key_enc) - SAV_ISCTRORGCM(sav) * 4;
+	keylen = _KEYLEN(sav->key_enc) - SAV_ISCTRORGCM(sav) * 4 -
+	    SAV_ISCHACHA(sav) * 4;
 	if (txform->minkey > keylen || keylen > txform->maxkey) {
 		DPRINTF(("%s: invalid key length %u, must be in the range "
 			"[%u..%u] for algorithm %s\n", __func__,
@@ -178,7 +178,7 @@ esp_init(struct secasvar *sav, struct xformsw *xsp)
 		return EINVAL;
 	}
 
-	if (SAV_ISCTRORGCM(sav))
+	if (SAV_ISCTRORGCM(sav) || SAV_ISCHACHA(sav))
 		sav->ivlen = 8;	/* RFC4106 3.1 and RFC3686 3.1 */
 	else
 		sav->ivlen = txform->ivsize;
@@ -226,6 +226,12 @@ esp_init(struct secasvar *sav, struct xformsw *xsp)
 		csp.csp_mode = CSP_MODE_AEAD;
 		if (sav->flags & SADB_X_SAFLAGS_ESN)
 			csp.csp_flags |= CSP_F_SEPARATE_AAD;
+	} else if (sav->alg_enc == SADB_X_EALG_CHACHA20POLY1305) {
+		sav->alg_auth = SADB_X_AALG_CHACHA20POLY1305;
+		sav->tdb_authalgxform = &auth_hash_poly1305;
+		csp.csp_mode = CSP_MODE_AEAD;
+		if (sav->flags & SADB_X_SAFLAGS_ESN)
+			csp.csp_flags |= CSP_F_SEPARATE_AAD;
 	} else if (sav->alg_auth != 0) {
 		csp.csp_mode = CSP_MODE_ETA;
 		if (sav->flags & SADB_X_SAFLAGS_ESN)
@@ -238,7 +244,7 @@ esp_init(struct secasvar *sav, struct xformsw *xsp)
 	if (csp.csp_cipher_alg != CRYPTO_NULL_CBC) {
 		csp.csp_cipher_key = sav->key_enc->key_data;
 		csp.csp_cipher_klen = _KEYBITS(sav->key_enc) / 8 -
-		    SAV_ISCTRORGCM(sav) * 4;
+		    SAV_ISCTRORGCM(sav) * 4 - SAV_ISCHACHA(sav) * 4;
 	};
 	csp.csp_ivlen = txform->ivsize;
 
@@ -273,6 +279,8 @@ esp_input(struct mbuf *m, struct secasvar *sav, int skip, int protoff)
 	int alen, error, hlen, plen;
 	uint32_t seqh;
 	const struct crypto_session_params *csp;
+
+	SECASVAR_RLOCK_TRACKER;
 
 	IPSEC_ASSERT(sav != NULL, ("null SA"));
 	IPSEC_ASSERT(sav->tdb_encalgxform != NULL, ("null encoding xform"));
@@ -329,10 +337,10 @@ esp_input(struct mbuf *m, struct secasvar *sav, int skip, int protoff)
 	/*
 	 * Check sequence number.
 	 */
-	SECASVAR_LOCK(sav);
+	SECASVAR_RLOCK(sav);
 	if (esph != NULL && sav->replay != NULL && sav->replay->wsize != 0) {
 		if (ipsec_chkreplay(ntohl(esp->esp_seq), &seqh, sav) == 0) {
-			SECASVAR_UNLOCK(sav);
+			SECASVAR_RUNLOCK(sav);
 			DPRINTF(("%s: packet replay check for %s\n", __func__,
 			    ipsec_sa2str(sav, buf, sizeof(buf))));
 			ESPSTAT_INC(esps_replay);
@@ -342,7 +350,7 @@ esp_input(struct mbuf *m, struct secasvar *sav, int skip, int protoff)
 		seqh = htonl(seqh);
 	}
 	cryptoid = sav->tdb_cryptoid;
-	SECASVAR_UNLOCK(sav);
+	SECASVAR_RUNLOCK(sav);
 
 	/* Update the counters */
 	ESPSTAT_ADD(esps_ibytes, m->m_pkthdr.len - (skip + hlen + alen));
@@ -366,7 +374,7 @@ esp_input(struct mbuf *m, struct secasvar *sav, int skip, int protoff)
 
 	if (esph != NULL) {
 		crp->crp_op = CRYPTO_OP_VERIFY_DIGEST;
-		if (SAV_ISGCM(sav))
+		if (SAV_ISGCM(sav) || SAV_ISCHACHA(sav))
 			crp->crp_aad_length = 8; /* RFC4106 5, SPI + SN */
 		else
 			crp->crp_aad_length = hlen;
@@ -426,7 +434,7 @@ esp_input(struct mbuf *m, struct secasvar *sav, int skip, int protoff)
 	crp->crp_payload_length = m->m_pkthdr.len - (skip + hlen + alen);
 
 	/* Generate or read cipher IV. */
-	if (SAV_ISCTRORGCM(sav)) {
+	if (SAV_ISCTRORGCM(sav) || SAV_ISCHACHA(sav)) {
 		ivp = &crp->crp_iv[0];
 
 		/*
@@ -493,6 +501,8 @@ esp_input_cb(struct cryptop *crp)
 	struct secasindex *saidx;
 	crypto_session_t cryptoid;
 	int hlen, skip, protoff, error, alen;
+
+	SECASVAR_RLOCK_TRACKER;
 
 	m = crp->crp_buf.cb_mbuf;
 	xd = crp->crp_opaque;
@@ -570,16 +580,16 @@ esp_input_cb(struct cryptop *crp)
 
 		m_copydata(m, skip + offsetof(struct newesp, esp_seq),
 			   sizeof (seq), (caddr_t) &seq);
-		SECASVAR_LOCK(sav);
+		SECASVAR_RLOCK(sav);
 		if (ipsec_updatereplay(ntohl(seq), sav)) {
-			SECASVAR_UNLOCK(sav);
+			SECASVAR_RUNLOCK(sav);
 			DPRINTF(("%s: packet replay check for %s\n", __func__,
 			    ipsec_sa2str(sav, buf, sizeof(buf))));
 			ESPSTAT_INC(esps_replay);
 			error = EACCES;
 			goto bad;
 		}
-		SECASVAR_UNLOCK(sav);
+		SECASVAR_RUNLOCK(sav);
 	}
 
 	/* Determine the ESP header length */
@@ -657,7 +667,6 @@ esp_input_cb(struct cryptop *crp)
 	CURVNET_RESTORE();
 	return error;
 bad:
-	CURVNET_RESTORE();
 	if (sav != NULL)
 		key_freesav(&sav);
 	if (m != NULL)
@@ -668,6 +677,7 @@ bad:
 		free(crp->crp_aad, M_ESP);
 		crypto_freereq(crp);
 	}
+	CURVNET_RESTORE();
 	return error;
 }
 /*
@@ -693,6 +703,8 @@ esp_output(struct mbuf *m, struct secpolicy *sp, struct secasvar *sav,
 	uint8_t prot;
 	uint32_t seqh;
 	const struct crypto_session_params *csp;
+
+	SECASVAR_RLOCK_TRACKER;
 
 	IPSEC_ASSERT(sav != NULL, ("null SA"));
 	esph = sav->tdb_authalgxform;
@@ -786,10 +798,11 @@ esp_output(struct mbuf *m, struct secpolicy *sp, struct secasvar *sav,
 	/* Initialize ESP header. */
 	bcopy((caddr_t) &sav->spi, mtod(mo, caddr_t) + roff,
 	    sizeof(uint32_t));
-	SECASVAR_LOCK(sav);
+	SECASVAR_RLOCK(sav);
 	if (sav->replay) {
 		uint32_t replay;
 
+		SECREPLAY_LOCK(sav->replay);
 #ifdef REGRESSION
 		/* Emulate replay attack when ipsec_replay is TRUE. */
 		if (!V_ipsec_replay)
@@ -801,11 +814,12 @@ esp_output(struct mbuf *m, struct secpolicy *sp, struct secasvar *sav,
 		    sizeof(uint32_t), sizeof(uint32_t));
 
 		seqh = htonl((uint32_t)(sav->replay->count >> IPSEC_SEQH_SHIFT));
+		SECREPLAY_UNLOCK(sav->replay);
 	}
 	cryptoid = sav->tdb_cryptoid;
-	if (SAV_ISCTRORGCM(sav))
+	if (SAV_ISCTRORGCM(sav) || SAV_ISCHACHA(sav))
 		cntr = sav->cntr++;
-	SECASVAR_UNLOCK(sav);
+	SECASVAR_RUNLOCK(sav);
 
 	/*
 	 * Add padding -- better to do it ourselves than use the crypto engine,
@@ -870,7 +884,7 @@ esp_output(struct mbuf *m, struct secpolicy *sp, struct secasvar *sav,
 
 	/* Generate cipher and ESP IVs. */
 	ivp = &crp->crp_iv[0];
-	if (SAV_ISCTRORGCM(sav)) {
+	if (SAV_ISCTRORGCM(sav) || SAV_ISCHACHA(sav)) {
 		/*
 		 * See comment in esp_input() for details on the
 		 * cipher IV.  A simple per-SA counter stored in
@@ -906,7 +920,7 @@ esp_output(struct mbuf *m, struct secpolicy *sp, struct secasvar *sav,
 	if (esph) {
 		/* Authentication descriptor. */
 		crp->crp_op |= CRYPTO_OP_COMPUTE_DIGEST;
-		if (SAV_ISGCM(sav))
+		if (SAV_ISGCM(sav) || SAV_ISCHACHA(sav))
 			crp->crp_aad_length = 8; /* RFC4106 5, SPI + SN */
 		else
 			crp->crp_aad_length = hlen;
@@ -1043,12 +1057,12 @@ esp_output_cb(struct cryptop *crp)
 	CURVNET_RESTORE();
 	return (error);
 bad:
-	CURVNET_RESTORE();
 	free(xd, M_ESP);
 	free(crp->crp_aad, M_ESP);
 	crypto_freereq(crp);
 	key_freesav(&sav);
 	key_freesp(&sp);
+	CURVNET_RESTORE();
 	return (error);
 }
 

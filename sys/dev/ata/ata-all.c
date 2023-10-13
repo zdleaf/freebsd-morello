@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 1998 - 2008 Søren Schmidt <sos@FreeBSD.org>
  * All rights reserved.
@@ -27,8 +27,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/ata.h>
@@ -1214,6 +1212,7 @@ ata_module_event_handler(module_t mod, int what, void *arg)
 
     switch (what) {
     case MOD_LOAD:
+	ata_devclass = devclass_find("ata");
 	return 0;
 
     case MOD_UNLOAD:
@@ -1225,6 +1224,6 @@ ata_module_event_handler(module_t mod, int what, void *arg)
 }
 
 static moduledata_t ata_moduledata = { "ata", ata_module_event_handler, NULL };
-DECLARE_MODULE(ata, ata_moduledata, SI_SUB_CONFIGURE, SI_ORDER_SECOND);
+DECLARE_MODULE(ata, ata_moduledata, SI_SUB_DRIVERS, SI_ORDER_ANY);
 MODULE_VERSION(ata, 1);
 MODULE_DEPEND(ata, cam, 1, 1, 1);

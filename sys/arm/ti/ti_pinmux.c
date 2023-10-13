@@ -34,8 +34,6 @@
  * Exposes pinmux module to pinctrl-compatible interface
  */
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
@@ -453,8 +451,6 @@ static driver_t ti_pinmux_driver = {
 	sizeof(struct ti_pinmux_softc),
 };
 
-static devclass_t ti_pinmux_devclass;
-
-DRIVER_MODULE(ti_pinmux, simplebus, ti_pinmux_driver, ti_pinmux_devclass, 0, 0);
+DRIVER_MODULE(ti_pinmux, simplebus, ti_pinmux_driver, 0, 0);
 MODULE_VERSION(ti_pinmux, 1);
 MODULE_DEPEND(ti_pinmux, ti_scm, 1, 1, 1);

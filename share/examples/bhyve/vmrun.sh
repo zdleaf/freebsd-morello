@@ -1,6 +1,6 @@
 #!/bin/sh
 #
-# SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+# SPDX-License-Identifier: BSD-2-Clause
 #
 # Copyright (c) 2013 NetApp, Inc.
 # All rights reserved.
@@ -26,7 +26,6 @@
 # OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 # SUCH DAMAGE.
 #
-# $FreeBSD$
 #
 
 LOADER=/usr/sbin/bhyveload
@@ -58,7 +57,7 @@ usage() {
 	    "[-d <disk file>]"
 	echo "                [-e <name=value>] [-f <path of firmware>]" \
 	    "[-F <size>]"
-	echo "                [-H <directory>]"
+	echo "                [-G [w][address:]port] [-H <directory>]"
 	echo "                [-I <location of installation iso>] [-l <loader>]"
 	echo "                [-L <VNC IP for UEFI framebuffer>]"
 	echo "                [-m <memsize>]" \
@@ -76,13 +75,14 @@ usage() {
 	echo "       -f: Use a specific UEFI firmware"
 	echo "       -F: Use a custom UEFI GOP framebuffer size" \
 	    "(default: ${DEFAULT_VNCSIZE})"
+	echo "       -G: bind the GDB stub to the specified address"
 	echo "       -H: host filesystem to export to the loader"
 	echo "       -i: force boot of the Installation CDROM image"
 	echo "       -I: Installation CDROM image location" \
 	    "(default: ${DEFAULT_ISOFILE})"
 	echo "       -l: the OS loader to use (default: /boot/userboot.so)"
 	echo "       -L: IP address for UEFI GOP VNC server" \
-	    "(default: ${DEFAULT_VNCHOST}"
+	    "(default: ${DEFAULT_VNCHOST})"
 	echo "       -m: memory size (default: ${DEFAULT_MEMSIZE})"
 	echo "       -n: network adapter emulation type" \
 	    "(default: ${DEFAULT_NIC})"
@@ -132,7 +132,7 @@ vncport=${DEFAULT_VNCPORT}
 vncsize=${DEFAULT_VNCSIZE}
 tablet=""
 
-while getopts aAc:C:d:e:Ef:F:g:hH:iI:l:L:m:n:p:P:t:Tuvw c ; do
+while getopts aAc:C:d:e:Ef:F:G:hH:iI:l:L:m:n:p:P:t:Tuvw c ; do
 	case $c in
 	a)
 		bhyverun_opt="${bhyverun_opt} -a"
@@ -164,6 +164,9 @@ while getopts aAc:C:d:e:Ef:F:g:hH:iI:l:L:m:n:p:P:t:Tuvw c ; do
 		;;
 	F)
 		vncsize="${OPTARG}"
+		;;
+	G)
+		bhyverun_opt="${bhyverun_opt} -G ${OPTARG}"
 		;;
 	H)
 		host_base=`realpath ${OPTARG}`
@@ -245,7 +248,7 @@ fi
 if [ ${efi_mode} -gt 0 ]; then
 	if [ ! -f ${efi_firmware} ]; then
 		echo "Error: EFI Firmware ${efi_firmware} doesn't exist." \
-		    "Try: pkg install uefi-edk2-bhyve"
+		    "Try: pkg install edk2-bhyve"
 		exit 1
 	fi
 fi

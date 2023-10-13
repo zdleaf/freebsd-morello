@@ -2,7 +2,7 @@
  * Debug routines for LSI '909 FC  adapters.
  * FreeBSD Version.
  *
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD AND BSD-3-Clause
+ * SPDX-License-Identifier: BSD-2-Clause AND BSD-3-Clause
  *
  * Copyright (c)  2000, 2001 by Greg Ansley
  *
@@ -66,8 +66,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <dev/mpt/mpt.h>
 
 #include <dev/mpt/mpilib/mpi_ioc.h>
@@ -183,8 +181,8 @@ static const struct Error_Map IOC_SCSIStatus[] = {
 { SCSI_STATUS_CHECK_COND,		"Check Condition" },
 { SCSI_STATUS_COND_MET,			"Check Condition Met" },
 { SCSI_STATUS_BUSY,			"Busy" },
-{ SCSI_STATUS_INTERMED,			"Intermidiate Condition" },
-{ SCSI_STATUS_INTERMED_COND_MET,	"Intermidiate Condition Met" },
+{ SCSI_STATUS_INTERMED,			"Intermediate Condition" },
+{ SCSI_STATUS_INTERMED_COND_MET,	"Intermediate Condition Met" },
 { SCSI_STATUS_RESERV_CONFLICT,		"Reservation Conflict" },
 { SCSI_STATUS_CMD_TERMINATED,		"Command Terminated" },
 { SCSI_STATUS_QUEUE_FULL,		"Queue Full" },

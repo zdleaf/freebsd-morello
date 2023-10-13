@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (C) 2011-2016 Universita` di Pisa
  * All rights reserved.
@@ -28,7 +28,6 @@
  */
 
 /*
- * $FreeBSD$
  *
  * Functions and macros to manipulate netmap structures and packets
  * in userspace. See netmap(4) for more information.
@@ -986,7 +985,7 @@ nm_close(struct nm_desc *d)
 		close(d->fd);
 	}
 
-	bzero(d, sizeof(*d));
+	bzero((char *)d, sizeof(*d));
 	free(d);
 	return 0;
 }

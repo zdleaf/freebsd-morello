@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2007, 2011 Robert N. M. Watson
  * Copyright (c) 2015 Allan Jude <allanjude@freebsd.org>
@@ -29,8 +29,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/sysctl.h>
 #include <sys/user.h>
@@ -87,6 +85,8 @@ static const struct procstat_cmd pacmd_table[] = {
 
 /* procstat parameters and arguments */
 static const struct procstat_cmd cmd_table[] = {
+	{ "advlock", "advisory_locks", NULL, &procstat_advlocks, &cmdopt_none,
+	    PS_CMP_PLURAL | PS_CMP_SUBSTR | PS_MODE_NO_KINFO_PROC },
 	{ "argument", "arguments", NULL, &procstat_args, &cmdopt_none,
 	    PS_CMP_PLURAL | PS_CMP_SUBSTR },
 	{ "auxv", "auxv", NULL, &procstat_auxv, &cmdopt_none, PS_CMP_NORMAL },
@@ -236,11 +236,10 @@ static const struct procstat_cmd *
 getcmdbyprogname(const char *pprogname)
 {
 	const char *ca;
-	size_t i, len;
+	size_t i;
 
 	if (pprogname == NULL)
 		return (NULL);
-	len = strlen(pprogname);
 
 	for (i = 0; i < nitems(pacmd_table); i++) {
 		ca = pacmd_table[i].command;
@@ -450,7 +449,8 @@ main(int argc, char *argv[])
 	}
 
 	/* Must specify either the -a flag or a list of pids. */
-	if (!(aflag == 1 && argc == 0) && !(aflag == 0 && argc > 0))
+	if (!(aflag == 1 && argc == 0) && !(aflag == 0 && argc > 0) &&
+	    (cmd->cmp & PS_MODE_NO_KINFO_PROC) == 0)
 		usage(cmd);
 
 	if (memf != NULL)
@@ -465,6 +465,11 @@ main(int argc, char *argv[])
 		xo_set_version(PROCSTAT_XO_VERSION);
 		xo_open_container(progname);
 		xo_open_container(xocontainer);
+
+		if ((cmd->cmp & PS_MODE_NO_KINFO_PROC) != 0) {
+			cmd->cmd(prstat, NULL);
+			goto iter;
+		}
 
 		if (aflag) {
 			p = procstat_getprocs(prstat, KERN_PROC_PROC, 0, &cnt);
@@ -521,6 +526,7 @@ main(int argc, char *argv[])
 			}
 		}
 
+iter:
 		xo_close_container(xocontainer);
 		xo_close_container(progname);
 		xo_finish();

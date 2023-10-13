@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2009-2016 Solarflare Communications Inc.
  * All rights reserved.
@@ -31,8 +31,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include "efx.h"
 #include "efx_impl.h"
 
@@ -586,6 +584,7 @@ siena_phy_stats_update(
 	siena_phy_decode_stats(enp, vmask, esmp, &smask, stat);
 	EFSYS_ASSERT(smask == encp->enc_phy_stat_mask);
 
+	(void)rc; /* XXX? */
 	return (0);
 
 fail2:

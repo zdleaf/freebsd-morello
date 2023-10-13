@@ -1,5 +1,4 @@
 #	from: @(#)bsd.prog.mk	5.26 (Berkeley) 6/25/91
-# $FreeBSD$
 
 .include <bsd.init.mk>
 .include <bsd.compiler.mk>
@@ -41,6 +40,13 @@ MK_DEBUG_FILES=	no
 .if ${MK_BIND_NOW} != "no"
 LDFLAGS+= -Wl,-znow
 .endif
+.if ${LINKER_TYPE} != "mac"
+.if ${MK_RELRO} == "no"
+LDFLAGS+= -Wl,-znorelro
+.else
+LDFLAGS+= -Wl,-zrelro
+.endif
+.endif
 .if ${MK_PIE} != "no"
 # Static PIE is not yet supported/tested.
 .if !defined(NO_SHARED) || ${NO_SHARED:tl} == "no"
@@ -61,23 +67,20 @@ LDFLAGS+= -Wl,-zretpolineplt
 .warning Retpoline requested but not supported by compiler or linker
 .endif
 .endif
+# LLD sensibly defaults to -znoexecstack, so do the same for BFD
+LDFLAGS.bfd+= -Wl,-znoexecstack
 
 # Initialize stack variables on function entry
-.if ${MK_INIT_ALL_ZERO} == "yes"
+.if ${OPT_INIT_ALL} != "none"
 .if ${COMPILER_FEATURES:Minit-all}
-CFLAGS+= -ftrivial-auto-var-init=zero \
-    -enable-trivial-auto-var-init-zero-knowing-it-will-be-removed-from-clang
-CXXFLAGS+= -ftrivial-auto-var-init=zero \
-    -enable-trivial-auto-var-init-zero-knowing-it-will-be-removed-from-clang
-.else
-.warning InitAll (zeros) requested but not support by compiler
+CFLAGS+= -ftrivial-auto-var-init=${OPT_INIT_ALL}
+CXXFLAGS+= -ftrivial-auto-var-init=${OPT_INIT_ALL}
+.if ${OPT_INIT_ALL} == "zero" && ${COMPILER_TYPE} == "clang" && ${COMPILER_VERSION} < 160000
+CFLAGS+= -enable-trivial-auto-var-init-zero-knowing-it-will-be-removed-from-clang
+CXXFLAGS+= -enable-trivial-auto-var-init-zero-knowing-it-will-be-removed-from-clang
 .endif
-.elif ${MK_INIT_ALL_PATTERN} == "yes"
-.if ${COMPILER_FEATURES:Minit-all}
-CFLAGS+= -ftrivial-auto-var-init=pattern
-CXXFLAGS+= -ftrivial-auto-var-init=pattern
 .else
-.warning InitAll (pattern) requested but not support by compiler
+.warning INIT_ALL (${OPT_INIT_ALL}) requested but not supported by compiler
 .endif
 .endif
 

@@ -25,8 +25,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/kernel.h>
 #include <sys/bus.h>
@@ -120,15 +118,11 @@ static device_method_t samsung_dwmmc_methods[] = {
 	DEVMETHOD_END
 };
 
-static devclass_t samsung_dwmmc_devclass;
-
 DEFINE_CLASS_1(samsung_dwmmc, samsung_dwmmc_driver, samsung_dwmmc_methods,
     sizeof(struct dwmmc_softc), dwmmc_driver);
 
-DRIVER_MODULE(samsung_dwmmc, simplebus, samsung_dwmmc_driver,
-    samsung_dwmmc_devclass, 0, 0);
-DRIVER_MODULE(samsung_dwmmc, ofwbus, samsung_dwmmc_driver, samsung_dwmmc_devclass
-    , NULL, NULL);
+DRIVER_MODULE(samsung_dwmmc, simplebus, samsung_dwmmc_driver, 0, 0);
+DRIVER_MODULE(samsung_dwmmc, ofwbus, samsung_dwmmc_driver, NULL, NULL);
 #ifndef MMCCAM
 MMC_DECLARE_BRIDGE(samsung_dwmmc);
 #endif

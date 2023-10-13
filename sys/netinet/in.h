@@ -29,7 +29,6 @@
  * SUCH DAMAGE.
  *
  *	@(#)in.h	8.3 (Berkeley) 1/3/94
- * $FreeBSD$
  */
 
 #ifndef _NETINET_IN_H_
@@ -383,7 +382,13 @@ __END_DECLS
 #define	IN_BADCLASS(i)		(((in_addr_t)(i) & 0xf0000000) == 0xf0000000)
 
 #define IN_LINKLOCAL(i)		(((in_addr_t)(i) & 0xffff0000) == 0xa9fe0000)
+#ifdef _KERNEL
+#define IN_LOOPBACK(i) \
+    (((in_addr_t)(i) & V_in_loopback_mask) == 0x7f000000)
+#define IN_LOOPBACK_MASK_DFLT	0xff000000
+#else
 #define IN_LOOPBACK(i)		(((in_addr_t)(i) & 0xff000000) == 0x7f000000)
+#endif
 #define IN_ZERONET(i)		(((in_addr_t)(i) & 0xff000000) == 0)
 
 #define	IN_PRIVATE(i)	((((in_addr_t)(i) & 0xff000000) == 0x0a000000) || \
@@ -413,6 +418,18 @@ __END_DECLS
 #endif /* IN_HISTORICAL_NETS */
 
 #define	IN_RFC3021_MASK		((in_addr_t)0xfffffffe)
+
+#ifdef _KERNEL
+#include <net/vnet.h>
+
+VNET_DECLARE(bool, ip_allow_net0);
+VNET_DECLARE(bool, ip_allow_net240);
+/* Address space reserved for loopback */
+VNET_DECLARE(uint32_t, in_loopback_mask);
+#define	V_ip_allow_net0		VNET(ip_allow_net0)
+#define	V_ip_allow_net240	VNET(ip_allow_net240)
+#define	V_in_loopback_mask	VNET(in_loopback_mask)
+#endif
 
 /*
  * Options for use with [gs]etsockopt at the IP level.
@@ -445,8 +462,8 @@ __END_DECLS
 				     /* unused; was IP_FAITH */
 #define	IP_ONESBCAST		23   /* bool: send all-ones broadcast */
 #define	IP_BINDANY		24   /* bool: allow bind to any address */
-#define	IP_BINDMULTI		25   /* bool: allow multiple listeners on a tuple */
-#define	IP_RSS_LISTEN_BUCKET	26   /* int; set RSS listen bucket */
+				     /* unused; was IP_BIND_MULTI */
+				     /* unused; was IP_RSS_LISTEN_BUCKET */
 #define	IP_ORIGDSTADDR		27   /* bool: receive IP dst addr/port w/dgram */
 #define	IP_RECVORIGDSTADDR      IP_ORIGDSTADDR
 

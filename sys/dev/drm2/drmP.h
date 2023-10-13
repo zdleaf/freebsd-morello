@@ -33,8 +33,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #ifndef _DRM_P_H_
 #define _DRM_P_H_
 
@@ -497,7 +495,7 @@ struct drm_agp_head {
  * Scatter-gather memory.
  */
 struct drm_sg_mem {
-	vm_offset_t vaddr;
+	void *vaddr;
 	vm_paddr_t *busaddr;
 	vm_pindex_t pages;
 };

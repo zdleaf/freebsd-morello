@@ -36,8 +36,6 @@
  * OF SUCH DAMAGE.
  *
  * Author: Archie Cobbs <archie@freebsd.org>
- *
- * $FreeBSD$
  * $Whistle: ng_iface.c,v 1.33 1999/11/01 09:24:51 julian Exp $
  */
 
@@ -74,6 +72,7 @@
 
 #include <net/if.h>
 #include <net/if_var.h>
+#include <net/if_private.h>
 #include <net/if_types.h>
 #include <net/bpf.h>
 #include <net/netisr.h>

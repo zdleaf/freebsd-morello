@@ -26,9 +26,7 @@
 .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 .\" SUCH DAMAGE.
 .\"
-.\" $FreeBSD$
-.\"
-.Dd November 15, 2021
+.Dd September 6, 2023
 .Dt LIBCASPER 3
 .Os
 .Sh NAME
@@ -96,6 +94,7 @@ The
 .Fn cap_init
 function instantiates a capability to allow a program to access
 the casper daemon.
+It must be called from a single-threaded context.
 .Pp
 The
 .Fn cap_wrap
@@ -213,12 +212,16 @@ Casper supports the following services in the base system:
 .Bl -tag -width "system.random" -compact -offset indent
 .It system.dns
 provides libc compatible DNS API
+.It system.fileargs
+provides an API for opening files specified on a command line
 .It system.grp
 provides a
 .Xr getgrent 3
 compatible API
 .It system.net
 provides a libc compatible network API
+.It system.netdb
+provides libc compatible network proto API
 .It system.pwd
 provides a
 .Xr getpwent 3
@@ -271,8 +274,10 @@ functions always succeed.
 .Xr poll 2 ,
 .Xr select 2 ,
 .Xr cap_dns 3 ,
+.Xr cap_fileargs 3 ,
 .Xr cap_grp 3 ,
 .Xr cap_net 3 ,
+.Xr cap_netdb 3 ,
 .Xr cap_pwd 3 ,
 .Xr cap_sysctl 3 ,
 .Xr cap_syslog 3 ,

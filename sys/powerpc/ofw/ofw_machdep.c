@@ -34,8 +34,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include "opt_platform.h"
 #include <sys/param.h>
 #include <sys/bus.h>
@@ -598,7 +596,7 @@ OF_initial_setup(void *fdt_ptr, void *junk, int (*openfirm)(void *))
 }
 
 boolean_t
-OF_bootstrap()
+OF_bootstrap(void)
 {
 	boolean_t status = FALSE;
 	int err = 0;
@@ -809,7 +807,7 @@ openfirmware(void *args)
 }
 
 void
-OF_reboot()
+OF_reboot(void)
 {
 	struct {
 		cell_t name;

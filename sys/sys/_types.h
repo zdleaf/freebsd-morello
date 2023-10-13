@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2002 Mike Barcroft <mike@FreeBSD.org>
  * All rights reserved.
@@ -24,8 +24,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 #ifndef _SYS__TYPES_H_
@@ -208,13 +206,8 @@ typedef __uintmax_t     __rman_res_t;
  * Types for varargs. These are all provided by builtin types these
  * days, so centralize their definition.
  */
-#ifdef __GNUCLIKE_BUILTIN_VARARGS
 typedef	__builtin_va_list	__va_list;	/* internally known to gcc */
-#else
-#error "No support for your compiler for stdargs"
-#endif
-#if defined(__GNUC_VA_LIST_COMPATIBILITY) && !defined(__GNUC_VA_LIST) \
-    && !defined(__NO_GNUC_VA_LIST)
+#if !defined(__GNUC_VA_LIST) && !defined(__NO_GNUC_VA_LIST)
 #define __GNUC_VA_LIST
 typedef __va_list		__gnuc_va_list;	/* compatibility w/GNU headers*/
 #endif

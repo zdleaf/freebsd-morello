@@ -23,14 +23,10 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 /* Based on sys/arm/ti/ti_sysc.c */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
@@ -127,7 +123,6 @@ static int
 ti_am3359_cppi41_attach(device_t dev)
 {
 	struct ti_am3359_cppi41_softc *sc;
-	phandle_t node;
 	uint32_t reg, reset_bit, timeout=10;
 	uint64_t sysc_address;
 	device_t parent;
@@ -145,7 +140,6 @@ ti_am3359_cppi41_attach(device_t dev)
 	sc->bsh = rman_get_bushandle(sc->res[0]);
 
 	mtx_init(&sc->mtx, device_get_nameunit(sc->dev), NULL, MTX_DEF);
-	node = ofw_bus_get_node(sc->dev);
 
 	/* variant of am335x_usbss.c */
 	DPRINTF(dev, "-- RESET USB --\n");
@@ -182,9 +176,7 @@ DEFINE_CLASS_1(ti_am3359_cppi41, ti_am3359_cppi41_driver,
     ti_am3359_cppi41_methods,sizeof(struct ti_am3359_cppi41_softc),
     simplebus_driver);
 
-static devclass_t ti_am3359_cppi41_devclass;
-
-EARLY_DRIVER_MODULE(ti_am3359_cppi41, simplebus, ti_am3359_cppi41_driver,
-    ti_am3359_cppi41_devclass, 0, 0, BUS_PASS_BUS + BUS_PASS_ORDER_MIDDLE);
+EARLY_DRIVER_MODULE(ti_am3359_cppi41, simplebus, ti_am3359_cppi41_driver, 0, 0,
+    BUS_PASS_BUS + BUS_PASS_ORDER_MIDDLE);
 MODULE_VERSION(ti_am3359_cppi41, 1);
 MODULE_DEPEND(ti_am3359_cppi41, ti_sysc, 1, 1, 1);

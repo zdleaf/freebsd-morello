@@ -2,7 +2,7 @@
 /*	NetBSD: lxtphy.c,v 1.19 2000/02/02 23:34:57 thorpej Exp 	*/
 
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-NetBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 1998, 1999 The NetBSD Foundation, Inc.
  * All rights reserved.
@@ -58,8 +58,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 /*
  * driver for Level One's LXT-970 ethernet 10/100 PHY
  * datasheet from www.level1.com
@@ -96,15 +94,13 @@ static device_method_t lxtphy_methods[] = {
 	DEVMETHOD_END
 };
 
-static devclass_t lxtphy_devclass;
-
 static driver_t lxtphy_driver = {
 	"lxtphy",
 	lxtphy_methods,
 	sizeof(struct mii_softc)
 };
 
-DRIVER_MODULE(lxtphy, miibus, lxtphy_driver, lxtphy_devclass, 0, 0);
+DRIVER_MODULE(lxtphy, miibus, lxtphy_driver, 0, 0);
 
 static int	lxtphy_service(struct mii_softc *, struct mii_data *, int);
 static void	lxtphy_status(struct mii_softc *);

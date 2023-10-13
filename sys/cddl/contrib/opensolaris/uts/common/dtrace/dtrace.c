@@ -17,8 +17,6 @@
  * information: Portions Copyright [yyyy] [name of copyright owner]
  *
  * CDDL HEADER END
- *
- * $FreeBSD$
  */
 
 /*
@@ -516,6 +514,11 @@ do {									\
 #define	DTRACE_INSCRATCH(mstate, alloc_sz) \
 	((mstate)->dtms_scratch_base + (mstate)->dtms_scratch_size - \
 	(mstate)->dtms_scratch_ptr >= (alloc_sz))
+
+#define DTRACE_INSCRATCHPTR(mstate, ptr, howmany) \
+	((ptr) >= (mstate)->dtms_scratch_base && \
+	(ptr) <= \
+	((mstate)->dtms_scratch_base + (mstate)->dtms_scratch_size - (howmany)))
 
 #define	DTRACE_LOADFUNC(bits)						\
 /*CSTYLED*/								\
@@ -3360,30 +3363,19 @@ dtrace_dif_variable(dtrace_mstate_t *mstate, dtrace_state_t *state, uint64_t v,
 
 		return (mstate->dtms_arg[ndx]);
 
-#ifdef illumos
-	case DIF_VAR_UREGS: {
-		klwp_t *lwp;
-
-		if (!dtrace_priv_proc(state))
-			return (0);
-
-		if ((lwp = curthread->t_lwp) == NULL) {
-			DTRACE_CPUFLAG_SET(CPU_DTRACE_BADADDR);
-			cpu_core[curcpu].cpuc_dtrace_illval = NULL;
-			return (0);
-		}
-
-		return (dtrace_getreg(lwp->lwp_regs, ndx));
-		return (0);
-	}
-#else
+	case DIF_VAR_REGS:
 	case DIF_VAR_UREGS: {
 		struct trapframe *tframe;
 
 		if (!dtrace_priv_proc(state))
 			return (0);
 
-		if ((tframe = curthread->td_frame) == NULL) {
+		if (v == DIF_VAR_REGS)
+			tframe = curthread->t_dtrace_trapframe;
+		else
+			tframe = curthread->td_frame;
+
+		if (tframe == NULL) {
 			DTRACE_CPUFLAG_SET(CPU_DTRACE_BADADDR);
 			cpu_core[curcpu].cpuc_dtrace_illval = 0;
 			return (0);
@@ -3391,7 +3383,6 @@ dtrace_dif_variable(dtrace_mstate_t *mstate, dtrace_state_t *state, uint64_t v,
 
 		return (dtrace_getreg(tframe, ndx));
 	}
-#endif
 
 	case DIF_VAR_CURTHREAD:
 		if (!dtrace_priv_proc(state))
@@ -5664,7 +5655,10 @@ dtrace_dif_subr(uint_t subr, uint_t rd, uint64_t *regs,
 		}
 		fdp = curproc->p_fd;
 		FILEDESC_SLOCK(fdp);
-		fp = fget_locked(fdp, fd);
+		/*
+		 * XXXMJG this looks broken as no ref is taken.
+		 */
+		fp = fget_noref(fdp, fd);
 		mstate->dtms_getf = fp;
 		regs[rd] = (uintptr_t)fp;
 		FILEDESC_SUNLOCK(fdp);
@@ -7335,7 +7329,7 @@ dtrace_probe(dtrace_id_t id, uintptr_t arg0, uintptr_t arg1,
 	volatile uint16_t *flags;
 	hrtime_t now;
 
-	if (panicstr != NULL)
+	if (KERNEL_PANICKED())
 		return;
 
 #ifdef illumos
@@ -7366,7 +7360,7 @@ dtrace_probe(dtrace_id_t id, uintptr_t arg0, uintptr_t arg1,
 #ifdef illumos
 	if (panic_quiesce) {
 #else
-	if (panicstr != NULL) {
+	if (KERNEL_PANICKED()) {
 #endif
 		/*
 		 * We don't trace anything if we're panicking.
@@ -7750,8 +7744,23 @@ dtrace_probe(dtrace_id_t id, uintptr_t arg0, uintptr_t arg1,
 			}
 
 			case DTRACEACT_PRINTM: {
-				/* The DIF returns a 'memref'. */
+				/*
+				 * printm() assumes that the DIF returns a
+				 * pointer returned by memref(). memref() is a
+				 * subroutine that is used to get around the
+				 * single-valued returns of DIF and is assumed
+				 * to always be allocated in the scratch space.
+				 * Therefore, we need to validate that the
+				 * pointer given to printm() is in the scratch
+				 * space in order to avoid a potential panic.
+				 */
 				uintptr_t *memref = (uintptr_t *)(uintptr_t) val;
+
+				if (!DTRACE_INSCRATCHPTR(&mstate,
+				    (uintptr_t)memref, 2 * sizeof(uintptr_t))) {
+					*flags |= CPU_DTRACE_BADADDR;
+					continue;
+				}
 
 				/* Get the size from the memref. */
 				size = memref[1];
@@ -9823,7 +9832,7 @@ dtrace_difo_validate(dtrace_difo_t *dp, dtrace_vstate_t *vstate, uint_t nregs,
 			if (rd >= nregs)
 				err += efunc(pc, "invalid register %u\n", rd);
 			if (rd == 0)
-				err += efunc(pc, "cannot write to %r0\n");
+				err += efunc(pc, "cannot write to %%r0\n");
 			break;
 		case DIF_OP_NOT:
 		case DIF_OP_MOV:
@@ -9835,7 +9844,7 @@ dtrace_difo_validate(dtrace_difo_t *dp, dtrace_vstate_t *vstate, uint_t nregs,
 			if (rd >= nregs)
 				err += efunc(pc, "invalid register %u\n", rd);
 			if (rd == 0)
-				err += efunc(pc, "cannot write to %r0\n");
+				err += efunc(pc, "cannot write to %%r0\n");
 			break;
 		case DIF_OP_LDSB:
 		case DIF_OP_LDSH:
@@ -9851,7 +9860,7 @@ dtrace_difo_validate(dtrace_difo_t *dp, dtrace_vstate_t *vstate, uint_t nregs,
 			if (rd >= nregs)
 				err += efunc(pc, "invalid register %u\n", rd);
 			if (rd == 0)
-				err += efunc(pc, "cannot write to %r0\n");
+				err += efunc(pc, "cannot write to %%r0\n");
 			if (kcheckload)
 				dp->dtdo_buf[pc] = DIF_INSTR_LOAD(op +
 				    DIF_OP_RLDSB - DIF_OP_LDSB, r1, rd);
@@ -9870,7 +9879,7 @@ dtrace_difo_validate(dtrace_difo_t *dp, dtrace_vstate_t *vstate, uint_t nregs,
 			if (rd >= nregs)
 				err += efunc(pc, "invalid register %u\n", rd);
 			if (rd == 0)
-				err += efunc(pc, "cannot write to %r0\n");
+				err += efunc(pc, "cannot write to %%r0\n");
 			break;
 		case DIF_OP_ULDSB:
 		case DIF_OP_ULDSH:
@@ -9886,7 +9895,7 @@ dtrace_difo_validate(dtrace_difo_t *dp, dtrace_vstate_t *vstate, uint_t nregs,
 			if (rd >= nregs)
 				err += efunc(pc, "invalid register %u\n", rd);
 			if (rd == 0)
-				err += efunc(pc, "cannot write to %r0\n");
+				err += efunc(pc, "cannot write to %%r0\n");
 			break;
 		case DIF_OP_STB:
 		case DIF_OP_STH:
@@ -9956,7 +9965,7 @@ dtrace_difo_validate(dtrace_difo_t *dp, dtrace_vstate_t *vstate, uint_t nregs,
 			if (rd >= nregs)
 				err += efunc(pc, "invalid register %u\n", rd);
 			if (rd == 0)
-				err += efunc(pc, "cannot write to %r0\n");
+				err += efunc(pc, "cannot write to %%r0\n");
 			break;
 		case DIF_OP_SETS:
 			if (DIF_INSTR_STRING(instr) >= dp->dtdo_strlen) {
@@ -9966,7 +9975,7 @@ dtrace_difo_validate(dtrace_difo_t *dp, dtrace_vstate_t *vstate, uint_t nregs,
 			if (rd >= nregs)
 				err += efunc(pc, "invalid register %u\n", rd);
 			if (rd == 0)
-				err += efunc(pc, "cannot write to %r0\n");
+				err += efunc(pc, "cannot write to %%r0\n");
 			break;
 		case DIF_OP_LDGA:
 		case DIF_OP_LDTA:
@@ -9977,7 +9986,7 @@ dtrace_difo_validate(dtrace_difo_t *dp, dtrace_vstate_t *vstate, uint_t nregs,
 			if (rd >= nregs)
 				err += efunc(pc, "invalid register %u\n", rd);
 			if (rd == 0)
-				err += efunc(pc, "cannot write to %r0\n");
+				err += efunc(pc, "cannot write to %%r0\n");
 			break;
 		case DIF_OP_LDGS:
 		case DIF_OP_LDTS:
@@ -9989,7 +9998,7 @@ dtrace_difo_validate(dtrace_difo_t *dp, dtrace_vstate_t *vstate, uint_t nregs,
 			if (rd >= nregs)
 				err += efunc(pc, "invalid register %u\n", rd);
 			if (rd == 0)
-				err += efunc(pc, "cannot write to %r0\n");
+				err += efunc(pc, "cannot write to %%r0\n");
 			break;
 		case DIF_OP_STGS:
 		case DIF_OP_STTS:
@@ -10007,7 +10016,7 @@ dtrace_difo_validate(dtrace_difo_t *dp, dtrace_vstate_t *vstate, uint_t nregs,
 			if (rd >= nregs)
 				err += efunc(pc, "invalid register %u\n", rd);
 			if (rd == 0)
-				err += efunc(pc, "cannot write to %r0\n");
+				err += efunc(pc, "cannot write to %%r0\n");
 
 			if (subr == DIF_SUBR_COPYOUT ||
 			    subr == DIF_SUBR_COPYOUTSTR) {
@@ -17013,7 +17022,7 @@ dtrace_toxrange_add(uintptr_t base, uintptr_t limit)
 }
 
 static void
-dtrace_getf_barrier()
+dtrace_getf_barrier(void)
 {
 #ifdef illumos
 	/*

@@ -1,4 +1,3 @@
-# $FreeBSD$
 
 .PATH: ${SRCTOP}/sys/contrib/openzfs/module/icp
 .PATH: ${SRCTOP}/sys/contrib/openzfs/module/zcommon
@@ -9,7 +8,7 @@
 .PATH: ${SRCTOP}/sys/contrib/openzfs/module/zstd
 .PATH: ${SRCTOP}/sys/contrib/openzfs/module/zstd/lib
 
-PACKAGE=	runtime
+PACKAGE=	zfs
 LIB=	zfs
 LIBADD= \
 	avl \
@@ -20,6 +19,7 @@ LIBADD= \
 	md \
 	nvpair \
 	pthread \
+	rt \
 	umem \
 	util \
 	uutil \
@@ -55,7 +55,6 @@ USER_C += \
 	os/freebsd/smb.c
 
 KERNEL_C = \
-        algs/sha2/sha2.c \
         cityhash.c \
         zfeature_common.c \
         zfs_comutil.c \
@@ -103,6 +102,6 @@ CFLAGS+= -DHAVE_ISSETUGID
 CFLAGS+= -include ${SRCTOP}/sys/modules/zfs/zfs_config.h
 CFLAGS+= -DSYSCONFDIR=\"/etc\"
 CFLAGS+= -DPKGDATADIR=\"/usr/share/zfs\"
-
+CFLAGS+= -DZFSEXECDIR=\"${LIBEXECDIR}/zfs\"
 
 .include <bsd.lib.mk>

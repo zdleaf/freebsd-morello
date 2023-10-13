@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2005 Bruno Ducrot
  *
@@ -38,8 +38,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/bus.h>
 #include <sys/cpu.h>
@@ -106,8 +104,8 @@ static device_method_t smist_methods[] = {
 static driver_t smist_driver = {
 	"smist", smist_methods, sizeof(struct smist_softc)
 };
-static devclass_t smist_devclass;
-DRIVER_MODULE(smist, cpu, smist_driver, smist_devclass, 0, 0);
+
+DRIVER_MODULE(smist, cpu, smist_driver, 0, 0);
 
 struct piix4_pci_device {
 	uint16_t		 vendor;

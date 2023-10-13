@@ -2,8 +2,6 @@
  * Various routines from the OSTA 2.01 specs.  Copyrights are included with
  * each code segment.  Slight whitespace modifications have been made for
  * formatting purposes.  Typos/bugs have been fixed.
- *
- * $FreeBSD$
  */
 
 #include <fs/udf/osta.h>
@@ -211,9 +209,7 @@ static unsigned short crc_table[256] = {
 };
 
 unsigned short
-udf_cksum(s, n)
-	unsigned char *s;
-	int n;
+udf_cksum(unsigned char *s, int n)
 {
 	unsigned short crc=0;
 
@@ -224,9 +220,7 @@ udf_cksum(s, n)
 
 /* UNICODE Checksum */
 unsigned short
-udf_unicode_cksum(s, n)
-	unsigned short *s;
-	int n;
+udf_unicode_cksum(unsigned short *s, int n)
 {
 	unsigned short crc=0;
 

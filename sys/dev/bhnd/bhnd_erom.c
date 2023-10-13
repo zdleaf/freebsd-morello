@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2016 Landon Fuller <landonf@FreeBSD.org>
  * Copyright (c) 2017 The FreeBSD Foundation
@@ -34,8 +34,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/bus.h>
 #include <sys/kobj.h>
@@ -159,7 +157,7 @@ bhnd_erom_probe_driver_classes(devclass_t bus_devclass,
 
 /**
  * Allocate and return a new device enumeration table parser.
- * 
+ *
  * @param cls		The parser class for which an instance will be
  *			allocated.
  * @param eio		The bus I/O callbacks to use when reading the device
@@ -167,7 +165,7 @@ bhnd_erom_probe_driver_classes(devclass_t bus_devclass,
  * @param cid		The device's chip identifier.
  *
  * @retval non-NULL	success
- * @retval NULL		if an error occured allocating or initializing the
+ * @retval NULL		if an error occurred allocating or initializing the
  *			EROM parser.
  */
 bhnd_erom_t *

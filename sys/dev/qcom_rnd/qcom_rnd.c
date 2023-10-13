@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2021, Adrian Chadd <adrian@FreeBSD.org>
  *
@@ -28,8 +28,6 @@
 /* Driver for Qualcomm MSM entropy device. */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/kernel.h>
 #include <sys/malloc.h>
@@ -247,11 +245,10 @@ static driver_t qcom_rnd_driver = {
 	qcom_rnd_methods,
 	sizeof(struct qcom_rnd_softc)
 };
-static devclass_t qcom_rnd_devclass;
 
-DRIVER_MODULE(qcom_rnd_random, simplebus, qcom_rnd_driver, qcom_rnd_devclass,
+DRIVER_MODULE(qcom_rnd_random, simplebus, qcom_rnd_driver,
     qcom_rnd_modevent, 0);
-DRIVER_MODULE(qcom_rnd_random, ofwbus, qcom_rnd_driver, qcom_rnd_devclass,
+DRIVER_MODULE(qcom_rnd_random, ofwbus, qcom_rnd_driver,
     qcom_rnd_modevent, 0);
 MODULE_DEPEND(qcom_rnd_random, random_device, 1, 1, 1);
 MODULE_VERSION(qcom_rnd_random, 1);

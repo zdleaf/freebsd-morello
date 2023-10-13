@@ -21,8 +21,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 #ifndef _MLX5_FS_
@@ -158,7 +156,7 @@ mlx5_add_flow_rule(struct mlx5_flow_table *ft,
 		   u32 action,
 		   u32 flow_tag,
 		   struct mlx5_flow_destination *dest);
-void mlx5_del_flow_rule(struct mlx5_flow_rule *fr);
+void mlx5_del_flow_rule(struct mlx5_flow_rule **);
 
 /*The following API is for sniffer*/
 typedef int (*rule_event_fn)(struct mlx5_flow_rule *rule,

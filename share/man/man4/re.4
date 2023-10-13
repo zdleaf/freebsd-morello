@@ -28,9 +28,7 @@
 .\" ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
 .\" THE POSSIBILITY OF SUCH DAMAGE.
 .\"
-.\" $FreeBSD$
-.\"
-.Dd September 21, 2016
+.Dd November 7, 2022
 .Dt RE 4
 .Os
 .Sh NAME
@@ -244,7 +242,7 @@ the network connection (cable).
 .Xr ifconfig 8
 .Rs
 .%T RealTek Semiconductor RTL8139C+, RTL8169, RTL8169S and RTL8110S datasheets
-.%U http://www.realtek.com.tw/
+.%U https://www.realtek.com
 .Re
 .Sh HISTORY
 The
@@ -285,3 +283,6 @@ avoid this problem.
 .Pp
 The RealTek 8169, 8169S and 8110S chips appear to only be capable of
 transmitting jumbo frames up to 7.5K in size.
+.Pp
+If this driver is causing problems then an updated driver from
+the vendor can be found in ports under net/realtek-re-kmod.

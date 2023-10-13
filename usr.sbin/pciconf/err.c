@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2012 Hudson River Trading LLC
  * Written by: John H. Baldwin <jhb@FreeBSD.org>
@@ -26,11 +26,6 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-
-#ifndef lint
-static const char rcsid[] =
-    "$FreeBSD$";
-#endif /* not lint */
 
 #include <sys/param.h>
 #include <sys/pciio.h>

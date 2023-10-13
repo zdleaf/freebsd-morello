@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2016, Anish Gupta (anish@freebsd.org)
  * All rights reserved.
@@ -27,8 +27,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/bus.h>
@@ -423,7 +421,7 @@ amdvi_cmd_inv_intr_map(struct amdvi_softc *softc,
 static void
 amdvi_inv_domain(struct amdvi_softc *softc, uint16_t domain_id)
 {
-	struct amdvi_cmd *cmd;
+	struct amdvi_cmd *cmd __diagused;
 
 	cmd = amdvi_get_cmd_tail(softc);
 	KASSERT(cmd != NULL, ("Cmd is NULL"));
@@ -444,13 +442,14 @@ amdvi_inv_domain(struct amdvi_softc *softc, uint16_t domain_id)
 static	bool
 amdvi_cmp_wait(struct amdvi_softc *softc)
 {
-	struct amdvi_ctrl *ctrl;
+#ifdef AMDVI_DEBUG_CMD
+	struct amdvi_ctrl *ctrl = softc->ctrl;
+#endif
 	const uint64_t VERIFY = 0xA5A5;
 	volatile uint64_t *read;
 	int i;
 	bool status;
 
-	ctrl = softc->ctrl;
 	read = &softc->cmp_data;
 	*read = 0;
 	amdvi_cmd_cmp(softc, VERIFY);

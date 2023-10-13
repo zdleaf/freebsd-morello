@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2001,2002,2003 Søren Schmidt <sos@FreeBSD.org>
  * All rights reserved.
@@ -29,8 +29,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
@@ -372,6 +370,4 @@ static driver_t pst_driver = {
     sizeof(struct pst_softc),
 };
 
-static devclass_t pst_devclass;
-
-DRIVER_MODULE(pst, pstpci, pst_driver, pst_devclass, 0, 0);
+DRIVER_MODULE(pst, pstpci, pst_driver, 0, 0);

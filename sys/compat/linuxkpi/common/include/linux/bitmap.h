@@ -22,8 +22,6 @@
  * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 #ifndef _LINUXKPI_LINUX_BITMAP_H_
@@ -286,6 +284,26 @@ bitmap_copy(unsigned long *dst, const unsigned long *src,
 
 	for (i = 0; i != end; i++)
 		dst[i] = src[i];
+}
+
+static inline void
+bitmap_to_arr32(uint32_t *dst, const unsigned long *src, unsigned int size)
+{
+	const unsigned int end = howmany(size, 32);
+
+#ifdef __LP64__
+	unsigned int i = 0;
+	while (i < end) {
+		dst[i++] = (uint32_t)(*src & UINT_MAX);
+		if (i < end)
+			dst[i++] = (uint32_t)(*src >> 32);
+		src++;
+	}
+#else
+	bitmap_copy((unsigned long *)dst, src, size);
+#endif
+	if ((size % 32) != 0) /* Linux uses BITS_PER_LONG. Seems to be a bug */
+		dst[end - 1] &= (uint32_t)(UINT_MAX >> (32 - (size % 32)));
 }
 
 static inline void

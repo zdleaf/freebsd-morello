@@ -26,8 +26,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/bus.h>
 #include <sys/kernel.h>
@@ -194,6 +192,7 @@ t4iov_attach(device_t dev)
 {
 	struct t4iov_softc *sc;
 	uint32_t pl_rev, whoami;
+	int error;
 
 	sc = device_get_softc(dev);
 	sc->sc_dev = dev;
@@ -217,10 +216,18 @@ t4iov_attach(device_t dev)
 
 	sc->sc_main = pci_find_dbsf(pci_get_domain(dev), pci_get_bus(dev),
 	    pci_get_slot(dev), 4);
-	if (sc->sc_main == NULL)
+	if (sc->sc_main == NULL) {
+		bus_release_resource(dev, SYS_RES_MEMORY, sc->regs_rid,
+		    sc->regs_res);
 		return (ENXIO);
-	if (T4_IS_MAIN_READY(sc->sc_main) == 0)
-		return (t4iov_attach_child(dev));
+	}
+	if (T4_IS_MAIN_READY(sc->sc_main) == 0) {
+		error = t4iov_attach_child(dev);
+		if (error != 0)
+			bus_release_resource(dev, SYS_RES_MEMORY, sc->regs_rid,
+			    sc->regs_res);
+		return (error);
+	}
 	return (0);
 }
 
@@ -425,13 +432,11 @@ static driver_t t6iov_driver = {
 	sizeof(struct t4iov_softc)
 };
 
-static devclass_t t4iov_devclass, t5iov_devclass, t6iov_devclass;
-
-DRIVER_MODULE(t4iov, pci, t4iov_driver, t4iov_devclass, 0, 0);
+DRIVER_MODULE(t4iov, pci, t4iov_driver, 0, 0);
 MODULE_VERSION(t4iov, 1);
 
-DRIVER_MODULE(t5iov, pci, t5iov_driver, t5iov_devclass, 0, 0);
+DRIVER_MODULE(t5iov, pci, t5iov_driver, 0, 0);
 MODULE_VERSION(t5iov, 1);
 
-DRIVER_MODULE(t6iov, pci, t6iov_driver, t6iov_devclass, 0, 0);
+DRIVER_MODULE(t6iov, pci, t6iov_driver, 0, 0);
 MODULE_VERSION(t6iov, 1);

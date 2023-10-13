@@ -25,8 +25,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
@@ -85,7 +83,6 @@ static device_method_t ofw_clkbus_methods[] = {
 
 DEFINE_CLASS_1(ofw_clkbus, ofw_clkbus_driver, ofw_clkbus_methods,
     sizeof(struct ofw_clkbus_softc), simplebus_driver);
-static devclass_t ofw_clkbus_devclass;
-EARLY_DRIVER_MODULE(ofw_clkbus, simplebus, ofw_clkbus_driver,
-    ofw_clkbus_devclass, 0, 0, BUS_PASS_BUS + BUS_PASS_ORDER_MIDDLE);
+EARLY_DRIVER_MODULE(ofw_clkbus, simplebus, ofw_clkbus_driver, 0, 0,
+    BUS_PASS_BUS + BUS_PASS_ORDER_MIDDLE);
 MODULE_VERSION(ofw_clkbus, 1);

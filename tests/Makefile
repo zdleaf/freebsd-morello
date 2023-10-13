@@ -1,15 +1,17 @@
-# $FreeBSD$
 
 PACKAGE= tests
 
 TESTSDIR= ${TESTSBASE}
 
-${PACKAGE}FILES+=		README
+${PACKAGE}FILES+=		README __init__.py conftest.py
 
 KYUAFILE= yes
 
 SUBDIR+= etc
+SUBDIR+= examples
+SUBDIR+= include
 SUBDIR+= sys
+SUBDIR+= atf_python
 
 SUBDIR_PARALLEL=
 

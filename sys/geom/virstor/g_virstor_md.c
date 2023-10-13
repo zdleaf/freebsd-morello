@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2005 Ivan Voras <ivoras@freebsd.org>
  * All rights reserved.
@@ -27,8 +27,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/endian.h>
 
@@ -36,7 +34,7 @@ __FBSDID("$FreeBSD$");
 #include <geom/virstor/binstream.h>
 
 /*
- * Encode data from g_virstor_metadata structure into a endian-independant
+ * Encode data from g_virstor_metadata structure into a endian-independent
  * byte stream.
  */
 void
@@ -64,7 +62,7 @@ virstor_metadata_encode(struct g_virstor_metadata *md, unsigned char *data)
 }
 
 /*
- * Decode data from endian-independant byte stream into g_virstor_metadata
+ * Decode data from endian-independent byte stream into g_virstor_metadata
  * structure.
  */
 void

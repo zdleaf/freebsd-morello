@@ -1,5 +1,4 @@
 #	@(#)Makefile	8.2 (Berkeley) 12/13/93
-# $FreeBSD$
 
 .include <src.opts.mk>
 
@@ -27,8 +26,10 @@ MAN=		arb.3 \
 		queue.3 \
 		sigevent.3 \
 		siginfo.3 \
+		snl.3 \
 		stats.3 \
 		stdarg.3 \
+		stdckdint.3 \
 		sysexits.3 \
 		tgmath.3 \
 		timeradd.3 \
@@ -97,13 +98,25 @@ MLINKS+=	ATOMIC_VAR_INIT.3 atomic_compare_exchange_strong.3 \
 		ATOMIC_VAR_INIT.3 atomic_store_explicit.3
 MLINKS+=	bitstring.3 bit_alloc.3 \
 		bitstring.3 bit_clear.3 \
+		bitstring.3 bit_count.3 \
 		bitstring.3 bit_decl.3 \
 		bitstring.3 bit_ffc.3 \
+		bitstring.3 bit_ffc_area.3 \
+		bitstring.3 bit_ffc_area_at.3 \
 		bitstring.3 bit_ffc_at.3 \
 		bitstring.3 bit_ffs.3 \
+		bitstring.3 bit_ffs_area.3 \
+		bitstring.3 bit_ffs_area_at.3 \
 		bitstring.3 bit_ffs_at.3 \
+		bitstring.3 bit_ff_at.3 \
+		bitstring.3 bit_ff_area_at.3 \
+		bitstring.3 bit_foreach.3 \
+		bitstring.3 bit_foreach_at.3 \
+		bitstring.3 bit_foreach_unset.3 \
+		bitstring.3 bit_foreach_unset_at.3 \
 		bitstring.3 bit_nclear.3 \
 		bitstring.3 bit_nset.3 \
+		bitstring.3 bit_ntest.3 \
 		bitstring.3 bit_set.3 \
 		bitstring.3 bitstr_size.3 \
 		bitstring.3 bit_test.3
@@ -298,6 +311,9 @@ MLINKS+=	stdarg.3 va_arg.3 \
 		stdarg.3 va_end.3 \
 		stdarg.3 varargs.3 \
 		stdarg.3 va_start.3
+MLINKS+=	stdckdint.3 ckd_add.3 \
+		stdckdint.3 ckd_sub.3 \
+		stdckdint.3 ckd_mul.3
 MLINKS+=	timeradd.3 timerclear.3 \
 		timeradd.3 timercmp.3 \
 		timeradd.3 timerisset.3 \
@@ -307,7 +323,9 @@ MLINKS+=	timeradd.3 timerclear.3 \
 		timeradd.3 timespecclear.3 \
 		timeradd.3 timespecisset.3 \
 		timeradd.3 timespeccmp.3
-MLINKS+=	tree.3 RB_EMPTY.3 \
+MLINKS+=	tree.3 RB_AUGMENT.3 \
+		tree.3 RB_AUGMENT_CHECK.3 \
+		tree.3 RB_EMPTY.3 \
 		tree.3 RB_ENTRY.3 \
 		tree.3 RB_FIND.3 \
 		tree.3 RB_FOREACH.3 \

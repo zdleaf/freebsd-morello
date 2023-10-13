@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2011 NetApp, Inc.
  * All rights reserved.
@@ -24,13 +24,9 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/kernel.h>
 #include <sys/systm.h>
@@ -117,7 +113,7 @@ struct domain {
 
 static SLIST_HEAD(, domain) domhead;
 
-#define	DRHD_MAX_UNITS	8
+#define	DRHD_MAX_UNITS	16
 static ACPI_DMAR_HARDWARE_UNIT	*drhds[DRHD_MAX_UNITS];
 static int			drhd_num;
 static struct vtdmap		*vtdmaps[DRHD_MAX_UNITS];
@@ -445,6 +441,8 @@ vtd_add_device(void *arg, uint16_t rid)
 	vm_paddr_t pt_paddr;
 	struct vtdmap *vtdmap;
 	uint8_t bus;
+
+	KASSERT(dom != NULL, ("domain is NULL"));
 
 	bus = PCI_RID2BUS(rid);
 	ctxp = ctx_tables[bus];

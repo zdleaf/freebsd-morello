@@ -3,7 +3,7 @@
  */
 
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2001-2002 Maksim Yevmenkin <m_evmenkin@yahoo.com>
  * All rights reserved.
@@ -30,7 +30,6 @@
  * SUCH DAMAGE.
  *
  * $Id: ng_btsocket_l2cap_raw.c,v 1.12 2003/09/14 23:29:06 max Exp $
- * $FreeBSD$
  */
 
 #include <sys/param.h>
@@ -784,7 +783,7 @@ ng_btsocket_l2cap_raw_connect(struct socket *so, struct sockaddr *nam,
  */
 
 int
-ng_btsocket_l2cap_raw_control(struct socket *so, u_long cmd, caddr_t data,
+ng_btsocket_l2cap_raw_control(struct socket *so, u_long cmd, void *data,
 		struct ifnet *ifp, struct thread *td)
 {
 	ng_btsocket_l2cap_raw_pcb_p	 pcb = so2l2cap_raw_pcb(so);

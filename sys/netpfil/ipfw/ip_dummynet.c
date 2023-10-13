@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Codel/FQ_Codel and PIE/FQ-PIE Code:
  * Copyright (C) 2016 Centre for Advanced Internet Architectures,
@@ -35,8 +35,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 /*
  * Configuration and internal object management for dummynet.
  */
@@ -107,6 +105,18 @@ dummynet(void *arg)
 
 	(void)arg;	/* UNUSED */
 	taskqueue_enqueue(dn_tq, &dn_task);
+}
+
+void
+dummynet_sched_lock(void)
+{
+	mtx_lock(&sched_mtx);
+}
+
+void
+dummynet_sched_unlock(void)
+{
+	mtx_unlock(&sched_mtx);
 }
 
 void
@@ -787,7 +797,7 @@ static void
 fsk_detach_list(struct dn_fsk_head *h, int flags)
 {
 	struct dn_fsk *fs;
-	int n = 0; /* only for stats */
+	int n __unused = 0; /* only for stats */
 
 	ND("head %p flags %x", h, flags);
 	while ((fs = SLIST_FIRST(h))) {
@@ -2550,7 +2560,7 @@ ip_dn_vnet_init(void)
 {
 	if (V_dn_cfg.init_done)
 		return;
-	V_dn_cfg.init_done = 1;
+
 	/* Set defaults here. MSVC does not accept initializers,
 	 * and this is also useful for vimages
 	 */
@@ -2589,6 +2599,8 @@ ip_dn_vnet_init(void)
 
 	/* Initialize curr_time adjustment mechanics. */
 	getmicrouptime(&V_dn_cfg.prev_t);
+
+	V_dn_cfg.init_done = 1;
 }
 
 static void

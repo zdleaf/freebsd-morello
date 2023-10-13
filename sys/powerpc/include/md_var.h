@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 1998 Doug Rabson
  * All rights reserved.
@@ -24,8 +24,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 #ifndef _MACHINE_MD_VAR_H_
@@ -58,7 +56,6 @@ extern  int hw_direct_map;
 
 void	__syncicache(void *, int);
 
-int	is_physical_memory(vm_offset_t addr);
 int	mem_valid(vm_offset_t addr, int len);
 
 void	decr_init(void);

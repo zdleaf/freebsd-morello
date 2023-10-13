@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2006 Marcel Moolenaar
  * All rights reserved.
@@ -27,8 +27,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/bus.h>
@@ -93,4 +91,4 @@ static driver_t scc_macio_driver = {
 	sizeof(struct scc_softc),
 };
 
-DRIVER_MODULE(scc, macio, scc_macio_driver, scc_devclass, NULL, NULL);
+DRIVER_MODULE(scc, macio, scc_macio_driver, NULL, NULL);

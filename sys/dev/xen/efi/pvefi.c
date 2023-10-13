@@ -25,8 +25,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/efi.h>
 #include <sys/eventhandler.h>
@@ -41,7 +39,7 @@ __FBSDID("$FreeBSD$");
 #include <xen/error.h>
 #include <xen/hypervisor.h>
 
-#include <xen/interface/platform.h>
+#include <contrib/xen/platform.h>
 
 extern char bootmethod[16];
 

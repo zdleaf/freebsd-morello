@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (C) 2011-2014 Matteo Landi
  * Copyright (C) 2011-2016 Luigi Rizzo
@@ -31,7 +31,6 @@
 
 
 /*
- * $FreeBSD$
  *
  * This module supports memory mapped access to network devices,
  * see netmap(4).
@@ -637,7 +636,7 @@ netmap_set_all_rings(struct netmap_adapter *na, int stopped)
  * onload).
  */
 void
-netmap_disable_all_rings(struct ifnet *ifp)
+netmap_disable_all_rings(if_t ifp)
 {
 	if (NM_NA_VALID(ifp)) {
 		netmap_set_all_rings(NA(ifp), NM_KR_LOCKED);
@@ -650,7 +649,7 @@ netmap_disable_all_rings(struct ifnet *ifp)
  * napi_enable().
  */
 void
-netmap_enable_all_rings(struct ifnet *ifp)
+netmap_enable_all_rings(if_t ifp)
 {
 	if (NM_NA_VALID(ifp)) {
 		netmap_set_all_rings(NA(ifp), 0 /* enabled */);
@@ -658,7 +657,7 @@ netmap_enable_all_rings(struct ifnet *ifp)
 }
 
 void
-netmap_make_zombie(struct ifnet *ifp)
+netmap_make_zombie(if_t ifp)
 {
 	if (NM_NA_VALID(ifp)) {
 		struct netmap_adapter *na = NA(ifp);
@@ -669,7 +668,7 @@ netmap_make_zombie(struct ifnet *ifp)
 }
 
 void
-netmap_undo_zombie(struct ifnet *ifp)
+netmap_undo_zombie(if_t ifp)
 {
 	if (NM_NA_VALID(ifp)) {
 		struct netmap_adapter *na = NA(ifp);
@@ -762,6 +761,10 @@ int
 netmap_update_config(struct netmap_adapter *na)
 {
 	struct nm_config_info info;
+
+	if (na->ifp && !nm_is_bwrap(na)) {
+		strlcpy(na->name, if_name(na->ifp), sizeof(na->name));
+	}
 
 	bzero(&info, sizeof(info));
 	if (na->nm_config == NULL ||
@@ -994,10 +997,12 @@ netmap_mem_restore(struct netmap_adapter *na)
 static void
 netmap_mem_drop(struct netmap_adapter *na)
 {
-	/* if the native allocator had been overridden on regif,
-	 * restore it now and drop the temporary one
-	 */
-	if (netmap_mem_deref(na->nm_mem, na)) {
+	netmap_mem_deref(na->nm_mem, na);
+
+	if (na->active_fds <= 0) {
+		/* if the native allocator had been overridden on regif,
+		 * restore it now and drop the temporary one
+		 */
 		netmap_mem_restore(na);
 	}
 }
@@ -1188,7 +1193,7 @@ netmap_dtor(void *data)
  * After this call the queue is empty.
  */
 static void
-netmap_send_up(struct ifnet *dst, struct mbq *q)
+netmap_send_up(if_t dst, struct mbq *q)
 {
 	struct mbuf *m;
 	struct mbuf *head = NULL, *prev = NULL;
@@ -1459,7 +1464,7 @@ netmap_rxsync_from_host(struct netmap_kring *kring, int flags)
  */
 static void netmap_hw_dtor(struct netmap_adapter *); /* needed by NM_IS_NATIVE() */
 int
-netmap_get_hw_na(struct ifnet *ifp, struct netmap_mem_d *nmd, struct netmap_adapter **na)
+netmap_get_hw_na(if_t ifp, struct netmap_mem_d *nmd, struct netmap_adapter **na)
 {
 	/* generic support */
 	int i = netmap_admode;	/* Take a snapshot. */
@@ -1549,7 +1554,7 @@ assign_mem:
  */
 int
 netmap_get_na(struct nmreq_header *hdr,
-	      struct netmap_adapter **na, struct ifnet **ifp,
+	      struct netmap_adapter **na, if_t *ifp,
 	      struct netmap_mem_d *nmd, int create)
 {
 	struct nmreq_register *req = (struct nmreq_register *)(uintptr_t)hdr->nr_body;
@@ -1665,7 +1670,7 @@ out:
 
 /* undo netmap_get_na() */
 void
-netmap_unget_na(struct netmap_adapter *na, struct ifnet *ifp)
+netmap_unget_na(struct netmap_adapter *na, if_t ifp)
 {
 	if (ifp)
 		if_rele(ifp);
@@ -1704,8 +1709,8 @@ netmap_unget_na(struct netmap_adapter *na, struct ifnet *ifp)
 u_int
 nm_txsync_prologue(struct netmap_kring *kring, struct netmap_ring *ring)
 {
-	u_int head = ring->head; /* read only once */
-	u_int cur = ring->cur; /* read only once */
+	u_int head = NM_ACCESS_ONCE(ring->head);
+	u_int cur = NM_ACCESS_ONCE(ring->cur);
 	u_int n = kring->nkr_num_slots;
 
 	nm_prdis(5, "%s kcur %d ktail %d head %d cur %d tail %d",
@@ -1782,8 +1787,8 @@ nm_rxsync_prologue(struct netmap_kring *kring, struct netmap_ring *ring)
 	 * - cur could in principle go back, however it does not matter
 	 *   because we are processing a brand new rxsync()
 	 */
-	cur = kring->rcur = ring->cur;	/* read only once */
-	head = kring->rhead = ring->head;	/* read only once */
+	cur = kring->rcur = NM_ACCESS_ONCE(ring->cur);
+	head = kring->rhead = NM_ACCESS_ONCE(ring->head);
 #if 1 /* kernel sanity checks */
 	NM_FAIL_ON(kring->nr_hwcur >= n || kring->nr_hwtail >= n);
 #endif /* kernel sanity checks */
@@ -2250,12 +2255,12 @@ netmap_buf_size_validate(const struct netmap_adapter *na, unsigned mtu) {
 			nm_prerr("error: large MTU (%d) needed "
 				 "but %s does not support "
 				 "NS_MOREFRAG", mtu,
-				 na->ifp->if_xname);
+				 if_name(na->ifp));
 			return EINVAL;
 		} else if (nbs < na->rx_buf_maxsize) {
 			nm_prerr("error: using NS_MOREFRAG on "
 				 "%s requires netmap buf size "
-				 ">= %u", na->ifp->if_xname,
+				 ">= %u", if_name(na->ifp),
 				 na->rx_buf_maxsize);
 			return EINVAL;
 		} else {
@@ -2263,7 +2268,7 @@ netmap_buf_size_validate(const struct netmap_adapter *na, unsigned mtu) {
 				 "%s needs to support "
 				 "NS_MOREFRAG "
 				 "(MTU=%u,netmap_buf_size=%u)",
-				 na->ifp->if_xname, mtu, nbs);
+				 if_name(na->ifp), mtu, nbs);
 		}
 	}
 	return 0;
@@ -2738,7 +2743,7 @@ netmap_ioctl(struct netmap_priv_d *priv, u_long cmd, caddr_t data,
 	struct mbq q;	/* packets from RX hw queues to host stack */
 	struct netmap_adapter *na = NULL;
 	struct netmap_mem_d *nmd = NULL;
-	struct ifnet *ifp = NULL;
+	if_t ifp = NULL;
 	int error = 0;
 	u_int i, qfirst, qlast;
 	struct netmap_kring **krings;
@@ -3033,7 +3038,7 @@ netmap_ioctl(struct netmap_priv_d *priv, u_long cmd, caddr_t data,
 			/* Build a nmreq_register out of the nmreq_port_hdr,
 			 * so that we can call netmap_get_bdg_na(). */
 			struct nmreq_register regreq;
-			struct ifnet *ifp;
+			if_t ifp;
 
 			bzero(&regreq, sizeof(regreq));
 			regreq.nr_mode = NR_REG_ALL_NIC;
@@ -3363,8 +3368,7 @@ nmreq_copyin(struct nmreq_header *hdr, int nr_body_is_user)
 	size_t rqsz, optsz, bufsz;
 	int error = 0;
 	char *ker = NULL, *p;
-	struct nmreq_option **next, *src, **opt_tab;
-	struct nmreq_option buf;
+	struct nmreq_option **next, *src, **opt_tab, *opt;
 	uint64_t *ptrs;
 
 	if (hdr->nr_reserved) {
@@ -3394,29 +3398,14 @@ nmreq_copyin(struct nmreq_header *hdr, int nr_body_is_user)
 		goto out_err;
 	}
 
-	bufsz = 2 * sizeof(void *) + rqsz +
-		NETMAP_REQ_OPT_MAX * sizeof(opt_tab);
-	/* compute the size of the buf below the option table.
-	 * It must contain a copy of every received option structure.
-	 * For every option we also need to store a copy of the user
-	 * list pointer.
+	/*
+	 * The buffer size must be large enough to store the request body,
+	 * all the possible options and the additional user pointers
+	 * (2+NETMAP_REQ_OPT_MAX). Note that the maximum size of body plus
+	 * options can not exceed NETMAP_REQ_MAXSIZE;
 	 */
-	optsz = 0;
-	for (src = (struct nmreq_option *)(uintptr_t)hdr->nr_options; src;
-	     src = (struct nmreq_option *)(uintptr_t)buf.nro_next)
-	{
-		error = copyin(src, &buf, sizeof(*src));
-		if (error)
-			goto out_err;
-		optsz += sizeof(*src);
-		optsz += nmreq_opt_size_by_type(buf.nro_reqtype, buf.nro_size);
-		if (rqsz + optsz > NETMAP_REQ_MAXSIZE) {
-			error = EMSGSIZE;
-			goto out_err;
-		}
-		bufsz += sizeof(void *);
-	}
-	bufsz += optsz;
+	bufsz = (2 + NETMAP_REQ_OPT_MAX) * sizeof(void *) + NETMAP_REQ_MAXSIZE +
+		NETMAP_REQ_OPT_MAX * sizeof(opt_tab);
 
 	ker = nm_os_malloc(bufsz);
 	if (ker == NULL) {
@@ -3430,39 +3419,56 @@ nmreq_copyin(struct nmreq_header *hdr, int nr_body_is_user)
 	*ptrs++ = hdr->nr_body;
 	*ptrs++ = hdr->nr_options;
 	p = (char *)ptrs;
-
-	/* copy the body */
-	error = copyin((void *)(uintptr_t)hdr->nr_body, p, rqsz);
-	if (error)
-		goto out_restore;
 	/* overwrite the user pointer with the in-kernel one */
 	hdr->nr_body = (uintptr_t)p;
+	/* prepare the options-list pointers and temporarily terminate
+	 * the in-kernel list, in case we have to jump to out_restore
+	 */
+	next = (struct nmreq_option **)&hdr->nr_options;
+	src = *next;
+	hdr->nr_options = 0;
+
+	/* copy the body */
+	error = copyin(*(void **)ker, p, rqsz);
+	if (error)
+		goto out_restore;
 	p += rqsz;
 	/* start of the options table */
 	opt_tab = (struct nmreq_option **)p;
 	p += sizeof(opt_tab) * NETMAP_REQ_OPT_MAX;
 
 	/* copy the options */
-	next = (struct nmreq_option **)&hdr->nr_options;
-	src = *next;
 	while (src) {
-		struct nmreq_option *opt;
+		struct nmreq_option *nsrc;
 
+		if (p - ker + sizeof(uint64_t*) + sizeof(*src) > bufsz) {
+			error = EMSGSIZE;
+			/* there might be a loop in the list: don't try to
+			 * copyout the options
+			 */
+			hdr->nr_options = 0;
+			goto out_restore;
+		}
 		/* copy the option header */
 		ptrs = (uint64_t *)p;
 		opt = (struct nmreq_option *)(ptrs + 1);
 		error = copyin(src, opt, sizeof(*src));
 		if (error)
 			goto out_restore;
+		rqsz += sizeof(*src);
+		p = (char *)(opt + 1);
+
 		/* make a copy of the user next pointer */
 		*ptrs = opt->nro_next;
-		/* overwrite the user pointer with the in-kernel one */
+		/* append the option to the in-kernel list */
 		*next = opt;
-
-		/* initialize the option as not supported.
-		 * Recognized options will update this field.
+		/* temporarily teminate the in-kernel list, in case we have to
+		 * jump to out_restore
 		 */
-		opt->nro_status = EOPNOTSUPP;
+		nsrc = (struct nmreq_option *)opt->nro_next;
+		opt->nro_next = 0;
+
+		opt->nro_status = 0;
 
 		/* check for invalid types */
 		if (opt->nro_reqtype < 1) {
@@ -3470,12 +3476,11 @@ nmreq_copyin(struct nmreq_header *hdr, int nr_body_is_user)
 				nm_prinf("invalid option type: %u", opt->nro_reqtype);
 			opt->nro_status = EINVAL;
 			error = EINVAL;
-			goto next;
+			goto out_restore;
 		}
 
 		if (opt->nro_reqtype >= NETMAP_REQ_OPT_MAX) {
-			/* opt->nro_status is already EOPNOTSUPP */
-			error = EOPNOTSUPP;
+			/* opt->nro_status will be set to EOPNOTSUPP */
 			goto next;
 		}
 
@@ -3488,15 +3493,21 @@ nmreq_copyin(struct nmreq_header *hdr, int nr_body_is_user)
 			opt->nro_status = EINVAL;
 			opt_tab[opt->nro_reqtype]->nro_status = EINVAL;
 			error = EINVAL;
-			goto next;
+			goto out_restore;
 		}
 		opt_tab[opt->nro_reqtype] = opt;
-
-		p = (char *)(opt + 1);
 
 		/* copy the option body */
 		optsz = nmreq_opt_size_by_type(opt->nro_reqtype,
 						opt->nro_size);
+		/* check optsz and nro_size to avoid for possible integer overflows of rqsz */
+		if ((optsz > NETMAP_REQ_MAXSIZE) || (opt->nro_size > NETMAP_REQ_MAXSIZE)
+				|| (rqsz + optsz > NETMAP_REQ_MAXSIZE)
+				|| (optsz > 0 && rqsz + optsz <= rqsz)) {
+			error = EMSGSIZE;
+			goto out_restore;
+		}
+		rqsz += optsz;
 		if (optsz) {
 			/* the option body follows the option header */
 			error = copyin(src + 1, p, optsz);
@@ -3508,18 +3519,20 @@ nmreq_copyin(struct nmreq_header *hdr, int nr_body_is_user)
 	next:
 		/* move to next option */
 		next = (struct nmreq_option **)&opt->nro_next;
-		src = *next;
+		src = nsrc;
 	}
-	if (error)
-		nmreq_copyout(hdr, error);
-	return error;
+
+	/* initialize all the options as not supported.  Recognized options
+	 * will update their field.
+	 */
+	for (src = (struct nmreq_option *)hdr->nr_options; src;
+			src = (struct nmreq_option *)src->nro_next) {
+		src->nro_status = EOPNOTSUPP;
+	}
+	return 0;
 
 out_restore:
-	ptrs = (uint64_t *)ker;
-	hdr->nr_body = *ptrs++;
-	hdr->nr_options = *ptrs++;
-	hdr->nr_reserved = 0;
-	nm_os_free(ker);
+	nmreq_copyout(hdr, error);
 out_err:
 	return error;
 }
@@ -3974,7 +3987,7 @@ netmap_attach_common(struct netmap_adapter *na)
 
 #ifdef __FreeBSD__
 	if (na->na_flags & NAF_HOST_RINGS && na->ifp) {
-		na->if_input = na->ifp->if_input; /* for netmap_send_up */
+		na->if_input = if_getinputfn(na->ifp); /* for netmap_send_up */
 	}
 	na->pdev = na; /* make sure netmap_mem_map() is called */
 #endif /* __FreeBSD__ */
@@ -4064,7 +4077,7 @@ int
 netmap_attach_ext(struct netmap_adapter *arg, size_t size, int override_reg)
 {
 	struct netmap_hw_adapter *hwna = NULL;
-	struct ifnet *ifp = NULL;
+	if_t ifp = NULL;
 
 	if (size < sizeof(struct netmap_hw_adapter)) {
 		if (netmap_debug & NM_DEBUG_ON)
@@ -4100,7 +4113,7 @@ netmap_attach_ext(struct netmap_adapter *arg, size_t size, int override_reg)
 		goto fail;
 	hwna->up = *arg;
 	hwna->up.na_flags |= NAF_HOST_RINGS | NAF_NATIVE;
-	strlcpy(hwna->up.name, ifp->if_xname, sizeof(hwna->up.name));
+	strlcpy(hwna->up.name, if_name(ifp), sizeof(hwna->up.name));
 	if (override_reg) {
 		hwna->nm_hw_register = hwna->up.nm_register;
 		hwna->up.nm_register = netmap_hw_reg;
@@ -4198,7 +4211,7 @@ netmap_hw_krings_create(struct netmap_adapter *na)
  * Called on module unload by the netmap-enabled drivers
  */
 void
-netmap_detach(struct ifnet *ifp)
+netmap_detach(if_t ifp)
 {
 	struct netmap_adapter *na;
 
@@ -4244,7 +4257,7 @@ netmap_detach(struct ifnet *ifp)
  * we make sure to make the mode change visible here.
  */
 int
-netmap_transmit(struct ifnet *ifp, struct mbuf *m)
+netmap_transmit(if_t ifp, struct mbuf *m)
 {
 	struct netmap_adapter *na = NA(ifp);
 	struct netmap_kring *kring, *tx_kring;
@@ -4330,8 +4343,10 @@ netmap_transmit(struct ifnet *ifp, struct mbuf *m)
 	mbq_unlock(q);
 
 done:
-	if (m)
+	if (m) {
+		if_inc_counter(ifp, IFCOUNTER_OQDROPS, 1);
 		m_freem(m);
+	}
 	/* unconditionally wake up listeners */
 	kring->nm_notify(kring, 0);
 	/* this is normally netmap_notify(), but for nics
@@ -4482,7 +4497,7 @@ netmap_common_irq(struct netmap_adapter *na, u_int q, u_int *work_done)
  * calls the proper forwarding routine.
  */
 int
-netmap_rx_irq(struct ifnet *ifp, u_int q, u_int *work_done)
+netmap_rx_irq(if_t ifp, u_int q, u_int *work_done)
 {
 	struct netmap_adapter *na = NA(ifp);
 
@@ -4507,7 +4522,7 @@ netmap_rx_irq(struct ifnet *ifp, u_int q, u_int *work_done)
 void
 nm_set_native_flags(struct netmap_adapter *na)
 {
-	struct ifnet *ifp = na->ifp;
+	if_t ifp = na->ifp;
 
 	/* We do the setup for intercepting packets only if we are the
 	 * first user of this adapter. */
@@ -4523,7 +4538,7 @@ nm_set_native_flags(struct netmap_adapter *na)
 void
 nm_clear_native_flags(struct netmap_adapter *na)
 {
-	struct ifnet *ifp = na->ifp;
+	if_t ifp = na->ifp;
 
 	/* We undo the setup for intercepting packets only if we are the
 	 * last user of this adapter. */

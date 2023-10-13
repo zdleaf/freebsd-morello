@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (C) 1996
  *	David L. Nugent.  All rights reserved.
@@ -25,11 +25,6 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-
-#ifndef lint
-static const char rcsid[] =
-  "$FreeBSD$";
-#endif /* not lint */
 
 #include <ctype.h>
 #include <err.h>
@@ -128,8 +123,8 @@ parse_datesub(char const * str, struct tm *t)
 
 	l = newlocale(LC_ALL_MASK, "C", NULL);
 
-	memset(&tm, 0, sizeof(tm));
 	for (i=0; valid_formats[i] != NULL; i++) {
+		memset(&tm, 0, sizeof(tm));
 		ret = strptime_l(str, valid_formats[i], &tm, l);
 		if (ret && *ret == '\0') {
 			t->tm_mday = tm.tm_mday;

@@ -26,10 +26,8 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 /*
- * Machine-independant ISA PnP enumerator implementing a subset of the
+ * Machine-independent ISA PnP enumerator implementing a subset of the
  * ISA PnP specification.
  */
 #include <stand.h>

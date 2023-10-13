@@ -23,13 +23,9 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/conf.h>
@@ -289,8 +285,6 @@ static driver_t mpc85xx_gpio_driver = {
 	mpc85xx_gpio_methods,
 	sizeof(struct mpc85xx_gpio_softc),
 };
-static devclass_t mpc85xx_gpio_devclass;
 
-EARLY_DRIVER_MODULE(mpc85xx_gpio, simplebus, mpc85xx_gpio_driver,
-    mpc85xx_gpio_devclass, NULL, NULL,
+EARLY_DRIVER_MODULE(mpc85xx_gpio, simplebus, mpc85xx_gpio_driver, NULL, NULL,
     BUS_PASS_RESOURCE + BUS_PASS_ORDER_MIDDLE);

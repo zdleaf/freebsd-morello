@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright 2013 Nathan Whitehorn
  * All rights reserved.
@@ -27,8 +27,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/sockio.h>
@@ -127,19 +125,20 @@ static void	llan_rx_load_cb(void *xsc, bus_dma_segment_t *segs, int nsegs,
 static int	llan_add_rxbuf(struct llan_softc *sc, struct llan_xfer *rx);
 static int	llan_set_multicast(struct llan_softc *sc);
 
-static devclass_t       llan_devclass;
 static device_method_t  llan_methods[] = {
         DEVMETHOD(device_probe,         llan_probe),
         DEVMETHOD(device_attach,        llan_attach),
         
         DEVMETHOD_END
 };
+
 static driver_t llan_driver = {
         "llan",
         llan_methods,
         sizeof(struct llan_softc)
 };
-DRIVER_MODULE(llan, vdevice, llan_driver, llan_devclass, 0, 0);
+
+DRIVER_MODULE(llan, vdevice, llan_driver, 0, 0);
 
 static int
 llan_probe(device_t dev)
@@ -156,7 +155,7 @@ llan_attach(device_t dev)
 {
 	struct llan_softc *sc;
 	phandle_t node;
-	int error, i;
+	int i;
 	ssize_t len;
 
 	sc = device_get_softc(dev);
@@ -193,22 +192,22 @@ llan_attach(device_t dev)
 	    INTR_ENTROPY, NULL, llan_intr, sc, &sc->irq_cookie);
 
 	/* Setup DMA */
-	error = bus_dma_tag_create(bus_get_dma_tag(dev), 16, 0,
+	bus_dma_tag_create(bus_get_dma_tag(dev), 16, 0,
             BUS_SPACE_MAXADDR, BUS_SPACE_MAXADDR, NULL, NULL,
 	    LLAN_RX_BUF_LEN, 1, BUS_SPACE_MAXSIZE_32BIT,
 	    0, NULL, NULL, &sc->rx_dma_tag);
-	error = bus_dma_tag_create(bus_get_dma_tag(dev), 4, 0,
+	bus_dma_tag_create(bus_get_dma_tag(dev), 4, 0,
             BUS_SPACE_MAXADDR, BUS_SPACE_MAXADDR, NULL, NULL,
 	    BUS_SPACE_MAXSIZE, 1, BUS_SPACE_MAXSIZE_32BIT,
 	    0, NULL, NULL, &sc->rxbuf_dma_tag);
-	error = bus_dma_tag_create(bus_get_dma_tag(dev), 1, 0,
+	bus_dma_tag_create(bus_get_dma_tag(dev), 1, 0,
             BUS_SPACE_MAXADDR_32BIT, BUS_SPACE_MAXADDR, NULL, NULL,
 	    BUS_SPACE_MAXSIZE, 6, BUS_SPACE_MAXSIZE_32BIT, 0,
 	    busdma_lock_mutex, &sc->io_lock, &sc->tx_dma_tag);
 
-	error = bus_dmamem_alloc(sc->rx_dma_tag, (void **)&sc->rx_buf,
+	bus_dmamem_alloc(sc->rx_dma_tag, (void **)&sc->rx_buf,
 	    BUS_DMA_WAITOK | BUS_DMA_ZERO, &sc->rx_buf_map);
-	error = bus_dmamap_load(sc->rx_dma_tag, sc->rx_buf_map, sc->rx_buf,
+	bus_dmamap_load(sc->rx_dma_tag, sc->rx_buf_map, sc->rx_buf,
 	    LLAN_RX_BUF_LEN, llan_rx_load_cb, sc, 0);
 
 	/* TX DMA maps */
@@ -216,33 +215,32 @@ llan_attach(device_t dev)
 
 	/* RX DMA */
 	for (i = 0; i < LLAN_MAX_RX_PACKETS; i++) {
-		error = bus_dmamap_create(sc->rxbuf_dma_tag, 0,
+		bus_dmamap_create(sc->rxbuf_dma_tag, 0,
 		    &sc->rx_xfer[i].rx_dmamap);
 		sc->rx_xfer[i].rx_mbuf = NULL;
 	}
 
 	/* Attach to network stack */
 	sc->ifp = if_alloc(IFT_ETHER);
-	sc->ifp->if_softc = sc;
+	if_setsoftc(sc->ifp, sc);
 
 	if_initname(sc->ifp, device_get_name(dev), device_get_unit(dev));
-	sc->ifp->if_mtu = ETHERMTU; /* XXX max-frame-size from OF? */
-	sc->ifp->if_flags = IFF_BROADCAST | IFF_SIMPLEX | IFF_MULTICAST;
-	sc->ifp->if_hwassist = 0; /* XXX: ibm,illan-options */
-	sc->ifp->if_capabilities = 0;
-	sc->ifp->if_capenable = 0;
-	sc->ifp->if_start = llan_start;
-	sc->ifp->if_ioctl = llan_ioctl;
-	sc->ifp->if_init = llan_init;
+	if_setmtu(sc->ifp, ETHERMTU); /* XXX max-frame-size from OF? */
+	if_setflags(sc->ifp, IFF_BROADCAST | IFF_SIMPLEX | IFF_MULTICAST);
+	if_sethwassist(sc->ifp, 0); /* XXX: ibm,illan-options */
+	if_setcapabilities(sc->ifp, 0);
+	if_setcapenable(sc->ifp, 0);
+	if_setstartfn(sc->ifp, llan_start);
+	if_setioctlfn(sc->ifp, llan_ioctl);
+	if_setinitfn(sc->ifp, llan_init);
 
 	ifmedia_init(&sc->media, IFM_IMASK, llan_media_change,
 	    llan_media_status);
 	ifmedia_add(&sc->media, IFM_ETHER | IFM_AUTO, 0, NULL);
 	ifmedia_set(&sc->media, IFM_ETHER | IFM_AUTO);
 
-	IFQ_SET_MAXLEN(&sc->ifp->if_snd, LLAN_MAX_TX_PACKETS);
-	sc->ifp->if_snd.ifq_drv_maxlen = LLAN_MAX_TX_PACKETS;
-	IFQ_SET_READY(&sc->ifp->if_snd);
+	if_setsendqlen(sc->ifp, LLAN_MAX_RX_PACKETS);
+	if_setsendqready(sc->ifp);
 
 	ether_ifattach(sc->ifp, &sc->mac_address[2]);
 
@@ -255,7 +253,7 @@ llan_attach(device_t dev)
 static int
 llan_media_change(struct ifnet *ifp)
 {
-	struct llan_softc *sc = ifp->if_softc;
+	struct llan_softc *sc = if_getsoftc(ifp);
 
 	if (IFM_TYPE(sc->media.ifm_media) != IFM_ETHER)
 		return (EINVAL);
@@ -291,7 +289,7 @@ llan_init(void *xsc)
 	struct llan_softc *sc = xsc;
 	uint64_t rx_buf_desc;
 	uint64_t macaddr;
-	int err, i;
+	int i;
 
 	mtx_lock(&sc->io_lock);
 
@@ -305,7 +303,7 @@ llan_init(void *xsc)
 	rx_buf_desc |= (sc->rx_buf_len << 32);
 	rx_buf_desc |= sc->rx_buf_phys;
 	memcpy(&macaddr, sc->mac_address, 8);
-	err = phyp_hcall(H_REGISTER_LOGICAL_LAN, sc->unit, sc->input_buf_phys,
+	phyp_hcall(H_REGISTER_LOGICAL_LAN, sc->unit, sc->input_buf_phys,
 	    rx_buf_desc, sc->filter_buf_phys, macaddr);
 
 	for (i = 0; i < LLAN_MAX_RX_PACKETS; i++)
@@ -314,8 +312,7 @@ llan_init(void *xsc)
 	phyp_hcall(H_VIO_SIGNAL, sc->unit, 1); /* Enable interrupts */
 
 	/* Tell stack we're up */
-	sc->ifp->if_drv_flags |= IFF_DRV_RUNNING;
-	sc->ifp->if_drv_flags &= ~IFF_DRV_OACTIVE;
+	if_setdrvflagbits(sc->ifp, IFF_DRV_RUNNING, IFF_DRV_OACTIVE);
 
 	mtx_unlock(&sc->io_lock);
 
@@ -411,7 +408,7 @@ restart:
 		}
 
 		mtx_unlock(&sc->io_lock);
-		(*sc->ifp->if_input)(sc->ifp, m);
+		if_input(sc->ifp, m);
 		mtx_lock(&sc->io_lock);
 	}
 
@@ -461,20 +458,18 @@ llan_send_packet(void *xsc, bus_dma_segment_t *segs, int nsegs,
 static void
 llan_start_locked(struct ifnet *ifp)
 {
-	struct llan_softc *sc = ifp->if_softc;
-	bus_addr_t first;
+	struct llan_softc *sc = if_getsoftc(ifp);
 	int nsegs;
 	struct mbuf *mb_head, *m;
 
 	mtx_assert(&sc->io_lock, MA_OWNED);
-	first = 0;
 
-	if ((ifp->if_drv_flags & (IFF_DRV_RUNNING | IFF_DRV_OACTIVE)) !=
+	if ((if_getdrvflags(ifp) & (IFF_DRV_RUNNING | IFF_DRV_OACTIVE)) !=
 	    IFF_DRV_RUNNING)
 		return;
 
-	while (!IFQ_DRV_IS_EMPTY(&ifp->if_snd)) {
-		IFQ_DRV_DEQUEUE(&ifp->if_snd, mb_head);
+	while (!if_sendq_empty(ifp)) {
+		mb_head = if_dequeue(ifp);
 
 		if (mb_head == NULL)
 			break;
@@ -501,7 +496,7 @@ llan_start_locked(struct ifnet *ifp)
 static void
 llan_start(struct ifnet *ifp)
 {
-	struct llan_softc *sc = ifp->if_softc;
+	struct llan_softc *sc = if_getsoftc(ifp);
 
 	mtx_lock(&sc->io_lock);
 	llan_start_locked(ifp);
@@ -538,13 +533,13 @@ static int
 llan_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 {
 	int err = 0;
-	struct llan_softc *sc = ifp->if_softc;
+	struct llan_softc *sc = if_getsoftc(ifp);
 
 	switch (cmd) {
 	case SIOCADDMULTI:
 	case SIOCDELMULTI:
 		mtx_lock(&sc->io_lock);
-		if ((sc->ifp->if_drv_flags & IFF_DRV_RUNNING) != 0)
+		if ((if_getdrvflags(sc->ifp) & IFF_DRV_RUNNING) != 0)
 			llan_set_multicast(sc);
 		mtx_unlock(&sc->io_lock);
 		break;

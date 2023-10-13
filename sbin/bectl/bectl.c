@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2017 Kyle J. Kneitinger <kyle@kneit.in>
  *
@@ -26,8 +26,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/mount.h>
 #include <errno.h>
@@ -69,23 +67,23 @@ usage(bool explicit)
 	fprintf(fp, "%s",
 	    "Usage:\tbectl {-h | -? | subcommand [args...]}\n"
 #if SOON
-	    "\tbectl add (path)*\n"
+	    "\tbectl [-r beroot] add (path)*\n"
 #endif
-	    "\tbectl activate [-t] beName\n"
-	    "\tbectl activate [-T]\n"
-	    "\tbectl check\n"
-	    "\tbectl create [-r] [-e {nonActiveBe | beName@snapshot}] beName\n"
-	    "\tbectl create [-r] beName@snapshot\n"
-	    "\tbectl destroy [-Fo] {beName | beName@snapshot}\n"
-	    "\tbectl export sourceBe\n"
-	    "\tbectl import targetBe\n"
-	    "\tbectl jail [-bU] [{-o key=value | -u key}]... beName\n"
+	    "\tbectl [-r beroot] activate [-t] beName\n"
+	    "\tbectl [-r beroot] activate [-T]\n"
+	    "\tbectl [-r beroot] check\n"
+	    "\tbectl [-r beroot] create [-r] [-e {nonActiveBe | beName@snapshot}] beName\n"
+	    "\tbectl [-r beroot] create [-r] beName@snapshot\n"
+	    "\tbectl [-r beroot] destroy [-Fo] {beName | beName@snapshot}\n"
+	    "\tbectl [-r beroot] export sourceBe\n"
+	    "\tbectl [-r beroot] import targetBe\n"
+	    "\tbectl [-r beroot] jail [-bU] [{-o key=value | -u key}]... beName\n"
 	    "\t      [utility [argument ...]]\n"
-	    "\tbectl list [-aDHs] [{-c property | -C property}]\n"
-	    "\tbectl mount beName [mountpoint]\n"
-	    "\tbectl rename origBeName newBeName\n"
-	    "\tbectl {ujail | unjail} {jailID | jailName | beName}\n"
-	    "\tbectl {umount | unmount} [-f] beName\n");
+	    "\tbectl [-r beroot] list [-aDHs] [{-c property | -C property}]\n"
+	    "\tbectl [-r beroot] mount beName [mountpoint]\n"
+	    "\tbectl [-r beroot] rename origBeName newBeName\n"
+	    "\tbectl [-r beroot] {ujail | unjail} {jailID | jailName | beName}\n"
+	    "\tbectl [-r beroot] {umount | unmount} [-f] beName\n");
 
 	return (explicit ? 0 : EX_USAGE);
 }
@@ -133,7 +131,6 @@ get_cmd_info(const char *cmd)
 
 	return (NULL);
 }
-
 
 static int
 bectl_cmd_activate(int argc, char *argv[])
@@ -233,10 +230,7 @@ bectl_cmd_create(int argc, char *argv[])
 	bootenv = *argv;
 
 	err = BE_ERR_SUCCESS;
-	if (strchr(bootenv, ' ') != NULL)
-		/* BE datasets with spaces are not bootable */
-		err = BE_ERR_INVALIDNAME;
-	else if ((atpos = strchr(bootenv, '@')) != NULL) {
+	if ((atpos = strchr(bootenv, '@')) != NULL) {
 		/*
 		 * This is the "create a snapshot variant". No new boot
 		 * environment is to be created here.
@@ -366,7 +360,8 @@ static int
 bectl_cmd_destroy(int argc, char *argv[])
 {
 	nvlist_t *props;
-	char *origin, *target, targetds[BE_MAXPATHLEN];
+	char *target, targetds[BE_MAXPATHLEN];
+	const char *origin;
 	int err, flags, opt;
 
 	flags = 0;
@@ -445,7 +440,7 @@ bectl_cmd_mount(int argc, char *argv[])
 
 	switch (err) {
 	case BE_ERR_SUCCESS:
-		printf("Successfully mounted %s at %s\n", bootenv, result_loc);
+		printf("%s\n", result_loc);
 		break;
 	default:
 		fprintf(stderr,
@@ -478,7 +473,6 @@ bectl_cmd_rename(int argc, char *argv[])
 	dest = argv[2];
 
 	err = be_rename(be, src, dest);
-
 	switch (err) {
 	case BE_ERR_SUCCESS:
 		break;
@@ -487,7 +481,7 @@ bectl_cmd_rename(int argc, char *argv[])
 		    src, dest);
 	}
 
-	return (0);
+	return (err);
 }
 
 static int

@@ -1,7 +1,7 @@
 #!/bin/sh
 
 #
-# SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+# SPDX-License-Identifier: BSD-2-Clause
 #
 # Copyright (c) 2002  The FreeBSD Project
 # All rights reserved.
@@ -31,7 +31,6 @@
 #
 # Inspired on spkrtest.pl, rewritten from scratch to remove perl dependency
 # $VER: spkrtest 0.3 (9.5.2002) Riccardo "VIC" Torrini <riccardo@torrini.org>
-# $FreeBSD$
 #
 
 cleanExit() {
@@ -53,21 +52,21 @@ then
 	cleanExit 1
 fi
 
-/usr/bin/dialog --title "Speaker test" --checklist \
+/usr/bin/bsddialog --title " Speaker test " --checklist \
 	"Please select the melodies you wish to play (space for select)" \
 	0 0 0 \
-	reveille "Reveille" OFF \
-	contact "Contact theme from Close Encounters" OFF \
-	dance "Lord of the Dance (aka Simple Gifts)" OFF \
-	loony "Loony Toons theme" OFF \
-	sinister "Standard villain's entrance music" OFF \
-	rightstuff "A trope from 'The Right Stuff' score by Bill Conti" OFF \
-	toccata "Opening bars of Bach's Toccata and Fugue in D Minor" OFF \
-	startrek "Opening bars of the theme from Star Trek Classic" OFF \
+	reveille "Reveille" off \
+	contact "Contact theme from Close Encounters" off \
+	dance "Lord of the Dance (aka Simple Gifts)" off \
+	loony "Loony Toons theme" off \
+	sinister "Standard villain's entrance music" off \
+	rightstuff "A trope from 'The Right Stuff' score by Bill Conti" off \
+	toccata "Opening bars of Bach's Toccata and Fugue in D Minor" off \
+	startrek "Opening bars of the theme from Star Trek Classic" off \
 		2> ${choices} || cleanExit 0
 
 echo ""
-tunes="`cat ${choices} | tr -d '\"'`"
+tunes="`cat ${choices}`"
 for tune in ${tunes:-DEFAULT}
 do
 	case ${tune:-NULL} in

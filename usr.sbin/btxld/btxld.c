@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 1998 Robert Nordier
  * All rights reserved.
@@ -25,11 +25,6 @@
  * OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
  * EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-
-#ifndef lint
-static const char rcsid[] =
-  "$FreeBSD$";
-#endif /* not lint */
 
 #include <sys/param.h>
 #include <sys/endian.h>
@@ -127,7 +122,7 @@ static unsigned int optfmt(const char *);
 static uint32_t optaddr(const char *);
 static int optpage(const char *, int);
 static void Warn(const char *, const char *, ...);
-static void usage(void);
+static void usage(void) __dead2;
 
 /*
  * A link editor for BTX clients.

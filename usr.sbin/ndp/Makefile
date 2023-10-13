@@ -11,23 +11,29 @@
 # AND WITHOUT ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, WITHOUT
 # LIMITATION, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
 # A PARTICULAR PURPOSE.
-# $FreeBSD$
 
 .include <src.opts.mk>
 
-.PATH: ${SRCTOP}/contrib/tcpdump
-
 PROG=	ndp
 MAN=	ndp.8
-SRCS=	ndp.c gmt2local.c
+SRCS=	ndp.c
 
-CFLAGS+= -I. -I${.CURDIR} -I${SRCTOP}/contrib/tcpdump
+LIBADD=	xo
+
+CFLAGS+= -I. -I${.CURDIR}
 CFLAGS+= -D_U_=""
 
 .if ${MK_EXPERIMENTAL} != "no"
 CFLAGS+=	-DEXPERIMENTAL
 CFLAGS+=	-DDRAFT_IETF_6MAN_IPV6ONLY_FLAG
 .endif
+
+.if ${MK_NETLINK_SUPPORT} != "no"
+SRCS+=	ndp_netlink.c
+.else
+CFLAGS+=-DWITHOUT_NETLINK
+.endif
+
 
 WARNS?=	3
 

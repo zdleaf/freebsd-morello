@@ -2,7 +2,6 @@
  * System call numbers.
  *
  * DO NOT EDIT-- this file is automatically @generated.
- * $FreeBSD$
  */
 
 #define	FREEBSD32_SYS_syscall	0
@@ -141,7 +140,7 @@
 #define	FREEBSD32_SYS_mkdir	136
 #define	FREEBSD32_SYS_rmdir	137
 #define	FREEBSD32_SYS_freebsd32_utimes	138
-				/* 139 is obsolete 4.2 sigreturn */
+				/* 139 is obsolete sigreturn */
 #define	FREEBSD32_SYS_freebsd32_adjtime	140
 				/* 141 is old getpeername */
 				/* 142 is old gethostid */
@@ -327,6 +326,7 @@
 #define	FREEBSD32_SYS_lchflags	391
 #define	FREEBSD32_SYS_uuidgen	392
 #define	FREEBSD32_SYS_freebsd32_sendfile	393
+#define	FREEBSD32_SYS_mac_syscall	394
 #define	FREEBSD32_SYS_freebsd11_freebsd32_getfsstat	395
 #define	FREEBSD32_SYS_freebsd11_statfs	396
 #define	FREEBSD32_SYS_freebsd11_fstatfs	397
@@ -501,4 +501,9 @@
 #define	FREEBSD32_SYS_fspacectl	580
 #define	FREEBSD32_SYS_sched_getcpu	581
 #define	FREEBSD32_SYS_swapoff	582
-#define	FREEBSD32_SYS_MAXSYSCALL	583
+#define	FREEBSD32_SYS_kqueuex	583
+#define	FREEBSD32_SYS_membarrier	584
+#define	FREEBSD32_SYS_timerfd_create	585
+#define	FREEBSD32_SYS_freebsd32_timerfd_gettime	586
+#define	FREEBSD32_SYS_freebsd32_timerfd_settime	587
+#define	FREEBSD32_SYS_MAXSYSCALL	588

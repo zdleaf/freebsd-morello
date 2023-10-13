@@ -23,12 +23,8 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD$
- *
  */
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include "opt_inet.h"
 #include "opt_inet6.h"
 
@@ -161,7 +157,7 @@ static int
 nicvf_alloc_q_desc_mem(struct nicvf *nic, struct q_desc_mem *dmem,
     int q_len, int desc_size, int align_bytes)
 {
-	int err, err_dmat;
+	int err, err_dmat __diagused;
 
 	/* Create DMA tag first */
 	err = bus_dma_tag_create(
@@ -231,7 +227,7 @@ dmamem_fail:
 static void
 nicvf_free_q_desc_mem(struct nicvf *nic, struct q_desc_mem *dmem)
 {
-	int err;
+	int err __diagused;
 
 	if ((dmem == NULL) || (dmem->base == NULL))
 		return;
@@ -438,7 +434,7 @@ nicvf_free_rbdr(struct nicvf *nic, struct rbdr *rbdr)
 	struct rbuf_info *rinfo;
 	bus_addr_t buf_addr;
 	int head, tail, idx;
-	int err;
+	int err __diagused;
 
 	qs = nic->qs;
 
@@ -732,8 +728,11 @@ static int
 nicvf_cq_intr_handler(struct nicvf *nic, uint8_t cq_idx)
 {
 	struct mbuf *mbuf;
-	struct ifnet *ifp;
-	int processed_cqe, work_done = 0, tx_done = 0;
+	if_t ifp;
+	int processed_cqe, tx_done = 0;
+#ifdef DEBUG
+	int work_done = 0;
+#endif
 	int cqe_count, cqe_head;
 	struct queue_set *qs = nic->qs;
 	struct cmp_queue *cq = &qs->cq[cq_idx];
@@ -780,7 +779,9 @@ nicvf_cq_intr_handler(struct nicvf *nic, uint8_t cq_idx)
 				 */
 				goto done;
 			}
+#ifdef DEBUG
 			work_done++;
+#endif
 			break;
 		case CQE_TYPE_SEND:
 			nicvf_snd_pkt_handler(nic, cq, (void *)cq_desc,
@@ -826,7 +827,7 @@ out:
 	while (!buf_ring_empty(cq->rx_br)) {
 		mbuf = buf_ring_dequeue_mc(cq->rx_br);
 		if (__predict_true(mbuf != NULL))
-			(*ifp->if_input)(ifp, mbuf);
+			if_input(ifp, mbuf);
 	}
 
 	return (cmp_err);
@@ -982,7 +983,7 @@ int
 nicvf_xmit_locked(struct snd_queue *sq)
 {
 	struct nicvf *nic;
-	struct ifnet *ifp;
+	if_t ifp;
 	struct mbuf *next;
 	int err;
 
@@ -1015,7 +1016,7 @@ nicvf_snd_task(void *arg, int pending)
 {
 	struct snd_queue *sq = (struct snd_queue *)arg;
 	struct nicvf *nic;
-	struct ifnet *ifp;
+	if_t ifp;
 	int err;
 
 	nic = sq->nic;
@@ -1142,7 +1143,7 @@ nicvf_free_snd_queue(struct nicvf *nic, struct snd_queue *sq)
 {
 	struct queue_set *qs = nic->qs;
 	size_t i;
-	int err;
+	int err __diagused;
 
 	if (sq == NULL)
 		return;
@@ -1291,7 +1292,7 @@ nicvf_rcv_queue_config(struct nicvf *nic, struct queue_set *qs,
 	union nic_mbx mbx = {};
 	struct rcv_queue *rq;
 	struct rq_cfg rq_cfg;
-	struct ifnet *ifp;
+	if_t ifp;
 	struct lro_ctrl	*lro;
 
 	ifp = nic->ifp;
@@ -1337,7 +1338,7 @@ nicvf_rcv_queue_config(struct nicvf *nic, struct queue_set *qs,
 	mbx.rq.msg = NIC_MBOX_MSG_RQ_CFG;
 	mbx.rq.qs_num = qs->vnic_id;
 	mbx.rq.rq_num = qidx;
-	mbx.rq.cfg = (rq->caching << 26) | (rq->cq_qs << 19) |
+	mbx.rq.cfg = ((uint64_t)rq->caching << 26) | (rq->cq_qs << 19) |
 	    (rq->cq_idx << 16) | (rq->cont_rbdr_qs << 9) |
 	    (rq->cont_qs_rbdr_idx << 8) | (rq->start_rbdr_qs << 1) |
 	    (rq->start_qs_rbdr_idx);

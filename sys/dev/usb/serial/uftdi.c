@@ -1,7 +1,7 @@
 /*	$NetBSD: uftdi.c,v 1.13 2002/09/23 05:51:23 simonb Exp $	*/
 
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-NetBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2000 The NetBSD Foundation, Inc.
  * All rights reserved.
@@ -32,8 +32,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 /*
  * NOTE: all function names beginning like "uftdi_cfg_" can only
  * be called from within the config thread function !
@@ -258,8 +256,6 @@ static device_method_t uftdi_methods[] = {
 	DEVMETHOD(device_detach, uftdi_detach),
 	DEVMETHOD_END
 };
-
-static devclass_t uftdi_devclass;
 
 static driver_t uftdi_driver = {
 	.name = "uftdi",
@@ -911,11 +907,12 @@ static const STRUCT_USB_HOST_ID uftdi_devs[] = {
 	UFTDI_DEV(TESTO, USB_INTERFACE, 0),
 	UFTDI_DEV(TML, USB_SERIAL, 0),
 	UFTDI_DEV(TTI, QL355P, 0),
+	UFTDI_DEV(UBLOX, XPLR_M9, 0),
 	UFTDI_DEV(UNKNOWN4, NF_RIC, 0),
 #undef UFTDI_DEV
 };
 
-DRIVER_MODULE(uftdi, uhub, uftdi_driver, uftdi_devclass, NULL, NULL);
+DRIVER_MODULE(uftdi, uhub, uftdi_driver, NULL, NULL);
 MODULE_DEPEND(uftdi, ucom, 1, 1, 1);
 MODULE_DEPEND(uftdi, usb, 1, 1, 1);
 MODULE_VERSION(uftdi, 1);

@@ -1,4 +1,3 @@
-/* $FreeBSD$ */
 
 /*-
  * SPDX-License-Identifier: BSD-4-Clause
@@ -34,4 +33,4 @@
  */
 
 #define _PATH_MAILERCONF	"/etc/mail/mailer.conf"
-#define _PATH_DEFAULTMTA	"/usr/libexec/sendmail/sendmail"
+#define _PATH_DEFAULTMTA	"/usr/libexec/dma"

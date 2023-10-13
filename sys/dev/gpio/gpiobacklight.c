@@ -25,8 +25,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include "opt_platform.h"
 
 #include <sys/param.h>
@@ -150,8 +148,6 @@ gpiobacklight_detach(device_t dev)
 	return (0);
 }
 
-static devclass_t gpiobacklight_devclass;
-
 static device_method_t gpiobacklight_methods[] = {
 	/* Device interface */
 	DEVMETHOD(device_probe,		gpiobacklight_probe),
@@ -167,6 +163,5 @@ static driver_t gpiobacklight_driver = {
 	sizeof(struct gpiobacklight_softc),
 };
 
-DRIVER_MODULE(gpiobacklight, simplebus, gpiobacklight_driver,
-    gpiobacklight_devclass, 0, 0);
+DRIVER_MODULE(gpiobacklight, simplebus, gpiobacklight_driver, 0, 0);
 MODULE_DEPEND(gpiobacklight, gpiobus, 1, 1, 1);

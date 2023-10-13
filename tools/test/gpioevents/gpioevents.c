@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2018 Christian Kramer
  * Copyright (c) 2020 Ian Lepore <ian@FreeBSD.org>
@@ -24,8 +24,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  *
  * make LDFLAGS+=-lgpio gpioevents
  */
@@ -66,7 +64,7 @@ static void
 usage()
 {
 	fprintf(stderr, "usage: %s [-f ctldev] [-m method] [-s] [-n] [-S] [-u]"
-	    "[-t timeout] [-d delay-usec] pin intr-config [pin intr-config ...]\n\n",
+	    "[-t timeout] [-d delay-usec] pin intr-config pin-mode [pin intr-config pin-mode ...]\n\n",
 	    getprogname());
 	fprintf(stderr, "  -d  delay before each call to read/poll/select/etc\n");
 	fprintf(stderr, "  -n  Non-blocking IO\n");
@@ -85,7 +83,11 @@ usage()
 	fprintf(stderr, "  no\t no interrupt\n");
 	fprintf(stderr, "  er\t edge rising\n");
 	fprintf(stderr, "  ef\t edge falling\n");
-	fprintf(stderr, "  eb\t edge both\n");
+	fprintf(stderr, "  eb\t edge both\n\n");
+	fprintf(stderr, "Possible options for pin-mode:\n\n");
+	fprintf(stderr, "  ft\t floating\n");
+	fprintf(stderr, "  pd\t pull-down\n");
+	fprintf(stderr, "  pu\t pull-up\n");
 }
 
 static void
@@ -539,8 +541,15 @@ main(int argc, char *argv[])
 		return EXIT_FAILURE;
 	}
 
-	if (argc % 2 == 1) {
-		fprintf(stderr, "%s: Invalid number of pin intr-conf pairs.\n",
+	if (argc == 1) {
+		fprintf(stderr, "%s: No trigger type specified.\n",
+		    getprogname());
+		usage();
+		return EXIT_FAILURE;
+	}
+
+	if (argc % 3 != 0) {
+		fprintf(stderr, "%s: Invalid number of (pin intr-conf mode) triplets.\n",
 		    getprogname());
 		usage();
 		return EXIT_FAILURE;
@@ -567,7 +576,7 @@ main(int argc, char *argv[])
 			err(EXIT_FAILURE, "cannot set O_NONBLOCK on %s", file);
 	}
 
-	for (int i = 0; i <= argc - 2; i += 2) {
+	for (int i = 0; i <= argc - 3; i += 3) {
 
 		errno = 0;
 		pin_config.g_pin = strtol(argv[i], NULL, 10);
@@ -604,7 +613,31 @@ main(int argc, char *argv[])
 			return EXIT_FAILURE;
 		}
 
-		pin_config.g_flags |= GPIO_PIN_INPUT | GPIO_PIN_PULLUP;
+		if (strnlen(argv[i + 2], 2) < 2) {
+			fprintf(stderr, "%s: Invalid pin mode (argument "
+			    "too short).\n", getprogname());
+			usage();
+			return EXIT_FAILURE;
+		}
+
+		switch((argv[i + 2][0] << 8) + argv[i + 2][1]) {
+		case ('f' << 8) + 't':
+			/* no changes to pin_config */
+			break;
+		case ('p' << 8) + 'd':
+			pin_config.g_flags |= GPIO_PIN_PULLDOWN;
+			break;
+		case ('p' << 8) + 'u':
+			pin_config.g_flags |= GPIO_PIN_PULLUP;
+			break;
+		default:
+			fprintf(stderr, "%s: Invalid pin mode.\n",
+			    getprogname());
+			usage();
+			return EXIT_FAILURE;
+		}
+
+		pin_config.g_flags |= GPIO_PIN_INPUT;
 
 		res = gpio_pin_set_flags(handle, &pin_config);
 		if (res < 0)

@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2020, 2021 Rubicon Communications, LLC (Netgate)
  * Copyright (c) 2021 The FreeBSD Foundation
@@ -29,8 +29,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/bus.h>
 #include <sys/counter.h>
@@ -1377,7 +1375,7 @@ safexcel_setkey_xts(const uint8_t *key, int klen, uint8_t *tweakkey)
 }
 
 /*
- * Populate a context record with paramters from a session.  Some consumers
+ * Populate a context record with parameters from a session.  Some consumers
  * specify per-request keys, in which case the context must be re-initialized
  * for each request.
  */
@@ -2602,14 +2600,12 @@ static device_method_t safexcel_methods[] = {
 	DEVMETHOD_END
 };
 
-static devclass_t safexcel_devclass;
-
 static driver_t safexcel_driver = {
 	.name 		= "safexcel",
 	.methods 	= safexcel_methods,
 	.size		= sizeof(struct safexcel_softc),
 };
 
-DRIVER_MODULE(safexcel, simplebus, safexcel_driver, safexcel_devclass, 0, 0);
+DRIVER_MODULE(safexcel, simplebus, safexcel_driver, 0, 0);
 MODULE_VERSION(safexcel, 1);
 MODULE_DEPEND(safexcel, crypto, 1, 1, 1);

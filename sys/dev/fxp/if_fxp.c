@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-NetBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 1995, David Greenman
  * Copyright (c) 2001 Jonathan Lemon <jlemon@freebsd.org>
@@ -30,8 +30,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 /*
  * Intel EtherExpress Pro/100B PCI Fast Ethernet driver
  */
@@ -303,13 +301,10 @@ static driver_t fxp_driver = {
 	sizeof(struct fxp_softc),
 };
 
-static devclass_t fxp_devclass;
-
-DRIVER_MODULE_ORDERED(fxp, pci, fxp_driver, fxp_devclass, NULL, NULL,
-    SI_ORDER_ANY);
+DRIVER_MODULE_ORDERED(fxp, pci, fxp_driver, NULL, NULL, SI_ORDER_ANY);
 MODULE_PNP_INFO("U16:vendor;U16:device", pci, fxp, fxp_ident_table,
     nitems(fxp_ident_table) - 1);
-DRIVER_MODULE(miibus, fxp, miibus_driver, miibus_devclass, NULL, NULL);
+DRIVER_MODULE(miibus, fxp, miibus_driver, NULL, NULL);
 
 static struct resource_spec fxp_res_spec_mem[] = {
 	{ SYS_RES_MEMORY,	FXP_PCI_MMBA,	RF_ACTIVE },
@@ -1382,7 +1377,7 @@ fxp_start_body(if_t ifp)
 		/*
 		 * Pass packet to bpf if there is a listener.
 		 */
-		if_bpfmtap(ifp, mb_head);
+		bpf_mtap_if(ifp, mb_head);
 	}
 
 	/*

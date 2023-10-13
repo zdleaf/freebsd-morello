@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2009, 2016 Robert N. M. Watson
  * All rights reserved.
@@ -55,8 +55,6 @@
  *   generate SIGCHLD on termination, or be picked up by waitpid().
  * - The pdkill(2) system call may be used to deliver a signal to the process
  *   using its process descriptor.
- * - The pdwait4(2) system call may be used to block (or not) on a process
- *   descriptor to collect termination information.
  *
  * Open questions:
  *
@@ -65,8 +63,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/capsicum.h>
 #include <sys/fcntl.h>
@@ -324,8 +320,8 @@ procdesc_exit(struct proc *p)
 }
 
 /*
- * When a process descriptor is reaped, perhaps as a result of close() or
- * pdwait4(), release the process's reference on the process descriptor.
+ * When a process descriptor is reaped, perhaps as a result of close(), release
+ * the process's reference on the process descriptor.
  */
 void
 procdesc_reap(struct proc *p)

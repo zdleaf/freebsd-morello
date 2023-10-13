@@ -33,8 +33,6 @@
  * STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED
  * OF THE POSSIBILITY OF SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 #ifndef _IF_SGEREG_H
@@ -338,7 +336,7 @@ struct sge_type {
 };
 
 struct sge_softc {
-	struct ifnet		*sge_ifp;	/* interface info */
+	if_t			sge_ifp;	/* interface info */
 	struct resource		*sge_res;
 	int			sge_res_id;
 	int			sge_res_type;

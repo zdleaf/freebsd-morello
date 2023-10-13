@@ -1,4 +1,3 @@
-/* $FreeBSD$ */
 #ifndef CONFIG_H
 #define CONFIG_H
 
@@ -19,6 +18,10 @@
 
 /* Define to 1 to enable crash memory dumps, and to 0 otherwise. */
 #define LLVM_ENABLE_CRASH_DUMPS 0
+
+/* Define to 1 to prefer forward slashes on Windows, and to 0 prefer
+   backslashes. */
+#define LLVM_WINDOWS_PREFER_FORWARD_SLASH 0
 
 /* Define to 1 if you have the `backtrace' function. */
 #define HAVE_BACKTRACE TRUE
@@ -51,9 +54,6 @@
    don't. */
 #define HAVE_DECL_STRERROR_S 0
 
-/* Define to 1 if you have the DIA SDK installed, and to 0 if you don't. */
-#define LLVM_ENABLE_DIA_SDK 0
-
 /* Define to 1 if you have the <dlfcn.h> header file. */
 #define HAVE_DLFCN_H 1
 
@@ -70,6 +70,9 @@
 /* Define to 1 if we can deregister EH frames on this platform. */
 #define HAVE_DEREGISTER_FRAME 1
 #endif // !arm || USING_SJLJ_EXCEPTIONS || ARM_DWARF_EH_
+
+/* Define if __unw_add_dynamic_fde() is available on this platform. */
+/* #undef HAVE_UNW_ADD_DYNAMIC_FDE */
 
 /* Define to 1 if you have the <errno.h> header file. */
 #define HAVE_ERRNO_H 1
@@ -108,7 +111,7 @@
 #define HAVE_ISATTY 1
 
 /* Define to 1 if you have the `edit' library (-ledit). */
-#define HAVE_LIBEDIT 1
+#define HAVE_LIBEDIT TRUE
 
 /* Define to 1 if you have the `pfm' library (-lpfm). */
 /* #undef HAVE_LIBPFM */
@@ -133,11 +136,6 @@
 #define HAVE_LINK_H 1
 #else
 #define HAVE_LINK_H 0
-#endif
-
-/* Define to 1 if you have the `lseek64' function. */
-#if defined(__linux__)
-#define HAVE_LSEEK64 1
 #endif
 
 /* Define to 1 if you have the <mach/mach.h> header file. */
@@ -168,19 +166,11 @@
 #define HAVE_MALLOC_ZONE_STATISTICS 1
 #endif
 
-/* Define to 1 if you have the `posix_fallocate' function. */
-#if !defined(__APPLE__)
-#define HAVE_POSIX_FALLOCATE 1
-#endif
-
 /* Define to 1 if you have the `posix_spawn' function. */
 #define HAVE_POSIX_SPAWN 1
 
 /* Define to 1 if you have the `pread' function. */
 #define HAVE_PREAD 1
-
-/* Have pthread_getspecific */
-#define HAVE_PTHREAD_GETSPECIFIC 1
 
 /* Define to 1 if you have the <pthread.h> header file. */
 #define HAVE_PTHREAD_H 1
@@ -252,7 +242,7 @@
  * This is only needed for terminalHasColors(). When disabled LLVM falls back
  * to checking a list of TERM prefixes which is sufficient for a bootstrap tool.
  */
-#define LLVM_ENABLE_TERMINFO 1
+#define LLVM_ENABLE_TERMINFO TRUE
 #endif
 
 /* Define to 1 if you have the <termios.h> header file. */
@@ -271,9 +261,7 @@
 /* #undef HAVE__CHSIZE_S */
 
 /* Define to 1 if you have the `_Unwind_Backtrace' function. */
-#if !defined(__FreeBSD__)
 #define HAVE__UNWIND_BACKTRACE 1
-#endif
 
 /* Have host's __alloca */
 /* #undef HAVE___ALLOCA */
@@ -329,18 +317,8 @@
 /* Linker version detected at compile time. */
 /* #undef HOST_LINK_VERSION */
 
-/* Target triple LLVM will generate code for by default */
-/* Doesn't use `cmakedefine` because it is allowed to be empty. */
-/* #undef LLVM_DEFAULT_TARGET_TRIPLE */
-
-/* Define if zlib compression is available */
-#define LLVM_ENABLE_ZLIB 1
-
 /* Define if overriding target triple is enabled */
 /* #undef LLVM_TARGET_TRIPLE_ENV */
-
-/* LLVM version information */
-/* #undef LLVM_VERSION_INFO */
 
 /* Whether tools show host and target info when invoked with --version */
 #define LLVM_VERSION_PRINTER_SHOW_HOST_TARGET_INFO 1
@@ -369,19 +347,13 @@
 #define PACKAGE_NAME "LLVM"
 
 /* Define to the full name and version of this package. */
-#define PACKAGE_STRING "LLVM 13.0.0"
+#define PACKAGE_STRING "LLVM 16.0.6"
 
 /* Define to the version of this package. */
-#define PACKAGE_VERSION "13.0.0"
+#define PACKAGE_VERSION "16.0.6"
 
 /* Define to the vendor of this package. */
 /* #undef PACKAGE_VENDOR */
-
-/* Define as the return type of signal handlers (`int' or `void'). */
-#define RETSIGTYPE void
-
-/* Define if std::is_trivially_copyable is supported */
-#define HAVE_STD_IS_TRIVIALLY_COPYABLE 1
 
 /* Define to a function implementing stricmp */
 /* #undef stricmp */
@@ -394,6 +366,13 @@
 
 /* Define to the default GlobalISel coverage file prefix */
 /* #undef LLVM_GISEL_COV_PREFIX */
+
+/* Whether Timers signpost passes in Xcode Instruments */
+#if defined(__APPLE__)
+#define LLVM_SUPPORT_XCODE_SIGNPOSTS 1
+#else
+#define LLVM_SUPPORT_XCODE_SIGNPOSTS 0
+#endif
 
 /* #undef HAVE_PROC_PID_RUSAGE */
 

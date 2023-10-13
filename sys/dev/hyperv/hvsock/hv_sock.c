@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2020 Microsoft Corp.
  * All rights reserved.
@@ -27,8 +27,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/bus.h>
 #include <sys/domain.h>
@@ -86,48 +84,35 @@ static int hvs_dom_probe(void);
 					 roundup2(payload_len, 8) + \
 					 sizeof(uint64_t))
 
-
-static struct domain		hv_socket_domain;
-
 /*
  * HyperV Transport sockets
  */
-static struct pr_usrreqs	hvs_trans_usrreqs = {
-	.pru_attach =		hvs_trans_attach,
-	.pru_bind =		hvs_trans_bind,
-	.pru_listen =		hvs_trans_listen,
-	.pru_accept =		hvs_trans_accept,
-	.pru_connect =		hvs_trans_connect,
-	.pru_peeraddr =		hvs_trans_peeraddr,
-	.pru_sockaddr =		hvs_trans_sockaddr,
-	.pru_soreceive =	hvs_trans_soreceive,
-	.pru_sosend =		hvs_trans_sosend,
-	.pru_disconnect =	hvs_trans_disconnect,
-	.pru_close =		hvs_trans_close,
-	.pru_detach =		hvs_trans_detach,
-	.pru_shutdown =		hvs_trans_shutdown,
-	.pru_abort =		hvs_trans_abort,
-};
-
-/*
- * Definitions of protocols supported in HyperV socket domain
- */
-static struct protosw		hv_socket_protosw[] = {
-{
+static struct protosw hv_socket_protosw = {
 	.pr_type =		SOCK_STREAM,
-	.pr_domain =		&hv_socket_domain,
 	.pr_protocol =		HYPERV_SOCK_PROTO_TRANS,
 	.pr_flags =		PR_CONNREQUIRED,
-	.pr_usrreqs =		&hvs_trans_usrreqs,
-},
+	.pr_attach =		hvs_trans_attach,
+	.pr_bind =		hvs_trans_bind,
+	.pr_listen =		hvs_trans_listen,
+	.pr_accept =		hvs_trans_accept,
+	.pr_connect =		hvs_trans_connect,
+	.pr_peeraddr =		hvs_trans_peeraddr,
+	.pr_sockaddr =		hvs_trans_sockaddr,
+	.pr_soreceive =		hvs_trans_soreceive,
+	.pr_sosend =		hvs_trans_sosend,
+	.pr_disconnect =	hvs_trans_disconnect,
+	.pr_close =		hvs_trans_close,
+	.pr_detach =		hvs_trans_detach,
+	.pr_shutdown =		hvs_trans_shutdown,
+	.pr_abort =		hvs_trans_abort,
 };
 
 static struct domain		hv_socket_domain = {
 	.dom_family =		AF_HYPERV,
 	.dom_name =		"hyperv",
 	.dom_probe =		hvs_dom_probe,
-	.dom_protosw =		hv_socket_protosw,
-	.dom_protoswNPROTOSW =	&hv_socket_protosw[nitems(hv_socket_protosw)]
+	.dom_nprotosw =		1,
+	.dom_protosw =		{ &hv_socket_protosw },
 };
 
 DOMAIN_SET(hv_socket_);
@@ -763,7 +748,7 @@ hvs_trans_soreceive(struct socket *so, struct sockaddr **paddr,
 		 * Wait and block until (more) data comes in.
 		 * Note: Drops the sockbuf lock during wait.
 		 */
-		error = sbwait(sb);
+		error = sbwait(so, SO_RCV);
 
 		if (error)
 			break;
@@ -859,7 +844,7 @@ hvs_trans_sosend(struct socket *so, struct sockaddr *addr, struct uio *uio,
 				 * Sleep wait until space avaiable to send
 				 * Note: Drops the sockbuf lock during wait.
 				 */
-				error = sbwait(sb);
+				error = sbwait(so, SO_SND);
 
 				if (error)
 					break;
@@ -1753,8 +1738,6 @@ static driver_t hvsock_driver = {
 	sizeof(struct hvsock_sc)
 };
 
-static devclass_t hvsock_devclass;
-
-DRIVER_MODULE(hvsock, vmbus, hvsock_driver, hvsock_devclass, NULL, NULL);
+DRIVER_MODULE(hvsock, vmbus, hvsock_driver, NULL, NULL);
 MODULE_VERSION(hvsock, 1);
 MODULE_DEPEND(hvsock, vmbus, 1, 1, 1);

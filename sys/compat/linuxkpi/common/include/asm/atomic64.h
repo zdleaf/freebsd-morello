@@ -22,8 +22,6 @@
  * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 #ifndef	_LINUXKPI_ASM_ATOMIC64_H_
 #define	_LINUXKPI_ASM_ATOMIC64_H_
@@ -51,6 +49,12 @@ typedef struct {
 #define	atomic64_inc_and_test(v)	(atomic64_add_return(1, (v)) == 0)
 #define	atomic64_dec_return(v)		atomic64_sub_return(1, (v))
 #define	atomic64_inc_not_zero(v)	atomic64_add_unless((v), 1, 0)
+
+static inline int64_t
+atomic64_fetch_add(int64_t i, atomic64_t *v)
+{
+	return (atomic_fetchadd_64(&v->counter, i));
+}
 
 static inline int64_t
 atomic64_add_return(int64_t i, atomic64_t *v)
@@ -119,8 +123,7 @@ atomic64_fetch_add_unless(atomic64_t *v, int64_t a, int64_t u)
 static inline int64_t
 atomic64_xchg(atomic64_t *v, int64_t i)
 {
-#if !((defined(__mips__) && !(defined(__mips_n32) || defined(__mips_n64))) || \
-    (defined(__powerpc__) && !defined(__powerpc64__)))
+#if !(defined(__powerpc__) && !defined(__powerpc64__))
 	return (atomic_swap_64(&v->counter, i));
 #else
 	int64_t ret = atomic64_read(v);

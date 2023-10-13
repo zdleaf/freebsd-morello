@@ -25,8 +25,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 /*
  * UART driver for Tegra SoCs.
  */
@@ -248,5 +246,4 @@ static driver_t tegra_uart_driver = {
 	sizeof(struct tegra_softc),
 };
 
-DRIVER_MODULE(tegra_uart, simplebus,  tegra_uart_driver, uart_devclass,
-    0, 0);
+DRIVER_MODULE(tegra_uart, simplebus,  tegra_uart_driver, 0, 0);

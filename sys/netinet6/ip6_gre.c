@@ -25,8 +25,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include "opt_inet.h"
 #include "opt_inet6.h"
 
@@ -45,6 +43,7 @@ __FBSDID("$FreeBSD$");
 
 #include <net/if.h>
 #include <net/if_var.h>
+#include <net/if_private.h>
 #include <net/vnet.h>
 
 #include <netinet/in.h>
@@ -212,7 +211,7 @@ in6_gre_srcaddr(void *arg __unused, const struct sockaddr *sa,
 	}
 }
 
-static void
+static bool
 in6_gre_udp_input(struct mbuf *m, int off, struct inpcb *inp,
     const struct sockaddr *sa, void *ctx)
 {
@@ -226,7 +225,7 @@ in6_gre_udp_input(struct mbuf *m, int off, struct inpcb *inp,
 	dst = *(const struct sockaddr_in6 *)sa;
 	if (sa6_embedscope(&dst, 0)) {
 		m_freem(m);
-		return;
+		return (true);
 	}
 	CK_LIST_FOREACH(sc, &gs->list, chain) {
 		if (IN6_ARE_ADDR_EQUAL(&sc->gre_oip6.ip6_dst, &dst.sin6_addr))
@@ -234,9 +233,11 @@ in6_gre_udp_input(struct mbuf *m, int off, struct inpcb *inp,
 	}
 	if (sc != NULL && (GRE2IFP(sc)->if_flags & IFF_UP) != 0){
 		gre_input(m, off + sizeof(struct udphdr), IPPROTO_UDP, sc);
-		return;
+		return (true);
 	}
 	m_freem(m);
+
+	return (true);
 }
 
 static int
@@ -252,7 +253,7 @@ in6_gre_setup_socket(struct gre_softc *sc)
 	 * NOTE: we are protected with gre_ioctl_sx lock.
 	 *
 	 * First check that socket is already configured.
-	 * If so, check that source addres was not changed.
+	 * If so, check that source address was not changed.
 	 * If address is different, check that there are no other tunnels
 	 * and close socket.
 	 */

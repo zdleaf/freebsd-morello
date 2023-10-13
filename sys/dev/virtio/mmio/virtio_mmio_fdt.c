@@ -50,8 +50,6 @@
 #include "opt_platform.h"
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/bus.h>
@@ -79,11 +77,8 @@ static device_method_t vtmmio_fdt_methods[] = {
 DEFINE_CLASS_1(virtio_mmio, vtmmio_fdt_driver, vtmmio_fdt_methods,
     sizeof(struct vtmmio_softc), vtmmio_driver);
 
-static devclass_t vtmmio_fdt_devclass;
-
-DRIVER_MODULE(virtio_mmio, simplebus, vtmmio_fdt_driver, vtmmio_fdt_devclass,
-    0, 0);
-DRIVER_MODULE(virtio_mmio, ofwbus, vtmmio_fdt_driver, vtmmio_fdt_devclass, 0,0);
+DRIVER_MODULE(virtio_mmio, simplebus, vtmmio_fdt_driver, 0, 0);
+DRIVER_MODULE(virtio_mmio, ofwbus, vtmmio_fdt_driver, 0,0);
 MODULE_DEPEND(virtio_mmio, simplebus, 1, 1, 1);
 MODULE_DEPEND(virtio_mmio, virtio, 1, 1, 1);
 

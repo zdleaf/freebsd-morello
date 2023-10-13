@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2019 The FreeBSD Foundation
  *
@@ -26,8 +26,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 extern "C" {
@@ -109,6 +107,8 @@ TEST_F(Bmap, bmap)
 	EXPECT_EQ(arg.bn, pbn);
 	EXPECT_EQ(arg.runp, m_maxphys / m_maxbcachebuf - 1);
 	EXPECT_EQ(arg.runb, m_maxphys / m_maxbcachebuf - 1);
+
+	leak(fd);
 }
 
 /* 
@@ -188,12 +188,11 @@ TEST_P(BmapEof, eof)
 	const off_t filesize = 2 * m_maxbcachebuf;
 	const ino_t ino = 42;
 	mode_t mode = S_IFREG | 0644;
-	void *contents, *buf;
+	void *buf;
 	int fd;
 	int ngetattrs;
 
 	ngetattrs = GetParam();
-	contents = calloc(1, filesize);
 	FuseTest::expect_lookup(RELPATH, ino, mode, filesize, 1, 0);
 	expect_open(ino, 0, 1);
 	// Depending on ngetattrs, FUSE_READ could be called with either
@@ -209,6 +208,8 @@ TEST_P(BmapEof, eof)
 		_)
 	).WillOnce(Invoke(ReturnImmediate([=](auto in, auto& out) {
 		size_t osize = in.body.read.size;
+
+		assert(osize < sizeof(out.body.bytes));
 		out.header.len = sizeof(struct fuse_out_header) + osize;
 		bzero(out.body.bytes, osize);
 	})));
@@ -246,8 +247,10 @@ TEST_P(BmapEof, eof)
 	fd = open(FULLPATH, O_RDWR);
 	ASSERT_LE(0, fd) << strerror(errno);
 	read(fd, buf, filesize);
+
+	leak(fd);
 }
 
-INSTANTIATE_TEST_CASE_P(BE, BmapEof,
+INSTANTIATE_TEST_SUITE_P(BE, BmapEof,
 	Values(1, 2, 3)
 );

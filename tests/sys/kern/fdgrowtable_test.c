@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2020 Rob Wing
  *
@@ -26,8 +26,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/filedesc.h>
 #include <sys/queue.h>
@@ -233,6 +231,7 @@ ATF_TC_BODY(oldtables_shared_via_process, tc)
 
 	/* get current status of child */
 	wpid = waitpid(child, &status, WUNTRACED);
+	ATF_REQUIRE(wpid == child);
 
 	/* child should be stopped */
 	ATF_REQUIRE(WIFSTOPPED(status));
@@ -254,6 +253,7 @@ ATF_TC_BODY(oldtables_shared_via_process, tc)
 
 	/* child should have exited */
 	wpid = waitpid(child, &status, 0);
+	ATF_REQUIRE(wpid == child);
 	ATF_REQUIRE(WIFEXITED(status));
 	ATF_REQUIRE(WEXITSTATUS(status) == 127);
 }

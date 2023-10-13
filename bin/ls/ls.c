@@ -44,8 +44,6 @@ static char sccsid[] = "@(#)ls.c	8.5 (Berkeley) 4/2/94";
 #endif /* not lint */
 #endif
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/stat.h>
 #include <sys/ioctl.h>
@@ -136,6 +134,7 @@ static int f_numericonly;	/* don't convert uid/gid to name */
        int f_octal_escape;	/* like f_octal but use C escapes if possible */
 static int f_recursive;		/* ls subdirectories also */
 static int f_reversesort;	/* reverse whatever sort is used */
+static int f_verssort;		/* sort names using strverscmp(3) rather than strcoll(3) */
        int f_samesort;		/* sort time and name in same direction */
        int f_sectime;		/* print full time information */
 static int f_singlecol;		/* use single column output */
@@ -143,6 +142,7 @@ static int f_singlecol;		/* use single column output */
 static int f_sizesort;
        int f_slash;		/* similar to f_type, but only for dirs */
        int f_sortacross;	/* sort across rows, not down columns */
+       int f_sowner;		/* disable showing owner's name */
        int f_statustime;	/* use time of last mode change */
 static int f_stream;		/* stream the output, separate with commas */
        int f_thousands;		/* show file sizes with thousands separators */
@@ -275,7 +275,7 @@ main(int argc, char *argv[])
 		colorflag = COLORFLAG_AUTO;
 #endif
 	while ((ch = getopt_long(argc, argv,
-	    "+1ABCD:FGHILPRSTUWXZabcdfghiklmnopqrstuwxy,", long_opts,
+	    "+1ABCD:FGHILPRSTUWXZabcdfghiklmnopqrstuvwxy,", long_opts,
 	    NULL)) != -1) {
 		switch (ch) {
 		/*
@@ -401,7 +401,11 @@ main(int argc, char *argv[])
 			f_listdir = 1;
 			f_recursive = 0;
 			break;
-		case 'g':	/* Compatibility with 4.3BSD. */
+		case 'g':
+			f_longform = 1;
+			f_singlecol = 0;
+			f_stream = 0;
+			f_sowner = 1;
 			break;
 		case 'h':
 			f_humanval = 1;
@@ -420,6 +424,9 @@ main(int argc, char *argv[])
 			break;
 		case 'n':
 			f_numericonly = 1;
+			f_longform = 1;
+			f_singlecol = 0;
+			f_stream = 0;
 			break;
 		case 'o':
 			f_flags = 1;
@@ -438,6 +445,9 @@ main(int argc, char *argv[])
 			break;
 		case 's':
 			f_size = 1;
+			break;
+		case 'v':
+			f_verssort = 1;
 			break;
 		case 'w':
 			f_nonprint = 0;
@@ -566,10 +576,12 @@ main(int argc, char *argv[])
 	}
 	/* Select a sort function. */
 	if (f_reversesort) {
-		if (!f_timesort && !f_sizesort)
-			sortfcn = revnamecmp;
-		else if (f_sizesort)
+		if (f_sizesort)
 			sortfcn = revsizecmp;
+		else if (f_verssort)
+			sortfcn = revverscmp;
+		else if (!f_timesort)
+			sortfcn = revnamecmp;
 		else if (f_accesstime)
 			sortfcn = revacccmp;
 		else if (f_birthtime)
@@ -579,10 +591,12 @@ main(int argc, char *argv[])
 		else		/* Use modification time. */
 			sortfcn = revmodcmp;
 	} else {
-		if (!f_timesort && !f_sizesort)
-			sortfcn = namecmp;
-		else if (f_sizesort)
+		if (f_sizesort)
 			sortfcn = sizecmp;
+		else if (f_verssort)
+			sortfcn = verscmp;
+		else if (!f_timesort)
+			sortfcn = namecmp;
 		else if (f_accesstime)
 			sortfcn = acccmp;
 		else if (f_birthtime)

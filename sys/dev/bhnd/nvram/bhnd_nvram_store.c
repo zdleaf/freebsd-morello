@@ -28,8 +28,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/hash.h>
 #include <sys/limits.h>
@@ -625,14 +623,13 @@ bhnd_nvram_store_export_child(struct bhnd_nvram_store *sc,
 	const char		*relpath;
 	char			*prefix, *namebuf;
 	size_t			 prefix_len, relpath_len;
-	size_t			 namebuf_size, num_props;
+	size_t			 namebuf_size;
 	bool			 emit_compact_devpath;
 	int			 error;
 
 	BHND_NVSTORE_LOCK_ASSERT(sc, MA_OWNED);
 
 	prefix = NULL;
-	num_props = 0;
 	path_vars = NULL;
 	namebuf = NULL;
 

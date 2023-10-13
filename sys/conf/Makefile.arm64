@@ -2,7 +2,6 @@
 # Copyright 1990 W. Jolitz
 #	from: @(#)Makefile.i386	7.1 5/10/91
 #	from FreeBSD: src/sys/conf/Makefile.i386,v 1.255 2002/02/20 23:35:49
-# $FreeBSD$
 #
 # Makefile for FreeBSD
 #
@@ -62,7 +61,7 @@ SYSTEM_LD= \
 KERNEL_EXTRA+= ${KERNEL_KO}.bin
 KERNEL_EXTRA_INSTALL+= ${KERNEL_KO}.bin
 
-.if !empty(DDB_ENABLED) || !empty(DTR_ENABLED) || !empty(HWPMC_ENABLED)
+.if !empty(DDB_ENABLED) || !empty(DTRACE_ENABLED) || !empty(HWPMC_ENABLED)
 CFLAGS += -fno-omit-frame-pointer -mno-omit-leaf-frame-pointer
 .endif
 
@@ -93,8 +92,8 @@ CLEAN+=	${KERNEL_KO}.bin
 # and the temp file together to make the kernel.bin file.
 ${KERNEL_KO}.bin: ${FULLKERNEL}
 	@${OBJCOPY} --wildcard --strip-symbol='$$[adtx]*' \
-	    --output-target=binary ${.ALLSRC} ${.TARGET}.temp
-	@{ ${NM} ${.ALLSRC} | \
+	    --output-target=binary ${FULLKERNEL} ${.TARGET}.temp
+	@{ ${NM} ${FULLKERNEL} | \
 	    ${AWK} -f $S/tools/arm_kernel_boothdr.awk -v hdrtype=v8booti && \
 	    cat ${.TARGET}.temp; \
 	 } > ${.TARGET}

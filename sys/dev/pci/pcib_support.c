@@ -25,8 +25,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 /*
  * Support functions for the PCI:PCI bridge driver.  This has to be in a
  * separate file because kernel configurations end up referencing the functions
@@ -58,6 +56,9 @@ int
 pcib_get_id(device_t pcib, device_t dev, enum pci_id_type type, uintptr_t *id)
 {
 	uint8_t bus, slot, func;
+
+	if (type == PCI_ID_OFW_IOMMU)
+		return (PCI_GET_ID(device_get_parent(pcib), dev, type, id));
 
 	if (type != PCI_ID_RID)
 		return (ENXIO);

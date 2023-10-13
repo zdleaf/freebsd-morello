@@ -1,7 +1,5 @@
 .\" Written by Jared Yanovich <jaredy@openbsd.org>
 .\" Public domain, July 3, 2005
-.\"
-.\" $FreeBSD$
 .Dd March 13, 2020
 .Dt CMSG_DATA 3
 .Os
@@ -165,7 +163,7 @@ main()
 		close(hellofd[1]);
 
 		if (read(hellofd[0], buf, HELLOLEN) == -1)
-			err(EX_IOERR, "faild to receive 'hello'");
+			err(EX_IOERR, "failed to receive 'hello'");
 		printf("parent: received '%s'\\n", buf);
 		break;
 	}

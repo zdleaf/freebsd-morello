@@ -25,8 +25,6 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 /*
@@ -39,6 +37,9 @@
 #include <machine/tls.h>
 
 #define	CPU_SPINWAIT
+
+/* For use in _Static_assert to check structs will fit in a page */
+#define	THR_PAGE_SIZE_MIN	PAGE_SIZE
 
 static __inline struct pthread *
 _get_curthread(void)

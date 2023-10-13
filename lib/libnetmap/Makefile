@@ -1,10 +1,9 @@
 #
-# $FreeBSD$
 #
 
 .include <src.opts.mk>
 
-PACKAGE=	lib${LIB}
+PACKAGE=	netmap
 LIB=		netmap
 SRCS=		nmctx.c nmport.c \
 		nmctx-pthreads.c nmreq.c

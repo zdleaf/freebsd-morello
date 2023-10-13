@@ -1,4 +1,3 @@
-#	$FreeBSD$
 
 SRCDIR:=${.PARSEDIR:tA}
 
@@ -16,8 +15,19 @@ SRCS=	cd9660.c \
 	walk.c
 MAN=	makefs.8
 
-WARNS?=	2
+NO_WCAST_ALIGN=
 CSTD=	c11
+
+.if ${MK_ZFS} != "no"
+SRCS+=	zfs.c
+CFLAGS+=-I${SRCDIR}/zfs \
+	-I${SRCTOP}/stand/libsa \
+	-I${SRCTOP}/sys/cddl/boot
+
+CFLAGS+=	-DHAVE_ZFS
+
+.include "${SRCDIR}/zfs/Makefile.inc"
+.endif
 
 .include "${SRCDIR}/cd9660/Makefile.inc"
 .include "${SRCDIR}/ffs/Makefile.inc"

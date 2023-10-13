@@ -1,6 +1,5 @@
-/* $FreeBSD$ */
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2008 Hans Petter Selasky. All rights reserved.
  * Copyright (c) 1998 The NetBSD Foundation, Inc. All rights reserved.
@@ -1578,7 +1577,7 @@ ohci_setup_standard_chain(struct usb_xfer *xfer, ohci_ed_t **ed_last)
 static void
 ohci_root_intr(ohci_softc_t *sc)
 {
-	uint32_t hstatus;
+	uint32_t hstatus __usbdebug_used;
 	uint16_t i;
 	uint16_t m;
 

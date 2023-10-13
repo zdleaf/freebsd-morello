@@ -3,7 +3,7 @@
  */
 
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2004 Maksim Yevmenkin <m_evmenkin@yahoo.com>
  * All rights reserved.
@@ -30,7 +30,6 @@
  * SUCH DAMAGE.
  *
  * $Id: vkbd.c,v 1.20 2004/11/15 23:53:30 max Exp $
- * $FreeBSD$
  */
 
 #include "opt_kbd.h"
@@ -192,6 +191,8 @@ vkbd_dev_clone(void *arg, struct ucred *cred, char *name, int namelen,
 		*dev = make_dev_credf(MAKEDEV_REF, &vkbd_dev_cdevsw, unit,
 			cred, UID_ROOT, GID_WHEEL, 0600, DEVICE_NAME "%d",
 			unit);
+	else
+		dev_ref(*dev);
 }
 
 /* Open device */
@@ -1204,9 +1205,12 @@ vkbd_ioctl(keyboard_t *kbd, u_long cmd, caddr_t arg)
 		break;
 
 	case PIO_KEYMAP:	/* set keyboard translation table */
-	case OPIO_KEYMAP:	/* set keyboard translation table (compat) */
 	case PIO_KEYMAPENT:	/* set keyboard translation table entry */
 	case PIO_DEADKEYMAP:	/* set accent key translation table */
+#ifdef COMPAT_FREEBSD13
+	case OPIO_KEYMAP:	/* set keyboard translation table (compat) */
+	case OPIO_DEADKEYMAP:	/* set accent key translation table (compat) */
+#endif /* COMPAT_FREEBSD13 */
 		state->ks_accents = 0;
 		/* FALLTHROUGH */
 
@@ -1302,22 +1306,16 @@ vkbd_poll(keyboard_t *kbd, int on)
  * Local functions
  */
 
-static int delays[] = { 250, 500, 750, 1000 };
-static int rates[] = {	34,  38,  42,  46,  50,  55,  59,  63,
-			68,  76,  84,  92, 100, 110, 118, 126,
-			136, 152, 168, 184, 200, 220, 236, 252,
-			272, 304, 336, 368, 400, 440, 472, 504 };
-
 static int
 typematic_delay(int i)
 {
-	return (delays[(i >> 5) & 3]);
+	return (kbdelays[(i >> 5) & 3]);
 }
 
 static int
 typematic_rate(int i)
 {
-	return (rates[i & 0x1f]);
+	return (kbrates[i & 0x1f]);
 }
 
 static int
@@ -1326,13 +1324,13 @@ typematic(int delay, int rate)
 	int value;
 	int i;
 
-	for (i = nitems(delays) - 1; i > 0; i --) {
-		if (delay >= delays[i])
+	for (i = nitems(kbdelays) - 1; i > 0; i--) {
+		if (delay >= kbdelays[i])
 			break;
 	}
 	value = i << 5;
-	for (i = nitems(rates) - 1; i > 0; i --) {
-		if (rate >= rates[i])
+	for (i = nitems(kbrates) - 1; i > 0; i--) {
+		if (rate >= kbrates[i])
 			break;
 	}
 	value |= i;

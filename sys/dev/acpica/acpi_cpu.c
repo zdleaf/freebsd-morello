@@ -26,8 +26,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include "opt_acpi.h"
 #include <sys/param.h>
 #include <sys/bus.h>
@@ -153,6 +151,9 @@ static struct sysctl_ctx_list cpu_sysctl_ctx;
 static struct sysctl_oid *cpu_sysctl_tree;
 static int		 cpu_cx_generic;
 static int		 cpu_cx_lowest_lim;
+#if defined(__i386__) || defined(__amd64__)
+static bool		 cppc_notify;
+#endif
 
 static struct acpi_cpu_softc **cpu_softc;
 ACPI_SERIAL_DECL(cpu, "ACPI CPU");
@@ -221,8 +222,7 @@ static driver_t acpi_cpu_driver = {
     sizeof(struct acpi_cpu_softc),
 };
 
-static devclass_t acpi_cpu_devclass;
-DRIVER_MODULE(cpu, acpi, acpi_cpu_driver, acpi_cpu_devclass, 0, 0);
+DRIVER_MODULE(cpu, acpi, acpi_cpu_driver, 0, 0);
 MODULE_DEPEND(cpu, acpi, 1, 1, 1);
 
 static int
@@ -300,7 +300,7 @@ acpi_cpu_probe(device_t dev)
 	    device_quiet_children(dev);
     }
 
-    return (0);
+    return (BUS_PROBE_DEFAULT);
 }
 
 static int
@@ -379,6 +379,14 @@ acpi_cpu_attach(device_t dev)
 	cpu_sysctl_tree = SYSCTL_ADD_NODE(&cpu_sysctl_ctx,
 	    SYSCTL_CHILDREN(acpi_sc->acpi_sysctl_tree), OID_AUTO, "cpu",
 	    CTLFLAG_RD | CTLFLAG_MPSAFE, 0, "node for CPU children");
+
+#if defined(__i386__) || defined(__amd64__)
+	/* Add sysctl handler to control registering for CPPC notifications */
+	cppc_notify = 1;
+	SYSCTL_ADD_BOOL(&cpu_sysctl_ctx, SYSCTL_CHILDREN(cpu_sysctl_tree),
+	    OID_AUTO, "cppc_notify", CTLFLAG_RDTUN | CTLFLAG_MPSAFE,
+	    &cppc_notify, 0, "Register for CPPC Notifications");
+#endif
     }
 
     /*
@@ -397,9 +405,17 @@ acpi_cpu_attach(device_t dev)
      */
     if (!acpi_disabled("mwait") && cpu_mwait_usable())
 	sc->cpu_features |= ACPI_CAP_SMP_C1_NATIVE | ACPI_CAP_SMP_C3_NATIVE;
+
+    /*
+     * Work around a lingering SMM bug which leads to freezes when handling
+     * CPPC notifications. Tell the SMM we will handle any CPPC notifications.
+     */
+    if ((cpu_power_eax & CPUTPM1_HWP_NOTIFICATION) && cppc_notify)
+	    sc->cpu_features |= ACPI_CAP_INTR_CPPC;
 #endif
 
-    if (devclass_get_drivers(acpi_cpu_devclass, &drivers, &drv_count) == 0) {
+    if (devclass_get_drivers(device_get_devclass(dev), &drivers,
+	&drv_count) == 0) {
 	for (i = 0; i < drv_count; i++) {
 	    if (ACPI_GET_FEATURES(drivers[i], &features) == 0)
 		sc->cpu_features |= features;

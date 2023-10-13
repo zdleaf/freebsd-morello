@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2013 The FreeBSD Foundation
  *
@@ -29,8 +29,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include "opt_capsicum.h"
 
 #include <sys/param.h>
@@ -104,7 +102,7 @@ freebsd32_cap_ioctls_get(struct thread *td,
 	fdp = td->td_proc->p_fd;
 	FILEDESC_SLOCK(fdp);
 
-	if (fget_locked(fdp, fd) == NULL) {
+	if (fget_noref(fdp, fd) == NULL) {
 		error = EBADF;
 		goto out;
 	}

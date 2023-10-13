@@ -26,9 +26,11 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
+
+#ifdef __arm__
+#include <arm/ucontext.h>
+#else /* !__arm__ */
 
 #ifndef _MACHINE_UCONTEXT_H_
 #define	_MACHINE_UCONTEXT_H_
@@ -38,8 +40,7 @@ struct gpregs {
 	__register_t	gp_lr;
 	__register_t	gp_sp;
 	__register_t	gp_elr;
-	__uint32_t	gp_spsr;
-	int		gp_pad;
+	__uint64_t	gp_spsr;
 };
 
 struct fpregs {
@@ -87,3 +88,5 @@ typedef struct __mcontext32_vfp {
 #endif /* COMPAT_FREEBSD32 */
 
 #endif	/* !_MACHINE_UCONTEXT_H_ */
+
+#endif /* !__arm__ */

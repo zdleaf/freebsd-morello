@@ -1,8 +1,8 @@
-# $FreeBSD$
 
 .PATH: ${SRCTOP}/cddl/contrib/opensolaris/tools/ctf/common
 .PATH: ${SRCTOP}/cddl/contrib/opensolaris/tools/ctf/cvt
 
+PACKAGE=	ctf-tools
 PROG=		ctfmerge
 SRCS=		alist.c \
 		barrier.c \

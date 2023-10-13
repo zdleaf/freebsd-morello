@@ -1,4 +1,3 @@
-# $FreeBSD$
 
 LOADER_CD9660_SUPPORT?=	yes
 LOADER_EXT2FS_SUPPORT?=	no
@@ -37,6 +36,7 @@ SRCS+=		trampolineLE.S
 .endif
 
 HELP_FILES=	${FDTSRC}/help.fdt
+HELP_FILENAME=	loader.help.ofw
 
 # Always add MI sources
 .include	"${BOOTSRC}/loader.mk"

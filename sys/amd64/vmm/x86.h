@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2011 NetApp, Inc.
  * All rights reserved.
@@ -24,8 +24,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 #ifndef _X86_H_
@@ -41,6 +39,8 @@
 #define	CPUID_0000_000A	(0xA)
 #define	CPUID_0000_000B	(0xB)
 #define	CPUID_0000_000D	(0xD)
+#define	CPUID_0000_000F	(0xF)
+#define	CPUID_0000_0010	(0x10)
 #define	CPUID_0000_0015	(0x15)
 #define CPUID_8000_0000	(0x80000000)
 #define CPUID_8000_0001	(0x80000001)
@@ -64,7 +64,7 @@
  */
 #define CPUID_0000_0001_FEAT0_VMX	(1<<5)
 
-int x86_emulate_cpuid(struct vm *vm, int vcpu_id, uint64_t *rax, uint64_t *rbx,
+int x86_emulate_cpuid(struct vcpu *vcpu, uint64_t *rax, uint64_t *rbx,
     uint64_t *rcx, uint64_t *rdx);
 
 enum vm_cpuid_capability {
@@ -79,7 +79,7 @@ enum vm_cpuid_capability {
  * Return 'true' if the capability 'cap' is enabled in this virtual cpu
  * and 'false' otherwise.
  */
-bool vm_cpuid_capability(struct vm *vm, int vcpuid, enum vm_cpuid_capability);
+bool vm_cpuid_capability(struct vcpu *vcpu, enum vm_cpuid_capability);
 
 #define VMM_MTRR_VAR_MAX 10
 #define VMM_MTRR_DEF_MASK \

@@ -1,4 +1,3 @@
-# $FreeBSD$
 
 LOADER_UFS_SUPPORT?=	yes
 LOADER_CD9660_SUPPORT?=	no
@@ -15,9 +14,9 @@ LOADER_DISK_SUPPORT?=	yes
 
 .include "${.CURDIR}/arch/${MACHINE_CPUARCH}/Makefile.inc"
 
-.if ${MK_PIE} == "yes"
+LOADER_UBLDR_BIN?=	yes
+.if ${LOADER_UBLDR_BIN} != "no"
 FILES+=		ubldr ubldr.bin
-OBJS+=  ${SRCS:N*.h:R:S/$/.o/g}
 .else
 PROG=		ubldr
 .endif
@@ -35,7 +34,8 @@ WARNS?=		1
 CWARNFLAGS.self_reloc.c+=	-Wno-error=maybe-uninitialized
 .endif
 
-HELP_FILES=	 ${.CURDIR}/help.uboot ${BOOTSRC}/fdt/help.fdt
+HELP_FILES=	${.CURDIR}/help.uboot ${BOOTSRC}/fdt/help.fdt
+HELP_FILENAME=	loader.help.uboot
 
 # Always add MI sources
 .include	"${BOOTSRC}/loader.mk"
@@ -62,8 +62,6 @@ SRCS+=	metadata.c
 
 .include "${BOOTSRC}/fdt.mk"
 
-CFLAGS+=	-fPIC
-
 # Pick up the bootstrap header for some interface items
 CFLAGS+=	-I${LDRSRC}
 
@@ -73,6 +71,11 @@ CFLAGS+=	-I${FDTSRC}
 .ifdef(BOOT_DISK_DEBUG)
 # Make the disk code more talkative
 CFLAGS+= -DDISK_DEBUG
+.endif
+
+.if ${LOADER_UBLDR_BIN} != "no"
+OBJS+=  ${SRCS:N*.h:R:S/$/.o/g}
+ubldr ubldr.bin ubldr.pie: ${OBJS}
 .endif
 
 DPADD=		${LDR_INTERP} ${LIBFDT} ${LIBSA}

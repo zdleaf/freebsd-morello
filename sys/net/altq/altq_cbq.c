@@ -28,7 +28,6 @@
  * These notices must be retained in any copies of any part of this software.
  *
  * $KAME: altq_cbq.c,v 1.19 2003/09/17 14:23:25 kjc Exp $
- * $FreeBSD$
  */
 
 #include "opt_altq.h"
@@ -47,6 +46,7 @@
 
 #include <net/if.h>
 #include <net/if_var.h>
+#include <net/if_private.h>
 #include <netinet/in.h>
 
 #include <netpfil/pf/pf.h>

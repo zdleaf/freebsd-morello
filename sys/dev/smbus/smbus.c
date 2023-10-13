@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 1998, 2001 Nicolas Souchu
  * All rights reserved.
@@ -29,7 +29,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/bus.h>
@@ -239,7 +238,5 @@ driver_t smbus_driver = {
         smbus_methods,
         sizeof(struct smbus_softc),
 };
-
-devclass_t smbus_devclass;
 
 MODULE_VERSION(smbus, SMBUS_MODVER);

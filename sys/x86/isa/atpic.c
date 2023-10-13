@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2003 John Baldwin <jhb@FreeBSD.org>
  *
@@ -30,8 +30,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include "opt_auto_eoi.h"
 #include "opt_isa.h"
 
@@ -526,6 +524,7 @@ atpic_handle_intr(u_int vector, struct trapframe *frame)
 
 	kasan_mark(frame, sizeof(*frame), sizeof(*frame), 0);
 	kmsan_mark(frame, sizeof(*frame), KMSAN_STATE_INITED);
+	trap_check_kstack();
 
 	KASSERT(vector < NUM_ISA_IRQS, ("unknown int %u\n", vector));
 	isrc = &atintrs[vector].at_intsrc;
@@ -613,9 +612,7 @@ static driver_t atpic_driver = {
 	1,		/* no softc */
 };
 
-static devclass_t atpic_devclass;
-
-DRIVER_MODULE(atpic, isa, atpic_driver, atpic_devclass, 0, 0);
-DRIVER_MODULE(atpic, acpi, atpic_driver, atpic_devclass, 0, 0);
+DRIVER_MODULE(atpic, isa, atpic_driver, 0, 0);
+DRIVER_MODULE(atpic, acpi, atpic_driver, 0, 0);
 ISA_PNP_INFO(atpic_ids);
 #endif /* DEV_ISA */

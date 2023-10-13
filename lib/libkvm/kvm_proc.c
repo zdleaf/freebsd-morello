@@ -34,7 +34,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
 __SCCSID("@(#)kvm_proc.c	8.3 (Berkeley) 9/23/93");
 
 /*
@@ -94,15 +93,10 @@ static uint64_t cpu_tick_frequency;
 static uint64_t
 cputick2usec(uint64_t tick)
 {
-
 	if (cpu_tick_frequency == 0)
 		return (0);
-	if (tick > 18446744073709551)		/* floor(2^64 / 1000) */
-		return (tick / (cpu_tick_frequency / 1000000));
-	else if (tick > 18446744073709)	/* floor(2^64 / 1000000) */
-		return ((tick * 1000) / (cpu_tick_frequency / 1000));
-	else
-		return ((tick * 1000000) / cpu_tick_frequency);
+	return ((tick / cpu_tick_frequency) * 1000000ULL) +
+	    ((tick % cpu_tick_frequency) * 1000000ULL) / cpu_tick_frequency;
 }
 
 /*

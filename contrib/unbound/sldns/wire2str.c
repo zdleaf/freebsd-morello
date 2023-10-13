@@ -159,7 +159,7 @@ static sldns_lookup_table sldns_wireparse_errors_data[] = {
 		"Mandatory SvcParamKey is missing"},
 	{ LDNS_WIREPARSE_ERR_SVCB_MANDATORY_DUPLICATE_KEY,
 		"Keys in SvcParam mandatory MUST be unique" },
-	{ LDNS_WIREPARSE_ERR_SVCB_MANDATORY_IN_MANDATORY, 
+	{ LDNS_WIREPARSE_ERR_SVCB_MANDATORY_IN_MANDATORY,
 		"mandatory MUST not be included as mandatory parameter" },
 	{ LDNS_WIREPARSE_ERR_SVCB_PORT_VALUE_SYNTAX,
 		"Could not parse port SvcParamValue" },
@@ -194,6 +194,7 @@ static sldns_lookup_table sldns_edns_options_data[] = {
 	{ 8, "edns-client-subnet" },
 	{ 11, "edns-tcp-keepalive"},
 	{ 12, "Padding" },
+	{ 15, "EDE"},
 	{ 0, NULL}
 };
 sldns_lookup_table* sldns_edns_options = sldns_edns_options_data;
@@ -223,7 +224,7 @@ sldns_lookup_table* sldns_tsig_errors = sldns_tsig_errors_data;
 /* draft-ietf-dnsop-svcb-https-06: 6. Initial SvcParamKeys */
 const char *svcparamkey_strs[] = {
 	"mandatory", "alpn", "no-default-alpn", "port",
-	"ipv4hint", "ech", "ipv6hint"
+	"ipv4hint", "ech", "ipv6hint", "dohpath"
 };
 
 char* sldns_wire2str_pkt(uint8_t* data, size_t len)
@@ -486,7 +487,7 @@ int sldns_wire2str_rr_scan(uint8_t** d, size_t* dlen, char** s, size_t* slen,
 	uint8_t* rr = *d;
 	size_t rrlen = *dlen, dname_off, rdlen, ordlen;
 	uint16_t rrtype = 0;
-	
+
 	if(*dlen >= 3 && (*d)[0]==0 &&
 		sldns_read_uint16((*d)+1)==LDNS_RR_TYPE_OPT) {
 		/* perform EDNS OPT processing */
@@ -817,6 +818,7 @@ int sldns_wire2str_dname_scan(uint8_t** d, size_t* dlen, char** s, size_t* slen,
 	unsigned i, counter=0;
 	unsigned maxcompr = MAX_COMPRESS_PTRS; /* loop detection, max compr ptrs */
 	int in_buf = 1;
+	size_t dname_len = 0;
 	if(comprloop) {
 		if(*comprloop != 0)
 			maxcompr = 30; /* for like ipv6 reverse name, per label */
@@ -872,6 +874,16 @@ int sldns_wire2str_dname_scan(uint8_t** d, size_t* dlen, char** s, size_t* slen,
 			labellen = (uint8_t)*dlen;
 		else if(!in_buf && pos+(size_t)labellen > pkt+pktlen)
 			labellen = (uint8_t)(pkt + pktlen - pos);
+		dname_len += ((size_t)labellen)+1;
+		if(dname_len > LDNS_MAX_DOMAINLEN) {
+			/* dname_len counts the uncompressed length we have
+			 * seen so far, and the domain name has become too
+			 * long, prevent the loop from printing overly long
+			 * content. */
+			w += sldns_str_print(s, slen,
+				"ErrorDomainNameTooLong");
+			return w;
+		}
 		for(i=0; i<(unsigned)labellen; i++) {
 			w += dname_char_print(s, slen, *pos++);
 		}
@@ -1059,7 +1071,7 @@ static int sldns_wire2str_svcparam_mandatory2str(char** s,
 	assert(data_len > 0);
 
 	if (data_len % sizeof(uint16_t))
-		return -1; // wireformat error, data_len must be multiple of shorts
+		return -1; /* wireformat error, data_len must be multiple of shorts */
 	w += sldns_str_print(s, slen, "=");
 	w += sldns_print_svcparamkey(s, slen, sldns_read_uint16(data));
 	data += 2;
@@ -1107,7 +1119,7 @@ static int sldns_wire2str_svcparam_alpn2str(char** s,
 			w += sldns_str_print(s, slen, "%s", ",");
 	}
 	w += sldns_str_print(s, slen, "\"");
-	
+
 	return w;
 }
 
@@ -1127,7 +1139,7 @@ static int sldns_wire2str_svcparam_ech2str(char** s,
 	(*s) += size;
 	(*slen) -= size;
 
-	w += sldns_str_print(s, slen, "\"");	
+	w += sldns_str_print(s, slen, "\"");
 
 	return w + size;
 }
@@ -1150,7 +1162,7 @@ int sldns_wire2str_svcparam_scan(uint8_t** d, size_t* dlen, char** s, size_t* sl
 
 	/* verify that we have data_len data */
 	if (data_len > *dlen)
-		return -1; 
+		return -1;
 
 	written_chars += sldns_print_svcparamkey(s, slen, svcparamkey);
 	if (!data_len) {
@@ -1162,6 +1174,7 @@ int sldns_wire2str_svcparam_scan(uint8_t** d, size_t* dlen, char** s, size_t* sl
 	 	case SVCB_KEY_IPV4HINT:
 	 	case SVCB_KEY_IPV6HINT:
 	 	case SVCB_KEY_MANDATORY:
+	 	case SVCB_KEY_DOHPATH:
 	 		return -1;
 	 	default:
 	 		return written_chars;
@@ -1189,6 +1202,8 @@ int sldns_wire2str_svcparam_scan(uint8_t** d, size_t* dlen, char** s, size_t* sl
 	case SVCB_KEY_ECH:
 		r = sldns_wire2str_svcparam_ech2str(s, slen, data_len, *d);
 		break;
+	case SVCB_KEY_DOHPATH:
+		/* fallthrough */
 	default:
 		r = sldns_str_print(s, slen, "=\"");
 
@@ -1210,7 +1225,7 @@ int sldns_wire2str_svcparam_scan(uint8_t** d, size_t* dlen, char** s, size_t* sl
 	}
 	if (r <= 0)
 		return -1; /* wireformat error */
-	
+
 	written_chars += r;
 	*d    += data_len;
 	*dlen -= data_len;
@@ -1539,7 +1554,7 @@ int sldns_wire2str_nsec_scan(uint8_t** d, size_t* dl, char** s, size_t* sl)
 	unsigned i, bit, window, block_len;
 	uint16_t t;
 	int w = 0;
-	
+
 	/* check for errors */
 	while(pl) {
 		if(pl < 2) return -1;

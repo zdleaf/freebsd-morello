@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2017, 2018 Dell EMC
  * Copyright (c) 2000, 2001, 2008, 2011, David E. O'Brien
@@ -26,8 +26,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 #ifndef _SYS_ELF_COMMON_H_
@@ -332,6 +330,7 @@ typedef struct {
 #define	EF_ARM_EABI_VER3	0x03000000
 #define	EF_ARM_EABI_VER4	0x04000000
 #define	EF_ARM_EABI_VER5	0x05000000
+#define	EF_ARM_EABI_VERSION(x)	((x) & EF_ARM_EABIMASK)
 #define	EF_ARM_INTERWORK	0x00000004
 #define	EF_ARM_APCS_26		0x00000008
 #define	EF_ARM_APCS_FLOAT	0x00000010
@@ -823,8 +822,11 @@ typedef struct {
 #define	NT_PTLWPINFO		17	/* Thread ptrace miscellaneous info. */
 #define	NT_PPC_VMX	0x100	/* PowerPC Altivec/VMX registers */
 #define	NT_PPC_VSX	0x102	/* PowerPC VSX registers */
+#define	NT_X86_SEGBASES	0x200	/* x86 FS/GS base addresses. */
 #define	NT_X86_XSTATE	0x202	/* x86 XSAVE extended state. */
 #define	NT_ARM_VFP	0x400	/* ARM VFP registers */
+#define	NT_ARM_TLS	0x401	/* ARM TLS register */
+#define	NT_ARM_ADDR_MASK	0x406	/* arm64 address mask (e.g. for TBI) */
 
 /* GNU note types. */
 #define	NT_GNU_ABI_TAG		1
@@ -941,6 +943,7 @@ typedef struct {
 
 /* Values for ch_type (compressed section headers). */
 #define	ELFCOMPRESS_ZLIB	1	/* ZLIB/DEFLATE */
+#define	ELFCOMPRESS_ZSTD	2	/* Zstandard */
 #define	ELFCOMPRESS_LOOS	0x60000000	/* OS-specific */
 #define	ELFCOMPRESS_HIOS	0x6fffffff
 #define	ELFCOMPRESS_LOPROC	0x70000000	/* Processor-specific */
@@ -982,8 +985,10 @@ typedef struct {
 #define	AT_PS_STRINGS	32	/* struct ps_strings */
 #define	AT_FXRNG	33	/* Pointer to root RNG seed version. */
 #define	AT_KPRELOAD	34	/* Base of vdso, preloaded by rtld */
+#define	AT_USRSTACKBASE	35	/* Top of user stack */
+#define	AT_USRSTACKLIM	36	/* Grow limit of user stack */
 
-#define	AT_COUNT	35	/* Count of defined aux entry types. */
+#define	AT_COUNT	37	/* Count of defined aux entry types. */
 
 /*
  * Relocation types.
@@ -1154,7 +1159,7 @@ typedef struct {
 #define	R_IA_64_PCREL22		0x7a	/* immediate22	S + A - P */
 #define	R_IA_64_PCREL64I	0x7b	/* immediate64	S + A - P */
 #define	R_IA_64_IPLTMSB		0x80	/* function descriptor MSB special */
-#define	R_IA_64_IPLTLSB		0x81	/* function descriptor LSB speciaal */
+#define	R_IA_64_IPLTLSB		0x81	/* function descriptor LSB special */
 #define	R_IA_64_SUB		0x85	/* immediate64	A - S */
 #define	R_IA_64_LTOFF22X	0x86	/* immediate22	special */
 #define	R_IA_64_LDXMOV		0x87	/* immediate22	special */
@@ -1357,8 +1362,6 @@ typedef struct {
 #define	R_RISCV_SUB16		38
 #define	R_RISCV_SUB32		39
 #define	R_RISCV_SUB64		40
-#define	R_RISCV_GNU_VTINHERIT	41
-#define	R_RISCV_GNU_VTENTRY	42
 #define	R_RISCV_ALIGN		43
 #define	R_RISCV_RVC_BRANCH	44
 #define	R_RISCV_RVC_JUMP	45
@@ -1497,5 +1500,6 @@ typedef struct {
 #define	R_X86_64_REX_GOTPCRELX	42
 
 #define	ELF_BSDF_SIGFASTBLK	0x0001	/* Kernel supports fast sigblock */
+#define	ELF_BSDF_VMNOOVERCOMMIT	0x0002
 
 #endif /* !_SYS_ELF_COMMON_H_ */

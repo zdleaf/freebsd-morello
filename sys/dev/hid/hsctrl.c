@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2020 Vladimir Kondratyev <wulf@FreeBSD.org>
  *
@@ -26,8 +26,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 /*
  * General Desktop/System Controls usage page driver
  * https://www.usb.org/sites/default/files/documents/hut1_12v2.pdf
@@ -91,7 +89,6 @@ hsctrl_detach(device_t dev)
 	return (hidmap_detach(device_get_softc(dev)));
 }
 
-static devclass_t hsctrl_devclass;
 static device_method_t hsctrl_methods[] = {
 	DEVMETHOD(device_probe,		hsctrl_probe),
 	DEVMETHOD(device_attach,	hsctrl_attach),
@@ -101,7 +98,7 @@ static device_method_t hsctrl_methods[] = {
 };
 
 DEFINE_CLASS_0(hsctrl, hsctrl_driver, hsctrl_methods, sizeof(struct hidmap));
-DRIVER_MODULE(hsctrl, hidbus, hsctrl_driver, hsctrl_devclass, NULL, 0);
+DRIVER_MODULE(hsctrl, hidbus, hsctrl_driver, NULL, NULL);
 MODULE_DEPEND(hsctrl, hid, 1, 1, 1);
 MODULE_DEPEND(hsctrl, hidbus, 1, 1, 1);
 MODULE_DEPEND(hsctrl, hidmap, 1, 1, 1);

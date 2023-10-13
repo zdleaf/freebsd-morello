@@ -41,8 +41,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include "opt_atpic.h"
 #include "opt_cpu.h"
 #include "opt_ddb.h"
@@ -50,7 +48,6 @@ __FBSDID("$FreeBSD$");
 #include "opt_isa.h"
 #include "opt_kstack_pages.h"
 #include "opt_maxmem.h"
-#include "opt_mp_watchdog.h"
 #include "opt_pci.h"
 #include "opt_platform.h"
 #include "opt_sched.h"
@@ -118,6 +115,8 @@ __FBSDID("$FreeBSD$");
 
 #include <net/netisr.h>
 
+#include <dev/smbios/smbios.h>
+
 #include <machine/clock.h>
 #include <machine/cpu.h>
 #include <machine/cputypes.h>
@@ -126,7 +125,6 @@ __FBSDID("$FreeBSD$");
 #include <x86/mca.h>
 #include <machine/md_var.h>
 #include <machine/metadata.h>
-#include <machine/mp_watchdog.h>
 #include <machine/pc/bios.h>
 #include <machine/pcb.h>
 #include <machine/proc.h>
@@ -169,6 +167,9 @@ extern u_int64_t hammer_time(u_int64_t, u_int64_t);
 static void cpu_startup(void *);
 SYSINIT(cpu, SI_SUB_CPU, SI_ORDER_FIRST, cpu_startup, NULL);
 
+/* Probe 8254 PIT and TSC. */
+static void native_clock_source_init(void);
+
 /* Preload data parse function */
 static caddr_t native_parse_preload_data(u_int64_t);
 
@@ -177,8 +178,8 @@ static void native_parse_memmap(caddr_t, vm_paddr_t *, int *);
 
 /* Default init_ops implementation. */
 struct init_ops init_ops = {
-	.parse_preload_data =	native_parse_preload_data,
-	.early_clock_source_init =	i8254_init,
+	.parse_preload_data =		native_parse_preload_data,
+	.early_clock_source_init =	native_clock_source_init,
 	.early_delay =			i8254_delay,
 	.parse_memmap =			native_parse_memmap,
 };
@@ -199,6 +200,7 @@ int cold = 1;
 
 long Maxmem = 0;
 long realmem = 0;
+int late_console = 1;
 
 struct kva_md_info kmi;
 
@@ -218,8 +220,7 @@ void (*vmm_resume_p)(void);
 bool efi_boot;
 
 static void
-cpu_startup(dummy)
-	void *dummy;
+cpu_startup(void *dummy)
 {
 	uintmax_t memsize;
 	char *sysenv;
@@ -323,13 +324,13 @@ cpu_setregs(void)
 {
 	register_t cr0;
 
+	TSENTER();
 	cr0 = rcr0();
-	/*
-	 * CR0_MP, CR0_NE and CR0_TS are also set by npx_probe() for the
-	 * BSP.  See the comments there about why we set them.
-	 */
 	cr0 |= CR0_MP | CR0_NE | CR0_TS | CR0_WP | CR0_AM;
+	TSENTER2("load_cr0");
 	load_cr0(cr0);
+	TSEXIT2("load_cr0");
+	TSEXIT();
 }
 
 /*
@@ -517,7 +518,7 @@ extern inthand_t
  * Display the index and function name of any IDT entries that don't use
  * the default 'rsvd' entry point.
  */
-DB_SHOW_COMMAND(idt, db_show_idt)
+DB_SHOW_COMMAND_FLAGS(idt, db_show_idt, DB_CMD_MEMSAFE)
 {
 	struct gate_descriptor *ip;
 	int idx;
@@ -536,7 +537,7 @@ DB_SHOW_COMMAND(idt, db_show_idt)
 }
 
 /* Show privileged registers. */
-DB_SHOW_COMMAND(sysregs, db_show_sysregs)
+DB_SHOW_COMMAND_FLAGS(sysregs, db_show_sysregs, DB_CMD_MEMSAFE)
 {
 	struct {
 		uint16_t limit;
@@ -569,7 +570,7 @@ DB_SHOW_COMMAND(sysregs, db_show_sysregs)
 	db_printf("GSBASE\t0x%016lx\n", rdmsr(MSR_GSBASE));
 }
 
-DB_SHOW_COMMAND(dbregs, db_show_dbregs)
+DB_SHOW_COMMAND_FLAGS(dbregs, db_show_dbregs, DB_CMD_MEMSAFE)
 {
 
 	db_printf("dr0\t0x%016lx\n", rdr0());
@@ -577,14 +578,12 @@ DB_SHOW_COMMAND(dbregs, db_show_dbregs)
 	db_printf("dr2\t0x%016lx\n", rdr2());
 	db_printf("dr3\t0x%016lx\n", rdr3());
 	db_printf("dr6\t0x%016lx\n", rdr6());
-	db_printf("dr7\t0x%016lx\n", rdr7());	
+	db_printf("dr7\t0x%016lx\n", rdr7());
 }
 #endif
 
 void
-sdtossd(sd, ssd)
-	struct user_segment_descriptor *sd;
-	struct soft_segment_descriptor *ssd;
+sdtossd(struct user_segment_descriptor *sd, struct soft_segment_descriptor *ssd)
 {
 
 	ssd->ssd_base  = (sd->sd_hibase << 24) | sd->sd_lobase;
@@ -598,9 +597,7 @@ sdtossd(sd, ssd)
 }
 
 void
-ssdtosd(ssd, sd)
-	struct soft_segment_descriptor *ssd;
-	struct user_segment_descriptor *sd;
+ssdtosd(struct soft_segment_descriptor *ssd, struct user_segment_descriptor *sd)
 {
 
 	sd->sd_lobase = (ssd->ssd_base) & 0xffffff;
@@ -616,9 +613,7 @@ ssdtosd(ssd, sd)
 }
 
 void
-ssdtosyssd(ssd, sd)
-	struct soft_segment_descriptor *ssd;
-	struct system_segment_descriptor *sd;
+ssdtosyssd(struct soft_segment_descriptor *ssd, struct system_segment_descriptor *sd)
 {
 
 	sd->sd_lobase = (ssd->ssd_base) & 0xffffff;
@@ -813,7 +808,7 @@ add_efi_map_entries(struct efi_map_header *efihdr, vm_paddr_t *physmap,
 			continue;
 		}
 
-		if (!add_physmap_entry(p->md_phys, (p->md_pages * PAGE_SIZE),
+		if (!add_physmap_entry(p->md_phys, p->md_pages * EFI_PAGE_SIZE,
 		    physmap, physmap_idx))
 			break;
 	}
@@ -873,6 +868,7 @@ getmemsize(caddr_t kmdp, u_int64_t first)
 	quad_t dcons_addr, dcons_size;
 	int page_counter;
 
+	TSENTER();
 	/*
 	 * Tell the physical memory allocator about pages used to store
 	 * the kernel and preloaded data.  See kmem_bootstrap_free().
@@ -1128,6 +1124,7 @@ do_next:
 
 	/* Map the message buffer. */
 	msgbufp = (struct msgbuf *)PHYS_TO_DMAP(phys_avail[pa_indx]);
+	TSEXIT();
 }
 
 static caddr_t
@@ -1158,6 +1155,12 @@ native_parse_preload_data(u_int64_t modulep)
 	efi_systbl_phys = MD_FETCH(kmdp, MODINFOMD_FW_HANDLE, vm_paddr_t);
 
 	return (kmdp);
+}
+
+static void
+native_clock_source_init(void)
+{
+	i8254_init();
 }
 
 static void
@@ -1251,52 +1254,53 @@ amd64_bsp_ist_init(struct pcpu *pc)
 	tssp->tss_ist4 = (long)np;
 }
 
+/*
+ * Calculate the kernel load address by inspecting page table created by loader.
+ * The assumptions:
+ * - kernel is mapped at KERNBASE, backed by contiguous phys memory
+ *   aligned at 2M, below 4G (the latter is important for AP startup)
+ * - there is a 2M hole at KERNBASE (KERNSTART = KERNBASE + 2M)
+ * - kernel is mapped with 2M superpages
+ * - all participating memory, i.e. kernel, modules, metadata,
+ *   page table is accessible by pre-created 1:1 mapping
+ *   (right now loader creates 1:1 mapping for lower 4G, and all
+ *   memory is from there)
+ * - there is a usable memory block right after the end of the
+ *   mapped kernel and all modules/metadata, pointed to by
+ *   physfree, for early allocations
+ */
+vm_paddr_t __nosanitizeaddress __nosanitizememory
+amd64_loadaddr(void)
+{
+	pml4_entry_t *pml4e;
+	pdp_entry_t *pdpe;
+	pd_entry_t *pde;
+	uint64_t cr3;
+
+	cr3 = rcr3();
+	pml4e = (pml4_entry_t *)cr3 + pmap_pml4e_index(KERNSTART);
+	pdpe = (pdp_entry_t *)(*pml4e & PG_FRAME) + pmap_pdpe_index(KERNSTART);
+	pde = (pd_entry_t *)(*pdpe & PG_FRAME) + pmap_pde_index(KERNSTART);
+	return (*pde & PG_FRAME);
+}
+
 u_int64_t
 hammer_time(u_int64_t modulep, u_int64_t physfree)
 {
 	caddr_t kmdp;
 	int gsel_tss, x;
 	struct pcpu *pc;
-	uint64_t cr3, rsp0;
-	pml4_entry_t *pml4e;
-	pdp_entry_t *pdpe;
-	pd_entry_t *pde;
+	uint64_t rsp0;
 	char *env;
 	struct user_segment_descriptor *gdt;
 	struct region_descriptor r_gdt;
 	size_t kstack0_sz;
-	int late_console;
 
 	TSRAW(&thread0, TS_ENTER, __func__, NULL);
 
-	/*
-	 * Calculate kernphys by inspecting page table created by loader.
-	 * The assumptions:
-	 * - kernel is mapped at KERNBASE, backed by contiguous phys memory
-	 *   aligned at 2M, below 4G (the latter is important for AP startup)
-	 * - there is a 2M hole at KERNBASE
-	 * - kernel is mapped with 2M superpages
-	 * - all participating memory, i.e. kernel, modules, metadata,
-	 *   page table is accessible by pre-created 1:1 mapping
-	 *   (right now loader creates 1:1 mapping for lower 4G, and all
-	 *   memory is from there)
-	 * - there is a usable memory block right after the end of the
-	 *   mapped kernel and all modules/metadata, pointed to by
-	 *   physfree, for early allocations
-	 */
-	cr3 = rcr3();
-	pml4e = (pml4_entry_t *)(cr3 & ~PAGE_MASK) + pmap_pml4e_index(
-	    (vm_offset_t)hammer_time);
-	pdpe = (pdp_entry_t *)(*pml4e & ~PAGE_MASK) + pmap_pdpe_index(
-	    (vm_offset_t)hammer_time);
-	pde = (pd_entry_t *)(*pdpe & ~PAGE_MASK) + pmap_pde_index(
-	    (vm_offset_t)hammer_time);
-	kernphys = (vm_paddr_t)(*pde & ~PDRMASK) -
-	    (vm_paddr_t)(((vm_offset_t)hammer_time - KERNBASE) & ~PDRMASK);
+	kernphys = amd64_loadaddr();
 
-	/* Fix-up for 2M hole */
 	physfree += kernphys;
-	kernphys += NBPDR;
 
 	kmdp = init_ops.parse_preload_data(modulep);
 
@@ -1313,6 +1317,7 @@ hammer_time(u_int64_t modulep, u_int64_t physfree)
 
 	identify_cpu1();
 	identify_hypervisor();
+	identify_hypervisor_smbios();
 	identify_cpu_fixup_bsp();
 	identify_cpu2();
 	initializecpucache();
@@ -1330,6 +1335,19 @@ hammer_time(u_int64_t modulep, u_int64_t physfree)
 		    CPUID_STDEXT_INVPCID) != 0;
 	} else {
 		pmap_pcid_enabled = 0;
+	}
+
+	/*
+	 * Now we can do small core initialization, after the PCID
+	 * CPU features and user knobs are evaluated.
+	 */
+	TUNABLE_INT_FETCH("vm.pmap.pcid_invlpg_workaround",
+	    &pmap_pcid_invlpg_workaround_uena);
+	cpu_init_small_core();
+
+	if ((cpu_feature2 & CPUID2_XSAVE) != 0) {
+		use_xsave = 1;
+		TUNABLE_INT_FETCH("hw.use_xsave", &use_xsave);
 	}
 
 	link_elf_ireloc(kmdp);
@@ -1448,12 +1466,6 @@ hammer_time(u_int64_t modulep, u_int64_t physfree)
 	lidt(&r_idt);
 
 	/*
-	 * Initialize the clock before the console so that console
-	 * initialization can use DELAY().
-	 */
-	clock_init();
-
-	/*
 	 * Use vt(4) by default for UEFI boot (during the sc(4)/vt(4)
 	 * transition).
 	 * Once bootblocks have updated, we can test directly for
@@ -1479,7 +1491,18 @@ hammer_time(u_int64_t modulep, u_int64_t physfree)
 	TUNABLE_INT_FETCH("machdep.mitigations.rndgs.enable",
 	    &x86_rngds_mitg_enable);
 
+	TUNABLE_INT_FETCH("machdep.mitigations.zenbleed.enable",
+	    &zenbleed_enable);
+	zenbleed_sanitize_enable();
+
 	finishidentcpu();	/* Final stage of CPU initialization */
+
+	/*
+	 * Initialize the clock before the console so that console
+	 * initialization can use DELAY().
+	 */
+	clock_init();
+
 	initializecpu();	/* Initialize CPU registers */
 
 	amd64_bsp_ist_init(pc);
@@ -1509,7 +1532,6 @@ hammer_time(u_int64_t modulep, u_int64_t physfree)
 	 * Default to late console initialization to support these drivers.
 	 * This loses mainly printf()s in getmemsize() and early debugging.
 	 */
-	late_console = 1;
 	TUNABLE_INT_FETCH("debug.late_console", &late_console);
 	if (!late_console) {
 		cninit();

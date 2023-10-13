@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2016 Flavius Anton
  * Copyright (c) 2016 Mihai Tiganus
@@ -34,8 +34,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/types.h>
 #ifndef WITHOUT_CAPSICUM
 #include <sys/capsicum.h>
@@ -45,9 +43,6 @@ __FBSDID("$FreeBSD$");
 #include <sys/stat.h>
 #include <sys/time.h>
 #include <sys/un.h>
-
-#include <machine/atomic.h>
-#include <machine/segments.h>
 
 #ifndef WITHOUT_CAPSICUM
 #include <capsicum_helpers.h>
@@ -78,22 +73,14 @@ __FBSDID("$FreeBSD$");
 
 #include "bhyverun.h"
 #include "acpi.h"
-#include "atkbdc.h"
+#ifdef __amd64__
+#include "amd64/atkbdc.h"
+#endif
 #include "debug.h"
-#include "inout.h"
-#include "fwctl.h"
-#include "ioapic.h"
+#include "ipc.h"
 #include "mem.h"
-#include "mevent.h"
-#include "mptbl.h"
 #include "pci_emul.h"
-#include "pci_irq.h"
-#include "pci_lpc.h"
-#include "smbiostbl.h"
 #include "snapshot.h"
-#include "xmsr.h"
-#include "spinup_ap.h"
-#include "rtc.h"
 
 #include <libxo/xo.h>
 #include <ucl.h>
@@ -116,14 +103,12 @@ static sig_t old_winch_handler;
 #define	SNAPSHOT_CHUNK	(4 * MB)
 #define	PROG_BUF_SZ	(8192)
 
-#define	MAX_VMNAME 100
-
 #define	SNAPSHOT_BUFFER_SIZE (20 * MB)
 
-#define	JSON_STRUCT_ARR_KEY		"structs"
+#define	JSON_KERNEL_ARR_KEY		"kern_structs"
 #define	JSON_DEV_ARR_KEY		"devices"
 #define	JSON_BASIC_METADATA_KEY 	"basic metadata"
-#define	JSON_SNAPSHOT_REQ_KEY		"snapshot_req"
+#define	JSON_SNAPSHOT_REQ_KEY		"device"
 #define	JSON_SIZE_KEY			"size"
 #define	JSON_FILE_OFFSET_KEY		"file_offset"
 
@@ -139,24 +124,9 @@ static sig_t old_winch_handler;
  _a < _b ? _a : _b;       	\
  })
 
-const struct vm_snapshot_dev_info snapshot_devs[] = {
-	{ "atkbdc",	atkbdc_snapshot,	NULL,		NULL		},
-	{ "virtio-net",	pci_snapshot,		pci_pause,	pci_resume	},
-	{ "virtio-blk",	pci_snapshot,		pci_pause,	pci_resume	},
-	{ "virtio-rnd",	pci_snapshot,		NULL,		NULL		},
-	{ "lpc",	pci_snapshot,		NULL,		NULL		},
-	{ "fbuf",	pci_snapshot,		NULL,		NULL		},
-	{ "xhci",	pci_snapshot,		NULL,		NULL		},
-	{ "e1000",	pci_snapshot,		NULL,		NULL		},
-	{ "ahci",	pci_snapshot,		pci_pause,	pci_resume	},
-	{ "ahci-hd",	pci_snapshot,		pci_pause,	pci_resume	},
-	{ "ahci-cd",	pci_snapshot,		pci_pause,	pci_resume	},
-};
-
-const struct vm_snapshot_kern_info snapshot_kern_structs[] = {
+static const struct vm_snapshot_kern_info snapshot_kern_structs[] = {
 	{ "vhpet",	STRUCT_VHPET	},
 	{ "vm",		STRUCT_VM	},
-	{ "vmx",	STRUCT_VMX	},
 	{ "vioapic",	STRUCT_VIOAPIC	},
 	{ "vlapic",	STRUCT_VLAPIC	},
 	{ "vmcx",	STRUCT_VMCX	},
@@ -181,10 +151,10 @@ strcat_extension(const char *base_str, const char *ext)
 	char *res;
 	size_t base_len, ext_len;
 
-	base_len = strnlen(base_str, MAX_VMNAME);
-	ext_len = strnlen(ext, MAX_VMNAME);
+	base_len = strnlen(base_str, NAME_MAX);
+	ext_len = strnlen(ext, NAME_MAX);
 
-	if (base_len + ext_len > MAX_VMNAME) {
+	if (base_len + ext_len > NAME_MAX) {
 		fprintf(stderr, "Filename exceeds maximum length.\n");
 		return (NULL);
 	}
@@ -299,13 +269,14 @@ err_load_kdata:
 static int
 load_metadata_file(const char *filename, struct restore_state *rstate)
 {
-	const ucl_object_t *obj;
+	ucl_object_t *obj;
 	struct ucl_parser *parser;
 	int err;
 
 	parser = ucl_parser_new(UCL_PARSER_DEFAULT);
 	if (parser == NULL) {
 		fprintf(stderr, "Failed to initialize UCL parser.\n");
+		err = -1;
 		goto err_load_metadata;
 	}
 
@@ -417,50 +388,6 @@ do {										\
 } while(0)
 
 static void *
-lookup_struct(enum snapshot_req struct_id, struct restore_state *rstate,
-	      size_t *struct_size)
-{
-	const ucl_object_t *structs = NULL, *obj = NULL;
-	ucl_object_iter_t it = NULL;
-	int64_t snapshot_req, size, file_offset;
-
-	structs = ucl_object_lookup(rstate->meta_root_obj, JSON_STRUCT_ARR_KEY);
-	if (structs == NULL) {
-		fprintf(stderr, "Failed to find '%s' object.\n",
-			JSON_STRUCT_ARR_KEY);
-		return (NULL);
-	}
-
-	if (ucl_object_type((ucl_object_t *)structs) != UCL_ARRAY) {
-		fprintf(stderr, "Object '%s' is not an array.\n",
-		JSON_STRUCT_ARR_KEY);
-		return (NULL);
-	}
-
-	while ((obj = ucl_object_iterate(structs, &it, true)) != NULL) {
-		snapshot_req = -1;
-		JSON_GET_INT_OR_RETURN(JSON_SNAPSHOT_REQ_KEY, obj,
-				       &snapshot_req, NULL);
-		assert(snapshot_req >= 0);
-		if ((enum snapshot_req) snapshot_req == struct_id) {
-			JSON_GET_INT_OR_RETURN(JSON_SIZE_KEY, obj,
-					       &size, NULL);
-			assert(size >= 0);
-
-			JSON_GET_INT_OR_RETURN(JSON_FILE_OFFSET_KEY, obj,
-					       &file_offset, NULL);
-			assert(file_offset >= 0);
-			assert(file_offset + size <= rstate->kdata_len);
-
-			*struct_size = (size_t)size;
-			return (rstate->kdata_map + file_offset);
-		}
-	}
-
-	return (NULL);
-}
-
-static void *
 lookup_check_dev(const char *dev_name, struct restore_state *rstate,
 		 const ucl_object_t *obj, size_t *data_size)
 {
@@ -479,31 +406,31 @@ lookup_check_dev(const char *dev_name, struct restore_state *rstate,
 		JSON_GET_INT_OR_RETURN(JSON_FILE_OFFSET_KEY, obj,
 				       &file_offset, NULL);
 		assert(file_offset >= 0);
-		assert(file_offset + size <= rstate->kdata_len);
+		assert((uint64_t)file_offset + size <= rstate->kdata_len);
 
 		*data_size = (size_t)size;
-		return (rstate->kdata_map + file_offset);
+		return ((uint8_t *)rstate->kdata_map + file_offset);
 	}
 
 	return (NULL);
 }
 
-static void*
-lookup_dev(const char *dev_name, struct restore_state *rstate,
-	   size_t *data_size)
+static void *
+lookup_dev(const char *dev_name, const char *key, struct restore_state *rstate,
+    size_t *data_size)
 {
 	const ucl_object_t *devs = NULL, *obj = NULL;
 	ucl_object_iter_t it = NULL;
 	void *ret;
 
-	devs = ucl_object_lookup(rstate->meta_root_obj, JSON_DEV_ARR_KEY);
+	devs = ucl_object_lookup(rstate->meta_root_obj, key);
 	if (devs == NULL) {
 		fprintf(stderr, "Failed to find '%s' object.\n",
 			JSON_DEV_ARR_KEY);
 		return (NULL);
 	}
 
-	if (ucl_object_type((ucl_object_t *)devs) != UCL_ARRAY) {
+	if (ucl_object_type(devs) != UCL_ARRAY) {
 		fprintf(stderr, "Object '%s' is not an array.\n",
 			JSON_DEV_ARR_KEY);
 		return (NULL);
@@ -531,7 +458,7 @@ lookup_basic_metadata_object(struct restore_state *rstate)
 		return (NULL);
 	}
 
-	if (ucl_object_type((ucl_object_t *)basic_meta_obj) != UCL_OBJECT) {
+	if (ucl_object_type(basic_meta_obj) != UCL_OBJECT) {
 		fprintf(stderr, "Object '%s' is not a JSON object.\n",
 		JSON_BASIC_METADATA_KEY);
 		return (NULL);
@@ -602,7 +529,7 @@ lookup_guest_ncpus(struct restore_state *rstate)
 }
 
 static void
-winch_handler(int signal)
+winch_handler(int signal __unused)
 {
 #ifdef TIOCGWINSZ
 	ioctl(STDOUT_FILENO, TIOCGWINSZ, &winsize);
@@ -621,7 +548,7 @@ print_progress(size_t crtval, const size_t maxval)
 	static const size_t len = sizeof(prog_buf);
 
 	static size_t div;
-	static char *div_str;
+	static const char *div_str;
 
 	static char wip_bar[] = { '/', '-', '\\', '|' };
 	static int wip_idx = 0;
@@ -778,7 +705,7 @@ vm_snapshot_mem_part(const int snapfd, const size_t foff, void *src,
 			return (-1);
 		}
 
-		src += done;
+		src = (uint8_t *)src + done;
 		part_done += done;
 		rem -= done;
 	}
@@ -861,97 +788,69 @@ restore_vm_mem(struct vmctx *ctx, struct restore_state *rstate)
 	return (0);
 }
 
-static int
-vm_restore_kern_struct(struct vmctx *ctx, struct restore_state *rstate,
-		       const struct vm_snapshot_kern_info *info)
-{
-	void *struct_ptr;
-	size_t struct_size;
-	int ret;
-	struct vm_snapshot_meta *meta;
-
-	struct_ptr = lookup_struct(info->req, rstate, &struct_size);
-	if (struct_ptr == NULL) {
-		fprintf(stderr, "%s: Failed to lookup struct %s\r\n",
-			__func__, info->struct_name);
-		ret = -1;
-		goto done;
-	}
-
-	if (struct_size == 0) {
-		fprintf(stderr, "%s: Kernel struct size was 0 for: %s\r\n",
-			__func__, info->struct_name);
-		ret = -1;
-		goto done;
-	}
-
-	meta = &(struct vm_snapshot_meta) {
-		.ctx = ctx,
-		.dev_name = info->struct_name,
-		.dev_req  = info->req,
-
-		.buffer.buf_start = struct_ptr,
-		.buffer.buf_size = struct_size,
-
-		.buffer.buf = struct_ptr,
-		.buffer.buf_rem = struct_size,
-
-		.op = VM_SNAPSHOT_RESTORE,
-	};
-
-	ret = vm_snapshot_req(meta);
-	if (ret != 0) {
-		fprintf(stderr, "%s: Failed to restore struct: %s\r\n",
-			__func__, info->struct_name);
-		goto done;
-	}
-
-done:
-	return (ret);
-}
-
 int
 vm_restore_kern_structs(struct vmctx *ctx, struct restore_state *rstate)
 {
-	int ret;
-	int i;
+	for (unsigned i = 0; i < nitems(snapshot_kern_structs); i++) {
+		const struct vm_snapshot_kern_info *info;
+		struct vm_snapshot_meta *meta;
+		void *data;
+		size_t size;
 
-	for (i = 0; i < nitems(snapshot_kern_structs); i++) {
-		ret = vm_restore_kern_struct(ctx, rstate,
-					     &snapshot_kern_structs[i]);
-		if (ret != 0)
-			return (ret);
+		info = &snapshot_kern_structs[i];
+		data = lookup_dev(info->struct_name, JSON_KERNEL_ARR_KEY, rstate, &size);
+		if (data == NULL)
+			errx(EX_DATAERR, "Cannot find kern struct %s",
+			    info->struct_name);
+
+		if (size == 0)
+			errx(EX_DATAERR, "data with zero size for %s",
+			    info->struct_name);
+
+		meta = &(struct vm_snapshot_meta) {
+			.dev_name = info->struct_name,
+			.dev_req  = info->req,
+
+			.buffer.buf_start = data,
+			.buffer.buf_size = size,
+
+			.buffer.buf = data,
+			.buffer.buf_rem = size,
+
+			.op = VM_SNAPSHOT_RESTORE,
+		};
+
+		if (vm_snapshot_req(ctx, meta))
+			err(EX_DATAERR, "Failed to restore %s",
+			    info->struct_name);
 	}
-
 	return (0);
 }
 
-int
-vm_restore_user_dev(struct vmctx *ctx, struct restore_state *rstate,
-		    const struct vm_snapshot_dev_info *info)
+static int
+vm_restore_device(struct restore_state *rstate, vm_snapshot_dev_cb func,
+    const char *name, void *data)
 {
 	void *dev_ptr;
 	size_t dev_size;
 	int ret;
 	struct vm_snapshot_meta *meta;
 
-	dev_ptr = lookup_dev(info->dev_name, rstate, &dev_size);
+	dev_ptr = lookup_dev(name, JSON_DEV_ARR_KEY, rstate, &dev_size);
+
 	if (dev_ptr == NULL) {
-		fprintf(stderr, "Failed to lookup dev: %s\r\n", info->dev_name);
-		fprintf(stderr, "Continuing the restore/migration process\r\n");
-		return (0);
+		EPRINTLN("Failed to lookup dev: %s", name);
+		return (EINVAL);
 	}
 
 	if (dev_size == 0) {
-		fprintf(stderr, "%s: Device size is 0. "
-			"Assuming %s is not used\r\n",
-			__func__, info->dev_name);
-		return (0);
+		EPRINTLN("Restore device size is 0: %s", name);
+		return (EINVAL);
 	}
 
 	meta = &(struct vm_snapshot_meta) {
-		.ctx = ctx,
-		.dev_name = info->dev_name,
+		.dev_name = name,
+		.dev_data = data,
 
 		.buffer.buf_start = dev_ptr,
 		.buffer.buf_size = dev_size,
@@ -962,81 +861,78 @@ vm_restore_user_dev(struct vmctx *ctx, struct restore_state *rstate,
 		.op = VM_SNAPSHOT_RESTORE,
 	};
 
-	ret = (*info->snapshot_cb)(meta);
+	ret = func(meta);
 	if (ret != 0) {
-		fprintf(stderr, "Failed to restore dev: %s\r\n",
-			info->dev_name);
-		return (-1);
-	}
-
-	return (0);
-}
-
-
-int
-vm_restore_user_devs(struct vmctx *ctx, struct restore_state *rstate)
-{
-	int ret;
-	int i;
-
-	for (i = 0; i < nitems(snapshot_devs); i++) {
-		ret = vm_restore_user_dev(ctx, rstate, &snapshot_devs[i]);
-		if (ret != 0)
-			return (ret);
-	}
-
-	return 0;
-}
-
-int
-vm_pause_user_devs(struct vmctx *ctx)
-{
-	const struct vm_snapshot_dev_info *info;
-	int ret;
-	int i;
-
-	for (i = 0; i < nitems(snapshot_devs); i++) {
-		info = &snapshot_devs[i];
-		if (info->pause_cb == NULL)
-			continue;
-
-		ret = info->pause_cb(ctx, info->dev_name);
-		if (ret != 0)
-			return (ret);
+		EPRINTLN("Failed to restore dev: %s %d", name, ret);
+		return (ret);
 	}
 
 	return (0);
 }
 
 int
-vm_resume_user_devs(struct vmctx *ctx)
+vm_restore_devices(struct restore_state *rstate)
 {
-	const struct vm_snapshot_dev_info *info;
 	int ret;
-	int i;
+	struct pci_devinst *pdi = NULL;
 
-	for (i = 0; i < nitems(snapshot_devs); i++) {
-		info = &snapshot_devs[i];
-		if (info->resume_cb == NULL)
-			continue;
-
-		ret = info->resume_cb(ctx, info->dev_name);
-		if (ret != 0)
+	while ((pdi = pci_next(pdi)) != NULL) {
+		ret = vm_restore_device(rstate, pci_snapshot, pdi->pi_name, pdi);
+		if (ret)
 			return (ret);
+	}
+
+#ifdef __amd64__
+	ret = vm_restore_device(rstate, atkbdc_snapshot, "atkbdc", NULL);
+#else
+	ret = 0;
+#endif
+	return (ret);
+}
+
+int
+vm_pause_devices(void)
+{
+	int ret;
+	struct pci_devinst *pdi = NULL;
+
+	while ((pdi = pci_next(pdi)) != NULL) {
+		ret = pci_pause(pdi);
+		if (ret) {
+			EPRINTLN("Cannot pause dev %s: %d", pdi->pi_name, ret);
+			return (ret);
+		}
+	}
+
+	return (0);
+}
+
+int
+vm_resume_devices(void)
+{
+	int ret;
+	struct pci_devinst *pdi = NULL;
+
+	while ((pdi = pci_next(pdi)) != NULL) {
+		ret = pci_resume(pdi);
+		if (ret) {
+			EPRINTLN("Cannot resume '%s': %d", pdi->pi_name, ret);
+			return (ret);
+		}
 	}
 
 	return (0);
 }
 
 static int
-vm_snapshot_kern_struct(int data_fd, xo_handle_t *xop, const char *array_key,
-			struct vm_snapshot_meta *meta, off_t *offset)
+vm_save_kern_struct(struct vmctx *ctx, int data_fd, xo_handle_t *xop,
+    const char *array_key, struct vm_snapshot_meta *meta, off_t *offset)
 {
 	int ret;
 	size_t data_size;
 	ssize_t write_cnt;
 
-	ret = vm_snapshot_req(meta);
+	ret = vm_snapshot_req(ctx, meta);
 	if (ret != 0) {
 		fprintf(stderr, "%s: Failed to snapshot struct %s\r\n",
 			__func__, meta->dev_name);
@@ -1046,8 +942,9 @@ vm_snapshot_kern_struct(int data_fd, xo_handle_t *xop, const char *array_key,
 
 	data_size = vm_get_snapshot_size(meta);
 
+	/* XXX-MJ no handling for short writes. */
 	write_cnt = write(data_fd, meta->buffer.buf_start, data_size);
-	if (write_cnt != data_size) {
+	if (write_cnt < 0 || (size_t)write_cnt != data_size) {
 		perror("Failed to write all snapshotted data.");
 		ret = -1;
 		goto done;
@@ -1055,12 +952,11 @@ vm_snapshot_kern_struct(int data_fd, xo_handle_t *xop, const char *array_key,
 
 	/* Write metadata. */
 	xo_open_instance_h(xop, array_key);
-	xo_emit_h(xop, "{:debug_name/%s}\n", meta->dev_name);
-	xo_emit_h(xop, "{:" JSON_SNAPSHOT_REQ_KEY "/%d}\n",
-		  meta->dev_req);
+	xo_emit_h(xop, "{:" JSON_SNAPSHOT_REQ_KEY "/%s}\n",
+	    meta->dev_name);
 	xo_emit_h(xop, "{:" JSON_SIZE_KEY "/%lu}\n", data_size);
 	xo_emit_h(xop, "{:" JSON_FILE_OFFSET_KEY "/%lu}\n", *offset);
-	xo_close_instance_h(xop, JSON_STRUCT_ARR_KEY);
+	xo_close_instance_h(xop, JSON_KERNEL_ARR_KEY);
 
 	*offset += data_size;
 
@@ -1069,10 +965,10 @@ done:
 }
 
 static int
-vm_snapshot_kern_structs(struct vmctx *ctx, int data_fd, xo_handle_t *xop)
+vm_save_kern_structs(struct vmctx *ctx, int data_fd, xo_handle_t *xop)
 {
-	int ret, i, error;
-	size_t offset, buf_size;
+	int ret, error;
+	size_t buf_size, i, offset;
 	char *buffer;
 	struct vm_snapshot_meta *meta;
 
@@ -1088,15 +984,13 @@ vm_snapshot_kern_structs(struct vmctx *ctx, int data_fd, xo_handle_t *xop)
 	}
 
 	meta = &(struct vm_snapshot_meta) {
-		.ctx = ctx,
-
 		.buffer.buf_start = buffer,
 		.buffer.buf_size = buf_size,
 
 		.op = VM_SNAPSHOT_SAVE,
 	};
 
-	xo_open_list_h(xop, JSON_STRUCT_ARR_KEY);
+	xo_open_list_h(xop, JSON_KERNEL_ARR_KEY);
 	for (i = 0; i < nitems(snapshot_kern_structs); i++) {
 		meta->dev_name = snapshot_kern_structs[i].struct_name;
 		meta->dev_req  = snapshot_kern_structs[i].req;
@@ -1105,14 +999,14 @@ vm_snapshot_kern_structs(struct vmctx *ctx, int data_fd, xo_handle_t *xop)
 		meta->buffer.buf = meta->buffer.buf_start;
 		meta->buffer.buf_rem = meta->buffer.buf_size;
 
-		ret = vm_snapshot_kern_struct(data_fd, xop, JSON_DEV_ARR_KEY,
-					      meta, &offset);
+		ret = vm_save_kern_struct(ctx, data_fd, xop,
+		    JSON_DEV_ARR_KEY, meta, &offset);
 		if (ret != 0) {
 			error = -1;
 			goto err_vm_snapshot_kern_data;
 		}
 	}
-	xo_close_list_h(xop, JSON_STRUCT_ARR_KEY);
+	xo_close_list_h(xop, JSON_KERNEL_ARR_KEY);
 
 err_vm_snapshot_kern_data:
 	if (buffer != NULL)
@@ -1123,41 +1017,29 @@ err_vm_snapshot_kern_data:
 static int
 vm_snapshot_basic_metadata(struct vmctx *ctx, xo_handle_t *xop, size_t memsz)
 {
-	int error;
-	int memflags;
-	char vmname_buf[MAX_VMNAME];
-
-	memset(vmname_buf, 0, MAX_VMNAME);
-	error = vm_get_name(ctx, vmname_buf, MAX_VMNAME - 1);
-	if (error != 0) {
-		perror("Failed to get VM name");
-		goto err;
-	}
-
-	memflags = vm_get_memflags(ctx);
 
 	xo_open_container_h(xop, JSON_BASIC_METADATA_KEY);
 	xo_emit_h(xop, "{:" JSON_NCPUS_KEY "/%ld}\n", guest_ncpus);
-	xo_emit_h(xop, "{:" JSON_VMNAME_KEY "/%s}\n", vmname_buf);
+	xo_emit_h(xop, "{:" JSON_VMNAME_KEY "/%s}\n", vm_get_name(ctx));
 	xo_emit_h(xop, "{:" JSON_MEMSIZE_KEY "/%lu}\n", memsz);
-	xo_emit_h(xop, "{:" JSON_MEMFLAGS_KEY "/%d}\n", memflags);
+	xo_emit_h(xop, "{:" JSON_MEMFLAGS_KEY "/%d}\n", vm_get_memflags(ctx));
 	xo_close_container_h(xop, JSON_BASIC_METADATA_KEY);
 
-err:
-	return (error);
+	return (0);
 }
 
 static int
 vm_snapshot_dev_write_data(int data_fd, xo_handle_t *xop, const char *array_key,
 			   struct vm_snapshot_meta *meta, off_t *offset)
 {
-	int ret;
+	ssize_t ret;
 	size_t data_size;
 
 	data_size = vm_get_snapshot_size(meta);
 
+	/* XXX-MJ no handling for short writes. */
 	ret = write(data_fd, meta->buffer.buf_start, data_size);
-	if (ret != data_size) {
+	if (ret < 0 || (size_t)ret != data_size) {
 		perror("Failed to write all snapshotted data.");
 		return (-1);
 	}
@@ -1175,16 +1057,21 @@ vm_snapshot_dev_write_data(int data_fd, xo_handle_t *xop, const char *array_key,
 }
 
 static int
-vm_snapshot_user_dev(const struct vm_snapshot_dev_info *info,
-		     int data_fd, xo_handle_t *xop,
-		     struct vm_snapshot_meta *meta, off_t *offset)
+vm_snapshot_device(vm_snapshot_dev_cb func, const char *dev_name,
+    void *devdata, int data_fd, xo_handle_t *xop,
+    struct vm_snapshot_meta *meta, off_t *offset)
 {
 	int ret;
 
-	ret = (*info->snapshot_cb)(meta);
+	memset(meta->buffer.buf_start, 0, meta->buffer.buf_size);
+	meta->buffer.buf = meta->buffer.buf_start;
+	meta->buffer.buf_rem = meta->buffer.buf_size;
+	meta->dev_name = dev_name;
+	meta->dev_data = devdata;
+
+	ret = func(meta);
 	if (ret != 0) {
-		fprintf(stderr, "Failed to snapshot %s; ret=%d\r\n",
-			meta->dev_name, ret);
+		EPRINTLN("Failed to snapshot %s; ret=%d", dev_name, ret);
 		return (ret);
 	}
 
@@ -1197,13 +1084,14 @@ vm_snapshot_user_dev(const struct vm_snapshot_dev_info *info,
 }
 
 static int
-vm_snapshot_user_devs(struct vmctx *ctx, int data_fd, xo_handle_t *xop)
+vm_snapshot_devices(int data_fd, xo_handle_t *xop)
 {
-	int ret, i;
+	int ret;
 	off_t offset;
 	void *buffer;
 	size_t buf_size;
 	struct vm_snapshot_meta *meta;
+	struct pci_devinst *pdi;
 
 	buf_size = SNAPSHOT_BUFFER_SIZE;
 
@@ -1221,8 +1109,6 @@ vm_snapshot_user_devs(struct vmctx *ctx, int data_fd, xo_handle_t *xop)
 	}
 
 	meta = &(struct vm_snapshot_meta) {
-		.ctx = ctx,
-
 		.buffer.buf_start = buffer,
 		.buffer.buf_size = buf_size,
 
@@ -1231,19 +1117,21 @@ vm_snapshot_user_devs(struct vmctx *ctx, int data_fd, xo_handle_t *xop)
 
 	xo_open_list_h(xop, JSON_DEV_ARR_KEY);
 
-	/* Restore other devices that support this feature */
-	for (i = 0; i < nitems(snapshot_devs); i++) {
-		meta->dev_name = snapshot_devs[i].dev_name;
-
-		memset(meta->buffer.buf_start, 0, meta->buffer.buf_size);
-		meta->buffer.buf = meta->buffer.buf_start;
-		meta->buffer.buf_rem = meta->buffer.buf_size;
-
-		ret = vm_snapshot_user_dev(&snapshot_devs[i], data_fd, xop,
-					   meta, &offset);
+	/* Save PCI devices */
+	pdi = NULL;
+	while ((pdi = pci_next(pdi)) != NULL) {
+		ret = vm_snapshot_device(pci_snapshot, pdi->pi_name, pdi,
+		    data_fd, xop, meta, &offset);
 		if (ret != 0)
 			goto snapshot_err;
 	}
+
+#ifdef __amd64__
+	ret = vm_snapshot_device(atkbdc_snapshot, "atkbdc", NULL,
+	    data_fd, xop, meta, &offset);
+#else
+	ret = 0;
+#endif
 
 	xo_close_list_h(xop, JSON_DEV_ARR_KEY);
 
@@ -1307,7 +1195,7 @@ vm_vcpu_pause(struct vmctx *ctx)
 
 	pthread_mutex_lock(&vcpu_lock);
 	checkpoint_active = true;
-	vm_suspend_cpu(ctx, -1);
+	vm_suspend_all_cpus(ctx);
 	while (CPU_CMP(&vcpus_active, &vcpus_suspended) != 0)
 		pthread_cond_wait(&vcpus_idle, &vcpu_lock);
 	pthread_mutex_unlock(&vcpu_lock);
@@ -1320,14 +1208,15 @@ vm_vcpu_resume(struct vmctx *ctx)
 	pthread_mutex_lock(&vcpu_lock);
 	checkpoint_active = false;
 	pthread_mutex_unlock(&vcpu_lock);
-	vm_resume_cpu(ctx, -1);
+	vm_resume_all_cpus(ctx);
 	pthread_cond_broadcast(&vcpus_can_run);
 }
 
 static int
-vm_checkpoint(struct vmctx *ctx, char *checkpoint_file, bool stop_vm)
+vm_checkpoint(struct vmctx *ctx, int fddir, const char *checkpoint_file,
+    bool stop_vm)
 {
-	int fd_checkpoint = 0, kdata_fd = 0;
+	int fd_checkpoint = 0, kdata_fd = 0, fd_meta;
 	int ret = 0;
 	int error = 0;
 	size_t memsz;
@@ -1342,14 +1231,14 @@ vm_checkpoint(struct vmctx *ctx, char *checkpoint_file, bool stop_vm)
 		return (-1);
 	}
 
-	kdata_fd = open(kdata_filename, O_WRONLY | O_CREAT | O_TRUNC, 0700);
+	kdata_fd = openat(fddir, kdata_filename, O_WRONLY | O_CREAT | O_TRUNC, 0700);
 	if (kdata_fd < 0) {
 		perror("Failed to open kernel data snapshot file.");
 		error = -1;
 		goto done;
 	}
 
-	fd_checkpoint = open(checkpoint_file, O_RDWR | O_CREAT | O_TRUNC, 0700);
+	fd_checkpoint = openat(fddir, checkpoint_file, O_RDWR | O_CREAT | O_TRUNC, 0700);
 
 	if (fd_checkpoint < 0) {
 		perror("Failed to create checkpoint file");
@@ -1363,9 +1252,12 @@ vm_checkpoint(struct vmctx *ctx, char *checkpoint_file, bool stop_vm)
 		goto done;
 	}
 
-	meta_file = fopen(meta_filename, "w");
+	fd_meta = openat(fddir, meta_filename, O_WRONLY | O_CREAT | O_TRUNC, 0700);
+	if (fd_meta != -1)
+		meta_file = fdopen(fd_meta, "w");
 	if (meta_file == NULL) {
 		perror("Failed to open vm metadata snapshot file.");
+		close(fd_meta);
 		goto done;
 	}
 
@@ -1377,7 +1269,7 @@ vm_checkpoint(struct vmctx *ctx, char *checkpoint_file, bool stop_vm)
 
 	vm_vcpu_pause(ctx);
 
-	ret = vm_pause_user_devs(ctx);
+	ret = vm_pause_devices();
 	if (ret != 0) {
 		fprintf(stderr, "Could not pause devices\r\n");
 		error = ret;
@@ -1398,15 +1290,14 @@ vm_checkpoint(struct vmctx *ctx, char *checkpoint_file, bool stop_vm)
 		goto done;
 	}
 
-
-	ret = vm_snapshot_kern_structs(ctx, kdata_fd, xop);
+	ret = vm_save_kern_structs(ctx, kdata_fd, xop);
 	if (ret != 0) {
 		fprintf(stderr, "Failed to snapshot vm kernel data.\n");
 		error = -1;
 		goto done;
 	}
 
-	ret = vm_snapshot_user_devs(ctx, kdata_fd, xop);
+	ret = vm_snapshot_devices(kdata_fd, xop);
 	if (ret != 0) {
 		fprintf(stderr, "Failed to snapshot device state.\n");
 		error = -1;
@@ -1421,7 +1312,7 @@ vm_checkpoint(struct vmctx *ctx, char *checkpoint_file, bool stop_vm)
 	}
 
 done:
-	ret = vm_resume_user_devs(ctx);
+	ret = vm_resume_devices();
 	if (ret != 0)
 		fprintf(stderr, "Could not resume devices\r\n");
 	vm_vcpu_resume(ctx);
@@ -1440,27 +1331,22 @@ done:
 	return (error);
 }
 
-int
-handle_message(struct ipc_message *imsg, struct vmctx *ctx)
+static int
+handle_message(struct vmctx *ctx, nvlist_t *nvl)
 {
-	int err;
+	const char *cmd;
+	struct ipc_command **ipc_cmd;
 
-	switch (imsg->code) {
-		case START_CHECKPOINT:
-			err = vm_checkpoint(ctx, imsg->data.op.snapshot_filename, false);
-			break;
-		case START_SUSPEND:
-			err = vm_checkpoint(ctx, imsg->data.op.snapshot_filename, true);
-			break;
-		default:
-			EPRINTLN("Unrecognized checkpoint operation\n");
-			err = -1;
+	if (!nvlist_exists_string(nvl, "cmd"))
+		return (EINVAL);
+
+	cmd = nvlist_get_string(nvl, "cmd");
+	IPC_COMMAND_FOREACH(ipc_cmd, ipc_cmd_set) {
+		if (strcmp(cmd, (*ipc_cmd)->name) == 0)
+			return ((*ipc_cmd)->handler(ctx, nvl));
 	}
 
-	if (err != 0)
-		EPRINTLN("Unable to perform the requested operation\n");
-
-	return (err);
+	return (EOPNOTSUPP);
 }
 
 /*
@@ -1469,29 +1355,45 @@ handle_message(struct ipc_message *imsg, struct vmctx *ctx)
 void *
 checkpoint_thread(void *param)
 {
-	struct ipc_message imsg;
+	int fd;
 	struct checkpoint_thread_info *thread_info;
-	ssize_t n;
+	nvlist_t *nvl;
 
 	pthread_set_name_np(pthread_self(), "checkpoint thread");
 	thread_info = (struct checkpoint_thread_info *)param;
 
-	for (;;) {
-		n = recvfrom(thread_info->socket_fd, &imsg, sizeof(imsg), 0, NULL, 0);
-
-		/*
-		 * slight sanity check: see if there's enough data to at
-		 * least determine the type of message.
-		 */
-		if (n >= sizeof(imsg.code))
-			handle_message(&imsg, thread_info->ctx);
+	while ((fd = accept(thread_info->socket_fd, NULL, NULL)) != -1) {
+		nvl = nvlist_recv(fd, 0);
+		if (nvl != NULL)
+			handle_message(thread_info->ctx, nvl);
 		else
-			EPRINTLN("Failed to receive message: %s\n",
-			    n == -1 ? strerror(errno) : "unknown error");
+			EPRINTLN("nvlist_recv() failed: %s", strerror(errno));
+
+		close(fd);
+		nvlist_destroy(nvl);
 	}
 
 	return (NULL);
 }
+
+static int
+vm_do_checkpoint(struct vmctx *ctx, const nvlist_t *nvl)
+{
+	int error;
+
+	if (!nvlist_exists_string(nvl, "filename") ||
+	    !nvlist_exists_bool(nvl, "suspend") ||
+	    !nvlist_exists_descriptor(nvl, "fddir"))
+		error = EINVAL;
+	else
+		error = vm_checkpoint(ctx,
+		    nvlist_get_descriptor(nvl, "fddir"),
+		    nvlist_get_string(nvl, "filename"),
+		    nvlist_get_bool(nvl, "suspend"));
+
+	return (error);
+}
+IPC_COMMAND(ipc_cmd_set, checkpoint, vm_do_checkpoint);
 
 void
 init_snapshot(void)
@@ -1519,12 +1421,14 @@ init_checkpoint_thread(struct vmctx *ctx)
 	struct sockaddr_un addr;
 	int socket_fd;
 	pthread_t checkpoint_pthread;
-	char vmname_buf[MAX_VMNAME];
 	int err;
+#ifndef WITHOUT_CAPSICUM
+	cap_rights_t rights;
+#endif
 
 	memset(&addr, 0, sizeof(addr));
 
-	socket_fd = socket(PF_UNIX, SOCK_DGRAM, 0);
+	socket_fd = socket(PF_UNIX, SOCK_STREAM, 0);
 	if (socket_fd < 0) {
 		EPRINTLN("Socket creation failed: %s", strerror(errno));
 		err = -1;
@@ -1533,14 +1437,8 @@ init_checkpoint_thread(struct vmctx *ctx)
 
 	addr.sun_family = AF_UNIX;
 
-	err = vm_get_name(ctx, vmname_buf, MAX_VMNAME - 1);
-	if (err != 0) {
-		perror("Failed to get VM name");
-		goto fail;
-	}
-
 	snprintf(addr.sun_path, sizeof(addr.sun_path), "%s%s",
-		 BHYVE_RUN_DIR, vmname_buf);
+		 BHYVE_RUN_DIR, vm_get_name(ctx));
 	addr.sun_len = SUN_LEN(&addr);
 	unlink(addr.sun_path);
 
@@ -1551,6 +1449,19 @@ init_checkpoint_thread(struct vmctx *ctx)
 		goto fail;
 	}
 
+	if (listen(socket_fd, 10) < 0) {
+		EPRINTLN("ipc socket listen: %s\n", strerror(errno));
+		err = errno;
+		goto fail;
+	}
+
+#ifndef WITHOUT_CAPSICUM
+	cap_rights_init(&rights, CAP_ACCEPT, CAP_READ, CAP_RECV, CAP_WRITE,
+	    CAP_SEND, CAP_GETSOCKOPT);
+
+	if (caph_rights_limit(socket_fd, &rights) == -1)
+		errx(EX_OSERR, "Unable to apply rights for sandbox");
+#endif
 	checkpoint_info = calloc(1, sizeof(*checkpoint_info));
 	checkpoint_info->ctx = ctx;
 	checkpoint_info->socket_fd = socket_fd;
@@ -1587,8 +1498,7 @@ vm_snapshot_buf_err(const char *bufname, const enum vm_snapshot_op op)
 }
 
 int
-vm_snapshot_buf(volatile void *data, size_t data_size,
-		struct vm_snapshot_meta *meta)
+vm_snapshot_buf(void *data, size_t data_size, struct vm_snapshot_meta *meta)
 {
 	struct vm_snapshot_buffer *buffer;
 	int op;
@@ -1602,9 +1512,9 @@ vm_snapshot_buf(volatile void *data, size_t data_size,
 	}
 
 	if (op == VM_SNAPSHOT_SAVE)
-		memcpy(buffer->buf, (uint8_t *) data, data_size);
+		memcpy(buffer->buf, data, data_size);
 	else if (op == VM_SNAPSHOT_RESTORE)
-		memcpy((uint8_t *) data, buffer->buf, data_size);
+		memcpy(data, buffer->buf, data_size);
 	else
 		return (EINVAL);
 
@@ -1634,14 +1544,14 @@ vm_get_snapshot_size(struct vm_snapshot_meta *meta)
 }
 
 int
-vm_snapshot_guest2host_addr(void **addrp, size_t len, bool restore_null,
-			    struct vm_snapshot_meta *meta)
+vm_snapshot_guest2host_addr(struct vmctx *ctx, void **addrp, size_t len,
+    bool restore_null, struct vm_snapshot_meta *meta)
 {
 	int ret;
 	vm_paddr_t gaddr;
 
 	if (meta->op == VM_SNAPSHOT_SAVE) {
-		gaddr = paddr_host2guest(meta->ctx, *addrp);
+		gaddr = paddr_host2guest(ctx, *addrp);
 		if (gaddr == (vm_paddr_t) -1) {
 			if (!restore_null ||
 			    (restore_null && (*addrp != NULL))) {
@@ -1660,7 +1570,7 @@ vm_snapshot_guest2host_addr(void **addrp, size_t len, bool restore_null,
 			}
 		}
 
-		*addrp = paddr_guest2host(meta->ctx, gaddr, len);
+		*addrp = paddr_guest2host(ctx, gaddr, len);
 	} else {
 		ret = EINVAL;
 	}
@@ -1670,8 +1580,7 @@ done:
 }
 
 int
-vm_snapshot_buf_cmp(volatile void *data, size_t data_size,
-		    struct vm_snapshot_meta *meta)
+vm_snapshot_buf_cmp(void *data, size_t data_size, struct vm_snapshot_meta *meta)
 {
 	struct vm_snapshot_buffer *buffer;
 	int op;
@@ -1688,9 +1597,9 @@ vm_snapshot_buf_cmp(volatile void *data, size_t data_size,
 
 	if (op == VM_SNAPSHOT_SAVE) {
 		ret = 0;
-		memcpy(buffer->buf, (uint8_t *) data, data_size);
+		memcpy(buffer->buf, data, data_size);
 	} else if (op == VM_SNAPSHOT_RESTORE) {
-		ret = memcmp((uint8_t *) data, buffer->buf, data_size);
+		ret = memcmp(data, buffer->buf, data_size);
 	} else {
 		ret = EINVAL;
 		goto done;

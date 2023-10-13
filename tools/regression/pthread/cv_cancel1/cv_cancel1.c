@@ -23,8 +23,6 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD$
- *
  */
 #include <pthread.h>
 #include <stdio.h>
@@ -32,14 +30,14 @@
 
 #define NLOOPS	10
 
-pthread_mutex_t m = PTHREAD_MUTEX_INITIALIZER;
-pthread_cond_t cv = PTHREAD_COND_INITIALIZER;
+static pthread_mutex_t m = PTHREAD_MUTEX_INITIALIZER;
+static pthread_cond_t cv = PTHREAD_COND_INITIALIZER;
 
-int wake;
-int stop;
+static int wake;
+static int stop;
 
-void *
-thr_routine(void *arg)
+static void *
+thr_routine(void *arg __unused)
 {
 	pthread_mutex_lock(&m);
 	while (wake == 0)
@@ -51,7 +49,8 @@ thr_routine(void *arg)
 	return (NULL);
 }
 
-int main(int argc, char **argv)
+int
+main(void)
 {
 	pthread_t td;
 	int i;

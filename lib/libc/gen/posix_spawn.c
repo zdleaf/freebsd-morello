@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2008 Ed Schouten <ed@FreeBSD.org>
  * All rights reserved.
@@ -27,8 +27,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include "namespace.h"
 #include <sys/param.h>
 #include <sys/queue.h>
@@ -44,8 +42,6 @@ __FBSDID("$FreeBSD$");
 #include <unistd.h>
 #include "un-namespace.h"
 #include "libc_private.h"
-
-extern char **environ;
 
 struct __posix_spawnattr {
 	short			sa_flags;

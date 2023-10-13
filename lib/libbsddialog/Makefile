@@ -6,8 +6,8 @@ LIB=	bsddialog
 PRIVATELIB=	yes
 SHLIB_MAJOR=	0
 SRCS=	barbox.c \
+	datebox.c \
 	formbox.c \
-	infobox.c \
 	lib_util.c \
 	lib_util.h \
 	libbsddialog.c \
@@ -21,8 +21,7 @@ INCS=	bsddialog.h \
 	bsddialog_progressview.h
 MAN=	bsddialog.3
 
-LIBADD=	ncursesw tinfow formw
-
-WARNS=	2
+LIBADD=	ncursesw tinfow
+CFLAGS+=	-D_XOPEN_SOURCE_EXTENDED
 
 .include <bsd.lib.mk>

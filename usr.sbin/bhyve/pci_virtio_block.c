@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2011 NetApp, Inc.
  * All rights reserved.
@@ -25,13 +25,9 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/linker_set.h>
 #include <sys/stat.h>
@@ -208,19 +204,19 @@ static int pci_vtblk_snapshot(void *, struct vm_snapshot_meta *);
 #endif
 
 static struct virtio_consts vtblk_vi_consts = {
-	"vtblk",		/* our name */
-	1,			/* we support 1 virtqueue */
-	sizeof(struct vtblk_config),	/* config reg size */
-	pci_vtblk_reset,	/* reset */
-	pci_vtblk_notify,	/* device-wide qnotify */
-	pci_vtblk_cfgread,	/* read PCI config */
-	pci_vtblk_cfgwrite,	/* write PCI config */
-	NULL,			/* apply negotiated features */
-	VTBLK_S_HOSTCAPS,	/* our capabilities */
+	.vc_name =	"vtblk",
+	.vc_nvq =	1,
+	.vc_cfgsize =	sizeof(struct vtblk_config),
+	.vc_reset =	pci_vtblk_reset,
+	.vc_qnotify =	pci_vtblk_notify,
+	.vc_cfgread =	pci_vtblk_cfgread,
+	.vc_cfgwrite =	pci_vtblk_cfgwrite,
+	.vc_apply_features = NULL,
+	.vc_hv_caps =	VTBLK_S_HOSTCAPS,
 #ifdef BHYVE_SNAPSHOT
-	pci_vtblk_pause,	/* pause blockif threads */
-	pci_vtblk_resume,	/* resume blockif threads */
-	pci_vtblk_snapshot,	/* save / restore device state */
+	.vc_pause =	pci_vtblk_pause,
+	.vc_resume =	pci_vtblk_resume,
+	.vc_snapshot =	pci_vtblk_snapshot,
 #endif
 };
 
@@ -437,7 +433,8 @@ pci_vtblk_notify(void *vsc, struct vqueue_info *vq)
 }
 
 static void
-pci_vtblk_resized(struct blockif_ctxt *bctxt, void *arg, size_t new_size)
+pci_vtblk_resized(struct blockif_ctxt *bctxt __unused, void *arg,
+    size_t new_size)
 {
 	struct pci_vtblk_softc *sc;
 
@@ -449,9 +446,9 @@ pci_vtblk_resized(struct blockif_ctxt *bctxt, void *arg, size_t new_size)
 }
 
 static int
-pci_vtblk_init(struct vmctx *ctx, struct pci_devinst *pi, nvlist_t *nvl)
+pci_vtblk_init(struct pci_devinst *pi, nvlist_t *nvl)
 {
-	char bident[sizeof("XX:X:X")];
+	char bident[sizeof("XXX:XXX")];
 	struct blockif_ctxt *bctxt;
 	const char *path, *serial;
 	MD5_CTX mdctx;
@@ -463,10 +460,15 @@ pci_vtblk_init(struct vmctx *ctx, struct pci_devinst *pi, nvlist_t *nvl)
 	/*
 	 * The supplied backing file has to exist
 	 */
-	snprintf(bident, sizeof(bident), "%d:%d", pi->pi_slot, pi->pi_func);
+	snprintf(bident, sizeof(bident), "%u:%u", pi->pi_slot, pi->pi_func);
 	bctxt = blockif_open(nvl, bident);
 	if (bctxt == NULL) {
 		perror("Could not open backing file");
+		return (1);
+	}
+
+	if (blockif_add_boot_device(pi, bctxt)) {
+		perror("Invalid boot device");
 		return (1);
 	}
 
@@ -565,7 +567,8 @@ pci_vtblk_init(struct vmctx *ctx, struct pci_devinst *pi, nvlist_t *nvl)
 }
 
 static int
-pci_vtblk_cfgwrite(void *vsc, int offset, int size, uint32_t value)
+pci_vtblk_cfgwrite(void *vsc __unused, int offset, int size __unused,
+    uint32_t value __unused)
 {
 
 	DPRINTF(("vtblk: write to readonly reg %d", offset));
@@ -584,7 +587,7 @@ pci_vtblk_cfgread(void *vsc, int offset, int size, uint32_t *retval)
 	return (0);
 }
 
-struct pci_devemu pci_de_vblk = {
+static const struct pci_devemu pci_de_vblk = {
 	.pe_emu =	"virtio-blk",
 	.pe_init =	pci_vtblk_init,
 	.pe_legacy_config = blockif_legacy_config,
@@ -592,6 +595,8 @@ struct pci_devemu pci_de_vblk = {
 	.pe_barread =	vi_pci_read,
 #ifdef BHYVE_SNAPSHOT
 	.pe_snapshot =	vi_pci_snapshot,
+	.pe_pause =     vi_pci_pause,
+	.pe_resume =    vi_pci_resume,
 #endif
 };
 PCI_EMUL_SET(pci_de_vblk);

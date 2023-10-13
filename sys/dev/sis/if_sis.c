@@ -34,8 +34,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 /*
  * SiS 900/SiS 7016 fast ethernet PCI NIC driver. Datasheets are
  * available from http://www.sis.com.tw.
@@ -146,12 +144,12 @@ static void sis_dmamap_cb(void *, bus_dma_segment_t *, int, int);
 #ifndef __NO_STRICT_ALIGNMENT
 static __inline void sis_fixup_rx(struct mbuf *);
 #endif
-static void sis_ifmedia_sts(struct ifnet *, struct ifmediareq *);
-static int sis_ifmedia_upd(struct ifnet *);
+static void sis_ifmedia_sts(if_t, struct ifmediareq *);
+static int sis_ifmedia_upd(if_t);
 static void sis_init(void *);
 static void sis_initl(struct sis_softc *);
 static void sis_intr(void *);
-static int sis_ioctl(struct ifnet *, u_long, caddr_t);
+static int sis_ioctl(if_t, u_long, caddr_t);
 static uint32_t sis_mii_bitbang_read(device_t);
 static void sis_mii_bitbang_write(device_t, uint32_t);
 static int sis_newbuf(struct sis_softc *, struct sis_rxdesc *);
@@ -160,8 +158,8 @@ static int sis_rxeof(struct sis_softc *);
 static void sis_rxfilter(struct sis_softc *);
 static void sis_rxfilter_ns(struct sis_softc *);
 static void sis_rxfilter_sis(struct sis_softc *);
-static void sis_start(struct ifnet *);
-static void sis_startl(struct ifnet *);
+static void sis_start(if_t);
+static void sis_startl(if_t);
 static void sis_stop(struct sis_softc *);
 static int sis_suspend(device_t);
 static void sis_add_sysctls(struct sis_softc *);
@@ -578,7 +576,7 @@ sis_miibus_statchg(device_t dev)
 {
 	struct sis_softc	*sc;
 	struct mii_data		*mii;
-	struct ifnet		*ifp;
+	if_t			ifp;
 	uint32_t		reg;
 
 	sc = device_get_softc(dev);
@@ -587,7 +585,7 @@ sis_miibus_statchg(device_t dev)
 	mii = device_get_softc(sc->sis_miibus);
 	ifp = sc->sis_ifp;
 	if (mii == NULL || ifp == NULL ||
-	    (ifp->if_drv_flags & IFF_DRV_RUNNING) == 0)
+	    (if_getdrvflags(ifp) & IFF_DRV_RUNNING) == 0)
 		return;
 
 	sc->sis_flags &= ~SIS_FLAG_LINK;
@@ -715,7 +713,7 @@ sis_write_maddr(void *arg, struct sockaddr_dl *sdl, u_int cnt)
 static void
 sis_rxfilter_ns(struct sis_softc *sc)
 {
-	struct ifnet		*ifp;
+	if_t			ifp;
 	uint32_t		i, filter;
 
 	ifp = sc->sis_ifp;
@@ -731,7 +729,7 @@ sis_rxfilter_ns(struct sis_softc *sc)
 	    NS_RXFILTCTL_MCHASH | SIS_RXFILTCTL_ALLPHYS | SIS_RXFILTCTL_BROAD |
 	    SIS_RXFILTCTL_ALLMULTI);
 
-	if (ifp->if_flags & IFF_BROADCAST)
+	if (if_getflags(ifp) & IFF_BROADCAST)
 		filter |= SIS_RXFILTCTL_BROAD;
 	/*
 	 * For the NatSemi chip, we have to explicitly enable the
@@ -741,9 +739,9 @@ sis_rxfilter_ns(struct sis_softc *sc)
 	 */
 	filter |= NS_RXFILTCTL_ARP | NS_RXFILTCTL_PERFECT;
 
-	if (ifp->if_flags & (IFF_ALLMULTI | IFF_PROMISC)) {
+	if (if_getflags(ifp) & (IFF_ALLMULTI | IFF_PROMISC)) {
 		filter |= SIS_RXFILTCTL_ALLMULTI;
-		if (ifp->if_flags & IFF_PROMISC)
+		if (if_getflags(ifp) & IFF_PROMISC)
 			filter |= SIS_RXFILTCTL_ALLPHYS;
 	} else {
 		/*
@@ -787,7 +785,7 @@ sis_hash_maddr(void *arg, struct sockaddr_dl *sdl, u_int cnt)
 static void
 sis_rxfilter_sis(struct sis_softc *sc)
 {
-	struct ifnet		*ifp;
+	if_t			ifp;
 	struct sis_hash_maddr_ctx ctx;
 	uint32_t		filter, i, n;
 
@@ -806,12 +804,12 @@ sis_rxfilter_sis(struct sis_softc *sc)
 	}
 	filter &= ~(SIS_RXFILTCTL_ALLPHYS | SIS_RXFILTCTL_BROAD |
 	    SIS_RXFILTCTL_ALLMULTI);
-	if (ifp->if_flags & IFF_BROADCAST)
+	if (if_getflags(ifp) & IFF_BROADCAST)
 		filter |= SIS_RXFILTCTL_BROAD;
 
-	if (ifp->if_flags & (IFF_ALLMULTI | IFF_PROMISC)) {
+	if (if_getflags(ifp) & (IFF_ALLMULTI | IFF_PROMISC)) {
 		filter |= SIS_RXFILTCTL_ALLMULTI;
-		if (ifp->if_flags & IFF_PROMISC)
+		if (if_getflags(ifp) & IFF_PROMISC)
 			filter |= SIS_RXFILTCTL_ALLPHYS;
 		for (i = 0; i < n; i++)
 			ctx.hashes[i] = ~0;
@@ -899,10 +897,9 @@ sis_attach(device_t dev)
 {
 	u_char			eaddr[ETHER_ADDR_LEN];
 	struct sis_softc	*sc;
-	struct ifnet		*ifp;
-	int			error = 0, pmc, waittime = 0;
+	if_t			ifp;
+	int			error = 0, pmc;
 
-	waittime = 0;
 	sc = device_get_softc(dev);
 
 	sc->sis_dev = dev;
@@ -1028,7 +1025,7 @@ sis_attach(device_t dev)
 			 * time we access it, we need to set SIS_EECMD_REQ.
 			 */
 			SIO_SET(SIS_EECMD_REQ);
-			for (waittime = 0; waittime < SIS_TIMEOUT;
+			for (int waittime = 0; waittime < SIS_TIMEOUT;
 			    waittime++) {
 				/* Force EEPROM to idle state. */
 				sis_eeprom_idle(sc);
@@ -1065,22 +1062,21 @@ sis_attach(device_t dev)
 		error = ENOSPC;
 		goto fail;
 	}
-	ifp->if_softc = sc;
+	if_setsoftc(ifp, sc);
 	if_initname(ifp, device_get_name(dev), device_get_unit(dev));
-	ifp->if_flags = IFF_BROADCAST | IFF_SIMPLEX | IFF_MULTICAST;
-	ifp->if_ioctl = sis_ioctl;
-	ifp->if_start = sis_start;
-	ifp->if_init = sis_init;
-	IFQ_SET_MAXLEN(&ifp->if_snd, SIS_TX_LIST_CNT - 1);
-	ifp->if_snd.ifq_drv_maxlen = SIS_TX_LIST_CNT - 1;
-	IFQ_SET_READY(&ifp->if_snd);
+	if_setflags(ifp, IFF_BROADCAST | IFF_SIMPLEX | IFF_MULTICAST);
+	if_setioctlfn(ifp, sis_ioctl);
+	if_setstartfn(ifp, sis_start);
+	if_setinitfn(ifp, sis_init);
+	if_setsendqlen(ifp, SIS_TX_LIST_CNT - 1);
+	if_setsendqready(ifp);
 
 	if (pci_find_cap(sc->sis_dev, PCIY_PMG, &pmc) == 0) {
 		if (sc->sis_type == SIS_TYPE_83815)
-			ifp->if_capabilities |= IFCAP_WOL;
+			if_setcapabilitiesbit(ifp, IFCAP_WOL, 0);
 		else
-			ifp->if_capabilities |= IFCAP_WOL_MAGIC;
-		ifp->if_capenable = ifp->if_capabilities;
+			if_setcapabilitiesbit(ifp, IFCAP_WOL_MAGIC, 0);
+		if_setcapenable(ifp, if_getcapabilities(ifp));
 	}
 
 	/*
@@ -1101,11 +1097,11 @@ sis_attach(device_t dev)
 	/*
 	 * Tell the upper layer(s) we support long frames.
 	 */
-	ifp->if_hdrlen = sizeof(struct ether_vlan_header);
-	ifp->if_capabilities |= IFCAP_VLAN_MTU;
-	ifp->if_capenable = ifp->if_capabilities;
+	if_setifheaderlen(ifp, sizeof(struct ether_vlan_header));
+	if_setcapabilitiesbit(ifp, IFCAP_VLAN_MTU, 0);
+	if_setcapenable(ifp, if_getcapabilities(ifp));
 #ifdef DEVICE_POLLING
-	ifp->if_capabilities |= IFCAP_POLLING;
+	if_setcapabilitiesbit(ifp, IFCAP_POLLING, 0);
 #endif
 
 	/* Hook interrupt last to avoid having to lock softc */
@@ -1136,14 +1132,14 @@ static int
 sis_detach(device_t dev)
 {
 	struct sis_softc	*sc;
-	struct ifnet		*ifp;
+	if_t			ifp;
 
 	sc = device_get_softc(dev);
 	KASSERT(mtx_initialized(&sc->sis_mtx), ("sis mutex not initialized"));
 	ifp = sc->sis_ifp;
 
 #ifdef DEVICE_POLLING
-	if (ifp->if_capenable & IFCAP_POLLING)
+	if (if_getcapenable(ifp) & IFCAP_POLLING)
 		ether_poll_deregister(ifp);
 #endif
 
@@ -1486,7 +1482,7 @@ static int
 sis_rxeof(struct sis_softc *sc)
 {
 	struct mbuf		*m;
-	struct ifnet		*ifp;
+	if_t			ifp;
 	struct sis_rxdesc	*rxd;
 	struct sis_desc		*cur_rx;
 	int			prog, rx_cons, rx_npkts = 0, total_len;
@@ -1500,10 +1496,10 @@ sis_rxeof(struct sis_softc *sc)
 	rx_cons = sc->sis_rx_cons;
 	ifp = sc->sis_ifp;
 
-	for (prog = 0; (ifp->if_drv_flags & IFF_DRV_RUNNING) != 0;
+	for (prog = 0; (if_getdrvflags(ifp) & IFF_DRV_RUNNING) != 0;
 	    SIS_INC(rx_cons, SIS_RX_LIST_CNT), prog++) {
 #ifdef DEVICE_POLLING
-		if (ifp->if_capenable & IFCAP_POLLING) {
+		if (if_getcapenable(ifp) & IFCAP_POLLING) {
 			if (sc->rxcycles <= 0)
 				break;
 			sc->rxcycles--;
@@ -1516,7 +1512,7 @@ sis_rxeof(struct sis_softc *sc)
 		rxd = &sc->sis_rxdesc[rx_cons];
 
 		total_len = (rxstat & SIS_CMDSTS_BUFLEN) - ETHER_CRC_LEN;
-		if ((ifp->if_capenable & IFCAP_VLAN_MTU) != 0 &&
+		if ((if_getcapenable(ifp) & IFCAP_VLAN_MTU) != 0 &&
 		    total_len <= (ETHER_MAX_LEN + ETHER_VLAN_ENCAP_LEN -
 		    ETHER_CRC_LEN))
 			rxstat &= ~SIS_RXSTAT_GIANT;
@@ -1551,7 +1547,7 @@ sis_rxeof(struct sis_softc *sc)
 		m->m_pkthdr.rcvif = ifp;
 
 		SIS_UNLOCK(sc);
-		(*ifp->if_input)(ifp, m);
+		if_input(ifp, m);
 		SIS_LOCK(sc);
 		rx_npkts++;
 	}
@@ -1573,7 +1569,7 @@ sis_rxeof(struct sis_softc *sc)
 static void
 sis_txeof(struct sis_softc *sc)
 {
-	struct ifnet		*ifp;
+	if_t			ifp;
 	struct sis_desc		*cur_tx;
 	struct sis_txdesc	*txd;
 	uint32_t		cons, txstat;
@@ -1617,7 +1613,7 @@ sis_txeof(struct sis_softc *sc)
 			}
 		}
 		sc->sis_tx_cnt--;
-		ifp->if_drv_flags &= ~IFF_DRV_OACTIVE;
+		if_setdrvflagbits(ifp, 0, IFF_DRV_OACTIVE);
 	}
 	sc->sis_tx_cons = cons;
 	if (sc->sis_tx_cnt == 0)
@@ -1645,13 +1641,13 @@ sis_tick(void *xsc)
 static poll_handler_t sis_poll;
 
 static int
-sis_poll(struct ifnet *ifp, enum poll_cmd cmd, int count)
+sis_poll(if_t ifp, enum poll_cmd cmd, int count)
 {
-	struct	sis_softc *sc = ifp->if_softc;
+	struct	sis_softc *sc = if_getsoftc(ifp);
 	int rx_npkts = 0;
 
 	SIS_LOCK(sc);
-	if (!(ifp->if_drv_flags & IFF_DRV_RUNNING)) {
+	if (!(if_getdrvflags(ifp) & IFF_DRV_RUNNING)) {
 		SIS_UNLOCK(sc);
 		return (rx_npkts);
 	}
@@ -1666,7 +1662,7 @@ sis_poll(struct ifnet *ifp, enum poll_cmd cmd, int count)
 	sc->rxcycles = count;
 	rx_npkts = sis_rxeof(sc);
 	sis_txeof(sc);
-	if (!IFQ_DRV_IS_EMPTY(&ifp->if_snd))
+	if (!if_sendq_empty(ifp))
 		sis_startl(ifp);
 
 	if (sc->rxcycles > 0 || cmd == POLL_AND_CHECK_STATUS) {
@@ -1682,7 +1678,7 @@ sis_poll(struct ifnet *ifp, enum poll_cmd cmd, int count)
 			SIS_SETBIT(sc, SIS_CSR, SIS_CSR_RX_ENABLE);
 
 		if (status & SIS_ISR_SYSERR) {
-			ifp->if_drv_flags &= ~IFF_DRV_RUNNING;
+			if_setdrvflagbits(ifp, 0, IFF_DRV_RUNNING);
 			sis_initl(sc);
 		}
 	}
@@ -1696,7 +1692,7 @@ static void
 sis_intr(void *arg)
 {
 	struct sis_softc	*sc;
-	struct ifnet		*ifp;
+	if_t			ifp;
 	uint32_t		status;
 
 	sc = arg;
@@ -1704,7 +1700,7 @@ sis_intr(void *arg)
 
 	SIS_LOCK(sc);
 #ifdef DEVICE_POLLING
-	if (ifp->if_capenable & IFCAP_POLLING) {
+	if (if_getcapenable(ifp) & IFCAP_POLLING) {
 		SIS_UNLOCK(sc);
 		return;
 	}
@@ -1722,7 +1718,7 @@ sis_intr(void *arg)
 	CSR_WRITE_4(sc, SIS_IER, 0);
 
 	for (;(status & SIS_INTRS) != 0;) {
-		if ((ifp->if_drv_flags & IFF_DRV_RUNNING) == 0)
+		if ((if_getdrvflags(ifp) & IFF_DRV_RUNNING) == 0)
 			break;
 		if (status &
 		    (SIS_ISR_TX_DESC_OK | SIS_ISR_TX_ERR |
@@ -1740,7 +1736,7 @@ sis_intr(void *arg)
 			SIS_SETBIT(sc, SIS_CSR, SIS_CSR_RX_ENABLE);
 
 		if (status & SIS_ISR_SYSERR) {
-			ifp->if_drv_flags &= ~IFF_DRV_RUNNING;
+			if_setdrvflagbits(ifp, 0, IFF_DRV_RUNNING);
 			sis_initl(sc);
 			SIS_UNLOCK(sc);
 			return;
@@ -1748,11 +1744,11 @@ sis_intr(void *arg)
 		status = CSR_READ_4(sc, SIS_ISR);
 	}
 
-	if (ifp->if_drv_flags & IFF_DRV_RUNNING) {
+	if (if_getdrvflags(ifp) & IFF_DRV_RUNNING) {
 		/* Re-enable interrupts. */
 		CSR_WRITE_4(sc, SIS_IER, 1);
 
-		if (!IFQ_DRV_IS_EMPTY(&ifp->if_snd))
+		if (!if_sendq_empty(ifp))
 			sis_startl(ifp);
 	}
 
@@ -1871,42 +1867,42 @@ sis_encap(struct sis_softc *sc, struct mbuf **m_head)
 }
 
 static void
-sis_start(struct ifnet *ifp)
+sis_start(if_t ifp)
 {
 	struct sis_softc	*sc;
 
-	sc = ifp->if_softc;
+	sc = if_getsoftc(ifp);
 	SIS_LOCK(sc);
 	sis_startl(ifp);
 	SIS_UNLOCK(sc);
 }
 
 static void
-sis_startl(struct ifnet *ifp)
+sis_startl(if_t ifp)
 {
 	struct sis_softc	*sc;
 	struct mbuf		*m_head;
 	int			queued;
 
-	sc = ifp->if_softc;
+	sc = if_getsoftc(ifp);
 
 	SIS_LOCK_ASSERT(sc);
 
-	if ((ifp->if_drv_flags & (IFF_DRV_RUNNING | IFF_DRV_OACTIVE)) !=
+	if ((if_getdrvflags(ifp) & (IFF_DRV_RUNNING | IFF_DRV_OACTIVE)) !=
 	    IFF_DRV_RUNNING || (sc->sis_flags & SIS_FLAG_LINK) == 0)
 		return;
 
-	for (queued = 0; !IFQ_DRV_IS_EMPTY(&ifp->if_snd) &&
+	for (queued = 0; !if_sendq_empty(ifp) &&
 	    sc->sis_tx_cnt < SIS_TX_LIST_CNT - 4;) {
-		IFQ_DRV_DEQUEUE(&ifp->if_snd, m_head);
+		m_head = if_dequeue(ifp);
 		if (m_head == NULL)
 			break;
 
 		if (sis_encap(sc, &m_head) != 0) {
 			if (m_head == NULL)
 				break;
-			IFQ_DRV_PREPEND(&ifp->if_snd, m_head);
-			ifp->if_drv_flags |= IFF_DRV_OACTIVE;
+			if_sendq_prepend(ifp, m_head);
+			if_setdrvflagbits(ifp, IFF_DRV_OACTIVE, 0);
 			break;
 		}
 
@@ -1945,13 +1941,13 @@ sis_init(void *xsc)
 static void
 sis_initl(struct sis_softc *sc)
 {
-	struct ifnet		*ifp = sc->sis_ifp;
+	if_t			ifp = sc->sis_ifp;
 	struct mii_data		*mii;
 	uint8_t			*eaddr;
 
 	SIS_LOCK_ASSERT(sc);
 
-	if ((ifp->if_drv_flags & IFF_DRV_RUNNING) != 0)
+	if ((if_getdrvflags(ifp) & IFF_DRV_RUNNING) != 0)
 		return;
 
 	/*
@@ -1966,7 +1962,7 @@ sis_initl(struct sis_softc *sc)
 	if (sc->sis_type == SIS_TYPE_83815 && sc->sis_srr >= NS_SRR_16A) {
 		/*
 		 * Configure 400usec of interrupt holdoff.  This is based
-		 * on emperical tests on a Soekris 4801.
+		 * on empirical tests on a Soekris 4801.
  		 */
 		CSR_WRITE_4(sc, NS_IHR, 0x100 | 4);
 	}
@@ -1975,7 +1971,7 @@ sis_initl(struct sis_softc *sc)
 	mii = device_get_softc(sc->sis_miibus);
 
 	/* Set MAC address */
-	eaddr = IF_LLADDR(sc->sis_ifp);
+	eaddr = if_getlladdr(sc->sis_ifp);
 	if (sc->sis_type == SIS_TYPE_83815) {
 		CSR_WRITE_4(sc, SIS_RXFILT_CTL, NS_FILTADDR_PAR0);
 		CSR_WRITE_4(sc, SIS_RXFILT_DATA, eaddr[0] | eaddr[1] << 8);
@@ -2062,7 +2058,7 @@ sis_initl(struct sis_softc *sc)
 	 * ... only enable interrupts if we are not polling, make sure
 	 * they are off otherwise.
 	 */
-	if (ifp->if_capenable & IFCAP_POLLING)
+	if (if_getcapenable(ifp) & IFCAP_POLLING)
 		CSR_WRITE_4(sc, SIS_IER, 0);
 	else
 #endif
@@ -2074,8 +2070,8 @@ sis_initl(struct sis_softc *sc)
 	sc->sis_flags &= ~SIS_FLAG_LINK;
 	mii_mediachg(mii);
 
-	ifp->if_drv_flags |= IFF_DRV_RUNNING;
-	ifp->if_drv_flags &= ~IFF_DRV_OACTIVE;
+	if_setdrvflagbits(ifp, IFF_DRV_RUNNING, 0);
+	if_setdrvflagbits(ifp, 0, IFF_DRV_OACTIVE);
 
 	callout_reset(&sc->sis_stat_ch, hz,  sis_tick, sc);
 }
@@ -2084,14 +2080,14 @@ sis_initl(struct sis_softc *sc)
  * Set media options.
  */
 static int
-sis_ifmedia_upd(struct ifnet *ifp)
+sis_ifmedia_upd(if_t ifp)
 {
 	struct sis_softc	*sc;
 	struct mii_data		*mii;
 	struct mii_softc	*miisc;
 	int			error;
 
-	sc = ifp->if_softc;
+	sc = if_getsoftc(ifp);
 
 	SIS_LOCK(sc);
 	mii = device_get_softc(sc->sis_miibus);
@@ -2107,12 +2103,12 @@ sis_ifmedia_upd(struct ifnet *ifp)
  * Report current media status.
  */
 static void
-sis_ifmedia_sts(struct ifnet *ifp, struct ifmediareq *ifmr)
+sis_ifmedia_sts(if_t ifp, struct ifmediareq *ifmr)
 {
 	struct sis_softc	*sc;
 	struct mii_data		*mii;
 
-	sc = ifp->if_softc;
+	sc = if_getsoftc(ifp);
 
 	SIS_LOCK(sc);
 	mii = device_get_softc(sc->sis_miibus);
@@ -2123,9 +2119,9 @@ sis_ifmedia_sts(struct ifnet *ifp, struct ifmediareq *ifmr)
 }
 
 static int
-sis_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
+sis_ioctl(if_t ifp, u_long command, caddr_t data)
 {
-	struct sis_softc	*sc = ifp->if_softc;
+	struct sis_softc	*sc = if_getsoftc(ifp);
 	struct ifreq		*ifr = (struct ifreq *) data;
 	struct mii_data		*mii;
 	int			error = 0, mask;
@@ -2133,22 +2129,22 @@ sis_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 	switch (command) {
 	case SIOCSIFFLAGS:
 		SIS_LOCK(sc);
-		if (ifp->if_flags & IFF_UP) {
-			if ((ifp->if_drv_flags & IFF_DRV_RUNNING) != 0 &&
-			    ((ifp->if_flags ^ sc->sis_if_flags) &
+		if (if_getflags(ifp) & IFF_UP) {
+			if ((if_getdrvflags(ifp) & IFF_DRV_RUNNING) != 0 &&
+			    ((if_getflags(ifp) ^ sc->sis_if_flags) &
 			    (IFF_PROMISC | IFF_ALLMULTI)) != 0)
 				sis_rxfilter(sc);
 			else
 				sis_initl(sc);
-		} else if (ifp->if_drv_flags & IFF_DRV_RUNNING)
+		} else if (if_getdrvflags(ifp) & IFF_DRV_RUNNING)
 			sis_stop(sc);
-		sc->sis_if_flags = ifp->if_flags;
+		sc->sis_if_flags = if_getflags(ifp);
 		SIS_UNLOCK(sc);
 		break;
 	case SIOCADDMULTI:
 	case SIOCDELMULTI:
 		SIS_LOCK(sc);
-		if ((ifp->if_drv_flags & IFF_DRV_RUNNING) != 0)
+		if ((if_getdrvflags(ifp) & IFF_DRV_RUNNING) != 0)
 			sis_rxfilter(sc);
 		SIS_UNLOCK(sc);
 		break;
@@ -2159,12 +2155,12 @@ sis_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		break;
 	case SIOCSIFCAP:
 		SIS_LOCK(sc);
-		mask = ifr->ifr_reqcap ^ ifp->if_capenable;
+		mask = ifr->ifr_reqcap ^ if_getcapenable(ifp);
 #ifdef DEVICE_POLLING
 		if ((mask & IFCAP_POLLING) != 0 &&
-		    (IFCAP_POLLING & ifp->if_capabilities) != 0) {
-			ifp->if_capenable ^= IFCAP_POLLING;
-			if ((IFCAP_POLLING & ifp->if_capenable) != 0) {
+		    (IFCAP_POLLING & if_getcapabilities(ifp)) != 0) {
+			if_togglecapenable(ifp, IFCAP_POLLING);
+			if ((IFCAP_POLLING & if_getcapenable(ifp)) != 0) {
 				error = ether_poll_register(sis_poll, ifp);
 				if (error != 0) {
 					SIS_UNLOCK(sc);
@@ -2180,13 +2176,13 @@ sis_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		}
 #endif /* DEVICE_POLLING */
 		if ((mask & IFCAP_WOL) != 0 &&
-		    (ifp->if_capabilities & IFCAP_WOL) != 0) {
+		    (if_getcapabilities(ifp) & IFCAP_WOL) != 0) {
 			if ((mask & IFCAP_WOL_UCAST) != 0)
-				ifp->if_capenable ^= IFCAP_WOL_UCAST;
+				if_togglecapenable(ifp, IFCAP_WOL_UCAST);
 			if ((mask & IFCAP_WOL_MCAST) != 0)
-				ifp->if_capenable ^= IFCAP_WOL_MCAST;
+				if_togglecapenable(ifp, IFCAP_WOL_MCAST);
 			if ((mask & IFCAP_WOL_MAGIC) != 0)
-				ifp->if_capenable ^= IFCAP_WOL_MAGIC;
+				if_togglecapenable(ifp, IFCAP_WOL_MAGIC);
 		}
 		SIS_UNLOCK(sc);
 		break;
@@ -2210,10 +2206,10 @@ sis_watchdog(struct sis_softc *sc)
 	device_printf(sc->sis_dev, "watchdog timeout\n");
 	if_inc_counter(sc->sis_ifp, IFCOUNTER_OERRORS, 1);
 
-	sc->sis_ifp->if_drv_flags &= ~IFF_DRV_RUNNING;
+	if_setdrvflagbits(sc->sis_ifp, 0, IFF_DRV_RUNNING);
 	sis_initl(sc);
 
-	if (!IFQ_DRV_IS_EMPTY(&sc->sis_ifp->if_snd))
+	if (!if_sendq_empty(sc->sis_ifp))
 		sis_startl(sc->sis_ifp);
 }
 
@@ -2224,7 +2220,7 @@ sis_watchdog(struct sis_softc *sc)
 static void
 sis_stop(struct sis_softc *sc)
 {
-	struct ifnet *ifp;
+	if_t			ifp;
 	struct sis_rxdesc *rxd;
 	struct sis_txdesc *txd;
 	int i;
@@ -2236,7 +2232,7 @@ sis_stop(struct sis_softc *sc)
 
 	callout_stop(&sc->sis_stat_ch);
 
-	ifp->if_drv_flags &= ~(IFF_DRV_RUNNING | IFF_DRV_OACTIVE);
+	if_setdrvflagbits(ifp, 0, (IFF_DRV_RUNNING | IFF_DRV_OACTIVE));
 	CSR_WRITE_4(sc, SIS_IER, 0);
 	CSR_WRITE_4(sc, SIS_IMR, 0);
 	CSR_READ_4(sc, SIS_ISR); /* clear any interrupts already pending */
@@ -2304,13 +2300,13 @@ static int
 sis_resume(device_t dev)
 {
 	struct sis_softc	*sc;
-	struct ifnet		*ifp;
+	if_t			ifp;
 
 	sc = device_get_softc(dev);
 	SIS_LOCK(sc);
 	ifp = sc->sis_ifp;
-	if ((ifp->if_flags & IFF_UP) != 0) {
-		ifp->if_drv_flags &= ~IFF_DRV_RUNNING;
+	if ((if_getflags(ifp) & IFF_UP) != 0) {
+		if_setdrvflagbits(ifp, 0, IFF_DRV_RUNNING);
 		sis_initl(sc);
 	}
 	SIS_UNLOCK(sc);
@@ -2320,13 +2316,13 @@ sis_resume(device_t dev)
 static void
 sis_wol(struct sis_softc *sc)
 {
-	struct ifnet		*ifp;
+	if_t			ifp;
 	uint32_t		val;
 	uint16_t		pmstat;
 	int			pmc;
 
 	ifp = sc->sis_ifp;
-	if ((ifp->if_capenable & IFCAP_WOL) == 0)
+	if ((if_getcapenable(ifp) & IFCAP_WOL) == 0)
 		return;
 
 	if (sc->sis_type == SIS_TYPE_83815) {
@@ -2336,11 +2332,11 @@ sis_wol(struct sis_softc *sc)
 		/* Configure WOL events. */
 		CSR_READ_4(sc, NS_WCSR);
 		val = 0;
-		if ((ifp->if_capenable & IFCAP_WOL_UCAST) != 0)
+		if ((if_getcapenable(ifp) & IFCAP_WOL_UCAST) != 0)
 			val |= NS_WCSR_WAKE_UCAST;
-		if ((ifp->if_capenable & IFCAP_WOL_MCAST) != 0)
+		if ((if_getcapenable(ifp) & IFCAP_WOL_MCAST) != 0)
 			val |= NS_WCSR_WAKE_MCAST;
-		if ((ifp->if_capenable & IFCAP_WOL_MAGIC) != 0)
+		if ((if_getcapenable(ifp) & IFCAP_WOL_MAGIC) != 0)
 			val |= NS_WCSR_WAKE_MAGIC;
 		CSR_WRITE_4(sc, NS_WCSR, val);
 		/* Enable PME and clear PMESTS. */
@@ -2353,14 +2349,14 @@ sis_wol(struct sis_softc *sc)
 		if (pci_find_cap(sc->sis_dev, PCIY_PMG, &pmc) != 0)
 			return;
 		val = 0;
-		if ((ifp->if_capenable & IFCAP_WOL_MAGIC) != 0)
+		if ((if_getcapenable(ifp) & IFCAP_WOL_MAGIC) != 0)
 			val |= SIS_PWRMAN_WOL_MAGIC;
 		CSR_WRITE_4(sc, SIS_PWRMAN_CTL, val);
 		/* Request PME. */
 		pmstat = pci_read_config(sc->sis_dev,
 		    pmc + PCIR_POWER_STATUS, 2);
 		pmstat &= ~(PCIM_PSTAT_PME | PCIM_PSTAT_PMEENABLE);
-		if ((ifp->if_capenable & IFCAP_WOL_MAGIC) != 0)
+		if ((if_getcapenable(ifp) & IFCAP_WOL_MAGIC) != 0)
 			pmstat |= PCIM_PSTAT_PME | PCIM_PSTAT_PMEENABLE;
 		pci_write_config(sc->sis_dev,
 		    pmc + PCIR_POWER_STATUS, pmstat, 2);
@@ -2411,7 +2407,5 @@ static driver_t sis_driver = {
 	sizeof(struct sis_softc)
 };
 
-static devclass_t sis_devclass;
-
-DRIVER_MODULE(sis, pci, sis_driver, sis_devclass, 0, 0);
-DRIVER_MODULE(miibus, sis, miibus_driver, miibus_devclass, 0, 0);
+DRIVER_MODULE(sis, pci, sis_driver, 0, 0);
+DRIVER_MODULE(miibus, sis, miibus_driver, 0, 0);

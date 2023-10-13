@@ -28,8 +28,6 @@
  * POSSIBILITY OF SUCH DAMAGES.
  *
  * Authors: Justin T. Gibbs     (Spectra Logic Corporation)
- *
- * $FreeBSD$
  */
 
 /**
@@ -97,6 +95,19 @@ public:
 	 *          Otherwise NULL.
 	 */
 	static CaseFile *Find(DevdCtl::Guid poolGUID, DevdCtl::Guid vdevGUID);
+
+	/**
+	 * \brief Find multiple CaseFile objects by a vdev's pool/vdev
+	 *        GUID tuple (special case for spare vdevs)
+	 *
+	 * \param poolGUID  Pool GUID for the vdev of the CaseFile to find.
+	 * 		    If InvalidGuid, then only match the vdev GUID
+	 * 		    instead of both pool and vdev GUIDs.
+	 * \param vdevGUID  Vdev GUID for the vdev of the CaseFile to find.
+	 * \param caseList  List of cases associated with the vdev.
+	 */
+	static void  Find(DevdCtl::Guid poolGUID, DevdCtl::Guid vdevGUID,
+				     CaseFileList &caseList);
 
 	/**
 	 * \brief Find a CaseFile object by a vdev's current/last known
@@ -218,6 +229,11 @@ public:
 	 * \brief Whether we should fault this vdev
 	 */
 	bool ShouldFault() const;
+
+	/**
+	 * \brief If this vdev is spare
+	 */
+	int IsSpare();
 
 protected:
 	enum {
@@ -384,6 +400,7 @@ protected:
 	string		   m_poolGUIDString;
 	string		   m_vdevGUIDString;
 	string		   m_vdevPhysPath;
+	int		   m_is_spare;
 
 	/**
 	 * \brief Callout activated when a grace period

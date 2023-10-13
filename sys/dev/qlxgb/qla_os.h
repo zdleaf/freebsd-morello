@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2011-2013 Qlogic Corporation
  * All rights reserved.
@@ -25,8 +25,6 @@
  *  CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
  *  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  *  POSSIBILITY OF SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 /*
  * File: qla_os.h
@@ -35,6 +33,8 @@
 
 #ifndef _QLA_OS_H_
 #define _QLA_OS_H_
+
+#include "opt_inet.h"
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -48,10 +48,6 @@
 #include <sys/types.h>
 #include <machine/atomic.h>
 #include <sys/conf.h>
-
-#if __FreeBSD_version < 700112
-#error FreeBSD Version not supported - use version >= 700112
-#endif
 
 #include <net/if.h>
 #include <net/if_var.h>

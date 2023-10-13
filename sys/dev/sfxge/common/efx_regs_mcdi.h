@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright 2008-2013 Solarflare Communications Inc.  All rights reserved.
  *
@@ -23,8 +23,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 #ifndef _SIENA_MC_DRIVER_PCOL_H
@@ -5832,16 +5830,16 @@
 #define	MC_CMD_SENSOR_SET_LIMS_IN_SENSOR_LEN 4
 /*            Enum values, see field(s): */
 /*               MC_CMD_SENSOR_INFO/MC_CMD_SENSOR_INFO_OUT/MASK */
-/* interpretation is is sensor-specific. */
+/* interpretation is sensor-specific. */
 #define	MC_CMD_SENSOR_SET_LIMS_IN_LOW0_OFST 4
 #define	MC_CMD_SENSOR_SET_LIMS_IN_LOW0_LEN 4
-/* interpretation is is sensor-specific. */
+/* interpretation is sensor-specific. */
 #define	MC_CMD_SENSOR_SET_LIMS_IN_HI0_OFST 8
 #define	MC_CMD_SENSOR_SET_LIMS_IN_HI0_LEN 4
-/* interpretation is is sensor-specific. */
+/* interpretation is sensor-specific. */
 #define	MC_CMD_SENSOR_SET_LIMS_IN_LOW1_OFST 12
 #define	MC_CMD_SENSOR_SET_LIMS_IN_LOW1_LEN 4
-/* interpretation is is sensor-specific. */
+/* interpretation is sensor-specific. */
 #define	MC_CMD_SENSOR_SET_LIMS_IN_HI1_OFST 16
 #define	MC_CMD_SENSOR_SET_LIMS_IN_HI1_LEN 4
 

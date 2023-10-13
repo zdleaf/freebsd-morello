@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2008 Nathan Whitehorn.  All rights reserved.
  *
@@ -26,8 +26,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/bio.h>
@@ -274,6 +272,5 @@ static driver_t mambodisk_driver = {
 	mambodisk_methods,
 	sizeof(struct mambodisk_softc),
 };
-static devclass_t mambodisk_devclass;
 
-DRIVER_MODULE(mambodisk, mambo, mambodisk_driver, mambodisk_devclass, 0, 0);
+DRIVER_MODULE(mambodisk, mambo, mambodisk_driver, 0, 0);

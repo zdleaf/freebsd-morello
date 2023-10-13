@@ -37,8 +37,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 /*
  * Support for the SMBus controller logical device which is part of the
  * Intel 81801AA/AB/BA/CA/DC/EB (ICH/ICH[02345]) I/O controller hub chips.
@@ -250,9 +248,7 @@ static driver_t ichsmb_pci_driver = {
 	sizeof(struct ichsmb_softc)
 };
 
-static devclass_t ichsmb_pci_devclass;
-
-DRIVER_MODULE(ichsmb, pci, ichsmb_pci_driver, ichsmb_pci_devclass, 0, 0);
+DRIVER_MODULE(ichsmb, pci, ichsmb_pci_driver, 0, 0);
 
 static int
 ichsmb_pci_probe(device_t dev)

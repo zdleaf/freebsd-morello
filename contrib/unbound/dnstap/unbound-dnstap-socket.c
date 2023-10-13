@@ -61,6 +61,7 @@
 #include "services/listen_dnsport.h"
 #include "sldns/sbuffer.h"
 #include "sldns/wire2str.h"
+#include "sldns/pkthdr.h"
 #ifdef USE_DNSTAP
 #include <protobuf-c/protobuf-c.h>
 #include "dnstap/dnstap.pb-c.h"
@@ -272,7 +273,7 @@ static int make_tcp_accept(char* ip)
 
 	memset(&addr, 0, sizeof(addr));
 	len = (socklen_t)sizeof(addr);
-	if(!extstrtoaddr(ip, &addr, &len)) {
+	if(!extstrtoaddr(ip, &addr, &len, UNBOUND_DNS_PORT)) {
 		log_err("could not parse IP '%s'", ip);
 		return -1;
 	}
@@ -448,6 +449,7 @@ static char* q_of_msg(ProtobufCBinaryData message)
 	char buf[300];
 	/* header, name, type, class minimum to get the query tuple */
 	if(message.len < 12 + 1 + 4 + 4) return NULL;
+	if(LDNS_QDCOUNT(message.data) < 1) return NULL;
 	if(sldns_wire2str_rrquestion_buf(message.data+12, message.len-12,
 		buf, sizeof(buf)) != 0) {
 		/* remove trailing newline, tabs to spaces */
@@ -502,7 +504,7 @@ static char* tv_to_str(protobuf_c_boolean has_time_sec, uint64_t time_sec,
 	time_t time_t_sec;
 	memset(&tv, 0, sizeof(tv));
 	if(has_time_sec) tv.tv_sec = time_sec;
-	if(has_time_nsec) tv.tv_usec = time_nsec;
+	if(has_time_nsec) tv.tv_usec = time_nsec/1000;
 
 	buf[0]=0;
 	time_t_sec = tv.tv_sec;
@@ -617,7 +619,7 @@ static void log_data_frame(uint8_t* pkt, size_t len)
 static ssize_t receive_bytes(struct tap_data* data, int fd, void* buf,
 	size_t len)
 {
-	ssize_t ret = recv(fd, buf, len, 0);
+	ssize_t ret = recv(fd, buf, len, MSG_DONTWAIT);
 	if(ret == 0) {
 		/* closed */
 		if(verbosity) log_info("dnstap client stream closed from %s",
@@ -789,7 +791,7 @@ static int reply_with_accept(struct tap_data* data)
 
 /** reply with FINISH control frame to bidirectional client,
  * returns 0 on error */
-static int reply_with_finish(int fd)
+static int reply_with_finish(struct tap_data* data)
 {
 #ifdef USE_DNSTAP
 	size_t len = 0;
@@ -799,21 +801,34 @@ static int reply_with_finish(int fd)
 		return 0;
 	}
 
-	fd_set_block(fd);
-	if(send(fd, finishframe, len, 0) == -1) {
-		log_err("send failed: %s", sock_strerror(errno));
-		fd_set_nonblock(fd);
-		free(finishframe);
-		return 0;
+	fd_set_block(data->fd);
+	if(data->ssl) {
+		int r;
+		if((r=SSL_write(data->ssl, finishframe, len)) <= 0) {
+			if(SSL_get_error(data->ssl, r) == SSL_ERROR_ZERO_RETURN)
+				log_err("SSL_write, peer closed connection");
+			else
+				log_err("could not SSL_write");
+			fd_set_nonblock(data->fd);
+			free(finishframe);
+			return 0;
+		}
+	} else {
+		if(send(data->fd, finishframe, len, 0) == -1) {
+			log_err("send failed: %s", sock_strerror(errno));
+			fd_set_nonblock(data->fd);
+			free(finishframe);
+			return 0;
+		}
 	}
 	if(verbosity) log_info("sent control frame(finish)");
 
-	fd_set_nonblock(fd);
+	fd_set_nonblock(data->fd);
 	free(finishframe);
 	return 1;
 #else
 	log_err("no dnstap compiled, no reply");
-	(void)fd;
+	(void)data;
 	return 0;
 #endif
 }
@@ -933,7 +948,7 @@ static int tap_handshake(struct tap_data* data)
 #endif /* HAVE_SSL */
 
 /** callback for dnstap listener */
-void dtio_tap_callback(int fd, short ATTR_UNUSED(bits), void* arg)
+void dtio_tap_callback(int ATTR_UNUSED(fd), short ATTR_UNUSED(bits), void* arg)
 {
 	struct tap_data* data = (struct tap_data*)arg;
 	if(verbosity>=3) log_info("tap callback");
@@ -1016,7 +1031,7 @@ void dtio_tap_callback(int fd, short ATTR_UNUSED(bits), void* arg)
 		}
 	} else if(data->len >= 4 && sldns_read_uint32(data->frame) ==
 		FSTRM_CONTROL_FRAME_STOP && data->is_bidirectional) {
-		if(!reply_with_finish(fd)) {
+		if(!reply_with_finish(data)) {
 			tap_data_free(data);
 			return;
 		}
@@ -1413,11 +1428,12 @@ void worker_sighandler(int ATTR_UNUSED(sig), void* ATTR_UNUSED(arg))
 struct outbound_entry* worker_send_query(
 	struct query_info* ATTR_UNUSED(qinfo), uint16_t ATTR_UNUSED(flags),
 	int ATTR_UNUSED(dnssec), int ATTR_UNUSED(want_dnssec),
-	int ATTR_UNUSED(nocaps), struct sockaddr_storage* ATTR_UNUSED(addr),
+	int ATTR_UNUSED(nocaps), int ATTR_UNUSED(check_ratelimit),
+	struct sockaddr_storage* ATTR_UNUSED(addr),
 	socklen_t ATTR_UNUSED(addrlen), uint8_t* ATTR_UNUSED(zone),
 	size_t ATTR_UNUSED(zonelen), int ATTR_UNUSED(tcp_upstream),
 	int ATTR_UNUSED(ssl_upstream), char* ATTR_UNUSED(tls_auth_name),
-	struct module_qstate* ATTR_UNUSED(q))
+	struct module_qstate* ATTR_UNUSED(q), int* ATTR_UNUSED(was_ratelimited))
 {
 	log_assert(0);
 	return 0;
@@ -1446,11 +1462,12 @@ worker_alloc_cleanup(void* ATTR_UNUSED(arg))
 struct outbound_entry* libworker_send_query(
 	struct query_info* ATTR_UNUSED(qinfo), uint16_t ATTR_UNUSED(flags),
 	int ATTR_UNUSED(dnssec), int ATTR_UNUSED(want_dnssec),
-	int ATTR_UNUSED(nocaps), struct sockaddr_storage* ATTR_UNUSED(addr),
+	int ATTR_UNUSED(nocaps), int ATTR_UNUSED(check_ratelimit),
+	struct sockaddr_storage* ATTR_UNUSED(addr),
 	socklen_t ATTR_UNUSED(addrlen), uint8_t* ATTR_UNUSED(zone),
 	size_t ATTR_UNUSED(zonelen), int ATTR_UNUSED(tcp_upstream),
 	int ATTR_UNUSED(ssl_upstream), char* ATTR_UNUSED(tls_auth_name),
-	struct module_qstate* ATTR_UNUSED(q))
+	struct module_qstate* ATTR_UNUSED(q), int* ATTR_UNUSED(was_ratelimited))
 {
 	log_assert(0);
 	return 0;

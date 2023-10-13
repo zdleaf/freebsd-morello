@@ -26,8 +26,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include "opt_ddb.h"
 
 #include <sys/param.h>
@@ -147,8 +145,7 @@ static driver_t ioat_pci_driver = {
 	sizeof(struct ioat_softc),
 };
 
-static devclass_t ioat_devclass;
-DRIVER_MODULE(ioat, pci, ioat_pci_driver, ioat_devclass, ioat_modevent, NULL);
+DRIVER_MODULE(ioat, pci, ioat_pci_driver, ioat_modevent, NULL);
 MODULE_VERSION(ioat, 1);
 
 /*
@@ -241,6 +238,8 @@ static struct _pcsid
 	{ 0x6f2f8086, "BDX IOAT Ch1 (RAID)" },
 
 	{ 0x20218086, "SKX IOAT" },
+
+	{ 0x0b008086, "ICX IOAT" },
 };
 
 MODULE_PNP_INFO("W32:vendor/device;D:#", pci, ioat, pci_ids,

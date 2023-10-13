@@ -32,8 +32,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <dev/aic7xxx/aic79xx_osm.h>
 
 static int ahd_pci_probe(device_t dev);
@@ -53,9 +51,7 @@ static driver_t ahd_pci_driver = {
 	sizeof(struct ahd_softc)
 };
 
-static devclass_t ahd_devclass;
-
-DRIVER_MODULE(ahd, pci, ahd_pci_driver, ahd_devclass, 0, 0);
+DRIVER_MODULE(ahd, pci, ahd_pci_driver, 0, 0);
 MODULE_DEPEND(ahd_pci, ahd, 1, 1, 1);
 MODULE_VERSION(ahd_pci, 1);
 

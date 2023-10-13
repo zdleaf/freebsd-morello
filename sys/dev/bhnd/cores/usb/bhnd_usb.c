@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2010, Aleksandr Rybalko <ray@ddteam.net>
  * All rights reserved.
@@ -28,8 +28,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 /*
  * Ported version of BroadCom USB core driver from ZRouter project
  */
@@ -491,10 +489,8 @@ static device_method_t bhnd_usb_methods[] = {
 	DEVMETHOD_END
 };
 
-static devclass_t bhnd_usb_devclass;
-
 DEFINE_CLASS_0(bhnd_usb, bhnd_usb_driver, bhnd_usb_methods,
     sizeof(struct bhnd_usb_softc));
-DRIVER_MODULE(bhnd_usb, bhnd, bhnd_usb_driver, bhnd_usb_devclass, 0, 0);
+DRIVER_MODULE(bhnd_usb, bhnd, bhnd_usb_driver, 0, 0);
 
 MODULE_VERSION(bhnd_usb, 1);

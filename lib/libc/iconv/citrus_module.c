@@ -1,4 +1,3 @@
-/* $FreeBSD$ */
 /* $NetBSD: citrus_module.c,v 1.9 2009/01/11 02:46:24 christos Exp $ */
 
 /*-
@@ -106,7 +105,7 @@
 #include <string.h>
 #include <unistd.h>
 
-#define	I18NMODULE_MAJOR	4
+#define	I18NMODULE_MAJOR	5
 
 #include "citrus_namespace.h"
 #include "citrus_bcs.h"
@@ -282,8 +281,8 @@ _citrus_load_module(_citrus_module_t *rhandle, const char *encname)
 	int maj, min;
 
 	if (_pathI18nModule == NULL) {
-		p = getenv("PATH_I18NMODULE");
-		if (p != NULL && !issetugid()) {
+		p = secure_getenv("PATH_I18NMODULE");
+		if (p != NULL) {
 			_pathI18nModule = strdup(p);
 			if (_pathI18nModule == NULL)
 				return (ENOMEM);

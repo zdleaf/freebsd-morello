@@ -1,5 +1,5 @@
 --
--- SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+-- SPDX-License-Identifier: BSD-2-Clause
 --
 -- Copyright (c) 2015 Pedro Souza <pedrosouza@freebsd.org>
 -- Copyright (c) 2018 Kyle Evans <kevans@FreeBSD.org>
@@ -25,8 +25,6 @@
 -- LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
 -- OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 -- SUCH DAMAGE.
---
--- $FreeBSD$
 --
 
 local config = require("config")
@@ -351,6 +349,14 @@ function core.changeRewindCheckpoint()
 	end
 end
 
+function core.loadEntropy()
+	if core.isUEFIBoot() then
+		if (loader.getenv("entropy_efi_seed") or "no"):lower() == "yes" then
+			loader.perform("efi-seed-entropy")
+		end
+	end
+end
+
 function core.setDefaults()
 	core.setACPI(core.getACPIPresent(true))
 	core.setSafeMode(default_safe_mode)
@@ -363,6 +369,7 @@ function core.autoboot(argstr)
 	if loader.getenv("kernelname") == nil then
 		config.loadelf()
 	end
+	core.loadEntropy()
 	loader.perform(composeLoaderCmd("autoboot", argstr))
 end
 
@@ -371,6 +378,7 @@ function core.boot(argstr)
 	if loader.getenv("kernelname") == nil then
 		config.loadelf()
 	end
+	core.loadEntropy()
 	loader.perform(composeLoaderCmd("boot", argstr))
 end
 

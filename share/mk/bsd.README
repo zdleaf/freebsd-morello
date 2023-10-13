@@ -1,5 +1,4 @@
 #	@(#)bsd.README	8.2 (Berkeley) 4/2/94
-# $FreeBSD$
 
 This is the README file for the "include" files for the FreeBSD
 source tree.  The files are installed in /usr/share/mk, and are by
@@ -345,7 +344,7 @@ LDADD		Additional loader objects.  Usually used for libraries.
 
 			LDADD=-lutil -lcompat
 
-LDADD.${TAREGT}
+LDADD.${TARGET}
 		Loader objects dependent on output file name.
 
 LDFLAGS		Additional loader flags. Passed to the loader via CC,
@@ -611,8 +610,6 @@ LINKOWN		Owner of links created with LINKS [${LIBOWN}].
 LINKGRP		Group of links created with LINKS [${LIBGRP}].
 
 LINKMODE	Mode of links created with LINKS [${LIBMODE}].
-
-LINTLIBDIR	Target directory for lint libraries.
 
 MAN		The manual pages to be installed. See bsd.man.mk for more
 		details.

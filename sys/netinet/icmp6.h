@@ -1,4 +1,3 @@
-/*	$FreeBSD$	*/
 /*	$KAME: icmp6.h,v 1.46 2001/04/27 15:09:48 itojun Exp $	*/
 
 /*-
@@ -602,6 +601,7 @@ struct icmp6stat {
 	uint64_t icp6s_tooshort;	/* packet < sizeof(struct icmp6_hdr) */
 	uint64_t icp6s_checksum;	/* bad checksum */
 	uint64_t icp6s_badlen;		/* calculated bound mismatch */
+	uint64_t icp6s_dropped;		/* # of packets dropped waiting for a resolution */
 	/*
 	 * number of responses: this member is inherited from netinet code, but
 	 * for netinet6 code, it is already available in icp6s_outhist[].
@@ -700,14 +700,14 @@ struct	rttimer;
 struct	in6_multi;
 # endif
 void	icmp6_paramerror(struct mbuf *, int);
+int	icmp6_errmap(const struct icmp6_hdr *);
 void	icmp6_error(struct mbuf *, int, int, int);
 void	icmp6_error2(struct mbuf *, int, int, int, struct ifnet *);
 int	icmp6_input(struct mbuf **, int *, int);
-void	icmp6_fasttimo(void);
-void	icmp6_slowtimo(void);
 void	icmp6_prepare(struct mbuf *);
 void	icmp6_redirect_input(struct mbuf *, int);
 void	icmp6_redirect_output(struct mbuf *, struct nhop_object *);
+int	icmp6_ratelimit(const struct in6_addr *, const int, const int);
 
 struct	ip6ctlparam;
 void	icmp6_mtudisc_update(struct ip6ctlparam *, int);

@@ -1,4 +1,3 @@
-.\"    $FreeBSD$
 .\"	$OpenBSD: pf.conf.5,v 1.406 2009/01/31 19:37:12 sobrado Exp $
 .\"
 .\" Copyright (c) 2002, Daniel Hartmeier
@@ -28,7 +27,7 @@
 .\" ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 .\" POSSIBILITY OF SUCH DAMAGE.
 .\"
-.Dd September 25, 2021
+.Dd June 21, 2023
 .Dt PF.CONF 5
 .Os
 .Sh NAME
@@ -41,7 +40,7 @@ packet filter modifies, drops or passes packets according to rules or
 definitions specified in
 .Nm pf.conf .
 .Sh STATEMENT ORDER
-There are seven types of statements in
+There are eight types of statements in
 .Nm pf.conf :
 .Bl -tag -width xxxx
 .It Cm Macros
@@ -54,6 +53,8 @@ Tables provide a mechanism for increasing the performance and flexibility of
 rules with large numbers of source or destination addresses.
 .It Cm Options
 Options tune the behaviour of the packet filtering engine.
+.It Cm Ethernet Filtering
+Ethernet filtering provides rule-based blocking or passing of Ethernet packets.
 .It Cm Traffic Normalization Li (e.g. Em scrub )
 Traffic normalization protects internal machines against inconsistencies
 in Internet protocols and implementations.
@@ -491,6 +492,7 @@ action:
 Packet is silently dropped.
 .It Ar return
 A TCP RST is returned for blocked TCP packets,
+an SCTP ABORT chunk is returned for blocked SCTP packets,
 an ICMP UNREACHABLE is returned for blocked UDP packets,
 and all other packets are silently dropped.
 .El
@@ -515,6 +517,7 @@ actions are possible:
 Incoming packet is silently dropped.
 .It Ar return
 Incoming packet is dropped and TCP RST is returned for TCP packets,
+an SCTP ABORT chunk is returned for blocked SCTP packets,
 an ICMP UNREACHABLE is returned for UDP packets,
 and no response is sent for other packets.
 .El
@@ -654,6 +657,102 @@ With
 set pf will attempt to find matching rules between old and new rulesets
 and preserve the rule counters.
 .El
+.Sh ETHERNET FILTERING
+.Xr pf 4
+has the ability to
+.Ar block
+and
+.Ar pass
+packets based on attributes of their Ethernet (layer 2) header.
+.Pp
+For each packet processed by the packet filter, the filter rules are
+evaluated in sequential order, from first to last.
+The last matching rule decides what action is taken.
+If no rule matches the packet, the default action is to pass
+the packet.
+.Pp
+The following actions can be used in the filter:
+.Bl -tag -width xxxx
+.It Ar block
+The packet is blocked.
+Unlike for layer 3 traffic the packet is always silently dropped.
+.It Ar pass
+The packet is passed;
+no state is created for layer 2 traffic.
+.El
+.Sh PARAMETERS
+The rule parameters specify the packets to which a rule applies.
+A packet always comes in on, or goes out through, one interface.
+Most parameters are optional.
+If a parameter is specified, the rule only applies to packets with
+matching attributes.
+Certain parameters can be expressed as lists, in which case
+.Xr pfctl 8
+generates all needed rule combinations.
+.Bl -tag -width xxxx
+.It Ar in No or Ar out
+This rule applies to incoming or outgoing packets.
+If neither
+.Ar in
+nor
+.Ar out
+are specified, the rule will match packets in both directions.
+.It Ar quick
+If a packet matches a rule which has the
+.Ar quick
+option set, this rule
+is considered the last matching rule, and evaluation of subsequent rules
+is skipped.
+.It Ar on Aq Ar ifspec
+This rule applies only to packets coming in on, or going out through, this
+particular interface or interface group.
+For more information on interface groups,
+see the
+.Ic group
+keyword in
+.Xr ifconfig 8 .
+.It Ar bridge-to Aq interface
+Packets matching this rule will be sent out of the specified interface without
+further processing.
+.It Ar proto Aq Ar protocol
+This rule applies only to packets of this protocol.
+Note that Ethernet protocol numbers are different from those used in
+.Xr ip 4
+and
+.Xr ip6 4 .
+.It Xo
+.Ar from Aq Ar source
+.Ar to Aq Ar dest
+.Xc
+This rule applies only to packets with the specified source and destination
+MAC addresses.
+.It Xo Ar queue Aq Ar queue
+.Xc
+Packets matching this rule will be assigned to the specified queue.
+See
+.Sx QUEUEING
+for setup details.
+.Pp
+.It Ar tag Aq Ar string
+Packets matching this rule will be tagged with the
+specified string.
+The tag acts as an internal marker that can be used to
+identify these packets later on.
+This can be used, for example, to provide trust between
+interfaces and to determine if packets have been
+processed by translation rules.
+Tags are
+.Qq sticky ,
+meaning that the packet will be tagged even if the rule
+is not the last matching rule.
+Further matching rules can replace the tag with a
+new one but will not remove a previously applied tag.
+A packet is only ever assigned one tag at a time.
+.It Ar tagged Aq Ar string
+Used to specify that packets must already be tagged with the given tag in order
+to match the rule.
+Inverse tag matching can also be done by specifying the !  operator before the
+tagged keyword.
 .Sh TRAFFIC NORMALIZATION
 Traffic normalization is used to sanitize packet content in such
 a way that there are no ambiguities in packet interpretation on
@@ -734,6 +833,9 @@ packet, and only the completed packet is passed on to the filter.
 The advantage is that filter rules have to deal only with complete
 packets, and can ignore fragments.
 The drawback of caching fragments is the additional memory cost.
+This is the default behaviour unless no fragment reassemble is specified.
+.It Ar no fragment reassemble
+Do not reassemble fragments.
 .It Ar reassemble tcp
 Statefully normalizes TCP connections.
 .Ar scrub reassemble tcp
@@ -1166,8 +1268,8 @@ A stateful connection is automatically created to track packets matching
 such a rule as long as they are not blocked by the filtering section of
 .Nm pf.conf .
 The translation engine modifies the specified address and/or port in the
-packet, recalculates IP, TCP and UDP checksums as necessary, and passes it to
-the packet filter for evaluation.
+packet, recalculates IP, TCP and UDP checksums as necessary, and passes
+it to the packet filter for evaluation.
 .Pp
 Since translation occurs before filtering the filter
 engine will see packets as they look after any
@@ -1303,6 +1405,7 @@ and layer 4 (see
 .Xr icmp 4 ,
 .Xr icmp6 4 ,
 .Xr tcp 4 ,
+.Xr sctp 4 ,
 .Xr udp 4 )
 headers.
 In addition, packets may also be
@@ -1317,7 +1420,7 @@ and
 , the last matching rule decides what action is taken.
 For
 .Ar match
-, rules are evaulated every time they match; the pass/block state of a packet
+, rules are evaluated every time they match; the pass/block state of a packet
 remains unchanged.
 If no rule matches the packet, the default action is to pass
 the packet.
@@ -1352,7 +1455,8 @@ can be overridden by specifying a message as a code or number.
 .It Ar return
 This causes a TCP RST to be returned for
 .Xr tcp 4
-packets and an ICMP UNREACHABLE for UDP and other packets.
+packets, an SCTP ABORT for SCTP
+and an ICMP UNREACHABLE for UDP and other packets.
 .El
 .Pp
 Options returning ICMP packets currently have no effect if
@@ -1388,6 +1492,15 @@ The packet is passed;
 state is created unless the
 .Ar no state
 option is specified.
+.It Ar match
+Action is unaltered, the previously matched rule's action still matters.
+Match rules apply queue and rtable assignments for every matched packet,
+subsequent matching pass or match rules can overwrite the assignment,
+if they don't specify a queue or an rtable, respectively, the previously
+set value remains.
+Additionally, match rules can contain log statements; the is logging done
+for each and every matching match rule, so it is possible to log a single
+packet multiple times.
 .El
 .Pp
 By default
@@ -1544,6 +1657,7 @@ Common protocols are
 .Xr icmp 4 ,
 .Xr icmp6 4 ,
 .Xr tcp 4 ,
+.Xr sctp 4 ,
 and
 .Xr udp 4 .
 For a list of all the protocol name to number mappings used by
@@ -1918,7 +2032,6 @@ For example:
 pass in proto tcp to port 25 queue mail
 pass in proto tcp to port 22 queue(ssh_bulk, ssh_prio)
 .Ed
-.Pp
 .It Cm set prio Ar priority | Pq Ar priority , priority
 Packets matching this rule will be assigned a specific queueing priority.
 Priorities are assigned as integers 0 through 7.
@@ -1935,7 +2048,6 @@ For example:
 pass in proto tcp to port 25 set prio 2
 pass in proto tcp to port 22 set prio (2, 5)
 .Ed
-.Pp
 .It Ar tag Aq Ar string
 Packets matching this rule will be tagged with the
 specified string.
@@ -1954,8 +2066,9 @@ A packet is only ever assigned one tag at a time.
 Packet tagging can be done during
 .Ar nat ,
 .Ar rdr ,
-or
 .Ar binat
+or
+.Ar ether
 rules in addition to filter rules.
 Tags take the same macros as labels (see above).
 .It Ar tagged Aq Ar string
@@ -1998,7 +2111,6 @@ block in proto icmp probability 20%
 .Ed
 .It Ar prio Aq Ar number
 Only match packets which have the given queueing priority assigned.
-.Pp
 .El
 .Sh ROUTING
 If a packet matches a rule with a route option set, the packet filter will
@@ -2110,7 +2222,6 @@ nat on $gif_mape_if from $int_if:network to any \e
 .Ed
 .Pp
 sets PSID offset 6, PSID length 8, PSID 0x34.
-.Ed
 .El
 .Pp
 Additionally, the
@@ -2746,6 +2857,14 @@ reference to an anchor name containing
 characters will require double quote
 .Pq Sq \&"
 characters around the anchor name.
+.Sh SCTP CONSIDERATIONS
+.Xr pf 4
+supports
+.Xr sctp 4
+connections.
+It can match ports, track state and NAT SCTP traffic.
+However, it will not alter port numbers during nat or rdr translations.
+Doing so would break SCTP multihoming.
 .Sh TRANSLATION EXAMPLES
 This example maps incoming requests on port 80 to port 8080, on
 which a daemon is running (because, for example, it is not run as root,
@@ -2828,6 +2947,10 @@ nat on $ext_if inet proto udp from any port = isakmp to any -\*(Gt ($ext_if) \e
 # Translate incoming packets' destination address to an internal machine
 # (bidirectional).
 binat on $ext_if from 10.1.2.150 to any -\*(Gt $ext_if
+
+# Translate packets arriving on $peer_if addressed to 172.22.16.0/20
+# to the corresponding address in 172.21.16.0/20 (bidirectional).
+binat on $peer_if from 172.21.16.0/20 to any -> 172.22.16.0/20
 
 # RDR
 # Translate incoming packets' destination addresses.
@@ -2962,10 +3085,10 @@ Syntax for
 .Nm
 in BNF:
 .Bd -literal
-line           = ( option | pf-rule | nat-rule | binat-rule | rdr-rule |
-                 antispoof-rule | altq-rule | queue-rule | trans-anchors |
-                 anchor-rule | anchor-close | load-anchor | table-rule |
-                 include )
+line           = ( option | ether-rule | pf-rule | nat-rule | binat-rule |
+                 rdr-rule | antispoof-rule | altq-rule | queue-rule |
+                 trans-anchors | anchor-rule | anchor-close | load-anchor |
+                 table-rule | include )
 
 option         = "set" ( [ "timeout" ( timeout | "{" timeout-list "}" ) ] |
                  [ "ruleset-optimization" [ "none" | "basic" | "profile" ]] |
@@ -2983,6 +3106,11 @@ option         = "set" ( [ "timeout" ( timeout | "{" timeout-list "}" ) ] |
                  [ "debug" ( "none" | "urgent" | "misc" | "loud" ) ]
                  [ "keepcounters" ] )
 
+ether-rule     = "ether" etheraction [ ( "in" | "out" ) ]
+                 [ "quick" ] [ "on" ifspec ] [ "bridge-to" interface-name ]
+                 [ etherprotospec ] etherhosts [ "l3" hosts ]
+                 [ etherfilteropt-list ]
+
 pf-rule        = action [ ( "in" | "out" ) ]
                  [ "log" [ "(" logopts ")"] ] [ "quick" ]
                  [ "on" ifspec ] [ route ] [ af ] [ protospec ]
@@ -2990,6 +3118,10 @@ pf-rule        = action [ ( "in" | "out" ) ]
 
 logopts        = logopt [ "," logopts ]
 logopt         = "all" | "user" | "to" interface-name
+
+etherfilteropt-list = etherfilteropt-list etherfilteropt | etherfilteropt
+etherfilteropt = "tag" string | "tagged" string | "queue" ( string ) |
+                 "ridentifier" number | "label" string
 
 filteropt-list = filteropt-list filteropt | filteropt
 filteropt      = user | group | flags | icmp-type | icmp6-type | "tos" tos |
@@ -3061,7 +3193,8 @@ queueopts      = [ "bandwidth" bandwidth-spec ] |
 schedulers     = ( cbq-def | priq-def | hfsc-def )
 bandwidth-spec = "number" ( "b" | "Kb" | "Mb" | "Gb" | "%" )
 
-action         = "pass" | "block" [ return ] | [ "no" ] "scrub"
+etheraction    = "pass" | "block"
+action         = "pass" | "match" | "block" [ return ] | [ "no" ] "scrub"
 return         = "drop" | "return" | "return-rst" [ "( ttl" number ")" ] |
                  "return-icmp" [ "(" icmpcode [ [ "," ] icmp6code ] ")" ] |
                  "return-icmp6" [ "(" icmp6code ")" ]
@@ -3077,9 +3210,14 @@ route          = ( "route-to" | "reply-to" | "dup-to" )
                  [ pooltype ]
 af             = "inet" | "inet6"
 
+etherprotospec = "proto" ( proto-number | "{" etherproto-list "}" )
+etherproto-list	= proto-number [ [ "," ] etherproto-list ]
 protospec      = "proto" ( proto-name | proto-number |
                  "{" proto-list "}" )
 proto-list     = ( proto-name | proto-number ) [ [ "," ] proto-list ]
+
+etherhosts     = "from" macaddress "to" macaddress
+macaddress     = mac | mac "/" masklen | mac "&" mask
 
 hosts          = "all" |
                  "from" ( "any" | "no-route" | "urpf-failed" | "self" | host |
@@ -3193,6 +3331,7 @@ Service name database.
 .Xr pf 4 ,
 .Xr pfsync 4 ,
 .Xr tcp 4 ,
+.Xr sctp 4 ,
 .Xr udp 4 ,
 .Xr hosts 5 ,
 .Xr pf.os 5 ,

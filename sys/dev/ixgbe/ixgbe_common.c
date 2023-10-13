@@ -31,7 +31,6 @@
   POSSIBILITY OF SUCH DAMAGE.
 
 ******************************************************************************/
-/*$FreeBSD$*/
 
 #include "ixgbe_common.h"
 #include "ixgbe_phy.h"
@@ -4118,7 +4117,7 @@ vlvf_update:
  * ixgbe_clear_vfta_generic - Clear VLAN filter table
  * @hw: pointer to hardware structure
  *
- * Clears the VLAN filer table, and the VMDq index associated with the filter
+ * Clears the VLAN filter table, and the VMDq index associated with the filter
  **/
 s32 ixgbe_clear_vfta_generic(struct ixgbe_hw *hw)
 {
@@ -4232,10 +4231,25 @@ s32 ixgbe_check_mac_link_generic(struct ixgbe_hw *hw, ixgbe_link_speed *speed,
 			links_reg = IXGBE_READ_REG(hw, IXGBE_LINKS);
 		}
 	} else {
-		if (links_reg & IXGBE_LINKS_UP)
+		if (links_reg & IXGBE_LINKS_UP) {
+			if (ixgbe_need_crosstalk_fix(hw)) {
+				/* Check the link state again after a delay
+				 * to filter out spurious link up
+				 * notifications.
+				 */
+				msec_delay(5);
+				links_reg = IXGBE_READ_REG(hw, IXGBE_LINKS);
+				if (!(links_reg & IXGBE_LINKS_UP)) {
+					*link_up = false;
+					*speed = IXGBE_LINK_SPEED_UNKNOWN;
+					return IXGBE_SUCCESS;
+				}
+
+			}
 			*link_up = true;
-		else
+		} else {
 			*link_up = false;
+		}
 	}
 
 	switch (links_reg & IXGBE_LINKS_SPEED_82599) {
@@ -4626,7 +4640,7 @@ s32 ixgbe_host_interface_command(struct ixgbe_hw *hw, u32 *buffer,
 	/* first pull in the header so we know the buffer length */
 	for (bi = 0; bi < dword_len; bi++) {
 		buffer[bi] = IXGBE_READ_REG_ARRAY(hw, IXGBE_FLEX_MNG, bi);
-		IXGBE_LE32_TO_CPUS((uintptr_t)&buffer[bi]);
+		IXGBE_LE32_TO_CPUS(&buffer[bi]);
 	}
 
 	/*
@@ -4662,7 +4676,7 @@ s32 ixgbe_host_interface_command(struct ixgbe_hw *hw, u32 *buffer,
 	/* Pull in the rest of the buffer (bi is where we left off) */
 	for (; bi <= dword_len; bi++) {
 		buffer[bi] = IXGBE_READ_REG_ARRAY(hw, IXGBE_FLEX_MNG, bi);
-		IXGBE_LE32_TO_CPUS((uintptr_t)&buffer[bi]);
+		IXGBE_LE32_TO_CPUS(&buffer[bi]);
 	}
 
 rel_out:
@@ -5136,7 +5150,7 @@ s32 ixgbe_bypass_rw_generic(struct ixgbe_hw *hw, u32 cmd, u32 *status)
  * ixgbe_bypass_valid_rd_generic - Verify valid return from bit-bang.
  *
  * If we send a write we can't be sure it took until we can read back
- * that same register.  It can be a problem as some of the feilds may
+ * that same register.  It can be a problem as some of the fields may
  * for valid reasons change inbetween the time wrote the register and
  * we read it again to verify.  So this function check everything we
  * can check and then assumes it worked.

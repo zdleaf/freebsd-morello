@@ -1,6 +1,6 @@
-# $FreeBSD$
 #
 
+PACKAGE=	ufs
 PROG=	snapinfo
 MAN=	snapinfo.8
 

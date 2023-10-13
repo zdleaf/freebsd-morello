@@ -23,8 +23,6 @@
 .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 .\" SUCH DAMAGE.
 .\"
-.\" $FreeBSD$
-.\"
 .Dd July 20, 2021
 .Dt MLX5EN 4
 .Os
@@ -69,7 +67,7 @@ HW Large Receive Offload (HW LRO), VLAN tag insertion and extraction,
 VLAN checksum offload, VLAN TSO, hardware rate limiting (TXRTLMT),
 stateless VxLAN hardware offload for receive and transmit,
 HW TLS offload for transmit, Receive Side Steering (RSS) and
-.Xr NUMA 4
+.Xr numa 4
 awareness.
 .Pp
 The network interface name is
@@ -88,8 +86,8 @@ requirements, see
 The
 .Nm
 driver supports 200Gb, 100Gb, 50Gb, 40Gb, 25Gb and 10Gb ethernet adapters.
-.Bl -bullet -compact
 .Pp
+.Bl -bullet -compact
 .It
 ConnectX-6 supports 10/20/25/40/50/56/100Gb/200Gb/s speeds.
 .It

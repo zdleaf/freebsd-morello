@@ -3,7 +3,7 @@
  */
 
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2001-2009 Maksim Yevmenkin <m_evmenkin@yahoo.com>
  * All rights reserved.
@@ -30,7 +30,6 @@
  * SUCH DAMAGE.
  *
  * $Id: ng_ubt_var.h,v 1.2 2003/03/22 23:44:36 max Exp $
- * $FreeBSD$
  */
 
 #ifndef _NG_UBT_VAR_H_
@@ -165,7 +164,6 @@ typedef struct ubt_softc *	ubt_softc_p;
 usb_error_t	ubt_do_hci_request(struct usb_device *, struct ubt_hci_cmd *,
 		    void *, usb_timeout_t);
 
-extern	devclass_t	ubt_devclass;
 extern	driver_t	ubt_driver;
 
 #endif /* ndef _NG_UBT_VAR_H_ */

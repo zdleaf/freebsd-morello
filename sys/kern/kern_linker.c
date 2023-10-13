@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 1997-2000 Doug Rabson
  * All rights reserved.
@@ -27,34 +27,32 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include "opt_ddb.h"
 #include "opt_kld.h"
 #include "opt_hwpmc_hooks.h"
 
 #include <sys/param.h>
-#include <sys/kernel.h>
 #include <sys/systm.h>
-#include <sys/malloc.h>
-#include <sys/sysproto.h>
-#include <sys/sysent.h>
-#include <sys/priv.h>
-#include <sys/proc.h>
-#include <sys/lock.h>
-#include <sys/mutex.h>
-#include <sys/sx.h>
-#include <sys/module.h>
-#include <sys/mount.h>
-#include <sys/linker.h>
+#include <sys/boottrace.h>
 #include <sys/eventhandler.h>
 #include <sys/fcntl.h>
 #include <sys/jail.h>
+#include <sys/kernel.h>
 #include <sys/libkern.h>
+#include <sys/linker.h>
+#include <sys/lock.h>
+#include <sys/malloc.h>
+#include <sys/module.h>
+#include <sys/mount.h>
+#include <sys/mutex.h>
 #include <sys/namei.h>
-#include <sys/vnode.h>
+#include <sys/priv.h>
+#include <sys/proc.h>
+#include <sys/sx.h>
 #include <sys/syscallsubr.h>
 #include <sys/sysctl.h>
+#include <sys/sysproto.h>
+#include <sys/vnode.h>
 
 #ifdef DDB
 #include <ddb/ddb.h>
@@ -196,6 +194,7 @@ static void
 linker_file_sysinit(linker_file_t lf)
 {
 	struct sysinit **start, **stop, **sipp, **xipp, *save;
+	int last;
 
 	KLD_DPF(FILE, ("linker_file_sysinit: calling SYSINITs for %s\n",
 	    lf->filename));
@@ -227,14 +226,20 @@ linker_file_sysinit(linker_file_t lf)
 	 * Traverse the (now) ordered list of system initialization tasks.
 	 * Perform each task, and continue on to the next task.
 	 */
+	last = SI_SUB_DUMMY;
 	sx_xunlock(&kld_sx);
 	mtx_lock(&Giant);
 	for (sipp = start; sipp < stop; sipp++) {
 		if ((*sipp)->subsystem == SI_SUB_DUMMY)
 			continue;	/* skip dummy task(s) */
 
+		if ((*sipp)->subsystem > last)
+			BOOTTRACE("%s: sysinit 0x%7x", lf->filename,
+			    (*sipp)->subsystem);
+
 		/* Call function */
 		(*((*sipp)->func)) ((*sipp)->udata);
+		last = (*sipp)->subsystem;
 	}
 	mtx_unlock(&Giant);
 	sx_xlock(&kld_sx);
@@ -244,6 +249,7 @@ static void
 linker_file_sysuninit(linker_file_t lf)
 {
 	struct sysinit **start, **stop, **sipp, **xipp, *save;
+	int last;
 
 	KLD_DPF(FILE, ("linker_file_sysuninit: calling SYSUNINITs for %s\n",
 	    lf->filename));
@@ -279,12 +285,18 @@ linker_file_sysuninit(linker_file_t lf)
 	 */
 	sx_xunlock(&kld_sx);
 	mtx_lock(&Giant);
+	last = SI_SUB_DUMMY;
 	for (sipp = start; sipp < stop; sipp++) {
 		if ((*sipp)->subsystem == SI_SUB_DUMMY)
 			continue;	/* skip dummy task(s) */
 
+		if ((*sipp)->subsystem > last)
+			BOOTTRACE("%s: sysuninit 0x%7x", lf->filename,
+			    (*sipp)->subsystem);
+
 		/* Call function */
 		(*((*sipp)->func)) ((*sipp)->udata);
+		last = (*sipp)->subsystem;
 	}
 	mtx_unlock(&Giant);
 	sx_xlock(&kld_sx);
@@ -459,6 +471,9 @@ linker_load_file(const char *filename, linker_file_t *result)
 			}
 			modules = !TAILQ_EMPTY(&lf->modules);
 			linker_file_register_sysctls(lf, false);
+#ifdef VIMAGE
+			LINKER_PROPAGATE_VNETS(lf);
+#endif
 			linker_file_sysinit(lf);
 			lf->flags |= LINKER_FILE_LINKED;
 
@@ -1373,7 +1388,7 @@ kern_kldstat(struct thread *td, int fileid, struct kld_file_stat *stat)
 }
 
 #ifdef DDB
-DB_COMMAND(kldstat, db_kldstat)
+DB_COMMAND_FLAGS(kldstat, db_kldstat, DB_CMD_MEMSAFE)
 {
 	linker_file_t lf;
 
@@ -1844,7 +1859,7 @@ linker_lookup_file(const char *path, int pathlen, const char *name,
 	const char * const *cpp, *sep;
 	char *result;
 	int error, len, extlen, reclen, flags;
-	enum vtype type;
+	__enum_uint8(vtype) type;
 
 	extlen = 0;
 	for (cpp = linker_ext_list; *cpp; cpp++) {
@@ -1868,7 +1883,7 @@ linker_lookup_file(const char *path, int pathlen, const char *name,
 		flags = FREAD;
 		error = vn_open(&nd, &flags, 0, NULL);
 		if (error == 0) {
-			NDFREE(&nd, NDF_ONLY_PNBUF);
+			NDFREE_PNBUF(&nd);
 			type = nd.ni_vp->v_type;
 			if (vap)
 				VOP_GETATTR(nd.ni_vp, vap, td->td_ucred);
@@ -1919,7 +1934,7 @@ linker_hints_lookup(const char *path, int pathlen, const char *modname,
 	error = vn_open(&nd, &flags, 0, NULL);
 	if (error)
 		goto bad;
-	NDFREE(&nd, NDF_ONLY_PNBUF);
+	NDFREE_PNBUF(&nd);
 	if (nd.ni_vp->v_type != VREG)
 		goto bad;
 	best = cp = NULL;
@@ -2105,7 +2120,7 @@ linker_hwpmc_list_objects(void)
 	i = 0;
 	TAILQ_FOREACH(lf, &linker_files, link) {
 		/* Save the info for this linker file. */
-		kobase[i].pm_file = lf->filename;
+		kobase[i].pm_file = lf->pathname;
 		kobase[i].pm_address = (uintptr_t)lf->address;
 		i++;
 	}

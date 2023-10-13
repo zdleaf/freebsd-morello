@@ -1,4 +1,3 @@
-# $FreeBSD$
 
 # Part of a unified Makefile for building kernels.  This part includes all
 # the definitions that need to be after all the % directives except %RULES
@@ -133,7 +132,7 @@ PORTSMODULESENV=\
 all:
 .for __i in ${PORTS_MODULES}
 	@${ECHO} "===> Ports module ${__i} (all)"
-	cd $${PORTSDIR:-/usr/ports}/${__i}; ${PORTSMODULESENV} ${MAKE} -B clean build
+	cd ${PORTSDIR:U/usr/ports}/${__i}; ${PORTSMODULESENV} ${MAKE} -B clean build
 .endfor
 
 .for __target in install reinstall clean
@@ -141,7 +140,7 @@ ${__target}: ports-${__target}
 ports-${__target}:
 .for __i in ${PORTS_MODULES}
 	@${ECHO} "===> Ports module ${__i} (${__target})"
-	cd $${PORTSDIR:-/usr/ports}/${__i}; ${PORTSMODULESENV} ${MAKE} -B ${__target:C/(re)?install/deinstall reinstall/}
+	cd ${PORTSDIR:U/usr/ports}/${__i}; ${PORTSMODULESENV} ${MAKE} -B ${__target:C/(re)?install/deinstall reinstall/}
 .endfor
 .endfor
 .endif
@@ -230,10 +229,12 @@ kernel-clean:
 # This is a hack.  BFD "optimizes" away dynamic mode if there are no
 # dynamic references.  We could probably do a '-Bforcedynamic' mode like
 # in the a.out ld.  For now, this works.
-hack.pico: Makefile
-	:> hack.c
-	${CC} ${CCLDFLAGS} -shared ${CFLAGS} -nostdlib hack.c -o hack.pico
-	rm -f hack.c
+force-dynamic-hack.c:
+	:> ${.TARGET}
+
+force-dynamic-hack.pico: force-dynamic-hack.c Makefile
+	${CC} ${CCLDFLAGS} -shared ${CFLAGS} -nostdlib \
+	    force-dynamic-hack.c -o ${.TARGET}
 
 offset.inc: $S/kern/genoffset.sh genoffset.o
 	NM='${NM}' NMFLAGS='${NMFLAGS}' sh $S/kern/genoffset.sh genoffset.o > ${.TARGET}
@@ -260,6 +261,7 @@ genoffset.o genassym.o vers.o: opt_global.h
 .if !empty(.MAKE.MODE:Unormal:Mmeta) && empty(.MAKE.MODE:Unormal:Mnofilemon)
 _meta_filemon=	1
 .endif
+.if ${MK_DIRDEPS_BUILD} == "no"
 # Skip reading .depend when not needed to speed up tree-walks and simple
 # lookups.  For install, only do this if no other targets are specified.
 # Also skip generating or including .depend.* files if in meta+filemon mode
@@ -274,6 +276,7 @@ _SKIP_DEPEND=	1
 .endif
 .if defined(_SKIP_DEPEND) || defined(_meta_filemon)
 .MAKE.DEPENDFILE=	/dev/null
+.endif
 .endif
 
 kernel-depend: .depend
@@ -349,14 +352,15 @@ ${__obj}: ${OBJS_DEPEND_GUESS.${__obj}}
 
 .depend: .PRECIOUS ${SRCS}
 
-_MAP_DEBUG_PREFIX= yes
-
 _ILINKS= machine
 .if ${MACHINE} != ${MACHINE_CPUARCH} && ${MACHINE} != "arm64"
 _ILINKS+= ${MACHINE_CPUARCH}
 .endif
 .if ${MACHINE_CPUARCH} == "i386" || ${MACHINE_CPUARCH} == "amd64"
 _ILINKS+= x86
+.endif
+.if ${MACHINE_CPUARCH} == "amd64"
+_ILINKS+= i386
 .endif
 
 # Ensure that the link exists without depending on it when it exists.
@@ -365,12 +369,10 @@ _ILINKS+= x86
 .if !exists(${.OBJDIR}/${_link})
 ${SRCS} ${DEPENDOBJS}: ${_link}
 .endif
-.if defined(_MAP_DEBUG_PREFIX)
 .if ${_link} == "machine"
 CFLAGS+= -fdebug-prefix-map=./machine=${SYSDIR}/${MACHINE}/include
 .else
 CFLAGS+= -fdebug-prefix-map=./${_link}=${SYSDIR}/${_link}/include
-.endif
 .endif
 .endfor
 
@@ -441,11 +443,12 @@ config.o env.o hints.o vers.o vnode_if.o:
 	${NORMAL_C}
 	${NORMAL_CTFCONVERT}
 
+NEWVERS_ENV+= MAKE="${MAKE}"
 .if ${MK_REPRODUCIBLE_BUILD} != "no"
-REPRO_FLAG="-R"
+NEWVERS_ARGS+= -R
 .endif
-vers.c: $S/conf/newvers.sh $S/sys/param.h ${SYSTEM_DEP}
-	MAKE="${MAKE}" sh $S/conf/newvers.sh ${REPRO_FLAG} ${KERN_IDENT}
+vers.c: .NOMETA_CMP $S/conf/newvers.sh $S/sys/param.h ${SYSTEM_DEP:Nvers.*}
+	${NEWVERS_ENV} sh $S/conf/newvers.sh ${NEWVERS_ARGS} ${KERN_IDENT}
 
 vnode_if.c: $S/tools/vnode_if.awk $S/kern/vnode_if.src
 	${AWK} -f $S/tools/vnode_if.awk $S/kern/vnode_if.src -c
@@ -462,7 +465,7 @@ vnode_if_typedef.h:
 .if ${MFS_IMAGE:Uno} != "no"
 .if empty(MD_ROOT_SIZE_CONFIGURED)
 embedfs_${MFS_IMAGE:T:R}.o: ${MFS_IMAGE} $S/dev/md/embedfs.S
-	${CC} ${CFLAGS} ${ACFLAGS} -DMFS_IMAGE="${MFS_IMAGE}" -c \
+	${CC} ${CFLAGS} ${ACFLAGS} -DMFS_IMAGE=\""${MFS_IMAGE}"\" -c \
 	    $S/dev/md/embedfs.S -o ${.TARGET}
 .endif
 .endif

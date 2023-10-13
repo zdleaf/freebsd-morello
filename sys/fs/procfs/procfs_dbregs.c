@@ -42,7 +42,6 @@
  *
  * From:
  *	$Id: procfs_regs.c,v 3.2 1993/12/15 09:40:17 jsp Exp $
- * $FreeBSD$
  */
 
 #include <sys/param.h>
@@ -51,13 +50,13 @@
 #include <sys/mutex.h>
 #include <sys/proc.h>
 #include <sys/ptrace.h>
-#include <sys/sysent.h>
 #include <sys/uio.h>
 
 #include <fs/pseudofs/pseudofs.h>
 #include <fs/procfs/procfs.h>
 
 #ifdef COMPAT_FREEBSD32
+#include <sys/sysent.h>
 #include <sys/procfs.h>
 #include <machine/fpu.h>
 

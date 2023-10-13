@@ -83,8 +83,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 /*
  *	Manages physical address maps.
  *
@@ -160,16 +158,6 @@ __FBSDID("$FreeBSD$");
 #include <machine/smp.h>
 #endif
 #include <machine/pmap_base.h>
-
-#if !defined(DIAGNOSTIC)
-#ifdef __GNUC_GNU_INLINE__
-#define PMAP_INLINE	__attribute__((__gnu_inline__)) inline
-#else
-#define PMAP_INLINE	extern inline
-#endif
-#else
-#define PMAP_INLINE
-#endif
 
 #ifdef PV_STATS
 #define PV_STAT(x)	do { x ; } while (0)
@@ -313,13 +301,14 @@ static int	pmap_pvh_wired_mappings(struct md_page *pvh, int count);
 
 static void	pmap_abort_ptp(pmap_t pmap, vm_offset_t va, vm_page_t mpte);
 static boolean_t pmap_demote_pde(pmap_t pmap, pd_entry_t *pde, vm_offset_t va);
-static bool	pmap_enter_4mpage(pmap_t pmap, vm_offset_t va, vm_page_t m,
+static int	pmap_enter_4mpage(pmap_t pmap, vm_offset_t va, vm_page_t m,
 		    vm_prot_t prot);
 static int	pmap_enter_pde(pmap_t pmap, vm_offset_t va, pd_entry_t newpde,
 		    u_int flags, vm_page_t m);
 static vm_page_t pmap_enter_quick_locked(pmap_t pmap, vm_offset_t va,
     vm_page_t m, vm_prot_t prot, vm_page_t mpte);
-static int pmap_insert_pt_page(pmap_t pmap, vm_page_t mpte, bool promoted);
+static int pmap_insert_pt_page(pmap_t pmap, vm_page_t mpte, bool promoted,
+    bool allpte_PG_A_set);
 static void pmap_invalidate_pde_page(pmap_t pmap, vm_offset_t va,
 		    pd_entry_t pde);
 static void pmap_fill_ptp(pt_entry_t *firstpte, pt_entry_t newpte);
@@ -329,7 +318,8 @@ static void pmap_kenter_attr(vm_offset_t va, vm_paddr_t pa, int mode);
 static void pmap_kenter_pde(vm_offset_t va, pd_entry_t newpde);
 static void pmap_pde_attr(pd_entry_t *pde, int cache_bits);
 #if VM_NRESERVLEVEL > 0
-static void pmap_promote_pde(pmap_t pmap, pd_entry_t *pde, vm_offset_t va);
+static bool pmap_promote_pde(pmap_t pmap, pd_entry_t *pde, vm_offset_t va,
+    vm_page_t mpte);
 #endif
 static boolean_t pmap_protect_pde(pmap_t pmap, pd_entry_t *pde, vm_offset_t sva,
     vm_prot_t prot);
@@ -659,6 +649,7 @@ __CONCAT(PMTYPE, bootstrap)(vm_paddr_t firstaddr)
 	CPU_FILL(&kernel_pmap->pm_active);	/* don't allow deactivation */
 	kernel_pmap->pm_stats.resident_count = res;
 	TAILQ_INIT(&kernel_pmap->pm_pvchunk);
+	vm_radix_init(&kernel_pmap->pm_root);
 
  	/*
 	 * Initialize the global pv list lock.
@@ -994,7 +985,7 @@ __CONCAT(PMTYPE, init)(void)
 		 */
 		if (pseflag != 0 &&
 		    KERNBASE <= i << PDRSHIFT && i << PDRSHIFT < KERNend &&
-		    pmap_insert_pt_page(kernel_pmap, mpte, true))
+		    pmap_insert_pt_page(kernel_pmap, mpte, true, true))
 			panic("pmap_init: pmap_insert_pt_page failed");
 	}
 	PMAP_UNLOCK(kernel_pmap);
@@ -1050,7 +1041,7 @@ __CONCAT(PMTYPE, init)(void)
 	 */
 	s = (vm_size_t)(pv_npg * sizeof(struct md_page));
 	s = round_page(s);
-	pv_table = (struct md_page *)kmem_malloc(s, M_WAITOK | M_ZERO);
+	pv_table = kmem_malloc(s, M_WAITOK | M_ZERO);
 	for (i = 0; i < pv_npg; i++)
 		TAILQ_INIT(&pv_table[i].pv_list);
 
@@ -1929,14 +1920,26 @@ pmap_add_delayed_free_list(vm_page_t m, struct spglist *free,
  * for mapping a distinct range of virtual addresses.  The pmap's collection is
  * ordered by this virtual address range.
  *
- * If "promoted" is false, then the page table page "mpte" must be zero filled.
+ * If "promoted" is false, then the page table page "mpte" must be zero filled;
+ * "mpte"'s valid field will be set to 0.
+ *
+ * If "promoted" is true and "allpte_PG_A_set" is false, then "mpte" must
+ * contain valid mappings with identical attributes except for PG_A; "mpte"'s
+ * valid field will be set to 1.
+ *
+ * If "promoted" and "allpte_PG_A_set" are both true, then "mpte" must contain
+ * valid mappings with identical attributes including PG_A; "mpte"'s valid
+ * field will be set to VM_PAGE_BITS_ALL.
  */
 static __inline int
-pmap_insert_pt_page(pmap_t pmap, vm_page_t mpte, bool promoted)
+pmap_insert_pt_page(pmap_t pmap, vm_page_t mpte, bool promoted,
+    bool allpte_PG_A_set)
 {
 
 	PMAP_LOCK_ASSERT(pmap, MA_OWNED);
-	mpte->valid = promoted ? VM_PAGE_BITS_ALL : 0;
+	KASSERT(promoted || !allpte_PG_A_set,
+	    ("a zero-filled PTP can't have PG_A set in every PTE"));
+	mpte->valid = promoted ? (allpte_PG_A_set ? VM_PAGE_BITS_ALL : 1) : 0;
 	return (vm_radix_insert(&pmap->pm_root, mpte));
 }
 
@@ -2287,27 +2290,9 @@ __CONCAT(PMTYPE, growkernel)(vm_offset_t addr)
  * page management routines.
  ***************************************************/
 
-CTASSERT(sizeof(struct pv_chunk) == PAGE_SIZE);
-CTASSERT(_NPCM == 11);
-CTASSERT(_NPCPV == 336);
-
-static __inline struct pv_chunk *
-pv_to_chunk(pv_entry_t pv)
-{
-
-	return ((struct pv_chunk *)((uintptr_t)pv & ~(uintptr_t)PAGE_MASK));
-}
-
-#define PV_PMAP(pv) (pv_to_chunk(pv)->pc_pmap)
-
-#define	PC_FREE0_9	0xfffffffful	/* Free values for index 0 through 9 */
-#define	PC_FREE10	0x0000fffful	/* Free values for index 10 */
-
 static const uint32_t pc_freemask[_NPCM] = {
-	PC_FREE0_9, PC_FREE0_9, PC_FREE0_9,
-	PC_FREE0_9, PC_FREE0_9, PC_FREE0_9,
-	PC_FREE0_9, PC_FREE0_9, PC_FREE0_9,
-	PC_FREE0_9, PC_FREE10
+	[0 ... _NPCM - 2] = PC_FREEN,
+	[_NPCM - 1] = PC_FREEL
 };
 
 #ifdef PV_STATS
@@ -2862,10 +2847,11 @@ pmap_demote_pde(pmap_t pmap, pd_entry_t *pde, vm_offset_t va)
 		newpte ^= PG_PDE_PAT | PG_PTE_PAT;
 
 	/*
-	 * If the page table page is not leftover from an earlier promotion,
-	 * initialize it.
+	 * If the PTP is not leftover from an earlier promotion or it does not
+	 * have PG_A set in every PTE, then fill it.  The new PTEs will all
+	 * have PG_A set.
 	 */
-	if (mpte->valid == 0)
+	if (!vm_page_all_valid(mpte))
 		pmap_fill_ptp(firstpte, newpte);
 
 	KASSERT((*firstpte & PG_FRAME) == (newpte & PG_FRAME),
@@ -2873,8 +2859,7 @@ pmap_demote_pde(pmap_t pmap, pd_entry_t *pde, vm_offset_t va)
 	    " addresses"));
 
 	/*
-	 * If the mapping has changed attributes, update the page table
-	 * entries.
+	 * If the mapping has changed attributes, update the PTEs.
 	 */ 
 	if ((*firstpte & PG_PTE_PROMOTE) != (newpte & PG_PTE_PROMOTE))
 		pmap_fill_ptp(firstpte, newpte);
@@ -2940,7 +2925,7 @@ pmap_remove_kernel_pde(pmap_t pmap, pd_entry_t *pde, vm_offset_t va)
 	 * If this page table page was unmapped by a promotion, then it
 	 * contains valid mappings.  Zero it to invalidate those mappings.
 	 */
-	if (mpte->valid != 0)
+	if (vm_page_any_valid(mpte))
 		pagezero((void *)&KPTmap[i386_btop(trunc_4mpage(va))]);
 
 	/*
@@ -3004,7 +2989,7 @@ pmap_remove_pde(pmap_t pmap, pd_entry_t *pdq, vm_offset_t sva,
 	} else {
 		mpte = pmap_remove_pt_page(pmap, sva);
 		if (mpte != NULL) {
-			KASSERT(mpte->valid == VM_PAGE_BITS_ALL,
+			KASSERT(vm_page_any_valid(mpte),
 			    ("pmap_remove_pde: pte page not promoted"));
 			pmap->pm_stats.resident_count--;
 			KASSERT(mpte->ref_count == NPTEPG,
@@ -3488,36 +3473,56 @@ retry:
  * pmap_clear_ptes() and pmap_ts_referenced() only read the PDE from the kernel
  * pmap.
  */
-static void
-pmap_promote_pde(pmap_t pmap, pd_entry_t *pde, vm_offset_t va)
+static bool
+pmap_promote_pde(pmap_t pmap, pd_entry_t *pde, vm_offset_t va, vm_page_t mpte)
 {
 	pd_entry_t newpde;
-	pt_entry_t *firstpte, oldpte, pa, *pte;
-	vm_offset_t oldpteva __diagused;
-	vm_page_t mpte;
+	pt_entry_t allpte_PG_A, *firstpte, oldpte, pa, *pte;
+#ifdef KTR
+	vm_offset_t oldpteva;
+#endif
 
 	PMAP_LOCK_ASSERT(pmap, MA_OWNED);
+	if (!pg_ps_enabled)
+		return (false);
 
 	/*
 	 * Examine the first PTE in the specified PTP.  Abort if this PTE is
-	 * either invalid, unused, or does not map the first 4KB physical page
+	 * either invalid or does not map the first 4KB physical page
 	 * within a 2- or 4MB page.
 	 */
 	firstpte = pmap_pte_quick(pmap, trunc_4mpage(va));
 setpde:
 	newpde = *firstpte;
-	if ((newpde & ((PG_FRAME & PDRMASK) | PG_A | PG_V)) != (PG_A | PG_V)) {
+	if ((newpde & ((PG_FRAME & PDRMASK) | PG_V)) != PG_V) {
 		pmap_pde_p_failures++;
 		CTR2(KTR_PMAP, "pmap_promote_pde: failure for va %#x"
 		    " in pmap %p", va, pmap);
-		return;
+		return (false);
 	}
 	if ((*firstpte & PG_MANAGED) != 0 && pmap == kernel_pmap) {
 		pmap_pde_p_failures++;
 		CTR2(KTR_PMAP, "pmap_promote_pde: failure for va %#x"
 		    " in pmap %p", va, pmap);
-		return;
+		return (false);
 	}
+
+	/*
+	 * Both here and in the below "for" loop, to allow for repromotion
+	 * after MADV_FREE, conditionally write protect a clean PTE before
+	 * possibly aborting the promotion due to other PTE attributes.  Why?
+	 * Suppose that MADV_FREE is applied to a part of a superpage, the
+	 * address range [S, E).  pmap_advise() will demote the superpage
+	 * mapping, destroy the 4KB page mapping at the end of [S, E), and
+	 * clear PG_M and PG_A in the PTEs for the rest of [S, E).  Later,
+	 * imagine that the memory in [S, E) is recycled, but the last 4KB
+	 * page in [S, E) is not the last to be rewritten, or simply accessed.
+	 * In other words, there is still a 4KB page in [S, E), call it P,
+	 * that is writeable but PG_M and PG_A are clear in P's PTE.  Unless
+	 * we write protect P before aborting the promotion, if and when P is
+	 * finally rewritten, there won't be a page fault to trigger
+	 * repromotion.
+	 */
 	if ((newpde & (PG_M | PG_RW)) == PG_RW) {
 		/*
 		 * When PG_M is already clear, PG_RW can be cleared without
@@ -3527,6 +3532,8 @@ setpde:
 		    ~PG_RW))  
 			goto setpde;
 		newpde &= ~PG_RW;
+		CTR2(KTR_PMAP, "pmap_promote_pde: protect for va %#lx"
+		    " in pmap %p", va & ~PDRMASK, pmap);
 	}
 
 	/* 
@@ -3534,15 +3541,16 @@ setpde:
 	 * PTE maps an unexpected 4KB physical page or does not have identical
 	 * characteristics to the first PTE.
 	 */
-	pa = (newpde & (PG_PS_FRAME | PG_A | PG_V)) + NBPDR - PAGE_SIZE;
+	allpte_PG_A = newpde & PG_A;
+	pa = (newpde & (PG_PS_FRAME | PG_V)) + NBPDR - PAGE_SIZE;
 	for (pte = firstpte + NPTEPG - 1; pte > firstpte; pte--) {
 setpte:
 		oldpte = *pte;
-		if ((oldpte & (PG_FRAME | PG_A | PG_V)) != pa) {
+		if ((oldpte & (PG_FRAME | PG_V)) != pa) {
 			pmap_pde_p_failures++;
 			CTR2(KTR_PMAP, "pmap_promote_pde: failure for va %#x"
 			    " in pmap %p", va, pmap);
-			return;
+			return (false);
 		}
 		if ((oldpte & (PG_M | PG_RW)) == PG_RW) {
 			/*
@@ -3553,8 +3561,10 @@ setpte:
 			    oldpte & ~PG_RW))
 				goto setpte;
 			oldpte &= ~PG_RW;
+#ifdef KTR
 			oldpteva = (oldpte & PG_FRAME & PDRMASK) |
 			    (va & ~PDRMASK);
+#endif
 			CTR2(KTR_PMAP, "pmap_promote_pde: protect for va %#x"
 			    " in pmap %p", oldpteva, pmap);
 		}
@@ -3562,28 +3572,39 @@ setpte:
 			pmap_pde_p_failures++;
 			CTR2(KTR_PMAP, "pmap_promote_pde: failure for va %#x"
 			    " in pmap %p", va, pmap);
-			return;
+			return (false);
 		}
+		allpte_PG_A &= oldpte;
 		pa -= PAGE_SIZE;
 	}
 
 	/*
-	 * Save the page table page in its current state until the PDE
-	 * mapping the superpage is demoted by pmap_demote_pde() or
-	 * destroyed by pmap_remove_pde(). 
+	 * Unless all PTEs have PG_A set, clear it from the superpage mapping,
+	 * so that promotions triggered by speculative mappings, such as
+	 * pmap_enter_quick(), don't automatically mark the underlying pages
+	 * as referenced.
 	 */
-	mpte = PHYS_TO_VM_PAGE(*pde & PG_FRAME);
+	newpde &= ~PG_A | allpte_PG_A;
+
+	/*
+	 * Save the PTP in its current state until the PDE mapping the
+	 * superpage is demoted by pmap_demote_pde() or destroyed by
+	 * pmap_remove_pde().  If PG_A is not set in every PTE, then request
+	 * that the PTP be refilled on demotion.
+	 */
+	if (mpte == NULL)
+		mpte = PHYS_TO_VM_PAGE(*pde & PG_FRAME);
 	KASSERT(mpte >= vm_page_array &&
 	    mpte < &vm_page_array[vm_page_array_size],
 	    ("pmap_promote_pde: page table page is out of range"));
 	KASSERT(mpte->pindex == va >> PDRSHIFT,
 	    ("pmap_promote_pde: page table page's pindex is wrong"));
-	if (pmap_insert_pt_page(pmap, mpte, true)) {
+	if (pmap_insert_pt_page(pmap, mpte, true, allpte_PG_A != 0)) {
 		pmap_pde_p_failures++;
 		CTR2(KTR_PMAP,
 		    "pmap_promote_pde: failure for va %#x in pmap %p", va,
 		    pmap);
-		return;
+		return (false);
 	}
 
 	/*
@@ -3611,6 +3632,7 @@ setpte:
 	pmap_pde_promotions++;
 	CTR2(KTR_PMAP, "pmap_promote_pde: success for va %#x"
 	    " in pmap %p", va, pmap);
+	return (true);
 }
 #endif /* VM_NRESERVLEVEL > 0 */
 
@@ -3874,9 +3896,9 @@ unchanged:
 	 * populated, then attempt promotion.
 	 */
 	if ((mpte == NULL || mpte->ref_count == NPTEPG) &&
-	    pg_ps_enabled && (m->flags & PG_FICTITIOUS) == 0 &&
+	    (m->flags & PG_FICTITIOUS) == 0 &&
 	    vm_reserv_level_iffullpop(m) == 0)
-		pmap_promote_pde(pmap, pde, va);
+		(void)pmap_promote_pde(pmap, pde, va, mpte);
 #endif
 
 	rv = KERN_SUCCESS;
@@ -3889,11 +3911,11 @@ out:
 
 /*
  * Tries to create a read- and/or execute-only 2 or 4 MB page mapping.  Returns
- * true if successful.  Returns false if (1) a mapping already exists at the
- * specified virtual address or (2) a PV entry cannot be allocated without
- * reclaiming another PV entry.
+ * KERN_SUCCESS if the mapping was created.  Otherwise, returns an error
+ * value.  See pmap_enter_pde() for the possible error values when "no sleep",
+ * "no replace", and "no reclaim" are specified.
  */
-static bool
+static int
 pmap_enter_4mpage(pmap_t pmap, vm_offset_t va, vm_page_t m, vm_prot_t prot)
 {
 	pd_entry_t newpde;
@@ -3910,8 +3932,7 @@ pmap_enter_4mpage(pmap_t pmap, vm_offset_t va, vm_page_t m, vm_prot_t prot)
 	if (pmap != kernel_pmap)
 		newpde |= PG_U;
 	return (pmap_enter_pde(pmap, va, newpde, PMAP_ENTER_NOSLEEP |
-	    PMAP_ENTER_NOREPLACE | PMAP_ENTER_NORECLAIM, NULL) ==
-	    KERN_SUCCESS);
+	    PMAP_ENTER_NOREPLACE | PMAP_ENTER_NORECLAIM, NULL));
 }
 
 /*
@@ -3934,11 +3955,14 @@ pmap_every_pte_zero(vm_offset_t va)
 
 /*
  * Tries to create the specified 2 or 4 MB page mapping.  Returns KERN_SUCCESS
- * if the mapping was created, and either KERN_FAILURE or
- * KERN_RESOURCE_SHORTAGE otherwise.  Returns KERN_FAILURE if
- * PMAP_ENTER_NOREPLACE was specified and a mapping already exists at the
- * specified virtual address.  Returns KERN_RESOURCE_SHORTAGE if
- * PMAP_ENTER_NORECLAIM was specified and a PV entry allocation failed.
+ * if the mapping was created, and one of KERN_FAILURE, KERN_NO_SPACE,
+ * or KERN_RESOURCE_SHORTAGE otherwise.  Returns KERN_FAILURE if
+ * PMAP_ENTER_NOREPLACE was specified and a 4 KB page mapping already exists
+ * within the 2 or 4 MB virtual address range starting at the specified virtual
+ * address.  Returns KERN_NO_SPACE if PMAP_ENTER_NOREPLACE was specified and a
+ * 2 or 4 MB page mapping already exists at the specified virtual address.
+ * Returns KERN_RESOURCE_SHORTAGE if PMAP_ENTER_NORECLAIM was specified and a
+ * PV entry allocation failed.
  *
  * The parameter "m" is only used when creating a managed, writeable mapping.
  */
@@ -3949,22 +3973,28 @@ pmap_enter_pde(pmap_t pmap, vm_offset_t va, pd_entry_t newpde, u_int flags,
 	struct spglist free;
 	pd_entry_t oldpde, *pde;
 	vm_page_t mt;
+	vm_page_t uwptpg;
 
 	rw_assert(&pvh_global_lock, RA_WLOCKED);
 	KASSERT((newpde & (PG_M | PG_RW)) != PG_RW,
 	    ("pmap_enter_pde: newpde is missing PG_M"));
-	KASSERT(pmap == kernel_pmap || (newpde & PG_W) == 0,
-	    ("pmap_enter_pde: cannot create wired user mapping"));
 	PMAP_LOCK_ASSERT(pmap, MA_OWNED);
 	pde = pmap_pde(pmap, va);
 	oldpde = *pde;
 	if ((oldpde & PG_V) != 0) {
-		if ((flags & PMAP_ENTER_NOREPLACE) != 0 && (pmap !=
-		    kernel_pmap || (oldpde & PG_PS) != 0 ||
-		    !pmap_every_pte_zero(va))) {
-			CTR2(KTR_PMAP, "pmap_enter_pde: failure for va %#lx"
-			    " in pmap %p", va, pmap);
-			return (KERN_FAILURE);
+		if ((flags & PMAP_ENTER_NOREPLACE) != 0) {
+			if ((oldpde & PG_PS) != 0) {
+				CTR2(KTR_PMAP,
+				    "pmap_enter_pde: no space for va %#lx"
+				    " in pmap %p", va, pmap);
+				return (KERN_NO_SPACE);
+			} else if (pmap != kernel_pmap ||
+			    !pmap_every_pte_zero(va)) {
+				CTR2(KTR_PMAP,
+				    "pmap_enter_pde: failure for va %#lx"
+				    " in pmap %p", va, pmap);
+				return (KERN_FAILURE);
+			}
 		}
 		/* Break the existing mapping(s). */
 		SLIST_INIT(&free);
@@ -3993,15 +4023,44 @@ pmap_enter_pde(pmap_t pmap, vm_offset_t va, pd_entry_t newpde, u_int flags,
 			 * leave the kernel page table page zero filled.
 			 */
 			mt = PHYS_TO_VM_PAGE(*pde & PG_FRAME);
-			if (pmap_insert_pt_page(pmap, mt, false))
+			if (pmap_insert_pt_page(pmap, mt, false, false))
 				panic("pmap_enter_pde: trie insert failed");
 		}
+	}
+
+	/*
+	 * Allocate a leaf ptpage for wired userspace pages.
+	 */
+	uwptpg = NULL;
+	if ((newpde & PG_W) != 0 && pmap != kernel_pmap) {
+		uwptpg = vm_page_alloc_noobj(VM_ALLOC_WIRED);
+		if (uwptpg == NULL) {
+			return (KERN_RESOURCE_SHORTAGE);
+		}
+		uwptpg->pindex = va >> PDRSHIFT;
+		if (pmap_insert_pt_page(pmap, uwptpg, true, false)) {
+			vm_page_unwire_noq(uwptpg);
+			vm_page_free(uwptpg);
+			return (KERN_RESOURCE_SHORTAGE);
+		}
+		pmap->pm_stats.resident_count++;
+		uwptpg->ref_count = NPTEPG;
 	}
 	if ((newpde & PG_MANAGED) != 0) {
 		/*
 		 * Abort this mapping if its PV entry could not be created.
 		 */
 		if (!pmap_pv_insert_pde(pmap, va, newpde, flags)) {
+			if (uwptpg != NULL) {
+				mt = pmap_remove_pt_page(pmap, va);
+				KASSERT(mt == uwptpg,
+				    ("removed pt page %p, expected %p", mt,
+				    uwptpg));
+				pmap->pm_stats.resident_count--;
+				uwptpg->ref_count = 1;
+				vm_page_unwire_noq(uwptpg);
+				vm_page_free(uwptpg);
+			}
 			CTR2(KTR_PMAP, "pmap_enter_pde: failure for va %#lx"
 			    " in pmap %p", va, pmap);
 			return (KERN_RESOURCE_SHORTAGE);
@@ -4050,6 +4109,7 @@ __CONCAT(PMTYPE, enter_object)(pmap_t pmap, vm_offset_t start, vm_offset_t end,
 	vm_offset_t va;
 	vm_page_t m, mpte;
 	vm_pindex_t diff, psize;
+	int rv;
 
 	VM_OBJECT_ASSERT_LOCKED(m_start->object);
 
@@ -4062,7 +4122,8 @@ __CONCAT(PMTYPE, enter_object)(pmap_t pmap, vm_offset_t start, vm_offset_t end,
 		va = start + ptoa(diff);
 		if ((va & PDRMASK) == 0 && va + NBPDR <= end &&
 		    m->psind == 1 && pg_ps_enabled &&
-		    pmap_enter_4mpage(pmap, va, m, prot))
+		    ((rv = pmap_enter_4mpage(pmap, va, m, prot)) ==
+		    KERN_SUCCESS || rv == KERN_NO_SPACE))
 			m = &m[NBPDR / PAGE_SIZE - 1];
 		else
 			mpte = pmap_enter_quick_locked(pmap, va, m, prot,
@@ -4099,12 +4160,14 @@ pmap_enter_quick_locked(pmap_t pmap, vm_offset_t va, vm_page_t m,
     vm_prot_t prot, vm_page_t mpte)
 {
 	pt_entry_t newpte, *pte;
+	pd_entry_t *pde;
 
 	KASSERT(pmap != kernel_pmap || !VA_IS_CLEANMAP(va) ||
 	    (m->oflags & VPO_UNMANAGED) != 0,
 	    ("pmap_enter_quick_locked: managed mapping within the clean submap"));
 	rw_assert(&pvh_global_lock, RA_WLOCKED);
 	PMAP_LOCK_ASSERT(pmap, MA_OWNED);
+	pde = NULL;
 
 	/*
 	 * In the case that a page table page is not
@@ -4124,7 +4187,8 @@ pmap_enter_quick_locked(pmap_t pmap, vm_offset_t va, vm_page_t m,
 			/*
 			 * Get the page directory entry
 			 */
-			ptepa = pmap->pm_pdir[ptepindex];
+			pde = &pmap->pm_pdir[ptepindex];
+			ptepa = *pde;
 
 			/*
 			 * If the page table page is mapped, we just increment
@@ -4182,6 +4246,27 @@ pmap_enter_quick_locked(pmap_t pmap, vm_offset_t va, vm_page_t m,
 	if (pmap != kernel_pmap)
 		newpte |= PG_U;
 	pte_store_zero(pte, newpte);
+
+#if VM_NRESERVLEVEL > 0
+	/*
+	 * If both the PTP and the reservation are fully populated, then
+	 * attempt promotion.
+	 */
+	if ((mpte == NULL || mpte->ref_count == NPTEPG) &&
+	    (m->flags & PG_FICTITIOUS) == 0 &&
+	    vm_reserv_level_iffullpop(m) == 0) {
+		if (pde == NULL)
+			pde = pmap_pde(pmap, va);
+
+		/*
+		 * If promotion succeeds, then the next call to this function
+		 * should not be given the unmapped PTP as a hint.
+		 */
+		if (pmap_promote_pde(pmap, pde, va, mpte))
+			mpte = NULL;
+	}
+#endif
+
 	sched_unpin();
 	return (mpte);
 }
@@ -4223,7 +4308,7 @@ __CONCAT(PMTYPE, object_init_pt)(pmap_t pmap, vm_offset_t addr,
 		if (!vm_object_populate(object, pindex, pindex + atop(size)))
 			return;
 		p = vm_page_lookup(object, pindex);
-		KASSERT(p->valid == VM_PAGE_BITS_ALL,
+		KASSERT(vm_page_all_valid(p),
 		    ("pmap_object_init_pt: invalid page %p", p));
 		pat_mode = p->md.pat_mode;
 
@@ -4243,7 +4328,7 @@ __CONCAT(PMTYPE, object_init_pt)(pmap_t pmap, vm_offset_t addr,
 		p = TAILQ_NEXT(p, listq);
 		for (pa = ptepa + PAGE_SIZE; pa < ptepa + size;
 		    pa += PAGE_SIZE) {
-			KASSERT(p->valid == VM_PAGE_BITS_ALL,
+			KASSERT(vm_page_all_valid(p),
 			    ("pmap_object_init_pt: invalid page %p", p));
 			if (pa != VM_PAGE_TO_PHYS(p) ||
 			    pat_mode != p->md.pat_mode)
@@ -4529,7 +4614,7 @@ __CONCAT(PMTYPE, zero_page)(vm_page_t m)
 }
 
 /*
- * Zero an an area within a single hardware page.  off and size must not
+ * Zero an area within a single hardware page.  off and size must not
  * cover an area beyond a single hardware page.
  */
 static void
@@ -4851,7 +4936,7 @@ __CONCAT(PMTYPE, remove_pages)(pmap_t pmap)
 					}
 					mpte = pmap_remove_pt_page(pmap, pv->pv_va);
 					if (mpte != NULL) {
-						KASSERT(mpte->valid == VM_PAGE_BITS_ALL,
+						KASSERT(vm_page_any_valid(mpte),
 						    ("pmap_remove_pages: pte page not promoted"));
 						pmap->pm_stats.resident_count--;
 						KASSERT(mpte->ref_count == NPTEPG,
@@ -5499,12 +5584,13 @@ __CONCAT(PMTYPE, mapdev_attr)(vm_paddr_t pa, vm_size_t size, int mode,
 }
 
 static void
-__CONCAT(PMTYPE, unmapdev)(vm_offset_t va, vm_size_t size)
+__CONCAT(PMTYPE, unmapdev)(void *p, vm_size_t size)
 {
 	struct pmap_preinit_mapping *ppim;
-	vm_offset_t offset;
+	vm_offset_t offset, va;
 	int i;
 
+	va = (vm_offset_t)p;
 	if (va >= PMAP_MAP_LOW && va <= KERNBASE && va + size <= KERNBASE)
 		return;
 	offset = va & PAGE_MASK;
@@ -5890,7 +5976,7 @@ pmap_trm_import(void *unused __unused, vmem_size_t size, int flags,
 	vmem_addr_t af, addr, prev_addr;
 	pt_entry_t *trm_pte;
 
-	prev_addr = atomic_load_long(&pmap_trm_arena_last);
+	prev_addr = atomic_load_int(&pmap_trm_arena_last);
 	size = round_page(size) + trm_guard;
 	for (;;) {
 		if (prev_addr + size < prev_addr || prev_addr + size < size ||

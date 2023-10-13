@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2016 Flavius Anton
  * Copyright (c) 2016 Mihai Tiganus
@@ -31,8 +31,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 #ifndef _BHYVE_SNAPSHOT_
@@ -60,39 +58,14 @@ struct restore_state {
 	ucl_object_t *meta_root_obj;
 };
 
-/* Filename that will be used for save/restore */
-struct checkpoint_op {
-	char snapshot_filename[MAX_SNAPSHOT_FILENAME];
-};
-
-/* Messages that a bhyve process understands. */
-enum ipc_opcode {
-	START_CHECKPOINT,
-	START_SUSPEND,
-};
-
-/*
- * The type of message and associated data to
- * send to a bhyve process.
- */
-struct ipc_message {
-        enum ipc_opcode code;
-        union {
-                /*
-                 * message specific structures
-                 */
-                struct checkpoint_op op;
-        } data;
-};
-
 struct checkpoint_thread_info {
 	struct vmctx *ctx;
 	int socket_fd;
 };
 
 typedef int (*vm_snapshot_dev_cb)(struct vm_snapshot_meta *);
-typedef int (*vm_pause_dev_cb) (struct vmctx *, const char *);
-typedef int (*vm_resume_dev_cb) (struct vmctx *, const char *);
+typedef int (*vm_pause_dev_cb) (const char *);
+typedef int (*vm_resume_dev_cb) (const char *);
 
 struct vm_snapshot_dev_info {
 	const char *dev_name;		/* device name */
@@ -120,9 +93,9 @@ void checkpoint_cpu_suspend(int vcpu);
 int restore_vm_mem(struct vmctx *ctx, struct restore_state *rstate);
 int vm_restore_kern_structs(struct vmctx *ctx, struct restore_state *rstate);
 
-int vm_restore_user_devs(struct vmctx *ctx, struct restore_state *rstate);
-int vm_pause_user_devs(struct vmctx *ctx);
-int vm_resume_user_devs(struct vmctx *ctx);
+int vm_restore_devices(struct restore_state *rstate);
+int vm_pause_devices(void);
+int vm_resume_devices(void);
 
 int get_checkpoint_msg(int conn_fd, struct vmctx *ctx);
 void *checkpoint_thread(void *param);
@@ -130,5 +103,26 @@ int init_checkpoint_thread(struct vmctx *ctx);
 void init_snapshot(void);
 
 int load_restore_file(const char *filename, struct restore_state *rstate);
+
+int vm_snapshot_guest2host_addr(struct vmctx *ctx, void **addrp, size_t len,
+    bool restore_null, struct vm_snapshot_meta *meta);
+
+/*
+ * Address variables are pointers to guest memory.
+ *
+ * When RNULL != 0, do not enforce invalid address checks; instead, make the
+ * pointer NULL at restore time.
+ */
+#define	SNAPSHOT_GUEST2HOST_ADDR_OR_LEAVE(CTX, ADDR, LEN, RNULL, META, RES, LABEL) \
+do {										\
+	(RES) = vm_snapshot_guest2host_addr((CTX), (void **)&(ADDR), (LEN),	\
+	    (RNULL), (META));							\
+	if ((RES) != 0) {							\
+		if ((RES) == EFAULT)						\
+			fprintf(stderr, "%s: invalid address: %s\r\n",		\
+				__func__, #ADDR);				\
+		goto LABEL;							\
+	}									\
+} while (0)
 
 #endif

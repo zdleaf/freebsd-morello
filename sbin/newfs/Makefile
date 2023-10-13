@@ -1,8 +1,8 @@
 #	@(#)Makefile	8.2 (Berkeley) 3/27/94
-# $FreeBSD$
 
 .PATH: ${SRCTOP}/sys/geom
 
+PACKAGE=	ufs
 PROG=	newfs
 LIBADD=	ufs util
 SRCS=	newfs.c mkfs.c geom_bsd_enc.c

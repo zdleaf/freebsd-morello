@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2003, Jeffrey Roberson <jeff@freebsd.org>
  * All rights reserved.
@@ -27,8 +27,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include "opt_posix.h"
 #include "opt_hwpmc_hooks.h"
 #include <sys/param.h>
@@ -231,8 +229,6 @@ thread_create(struct thread *td, struct rtprio *rtp,
 	if (error)
 		goto fail;
 
-	cpu_copy_thread(newtd, td);
-
 	bzero(&newtd->td_startzero,
 	    __rangeof(struct thread, td_startzero, td_endzero));
 	bcopy(&td->td_startcopy, &newtd->td_startcopy,
@@ -240,6 +236,8 @@ thread_create(struct thread *td, struct rtprio *rtp,
 	newtd->td_proc = td->td_proc;
 	newtd->td_rb_list = newtd->td_rbp_list = newtd->td_rb_inact = 0;
 	thread_cow_get(newtd, td);
+
+	cpu_copy_thread(newtd, td);
 
 	error = initialize_thread(newtd, thunk);
 	if (error != 0) {
@@ -257,7 +255,7 @@ thread_create(struct thread *td, struct rtprio *rtp,
 	sched_fork_thread(td, newtd);
 	thread_unlock(td);
 	if (P_SHOULDSTOP(p))
-		newtd->td_flags |= TDF_ASTPENDING | TDF_NEEDSUSPCHK;
+		ast_sched(newtd, TDA_SUSPEND);
 	if (p->p_ptevents & PTRACE_LWP)
 		newtd->td_dbgflags |= TDB_BORN;
 

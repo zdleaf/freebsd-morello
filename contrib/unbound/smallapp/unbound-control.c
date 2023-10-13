@@ -4,22 +4,22 @@
  * Copyright (c) 2008, NLnet Labs. All rights reserved.
  *
  * This software is open source.
- * 
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
  * are met:
- * 
+ *
  * Redistributions of source code must retain the above copyright notice,
  * this list of conditions and the following disclaimer.
- * 
+ *
  * Redistributions in binary form must reproduce the above copyright notice,
  * this list of conditions and the following disclaimer in the documentation
  * and/or other materials provided with the distribution.
- * 
+ *
  * Neither the name of the NLNET LABS nor the names of its contributors may
  * be used to endorse or promote products derived from this software without
  * specific prior written permission.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
  * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
  * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
@@ -59,6 +59,7 @@
 #include "util/locks.h"
 #include "util/net_help.h"
 #include "util/shm_side/shm_main.h"
+#include "util/timeval_func.h"
 #include "daemon/stats.h"
 #include "sldns/wire2str.h"
 #include "sldns/pkthdr.h"
@@ -102,6 +103,12 @@ usage(void)
 	printf("  stop				stops the server\n");
 	printf("  reload			reloads the server\n");
 	printf("  				(this flushes data, stats, requestlist)\n");
+	printf("  reload_keep_cache		reloads the server but tries to\n");
+	printf("  				keep the RRset and message cache\n");
+	printf("  				if (re)configuration allows for it.\n");
+	printf("  				That means the caches sizes and\n");
+	printf("  				the number of threads must not\n");
+	printf("  				change between reloads.\n");
 	printf("  stats				print statistics\n");
 	printf("  stats_noreset			peek at statistics\n");
 #ifdef HAVE_SHMGET
@@ -155,9 +162,9 @@ usage(void)
 	printf("  ratelimit_list [+a]		list ratelimited domains\n");
 	printf("  ip_ratelimit_list [+a]	list ratelimited ip addresses\n");
 	printf("		+a		list all, also not ratelimited\n");
-	printf("  list_auth_zones		list auth zones\n");
-	printf("  auth_zone_reload zone		reload auth zone from zonefile\n");
-	printf("  auth_zone_transfer zone	transfer auth zone from master\n");
+	printf("  list_auth_zones		list auth zones (includes RPZ zones)\n");
+	printf("  auth_zone_reload zone		reload auth zone (or RPZ zone) from zonefile\n");
+	printf("  auth_zone_transfer zone	transfer auth zone (or RPZ zone) from master\n");
 	printf("  view_list_local_zones	view	list local-zones in view\n");
 	printf("  view_list_local_data	view	list local-data RRs in view\n");
 	printf("  view_local_zone view name type  	add local-zone in view\n");
@@ -180,33 +187,6 @@ usage(void)
 #ifdef HAVE_SHMGET
 /** what to put on statistics lines between var and value, ": " or "=" */
 #define SQ "="
-/** if true, inhibits a lot of =0 lines from the stats output */
-static const int inhibit_zero = 1;
-/** divide sum of timers to get average */
-static void
-timeval_divide(struct timeval* avg, const struct timeval* sum, long long d)
-{
-#ifndef S_SPLINT_S
-	size_t leftover;
-	if(d <= 0) {
-		avg->tv_sec = 0;
-		avg->tv_usec = 0;
-		return;
-	}
-	avg->tv_sec = sum->tv_sec / d;
-	avg->tv_usec = sum->tv_usec / d;
-	/* handle fraction from seconds divide */
-	leftover = sum->tv_sec - avg->tv_sec*d;
-	if(leftover <= 0)
-		leftover = 0;
-	avg->tv_usec += (((long long)leftover)*((long long)1000000))/d;
-	if(avg->tv_sec < 0)
-		avg->tv_sec = 0;
-	if(avg->tv_usec < 0)
-		avg->tv_usec = 0;
-#endif
-}
-
 /** print unsigned long stats value */
 #define PR_UL_NM(str, var) printf("%s."str SQ"%lu\n", nm, (unsigned long)(var));
 #define PR_UL(str, var) printf(str SQ"%lu\n", (unsigned long)(var));
@@ -222,12 +202,20 @@ static void pr_stats(const char* nm, struct ub_stats_info* s)
 {
 	struct timeval sumwait, avg;
 	PR_UL_NM("num.queries", s->svr.num_queries);
-	PR_UL_NM("num.queries_ip_ratelimited", 
+	PR_UL_NM("num.queries_ip_ratelimited",
 		s->svr.num_queries_ip_ratelimited);
+	PR_UL_NM("num.queries_cookie_valid",
+		s->svr.num_queries_cookie_valid);
+	PR_UL_NM("num.queries_cookie_client",
+		s->svr.num_queries_cookie_client);
+	PR_UL_NM("num.queries_cookie_invalid",
+		s->svr.num_queries_cookie_invalid);
 	PR_UL_NM("num.cachehits",
 		s->svr.num_queries - s->svr.num_queries_missed_cache);
 	PR_UL_NM("num.cachemiss", s->svr.num_queries_missed_cache);
 	PR_UL_NM("num.prefetch", s->svr.num_queries_prefetch);
+	PR_UL_NM("num.queries_timed_out", s->svr.num_queries_timed_out);
+	PR_UL_NM("query.queue_time_us.max", s->svr.max_query_time_us);
 	PR_UL_NM("num.expired", s->svr.ans_expired);
 	PR_UL_NM("num.recursivereplies", s->mesh_replies_sent);
 #ifdef USE_DNSCRYPT
@@ -316,7 +304,7 @@ static void print_hist(struct ub_stats_info* s)
 }
 
 /** print extended */
-static void print_extended(struct ub_stats_info* s)
+static void print_extended(struct ub_stats_info* s, int inhibit_zero)
 {
 	int i;
 	char nm[16];
@@ -354,6 +342,7 @@ static void print_extended(struct ub_stats_info* s)
 	/* transport */
 	PR_UL("num.query.tcp", s->svr.qtcp);
 	PR_UL("num.query.tcpout", s->svr.qtcp_outgoing);
+	PR_UL("num.query.udpout", s->svr.qudp_outgoing);
 	PR_UL("num.query.tls", s->svr.qtls);
 	PR_UL("num.query.tls_resume", s->svr.qtls_resume);
 	PR_UL("num.query.ipv6", s->svr.qipv6);
@@ -398,6 +387,9 @@ static void print_extended(struct ub_stats_info* s)
 	PR_UL("rrset.cache.count", s->svr.rrset_cache_count);
 	PR_UL("infra.cache.count", s->svr.infra_cache_count);
 	PR_UL("key.cache.count", s->svr.key_cache_count);
+	/* max collisions */
+	PR_UL("msg.cache.max_collisions", s->svr.msg_cache_max_collisions);
+	PR_UL("rrset.cache.max_collisions", s->svr.rrset_cache_max_collisions);
 	/* applied RPZ actions */
 	for(i=0; i<UB_STATS_RPZ_ACTION_NUM; i++) {
 		if(i == RPZ_NO_OVERRIDE_ACTION)
@@ -421,6 +413,9 @@ static void print_extended(struct ub_stats_info* s)
 	PR_UL("num.query.subnet", s->svr.num_query_subnet);
 	PR_UL("num.query.subnet_cache", s->svr.num_query_subnet_cache);
 #endif
+#ifdef USE_CACHEDB
+	PR_UL("num.query.cachedb", s->svr.num_query_cachedb);
+#endif
 }
 
 /** print statistics out of memory structures */
@@ -438,13 +433,13 @@ static void do_stats_shm(struct config_file* cfg, struct ub_stats_info* stats,
 	if(cfg->stat_extended) {
 		print_mem(shm_stat, &stats[0]);
 		print_hist(stats);
-		print_extended(stats);
+		print_extended(stats, cfg->stat_inhibit_zero);
 	}
 }
 #endif /* HAVE_SHMGET */
 
 /** print statistics from shm memory segment */
-static void print_stats_shm(const char* cfgfile)
+static void print_stats_shm(const char* cfgfile, int quiet)
 {
 #ifdef HAVE_SHMGET
 	struct config_file* cfg;
@@ -474,8 +469,11 @@ static void print_stats_shm(const char* cfgfile)
 		fatal_exit("shmat(%d): %s", id_arr, strerror(errno));
 	}
 
-	/* print the stats */
-	do_stats_shm(cfg, stats, shm_stat);
+
+	if(!quiet) {
+		/* print the stats */
+		do_stats_shm(cfg, stats, shm_stat);
+	}
 
 	/* shutdown */
 	shmdt(shm_stat);
@@ -483,6 +481,7 @@ static void print_stats_shm(const char* cfgfile)
 	config_delete(cfg);
 #else
 	(void)cfgfile;
+	(void)quiet;
 #endif /* HAVE_SHMGET */
 }
 
@@ -499,7 +498,7 @@ static void ssl_path_err(const char* s, const char *path)
 {
 	unsigned long err;
 	err = ERR_peek_error();
-	if (ERR_GET_LIB(err) == ERR_LIB_SYS) {
+	if(ERR_GET_LIB(err) == ERR_LIB_SYS) {
 		fprintf(stderr, "error: %s\n%s: %s\n",
 			s, path, ERR_reason_error_string(err));
 		exit(1);
@@ -541,11 +540,11 @@ setup_ctx(struct config_file* cfg)
 #endif
 	if(!SSL_CTX_use_certificate_chain_file(ctx,c_cert))
 		ssl_path_err("Error setting up SSL_CTX client cert", c_cert);
-	if (!SSL_CTX_use_PrivateKey_file(ctx,c_key,SSL_FILETYPE_PEM))
+	if(!SSL_CTX_use_PrivateKey_file(ctx,c_key,SSL_FILETYPE_PEM))
 		ssl_path_err("Error setting up SSL_CTX client key", c_key);
-	if (!SSL_CTX_check_private_key(ctx))
+	if(!SSL_CTX_check_private_key(ctx))
 		ssl_err("Error setting up SSL_CTX client key");
-	if (SSL_CTX_load_verify_locations(ctx, s_cert, NULL) != 1)
+	if(SSL_CTX_load_verify_locations(ctx, s_cert, NULL) != 1)
 		ssl_path_err("Error setting up SSL_CTX verify, server cert",
 			     s_cert);
 	SSL_CTX_set_verify(ctx, SSL_VERIFY_PEER, NULL);
@@ -596,7 +595,7 @@ contact_server(const char* svr, struct config_file* cfg, int statuscmd)
 			struct sockaddr_storage addr2;
 			socklen_t addrlen2;
 			if(extstrtoaddr(cfg->control_ifs.first->str, &addr2,
-				&addrlen2)) {
+				&addrlen2, UNBOUND_DNS_PORT)) {
 				svr = cfg->control_ifs.first->str;
 			} else {
 				if(!resolve_interface_names(NULL, 0,
@@ -624,7 +623,7 @@ contact_server(const char* svr, struct config_file* cfg, int statuscmd)
 			svr = "::1";
 	}
 	if(strchr(svr, '@')) {
-		if(!extstrtoaddr(svr, &addr, &addrlen))
+		if(!extstrtoaddr(svr, &addr, &addrlen, UNBOUND_DNS_PORT))
 			fatal_exit("could not parse IP@port: %s", svr);
 #ifdef HAVE_SYS_UN_H
 	} else if(svr[0] == '/') {
@@ -880,8 +879,9 @@ go_cmd(SSL* ssl, int fd, int quiet, int argc, char* argv[])
 		if(first_line && strncmp(buf, "error", 5) == 0) {
 			printf("%s", buf);
 			was_error = 1;
-		} else if (!quiet)
+		} else if(!quiet) {
 			printf("%s", buf);
+		}
 
 		first_line = 0;
 	}
@@ -979,7 +979,7 @@ int main(int argc, char* argv[])
 		fatal_exit("could not exec unbound: %s",
 			strerror(ENOSYS));
 #else
-		if(execlp("unbound", "unbound", "-c", cfgfile, 
+		if(execlp("unbound", "unbound", "-c", cfgfile,
 			(char*)NULL) < 0) {
 			fatal_exit("could not exec unbound: %s",
 				strerror(errno));
@@ -987,7 +987,7 @@ int main(int argc, char* argv[])
 #endif
 	}
 	if(argc >= 1 && strcmp(argv[0], "stats_shm")==0) {
-		print_stats_shm(cfgfile);
+		print_stats_shm(cfgfile, quiet);
 		return 0;
 	}
 	check_args_for_listcmd(argc, argv);

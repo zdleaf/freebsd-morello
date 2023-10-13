@@ -22,8 +22,6 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 /*
@@ -31,8 +29,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/bus.h>
@@ -1206,6 +1202,6 @@ static driver_t a10codec_pcm_driver = {
 	PCM_SOFTC_SIZE,
 };
 
-DRIVER_MODULE(a10codec, simplebus, a10codec_pcm_driver, pcm_devclass, 0, 0);
+DRIVER_MODULE(a10codec, simplebus, a10codec_pcm_driver, 0, 0);
 MODULE_DEPEND(a10codec, sound, SOUND_MINVER, SOUND_PREFVER, SOUND_MAXVER);
 MODULE_VERSION(a10codec, 1);

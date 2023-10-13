@@ -25,8 +25,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 /*
  * Driver for extra ACPI-controlled features found on HP laptops
  * that use a WMI enabled BIOS (e.g. HP Compaq 8510p and 6510p).
@@ -349,10 +347,7 @@ static driver_t	acpi_hp_driver = {
 	sizeof(struct acpi_hp_softc),
 };
 
-static devclass_t acpi_hp_devclass;
-
-DRIVER_MODULE(acpi_hp, acpi_wmi, acpi_hp_driver, acpi_hp_devclass,
-		0, 0);
+DRIVER_MODULE(acpi_hp, acpi_wmi, acpi_hp_driver, 0, 0);
 MODULE_DEPEND(acpi_hp, acpi_wmi, 1, 1, 1);
 MODULE_DEPEND(acpi_hp, acpi, 1, 1, 1);
 

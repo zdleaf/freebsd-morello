@@ -1,9 +1,11 @@
-# $FreeBSD$
 
 .PATH: ${SRCTOP}/contrib/ntp/sntp/libopts
 
 LIB=	opts
 INTERNALLIB=
+
+# XXX libopts uses generated format string tables containing embedded NULs.
+NO_WFORMAT=
 
 SRCS=	libopts.c
 

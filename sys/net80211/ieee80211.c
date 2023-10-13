@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2001 Atsushi Onoe
  * Copyright (c) 2002-2009 Sam Leffler, Errno Consulting
@@ -27,8 +27,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 /*
  * IEEE 802.11 generic handler
  */
@@ -47,6 +45,7 @@ __FBSDID("$FreeBSD$");
 #include <net/if_var.h>
 #include <net/if_dl.h>
 #include <net/if_media.h>
+#include <net/if_private.h>
 #include <net/if_types.h>
 #include <net/ethernet.h>
 
@@ -333,12 +332,13 @@ ieee80211_ifattach(struct ieee80211com *ic)
 	TAILQ_INIT(&ic->ic_vaps);
 
 	/* Create a taskqueue for all state changes */
-	ic->ic_tq = taskqueue_create("ic_taskq", M_WAITOK | M_ZERO,
+	ic->ic_tq = taskqueue_create("ic_taskq",
+	    IEEE80211_M_WAITOK | IEEE80211_M_ZERO,
 	    taskqueue_thread_enqueue, &ic->ic_tq);
 	taskqueue_start_threads(&ic->ic_tq, 1, PI_NET, "%s net80211 taskq",
 	    ic->ic_name);
-	ic->ic_ierrors = counter_u64_alloc(M_WAITOK);
-	ic->ic_oerrors = counter_u64_alloc(M_WAITOK);
+	ic->ic_ierrors = counter_u64_alloc(IEEE80211_M_WAITOK);
+	ic->ic_oerrors = counter_u64_alloc(IEEE80211_M_WAITOK);
 	/*
 	 * Fill in 802.11 available channel set, mark all
 	 * available channels as active, and pick a default
@@ -1287,8 +1287,8 @@ addchan(struct ieee80211_channel chans[], int maxchans, int *nchans,
 		return (ENOBUFS);
 
 #if 0
-	printf("%s: %d: ieee=%d, freq=%d, flags=0x%08x\n",
-	    __func__, *nchans, ieee, freq, flags);
+	printf("%s: %d of %d: ieee=%d, freq=%d, flags=0x%08x\n",
+	    __func__, *nchans, maxchans, ieee, freq, flags);
 #endif
 
 	c = &chans[(*nchans)++];
@@ -1317,8 +1317,8 @@ copychan_prev(struct ieee80211_channel chans[], int maxchans, int *nchans,
 		return (ENOBUFS);
 
 #if 0
-	printf("%s: %d: flags=0x%08x\n",
-	    __func__, *nchans, flags);
+	printf("%s: %d of %d: flags=0x%08x\n",
+	    __func__, *nchans, maxchans, flags);
 #endif
 
 	c = &chans[(*nchans)++];
@@ -1551,7 +1551,7 @@ ieee80211_get_channel_center_freq(const struct ieee80211_channel *c)
  * For 5, 10, 20MHz channels it'll be the normally configured channel
  * frequency.
  *
- * For 40MHz, 80MHz, 160Mhz channels it'll the the centre of the
+ * For 40MHz, 80MHz, 160MHz channels it will be the centre of the
  * wide channel, not the centre of the primary channel (that's ic_freq).
  *
  * For 80+80MHz channels this will be the centre of the primary
@@ -2204,7 +2204,11 @@ media_status(enum ieee80211_opmode opmode, const struct ieee80211_channel *chan)
 		status |= IFM_IEEE80211_MBSS;
 		break;
 	}
-	if (IEEE80211_IS_CHAN_HTA(chan)) {
+	if (IEEE80211_IS_CHAN_VHT_5GHZ(chan)) {
+		status |= IFM_IEEE80211_VHT5G;
+	} else if (IEEE80211_IS_CHAN_VHT_2GHZ(chan)) {
+		status |= IFM_IEEE80211_VHT2G;
+	} else if (IEEE80211_IS_CHAN_HTA(chan)) {
 		status |= IFM_IEEE80211_11NA;
 	} else if (IEEE80211_IS_CHAN_HTG(chan)) {
 		status |= IFM_IEEE80211_11NG;

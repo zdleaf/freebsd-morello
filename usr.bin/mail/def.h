@@ -29,8 +29,6 @@
  * SUCH DAMAGE.
  *
  *	@(#)def.h	8.4 (Berkeley) 4/20/95
- *
- * $FreeBSD$
  */
 
 /*
@@ -106,7 +104,7 @@ struct message {
  */
 struct cmd {
 	const	char *c_name;		/* Name of command */
-	int	(*c_func)();		/* Implementor of the command */
+	int	(*c_func)(void *);	/* Implementor of the command */
 	short	c_argtype;		/* Type of arglist (see below) */
 	short	c_msgflag;		/* Required flags of messages */
 	short	c_msgmask;		/* Relevant flags of messages */

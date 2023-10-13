@@ -33,8 +33,6 @@
 static char sccsid[] = "@(#)tempnam.c	8.1 (Berkeley) 6/4/93";
 #endif /* LIBC_SCCS and not lint */
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <errno.h>
 #include <stdio.h>
@@ -60,7 +58,7 @@ tempnam(const char *dir, const char *pfx)
 	if (!pfx)
 		pfx = "tmp.";
 
-	if (issetugid() == 0 && (f = getenv("TMPDIR"))) {
+	if ((f = secure_getenv("TMPDIR")) != NULL) {
 		(void)snprintf(name, MAXPATHLEN, "%s%s%sXXXXXX", f,
 		    *(f + strlen(f) - 1) == '/'? "": "/", pfx);
 		if ((f = _mktemp(name)))

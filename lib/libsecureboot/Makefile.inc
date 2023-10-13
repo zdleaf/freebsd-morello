@@ -1,4 +1,3 @@
-# $FreeBSD$
 
 .if empty(BEARSSL)
 .include "../libbearssl/Makefile.inc"
@@ -10,6 +9,8 @@ _${__this}_:
 libsecureboot_src:= ${.PARSEDIR}
 
 CFLAGS+= -I${libsecureboot_src}/h
+
+CFLAGS+= -DHAVE_BR_X509_TIME_CHECK
 
 .PATH: ${.PARSEDIR}
 
@@ -124,7 +125,11 @@ BUILD_UTC?= ${SOURCE_DATE_EPOCH}
 BUILD_UTC_FILE:= ${.PARSEDIR:tA}/${.PARSEFILE}
 .endif
 # you can of course set BUILD_UTC to any value you like
-BUILD_UTC?= ${${STAT:Ustat} -f %m ${BUILD_UTC_FILE}:L:sh}
+.if ${MAKE_VERSION} > 20230509
+BUILD_UTC?= ${BUILD_UTC_FILE:mtime}
+.else
+BUILD_UTC?= ${${STAT:Ustat} -L -f %m ${BUILD_UTC_FILE}:L:sh}
+.endif
 
 # Generate ta.h containing one or more PEM encoded trust anchors in ta_PEM.
 #

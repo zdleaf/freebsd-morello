@@ -31,7 +31,6 @@
  * SUCH DAMAGE.
  *
  *	@(#)user.h	8.2 (Berkeley) 9/23/93
- * $FreeBSD$
  */
 
 #ifndef _SYS_USER_H_
@@ -265,6 +264,7 @@ struct user {
 #define	KF_TYPE_PROCDESC	11
 #define	KF_TYPE_DEV	12
 #define	KF_TYPE_EVENTFD	13
+#define	KF_TYPE_TIMERFD	14
 #define	KF_TYPE_UNKNOWN	255
 
 #define	KF_VTYPE_VNON	0
@@ -389,7 +389,9 @@ struct kinfo_file {
 				int		kf_file_type;
 				/* Space for future use */
 				int		kf_spareint[3];
-				uint64_t	kf_spareint64[30];
+				uint64_t	kf_spareint64[29];
+				/* Number of references to file. */
+				uint64_t	kf_file_nlink;
 				/* Vnode filesystem id. */
 				uint64_t	kf_file_fsid;
 				/* File device. */
@@ -420,8 +422,9 @@ struct kinfo_file {
 				uint64_t	kf_pipe_addr;
 				uint64_t	kf_pipe_peer;
 				uint32_t	kf_pipe_buffer_cnt;
-				/* Round to 64 bit alignment. */
-				uint32_t	kf_pipe_pad0[3];
+				uint32_t	kf_pipe_buffer_in;
+				uint32_t	kf_pipe_buffer_out;
+				uint32_t	kf_pipe_buffer_size;
 			} kf_pipe;
 			struct {
 				uint32_t	kf_spareint[4];
@@ -440,7 +443,19 @@ struct kinfo_file {
 			struct {
 				uint64_t	kf_eventfd_value;
 				uint32_t	kf_eventfd_flags;
+				uint32_t	kf_eventfd_spareint[3];
+				uint64_t	kf_eventfd_addr;
 			} kf_eventfd;
+			struct {
+				uint32_t	kf_timerfd_clockid;
+				uint32_t	kf_timerfd_flags;
+				uint64_t	kf_timerfd_addr;
+			} kf_timerfd;
+			struct {
+				uint64_t	kf_kqueue_addr;
+				int32_t		kf_kqueue_count;
+				int32_t		kf_kqueue_state;
+			} kf_kqueue;
 		} kf_un;
 	};
 	uint16_t	kf_status;		/* Status flags. */
@@ -452,12 +467,34 @@ struct kinfo_file {
 	char		kf_path[PATH_MAX];	/* Path to file, if any. */
 };
 
+struct kinfo_lockf {
+	int		kl_structsize;		/* Variable size of record. */
+	int		kl_rw;
+	int		kl_type;
+	int		kl_pid;
+	int		kl_sysid;
+	int		kl_pad0;
+	uint64_t	kl_file_fsid;
+	uint64_t	kl_file_rdev;
+	uint64_t	kl_file_fileid;
+	off_t		kl_start;
+	off_t		kl_len;			/* len == 0 till the EOF */
+	char		kl_path[PATH_MAX];
+};
+
+#define	KLOCKF_RW_READ		0x01
+#define	KLOCKF_RW_WRITE		0x02
+
+#define	KLOCKF_TYPE_FLOCK	0x01
+#define	KLOCKF_TYPE_PID		0x02
+#define	KLOCKF_TYPE_REMOTE	0x03
+
 /*
  * The KERN_PROC_VMMAP sysctl allows a process to dump the VM layout of
  * another process as a series of entries.
  */
 #define	KVME_TYPE_NONE		0
-#define	KVME_TYPE_DEFAULT	1
+#define	KVME_TYPE_DEFAULT	1		/* no longer returned */
 #define	KVME_TYPE_VNODE		2
 #define	KVME_TYPE_SWAP		3
 #define	KVME_TYPE_DEVICE	4
@@ -603,6 +640,7 @@ struct kinfo_sigtramp {
 #define	KMAP_FLAG_ASLR_IGNSTART	0x04	/* ASLR may map into sbrk grow region */
 #define	KMAP_FLAG_WXORX		0x08	/* W^X mapping policy is enforced */
 #define	KMAP_FLAG_ASLR_STACK	0x10	/* the stack location is randomized */
+#define	KMAP_FLAG_ASLR_SHARED_PAGE 0x20	/* the shared page location is randomized */
 
 struct kinfo_vm_layout {
 	uintptr_t	kvm_min_user_addr;
@@ -614,7 +652,9 @@ struct kinfo_vm_layout {
 	uintptr_t	kvm_stack_addr;
 	size_t		kvm_stack_size;
 	int		kvm_map_flags;
-	uintptr_t	kvm_spare[14];
+	uintptr_t	kvm_shp_addr;
+	size_t		kvm_shp_size;
+	uintptr_t	kvm_spare[12];
 };
 
 #ifdef _KERNEL

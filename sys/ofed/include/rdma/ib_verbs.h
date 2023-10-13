@@ -36,8 +36,6 @@
  * ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
  * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
- *
- * $FreeBSD$
  */
 
 #if !defined(IB_VERBS_H)
@@ -106,7 +104,7 @@ enum ib_gid_type {
 #define ROCE_V2_UDP_DPORT      4791
 struct ib_gid_attr {
 	enum ib_gid_type	gid_type;
-	struct ifnet	*ndev;
+	if_t ndev;
 };
 
 enum rdma_node_type {
@@ -242,6 +240,7 @@ enum ib_device_cap_flags {
 	IB_DEVICE_SG_GAPS_REG			= (1ULL << 32),
 	IB_DEVICE_VIRTUAL_FUNCTION		= (1ULL << 33),
 	IB_DEVICE_RAW_SCATTER_FCS		= (1ULL << 34),
+	IB_DEVICE_KNOWSEPOCH			= (1ULL << 35),
 };
 
 enum ib_atomic_cap {
@@ -486,7 +485,8 @@ enum ib_port_speed {
 	IB_SPEED_FDR10	= 8,
 	IB_SPEED_FDR	= 16,
 	IB_SPEED_EDR	= 32,
-	IB_SPEED_HDR	= 64
+	IB_SPEED_HDR	= 64,
+	IB_SPEED_NDR	= 128
 };
 
 /**
@@ -2164,7 +2164,7 @@ struct ib_device {
 	 * that this function returns NULL before the net device reaches
 	 * NETDEV_UNREGISTER_FINAL state.
 	 */
-	struct ifnet		  *(*get_netdev)(struct ib_device *device,
+	if_t (*get_netdev)(struct ib_device *device,
 						 u8 port_num);
 	int		           (*query_gid)(struct ib_device *device,
 						u8 port_num, int index,
@@ -2442,7 +2442,7 @@ struct ib_client {
 	 *
 	 * The caller is responsible for calling dev_put on the returned
 	 * netdev. */
-	struct ifnet *(*get_net_dev_by_params)(
+	if_t (*get_net_dev_by_params)(
 			struct ib_device *dev,
 			u8 port,
 			u16 pkey,
@@ -2930,7 +2930,7 @@ int ib_modify_port(struct ib_device *device,
 		   struct ib_port_modify *port_modify);
 
 int ib_find_gid(struct ib_device *device, union ib_gid *gid,
-		enum ib_gid_type gid_type, struct ifnet *ndev,
+		enum ib_gid_type gid_type, if_t ndev,
 		u8 *port_num, u16 *index);
 
 int ib_find_pkey(struct ib_device *device,
@@ -3917,7 +3917,7 @@ static inline bool ib_access_writable(int access_flags)
 int ib_check_mr_status(struct ib_mr *mr, u32 check_mask,
 		       struct ib_mr_status *mr_status);
 
-struct ifnet *ib_get_net_dev_by_params(struct ib_device *dev, u8 port,
+if_t ib_get_net_dev_by_params(struct ib_device *dev, u8 port,
 					    u16 pkey, const union ib_gid *gid,
 					    const struct sockaddr *addr);
 struct ib_wq *ib_create_wq(struct ib_pd *pd,

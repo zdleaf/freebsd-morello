@@ -1,7 +1,7 @@
 #!/bin/sh
 
 #
-# SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+# SPDX-License-Identifier: BSD-2-Clause
 #
 # Copyright (c) 2022 Peter Holm <pho@FreeBSD.org>
 #
@@ -33,6 +33,7 @@
 # https://people.freebsd.org/~pho/stress/log/log0205.txt
 
 # https://people.freebsd.org/~pho/stress/log/log0226.txt
+# https://people.freebsd.org/~pho/stress/log/log0404.txt
 
 [ `id -u ` -ne 0 ] && echo "Must be root!" && exit 1
 . ../default.cfg

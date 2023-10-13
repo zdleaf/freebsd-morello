@@ -1,5 +1,4 @@
 #
-# $FreeBSD$
 #
 
 .PATH: ${.CURDIR}/../../../netinet/tcp_stacks
@@ -9,8 +8,8 @@ KMOD=	tcp_${STACKNAME}
 SRCS=	bbr.c sack_filter.c rack_bbr_common.c
 
 SRCS+=	opt_inet.h opt_inet6.h opt_ipsec.h
-SRCS+=	opt_tcpdebug.h
 SRCS+=	opt_kern_tls.h
+SRCS+=	opt_ratelimit.h
 
 #
 # Enable full debugging

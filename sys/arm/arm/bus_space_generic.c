@@ -38,8 +38,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/bus.h>
@@ -95,7 +93,7 @@ void
 generic_bs_unmap(bus_space_tag_t t, bus_space_handle_t h, bus_size_t size)
 {
 
-	pmap_unmapdev((vm_offset_t)h, size);
+	pmap_unmapdev((void *)h, size);
 }
 
 void

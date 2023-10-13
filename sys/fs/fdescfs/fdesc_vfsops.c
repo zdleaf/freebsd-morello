@@ -32,8 +32,6 @@
  * SUCH DAMAGE.
  *
  *	@(#)fdesc_vfsops.c	8.4 (Berkeley) 1/21/94
- *
- * $FreeBSD$
  */
 
 /*
@@ -90,8 +88,7 @@ fdesc_mount(struct mount *mp)
 	if (mp->mnt_flag & (MNT_UPDATE | MNT_ROOTFS))
 		return (EOPNOTSUPP);
 
-	fmp = malloc(sizeof(struct fdescmount),
-				M_FDESCMNT, M_WAITOK);	/* XXX */
+	fmp = malloc(sizeof(struct fdescmount), M_FDESCMNT, M_WAITOK);
 
 	/*
 	 * We need to initialize a few bits of our local mount point struct to
@@ -101,6 +98,8 @@ fdesc_mount(struct mount *mp)
 	fmp->flags = 0;
 	if (vfs_getopt(mp->mnt_optnew, "linrdlnk", NULL, NULL) == 0)
 		fmp->flags |= FMNT_LINRDLNKF;
+	if (vfs_getopt(mp->mnt_optnew, "rdlnk", NULL, NULL) == 0)
+		fmp->flags |= FMNT_RDLNKF;
 	if (vfs_getopt(mp->mnt_optnew, "nodup", NULL, NULL) == 0)
 		fmp->flags |= FMNT_NODUP;
 	error = fdesc_allocvp(Froot, -1, FD_ROOT, mp, &rvp);
@@ -220,12 +219,12 @@ fdesc_statfs(struct mount *mp, struct statfs *sbp)
 		freefd += (lim - fdp->fd_nfiles);
 	FILEDESC_SUNLOCK(fdp);
 
-	sbp->f_flags = 0;
+	sbp->f_flags = mp->mnt_flag & MNT_IGNORE;
 	sbp->f_bsize = DEV_BSIZE;
 	sbp->f_iosize = DEV_BSIZE;
 	sbp->f_blocks = 2;		/* 1K to keep df happy */
-	sbp->f_bfree = 0;
-	sbp->f_bavail = 0;
+	sbp->f_bfree = 2;
+	sbp->f_bavail = 2;
 	sbp->f_files = lim + 1;		/* Allow for "." */
 	sbp->f_ffree = freefd;		/* See comments above */
 	return (0);

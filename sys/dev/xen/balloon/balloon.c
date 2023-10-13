@@ -30,8 +30,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/lock.h>
 #include <sys/kernel.h>
@@ -155,7 +153,6 @@ increase_reservation(unsigned long nr_pages)
 	vm_page_t      page;
 	long           rc;
 	struct xen_memory_reservation reservation = {
-		.address_bits = 0,
 		.extent_order = 0,
 		.domid        = DOMID_SELF
 	};
@@ -217,7 +214,6 @@ decrease_reservation(unsigned long nr_pages)
 	int            need_sleep = 0;
 	int ret __diagused;
 	struct xen_memory_reservation reservation = {
-		.address_bits = 0,
 		.extent_order = 0,
 		.domid        = DOMID_SELF
 	};
@@ -408,7 +404,5 @@ static device_method_t xenballoon_methods[] = {
 };
 
 DEFINE_CLASS_0(xenballoon, xenballoon_driver, xenballoon_methods, 0);
-devclass_t xenballoon_devclass;
 
-DRIVER_MODULE(xenballoon, xenstore, xenballoon_driver, xenballoon_devclass,
-    NULL, NULL);
+DRIVER_MODULE(xenballoon, xenstore, xenballoon_driver, NULL, NULL);

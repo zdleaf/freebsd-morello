@@ -25,32 +25,41 @@
 .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 .\" SUCH DAMAGE.
 .\"
-.\" $FreeBSD$
-.\"
 .Dd September 2, 2011
 .Dt MFIUTIL 8
 .Os
 .Sh NAME
-.Nm mfiutil
+.Nm mfiutil ,
+.Nm mrsasutil
 .Nd Utility for managing LSI MegaRAID SAS controllers
 .Sh SYNOPSIS
 .Nm
 .Cm version
 .Nm
+.Op Fl D Ar device
+.Op Fl t Ar type
 .Op Fl u Ar unit
 .Cm show adapter
 .Nm
+.Op Fl D Ar device
+.Op Fl t Ar type
 .Op Fl u Ar unit
 .Cm show battery
 .Nm
 .Op Fl d
 .Op Fl e
+.Op Fl D Ar device
+.Op Fl t Ar type
 .Op Fl u Ar unit
 .Cm show config
 .Nm
+.Op Fl D Ar device
+.Op Fl t Ar type
 .Op Fl u Ar unit
 .Cm show drives
 .Nm
+.Op Fl D Ar device
+.Op Fl t Ar type
 .Op Fl u Ar unit
 .Cm show events
 .Op Fl c Ar class
@@ -59,67 +68,107 @@
 .Op Fl v
 .Op Ar start Op Ar stop
 .Nm
+.Op Fl D Ar device
+.Op Fl t Ar type
 .Op Fl u Ar unit
 .Cm show firmware
 .Nm
+.Op Fl D Ar device
+.Op Fl t Ar type
 .Op Fl u Ar unit
 .Cm show foreign Op Ar volume
 .Nm
+.Op Fl D Ar device
+.Op Fl t Ar type
 .Op Fl u Ar unit
 .Cm show logstate
 .Nm
 .Op Fl d
 .Op Fl e
+.Op Fl D Ar device
+.Op Fl t Ar type
 .Op Fl u Ar unit
 .Cm show patrol
 .Nm
 .Op Fl d
 .Op Fl e
+.Op Fl D Ar device
+.Op Fl t Ar type
 .Op Fl u Ar unit
 .Cm show progress
 .Nm
+.Op Fl D Ar device
+.Op Fl t Ar type
 .Op Fl u Ar unit
 .Cm show volumes
 .Nm
+.Op Fl D Ar device
+.Op Fl t Ar type
 .Op Fl u Ar unit
 .Cm fail Ar drive
 .Nm
+.Op Fl D Ar device
+.Op Fl t Ar type
 .Op Fl u Ar unit
 .Cm good Ar drive
 .Nm
+.Op Fl D Ar device
+.Op Fl t Ar type
 .Op Fl u Ar unit
 .Cm rebuild Ar drive
 .Nm
+.Op Fl D Ar device
+.Op Fl t Ar type
 .Op Fl u Ar unit
 .Cm syspd Ar drive
 .Nm
+.Op Fl D Ar device
+.Op Fl t Ar type
 .Op Fl u Ar unit
 .Cm drive progress Ar drive
 .Nm
+.Op Fl D Ar device
+.Op Fl t Ar type
 .Op Fl u Ar unit
 .Cm drive clear Ar drive Brq "start | stop"
 .Nm
+.Op Fl D Ar device
+.Op Fl t Ar type
 .Op Fl u Ar unit
 .Cm start rebuild Ar drive
 .Nm
+.Op Fl D Ar device
+.Op Fl t Ar type
 .Op Fl u Ar unit
 .Cm abort rebuild Ar drive
 .Nm
+.Op Fl D Ar device
+.Op Fl t Ar type
 .Op Fl u Ar unit
 .Cm locate Ar drive Brq "on | off"
 .Nm
+.Op Fl D Ar device
+.Op Fl t Ar type
 .Op Fl u Ar unit
 .Cm cache Ar volume Op Ar setting Oo Ar value Oc Op ...
 .Nm
+.Op Fl D Ar device
+.Op Fl t Ar type
 .Op Fl u Ar unit
 .Cm name Ar volume Ar name
 .Nm
+.Op Fl D Ar device
+.Op Fl t Ar type
 .Op Fl u Ar unit
 .Cm volume progress Ar volume
 .Nm
+.Op Fl D Ar device
+.Op Fl t Ar type
 .Op Fl u Ar unit
 .Cm clear
 .Nm
+.Op Fl D Ar device
+.Op Fl t Ar type
 .Op Fl u Ar unit
 .Cm create Ar type
 .Op Fl v
@@ -127,51 +176,83 @@
 .Ar drive Ns Op \&, Ns Ar drive Ns Op ",..."
 .Op Ar drive Ns Op \&, Ns Ar drive Ns Op ",..."
 .Nm
+.Op Fl D Ar device
+.Op Fl t Ar type
 .Op Fl u Ar unit
 .Cm delete Ar volume
 .Nm
+.Op Fl D Ar device
+.Op Fl t Ar type
 .Op Fl u Ar unit
 .Cm add Ar drive Op Ar volume
 .Nm
+.Op Fl D Ar device
+.Op Fl t Ar type
 .Op Fl u Ar unit
 .Cm remove Ar drive
 .Nm
+.Op Fl D Ar device
+.Op Fl t Ar type
 .Op Fl u Ar unit
 .Cm start patrol
 .Nm
+.Op Fl D Ar device
+.Op Fl t Ar type
 .Op Fl u Ar unit
 .Cm stop patrol
 .Nm
+.Op Fl D Ar device
+.Op Fl t Ar type
 .Op Fl u Ar unit
 .Cm patrol Ar command Op Ar interval Op Ar start
 .Nm
+.Op Fl D Ar device
+.Op Fl t Ar type
 .Op Fl u Ar unit
 .Cm foreign scan
 .Nm
+.Op Fl D Ar device
+.Op Fl t Ar type
 .Op Fl u Ar unit
 .Cm foreign clear Op Ar config
 .Nm
+.Op Fl D Ar device
+.Op Fl t Ar type
 .Op Fl u Ar unit
 .Cm foreign diag Op Ar config
 .Nm
+.Op Fl D Ar device
+.Op Fl t Ar type
 .Op Fl u Ar unit
 .Cm foreign preview Op Ar config
 .Nm
+.Op Fl D Ar device
+.Op Fl t Ar type
 .Op Fl u Ar unit
 .Cm foreign import Op Ar config
 .Nm
+.Op Fl D Ar device
+.Op Fl t Ar type
 .Op Fl u Ar unit
 .Cm flash Ar file
 .Nm
+.Op Fl D Ar device
+.Op Fl t Ar type
 .Op Fl u Ar unit
 .Cm start learn
 .Nm
+.Op Fl D Ar device
+.Op Fl t Ar type
 .Op Fl u Ar unit
 .Cm bbu Ar setting Ar value
 .Nm
+.Op Fl D Ar device
+.Op Fl t Ar type
 .Op Fl u Ar unit
 .Cm ctrlprop Ar rebuild Op Ar rate
 .Nm
+.Op Fl D Ar device
+.Op Fl t Ar type
 .Op Fl u Ar unit
 .Cm ctrlprop Ar alarm Op Ar 0/1
 .Sh DESCRIPTION
@@ -185,8 +266,22 @@ consists of zero or more global options followed by a command.
 Commands may support additional optional or required arguments after the
 command.
 .Pp
-Currently one global option is supported:
+Currently three global options are supported:
 .Bl -tag -width indent
+.It Fl D Ar device
+.Ar device
+specifies the device node of the controller to use.
+'/dev/' will be added to the device node if needed.
+If no device node is specified,
+then device will be made of the type and device.
+.It Fl t Ar type
+.Ar type
+specifies the type of the controller to work with either
+.Xr mfi 4
+or
+.Xr mrsas 4 .
+If no type is specified,
+then the name of the invoked tool used to derive the type.
 .It Fl u Ar unit
 .Ar unit
 specifies the unit of the controller to work with.
@@ -326,7 +421,8 @@ the controller for each low-level request.
 The default is 15 events.
 .Pp
 By default, matching event log entries from the previous shutdown up to the
-present are displayed.  This range can be adjusted via the
+present are displayed.
+This range can be adjusted via the
 .Ar start
 and
 .Ar stop
@@ -383,7 +479,8 @@ The firmware should kick off an array rebuild on its own if a failed drive
 is marked as a rebuild drive.
 .It Cm syspd Ar drive
 Present the drive to the host operating system as a disk SYSPD block device in
-the format /dev/mfisyspdX.  Clear this flag with
+the format /dev/mfisyspdX.
+Clear this flag with
 .Cm good
 .Ar drive
 .It Cm drive progress Ar drive
@@ -524,7 +621,7 @@ Creates a single volume by concatenating all of the drives in the single drive
 list.
 .El
 .Pp
-.Sy Note:
+.Sy Note :
 Not all volume types are supported by all controllers.
 .Pp
 If the
@@ -602,7 +699,8 @@ Start a patrol read operation.
 .It Cm stop patrol
 Stop a currently running patrol read operation.
 .It Cm foreign scan
-Scan for foreign configurations and display the number found. The
+Scan for foreign configurations and display the number found.
+The
 .Ar config
 argument for the commands below takes the form of a number from 0 to the total
 configurations found.
@@ -645,8 +743,8 @@ Update battery backup unit (BBU) properties related to battery relearning.
 The following settings are configurable:
 .Bl -tag -width indent
 .It Cm learn-delay
-Add a delay to the next scheduled battery relearn event. This setting is
-given in hours and must lie in the range of 0 to 255.
+Add a delay to the next scheduled battery relearn event.
+This setting is given in hours and must lie in the range of 0 to 255.
 .It Cm autolearn-mode
 Enable or disable automatic periodic battery relearning.
 The setting may be set to
@@ -659,7 +757,8 @@ Mode 0 enables periodic relearning, mode 1 disables it, and mode 2 disables
 it and logs a warning to the event log when it detects that a battery relearn
 should be performed.
 .It Cm bbu-mode
-Set the BBU's mode of operation. This setting is not supported by all BBUs.
+Set the BBU's mode of operation.
+This setting is not supported by all BBUs.
 Where it is supported, the possible values are the integers between 1 and 5
 inclusive.
 Modes 1, 2 and 3 enable a transparent learn cycle, whereas modes 4 and 5 do not.
@@ -670,7 +769,8 @@ With no arguments display the rate of rebuild (percentage)a for volumes.
 With an integer argument (0-100), set that value as the new rebuild rate for volumes.
 .It Cm ctrlprop Ar alarm Op Ar 0/1
 With no arguments display the current alarm enable/disable status.
-With a 0, disable alarms.  With a 1, enable alarms.
+With a 0, disable alarms.
+With a 1, enable alarms.
 .El
 .Sh EXAMPLES
 Configure the cache for volume mfid0 to cache only writes:
@@ -715,7 +815,8 @@ Display the second detected foreign configuration:
 Set the current rebuild rate for volumes to 40%:
 .Dl Nm Cm ctrlprop rebuild 40
 .Sh SEE ALSO
-.Xr mfi 4
+.Xr mfi 4 ,
+.Xr mrsas 4
 .Sh HISTORY
 The
 .Nm

@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2012, 2016 Robert N. M. Watson
  * All rights reserved.
@@ -28,8 +28,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 #ifndef _DEV_ALTERA_AVALON_H_
@@ -94,7 +92,5 @@ int	altera_avgen_attach(struct altera_avgen_softc *sc,
 	    const char *str_fileio, const char *str_geomio,
 	    const char *str_mmapio, const char *str_devname, int devunit);
 void	altera_avgen_detach(struct altera_avgen_softc *sc);
-
-extern devclass_t	altera_avgen_devclass;
 
 #endif /* _DEV_ALTERA_AVALON_H_ */

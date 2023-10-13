@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2011 NetApp, Inc.
  * All rights reserved.
@@ -24,27 +24,43 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
-#ifndef	_FBSDRUN_H_
-#define	_FBSDRUN_H_
+#ifndef	_BHYVERUN_H_
+#define	_BHYVERUN_H_
+
+#include <stdbool.h>
 
 #define	VMEXIT_CONTINUE		(0)
 #define	VMEXIT_ABORT		(-1)
 
-struct vmctx;
 extern int guest_ncpus;
-extern uint16_t cores, sockets, threads;
+extern uint16_t cpu_cores, cpu_sockets, cpu_threads;
+
+struct vcpu;
+struct vmctx;
+struct vm_run;
 
 void *paddr_guest2host(struct vmctx *ctx, uintptr_t addr, size_t len);
 #ifdef BHYVE_SNAPSHOT
 uintptr_t paddr_host2guest(struct vmctx *ctx, void *addr);
 #endif
 
-void fbsdrun_set_capabilities(struct vmctx *ctx, int cpu);
-void fbsdrun_addcpu(struct vmctx *ctx, int fromcpu, int newcpu, uint64_t rip);
+struct vcpu;
+struct vcpu *fbsdrun_vcpu(int vcpuid);
+void fbsdrun_addcpu(int vcpuid);
+void fbsdrun_deletecpu(int vcpuid);
+int fbsdrun_suspendcpu(int vcpuid);
+
 int  fbsdrun_virtio_msix(void);
+
+typedef int (*vmexit_handler_t)(struct vmctx *, struct vcpu *, struct vm_run *);
+
+/* Interfaces implemented by machine-dependent code. */
+void bhyve_init_config(void);
+void bhyve_init_vcpu(struct vcpu *vcpu);
+void bhyve_start_vcpu(struct vcpu *vcpu, bool bsp);
+int bhyve_init_platform(struct vmctx *ctx, struct vcpu *bsp);
+int bhyve_init_platform_late(struct vmctx *ctx, struct vcpu *bsp);
 
 #endif

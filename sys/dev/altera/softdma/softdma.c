@@ -31,8 +31,6 @@
 /* This is driver for SoftDMA device built using Altera FIFO component. */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include "opt_platform.h"
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -880,7 +878,5 @@ static driver_t softdma_driver = {
 	sizeof(struct softdma_softc),
 };
 
-static devclass_t softdma_devclass;
-
-EARLY_DRIVER_MODULE(softdma, simplebus, softdma_driver, softdma_devclass, 0, 0,
+EARLY_DRIVER_MODULE(softdma, simplebus, softdma_driver, 0, 0,
     BUS_PASS_INTERRUPT + BUS_PASS_ORDER_LATE);

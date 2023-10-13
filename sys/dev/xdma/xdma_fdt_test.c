@@ -31,8 +31,6 @@
 /* xDMA memcpy test driver. */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/conf.h>
@@ -426,6 +424,4 @@ static driver_t xdmatest_driver = {
 	sizeof(struct xdmatest_softc),
 };
 
-static devclass_t xdmatest_devclass;
-
-DRIVER_MODULE(xdmatest, simplebus, xdmatest_driver, xdmatest_devclass, 0, 0);
+DRIVER_MODULE(xdmatest, simplebus, xdmatest_driver, 0, 0);

@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2006, Pyun YongHyeon <yongari@FreeBSD.org>
  * All rights reserved.
@@ -29,8 +29,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 /*
  * Driver for the IC Plus IP1000A/IP1001 10/100/1000 PHY.
  */
@@ -70,14 +68,13 @@ static device_method_t ip1000phy_methods[] = {
 	DEVMETHOD_END
 };
 
-static devclass_t ip1000phy_devclass;
 static driver_t ip1000phy_driver = {
 	"ip1000phy",
 	ip1000phy_methods,
 	sizeof(struct mii_softc)
 };
 
-DRIVER_MODULE(ip1000phy, miibus, ip1000phy_driver, ip1000phy_devclass, 0, 0);
+DRIVER_MODULE(ip1000phy, miibus, ip1000phy_driver, 0, 0);
 
 static int	ip1000phy_service(struct mii_softc *, struct mii_data *, int);
 static void	ip1000phy_status(struct mii_softc *);

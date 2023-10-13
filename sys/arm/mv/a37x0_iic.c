@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2018, 2019 Rubicon Communications, LLC (Netgate)
  *
@@ -26,8 +26,6 @@
  *
  */
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 /*
  * Driver for Armada 37x0 i2c controller.
  */
@@ -472,13 +470,11 @@ static device_method_t a37x0_iic_methods[] = {
 	DEVMETHOD_END
 };
 
-static devclass_t a37x0_iic_devclass;
-
 static driver_t a37x0_iic_driver = {
 	"iichb",
 	a37x0_iic_methods,
 	sizeof(struct a37x0_iic_softc),
 };
 
-DRIVER_MODULE(iicbus, a37x0_iic, iicbus_driver, iicbus_devclass, 0, 0);
-DRIVER_MODULE(a37x0_iic, simplebus, a37x0_iic_driver, a37x0_iic_devclass, 0, 0);
+DRIVER_MODULE(iicbus, a37x0_iic, iicbus_driver, 0, 0);
+DRIVER_MODULE(a37x0_iic, simplebus, a37x0_iic_driver, 0, 0);

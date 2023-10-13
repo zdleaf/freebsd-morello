@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2012 Damjan Marion <dmarion@Freebsd.org>
  * All rights reserved.
@@ -27,7 +27,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
 /*
 * TI TPS65217 PMIC companion chip for AM335x SoC sitting on I2C bus
 */
@@ -321,8 +320,6 @@ static driver_t am335x_pmic_driver = {
 	sizeof(struct am335x_pmic_softc),
 };
 
-static devclass_t am335x_pmic_devclass;
-
-DRIVER_MODULE(am335x_pmic, iicbus, am335x_pmic_driver, am335x_pmic_devclass, 0, 0);
+DRIVER_MODULE(am335x_pmic, iicbus, am335x_pmic_driver, 0, 0);
 MODULE_VERSION(am335x_pmic, 1);
 MODULE_DEPEND(am335x_pmic, iicbus, 1, 1, 1);

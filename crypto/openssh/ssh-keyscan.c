@@ -1,4 +1,4 @@
-/* $OpenBSD: ssh-keyscan.c,v 1.139 2021/01/27 09:26:54 djm Exp $ */
+/* $OpenBSD: ssh-keyscan.c,v 1.153 2023/06/21 05:06:04 djm Exp $ */
 /*
  * Copyright 1995, 1996 by David Mazieres <dm@lcs.mit.edu>.
  *
@@ -23,8 +23,12 @@
 #include <openssl/bn.h>
 #endif
 
+#include <limits.h>
 #include <netdb.h>
 #include <errno.h>
+#ifdef HAVE_POLL_H
+#include <poll.h>
+#endif
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -37,6 +41,7 @@
 #include "sshbuf.h"
 #include "sshkey.h"
 #include "cipher.h"
+#include "digest.h"
 #include "kex.h"
 #include "compat.h"
 #include "myproposal.h"
@@ -49,6 +54,7 @@
 #include "ssherr.h"
 #include "ssh_api.h"
 #include "dns.h"
+#include "addr.h"
 
 /* Flag indicating whether IPv4 or IPv6.  This can be set on the command line.
    Default value is AF_UNSPEC means both IPv4 and IPv6. */
@@ -76,6 +82,8 @@ int print_sshfp = 0;		/* Print SSHFP records instead of known_hosts */
 
 int found_one = 0;		/* Successfully found a key */
 
+int hashalg = -1;		/* Hash for SSHFP records or -1 for all */
+
 #define MAXMAXFD 256
 
 /* The number of seconds after which to give up on a TCP connection */
@@ -85,8 +93,7 @@ int maxfd;
 #define MAXCON (maxfd - 10)
 
 extern char *__progname;
-fd_set *read_wait;
-size_t read_wait_nfdset;
+struct pollfd *read_wait;
 int ncon;
 
 /*
@@ -111,7 +118,7 @@ typedef struct Connection {
 	char *c_output_name;	/* Hostname of connection for output */
 	char *c_data;		/* Data read from this fd */
 	struct ssh *c_ssh;	/* SSH-connection */
-	struct timeval c_tv;	/* Time at which connection gets aborted */
+	struct timespec c_ts;	/* Time at which connection gets aborted */
 	TAILQ_ENTRY(Connection) c_link;	/* List of connections in timeout order. */
 } con;
 
@@ -125,15 +132,21 @@ fdlim_get(int hard)
 {
 #if defined(HAVE_GETRLIMIT) && defined(RLIMIT_NOFILE)
 	struct rlimit rlfd;
+	rlim_t lim;
 
 	if (getrlimit(RLIMIT_NOFILE, &rlfd) == -1)
-		return (-1);
-	if ((hard ? rlfd.rlim_max : rlfd.rlim_cur) == RLIM_INFINITY)
-		return SSH_SYSFDMAX;
-	else
-		return hard ? rlfd.rlim_max : rlfd.rlim_cur;
+		return -1;
+	lim = hard ? rlfd.rlim_max : rlfd.rlim_cur;
+	if (lim <= 0)
+		return -1;
+	if (lim == RLIM_INFINITY)
+		lim = SSH_SYSFDMAX;
+	if (lim >= INT_MAX)
+		lim = INT_MAX;
+	return lim;
 #else
-	return SSH_SYSFDMAX;
+	return (SSH_SYSFDMAX <= 0) ? -1 :
+	    ((SSH_SYSFDMAX >= INT_MAX) ? INT_MAX : SSH_SYSFDMAX);
 #endif
 }
 
@@ -305,25 +318,27 @@ keygrab_ssh2(con *c)
 static void
 keyprint_one(const char *host, struct sshkey *key)
 {
-	char *hostport;
-	const char *known_host, *hashed;
+	char *hostport = NULL, *hashed = NULL;
+	const char *known_host;
+	int r = 0;
 
 	found_one = 1;
 
 	if (print_sshfp) {
-		export_dns_rr(host, key, stdout, 0);
+		export_dns_rr(host, key, stdout, 0, hashalg);
 		return;
 	}
 
 	hostport = put_host_port(host, ssh_port);
 	lowercase(hostport);
-	if (hash_hosts && (hashed = host_hash(host, NULL, 0)) == NULL)
+	if (hash_hosts && (hashed = host_hash(hostport, NULL, 0)) == NULL)
 		fatal("host_hash failed");
 	known_host = hash_hosts ? hashed : hostport;
 	if (!get_cert)
-		fprintf(stdout, "%s ", known_host);
-	sshkey_write(key, stdout);
-	fputs("\n", stdout);
+		r = fprintf(stdout, "%s ", known_host);
+	if (r >= 0 && sshkey_write(key, stdout) == 0)
+		(void)fputs("\n", stdout);
+	free(hashed);
 	free(hostport);
 }
 
@@ -381,7 +396,7 @@ tcpconnect(char *host)
 }
 
 static int
-conalloc(char *iname, char *oname, int keytype)
+conalloc(const char *iname, const char *oname, int keytype)
 {
 	char *namebase, *name, *namelist;
 	int s;
@@ -412,10 +427,11 @@ conalloc(char *iname, char *oname, int keytype)
 	fdcon[s].c_len = 4;
 	fdcon[s].c_off = 0;
 	fdcon[s].c_keytype = keytype;
-	monotime_tv(&fdcon[s].c_tv);
-	fdcon[s].c_tv.tv_sec += timeout;
+	monotime_ts(&fdcon[s].c_ts);
+	fdcon[s].c_ts.tv_sec += timeout;
 	TAILQ_INSERT_TAIL(&tq, &fdcon[s], c_link);
-	FD_SET(s, read_wait);
+	read_wait[s].fd = s;
+	read_wait[s].events = POLLIN;
 	ncon++;
 	return (s);
 }
@@ -438,7 +454,8 @@ confree(int s)
 	} else
 		close(s);
 	TAILQ_REMOVE(&tq, &fdcon[s], c_link);
-	FD_CLR(s, read_wait);
+	read_wait[s].fd = -1;
+	read_wait[s].events = 0;
 	ncon--;
 }
 
@@ -446,8 +463,8 @@ static void
 contouch(int s)
 {
 	TAILQ_REMOVE(&tq, &fdcon[s], c_link);
-	monotime_tv(&fdcon[s].c_tv);
-	fdcon[s].c_tv.tv_sec += timeout;
+	monotime_ts(&fdcon[s].c_ts);
+	fdcon[s].c_ts.tv_sec += timeout;
 	TAILQ_INSERT_TAIL(&tq, &fdcon[s], c_link);
 }
 
@@ -485,6 +502,15 @@ congreet(int s)
 		return;
 	}
 
+	/*
+	 * Read the server banner as per RFC4253 section 4.2.  The "SSH-"
+	 * protocol identification string may be preceeded by an arbitrarily
+	 * large banner which we must read and ignore.  Loop while reading
+	 * newline-terminated lines until we have one starting with "SSH-".
+	 * The ID string cannot be longer than 255 characters although the
+	 * preceeding banner lines may (in which case they'll be discarded
+	 * in multiple iterations of the outer loop).
+	 */
 	for (;;) {
 		memset(buf, '\0', sizeof(buf));
 		bufsiz = sizeof(buf);
@@ -510,6 +536,11 @@ congreet(int s)
 			break;
 		}
 		conrecycle(s);
+		return;
+	}
+	if (cp >= buf + sizeof(buf)) {
+		error("%s: greeting exceeds allowable length", c->c_name);
+		confree(s);
 		return;
 	}
 	if (*cp != '\n' && *cp != '\r') {
@@ -575,40 +606,33 @@ conread(int s)
 static void
 conloop(void)
 {
-	struct timeval seltime, now;
-	fd_set *r, *e;
+	struct timespec seltime, now;
 	con *c;
 	int i;
 
-	monotime_tv(&now);
+	monotime_ts(&now);
 	c = TAILQ_FIRST(&tq);
 
-	if (c && timercmp(&c->c_tv, &now, >))
-		timersub(&c->c_tv, &now, &seltime);
+	if (c && timespeccmp(&c->c_ts, &now, >))
+		timespecsub(&c->c_ts, &now, &seltime);
 	else
-		timerclear(&seltime);
+		timespecclear(&seltime);
 
-	r = xcalloc(read_wait_nfdset, sizeof(fd_mask));
-	e = xcalloc(read_wait_nfdset, sizeof(fd_mask));
-	memcpy(r, read_wait, read_wait_nfdset * sizeof(fd_mask));
-	memcpy(e, read_wait, read_wait_nfdset * sizeof(fd_mask));
-
-	while (select(maxfd, r, NULL, e, &seltime) == -1 &&
-	    (errno == EAGAIN || errno == EINTR || errno == EWOULDBLOCK))
-		;
+	while (ppoll(read_wait, maxfd, &seltime, NULL) == -1) {
+		if (errno == EAGAIN || errno == EINTR || errno == EWOULDBLOCK)
+			continue;
+		error("poll error");
+	}
 
 	for (i = 0; i < maxfd; i++) {
-		if (FD_ISSET(i, e)) {
-			error("%s: exception!", fdcon[i].c_name);
+		if (read_wait[i].revents & (POLLHUP|POLLERR|POLLNVAL))
 			confree(i);
-		} else if (FD_ISSET(i, r))
+		else if (read_wait[i].revents & (POLLIN|POLLHUP))
 			conread(i);
 	}
-	free(r);
-	free(e);
 
 	c = TAILQ_FIRST(&tq);
-	while (c && timercmp(&c->c_tv, &now, <)) {
+	while (c && timespeccmp(&c->c_ts, &now, <)) {
 		int s = c->c_fd;
 
 		c = TAILQ_NEXT(c, c_link);
@@ -617,7 +641,7 @@ conloop(void)
 }
 
 static void
-do_host(char *host)
+do_one_host(char *host)
 {
 	char *name = strnnsep(&host, " \t\n");
 	int j;
@@ -630,6 +654,42 @@ do_host(char *host)
 				conloop();
 			conalloc(name, *host ? host : name, j);
 		}
+	}
+}
+
+static void
+do_host(char *host)
+{
+	char daddr[128];
+	struct xaddr addr, end_addr;
+	u_int masklen;
+
+	if (host == NULL)
+		return;
+	if (addr_pton_cidr(host, &addr, &masklen) != 0) {
+		/* Assume argument is a hostname */
+		do_one_host(host);
+	} else {
+		/* Argument is a CIDR range */
+		debug("CIDR range %s", host);
+		end_addr = addr;
+		if (addr_host_to_all1s(&end_addr, masklen) != 0)
+			goto badaddr;
+		/*
+		 * Note: we deliberately include the all-zero/ones addresses.
+		 */
+		for (;;) {
+			if (addr_ntop(&addr, daddr, sizeof(daddr)) != 0) {
+ badaddr:
+				error("Invalid address %s", host);
+				return;
+			}
+			debug("CIDR expand: address %s", daddr);
+			do_one_host(daddr);
+			if (addr_cmp(&addr, &end_addr) == 0)
+				break;
+			addr_increment(&addr);
+		};
 	}
 }
 
@@ -649,9 +709,8 @@ static void
 usage(void)
 {
 	fprintf(stderr,
-	    "usage: %s [-46cDHv] [-f file] [-p port] [-T timeout] [-t type]\n"
-	    "\t\t   [host | addrlist namelist]\n",
-	    __progname);
+	    "usage: ssh-keyscan [-46cDHv] [-f file] [-O option] [-p port] [-T timeout]\n"
+	    "                   [-t type] [host | addrlist namelist]\n");
 	exit(1);
 }
 
@@ -677,7 +736,7 @@ main(int argc, char **argv)
 	if (argc <= 1)
 		usage();
 
-	while ((opt = getopt(argc, argv, "cDHv46p:T:t:f:")) != -1) {
+	while ((opt = getopt(argc, argv, "cDHv46O:p:T:t:f:")) != -1) {
 		switch (opt) {
 		case 'H':
 			hash_hosts = 1;
@@ -716,6 +775,14 @@ main(int argc, char **argv)
 			if (strcmp(optarg, "-") == 0)
 				optarg = NULL;
 			argv[fopt_count++] = optarg;
+			break;
+		case 'O':
+			/* Maybe other misc options in the future too */
+			if (strncmp(optarg, "hashalg=", 8) != 0)
+				fatal("Unsupported -O option");
+			if ((hashalg = ssh_digest_alg_by_name(
+			    optarg + 8)) == -1)
+				fatal("Unsupported hash algorithm");
 			break;
 		case 't':
 			get_keytypes = 0;
@@ -758,7 +825,6 @@ main(int argc, char **argv)
 		case '6':
 			IPv4or6 = AF_INET6;
 			break;
-		case '?':
 		default:
 			usage();
 		}
@@ -778,9 +844,9 @@ main(int argc, char **argv)
 	if (maxfd > fdlim_get(0))
 		fdlim_set(maxfd);
 	fdcon = xcalloc(maxfd, sizeof(con));
-
-	read_wait_nfdset = howmany(maxfd, NFDBITS);
-	read_wait = xcalloc(read_wait_nfdset, sizeof(fd_mask));
+	read_wait = xcalloc(maxfd, sizeof(struct pollfd));
+	for (j = 0; j < maxfd; j++)
+		read_wait[j].fd = -1;
 
 	for (j = 0; j < fopt_count; j++) {
 		if (argv[j] == NULL)

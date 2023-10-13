@@ -11,9 +11,8 @@
 .\"    documentation and/or other materials provided with the distribution.
 .\"
 .\"     @(#)vidcontrol.1
-.\" $FreeBSD$
 .\"
-.Dd October 20, 2018
+.Dd April 6, 2022
 .Dt VIDCONTROL 1
 .Os
 .Sh NAME
@@ -388,12 +387,16 @@ For details about that
 format see
 .Sx Format of Video Buffer Dump
 below.
+Supported only with
+.Xr syscons 4 .
 .It Fl P
 Same as
 .Fl p ,
 but dump contents of the video buffer in a plain text format
 ignoring nonprintable characters and information about text
 attributes.
+Supported only with
+.Xr syscons 4 .
 .It Fl H
 When used with
 .Fl p

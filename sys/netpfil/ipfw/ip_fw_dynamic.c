@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2017-2018 Yandex LLC
  * Copyright (c) 2017-2018 Andrey V. Elsukov <ae@FreeBSD.org>
@@ -28,8 +28,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include "opt_inet.h"
 #include "opt_inet6.h"
 #include "opt_ipfw.h"
@@ -1851,7 +1849,7 @@ dyn_get_parent_state(const struct ipfw_flow_id *pkt, uint32_t zoneid,
 	/*
 	 * We must exit from critical section because the following code
 	 * can acquire bucket mutex.
-	 * We rely on the the 'count' field. The state will not expire
+	 * We rely on the 'count' field. The state will not expire
 	 * until it has some child states, i.e. 'count' field is not zero.
 	 * Return state pointer, it will be used by child states as parent.
 	 */

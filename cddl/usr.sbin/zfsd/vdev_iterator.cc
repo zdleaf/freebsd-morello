@@ -28,8 +28,6 @@
  * POSSIBILITY OF SUCH DAMAGES.
  *
  * Authors: Justin T. Gibbs     (Spectra Logic Corporation)
- *
- * $FreeBSD$
  */
 
 /**
@@ -78,8 +76,10 @@ VdevIterator::Reset()
 {
 	nvlist_t  *rootVdev;
 	nvlist	  **cache_child;
+	nvlist	  **spare_child;
 	int	   result;
 	uint_t   cache_children;
+	uint_t	 spare_children;
 
 	result = nvlist_lookup_nvlist(m_poolConfig,
 				      ZPOOL_CONFIG_VDEV_TREE,
@@ -95,6 +95,13 @@ VdevIterator::Reset()
 	if (result == 0)
 		for (uint_t c = 0; c < cache_children; c++)
 			m_vdevQueue.push_back(cache_child[c]);
+	result = nvlist_lookup_nvlist_array(rootVdev,
+					    ZPOOL_CONFIG_SPARES,
+					    &spare_child,
+					    &spare_children);
+	if (result == 0)
+		for (uint_t c = 0; c < spare_children; c++)
+			m_vdevQueue.push_back(spare_child[c]);
 }
 
 nvlist_t *
@@ -102,10 +109,7 @@ VdevIterator::Next()
 {
 	nvlist_t *vdevConfig;
 
-	if (m_vdevQueue.empty())
-		return (NULL);
-
-	for (;;) {
+	for (vdevConfig = NULL; !m_vdevQueue.empty();) {
 		nvlist_t **vdevChildren;
 		int        result;
 		u_int      numChildren;

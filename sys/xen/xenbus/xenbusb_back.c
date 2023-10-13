@@ -36,8 +36,6 @@
  * Xen split devices.
  */
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/bus.h>
 #include <sys/kernel.h>
@@ -60,7 +58,7 @@ __FBSDID("$FreeBSD$");
 
 /*------------------ Private Device Attachment Functions  --------------------*/
 /**
- * \brief Probe for the existance of the XenBus back bus.
+ * \brief Probe for the existence of the XenBus back bus.
  *
  * \param dev  NewBus device_t for this XenBus back bus instance.
  *
@@ -312,7 +310,5 @@ static device_method_t xenbusb_back_methods[] = {
 
 DEFINE_CLASS_0(xenbusb_back, xenbusb_back_driver, xenbusb_back_methods,
 	       sizeof(struct xenbusb_softc));
-devclass_t xenbusb_back_devclass; 
 
-DRIVER_MODULE(xenbusb_back, xenstore, xenbusb_back_driver,
-	      xenbusb_back_devclass, 0, 0);
+DRIVER_MODULE(xenbusb_back, xenstore, xenbusb_back_driver, 0, 0);

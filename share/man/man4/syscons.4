@@ -24,15 +24,13 @@
 .\" (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 .\" THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 .\"
-.\" $FreeBSD$
-.\"
-.Dd June 2, 2018
+.Dd May 25, 2022
 .Dt SYSCONS 4
 .Os
 .Sh NAME
 .Nm syscons ,
 .Nm sc
-.Nd the console driver
+.Nd the legacy console driver
 .Sh SYNOPSIS
 .Cd "options MAXCONS=N"
 .Cd "options SC_ALT_MOUSE_IMAGE"
@@ -76,6 +74,14 @@ The
 .Nm
 driver provides multiple virtual terminals.
 It resembles the SCO color console driver.
+.Pp
+Note that the
+.Nm
+driver is not compatible with systems booted via
+.Xr UEFI 8 .
+Forcing use of
+.Nm
+on such systems will result in no usable console.
 .Pp
 The
 .Nm

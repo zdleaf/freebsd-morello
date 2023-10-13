@@ -32,8 +32,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include "opt_ktrace.h"
 
 #include <sys/param.h>
@@ -49,7 +47,6 @@ __FBSDID("$FreeBSD$");
 #include <sys/sleepqueue.h>
 #include <sys/syscallsubr.h>
 #include <sys/sysctl.h>
-#include <sys/sysent.h>
 #include <sys/priv.h>
 #include <sys/proc.h>
 #include <sys/posix4.h>
@@ -108,6 +105,8 @@ static int	realtimer_delete(struct itimer *);
 static void	realtimer_clocktime(clockid_t, struct timespec *);
 static void	realtimer_expire(void *);
 static void	realtimer_expire_l(struct itimer *it, bool proc_locked);
+
+static void	realitexpire(void *arg);
 
 static int	register_posix_clock(int, const struct kclock *);
 static void	itimer_fire(struct itimer *it);
@@ -245,9 +244,10 @@ sys_clock_gettime(struct thread *td, struct clock_gettime_args *uap)
 static inline void
 cputick2timespec(uint64_t runtime, struct timespec *ats)
 {
-	runtime = cputick2usec(runtime);
-	ats->tv_sec = runtime / 1000000;
-	ats->tv_nsec = runtime % 1000000 * 1000;
+	uint64_t tr;
+	tr = cpu_tickrate();
+	ats->tv_sec = runtime / tr;
+	ats->tv_nsec = ((runtime % tr) * 1000000000ULL) / tr;
 }
 
 void
@@ -256,11 +256,11 @@ kern_thread_cputime(struct thread *targettd, struct timespec *ats)
 	uint64_t runtime, curtime, switchtime;
 
 	if (targettd == NULL) { /* current thread */
-		critical_enter();
+		spinlock_enter();
 		switchtime = PCPU_GET(switchtime);
 		curtime = cpu_ticks();
 		runtime = curthread->td_runtime;
-		critical_exit();
+		spinlock_exit();
 		runtime += curtime - switchtime;
 	} else {
 		PROC_LOCK_ASSERT(targettd->td_proc, MA_OWNED);
@@ -410,7 +410,7 @@ kern_clock_settime(struct thread *td, clockid_t clock_id, struct timespec *ats)
 		return (error);
 	if (clock_id != CLOCK_REALTIME)
 		return (EINVAL);
-	if (ats->tv_nsec < 0 || ats->tv_nsec >= NS_PER_SEC || ats->tv_sec < 0)
+	if (!timespecvalid_interval(ats))
 		return (EINVAL);
 	if (!allow_insane_settime &&
 	    (ats->tv_sec > 8000ULL * 365 * 24 * 60 * 60 ||
@@ -477,10 +477,7 @@ kern_clock_getres(struct thread *td, clockid_t clock_id, struct timespec *ts)
 	case CLOCK_THREAD_CPUTIME_ID:
 	case CLOCK_PROCESS_CPUTIME_ID:
 	cputime:
-		/* sync with cputick2usec */
-		ts->tv_nsec = 1000000 / cpu_tickrate();
-		if (ts->tv_nsec == 0)
-			ts->tv_nsec = 1000;
+		ts->tv_nsec = 1000000000 / cpu_tickrate() + 1;
 		break;
 	default:
 		if ((int)clock_id < 0)
@@ -941,7 +938,7 @@ itimer_proc_continue(struct proc *p)
  * that here since we want to appear to be in sync with the clock
  * interrupt even when we're delayed.
  */
-void
+static void
 realitexpire(void *arg)
 {
 	struct proc *p;
@@ -952,8 +949,6 @@ realitexpire(void *arg)
 	kern_psignal(p, SIGALRM);
 	if (!timevalisset(&p->p_realtimer.it_interval)) {
 		timevalclear(&p->p_realtimer.it_value);
-		if (p->p_flag & P_WEXIT)
-			wakeup(&p->p_itcallout);
 		return;
 	}
 
@@ -1101,21 +1096,21 @@ ratecheck(struct timeval *lasttime, const struct timeval *mininterval)
 }
 
 /*
- * ppsratecheck(): packets (or events) per second limitation.
+ * eventratecheck(): events per second limitation.
  *
  * Return 0 if the limit is to be enforced (e.g. the caller
- * should drop a packet because of the rate limitation).
+ * should ignore the event because of the rate limitation).
  *
- * maxpps of 0 always causes zero to be returned.  maxpps of -1
+ * maxeps of 0 always causes zero to be returned.  maxeps of -1
  * always causes 1 to be returned; this effectively defeats rate
  * limiting.
  *
  * Note that we maintain the struct timeval for compatibility
  * with other bsd systems.  We reuse the storage and just monitor
- * clock ticks for minimal overhead.  
+ * clock ticks for minimal overhead.
  */
 int
-ppsratecheck(struct timeval *lasttime, int *curpps, int maxpps)
+eventratecheck(struct timeval *lasttime, int *cureps, int maxeps)
 {
 	int now;
 
@@ -1127,11 +1122,11 @@ ppsratecheck(struct timeval *lasttime, int *curpps, int maxpps)
 	now = ticks;
 	if (lasttime->tv_sec == 0 || (u_int)(now - lasttime->tv_sec) >= hz) {
 		lasttime->tv_sec = now;
-		*curpps = 1;
-		return (maxpps != 0);
+		*cureps = 1;
+		return (maxeps != 0);
 	} else {
-		(*curpps)++;		/* NB: ignore potential overflow */
-		return (maxpps < 0 || *curpps <= maxpps);
+		(*cureps)++;		/* NB: ignore potential overflow */
+		return (maxeps < 0 || *cureps <= maxeps);
 	}
 }
 
@@ -1648,7 +1643,7 @@ static int
 itimespecfix(struct timespec *ts)
 {
 
-	if (ts->tv_sec < 0 || ts->tv_nsec < 0 || ts->tv_nsec >= NS_PER_SEC)
+	if (!timespecvalid_interval(ts))
 		return (EINVAL);
 	if ((UINT64_MAX - ts->tv_nsec) / NS_PER_SEC < ts->tv_sec)
 		return (EINVAL);

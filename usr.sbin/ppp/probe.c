@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 1998 Brian Somers <brian@Awfulhak.org>
  * All rights reserved.
@@ -24,8 +24,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 #include <sys/time.h>
@@ -67,7 +65,7 @@ ipv6_available(void)
 #endif
 
 void
-probe_Init()
+probe_Init(void)
 {
   probe.select_changes_time = select_changes_time() ? 1 : 0;
   log_Printf(LogDEBUG, "Select changes time: %s\n",

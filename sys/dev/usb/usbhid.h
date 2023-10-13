@@ -1,6 +1,5 @@
-/* $FreeBSD$ */
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-NetBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2008 Hans Petter Selasky. All rights reserved.
  * Copyright (c) 1998 The NetBSD Foundation, Inc. All rights reserved.
@@ -82,7 +81,7 @@ hid_get_data_unsigned(const uint8_t *buf, hid_size_t len,
 }
 static __inline void
 hid_put_data_unsigned(uint8_t *buf, hid_size_t len, struct hid_location *loc,
-    unsigned int value)
+    unsigned value)
 {
 	return (hid_put_udata(buf, len, loc, value));
 }

@@ -33,8 +33,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 /*
  * Driver for the Broadcom BCM54xx/57xx 1000baseTX PHY.
  */
@@ -89,15 +87,13 @@ static device_method_t brgphy_methods[] = {
 	DEVMETHOD_END
 };
 
-static devclass_t brgphy_devclass;
-
 static driver_t brgphy_driver = {
 	"brgphy",
 	brgphy_methods,
 	sizeof(struct brgphy_softc)
 };
 
-DRIVER_MODULE(brgphy, miibus, brgphy_driver, brgphy_devclass, 0, 0);
+DRIVER_MODULE(brgphy, miibus, brgphy_driver, 0, 0);
 
 static int	brgphy_service(struct mii_softc *, struct mii_data *, int);
 static void	brgphy_setmedia(struct mii_softc *, int);
@@ -153,6 +149,7 @@ static const struct mii_phydesc brgphys[] = {
 #ifdef notyet	/* better handled by ukphy(4) until WARs are implemented */
 	MII_PHY_DESC(BROADCOM2, BCM5785),
 #endif
+	MII_PHY_DESC(BROADCOM3, BCM54616S),
 	MII_PHY_DESC(BROADCOM3, BCM54618SE),
 	MII_PHY_DESC(BROADCOM3, BCM5717C),
 	MII_PHY_DESC(BROADCOM3, BCM5719C),

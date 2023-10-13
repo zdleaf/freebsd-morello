@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2006 Stephane E. Potvin <sepotvin@videotron.ca>
  * Copyright (c) 2006 Ariff Abdullah <ariff@FreeBSD.org>
@@ -42,8 +42,6 @@
 
 #include <dev/sound/pci/hda/hda_reg.h>
 #include <dev/sound/pci/hda/hdac.h>
-
-SND_DECLARE_FILE("$FreeBSD$");
 
 struct hdacc_fg {
 	device_t	dev;
@@ -269,6 +267,7 @@ static const struct {
 	{ HDA_CODEC_IDT92HD90BXX, 0,	"IDT 92HD90BXX" },
 	{ HDA_CODEC_IDT92HD91BXX, 0,	"IDT 92HD91BXX" },
 	{ HDA_CODEC_IDT92HD93BXX, 0,	"IDT 92HD93BXX" },
+	{ HDA_CODEC_IDT92HD95B, 0,	"Tempo 92HD95B" },
 	{ HDA_CODEC_IDT92HD98BXX, 0,	"IDT 92HD98BXX" },
 	{ HDA_CODEC_IDT92HD99BXX, 0,	"IDT 92HD99BXX" },
 	{ HDA_CODEC_CX20549, 0,		"Conexant CX20549 (Venice)" },
@@ -396,6 +395,7 @@ static const struct {
 	{ HDA_CODEC_INTELALLK, 0,	"Intel Alder Lake" },
 	{ HDA_CODEC_SII1390, 0,		"Silicon Image SiI1390" },
 	{ HDA_CODEC_SII1392, 0,		"Silicon Image SiI1392" },
+	{ HDA_CODEC_VMWARE, 0,		"VMware" },
 	/* Unknown CODECs */
 	{ HDA_CODEC_ADXXXX, 0,		"Analog Devices" },
 	{ HDA_CODEC_AGEREXXXX, 0,	"Lucent/Agere Systems" },
@@ -413,6 +413,7 @@ static const struct {
 	{ HDA_CODEC_NVIDIAXXXX, 0,	"NVIDIA" },
 	{ HDA_CODEC_SIIXXXX, 0,		"Silicon Image" },
 	{ HDA_CODEC_STACXXXX, 0,	"Sigmatel" },
+	{ HDA_CODEC_VMWAREXXXX, 0,	"VMware" },
 	{ HDA_CODEC_VTXXXX, 0,		"VIA" },
 };
 
@@ -794,6 +795,4 @@ static driver_t hdacc_driver = {
 	sizeof(struct hdacc_softc),
 };
 
-static devclass_t hdacc_devclass;
-
-DRIVER_MODULE(snd_hda, hdac, hdacc_driver, hdacc_devclass, NULL, NULL);
+DRIVER_MODULE(snd_hda, hdac, hdacc_driver, NULL, NULL);

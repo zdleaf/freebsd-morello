@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 1997 Brian Somers <brian@Awfulhak.org>
  * All rights reserved.
@@ -24,8 +24,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 #include <sys/types.h>
@@ -83,7 +81,7 @@ struct prompt *log_PromptContext;
 int log_PromptListChanged;
 
 struct prompt *
-log_PromptList()
+log_PromptList(void)
 {
   return promptlist;
 }
@@ -163,7 +161,7 @@ log_DestroyPrompts(struct server *s)
 }
 
 void
-log_DisplayPrompts()
+log_DisplayPrompts(void)
 {
   struct prompt *p;
 
@@ -254,7 +252,7 @@ log_DiscardLocal(int id, u_long *mask)
 }
 
 void
-log_DiscardAll()
+log_DiscardAll(void)
 {
   LogMask = 0;
 }
@@ -306,7 +304,7 @@ log_SetTun(int tunno, const char *ifaceName)
 }
 
 void
-log_Close()
+log_Close(void)
 {
   closelog();
   LogTunno = -1;

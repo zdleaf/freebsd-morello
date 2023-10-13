@@ -4,7 +4,6 @@
  * See the IPFILTER.LICENCE file for details on licencing.
  *
  * @(#)ip_fil.h	1.35 6/5/96
- * $FreeBSD$
  * Id: ip_fil.h,v 2.170.2.51 2007/10/10 09:48:03 darrenr Exp $
  */
 
@@ -833,7 +832,7 @@ typedef	struct	frentry {
 #define	FR_STATESYNC	0x1000000	/* synchronize state to slave */
 #define	FR_COPIED	0x2000000	/* copied from user space */
 #define	FR_INACTIVE	0x4000000	/* only used when flush'ing rules */
-#define	FR_NOMATCH	0x8000000	/* no match occured */
+#define	FR_NOMATCH	0x8000000	/* no match occurred */
 		/*	0x10000000 	FF_LOGPASS */
 		/*	0x20000000 	FF_LOGBLOCK */
 		/*	0x40000000 	FF_LOGNOMATCH */
@@ -1700,7 +1699,7 @@ extern	int	ipf_outobj(ipf_main_softc_t *, void *, void *, int);
 extern	int	ipf_outobjk(ipf_main_softc_t *, ipfobj_t *, void *);
 extern	int	ipf_outobjsz(ipf_main_softc_t *, void *, void *,
 				  int, int);
-extern	void	*ipf_pullup(mb_t *, fr_info_t *, int);
+extern	ip_t	*ipf_pullup(mb_t *, fr_info_t *, int);
 extern	int	ipf_resolvedest(ipf_main_softc_t *, char *,
 				     struct frdest *, int);
 extern	int	ipf_resolvefunc(ipf_main_softc_t *, void *);

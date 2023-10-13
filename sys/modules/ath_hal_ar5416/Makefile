@@ -26,7 +26,6 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
 # THE POSSIBILITY OF SUCH DAMAGES.
 #
-# $FreeBSD$
 #
 
 .PATH:	${SRCTOP}/sys/dev/ath
@@ -61,15 +60,6 @@ SRCS+=	ar2133.c
 .PATH:	${SRCTOP}/sys/dev/ath/ath_hal/ar9001
 SRCS+=	ar9160_attach.c
 
-# + AR9130 - (Sowl) - Embedded (AR913x SoC)
-#
-# This requires AH_SUPPORT_AR9130 in order to function as some
-# register values have shifted for this chipset. Definig this however
-# (currently) breaks non-AR9130 chipsets - since this is an embedded
-# chipset and no other radios are glued to it, this shouldn't pose a
-# problem.
-SRCS+=	ar9130_attach.c ar9130_eeprom.c ar9130_phy.c
-
 # AR9002 series chips
 # + AR9220/AR9280 - Merlin
 .PATH:	${SRCTOP}/sys/dev/ath/ath_hal/ar9002
@@ -89,3 +79,5 @@ CFLAGS+=  -I. -I${SRCTOP}/sys/dev/ath -I${SRCTOP}/sys/dev/ath/ath_hal
 CFLAGS+=  -I. -I${SRCTOP}/sys/contrib/dev/ath/ath_hal/
 
 .include <bsd.kmod.mk>
+
+CWARNFLAGS+=	${NO_WUNUSED_BUT_SET_VARIABLE}

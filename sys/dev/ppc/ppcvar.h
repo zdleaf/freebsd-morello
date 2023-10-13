@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 1997-2000 Nicolas Souchu
  * Copyright (c) 2001 Alcove - Nicolas Souchu
@@ -26,8 +26,6 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD$
- *
  */
 
 int ppc_probe(device_t dev, int rid);
@@ -50,5 +48,4 @@ int ppc_reset_epp(device_t);
 int ppc_ecp_sync(device_t);
 int ppc_setmode(device_t, int);
 
-extern devclass_t ppc_devclass;
 extern const char ppc_driver_name[];

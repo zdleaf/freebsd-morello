@@ -34,8 +34,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 /*
  * Intel fourth generation mobile cpus integrated I2C device.
  *
@@ -337,9 +335,9 @@ set_slave_addr(ig4iic_softc_t *sc, uint8_t slave)
 {
 	uint32_t tar;
 	uint32_t ctl;
-	int use_10bit;
+	bool use_10bit;
 
-	use_10bit = 0;
+	use_10bit = false;
 	if (sc->slave_valid && sc->last_slave == slave &&
 	    sc->use_10bit == use_10bit) {
 		return;
@@ -364,7 +362,7 @@ set_slave_addr(ig4iic_softc_t *sc, uint8_t slave)
 	reg_write(sc, IG4_REG_CTL, ctl);
 	reg_write(sc, IG4_REG_TAR_ADD, tar);
 	set_controller(sc, IG4_I2C_ENABLE);
-	sc->slave_valid = 1;
+	sc->slave_valid = true;
 	sc->last_slave = slave;
 }
 
@@ -1009,7 +1007,7 @@ ig4iic_set_config(ig4iic_softc_t *sc, bool reset)
 		  (sc->cfg.bus_speed & IG4_CTL_SPEED_MASK));
 
 	/* Force setting of the target address on the next transfer */
-	sc->slave_valid = 0;
+	sc->slave_valid = false;
 
 	return (0);
 }
@@ -1210,12 +1208,9 @@ ig4iic_dump(ig4iic_softc_t *sc)
 }
 #undef REGDUMP
 
-devclass_t ig4iic_devclass;
-
-DRIVER_MODULE(iicbus, ig4iic, iicbus_driver, iicbus_devclass, NULL, NULL);
+DRIVER_MODULE(iicbus, ig4iic, iicbus_driver, NULL, NULL);
 #ifdef DEV_ACPI
-DRIVER_MODULE(acpi_iicbus, ig4iic, acpi_iicbus_driver, iicbus_devclass, NULL,
-    NULL);
+DRIVER_MODULE(acpi_iicbus, ig4iic, acpi_iicbus_driver, NULL, NULL);
 #endif
 MODULE_DEPEND(ig4iic, iicbus, IICBUS_MINVER, IICBUS_PREFVER, IICBUS_MAXVER);
 MODULE_VERSION(ig4iic, 1);

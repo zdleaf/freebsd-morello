@@ -24,8 +24,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 #ifndef __LINUXKPI_LINUX_DMI_H__
@@ -33,6 +31,12 @@
 
 #include <sys/types.h>
 #include <linux/mod_devicetable.h>
+
+struct dmi_header {
+	uint8_t		type;
+	uint8_t		length;
+	uint16_t	handle;
+};
 
 int linux_dmi_check_system(const struct dmi_system_id *);
 bool linux_dmi_match(enum dmi_field, const char *);
@@ -43,5 +47,12 @@ const char *linux_dmi_get_system_info(int);
 #define	dmi_match(f, str)	linux_dmi_match(f, str)
 #define	dmi_first_match(sysid)	linux_dmi_first_match(sysid)
 #define	dmi_get_system_info(sysid)	linux_dmi_get_system_info(sysid)
+
+static inline int
+dmi_walk(void (*callbackf)(const struct dmi_header *, void *), void *arg)
+{
+
+	return (-ENXIO);
+}
 
 #endif	/* __LINUXKPI_LINUX_DMI_H__ */

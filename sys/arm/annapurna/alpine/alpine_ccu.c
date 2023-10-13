@@ -27,8 +27,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/bus.h>
 #include <sys/conf.h>
@@ -71,12 +69,10 @@ static driver_t al_ccu_driver = {
 	sizeof(struct al_ccu_softc)
 };
 
-static devclass_t al_ccu_devclass;
-
-EARLY_DRIVER_MODULE(al_ccu, simplebus, al_ccu_driver,
-    al_ccu_devclass, 0, 0, BUS_PASS_CPU + BUS_PASS_ORDER_MIDDLE);
-EARLY_DRIVER_MODULE(al_ccu, ofwbus, al_ccu_driver,
-    al_ccu_devclass, 0, 0, BUS_PASS_CPU + BUS_PASS_ORDER_MIDDLE);
+EARLY_DRIVER_MODULE(al_ccu, simplebus, al_ccu_driver, 0, 0,
+    BUS_PASS_CPU + BUS_PASS_ORDER_MIDDLE);
+EARLY_DRIVER_MODULE(al_ccu, ofwbus, al_ccu_driver, 0, 0,
+    BUS_PASS_CPU + BUS_PASS_ORDER_MIDDLE);
 
 static int
 al_ccu_probe(device_t dev)

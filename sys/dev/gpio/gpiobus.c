@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2009 Oleksandr Tymoshenko <gonzo@freebsd.org>
  * All rights reserved.
@@ -27,8 +27,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/bus.h>
@@ -1113,8 +1111,6 @@ driver_t gpiobus_driver = {
 	sizeof(struct gpiobus_softc)
 };
 
-devclass_t	gpiobus_devclass;
-
-EARLY_DRIVER_MODULE(gpiobus, gpio, gpiobus_driver, gpiobus_devclass, 0, 0,
+EARLY_DRIVER_MODULE(gpiobus, gpio, gpiobus_driver, 0, 0,
     BUS_PASS_BUS + BUS_PASS_ORDER_MIDDLE);
 MODULE_VERSION(gpiobus, 1);

@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2020 Peter Holm <pho@FreeBSD.org>
  * All rights reserved.
@@ -57,7 +57,7 @@ flip(void *ap, size_t len)
 	unsigned char bit, buf, mask, old __unused;
 
 	cp = (unsigned char *)ap;
-	byte = random_long(0, len);
+	byte = random_long(0, len - 1);
 	bit = random_long(0,7);
 	mask = ~(1 << bit);
 	buf = cp[byte];
@@ -68,6 +68,15 @@ flip(void *ap, size_t len)
 	printf("Change %2x to %2x at %d by flipping bit %d\n",
 	    old, buf, byte, bit);
 #endif
+}
+
+static void
+trash(char *c)
+{
+	if (arc4random() % 2 == 1)
+		*c = 0;
+	else
+		arc4random_buf(c, sizeof(c));
 }
 
 int
@@ -111,6 +120,8 @@ main(int argc, char *argv[])
 	if (size == 0) {
 		if (fstat(fd, &st) == -1)
 			err(1, "stat %s", argv[0]);
+		if ((st.st_mode & S_IFREG) == 0)
+			errx(1, "%s must be a regular file\n", argv[0]);
 		size = st.st_size;
 	}
 
@@ -120,7 +131,10 @@ main(int argc, char *argv[])
 			err(1, "lseek()");
 		if (read(fd, &c, 1) != 1)
 			err(1, "read()");
-		flip(&c, 1);
+		if (arc4random() % 100 < 98)
+			flip(&c, 1);
+		else
+			trash(&c);
 		if (lseek(fd, pos, SEEK_SET) == -1)
 			err(1, "lseek()");
 		if (write(fd, &c, 1) != 1)

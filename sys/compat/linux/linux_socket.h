@@ -26,8 +26,6 @@
  * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 #ifndef _LINUX_SOCKET_H_
@@ -52,12 +50,6 @@
 #define LINUX_MSG_NOSIGNAL	0x4000
 #define LINUX_MSG_WAITFORONE	0x10000
 #define LINUX_MSG_CMSG_CLOEXEC	0x40000000
-
-/* Socket-level control message types */
-
-#define LINUX_SCM_RIGHTS	0x01
-#define LINUX_SCM_CREDENTIALS	0x02
-#define LINUX_SCM_TIMESTAMP	0x1D
 
 struct l_msghdr {
 	l_uintptr_t	msg_name;
@@ -132,8 +124,7 @@ struct l_ucred {
 	uint32_t	gid;
 };
 
-#if defined(__i386__) || defined(__arm__) || \
-    (defined(__amd64__) && defined(COMPAT_LINUX32))
+#if defined(__i386__) || (defined(__amd64__) && defined(COMPAT_LINUX32))
 
 struct linux_accept_args {
 	register_t s;
@@ -166,7 +157,7 @@ int linux_accept(struct thread *td, struct linux_accept_args *args);
 #define	LINUX_SENDMMSG		20
 #define	LINUX_SENDFILE		21
 
-#endif /* __i386__ || __arm__ || (__amd64__ && COMPAT_LINUX32) */
+#endif /* __i386__ || (__amd64__ && COMPAT_LINUX32) */
 
 /* Socket defines */
 #define	LINUX_SOL_SOCKET	1
@@ -193,13 +184,26 @@ int linux_accept(struct thread *td, struct linux_accept_args *args);
 #define	LINUX_SO_RCVTIMEO	20
 #define	LINUX_SO_SNDTIMEO	21
 #endif
-#define	LINUX_SO_TIMESTAMP	29
+#define	LINUX_SO_TIMESTAMPO	29
+#define	LINUX_SO_TIMESTAMPN	63
+#define	LINUX_SO_TIMESTAMPNSO	35
+#define	LINUX_SO_TIMESTAMPNSN	64
 #define	LINUX_SO_ACCEPTCONN	30
 #define	LINUX_SO_PEERSEC	31
 #define	LINUX_SO_SNDBUFFORCE	32
 #define	LINUX_SO_RCVBUFFORCE	33
 #define	LINUX_SO_PROTOCOL	38
+#define	LINUX_SO_DOMAIN		39
 #define	LINUX_SO_PEERGROUPS	59
+
+/* Socket-level control message types */
+
+#define LINUX_SCM_RIGHTS	0x01
+#define LINUX_SCM_CREDENTIALS	0x02
+#define LINUX_SCM_TIMESTAMPO	LINUX_SO_TIMESTAMPO
+#define LINUX_SCM_TIMESTAMPN	LINUX_SO_TIMESTAMPN
+#define LINUX_SCM_TIMESTAMPNSO	LINUX_SO_TIMESTAMPNSO
+#define LINUX_SCM_TIMESTAMPNSN	LINUX_SO_TIMESTAMPNSN
 
 /* Socket options */
 #define	LINUX_IP_TOS		1
@@ -222,6 +226,8 @@ int linux_accept(struct thread *td, struct linux_accept_args *args);
 #define	LINUX_IP_PASSSEC	18
 #define	LINUX_IP_TRANSPARENT	19
 
+#define	LINUX_IP_ORIGDSTADDR		20
+#define	LINUX_IP_RECVORIGDSTADDR	LINUX_IP_ORIGDSTADDR
 #define	LINUX_IP_MINTTL		21
 #define	LINUX_IP_NODEFRAG	22
 #define	LINUX_IP_CHECKSUM	23
@@ -316,5 +322,43 @@ int linux_accept(struct thread *td, struct linux_accept_args *args);
 #define	LINUX_TCP_KEEPCNT	6
 #define	LINUX_TCP_INFO		11
 #define	LINUX_TCP_MD5SIG	14
+
+struct l_ifmap {
+	l_ulong		mem_start;
+	l_ulong		mem_end;
+	l_ushort	base_addr;
+	u_char		irq;
+	u_char		dma;
+	u_char		port;
+	/* 3 bytes spare */
+};
+
+/*
+ * Careful changing the declaration of this structure.
+ * To use FreeBSD names to access the struct l_ifreq members the
+ * member names of struct l_ifreq should be equal to the FreeBSD.
+ */
+struct l_ifreq {
+	char	ifr_name[LINUX_IFNAMSIZ];
+	union {
+		struct l_sockaddr	ifru_addr;
+		struct l_sockaddr	ifru_dstaddr;
+		struct l_sockaddr	ifru_broadaddr;
+		struct l_sockaddr	ifru_netmask;
+		struct l_sockaddr	ifru_hwaddr;
+		l_short		ifru_flags[1];
+		l_int		ifru_index;
+		l_int		ifru_mtu;
+		struct l_ifmap	ifru_map;
+		char		ifru_slave[LINUX_IFNAMSIZ];
+		char		ifru_newname[LINUX_IFNAMSIZ];
+		l_uintptr_t	ifru_data;
+	} ifr_ifru;
+};
+
+/*
+ * Define here members which are not exists in the FreeBSD struct ifreq.
+ */
+#define	ifr_hwaddr	ifr_ifru.ifru_hwaddr	/* MAC address */
 
 #endif /* _LINUX_SOCKET_H_ */

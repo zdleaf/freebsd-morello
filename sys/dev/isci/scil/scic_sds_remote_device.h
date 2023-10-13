@@ -50,8 +50,6 @@
  * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 #ifndef _SCIC_SDS_REMOTE_DEVICE_H_
 #define _SCIC_SDS_REMOTE_DEVICE_H_
@@ -128,7 +126,7 @@ enum SCIC_SDS_STP_REMOTE_DEVICE_READY_SUBSTATES
    SCIC_SDS_STP_REMOTE_DEVICE_READY_SUBSTATE_IDLE,
 
    /**
-    * This is the command state for for the STP remote device.  This state is
+    * This is the command state for the STP remote device.  This state is
     * entered when the device is processing a non-NCQ command.  The device object
     * will fail any new start IO requests until this command is complete.
     */
@@ -136,7 +134,7 @@ enum SCIC_SDS_STP_REMOTE_DEVICE_READY_SUBSTATES
 
    /**
     * This is the NCQ state for the STP remote device.  This state is entered
-    * when the device is processing an NCQ reuqest.  It will remain in this state
+    * when the device is processing an NCQ request.  It will remain in this state
     * so long as there is one or more NCQ requests being processed.
     */
    SCIC_SDS_STP_REMOTE_DEVICE_READY_SUBSTATE_NCQ,
@@ -232,14 +230,14 @@ typedef struct SCIC_SDS_REMOTE_DEVICE
    SCI_SAS_ADDRESS_T device_address;
 
    /**
-    * This filed is assinged the value of TRUE if the device is directly attached
+    * This filed is assigned the value of TRUE if the device is directly attached
     * to the port.
     */
    BOOL is_direct_attached;
 
 #if !defined(DISABLE_ATAPI)
    /**
-    * This filed is assinged the value of TRUE if the device is an ATAPI device.
+    * This filed is assigned the value of TRUE if the device is an ATAPI device.
     */
    BOOL is_atapi;
 #endif
@@ -277,7 +275,7 @@ typedef struct SCIC_SDS_REMOTE_DEVICE
    U32 not_ready_reason;
 
    /**
-    * This field is TRUE if this remote device has an initialzied ready substate
+    * This field is TRUE if this remote device has an initialized ready substate
     * machine. SSP devices do not have a ready substate machine and STP devices
     * have a ready substate machine.
     */

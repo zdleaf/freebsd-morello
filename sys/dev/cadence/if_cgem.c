@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2012-2014 Thomas Skibo <thomasskibo@yahoo.com>
  * All rights reserved.
@@ -36,8 +36,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/bus.h>
@@ -76,10 +74,9 @@ __FBSDID("$FreeBSD$");
 
 #include <dev/mii/mii.h>
 #include <dev/mii/miivar.h>
+#include <dev/mii/mii_fdt.h>
 
-#ifdef EXT_RESOURCES
 #include <dev/extres/clk/clk.h>
-#endif
 
 #if BUS_SPACE_MAXADDR > BUS_SPACE_MAXADDR_32BIT
 #define CGEM64
@@ -102,18 +99,18 @@ __FBSDID("$FreeBSD$");
 #define CGEM_CKSUM_ASSIST	(CSUM_IP | CSUM_TCP | CSUM_UDP | \
 				 CSUM_TCP_IPV6 | CSUM_UDP_IPV6)
 
-#define HWTYPE_GENERIC_GEM	1
-#define HWTYPE_ZYNQ		2
-#define HWTYPE_ZYNQMP		3
-#define HWTYPE_SIFIVE		4
+#define HWQUIRK_NONE		0
+#define HWQUIRK_NEEDNULLQS	1
+#define HWQUIRK_RXHANGWAR	2
 
 static struct ofw_compat_data compat_data[] = {
-	{ "cdns,zynq-gem",		HWTYPE_ZYNQ },
-	{ "cdns,zynqmp-gem",		HWTYPE_ZYNQMP },
-	{ "sifive,fu540-c000-gem",	HWTYPE_SIFIVE },
-	{ "sifive,fu740-c000-gem",	HWTYPE_SIFIVE },
-	{ "cdns,gem",			HWTYPE_GENERIC_GEM },
-	{ "cadence,gem",		HWTYPE_GENERIC_GEM },
+	{ "cdns,zynq-gem",		HWQUIRK_RXHANGWAR }, /* Deprecated */
+	{ "cdns,zynqmp-gem",		HWQUIRK_NEEDNULLQS }, /* Deprecated */
+	{ "xlnx,zynq-gem",		HWQUIRK_RXHANGWAR },
+	{ "xlnx,zynqmp-gem",		HWQUIRK_NEEDNULLQS },
+	{ "microchip,mpfs-mss-gem",	HWQUIRK_NEEDNULLQS },
+	{ "sifive,fu540-c000-gem",	HWQUIRK_NONE },
+	{ "sifive,fu740-c000-gem",	HWQUIRK_NONE },
 	{ NULL,				0 }
 };
 
@@ -130,12 +127,13 @@ struct cgem_softc {
 	struct callout		tick_ch;
 	uint32_t		net_ctl_shadow;
 	uint32_t		net_cfg_shadow;
-#ifdef EXT_RESOURCES
-	clk_t			ref_clk;
-#else
-	int			ref_clk_num;
-#endif
+	clk_t			clk_pclk;
+	clk_t			clk_hclk;
+	clk_t			clk_txclk;
+	clk_t			clk_rxclk;
+	clk_t			clk_tsuclk;
 	int			neednullqs;
+	int			phy_contype;
 
 	bus_dma_tag_t		desc_dma_tag;
 	bus_dma_tag_t		mbuf_dma_tag;
@@ -234,8 +232,6 @@ struct cgem_softc {
 
 /* Allow platforms to optionally provide a way to set the reference clock. */
 int cgem_set_ref_clk(int unit, int frequency);
-
-static devclass_t cgem_devclass;
 
 static int cgem_probe(device_t dev);
 static int cgem_attach(device_t dev);
@@ -1089,6 +1085,12 @@ cgem_config(struct cgem_softc *sc)
 	    CGEM_NET_CFG_GIGE_EN | CGEM_NET_CFG_1536RXEN |
 	    CGEM_NET_CFG_FULL_DUPLEX | CGEM_NET_CFG_SPEED100);
 
+	/* Check connection type, enable SGMII bits if necessary. */
+	if (sc->phy_contype == MII_CONTYPE_SGMII) {
+		sc->net_cfg_shadow |= CGEM_NET_CFG_SGMII_EN;
+		sc->net_cfg_shadow |= CGEM_NET_CFG_PCS_SEL;
+	}
+
 	/* Enable receive checksum offloading? */
 	if ((if_getcapenable(ifp) & IFCAP_RXCSUM) != 0)
 		sc->net_cfg_shadow |=  CGEM_NET_CFG_RX_CHKSUM_OFFLD_EN;
@@ -1497,21 +1499,13 @@ cgem_mediachange(struct cgem_softc *sc,	struct mii_data *mii)
 
 	WR4(sc, CGEM_NET_CFG, sc->net_cfg_shadow);
 
-#ifdef EXT_RESOURCES
-	if (sc->ref_clk != NULL) {
+	if (sc->clk_pclk != NULL) {
 		CGEM_UNLOCK(sc);
-		if (clk_set_freq(sc->ref_clk, ref_clk_freq, 0))
+		if (clk_set_freq(sc->clk_pclk, ref_clk_freq, 0))
 			device_printf(sc->dev, "could not set ref clk to %d\n",
 			    ref_clk_freq);
 		CGEM_LOCK(sc);
 	}
-#else
-	/* Set the reference clock if necessary. */
-	if (cgem_set_ref_clk(sc->ref_clk_num, ref_clk_freq))
-		device_printf(sc->dev,
-		    "cgem_mediachange: could not set ref clk%d to %d.\n",
-		    sc->ref_clk_num, ref_clk_freq);
-#endif
 
 	sc->mii_media_active = mii->mii_media_active;
 }
@@ -1726,7 +1720,7 @@ cgem_probe(device_t dev)
 	if (!ofw_bus_status_okay(dev))
 		return (ENXIO);
 
-	if (ofw_bus_search_compatible(dev, compat_data)->ocd_data == 0)
+	if (ofw_bus_search_compatible(dev, compat_data)->ocd_str == NULL)
 		return (ENXIO);
 
 	device_set_desc(dev, "Cadence CGEM Gigabit Ethernet Interface");
@@ -1740,43 +1734,63 @@ cgem_attach(device_t dev)
 	if_t ifp = NULL;
 	int rid, err;
 	u_char eaddr[ETHER_ADDR_LEN];
-	int hwtype;
-#ifndef EXT_RESOURCES
+	int hwquirks;
 	phandle_t node;
-	pcell_t cell;
-#endif
 
 	sc->dev = dev;
 	CGEM_LOCK_INIT(sc);
 
 	/* Key off of compatible string and set hardware-specific options. */
-	hwtype = ofw_bus_search_compatible(dev, compat_data)->ocd_data;
-	if (hwtype == HWTYPE_ZYNQMP)
+	hwquirks = ofw_bus_search_compatible(dev, compat_data)->ocd_data;
+	if ((hwquirks & HWQUIRK_NEEDNULLQS) != 0)
 		sc->neednullqs = 1;
-	if (hwtype == HWTYPE_ZYNQ)
+	if ((hwquirks & HWQUIRK_RXHANGWAR) != 0)
 		sc->rxhangwar = 1;
-
-#ifdef EXT_RESOURCES
-	if (hwtype == HWTYPE_ZYNQ || hwtype == HWTYPE_ZYNQMP) {
-		if (clk_get_by_ofw_name(dev, 0, "tx_clk", &sc->ref_clk) != 0)
-			device_printf(dev,
-			    "could not retrieve reference clock.\n");
-		else if (clk_enable(sc->ref_clk) != 0)
-			device_printf(dev, "could not enable clock.\n");
-	} else if (hwtype == HWTYPE_SIFIVE) {
-		if (clk_get_by_ofw_name(dev, 0, "pclk", &sc->ref_clk) != 0)
-			device_printf(dev,
-			    "could not retrieve reference clock.\n");
-		else if (clk_enable(sc->ref_clk) != 0)
-			device_printf(dev, "could not enable clock.\n");
+	/*
+	 * Both pclk and hclk are mandatory but we don't have a proper
+	 * clock driver for Zynq so don't make it fatal if we can't
+	 * get them.
+	 */
+	if (clk_get_by_ofw_name(dev, 0, "pclk", &sc->clk_pclk) != 0)
+		device_printf(dev,
+		  "could not retrieve pclk.\n");
+	else {
+		if (clk_enable(sc->clk_pclk) != 0)
+			device_printf(dev, "could not enable pclk.\n");
 	}
-#else
-	/* Get reference clock number and base divider from fdt. */
+	if (clk_get_by_ofw_name(dev, 0, "hclk", &sc->clk_hclk) != 0)
+		device_printf(dev,
+		  "could not retrieve hclk.\n");
+	else {
+		if (clk_enable(sc->clk_hclk) != 0)
+			device_printf(dev, "could not enable hclk.\n");
+	}
+
+	/* Optional clocks */
+	if (clk_get_by_ofw_name(dev, 0, "tx_clk", &sc->clk_txclk) == 0) {
+		if (clk_enable(sc->clk_txclk) != 0) {
+			device_printf(dev, "could not enable tx_clk.\n");
+			err = ENXIO;
+			goto err_pclk;
+		}
+	}
+	if (clk_get_by_ofw_name(dev, 0, "rx_clk", &sc->clk_rxclk) == 0) {
+		if (clk_enable(sc->clk_rxclk) != 0) {
+			device_printf(dev, "could not enable rx_clk.\n");
+			err = ENXIO;
+			goto err_tx_clk;
+		}
+	}
+	if (clk_get_by_ofw_name(dev, 0, "tsu_clk", &sc->clk_tsuclk) == 0) {
+		if (clk_enable(sc->clk_tsuclk) != 0) {
+			device_printf(dev, "could not enable tsu_clk.\n");
+			err = ENXIO;
+			goto err_rx_clk;
+		}
+	}
+
 	node = ofw_bus_get_node(dev);
-	sc->ref_clk_num = 0;
-	if (OF_getprop(node, "ref-clock-num", &cell, sizeof(cell)) > 0)
-		sc->ref_clk_num = fdt32_to_cpu(cell);
-#endif
+	sc->phy_contype = mii_fdt_get_contype(node);
 
 	/* Get memory resource. */
 	rid = 0;
@@ -1784,7 +1798,8 @@ cgem_attach(device_t dev)
 	    RF_ACTIVE);
 	if (sc->mem_res == NULL) {
 		device_printf(dev, "could not allocate memory resources.\n");
-		return (ENOMEM);
+		err = ENOMEM;
+		goto err_tsu_clk;
 	}
 
 	/* Get IRQ resource. */
@@ -1840,7 +1855,7 @@ cgem_attach(device_t dev)
 	if (err) {
 		device_printf(dev, "could not set up dma mem for descs.\n");
 		cgem_detach(dev);
-		return (ENOMEM);
+		goto err;
 	}
 
 	/* Get a MAC address. */
@@ -1857,12 +1872,29 @@ cgem_attach(device_t dev)
 		device_printf(dev, "could not set interrupt handler.\n");
 		ether_ifdetach(ifp);
 		cgem_detach(dev);
-		return (err);
+		goto err;
 	}
 
 	cgem_add_sysctls(dev);
 
 	return (0);
+
+err_tsu_clk:
+	if (sc->clk_tsuclk)
+		clk_release(sc->clk_tsuclk);
+err_rx_clk:
+	if (sc->clk_rxclk)
+		clk_release(sc->clk_rxclk);
+err_tx_clk:
+	if (sc->clk_txclk)
+		clk_release(sc->clk_txclk);
+err_pclk:
+	if (sc->clk_pclk)
+		clk_release(sc->clk_pclk);
+	if (sc->clk_hclk)
+		clk_release(sc->clk_hclk);
+err:
+	return (err);
 }
 
 static int
@@ -1939,14 +1971,18 @@ cgem_detach(device_t dev)
 		sc->mbuf_dma_tag = NULL;
 	}
 
-#ifdef EXT_RESOURCES
-	if (sc->ref_clk != NULL) {
-		clk_release(sc->ref_clk);
-		sc->ref_clk = NULL;
-	}
-#endif
-
 	bus_generic_detach(dev);
+
+	if (sc->clk_tsuclk)
+		clk_release(sc->clk_tsuclk);
+	if (sc->clk_rxclk)
+		clk_release(sc->clk_rxclk);
+	if (sc->clk_txclk)
+		clk_release(sc->clk_txclk);
+	if (sc->clk_pclk)
+		clk_release(sc->clk_pclk);
+	if (sc->clk_hclk)
+		clk_release(sc->clk_hclk);
 
 	CGEM_LOCK_DESTROY(sc);
 
@@ -1974,8 +2010,8 @@ static driver_t cgem_driver = {
 	sizeof(struct cgem_softc),
 };
 
-DRIVER_MODULE(cgem, simplebus, cgem_driver, cgem_devclass, NULL, NULL);
-DRIVER_MODULE(miibus, cgem, miibus_driver, miibus_devclass, NULL, NULL);
+DRIVER_MODULE(cgem, simplebus, cgem_driver, NULL, NULL);
+DRIVER_MODULE(miibus, cgem, miibus_driver, NULL, NULL);
 MODULE_DEPEND(cgem, miibus, 1, 1, 1);
 MODULE_DEPEND(cgem, ether, 1, 1, 1);
 SIMPLEBUS_PNP_INFO(compat_data);

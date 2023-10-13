@@ -1,6 +1,5 @@
-# $FreeBSD$
 #
-# SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+# SPDX-License-Identifier: BSD-2-Clause
 #
 # Copyright (c) 2020 Kristof Provost <kp@FreeBSD.org>
 #
@@ -46,6 +45,11 @@ wait_for_carp()
 	    [ -z "$(is_master ${jail2} ${itf2})" ]; do
 		sleep 1
 	done
+
+	if [ -n "$(is_master ${jail1} ${itf1})" ] &&
+	    [ -n "$(is_master ${jail2} ${itf2})" ]; then
+		atf_fail "Both jails are master"
+	fi
 }
 
 carp_init()
@@ -101,6 +105,64 @@ basic_v4_cleanup()
 	vnet_cleanup
 }
 
+
+atf_test_case "unicast_v4" "cleanup"
+unicast_v4_head()
+{
+	atf_set descr 'Unicast CARP test (IPv4)'
+	atf_set require.user root
+}
+
+unicast_v4_body()
+{
+	carp_init
+
+	bridge=$(vnet_mkbridge)
+	epair_one=$(vnet_mkepair)
+	epair_two=$(vnet_mkepair)
+
+	vnet_mkjail carp_uni_v4_one ${bridge} ${epair_one}a ${epair_two}a
+	vnet_mkjail carp_uni_v4_two ${epair_one}b
+	vnet_mkjail carp_uni_v4_three ${epair_two}b
+
+	jexec carp_uni_v4_one ifconfig ${bridge} 192.0.2.4/29 up
+	jexec carp_uni_v4_one sysctl net.inet.ip.forwarding=1
+	jexec carp_uni_v4_one ifconfig ${bridge} addm ${epair_one}a \
+	    addm ${epair_two}a
+	jexec carp_uni_v4_one ifconfig ${epair_one}a up
+	jexec carp_uni_v4_one ifconfig ${epair_two}a up
+	jexec carp_uni_v4_one ifconfig ${bridge} inet alias 198.51.100.1/25
+	jexec carp_uni_v4_one ifconfig ${bridge} inet alias 198.51.100.129/25
+
+	jexec carp_uni_v4_two ifconfig ${epair_one}b 198.51.100.2/25 up
+	jexec carp_uni_v4_two route add default 198.51.100.1
+	jexec carp_uni_v4_two ifconfig ${epair_one}b add vhid 1 \
+	    peer 198.51.100.130 192.0.2.1/29
+
+	jexec carp_uni_v4_three ifconfig ${epair_two}b 198.51.100.130/25 up
+	jexec carp_uni_v4_three route add default 198.51.100.129
+	jexec carp_uni_v4_three ifconfig ${epair_two}b add vhid 1 \
+	    peer 198.51.100.2 192.0.2.1/29
+
+	# Sanity check
+	atf_check -s exit:0 -o ignore jexec carp_uni_v4_two \
+	    ping -c 1 198.51.100.130
+
+	wait_for_carp carp_uni_v4_two ${epair_one}b \
+	    carp_uni_v4_three ${epair_two}b
+
+	atf_check -s exit:0 -o ignore jexec carp_uni_v4_one \
+	    ping -c 3 192.0.2.1
+
+	jexec carp_uni_v4_two ifconfig
+	jexec carp_uni_v4_three ifconfig
+}
+
+unicast_v4_cleanup()
+{
+	vnet_cleanup
+}
+
 atf_test_case "basic_v6" "cleanup"
 basic_v6_head()
 {
@@ -144,6 +206,128 @@ basic_v6_body()
 }
 
 basic_v6_cleanup()
+{
+	vnet_cleanup
+}
+
+atf_test_case "unicast_v6" "cleanup"
+unicast_v6_head()
+{
+	atf_set descr 'Unicast CARP test (IPv6)'
+	atf_set require.user root
+}
+
+unicast_v6_body()
+{
+	carp_init
+
+	bridge=$(vnet_mkbridge)
+	epair_one=$(vnet_mkepair)
+	epair_two=$(vnet_mkepair)
+
+	vnet_mkjail carp_uni_v6_one ${bridge} ${epair_one}a ${epair_two}a
+	vnet_mkjail carp_uni_v6_two ${epair_one}b
+	vnet_mkjail carp_uni_v6_three ${epair_two}b
+
+	jexec carp_uni_v6_one sysctl net.inet6.ip6.forwarding=1
+	jexec carp_uni_v6_one ifconfig ${bridge} addm ${epair_one}a \
+	    addm ${epair_two}a
+	jexec carp_uni_v6_one ifconfig ${epair_one}a up
+	jexec carp_uni_v6_one ifconfig ${epair_two}a up
+	jexec carp_uni_v6_one ifconfig ${bridge} inet6 2001:db8::0:4/64 up \
+	    no_dad
+	jexec carp_uni_v6_one ifconfig ${bridge} inet6 alias 2001:db8:1::1/64 \
+	    no_dad up
+	jexec carp_uni_v6_one ifconfig ${bridge} inet6 alias 2001:db8:2::1/64 \
+	    no_dad up
+
+	jexec carp_uni_v6_two ifconfig ${epair_one}b inet6 2001:db8:1::2/64 \
+	    no_dad up
+	jexec carp_uni_v6_two route -6 add default 2001:db8:1::1
+	jexec carp_uni_v6_two ifconfig ${epair_one}b inet6 add vhid 1 \
+	    peer6 2001:db8:2::2 \
+	    2001:db8::0:1/64
+
+	jexec carp_uni_v6_three ifconfig ${epair_two}b inet6 2001:db8:2::2/64 \
+	    no_dad up
+	jexec carp_uni_v6_three route -6 add default 2001:db8:2::1
+	jexec carp_uni_v6_three ifconfig ${epair_two}b inet6 add vhid 1 \
+	    peer6 2001:db8:1::2 \
+	    2001:db8::0:1/64
+
+	# Sanity check
+	atf_check -s exit:0 -o ignore jexec carp_uni_v6_two \
+	    ping -6 -c 1 2001:db8:2::2
+
+	wait_for_carp carp_uni_v6_two ${epair_one}b \
+	    carp_uni_v6_three ${epair_two}b
+
+	atf_check -s exit:0 -o ignore jexec carp_uni_v6_one \
+	    ping -6 -c 3 2001:db8::0:1
+}
+
+unicast_v6_cleanup()
+{
+	vnet_cleanup
+}
+
+atf_test_case "unicast_ll_v6" "cleanup"
+unicast_ll_v6_head()
+{
+	atf_set descr 'Unicast CARP test (IPv6, link-local)'
+	atf_set require.user root
+}
+
+unicast_ll_v6_body()
+{
+	carp_init
+
+	j=carp_uni_ll_v6
+
+	bridge=$(vnet_mkbridge)
+	epair_one=$(vnet_mkepair)
+	epair_two=$(vnet_mkepair)
+
+	vnet_mkjail ${j}_one ${bridge} ${epair_one}a ${epair_two}a
+	vnet_mkjail ${j}_two ${epair_one}b
+	vnet_mkjail ${j}_three ${epair_two}b
+
+	jexec ${j}_one ifconfig ${bridge} addm ${epair_one}a \
+	    addm ${epair_two}a
+	jexec ${j}_one ifconfig ${epair_one}a up
+	jexec ${j}_one ifconfig ${epair_two}a up
+	jexec ${j}_one ifconfig ${bridge} inet6 2001:db8::0:4/64 up \
+	    no_dad
+	jexec ${j}_one ifconfig ${bridge} inet6 alias 2001:db8:1::1/64 \
+	    no_dad up
+
+	jexec ${j}_two ifconfig ${epair_one}b inet6 2001:db8:1::2/64 \
+	    no_dad up
+	jexec ${j}_three ifconfig ${epair_two}b inet6 2001:db8:1::3/64 \
+	    no_dad up
+
+	ll_one=$(jexec ${j}_two ifconfig ${epair_one}b | awk "/ .*%${epair_one}b.* / { print \$2 }" | cut -d % -f 1)
+	ll_two=$(jexec ${j}_three ifconfig ${epair_two}b | awk "/ .*%${epair_two}b.* / { print \$2 }" | cut -d % -f 1)
+
+	jexec ${j}_two ifconfig ${epair_one}b inet6 add vhid 1 \
+	    peer6 ${ll_two} \
+	    2001:db8::0:1/64
+	jexec ${j}_three ifconfig ${epair_two}b inet6 add vhid 1 \
+	    peer6 ${ll_one} \
+	    2001:db8::0:1/64
+
+	# Sanity check
+	atf_check -s exit:0 -o ignore jexec ${j}_two \
+	    ping -6 -c 1 2001:db8:1::3
+
+	wait_for_carp ${j}_two ${epair_one}b \
+	    ${j}_three ${epair_two}b
+
+	atf_check -s exit:0 -o ignore jexec ${j}_one \
+	    ping -6 -c 3 2001:db8::0:1
+}
+
+unicast_ll_v6_cleanup()
 {
 	vnet_cleanup
 }
@@ -258,10 +442,38 @@ nd6_ns_source_mac_cleanup()
 }
 
 
+atf_test_case "switch" "cleanup"
+switch_head()
+{
+	atf_set descr 'Switch between master and backup'
+	atf_set require.user root
+}
+
+switch_body()
+{
+	carp_init
+
+	epair=$(vnet_mkepair)
+
+	ifconfig ${epair}a up
+	ifconfig ${epair}a vhid 1 advskew 100 192.0.2.1/24
+	ifconfig ${epair}a vhid 1 state backup
+	ifconfig ${epair}a vhid 1 state master
+}
+
+switch_cleanup()
+{
+	vnet_cleanup
+}
+
 atf_init_test_cases()
 {
 	atf_add_test_case "basic_v4"
+	atf_add_test_case "unicast_v4"
 	atf_add_test_case "basic_v6"
+	atf_add_test_case "unicast_v6"
+	atf_add_test_case "unicast_ll_v6"
 	atf_add_test_case "negative_demotion"
 	atf_add_test_case "nd6_ns_source_mac"
+	atf_add_test_case "switch"
 }

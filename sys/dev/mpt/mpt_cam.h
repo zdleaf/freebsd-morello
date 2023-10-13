@@ -1,8 +1,7 @@
-/* $FreeBSD$ */
 /*-
  * LSI MPT Host Adapter FreeBSD Wrapper Definitions (CAM version)
  *
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD AND BSD-3-Clause
+ * SPDX-License-Identifier: BSD-2-Clause AND BSD-3-Clause
  *
  * Copyright (c) 2000, 2001 by Greg Ansley, Adam Prewett
  *
@@ -145,11 +144,6 @@ mpt_wakeup_recovery_thread(struct mpt_softc *mpt)
 }
 
 /************************** Version Compatibility *************************/
-#if	__FreeBSD_version < 700031
-#define	mpt_sim_alloc(a, b, c, mpt, e, f, g)	\
-	cam_sim_alloc(a, b, c, mpt, (mpt)->unit, e, f, g)
-#else
 #define	mpt_sim_alloc(a, b, c, mpt, e, f, g)	\
 	cam_sim_alloc(a, b, c, mpt, (mpt)->unit, &(mpt)->mpt_lock, e, f, g)
-#endif
 #endif /*_MPT_CAM_H_ */

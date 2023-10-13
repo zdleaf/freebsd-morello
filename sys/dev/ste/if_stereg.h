@@ -30,8 +30,6 @@
  * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 /*
@@ -568,7 +566,7 @@ struct ste_chain_data {
 };
 
 struct ste_softc {
-	struct ifnet		*ste_ifp;
+	if_t			ste_ifp;
 	struct resource		*ste_res;
 	int			ste_res_id;
 	int			ste_res_type;

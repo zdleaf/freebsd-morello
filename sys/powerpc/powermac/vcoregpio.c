@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2009 Nathan Whitehorn
  * All rights reserved.
@@ -28,8 +28,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/module.h>
@@ -63,9 +61,7 @@ static driver_t vcoregpio_driver = {
 	0
 };
 
-static devclass_t vcoregpio_devclass;
-
-DRIVER_MODULE(vcoregpio, macgpio, vcoregpio_driver, vcoregpio_devclass, 0, 0);
+DRIVER_MODULE(vcoregpio, macgpio, vcoregpio_driver, 0, 0);
 
 static int
 vcoregpio_probe(device_t dev)

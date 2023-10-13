@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2011 Justin Hibbits
  * Copyright (c) 2009 Nathan Whitehorn
@@ -28,8 +28,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/bus.h>
@@ -79,8 +77,7 @@ static driver_t pmufreq_driver = {
 	sizeof(struct pmufreq_softc)
 };
 
-static devclass_t pmufreq_devclass;
-DRIVER_MODULE(pmufreq, cpu, pmufreq_driver, pmufreq_devclass, 0, 0);
+DRIVER_MODULE(pmufreq, cpu, pmufreq_driver, 0, 0);
 
 static void
 pmufreq_identify(driver_t *driver, device_t parent)
@@ -107,14 +104,12 @@ pmufreq_identify(driver_t *driver, device_t parent)
 static int
 pmufreq_probe(device_t dev)
 {
-	struct pmufreq_softc *sc;
 	phandle_t node;
 	uint32_t min_freq;
 
 	if (resource_disabled("pmufreq", 0))
 		return (ENXIO);
 
-	sc = device_get_softc(dev);
 	node = ofw_bus_get_node(device_get_parent(dev));
 	/*
 	 * A scalable MPC7455 has min-clock-frequency/max-clock-frequency as OFW

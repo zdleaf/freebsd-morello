@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright 2006-2008 John Birrell <jb@FreeBSD.org>
  *
@@ -23,8 +23,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  *
  * Statically Defined Tracing (SDT) definitions.
  *
@@ -86,6 +84,8 @@ extern volatile bool sdt_probes_enabled;
 
 #ifndef KDTRACE_HOOKS
 
+#define __sdt_used	__unused
+
 #define SDT_PROVIDER_DEFINE(prov)
 #define SDT_PROVIDER_DECLARE(prov)
 #define SDT_PROBE_DEFINE(prov, mod, func, name)
@@ -140,6 +140,8 @@ extern volatile bool sdt_probes_enabled;
     type4, arg4)
 
 #else
+
+#define __sdt_used
 
 SET_DECLARE(sdt_providers_set, struct sdt_provider);
 SET_DECLARE(sdt_probes_set, struct sdt_probe);

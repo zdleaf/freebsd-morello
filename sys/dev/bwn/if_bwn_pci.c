@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2015-2016 Landon Fuller <landonf@FreeBSD.org>
  * All rights reserved.
@@ -27,8 +27,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include "opt_bwn.h"
 #include "opt_wlan.h"
 
@@ -287,17 +285,14 @@ static device_method_t bwn_pci_methods[] = {
 	DEVMETHOD_END
 };
 
-static devclass_t bwn_pci_devclass;
-
 DEFINE_CLASS_0(bwn_pci, bwn_pci_driver, bwn_pci_methods,
     sizeof(struct bwn_pci_softc));
-DRIVER_MODULE_ORDERED(bwn_pci, pci, bwn_pci_driver, bwn_pci_devclass, NULL,
-    NULL, SI_ORDER_ANY);
+DRIVER_MODULE_ORDERED(bwn_pci, pci, bwn_pci_driver, NULL, NULL, SI_ORDER_ANY);
 MODULE_PNP_INFO("U16:vendor;U16:device;D:#", pci, bwn_siba,
     siba_devices, nitems(siba_devices) - 1);
 MODULE_PNP_INFO("U16:vendor;U16:device;D:#", pci, bwn_bcma,
     bcma_devices, nitems(bcma_devices) - 1);
-DRIVER_MODULE(bhndb, bwn_pci, bhndb_pci_driver, bhndb_devclass, NULL, NULL);
+DRIVER_MODULE(bhndb, bwn_pci, bhndb_pci_driver, NULL, NULL);
 
 MODULE_DEPEND(bwn_pci, bwn, 1, 1, 1);
 MODULE_DEPEND(bwn_pci, bhnd, 1, 1, 1);

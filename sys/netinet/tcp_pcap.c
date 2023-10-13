@@ -22,8 +22,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 #include <sys/queue.h>
@@ -36,6 +34,8 @@
 #include <sys/mbuf.h>
 #include <sys/eventhandler.h>
 #include <machine/atomic.h>
+#include <netinet/in.h>
+#include <netinet/in_pcb.h>
 #include <netinet/tcp_var.h>
 #include <netinet/tcp_pcap.h>
 
@@ -75,7 +75,7 @@ SYSCTL_INT(_net_inet_tcp, OID_AUTO, tcp_pcap_alloc_new_mbuf,
 VNET_DEFINE(int, tcp_pcap_packets) = 0;
 #define V_tcp_pcap_packets	VNET(tcp_pcap_packets)
 SYSCTL_INT(_net_inet_tcp, OID_AUTO, tcp_pcap_packets,
-	CTLFLAG_RW, &VNET_NAME(tcp_pcap_packets), 0,
+	CTLFLAG_VNET | CTLFLAG_RW, &VNET_NAME(tcp_pcap_packets), 0,
 	"Default number of packets saved per direction per TCPCB");
 
 /* Initialize the values. */

@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (C) 2002 Benno Rice.
  * All rights reserved.
@@ -23,8 +23,6 @@
  * WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR
  * OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 #ifndef	_POWERPC_OPENPICVAR_H_
@@ -68,8 +66,6 @@ struct openpic_softc {
 	uint32_t		sc_saved_vectors[OPENPIC_SRC_VECTOR_COUNT];
 
 };
-
-extern devclass_t openpic_devclass;
 
 /*
  * Bus-independent attach i/f

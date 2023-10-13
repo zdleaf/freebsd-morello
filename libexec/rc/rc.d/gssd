@@ -1,11 +1,11 @@
 #!/bin/sh
 #
-# $FreeBSD$
 #
 
 # PROVIDE: gssd
-# REQUIRE: root mountcritlocal
-# KEYWORD: nojail shutdown
+# REQUIRE: root mountcritlocal NETWORKING kdc
+# BEFORE: mountcritremote
+# KEYWORD: nojailvnet shutdown
 
 . /etc/rc.subr
 

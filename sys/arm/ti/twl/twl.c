@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2011
  *	Ben Gray <ben.r.gray@gmail.com>.
@@ -28,8 +28,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 /*
  * Texas Instruments TWL4030/TWL5030/TWL60x0/TPS659x0 Power Management and
  * Audio CODEC devices.
@@ -452,7 +450,6 @@ static driver_t twl_driver = {
 	twl_methods,
 	sizeof(struct twl_softc),
 };
-static devclass_t twl_devclass;
 
-DRIVER_MODULE(twl, iicbus, twl_driver, twl_devclass, 0, 0);
+DRIVER_MODULE(twl, iicbus, twl_driver, 0, 0);
 MODULE_VERSION(twl, 1);

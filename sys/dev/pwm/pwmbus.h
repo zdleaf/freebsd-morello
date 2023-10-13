@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2019 Ian Lepore <ian@FreeBSD.org>
  *
@@ -23,8 +23,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 #ifndef _PWMBUS_H_
@@ -66,8 +64,6 @@ PWMBUS_ACCESSOR(channel, CHANNEL, u_int)
 #endif
 
 extern driver_t   pwmbus_driver;
-extern devclass_t pwmbus_devclass;
 extern driver_t   ofw_pwmbus_driver;
-extern devclass_t ofw_pwmbus_devclass;
 
 #endif /* _PWMBUS_H_ */

@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2012 SRI International
  * Copyright (c) 2009 Roelof Jonkman, Carlson Wireless Inc.
@@ -33,8 +33,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/bus.h>
@@ -80,4 +78,5 @@ static driver_t cfi_nexus_driver = {
 	cfi_nexus_methods,
 	sizeof(struct cfi_softc),
 };
-DRIVER_MODULE(cfi, nexus, cfi_nexus_driver, cfi_devclass, 0, 0);
+
+DRIVER_MODULE(cfi, nexus, cfi_nexus_driver, 0, 0);

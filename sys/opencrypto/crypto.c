@@ -27,8 +27,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 /*
  * Cryptographic Subsystem.
  *
@@ -58,7 +56,6 @@ __FBSDID("$FreeBSD$");
  * PURPOSE.
  */
 
-#include "opt_compat.h"
 #include "opt_ddb.h"
 
 #include <sys/param.h>
@@ -149,8 +146,8 @@ SYSCTL_NODE(_kern, OID_AUTO, crypto, CTLFLAG_RW, 0,
     "In-kernel cryptography");
 
 /*
- * Taskqueue used to dispatch the crypto requests
- * that have the CRYPTO_F_ASYNC flag
+ * Taskqueue used to dispatch the crypto requests submitted with
+ * crypto_dispatch_async .
  */
 static struct taskqueue *crypto_tq;
 
@@ -200,6 +197,13 @@ SYSCTL_INT(_kern_crypto, OID_AUTO, allow_soft, CTLFLAG_RWTUN,
 SYSCTL_INT(_kern, OID_AUTO, cryptodevallowsoft, CTLFLAG_RWTUN,
 	   &crypto_devallowsoft, 0,
 	   "Enable/disable use of software crypto by /dev/crypto");
+#endif
+
+#ifdef DIAGNOSTIC
+bool crypto_destroyreq_check;
+SYSCTL_BOOL(_kern_crypto, OID_AUTO, destroyreq_check, CTLFLAG_RWTUN,
+	   &crypto_destroyreq_check, 0,
+	   "Enable checks when destroying a request");
 #endif
 
 MALLOC_DEFINE(M_CRYPTO_DATA, "crypto", "crypto session records");
@@ -1365,6 +1369,11 @@ crp_sanity(struct cryptop *crp)
 	if (out == NULL) {
 		KASSERT(crp->crp_payload_output_start == 0,
 		    ("payload output start non-zero without output buffer"));
+	} else if (csp->csp_mode == CSP_MODE_DIGEST) {
+		KASSERT(!(crp->crp_op & CRYPTO_OP_VERIFY_DIGEST),
+		    ("digest verify with separate output buffer"));
+		KASSERT(crp->crp_payload_output_start == 0,
+		    ("digest operation with non-zero payload output start"));
 	} else {
 		KASSERT(crp->crp_payload_output_start == 0 ||
 		    crp->crp_payload_output_start < olen,
@@ -1515,6 +1524,7 @@ crypto_task_invoke(void *ctx, int pending)
 static int
 crypto_invoke(struct cryptocap *cap, struct cryptop *crp, int hint)
 {
+	int error;
 
 	KASSERT(crp != NULL, ("%s: crp == NULL", __func__));
 	KASSERT(crp->crp_callback != NULL,
@@ -1563,13 +1573,19 @@ crypto_invoke(struct cryptocap *cap, struct cryptop *crp, int hint)
 
 		crp->crp_etype = EAGAIN;
 		crypto_done(crp);
-		return 0;
+		error = 0;
 	} else {
 		/*
-		 * Invoke the driver to process the request.
+		 * Invoke the driver to process the request.  Errors are
+		 * signaled by setting crp_etype before invoking the completion
+		 * callback.
 		 */
-		return CRYPTODEV_PROCESS(cap->cc_dev, crp, hint);
+		error = CRYPTODEV_PROCESS(cap->cc_dev, crp, hint);
+		KASSERT(error == 0 || error == ERESTART,
+		    ("%s: invalid error %d from CRYPTODEV_PROCESS",
+		    __func__, error));
 	}
+	return (error);
 }
 
 void
@@ -1579,6 +1595,9 @@ crypto_destroyreq(struct cryptop *crp)
 	{
 		struct cryptop *crp2;
 		struct crypto_ret_worker *ret_worker;
+
+		if (!crypto_destroyreq_check)
+			return;
 
 		CRYPTO_Q_LOCK();
 		TAILQ_FOREACH(crp2, &crp_q, crp_next) {
@@ -1611,17 +1630,11 @@ crypto_freereq(struct cryptop *crp)
 	uma_zfree(cryptop_zone, crp);
 }
 
-static void
-_crypto_initreq(struct cryptop *crp, crypto_session_t cses)
-{
-	crp->crp_session = cses;
-}
-
 void
 crypto_initreq(struct cryptop *crp, crypto_session_t cses)
 {
 	memset(crp, 0, sizeof(*crp));
-	_crypto_initreq(crp, cses);
+	crp->crp_session = cses;
 }
 
 struct cryptop *
@@ -1630,9 +1643,9 @@ crypto_getreq(crypto_session_t cses, int how)
 	struct cryptop *crp;
 
 	MPASS(how == M_WAITOK || how == M_NOWAIT);
-	crp = uma_zalloc(cryptop_zone, how | M_ZERO);
+	crp = uma_zalloc(cryptop_zone, how);
 	if (crp != NULL)
-		_crypto_initreq(crp, cses);
+		crypto_initreq(crp, cses);
 	return (crp);
 }
 
@@ -1929,7 +1942,7 @@ db_show_drivers(void)
 	}
 }
 
-DB_SHOW_COMMAND(crypto, db_show_crypto)
+DB_SHOW_COMMAND_FLAGS(crypto, db_show_crypto, DB_CMD_MEMSAFE)
 {
 	struct cryptop *crp;
 	struct crypto_ret_worker *ret_worker;

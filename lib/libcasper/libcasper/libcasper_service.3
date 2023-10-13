@@ -22,8 +22,6 @@
 .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 .\" SUCH DAMAGE.
 .\"
-.\" $FreeBSD$
-.\"
 .Dd November 15, 2021
 .Dt LIBCASPER 3
 .Os
@@ -95,7 +93,7 @@ from the process it was spawned from.
 The whole casper communication is using an
 .Xr nvlist 9
 with the
-.Xr NVLIST_NO_UNIQ 9
+.Dv NV_FLAG_NO_UNIQUE
 flag.
 .El
 .Sh SEE ALSO

@@ -1,4 +1,3 @@
-# $FreeBSD$
 #
 # The include file <bsd.own.mk> set common variables for owner,
 # group, mode, and directories. Defaults are in brackets.
@@ -248,7 +247,7 @@ _LINKMODE?=	${LINKMODE:U${NOBINMODE}}
 _SYMLINKOWN?=	${SYMLINKOWN:U${BINOWN}}
 _SYMLINKGRP?=	${SYMLINKGRP:U${BINGRP}}
 _SYMLINKMODE?=	${SYMLINKMODE:U755}
-HRDLINK?=	-l h -o ${_LINKOWN} -g ${_LINKGRP} -m ${_LINKMODE}
+HRDLINK?=	-l mr -o ${_LINKOWN} -g ${_LINKGRP} -m ${_LINKMODE}
 MANHRDLINK?=	-l h -o ${MANOWN} -g ${MANGRP} -m ${MANMODE}
 SYMLINK?=	-l s -o ${_SYMLINKOWN} -g ${_SYMLINKGRP} -m ${_SYMLINKMODE}
 LSYMLINK?=	-l s -o ${LIBOWN} -g ${LIBGRP} -m ${LIBMODE}
@@ -264,6 +263,8 @@ INSTALL_RSYMLINK?=	${INSTALL} ${RSYMLINK}
 .if !defined(DEBUG_FLAGS)
 STRIP?=		-s
 .endif
+
+TAR_CMD?=	tar
 
 COMPRESS_CMD?=	gzip -cn
 COMPRESS_EXT?=	.gz

@@ -32,7 +32,7 @@
  *    must display the following acknowledgement:
  *    "This product includes cryptographic software written by
  *     Eric Young (eay@cryptsoft.com)"
- *    The word 'cryptographic' can be left out if the rouines from the library
+ *    The word 'cryptographic' can be left out if the routines from the library
  *    being used are not cryptographic related :-).
  * 4. If you include any Windows specific code (or a derivative thereof) from 
  *    the apps directory (application code) you must include an acknowledgement:
@@ -57,8 +57,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/types.h>
 
 #include <stdio.h>
@@ -102,8 +100,7 @@ char *SHA_version="SHA part of SSLeay 0.9.0b 11-Oct-1998";
 #define	M_p_c2nl_p	p_c2nl_p
 #define	M_nl2c		nl2c
 
-void SHA_Init(c)
-SHA_CTX *c;
+void SHA_Init(SHA_CTX *c)
 	{
 	c->h0=INIT_DATA_h0;
 	c->h1=INIT_DATA_h1;
@@ -115,10 +112,7 @@ SHA_CTX *c;
 	c->num=0;
 	}
 
-void SHA_Update(c, in, len)
-SHA_CTX *c;
-const void *in;
-size_t len;
+void SHA_Update(SHA_CTX *c, const void *in, size_t len)
 	{
 	u_int32_t *p;
 	int ew,ec,sw,sc;
@@ -249,9 +243,7 @@ size_t len;
 	p[sw]=l;
 	}
 
-void SHA_Transform(c,b)
-SHA_CTX *c;
-unsigned char *b;
+void SHA_Transform(SHA_CTX *c, unsigned char *b)
 	{
 	u_int32_t p[16];
 #if BYTE_ORDER == LITTLE_ENDIAN
@@ -286,10 +278,7 @@ unsigned char *b;
 	sha_block(c,p,64);
 	}
 
-void sha_block(c, W, num)
-SHA_CTX *c;
-const u_int32_t *W;
-int num;
+void sha_block(SHA_CTX *c, const u_int32_t *W, int num)
 	{
 	u_int32_t A,B,C,D,E,T;
 	u_int32_t X[16];
@@ -405,9 +394,7 @@ int num;
 		}
 	}
 
-void SHA_Final(md, c)
-unsigned char *md;
-SHA_CTX *c;
+void SHA_Final(unsigned char *md, SHA_CTX *c)
 	{
 	int i,j;
 	u_int32_t l;

@@ -32,8 +32,6 @@
  * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 /*-
@@ -1471,7 +1469,7 @@ struct sk_softc {
 
 /* Softc for each logical interface */
 struct sk_if_softc {
-	struct ifnet		*sk_ifp;	/* interface info */
+	if_t			sk_ifp;	/* interface info */
 	device_t		sk_miibus;
 	device_t		sk_if_dev;
 	u_int8_t		sk_port;	/* port # on controller */

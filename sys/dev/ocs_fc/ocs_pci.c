@@ -27,8 +27,6 @@
  * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 #define OCS_COPYRIGHT "Copyright (C) 2017 Broadcom. All rights reserved."
@@ -1004,7 +1002,5 @@ static driver_t ocs_driver = {
 	sizeof(struct ocs_softc)
 };
 
-static devclass_t ocs_devclass;
-
-DRIVER_MODULE(ocs_fc, pci, ocs_driver, ocs_devclass, 0, 0);
+DRIVER_MODULE(ocs_fc, pci, ocs_driver, 0, 0);
 MODULE_VERSION(ocs_fc, 1);

@@ -23,7 +23,7 @@
 .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 .\" SUCH DAMAGE.
 .\"
-.Dd September 25, 2021
+.Dd August 19, 2022
 .Dt BHYVE_CONFIG 5
 .Os
 .Sh NAME
@@ -120,8 +120,15 @@ The value must be formatted as described in
 .Xr expand_number 3 .
 .It Va memory.wired Ta bool Ta false Ta
 Wire guest memory.
-.It Va acpi_tables Ta bool Ta false Ta
+.It Va acpi_tables Ta bool Ta true Ta
 Generate ACPI tables.
+.It Va acpi_tables_in_memory Ta bool Ta true Ta
+.Xr bhyve 8
+always exposes ACPI tables by FwCfg.
+For backward compatibility bhyve copies them into the guest memory as well.
+This can cause problems if the guest uses the in-memory version, since certain
+advanced features, such as TPM emulation, are exposed only via FwCfg.
+Therefore, it is recommended to set this flag to false when running Windows guests.
 .It Va destroy_on_poweroff Ta bool Ta false Ta
 Destroy the VM on guest-initiated power-off.
 .It Va gdb.address Ta string Ta localhost Ta
@@ -139,6 +146,15 @@ Specify the keyboard layout name with the file name in
 This value only works when loaded with UEFI mode for VNC, and
 used a VNC client that don't support QEMU Extended Key Event
 Message (e.g. TightVNC).
+.It Va tpm.path Ta string Ta Ta
+Path to the host TPM device.
+This is typically /dev/tpm0.
+.It Va tpm.type Ta string Ta Ta
+Type of the TPM device passed to the guest.
+Currently, only "passthru" is supported.
+.It Va tpm.version Ta string Ta 2.0 Ta
+Version of the TPM device according to the TCG specification.
+Currently, only version 2.0 is supported.
 .It Va rtc.use_localtime Ta bool Ta true Ta
 The real time clock uses the local time of the host.
 If this is set to false, the real time clock uses UTC.
@@ -158,6 +174,52 @@ then
 .Xr bhyve 8
 will write all of its configuration variables to stdout and exit.
 No VM will be started.
+.It Va bios.vendor Ta string Ta BHYVE Ta
+This value is used for the guest's System Management BIOS System Information structure.
+.It Va bios.version Ta string Ta 14.0 Ta
+This value is used for the guest's System Management BIOS System Information structure.
+.It Va bios.release_date Ta string Ta 10/17/2021 Ta
+This value is used for the guest's System Management BIOS System Information structure.
+.It Va system.family_name Ta string Ta Virtual Machine Ta
+Family the computer belongs to.
+This value is used for the guest's System Management BIOS System Information structure.
+.It Va system.manufacturer Ta string Ta FreeBSD Ta
+This value is used for the guest's System Management BIOS System Information structure.
+.It Va system.product_name Ta string Ta BHYVE Ta
+This value is used for the guest's System Management BIOS System Information structure.
+.It Va system.serial_number Ta string Ta None Ta
+This value is used for the guest's System Management BIOS System Information structure.
+.It Va system.sku Ta string Ta None Ta
+Stock keeping unit of the computer.
+It's also called product ID or purchase order number.
+This value is used for the guest's System Management BIOS System Information structure.
+.It Va system.version Ta string Ta 1.0 Ta
+This value is used for the guest's System Management BIOS System Information structure.
+.It Va board.manufacturer Ta string Ta FreeBSD Ta
+This value is used for the guest's System Management BIOS System Information structure.
+.It Va board.product_name Ta string Ta BHYVE Ta
+This value is used for the guest's System Management BIOS System Information structure.
+.It Va board.version Ta string Ta 1.0 Ta
+This value is used for the guest's System Management BIOS System Information structure.
+.It Va board.serial_number Ta string Ta None Ta
+This value is used for the guest's System Management BIOS System Information structure.
+.It Va board.asset_tag Ta string Ta None Ta
+This value is used for the guest's System Management BIOS System Information structure.
+.It Va board.location Ta string Ta None Ta
+Describes the board's location within the chassis.
+This value is used for the guest's System Management BIOS System Information structure.
+.It Va chassis.manufacturer Ta string Ta FreeBSD Ta
+This value is used for the guest's System Management BIOS System Information structure.
+.It Va chassis.version Ta string Ta 1.0 Ta
+This value is used for the guest's System Management BIOS System Information structure.
+.It Va chassis.serial_number Ta string Ta None Ta
+This value is used for the guest's System Management BIOS System Information structure.
+.It Va chassis.asset_tag Ta string Ta None Ta
+This value is used for the guest's System Management BIOS System Information structure.
+.It Va chassis.sku Ta string Ta None Ta
+Stock keeping unit of the chassis.
+It's also called product ID or purchase order number.
+This value is used for the guest's System Management BIOS System Information structure.
 .El
 .Ss x86-Specific Settings
 .Bl -column "x86.vmexit_on_pause" "integer" "Default"
@@ -213,6 +275,7 @@ VGA framebuffer device attached to VNC server.
 .It Li lpc
 LPC PCI-ISA bridge with COM1-COM4 16550 serial ports,
 a boot ROM,
+an optional fwcfg type,
 and an optional debug/test device.
 This device must be configured on bus 0.
 .It Li hda
@@ -290,16 +353,21 @@ The backend is responsible for passing packets between the device model
 and a desired destination.
 Configuring a backend requires setting the
 .Va backend
-variable to one of the following values:
-.Bl -tag
-.It tap Ns Va N
-Use the named
+variable.
+The type of a backend can either be set explicitly via the
+.Va type
+variable
+or it can be inferred from the value of
+.Va backend .
+.Pp
+The following types of backends are supported:
+.Bl -tag -width "netgraph"
+.It tap
+Use the
 .Xr tap 4
-interface as the backend.
-.It vmnet Ns Va N
-Use the named
-.Xr vmnet 4
-interface as the backend.
+interface named in
+.Va backend
+as the backend.
 .It netgraph
 Use a
 .Xr netgraph 4
@@ -322,14 +390,31 @@ The name of the source hook on the created
 .Xr ng_socket 4
 node.
 .El
-.It netmap: Ns Va interface
+.It netmap
 Use
 .Xr netmap 4
-on a network interface as the backend.
-.It vale Ns Va bridge : Ns Va port
-Use a port on a
+either on a network interface or a port on a
 .Xr vale 4
 bridge as the backend.
+The value of
+.Va backend
+is passed to
+.Xr nm_open
+to connect to a netmap port.
+.El
+.Pp
+If
+.Va type
+is not specified explicitly, then it is inferred from
+.Va backend
+based on the following patterns:
+.Bl -column -offset indent "valuebridge:port"
+.It Sy Pattern Ta Sy Type
+.It tap Ns Va N Ta tap
+.It vmnet Ns Va N Ta tap
+.It netgraph Ta netgraph
+.It netmap: Ns Va interface Ta netmap
+.It vale Ns Va bridge : Ns Va port Ta netmap
 .El
 .Ss UART Device Settings
 .Bl -column "Name" "Format" "Default"
@@ -343,12 +428,15 @@ to use standard input and output of the
 process.
 .El
 .Ss Host Bridge Settings
-.Bl -column "vendor" "integer" "Default"
+.Bl -column "pcireg.*" "integer" "Default"
 .It Sy Name Ta Sy Format Ta Sy Default Ta Sy Description
+.It Va pcireg.* Ta integer Ta Ta
+Values of PCI register.
+.Bl -column "device" "Default"
+.It Sy Name Ta Sy Default
 .It Va vendor Ta integer Ta 0x1275 Ta
-PCI vendor ID.
-.It Va devid Ta integer Ta 0x1275 Ta
-PCI device ID.
+.It Va device Ta integer Ta 0x1275 Ta
+.El
 .El
 .Ss AHCI Controller Settings
 AHCI controller devices contain zero or more ports each of which
@@ -448,6 +536,11 @@ The contents of this file are copied into the guest's
 memory ending just before the 4GB physical address.
 If a boot ROM is present, a firmware interface device is
 also enabled for use by the boot ROM.
+.It Va bootvars Ta path Ta Ta
+Path to boot VARS.
+The contents of this file are copied beneath the boot ROM.
+Firmware can write to it to save variables.
+All variables will be persistent even on reboots of the guest.
 .It Va com1 Ta node Ta Ta
 Settings for the COM1 serial port device.
 .It Va com2 Ta node Ta Ta
@@ -456,14 +549,35 @@ Settings for the COM2 serial port device.
 Settings for the COM3 serial port device.
 .It Va com4 Ta node Ta Ta
 Settings for the COM4 serial port device.
+.It Va fwcfg Ta string Ta bhyve Ta
+The fwcfg type to be used.
+Supported values are
+.Dq bhyve
+for fwctl and
+.Dq qemu
+for fwcfg.
 .It Va pc-testdev Ta bool Ta false Ta
 Enable the PC debug/test device.
+.It Va pcireg.* Ta integer Ta Ta
+Values of PCI register.
+It also accepts the value
+.Ar host
+to use the pci id of the host system.
+This value is required for the Intel GOP driver to work properly.
+.Bl -column "subvendor" "Default"
+.It Sy Name Ta Sy Default
+.It Va vendor Ta 0x8086
+.It Va device Ta 0x7000
+.It Va revid Ta 0
+.It Va subvendor Ta 0
+.It Va subdevice Ta 0
+.El
 .El
 .Ss NVMe Controller Settings
 Each NVMe controller supports a single storage device.
 The device can be backed either by a memory disk described by the
 .Va ram
-variable, or a block device using the the block device settings described above.
+variable, or a block device using the block device settings described above.
 In addition, each controller supports the following settings:
 .Bl -column "ioslots" "Format" "Default"
 .It Sy Name Ta Sy Format Ta Sy Default Ta Sy Description
@@ -502,6 +616,12 @@ If set, allocate a memory disk as the backing store.
 The value of this variable is the size of the memory disk in megabytes.
 .El
 .Ss PCI Passthrough Settings
+The
+.Xr ppt 4
+device driver must be attached to the
+PCI device being passed through.
+The device to pass through can be identified either by name or its
+host PCI bus location.
 .Bl -column "Name" "integer" "Default"
 .It Sy Name Ta Sy Format Ta Sy Default Ta Sy Description
 .It Va bus Ta integer Ta Ta
@@ -510,6 +630,12 @@ Host PCI bus address of device to pass through.
 Host PCI slot address of device to pass through.
 .It Va func Ta integer Ta Ta
 Host PCI function address of device to pass through.
+.It Va pptdev Ta string Ta Ta
+Name of a
+.Xr ppt 4
+device to pass through.
+.It Va rom Ta path Ta Ta
+ROM file of the device which will be executed by OVMF to init the device.
 .El
 .Ss VirtIO 9p Settings
 Each VirtIO 9p device exposes a single filesystem from a host path.

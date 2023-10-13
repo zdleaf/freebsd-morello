@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2001 Orion Hodson <oho@acm.org>
  * All rights reserved.
@@ -47,8 +47,6 @@
 #include <dev/pci/pcivar.h>
 
 #include "mixer_if.h"
-
-SND_DECLARE_FILE("$FreeBSD$");
 
 /* Debugging macro's */
 #undef DEB
@@ -936,6 +934,6 @@ static driver_t als_driver = {
 	PCM_SOFTC_SIZE,
 };
 
-DRIVER_MODULE(snd_als4000, pci, als_driver, pcm_devclass, 0, 0);
+DRIVER_MODULE(snd_als4000, pci, als_driver, 0, 0);
 MODULE_DEPEND(snd_als4000, sound, SOUND_MINVER, SOUND_PREFVER, SOUND_MAXVER);
 MODULE_VERSION(snd_als4000, 1);

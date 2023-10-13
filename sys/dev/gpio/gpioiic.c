@@ -28,8 +28,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include "opt_platform.h"
 
 #include <sys/param.h>
@@ -340,8 +338,6 @@ gpioiic_detach(device_t dev)
 	return (0);
 }
 
-static devclass_t gpioiic_devclass;
-
 static device_method_t gpioiic_methods[] = {
 	/* Device interface */
 	DEVMETHOD(device_probe,		gpioiic_probe),
@@ -369,8 +365,8 @@ static driver_t gpioiic_driver = {
 	sizeof(struct gpioiic_softc),
 };
 
-DRIVER_MODULE(gpioiic, gpiobus, gpioiic_driver, gpioiic_devclass, 0, 0);
-DRIVER_MODULE(gpioiic, simplebus, gpioiic_driver, gpioiic_devclass, 0, 0);
-DRIVER_MODULE(iicbb, gpioiic, iicbb_driver, iicbb_devclass, 0, 0);
+DRIVER_MODULE(gpioiic, gpiobus, gpioiic_driver, 0, 0);
+DRIVER_MODULE(gpioiic, simplebus, gpioiic_driver, 0, 0);
+DRIVER_MODULE(iicbb, gpioiic, iicbb_driver, 0, 0);
 MODULE_DEPEND(gpioiic, iicbb, IICBB_MINVER, IICBB_PREFVER, IICBB_MAXVER);
 MODULE_DEPEND(gpioiic, gpiobus, 1, 1, 1);

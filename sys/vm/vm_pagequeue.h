@@ -58,8 +58,6 @@
  *
  * any improvements or extensions that they make and grant Carnegie the
  * rights to redistribute these changes.
- *
- * $FreeBSD$
  */
 
 #ifndef	_VM_PAGEQUEUE_
@@ -74,8 +72,10 @@ struct vm_pagequeue {
 	uint64_t	pq_pdpages;
 } __aligned(CACHE_LINE_SIZE);
 
-#ifndef VM_BATCHQUEUE_SIZE
-#define	VM_BATCHQUEUE_SIZE	7
+#if __SIZEOF_LONG__ == 8
+#define	VM_BATCHQUEUE_SIZE	63
+#else
+#define	VM_BATCHQUEUE_SIZE	15
 #endif
 
 struct vm_batchqueue {
@@ -356,15 +356,17 @@ vm_batchqueue_init(struct vm_batchqueue *bq)
 	bq->bq_cnt = 0;
 }
 
-static inline bool
+static inline int
 vm_batchqueue_insert(struct vm_batchqueue *bq, vm_page_t m)
 {
+	int slots_free;
 
-	if (bq->bq_cnt < nitems(bq->bq_pa)) {
+	slots_free = nitems(bq->bq_pa) - bq->bq_cnt;
+	if (slots_free > 0) {
 		bq->bq_pa[bq->bq_cnt++] = m;
-		return (true);
+		return (slots_free);
 	}
-	return (false);
+	return (slots_free);
 }
 
 static inline vm_page_t

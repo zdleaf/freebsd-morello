@@ -32,8 +32,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 /*
  * Various setup functions for truss.  Not the cleanest-written code,
  * I'm afraid.
@@ -561,7 +559,7 @@ exit_syscall(struct trussinfo *info, struct ptrace_lwpinfo *pl)
 			 */
 			if (psr.sr_error != 0) {
 				asprintf(&temp, "0x%lx",
-				    t->cs.args[sc->decode.args[i].offset]);
+				    (long)t->cs.args[sc->decode.args[i].offset]);
 			} else {
 				temp = print_arg(&sc->decode.args[i],
 				    t->cs.args, psr.sr_retval, info);

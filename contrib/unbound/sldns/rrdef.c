@@ -381,9 +381,9 @@ static sldns_rr_descriptor rdata_field_descriptors[] = {
 	/* 63 */
 	{LDNS_RR_TYPE_ZONEMD, "ZONEMD", 4, 4, type_zonemd_wireformat, LDNS_RDF_TYPE_NONE, LDNS_RR_NO_COMPRESS, 0 },
 	/* 64 */
-	{LDNS_RR_TYPE_SVCB, "SVCB", 2, 2, type_svcb_wireformat, LDNS_RDF_TYPE_SVCPARAM, LDNS_RR_NO_COMPRESS, 0 },
+	{LDNS_RR_TYPE_SVCB, "SVCB", 2, 2, type_svcb_wireformat, LDNS_RDF_TYPE_SVCPARAM, LDNS_RR_NO_COMPRESS, 1 },
 	/* 65 */
-	{LDNS_RR_TYPE_HTTPS, "HTTPS", 2, 2, type_svcb_wireformat, LDNS_RDF_TYPE_SVCPARAM, LDNS_RR_NO_COMPRESS, 0 },
+	{LDNS_RR_TYPE_HTTPS, "HTTPS", 2, 2, type_svcb_wireformat, LDNS_RDF_TYPE_SVCPARAM, LDNS_RR_NO_COMPRESS, 1 },
 {(enum sldns_enum_rr_type)0, "TYPE66", 1, 1, type_0_wireformat, LDNS_RDF_TYPE_NONE, LDNS_RR_NO_COMPRESS, 0 },
 {(enum sldns_enum_rr_type)0, "TYPE67", 1, 1, type_0_wireformat, LDNS_RDF_TYPE_NONE, LDNS_RR_NO_COMPRESS, 0 },
 {(enum sldns_enum_rr_type)0, "TYPE68", 1, 1, type_0_wireformat, LDNS_RDF_TYPE_NONE, LDNS_RR_NO_COMPRESS, 0 },
@@ -702,7 +702,11 @@ sldns_get_rr_type_by_name(const char *name)
 
 	/* TYPEXX representation */
 	if (strlen(name) > 4 && strncasecmp(name, "TYPE", 4) == 0) {
-		return atoi(name + 4);
+		unsigned int a = atoi(name + 4);
+		if (a > LDNS_RR_TYPE_LAST) {
+			return (enum sldns_enum_rr_type)0;
+		}
+		return a;
 	}
 
 	/* Normal types */
@@ -740,7 +744,11 @@ sldns_get_rr_class_by_name(const char *name)
 
 	/* CLASSXX representation */
 	if (strlen(name) > 5 && strncasecmp(name, "CLASS", 5) == 0) {
-		return atoi(name + 5);
+		unsigned int a = atoi(name + 5);
+		if (a > LDNS_RR_CLASS_LAST) {
+			return (enum sldns_enum_rr_class)0;
+		}
+		return a;
 	}
 
 	/* Normal types */

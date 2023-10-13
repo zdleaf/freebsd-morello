@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2002 Cedric Berger
  * All rights reserved.
@@ -32,8 +32,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include "opt_inet.h"
 #include "opt_inet6.h"
 
@@ -103,24 +101,19 @@ struct pfr_walktree {
 		PFRW_GET_ADDRS,
 		PFRW_GET_ASTATS,
 		PFRW_POOL_GET,
-		PFRW_DYNADDR_UPDATE
+		PFRW_DYNADDR_UPDATE,
+		PFRW_COUNTERS
 	}	 pfrw_op;
 	union {
-		struct pfr_addr		*pfrw1_addr;
-		struct pfr_astats	*pfrw1_astats;
-		struct pfr_kentryworkq	*pfrw1_workq;
-		struct pfr_kentry	*pfrw1_kentry;
-		struct pfi_dynaddr	*pfrw1_dyn;
-	}	 pfrw_1;
+		struct pfr_addr		*pfrw_addr;
+		struct pfr_astats	*pfrw_astats;
+		struct pfr_kentryworkq	*pfrw_workq;
+		struct pfr_kentry	*pfrw_kentry;
+		struct pfi_dynaddr	*pfrw_dyn;
+	};
 	int	 pfrw_free;
 	int	 pfrw_flags;
 };
-#define	pfrw_addr	pfrw_1.pfrw1_addr
-#define	pfrw_astats	pfrw_1.pfrw1_astats
-#define	pfrw_workq	pfrw_1.pfrw1_workq
-#define	pfrw_kentry	pfrw_1.pfrw1_kentry
-#define	pfrw_dyn	pfrw_1.pfrw1_dyn
-#define	pfrw_cnt	pfrw_free
 
 #define	senderr(e)	do { rv = (e); goto _bad; } while (0)
 
@@ -209,6 +202,7 @@ pfr_initialize(void)
 	V_pfr_kentry_z = uma_zcreate("pf table entries",
 	    sizeof(struct pfr_kentry), NULL, NULL, NULL, NULL, UMA_ALIGN_PTR,
 	    0);
+	uma_zone_set_max(V_pfr_kentry_z, PFR_KENTRY_HIWAT);
 	V_pf_limits[PF_LIMIT_TABLE_ENTRIES].zone = V_pfr_kentry_z;
 	V_pf_limits[PF_LIMIT_TABLE_ENTRIES].limit = PFR_KENTRY_HIWAT;
 }
@@ -738,7 +732,7 @@ pfr_enqueue_addrs(struct pfr_ktable *kt, struct pfr_kentryworkq *workq,
 		    pfr_walktree, &w))
 			printf("pfr_enqueue_addrs: IPv6 walktree failed.\n");
 	if (naddr != NULL)
-		*naddr = w.pfrw_cnt;
+		*naddr = w.pfrw_free;
 }
 
 static void
@@ -1032,7 +1026,8 @@ pfr_copyout_astats(struct pfr_astats *as, const struct pfr_kentry *ke,
 	pfr_copyout_addr(&as->pfras_a, ke);
 	as->pfras_tzero = kc->pfrkc_tzero;
 
-	if (! (w->pfrw_flags & PFR_TFLAG_COUNTERS)) {
+	if (! (w->pfrw_flags & PFR_TFLAG_COUNTERS) ||
+	    kc->pfrkc_counters == NULL) {
 		bzero(as->pfras_packets, sizeof(as->pfras_packets));
 		bzero(as->pfras_bytes, sizeof(as->pfras_bytes));
 		as->pfras_a.pfra_fback = PFR_FB_NOCOUNT;
@@ -1065,7 +1060,7 @@ pfr_walktree(struct radix_node *rn, void *arg)
 		/* FALLTHROUGH */
 	case PFRW_ENQUEUE:
 		SLIST_INSERT_HEAD(w->pfrw_workq, ke, pfrke_workq);
-		w->pfrw_cnt++;
+		w->pfrw_free++;
 		break;
 	case PFRW_GET_ADDRS:
 		if (w->pfrw_free-- > 0) {
@@ -1086,7 +1081,7 @@ pfr_walktree(struct radix_node *rn, void *arg)
 	case PFRW_POOL_GET:
 		if (ke->pfrke_not)
 			break; /* negative entries are ignored */
-		if (!w->pfrw_cnt--) {
+		if (!w->pfrw_free--) {
 			w->pfrw_kentry = ke;
 			return (1); /* finish search */
 		}
@@ -1111,6 +1106,21 @@ pfr_walktree(struct radix_node *rn, void *arg)
 			    AF_INET6);
 			w->pfrw_dyn->pfid_mask6 = *SUNION2PF(&pfr_mask,
 			    AF_INET6);
+		}
+		break;
+	    }
+	case PFRW_COUNTERS:
+	    {
+		if (w->pfrw_flags & PFR_TFLAG_COUNTERS) {
+			if (ke->pfrke_counters.pfrkc_counters != NULL)
+				break;
+			ke->pfrke_counters.pfrkc_counters =
+			    uma_zalloc_pcpu(V_pfr_kentry_counter_z,
+			    M_NOWAIT | M_ZERO);
+		} else {
+			uma_zfree_pcpu(V_pfr_kentry_counter_z,
+			    ke->pfrke_counters.pfrkc_counters);
+			ke->pfrke_counters.pfrkc_counters = NULL;
 		}
 		break;
 	    }
@@ -1818,6 +1828,7 @@ static void
 pfr_setflags_ktable(struct pfr_ktable *kt, int newf)
 {
 	struct pfr_kentryworkq	addrq;
+	struct pfr_walktree	w;
 
 	PF_RULES_WASSERT();
 
@@ -1837,6 +1848,20 @@ pfr_setflags_ktable(struct pfr_ktable *kt, int newf)
 		pfr_destroy_ktable(kt, 1);
 		V_pfr_ktable_cnt--;
 		return;
+	}
+	if (newf & PFR_TFLAG_COUNTERS && ! (kt->pfrkt_flags & PFR_TFLAG_COUNTERS)) {
+		bzero(&w, sizeof(w));
+		w.pfrw_op = PFRW_COUNTERS;
+		w.pfrw_flags |= PFR_TFLAG_COUNTERS;
+		kt->pfrkt_ip4->rnh_walktree(&kt->pfrkt_ip4->rh, pfr_walktree, &w);
+		kt->pfrkt_ip6->rnh_walktree(&kt->pfrkt_ip6->rh, pfr_walktree, &w);
+	}
+	if (! (newf & PFR_TFLAG_COUNTERS) && (kt->pfrkt_flags & PFR_TFLAG_COUNTERS)) {
+		bzero(&w, sizeof(w));
+		w.pfrw_op = PFRW_COUNTERS;
+		w.pfrw_flags |= 0;
+		kt->pfrkt_ip4->rnh_walktree(&kt->pfrkt_ip4->rh, pfr_walktree, &w);
+		kt->pfrkt_ip6->rnh_walktree(&kt->pfrkt_ip6->rh, pfr_walktree, &w);
 	}
 	if (!(newf & PFR_TFLAG_ACTIVE) && kt->pfrkt_cnt) {
 		pfr_enqueue_addrs(kt, &addrq, NULL, 0);
@@ -2119,6 +2144,44 @@ pfr_update_stats(struct pfr_ktable *kt, struct pf_addr *a, sa_family_t af,
 }
 
 struct pfr_ktable *
+pfr_eth_attach_table(struct pf_keth_ruleset *rs, char *name)
+{
+	struct pfr_ktable	*kt, *rt;
+	struct pfr_table	 tbl;
+	struct pf_keth_anchor	*ac = rs->anchor;
+
+	PF_RULES_WASSERT();
+
+	bzero(&tbl, sizeof(tbl));
+	strlcpy(tbl.pfrt_name, name, sizeof(tbl.pfrt_name));
+	if (ac != NULL)
+		strlcpy(tbl.pfrt_anchor, ac->path, sizeof(tbl.pfrt_anchor));
+	kt = pfr_lookup_table(&tbl);
+	if (kt == NULL) {
+		kt = pfr_create_ktable(&tbl, time_second, 1);
+		if (kt == NULL)
+			return (NULL);
+		if (ac != NULL) {
+			bzero(tbl.pfrt_anchor, sizeof(tbl.pfrt_anchor));
+			rt = pfr_lookup_table(&tbl);
+			if (rt == NULL) {
+				rt = pfr_create_ktable(&tbl, 0, 1);
+				if (rt == NULL) {
+					pfr_destroy_ktable(kt, 0);
+					return (NULL);
+				}
+				pfr_insert_ktable(rt);
+			}
+			kt->pfrkt_root = rt;
+		}
+		pfr_insert_ktable(kt);
+	}
+	if (!kt->pfrkt_refcnt[PFR_REFCNT_RULE]++)
+		pfr_setflags_ktable(kt, kt->pfrkt_flags|PFR_TFLAG_REFERENCED);
+	return (kt);
+}
+
+struct pfr_ktable *
 pfr_attach_table(struct pf_kruleset *rs, char *name)
 {
 	struct pfr_ktable	*kt, *rt;
@@ -2178,6 +2241,7 @@ pfr_pool_get(struct pfr_ktable *kt, int *pidx, struct pf_addr *counter,
 	int			 idx = -1, use_counter = 0;
 
 	MPASS(pidx != NULL);
+	MPASS(counter != NULL);
 
 	switch (af) {
 	case AF_INET:
@@ -2197,7 +2261,7 @@ pfr_pool_get(struct pfr_ktable *kt, int *pidx, struct pf_addr *counter,
 		return (-1);
 
 	idx = *pidx;
-	if (counter != NULL && idx >= 0)
+	if (idx >= 0)
 		use_counter = 1;
 	if (idx < 0)
 		idx = 0;
@@ -2275,7 +2339,7 @@ pfr_kentry_byidx(struct pfr_ktable *kt, int idx, int af)
 
 	bzero(&w, sizeof(w));
 	w.pfrw_op = PFRW_POOL_GET;
-	w.pfrw_cnt = idx;
+	w.pfrw_free = idx;
 
 	switch (af) {
 #ifdef INET

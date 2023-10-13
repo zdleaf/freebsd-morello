@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2008 Ed Schouten <ed@FreeBSD.org>
  * All rights reserved.
@@ -30,8 +30,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include "opt_capsicum.h"
 #include "opt_printf.h"
 
@@ -87,8 +85,8 @@ static const char	*dev_console_filename;
 /*
  * Flags that are supported and stored by this implementation.
  */
-#define TTYSUP_IFLAG	(IGNBRK|BRKINT|IGNPAR|PARMRK|INPCK|ISTRIP|\
-			INLCR|IGNCR|ICRNL|IXON|IXOFF|IXANY|IMAXBEL)
+#define TTYSUP_IFLAG	(IGNBRK|BRKINT|IGNPAR|PARMRK|INPCK|ISTRIP|INLCR|\
+			IGNCR|ICRNL|IXON|IXOFF|IXANY|IMAXBEL|IUTF8)
 #define TTYSUP_OFLAG	(OPOST|ONLCR|TAB3|ONOEOT|OCRNL|ONOCR|ONLRET)
 #define TTYSUP_LFLAG	(ECHOKE|ECHOE|ECHOK|ECHO|ECHONL|ECHOPRT|\
 			ECHOCTL|ISIG|ICANON|ALTWERASE|IEXTEN|TOSTOP|\
@@ -2074,9 +2072,18 @@ ttyhook_register(struct tty **rtp, struct proc *p, int fd, struct ttyhook *th,
 	int error, ref;
 
 	/* Validate the file descriptor. */
+	/*
+	 * XXX this code inspects a file descriptor from a different process,
+	 * but there is no dedicated routine to do it in fd code, making the
+	 * ordeal highly questionable.
+	 */
 	fdp = p->p_fd;
-	error = fget_unlocked(fdp, fd, cap_rights_init_one(&rights, CAP_TTYHOOK),
-	    &fp);
+	FILEDESC_SLOCK(fdp);
+	error = fget_cap_noref(fdp, fd, cap_rights_init_one(&rights, CAP_TTYHOOK),
+	    &fp, NULL);
+	if (error == 0 && !fhold(fp))
+		error = EBADF;
+	FILEDESC_SUNLOCK(fdp);
 	if (error != 0)
 		return (error);
 	if (fp->f_ops == &badfileops) {

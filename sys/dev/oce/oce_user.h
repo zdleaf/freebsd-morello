@@ -36,7 +36,6 @@
  * Costa Mesa, CA 92626
  */
 
-/* $FreeBSD$ */
 
 struct oce_mbx;
 struct oce_softc;
@@ -54,7 +53,7 @@ enum oce_interrupt_mode {
 
 struct oce_dev_info {
 	device_t dev;
-	struct ifnet *ifp;
+	if_t ifp;
 	struct oce_softc *softc;
 
 	bus_space_handle_t db_bhandle;

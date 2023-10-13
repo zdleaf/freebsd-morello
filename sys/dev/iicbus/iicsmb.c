@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 1998, 2001 Nicolas Souchu
  * All rights reserved.
@@ -27,8 +27,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 /*
  * I2C to SMB bridge
  *
@@ -99,8 +97,6 @@ static int iicsmb_readw(device_t dev, u_char slave, char cmd, short *word);
 static int iicsmb_pcall(device_t dev, u_char slave, char cmd, short sdata, short *rdata);
 static int iicsmb_bwrite(device_t dev, u_char slave, char cmd, u_char count, char *buf);
 static int iicsmb_bread(device_t dev, u_char slave, char cmd, u_char *count, char *buf);
-
-static devclass_t iicsmb_devclass;
 
 static device_method_t iicsmb_methods[] = {
 	/* device interface */
@@ -475,8 +471,8 @@ iicsmb_bread(device_t dev, u_char slave, char cmd, u_char *count, char *buf)
 	return (iic2smb_error(error));
 }
 
-DRIVER_MODULE(iicsmb, iicbus, iicsmb_driver, iicsmb_devclass, 0, 0);
-DRIVER_MODULE(smbus, iicsmb, smbus_driver, smbus_devclass, 0, 0);
+DRIVER_MODULE(iicsmb, iicbus, iicsmb_driver, 0, 0);
+DRIVER_MODULE(smbus, iicsmb, smbus_driver, 0, 0);
 MODULE_DEPEND(iicsmb, iicbus, IICBUS_MINVER, IICBUS_PREFVER, IICBUS_MAXVER);
 MODULE_DEPEND(iicsmb, smbus, SMBUS_MINVER, SMBUS_PREFVER, SMBUS_MAXVER);
 MODULE_VERSION(iicsmb, 1);

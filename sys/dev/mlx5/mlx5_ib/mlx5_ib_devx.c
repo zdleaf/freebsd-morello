@@ -21,8 +21,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 #include "opt_rss.h"
@@ -1923,7 +1921,6 @@ static int UVERBS_HANDLER(MLX5_IB_METHOD_DEVX_SUBSCRIBE_EVENT)(
 	int redirect_fd;
 	bool use_eventfd = false;
 	int num_events;
-	int num_alloc_xa_entries = 0;
 	u16 obj_type = 0;
 	u64 cookie = 0;
 	u32 obj_id = 0;
@@ -2005,7 +2002,6 @@ static int UVERBS_HANDLER(MLX5_IB_METHOD_DEVX_SUBSCRIBE_EVENT)(
 		if (err)
 			goto err;
 
-		num_alloc_xa_entries++;
 		event_sub = kzalloc(sizeof(*event_sub), GFP_KERNEL);
 		if (!event_sub)
 			goto err;

@@ -27,8 +27,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/socket.h>
 #include <sys/types.h>
@@ -54,10 +52,10 @@ __FBSDID("$FreeBSD$");
 
 #include "yplib_host.h"
 
+extern bool_t xdr_ypresp_all_seq(XDR *, unsigned long *);
+
 extern int (*ypresp_allfn)(u_long, char *, int, char *, int, void *);
 extern void *ypresp_data;
-extern bool_t xdr_ypreq_key(), xdr_ypresp_val();
-extern bool_t xdr_ypresp_all_seq();
 
 static int _yplib_host_timeout = 10;
 

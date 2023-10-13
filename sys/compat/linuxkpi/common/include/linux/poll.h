@@ -25,8 +25,6 @@
  * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 #ifndef	_LINUXKPI_LINUX_POLL_H_
 #define	_LINUXKPI_LINUX_POLL_H_
@@ -34,6 +32,7 @@
 #include <sys/poll.h>
 #include <sys/fcntl.h>
 
+#include <linux/eventpoll.h>
 #include <linux/wait.h>
 #include <linux/file.h>
 

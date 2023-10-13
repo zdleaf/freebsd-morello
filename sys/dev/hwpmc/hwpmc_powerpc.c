@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2011,2013 Justin Hibbits
  * Copyright (c) 2005, Joseph Koshy
@@ -29,8 +29,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/pmc.h>
 #include <sys/pmckern.h>
@@ -105,36 +103,19 @@ pmc_save_kernel_callchain(uintptr_t *cc, int maxsamples,
 	return (frames);
 }
 
-static int
-powerpc_switch_in(struct pmc_cpu *pc, struct pmc_process *pp)
-{
-
-	return (0);
-}
-
-static int
-powerpc_switch_out(struct pmc_cpu *pc, struct pmc_process *pp)
-{
-
-	return (0);
-}
-
 int
 powerpc_describe(int cpu, int ri, struct pmc_info *pi, struct pmc **ppmc)
 {
-	int error;
 	struct pmc_hw *phw;
-	char powerpc_name[PMC_NAME_MAX];
 
 	KASSERT(cpu >= 0 && cpu < pmc_cpu_max(),
 	    ("[powerpc,%d], illegal CPU %d", __LINE__, cpu));
 
 	phw = &powerpc_pcpu[cpu]->pc_ppcpmcs[ri];
-	snprintf(powerpc_name, sizeof(powerpc_name), "POWERPC-%d", ri);
-	if ((error = copystr(powerpc_name, pi->pm_name, PMC_NAME_MAX,
-	    NULL)) != 0)
-		return error;
+
+	snprintf(pi->pm_name, sizeof(pi->pm_name), "POWERPC-%d", ri);
 	pi->pm_class = powerpc_pcpu[cpu]->pc_class;
+
 	if (phw->phw_state & PMC_PHW_FLAG_IS_ENABLED) {
 		pi->pm_enabled = TRUE;
 		*ppmc          = phw->phw_pmc;
@@ -167,10 +148,8 @@ powerpc_pcpu_init(struct pmc_mdep *md, int cpu)
 	    ("[powerpc,%d] wrong cpu number %d", __LINE__, cpu));
 	PMCDBG1(MDP,INI,1,"powerpc-init cpu=%d", cpu);
 
-	powerpc_pcpu[cpu] = pac = malloc(sizeof(struct powerpc_cpu), M_PMC,
-	    M_WAITOK|M_ZERO);
-	pac->pc_ppcpmcs = malloc(sizeof(struct pmc_hw) * ppc_max_pmcs,
-	    M_PMC, M_WAITOK|M_ZERO);
+	powerpc_pcpu[cpu] = pac = malloc(sizeof(struct powerpc_cpu) +
+	    ppc_max_pmcs * sizeof(struct pmc_hw), M_PMC, M_WAITOK | M_ZERO);
 	pac->pc_class =
 	    md->pmd_classdep[PMC_MDEP_CLASS_INDEX_POWERPC].pcd_class;
 
@@ -193,8 +172,8 @@ powerpc_pcpu_fini(struct pmc_mdep *md, int cpu)
 {
 	PMCDBG1(MDP,INI,1,"powerpc-fini cpu=%d", cpu);
 
-	free(powerpc_pcpu[cpu]->pc_ppcpmcs, M_PMC);
 	free(powerpc_pcpu[cpu], M_PMC);
+	powerpc_pcpu[cpu] = NULL;
 
 	return (0);
 }
@@ -252,7 +231,7 @@ powerpc_allocate_pmc(int cpu, int ri, struct pmc *pm,
 int
 powerpc_release_pmc(int cpu, int ri, struct pmc *pmc)
 {
-	struct pmc_hw *phw;
+	struct pmc_hw *phw __diagused;
 
 	KASSERT(cpu >= 0 && cpu < pmc_cpu_max(),
 	    ("[powerpc,%d] illegal CPU value %d", __LINE__, cpu));
@@ -267,19 +246,17 @@ powerpc_release_pmc(int cpu, int ri, struct pmc *pmc)
 }
 
 int
-powerpc_start_pmc(int cpu, int ri)
+powerpc_start_pmc(int cpu, int ri, struct pmc *pm)
 {
-	struct pmc *pm;
 
 	PMCDBG2(MDP,STA,1,"powerpc-start cpu=%d ri=%d", cpu, ri);
-	pm = powerpc_pcpu[cpu]->pc_ppcpmcs[ri].phw_pmc;
 	powerpc_set_pmc(cpu, ri, pm->pm_md.pm_powerpc.pm_powerpc_evsel);
 
 	return (0);
 }
 
 int
-powerpc_stop_pmc(int cpu, int ri)
+powerpc_stop_pmc(int cpu, int ri, struct pmc *pm __unused)
 {
 	PMCDBG2(MDP,STO,1, "powerpc-stop cpu=%d ri=%d", cpu, ri);
 	powerpc_set_pmc(cpu, ri, PMCN_NONE);
@@ -382,20 +359,14 @@ powerpc_pmcn_write_default(unsigned int pmc, uint32_t val)
 }
 
 int
-powerpc_read_pmc(int cpu, int ri, pmc_value_t *v)
+powerpc_read_pmc(int cpu, int ri, struct pmc *pm, pmc_value_t *v)
 {
-	struct pmc *pm;
 	pmc_value_t p, r, tmp;
 
 	KASSERT(cpu >= 0 && cpu < pmc_cpu_max(),
 	    ("[powerpc,%d] illegal CPU value %d", __LINE__, cpu));
 	KASSERT(ri >= 0 && ri < ppc_max_pmcs,
 	    ("[powerpc,%d] illegal row index %d", __LINE__, ri));
-
-	pm  = powerpc_pcpu[cpu]->pc_ppcpmcs[ri].phw_pmc;
-	KASSERT(pm,
-	    ("[core,%d] cpu %d ri %d pmc not configured", __LINE__, cpu,
-		ri));
 
 	/*
 	 * After an interrupt occurs because of a PMC overflow, the PMC value
@@ -435,17 +406,14 @@ powerpc_read_pmc(int cpu, int ri, pmc_value_t *v)
 }
 
 int
-powerpc_write_pmc(int cpu, int ri, pmc_value_t v)
+powerpc_write_pmc(int cpu, int ri, struct pmc *pm, pmc_value_t v)
 {
-	struct pmc *pm;
 	pmc_value_t vlo;
 
 	KASSERT(cpu >= 0 && cpu < pmc_cpu_max(),
 	    ("[powerpc,%d] illegal CPU value %d", __LINE__, cpu));
 	KASSERT(ri >= 0 && ri < ppc_max_pmcs,
 	    ("[powerpc,%d] illegal row-index %d", __LINE__, ri));
-
-	pm = powerpc_pcpu[cpu]->pc_ppcpmcs[ri].phw_pmc;
 
 	if (PMC_IS_COUNTING_MODE(PMC_TO_MODE(pm))) {
 		PPC_OVERFLOWCNT(pm) = v / (POWERPC_MAX_PMC_VALUE + 1);
@@ -501,7 +469,7 @@ powerpc_pmc_intr(struct trapframe *tf)
 		if ((pm = pc->pc_ppcpmcs[i].phw_pmc) != NULL &&
 		    PMC_IS_SAMPLING_MODE(PMC_TO_MODE(pm))) {
 			if (pm->pm_state != PMC_STATE_RUNNING) {
-				powerpc_write_pmc(cpu, i,
+				powerpc_write_pmc(cpu, i, pm,
 				    pm->pm_sc.pm_reloadcount);
 				continue;
 			}
@@ -523,11 +491,11 @@ powerpc_pmc_intr(struct trapframe *tf)
 			PMCDBG3(MDP,INT,3,
 			    "cpu=%d ri=%d: error %d processing interrupt",
 			    cpu, i, error);
-			powerpc_stop_pmc(cpu, i);
+			powerpc_stop_pmc(cpu, i, pm);
 		}
 
 		/* Reload sampling count */
-		powerpc_write_pmc(cpu, i, pm->pm_sc.pm_reloadcount);
+		powerpc_write_pmc(cpu, i, pm, pm->pm_sc.pm_reloadcount);
 	}
 
 	if (retval)
@@ -551,7 +519,7 @@ powerpc_pmc_intr(struct trapframe *tf)
 }
 
 struct pmc_mdep *
-pmc_md_initialize()
+pmc_md_initialize(void)
 {
 	struct pmc_mdep *pmc_mdep;
 	int error;
@@ -569,9 +537,6 @@ pmc_md_initialize()
 
 	vers = mfpvr() >> 16;
 
-	pmc_mdep->pmd_switch_in  = powerpc_switch_in;
-	pmc_mdep->pmd_switch_out = powerpc_switch_out;
-	
 	switch (vers) {
 	case MPC7447A:
 	case MPC7448:

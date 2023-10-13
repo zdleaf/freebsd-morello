@@ -25,8 +25,6 @@
  * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 #ifndef	_LINUXKPI_LINUX_COMPAT_H_
 #define	_LINUXKPI_LINUX_COMPAT_H_
@@ -57,5 +55,8 @@ linux_set_current_flags(struct thread *td, int flags)
 		return (lkpi_alloc_current(td, flags));
 	return (0);
 }
+
+#define	compat_ptr(x)		((void *)(uintptr_t)x)
+#define	ptr_to_compat(x)	((uintptr_t)x)
 
 #endif	/* _LINUXKPI_LINUX_COMPAT_H_ */

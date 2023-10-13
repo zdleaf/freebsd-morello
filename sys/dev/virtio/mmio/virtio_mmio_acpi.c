@@ -40,8 +40,6 @@
 #include "opt_acpi.h"
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/bus.h>
@@ -65,9 +63,7 @@ static device_method_t vtmmio_acpi_methods[] = {
 DEFINE_CLASS_1(virtio_mmio, vtmmio_acpi_driver, vtmmio_acpi_methods,
     sizeof(struct vtmmio_softc), vtmmio_driver);
 
-static devclass_t vtmmio_acpi_devclass;
-
-DRIVER_MODULE(virtio_mmio, acpi, vtmmio_acpi_driver, vtmmio_acpi_devclass, 0,0);
+DRIVER_MODULE(virtio_mmio, acpi, vtmmio_acpi_driver, 0,0);
 MODULE_DEPEND(virtio_mmio, acpi, 1, 1, 1);
 
 static int

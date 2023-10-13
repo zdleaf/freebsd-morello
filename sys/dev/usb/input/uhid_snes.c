@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright 2013, Michael Terrell <vashisnotatree@gmail.com>
  * Copyright 2018, Johannes Lundberg <johalun0@gmail.com>
@@ -25,8 +25,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 #include <sys/param.h>
@@ -94,7 +92,6 @@ struct uhid_snes_softc {
 	int sc_fflags;
 	struct usb_fifo *sc_fifo_open[2];
 	uint8_t sc_zero_length_packets;
-	uint8_t sc_previous_status;
 	uint8_t sc_iid;
 	uint8_t sc_oid;
 	uint8_t sc_fid;
@@ -498,7 +495,6 @@ uhid_snes_status_callback(struct usb_xfer *transfer, usb_error_t error)
 	struct uhid_snes_softc *sc = usbd_xfer_softc(transfer);
 	struct usb_device_request req;
 	struct usb_page_cache *pc;
-	uint8_t current_status, new_status;
 
 	switch (USB_GET_STATE(transfer)) {
 	case USB_ST_SETUP:
@@ -515,13 +511,6 @@ uhid_snes_status_callback(struct usb_xfer *transfer, usb_error_t error)
 		usbd_xfer_set_frame_len(transfer, 1, 1);
 		usbd_xfer_set_frames(transfer, 2);
 		usbd_transfer_submit(transfer);
-		break;
-
-	case USB_ST_TRANSFERRED:
-		pc = usbd_xfer_get_frame(transfer, 1);
-		usbd_copy_out(pc, 0, &current_status, 1);
-		new_status = current_status & ~sc->sc_previous_status;
-		sc->sc_previous_status = current_status;
 		break;
 
 	default:
@@ -647,8 +636,6 @@ static driver_t uhid_snes_driver = {
 	sizeof(struct uhid_snes_softc)
 };
 
-static devclass_t uhid_snes_devclass;
-
-DRIVER_MODULE(uhid_snes, uhub, uhid_snes_driver, uhid_snes_devclass, NULL, 0);
+DRIVER_MODULE(uhid_snes, uhub, uhid_snes_driver, NULL, NULL);
 MODULE_DEPEND(uhid_snes, usb, 1, 1, 1);
 USB_PNP_HOST_INFO(snes_devs);

@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2003 Silicon Graphics International Corp.
  * Copyright (c) 2011 Spectra Logic Corporation
@@ -32,7 +32,6 @@
  * POSSIBILITY OF SUCH DAMAGES.
  *
  * $Id: //depot/users/kenm/FreeBSD-test2/sys/cam/ctl/ctl_ioctl.h#4 $
- * $FreeBSD$
  */
 /*
  * CAM Target Layer ioctl interface.
@@ -256,7 +255,8 @@ struct ctl_ooa_entry {
 	ctl_ooa_cmd_flags	cmd_flags;
 	uint8_t			cdb[CTL_MAX_CDBLEN];
 	uint8_t			cdb_len;
-	uint32_t		tag_num;
+	uint64_t		tag_num;
+	ctl_tag_type		tag_type;
 	uint32_t		lun_num;
 	struct bintime		start_bt;
 };
@@ -460,6 +460,7 @@ struct ctl_lun_req {
 	union ctl_lunreq_data	reqdata;
 	void *			args;
 	nvlist_t *		args_nvl;
+#define	CTL_MAX_ARGS_LEN	(1024 * 1024)
 	size_t			args_len;
 	void *			result;
 	nvlist_t *		result_nvl;
@@ -669,9 +670,12 @@ struct ctl_iscsi_terminate_params {
 struct ctl_iscsi_limits_params {
 	/* passed to kernel */
 	char			offload[CTL_ISCSI_OFFLOAD_LEN];
+	int			socket;
 
 	/* passed to userland */
-	size_t			spare;
+#ifdef __LP64__
+	int			spare;
+#endif
 	int			max_recv_data_segment_length;
 	int			max_send_data_segment_length;
 	int			max_burst_length;

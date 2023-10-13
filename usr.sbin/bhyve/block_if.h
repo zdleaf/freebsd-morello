@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2013  Peter Grehan <grehan@freebsd.org>
  * All rights reserved.
@@ -24,8 +24,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 /*
@@ -62,11 +60,13 @@ struct blockif_req {
 	struct iovec	br_iov[BLOCKIF_IOV_MAX];
 };
 
+struct pci_devinst;
 struct blockif_ctxt;
 
 typedef void blockif_resize_cb(struct blockif_ctxt *, void *, size_t);
 
 int	blockif_legacy_config(nvlist_t *nvl, const char *opts);
+int 	blockif_add_boot_device(struct pci_devinst *const pi, struct blockif_ctxt *const bc);
 struct blockif_ctxt *blockif_open(nvlist_t *nvl, const char *ident);
 int	blockif_register_resize_callback(struct blockif_ctxt *bc,
     blockif_resize_cb *cb, void *cb_arg);
@@ -87,10 +87,6 @@ int	blockif_close(struct blockif_ctxt *bc);
 #ifdef BHYVE_SNAPSHOT
 void	blockif_pause(struct blockif_ctxt *bc);
 void	blockif_resume(struct blockif_ctxt *bc);
-int	blockif_snapshot_req(struct blockif_req *br,
-    struct vm_snapshot_meta *meta);
-int	blockif_snapshot(struct blockif_ctxt *bc,
-    struct vm_snapshot_meta *meta);
 #endif
 
 #endif /* _BLOCK_IF_H_ */

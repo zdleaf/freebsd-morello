@@ -1,7 +1,7 @@
 /*	$NetBSD: sprayd.c,v 1.15 2009/10/21 01:07:46 snj Exp $	*/
 
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-NetBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 1994 Christos Zoulas
  * All rights reserved.
@@ -26,11 +26,6 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-
-#ifndef lint
-static const char rcsid[] =
-  "$FreeBSD$";
-#endif /* not lint */
 
 #include <rpc/rpc.h>
 #include <rpcsvc/spray.h>

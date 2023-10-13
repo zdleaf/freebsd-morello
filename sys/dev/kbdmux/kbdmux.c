@@ -3,7 +3,7 @@
  */
 
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2005 Maksim Yevmenkin <m_evmenkin@yahoo.com>
  * All rights reserved.
@@ -30,7 +30,6 @@
  * SUCH DAMAGE.
  *
  * $Id: kbdmux.c,v 1.4 2005/07/14 17:38:35 max Exp $
- * $FreeBSD$
  */
 
 #include "opt_evdev.h"
@@ -715,6 +714,9 @@ next_code:
 			evdev_sync(state->ks_evdev);
 		}
 	}
+
+	if (state->ks_evdev != NULL && evdev_is_grabbed(state->ks_evdev))
+		return (NOKEY);
 #endif
 
 	/* return the byte as is for the K_RAW mode */
@@ -960,17 +962,6 @@ kbdmux_check_char(keyboard_t *kbd)
 static int
 kbdmux_ioctl(keyboard_t *kbd, u_long cmd, caddr_t arg)
 {
-	static int	 delays[] = {
-		250, 500, 750, 1000
-	};
-
-	static int	 rates[]  =  {
-		34,  38,  42,  46,  50,   55,  59,  63,
-		68,  76,  84,  92,  100, 110, 118, 126,
-		136, 152, 168, 184, 200, 220, 236, 252,
-		272, 304, 336, 368, 400, 440, 472, 504
-	};
-
 	kbdmux_state_t	*state = (kbdmux_state_t *) kbd->kb_data;
 	kbdmux_kbd_t	*k;
 	keyboard_info_t	*ki;
@@ -1203,14 +1194,14 @@ kbdmux_ioctl(keyboard_t *kbd, u_long cmd, caddr_t arg)
 			int	i;
 
 			/* lookup delay */
-			for (i = sizeof(delays)/sizeof(delays[0]) - 1; i > 0; i --)
-				if (((int *)arg)[0] >= delays[i])
+			for (i = nitems(kbdelays) - 1; i > 0; i--)
+				if (((int *)arg)[0] >= kbdelays[i])
 					break;
 			mode = i << 5;
 
 			/* lookup rate */
-			for (i = sizeof(rates)/sizeof(rates[0]) - 1; i > 0; i --)
-				if (((int *)arg)[1] >= rates[i])
+			for (i = nitems(kbrates) - 1; i > 0; i--)
+				if (((int *)arg)[1] >= kbrates[i])
 					break;
 			mode |= i;
 		} else
@@ -1222,8 +1213,8 @@ kbdmux_ioctl(keyboard_t *kbd, u_long cmd, caddr_t arg)
 			return (EINVAL);
 		}
 
-		kbd->kb_delay1 = delays[(mode >> 5) & 3];
-		kbd->kb_delay2 = rates[mode & 0x1f];
+		kbd->kb_delay1 = kbdelays[(mode >> 5) & 3];
+		kbd->kb_delay2 = kbrates[mode & 0x1f];
 #ifdef EVDEV_SUPPORT
 		if (state->ks_evdev != NULL &&
 		    evdev_rcpt_mask & EVDEV_RCPT_KBDMUX)
@@ -1237,11 +1228,14 @@ kbdmux_ioctl(keyboard_t *kbd, u_long cmd, caddr_t arg)
 		break;
 
 	case PIO_KEYMAP:	/* set keyboard translation table */
-	case OPIO_KEYMAP:	/* set keyboard translation table (compat) */
 	case PIO_KEYMAPENT:	/* set keyboard translation table entry */
 	case PIO_DEADKEYMAP:	/* set accent key translation table */
+#ifdef COMPAT_FREEBSD13
+	case OPIO_KEYMAP:	/* set keyboard translation table (compat) */
+	case OPIO_DEADKEYMAP:	/* set accent key translation table (compat) */
 		KBDMUX_LOCK(state);
-                state->ks_accents = 0;
+		state->ks_accents = 0;
+#endif /* COMPAT_FREEBSD13 */
 
 		/* perform command on all slave keyboards */
 		SLIST_FOREACH(k, &state->ks_kbds, next)

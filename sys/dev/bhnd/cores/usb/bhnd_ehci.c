@@ -33,8 +33,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 /*
  * BHND attachment driver for the USB Enhanced Host Controller.
  * Ported from ZRouter with insignificant adaptations for FreeBSD11.
@@ -256,7 +254,5 @@ static driver_t ehci_driver = {
 	sizeof(ehci_softc_t),
 };
 
-static devclass_t ehci_devclass;
-
-DRIVER_MODULE(ehci, bhnd_usb, ehci_driver, ehci_devclass, 0, 0);
+DRIVER_MODULE(ehci, bhnd_usb, ehci_driver, 0, 0);
 MODULE_DEPEND(ehci, usb, 1, 1, 1);

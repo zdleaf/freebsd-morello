@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (C) 2011 glevand (geoffrey.levand@mail.ru)
  * All rights reserved.
@@ -27,8 +27,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/sysctl.h>
@@ -698,6 +696,4 @@ static driver_t ps3disk_driver = {
 	sizeof(struct ps3disk_softc),
 };
 
-static devclass_t ps3disk_devclass;
-
-DRIVER_MODULE(ps3disk, ps3bus, ps3disk_driver, ps3disk_devclass, 0, 0);
+DRIVER_MODULE(ps3disk, ps3bus, ps3disk_driver, 0, 0);

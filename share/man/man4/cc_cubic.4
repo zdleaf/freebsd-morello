@@ -28,9 +28,7 @@
 .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 .\" SUCH DAMAGE.
 .\"
-.\" $FreeBSD$
-.\"
-.Dd May 13, 2021
+.Dd February 4, 2023
 .Dt CC_CUBIC 4
 .Os
 .Sh NAME
@@ -39,6 +37,7 @@
 .Sh DESCRIPTION
 The CUBIC congestion control algorithm was designed to provide increased
 throughput in fast and long-distance networks.
+The CUBIC congestion control algorithm is the default for TCP.
 It attempts to maintain fairness when competing with legacy NewReno TCP in lower
 speed scenarios where NewReno is able to operate adequately.
 .Pp
@@ -77,7 +76,7 @@ There are currently no tunable MIB variables.
 .%A "Injong Rhee"
 .%A "Lisong Xu"
 .%T "CUBIC for Fast Long-Distance Networks"
-.%U "http://tools.ietf.org/id/draft-rhee-tcpm-cubic-02.txt"
+.%U "https://tools.ietf.org/id/draft-rhee-tcpm-cubic-02.txt"
 .Re
 .Rs
 .%A "Sangtae Ha"
@@ -99,6 +98,11 @@ The
 .Nm
 congestion control module first appeared in
 .Fx 9.0 .
+.Pp
+This became the default congestion algorithm for FreeBSD in version
+.Fx 14.0 ,
+replacing
+.Xr cc_newreno 4 .
 .Pp
 The module was first released in 2009 by Lawrence Stewart whilst studying at
 Swinburne University of Technology's Centre for Advanced Internet Architectures,

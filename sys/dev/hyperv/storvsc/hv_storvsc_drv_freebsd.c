@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2009-2012,2016-2017 Microsoft Corp.
  * Copyright (c) 2012 NetApp Inc.
@@ -35,8 +35,6 @@
  * partition StorVSP driver over the Hyper-V VMBUS.
  */
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/proc.h>
 #include <sys/condvar.h>
@@ -371,8 +369,7 @@ static driver_t storvsc_driver = {
 	"storvsc", storvsc_methods, sizeof(struct storvsc_softc),
 };
 
-static devclass_t storvsc_devclass;
-DRIVER_MODULE(storvsc, vmbus, storvsc_driver, storvsc_devclass, 0, 0);
+DRIVER_MODULE(storvsc, vmbus, storvsc_driver, 0, 0);
 MODULE_VERSION(storvsc, 1);
 MODULE_DEPEND(storvsc, vmbus, 1, 1, 1);
 
@@ -381,12 +378,11 @@ storvsc_subchan_attach(struct storvsc_softc *sc,
     struct vmbus_channel *new_channel)
 {
 	struct vmstor_chan_props props;
-	int ret = 0;
 
 	memset(&props, 0, sizeof(props));
 
 	vmbus_chan_cpu_rr(new_channel);
-	ret = vmbus_chan_open(new_channel,
+	vmbus_chan_open(new_channel,
 	    sc->hs_drv_props->drv_ringbuffer_size,
   	    sc->hs_drv_props->drv_ringbuffer_size,
 	    (void *)&props,
@@ -407,7 +403,7 @@ storvsc_send_multichannel_request(struct storvsc_softc *sc, int max_subch)
 	struct hv_storvsc_request *request;
 	struct vstor_packet *vstor_packet;	
 	int request_subch;
-	int ret, i;
+	int i;
 
 	/* get sub-channel count that need to create */
 	request_subch = MIN(max_subch, mp_ncpus - 1);
@@ -425,7 +421,7 @@ storvsc_send_multichannel_request(struct storvsc_softc *sc, int max_subch)
 	vstor_packet->flags = REQUEST_COMPLETION_FLAG;
 	vstor_packet->u.multi_channels_cnt = request_subch;
 
-	ret = vmbus_chan_send(sc->hs_chan,
+	vmbus_chan_send(sc->hs_chan,
 	    VMBUS_CHANPKT_TYPE_INBAND, VMBUS_CHANPKT_FLAG_RC,
 	    vstor_packet, VSTOR_PKT_SIZE, (uint64_t)(uintptr_t)request);
 
@@ -720,7 +716,7 @@ hv_storvsc_io_request(struct storvsc_softc *sc,
 	 * always uses sc->hs_chan, then we must send to that channel or a poll
 	 * timeout will occur.
 	 */
-	if (panicstr) {
+	if (KERNEL_PANICKED()) {
 		outgoing_channel = sc->hs_chan;
 	} else {
 		outgoing_channel = sc->hs_sel_chan[ch_sel];
@@ -1832,6 +1828,7 @@ storvsc_xferbuf_prepare(void *arg, bus_dma_segment_t *segs, int nsegs, int error
 
 	for (i = 0; i < nsegs; i++) {
 #ifdef INVARIANTS
+#if !defined(__aarch64__)
 		if (nsegs > 1) {
 			if (i == 0) {
 				KASSERT((segs[i].ds_addr & PAGE_MASK) +
@@ -1852,9 +1849,22 @@ storvsc_xferbuf_prepare(void *arg, bus_dma_segment_t *segs, int nsegs, int error
 			}
 		}
 #endif
+#endif
 		prplist->gpa_page[i] = atop(segs[i].ds_addr);
 	}
 	reqp->prp_cnt = nsegs;
+
+	if ((ccb->ccb_h.flags & CAM_DIR_MASK) != CAM_DIR_NONE) {
+		bus_dmasync_op_t op;
+
+		if ((ccb->ccb_h.flags & CAM_DIR_MASK) == CAM_DIR_IN)
+			op = BUS_DMASYNC_PREREAD;
+		else
+			op = BUS_DMASYNC_PREWRITE;
+
+		bus_dmamap_sync(reqp->softc->storvsc_req_dtag,
+		    reqp->data_dmap, op);
+	}
 }
 
 /**
@@ -2114,6 +2124,19 @@ storvsc_io_done(struct hv_storvsc_request *reqp)
 	bus_dma_segment_t *ori_sglist = NULL;
 	int ori_sg_count = 0;
 	const struct scsi_generic *cmd;
+
+	if ((ccb->ccb_h.flags & CAM_DIR_MASK) != CAM_DIR_NONE) {
+		bus_dmasync_op_t op;
+
+		if ((ccb->ccb_h.flags & CAM_DIR_MASK) == CAM_DIR_IN)
+			op = BUS_DMASYNC_POSTREAD;
+		else
+			op = BUS_DMASYNC_POSTWRITE;
+
+		bus_dmamap_sync(reqp->softc->storvsc_req_dtag,
+		    reqp->data_dmap, op);
+		bus_dmamap_unload(sc->storvsc_req_dtag, reqp->data_dmap);
+	}
 
 	/* destroy bounce buffer if it is used */
 	if (reqp->bounce_sgl_count) {

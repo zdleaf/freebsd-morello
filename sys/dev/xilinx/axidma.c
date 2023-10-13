@@ -33,8 +33,6 @@
 /* Xilinx AXI DMA controller driver. */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include "opt_platform.h"
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -318,9 +316,7 @@ static int
 axidma_desc_free(struct axidma_softc *sc, struct axidma_channel *chan)
 {
 	struct xdma_channel *xchan;
-	int nsegments;
 
-	nsegments = chan->descs_num;
 	xchan = chan->xchan;
 
 	free(chan->descs, M_DEVBUF);
@@ -463,7 +459,6 @@ axidma_channel_submit_sg(device_t dev, struct xdma_channel *xchan,
 	uint32_t len;
 	uint32_t tmp;
 	int i;
-	int tail;
 
 	dprintf("%s: sg_n %d\n", __func__, sg_n);
 
@@ -475,8 +470,6 @@ axidma_channel_submit_sg(device_t dev, struct xdma_channel *xchan,
 
 	if (sg_n == 0)
 		return (0);
-
-	tail = chan->idx_head;
 
 	tmp = 0;
 
@@ -577,12 +570,6 @@ axidma_channel_prep_sg(device_t dev, struct xdma_channel *xchan)
 static int
 axidma_channel_control(device_t dev, xdma_channel_t *xchan, int cmd)
 {
-	struct axidma_channel *chan;
-	struct axidma_softc *sc;
-
-	sc = device_get_softc(dev);
-
-	chan = (struct axidma_channel *)xchan->chan;
 
 	switch (cmd) {
 	case XDMA_CMD_BEGIN:
@@ -643,7 +630,5 @@ static driver_t axidma_driver = {
 	sizeof(struct axidma_softc),
 };
 
-static devclass_t axidma_devclass;
-
-EARLY_DRIVER_MODULE(axidma, simplebus, axidma_driver, axidma_devclass, 0, 0,
+EARLY_DRIVER_MODULE(axidma, simplebus, axidma_driver, 0, 0,
     BUS_PASS_INTERRUPT + BUS_PASS_ORDER_LATE);

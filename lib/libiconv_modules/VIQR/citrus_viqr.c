@@ -1,4 +1,3 @@
-/* $FreeBSD$ */
 /* $NetBSD: citrus_viqr.c,v 1.5 2011/11/19 18:20:13 tnozaki Exp $ */
 
 /*-
@@ -195,9 +194,9 @@ mnemonic_append_child(mnemonic_t *m, const char *s,
 static void
 mnemonic_destroy(mnemonic_t *m)
 {
-	mnemonic_t *m0;
+	mnemonic_t *m0, *n;
 
-	TAILQ_FOREACH(m0, &m->child, entry)
+	TAILQ_FOREACH_SAFE(m0, &m->child, entry, n)
 		mnemonic_destroy(m0);
 	free(m);
 }

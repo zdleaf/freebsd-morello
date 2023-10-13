@@ -1,6 +1,5 @@
-/* $FreeBSD$ */
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-NetBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2008 Hans Petter Selasky. All rights reserved.
  * Copyright (c) 1998 The NetBSD Foundation, Inc. All rights reserved.
@@ -123,6 +122,7 @@ MALLOC_DECLARE(M_USBDEV);
 #define	USB_RESUME_WAIT			50	/* ms */
 #define	USB_RESUME_RECOVERY		50	/* ms */
 #define	USB_EXTRA_POWER_UP_TIME		20	/* ms */
+#define	USB_ENUM_NICE_TIME		16	/* ms */
 
 #define	USB_MIN_POWER		100	/* mA */
 #define	USB_MAX_POWER		500	/* mA */

@@ -25,8 +25,6 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD$
- *
  */
 
 #ifndef __THUNDER_MDIO_VAR_H__
@@ -44,7 +42,7 @@ enum thunder_mdio_mode {
 
 struct phy_desc {
 	device_t		miibus; /* One miibus per LMAC */
-	struct ifnet *		ifp;	/* Fake ifp to satisfy miibus */
+	if_t 			ifp;	/* Fake ifp to satisfy miibus */
 	int			lmacid;	/* ID number of LMAC connected */
 	TAILQ_ENTRY(phy_desc)	phy_desc_list;
 };

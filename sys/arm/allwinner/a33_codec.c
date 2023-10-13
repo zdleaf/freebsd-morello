@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2020 Oleksandr Tymoshenko <gonzo@FreeBSD.org>
  * Copyright (c) 2018 Jared McNeill <jmcneill@invisible.ca>
@@ -24,13 +24,9 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/bus.h>
@@ -383,11 +379,8 @@ sun8i_codec_dai_trigger(device_t dev, int go, int pcm_dir)
 static int
 sun8i_codec_dai_setup_mixer(device_t dev, device_t pcmdev)
 {
-	struct sun8i_codec_softc *sc;
 
-	sc = device_get_softc(dev);
 	/* Do nothing for now */
-
 	return (0);
 }
 
@@ -411,7 +404,5 @@ static driver_t sun8i_codec_driver = {
 	sizeof(struct sun8i_codec_softc),
 };
 
-static devclass_t sun8i_codec_devclass;
-
-DRIVER_MODULE(sun8i_codec, simplebus, sun8i_codec_driver, sun8i_codec_devclass, 0, 0);
+DRIVER_MODULE(sun8i_codec, simplebus, sun8i_codec_driver, 0, 0);
 SIMPLEBUS_PNP_INFO(compat_data);

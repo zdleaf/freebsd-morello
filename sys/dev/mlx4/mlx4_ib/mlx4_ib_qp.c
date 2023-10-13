@@ -1284,7 +1284,6 @@ static int _mlx4_ib_destroy_qp(struct ib_qp *qp, struct ib_udata *udata)
 {
 	struct mlx4_ib_dev *dev = to_mdev(qp->device);
 	struct mlx4_ib_qp *mqp = to_mqp(qp);
-	struct mlx4_ib_pd *pd;
 
 	if (is_qp0(dev, mqp))
 		mlx4_CLOSE_PORT(dev->dev, mqp->port);
@@ -1298,7 +1297,6 @@ static int _mlx4_ib_destroy_qp(struct ib_qp *qp, struct ib_udata *udata)
 	if (mqp->counter_index)
 		mlx4_ib_free_qp_counter(dev, mqp);
 
-	pd = get_pd(mqp);
 	destroy_qp_common(dev, mqp, udata);
 
 	if (is_sqp(dev, mqp))
@@ -1792,7 +1790,7 @@ static int __mlx4_ib_modify_qp(struct ib_qp *ibqp,
 				status = -ENOENT;
 			if (!status && gid_attr.ndev) {
 				vlan = rdma_vlan_dev_vlan_id(gid_attr.ndev);
-				memcpy(smac, IF_LLADDR(gid_attr.ndev), ETH_ALEN);
+				memcpy(smac, if_getlladdr(gid_attr.ndev), ETH_ALEN);
 				if_rele(gid_attr.ndev);
 			}
 		}

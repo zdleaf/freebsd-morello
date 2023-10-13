@@ -22,12 +22,14 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 #ifndef _LINUXKPI_ASM_SMP_H_
 #define	_LINUXKPI_ASM_SMP_H_
+
+#include <linux/jump_label.h>
+#include <linux/preempt.h>
+#include <asm/fpu/api.h>
 
 #if defined(__i386__) || defined(__amd64__)
 

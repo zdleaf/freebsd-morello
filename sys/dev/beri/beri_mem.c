@@ -33,8 +33,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/bus.h>
@@ -181,6 +179,4 @@ static driver_t beri_mem_driver = {
 	sizeof(struct beri_mem_softc),
 };
 
-static devclass_t beri_mem_devclass;
-
-DRIVER_MODULE(beri_mem, simplebus, beri_mem_driver, beri_mem_devclass, 0, 0);
+DRIVER_MODULE(beri_mem, simplebus, beri_mem_driver, 0, 0);

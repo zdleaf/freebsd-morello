@@ -34,7 +34,6 @@
  * SUCH DAMAGE.
  *
  * 	from: @(#) ieeefp.h 	1.0 (Berkeley) 9/23/93
- * $FreeBSD$
  */
 
 #ifndef _MACHINE_IEEEFP_H_
@@ -66,8 +65,6 @@
 #define	SSE_MSKS_OFF	7	/* other exception masks offset */
 #define	SSE_RND_OFF	13	/* rounding control offset */
 #define	SSE_FZ_OFF	15	/* flush to zero offset */
-
-#ifdef __GNUCLIKE_ASM
 
 /*
  * General notes about conflicting SSE vs FP status bits.
@@ -184,9 +181,7 @@ __fpgetsticky(void)
 	return ((fp_except_t)_ex);
 }
 
-#endif /* __GNUCLIKE_ASM */
-
-#if !defined(__IEEEFP_NOINLINES__) && defined(__GNUCLIKE_ASM)
+#if !defined(__IEEEFP_NOINLINES__)
 
 #define	fpgetmask()	__fpgetmask()
 #define	fpgetprec()	__fpgetprec()
@@ -196,7 +191,7 @@ __fpgetsticky(void)
 #define	fpsetprec(m)	__fpsetprec(m)
 #define	fpsetround(m)	__fpsetround(m)
 
-#else /* !(!__IEEEFP_NOINLINES__ && __GNUCLIKE_ASM) */
+#else /* __IEEEFP_NOINLINES__ */
 
 /* Augment the userland declarations. */
 __BEGIN_DECLS
@@ -210,6 +205,6 @@ fp_prec_t	fpgetprec(void);
 fp_prec_t	fpsetprec(fp_prec_t);
 __END_DECLS
 
-#endif /* !__IEEEFP_NOINLINES__ && __GNUCLIKE_ASM */
+#endif /* !__IEEEFP_NOINLINES__ */
 
 #endif /* !_MACHINE_IEEEFP_H_ */

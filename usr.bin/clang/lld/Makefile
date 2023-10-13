@@ -1,4 +1,3 @@
-# $FreeBSD$
 
 .include <src.opts.mk>
 
@@ -16,19 +15,17 @@ SYMLINKS=	${PROG_CXX} ${BINDIR}/ld
 MLINKS=		ld.lld.1 ld.1
 .endif
 
-.if ${MK_SHARED_TOOLCHAIN} == "no"
-NO_SHARED?= yes
-.endif
-
 .include "${SRCTOP}/lib/clang/llvm.pre.mk"
 
 CFLAGS+=	-I${LLD_SRCS}/ELF
 CFLAGS+=	-I${LLD_SRCS}/include
 CFLAGS+=	-I${.OBJDIR}
 CFLAGS+=	-I${OBJTOP}/lib/clang/libllvm
+CFLAGS+=	-I${SRCTOP}/sys/contrib/zstd/lib
 
 SRCDIR=		lld
 SRCS+=		Common/Args.cpp
+SRCS+=		Common/CommonLinkerContext.cpp
 SRCS+=		Common/DWARF.cpp
 SRCS+=		Common/ErrorHandler.cpp
 SRCS+=		Common/Filesystem.cpp
@@ -75,13 +72,9 @@ SRCS+=		ELF/SyntheticSections.cpp
 SRCS+=		ELF/Target.cpp
 SRCS+=		ELF/Thunks.cpp
 SRCS+=		ELF/Writer.cpp
-SRCS+=		lib/Core/Error.cpp
-SRCS+=		lib/Core/File.cpp
-SRCS+=		lib/Core/LinkingContext.cpp
-SRCS+=		lib/Core/Reader.cpp
-SRCS+=		lib/Core/Resolver.cpp
-SRCS+=		lib/Core/SymbolTable.cpp
 SRCS+=		tools/lld/lld.cpp
+
+CFLAGS.lld.cpp+=	-Dlld_main=main
 
 .include "${SRCTOP}/lib/clang/llvm.build.mk"
 
@@ -110,5 +103,6 @@ LIBADD+=	tinfow
 .endif
 LIBADD+=	pthread
 LIBADD+=	z
+LIBADD+=	zstd
 
 .include <bsd.prog.mk>

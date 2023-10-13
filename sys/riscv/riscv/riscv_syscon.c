@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2018 Kyle Evans <kevans@FreeBSD.org>
  * Copyright (c) 2020 Jessica Clarke <jrtc27@FreeBSD.org>
@@ -32,8 +32,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/bus.h>
 #include <sys/kernel.h>
@@ -77,8 +75,7 @@ static device_method_t riscv_syscon_methods[] = {
 DEFINE_CLASS_1(riscv_syscon, riscv_syscon_driver, riscv_syscon_methods,
     sizeof(struct syscon_generic_softc), syscon_generic_driver);
 
-static devclass_t riscv_syscon_devclass;
 /* riscv_syscon needs to attach prior to syscon_power */
-EARLY_DRIVER_MODULE(riscv_syscon, simplebus, riscv_syscon_driver,
-    riscv_syscon_devclass, 0, 0, BUS_PASS_SCHEDULER + BUS_PASS_ORDER_LAST);
+EARLY_DRIVER_MODULE(riscv_syscon, simplebus, riscv_syscon_driver, 0, 0,
+    BUS_PASS_SCHEDULER + BUS_PASS_ORDER_LAST);
 MODULE_VERSION(riscv_syscon, 1);

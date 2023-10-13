@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2009-2012 Alexander Motin <mav@FreeBSD.org>
  * All rights reserved.
@@ -27,8 +27,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/module.h>
 #include <sys/systm.h>
@@ -1056,7 +1054,6 @@ ahci_ch_resume(device_t dev)
 	return (0);
 }
 
-devclass_t ahcich_devclass;
 static device_method_t ahcich_methods[] = {
 	DEVMETHOD(device_probe,     ahci_ch_probe),
 	DEVMETHOD(device_attach,    ahci_ch_attach),
@@ -1070,7 +1067,7 @@ static driver_t ahcich_driver = {
         ahcich_methods,
         sizeof(struct ahci_channel)
 };
-DRIVER_MODULE(ahcich, ahci, ahcich_driver, ahcich_devclass, NULL, NULL);
+DRIVER_MODULE(ahcich, ahci, ahcich_driver, NULL, NULL);
 
 struct ahci_dc_cb_args {
 	bus_addr_t maddr;
@@ -1485,7 +1482,7 @@ ahci_ch_intr_main(struct ahci_channel *ch, uint32_t istatus)
 			ahci_done(ch, fccb);
 		}
 		for (i = 0; i < ch->numslots; i++) {
-			/* XXX: reqests in loading state. */
+			/* XXX: requests in loading state. */
 			if (((err >> i) & 1) == 0)
 				continue;
 			if (port >= 0 &&
@@ -2178,7 +2175,8 @@ completeall:
 		ahci_reset(ch);
 		return;
 	}
-	ccb->ccb_h = ch->hold[i]->ccb_h;	/* Reuse old header. */
+	xpt_setup_ccb(&ccb->ccb_h, ch->hold[i]->ccb_h.path,
+	    ch->hold[i]->ccb_h.pinfo.priority);
 	if (ccb->ccb_h.func_code == XPT_ATA_IO) {
 		/* READ LOG */
 		ccb->ccb_h.recovery_type = RECOVERY_READ_LOG;
@@ -2605,10 +2603,14 @@ static int
 ahci_sata_connect(struct ahci_channel *ch)
 {
 	u_int32_t status;
-	int timeout, found = 0;
+	int timeout, timeoutslot, found = 0;
 
-	/* Wait up to 100ms for "connect well" */
-	for (timeout = 0; timeout < 1000 ; timeout++) {
+	/*
+	 * Wait for "connect well", up to 100ms by default and
+	 * up to 500ms for devices with the SLOWDEV quirk.
+	 */
+	timeoutslot = ((ch->quirks & AHCI_Q_SLOWDEV) ? 5000 : 1000);
+	for (timeout = 0; timeout < timeoutslot; timeout++) {
 		status = ATA_INL(ch->r_mem, AHCI_P_SSTS);
 		if ((status & ATA_SS_DET_MASK) != ATA_SS_DET_NO_DEVICE)
 			found = 1;
@@ -2627,7 +2629,7 @@ ahci_sata_connect(struct ahci_channel *ch)
 			break;
 		DELAY(100);
 	}
-	if (timeout >= 1000 || !found) {
+	if (timeout >= timeoutslot || !found) {
 		if (bootverbose) {
 			device_printf(ch->dev,
 			    "SATA connect timeout time=%dus status=%08x\n",
@@ -2904,8 +2906,6 @@ ahcipoll(struct cam_sim *sim)
 		ahci_reset_to(ch);
 	}
 }
-
-devclass_t ahci_devclass;
 
 MODULE_VERSION(ahci, 1);
 MODULE_DEPEND(ahci, cam, 1, 1, 1);

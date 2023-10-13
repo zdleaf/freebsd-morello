@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2013 Bjoern A. Zeeb
  * All rights reserved.
@@ -31,8 +31,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/bus.h>
 #include <sys/kernel.h>
@@ -143,5 +141,5 @@ static driver_t atse_driver_fdt = {
 	sizeof(struct atse_softc)
 };
 
-DRIVER_MODULE(atse, simplebus, atse_driver_fdt, atse_devclass, 0, 0);
-DRIVER_MODULE(miibus, atse, miibus_driver, miibus_devclass, 0, 0);
+DRIVER_MODULE(atse, simplebus, atse_driver_fdt, 0, 0);
+DRIVER_MODULE(miibus, atse, miibus_driver, 0, 0);

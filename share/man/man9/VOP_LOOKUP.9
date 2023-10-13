@@ -26,8 +26,6 @@
 .\" (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 .\" THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 .\"
-.\" $FreeBSD$
-.\"
 .Dd August 8, 2018
 .Dt VOP_LOOKUP 9
 .Os
@@ -70,6 +68,7 @@ struct componentname {
 	long	cn_namelen;	/* length of looked up component */
 };
 .Ed
+.El
 .Pp
 Convert a component of a pathname into a pointer to a locked vnode.
 This is a very central and rather complicated routine.

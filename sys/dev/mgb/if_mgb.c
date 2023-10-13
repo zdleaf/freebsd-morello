@@ -28,8 +28,6 @@
  * SUCH DAMAGE.
  */
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 /*
  * Microchip LAN7430/LAN7431 PCIe to Gigabit Ethernet Controller driver.
  *
@@ -88,7 +86,7 @@ __FBSDID("$FreeBSD$");
 #include "ifdi_if.h"
 #include "miibus_if.h"
 
-static pci_vendor_info_t mgb_vendor_info_array[] = {
+static const pci_vendor_info_t mgb_vendor_info_array[] = {
 	PVID(MGB_MICROCHIP_VENDOR_ID, MGB_LAN7430_DEVICE_ID,
 	    "Microchip LAN7430 PCIe Gigabit Ethernet Controller"),
 	PVID(MGB_MICROCHIP_VENDOR_ID, MGB_LAN7431_DEVICE_ID,
@@ -206,17 +204,16 @@ static driver_t mgb_driver = {
 	"mgb", mgb_methods, sizeof(struct mgb_softc)
 };
 
-static devclass_t mgb_devclass;
-DRIVER_MODULE(mgb, pci, mgb_driver, mgb_devclass, NULL, NULL);
+DRIVER_MODULE(mgb, pci, mgb_driver, NULL, NULL);
 IFLIB_PNP_INFO(pci, mgb, mgb_vendor_info_array);
 MODULE_VERSION(mgb, 1);
 
 #if 0 /* MIIBUS_DEBUG */
 /* If MIIBUS debug stuff is in attach then order matters. Use below instead. */
-DRIVER_MODULE_ORDERED(miibus, mgb, miibus_driver, miibus_devclass, NULL, NULL,
+DRIVER_MODULE_ORDERED(miibus, mgb, miibus_driver, NULL, NULL,
     SI_ORDER_ANY);
 #endif /* MIIBUS_DEBUG */
-DRIVER_MODULE(miibus, mgb, miibus_driver, miibus_devclass, NULL, NULL);
+DRIVER_MODULE(miibus, mgb, miibus_driver, NULL, NULL);
 
 MODULE_DEPEND(mgb, pci, 1, 1, 1);
 MODULE_DEPEND(mgb, ether, 1, 1, 1);
@@ -254,6 +251,7 @@ static device_method_t mgb_iflib_methods[] = {
 	 */
 	DEVMETHOD(ifdi_vlan_register, mgb_vlan_register),
 	DEVMETHOD(ifdi_vlan_unregister, mgb_vlan_unregister),
+	DEVMETHOD(ifdi_needs_restart, mgb_if_needs_restart),
 
 	/*
 	 * Needed for WOL support
@@ -514,7 +512,7 @@ mgb_media_change(if_t ifp)
 
 	needs_reset = mii_mediachg(miid);
 	if (needs_reset != 0)
-		ifp->if_init(ctx);
+		if_init(ifp, ctx);
 	return (needs_reset);
 }
 
@@ -620,7 +618,7 @@ mgb_init(if_ctx_t ctx)
 		    error);
 }
 
-#ifdef DEBUG
+#if 0
 static void
 mgb_dump_some_stats(struct mgb_softc *sc)
 {

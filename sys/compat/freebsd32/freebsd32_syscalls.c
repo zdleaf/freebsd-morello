@@ -2,7 +2,6 @@
  * System call names.
  *
  * DO NOT EDIT-- this file is automatically @generated.
- * $FreeBSD$
  */
 
 const char *freebsd32_syscallnames[] = {
@@ -145,7 +144,7 @@ const char *freebsd32_syscallnames[] = {
 	"mkdir",			/* 136 = mkdir */
 	"rmdir",			/* 137 = rmdir */
 	"freebsd32_utimes",			/* 138 = freebsd32_utimes */
-	"obs_4.2",			/* 139 = obsolete 4.2 sigreturn */
+	"obs_freebsd32_sigreturn",			/* 139 = obsolete sigreturn */
 	"freebsd32_adjtime",			/* 140 = freebsd32_adjtime */
 	"compat.getpeername",		/* 141 = old getpeername */
 	"compat.gethostid",		/* 142 = old gethostid */
@@ -400,7 +399,7 @@ const char *freebsd32_syscallnames[] = {
 	"lchflags",			/* 391 = lchflags */
 	"uuidgen",			/* 392 = uuidgen */
 	"freebsd32_sendfile",			/* 393 = freebsd32_sendfile */
-	"#394",			/* 394 = mac_syscall */
+	"mac_syscall",			/* 394 = mac_syscall */
 	"compat11.freebsd32_getfsstat",		/* 395 = freebsd11 freebsd32_getfsstat */
 	"compat11.statfs",		/* 396 = freebsd11 statfs */
 	"compat11.fstatfs",		/* 397 = freebsd11 fstatfs */
@@ -589,4 +588,9 @@ const char *freebsd32_syscallnames[] = {
 	"fspacectl",			/* 580 = fspacectl */
 	"sched_getcpu",			/* 581 = sched_getcpu */
 	"swapoff",			/* 582 = swapoff */
+	"kqueuex",			/* 583 = kqueuex */
+	"membarrier",			/* 584 = membarrier */
+	"timerfd_create",			/* 585 = timerfd_create */
+	"freebsd32_timerfd_gettime",			/* 586 = freebsd32_timerfd_gettime */
+	"freebsd32_timerfd_settime",			/* 587 = freebsd32_timerfd_settime */
 };

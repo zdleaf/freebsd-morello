@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2009 Yahoo! Inc.
  * All rights reserved.
@@ -27,8 +27,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 /* PCI/PCI-X/PCIe bus interface for the Avago Tech (LSI) MPT2 controllers */
 
 /* TODO Move headers to mpsvar */
@@ -143,8 +141,7 @@ struct mps_ident {
 	{ 0, 0, 0, 0, 0, NULL }
 };
 
-static devclass_t	mps_devclass;
-DRIVER_MODULE(mps, pci, mps_pci_driver, mps_devclass, 0, 0);
+DRIVER_MODULE(mps, pci, mps_pci_driver, 0, 0);
 MODULE_DEPEND(mps, cam, 1, 1, 1);
 MODULE_PNP_INFO("U16:vendor;U16:device;U16:subvendor;U16:subdevice", pci, mps,
     mps_identifiers, nitems(mps_identifiers) - 1);

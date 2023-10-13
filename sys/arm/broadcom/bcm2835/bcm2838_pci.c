@@ -16,8 +16,6 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  *
  *
- * $FreeBSD$
- *
  */
 
 /*
@@ -28,8 +26,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/endian.h>
@@ -168,16 +164,14 @@ static void
 bcm_pcib_set_reg(struct bcm_pcib_softc *sc, uint32_t reg, uint32_t val)
 {
 
-	bus_space_write_4(sc->base.base.bst, sc->base.base.bsh, reg,
-	    htole32(val));
+	bus_write_4(sc->base.base.res, reg, htole32(val));
 }
 
 static uint32_t
 bcm_pcib_read_reg(struct bcm_pcib_softc *sc, uint32_t reg)
 {
 
-	return (le32toh(bus_space_read_4(sc->base.base.bst, sc->base.base.bsh,
-	    reg)));
+	return (le32toh(bus_read_4(sc->base.base.res, reg)));
 }
 
 static void
@@ -318,8 +312,6 @@ bcm_pcib_read_config(device_t dev, u_int bus, u_int slot, u_int func, u_int reg,
     int bytes)
 {
 	struct bcm_pcib_softc *sc;
-	bus_space_handle_t h;
-	bus_space_tag_t	t;
 	bus_addr_t offset;
 	uint32_t data;
 
@@ -330,18 +322,15 @@ bcm_pcib_read_config(device_t dev, u_int bus, u_int slot, u_int func, u_int reg,
 	mtx_lock(&sc->config_mtx);
 	offset = bcm_get_offset_and_prepare_config(sc, bus, slot, func, reg);
 
-	t = sc->base.base.bst;
-	h = sc->base.base.bsh;
-
 	switch (bytes) {
 	case 1:
-		data = bus_space_read_1(t, h, offset);
+		data = bus_read_1(sc->base.base.res, offset);
 		break;
 	case 2:
-		data = le16toh(bus_space_read_2(t, h, offset));
+		data = le16toh(bus_read_2(sc->base.base.res, offset));
 		break;
 	case 4:
-		data = le32toh(bus_space_read_4(t, h, offset));
+		data = le32toh(bus_read_4(sc->base.base.res, offset));
 		break;
 	default:
 		data = ~0U;
@@ -357,8 +346,6 @@ bcm_pcib_write_config(device_t dev, u_int bus, u_int slot,
     u_int func, u_int reg, uint32_t val, int bytes)
 {
 	struct bcm_pcib_softc *sc;
-	bus_space_handle_t h;
-	bus_space_tag_t	t;
 	uint32_t offset;
 
 	sc = device_get_softc(dev);
@@ -368,18 +355,15 @@ bcm_pcib_write_config(device_t dev, u_int bus, u_int slot,
 	mtx_lock(&sc->config_mtx);
 	offset = bcm_get_offset_and_prepare_config(sc, bus, slot, func, reg);
 
-	t = sc->base.base.bst;
-	h = sc->base.base.bsh;
-
 	switch (bytes) {
 	case 1:
-		bus_space_write_1(t, h, offset, val);
+		bus_write_1(sc->base.base.res, offset, val);
 		break;
 	case 2:
-		bus_space_write_2(t, h, offset, htole16(val));
+		bus_write_2(sc->base.base.res, offset, htole16(val));
 		break;
 	case 4:
-		bus_space_write_4(t, h, offset, htole32(val));
+		bus_write_4(sc->base.base.res, offset, htole32(val));
 		break;
 	default:
 		break;
@@ -513,7 +497,7 @@ bcm_pcib_msi_attach(device_t dev)
 	struct bcm_pcib_softc *sc;
 	phandle_t node, xref;
 	char const *bcm_name;
-	int i, rid;
+	int error, i, rid;
 
 	sc = device_get_softc(dev);
 	sc->msi_addr = 0xffffffffc;
@@ -532,11 +516,11 @@ bcm_pcib_msi_attach(device_t dev)
 	sc->msi_isrcs = malloc(sizeof(*sc->msi_isrcs) * NUM_MSI, M_DEVBUF,
 	    M_WAITOK | M_ZERO);
 
-	int error = bus_setup_intr(dev, sc->msi_irq_res, INTR_TYPE_BIO |
+	error = bus_setup_intr(dev, sc->msi_irq_res, INTR_TYPE_BIO |
 	    INTR_MPSAFE, bcm_pcib_msi_intr, NULL, sc, &sc->msi_intr_cookie);
-	if (error) {
+	if (error != 0) {
 		device_printf(dev, "error: failed to setup MSI handler.\n");
-		return (ENXIO);
+		return (error);
 	}
 
 	bcm_name = device_get_nameunit(dev);
@@ -544,10 +528,10 @@ bcm_pcib_msi_attach(device_t dev)
 		sc->msi_isrcs[i].irq = i;
 		error = intr_isrc_register(&sc->msi_isrcs[i].isrc, dev, 0,
 		    "%s,%u", bcm_name, i);
-		if (error) {
+		if (error != 0) {
 			device_printf(dev,
-			"error: failed to register interrupt %d.\n", i);
-			return (ENXIO);
+			    "error: failed to register interrupt %d.\n", i);
+			return (error);
 		}
 	}
 
@@ -556,8 +540,8 @@ bcm_pcib_msi_attach(device_t dev)
 	OF_device_register_xref(xref, dev);
 
 	error = intr_msi_register(dev, xref);
-	if (error)
-		return (ENXIO);
+	if (error != 0)
+		return (error);
 
 	mtx_init(&sc->msi_mtx, "bcm_pcib: msi_mtx", NULL, MTX_DEF);
 
@@ -651,15 +635,15 @@ bcm_pcib_attach(device_t dev)
 	    0, 					/* flags */
 	    NULL, NULL,				/* lockfunc, lockarg */
 	    &sc->dmat);
-	if (error)
+	if (error != 0)
 		return (error);
 
 	error = pci_host_generic_setup_fdt(dev);
-	if (error)
+	if (error != 0)
 		return (error);
 
 	error = bcm_pcib_check_ranges(dev);
-	if (error)
+	if (error != 0)
 		return (error);
 
 	mtx_init(&sc->config_mtx, "bcm_pcib: config_mtx", NULL, MTX_DEF);
@@ -743,7 +727,7 @@ bcm_pcib_attach(device_t dev)
 
 	/* Configure interrupts. */
 	error = bcm_pcib_msi_attach(dev);
-	if (error)
+	if (error != 0)
 		return (error);
 
 	/* Done. */
@@ -777,6 +761,5 @@ static device_method_t bcm_pcib_methods[] = {
 DEFINE_CLASS_1(pcib, bcm_pcib_driver, bcm_pcib_methods,
     sizeof(struct bcm_pcib_softc), generic_pcie_fdt_driver);
 
-static devclass_t bcm_pcib_devclass;
-DRIVER_MODULE(bcm_pcib, simplebus, bcm_pcib_driver, bcm_pcib_devclass, 0, 0);
+DRIVER_MODULE(bcm_pcib, simplebus, bcm_pcib_driver, 0, 0);
 

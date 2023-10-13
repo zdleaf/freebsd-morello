@@ -1,5 +1,5 @@
 #-
-# SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+# SPDX-License-Identifier: BSD-2-Clause
 #
 # Copyright (c) 2014 The FreeBSD Foundation
 #
@@ -27,9 +27,9 @@
 # OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 # SUCH DAMAGE.
 #
-# $FreeBSD$
 #
 
+#include <sys/bio.h>
 #include <sys/socket.h>
 #include <dev/iscsi/icl.h>
 
@@ -50,12 +50,30 @@ METHOD size_t pdu_data_segment_length {
 	const struct icl_pdu *_ip;
 };
 
+METHOD int pdu_append_bio {
+	struct icl_conn *_ic;
+	struct icl_pdu *_ip;
+	struct bio *_bp;
+	size_t _offset;
+	size_t _len;
+	int _flags;
+};
+
 METHOD int pdu_append_data {
 	struct icl_conn *_ic;
 	struct icl_pdu *_ip;
 	const void *_addr;
 	size_t _len;
 	int _flags;
+};
+
+METHOD void pdu_get_bio {
+	struct icl_conn *_ic;
+	struct icl_pdu *_ip;
+	size_t _pdu_off;
+	struct bio *_bp;
+	size_t _bio_off;
+	size_t _len;
 };
 
 METHOD void pdu_get_data {

@@ -39,8 +39,6 @@ static const char copyright[] =
 #if 0
 static char sccsid[] = "@(#)ul.c	8.1 (Berkeley) 6/6/93";
 #endif
-static const char rcsid[] =
-  "$FreeBSD$";
 #endif /* not lint */
 
 #include <err.h>
@@ -89,7 +87,7 @@ static int	halfpos;
 static int	upln;
 static int	iflag;
 
-static void usage(void);
+static void usage(void) __dead2;
 static void setnewmode(int);
 static void initcap(void);
 static void reverse(void);

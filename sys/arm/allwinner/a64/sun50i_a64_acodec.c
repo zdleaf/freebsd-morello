@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2020 Oleksandr Tymoshenko <gonzo@FreeBSD.org>
  * Copyright (c) 2018 Jared McNeill <jmcneill@invisible.ca>
@@ -24,13 +24,9 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/bus.h>
@@ -482,7 +478,5 @@ static driver_t a64codec_driver = {
 	sizeof(struct a64codec_softc),
 };
 
-static devclass_t a64codec_devclass;
-
-DRIVER_MODULE(a64codec, simplebus, a64codec_driver, a64codec_devclass, 0, 0);
+DRIVER_MODULE(a64codec, simplebus, a64codec_driver, 0, 0);
 SIMPLEBUS_PNP_INFO(compat_data);

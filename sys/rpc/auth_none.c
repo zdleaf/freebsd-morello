@@ -35,8 +35,6 @@ static char *sccsid2 = "@(#)auth_none.c 1.19 87/08/11 Copyr 1984 Sun Micro";
 static char *sccsid = "@(#)auth_none.c	2.1 88/07/29 4.0 RPCSRC";
 #endif
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 /*
  * auth_none.c
  * Creates a client authentication handle for passing "null"
@@ -103,7 +101,7 @@ authnone_init(void *dummy)
 SYSINIT(authnone_init, SI_SUB_KMEM, SI_ORDER_ANY, authnone_init, NULL);
 
 AUTH *
-authnone_create()
+authnone_create(void)
 {
 	struct authnone_private *ap = &authnone_private;
 

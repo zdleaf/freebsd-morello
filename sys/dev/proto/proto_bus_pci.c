@@ -24,8 +24,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/bus.h>
@@ -115,4 +113,4 @@ proto_pci_attach(device_t dev)
 	return (proto_attach(dev));
 }
 
-DRIVER_MODULE(proto, pci, proto_pci_driver, proto_devclass, NULL, NULL);
+DRIVER_MODULE(proto, pci, proto_pci_driver, NULL, NULL);

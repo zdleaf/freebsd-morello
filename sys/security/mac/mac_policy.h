@@ -38,8 +38,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 /*
  * Kernel interface for MAC policy modules.
@@ -66,18 +64,22 @@
 #include <sys/acl.h>	/* XXX acl_type_t */
 #include <sys/types.h>	/* XXX accmode_t */
 
+#include <ddb/ddb.h>	/* XXX db_expr_t */
+
 struct acl;
 struct auditinfo;
 struct auditinfo_addr;
 struct bpf_d;
 struct cdev;
 struct componentname;
+struct db_command;
 struct devfs_dirent;
 struct ifnet;
 struct image_params;
 struct inpcb;
 struct ip6q;
 struct ipq;
+struct kdb_dbbe;
 struct ksem;
 struct label;
 struct mac_policy_conf;
@@ -99,6 +101,9 @@ struct thread;
 struct ucred;
 struct vattr;
 struct vnode;
+
+struct in_addr;
+struct in6_addr;
 
 /*
  * Policy module operations.
@@ -167,6 +172,12 @@ typedef int	(*mpo_cred_internalize_label_t)(struct label *label,
 		    char *element_name, char *element_data, int *claimed);
 typedef void	(*mpo_cred_relabel_t)(struct ucred *cred,
 		    struct label *newlabel);
+
+typedef int	(*mpo_ddb_command_register_t)(struct db_command_table *table,
+		    struct db_command *cmd);
+typedef int	(*mpo_ddb_command_exec_t)(struct db_command *cmd,
+		    db_expr_t addr, bool have_addr, db_expr_t count,
+		    char *modif);
 
 typedef void	(*mpo_devfs_create_device_t)(struct ucred *cred,
 		    struct mount *mp, struct cdev *dev,
@@ -238,6 +249,12 @@ typedef void	(*mpo_ip6q_reassemble)(struct ip6q *q6, struct label *q6label,
 typedef void	(*mpo_ip6q_update_t)(struct mbuf *m, struct label *mlabel,
 		    struct ip6q *q6, struct label *q6label);
 
+/* Policy ops checking IPv4 and IPv6 address for ipacl. */
+typedef int	(*mpo_ip4_check_jail_t)(struct ucred *cred,
+		    const struct in_addr *ia, struct ifnet *ifp);
+typedef int	(*mpo_ip6_check_jail_t)(struct ucred *cred,
+		    const struct in6_addr *ia6, struct ifnet *ifp);
+
 typedef void	(*mpo_ipq_create_t)(struct mbuf *m, struct label *mlabel,
 		    struct ipq *q, struct label *qlabel);
 typedef void	(*mpo_ipq_destroy_label_t)(struct label *label);
@@ -248,6 +265,8 @@ typedef void	(*mpo_ipq_reassemble)(struct ipq *q, struct label *qlabel,
 		    struct mbuf *m, struct label *mlabel);
 typedef void	(*mpo_ipq_update_t)(struct mbuf *m, struct label *mlabel,
 		    struct ipq *q, struct label *qlabel);
+
+typedef int	(*mpo_kdb_check_backend_t)(struct kdb_dbbe *be);
 
 typedef int	(*mpo_kenv_check_dump_t)(struct ucred *cred);
 typedef int	(*mpo_kenv_check_get_t)(struct ucred *cred, char *name);
@@ -720,6 +739,9 @@ struct mac_policy_ops {
 	mpo_cred_internalize_label_t		mpo_cred_internalize_label;
 	mpo_cred_relabel_t			mpo_cred_relabel;
 
+	mpo_ddb_command_register_t		mpo_ddb_command_register;
+	mpo_ddb_command_exec_t			mpo_ddb_command_exec;
+
 	mpo_devfs_create_device_t		mpo_devfs_create_device;
 	mpo_devfs_create_directory_t		mpo_devfs_create_directory;
 	mpo_devfs_create_symlink_t		mpo_devfs_create_symlink;
@@ -747,6 +769,9 @@ struct mac_policy_ops {
 	mpo_inpcb_init_label_t			mpo_inpcb_init_label;
 	mpo_inpcb_sosetlabel_t			mpo_inpcb_sosetlabel;
 
+	mpo_ip4_check_jail_t			mpo_ip4_check_jail;
+	mpo_ip6_check_jail_t			mpo_ip6_check_jail;
+
 	mpo_ip6q_create_t			mpo_ip6q_create;
 	mpo_ip6q_destroy_label_t		mpo_ip6q_destroy_label;
 	mpo_ip6q_init_label_t			mpo_ip6q_init_label;
@@ -760,6 +785,8 @@ struct mac_policy_ops {
 	mpo_ipq_match_t				mpo_ipq_match;
 	mpo_ipq_reassemble			mpo_ipq_reassemble;
 	mpo_ipq_update_t			mpo_ipq_update;
+
+	mpo_kdb_check_backend_t			mpo_kdb_check_backend;
 
 	mpo_kenv_check_dump_t			mpo_kenv_check_dump;
 	mpo_kenv_check_get_t			mpo_kenv_check_get;
@@ -1005,8 +1032,9 @@ struct mac_policy_conf {
  *   2                       6.x
  *   3                       7.x
  *   4                       8.x
+ *   5                       14.x
  */
-#define	MAC_VERSION	4
+#define	MAC_VERSION	5
 
 #define	MAC_POLICY_SET(mpops, mpname, mpfullname, mpflags, privdata_wanted) \
 	static struct mac_policy_conf mpname##_mac_policy_conf = {	\

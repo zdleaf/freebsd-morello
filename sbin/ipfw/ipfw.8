@@ -1,7 +1,5 @@
 .\"
-.\" $FreeBSD$
-.\"
-.Dd June 14, 2021
+.Dd September 28, 2023
 .Dt IPFW 8
 .Os
 .Sh NAME
@@ -593,7 +591,7 @@ where the body of the rule specifies which information is used
 for filtering packets, among the following:
 .Pp
 .Bl -tag -width "Source and dest. addresses and ports" -offset XXX -compact
-.It Layer-2 header fields
+.It Layer2 header fields
 When available
 .It IPv4 and IPv6 Protocol
 SCTP, TCP, UDP, ICMP, etc.
@@ -759,7 +757,7 @@ A packet can have multiple tags at the same time.
 Tags are "sticky", meaning once a tag is applied to a packet by a
 matching rule it exists until explicit removal.
 Tags are kept with the packet everywhere within the kernel, but are
-lost when packet leaves the kernel, for example, on transmitting
+lost when the packet leaves the kernel, for example, on transmitting
 packet out to the network or sending packet to a
 .Xr divert 4
 socket.
@@ -793,6 +791,27 @@ keyword, the tag with the number
 is searched among the tags attached to this packet and,
 if found, removed from it.
 Other tags bound to packet, if present, are left untouched.
+.It Cm setmark Ar value | tablearg
+When a packet matches a rule with the
+.Cm setmark
+keyword, a 32-bit numeric mark is assigned to the packet.
+The mark is an extension to the tags.
+As tags, mark is "sticky" so the value is kept the same within the kernel and
+is lost when the packet leaves the kernel.
+Unlike tags, mark can be matched as a lookup table key or compared with bitwise
+mask applied against another value.
+Each packet can have only one mark, so
+.Cm setmark
+always overwrites the previous mark value.
+.Pp
+The initial mark value is 0.
+To check the current mark value, use the
+.Cm mark
+rule option.
+Mark
+.Ar value
+can be entered as decimal or hexadecimal (if prefixed by 0x), and they
+are always printed as hexadecimal.
 .It Cm altq Ar queue
 When a packet matches a rule with the
 .Cm altq
@@ -911,7 +930,7 @@ the local routing table for that IP.
 .br
 A
 .Ar fwd
-rule will not match layer-2 packets (those received
+rule will not match layer2 packets (those received
 on ether_input, ether_output, or bridged).
 .br
 The
@@ -1080,7 +1099,7 @@ Send a copy of packets matching this rule to the
 socket bound to port
 .Ar port .
 The search continues with the next rule.
-.It Cm unreach Ar code
+.It Cm unreach Ar code Op mtu
 Discard packets that match this rule, and try to send an ICMP
 unreachable notice with code
 .Ar code ,
@@ -1093,6 +1112,12 @@ is a number from 0 to 255, or one of these aliases:
 .Cm toshost , filter-prohib , host-precedence
 or
 .Cm precedence-cutoff .
+The
+.Cm needfrag
+code may have an optional
+.Ar mtu
+parameter.
+If specified, the MTU value will be put into generated ICMP packet.
 The search terminates.
 .It Cm unreach6 Ar code
 Discard packets that match this rule, and try to send an ICMPv6
@@ -1180,6 +1205,8 @@ Supported values are:
 .Pq Dv 100100 ,
 .Cm af43
 .Pq Dv 100110 ,
+.Cm va
+.Pq Dv 101100 ,
 .Cm ef
 .Pq Dv 101110 ,
 .Cm be
@@ -1610,6 +1637,20 @@ Matches IPv6 packets containing any of the flow labels given in
 .Ar labels .
 .Ar labels
 is a comma separated list of numeric flow labels.
+.It Cm dst-mac Ar table Ns Pq Ar name Ns Op , Ns Ar value
+Search for the destination MAC address entry in lookup table
+.Ar name .
+If not found, the match fails.
+Otherwise, the match succeeds and
+.Cm tablearg
+is set to the value extracted from the table.
+.It Cm src-mac Ar table Ns Pq Ar name Ns Op , Ns Ar value
+Search for the source MAC address entry in lookup table
+.Ar name .
+If not found, the match fails.
+Otherwise, the match succeeds and
+.Cm tablearg
+is set to the value extracted from the table.
 .It Cm frag Ar spec
 Matches IPv4 packets whose
 .Cm ip_off
@@ -1823,7 +1864,8 @@ set of parameters as specified in the rule.
 One or more
 of source and destination addresses and ports can be
 specified.
-.It Cm lookup Bro Cm dst-ip | dst-port | src-ip | src-port | uid | jail Brc Ar name
+.It Cm lookup Bro Cm dst-ip | dst-port | dst-mac | src-ip | src-port | src-mac | uid |
+.Cm jail | dscp | mark Brc Ar name
 Search an entry in lookup table
 .Ar name
 that matches the field specified as argument.
@@ -1896,13 +1938,24 @@ However, this option doesn't imply an implicit
 .Cm check-state
 in contrast to
 .Cm keep-state .
-.It Cm recv | xmit | via Brq Ar ifX | Ar if Ns Cm * | Ar table Ns Po Ar name Ns Oo , Ns Ar value Oc Pc | Ar ipno | Ar any
+.It Cm recv | xmit | via Brq Ar ifX | Ar ifmask | Ar table Ns Po Ar name Ns Oo , Ns Ar value Oc Pc | Ar ipno | Ar any
 Matches packets received, transmitted or going through,
 respectively, the interface specified by exact name
 .Po Ar ifX Pc ,
-by device name
-.Po Ar if* Pc ,
+by device mask
+.Po Ar ifmask Pc ,
 by IP address, or through some interface.
+.Pp
+Interface
+name may be matched against
+.Ar ifmask
+with
+.Xr fnmatch 3
+according to the rules used by the shell (f.e. tun*).
+See also the
+.Sx EXAMPLES
+section.
+.Pp
 Table
 .Ar name
 may be used to match interface by its kernel ifindex.
@@ -1984,6 +2037,23 @@ specified in the same way as
 Tags can be applied to the packet using
 .Cm tag
 rule action parameter (see it's description for details on tags).
+.It Cm mark Ar value[:bitmask] | tablearg[:bitmask]
+Matches packets whose mark is equal to
+.Ar value
+with optional
+.Ar bitmask
+applied to it.
+.Cm tablearg
+can also be used instead of an explicit
+.Ar value
+to match a value supplied by the last table lookup.
+.Pp
+Both
+.Ar value
+and
+.Ar bitmask
+can be entered as decimal or hexadecimal (if prefixed by 0x), and they
+are always printed as hexadecimal.
 .It Cm tcpack Ar ack
 TCP packets only.
 Match if the TCP header acknowledgment number field is set to
@@ -2133,7 +2203,7 @@ There may be up to 65535 different lookup tables.
 .Pp
 The following table types are supported:
 .Bl -tag -width indent
-.It Ar table-type : Ar addr | iface | number | flow
+.It Ar table-type : Ar addr | iface | number | flow | mac
 .It Ar table-key : Ar addr Ns Oo / Ns Ar masklen Oc | iface-name | number | flow-spec
 .It Ar flow-spec : Ar flow-field Ns Op , Ns Ar flow-spec
 .It Ar flow-field : src-ip | proto | src-port | dst-ip | dst-port
@@ -2163,6 +2233,20 @@ Ranges are not supported.
 Matches packet fields specified by
 .Ar flow
 type suboptions with table entries.
+.It Cm mac
+Matches MAC address.
+Each entry is represented by an
+.Ar addr Ns Op / Ns Ar masklen
+and will match all addresses with base
+.Ar addr
+and mask width of
+.Ar masklen
+bits.
+If
+.Ar masklen
+is not specified, it defaults to 48.
+When looking up an MAC address in a table, the most specific
+entry will match.
 .El
 .Pp
 Tables require explicit creation via
@@ -2266,7 +2350,7 @@ Shows generic table information and algo-specific data.
 The following lookup algorithms are supported:
 .Bl -tag -width indent
 .It Ar algo-desc : algo-name | "algo-name algo-data"
-.It Ar algo-name : Ar addr: radix | addr: hash | iface: array | number: array | flow: hash
+.It Ar algo-name : Ar addr: radix | addr: hash | iface: array | number: array | flow: hash | mac: radix
 .It Cm addr: radix
 Separate Radix trees for IPv4 and IPv6, the same way as the routing table (see
 .Xr route 4 ) .
@@ -2291,6 +2375,8 @@ Array storing sorted u32 numbers.
 Auto-growing hash storing flow entries.
 Search calculates hash on required packet fields and searches for matching
 entries in selected bucket.
+.It Cm mac: radix
+Radix tree for MAC address
 .El
 .Pp
 The
@@ -2310,7 +2396,7 @@ The following value types are supported:
 .Bl -tag -width indent
 .It Ar value-mask : Ar value-type Ns Op , Ns Ar value-mask
 .It Ar value-type : Ar skipto | pipe | fib | nat | dscp | tag | divert |
-.Ar netgraph | limit | ipv4
+.Ar netgraph | limit | ipv4 | ipv6 | mark
 .It Cm skipto
 rule number to jump to.
 .It Cm pipe
@@ -2333,16 +2419,19 @@ maximum number of connections.
 IPv4 nexthop to fwd packets to.
 .It Cm ipv6
 IPv6 nexthop to fwd packets to.
+.It Cm mark
+mark value to match/set.
 .El
 .Pp
 The
 .Cm tablearg
 argument can be used with the following actions:
 .Cm nat, pipe, queue, divert, tee, netgraph, ngtee, fwd, skipto, setfib ,
+.Cm setmark ,
 action parameters:
 .Cm tag, untag ,
 rule options:
-.Cm limit, tagged .
+.Cm limit, tagged, mark .
 .Pp
 When used with the
 .Cm skipto
@@ -3277,8 +3366,8 @@ Obey transparent proxy rules only, packet aliasing is not performed.
 .It Cm skip_global
 Skip instance in case of global state lookup (see below).
 .It Cm port_range Ar lower-upper
-Set the aliasing ports between the ranges given. Upper port has to be greater
-than lower.
+Set the aliasing ports between the ranges given.
+Upper port has to be greater than lower.
 .El
 .Pp
 Some special values can be supplied instead of
@@ -3672,6 +3761,16 @@ or
 .Xr kenv 1
 before ipfw module gets loaded.
 .Bl -tag -width indent
+.It Va net.inet.ip.fw.enable : No 1
+Enables the firewall.
+Setting this variable to 0 lets you run your machine without
+firewall even if compiled in.
+.It Va net.inet6.ip6.fw.enable : No 1
+provides the same functionality as above for the IPv6 case.
+.It Va net.link.ether.ipfw : No 0
+Controls whether layer2 packets are passed to
+.Nm .
+Default is no.
 .It Va net.inet.ip.fw.default_to_accept : No 0
 Defines ipfw last rule behavior.
 This value overrides
@@ -4065,12 +4164,6 @@ Keep dynamic states on rule/set deletion.
 States are relinked to default rule (65535).
 This can be handly for ruleset reload.
 Turned off by default.
-.It Va net.inet.ip.fw.enable : No 1
-Enables the firewall.
-Setting this variable to 0 lets you run your machine without
-firewall even if compiled in.
-.It Va net.inet6.ip6.fw.enable : No 1
-provides the same functionality as above for the IPv6 case.
 .It Va net.inet.ip.fw.one_pass : No 1
 When set, the packet exiting from the
 .Nm dummynet
@@ -4087,10 +4180,6 @@ Enables verbose messages.
 Limits the number of messages produced by a verbose firewall.
 .It Va net.inet6.ip6.fw.deny_unknown_exthdrs : No 1
 If enabled packets with unknown IPv6 Extension Headers will be denied.
-.It Va net.link.ether.ipfw : No 0
-Controls whether layer-2 packets are passed to
-.Nm .
-Default is no.
 .It Va net.link.bridge.ipfw : No 0
 Controls whether bridged packets are passed to
 .Nm .
@@ -4184,6 +4273,12 @@ of clients, as below:
 .Dl "ipfw add allow ip from ${goodguys} to any"
 .Dl "ipfw add deny ip from ${badguys} to any"
 .Dl "... normal policies ..."
+.Pp
+Allow any transit packets coming from single vlan 10 and
+going out to vlans 100-1000:
+.Pp
+.Dl "ipfw add 10 allow out recv vlan10 \e"
+.Dl "{ xmit vlan1000 or xmit \*qvlan[1-9]??\*q }"
 .Pp
 The
 .Cm verrevpath
@@ -4593,7 +4688,7 @@ Bear in mind that this is example only and it is not very useful by itself.
 .Pp
 On way out, after all checks place this rules:
 .Pp
-.Dl "ipfw add allow record-state skip-action"
+.Dl "ipfw add allow record-state defer-action"
 .Dl "ipfw add nat 1"
 .Pp
 And on way in there should be something like this:
@@ -4708,6 +4803,7 @@ can be changed in a similar way as for
 .Sh SEE ALSO
 .Xr cpp 1 ,
 .Xr m4 1 ,
+.Xr fnmatch 3 ,
 .Xr altq 4 ,
 .Xr divert 4 ,
 .Xr dummynet 4 ,

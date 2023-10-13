@@ -32,8 +32,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include "opt_capsicum.h"
 
 #include <sys/param.h>
@@ -102,6 +100,8 @@ static bool __elfN(check_note)(struct image_params *imgp,
     uint32_t *fctl0);
 static vm_prot_t __elfN(trans_prot)(Elf_Word);
 static Elf_Word __elfN(untrans_prot)(vm_prot_t);
+static size_t __elfN(prepare_register_notes)(struct thread *td,
+    struct note_info_list *list, struct thread *target_td);
 
 SYSCTL_NODE(_kern, OID_AUTO, __CONCAT(elf, __ELF_WORD_SIZE),
     CTLFLAG_RW | CTLFLAG_MPSAFE, 0,
@@ -171,10 +171,9 @@ SYSCTL_NODE(__CONCAT(_kern_elf, __ELF_WORD_SIZE), OID_AUTO, aslr,
 #define	ASLR_NODE_OID	__CONCAT(__CONCAT(_kern_elf, __ELF_WORD_SIZE), _aslr)
 
 /*
- * While for 64-bit machines ASLR works properly, there are
- * still some problems when using 32-bit architectures. For this
- * reason ASLR is only enabled by default when running native
- * 64-bit non-PIE executables.
+ * Enable ASLR by default for 64-bit non-PIE binaries.  32-bit architectures
+ * have limited address space (which can cause issues for applications with
+ * high memory use) so we leave it off there.
  */
 static int __elfN(aslr_enabled) = __ELF_WORD_SIZE == 64;
 SYSCTL_INT(ASLR_NODE_OID, OID_AUTO, enable, CTLFLAG_RWTUN,
@@ -183,7 +182,7 @@ SYSCTL_INT(ASLR_NODE_OID, OID_AUTO, enable, CTLFLAG_RWTUN,
     ": enable address map randomization");
 
 /*
- * Enable ASLR only for 64-bit PIE binaries by default.
+ * Enable ASLR by default for 64-bit PIE binaries.
  */
 static int __elfN(pie_aslr_enabled) = __ELF_WORD_SIZE == 64;
 SYSCTL_INT(ASLR_NODE_OID, OID_AUTO, pie_enable, CTLFLAG_RWTUN,
@@ -192,9 +191,9 @@ SYSCTL_INT(ASLR_NODE_OID, OID_AUTO, pie_enable, CTLFLAG_RWTUN,
     ": enable address map randomization for PIE binaries");
 
 /*
- * Sbrk is now deprecated and it can be assumed, that in most
- * cases it will not be used anyway. This setting is valid only
- * for the ASLR enabled and allows for utilizing the bss grow region.
+ * Sbrk is deprecated and it can be assumed that in most cases it will not be
+ * used anyway. This setting is valid only with ASLR enabled, and allows ASLR
+ * to use the bss grow region.
  */
 static int __elfN(aslr_honor_sbrk) = 0;
 SYSCTL_INT(ASLR_NODE_OID, OID_AUTO, honor_sbrk, CTLFLAG_RW,
@@ -206,6 +205,12 @@ SYSCTL_INT(ASLR_NODE_OID, OID_AUTO, stack, CTLFLAG_RWTUN,
     &__elfN(aslr_stack), 0,
     __XSTRING(__CONCAT(ELF, __ELF_WORD_SIZE))
     ": enable stack address randomization");
+
+static int __elfN(aslr_shared_page) = __ELF_WORD_SIZE == 64;
+SYSCTL_INT(ASLR_NODE_OID, OID_AUTO, shared_page, CTLFLAG_RWTUN,
+    &__elfN(aslr_shared_page), 0,
+    __XSTRING(__CONCAT(ELF, __ELF_WORD_SIZE))
+    ": enable shared page address randomization");
 
 static int __elfN(sigfastblock) = 1;
 SYSCTL_INT(__CONCAT(_kern_elf, __ELF_WORD_SIZE), OID_AUTO, sigfastblock,
@@ -814,7 +819,7 @@ __elfN(load_file)(struct proc *p, const char *file, u_long *addr,
 		nd->ni_vp = NULL;
 		goto fail;
 	}
-	NDFREE(nd, NDF_ONLY_PNBUF);
+	NDFREE_PNBUF(nd);
 	imgp->vp = nd->ni_vp;
 
 	/*
@@ -917,7 +922,7 @@ __CONCAT(rnd_, __elfN(base))(vm_map_t map, u_long minv, u_long maxv,
 
 static int
 __elfN(enforce_limits)(struct image_params *imgp, const Elf_Ehdr *hdr,
-    const Elf_Phdr *phdr, u_long et_dyn_addr)
+    const Elf_Phdr *phdr)
 {
 	struct vmspace *vmspace;
 	const char *err_str;
@@ -932,9 +937,9 @@ __elfN(enforce_limits)(struct image_params *imgp, const Elf_Ehdr *hdr,
 		if (phdr[i].p_type != PT_LOAD || phdr[i].p_memsz == 0)
 			continue;
 
-		seg_addr = trunc_page(phdr[i].p_vaddr + et_dyn_addr);
+		seg_addr = trunc_page(phdr[i].p_vaddr + imgp->et_dyn_addr);
 		seg_size = round_page(phdr[i].p_memsz +
-		    phdr[i].p_vaddr + et_dyn_addr - seg_addr);
+		    phdr[i].p_vaddr + imgp->et_dyn_addr - seg_addr);
 
 		/*
 		 * Make the largest executable segment the official
@@ -1062,19 +1067,7 @@ static int
 __elfN(load_interp)(struct image_params *imgp, const Elf_Brandinfo *brand_info,
     const char *interp, u_long *addr, u_long *entry)
 {
-	char *path;
 	int error;
-
-	if (brand_info->emul_path != NULL &&
-	    brand_info->emul_path[0] != '\0') {
-		path = malloc(MAXPATHLEN, M_TEMP, M_WAITOK);
-		snprintf(path, MAXPATHLEN, "%s%s",
-		    brand_info->emul_path, interp);
-		error = __elfN(load_file)(imgp->proc, path, addr, entry);
-		free(path, M_TEMP);
-		if (error == 0)
-			return (0);
-	}
 
 	if (brand_info->interp_newpath != NULL &&
 	    (brand_info->interp_path == NULL ||
@@ -1111,7 +1104,7 @@ __CONCAT(exec_, __elfN(imgact))(struct image_params *imgp)
 	char *interp;
 	Elf_Brandinfo *brand_info;
 	struct sysentvec *sv;
-	u_long addr, baddr, et_dyn_addr, entry, proghdr;
+	u_long addr, baddr, entry, proghdr;
 	u_long maxalign, maxsalign, mapsz, maxv, maxv1, anon_loc;
 	uint32_t fctl0;
 	int32_t osrel;
@@ -1214,9 +1207,16 @@ __CONCAT(exec_, __elfN(imgact))(struct image_params *imgp)
 				goto ret;
 			break;
 		case PT_GNU_STACK:
-			if (__elfN(nxstack))
+			if (__elfN(nxstack)) {
 				imgp->stack_prot =
 				    __elfN(trans_prot)(phdr[i].p_flags);
+				if ((imgp->stack_prot & VM_PROT_RW) !=
+				    VM_PROT_RW) {
+					uprintf("Invalid PT_GNU_STACK\n");
+					error = ENOEXEC;
+					goto ret;
+				}
+			}
 			imgp->stack_sz = phdr[i].p_memsz;
 			break;
 		case PT_PHDR: 	/* Program header table info */
@@ -1233,7 +1233,6 @@ __CONCAT(exec_, __elfN(imgact))(struct image_params *imgp)
 		goto ret;
 	}
 	sv = brand_info->sysvec;
-	et_dyn_addr = 0;
 	if (hdr->e_type == ET_DYN) {
 		if ((brand_info->flags & BI_CAN_EXEC_DYN) == 0) {
 			uprintf("Cannot execute shared object\n");
@@ -1247,13 +1246,13 @@ __CONCAT(exec_, __elfN(imgact))(struct image_params *imgp)
 		if (baddr == 0) {
 			if ((sv->sv_flags & SV_ASLR) == 0 ||
 			    (fctl0 & NT_FREEBSD_FCTL_ASLR_DISABLE) != 0)
-				et_dyn_addr = __elfN(pie_base);
+				imgp->et_dyn_addr = __elfN(pie_base);
 			else if ((__elfN(pie_aslr_enabled) &&
 			    (imgp->proc->p_flag2 & P2_ASLR_DISABLE) == 0) ||
 			    (imgp->proc->p_flag2 & P2_ASLR_ENABLE) != 0)
-				et_dyn_addr = ET_DYN_ADDR_RAND;
+				imgp->et_dyn_addr = ET_DYN_ADDR_RAND;
 			else
-				et_dyn_addr = __elfN(pie_base);
+				imgp->et_dyn_addr = __elfN(pie_base);
 		}
 	}
 
@@ -1286,11 +1285,11 @@ __CONCAT(exec_, __elfN(imgact))(struct image_params *imgp)
 	if ((sv->sv_flags & SV_ASLR) == 0 ||
 	    (imgp->proc->p_flag2 & P2_ASLR_DISABLE) != 0 ||
 	    (fctl0 & NT_FREEBSD_FCTL_ASLR_DISABLE) != 0) {
-		KASSERT(et_dyn_addr != ET_DYN_ADDR_RAND,
-		    ("et_dyn_addr == RAND and !ASLR"));
+		KASSERT(imgp->et_dyn_addr != ET_DYN_ADDR_RAND,
+		    ("imgp->et_dyn_addr == RAND and !ASLR"));
 	} else if ((imgp->proc->p_flag2 & P2_ASLR_ENABLE) != 0 ||
 	    (__elfN(aslr_enabled) && hdr->e_type == ET_EXEC) ||
-	    et_dyn_addr == ET_DYN_ADDR_RAND) {
+	    imgp->et_dyn_addr == ET_DYN_ADDR_RAND) {
 		imgp->map_flags |= MAP_ASLR;
 		/*
 		 * If user does not care about sbrk, utilize the bss
@@ -1303,6 +1302,8 @@ __CONCAT(exec_, __elfN(imgact))(struct image_params *imgp)
 			imgp->map_flags |= MAP_ASLR_IGNSTART;
 		if (__elfN(aslr_stack))
 			imgp->map_flags |= MAP_ASLR_STACK;
+		if (__elfN(aslr_shared_page))
+			imgp->imgp_flags |= IMGP_ASLR_SHARED_PAGE;
 	}
 
 	if ((!__elfN(allow_wx) && (fctl0 & NT_FREEBSD_FCTL_WXNEEDED) == 0 &&
@@ -1325,24 +1326,24 @@ __CONCAT(exec_, __elfN(imgact))(struct image_params *imgp)
 		error = ENOEXEC;
 	}
 
-	if (error == 0 && et_dyn_addr == ET_DYN_ADDR_RAND) {
+	if (error == 0 && imgp->et_dyn_addr == ET_DYN_ADDR_RAND) {
 		KASSERT((map->flags & MAP_ASLR) != 0,
 		    ("ET_DYN_ADDR_RAND but !MAP_ASLR"));
 		error = __CONCAT(rnd_, __elfN(base))(map,
 		    vm_map_min(map) + mapsz + lim_max(td, RLIMIT_DATA),
 		    /* reserve half of the address space to interpreter */
-		    maxv / 2, maxalign, &et_dyn_addr);
+		    maxv / 2, maxalign, &imgp->et_dyn_addr);
 	}
 
 	vn_lock(imgp->vp, LK_SHARED | LK_RETRY);
 	if (error != 0)
 		goto ret;
 
-	error = __elfN(load_sections)(imgp, hdr, phdr, et_dyn_addr, NULL);
+	error = __elfN(load_sections)(imgp, hdr, phdr, imgp->et_dyn_addr, NULL);
 	if (error != 0)
 		goto ret;
 
-	error = __elfN(enforce_limits)(imgp, hdr, phdr, et_dyn_addr);
+	error = __elfN(enforce_limits)(imgp, hdr, phdr);
 	if (error != 0)
 		goto ret;
 
@@ -1366,7 +1367,7 @@ __CONCAT(exec_, __elfN(imgact))(struct image_params *imgp)
 		map->anon_loc = addr;
 	}
 
-	entry = (u_long)hdr->e_entry + et_dyn_addr;
+	entry = (u_long)hdr->e_entry + imgp->et_dyn_addr;
 	imgp->entry_addr = entry;
 
 	if (interp != NULL) {
@@ -1385,7 +1386,7 @@ __CONCAT(exec_, __elfN(imgact))(struct image_params *imgp)
 		if (error != 0)
 			goto ret;
 	} else
-		addr = et_dyn_addr;
+		addr = imgp->et_dyn_addr;
 
 	error = exec_map_stack(imgp);
 	if (error != 0)
@@ -1401,7 +1402,7 @@ __CONCAT(exec_, __elfN(imgact))(struct image_params *imgp)
 		vn_lock(imgp->vp, LK_SHARED | LK_RETRY);
 	}
 	elf_auxargs->execfd = -1;
-	elf_auxargs->phdr = proghdr + et_dyn_addr;
+	elf_auxargs->phdr = proghdr + imgp->et_dyn_addr;
 	elf_auxargs->phent = hdr->e_phentsize;
 	elf_auxargs->phnum = hdr->e_phnum;
 	elf_auxargs->pagesz = PAGE_SIZE;
@@ -1431,10 +1432,14 @@ __elfN(freebsd_copyout_auxargs)(struct image_params *imgp, uintptr_t base)
 {
 	Elf_Auxargs *args = (Elf_Auxargs *)imgp->auxargs;
 	Elf_Auxinfo *argarray, *pos;
-	int error;
+	struct vmspace *vmspace;
+	rlim_t stacksz;
+	int error, bsdflags, oc;
 
 	argarray = pos = malloc(AT_COUNT * sizeof(*pos), M_TEMP,
 	    M_WAITOK | M_ZERO);
+
+	vmspace = imgp->proc->p_vmspace;
 
 	if (args->execfd != -1)
 		AUXARGS_ENTRY(pos, AT_EXECFD, args->execfd);
@@ -1459,9 +1464,9 @@ __elfN(freebsd_copyout_auxargs)(struct image_params *imgp, uintptr_t base)
 		AUXARGS_ENTRY_PTR(pos, AT_PAGESIZES, imgp->pagesizes);
 		AUXARGS_ENTRY(pos, AT_PAGESIZESLEN, imgp->pagesizeslen);
 	}
-	if (imgp->sysent->sv_timekeep_base != 0) {
+	if ((imgp->sysent->sv_flags & SV_TIMEKEEP) != 0) {
 		AUXARGS_ENTRY(pos, AT_TIMEKEEP,
-		    imgp->sysent->sv_timekeep_base);
+		    vmspace->vm_shp_base + imgp->sysent->sv_timekeep_offset);
 	}
 	AUXARGS_ENTRY(pos, AT_STACKPROT, imgp->sysent->sv_shared_page_obj
 	    != NULL && imgp->stack_prot != 0 ? imgp->stack_prot :
@@ -1470,17 +1475,30 @@ __elfN(freebsd_copyout_auxargs)(struct image_params *imgp, uintptr_t base)
 		AUXARGS_ENTRY(pos, AT_HWCAP, *imgp->sysent->sv_hwcap);
 	if (imgp->sysent->sv_hwcap2 != NULL)
 		AUXARGS_ENTRY(pos, AT_HWCAP2, *imgp->sysent->sv_hwcap2);
-	AUXARGS_ENTRY(pos, AT_BSDFLAGS, __elfN(sigfastblock) ?
-	    ELF_BSDF_SIGFASTBLK : 0);
+	bsdflags = 0;
+	bsdflags |= __elfN(sigfastblock) ? ELF_BSDF_SIGFASTBLK : 0;
+	oc = atomic_load_int(&vm_overcommit);
+	bsdflags |= (oc & (SWAP_RESERVE_FORCE_ON | SWAP_RESERVE_RLIMIT_ON)) !=
+	    0 ? ELF_BSDF_VMNOOVERCOMMIT : 0;
+	AUXARGS_ENTRY(pos, AT_BSDFLAGS, bsdflags);
 	AUXARGS_ENTRY(pos, AT_ARGC, imgp->args->argc);
 	AUXARGS_ENTRY_PTR(pos, AT_ARGV, imgp->argv);
 	AUXARGS_ENTRY(pos, AT_ENVC, imgp->args->envc);
 	AUXARGS_ENTRY_PTR(pos, AT_ENVV, imgp->envv);
 	AUXARGS_ENTRY_PTR(pos, AT_PS_STRINGS, imgp->ps_strings);
-	if (imgp->sysent->sv_fxrng_gen_base != 0)
-		AUXARGS_ENTRY(pos, AT_FXRNG, imgp->sysent->sv_fxrng_gen_base);
-	if (imgp->sysent->sv_vdso_base != 0 && __elfN(vdso) != 0)
-		AUXARGS_ENTRY(pos, AT_KPRELOAD, imgp->sysent->sv_vdso_base);
+#ifdef RANDOM_FENESTRASX
+	if ((imgp->sysent->sv_flags & SV_RNG_SEED_VER) != 0) {
+		AUXARGS_ENTRY(pos, AT_FXRNG,
+		    vmspace->vm_shp_base + imgp->sysent->sv_fxrng_gen_offset);
+	}
+#endif
+	if ((imgp->sysent->sv_flags & SV_DSO_SIG) != 0 && __elfN(vdso) != 0) {
+		AUXARGS_ENTRY(pos, AT_KPRELOAD,
+		    vmspace->vm_shp_base + imgp->sysent->sv_vdso_offset);
+	}
+	AUXARGS_ENTRY(pos, AT_USRSTACKBASE, round_page(vmspace->vm_stacktop));
+	stacksz = imgp->proc->p_limit->pl_rlimit[RLIMIT_STACK].rlim_cur;
+	AUXARGS_ENTRY(pos, AT_USRSTACKLIM, stacksz);
 	AUXARGS_ENTRY(pos, AT_NULL, 0);
 
 	free(imgp->auxargs, M_TEMP);
@@ -1519,6 +1537,7 @@ struct phdr_closure {
 
 struct note_info {
 	int		type;		/* Note type. */
+	struct regset	*regset;	/* Register set. */
 	outfunc_t 	outfunc; 	/* Output function. */
 	void		*outarg;	/* Argument for the output function. */
 	size_t		outsize;	/* Output size. */
@@ -1538,12 +1557,8 @@ static int __elfN(corehdr)(struct coredump_params *, int, void *, size_t,
     struct note_info_list *, size_t, int);
 static void __elfN(putnote)(struct thread *td, struct note_info *, struct sbuf *);
 
-static void __elfN(note_fpregset)(void *, struct sbuf *, size_t *);
 static void __elfN(note_prpsinfo)(void *, struct sbuf *, size_t *);
-static void __elfN(note_prstatus)(void *, struct sbuf *, size_t *);
 static void __elfN(note_threadmd)(void *, struct sbuf *, size_t *);
-static void __elfN(note_thrmisc)(void *, struct sbuf *, size_t *);
-static void __elfN(note_ptlwpinfo)(void *, struct sbuf *, size_t *);
 static void __elfN(note_procstat_auxv)(void *, struct sbuf *, size_t *);
 static void __elfN(note_procstat_proc)(void *, struct sbuf *, size_t *);
 static void __elfN(note_procstat_psstrings)(void *, struct sbuf *, size_t *);
@@ -1833,7 +1848,8 @@ __elfN(prepare_notes)(struct thread *td, struct note_info_list *list,
 	p = td->td_proc;
 	size = 0;
 
-	size += __elfN(register_note)(td, list, NT_PRPSINFO, __elfN(note_prpsinfo), p);
+	size += __elfN(register_note)(td, list, NT_PRPSINFO,
+	    __elfN(note_prpsinfo), p);
 
 	/*
 	 * To have the debugger select the right thread (LWP) as the initial
@@ -1843,14 +1859,7 @@ __elfN(prepare_notes)(struct thread *td, struct note_info_list *list,
 	 */
 	thr = td;
 	while (thr != NULL) {
-		size += __elfN(register_note)(td, list, NT_PRSTATUS,
-		    __elfN(note_prstatus), thr);
-		size += __elfN(register_note)(td, list, NT_FPREGSET,
-		    __elfN(note_fpregset), thr);
-		size += __elfN(register_note)(td, list, NT_THRMISC,
-		    __elfN(note_thrmisc), thr);
-		size += __elfN(register_note)(td, list, NT_PTLWPINFO,
-		    __elfN(note_ptlwpinfo), thr);
+		size += __elfN(prepare_register_notes)(td, list, thr);
 		size += __elfN(register_note)(td, list, -1,
 		    __elfN(note_threadmd), thr);
 
@@ -1968,6 +1977,34 @@ __elfN(puthdr)(struct thread *td, void *hdr, size_t hdrsize, int numsegs,
 	each_dumpable_segment(td, cb_put_phdr, &phc, flags);
 }
 
+static size_t
+__elfN(register_regset_note)(struct thread *td, struct note_info_list *list,
+    struct regset *regset, struct thread *target_td)
+{
+	const struct sysentvec *sv;
+	struct note_info *ninfo;
+	size_t size, notesize;
+
+	size = 0;
+	if (!regset->get(regset, target_td, NULL, &size) || size == 0)
+		return (0);
+
+	ninfo = malloc(sizeof(*ninfo), M_TEMP, M_ZERO | M_WAITOK);
+	ninfo->type = regset->note;
+	ninfo->regset = regset;
+	ninfo->outarg = target_td;
+	ninfo->outsize = size;
+	TAILQ_INSERT_TAIL(list, ninfo, link);
+
+	sv = td->td_proc->p_sysent;
+	notesize = sizeof(Elf_Note) +		/* note header */
+	    roundup2(strlen(sv->sv_elf_core_abi_vendor) + 1, ELF_NOTE_ROUNDSIZE) +
+						/* note name */
+	    roundup2(size, ELF_NOTE_ROUNDSIZE);	/* note description */
+
+	return (notesize);
+}
+
 size_t
 __elfN(register_note)(struct thread *td, struct note_info_list *list,
     int type, outfunc_t out, void *arg)
@@ -2066,7 +2103,16 @@ __elfN(putnote)(struct thread *td, struct note_info *ninfo, struct sbuf *sb)
 	if (note.n_descsz == 0)
 		return;
 	sbuf_start_section(sb, &old_len);
-	ninfo->outfunc(ninfo->outarg, sb, &ninfo->outsize);
+	if (ninfo->regset != NULL) {
+		struct regset *regset = ninfo->regset;
+		void *buf;
+
+		buf = malloc(ninfo->outsize, M_TEMP, M_ZERO | M_WAITOK);
+		(void)regset->get(regset, ninfo->outarg, buf, &ninfo->outsize);
+		sbuf_bcat(sb, buf, ninfo->outsize);
+		free(buf, M_TEMP);
+	} else
+		ninfo->outfunc(ninfo->outarg, sb, &ninfo->outsize);
 	sect_len = sbuf_end_section(sb, old_len, ELF_NOTE_ROUNDSIZE, 0);
 	if (sect_len < 0)
 		return;
@@ -2110,6 +2156,7 @@ typedef struct fpreg32 elf_prfpregset_t;
 typedef struct fpreg32 elf_fpregset_t;
 typedef struct reg32 elf_gregset_t;
 typedef struct thrmisc32 elf_thrmisc_t;
+typedef struct ptrace_lwpinfo32 elf_lwpinfo_t;
 #define ELF_KERN_PROC_MASK	KERN_PROC_MASK32
 typedef struct kinfo_proc32 elf_kinfo_proc_t;
 typedef uint32_t elf_ps_strings_t;
@@ -2120,6 +2167,7 @@ typedef prfpregset_t elf_prfpregset_t;
 typedef prfpregset_t elf_fpregset_t;
 typedef gregset_t elf_gregset_t;
 typedef thrmisc_t elf_thrmisc_t;
+typedef struct ptrace_lwpinfo elf_lwpinfo_t;
 #define ELF_KERN_PROC_MASK	0
 typedef struct kinfo_proc elf_kinfo_proc_t;
 typedef vm_offset_t elf_ps_strings_t;
@@ -2157,13 +2205,16 @@ __elfN(note_prpsinfo)(void *arg, struct sbuf *sb, size_t *sizep)
 			    sizeof(psinfo->pr_psargs), SBUF_FIXEDLEN);
 			error = proc_getargv(curthread, p, &sbarg);
 			PRELE(p);
-			if (sbuf_finish(&sbarg) == 0)
-				len = sbuf_len(&sbarg) - 1;
-			else
+			if (sbuf_finish(&sbarg) == 0) {
+				len = sbuf_len(&sbarg);
+				if (len > 0)
+					len--;
+			} else {
 				len = sizeof(psinfo->pr_psargs) - 1;
+			}
 			sbuf_delete(&sbarg);
 		}
-		if (error || len == 0)
+		if (error != 0 || len == 0 || (ssize_t)len == -1)
 			strlcpy(psinfo->pr_psargs, p->p_comm,
 			    sizeof(psinfo->pr_psargs));
 		else {
@@ -2196,6 +2247,7 @@ __elfN(get_prstatus)(struct regset *rs, struct thread *td, void *buf,
 		KASSERT(*sizep == sizeof(*status), ("%s: invalid size",
 		    __func__));
 		status = buf;
+		memset(status, 0, *sizep);
 		status->pr_version = PRSTATUS_VERSION;
 		status->pr_statussz = sizeof(elf_prstatus_t);
 		status->pr_gregsetsz = sizeof(elf_gregset_t);
@@ -2237,24 +2289,6 @@ static struct regset __elfN(regset_prstatus) = {
 };
 ELF_REGSET(__elfN(regset_prstatus));
 
-static void
-__elfN(note_prstatus)(void *arg, struct sbuf *sb, size_t *sizep)
-{
-	struct thread *td;
-	elf_prstatus_t *status;
-
-	td = arg;
-	if (sb != NULL) {
-		KASSERT(*sizep == sizeof(*status), ("%s: invalid size",
-		    __func__));
-		status = malloc(sizeof(*status), M_TEMP, M_ZERO | M_WAITOK);
-		__elfN(get_prstatus)(NULL, td, status, sizep);
-		sbuf_bcat(sb, status, sizeof(*status));
-		free(status, M_TEMP);
-	}
-	*sizep = sizeof(*status);
-}
-
 static bool
 __elfN(get_fpregset)(struct regset *rs, struct thread *td, void *buf,
     size_t *sizep)
@@ -2271,7 +2305,7 @@ __elfN(get_fpregset)(struct regset *rs, struct thread *td, void *buf,
 		fill_fpregs(td, fpregset);
 #endif
 	}
-	*sizep = sizeof(fpregset);
+	*sizep = sizeof(*fpregset);
 	return (true);
 }
 
@@ -2299,57 +2333,43 @@ static struct regset __elfN(regset_fpregset) = {
 };
 ELF_REGSET(__elfN(regset_fpregset));
 
-static void
-__elfN(note_fpregset)(void *arg, struct sbuf *sb, size_t *sizep)
+static bool
+__elfN(get_thrmisc)(struct regset *rs, struct thread *td, void *buf,
+    size_t *sizep)
 {
-	struct thread *td;
-	elf_prfpregset_t *fpregset;
+	elf_thrmisc_t *thrmisc;
 
-	td = arg;
-	if (sb != NULL) {
-		KASSERT(*sizep == sizeof(*fpregset), ("invalid size"));
-		fpregset = malloc(sizeof(*fpregset), M_TEMP, M_ZERO | M_WAITOK);
-		__elfN(get_fpregset)(NULL, td, fpregset, sizep);
-		sbuf_bcat(sb, fpregset, sizeof(*fpregset));
-		free(fpregset, M_TEMP);
+	if (buf != NULL) {
+		KASSERT(*sizep == sizeof(*thrmisc),
+		    ("%s: invalid size", __func__));
+		thrmisc = buf;
+		bzero(thrmisc, sizeof(*thrmisc));
+		strcpy(thrmisc->pr_tname, td->td_name);
 	}
-	*sizep = sizeof(*fpregset);
+	*sizep = sizeof(*thrmisc);
+	return (true);
 }
 
-static void
-__elfN(note_thrmisc)(void *arg, struct sbuf *sb, size_t *sizep)
-{
-	struct thread *td;
-	elf_thrmisc_t thrmisc;
+static struct regset __elfN(regset_thrmisc) = {
+	.note = NT_THRMISC,
+	.size = sizeof(elf_thrmisc_t),
+	.get = __elfN(get_thrmisc),
+};
+ELF_REGSET(__elfN(regset_thrmisc));
 
-	td = arg;
-	if (sb != NULL) {
-		KASSERT(*sizep == sizeof(thrmisc), ("invalid size"));
-		bzero(&thrmisc, sizeof(thrmisc));
-		strcpy(thrmisc.pr_tname, td->td_name);
-		sbuf_bcat(sb, &thrmisc, sizeof(thrmisc));
-	}
-	*sizep = sizeof(thrmisc);
-}
-
-static void
-__elfN(note_ptlwpinfo)(void *arg, struct sbuf *sb, size_t *sizep)
+static bool
+__elfN(get_lwpinfo)(struct regset *rs, struct thread *td, void *buf,
+    size_t *sizep)
 {
-	struct thread *td;
+	elf_lwpinfo_t pl;
 	size_t size;
 	int structsize;
-#if defined(COMPAT_FREEBSD32) && __ELF_WORD_SIZE == 32
-	struct ptrace_lwpinfo32 pl;
-#else
-	struct ptrace_lwpinfo pl;
-#endif
 
-	td = arg;
 	size = sizeof(structsize) + sizeof(pl);
-	if (sb != NULL) {
-		KASSERT(*sizep == size, ("invalid size"));
+	if (buf != NULL) {
+		KASSERT(*sizep == size, ("%s: invalid size", __func__));
 		structsize = sizeof(pl);
-		sbuf_bcat(sb, &structsize, sizeof(structsize));
+		memcpy(buf, &structsize, sizeof(structsize));
 		bzero(&pl, sizeof(pl));
 		pl.pl_lwpid = td->td_tid;
 		pl.pl_event = PL_EVENT_NONE;
@@ -2366,9 +2386,50 @@ __elfN(note_ptlwpinfo)(void *arg, struct sbuf *sb, size_t *sizep)
 		}
 		strcpy(pl.pl_tdname, td->td_name);
 		/* XXX TODO: supply more information in struct ptrace_lwpinfo*/
-		sbuf_bcat(sb, &pl, sizeof(pl));
+		memcpy((int *)buf + 1, &pl, sizeof(pl));
 	}
 	*sizep = size;
+	return (true);
+}
+
+static struct regset __elfN(regset_lwpinfo) = {
+	.note = NT_PTLWPINFO,
+	.size = sizeof(int) + sizeof(elf_lwpinfo_t),
+	.get = __elfN(get_lwpinfo),
+};
+ELF_REGSET(__elfN(regset_lwpinfo));
+
+static size_t
+__elfN(prepare_register_notes)(struct thread *td, struct note_info_list *list,
+    struct thread *target_td)
+{
+	struct sysentvec *sv = td->td_proc->p_sysent;
+	struct regset **regsetp, **regset_end, *regset;
+	size_t size;
+
+	size = 0;
+
+	/* NT_PRSTATUS must be the first register set note. */
+	size += __elfN(register_regset_note)(td, list, &__elfN(regset_prstatus),
+	    target_td);
+
+	regsetp = sv->sv_regset_begin;
+	if (regsetp == NULL) {
+		/* XXX: This shouldn't be true for any FreeBSD ABIs. */
+		size += __elfN(register_regset_note)(td, list,
+		    &__elfN(regset_fpregset), target_td);
+		return (size);
+	}
+	regset_end = sv->sv_regset_end;
+	MPASS(regset_end != NULL);
+	for (; regsetp < regset_end; regsetp++) {
+		regset = *regsetp;
+		if (regset->note == NT_PRSTATUS)
+			continue;
+		size += __elfN(register_regset_note)(td, list, regset,
+		    target_td);
+	}
+	return (size);
 }
 
 /*

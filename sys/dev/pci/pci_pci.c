@@ -31,8 +31,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 /*
  * PCI:PCI bridge support.
  */
@@ -133,11 +131,8 @@ static device_method_t pcib_methods[] = {
     DEVMETHOD_END
 };
 
-static devclass_t pcib_devclass;
-
 DEFINE_CLASS_0(pcib, pcib_driver, pcib_methods, sizeof(struct pcib_softc));
-EARLY_DRIVER_MODULE(pcib, pci, pcib_driver, pcib_devclass, NULL, NULL,
-    BUS_PASS_BUS);
+EARLY_DRIVER_MODULE(pcib, pci, pcib_driver, NULL, NULL, BUS_PASS_BUS);
 
 #if defined(NEW_PCIB) || defined(PCI_HP)
 SYSCTL_DECL(_hw_pci);
@@ -1096,6 +1091,11 @@ pcib_hotplug_present(struct pcib_softc *sc)
 	return (-1);
 }
 
+static int pci_enable_pcie_ei = 0;
+SYSCTL_INT(_hw_pci, OID_AUTO, enable_pcie_ei, CTLFLAG_RWTUN,
+    &pci_enable_pcie_ei, 0,
+    "Enable support for PCI-express Electromechanical Interlock.");
+
 static void
 pcib_pcie_hotplug_update(struct pcib_softc *sc, uint16_t val, uint16_t mask,
     bool schedule_task)
@@ -1135,7 +1135,8 @@ pcib_pcie_hotplug_update(struct pcib_softc *sc, uint16_t val, uint16_t mask,
 	 * process of detaching), disable the Electromechanical
 	 * Interlock.
 	 */
-	if (sc->pcie_slot_cap & PCIEM_SLOT_CAP_EIP) {
+	if ((sc->pcie_slot_cap & PCIEM_SLOT_CAP_EIP) &&
+	    pci_enable_pcie_ei) {
 		mask |= PCIEM_SLOT_CTL_EIC;
 		ei_engaged = (sc->pcie_slot_sta & PCIEM_SLOT_STA_EIS) != 0;
 		if (card_inserted != ei_engaged)
@@ -1318,7 +1319,7 @@ static int
 pcib_alloc_pcie_irq(struct pcib_softc *sc)
 {
 	device_t dev;
-	int count, error, rid;
+	int count, error, mem_rid, rid;
 
 	rid = -1;
 	dev = sc->dev;
@@ -1330,9 +1331,17 @@ pcib_alloc_pcie_irq(struct pcib_softc *sc)
 	 */
 	count = pci_msix_count(dev);
 	if (count == 1) {
-		error = pci_alloc_msix(dev, &count);
-		if (error == 0)
-			rid = 1;
+		mem_rid = pci_msix_table_bar(dev);
+		sc->pcie_mem = bus_alloc_resource_any(dev, SYS_RES_MEMORY,
+		    &mem_rid, RF_ACTIVE);
+		if (sc->pcie_mem == NULL) {
+			device_printf(dev,
+			    "Failed to allocate BAR for MSI-X table\n");
+		} else {
+			error = pci_alloc_msix(dev, &count);
+			if (error == 0)
+				rid = 1;
+		}
 	}
 
 	if (rid < 0 && pci_msi_count(dev) > 0) {
@@ -1380,7 +1389,12 @@ pcib_release_pcie_irq(struct pcib_softc *sc)
 	error = bus_free_resource(dev, SYS_RES_IRQ, sc->pcie_irq);
 	if (error)
 		return (error);
-	return (pci_release_msi(dev));
+	error = pci_release_msi(dev);
+	if (error)
+		return (error);
+	if (sc->pcie_mem != NULL)
+		error = bus_free_resource(dev, SYS_RES_MEMORY, sc->pcie_mem);
+	return (error);
 }
 
 static void

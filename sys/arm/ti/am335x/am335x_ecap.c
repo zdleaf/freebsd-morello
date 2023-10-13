@@ -25,8 +25,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/bus.h>
@@ -81,6 +79,13 @@ struct am335x_ecap_softc {
 	int			sc_mem_rid;
 };
 
+static struct ofw_compat_data compat_data[] = {
+	{"ti,am3352-ecap",	true},
+	{"ti,am33xx-ecap",	true},
+	{NULL,			false},
+};
+SIMPLEBUS_PNP_INFO(compat_data);
+
 static device_method_t am335x_ecap_methods[] = {
 	DEVMETHOD(device_probe,		am335x_ecap_probe),
 	DEVMETHOD(device_attach,	am335x_ecap_attach),
@@ -95,8 +100,6 @@ static driver_t am335x_ecap_driver = {
 	sizeof(struct am335x_ecap_softc),
 };
 
-static devclass_t am335x_ecap_devclass;
-
 /*
  * API function to set period/duty cycles for ECAPx
  */
@@ -107,7 +110,7 @@ am335x_pwm_config_ecap(int unit, int period, int duty)
 	struct am335x_ecap_softc *sc;
 	uint16_t reg;
 
-	dev = devclass_get_device(am335x_ecap_devclass, unit);
+	dev = devclass_get_device(devclass_find(am335x_ecap_driver.name), unit);
 	if (dev == NULL)
 		return (ENXIO);
 
@@ -144,7 +147,7 @@ am335x_ecap_probe(device_t dev)
 	if (!ofw_bus_status_okay(dev))
 		return (ENXIO);
 
-	if (!ofw_bus_is_compatible(dev, "ti,am33xx-ecap"))
+	if (!ofw_bus_search_compatible(dev, compat_data)->ocd_data)
 		return (ENXIO);
 
 	device_set_desc(dev, "AM335x eCAP");
@@ -194,6 +197,6 @@ am335x_ecap_detach(device_t dev)
 	return (0);
 }
 
-DRIVER_MODULE(am335x_ecap, am335x_pwmss, am335x_ecap_driver, am335x_ecap_devclass, 0, 0);
+DRIVER_MODULE(am335x_ecap, am335x_pwmss, am335x_ecap_driver, 0, 0);
 MODULE_VERSION(am335x_ecap, 1);
 MODULE_DEPEND(am335x_ecap, am335x_pwmss, 1, 1, 1);

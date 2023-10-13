@@ -1,7 +1,7 @@
 /*-
  * alias_smedia.c
  *
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD AND BSD-2-Clause
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2000 Whistle Communications, Inc.
  * All rights reserved.
@@ -66,8 +66,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 /*
    Alias_smedia.c is meant to contain the aliasing code for streaming media
    protocols.  It performs special processing for RSTP sessions under TCP.
@@ -404,7 +402,7 @@ alias_rtsp_out(struct libalias *la, struct ip *pip,
 
 	tc->th_sum = 0;
 #ifdef _KERNEL
-	tc->th_x2 = 1;
+	tc->th_x2 = (TH_RES1 >> 8);
 #else
 	tc->th_sum = TcpChecksum(pip);
 #endif
@@ -451,7 +449,7 @@ alias_pna_out(struct libalias *la, struct ip *pip,
 				/* Compute TCP checksum for revised packet */
 				tc->th_sum = 0;
 #ifdef _KERNEL
-				tc->th_x2 = 1;
+				tc->th_x2 = (TH_RES1 >> 8);
 #else
 				tc->th_sum = TcpChecksum(pip);
 #endif

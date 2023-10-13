@@ -21,8 +21,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 #include "opt_rss.h"
@@ -1063,14 +1061,12 @@ static struct mlx5_flow_group *fs_create_fg(struct mlx5_core_dev *dev,
 {
 	struct mlx5_flow_group *fg;
 	int err;
-	unsigned int end_index;
 	char name[20];
 
 	fg = fs_alloc_fg(fg_in);
 	if (IS_ERR(fg))
 		return fg;
 
-	end_index = fg->start_index + fg->max_ftes - 1;
 	err =  mlx5_cmd_fs_create_fg(dev, fg_in,
 				     ft->vport, ft->type, ft->id,
 				     &fg->id);
@@ -1407,7 +1403,6 @@ static struct mlx5_flow_group *create_autogroup(struct mlx5_flow_table *ft,
 {
 	unsigned int group_size;
 	unsigned int candidate_index = 0;
-	unsigned int candidate_group_num = 0;
 	struct mlx5_flow_group *g;
 	struct mlx5_flow_group *ret;
 	struct list_head *prev = &ft->fgs;
@@ -1444,7 +1439,6 @@ static struct mlx5_flow_group *create_autogroup(struct mlx5_flow_table *ft,
 
 	/* sorted by start_index */
 	fs_for_each_fg(g, ft) {
-		candidate_group_num++;
 		if (candidate_index + group_size > g->start_index)
 			candidate_index = g->start_index + g->max_ftes;
 		else
@@ -1523,7 +1517,7 @@ static void call_to_add_rule_notifiers(struct mlx5_flow_rule *dst,
 			mutex_unlock(&dst->clients_lock);
 			err  = iter_handler->add_dst_cb(dst,
 							is_new_rule,
-							NULL,
+							data,
 							iter_handler->client_context);
 			if (err)
 				break;
@@ -1880,10 +1874,16 @@ mlx5_add_flow_rule(struct mlx5_flow_table *ft,
 }
 EXPORT_SYMBOL(mlx5_add_flow_rule);
 
-void mlx5_del_flow_rule(struct mlx5_flow_rule *dst)
+void mlx5_del_flow_rule(struct mlx5_flow_rule **pp)
 {
 	struct mlx5_flow_namespace *ns;
+	struct mlx5_flow_rule *dst;
 
+	dst = *pp;
+	*pp = NULL;
+
+	if (IS_ERR_OR_NULL(dst))
+		return;
 	ns = get_ns_with_notifiers(&dst->base);
 	if (ns)
 		down_read(&ns->dests_rw_sem);

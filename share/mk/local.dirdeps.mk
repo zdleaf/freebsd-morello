@@ -1,4 +1,3 @@
-# $FreeBSD$
 .if !target(_DIRDEP_USE)
 # we are the 1st makefile
 
@@ -13,35 +12,47 @@ DIRDEPS_FILTER+= N*.host
 .endif
 
 # pseudo machines get no qualification
-.for m in host common
+.for m in ${PSEUDO_MACHINE_LIST:Nhost*}
 M_dep_qual_fixes += C;($m),[^/.,]*$$;\1;
 .endfor
 #.info M_dep_qual_fixes=${M_dep_qual_fixes}
+
+# Some things we never want to build for host
+DIRDEPS_FILTER.host = \
+	Ninclude* \
+	Nlib/csu* \
+	Nlib/libc \
+	Nlib/libcompiler_rt \
+	Nlib/[mn]* \
+	Nlib/lib[t]* \
+	Ngnu/lib/lib[a-r]* \
+	Nsecure/lib* \
+	Nusr.bin/xinstall* \
+
+.if ${.MAKE.OS} == "FreeBSD"
+# Host libraries should mostly be excluded from the build so the
+# host version in /usr/lib is used.
+# Internal libraries need to be allowed to be built though
+# since they are never installed.
 
 # Cheat for including src.libnames.mk
 __<bsd.init.mk>__:
 # Pull in _INTERNALLIBS
 .include <src.libnames.mk>
 
-# Host libraries should mostly be excluded from the build so the
-# host version in /usr/lib is used.  Internal libraries need to be
-# allowed to be built though since they are never installed.
 _need_host_libs=
 .for lib in ${_INTERNALLIBS}
 _need_host_libs+= ${LIB${lib:tu}DIR:S,^${OBJTOP}/,,}
 .endfor
+.if ${MK_host_egacy} == "yes"
+_need_host_libs+= lib/libmd
+.endif
 
 N_host_libs:= ${cd ${SRCTOP} && echo lib/lib*:L:sh:${_need_host_libs:${M_ListToSkip}}:${M_ListToSkip}}
-DIRDEPS_FILTER.host = \
-	${N_host_libs} \
-	Ninclude* \
-	Nlib/csu* \
-	Nlib/libc \
-	Nlib/[mn]* \
-	Ngnu/lib/lib[a-r]* \
-	Nsecure/lib* \
-	Nusr.bin/xinstall* \
+DIRDEPS_FILTER.host+= ${N_host_libs}
+.endif
 
+DIRDEPS_FILTER.host32 = ${DIRDEPS_FILTER.host}
 
 DIRDEPS_FILTER+= \
 	Nbin/cat.host \
@@ -60,7 +71,15 @@ cleanup_worldtmp: .PHONY .NOMETA
 	rm -rf ${OBJTOP}/tmp
 beforedirdeps: cleanup_worldtmp
 .endif
-.endif
+
+# pseudo option for building host tools on old or non-FreeBSD host
+# allows us to leverage Makefile.depend.options with
+# DIRDEPS_OPTIONS = host_egacy
+# dirdeps-options.mk will qualify with ${DEP_MACHINE} (and others)
+# before looking at the bare option.
+MK_host_egacy.host= ${MK_host_egacy}
+
+.endif				# !target(_DIRDEP_USE)
 
 # reset this each time
 DIRDEPS_FILTER.xtras=
@@ -68,7 +87,12 @@ DIRDEPS_FILTER.xtras=
 DIRDEPS_FILTER.xtras+= Nusr.bin/clang/clang.host
 .endif
 
-.if ${DEP_MACHINE} != "host"
+.if ${DEP_MACHINE:Nhost*} == ""
+.if ${MK_host_egacy} == "yes" && ${DEP_RELDIR:Ntools/build:Ntargets/*:N*/stage} != ""
+DIRDEPS += tools/build
+.endif
+.else
+MK_host_egacy.${DEP_MACHINE}= no
 
 # this is how we can handle optional dependencies
 .if ${DEP_RELDIR} == "lib/libc"
@@ -87,6 +111,7 @@ DIRDEPS += \
 	cddl/usr.bin/ctfmerge.host
 .endif
 
+.if ${DEP_MACHINE:Nhost*} != ""
 # Add in proper libgcc (gnu or LLVM) if not building libcc and libc is needed.
 # Add both gcc_s and gcc_eh as dependencies as the decision to build
 # -static or not is not known here.
@@ -94,6 +119,7 @@ DIRDEPS += \
 DIRDEPS+= \
 	lib/libgcc_eh \
 	lib/libgcc_s
+.endif
 .endif
 
 # Bootstrap support.  Give hints to DIRDEPS if there is no Makefile.depend*
@@ -207,13 +233,16 @@ DIRDEPS+= ${_lib${_lib}reldir}
 
 .if ${MK_STAGING} == "yes"
 # we need targets/pseudo/stage to prep the stage tree
-.if ${DEP_RELDIR} != "targets/pseudo/stage"
+.if ${DEP_RELDIR:N.:N${SRCTOP}:N*pseudo/stage} != ""
 DIRDEPS += targets/pseudo/stage
 .endif
 .endif
 
 DEP_MACHINE_ARCH = ${MACHINE_ARCH.${DEP_MACHINE}}
+DEP_MACHINE_CPUARCH = ${DEP_MACHINE_ARCH:${__TO_CPUARCH}}
 CSU_DIR.${DEP_MACHINE_ARCH} ?= csu/${DEP_MACHINE_ARCH}
 CSU_DIR := ${CSU_DIR.${DEP_MACHINE_ARCH}}
 BOOT_MACHINE_DIR:= ${BOOT_MACHINE_DIR.${DEP_MACHINE}}
 KERNEL_NAME:= ${KERNEL_NAME.${DEP_MACHINE}}
+
+.-include <site.dirdeps.mk>

@@ -1,4 +1,3 @@
-/* $FreeBSD$ */
 /*===------- llvm/Config/llvm-config.h - llvm configuration -------*- C -*-===*/
 /*                                                                            */
 /* Part of the LLVM Project, under the Apache License v2.0 with LLVM          */
@@ -19,6 +18,7 @@
 /* #undef LLVM_ENABLE_DUMP */
 
 /* Target triple LLVM will generate code for by default */
+/* Doesn't use `cmakedefine` because it is allowed to be empty. */
 /* #undef LLVM_DEFAULT_TARGET_TRIPLE */
 
 /* Define if threads enabled */
@@ -51,6 +51,9 @@
 /* LLVM name for the native target MC init function, if available */
 /* #undef LLVM_NATIVE_TARGETMC */
 
+/* LLVM name for the native target MCA init function, if available */
+/* #undef LLVM_NATIVE_TARGETMCA */
+
 /* Define if this is Unixish platform */
 #define LLVM_ON_UNIX 1
 
@@ -64,16 +67,16 @@
 #define LLVM_USE_PERF 0
 
 /* Major version of the LLVM API */
-#define LLVM_VERSION_MAJOR 13
+#define LLVM_VERSION_MAJOR 16
 
 /* Minor version of the LLVM API */
 #define LLVM_VERSION_MINOR 0
 
 /* Patch version of the LLVM API */
-#define LLVM_VERSION_PATCH 0
+#define LLVM_VERSION_PATCH 6
 
 /* LLVM version string */
-#define LLVM_VERSION_STRING "13.0.0"
+#define LLVM_VERSION_STRING "16.0.6"
 
 /* Whether LLVM records statistics for use with GetStatistics(),
  * PrintStatistics() or PrintStatisticsJSON()
@@ -83,29 +86,46 @@
 /* Define if we have z3 and want to build it */
 /* #undef LLVM_WITH_Z3 */
 
-/* Define if LLVM was built with a dependency to the libtensorflow dynamic library */
-/* #undef LLVM_HAVE_TF_API */
+/* Define if we have curl and want to use it */
+/* #undef LLVM_ENABLE_CURL */
 
-/* Define if LLVM was built with a dependency to the tensorflow compiler */
-/* #undef LLVM_HAVE_TF_AOT */
+/* Define if we have cpp-httplib and want to use it */
+/* #undef LLVM_ENABLE_HTTPLIB */
+
+/* Define if zlib compression is available */
+#define LLVM_ENABLE_ZLIB 1
+
+/* Define if zstd compression is available */
+#define LLVM_ENABLE_ZSTD 1
+
+/* Define if LLVM is using tflite instead of libtensorflow */
+/* #undef LLVM_HAVE_TFLITE */
 
 /* Define to 1 if you have the <sysexits.h> header file. */
 #define HAVE_SYSEXITS_H 1
-
-/* Define to 1 to enable the experimental new pass manager by default */
-#define LLVM_ENABLE_NEW_PASS_MANAGER 1
 
 /* Define if the xar_open() function is supported on this platform. */
 #if defined(__APPLE__)
 #define LLVM_HAVE_LIBXAR 1
 #endif
 
-/* Whether Timers signpost passes in Xcode Instruments */
-#if defined(__APPLE__)
-#define LLVM_SUPPORT_XCODE_SIGNPOSTS 1
-#else
-#define LLVM_SUPPORT_XCODE_SIGNPOSTS 0
-#endif
+/* Define if building libLLVM shared library */
+/* #undef LLVM_BUILD_LLVM_DYLIB */
 
+/* Define if building LLVM with BUILD_SHARED_LIBS */
+/* #undef LLVM_BUILD_SHARED_LIBS */
+
+/* Define if building LLVM with LLVM_FORCE_USE_OLD_TOOLCHAIN_LIBS */
+/* #undef LLVM_FORCE_USE_OLD_TOOLCHAIN */
+
+/* Define if llvm_unreachable should be optimized with undefined behavior
+ * in non assert builds */
+#define LLVM_UNREACHABLE_OPTIMIZE 1
+
+/* Define to 1 if you have the DIA SDK installed, and to 0 if you don't. */
+#define LLVM_ENABLE_DIA_SDK 0
+
+/* Define if plugins enabled */
+/* #undef LLVM_ENABLE_PLUGINS */
 
 #endif

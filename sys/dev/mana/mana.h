@@ -27,8 +27,6 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD$
- *
  */
 
 #ifndef _MANA_H
@@ -155,7 +153,7 @@ struct mana_txq {
 
 	uint16_t		vp_offset;
 
-	struct ifnet		*ndev;
+	if_t			ndev;
 	/* Store index to the array of tx_qp in port structure */
 	int			idx;
 	/* The alternative txq idx when this txq is under heavy load */
@@ -171,6 +169,9 @@ struct mana_txq {
 	struct buf_ring		*txq_br;
 	struct mtx		txq_mtx;
 	char			txq_mtx_name[16];
+
+	uint64_t		tso_pkts;
+	uint64_t		tso_bytes;
 
 	struct task		enqueue_task;
 	struct taskqueue	*enqueue_tq;
@@ -188,6 +189,7 @@ struct mana_txq {
  */
 #define	MAX_MBUF_FRAGS		30
 #define MANA_TSO_MAXSEG_SZ	PAGE_SIZE
+#define MANA_TSO_MAX_SZ		IP_MAXPACKET
 
 /* mbuf data and frags dma mappings */
 struct mana_mbuf_head {
@@ -382,8 +384,6 @@ struct mana_cq {
 	struct gdma_comp	gdma_comp_buf[CQE_POLLING_BUFFER];
 };
 
-#define GDMA_MAX_RQE_SGES	15
-
 struct mana_recv_buf_oob {
 	/* A valid GDMA work request representing the data buffer. */
 	struct gdma_wqe_request		wqe_req;
@@ -393,7 +393,7 @@ struct mana_recv_buf_oob {
 
 	/* SGL of the buffer going to be sent as part of the work request. */
 	uint32_t			num_sge;
-	struct gdma_sge			sgl[GDMA_MAX_RQE_SGES];
+	struct gdma_sge			sgl[MAX_RX_WQE_SGL_ENTRIES];
 
 	/* Required to store the result of mana_gd_post_work_request.
 	 * gdma_posted_wqe_info.wqe_size_in_bu is required for progressing the
@@ -418,7 +418,7 @@ struct mana_rxq {
 
 	struct mana_cq			rx_cq;
 
-	struct ifnet			*ndev;
+	if_t				ndev;
 	struct lro_ctrl			lro;
 
 	/* Total number of receive buffers to be allocated */
@@ -426,6 +426,8 @@ struct mana_rxq {
 
 	uint32_t			buf_index;
 
+	uint64_t			lro_tried;
+	uint64_t			lro_failed;
 	struct mana_stats		stats;
 
 	/* MUST BE THE LAST MEMBER:
@@ -463,12 +465,12 @@ struct mana_context {
 
 	struct mana_eq		*eqs;
 
-	struct ifnet		*ports[MAX_PORTS_IN_MANA_DEV];
+	if_t			ports[MAX_PORTS_IN_MANA_DEV];
 };
 
 struct mana_port_context {
 	struct mana_context	*ac;
-	struct ifnet		*ndev;
+	if_t			ndev;
 	struct ifmedia		media;
 
 	struct sx		apc_lock;
@@ -505,6 +507,8 @@ struct mana_port_context {
 
 	mana_handle_t		port_handle;
 
+	int			vport_use_count;
+
 	uint16_t		port_idx;
 
 	uint16_t		frame_size;
@@ -533,9 +537,9 @@ struct mana_port_context {
 int mana_config_rss(struct mana_port_context *ac, enum TRI_STATE rx,
     bool update_hash, bool update_tab);
 
-int mana_alloc_queues(struct ifnet *ndev);
-int mana_attach(struct ifnet *ndev);
-int mana_detach(struct ifnet *ndev);
+int mana_alloc_queues(if_t ndev);
+int mana_attach(if_t ndev);
+int mana_detach(if_t ndev);
 
 int mana_probe(struct gdma_dev *gd);
 void mana_remove(struct gdma_dev *gd);
@@ -699,4 +703,17 @@ struct mana_tx_package {
 
 int mana_restart(struct mana_port_context *apc);
 
+int mana_create_wq_obj(struct mana_port_context *apc,
+    mana_handle_t vport,
+    uint32_t wq_type, struct mana_obj_spec *wq_spec,
+    struct mana_obj_spec *cq_spec,
+    mana_handle_t *wq_obj);
+
+void mana_destroy_wq_obj(struct mana_port_context *apc, uint32_t wq_type,
+    mana_handle_t wq_obj);
+
+int mana_cfg_vport(struct mana_port_context *apc, uint32_t protection_dom_id,
+    uint32_t doorbell_pg_id);
+
+void mana_uncfg_vport(struct mana_port_context *apc);
 #endif /* _MANA_H */

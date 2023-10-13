@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2021 Semihalf.
  *
@@ -26,8 +26,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/bus.h>
 #include <sys/kernel.h>
@@ -65,10 +63,8 @@ a37x0_periph_fixed_register_fixed(struct clkdom *clkdom,
 	struct clk_fixed_def fixed_def;
 	struct clk_gate_def *gate;
 	struct clk_mux_def *mux;
-	const char *dev_name;
 	int error, dev_id;
 
-	dev_name = device_def->common_def.device_name;
 	dev_id = device_def->common_def.device_id;
 	mux = &device_def->clk_def.fixed.mux;
 	gate = &device_def->clk_def.fixed.gate;

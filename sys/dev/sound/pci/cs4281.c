@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2000 Orion Hodson <O.Hodson@cs.ucl.ac.uk>
  * All rights reserved.
@@ -44,8 +44,6 @@
 #include <dev/pci/pcivar.h>
 
 #include <dev/sound/pci/cs4281.h>
-
-SND_DECLARE_FILE("$FreeBSD$");
 
 #define CS4281_DEFAULT_BUFSZ 16384
 
@@ -257,9 +255,7 @@ static int
 cs4281_rdcd(kobj_t obj, void *devinfo, int regno)
 {
     struct sc_info *sc = (struct sc_info *)devinfo;
-    int codecno;
 
-    codecno = regno >> 8;
     regno &= 0xff;
 
     /* Remove old state */
@@ -291,9 +287,7 @@ static int
 cs4281_wrcd(kobj_t obj, void *devinfo, int regno, u_int32_t data)
 {
     struct sc_info *sc = (struct sc_info *)devinfo;
-    int codecno;
 
-    codecno = regno >> 8;
     regno &= 0xff;
 
     cs4281_wr(sc, CS4281PCI_ACCAD, regno);
@@ -968,6 +962,6 @@ static driver_t cs4281_driver = {
     PCM_SOFTC_SIZE,
 };
 
-DRIVER_MODULE(snd_cs4281, pci, cs4281_driver, pcm_devclass, 0, 0);
+DRIVER_MODULE(snd_cs4281, pci, cs4281_driver, 0, 0);
 MODULE_DEPEND(snd_cs4281, sound, SOUND_MINVER, SOUND_PREFVER, SOUND_MAXVER);
 MODULE_VERSION(snd_cs4281, 1);

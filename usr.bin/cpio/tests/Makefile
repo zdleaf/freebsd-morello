@@ -1,4 +1,3 @@
-# $FreeBSD$
 
 PACKAGE=	tests
 
@@ -21,6 +20,8 @@ CFLAGS+=	-I${_LIBARCHIVEDIR}/libarchive_fe -I${_LIBARCHIVEDIR}/test_utils
 # Uncomment to link against dmalloc
 #LDADD+= -L/usr/local/lib -ldmalloc
 #CFLAGS+= -I/usr/local/include -DUSE_DMALLOC
+
+CFLAGS.test_utils.c+=	-Wno-cast-align
 
 .PATH:	${_LIBARCHIVEDIR}/cpio
 CPIO_SRCS= cmdline.c

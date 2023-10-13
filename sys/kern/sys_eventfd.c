@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2014 Dmitry Chagin <dchagin@FreeBSD.org>
  *
@@ -26,8 +26,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
@@ -341,6 +339,7 @@ eventfd_fill_kinfo(struct file *fp, struct kinfo_file *kif, struct filedesc *fdp
 	mtx_lock(&efd->efd_lock);
 	kif->kf_un.kf_eventfd.kf_eventfd_value = efd->efd_count;
 	kif->kf_un.kf_eventfd.kf_eventfd_flags = efd->efd_flags;
+	kif->kf_un.kf_eventfd.kf_eventfd_addr = (uintptr_t)efd;
 	mtx_unlock(&efd->efd_lock);
 	return (0);
 }

@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2011 Marcel Moolenaar
  * All rights reserved.
@@ -30,8 +30,6 @@
 #endif
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/queue.h>
 #include <sys/sbuf.h>
@@ -742,7 +740,10 @@ read_mtree_keywords(FILE *fp, fsnode *node)
 		type = S_IFREG;
 	} else if (node->type != 0) {
 		type = node->type;
-		if (type == S_IFREG) {
+		if (type == S_IFLNK && node->symlink == NULL) {
+			mtree_error("%s: link type requires link keyword", node->name);
+			return (0);
+		} else if (type == S_IFREG) {
 			/* the named path is the default contents */
 			node->contents = mtree_file_path(node);
 		}
@@ -836,7 +837,7 @@ read_mtree_spec1(FILE *fp, bool def, const char *name)
 	 * not the '.' node of the parent directory, but the directory
 	 * node within the parent to which the child relates. However,
 	 * going up a directory means we need to find the '.' node to
-	 * which the directoy node is linked.  This we can do via the
+	 * which the directory node is linked.  This we can do via the
 	 * first * pointer, because '.' is always the first entry in a
 	 * directory.
 	 */
@@ -1016,7 +1017,7 @@ read_mtree_spec(FILE *fp)
 		}
 	}
 
-	/* Ignore absolute specfications that end with a slash. */
+	/* Ignore absolute specifications that end with a slash. */
 	if (!error && pathspec[0] != '\0')
 		error = read_mtree_spec1(fp, true, pathspec);
 

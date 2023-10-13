@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-NetBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2002 The NetBSD Foundation, Inc.
  * All rights reserved.
@@ -36,9 +36,6 @@ __RCSID("$NetBSD: stat.c,v 1.33 2011/01/15 22:54:10 njoly Exp $"
 "$OpenBSD: stat.c,v 1.14 2009/06/24 09:44:25 sobrado Exp $");
 #endif
 #endif
-
-__FBSDID("$FreeBSD$");
-
 #if HAVE_CONFIG_H
 #include "config.h" 
 #else  /* HAVE_CONFIG_H */
@@ -373,7 +370,7 @@ main(int argc, char *argv[])
 			errs = 1;
 			linkfail = 1;
 			if (!quiet)
-				warn("%s: stat", file);
+				warn("%s", file);
 		}
 		else
 			output(&st, file, statfmt, fn, nonl);
@@ -640,14 +637,9 @@ format1(const struct stat *st,
 		small = (sizeof(st->st_dev) == 4);
 		data = (what == SHOW_st_dev) ? st->st_dev : st->st_rdev;
 #if HAVE_DEVNAME
-		sdata = (what == SHOW_st_dev) ?
-		    devname(st->st_dev, S_IFBLK) :
-		    devname(st->st_rdev, 
-		    S_ISCHR(st->st_mode) ? S_IFCHR :
-		    S_ISBLK(st->st_mode) ? S_IFBLK :
-		    0U);
-		if (sdata == NULL)
-			sdata = "???";
+		sdata = devname(what == SHOW_st_dev ? st->st_dev :
+		    st->st_rdev, S_ISCHR(st->st_mode) ? S_IFCHR :
+		    (S_ISBLK(st->st_mode) ? S_IFBLK : 0));
 #endif /* HAVE_DEVNAME */
 		if (hilo == HIGH_PIECE) {
 			data = major(data);

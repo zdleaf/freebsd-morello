@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2009 Rick Macklem, University of Guelph
  * All rights reserved.
@@ -28,8 +28,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 /*
  * These functions implement the client side state handling for NFSv4.
  * NFSv4 state handling:
@@ -543,7 +541,7 @@ nfscl_getstateid(vnode_t vp, u_int8_t *nfhp, int fhlen, u_int32_t mode,
 		stateidp->other[1] = 0;
 		stateidp->other[2] = 0;
 	}
-	if (vnode_vtype(vp) != VREG)
+	if (vp->v_type != VREG)
 		return (EISDIR);
 	np = VTONFS(vp);
 	nmp = VFSTONFS(vp->v_mount);
@@ -1468,6 +1466,12 @@ nfscl_checkwritelocked(vnode_t vp, struct flock *fl,
 	 */
 	dp = nfscl_finddeleg(clp, np->n_fhp->nfh_fh, np->n_fhp->nfh_len);
 	if (dp != NULL) {
+		/* No need to flush if it is a write delegation. */
+		if ((dp->nfsdl_flags & NFSCLDL_WRITE) != 0) {
+			nfscl_clrelease(clp);
+			NFSUNLOCKCLSTATE();
+			return (0);
+		}
 		LIST_FOREACH(lp, &dp->nfsdl_lock, nfsl_list) {
 			if (!NFSBCMP(lp->nfsl_owner, own,
 			    NFSV4CL_LOCKNAMELEN))
@@ -1642,8 +1646,22 @@ nfscl_expireopen(struct nfsclclient *clp, struct nfsclopen *op,
 static void
 nfscl_freeopenowner(struct nfsclowner *owp, int local)
 {
+	int owned;
 
+	/*
+	 * Make sure the NFSCLSTATE mutex is held, to avoid races with
+	 * calls in nfscl_renewthread() that do not hold a reference
+	 * count on the nfsclclient and just the mutex.
+	 * The mutex will not be held for calls done with the exclusive
+	 * nfsclclient lock held, in particular, nfscl_hasexpired()
+	 * and nfscl_recalldeleg() might do this.
+	 */
+	owned = mtx_owned(NFSCLSTATEMUTEXPTR);
+	if (owned == 0)
+		NFSLOCKCLSTATE();
 	LIST_REMOVE(owp, nfsow_list);
+	if (owned == 0)
+		NFSUNLOCKCLSTATE();
 	free(owp, M_NFSCLOWNER);
 	if (local)
 		nfsstatsv1.cllocalopenowners--;
@@ -1658,8 +1676,22 @@ void
 nfscl_freelockowner(struct nfscllockowner *lp, int local)
 {
 	struct nfscllock *lop, *nlop;
+	int owned;
 
+	/*
+	 * Make sure the NFSCLSTATE mutex is held, to avoid races with
+	 * calls in nfscl_renewthread() that do not hold a reference
+	 * count on the nfsclclient and just the mutex.
+	 * The mutex will not be held for calls done with the exclusive
+	 * nfsclclient lock held, in particular, nfscl_hasexpired()
+	 * and nfscl_recalldeleg() might do this.
+	 */
+	owned = mtx_owned(NFSCLSTATEMUTEXPTR);
+	if (owned == 0)
+		NFSLOCKCLSTATE();
 	LIST_REMOVE(lp, nfsl_list);
+	if (owned == 0)
+		NFSUNLOCKCLSTATE();
 	LIST_FOREACH_SAFE(lop, &lp->nfsl_lock, nfslo_list, nlop) {
 		nfscl_freelock(lop, local);
 	}
@@ -1849,16 +1881,17 @@ static void
 nfscl_cleanup_common(struct nfsclclient *clp, u_int8_t *own)
 {
 	struct nfsclowner *owp, *nowp;
-	struct nfscllockowner *lp, *nlp;
+	struct nfscllockowner *lp;
 	struct nfscldeleg *dp;
 
 	/* First, get rid of local locks on delegations. */
 	TAILQ_FOREACH(dp, &clp->nfsc_deleg, nfsdl_list) {
-		LIST_FOREACH_SAFE(lp, &dp->nfsdl_lock, nfsl_list, nlp) {
+		LIST_FOREACH(lp, &dp->nfsdl_lock, nfsl_list) {
 		    if (!NFSBCMP(lp->nfsl_owner, own, NFSV4CL_LOCKNAMELEN)) {
 			if ((lp->nfsl_rwlock.nfslock_lock & NFSV4LOCK_WANTED))
 			    panic("nfscllckw");
 			nfscl_freelockowner(lp, 1);
+			break;
 		    }
 		}
 	}
@@ -1877,6 +1910,7 @@ nfscl_cleanup_common(struct nfsclclient *clp, u_int8_t *own)
 				nfscl_freeopenowner(owp, 0);
 			else
 				owp->nfsow_defunct = 1;
+			break;
 		}
 		owp = nowp;
 	}
@@ -1892,6 +1926,7 @@ nfscl_cleanupkext(struct nfsclclient *clp, struct nfscllockownerfhhead *lhp)
 	struct nfsclopen *op;
 	struct nfscllockowner *lp, *nlp;
 	struct nfscldeleg *dp;
+	uint8_t own[NFSV4CL_LOCKNAMELEN];
 
 	/*
 	 * All the pidhash locks must be acquired, since they are sx locks
@@ -1908,8 +1943,10 @@ nfscl_cleanupkext(struct nfsclclient *clp, struct nfscllockownerfhhead *lhp)
 					nfscl_emptylockowner(lp, lhp);
 			}
 		}
-		if (nfscl_procdoesntexist(owp->nfsow_owner))
-			nfscl_cleanup_common(clp, owp->nfsow_owner);
+		if (nfscl_procdoesntexist(owp->nfsow_owner)) {
+			memcpy(own, owp->nfsow_owner, NFSV4CL_LOCKNAMELEN);
+			nfscl_cleanup_common(clp, own);
+		}
 	}
 
 	/*
@@ -1921,8 +1958,11 @@ nfscl_cleanupkext(struct nfsclclient *clp, struct nfscllockownerfhhead *lhp)
 	 */
 	TAILQ_FOREACH(dp, &clp->nfsc_deleg, nfsdl_list) {
 		LIST_FOREACH_SAFE(lp, &dp->nfsdl_lock, nfsl_list, nlp) {
-			if (nfscl_procdoesntexist(lp->nfsl_owner))
-				nfscl_cleanup_common(clp, lp->nfsl_owner);
+			if (nfscl_procdoesntexist(lp->nfsl_owner)) {
+				memcpy(own, lp->nfsl_owner,
+				    NFSV4CL_LOCKNAMELEN);
+				nfscl_cleanup_common(clp, own);
+			}
 		}
 	}
 	NFSUNLOCKCLSTATE();
@@ -2051,10 +2091,10 @@ nfscl_umount(struct nfsmount *nmp, NFSPROC_T *p, struct nfscldeleghead *dhp)
 		nfscl_delegreturnall(clp, p, dhp);
 		cred = newnfs_getcred();
 		if (NFSHASNFSV4N(nmp)) {
-			(void)nfsrpc_destroysession(nmp, clp, cred, p);
-			(void)nfsrpc_destroyclient(nmp, clp, cred, p);
+			nfsrpc_destroysession(nmp, NULL, cred, p);
+			nfsrpc_destroyclient(nmp, clp, cred, p);
 		} else
-			(void)nfsrpc_setclient(nmp, clp, 0, NULL, cred, p);
+			nfsrpc_setclient(nmp, clp, 0, NULL, cred, p);
 		nfscl_cleanclient(clp);
 		nmp->nm_clp = NULL;
 		NFSFREECRED(cred);
@@ -2729,8 +2769,7 @@ nfscl_renewthread(struct nfsclclient *clp, NFSPROC_T *p)
 			error = nfsrpc_renew(clp, NULL, cred, p);
 			if (error == NFSERR_CBPATHDOWN)
 			    cbpathdown = 1;
-			else if (error == NFSERR_STALECLIENTID ||
-			    error == NFSERR_BADSESSION) {
+			else if (error == NFSERR_STALECLIENTID) {
 			    NFSLOCKCLSTATE();
 			    clp->nfsc_flags |= NFSCLFLAGS_RECOVER;
 			    NFSUNLOCKCLSTATE();
@@ -5767,7 +5806,7 @@ nfscl_dolayoutcommit(struct nfsmount *nmp, struct nfscllayout *lyp,
 			error = nfsrpc_layoutcommit(nmp, lyp->nfsly_fh,
 			    lyp->nfsly_fhlen, 0, flp->nfsfl_off, len,
 			    lyp->nfsly_lastbyte, &lyp->nfsly_stateid,
-			    layouttype, cred, p, NULL);
+			    layouttype, cred, p);
 			NFSCL_DEBUG(4, "layoutcommit err=%d\n", error);
 			if (error == NFSERR_NOTSUPP) {
 				/* If not supported, don't bother doing it. */

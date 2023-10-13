@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2002, 2003 Gordon Tetlow
  * Copyright (c) 2006 Pawel Jakub Dawidek <pjd@FreeBSD.org>
@@ -28,8 +28,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/disklabel.h>
@@ -139,8 +137,10 @@ g_label_ufs_taste_common(struct g_consumer *cp, char *label, size_t size, int wh
 	label[0] = '\0';
 
 	fs = NULL;
-	if (SBLOCKSIZE % pp->sectorsize != 0 || ffs_sbget(cp, &fs,
-	    STDSB_NOHASHFAIL_NOMSG, M_GEOM, g_use_g_read_data) != 0) {
+	KASSERT(pp->sectorsize != 0, ("Tasting a disk with 0 sectorsize"));
+	if (SBLOCKSIZE % pp->sectorsize != 0 || ffs_sbget(cp, &fs, UFS_STDSB,
+	    UFS_NOHASHFAIL | UFS_NOCSUM | UFS_NOMSG, M_GEOM, g_use_g_read_data)
+	    != 0) {
 		KASSERT(fs == NULL,
 		    ("g_label_ufs_taste_common: non-NULL fs %p\n", fs));
 		return;
@@ -172,8 +172,6 @@ g_label_ufs_taste_common(struct g_consumer *cp, char *label, size_t size, int wh
 		break;
 	}
 out:
-	g_free(fs->fs_csp);
-	g_free(fs->fs_si);
 	g_free(fs);
 }
 

@@ -1,4 +1,3 @@
-# $FreeBSD$
 
 PACKAGE=	tests
 
@@ -17,6 +16,8 @@ CFLAGS+=	-I${.OBJDIR}
 CFLAGS+=	-I${_LIBARCHIVEDIR}/cat -I${_LIBARCHIVEDIR}/cat/test
 CFLAGS+=	-I${_LIBARCHIVEDIR}/libarchive
 CFLAGS+=	-I${_LIBARCHIVEDIR}/libarchive_fe -I${_LIBARCHIVEDIR}/test_utils
+
+CFLAGS.test_utils.c+=	-Wno-cast-align
 
 # Uncomment to link against dmalloc
 #LDADD+= -L/usr/local/lib -ldmalloc

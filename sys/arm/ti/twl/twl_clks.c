@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2012
  *	Ben Gray <bgray@freebsd.org>.
@@ -28,8 +28,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 /*
  * Texas Instruments TWL4030/TWL5030/TWL60x0/TPS659x0 Power Management.
  *
@@ -645,7 +643,5 @@ static driver_t twl_clks_driver = {
 	sizeof(struct twl_clks_softc),
 };
 
-static devclass_t twl_clks_devclass;
-
-DRIVER_MODULE(twl_clks, twl, twl_clks_driver, twl_clks_devclass, 0, 0);
+DRIVER_MODULE(twl_clks, twl, twl_clks_driver, 0, 0);
 MODULE_VERSION(twl_clks, 1);

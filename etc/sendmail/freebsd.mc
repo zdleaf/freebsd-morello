@@ -48,7 +48,6 @@ divert(-1)
 #
 
 divert(0)
-VERSIONID(`$FreeBSD$')
 OSTYPE(freebsd6)
 DOMAIN(generic)
 
@@ -66,21 +65,20 @@ define(`confCLIENT_CERT', `CERT_DIR/host.cert')dnl
 define(`confCLIENT_KEY', `CERT_DIR/host.key')dnl
 define(`confCACERT', `CERT_DIR/cacert.pem')dnl
 define(`confCACERT_PATH', `CERT_DIR')dnl
-define(`confDH_PARAMETERS', `CERT_DIR/dh.param')dnl
 
 dnl Uncomment to allow relaying based on your MX records.
 dnl NOTE: This can allow sites to use your server as a backup MX without
 dnl       your permission.
 dnl FEATURE(relay_based_on_MX)
 
-dnl DNS based black hole lists
-dnl --------------------------------
-dnl DNS based black hole lists come and go on a regular basis
-dnl so this file will not serve as a database of the available servers.
+dnl DNS based block lists
+dnl ---------------------
+dnl DNS based block lists come and go on a regular basis so this
+dnl file will not serve as a database of the available servers.
 dnl For more information, visit
 dnl http://en.wikipedia.org/wiki/DNSBL
 
-dnl Uncomment to activate your chosen DNS based blacklist
+dnl Uncomment to activate your chosen DNS based block list
 dnl FEATURE(dnsbl, `dnsbl.example.com')
 dnl Alternatively, you can provide your own server and rejection message:
 dnl FEATURE(dnsbl, `dnsbl.example.com', ``"550 Mail from " $&{client_addr} " rejected"'')

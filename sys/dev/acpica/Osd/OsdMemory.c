@@ -31,8 +31,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <contrib/dev/acpica/include/acpi.h>
 
 #include <sys/kernel.h>
@@ -63,7 +61,7 @@ AcpiOsMapMemory(ACPI_PHYSICAL_ADDRESS PhysicalAddress, ACPI_SIZE Length)
 void
 AcpiOsUnmapMemory(void *LogicalAddress, ACPI_SIZE Length)
 {
-    pmap_unmapbios((vm_offset_t)LogicalAddress, Length);
+    pmap_unmapbios(LogicalAddress, Length);
 }
 
 ACPI_STATUS
@@ -110,7 +108,7 @@ AcpiOsReadMemory(ACPI_PHYSICAL_ADDRESS Address, UINT64 *Value, UINT32 Width)
 	break;
     }
 
-    pmap_unmapdev((vm_offset_t)LogicalAddress, Width / 8);
+    pmap_unmapdev(LogicalAddress, Width / 8);
 
     return (AE_OK);
 }
@@ -139,7 +137,7 @@ AcpiOsWriteMemory(ACPI_PHYSICAL_ADDRESS Address, UINT64 Value, UINT32 Width)
 	break;
     }
 
-    pmap_unmapdev((vm_offset_t)LogicalAddress, Width / 8);
+    pmap_unmapdev(LogicalAddress, Width / 8);
 
     return (AE_OK);
 }

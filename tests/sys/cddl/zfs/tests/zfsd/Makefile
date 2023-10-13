@@ -1,4 +1,3 @@
-# $FreeBSD$
 
 .include <src.opts.mk>
 
@@ -34,5 +33,7 @@ ${PACKAGE}FILES+=	zfsd_import_001_pos.ksh
 ${PACKAGE}FILES+=	zfsd_replace_001_pos.ksh
 ${PACKAGE}FILES+=	zfsd_replace_002_pos.ksh
 ${PACKAGE}FILES+=	zfsd_replace_003_pos.ksh
+${PACKAGE}FILES+=	zfsd_replace_004_pos.ksh
+${PACKAGE}FILES+=	zfsd_replace_005_pos.ksh
 
 .include <bsd.test.mk>

@@ -1,12 +1,9 @@
-# $FreeBSD$
 
 .include <src.opts.mk>
 
-SUBDIR=	${_zpool_influxdb}
-
-.if ${MK_ZFS} != "no"
-_zpool_influxdb= zpool_influxdb
-.endif
+SUBDIR.${MK_ZFS}+= \
+	zfs_prepare_disk \
+	zpool_influxdb
 
 SUBDIR_PARALLEL=
 

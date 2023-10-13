@@ -29,8 +29,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <dev/drm2/drmP.h>
 #include <dev/drm2/drm_global.h>
 
@@ -71,7 +69,6 @@ int drm_global_item_ref(struct drm_global_reference *ref)
 {
 	int ret;
 	struct drm_global_item *item = &glob[ref->global_type];
-	void *object;
 
 	sx_xlock(&item->mutex);
 	if (item->refcount == 0) {
@@ -90,7 +87,6 @@ int drm_global_item_ref(struct drm_global_reference *ref)
 	}
 	++item->refcount;
 	ref->object = item->object;
-	object = item->object;
 	sx_xunlock(&item->mutex);
 	return 0;
 out_err:

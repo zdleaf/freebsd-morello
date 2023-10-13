@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (C) 2012-2014 Intel Corporation
  * All rights reserved.
@@ -24,8 +24,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 #ifndef __NVME_PRIVATE_H__
@@ -37,6 +35,7 @@
 #include <sys/kernel.h>
 #include <sys/lock.h>
 #include <sys/malloc.h>
+#include <sys/memdesc.h>
 #include <sys/module.h>
 #include <sys/mutex.h>
 #include <sys/rman.h>
@@ -114,27 +113,16 @@ struct nvme_completion_poll_status {
 	int			done;
 };
 
-extern devclass_t nvme_devclass;
-
-#define NVME_REQUEST_VADDR	1
-#define NVME_REQUEST_NULL	2 /* For requests with no payload. */
-#define NVME_REQUEST_UIO	3
-#define NVME_REQUEST_BIO	4
-#define NVME_REQUEST_CCB        5
-
 struct nvme_request {
 	struct nvme_command		cmd;
 	struct nvme_qpair		*qpair;
-	union {
-		void			*payload;
-		struct bio		*bio;
-	} u;
-	uint32_t			type;
-	uint32_t			payload_size;
-	bool				timeout;
+	struct memdesc			payload;
 	nvme_cb_fn_t			cb_fn;
 	void				*cb_arg;
 	int32_t				retries;
+	bool				payload_valid;
+	bool				timeout;
+	bool				spare[2];		/* Future use */
 	STAILQ_ENTRY(nvme_request)	stailq;
 };
 
@@ -161,8 +149,6 @@ struct nvme_tracker {
 
 enum nvme_recovery {
 	RECOVERY_NONE = 0,		/* Normal operations */
-	RECOVERY_START,			/* Deadline has passed, start recovering */
-	RECOVERY_RESET,			/* This pass, initiate reset of controller */
 	RECOVERY_WAITING,		/* waiting for the reset to complete */
 };
 struct nvme_qpair {
@@ -176,10 +162,9 @@ struct nvme_qpair {
 	struct resource		*res;
 	void 			*tag;
 
-	struct callout		timer;
-	sbintime_t		deadline;
-	bool			timer_armed;
-	enum nvme_recovery	recovery_state;
+	struct callout		timer;			/* recovery lock */
+	bool			timer_armed;		/* recovery lock */
+	enum nvme_recovery	recovery_state;		/* recovery lock */
 
 	uint32_t		num_entries;
 	uint32_t		num_trackers;
@@ -196,6 +181,7 @@ struct nvme_qpair {
 	int64_t			num_retries;
 	int64_t			num_failures;
 	int64_t			num_ignored;
+	int64_t			num_recovery_nolock;
 
 	struct nvme_command	*cmd;
 	struct nvme_completion	*cpl;
@@ -213,8 +199,8 @@ struct nvme_qpair {
 
 	struct nvme_tracker	**act_tr;
 
-	struct mtx		lock __aligned(CACHE_LINE_SIZE);
-
+	struct mtx_padalign	lock;
+	struct mtx_padalign	recovery;
 } __aligned(CACHE_LINE_SIZE);
 
 struct nvme_namespace {
@@ -268,7 +254,6 @@ struct nvme_controller {
 	uint32_t		queues_created;
 
 	struct task		reset_task;
-	struct task		fail_req_task;
 	struct taskqueue	*taskqueue;
 
 	/* For shared legacy interrupt. */
@@ -279,8 +264,13 @@ struct nvme_controller {
 	/** maximum i/o size in bytes */
 	uint32_t		max_xfer_size;
 
-	/** minimum page size supported by this controller in bytes */
-	uint32_t		min_page_size;
+	/** LO and HI capacity mask */
+	uint32_t		cap_lo;
+	uint32_t		cap_hi;
+
+	/** Page size and log2(page_size) - 12 that we're currently using */
+	uint32_t		page_size;
+	uint32_t		mps;
 
 	/** interrupt coalescing time period (in microseconds) */
 	uint32_t		int_coal_time;
@@ -418,8 +408,6 @@ void	nvme_ctrlr_submit_admin_request(struct nvme_controller *ctrlr,
 					struct nvme_request *req);
 void	nvme_ctrlr_submit_io_request(struct nvme_controller *ctrlr,
 				     struct nvme_request *req);
-void	nvme_ctrlr_post_failed_request(struct nvme_controller *ctrlr,
-				       struct nvme_request *req);
 
 int	nvme_qpair_construct(struct nvme_qpair *qpair,
 			     uint32_t num_entries, uint32_t num_trackers,
@@ -449,8 +437,10 @@ void	nvme_ns_destruct(struct nvme_namespace *ns);
 
 void	nvme_sysctl_initialize_ctrlr(struct nvme_controller *ctrlr);
 
-void	nvme_dump_command(struct nvme_command *cmd);
-void	nvme_dump_completion(struct nvme_completion *cpl);
+void	nvme_qpair_print_command(struct nvme_qpair *qpair,
+	    struct nvme_command *cmd);
+void	nvme_qpair_print_completion(struct nvme_qpair *qpair,
+	    struct nvme_completion *cpl);
 
 int	nvme_attach(device_t dev);
 int	nvme_shutdown(device_t dev);
@@ -518,9 +508,8 @@ nvme_allocate_request_vaddr(void *payload, uint32_t payload_size,
 
 	req = _nvme_allocate_request(cb_fn, cb_arg);
 	if (req != NULL) {
-		req->type = NVME_REQUEST_VADDR;
-		req->u.payload = payload;
-		req->payload_size = payload_size;
+		req->payload = memdesc_vaddr(payload, payload_size);
+		req->payload_valid = true;
 	}
 	return (req);
 }
@@ -531,8 +520,6 @@ nvme_allocate_request_null(nvme_cb_fn_t cb_fn, void *cb_arg)
 	struct nvme_request *req;
 
 	req = _nvme_allocate_request(cb_fn, cb_arg);
-	if (req != NULL)
-		req->type = NVME_REQUEST_NULL;
 	return (req);
 }
 
@@ -543,8 +530,8 @@ nvme_allocate_request_bio(struct bio *bio, nvme_cb_fn_t cb_fn, void *cb_arg)
 
 	req = _nvme_allocate_request(cb_fn, cb_arg);
 	if (req != NULL) {
-		req->type = NVME_REQUEST_BIO;
-		req->u.bio = bio;
+		req->payload = memdesc_bio(bio);
+		req->payload_valid = true;
 	}
 	return (req);
 }
@@ -556,8 +543,8 @@ nvme_allocate_request_ccb(union ccb *ccb, nvme_cb_fn_t cb_fn, void *cb_arg)
 
 	req = _nvme_allocate_request(cb_fn, cb_arg);
 	if (req != NULL) {
-		req->type = NVME_REQUEST_CCB;
-		req->u.payload = ccb;
+		req->payload = memdesc_ccb(ccb);
+		req->payload_valid = true;
 	}
 
 	return (req);

@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2012 Damjan Marion <dmarion@Freebsd.org>
  * All rights reserved.
@@ -29,8 +29,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include "opt_platform.h"
 
 #include <sys/param.h>
@@ -302,8 +300,6 @@ static driver_t ti_aintc_driver = {
 	sizeof(struct ti_aintc_softc),
 };
 
-static devclass_t ti_aintc_devclass;
-
-EARLY_DRIVER_MODULE(ti_aintc, simplebus, ti_aintc_driver, ti_aintc_devclass,
-    0, 0, BUS_PASS_INTERRUPT + BUS_PASS_ORDER_MIDDLE);
+EARLY_DRIVER_MODULE(ti_aintc, simplebus, ti_aintc_driver, 0, 0,
+    BUS_PASS_INTERRUPT + BUS_PASS_ORDER_MIDDLE);
 SIMPLEBUS_PNP_INFO(compat_data);

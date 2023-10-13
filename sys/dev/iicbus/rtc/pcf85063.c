@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2021 Alstom Group.
  * Copyright (c) 2021 Semihalf.
@@ -26,8 +26,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include "opt_platform.h"
 
 #include <sys/param.h>
@@ -271,7 +269,5 @@ static driver_t pcf85063_driver = {
 	0
 };
 
-static devclass_t pcf85063_devclass;
-
-DRIVER_MODULE(pcf85063, iicbus, pcf85063_driver, pcf85063_devclass, NULL, NULL);
+DRIVER_MODULE(pcf85063, iicbus, pcf85063_driver, NULL, NULL);
 IICBUS_FDT_PNP_INFO(pcf85063_compat_data);

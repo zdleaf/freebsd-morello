@@ -32,8 +32,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/ktr.h>
@@ -192,8 +190,21 @@ proc_read_regset(struct thread *td, int note, struct iovec *iov)
 	if (regset == NULL)
 		return (EINVAL);
 
+	if (regset->get == NULL)
+		return (EINVAL);
+
+	size = regset->size;
+	/*
+	 * The regset is dynamically sized, e.g. the size could change
+	 * depending on the hardware, or may have a per-thread size.
+	 */
+	if (size == 0) {
+		if (!regset->get(regset, td, NULL, &size))
+			return (EINVAL);
+	}
+
 	if (iov->iov_base == NULL) {
-		iov->iov_len = regset->size;
+		iov->iov_len = size;
 		if (iov->iov_len == 0)
 			return (EINVAL);
 
@@ -201,14 +212,10 @@ proc_read_regset(struct thread *td, int note, struct iovec *iov)
 	}
 
 	/* The length is wrong, return an error */
-	if (iov->iov_len != regset->size)
-		return (EINVAL);
-
-	if (regset->get == NULL)
+	if (iov->iov_len != size)
 		return (EINVAL);
 
 	error = 0;
-	size = regset->size;
 	p = td->td_proc;
 
 	/* Drop the proc lock while allocating the temp buffer */
@@ -220,7 +227,7 @@ proc_read_regset(struct thread *td, int note, struct iovec *iov)
 	if (!regset->get(regset, td, buf, &size)) {
 		error = EINVAL;
 	} else {
-		KASSERT(size == regset->size,
+		KASSERT(size == regset->size || regset->size == 0,
 		    ("%s: Getter function changed the size", __func__));
 
 		iov->iov_len = size;
@@ -247,14 +254,23 @@ proc_write_regset(struct thread *td, int note, struct iovec *iov)
 	if (regset == NULL)
 		return (EINVAL);
 
+	size = regset->size;
+	/*
+	 * The regset is dynamically sized, e.g. the size could change
+	 * depending on the hardware, or may have a per-thread size.
+	 */
+	if (size == 0) {
+		if (!regset->get(regset, td, NULL, &size))
+			return (EINVAL);
+	}
+
 	/* The length is wrong, return an error */
-	if (iov->iov_len != regset->size)
+	if (iov->iov_len != size)
 		return (EINVAL);
 
 	if (regset->set == NULL)
 		return (EINVAL);
 
-	size = regset->size;
 	p = td->td_proc;
 
 	/* Drop the proc lock while allocating the temp buffer */
@@ -336,11 +352,10 @@ proc_rwmem(struct proc *p, struct uio *uio)
 	int error, fault_flags, page_offset, writing;
 
 	/*
-	 * Assert that someone has locked this vmspace.  (Should be
-	 * curthread but we can't assert that.)  This keeps the process
-	 * from exiting out from under us until this operation completes.
+	 * Make sure that the process' vmspace remains live.
 	 */
-	PROC_ASSERT_HELD(p);
+	if (p != curproc)
+		PROC_ASSERT_HELD(p);
 	PROC_LOCK_ASSERT(p, MA_NOTOWNED);
 
 	/*
@@ -593,14 +608,16 @@ sys_ptrace(struct thread *td, struct ptrace_args *uap)
 		struct ptrace_lwpinfo pl;
 		struct ptrace_vm_entry pve;
 		struct ptrace_coredump pc;
+		struct ptrace_sc_remote sr;
 		struct dbreg dbreg;
 		struct fpreg fpreg;
 		struct reg reg;
 		struct iovec vec;
-		char args[sizeof(td->td_sa.args)];
+		syscallarg_t args[nitems(td->td_sa.args)];
 		struct ptrace_sc_ret psr;
 		int ptevents;
 	} r;
+	syscallarg_t pscr_args[nitems(td->td_sa.args)];
 	void *addr;
 	int error;
 
@@ -627,10 +644,8 @@ sys_ptrace(struct thread *td, struct ptrace_args *uap)
 	case PT_GETDBREGS:
 		bzero(&r.dbreg, sizeof(r.dbreg));
 		break;
-	case PT_SETREGSET:
-		error = copyin(uap->addr, &r.vec, sizeof(r.vec));
-		break;
 	case PT_GETREGSET:
+	case PT_SETREGSET:
 		error = copyin(uap->addr, &r.vec, sizeof(r.vec));
 		break;
 	case PT_SETREGS:
@@ -659,6 +674,24 @@ sys_ptrace(struct thread *td, struct ptrace_args *uap)
 			error = EINVAL;
 		else
 			error = copyin(uap->addr, &r.pc, uap->data);
+		break;
+	case PT_SC_REMOTE:
+		if (uap->data != sizeof(r.sr)) {
+			error = EINVAL;
+			break;
+		}
+		error = copyin(uap->addr, &r.sr, uap->data);
+		if (error != 0)
+			break;
+		if (r.sr.pscr_nargs > nitems(td->td_sa.args)) {
+			error = EINVAL;
+			break;
+		}
+		error = copyin(r.sr.pscr_args, pscr_args,
+		    sizeof(u_long) * r.sr.pscr_nargs);
+		if (error != 0)
+			break;
+		r.sr.pscr_args = pscr_args;
 		break;
 	default:
 		addr = uap->addr;
@@ -705,6 +738,11 @@ sys_ptrace(struct thread *td, struct ptrace_args *uap)
 	case PT_GET_SC_RET:
 		error = copyout(&r.psr, uap->addr, MIN(uap->data,
 		    sizeof(r.psr)));
+		break;
+	case PT_SC_REMOTE:
+		error = copyout(&r.sr.pscr_ret, uap->addr +
+		    offsetof(struct ptrace_sc_remote, pscr_ret),
+		    sizeof(r.sr.pscr_ret));
 		break;
 	}
 
@@ -815,9 +853,11 @@ kern_ptrace(struct thread *td, int req, pid_t pid, void *addr, int data)
 	struct ptrace_io_desc *piod = NULL;
 	struct ptrace_lwpinfo *pl;
 	struct ptrace_sc_ret *psr;
+	struct ptrace_sc_remote *pscr;
 	struct file *fp;
 	struct ptrace_coredump *pc;
 	struct thr_coredump_req *tcq;
+	struct thr_syscall_req *tsr;
 	int error, num, tmp;
 	lwpid_t tid = 0, *buf;
 #ifdef COMPAT_FREEBSD32
@@ -1075,9 +1115,7 @@ kern_ptrace(struct thread *td, int req, pid_t pid, void *addr, int data)
 		CTR2(KTR_PTRACE, "PT_SUSPEND: tid %d (pid %d)", td2->td_tid,
 		    p->p_pid);
 		td2->td_dbgflags |= TDB_SUSPEND;
-		thread_lock(td2);
-		td2->td_flags |= TDF_NEEDSUSPCHK;
-		thread_unlock(td2);
+		ast_sched(td2, TDA_SUSPEND);
 		break;
 
 	case PT_RESUME:
@@ -1146,7 +1184,7 @@ kern_ptrace(struct thread *td, int req, pid_t pid, void *addr, int data)
 		/* See the explanation in linux_ptrace_get_syscall_info(). */
 		bcopy(td2->td_sa.args, addr, SV_PROC_ABI(td->td_proc) ==
 		    SV_ABI_LINUX ? sizeof(td2->td_sa.args) :
-		    td2->td_sa.callp->sy_narg * sizeof(register_t));
+		    td2->td_sa.callp->sy_narg * sizeof(syscallarg_t));
 		break;
 
 	case PT_GET_SC_RET:
@@ -1266,7 +1304,7 @@ kern_ptrace(struct thread *td, int req, pid_t pid, void *addr, int data)
 					    SIGSTOP);
 				}
 				td3->td_dbgflags &= ~(TDB_XSIG | TDB_FSTP |
-				    TDB_SUSPEND);
+				    TDB_SUSPEND | TDB_BORN);
 			}
 
 			if ((p->p_flag2 & P2_PTRACE_FSTP) != 0) {
@@ -1564,7 +1602,8 @@ kern_ptrace(struct thread *td, int req, pid_t pid, void *addr, int data)
 			error = EBUSY;
 			goto coredump_cleanup_locked;
 		}
-		KASSERT((td2->td_dbgflags & TDB_COREDUMPRQ) == 0,
+		KASSERT((td2->td_dbgflags & (TDB_COREDUMPREQ |
+		    TDB_SCREMOTEREQ)) == 0,
 		    ("proc %d tid %d req coredump", p->p_pid, td2->td_tid));
 
 		tcq->tc_vp = fp->f_vnode;
@@ -1574,10 +1613,10 @@ kern_ptrace(struct thread *td, int req, pid_t pid, void *addr, int data)
 			tcq->tc_flags |= SVC_NOCOMPRESS;
 		if ((pc->pc_flags & PC_ALL) != 0)
 			tcq->tc_flags |= SVC_ALL;
-		td2->td_coredump = tcq;
-		td2->td_dbgflags |= TDB_COREDUMPRQ;
+		td2->td_remotereq = tcq;
+		td2->td_dbgflags |= TDB_COREDUMPREQ;
 		thread_run_flash(td2);
-		while ((td2->td_dbgflags & TDB_COREDUMPRQ) != 0)
+		while ((td2->td_dbgflags & TDB_COREDUMPREQ) != 0)
 			msleep(p, &p->p_mtx, PPAUSE, "crdmp", 0);
 		error = tcq->tc_error;
 coredump_cleanup_locked:
@@ -1587,6 +1626,50 @@ coredump_cleanup:
 coredump_cleanup_nofp:
 		free(tcq, M_TEMP);
 		PROC_LOCK(p);
+		break;
+
+	case PT_SC_REMOTE:
+		pscr = addr;
+		CTR2(KTR_PTRACE, "PT_SC_REMOTE: pid %d, syscall %d",
+		    p->p_pid, pscr->pscr_syscall);
+		if ((td2->td_dbgflags & TDB_BOUNDARY) == 0) {
+			error = EBUSY;
+			break;
+		}
+		PROC_UNLOCK(p);
+		MPASS(pscr->pscr_nargs <= nitems(td->td_sa.args));
+
+		tsr = malloc(sizeof(struct thr_syscall_req), M_TEMP,
+		    M_WAITOK | M_ZERO);
+
+		tsr->ts_sa.code = pscr->pscr_syscall;
+		tsr->ts_nargs = pscr->pscr_nargs;
+		memcpy(&tsr->ts_sa.args, pscr->pscr_args,
+		    sizeof(syscallarg_t) * tsr->ts_nargs);
+
+		PROC_LOCK(p);
+		error = proc_can_ptrace(td, p);
+		if (error != 0) {
+			free(tsr, M_TEMP);
+			break;
+		}
+		if (td2->td_proc != p) {
+			free(tsr, M_TEMP);
+			error = ESRCH;
+			break;
+		}
+		KASSERT((td2->td_dbgflags & (TDB_COREDUMPREQ |
+		    TDB_SCREMOTEREQ)) == 0,
+		    ("proc %d tid %d req coredump", p->p_pid, td2->td_tid));
+
+		td2->td_remotereq = tsr;
+		td2->td_dbgflags |= TDB_SCREMOTEREQ;
+		thread_run_flash(td2);
+		while ((td2->td_dbgflags & TDB_SCREMOTEREQ) != 0)
+			msleep(p, &p->p_mtx, PPAUSE, "pscrx", 0);
+		error = 0;
+		memcpy(&pscr->pscr_ret, &tsr->ts_ret, sizeof(tsr->ts_ret));
+		free(tsr, M_TEMP);
 		break;
 
 	default:

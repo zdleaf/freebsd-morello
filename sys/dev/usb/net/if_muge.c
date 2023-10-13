@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (C) 2012 Ben Gray <bgray@freebsd.org>.
  * Copyright (C) 2018 The FreeBSD Foundation.
@@ -27,13 +27,9 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 /*
  * USB-To-Ethernet adapter driver for Microchip's LAN78XX and related families.
  *
@@ -217,11 +213,11 @@ static uether_fn_t muge_tick;
 static uether_fn_t muge_setmulti;
 static uether_fn_t muge_setpromisc;
 
-static int muge_ifmedia_upd(struct ifnet *);
-static void muge_ifmedia_sts(struct ifnet *, struct ifmediareq *);
+static int muge_ifmedia_upd(if_t);
+static void muge_ifmedia_sts(if_t, struct ifmediareq *);
 
 static int lan78xx_chip_init(struct muge_softc *sc);
-static int muge_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data);
+static int muge_ioctl(if_t ifp, u_long cmd, caddr_t data);
 
 static const struct usb_config muge_config[MUGE_N_TRANSFER] = {
 	[MUGE_BULK_DT_WR] = {
@@ -614,30 +610,29 @@ done:
 static int
 lan78xx_set_rx_max_frame_length(struct muge_softc *sc, int size)
 {
-	int err = 0;
 	uint32_t buf;
 	bool rxenabled;
 
 	/* First we have to disable rx before changing the length. */
-	err = lan78xx_read_reg(sc, ETH_MAC_RX, &buf);
+	lan78xx_read_reg(sc, ETH_MAC_RX, &buf);
 	rxenabled = ((buf & ETH_MAC_RX_EN_) != 0);
 
 	if (rxenabled) {
 		buf &= ~ETH_MAC_RX_EN_;
-		err = lan78xx_write_reg(sc, ETH_MAC_RX, buf);
+		lan78xx_write_reg(sc, ETH_MAC_RX, buf);
 	}
 
 	/* Setting max frame length. */
 	buf &= ~ETH_MAC_RX_MAX_FR_SIZE_MASK_;
 	buf |= (((size + 4) << ETH_MAC_RX_MAX_FR_SIZE_SHIFT_) &
 	    ETH_MAC_RX_MAX_FR_SIZE_MASK_);
-	err = lan78xx_write_reg(sc, ETH_MAC_RX, buf);
+	lan78xx_write_reg(sc, ETH_MAC_RX, buf);
 
 	/* If it were enabled before, we enable it back. */
 
 	if (rxenabled) {
 		buf |= ETH_MAC_RX_EN_;
-		err = lan78xx_write_reg(sc, ETH_MAC_RX, buf);
+		lan78xx_write_reg(sc, ETH_MAC_RX, buf);
 	}
 
 	return (0);
@@ -760,7 +755,7 @@ lan78xx_miibus_statchg(device_t dev)
 {
 	struct muge_softc *sc = device_get_softc(dev);
 	struct mii_data *mii = uether_getmii(&sc->sc_ue);
-	struct ifnet *ifp;
+	if_t ifp;
 	int err;
 	uint32_t flow = 0;
 	uint32_t fct_flow = 0;
@@ -772,7 +767,7 @@ lan78xx_miibus_statchg(device_t dev)
 
 	ifp = uether_getifp(&sc->sc_ue);
 	if (mii == NULL || ifp == NULL ||
-	    (ifp->if_drv_flags & IFF_DRV_RUNNING) == 0)
+	    (if_getdrvflags(ifp) & IFF_DRV_RUNNING) == 0)
 		goto done;
 
 	/* Use the MII status to determine link status */
@@ -932,7 +927,7 @@ lan78xx_phy_init(struct muge_softc *sc)
 	    ANAR_10 | ANAR_10_FD | ANAR_TX | ANAR_TX_FD |
 	    ANAR_CSMA | ANAR_FC | ANAR_PAUSE_ASYM);
 
-	/* Restart auto-negotation. */
+	/* Restart auto-negotiation. */
 	bmcr |= BMCR_STARTNEG;
 	bmcr |= BMCR_AUTOEN;
 	lan78xx_miibus_writereg(sc->sc_ue.ue_dev, sc->sc_phyno, MII_BMCR, bmcr);
@@ -1165,7 +1160,7 @@ muge_bulk_read_callback(struct usb_xfer *xfer, usb_error_t error)
 {
 	struct muge_softc *sc = usbd_xfer_softc(xfer);
 	struct usb_ether *ue = &sc->sc_ue;
-	struct ifnet *ifp = uether_getifp(ue);
+	if_t ifp = uether_getifp(ue);
 	struct mbuf *m;
 	struct usb_page_cache *pc;
 	uint32_t rx_cmd_a, rx_cmd_b;
@@ -1263,10 +1258,8 @@ muge_bulk_read_callback(struct usb_xfer *xfer, usb_error_t error)
 				 * Check if RX checksums are computed, and
 				 * offload them
 				 */
-				if ((ifp->if_capenable & IFCAP_RXCSUM) &&
+				if ((if_getcapenable(ifp) & IFCAP_RXCSUM) &&
 				    !(rx_cmd_a & RX_CMD_A_ICSM_)) {
-					struct ether_header *eh;
-					eh = mtod(m, struct ether_header *);
 					/*
 					 * Remove the extra 2 bytes of the csum
 					 *
@@ -1360,7 +1353,7 @@ static void
 muge_bulk_write_callback(struct usb_xfer *xfer, usb_error_t error)
 {
 	struct muge_softc *sc = usbd_xfer_softc(xfer);
-	struct ifnet *ifp = uether_getifp(&sc->sc_ue);
+	if_t ifp = uether_getifp(&sc->sc_ue);
 	struct usb_page_cache *pc;
 	struct mbuf *m;
 	int nframes;
@@ -1370,19 +1363,19 @@ muge_bulk_write_callback(struct usb_xfer *xfer, usb_error_t error)
 	case USB_ST_TRANSFERRED:
 		muge_dbg_printf(sc,
 		    "USB TRANSFER status: USB_ST_TRANSFERRED\n");
-		ifp->if_drv_flags &= ~IFF_DRV_OACTIVE;
+		if_setdrvflagbits(ifp, 0, IFF_DRV_OACTIVE);
 		/* FALLTHROUGH */
 	case USB_ST_SETUP:
 		muge_dbg_printf(sc, "USB TRANSFER status: USB_ST_SETUP\n");
 tr_setup:
 		if ((sc->sc_flags & MUGE_FLAG_LINK) == 0 ||
-		    (ifp->if_drv_flags & IFF_DRV_OACTIVE) != 0) {
+		    (if_getdrvflags(ifp) & IFF_DRV_OACTIVE) != 0) {
 			muge_dbg_printf(sc,
 			    "sc->sc_flags & MUGE_FLAG_LINK: %d\n",
 			    (sc->sc_flags & MUGE_FLAG_LINK));
 			muge_dbg_printf(sc,
-			    "ifp->if_drv_flags & IFF_DRV_OACTIVE: %d\n",
-			    (ifp->if_drv_flags & IFF_DRV_OACTIVE));
+			    "if_getdrvflags(ifp) & IFF_DRV_OACTIVE: %d",
+			    (if_getdrvflags(ifp) & IFF_DRV_OACTIVE));
 			muge_dbg_printf(sc,
 			    "USB TRANSFER not sending: no link or controller is busy \n");
 			/*
@@ -1392,9 +1385,9 @@ tr_setup:
 			return;
 		}
 		for (nframes = 0;
-		     nframes < 16 && !IFQ_DRV_IS_EMPTY(&ifp->if_snd);
+		     nframes < 16 && !if_sendq_empty(ifp);
 		     nframes++) {
-			IFQ_DRV_DEQUEUE(&ifp->if_snd, m);
+			m = if_dequeue(ifp);
 			if (m == NULL)
 				break;
 			usbd_xfer_set_frame_offset(xfer, nframes * MCLBYTES,
@@ -1441,13 +1434,13 @@ tr_setup:
 			muge_dbg_printf(sc, "USB TRANSFER submit attempt\n");
 			usbd_xfer_set_frames(xfer, nframes);
 			usbd_transfer_submit(xfer);
-			ifp->if_drv_flags |= IFF_DRV_OACTIVE;
+			if_setdrvflagbits(ifp, IFF_DRV_OACTIVE, 0);
 		}
 		return;
 
 	default:
 		if_inc_counter(ifp, IFCOUNTER_OERRORS, 1);
-		ifp->if_drv_flags &= ~IFF_DRV_OACTIVE;
+		if_setdrvflagbits(ifp, 0, IFF_DRV_OACTIVE);
 
 		if (error != USB_ERR_CANCELLED) {
 			muge_err_printf(sc,
@@ -1585,7 +1578,7 @@ muge_attach_post(struct usb_ether *ue)
  *	@ue: the USB ethernet device
  *
  *	Most of this is boilerplate code and copied from the base USB ethernet
- *	driver.  It has been overriden so that we can indicate to the system
+ *	driver.  It has been overridden so that we can indicate to the system
  *	that the chip supports H/W checksumming.
  *
  *	RETURNS:
@@ -1595,31 +1588,29 @@ static int
 muge_attach_post_sub(struct usb_ether *ue)
 {
 	struct muge_softc *sc;
-	struct ifnet *ifp;
-	int error;
+	if_t ifp;
 
 	sc = uether_getsc(ue);
 	muge_dbg_printf(sc, "Calling muge_attach_post_sub.\n");
 	ifp = ue->ue_ifp;
-	ifp->if_flags = IFF_BROADCAST | IFF_SIMPLEX | IFF_MULTICAST;
-	ifp->if_start = uether_start;
-	ifp->if_ioctl = muge_ioctl;
-	ifp->if_init = uether_init;
-	IFQ_SET_MAXLEN(&ifp->if_snd, ifqmaxlen);
-	ifp->if_snd.ifq_drv_maxlen = ifqmaxlen;
-	IFQ_SET_READY(&ifp->if_snd);
+	if_setflags(ifp, IFF_BROADCAST | IFF_SIMPLEX | IFF_MULTICAST);
+	if_setstartfn(ifp, uether_start);
+	if_setioctlfn(ifp, muge_ioctl);
+	if_setinitfn(ifp, uether_init);
+	if_setsendqlen(ifp, ifqmaxlen);
+	if_setsendqready(ifp);
 
 	/*
 	 * The chip supports TCP/UDP checksum offloading on TX and RX paths,
 	 * however currently only RX checksum is supported in the driver
 	 * (see top of file).
 	 */
-	ifp->if_capabilities |= IFCAP_VLAN_MTU;
-	ifp->if_hwassist = 0;
-	ifp->if_capabilities |= IFCAP_RXCSUM;
+	if_setcapabilitiesbit(ifp, IFCAP_VLAN_MTU, 0);
+	if_sethwassist(ifp, 0);
+	if_setcapabilitiesbit(ifp, IFCAP_RXCSUM, 0);
 
 	if (MUGE_DEFAULT_TX_CSUM_ENABLE)
-		ifp->if_capabilities |= IFCAP_TXCSUM;
+		if_setcapabilitiesbit(ifp, IFCAP_TXCSUM, 0);
 
 	/*
 	 * In the Linux driver they also enable scatter/gather (NETIF_F_SG)
@@ -1627,19 +1618,19 @@ muge_attach_post_sub(struct usb_ether *ue)
 	 * FreeBSD doesn't have that as an interface feature.
 	 */
 	if (MUGE_DEFAULT_TSO_ENABLE)
-		ifp->if_capabilities |= IFCAP_TSO4 | IFCAP_TSO6;
+		if_setcapabilitiesbit(ifp, IFCAP_TSO4 | IFCAP_TSO6, 0);
 
 #if 0
 	/* TX checksuming is disabled since not yet implemented. */
-	ifp->if_capabilities |= IFCAP_TXCSUM;
-	ifp->if_capenable |= IFCAP_TXCSUM;
-	ifp->if_hwassist = CSUM_TCP | CSUM_UDP;
+	if_setcapabilitiesbit(ifp, IFCAP_TXCSUM, 0);
+	if_setcapenablebit(ifp, IFCAP_TXCSUM, 0);
+	if_sethwassist(ifp, CSUM_TCP | CSUM_UDP);
 #endif
 
-	ifp->if_capenable = ifp->if_capabilities;
+	if_setcapenable(ifp, if_getcapabilities(ifp));
 
 	bus_topo_lock();
-	error = mii_attach(ue->ue_dev, &ue->ue_miibus, ifp, uether_ifmedia_upd,
+	mii_attach(ue->ue_dev, &ue->ue_miibus, ifp, uether_ifmedia_upd,
 	    ue->ue_methods->ue_mii_sts, BMSR_DEFCAPMASK, sc->sc_phyno,
 	    MII_OFFSET_ANY, 0);
 	bus_topo_unlock();
@@ -1677,9 +1668,9 @@ muge_start(struct usb_ether *ue)
  *	0 on success and an error code on failure.
  */
 static int
-muge_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
+muge_ioctl(if_t ifp, u_long cmd, caddr_t data)
 {
-	struct usb_ether *ue = ifp->if_softc;
+	struct usb_ether *ue = if_getsoftc(ifp);
 	struct muge_softc *sc;
 	struct ifreq *ifr;
 	int rc;
@@ -1695,15 +1686,15 @@ muge_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		rc = 0;
 		reinit = 0;
 
-		mask = ifr->ifr_reqcap ^ ifp->if_capenable;
+		mask = ifr->ifr_reqcap ^ if_getcapenable(ifp);
 
 		/* Modify the RX CSUM enable bits. */
 		if ((mask & IFCAP_RXCSUM) != 0 &&
-		    (ifp->if_capabilities & IFCAP_RXCSUM) != 0) {
-			ifp->if_capenable ^= IFCAP_RXCSUM;
+		    (if_getcapabilities(ifp) & IFCAP_RXCSUM) != 0) {
+			if_togglecapenable(ifp, IFCAP_RXCSUM);
 
-			if (ifp->if_drv_flags & IFF_DRV_RUNNING) {
-				ifp->if_drv_flags &= ~IFF_DRV_RUNNING;
+			if (if_getdrvflags(ifp) & IFF_DRV_RUNNING) {
+				if_setdrvflagbits(ifp, 0, IFF_DRV_RUNNING);
 				reinit = 1;
 			}
 		}
@@ -1827,16 +1818,16 @@ done:
 static void
 muge_multicast_write(struct muge_softc *sc)
 {
-	int i, ret;
+	int i;
 	lan78xx_dataport_write(sc, ETH_DP_SEL_RSEL_VLAN_DA_,
 	    ETH_DP_SEL_VHF_VLAN_LEN, ETH_DP_SEL_VHF_HASH_LEN,
 	    sc->sc_mchash_table);
 
 	for (i = 1; i < MUGE_NUM_PFILTER_ADDRS_; i++) {
-		ret = lan78xx_write_reg(sc, PFILTER_HI(i), 0);
-		ret = lan78xx_write_reg(sc, PFILTER_LO(i),
+		lan78xx_write_reg(sc, PFILTER_HI(i), 0);
+		lan78xx_write_reg(sc, PFILTER_LO(i),
 		    sc->sc_pfilter_table[i][1]);
-		ret = lan78xx_write_reg(sc, PFILTER_HI(i),
+		lan78xx_write_reg(sc, PFILTER_HI(i),
 		    sc->sc_pfilter_table[i][0]);
 	}
 }
@@ -1890,7 +1881,7 @@ static void
 muge_setmulti(struct usb_ether *ue)
 {
 	struct muge_softc *sc = uether_getsc(ue);
-	struct ifnet *ifp = uether_getifp(ue);
+	if_t ifp = uether_getifp(ue);
 	uint8_t i;
 
 	MUGE_LOCK_ASSERT(sc, MA_OWNED);
@@ -1909,10 +1900,10 @@ muge_setmulti(struct usb_ether *ue)
 
 	sc->sc_rfe_ctl |= ETH_RFE_CTL_BCAST_EN_;
 
-	if (ifp->if_flags & IFF_PROMISC) {
+	if (if_getflags(ifp) & IFF_PROMISC) {
 		muge_dbg_printf(sc, "promiscuous mode enabled\n");
 		sc->sc_rfe_ctl |= ETH_RFE_CTL_MCAST_EN_ | ETH_RFE_CTL_UCAST_EN_;
-	} else if (ifp->if_flags & IFF_ALLMULTI) {
+	} else if (if_getflags(ifp) & IFF_ALLMULTI) {
 		muge_dbg_printf(sc, "receive all multicast enabled\n");
 		sc->sc_rfe_ctl |= ETH_RFE_CTL_MCAST_EN_;
 	} else {
@@ -1933,14 +1924,14 @@ static void
 muge_setpromisc(struct usb_ether *ue)
 {
 	struct muge_softc *sc = uether_getsc(ue);
-	struct ifnet *ifp = uether_getifp(ue);
+	if_t ifp = uether_getifp(ue);
 
 	muge_dbg_printf(sc, "promiscuous mode %sabled\n",
-	    (ifp->if_flags & IFF_PROMISC) ? "en" : "dis");
+	    (if_getflags(ifp) & IFF_PROMISC) ? "en" : "dis");
 
 	MUGE_LOCK_ASSERT(sc, MA_OWNED);
 
-	if (ifp->if_flags & IFF_PROMISC)
+	if (if_getflags(ifp) & IFF_PROMISC)
 		sc->sc_rfe_ctl |= ETH_RFE_CTL_MCAST_EN_ | ETH_RFE_CTL_UCAST_EN_;
 	else
 		sc->sc_rfe_ctl &= ~(ETH_RFE_CTL_MCAST_EN_);
@@ -1961,7 +1952,7 @@ muge_setpromisc(struct usb_ether *ue)
 static int
 muge_sethwcsum(struct muge_softc *sc)
 {
-	struct ifnet *ifp = uether_getifp(&sc->sc_ue);
+	if_t ifp = uether_getifp(&sc->sc_ue);
 	int err;
 
 	if (!ifp)
@@ -1969,7 +1960,7 @@ muge_sethwcsum(struct muge_softc *sc)
 
 	MUGE_LOCK_ASSERT(sc, MA_OWNED);
 
-	if (ifp->if_capenable & IFCAP_RXCSUM) {
+	if (if_getcapenable(ifp) & IFCAP_RXCSUM) {
 		sc->sc_rfe_ctl |= ETH_RFE_CTL_IGMP_COE_ | ETH_RFE_CTL_ICMP_COE_;
 		sc->sc_rfe_ctl |= ETH_RFE_CTL_TCPUDP_COE_ | ETH_RFE_CTL_IP_COE_;
 	} else {
@@ -2006,9 +1997,9 @@ muge_sethwcsum(struct muge_softc *sc)
  *	Returns 0 on success or a negative error code.
  */
 static int
-muge_ifmedia_upd(struct ifnet *ifp)
+muge_ifmedia_upd(if_t ifp)
 {
-	struct muge_softc *sc = ifp->if_softc;
+	struct muge_softc *sc = if_getsoftc(ifp);
 	muge_dbg_printf(sc, "Calling muge_ifmedia_upd.\n");
 	struct mii_data *mii = uether_getmii(&sc->sc_ue);
 	struct mii_softc *miisc;
@@ -2037,13 +2028,13 @@ muge_init(struct usb_ether *ue)
 {
 	struct muge_softc *sc = uether_getsc(ue);
 	muge_dbg_printf(sc, "Calling muge_init.\n");
-	struct ifnet *ifp = uether_getifp(ue);
+	if_t ifp = uether_getifp(ue);
 	MUGE_LOCK_ASSERT(sc, MA_OWNED);
 
-	if (lan78xx_setmacaddress(sc, IF_LLADDR(ifp)))
+	if (lan78xx_setmacaddress(sc, if_getlladdr(ifp)))
 		muge_dbg_printf(sc, "setting MAC address failed\n");
 
-	if ((ifp->if_drv_flags & IFF_DRV_RUNNING) != 0)
+	if ((if_getdrvflags(ifp) & IFF_DRV_RUNNING) != 0)
 		return;
 
 	/* Cancel pending I/O. */
@@ -2061,7 +2052,7 @@ muge_init(struct usb_ether *ue)
 	usbd_xfer_set_stall(sc->sc_xfer[MUGE_BULK_DT_WR]);
 
 	/* Indicate we are up and running. */
-	ifp->if_drv_flags |= IFF_DRV_RUNNING;
+	if_setdrvflagbits(ifp, IFF_DRV_RUNNING, 0);
 
 	/* Switch to selected media. */
 	muge_ifmedia_upd(ifp);
@@ -2076,11 +2067,11 @@ static void
 muge_stop(struct usb_ether *ue)
 {
 	struct muge_softc *sc = uether_getsc(ue);
-	struct ifnet *ifp = uether_getifp(ue);
+	if_t ifp = uether_getifp(ue);
 
 	MUGE_LOCK_ASSERT(sc, MA_OWNED);
 
-	ifp->if_drv_flags &= ~(IFF_DRV_RUNNING | IFF_DRV_OACTIVE);
+	if_setdrvflagbits(ifp, 0, (IFF_DRV_RUNNING | IFF_DRV_OACTIVE));
 	sc->sc_flags &= ~MUGE_FLAG_LINK;
 
 	/*
@@ -2127,9 +2118,9 @@ muge_tick(struct usb_ether *ue)
  *	Internally takes and releases the device lock.
  */
 static void
-muge_ifmedia_sts(struct ifnet *ifp, struct ifmediareq *ifmr)
+muge_ifmedia_sts(if_t ifp, struct ifmediareq *ifmr)
 {
-	struct muge_softc *sc = ifp->if_softc;
+	struct muge_softc *sc = if_getsoftc(ifp);
 	struct mii_data *mii = uether_getmii(&sc->sc_ue);
 
 	MUGE_LOCK(sc);
@@ -2268,10 +2259,8 @@ static driver_t muge_driver = {
 	.size = sizeof(struct muge_softc),
 };
 
-static devclass_t muge_devclass;
-
-DRIVER_MODULE(muge, uhub, muge_driver, muge_devclass, NULL, NULL);
-DRIVER_MODULE(miibus, muge, miibus_driver, miibus_devclass, NULL, NULL);
+DRIVER_MODULE(muge, uhub, muge_driver, NULL, NULL);
+DRIVER_MODULE(miibus, muge, miibus_driver, NULL, NULL);
 MODULE_DEPEND(muge, uether, 1, 1, 1);
 MODULE_DEPEND(muge, usb, 1, 1, 1);
 MODULE_DEPEND(muge, ether, 1, 1, 1);

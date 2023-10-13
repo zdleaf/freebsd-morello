@@ -1,4 +1,3 @@
-# $FreeBSD$
 
 #-
 # Copyright (c) 2014 M. Warner Losh <imp@FreeBSD.org>
@@ -98,10 +97,8 @@ NANO_MAKEFS="makefs -B big \
 	-o bsize=4096,fsize=512,density=8192,optimization=space"
 export NANO_MAKEFS
 
-# NB: leave c++ enabled so devd can be built
 CONF_BUILD="
 WITHOUT_ACPI=true
-WITHOUT_ATM=true
 WITHOUT_AUDIT=true
 WITHOUT_BLUETOOTH=true
 WITHOUT_CALENDAR=true

@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2003 Marcel Moolenaar
  * All rights reserved.
@@ -27,8 +27,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/bus.h>
@@ -54,7 +52,6 @@ __FBSDID("$FreeBSD$");
 
 #include "uart_if.h"
 
-devclass_t uart_devclass;
 const char uart_driver_name[] = "uart";
 
 SLIST_HEAD(uart_devinfo_list, uart_devinfo) uart_sysdevs =
@@ -345,9 +342,11 @@ static __inline int
 uart_intr_rxready(void *arg)
 {
 	struct uart_softc *sc = arg;
+#if defined(KDB)
 	int rxp;
 
 	rxp = sc->sc_rxput;
+#endif
 	UART_RECEIVE(sc);
 #if defined(KDB)
 	if (sc->sc_sysdev != NULL && sc->sc_sysdev->type == UART_DEV_CONSOLE) {

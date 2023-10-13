@@ -1,7 +1,7 @@
 /*-
  * CAM request queue management functions.
  *
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 1997 Justin T. Gibbs.
  * All rights reserved.
@@ -29,8 +29,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/types.h>
@@ -46,10 +44,6 @@ static MALLOC_DEFINE(M_CAMQ, "CAM queue", "CAM queue buffers");
 static MALLOC_DEFINE(M_CAMDEVQ, "CAM dev queue", "CAM dev queue buffers");
 static MALLOC_DEFINE(M_CAMCCBQ, "CAM ccb queue", "CAM ccb queue buffers");
 
-static __inline int
-		queue_cmp(cam_pinfo **queue_array, int i, int j);
-static __inline void
-		swap(cam_pinfo **queue_array, int i, int j);
 static void	heap_up(cam_pinfo **queue_array, int new_index);
 static void	heap_down(cam_pinfo **queue_array, int index,
 			  int last_index);
@@ -76,7 +70,7 @@ camq_init(struct camq *camq, int size)
 
 /*
  * Free a camq structure.  This should only be called if a controller
- * driver failes somehow during its attach routine or is unloaded and has
+ * driver fails somehow during its attach routine or is unloaded and has
  * obtained a camq structure.  The XPT should ensure that the queue
  * is empty before calling this routine.
  */
@@ -88,7 +82,7 @@ camq_fini(struct camq *queue)
 	}
 }
 
-u_int32_t
+uint32_t
 camq_resize(struct camq *queue, int new_size)
 {
 	cam_pinfo **new_array;
@@ -170,7 +164,7 @@ camq_remove(struct camq *queue, int index)
  * element index and restore the Heap(0, num_elements) property.
  */
 void
-camq_change_priority(struct camq *queue, int index, u_int32_t new_priority)
+camq_change_priority(struct camq *queue, int index, uint32_t new_priority)
 {
 	if (new_priority > queue->queue_array[index]->priority) {
 		queue->queue_array[index]->priority = new_priority;
@@ -221,10 +215,10 @@ cam_devq_free(struct cam_devq *devq)
 	free(devq, M_CAMDEVQ);
 }
 
-u_int32_t
+uint32_t
 cam_devq_resize(struct cam_devq *camq, int devices)
 {
-	u_int32_t retval;
+	uint32_t retval;
 
 	retval = camq_resize(&camq->send_queue, devices);
 	return (retval);
@@ -257,7 +251,7 @@ cam_ccbq_free(struct cam_ccbq *ccbq)
 	}
 }
 
-u_int32_t
+uint32_t
 cam_ccbq_resize(struct cam_ccbq *ccbq, int new_size)
 {
 	int delta;

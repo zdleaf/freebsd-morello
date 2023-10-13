@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2000 Doug Rabson
  * All rights reserved.
@@ -27,8 +27,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/malloc.h>
@@ -285,8 +283,6 @@ static driver_t agp_sis_driver = {
 	sizeof(struct agp_sis_softc),
 };
 
-static devclass_t agp_devclass;
-
-DRIVER_MODULE(agp_sis, hostb, agp_sis_driver, agp_devclass, 0, 0);
+DRIVER_MODULE(agp_sis, hostb, agp_sis_driver, 0, 0);
 MODULE_DEPEND(agp_sis, agp, 1, 1, 1);
 MODULE_DEPEND(agp_sis, pci, 1, 1, 1);

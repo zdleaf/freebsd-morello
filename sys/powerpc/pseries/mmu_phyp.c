@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (C) 2010 Andreas Tobler
  * All rights reserved.
@@ -26,8 +26,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/kernel.h>
 #include <sys/ktr.h>
@@ -124,7 +122,7 @@ SYSINIT(kvmbugwarn2, SI_SUB_LAST, SI_ORDER_THIRD + 1, print_kvm_bug_warning,
     NULL);
 
 static void
-mphyp_install()
+mphyp_install(void)
 {
 	char buf[8];
 	uint32_t prop[2];
@@ -320,7 +318,7 @@ mphyp_pte_clear(struct pvo_entry *pvo, uint64_t ptebit)
 	struct rm_priotracker track;
 	int64_t refchg;
 	uint64_t ptelo, junk;
-	int err;
+	int err __diagused;
 
 	/*
 	 * This involves two steps (synch and clear) so we need the entry
@@ -589,7 +587,7 @@ mphyp_pte_unset_sp(struct pvo_entry *pvo)
 	uint64_t junk, refchg;
 	int err;
 	vm_offset_t eva;
-	pmap_t pm;
+	pmap_t pm __diagused;
 
 	pm = pvo->pvo_pmap;
 	PMAP_LOCK_ASSERT(pm, MA_OWNED);
@@ -624,7 +622,7 @@ mphyp_pte_insert_sp(struct pvo_entry *pvo)
 	int64_t ret;
 	struct lpte pte;
 	vm_offset_t eva;
-	pmap_t pm;
+	pmap_t pm __diagused;
 
 	pm = pvo->pvo_pmap;
 	PMAP_LOCK_ASSERT(pm, MA_OWNED);

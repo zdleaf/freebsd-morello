@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 1997, 1998 Justin T. Gibbs.
  * All rights reserved.
@@ -27,8 +27,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/domainset.h>
@@ -230,12 +228,13 @@ bounce_bus_dma_tag_set_domain(bus_dma_tag_t dmat)
 static int
 bounce_bus_dma_tag_destroy(bus_dma_tag_t dmat)
 {
-	bus_dma_tag_t dmat_copy __diagused;
+#ifdef KTR
+	bus_dma_tag_t dmat_copy = dmat;
+#endif
 	bus_dma_tag_t parent;
 	int error;
 
 	error = 0;
-	dmat_copy = dmat;
 
 	if (dmat != NULL) {
 		if (dmat->map_count != 0) {
@@ -324,6 +323,7 @@ bounce_bus_dmamap_create(bus_dma_tag_t dmat, int flags, bus_dmamap_t *mapp)
 		if ((dmat->bounce_flags & BUS_DMA_MIN_ALLOC_COMP) == 0 ||
 		    (bz->map_count > 0 && bz->total_bpages < maxpages)) {
 			pages = MAX(atop(dmat->common.maxsize), 1);
+			pages = MIN(dmat->common.nsegments, pages);
 			pages = MIN(maxpages - bz->total_bpages, pages);
 			pages = MAX(pages, 1);
 			if (alloc_bounce_pages(dmat, pages) < pages)
@@ -448,12 +448,12 @@ bounce_bus_dmamem_alloc(bus_dma_tag_t dmat, void **vaddr, int flags,
 	    dmat->common.alignment <= PAGE_SIZE &&
 	    (dmat->common.boundary % PAGE_SIZE) == 0) {
 		/* Page-based multi-segment allocations allowed */
-		*vaddr = (void *)kmem_alloc_attr_domainset(
+		*vaddr = kmem_alloc_attr_domainset(
 		    DOMAINSET_PREF(dmat->common.domain), dmat->common.maxsize,
 		    mflags, 0ul, dmat->common.lowaddr, attr);
 		dmat->bounce_flags |= BUS_DMA_KMEM_ALLOC;
 	} else {
-		*vaddr = (void *)kmem_alloc_contig_domainset(
+		*vaddr = kmem_alloc_contig_domainset(
 		    DOMAINSET_PREF(dmat->common.domain), dmat->common.maxsize,
 		    mflags, 0ul, dmat->common.lowaddr,
 		    dmat->common.alignment != 0 ? dmat->common.alignment : 1ul,
@@ -489,7 +489,7 @@ bounce_bus_dmamem_free(bus_dma_tag_t dmat, void *vaddr, bus_dmamap_t map)
 	if ((dmat->bounce_flags & BUS_DMA_KMEM_ALLOC) == 0)
 		free(vaddr, M_DEVBUF);
 	else
-		kmem_free((vm_offset_t)vaddr, dmat->common.maxsize);
+		kmem_free(vaddr, dmat->common.maxsize);
 	CTR3(KTR_BUSDMA, "%s: tag %p flags 0x%x", __func__, dmat,
 	    dmat->bounce_flags);
 }
@@ -906,15 +906,10 @@ bounce_bus_dmamap_complete(bus_dma_tag_t dmat, bus_dmamap_t map,
 static void
 bounce_bus_dmamap_unload(bus_dma_tag_t dmat, bus_dmamap_t map)
 {
-	struct bounce_page *bpage;
-
 	if (map == NULL)
 		return;
 
-	while ((bpage = STAILQ_FIRST(&map->bpages)) != NULL) {
-		STAILQ_REMOVE_HEAD(&map->bpages, links);
-		free_bounce_page(dmat, bpage);
-	}
+	free_bounce_pages(dmat, map);
 }
 
 static void
@@ -927,7 +922,6 @@ bounce_bus_dmamap_sync(bus_dma_tag_t dmat, bus_dmamap_t map,
 
 	if (map == NULL)
 		goto out;
-	kmsan_bus_dmamap_sync(&map->kmsan_mem, op);
 	if ((bpage = STAILQ_FIRST(&map->bpages)) == NULL)
 		goto out;
 
@@ -1021,6 +1015,8 @@ next_r:
 	}
 out:
 	atomic_thread_fence_rel();
+	if (map != NULL)
+		kmsan_bus_dmamap_sync(&map->kmsan_mem, op);
 }
 
 #ifdef KMSAN

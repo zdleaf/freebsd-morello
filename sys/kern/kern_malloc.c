@@ -46,8 +46,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include "opt_ddb.h"
 #include "opt_vm.h"
 
@@ -494,7 +492,7 @@ void
 contigfree(void *addr, unsigned long size, struct malloc_type *type)
 {
 
-	kmem_free((vm_offset_t)addr, size);
+	kmem_free(addr, size);
 	malloc_type_freed(type, round_page(size));
 }
 
@@ -588,17 +586,15 @@ static caddr_t __noinline
 malloc_large(size_t size, struct malloc_type *mtp, struct domainset *policy,
     int flags DEBUG_REDZONE_ARG_DEF)
 {
-	vm_offset_t kva;
-	caddr_t va;
+	void *va;
 
 	size = roundup(size, PAGE_SIZE);
-	kva = kmem_malloc_domainset(policy, size, flags);
-	if (kva != 0) {
+	va = kmem_malloc_domainset(policy, size, flags);
+	if (va != NULL) {
 		/* The low bit is unused for slab pointers. */
-		vsetzoneslab(kva, NULL, (void *)((size << 1) | 1));
+		vsetzoneslab((uintptr_t)va, NULL, (void *)((size << 1) | 1));
 		uma_total_inc(size);
 	}
-	va = (caddr_t)kva;
 	malloc_type_allocated(mtp, va == NULL ? 0 : size);
 	if (__predict_false(va == NULL)) {
 		KASSERT((flags & M_WAITOK) == 0,
@@ -607,7 +603,7 @@ malloc_large(size_t size, struct malloc_type *mtp, struct domainset *policy,
 #ifdef DEBUG_REDZONE
 		va = redzone_setup(va, osize);
 #endif
-		kasan_mark((void *)va, osize, size, KASAN_MALLOC_REDZONE);
+		kasan_mark(va, osize, size, KASAN_MALLOC_REDZONE);
 	}
 	return (va);
 }
@@ -616,7 +612,7 @@ static void
 free_large(void *addr, size_t size)
 {
 
-	kmem_free((vm_offset_t)addr, size);
+	kmem_free(addr, size);
 	uma_total_dec(size);
 }
 
@@ -986,8 +982,10 @@ zfree(void *addr, struct malloc_type *mtp)
 void *
 realloc(void *addr, size_t size, struct malloc_type *mtp, int flags)
 {
+#ifndef DEBUG_REDZONE
 	uma_zone_t zone;
 	uma_slab_t slab;
+#endif
 	unsigned long alloc;
 	void *newaddr;
 
@@ -1011,8 +1009,6 @@ realloc(void *addr, size_t size, struct malloc_type *mtp, int flags)
 #endif
 
 #ifdef DEBUG_REDZONE
-	slab = NULL;
-	zone = NULL;
 	alloc = redzone_get_size(addr);
 #else
 	vtozoneslab((vm_offset_t)addr & (~UMA_SLAB_MASK), &zone, &slab);
@@ -1482,7 +1478,7 @@ get_malloc_stats(const struct malloc_type_internal *mtip, uint64_t *allocs,
 	return (alloced - freed);
 }
 
-DB_SHOW_COMMAND(malloc, db_show_malloc)
+DB_SHOW_COMMAND_FLAGS(malloc, db_show_malloc, DB_CMD_MEMSAFE)
 {
 	const char *fmt_hdr, *fmt_entry;
 	struct malloc_type *mtp;

@@ -1,7 +1,7 @@
 #!/bin/sh
 
 #
-# SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+# SPDX-License-Identifier: BSD-2-Clause
 #
 # Copyright (c) 2020 Peter Holm <pho@FreeBSD.org>
 #
@@ -78,7 +78,7 @@ work(int idx)
 	size_t len;
 	int i,r;
 	char *p;
-	volatile char val;
+	volatile char val __unused;
 	char path[PATH_MAX];
 
 	len = ps[idx];

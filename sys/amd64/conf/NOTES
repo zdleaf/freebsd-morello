@@ -4,7 +4,6 @@
 # This file contains machine dependent kernel configuration notes.  For
 # machine independent notes, look in /sys/conf/NOTES.
 #
-# $FreeBSD$
 #
 
 #
@@ -42,11 +41,6 @@ options 	KDTRACE_HOOKS
 options 	IPI_PREEMPTION
 device		atpic			# Optional legacy pic support
 device		mptable			# Optional MPSPEC mptable support
-
-#
-# Watchdog routines.
-#
-options 	MP_WATCHDOG
 
 # Debugging options.
 #
@@ -142,7 +136,7 @@ device		isa
 #
 # AUTO_EOI_2 enables the `automatic EOI' feature for the slave 8259A
 # interrupt controller.  This saves about 0.7-1.25 usec for each interrupt.
-# Automatic EOI is documented not to work for for the slave with the
+# Automatic EOI is documented not to work for the slave with the
 # original i8259A, but it works for some clones and some integrated
 # versions.
 #
@@ -283,6 +277,8 @@ device		cpufreq
 # Network interfaces:
 #
 
+# axp: AMD EPYC integrated NIC
+#	Requires the miibus module
 # bxe:  Broadcom NetXtreme II (BCM5771X/BCM578XX) PCIe 10Gb Ethernet
 #       adapters.
 # ice:	Intel 800 Series Physical Function
@@ -290,6 +286,8 @@ device		cpufreq
 # igc:	Intel I225 2.5Gb Ethernet adapter
 # ipw:	Intel PRO/Wireless 2100 IEEE 802.11 adapter
 #	Requires the ipw firmware module
+# irdma: Intel 800 Series RDMA driver
+#        Requires the ice module
 # iwi:	Intel PRO/Wireless 2200BG/2225BG/2915ABG IEEE 802.11 adapters
 #	Requires the iwi firmware module
 # iwn:	Intel Wireless WiFi Link 1000/105/135/2000/4965/5000/6000/6050 abgn
@@ -299,13 +297,16 @@ device		cpufreq
 # mlx4ib: Mellanox ConnectX HCA InfiniBand
 # mlx4en: Mellanox ConnectX HCA Ethernet
 # nfe:	nVidia nForce MCP on-board Ethernet Networking (BSD open source)
+# qlxgb: QLogic 3200 and 8200 series 10 Gigabit Ethernet & CNA Adapter
+# qlxgbe: QLogic 8300 series 10 Gigabit Ethernet & CNA Adapter
+# qlxge: QLogic 8100 series 10 Gigabit Ethernet & CNA Adapter
+# qlnxe: Cavium QLogic 41000/45000 series 10/25/40/100 Gigabit Ethernet & CNA Adapter
 # sfxge: Solarflare SFC9000 family 10Gb Ethernet adapters
 # vmx:	VMware VMXNET3 Ethernet (BSD open source)
 # wpi:	Intel 3945ABG Wireless LAN controller
 #	Requires the wpi firmware module
-# axp: AMD EPYC integrated NIC
-#   Requires the miibus module
 
+device		axp		# AMD EPYC integrated NIC
 device		bxe		# Broadcom NetXtreme II BCM5771X/BCM578XX 10GbE
 device		igc		# Intel I225 2.5G Ethernet
 device		ipw		# Intel 2100 wireless NICs.
@@ -315,15 +316,19 @@ device		ixl		# Intel 700 Series Physical Function
 device		iavf		# Intel Adaptive Virtual Function
 device		ice		# Intel 800 Series Physical Function
 device		ice_ddp		# Intel 800 Series DDP Package
+device		irdma		# Intel 800 Series RDMA driver
 device  	mthca		# Mellanox HCA InfiniBand
 device  	mlx4		# Shared code module between IB and Ethernet
 device  	mlx4ib		# Mellanox ConnectX HCA InfiniBand
 device  	mlx4en		# Mellanox ConnectX HCA Ethernet
 device		nfe		# nVidia nForce MCP on-board Ethernet
+device		qlxgb		# QLogic 3200/8200 Ethernet
+device		qlxgbe		# QLogic 8300 Ethernet
+device		qlxge		# QLogic 8100 Ethernet
+device		qlnxe		# QLogic 41000/45000 Ethernet
 device		sfxge		# Solarflare SFC9000 10Gb Ethernet
 device		vmx		# VMware VMXNET3 Ethernet
 device		wpi		# Intel 3945ABG wireless NICs.
-device		axp		# AMD EPYC integrated NIC
 
 # IEEE 802.11 adapter firmware modules
 
@@ -375,6 +380,9 @@ device		iwn6000g2afw
 device		iwn6000g2bfw
 device		iwn6050fw
 device		wpifw
+
+# net80211 options
+options 	IEEE80211_DEBUG_REFCNT
 
 #
 # Non-Transparent Bridge (NTB) drivers
@@ -458,8 +466,10 @@ device		vmd
 device		pmspcv
 
 #
-# Intel QuickAssist
-device		qat
+# Intel QuickAssist driver with OpenCrypto support
+#
+# Only for legacy Atom C2XXX chipsets.
+device		qat_c2xxx
 
 #
 # SafeNet crypto driver: can be moved to the MI NOTES as soon as
@@ -490,11 +500,16 @@ device		virtio_console	# VirtIO Console device
 # Linux KVM paravirtualization support
 device		kvm_clock	# KVM paravirtual clock driver
 
+# Google Virtual NIC
+device		gve		# Google Virtual NIC (gVNIC) driver
+
 # Microsoft Hyper-V enhancement support
 device 		hyperv		# HyperV drivers
+device		hvhid		# HyperV HID device
 
 # Xen HVM Guest Optimizations
 options 	XENHVM		# Xen HVM kernel infrastructure
+device		xenefi		# Xen EFI timer device
 device 		xenpci		# Xen HVM Hypervisor services driver
 device		xentimer	# Xen x86 PV timer device
 
@@ -620,7 +635,7 @@ options 	COMPAT_AOUT
 # ZFS support
 
 # NB: This depends on crypto, cryptodev and ZSTDIO
-options		ZFS
+options 	ZFS
 
 #####################################################################
 # VM OPTIONS
@@ -639,8 +654,6 @@ options 	PV_STATS
 # More undocumented options for linting.
 # Note that documenting these are not considered an affront.
 
-options 	FB_INSTALL_CDEV		# install a CDEV entry in /dev
-
 options 	KBDIO_DEBUG=2
 options 	KBD_MAXRETRY=4
 options 	KBD_MAXWAIT=6
@@ -656,5 +669,5 @@ options 	VM_KMEM_SIZE_SCALE
 
 # GCOV (code coverage) support
 
-options		LINDEBUGFS
-options		GCOV
+options 	LINDEBUGFS
+options 	GCOV

@@ -1,4 +1,3 @@
-# $FreeBSD$
 #
 # Please see the file src/etc/mtree/README before making changes to this file.
 #
@@ -19,17 +18,51 @@
         v1
             __algorithm
             ..
+            __bit
+            ..
+            __charconv
+            ..
+            __chrono
+            ..
+            __compare
+            ..
+            __concepts
+            ..
+            __coroutine
+            ..
+            __debug_utils
+            ..
+            __expected
+            ..
+            __filesystem
+            ..
             __format
             ..
             __functional
+            ..
+            __fwd
+            ..
+            __ios
             ..
             __iterator
             ..
             __memory
             ..
+            __memory_resource
+            ..
+            __numeric
+            ..
             __random
             ..
             __ranges
+            ..
+            __string
+            ..
+            __thread
+            ..
+            __tuple_dir
+            ..
+            __type_traits
             ..
             __utility
             ..
@@ -118,6 +151,8 @@
         ..
         vkbd
         ..
+        wg
+        ..
         wi
         ..
     ..
@@ -149,10 +184,6 @@
         unionfs
         ..
     ..
-    gcc
-        4.2
-        ..
-    ..
     geom
         cache
         ..
@@ -181,6 +212,8 @@
         shsec
         ..
         stripe
+        ..
+        union
         ..
         virstor
         ..
@@ -249,17 +282,11 @@
     ..
     netinet6
     ..
-    netipsec
+    netlink
+        route
+        ..
     ..
-    netnatm
-        api
-        ..
-        msg
-        ..
-        saal
-        ..
-        sig
-        ..
+    netipsec
     ..
     netpfil
         pf
@@ -275,6 +302,8 @@
     ..
     opencsd
         c_api
+        ..
+        ete
         ..
         etmv3
         ..
@@ -303,6 +332,8 @@
         mac_biba
         ..
         mac_bsdextended
+        ..
+        mac_grantbylabel
         ..
         mac_lomac
         ..

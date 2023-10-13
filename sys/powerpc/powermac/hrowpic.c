@@ -25,8 +25,6 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 /*
@@ -94,9 +92,7 @@ static driver_t hrowpic_driver = {
 	sizeof(struct hrowpic_softc)
 };
 
-static devclass_t hrowpic_devclass;
-
-DRIVER_MODULE(hrowpic, macio, hrowpic_driver, hrowpic_devclass, 0, 0);
+DRIVER_MODULE(hrowpic, macio, hrowpic_driver, 0, 0);
 
 static uint32_t
 hrowpic_read_reg(struct hrowpic_softc *sc, u_int reg, u_int bank)

@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2013 Mikolaj Golub <trociny@FreeBSD.org>
  * Copyright (c) 2017 Dell EMC
@@ -28,8 +28,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/elf.h>
 #include <sys/exec.h>
@@ -121,7 +119,7 @@ procstat_core_open(const char *filename)
 		warnx("%s is not a CORE file", filename);
 		goto fail;
 	}
-	if (elf_getphnum(e, &nph) == 0) {
+	if (elf_getphdrnum(e, &nph) == -1) {
 		warnx("program headers not found");
 		goto fail;
 	}

@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (C) 2008-2009 Semihalf, Piotr Ziecik
  * All rights reserved.
@@ -31,8 +31,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/bus.h>
@@ -138,8 +136,7 @@ static driver_t sec_driver = {
 	sizeof(struct sec_softc),
 };
 
-static devclass_t sec_devclass;
-DRIVER_MODULE(sec, simplebus, sec_driver, sec_devclass, 0, 0);
+DRIVER_MODULE(sec, simplebus, sec_driver, 0, 0);
 MODULE_DEPEND(sec, crypto, 1, 1, 1);
 
 static struct sec_eu_methods sec_eus[] = {

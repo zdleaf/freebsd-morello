@@ -25,8 +25,6 @@
  * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 #ifndef	_LINUXKPI_LINUX_GFP_H_
 #define	_LINUXKPI_LINUX_GFP_H_
@@ -47,6 +45,7 @@
 #define	__GFP_HIGHMEM	0
 #define	__GFP_ZERO	M_ZERO
 #define	__GFP_NORETRY	0
+#define	__GFP_NOMEMALLOC 0
 #define	__GFP_RECLAIM   0
 #define	__GFP_RECLAIMABLE   0
 #define	__GFP_RETRY_MAYFAIL 0
@@ -71,6 +70,7 @@
 #define	GFP_HIGHUSER_MOVABLE	M_WAITOK
 #define	GFP_IOFS	M_NOWAIT
 #define	GFP_NOIO	M_NOWAIT
+#define	GFP_NOFS	M_NOWAIT
 #define	GFP_DMA32	__GFP_DMA32
 #define	GFP_TEMPORARY	M_NOWAIT
 #define	GFP_NATIVE_MASK	(M_NOWAIT | M_WAITOK | M_USE_RESERVE | M_ZERO)
@@ -79,6 +79,11 @@
 
 CTASSERT((__GFP_DMA32 & GFP_NATIVE_MASK) == 0);
 CTASSERT((__GFP_BITS_MASK & GFP_NATIVE_MASK) == GFP_NATIVE_MASK);
+
+struct page_frag_cache {
+	void *va;
+	int pagecnt_bias;
+};
 
 /*
  * Resolve a page into a virtual address:
@@ -92,8 +97,11 @@ extern void *linux_page_address(struct page *);
 /*
  * Page management for unmapped pages:
  */
-extern vm_page_t linux_alloc_pages(gfp_t flags, unsigned int order);
-extern void linux_free_pages(vm_page_t page, unsigned int order);
+extern struct page *linux_alloc_pages(gfp_t flags, unsigned int order);
+extern void linux_free_pages(struct page *page, unsigned int order);
+void *linuxkpi_page_frag_alloc(struct page_frag_cache *, size_t, gfp_t);
+void linuxkpi_page_frag_free(void *);
+void linuxkpi__page_frag_cache_drain(struct page *, size_t);
 
 static inline struct page *
 alloc_page(gfp_t flags)
@@ -173,6 +181,27 @@ free_page(uintptr_t addr)
 		return;
 
 	linux_free_kmem(addr, 0);
+}
+
+static inline void *
+page_frag_alloc(struct page_frag_cache *pfc, size_t fragsz, gfp_t gfp)
+{
+
+	return (linuxkpi_page_frag_alloc(pfc, fragsz, gfp));
+}
+
+static inline void
+page_frag_free(void *addr)
+{
+
+	linuxkpi_page_frag_free(addr);
+}
+
+static inline void
+__page_frag_cache_drain(struct page *page, size_t count)
+{
+
+	linuxkpi__page_frag_cache_drain(page, count);
 }
 
 static inline bool

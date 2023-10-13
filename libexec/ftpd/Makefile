@@ -1,5 +1,4 @@
 #	@(#)Makefile	8.2 (Berkeley) 4/4/94
-# $FreeBSD$
 
 .include <src.opts.mk>
 
@@ -16,10 +15,7 @@ YFLAGS=
 WARNS?=	2
 WFORMAT=0
 
-LIBADD=	crypt xo util
-
-# XXX Kluge! Conversation mechanism needs to be fixed.
-LIBADD+=	opie md
+LIBADD=	crypt md util
 
 .PATH:	${SRCTOP}/bin/ls
 SRCS+=	ls.c cmp.c print.c util.c

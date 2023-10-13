@@ -36,8 +36,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/uio.h>
@@ -57,8 +55,6 @@ __FBSDID("$FreeBSD$");
 #include <sys/module.h>
 #include <sys/filio.h>
 #include <sys/vnode.h>
-
-#include <machine/xen/synch_bitops.h>
 
 #include <xen/xen-os.h>
 #include <xen/evtchn.h>
@@ -599,7 +595,5 @@ static driver_t evtchn_driver = {
 	0,
 };
 
-devclass_t evtchn_devclass;
-
-DRIVER_MODULE(evtchn, xenpv, evtchn_driver, evtchn_devclass, 0, 0);
+DRIVER_MODULE(evtchn, xenpv, evtchn_driver, 0, 0);
 MODULE_DEPEND(evtchn, xenpv, 1, 1, 1);

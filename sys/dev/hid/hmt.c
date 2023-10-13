@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2014-2020 Vladimir Kondratyev <wulf@FreeBSD.org>
  *
@@ -26,8 +26,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 /*
  * MS Windows 7/8/10 compatible HID Multi-touch Device driver.
  * https://msdn.microsoft.com/en-us/library/windows/hardware/jj151569(v=vs.85).aspx
@@ -252,13 +250,13 @@ static const struct hid_device_id hmt_devs[] = {
 static int
 hmt_ev_close(struct evdev_dev *evdev)
 {
-	return (hidbus_intr_stop(evdev_get_softc(evdev)));
+	return (hid_intr_stop(evdev_get_softc(evdev)));
 }
 
 static int
 hmt_ev_open(struct evdev_dev *evdev)
 {
-	return (hidbus_intr_start(evdev_get_softc(evdev)));
+	return (hid_intr_start(evdev_get_softc(evdev)));
 }
 
 static int
@@ -886,15 +884,13 @@ hmt_set_input_mode(struct hmt_softc *sc, enum hconf_input_mode mode)
 	if (device_get_devclass(hconf) != hconf_devclass)
 		return (ENXIO);
 
-	/* hconf_set_input_mode can drop the the topo lock while sleeping */
+	/* hconf_set_input_mode can drop the topo lock while sleeping */
 	device_busy(hconf);
 	err = hconf_set_input_mode(hconf, mode);
 	device_unbusy(hconf);
 
 	return (err);
 }
-
-static devclass_t hmt_devclass;
 
 static device_method_t hmt_methods[] = {
 	DEVMETHOD(device_probe,		hmt_probe),
@@ -910,7 +906,7 @@ static driver_t hmt_driver = {
 	.size = sizeof(struct hmt_softc),
 };
 
-DRIVER_MODULE(hmt, hidbus, hmt_driver, hmt_devclass, NULL, 0);
+DRIVER_MODULE(hmt, hidbus, hmt_driver, NULL, NULL);
 MODULE_DEPEND(hmt, hidbus, 1, 1, 1);
 MODULE_DEPEND(hmt, hid, 1, 1, 1);
 MODULE_DEPEND(hmt, hconf, 1, 1, 1);

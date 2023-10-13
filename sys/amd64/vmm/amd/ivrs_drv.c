@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2016, Anish Gupta (anish@freebsd.org)
  * Copyright (c) 2021 The FreeBSD Foundation
@@ -28,8 +28,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include "opt_acpi.h"
 #include <sys/param.h>
 #include <sys/bus.h>
@@ -754,12 +752,9 @@ static driver_t ivhd_driver = {
 	sizeof(struct amdvi_softc),
 };
 
-static devclass_t ivhd_devclass;
-
 /*
  * Load this module at the end after PCI re-probing to configure interrupt.
  */
-DRIVER_MODULE_ORDERED(ivhd, acpi, ivhd_driver, ivhd_devclass, 0, 0,
-		      SI_ORDER_ANY);
+DRIVER_MODULE_ORDERED(ivhd, acpi, ivhd_driver, 0, 0, SI_ORDER_ANY);
 MODULE_DEPEND(ivhd, acpi, 1, 1, 1);
 MODULE_DEPEND(ivhd, pci, 1, 1, 1);

@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright 2019 Michal Meloun <mmel@FreeBSD.org>
  *
@@ -26,8 +26,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/bus.h>
@@ -150,6 +148,8 @@ rk_clk_fract_init(struct clknode *clk, device_t dev)
 
 	sc->numerator  = (reg >> 16) & 0xFFFF;
 	sc->denominator  = reg & 0xFFFF;
+	if (sc->denominator == 0)
+		sc->denominator = 1;
 	clknode_init_parent_idx(clk, 0);
 
 	return(0);

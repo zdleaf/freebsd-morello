@@ -19,8 +19,6 @@ PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS
 ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS
 SOFTWARE.
 
- $FreeBSD$
-
 ************************************************************************/
 
 /*
@@ -78,7 +76,7 @@ SOFTWARE.
  */
 
 static void mktagfile(struct host *);
-static void usage(void);
+static void usage(void) __dead2;
 
 /*
  * General
@@ -100,7 +98,7 @@ char *bootptab = CONFIG_FILE;
  * Print "usage" message and exit
  */
 static void
-usage()
+usage(void)
 {
 	fprintf(stderr,
 	   "usage:  $s [ -c chdir ] [-d level] [-f configfile] [host...]\n");
@@ -116,9 +114,7 @@ usage()
  * main server loop is started.
  */
 int
-main(argc, argv)
-	int argc;
-	char **argv;
+main(int argc, char **argv)
 {
 	struct host *hp;
 	char *stmp;
@@ -262,8 +258,7 @@ main(argc, argv)
  */
 
 static void
-mktagfile(hp)
-	struct host *hp;
+mktagfile(struct host *hp)
 {
 	FILE *fp;
 	int bytesleft, len;

@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (C) 2003 David Xu <davidxu@freebsd.org>
  * Copyright (c) 2001 Daniel Eischen <deischen@freebsd.org>
@@ -25,8 +25,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 /*
@@ -40,6 +38,9 @@
 #include <machine/tls.h>
 
 #define	CPU_SPINWAIT		__asm __volatile("pause")
+
+/* For use in _Static_assert to check structs will fit in a page */
+#define	THR_PAGE_SIZE_MIN	PAGE_SIZE
 
 static __inline struct pthread *
 _get_curthread(void)

@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2006 John Baldwin <jhb@FreeBSD.org>
  *
@@ -31,8 +31,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include "opt_ddb.h"
 #include "opt_mprof.h"
 
@@ -63,9 +61,6 @@ __FBSDID("$FreeBSD$");
  * the flag in the lock
  */
 //#define	LOCK_PROFILING_DEBUG_SPIN
-
-SDT_PROVIDER_DEFINE(lock);
-SDT_PROBE_DEFINE1(lock, , , starvation, "u_int");
 
 CTASSERT(LOCK_CLASS_MAX == 15);
 
@@ -120,33 +115,19 @@ static SYSCTL_NODE(_debug_lock, OID_AUTO, delay,
     CTLFLAG_RD | CTLFLAG_MPSAFE, NULL,
     "lock delay");
 
-static u_int __read_mostly starvation_limit = 131072;
-SYSCTL_INT(_debug_lock_delay, OID_AUTO, starvation_limit, CTLFLAG_RW,
-    &starvation_limit, 0, "");
-
-static u_int __read_mostly restrict_starvation = 0;
-SYSCTL_INT(_debug_lock_delay, OID_AUTO, restrict_starvation, CTLFLAG_RW,
-    &restrict_starvation, 0, "");
-
 void
 lock_delay(struct lock_delay_arg *la)
 {
 	struct lock_delay_config *lc = la->config;
-	u_short i;
+	u_int i;
 
 	for (i = la->delay; i > 0; i--)
 		cpu_spinwait();
 	la->spin_cnt += la->delay;
 
 	la->delay <<= 1;
-	if (__predict_false(la->delay > lc->max))
+	if (__predict_false(la->delay > (u_int)lc->max))
 		la->delay = lc->max;
-
-	if (__predict_false(la->spin_cnt > starvation_limit)) {
-		SDT_PROBE1(lock, , , starvation, la->delay);
-		if (restrict_starvation)
-			la->delay = lc->base;
-	}
 }
 
 static u_int
@@ -165,9 +146,7 @@ lock_delay_default_init(struct lock_delay_config *lc)
 {
 
 	lc->base = 1;
-	lc->max = lock_roundup_2(mp_ncpus) * 256;
-	if (lc->max > 32678)
-		lc->max = 32678;
+	lc->max = min(lock_roundup_2(mp_ncpus) * 256, SHRT_MAX);
 }
 
 struct lock_delay_config __read_frequently locks_delay;

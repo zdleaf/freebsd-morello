@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2000 John Baldwin <jhb@FreeBSD.org>
  *
@@ -31,8 +31,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include "opt_ddb.h"
 #include "opt_ktr.h"
 #include "opt_alq.h"
@@ -417,7 +415,7 @@ static	struct tstate tstate;
 static	int db_ktr_verbose;
 static	int db_mach_vtrace(void);
 
-DB_SHOW_COMMAND(ktr, db_ktr_all)
+DB_SHOW_COMMAND_FLAGS(ktr, db_ktr_all, DB_CMD_MEMSAFE)
 {
 
 	tstate.cur = (ktr_idx - 1) % ktr_entries;

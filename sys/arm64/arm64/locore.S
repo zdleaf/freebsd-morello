@@ -22,8 +22,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 #include "assym.inc"
@@ -38,7 +36,14 @@
 #include <machine/vmparam.h>
 
 #define	VIRT_BITS	48
-#define	DMAP_TABLES	((DMAP_MAX_ADDRESS - DMAP_MIN_ADDRESS) >> L0_SHIFT)
+
+#if PAGE_SIZE == PAGE_SIZE_16K
+/*
+ * The number of level 3 tables to create. 32 will allow for 1G of address
+ * space, the same as a single level 2 page with 4k pages.
+ */
+#define	L3_PAGE_COUNT	32
+#endif
 
 	.globl	kernbase
 	.set	kernbase, KERNBASE
@@ -102,6 +107,8 @@ ENTRY(_start)
 	br	x15
 
 virtdone:
+	BTI_J
+
 	/* Set up the stack */
 	adrp	x25, initstack_end
 	add	x25, x25, :lo12:initstack_end
@@ -126,25 +133,31 @@ virtdone:
 	/* Backup the module pointer */
 	mov	x1, x0
 
-	/* Make the page table base a virtual address */
-	sub	x26, x26, x29
-	sub	x24, x24, x29
-
 	sub	sp, sp, #BOOTPARAMS_SIZE
 	mov	x0, sp
 
-	/* Degate the delda so it is VA -> PA */
+	/* Negate the delta so it is VA -> PA */
 	neg	x29, x29
 
 	str	x1,  [x0, #BP_MODULEP]
-	str	x26, [x0, #BP_KERN_L1PT]
 	str	x29, [x0, #BP_KERN_DELTA]
 	adrp	x25, initstack
 	add	x25, x25, :lo12:initstack
 	str	x25, [x0, #BP_KERN_STACK]
-	str	x24, [x0, #BP_KERN_L0PT]
 	str	x27, [x0, #BP_KERN_TTBR0]
 	str	x23, [x0, #BP_BOOT_EL]
+	str	x4,  [x0, #BP_HCR_EL2]
+
+#ifdef KASAN
+	/* Save bootparams */
+	mov	x19, x0
+
+	/* Bootstrap an early shadow map for the boot stack. */
+	bl	pmap_san_bootstrap
+
+	/* Restore bootparams */
+	mov	x0, x19
+#endif
 
 	/* trace back starts here */
 	mov	fp, #0
@@ -212,6 +225,8 @@ ENTRY(mpentry)
 	br	x15
 
 mp_virtdone:
+	BTI_J
+
 	/* Start using the AP boot stack */
 	ldr	x4, =bootstack
 	ldr	x4, [x4]
@@ -248,9 +263,23 @@ LENTRY(drop_to_el1)
 	b.eq	1f
 	ret
 1:
+	/*
+	 * Disable the MMU. If the HCR_EL2.E2H field is set we will clear it
+	 * which may break address translation.
+	 */
+	dsb	sy
+	mrs	x2, sctlr_el2
+	bic	x2, x2, SCTLR_M
+	msr	sctlr_el2, x2
+	isb
+
 	/* Configure the Hypervisor */
 	ldr	x2, =(HCR_RW | HCR_APK | HCR_API)
 	msr	hcr_el2, x2
+
+	/* Stash value of HCR_EL2 for later */
+	isb
+	mrs	x4, hcr_el2
 
 	/* Load the Virtualization Process ID Register */
 	mrs	x2, midr_el1
@@ -264,8 +293,15 @@ LENTRY(drop_to_el1)
 	ldr	x2, .Lsctlr_res1
 	msr	sctlr_el1, x2
 
-	/* Don't trap to EL2 for exceptions */
-	mov	x2, #CPTR_RES1
+	/*
+	 * On some hardware, e.g., Apple M1, we can't clear E2H, so make sure we
+	 * don't trap to EL2 for SIMD register usage to have at least a
+	 * minimally usable system.
+	 */
+	tst	x4, #HCR_E2H
+	mov	x3, #CPTR_RES1	/* HCR_E2H == 0 */
+	mov	x5, #CPTR_FPEN	/* HCR_E2H == 1 */
+	csel	x2, x3, x5, eq
 	msr	cptr_el2, x2
 
 	/* Don't trap to EL2 for CP15 traps */
@@ -280,11 +316,14 @@ LENTRY(drop_to_el1)
 	msr	cntvoff_el2, xzr
 
 	/* Hypervisor trap functions */
-	adrp	x2, hyp_vectors
-	add	x2, x2, :lo12:hyp_vectors
+	adrp	x2, hyp_stub_vectors
+	add	x2, x2, :lo12:hyp_stub_vectors
 	msr	vbar_el2, x2
 
-	mov	x2, #(PSR_F | PSR_I | PSR_A | PSR_D | PSR_M_EL1h)
+	/* Zero vttbr_el2 so a hypervisor can tell the host and guest apart */
+	msr	vttbr_el2, xzr
+
+	mov	x2, #(PSR_DAIF | PSR_M_EL1h)
 	msr	spsr_el2, x2
 
 	/* Configure GICv3 CPU interface */
@@ -311,32 +350,6 @@ LENTRY(drop_to_el1)
 .Lsctlr_res1:
 	.quad SCTLR_RES1
 LEND(drop_to_el1)
-
-#define	VECT_EMPTY	\
-	.align 7;	\
-	1:	b	1b
-
-	.align 11
-hyp_vectors:
-	VECT_EMPTY	/* Synchronous EL2t */
-	VECT_EMPTY	/* IRQ EL2t */
-	VECT_EMPTY	/* FIQ EL2t */
-	VECT_EMPTY	/* Error EL2t */
-
-	VECT_EMPTY	/* Synchronous EL2h */
-	VECT_EMPTY	/* IRQ EL2h */
-	VECT_EMPTY	/* FIQ EL2h */
-	VECT_EMPTY	/* Error EL2h */
-
-	VECT_EMPTY	/* Synchronous 64-bit EL1 */
-	VECT_EMPTY	/* IRQ 64-bit EL1 */
-	VECT_EMPTY	/* FIQ 64-bit EL1 */
-	VECT_EMPTY	/* Error 64-bit EL1 */
-
-	VECT_EMPTY	/* Synchronous 32-bit EL1 */
-	VECT_EMPTY	/* IRQ 32-bit EL1 */
-	VECT_EMPTY	/* FIQ 32-bit EL1 */
-	VECT_EMPTY	/* Error 32-bit EL1 */
 
 /*
  * Get the delta between the physical address we were loaded to and the
@@ -378,7 +391,6 @@ LEND(get_virt_delta)
  *    - The Kernel L0 table             (TTBR1)
  *    - The identity (PA = VA) L1 table
  *    - The identity (PA = VA) L0 table (TTBR0)
- *    - The DMAP L1 tables
  */
 LENTRY(create_pagetables)
 	/* Save the Link register */
@@ -423,8 +435,13 @@ LENTRY(create_pagetables)
 	/* Booted with modules pointer */
 	/* Find modulep - begin */
 	sub	x8, x0, x6
-	/* Add two 2MiB pages for the module data and round up */
-	ldr	x7, =(3 * L2_SIZE - 1)
+	/*
+	 * Add space for the module data. When PAGE_SIZE is 4k this will
+	 * add at least 2 level 2 blocks (2 * 2MiB). When PAGE_SIZE is
+	 * larger it will be at least as large as we use smaller level 3
+	 * pages.
+	 */
+	ldr	x7, =((6 * 1024 * 1024) - 1)
 	add	x8, x8, x7
 	b	common
 
@@ -449,15 +466,44 @@ booti_no_fdt:
 #endif
 
 common:
+#if PAGE_SIZE != PAGE_SIZE_4K
+	/*
+	 * Create L3 pages. The kernel will be loaded at a 2M aligned
+	 * address, however L2 blocks are too large when the page size is
+	 * not 4k to map the kernel with such an aligned address. However,
+	 * when the page size is larger than 4k, L2 blocks are too large to
+	 * map the kernel with such an alignment.
+	 */
+
+	/* Get the number of l3 pages to allocate, rounded down */
+	lsr	x10, x8, #(L3_SHIFT)
+
+	/* Create the kernel space L2 table */
+	mov	x6, x26
+	mov	x7, #(ATTR_S1_IDX(VM_MEMATTR_WRITE_BACK))
+	mov	x8, #(KERNBASE)
+	mov	x9, x28
+	bl	build_l3_page_pagetable
+
+	/* Move to the l2 table */
+	ldr	x9, =(PAGE_SIZE * L3_PAGE_COUNT)
+	add	x26, x26, x9
+
+	/* Link the l2 -> l3 table */
+	mov	x9, x6
+	mov	x6, x26
+	bl	link_l2_pagetable
+#else
 	/* Get the number of l2 pages to allocate, rounded down */
 	lsr	x10, x8, #(L2_SHIFT)
 
 	/* Create the kernel space L2 table */
 	mov	x6, x26
 	mov	x7, #(ATTR_S1_IDX(VM_MEMATTR_WRITE_BACK))
-	mov	x8, #(KERNBASE & L2_BLOCK_MASK)
+	mov	x8, #(KERNBASE)
 	mov	x9, x28
 	bl	build_l2_block_pagetable
+#endif
 
 	/* Move to the l1 table */
 	add	x26, x26, #PAGE_SIZE
@@ -474,13 +520,6 @@ common:
 	mov	x9, x6
 	mov	x6, x24
 	mov	x10, #1
-	bl	link_l0_pagetable
-
-	/* Link the DMAP tables */
-	ldr	x8, =DMAP_MIN_ADDRESS
-	adrp	x9, pagetable_dmap
-	add	x9, x9, :lo12:pagetable_dmap
-	mov	x10, #DMAP_TABLES
 	bl	link_l0_pagetable
 
 	/*
@@ -503,7 +542,8 @@ common:
 #if defined(SOCDEV_PA)
 	/* Create a table for the UART */
 	mov	x7, #(ATTR_S1_nG | ATTR_S1_IDX(VM_MEMATTR_DEVICE))
-	add	x16, x16, #(L2_SIZE)	/* VA start */
+	ldr	x9, =(L2_SIZE)
+	add	x16, x16, x9	/* VA start */
 	mov	x8, x16
 
 	/* Store the socdev virtual address */
@@ -522,7 +562,8 @@ common:
 
 	/* Create the mapping for FDT data (2 MiB max) */
 	mov	x7, #(ATTR_S1_nG | ATTR_S1_IDX(VM_MEMATTR_WRITE_BACK))
-	add	x16, x16, #(L2_SIZE)	/* VA start */
+	ldr	x9, =(L2_SIZE)
+	add	x16, x16, x9	/* VA start */
 	mov	x8, x16
 	mov	x9, x0			/* PA start */
 	/* Update the module pointer to point at the allocated memory */
@@ -661,6 +702,76 @@ LENTRY(build_l2_block_pagetable)
 	ret
 LEND(build_l2_block_pagetable)
 
+#if PAGE_SIZE != PAGE_SIZE_4K
+/*
+ * Builds an L2 -> L3 table descriptor
+ *
+ *  x6  = L2 table
+ *  x8  = Virtual Address
+ *  x9  = L3 PA (trashed)
+ *  x11, x12 and x13 are trashed
+ */
+LENTRY(link_l2_pagetable)
+	/*
+	 * Link an L2 -> L3 table entry.
+	 */
+	/* Find the table index */
+	lsr	x11, x8, #L2_SHIFT
+	and	x11, x11, #Ln_ADDR_MASK
+
+	/* Build the L1 block entry */
+	mov	x12, #L2_TABLE
+
+	/* Only use the output address bits */
+	lsr	x9, x9, #PAGE_SHIFT
+	orr	x13, x12, x9, lsl #PAGE_SHIFT
+
+	/* Store the entry */
+	str	x13, [x6, x11, lsl #3]
+
+	ret
+LEND(link_l2_pagetable)
+
+/*
+ * Builds count level 3 page table entries
+ *  x6  = L3 table
+ *  x7  = Block attributes
+ *  x8  = VA start
+ *  x9  = PA start (trashed)
+ *  x10 = Entry count (trashed)
+ *  x11, x12 and x13 are trashed
+ */
+LENTRY(build_l3_page_pagetable)
+	/*
+	 * Build the L3 table entry.
+	 */
+	/* Find the table index */
+	lsr	x11, x8, #L3_SHIFT
+	and	x11, x11, #Ln_ADDR_MASK
+
+	/* Build the L3 page entry */
+	orr	x12, x7, #L3_PAGE
+	orr	x12, x12, #(ATTR_DEFAULT)
+	orr	x12, x12, #(ATTR_S1_UXN)
+
+	/* Only use the output address bits */
+	lsr	x9, x9, #L3_SHIFT
+
+	/* Set the physical address for this virtual address */
+1:	orr	x13, x12, x9, lsl #L3_SHIFT
+
+	/* Store the entry */
+	str	x13, [x6, x11, lsl #3]
+
+	sub	x10, x10, #1
+	add	x11, x11, #1
+	add	x9, x9, #1
+	cbnz	x10, 1b
+
+	ret
+LEND(build_l3_page_pagetable)
+#endif
+
 LENTRY(start_mmu)
 	dsb	sy
 
@@ -742,14 +853,22 @@ mair:
 		MAIR_ATTR(MAIR_NORMAL_WT, VM_MEMATTR_WRITE_THROUGH) |	\
 		MAIR_ATTR(MAIR_DEVICE_nGnRE, VM_MEMATTR_DEVICE_nGnRE)
 tcr:
-	.quad (TCR_TxSZ(64 - VIRT_BITS) | TCR_TG1_4K | \
+#if PAGE_SIZE == PAGE_SIZE_4K
+#define	TCR_TG	(TCR_TG1_4K | TCR_TG0_4K)
+#elif PAGE_SIZE == PAGE_SIZE_16K
+#define	TCR_TG	(TCR_TG1_16K | TCR_TG0_16K)
+#else
+#error Unsupported page size
+#endif
+
+	.quad (TCR_TxSZ(64 - VIRT_BITS) | TCR_TG | \
 	    TCR_CACHE_ATTRS | TCR_SMP_ATTRS)
 sctlr_set:
 	/* Bits to set */
 	.quad (SCTLR_LSMAOE | SCTLR_nTLSMD | SCTLR_UCI | SCTLR_SPAN | \
 	    SCTLR_nTWE | SCTLR_nTWI | SCTLR_UCT | SCTLR_DZE | \
 	    SCTLR_I | SCTLR_SED | SCTLR_SA0 | SCTLR_SA | SCTLR_C | \
-	    SCTLR_M | SCTLR_CP15BEN)
+	    SCTLR_M | SCTLR_CP15BEN | SCTLR_BT1 | SCTLR_BT0)
 sctlr_clear:
 	/* Bits to clear */
 	.quad (SCTLR_EE | SCTLR_E0E | SCTLR_IESB | SCTLR_WXN | SCTLR_UMA | \
@@ -759,6 +878,12 @@ LEND(start_mmu)
 ENTRY(abort)
 	b abort
 END(abort)
+
+.bss
+	.align	PAGE_SHIFT
+initstack:
+	.space	(PAGE_SIZE * KSTACK_PAGES)
+initstack_end:
 
 	.section .init_pagetable, "aw", %nobits
 	.align PAGE_SHIFT
@@ -771,7 +896,12 @@ END(abort)
 	 *           L0 bootstrap for user
 	 *           L0 for user
 	 */
+	.globl pagetable_l0_ttbr1
 pagetable:
+#if PAGE_SIZE != PAGE_SIZE_4K
+	.space	(PAGE_SIZE * L3_PAGE_COUNT)
+pagetable_l2_ttbr1:
+#endif
 	.space	PAGE_SIZE
 pagetable_l1_ttbr1:
 	.space	PAGE_SIZE
@@ -785,23 +915,15 @@ pagetable_l0_ttbr0_boostrap:
 	.space	PAGE_SIZE
 pagetable_l0_ttbr0:
 	.space	PAGE_SIZE
-
-	.globl pagetable_dmap
-pagetable_dmap:
-	.space	PAGE_SIZE * DMAP_TABLES
 pagetable_end:
 
 el2_pagetable:
 	.space	PAGE_SIZE
 
-	.align	4
-initstack:
-	.space	(PAGE_SIZE * KSTACK_PAGES)
-initstack_end:
-
-
-.text
-EENTRY(aarch32_sigcode)
+	.section .rodata, "a", %progbits
+	.globl	aarch32_sigcode
+	.align 2
+aarch32_sigcode:
 	.word 0xe1a0000d	// mov r0, sp
 	.word 0xe2800040	// add r0, r0, #SIGF_UC
 	.word 0xe59f700c	// ldr r7, [pc, #12]
@@ -809,10 +931,10 @@ EENTRY(aarch32_sigcode)
 	.word 0xe59f7008	// ldr r7, [pc, #8]
 	.word 0xef000000	// swi #0
 	.word 0xeafffffa	// b . - 16
-EEND(aarch32_sigcode)
 	.word SYS_sigreturn
 	.word SYS_exit
 	.align	3
+	.size aarch32_sigcode, . - aarch32_sigcode
 aarch32_esigcode:
 	.data
 	.global sz_aarch32_sigcode

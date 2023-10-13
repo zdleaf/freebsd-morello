@@ -30,8 +30,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 #ifndef _NFS_NFSPORT_H_
@@ -180,6 +178,20 @@
  * Type for a mutex lock.
  */
 #define	NFSMUTEX_T		struct mtx
+
+/* Just define the NFSD_VNETxxx() macros as VNETxxx() macros. */
+#define	NFSD_VNET_NAME(n)		VNET_NAME(n)
+#define	NFSD_VNET_DECLARE(t, n)		VNET_DECLARE(t, n)
+#define	NFSD_VNET_DEFINE(t, n)		VNET_DEFINE(t, n)
+#define	NFSD_VNET_DEFINE_STATIC(t, n)	VNET_DEFINE_STATIC(t, n)
+#define	NFSD_VNET(n)			VNET(n)
+
+#define	CTLFLAG_NFSD_VNET		CTLFLAG_VNET
+
+#define	NFSD_CURVNET_SET(n)		CURVNET_SET(n)
+#define	NFSD_CURVNET_SET_QUIET(n)	CURVNET_SET_QUIET(n)
+#define	NFSD_CURVNET_RESTORE()		CURVNET_RESTORE()
+#define	NFSD_TD_TO_VNET(n)		TD_TO_VNET(n)
 
 #endif	/* _KERNEL */
 
@@ -424,10 +436,16 @@
 /* Do an NFSv4.2 LayoutError. */
 #define	NFSPROC_LAYOUTERROR	68
 
+/* Do an NFSv4 Verify+Write. */
+#define	NFSPROC_APPENDWRITE	69
+
 /*
  * Must be defined as one higher than the last NFSv4.2 Proc# above.
  */
-#define	NFSV42_NPROCS		69
+#define	NFSV42_NPROCS		70
+
+/* Value of NFSV42_NPROCS for old nfsstats structure. (Always 69) */
+#define	NFSV42_OLDNPROCS	69
 
 #endif	/* NFS_V3NPROCS */
 
@@ -456,7 +474,7 @@ struct nfsstatsv1 {
 	uint64_t	readlink_bios;
 	uint64_t	biocache_readdirs;
 	uint64_t	readdir_bios;
-	uint64_t	rpccnt[NFSV42_NPROCS + 11];
+	uint64_t	rpccnt[NFSV42_NPROCS + 10];
 	uint64_t	rpcretries;
 	uint64_t	srvrpccnt[NFSV42_NOPS + NFSV4OP_FAKENOPS + 15];
 	uint64_t	srvlayouts;
@@ -521,7 +539,7 @@ struct nfsstatsov1 {
 	uint64_t	readlink_bios;
 	uint64_t	biocache_readdirs;
 	uint64_t	readdir_bios;
-	uint64_t	rpccnt[NFSV42_NPROCS];
+	uint64_t	rpccnt[NFSV42_OLDNPROCS];
 	uint64_t	rpcretries;
 	uint64_t	srvrpccnt[NFSV42_PURENOPS + NFSV4OP_FAKENOPS];
 	uint64_t	reserved_0;
@@ -1000,8 +1018,7 @@ MALLOC_DECLARE(M_NEWNFSDSESSION);
 /*
  * Prototypes for functions where the arguments vary for different ports.
  */
-int nfscl_loadattrcache(struct vnode **, struct nfsvattr *, void *, void *,
-    int, int);
+int nfscl_loadattrcache(struct vnode **, struct nfsvattr *, void *, int, int);
 int newnfs_realign(struct mbuf **, int);
 bool ncl_pager_setsize(struct vnode *vp, u_quad_t *nsizep);
 void ncl_copy_vattr(struct vattr *dst, struct vattr *src);
@@ -1066,6 +1083,7 @@ void ncl_copy_vattr(struct vattr *dst, struct vattr *src);
 #define	NFSHASONEOPENOWN(n)	(((n)->nm_flag & NFSMNT_ONEOPENOWN) != 0 &&	\
 				    (n)->nm_minorvers > 0)
 #define	NFSHASTLS(n)		(((n)->nm_newflag & NFSMNT_TLS) != 0)
+#define	NFSHASSYSKRB5(n)	(((n)->nm_newflag & NFSMNT_SYSKRB5) != 0)
 
 /*
  * Set boottime.

@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2000 Matthew Jacob
  * Copyright (c) 2010 Spectra Logic Corporation
@@ -34,8 +34,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 
 #include <sys/ctype.h>
@@ -986,7 +984,7 @@ ses_paths_iter(enc_softc_t *enc, enc_element_t *elm,
 			xpt_setup_ccb(&cgd.ccb_h, path, CAM_PRIORITY_NORMAL);
 			cgd.ccb_h.func_code = XPT_GDEV_TYPE;
 			xpt_action((union ccb *)&cgd);
-			if (cgd.ccb_h.status == CAM_REQ_CMP)
+			if (cam_ccb_success((union ccb *)&cgd))
 				callback(enc, elm, path, callback_arg);
 
 			xpt_free_path(path);
@@ -1065,7 +1063,7 @@ ses_setphyspath_callback(enc_softc_t *enc, enc_element_t *elm,
 		xpt_action((union ccb *)&cdai);
 		if ((cdai.ccb_h.status & CAM_DEV_QFRZN) != 0)
 			cam_release_devq(cdai.ccb_h.path, 0, 0, 0, FALSE);
-		if (cdai.ccb_h.status == CAM_REQ_CMP)
+		if (cam_ccb_success((union ccb *)&cdai))
 			args->num_set++;
 	}
 	xpt_path_unlock(path);

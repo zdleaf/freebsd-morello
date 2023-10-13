@@ -1,4 +1,4 @@
-/* $OpenBSD: addr.c,v 1.1 2021/01/09 11:58:50 dtucker Exp $ */
+/* $OpenBSD: addr.c,v 1.7 2023/03/27 03:31:05 djm Exp $ */
 
 /*
  * Copyright (c) 2004-2008 Damien Miller <djm@mindrot.org>
@@ -228,6 +228,28 @@ addr_and(struct xaddr *dst, const struct xaddr *a, const struct xaddr *b)
 }
 
 int
+addr_or(struct xaddr *dst, const struct xaddr *a, const struct xaddr *b)
+{
+	int i;
+
+	if (dst == NULL || a == NULL || b == NULL || a->af != b->af)
+		return (-1);
+
+	memcpy(dst, a, sizeof(*dst));
+	switch (a->af) {
+	case AF_INET:
+		dst->v4.s_addr |= b->v4.s_addr;
+		return (0);
+	case AF_INET6:
+		for (i = 0; i < 4; i++)
+			dst->addr32[i] |= b->addr32[i];
+		return (0);
+	default:
+		return (-1);
+	}
+}
+
+int
 addr_cmp(const struct xaddr *a, const struct xaddr *b)
 {
 	int i;
@@ -244,7 +266,7 @@ addr_cmp(const struct xaddr *a, const struct xaddr *b)
 		if (a->v4.s_addr == b->v4.s_addr)
 			return 0;
 		return (ntohl(a->v4.s_addr) > ntohl(b->v4.s_addr) ? 1 : -1);
-	case AF_INET6:;
+	case AF_INET6:
 		/*
 		 * Do this a byte at a time to avoid the above issue and
 		 * any endian problems
@@ -268,7 +290,7 @@ addr_is_all0s(const struct xaddr *a)
 	switch (a->af) {
 	case AF_INET:
 		return (a->v4.s_addr == 0 ? 0 : -1);
-	case AF_INET6:;
+	case AF_INET6:
 		for (i = 0; i < 4; i++)
 			if (a->addr32[i] != 0)
 				return -1;
@@ -278,10 +300,33 @@ addr_is_all0s(const struct xaddr *a)
 	}
 }
 
+/* Increment the specified address. Note, does not do overflow checking */
+void
+addr_increment(struct xaddr *a)
+{
+	int i;
+	uint32_t n;
+
+	switch (a->af) {
+	case AF_INET:
+		a->v4.s_addr = htonl(ntohl(a->v4.s_addr) + 1);
+		break;
+	case AF_INET6:
+		for (i = 0; i < 4; i++) {
+			/* Increment with carry */
+			n = ntohl(a->addr32[3 - i]) + 1;
+			a->addr32[3 - i] = htonl(n);
+			if (n != 0)
+				break;
+		}
+		break;
+	}
+}
+
 /*
  * Test whether host portion of address 'a', as determined by 'masklen'
  * is all zeros.
- * Returns 0 on if host portion of address is all-zeros,
+ * Returns 0 if host portion of address is all-zeros,
  * -1 if not all zeros or on failure.
  */
 int
@@ -297,8 +342,34 @@ addr_host_is_all0s(const struct xaddr *a, u_int masklen)
 	return addr_is_all0s(&tmp_result);
 }
 
+#if 0
+int
+addr_host_to_all0s(struct xaddr *a, u_int masklen)
+{
+	struct xaddr tmp_mask;
+
+	if (addr_netmask(a->af, masklen, &tmp_mask) == -1)
+		return (-1);
+	if (addr_and(a, a, &tmp_mask) == -1)
+		return (-1);
+	return (0);
+}
+#endif
+
+int
+addr_host_to_all1s(struct xaddr *a, u_int masklen)
+{
+	struct xaddr tmp_mask;
+
+	if (addr_hostmask(a->af, masklen, &tmp_mask) == -1)
+		return (-1);
+	if (addr_or(a, a, &tmp_mask) == -1)
+		return (-1);
+	return (0);
+}
+
 /*
- * Parse string address 'p' into 'n'
+ * Parse string address 'p' into 'n'.
  * Returns 0 on success, -1 on failure.
  */
 int
@@ -312,8 +383,13 @@ addr_pton(const char *p, struct xaddr *n)
 	if (p == NULL || getaddrinfo(p, NULL, &hints, &ai) != 0)
 		return -1;
 
-	if (ai == NULL || ai->ai_addr == NULL)
+	if (ai == NULL)
 		return -1;
+
+	if (ai->ai_addr == NULL) {
+		freeaddrinfo(ai);
+		return -1;
+	}
 
 	if (n != NULL && addr_sa_to_xaddr(ai->ai_addr, ai->ai_addrlen,
 	    n) == -1) {
@@ -336,12 +412,19 @@ addr_sa_pton(const char *h, const char *s, struct sockaddr *sa, socklen_t slen)
 	if (h == NULL || getaddrinfo(h, s, &hints, &ai) != 0)
 		return -1;
 
-	if (ai == NULL || ai->ai_addr == NULL)
+	if (ai == NULL)
 		return -1;
 
+	if (ai->ai_addr == NULL) {
+		freeaddrinfo(ai);
+		return -1;
+	}
+
 	if (sa != NULL) {
-		if (slen < ai->ai_addrlen)
+		if (slen < ai->ai_addrlen) {
+			freeaddrinfo(ai);
 			return -1;
+		}
 		memcpy(sa, &ai->ai_addr, ai->ai_addrlen);
 	}
 
@@ -357,10 +440,10 @@ addr_ntop(const struct xaddr *n, char *p, size_t len)
 
 	if (addr_xaddr_to_sa(n, _SA(&ss), &slen, 0) == -1)
 		return -1;
-	if (n == NULL || p == NULL || len == 0)
+	if (p == NULL || len == 0)
 		return -1;
 	if (getnameinfo(_SA(&ss), slen, p, len, NULL, 0,
-	    NI_NUMERICHOST) == -1)
+	    NI_NUMERICHOST) != 0)
 		return -1;
 
 	return 0;
@@ -385,7 +468,7 @@ addr_pton_cidr(const char *p, struct xaddr *n, u_int *l)
 		*mp = '\0';
 		mp++;
 		masklen = strtoul(mp, &cp, 10);
-		if (*mp == '\0' || *cp != '\0' || masklen > 128)
+		if (*mp < '0' || *mp > '9' || *cp != '\0' || masklen > 128)
 			return -1;
 	}
 

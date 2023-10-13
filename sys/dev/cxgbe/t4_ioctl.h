@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2011 Chelsio Communications, Inc.
  * All rights reserved.
@@ -25,8 +25,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  *
  */
 
@@ -374,6 +372,11 @@ enum {
 	OPEN_TYPE_ACTIVE = 'A',
 	OPEN_TYPE_PASSIVE = 'P',
 	OPEN_TYPE_DONTCARE = 'D',
+};
+
+enum {
+	QUEUE_RANDOM = -1,
+	QUEUE_ROUNDROBIN = -2,
 };
 
 struct offload_settings {

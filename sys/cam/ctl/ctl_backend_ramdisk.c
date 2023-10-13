@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2003, 2008 Silicon Graphics International Corp.
  * Copyright (c) 2012 The FreeBSD Foundation
@@ -43,8 +43,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
@@ -386,6 +384,7 @@ ctl_backend_ramdisk_cmp(union ctl_io *io)
 		if (res < cbe_lun->blocksize)
 			break;
 	}
+	free(io->scsiio.kern_data_ptr, M_RAMDISK);
 	if (lbas > 0) {
 		off += io->scsiio.kern_rel_offset - io->scsiio.kern_data_len;
 		scsi_u64to8b(off, info);

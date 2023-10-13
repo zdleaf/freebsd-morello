@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2008 Isilon Inc http://www.isilon.com/
  * Authors: Doug Rabson <dfr@rabson.org>
@@ -28,8 +28,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/malloc.h>
@@ -158,9 +156,7 @@ xdrmbuf_getlong(XDR *xdrs, long *lp)
 }
 
 static bool_t
-xdrmbuf_putlong(xdrs, lp)
-	XDR *xdrs;
-	const long *lp;
+xdrmbuf_putlong(XDR *xdrs, const long *lp)
 {
 	int32_t *p;
 	int32_t t = htonl(*lp);

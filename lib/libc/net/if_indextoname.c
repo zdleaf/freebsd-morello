@@ -28,8 +28,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <net/if_dl.h>
@@ -40,7 +38,7 @@ __FBSDID("$FreeBSD$");
 #include <errno.h>
 
 /*
- * From RFC 2533:
+ * From RFC 2553:
  *
  * The second function maps an interface index into its corresponding
  * name.

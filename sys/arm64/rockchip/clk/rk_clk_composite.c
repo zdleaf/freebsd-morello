@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2018 Emmanuel Vadot <manu@freebsd.org>
  *
@@ -23,13 +23,9 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/bus.h>
@@ -51,9 +47,6 @@ struct rk_clk_composite_sc {
 	uint32_t	div_shift;
 	uint32_t	div_width;
 	uint32_t	div_mask;
-
-	uint32_t	gate_offset;
-	uint32_t	gate_shift;
 
 	uint32_t	flags;
 
@@ -145,30 +138,6 @@ rk_clk_composite_init(struct clknode *clk, device_t dev)
 	}
 
 	clknode_init_parent_idx(clk, idx);
-
-	return (0);
-}
-
-static int
-rk_clk_composite_set_gate(struct clknode *clk, bool enable)
-{
-	struct rk_clk_composite_sc *sc;
-	uint32_t val = 0;
-
-	sc = clknode_get_softc(clk);
-
-	if ((sc->flags & RK_CLK_COMPOSITE_HAVE_GATE) == 0)
-		return (0);
-
-	dprintf("%sabling gate\n", enable ? "En" : "Dis");
-	if (!enable)
-		val |= 1 << sc->gate_shift;
-	dprintf("sc->gate_shift: %x\n", sc->gate_shift);
-	val |= (1 << sc->gate_shift) << RK_CLK_COMPOSITE_MASK_SHIFT;
-	dprintf("Write: gate_offset=%x, val=%x\n", sc->gate_offset, val);
-	DEVICE_LOCK(clk);
-	WRITE4(clk, sc->gate_offset, val);
-	DEVICE_UNLOCK(clk);
 
 	return (0);
 }
@@ -324,7 +293,6 @@ rk_clk_composite_set_freq(struct clknode *clk, uint64_t fparent, uint64_t *fout,
 static clknode_method_t rk_clk_composite_clknode_methods[] = {
 	/* Device interface */
 	CLKNODEMETHOD(clknode_init,		rk_clk_composite_init),
-	CLKNODEMETHOD(clknode_set_gate,		rk_clk_composite_set_gate),
 	CLKNODEMETHOD(clknode_set_mux,		rk_clk_composite_set_mux),
 	CLKNODEMETHOD(clknode_recalc_freq,	rk_clk_composite_recalc),
 	CLKNODEMETHOD(clknode_set_freq,		rk_clk_composite_set_freq),
@@ -358,9 +326,6 @@ rk_clk_composite_register(struct clkdom *clkdom,
 	sc->div_shift = clkdef->div_shift;
 	sc->div_width = clkdef->div_width;
 	sc->div_mask = ((1 << clkdef->div_width) - 1) << sc->div_shift;
-
-	sc->gate_offset = clkdef->gate_offset;
-	sc->gate_shift = clkdef->gate_shift;
 
 	sc->flags = clkdef->flags;
 

@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2010 The FreeBSD Foundation
  * All rights reserved.
@@ -30,8 +30,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/types.h>
 #include <sys/ptrace.h>
 #include <sys/wait.h>
@@ -56,9 +54,6 @@ __FBSDID("$FreeBSD$");
 #define	BREAKPOINT_ADJUST_SZ	BREAKPOINT_INSTR_SZ
 #elif defined(__arm__)
 #define	BREAKPOINT_INSTR	0xe7ffffff	/* bkpt */
-#define	BREAKPOINT_INSTR_SZ	4
-#elif defined(__mips__)
-#define	BREAKPOINT_INSTR	0xd	/* break */
 #define	BREAKPOINT_INSTR_SZ	4
 #elif defined(__powerpc__)
 #define	BREAKPOINT_INSTR	0x7fe00008	/* trap */

@@ -24,8 +24,6 @@
  * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 #ifndef _NET_IF_PFLOG_H_
@@ -33,7 +31,6 @@
 
 #include <sys/types.h>
 
-#include <net/bpf.h>
 #include <net/if.h>
 
 #define	PFLOGIFS_MAX	16
@@ -60,7 +57,9 @@ struct pfloghdr {
 	u_int8_t	pad2[3];
 };
 
-#define	PFLOG_HDRLEN		BPF_WORDALIGN(offsetof(struct pfloghdr, pad2))
+#define PFLOG_ALIGNMENT		sizeof(uint32_t)
+#define PFLOG_ALIGN(x)		(((x) + PFLOG_ALIGNMENT - 1) & ~(PFLOG_ALIGNMENT - 1))
+#define	PFLOG_HDRLEN		PFLOG_ALIGN(offsetof(struct pfloghdr, pad2))
 /* minus pad, also used as a signature */
 #define	PFLOG_REAL_HDRLEN	offsetof(struct pfloghdr, pad2)
 
@@ -70,9 +69,9 @@ struct pf_ruleset;
 struct pfi_kif;
 struct pf_pdesc;
 
-#define	PFLOG_PACKET(i,a,b,c,d,e,f,g,h,di) do {		\
+#define	PFLOG_PACKET(i,a,b,c,d,e,f,g,di) do {		\
 	if (pflog_packet_ptr != NULL)			\
-		pflog_packet_ptr(i,a,b,c,d,e,f,g,h,di);	\
+		pflog_packet_ptr(i,a,b,c,d,e,f,g,di);	\
 } while (0)
 #endif /* _KERNEL */
 #endif /* _NET_IF_PFLOG_H_ */

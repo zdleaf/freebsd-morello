@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2013-2014 Qlogic Corporation
  * All rights reserved.
@@ -31,8 +31,6 @@
  * File: qls_dump.c
  */
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include "qls_os.h"
 #include "qls_hw.h"
 #include "qls_def.h"
@@ -503,7 +501,6 @@ static void
 qls_wr_ofunc_reg(qla_host_t *ha, uint32_t reg, uint32_t value)
 {
 	uint32_t ofunc;
-	int ret = 0;
 
 	ofunc = qls_get_other_fnum(ha);
 
@@ -512,7 +509,7 @@ qls_wr_ofunc_reg(qla_host_t *ha, uint32_t reg, uint32_t value)
 
 	reg = Q81_CTL_PROC_ADDR_REG_BLOCK | (ofunc << Q81_FUNCTION_SHIFT) | reg;
 
-	ret = qls_wr_mpi_reg(ha, reg, value);
+	qls_wr_mpi_reg(ha, reg, value);
 
 	return;
 }

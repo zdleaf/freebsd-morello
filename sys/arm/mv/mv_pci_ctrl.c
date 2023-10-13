@@ -38,8 +38,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
@@ -124,9 +122,7 @@ static driver_t mv_pcib_ctrl_driver = {
 	sizeof(struct mv_pcib_ctrl_softc),
 };
 
-devclass_t pcib_ctrl_devclass;
-
-DRIVER_MODULE(pcib_ctrl, simplebus, mv_pcib_ctrl_driver, pcib_ctrl_devclass, 0, 0);
+DRIVER_MODULE(pcib_ctrl, simplebus, mv_pcib_ctrl_driver, 0, 0);
 
 MALLOC_DEFINE(M_PCIB_CTRL, "PCIe Bus Controller",
     "Marvell Integrated PCIe Bus Controller");

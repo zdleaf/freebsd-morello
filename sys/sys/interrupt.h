@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 1997, Stefan Esser <se@freebsd.org>
  * All rights reserved.
@@ -24,8 +24,6 @@
  * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 #ifndef _SYS_INTERRUPT_H_
@@ -138,8 +136,8 @@ struct intr_event {
 #define	SWI_DELAY	0x2
 
 /*
- * Software interrupt numbers in priority order.  The priority determines
- * the priority of the corresponding interrupt thread.
+ * Software interrupt numbers.  Historically this was used to determine
+ * the relative priority of SWI ithreads.
  */
 #define	SWI_TTY		0
 #define	SWI_NET		1
@@ -150,14 +148,15 @@ struct intr_event {
 #define	SWI_TQ		6
 #define	SWI_TQ_GIANT	6
 
+/* Maximum number of stray interrupts to log */
+#define	INTR_STRAY_LOG_MAX	5
+
 struct proc;
 
 extern struct	intr_event *clk_intr_event;
-extern struct	intr_event *tty_intr_event;
-extern void	*vm_ih;
 
 /* Counts and names for statistics (defined in MD code). */
-extern u_long 	*intrcnt;	/* counts for for each device and stray */
+extern u_long 	*intrcnt;	/* counts for each device and stray */
 extern char 	*intrnames;	/* string table containing device names */
 extern size_t	sintrcnt;	/* size of intrcnt table */
 extern size_t	sintrnames;	/* size of intrnames table */

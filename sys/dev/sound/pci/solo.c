@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 1999 Cameron Grant <cg@freebsd.org>
  *
@@ -38,8 +38,6 @@
 #include  <dev/sound/chip.h>
 
 #include "mixer_if.h"
-
-SND_DECLARE_FILE("$FreeBSD$");
 
 #define SOLO_DEFAULT_BUFSZ 16384
 #define ABS(x) (((x) < 0)? -(x) : (x))
@@ -1072,6 +1070,6 @@ static driver_t ess_driver = {
 	PCM_SOFTC_SIZE,
 };
 
-DRIVER_MODULE(snd_solo, pci, ess_driver, pcm_devclass, 0, 0);
+DRIVER_MODULE(snd_solo, pci, ess_driver, 0, 0);
 MODULE_DEPEND(snd_solo, sound, SOUND_MINVER, SOUND_PREFVER, SOUND_MAXVER);
 MODULE_VERSION(snd_solo, 1);

@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2000,2001 Michael Smith
  * Copyright (c) 2000 BSDi
@@ -28,8 +28,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/bus.h>
 #include <sys/kernel.h>
@@ -64,16 +62,6 @@ acpi_get_root_from_loader(void)
 	long acpi_root;
 
 	if (TUNABLE_ULONG_FETCH("acpi.rsdp", &acpi_root))
-		return (acpi_root);
-
-	/*
-	 * The hints mechanism is unreliable (it fails if anybody ever
-	 * compiled in hints to the kernel). It has been replaced
-	 * by the tunable method, but is used here as a fallback to
-	 * retain maximum compatibility between old loaders and new
-	 * kernels. It can be removed after 11.0R.
-	 */
-	if (resource_long_value("acpi", 0, "rsdp", &acpi_root) == 0)
 		return (acpi_root);
 
 	return (0);

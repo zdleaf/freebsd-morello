@@ -1,4 +1,3 @@
-# $FreeBSD$
 
 # Set default CPU compile flags and baseline CPUTYPE for each arch.  The
 # compile flags must support the minimum CPU type for each architecture but
@@ -14,8 +13,12 @@ MACHINE_CPU = amd64 sse2 sse mmx
 MACHINE_CPU = arm
 . elif ${MACHINE_CPUARCH} == "i386"
 MACHINE_CPU = i486
-. elif ${MACHINE_CPUARCH} == "powerpc"
+. elif ${MACHINE_ARCH} == "powerpc"
 MACHINE_CPU = aim
+. elif ${MACHINE_ARCH} == "powerpc64"
+MACHINE_CPU = aim altivec
+. elif ${MACHINE_ARCH} == "powerpc64le"
+MACHINE_CPU = aim altivec vsx vsx2
 . elif ${MACHINE_CPUARCH} == "riscv"
 MACHINE_CPU = riscv
 . endif
@@ -103,9 +106,9 @@ _CPUCFLAGS = -march=armv5te -D__XSCALE__
 _CPUCFLAGS = -mfloat-abi=softfp
 .  elif ${CPUTYPE} == "cortexa"
 _CPUCFLAGS = -march=armv7 -mfpu=vfp
-.  elif ${CPUTYPE:Marmv[4567]*} != ""
+.  elif ${CPUTYPE:Marmv[67]*} != ""
 # Handle all the armvX types that FreeBSD runs:
-#	armv4, armv4t, armv5, armv5te, armv6, armv6t2, armv7, armv7-a, armv7ve
+#	armv6, armv6t2, armv7, armv7-a, armv7ve
 # they require -march=. All the others require -mcpu=.
 _CPUCFLAGS = -march=${CPUTYPE}
 .  else
@@ -125,7 +128,7 @@ _CPUCFLAGS = -mcpu=${CPUTYPE}
 .  if ${CPUTYPE} == "e500"
 _CPUCFLAGS = -Wa,-me500 -msoft-float
 .  else
-_CPUCFLAGS = -mcpu=${CPUTYPE} -mno-powerpc64
+_CPUCFLAGS = -mcpu=${CPUTYPE}
 .  endif
 . elif ${MACHINE_ARCH:Mpowerpc64*} != ""
 _CPUCFLAGS = -mcpu=${CPUTYPE}
@@ -145,7 +148,9 @@ _CPUCFLAGS = -mcpu=${CPUTYPE}
 
 ########## i386
 . if ${MACHINE_CPUARCH} == "i386"
-.  if ${CPUTYPE} == "znver3" || ${CPUTYPE} == "znver2" || \
+.  if ${CPUTYPE} == "znver4"
+MACHINE_CPU = avx512 avx2 avx sse42 sse41 ssse3 sse4a sse3 sse2 sse mmx k6 k5 i586
+.  elif ${CPUTYPE} == "znver3" || ${CPUTYPE} == "znver2" || \
     ${CPUTYPE} == "znver1"
 MACHINE_CPU = avx2 avx sse42 sse41 ssse3 sse4a sse3 sse2 sse mmx k6 k5 i586
 .  elif ${CPUTYPE} == "bdver4"
@@ -226,7 +231,9 @@ MACHINE_CPU = mmx
 MACHINE_CPU += i486
 ########## amd64
 . elif ${MACHINE_CPUARCH} == "amd64"
-.  if ${CPUTYPE} == "znver3" || ${CPUTYPE} == "znver2" || \
+.  if ${CPUTYPE} == "znver4"
+MACHINE_CPU = avx512 avx2 avx sse42 sse41 ssse3 sse4a sse3
+.  elif ${CPUTYPE} == "znver3" || ${CPUTYPE} == "znver2" || \
     ${CPUTYPE} == "znver1"
 MACHINE_CPU = avx2 avx sse42 sse41 ssse3 sse4a sse3
 .  elif ${CPUTYPE} == "bdver4"
@@ -276,6 +283,27 @@ MACHINE_CPU += amd64 sse2 sse mmx
 . elif ${MACHINE_ARCH} == "powerpc"
 .  if ${CPUTYPE} == "e500"
 MACHINE_CPU = booke softfp
+.  elif ${CPUTYPE} == "g4"
+MACHINE_CPU = aim altivec
+.  else
+MACHINE_CPU= aim
+.  endif
+. elif ${MACHINE_ARCH} == "powerpc64"
+.  if ${CPUTYPE} == "e5500"
+MACHINE_CPU = booke
+.  elif ${CPUTYPE} == power7
+MACHINE_CPU = altivec vsx
+.  elif ${CPUTYPE} == power8
+MACHINE_CPU = altivec vsx vsx2
+.  elif ${CPUTYPE} == power9
+MACHINE_CPU = altivec vsx vsx2 vsx3
+.  else
+MACHINE_CPU = aim altivec
+.  endif
+. elif ${MACHINE_ARCH} == "powerpc64le"
+MACHINE_CPU = aim altivec vsx vsx2
+.  if ${CPUTYPE} == power9
+MACHINE_CPU += vsx3
 .  endif
 ########## riscv
 . elif ${MACHINE_CPUARCH} == "riscv"
@@ -292,17 +320,11 @@ MACHINE_CPU += armv6
 . if ${MACHINE_ARCH:Marmv7*} != ""
 MACHINE_CPU += armv7
 . endif
-# armv6 and armv7 are a hybrid. It can use the softfp ABI, but doesn't emulate
-# floating point in the general case, so don't define softfp for it at this
-# time. arm is pure softfp, so define it for them.
-. if ${MACHINE_ARCH:Marmv[67]*} == ""
-MACHINE_CPU += softfp
-. endif
 # Normally armv6 and armv7 are hard float ABI from FreeBSD 11 onwards. However
 # when CPUTYPE has 'soft' in it, we use the soft-float ABI to allow building of
 # soft-float ABI libraries. In this case, we have to add the -mfloat-abi=softfp
 # to force that.
-. if ${MACHINE_ARCH:Marmv[67]*} && defined(CPUTYPE) && ${CPUTYPE:M*soft*} != ""
+. if defined(CPUTYPE) && ${CPUTYPE:M*soft*} != ""
 # Needs to be CFLAGS not _CPUCFLAGS because it's needed for the ABI
 # not a nice optimization. Please note: softfp ABI uses hardware floating
 # instructions, but passes arguments to function calls in integer regsiters.
@@ -323,11 +345,7 @@ CFLAGS.gcc+= -mabi=spe -mfloat-gprs=double -Wa,-me500
 .endif
 
 .if ${MACHINE_CPUARCH} == "riscv"
-.if ${MACHINE_ARCH:Mriscv*sf}
-CFLAGS += -march=rv64imac -mabi=lp64
-.else
 CFLAGS += -march=rv64imafdc -mabi=lp64d
-.endif
 .endif
 
 # NB: COPTFLAGS is handled in /usr/src/sys/conf/kern.pre.mk
@@ -362,3 +380,40 @@ CFLAGS_NO_SIMD += ${CFLAGS_NO_SIMD.${COMPILER_TYPE}}
 CFLAGS += ${CFLAGS.${MACHINE_ARCH}}
 CXXFLAGS += ${CXXFLAGS.${MACHINE_ARCH}}
 
+#
+# MACHINE_ABI is a list of properties about the ABI used for MACHINE_ARCH.
+# The following properties are indicated with one of the follow values:
+#
+# Byte order:			big-endian, little-endian
+# Floating point ABI:		soft-float, hard-float
+# Size of long (size_t, etc):	long32, long64
+# Pointer type:			ptr32, ptr64
+# Size of time_t:		time32, time64
+#
+.if (${MACHINE} == "arm" && (defined(CPUTYPE) && ${CPUTYPE:M*soft*})) || \
+    (${MACHINE_ARCH} == "powerpc" && (defined(CPUTYPE) && ${CPUTYPE} == "e500"))
+MACHINE_ABI+=	soft-float
+.else
+MACHINE_ABI+=	hard-float
+.endif
+# Currently all 64-bit architectures include 64 in their name (see arch(7)).
+.if ${MACHINE_ARCH:M*64*}
+MACHINE_ABI+=  long64
+.else
+MACHINE_ABI+=  long32
+.endif
+.if ${MACHINE_ABI:Mlong64}
+MACHINE_ABI+=  ptr64
+.else
+MACHINE_ABI+=  ptr32
+.endif
+.if ${MACHINE_ARCH} == "i386"
+MACHINE_ABI+=  time32
+.else
+MACHINE_ABI+=  time64
+.endif
+.if ${MACHINE_ARCH:Mpowerpc*} && !${MACHINE_ARCH:M*le}
+MACHINE_ABI+=	big-endian
+.else
+MACHINE_ABI+=	little-endian
+.endif

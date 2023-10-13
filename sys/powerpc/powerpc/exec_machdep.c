@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-4-Clause AND BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-4-Clause AND BSD-2-Clause
  *
  * Copyright (C) 1995, 1996 Wolfgang Solfrank.
  * Copyright (C) 1995, 1996 TooLs GmbH.
@@ -57,8 +57,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include "opt_fpu_emu.h"
 
 #include <sys/param.h>
@@ -94,7 +92,10 @@ __FBSDID("$FreeBSD$");
 #include <machine/trap.h>
 #include <machine/vmparam.h>
 
+#include <vm/vm.h>
+#include <vm/vm_param.h>
 #include <vm/pmap.h>
+#include <vm/vm_map.h>
 
 #ifdef FPU_EMU
 #include <powerpc/fpu/fpu_extern.h>
@@ -128,6 +129,21 @@ static void	cleanup_power_extras(struct thread *);
 
 #ifdef __powerpc64__
 extern struct sysentvec elf64_freebsd_sysvec_v2;
+#endif
+
+#ifdef __powerpc64__
+_Static_assert(sizeof(mcontext_t) == 1392, "mcontext_t size incorrect");
+_Static_assert(sizeof(ucontext_t) == 1472, "ucontext_t size incorrect");
+_Static_assert(sizeof(siginfo_t) == 80, "siginfo_t size incorrect");
+#ifdef COMPAT_FREEBSD32
+_Static_assert(sizeof(mcontext32_t) == 1224, "mcontext32_t size incorrect");
+_Static_assert(sizeof(ucontext32_t) == 1280, "ucontext32_t size incorrect");
+_Static_assert(sizeof(struct siginfo32) == 64, "struct siginfo32 size incorrect");
+#endif /* COMPAT_FREEBSD32 */
+#else /* powerpc */
+_Static_assert(sizeof(mcontext_t) == 1224, "mcontext_t size incorrect");
+_Static_assert(sizeof(ucontext_t) == 1280, "ucontext_t size incorrect");
+_Static_assert(sizeof(siginfo_t) == 64, "siginfo_t size incorrect");
 #endif
 
 void
@@ -295,7 +311,7 @@ sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	mtx_unlock(&psp->ps_mtx);
 	PROC_UNLOCK(p);
 
-	tf->srr0 = (register_t)p->p_sysent->sv_sigcode_base;
+	tf->srr0 = (register_t)PROC_SIGCODE(p);
 
 	/*
 	 * copy the frame out to userland.
@@ -425,12 +441,14 @@ grab_mcontext(struct thread *td, mcontext_t *mcp, int flags)
 	 * Repeat for Altivec context
 	 */
 
-	if (pcb->pcb_flags & PCB_VEC) {
-		KASSERT(td == curthread,
-			("get_mcontext: fp save not curthread"));
-		critical_enter();
-		save_vec(td);
-		critical_exit();
+	if (pcb->pcb_flags & PCB_VECREGS) {
+		if (pcb->pcb_flags & PCB_VEC) {
+			KASSERT(td == curthread,
+				("get_mcontext: altivec save not curthread"));
+			critical_enter();
+			save_vec(td);
+			critical_exit();
+		}
 		mcp->mc_flags |= _MC_AV_VALID;
 		mcp->mc_vscr  = pcb->pcb_vec.vscr;
 		mcp->mc_vrsave =  pcb->pcb_vec.vrsave;
@@ -527,11 +545,8 @@ set_mcontext(struct thread *td, mcontext_t *mcp)
 	}
 
 	if (mcp->mc_flags & _MC_AV_VALID) {
-		if ((pcb->pcb_flags & PCB_VEC) != PCB_VEC) {
-			critical_enter();
-			enable_vec(td);
-			critical_exit();
-		}
+		/* enable_vec() will happen lazily on a fault */
+		pcb->pcb_flags |= PCB_VECREGS;
 		pcb->pcb_vec.vscr = mcp->mc_vscr;
 		pcb->pcb_vec.vrsave = mcp->mc_vrsave;
 		memcpy(pcb->pcb_vec.vr, mcp->mc_avec, sizeof(mcp->mc_avec));
@@ -673,7 +688,7 @@ exec_setregs(struct thread *td, struct image_params *imgp, uintptr_t stack)
 	tf->fixreg[3] = argc;
 	tf->fixreg[4] = stack + sizeof(register_t);
 	tf->fixreg[5] = stack + (2 + argc)*sizeof(register_t);
-	tf->fixreg[6] = 0;				/* auxillary vector */
+	tf->fixreg[6] = 0;				/* auxiliary vector */
 	tf->fixreg[7] = 0;				/* termination vector */
 	tf->fixreg[8] = (register_t)imgp->ps_strings;	/* NetBSD extension */
 
@@ -702,7 +717,7 @@ ppc32_setregs(struct thread *td, struct image_params *imgp, uintptr_t stack)
 	tf->fixreg[3] = argc;
 	tf->fixreg[4] = stack + sizeof(uint32_t);
 	tf->fixreg[5] = stack + (2 + argc)*sizeof(uint32_t);
-	tf->fixreg[6] = 0;				/* auxillary vector */
+	tf->fixreg[6] = 0;				/* auxiliary vector */
 	tf->fixreg[7] = 0;				/* termination vector */
 	tf->fixreg[8] = (register_t)imgp->ps_strings;	/* NetBSD extension */
 

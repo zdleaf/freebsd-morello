@@ -1,9 +1,6 @@
-/*	$FreeBSD$	*/
 
 /*
  * Copyright (C) 2012 by Darren Reed.
- *
- * $FreeBSD$
  * See the IPFILTER.LICENCE file for details on licencing.
  */
 
@@ -137,7 +134,7 @@ SYSCTL_IPF(_net_inet_ipf, OID_AUTO, fr_running, CTLFLAG_RD,
 	   &VNET_NAME(ipfmain.ipf_running), 0, "IPF is running");
 SYSCTL_IPF(_net_inet_ipf, OID_AUTO, fr_chksrc, CTLFLAG_RW, &VNET_NAME(ipfmain.ipf_chksrc), 0, "");
 SYSCTL_IPF(_net_inet_ipf, OID_AUTO, fr_minttl, CTLFLAG_RW, &VNET_NAME(ipfmain.ipf_minttl), 0, "");
-SYSCTL_IPF(_net_inet_ipf, OID_AUTO, large_nat, CTLFLAG_RD, &VNET_NAME(ipfmain.ipf_large_nat), 0, "large_nat");
+SYSCTL_IPF(_net_inet_ipf, OID_AUTO, large_nat, CTLFLAG_RDTUN | CTLFLAG_NOFETCH, &VNET_NAME(ipfmain.ipf_large_nat), 0, "large_nat");
 
 #define CDEV_MAJOR 79
 #include <sys/poll.h>
@@ -377,10 +374,13 @@ sysctl_error:
 static int
 sysctl_ipf_int_nat ( SYSCTL_HANDLER_ARGS )
 {
+	if (jailed_without_vnet(curthread->td_ucred))
+		return (0);
+
 	ipf_nat_softc_t *nat_softc;
 
 	nat_softc = V_ipfmain.ipf_nat_soft;
-	arg1 = (void *)((uintptr_t)nat_softc + arg2);
+	arg1 = (void *)((uintptr_t)nat_softc + (size_t)arg2);
 
 	return (sysctl_ipf_int(oidp, arg1, 0, req));
 }
@@ -388,10 +388,13 @@ sysctl_ipf_int_nat ( SYSCTL_HANDLER_ARGS )
 static int
 sysctl_ipf_int_state ( SYSCTL_HANDLER_ARGS )
 {
+	if (jailed_without_vnet(curthread->td_ucred))
+		return (0);
+
 	ipf_state_softc_t *state_softc;
 
 	state_softc = V_ipfmain.ipf_state_soft;
-	arg1 = (void *)((uintptr_t)state_softc + arg2);
+	arg1 = (void *)((uintptr_t)state_softc + (size_t)arg2);
 
 	return (sysctl_ipf_int(oidp, arg1, 0, req));
 }
@@ -399,10 +402,13 @@ sysctl_ipf_int_state ( SYSCTL_HANDLER_ARGS )
 static int
 sysctl_ipf_int_auth ( SYSCTL_HANDLER_ARGS )
 {
+	if (jailed_without_vnet(curthread->td_ucred))
+		return (0);
+
 	ipf_auth_softc_t *auth_softc;
 
 	auth_softc = V_ipfmain.ipf_auth_soft;
-	arg1 = (void *)((uintptr_t)auth_softc + arg2);
+	arg1 = (void *)((uintptr_t)auth_softc + (size_t)arg2);
 
 	return (sysctl_ipf_int(oidp, arg1, 0, req));
 }
@@ -410,10 +416,13 @@ sysctl_ipf_int_auth ( SYSCTL_HANDLER_ARGS )
 static int
 sysctl_ipf_int_frag ( SYSCTL_HANDLER_ARGS )
 {
+	if (jailed_without_vnet(curthread->td_ucred))
+		return (0);
+
 	ipf_frag_softc_t *frag_softc;
 
 	frag_softc = V_ipfmain.ipf_frag_soft;
-	arg1 = (void *)((uintptr_t)frag_softc + arg2);
+	arg1 = (void *)((uintptr_t)frag_softc + (size_t)arg2);
 
 	return (sysctl_ipf_int(oidp, arg1, 0, req));
 }
@@ -530,14 +539,14 @@ ipfclose(dev_t dev, int flags)
  * called during packet processing and cause an inconsistancy to appear in
  * the filter lists.
  */
+#ifdef __FreeBSD__
+static int ipfread(struct cdev *dev, struct uio *uio, int ioflag)
+#else
 static int ipfread(dev, uio, ioflag)
 	int ioflag;
-#ifdef __FreeBSD__
-	struct cdev *dev;
-#else
 	dev_t dev;
-#endif
 	struct uio *uio;
+#endif
 {
 	int error;
 	int	unit = GET_MINOR(dev);
@@ -573,14 +582,14 @@ static int ipfread(dev, uio, ioflag)
  * called during packet processing and cause an inconsistancy to appear in
  * the filter lists.
  */
+#ifdef __FreeBSD__
+static int ipfwrite(struct cdev *dev, struct uio *uio, int ioflag)
+#else
 static int ipfwrite(dev, uio, ioflag)
 	int ioflag;
-#ifdef __FreeBSD__
-	struct cdev *dev;
-#else
 	dev_t dev;
-#endif
 	struct uio *uio;
+#endif
 {
 	int error;
 

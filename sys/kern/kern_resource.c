@@ -37,8 +37,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/sysproto.h>
@@ -656,7 +654,7 @@ int
 kern_proc_setrlimit(struct thread *td, struct proc *p, u_int which,
     struct rlimit *limp)
 {
-	struct plimit *newlim, *oldlim;
+	struct plimit *newlim, *oldlim, *oldlim_td;
 	struct rlimit *alimp;
 	struct rlimit oldssiz;
 	int error;
@@ -738,8 +736,18 @@ kern_proc_setrlimit(struct thread *td, struct proc *p, u_int which,
 	*alimp = *limp;
 	p->p_limit = newlim;
 	PROC_UPDATE_COW(p);
+	oldlim_td = NULL;
+	if (td == curthread && PROC_COW_CHANGECOUNT(td, p) == 1) {
+		oldlim_td = lim_cowsync();
+		thread_cow_synced(td);
+	}
 	PROC_UNLOCK(p);
-	lim_free(oldlim);
+	if (oldlim_td != NULL) {
+		MPASS(oldlim_td == oldlim);
+		lim_freen(oldlim, 2);
+	} else {
+		lim_free(oldlim);
+	}
 
 	if (which == RLIMIT_STACK &&
 	    /*
@@ -760,12 +768,12 @@ kern_proc_setrlimit(struct thread *td, struct proc *p, u_int which,
 			if (limp->rlim_cur > oldssiz.rlim_cur) {
 				prot = p->p_sysent->sv_stackprot;
 				size = limp->rlim_cur - oldssiz.rlim_cur;
-				addr = p->p_sysent->sv_usrstack -
+				addr = round_page(p->p_vmspace->vm_stacktop) -
 				    limp->rlim_cur;
 			} else {
 				prot = VM_PROT_NONE;
 				size = oldssiz.rlim_cur - limp->rlim_cur;
-				addr = p->p_sysent->sv_usrstack -
+				addr = round_page(p->p_vmspace->vm_stacktop) -
 				    oldssiz.rlim_cur;
 			}
 			addr = trunc_page(addr);
@@ -874,11 +882,6 @@ rufetchtd(struct thread *td, struct rusage *ru)
 	*ru = td->td_ru;
 	calcru1(p, &td->td_rux, &ru->ru_utime, &ru->ru_stime);
 }
-
-/* XXX: the MI version is too slow to use: */
-#ifndef __HAVE_INLINE_FLSLL
-#define	flsll(x)	(fls((x) >> 32) != 0 ? fls((x) >> 32) + 32 : fls(x))
-#endif
 
 static uint64_t
 mul64_by_fraction(uint64_t a, uint64_t b, uint64_t c)
@@ -1199,7 +1202,7 @@ rufetchcalc(struct proc *p, struct rusage *ru, struct timeval *up,
  * reference count and mutex pointer.
  */
 struct plimit *
-lim_alloc()
+lim_alloc(void)
 {
 	struct plimit *limp;
 
@@ -1214,6 +1217,26 @@ lim_hold(struct plimit *limp)
 
 	refcount_acquire(&limp->pl_refcnt);
 	return (limp);
+}
+
+struct plimit *
+lim_cowsync(void)
+{
+	struct thread *td;
+	struct proc *p;
+	struct plimit *oldlimit;
+
+	td = curthread;
+	p = td->td_proc;
+	PROC_LOCK_ASSERT(p, MA_OWNED);
+
+	if (td->td_limit == p->p_limit)
+		return (NULL);
+
+	oldlimit = td->td_limit;
+	td->td_limit = lim_hold(p->p_limit);
+
+	return (oldlimit);
 }
 
 void
@@ -1244,6 +1267,33 @@ lim_freen(struct plimit *limp, int n)
 
 	if (refcount_releasen(&limp->pl_refcnt, n))
 		free((void *)limp, M_PLIMIT);
+}
+
+void
+limbatch_add(struct limbatch *lb, struct thread *td)
+{
+	struct plimit *limp;
+
+	MPASS(td->td_limit != NULL);
+	limp = td->td_limit;
+
+	if (lb->limp != limp) {
+		if (lb->count != 0) {
+			lim_freen(lb->limp, lb->count);
+			lb->count = 0;
+		}
+		lb->limp = limp;
+	}
+
+	lb->count++;
+}
+
+void
+limbatch_final(struct limbatch *lb)
+{
+
+	MPASS(lb->count != 0);
+	lim_freen(lb->limp, lb->count);
 }
 
 /*
@@ -1332,7 +1382,7 @@ lim_rlimit_proc(struct proc *p, int which, struct rlimit *rlp)
 }
 
 void
-uihashinit()
+uihashinit(void)
 {
 
 	uihashtbl = hashinit(maxproc / 16, M_UIDINFO, &uihash);

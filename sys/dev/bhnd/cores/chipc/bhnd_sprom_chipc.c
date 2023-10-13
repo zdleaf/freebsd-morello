@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2015-2016 Landon Fuller <landon@landonf.org>
  * All rights reserved.
@@ -30,8 +30,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 /*
  * ChipCommon SPROM driver.
  */
@@ -104,7 +102,7 @@ static device_method_t chipc_sprom_methods[] = {
 };
 
 DEFINE_CLASS_1(bhnd_nvram, chipc_sprom_driver, chipc_sprom_methods, sizeof(struct bhnd_sprom_softc), bhnd_sprom_driver);
-DRIVER_MODULE(bhnd_chipc_sprom, bhnd_chipc, chipc_sprom_driver, bhnd_nvram_devclass, NULL, NULL);
+DRIVER_MODULE(bhnd_chipc_sprom, bhnd_chipc, chipc_sprom_driver, NULL, NULL);
 
 MODULE_DEPEND(bhnd_chipc_sprom, bhnd, 1, 1, 1);
 MODULE_DEPEND(bhnd_chipc_sprom, bhnd_chipc, 1, 1, 1);

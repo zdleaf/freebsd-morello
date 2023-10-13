@@ -38,8 +38,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/mount.h>
@@ -57,14 +55,8 @@ extern struct iconv_functions *cd9660_iconv;
  * Return number of bytes consumed
  */
 int
-isochar(isofn, isoend, joliet_level, c, clen, flags, handle)
-      u_char *isofn;
-      u_char *isoend;
-      int joliet_level;
-      u_short *c;
-      int *clen;
-      int flags;
-      void *handle;
+isochar(u_char *isofn, u_char *isoend, int joliet_level, u_short *c, int *clen,
+    int flags, void *handle)
 {
       size_t i, j, len;
       char inbuf[3], outbuf[3], *inp, *outp;
@@ -109,15 +101,8 @@ isochar(isofn, isoend, joliet_level, c, clen, flags, handle)
  * Note: Version number plus ';' may be omitted.
  */
 int
-isofncmp(fn, fnlen, isofn, isolen, joliet_level, flags, handle, lhandle)
-	u_char *fn;
-	int fnlen;
-	u_char *isofn;
-	int isolen;
-	int joliet_level;
-	int flags;
-	void *handle;
-	void *lhandle;
+isofncmp(u_char *fn, int fnlen, u_char *isofn, int isolen, int joliet_level,
+    int flags, void *handle, void *lhandle)
 {
 	int i, j;
 	u_short c, d;
@@ -179,16 +164,8 @@ isofncmp(fn, fnlen, isofn, isolen, joliet_level, flags, handle, lhandle)
  * translate a filename of length > 0
  */
 void
-isofntrans(infn, infnlen, outfn, outfnlen, original, assoc, joliet_level, flags, handle)
-	u_char *infn;
-	int infnlen;
-	u_char *outfn;
-	u_short *outfnlen;
-	int original;
-	int assoc;
-	int joliet_level;
-	int flags;
-	void *handle;
+isofntrans(u_char *infn, int infnlen, u_char *outfn, u_short *outfnlen,
+    int original, int assoc, int joliet_level, int flags, void *handle)
 {
 	u_short c, d = '\0';
 	u_char *outp = outfn, *infnend = infn + infnlen;
@@ -217,12 +194,8 @@ isofntrans(infn, infnlen, outfn, outfnlen, original, assoc, joliet_level, flags,
  * same as sgetrune(3)
  */
 u_short
-sgetrune(string, n, result, flags, handle)
-	const char *string;
-	size_t n;
-	char const **result;
-	int flags;
-	void *handle;
+sgetrune(const char *string, size_t n, char const **result, int flags,
+    void *handle)
 {
 	size_t i, j, len;
 	char outbuf[3], *outp;

@@ -25,8 +25,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include "opt_acpi.h"
 #include "opt_platform.h"
 
@@ -172,7 +170,6 @@ ahci_gen_detach(device_t dev)
 }
 
 #ifdef FDT
-static devclass_t ahci_gen_fdt_devclass;
 static device_method_t ahci_fdt_methods[] = {
 	DEVMETHOD(device_probe,     ahci_fdt_probe),
 	DEVMETHOD(device_attach,    ahci_gen_attach),
@@ -191,12 +188,10 @@ static driver_t ahci_fdt_driver = {
 	ahci_fdt_methods,
 	sizeof(struct ahci_controller)
 };
-DRIVER_MODULE(ahci_fdt, simplebus, ahci_fdt_driver, ahci_gen_fdt_devclass,
-    NULL, NULL);
+DRIVER_MODULE(ahci_fdt, simplebus, ahci_fdt_driver, NULL, NULL);
 #endif
 
 #ifdef DEV_ACPI
-static devclass_t ahci_gen_acpi_devclass;
 static device_method_t ahci_acpi_methods[] = {
 	DEVMETHOD(device_probe,     ahci_acpi_probe),
 	DEVMETHOD(device_attach,    ahci_gen_attach),
@@ -215,6 +210,5 @@ static driver_t ahci_acpi_driver = {
 	ahci_acpi_methods,
 	sizeof(struct ahci_controller)
 };
-DRIVER_MODULE(ahci_acpi, acpi, ahci_acpi_driver, ahci_gen_acpi_devclass,
-    NULL, NULL);
+DRIVER_MODULE(ahci_acpi, acpi, ahci_acpi_driver, NULL, NULL);
 #endif

@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2008, Pyun YongHyeon <yongari@FreeBSD.org>
  * All rights reserved.
@@ -25,8 +25,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 #ifndef	_IF_AGEVAR_H
@@ -193,7 +191,7 @@ struct age_stats {
  * Software state per device.
  */
 struct age_softc {
-	struct ifnet 		*age_ifp;
+	if_t	 		age_ifp;
 	device_t		age_dev;
 	device_t		age_miibus;
 	struct resource		*age_res[1];

@@ -63,8 +63,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include "opt_inet.h"
 #include "opt_inet6.h"
 #include "opt_ipsec.h"
@@ -92,6 +90,7 @@ __FBSDID("$FreeBSD$");
 
 #include <net/if.h>
 #include <net/if_var.h>
+#include <net/if_private.h>
 #include <net/if_vlan_var.h>
 #include <net/if_llatbl.h>
 #include <net/ethernet.h>
@@ -121,7 +120,6 @@ __FBSDID("$FreeBSD$");
 #include <netinet/sctp_crc32.h>
 #endif
 
-#include <netinet6/ip6protosw.h>
 #include <netinet6/scope6_var.h>
 
 extern int in6_mcast_loop;
@@ -461,6 +459,12 @@ ip6_output(struct mbuf *m0, struct ip6_pktopts *opt,
 	 * XXX: need scope argument.
 	 */
 	if (IPSEC_ENABLED(ipv6)) {
+		m = mb_unmapped_to_ext(m);
+		if (m == NULL) {
+			IP6STAT_INC(ip6s_odropped);
+			error = ENOBUFS;
+			goto bad;
+		}
 		if ((error = IPSEC_OUTPUT(ipv6, m, inp)) != 0) {
 			if (error == EINPROGRESS)
 				error = 0;
@@ -688,8 +692,8 @@ again:
 		if (ro->ro_nh != NULL && fwd_tag == NULL &&
 		    ro->ro_dst.sin6_family == AF_INET6 &&
 		    IN6_ARE_ADDR_EQUAL(&ro->ro_dst.sin6_addr, &ip6->ip6_dst)) {
+			/* Nexthop is valid and contains valid ifp */
 			nh = ro->ro_nh;
-			ifp = nh->nh_ifp;
 		} else {
 			if (ro->ro_lle)
 				LLE_FREE(ro->ro_lle);	/* zeros ro_lle */
@@ -708,8 +712,11 @@ again:
 					in6_ifstat_inc(ifp, ifs6_out_discard);
 				goto bad;
 			}
-			if (ifp != NULL)
-			    mtu = ifp->if_mtu;
+			/*
+			 * At this point at least @ifp is not NULL
+			 * Can be the case when dst is multicast, link-local or
+			 * interface is explicitly specificed by the caller.
+			 */
 		}
 		if (nh == NULL) {
 			/*
@@ -717,9 +724,11 @@ again:
 			 * dst may not have been updated.
 			 */
 			*dst = dst_sa;	/* XXX */
+			origifp = ifp;
+			mtu = ifp->if_mtu;
 		} else {
-			if (nh->nh_flags & NHF_HOST)
-			    mtu = nh->nh_mtu;
+			ifp = nh->nh_ifp;
+			origifp = nh->nh_aifp;
 			ia = (struct in6_ifaddr *)(nh->nh_ifa);
 			counter_u64_add(nh->nh_pksent, 1);
 		}
@@ -740,6 +749,7 @@ again:
 		    (ifp = im6o->im6o_multicast_ifp) != NULL) {
 			/* We do not need a route lookup. */
 			*dst = dst_sa;	/* XXX */
+			origifp = ifp;
 			goto nonh6lookup;
 		}
 
@@ -754,6 +764,7 @@ again:
 					goto bad;
 				}
 				*dst = dst_sa;	/* XXX */
+				origifp = ifp;
 				goto nonh6lookup;
 			}
 		}
@@ -763,20 +774,35 @@ again:
 		if (nh == NULL) {
 			IP6STAT_INC(ip6s_noroute);
 			/* No ifp in6_ifstat_inc(ifp, ifs6_out_discard); */
-			error = EHOSTUNREACH;;
+			error = EHOSTUNREACH;
 			goto bad;
 		}
 
 		ifp = nh->nh_ifp;
-		mtu = nh->nh_mtu;
+		origifp = nh->nh_aifp;
 		ia = ifatoia6(nh->nh_ifa);
 		if (nh->nh_flags & NHF_GATEWAY)
 			dst->sin6_addr = nh->gw6_sa.sin6_addr;
+		else if (fwd_tag != NULL)
+			dst->sin6_addr = dst_sa.sin6_addr;
 nonh6lookup:
 		;
 	}
+	/*
+	 * At this point ifp MUST be pointing to the valid transmit ifp.
+	 * origifp MUST be valid and pointing to either the same ifp or,
+	 * in case of loopback output, to the interface which ip6_src
+	 * belongs to.
+	 * Examples:
+	 *  fe80::1%em0 -> fe80::2%em0 -> ifp=em0, origifp=em0
+	 *  fe80::1%em0 -> fe80::1%em0 -> ifp=lo0, origifp=em0
+	 *  ::1 -> ::1 -> ifp=lo0, origifp=lo0
+	 *
+	 * mtu can be 0 and will be refined later.
+	 */
+	KASSERT((ifp != NULL), ("output interface must not be NULL"));
+	KASSERT((origifp != NULL), ("output address interface must not be NULL"));
 
-	/* Then nh (for unicast) and ifp must be non-NULL valid values. */
 	if ((flags & IPV6_FORWARDING) == 0) {
 		/* XXX: the FORWARDING flag can be set for mrouting. */
 		in6_ifstat_inc(ifp, ifs6_out_request);
@@ -797,39 +823,22 @@ nonh6lookup:
 	dst_sa.sin6_addr = ip6->ip6_dst;
 
 	/* Check for valid scope ID. */
-	if (in6_setscope(&src0, ifp, &zone) == 0 &&
+	if (in6_setscope(&src0, origifp, &zone) == 0 &&
 	    sa6_recoverscope(&src_sa) == 0 && zone == src_sa.sin6_scope_id &&
-	    in6_setscope(&dst0, ifp, &zone) == 0 &&
+	    in6_setscope(&dst0, origifp, &zone) == 0 &&
 	    sa6_recoverscope(&dst_sa) == 0 && zone == dst_sa.sin6_scope_id) {
 		/*
 		 * The outgoing interface is in the zone of the source
 		 * and destination addresses.
 		 *
-		 * Because the loopback interface cannot receive
-		 * packets with a different scope ID than its own,
-		 * there is a trick to pretend the outgoing packet
-		 * was received by the real network interface, by
-		 * setting "origifp" different from "ifp". This is
-		 * only allowed when "ifp" is a loopback network
-		 * interface. Refer to code in nd6_output_ifp() for
-		 * more details.
 		 */
-		origifp = ifp;
-
-		/*
-		 * We should use ia_ifp to support the case of sending
-		 * packets to an address of our own.
-		 */
-		if (ia != NULL && ia->ia_ifp)
-			ifp = ia->ia_ifp;
-
-	} else if ((ifp->if_flags & IFF_LOOPBACK) == 0 ||
+	} else if ((origifp->if_flags & IFF_LOOPBACK) == 0 ||
 	    sa6_recoverscope(&src_sa) != 0 ||
 	    sa6_recoverscope(&dst_sa) != 0 ||
 	    dst_sa.sin6_scope_id == 0 ||
 	    (src_sa.sin6_scope_id != 0 &&
 	    src_sa.sin6_scope_id != dst_sa.sin6_scope_id) ||
-	    (origifp = ifnet_byindex(dst_sa.sin6_scope_id)) == NULL) {
+	    ifnet_byindex(dst_sa.sin6_scope_id) == NULL) {
 		/*
 		 * If the destination network interface is not a
 		 * loopback interface, or the destination network
@@ -840,7 +849,7 @@ nonh6lookup:
 		 * pair is considered invalid.
 		 */
 		IP6STAT_INC(ip6s_badscope);
-		in6_ifstat_inc(ifp, ifs6_out_discard);
+		in6_ifstat_inc(origifp, ifs6_out_discard);
 		if (error == 0)
 			error = EHOSTUNREACH; /* XXX */
 		goto bad;
@@ -1009,7 +1018,7 @@ nonh6lookup:
 
 	odst = ip6->ip6_dst;
 	/* Run through list of hooks for output packets. */
-	switch (pfil_run_hooks(V_inet6_pfil_head, &m, ifp, PFIL_OUT, inp)) {
+	switch (pfil_mbuf_out(V_inet6_pfil_head, &m, ifp, inp)) {
 	case PFIL_PASS:
 		ip6 = mtod(m, struct ip6_hdr *);
 		break;
@@ -1630,33 +1639,6 @@ ip6_ctloutput(struct socket *so, struct sockopt *sopt)
 		if (sopt->sopt_level == SOL_SOCKET &&
 		    sopt->sopt_dir == SOPT_SET) {
 			switch (sopt->sopt_name) {
-			case SO_REUSEADDR:
-				INP_WLOCK(inp);
-				if ((so->so_options & SO_REUSEADDR) != 0)
-					inp->inp_flags2 |= INP_REUSEADDR;
-				else
-					inp->inp_flags2 &= ~INP_REUSEADDR;
-				INP_WUNLOCK(inp);
-				error = 0;
-				break;
-			case SO_REUSEPORT:
-				INP_WLOCK(inp);
-				if ((so->so_options & SO_REUSEPORT) != 0)
-					inp->inp_flags2 |= INP_REUSEPORT;
-				else
-					inp->inp_flags2 &= ~INP_REUSEPORT;
-				INP_WUNLOCK(inp);
-				error = 0;
-				break;
-			case SO_REUSEPORT_LB:
-				INP_WLOCK(inp);
-				if ((so->so_options & SO_REUSEPORT_LB) != 0)
-					inp->inp_flags2 |= INP_REUSEPORT_LB;
-				else
-					inp->inp_flags2 &= ~INP_REUSEPORT_LB;
-				INP_WUNLOCK(inp);
-				error = 0;
-				break;
 			case SO_SETFIB:
 				INP_WLOCK(inp);
 				inp->inp_inc.inc_fibnum = so->so_fibnum;
@@ -1747,10 +1729,6 @@ ip6_ctloutput(struct socket *so, struct sockopt *sopt)
 			case IPV6_AUTOFLOWLABEL:
 			case IPV6_ORIGDSTADDR:
 			case IPV6_BINDANY:
-			case IPV6_BINDMULTI:
-#ifdef	RSS
-			case IPV6_RSS_LISTEN_BUCKET:
-#endif
 			case IPV6_VLAN_PCP:
 				if (optname == IPV6_BINDANY && td != NULL) {
 					error = priv_check(td,
@@ -1840,7 +1818,7 @@ do {									\
 						break;
 					}
 					INP_WLOCK(inp);
-					if (inp->inp_flags & (INP_TIMEWAIT | INP_DROPPED)) {
+					if (inp->inp_flags & INP_DROPPED) {
 						INP_WUNLOCK(inp);
 						return (ECONNRESET);
 					}
@@ -1928,23 +1906,6 @@ do {									\
 				case IPV6_BINDANY:
 					OPTSET(INP_BINDANY);
 					break;
-
-				case IPV6_BINDMULTI:
-					OPTSET2(INP_BINDMULTI, optval);
-					break;
-#ifdef	RSS
-				case IPV6_RSS_LISTEN_BUCKET:
-					if ((optval >= 0) &&
-					    (optval < rss_getnumbuckets())) {
-						INP_WLOCK(inp);
-						inp->inp_rss_listen_bucket = optval;
-						OPTSET2_N(INP_RSS_BUCKET_SET, 1);
-						INP_WUNLOCK(inp);
-					} else {
-						error = EINVAL;
-					}
-					break;
-#endif
 				case IPV6_VLAN_PCP:
 					if ((optval >= -1) && (optval <=
 					    (INP_2PCP_MASK >> INP_2PCP_SHIFT))) {
@@ -1986,7 +1947,7 @@ do {									\
 				{
 					struct ip6_pktopts **optp;
 					INP_WLOCK(inp);
-					if (inp->inp_flags & (INP_TIMEWAIT | INP_DROPPED)) {
+					if (inp->inp_flags & INP_DROPPED) {
 						INP_WUNLOCK(inp);
 						return (ECONNRESET);
 					}
@@ -2078,7 +2039,7 @@ do {									\
 				optlen = sopt->sopt_valsize;
 				optbuf = optbuf_storage;
 				INP_WLOCK(inp);
-				if (inp->inp_flags & (INP_TIMEWAIT | INP_DROPPED)) {
+				if (inp->inp_flags & INP_DROPPED) {
 					INP_WUNLOCK(inp);
 					return (ECONNRESET);
 				}
@@ -2190,7 +2151,6 @@ do {									\
 			case IPV6_RSSBUCKETID:
 			case IPV6_RECVRSSBUCKETID:
 #endif
-			case IPV6_BINDMULTI:
 			case IPV6_VLAN_PCP:
 				switch (optname) {
 				case IPV6_RECVHOPOPTS:
@@ -2285,9 +2245,6 @@ do {									\
 					break;
 #endif
 
-				case IPV6_BINDMULTI:
-					optval = OPTBIT2(INP_BINDMULTI);
-					break;
 
 				case IPV6_VLAN_PCP:
 					if (OPTBIT2(INP_2PCP_SET)) {
@@ -2446,8 +2403,7 @@ ip6_raw_ctloutput(struct socket *so, struct sockopt *sopt)
 				 * values or -1 as a special value.
 				 */
 				error = EINVAL;
-			} else if (so->so_proto->pr_protocol ==
-			    IPPROTO_ICMPV6) {
+			} else if (inp->inp_ip_p == IPPROTO_ICMPV6) {
 				if (optval != icmp6off)
 					error = EINVAL;
 			} else
@@ -2455,7 +2411,7 @@ ip6_raw_ctloutput(struct socket *so, struct sockopt *sopt)
 			break;
 
 		case SOPT_GET:
-			if (so->so_proto->pr_protocol == IPPROTO_ICMPV6)
+			if (inp->inp_ip_p == IPPROTO_ICMPV6)
 				optval = icmp6off;
 			else
 				optval = inp->in6p_cksum;
@@ -2568,33 +2524,33 @@ ip6_pcbopt(int optname, u_char *buf, int len, struct ip6_pktopts **pktopt,
 	return (ret);
 }
 
-#define GET_PKTOPT_VAR(field, lenexpr) do {					\
-	if (pktopt && pktopt->field) {						\
-		INP_RUNLOCK(inp);						\
-		optdata = malloc(sopt->sopt_valsize, M_TEMP, M_WAITOK);		\
-		malloc_optdata = true;						\
-		INP_RLOCK(inp);							\
-		if (inp->inp_flags & (INP_TIMEWAIT | INP_DROPPED)) {		\
-			INP_RUNLOCK(inp);					\
-			free(optdata, M_TEMP);					\
-			return (ECONNRESET);					\
-		}								\
-		pktopt = inp->in6p_outputopts;					\
-		if (pktopt && pktopt->field) {					\
-			optdatalen = min(lenexpr, sopt->sopt_valsize);		\
-			bcopy(pktopt->field, optdata, optdatalen);		\
-		} else {							\
-			free(optdata, M_TEMP);					\
-			optdata = NULL;						\
-			malloc_optdata = false;					\
-		}								\
-	}									\
+#define GET_PKTOPT_VAR(field, lenexpr) do {				\
+	if (pktopt && pktopt->field) {					\
+		INP_RUNLOCK(inp);					\
+		optdata = malloc(sopt->sopt_valsize, M_TEMP, M_WAITOK);	\
+		malloc_optdata = true;					\
+		INP_RLOCK(inp);						\
+		if (inp->inp_flags & INP_DROPPED) {			\
+			INP_RUNLOCK(inp);				\
+			free(optdata, M_TEMP);				\
+			return (ECONNRESET);				\
+		}							\
+		pktopt = inp->in6p_outputopts;				\
+		if (pktopt && pktopt->field) {				\
+			optdatalen = min(lenexpr, sopt->sopt_valsize);	\
+			bcopy(pktopt->field, optdata, optdatalen);	\
+		} else {						\
+			free(optdata, M_TEMP);				\
+			optdata = NULL;					\
+			malloc_optdata = false;				\
+		}							\
+	}								\
 } while(0)
 
-#define GET_PKTOPT_EXT_HDR(field) GET_PKTOPT_VAR(field,				\
+#define GET_PKTOPT_EXT_HDR(field) GET_PKTOPT_VAR(field,			\
 	(((struct ip6_ext *)pktopt->field)->ip6e_len + 1) << 3)
 
-#define GET_PKTOPT_SOCKADDR(field) GET_PKTOPT_VAR(field,			\
+#define GET_PKTOPT_SOCKADDR(field) GET_PKTOPT_VAR(field,		\
 	pktopt->field->sa_len)
 
 static int

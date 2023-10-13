@@ -13,7 +13,6 @@
 # references must include a dollar sign '$' in front of the
 # name to be expanded properly.
 #
-# $FreeBSD$
 #
 
 # Very basic and secure ruleset: Hide everything.
@@ -26,7 +25,6 @@ add hide
 # Requires: devfsrules_hide_all
 #
 [devfsrules_unhide_basic=2]
-add path log unhide
 add path null unhide
 add path zero unhide
 add path crypto unhide

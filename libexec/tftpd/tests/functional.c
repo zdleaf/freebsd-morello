@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2018 Alan Somers.
  *
@@ -26,8 +26,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
@@ -319,7 +317,13 @@ setup(struct sockaddr_storage *to, uint16_t idx)
 	ATF_REQUIRE_EQ(getcwd(pwd, sizeof(pwd)), pwd);
 	
 	/* Must bind(2) pre-fork so it happens before the client's send(2) */
-	ATF_REQUIRE((server_s = socket(protocol, SOCK_DGRAM, 0)) > 0);
+	server_s = socket(protocol, SOCK_DGRAM, 0);
+	if (server_s < 0 && errno == EAFNOSUPPORT) {
+		atf_tc_skip("This test requires IPv%d support",
+		    protocol == PF_INET ? 4 : 6);
+	}
+	ATF_REQUIRE_MSG(server_s >= 0,
+	    "socket failed with error %s", strerror(errno));
 	ATF_REQUIRE_EQ_MSG(bind(server_s, server_addr, len), 0,
 	    "bind failed with error %s", strerror(errno));
 

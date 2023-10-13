@@ -34,8 +34,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 /*
  * driver for RealTek 8305 pseudo PHYs
  */
@@ -76,15 +74,13 @@ static device_method_t rlswitch_methods[] = {
 	DEVMETHOD_END
 };
 
-static devclass_t rlswitch_devclass;
-
 static driver_t rlswitch_driver = {
 	"rlswitch",
 	rlswitch_methods,
 	sizeof(struct mii_softc)
 };
 
-DRIVER_MODULE(rlswitch, miibus, rlswitch_driver, rlswitch_devclass, 0, 0);
+DRIVER_MODULE(rlswitch, miibus, rlswitch_driver, 0, 0);
 
 static int	rlswitch_service(struct mii_softc *, struct mii_data *, int);
 static void	rlswitch_status(struct mii_softc *);

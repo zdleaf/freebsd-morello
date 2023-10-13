@@ -29,14 +29,14 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
  * ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 #ifndef _PFCTL_H_
 #define _PFCTL_H_
 
 #include <libpfctl.h>
+
+struct pfctl;
 
 enum pfctl_show { PFCTL_SHOW_RULES, PFCTL_SHOW_LABELS, PFCTL_SHOW_NOTHING };
 
@@ -88,6 +88,7 @@ int	 pfctl_command_tables(int, char *[], char *, const char *, char *,
 int	 pfctl_show_altq(int, const char *, int, int);
 void	 warn_namespace_collision(const char *);
 int	 pfctl_show_ifaces(const char *, int);
+void	pfctl_show_creators(int);
 FILE	*pfctl_fopen(const char *, const char *);
 
 #ifdef __FreeBSD__
@@ -137,6 +138,13 @@ int	 pfctl_anchor_setup(struct pfctl_rule *,
 void	 pf_remove_if_empty_ruleset(struct pfctl_ruleset *);
 struct pfctl_ruleset	*pf_find_ruleset(const char *);
 struct pfctl_ruleset	*pf_find_or_create_ruleset(const char *);
+void			 pf_init_eth_ruleset(struct pfctl_eth_ruleset *);
+int			 pfctl_eth_anchor_setup(struct pfctl *,
+			    struct pfctl_eth_rule *,
+			    const struct pfctl_eth_ruleset *, const char *);
+struct pfctl_eth_ruleset	*pf_find_or_create_eth_ruleset(const char *);
+void			 pf_remove_if_empty_eth_ruleset(
+			    struct pfctl_eth_ruleset *);
 
 void		 expand_label(char *, size_t, struct pfctl_rule *);
 

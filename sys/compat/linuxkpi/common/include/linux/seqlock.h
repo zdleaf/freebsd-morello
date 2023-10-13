@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2021 Vladimir Kondratyev <wulf@FreeBSD.org>
  *
@@ -30,8 +30,10 @@
 #define	_LINUXKPI_LINUX_SEQLOCK_H__
 
 #include <sys/param.h>
+#include <sys/systm.h>
 #include <sys/lock.h>
 #include <sys/mutex.h>
+#include <sys/rwlock.h>
 #include <sys/seqc.h>
 
 struct lock_class_key;
@@ -47,6 +49,12 @@ struct seqlock {
 };
 typedef struct seqlock seqlock_t;
 
+struct seqcount_mutex {
+	seqc_t		seqc;
+};
+typedef struct seqcount_mutex seqcount_mutex_t;
+typedef struct seqcount_mutex seqcount_ww_mutex_t;
+
 static inline void
 __seqcount_init(struct seqcount *seqcount, const char *name __unused,
     struct lock_class_key *key __unused)
@@ -56,36 +64,36 @@ __seqcount_init(struct seqcount *seqcount, const char *name __unused,
 #define	seqcount_init(seqcount)	__seqcount_init(seqcount, NULL, NULL)
 
 static inline void
-write_seqcount_begin(struct seqcount *seqcount)
+seqcount_mutex_init(struct seqcount_mutex *seqcount, void *mutex __unused)
 {
-	seqc_sleepable_write_begin(&seqcount->seqc);
+	seqcount->seqc = 0;
 }
 
-static inline void
-write_seqcount_end(struct seqcount *seqcount)
-{
-	seqc_sleepable_write_end(&seqcount->seqc);
-}
+#define	seqcount_ww_mutex_init(seqcount, ww_mutex) \
+    seqcount_mutex_init((seqcount), (ww_mutex))
+
+#define	write_seqcount_begin(s)						\
+    _Generic(*(s),							\
+	struct seqcount:	seqc_sleepable_write_begin,		\
+	struct seqcount_mutex:	seqc_write_begin			\
+    )(&(s)->seqc)
+
+#define	write_seqcount_end(s)						\
+    _Generic(*(s),							\
+	struct seqcount:	seqc_sleepable_write_end,		\
+	struct seqcount_mutex:	seqc_write_end				\
+    )(&(s)->seqc)
+
+#define	read_seqcount_begin(s)	seqc_read(&(s)->seqc)
+#define	raw_read_seqcount(s)	seqc_read_any(&(s)->seqc)
 
 /*
  * XXX: Are predicts from inline functions still not honored by clang?
  */
 #define	__read_seqcount_retry(seqcount, gen)	\
-	(!seqc_consistent_nomb(&(seqcount)->seqc, gen))
+	(!seqc_consistent_no_fence(&(seqcount)->seqc, gen))
 #define	read_seqcount_retry(seqcount, gen)	\
 	(!seqc_consistent(&(seqcount)->seqc, gen))
-
-static inline unsigned
-read_seqcount_begin(const struct seqcount *seqcount)
-{
-	return (seqc_read(&seqcount->seqc));
-}
-
-static inline unsigned
-raw_read_seqcount(const struct seqcount *seqcount)
-{
-	return (seqc_read_any(&seqcount->seqc));
-}
 
 static inline void
 seqlock_init(struct seqlock *seqlock)
@@ -100,29 +108,52 @@ seqlock_init(struct seqlock *seqlock)
 }
 
 static inline void
-write_seqlock(struct seqlock *seqlock)
+lkpi_write_seqlock(struct seqlock *seqlock, const bool irqsave)
 {
 	mtx_lock(&seqlock->seql_lock);
+	if (irqsave)
+		critical_enter();
 	write_seqcount_begin(&seqlock->seql_count);
+}
+
+static inline void
+write_seqlock(struct seqlock *seqlock)
+{
+	lkpi_write_seqlock(seqlock, false);
+}
+
+static inline void
+lkpi_write_sequnlock(struct seqlock *seqlock, const bool irqsave)
+{
+	write_seqcount_end(&seqlock->seql_count);
+	if (irqsave)
+		critical_exit();
+	mtx_unlock(&seqlock->seql_lock);
 }
 
 static inline void
 write_sequnlock(struct seqlock *seqlock)
 {
-	write_seqcount_end(&seqlock->seql_count);
-	mtx_unlock(&seqlock->seql_lock);
+	lkpi_write_sequnlock(seqlock, false);
 }
 
+/*
+ * Disable preemption when the consumer wants to disable interrupts.  This
+ * ensures that the caller won't be starved if it is preempted by a
+ * higher-priority reader, but assumes that the caller won't perform any
+ * blocking operations while holding the write lock; probably a safe
+ * assumption.
+ */
 #define	write_seqlock_irqsave(seqlock, flags)	do {	\
 	(flags) = 0;					\
-	write_seqlock(seqlock);				\
+	lkpi_write_seqlock(seqlock, true);		\
 } while (0)
 
 static inline void
 write_sequnlock_irqrestore(struct seqlock *seqlock,
     unsigned long flags __unused)
 {
-	write_sequnlock(seqlock);
+	lkpi_write_sequnlock(seqlock, true);
 }
 
 static inline unsigned

@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2003 Juli Mallett.  All rights reserved.
  *
@@ -28,8 +28,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/mount.h>
 #include <sys/disklabel.h>
@@ -268,6 +266,10 @@ cgwrite1(struct uufsd *disk, int cg)
 	static char errmsg[BUFSIZ];
 
 	if (cg == disk->d_cg.cg_cgx) {
+		if (ufs_disk_write(disk) == -1) {
+			ERROR(disk, "failed to open disk for writing");
+			return (-1);
+		}
 		if (cgput(disk->d_fd, &disk->d_fs, &disk->d_cg) == 0)
 			return (0);
 		ERROR(disk, NULL);

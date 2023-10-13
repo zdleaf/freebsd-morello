@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 1997, 1998 Justin T. Gibbs.
  * All rights reserved.
@@ -31,8 +31,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/malloc.h>
@@ -483,7 +481,7 @@ bus_dmamem_alloc(bus_dma_tag_t dmat, void** vaddr, int flags,
 		 *     multi-seg allocations yet though.
 		 * XXX Certain AGP hardware does.
 		 */
-		*vaddr = (void *)kmem_alloc_contig(dmat->maxsize, mflags, 0ul,
+		*vaddr = kmem_alloc_contig(dmat->maxsize, mflags, 0ul,
 		    dmat->lowaddr, dmat->alignment ? dmat->alignment : 1ul,
 		    dmat->boundary, attr);
 		(*mapp)->contigalloc = 1;
@@ -511,7 +509,7 @@ bus_dmamem_free(bus_dma_tag_t dmat, void *vaddr, bus_dmamap_t map)
 	if (!map->contigalloc)
 		free(vaddr, M_DEVBUF);
 	else
-		kmem_free((vm_offset_t)vaddr, dmat->maxsize);
+		kmem_free(vaddr, dmat->maxsize);
 	bus_dmamap_destroy(dmat, map);
 	CTR3(KTR_BUSDMA, "%s: tag %p flags 0x%x", __func__, dmat, dmat->flags);
 }
@@ -801,17 +799,12 @@ _bus_dmamap_complete(bus_dma_tag_t dmat, bus_dmamap_t map,
 void
 bus_dmamap_unload(bus_dma_tag_t dmat, bus_dmamap_t map)
 {
-	struct bounce_page *bpage;
-
 	if (dmat->iommu) {
 		IOMMU_UNMAP(dmat->iommu, map->segments, map->nsegs, dmat->iommu_cookie);
 		map->nsegs = 0;
 	}
 
-	while ((bpage = STAILQ_FIRST(&map->bpages)) != NULL) {
-		STAILQ_REMOVE_HEAD(&map->bpages, links);
-		free_bounce_page(dmat, bpage);
-	}
+	free_bounce_pages(dmat, map);
 }
 
 void

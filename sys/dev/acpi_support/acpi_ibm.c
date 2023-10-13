@@ -27,8 +27,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 /*
  * Driver for extra ACPI-controlled gadgets found on ThinkPad laptops.
  * Inspired by the ibm-acpi and tpb projects which implement these features
@@ -363,9 +361,7 @@ static driver_t	acpi_ibm_driver = {
 	sizeof(struct acpi_ibm_softc),
 };
 
-static devclass_t acpi_ibm_devclass;
-
-DRIVER_MODULE(acpi_ibm, acpi, acpi_ibm_driver, acpi_ibm_devclass, 0, 0);
+DRIVER_MODULE(acpi_ibm, acpi, acpi_ibm_driver, 0, 0);
 MODULE_DEPEND(acpi_ibm, acpi, 1, 1, 1);
 static char    *ibm_ids[] = {"IBM0068", "LEN0068", "LEN0268", NULL};
 

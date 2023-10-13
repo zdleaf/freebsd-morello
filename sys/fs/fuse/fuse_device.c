@@ -61,8 +61,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/types.h>
 #include <sys/param.h>
 #include <sys/module.h>
@@ -518,8 +516,18 @@ fuse_device_write(struct cdev *dev, struct uio *uio, int ioflag)
 				"pass ticket to a callback");
 			/* Sanitize the linuxism of negative errnos */
 			ohead.error *= -1;
-			memcpy(&tick->tk_aw_ohead, &ohead, sizeof(ohead));
-			err = tick->tk_aw_handler(tick, uio);
+			if (ohead.error < 0 || ohead.error > ELAST) {
+				/* Illegal error code */
+				ohead.error = EIO;
+				memcpy(&tick->tk_aw_ohead, &ohead,
+					sizeof(ohead));
+				tick->tk_aw_handler(tick, uio);
+				err = EINVAL;
+			} else {
+				memcpy(&tick->tk_aw_ohead, &ohead,
+					sizeof(ohead));
+				err = tick->tk_aw_handler(tick, uio);
+			}
 		} else {
 			/* pretender doesn't wanna do anything with answer */
 			SDT_PROBE2(fusefs, , device, trace, 1,

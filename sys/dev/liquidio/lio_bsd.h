@@ -30,7 +30,6 @@
  *   (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  *   OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-/*$FreeBSD$*/
 
 #ifndef __LIO_BSD_H__
 #define __LIO_BSD_H__
@@ -52,7 +51,6 @@
 
 #include <net/if_types.h>
 #include <net/if_vlan_var.h>
-#include <net/if_gif.h>
 
 #include <netinet/in.h>
 #include <netinet/tcp_lro.h>

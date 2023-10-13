@@ -1,4 +1,3 @@
-# $FreeBSD$
 # Copyright (c) David E. O'Brien, 2000-2004, 2006, 2009
 
 PACKAGE=lib${LIB}
@@ -17,6 +16,7 @@ MAN=	libmagic.3 magic.5
 SRCS=	apprentice.c apptype.c ascmagic.c buffer.c cdf.c cdf_time.c \
 	compress.c der.c encoding.c fsmagic.c funcs.c is_json.c \
 	is_csv.c \
+	is_simh.c \
 	is_tar.c magic.c print.c readcdf.c readelf.c seccomp.c softmagic.c
 INCS=	magic.h
 
@@ -42,9 +42,9 @@ PACKAGE_VERSION!=	sed -n '/define.*PACKAGE_VERSION/{s,[^0-9.],,gp;q;}' ${.CURDIR
 libmagic.pc: libmagic.pc.in
 	sed -e 's,@prefix@,/usr,g ; \
 		s,@exec_prefix@,$${prefix},g ; \
-		s,@libdir@,$${exec_prefix}/lib,g ; \
-		s,@sharedlibdir@,$${libdir},g ; \
-		s,@includedir@,$${prefix}/include,g ; \
+		s,@libdir@,${LIBDIR},g ; \
+		s,@sharedlibdir@,${SHLIBDIR},g ; \
+		s,@includedir@,${INCLUDEDIR},g ; \
 		s,@VERSION@,${PACKAGE_VERSION},g ; \
 		s,@LIBS@,,g ;' \
                 ${.ALLSRC} > ${.TARGET}

@@ -24,8 +24,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/bus.h>
@@ -236,9 +234,7 @@ static driver_t glxsb_driver = {
 	sizeof(struct glxsb_softc)
 };
 
-static devclass_t glxsb_devclass;
-
-DRIVER_MODULE(glxsb, pci, glxsb_driver, glxsb_devclass, 0, 0);
+DRIVER_MODULE(glxsb, pci, glxsb_driver, 0, 0);
 MODULE_VERSION(glxsb, 1);
 MODULE_DEPEND(glxsb, crypto, 1, 1, 1);
 

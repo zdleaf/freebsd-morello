@@ -16,8 +16,6 @@
  * This software is provided ``AS IS'' without any warranties of any kind.
  *
  * Command line interface for IP firewall facility
- *
- * $FreeBSD$
  */
 
 #include <sys/wait.h>
@@ -30,6 +28,7 @@
 #include <string.h>
 #include <sysexits.h>
 #include <unistd.h>
+#include <libgen.h>
 
 #include "ipfw2.h"
 
@@ -276,7 +275,7 @@ ipfw_main(int oldac, char **oldav)
 
 	optind = optreset = 1;	/* restart getopt() */
 	if (is_ipfw()) {
-		while ((ch = getopt(ac, av, "abcdDefhinNp:qs:STtv")) != -1)
+		while ((ch = getopt(ac, av, "abcdDefhinNp:qs:STtvx")) != -1)
 			switch (ch) {
 			case 'a':
 				do_acct = 1;
@@ -351,6 +350,10 @@ ipfw_main(int oldac, char **oldav)
 
 			case 'v': /* verbose */
 				g_co.verbose = 1;
+				break;
+
+			case 'x': /* debug output */
+				g_co.debug_only = 1;
 				break;
 
 			default:
@@ -682,7 +685,7 @@ main(int ac, char *av[])
 	}
 #endif
 
-	if (strcmp(av[0], "dnctl") == 0)
+	if (strcmp("dnctl", basename(av[0])) == 0)
 		g_co.prog = cmdline_prog_dnctl;
 	else
 		g_co.prog = cmdline_prog_ipfw;

@@ -1,4 +1,3 @@
-# $FreeBSD$
 
 # Options set in the build system which affect the building of kernel
 # modules. These select which parts to compile in or out (eg INET) or which
@@ -35,6 +34,7 @@ __DEFAULT_YES_OPTIONS = \
     CDDL \
     CRYPT \
     CUSE \
+    DTRACE \
     EFI \
     FORMAT_EXTENSIONS \
     INET \
@@ -49,6 +49,7 @@ __DEFAULT_YES_OPTIONS = \
     SCTP_SUPPORT \
     SOURCELESS_HOST \
     SOURCELESS_UCODE \
+    SPLIT_KERNEL_DEBUG \
     TESTS \
     USB_GADGET_EXAMPLES \
     ZFS
@@ -56,11 +57,10 @@ __DEFAULT_YES_OPTIONS = \
 __DEFAULT_NO_OPTIONS = \
     BHYVE_SNAPSHOT \
     EXTRA_TCP_STACKS \
-    INIT_ALL_PATTERN \
-    INIT_ALL_ZERO \
     KERNEL_RETPOLINE \
     RATELIMIT \
-    REPRODUCIBLE_BUILD
+    REPRODUCIBLE_BUILD \
+    VERIEXEC
 
 # Some options are totally broken on some architectures. We disable
 # them. If you need to enable them on an experimental basis, you
@@ -70,25 +70,8 @@ __DEFAULT_NO_OPTIONS = \
 # Kernel config files are unaffected, though some targets can be
 # affected by KERNEL_SYMBOLS, FORMAT_EXTENSIONS, CTF and SSP.
 
-# Things that don't work based on the CPU
-.if ${MACHINE} == "amd64"
-# PR251083 conflict between INIT_ALL_ZERO and ifunc memset
-BROKEN_OPTIONS+= INIT_ALL_ZERO
-.endif
-
+# Broken on 32-bit arm, kernel module compile errors
 .if ${MACHINE_CPUARCH} == "arm"
-. if ${MACHINE_ARCH:Marmv[67]*} == ""
-BROKEN_OPTIONS+= CDDL ZFS
-. endif
-.endif
-
-.if ${MACHINE_CPUARCH} == "powerpc" && ${MACHINE_ARCH} == "powerpc"
-BROKEN_OPTIONS+= ZFS
-.endif
-
-# Things that don't work because the kernel doesn't have the support
-# for them.
-.if ${MACHINE} != "i386" && ${MACHINE} != "amd64"
 BROKEN_OPTIONS+= OFED
 .endif
 
@@ -97,9 +80,25 @@ BROKEN_OPTIONS+= OFED
 BROKEN_OPTIONS+= KERNEL_RETPOLINE
 .endif
 
-# EFI doesn't exist on powerpc, or riscv
-.if ${MACHINE:Mpowerpc} || ${MACHINE:Mriscv}
+# EFI doesn't exist on powerpc or riscv and is broken on i386
+.if ${MACHINE:Mpowerpc} || ${MACHINE:Mriscv} || ${MACHINE} == "i386"
 BROKEN_OPTIONS+=EFI
+.endif
+
+.if ${MACHINE_CPUARCH} == "i386" || ${MACHINE_CPUARCH} == "amd64"
+__DEFAULT_NO_OPTIONS += FDT
+.else
+__DEFAULT_YES_OPTIONS += FDT
+.endif
+
+__SINGLE_OPTIONS = \
+	INIT_ALL
+
+__INIT_ALL_OPTIONS=	none pattern zero
+__INIT_ALL_DEFAULT=	none
+.if ${MACHINE} == "amd64"
+# PR251083 conflict between INIT_ALL_ZERO and ifunc memset
+BROKEN_SINGLE_OPTIONS+=	INIT_ALL zero none
 .endif
 
 # expanded inline from bsd.mkopt.mk to avoid share/mk dependency
@@ -144,6 +143,33 @@ MK_${var}:=	no
 MK_${var}:=	no
 .endfor
 .undef BROKEN_OPTIONS
+
+#
+# Group options set an OPT_FOO variable for each option.
+#
+.for opt in ${__SINGLE_OPTIONS}
+.if !defined(__${opt}_OPTIONS) || empty(__${opt}_OPTIONS)
+.error __${opt}_OPTIONS not defined or empty
+.endif
+.if !defined(__${opt}_DEFAULT) || empty(__${opt}_DEFAULT)
+.error __${opt}_DEFAULT undefined or empty
+.endif
+.if defined(${opt})
+OPT_${opt}:=	${${opt}}
+.else
+OPT_${opt}:=	${__${opt}_DEFAULT}
+.endif
+.if empty(OPT_${opt}) || ${__${opt}_OPTIONS:M${OPT_${opt}}} != ${OPT_${opt}}
+.error Invalid option OPT_${opt} (${OPT_${opt}}), must be one of: ${__${opt}_OPTIONS}
+.endif
+.endfor
+.undef __SINGLE_OPTIONS
+
+.for opt val rep in ${BROKEN_SINGLE_OPTIONS}
+.if ${OPT_${opt}} == ${val}
+OPT_${opt}:=	${rep}
+.endif
+.endfor
 #end of bsd.mkopt.mk expanded inline.
 
 #
@@ -172,10 +198,23 @@ MK_${var}_SUPPORT:= yes
 .endif
 .endfor
 
+.if ${MK_SPLIT_KERNEL_DEBUG} == "no"
+MK_KERNEL_SYMBOLS:=	no
+.endif
+
+.if ${MK_CDDL} == "no"
+MK_DTRACE:=	no
+.endif
+
 # Some modules only compile successfully if option FDT is set, due to #ifdef FDT
 # wrapped around declarations.  Module makefiles can optionally compile such
 # things using .if !empty(OPT_FDT)
 .if !defined(OPT_FDT) && defined(KERNBUILDDIR)
 OPT_FDT!= sed -n '/FDT/p' ${KERNBUILDDIR}/opt_platform.h
 .export OPT_FDT
+.if empty(OPT_FDT)
+MK_FDT:=no
+.else
+MK_FDT:=yes
+.endif
 .endif

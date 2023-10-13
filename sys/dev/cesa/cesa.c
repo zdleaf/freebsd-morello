@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (C) 2009-2011 Semihalf.
  * All rights reserved.
@@ -41,8 +41,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/bus.h>
@@ -112,9 +110,8 @@ static driver_t cesa_driver = {
 	cesa_methods,
 	sizeof (struct cesa_softc)
 };
-static devclass_t cesa_devclass;
 
-DRIVER_MODULE(cesa, simplebus, cesa_driver, cesa_devclass, 0, 0);
+DRIVER_MODULE(cesa, simplebus, cesa_driver, 0, 0);
 MODULE_DEPEND(cesa, crypto, 1, 1, 1);
 
 static void
@@ -963,7 +960,7 @@ cesa_setup_sram(struct cesa_softc *sc)
 	sram_va = pmap_mapdev(sc->sc_sram_base_pa, sc->sc_sram_size);
 	if (sram_va == NULL)
 		return (ENOMEM);
-	sc->sc_sram_base_va = (vm_offset_t)sram_va;
+	sc->sc_sram_base_va = sram_va;
 
 	return (0);
 }
@@ -1073,7 +1070,7 @@ cesa_setup_sram_armada(struct cesa_softc *sc)
 	sram_va = pmap_mapdev(sc->sc_sram_base_pa, sc->sc_sram_size);
 	if (sram_va == NULL)
 		return (ENOMEM);
-	sc->sc_sram_base_va = (vm_offset_t)sram_va;
+	sc->sc_sram_base_va = sram_va;
 
 	return (0);
 }
@@ -1637,10 +1634,8 @@ cesa_newsession(device_t dev, crypto_session_t cses,
     const struct crypto_session_params *csp)
 {
 	struct cesa_session *cs;
-	struct cesa_softc *sc;
 	int error;
 
-	sc = device_get_softc(dev);
 	error = 0;
 
 	/* Allocate session */

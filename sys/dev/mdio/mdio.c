@@ -22,8 +22,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 #include <sys/param.h>
@@ -131,7 +129,5 @@ driver_t mdio_driver = {
 	mdio_methods,
 	0
 };
-
-devclass_t mdio_devclass;
 
 MODULE_VERSION(mdio, 1);

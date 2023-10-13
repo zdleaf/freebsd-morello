@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2015 Landon Fuller <landon@landonf.org>
  * All rights reserved.
@@ -30,8 +30,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 /*
  * Broadcom Common PCI/PCIe Support.
  * 
@@ -354,7 +352,7 @@ bhnd_pcie_mdio_cmd_write(struct bhnd_pci_softc *sc, uint32_t cmd)
 }
 
 /**
- * Issue an an MDIO read command, wait for completion, and return
+ * Issue an MDIO read command, wait for completion, and return
  * the result in @p data_read.
  */
 static int

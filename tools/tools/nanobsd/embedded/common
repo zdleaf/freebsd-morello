@@ -1,4 +1,3 @@
-# $FreeBSD$
 
 #-
 # Copyright (c) 2015 M. Warner Losh <imp@FreeBSD.org>
@@ -128,11 +127,9 @@ cust_install_machine_files ( ) (
 customize_cmd cust_install_files
 customize_cmd cust_install_machine_files 
 
-# NB: leave c++ enabled so devd can be built
 CONF_BUILD="
 LOCAL_XTOOL_DIRS=usr.bin/mkimg
 WITHOUT_ACPI=true
-WITHOUT_ATM=true
 WITHOUT_AUDIT=true
 WITHOUT_BLUETOOTH=true
 WITHOUT_CALENDAR=true
@@ -217,7 +214,7 @@ create_diskimage_mbr ( ) (
 		if [ -d ${NANO_FAT_DIR} ]; then
 			# Need to copy files from ${NANO_FATDIR} with mtools, or use
 			# makefs -t msdos once that's supported
-			mcopy -i ${NANO_LOG}/_.${NANO_SLICE_FAT} ${NANO_FAT_DIR}/* ::
+			mcopy -s -i ${NANO_LOG}/_.${NANO_SLICE_FAT} ${NANO_FAT_DIR}/* ::
 		fi
 	fi
 
@@ -452,11 +449,6 @@ dos_boot_part ( ) (
 	chdir $f
 	cp ${d}/* .
 
-	# Also copy ubldr. u-boot will load it and it will load the kernel
-	# from the ufs partition
-	cp ${NANO_WORLDDIR}/boot/ubldr .
-	cp ${NANO_WORLDDIR}/boot/ubldr.bin .
-
 	# We have to touch the saveenv file
 	touch uEnv.txt
 
@@ -529,30 +521,12 @@ std_i386 ( ) {
 	: ${NANO_BOOT_BSD:=${NANO_WORLDDIR}/boot/boot}
 }
 
-std_mips ( ) {
-	NANO_ENDIAN=big
-}
-
-std_mipsel ( ) {
-}
-
-std_mips64 ( ) {
-	NANO_ENDIAN=big
-}
-
-std_mips64el ( ) {
-}
-
 std_powerpc ( ) {
 	NANO_ENDIAN=big
 }
 
 std_powerpc64 ( ) {
 	NANO_LAYOUT=powerpc64-ibm
-	NANO_ENDIAN=big
-}
-
-std_sparc64 ( ) {
 	NANO_ENDIAN=big
 }
 

@@ -23,7 +23,6 @@
 # OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 # SUCH DAMAGE.
 #
-# $FreeBSD$
 #
 
 #include <sys/types.h>
@@ -67,21 +66,16 @@ CODE {
 		panic("bus_add_child is not implemented");
 	}
 
-	static int null_reset_post(device_t bus, device_t dev)
+	static int
+	null_reset_post(device_t bus, device_t dev)
 	{
 		return (0);
 	}
 
-	static int null_reset_prepare(device_t bus, device_t dev)
+	static int
+	null_reset_prepare(device_t bus, device_t dev)
 	{
 		return (0);
-	}
-
-	static ssize_t
-	null_get_property(device_t dev, device_t child, const char *propname,
-	    void *propvalue, size_t size)
-	{
-		return (-1);
 	}
 };
 
@@ -259,7 +253,7 @@ METHOD device_t add_child {
  */
 METHOD int rescan {
 	device_t _dev;
-}
+} DEFAULT bus_null_rescan;
 
 /**
  * @brief Allocate a system resource
@@ -944,4 +938,24 @@ METHOD ssize_t get_property {
 	const char *_propname;
 	void *_propvalue;
 	size_t _size;
-} DEFAULT null_get_property;
+	device_property_type_t type;
+} DEFAULT bus_generic_get_property;
+
+/**
+ * @brief Gets a child's full path to the device
+ *
+ * The get_device_path method retrieves a device's
+ * full path to the device using one of several
+ * locators present in the system.
+ *
+ * @param _bus			the bus device
+ * @param _child		the child device
+ * @param _locator		locator name
+ * @param _sb			buffer loaction string
+ */
+METHOD int get_device_path {
+	device_t _bus;
+	device_t _child;
+	const char *_locator;
+	struct sbuf *_sb;
+} DEFAULT bus_generic_get_device_path;

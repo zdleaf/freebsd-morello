@@ -30,8 +30,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include "opt_kstack_pages.h"
 
 #include <sys/param.h>
@@ -48,6 +46,8 @@ __FBSDID("$FreeBSD$");
 #include <vm/vm_map.h>
 
 #include <ddb/ddb.h>
+
+#include <machine/stack.h>
 
 #define PRINT_NONE	0
 #define PRINT_ARGS	1

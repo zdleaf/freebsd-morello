@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2019 Conrad Meyer <cem@FreeBSD.org>
  *
@@ -26,8 +26,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/domainset.h>
 #include <sys/fail.h>
@@ -162,6 +160,9 @@ static const struct fxrng_ent_char {
 		.entc_cls = &fxrng_lo_push,
 	},
 	[RANDOM_UMA] = {
+		.entc_cls = &fxrng_lo_push,
+	},
+	[RANDOM_CALLOUT] = {
 		.entc_cls = &fxrng_lo_push,
 	},
 	[RANDOM_PURE_OCTEON] = {

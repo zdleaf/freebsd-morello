@@ -25,8 +25,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/module.h>
@@ -94,10 +92,7 @@ static driver_t opaldev_driver = {
 	0
 };
 
-static devclass_t opaldev_devclass;
-
-EARLY_DRIVER_MODULE(opaldev, ofwbus, opaldev_driver, opaldev_devclass, 0, 0,
-    BUS_PASS_BUS);
+EARLY_DRIVER_MODULE(opaldev, ofwbus, opaldev_driver, 0, 0, BUS_PASS_BUS);
 
 static void opal_heartbeat(void);
 static void opal_handle_messages(void);

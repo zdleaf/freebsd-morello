@@ -42,8 +42,6 @@ static char sccsid[] = "@(#)cmp.c	8.3 (Berkeley) 4/2/94";
 #endif
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/types.h>
 #include <sys/stat.h>
 
@@ -75,7 +73,18 @@ static const struct option long_opts[] =
 	{NULL,		no_argument,		NULL, 0}
 };
 
-static void usage(void);
+#ifdef SIGINFO
+volatile sig_atomic_t info;
+
+static void
+siginfo(int signo)
+{
+
+	info = signo;
+}
+#endif
+
+static void usage(void) __dead2;
 
 static bool
 parse_iskipspec(char *spec, off_t *skip1, off_t *skip2)
@@ -240,6 +249,9 @@ main(int argc, char *argv[])
 		}
 	}
 
+#ifdef SIGINFO
+	(void)signal(SIGINFO, siginfo);
+#endif
 	if (special)
 		c_special(fd1, file1, skip1, fd2, file2, skip2, limit);
 	else {

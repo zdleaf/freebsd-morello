@@ -1,6 +1,6 @@
 #!/usr/bin/awk -f
 #
-# SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+# SPDX-License-Identifier: BSD-2-Clause
 #
 # Copyright (c) 2008-2009 Ariff Abdullah <ariff@FreeBSD.org>
 # All rights reserved.
@@ -26,7 +26,6 @@
 # OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 # SUCH DAMAGE.
 #
-# $FreeBSD$
 #
 
 #
@@ -300,9 +299,8 @@ BEGIN {
 		split(arg[i++], subarg, ",");
 		FEEDEQ_TREBLE_SFREQ = 1.0 * subarg[1];
 		FEEDEQ_TREBLE_SLOPE = 1.0 * subarg[2];
-		split(arg[i++], subarg, ",");
-		FEEDEQ_BASS_SFREQ = 1.0 * subarg[1];
-		FEEDEQ_BASS_SLOPE = 1.0 * subarg[2];
+		FEEDEQ_BASS_SFREQ = 1.0 * subarg[3];
+		FEEDEQ_BASS_SLOPE = 1.0 * subarg[4];
 		split(arg[i++], subarg, ",");
 		FEEDEQ_GAIN_MIN = floor(1.0 * subarg[1]);
 		FEEDEQ_GAIN_MAX = floor(1.0 * subarg[2]);

@@ -17,7 +17,7 @@
 #	Simon J. Gerraty <sjg@crufty.net>
 
 # RCSid:
-#	$Id: os.sh,v 1.59 2021/11/14 04:18:00 sjg Exp $
+#	$Id: os.sh,v 1.63 2023/05/22 20:44:47 sjg Exp $
 #
 #	@(#) Copyright (c) 1994 Simon J. Gerraty
 #
@@ -41,12 +41,16 @@ OSMAJOR=`IFS=.; set $OSREL; echo $1`
 MACHINE=`uname -m`
 MACHINE_ARCH=`uname -p 2>/dev/null || echo $MACHINE`
 
-# there is at least one case of `uname -p` outputting
-# a bunch of usless drivel
+# there is at least one case of `uname -p`
+# and even `uname -m` outputting usless info
+# fortunately not both together
+case "$MACHINE" in
+*[!A-Za-z0-9_-]*) MACHINE="$MACHINE_ARCH";;
+esac
 case "$MACHINE_ARCH" in
 unknown|*[!A-Za-z0-9_-]*) MACHINE_ARCH="$MACHINE";;
 esac
-        
+
 # we need this here, and it is not always available...
 Which() {
 	case "$1" in
@@ -78,15 +82,16 @@ toLower() {
 }
 
 K=
-case $OS in
+case "$OS" in
 AIX)	# everyone loves to be different...
 	OSMAJOR=`uname -v`
-	OSREL="$OSMAJOR.`uname -r`"
+	OSMINOR=`uname -r`
+	OSREL="$OSMAJOR.$OSMINOR"
 	LOCAL_FS=jfs
 	PS_AXC=-e
 	SHARE_ARCH=$OS/$OSMAJOR.X
 	;;
-Darwin) # a bit like BSD
+Darwin) # this is more explicit (arm64 vs arm)
         HOST_ARCH=$MACHINE
         ;;
 SunOS)
@@ -139,10 +144,10 @@ SunOS)
 	esac
 	# NetBSD at least has good backward compatibility
 	# so NetBSD/i386 is good enough
+        # recent NetBSD uses x86_64 for MACHINE_ARCH
 	case $OS in
 	NetBSD)
 	        LOCALBASE=/usr/pkg
-		HOST_ARCH=$MACHINE
 		SHARE_ARCH=$OS/$HOST_ARCH
 		;;
 	OpenBSD)
@@ -229,15 +234,20 @@ HOST_TARGET=`echo ${OS}${OSMAJOR}-$HOST_ARCH | tr -d / | toLower`
 HOST_TARGET32=`echo ${OS}${OSMAJOR}-$HOST_ARCH32 | tr -d / | toLower`
 export HOST_TARGET HOST_TARGET32
 
-case `echo -n .` in -n*) N=; C="\c";; *) N=-n; C=;; esac
+case `echo -n .` in -n*) echo_n=; echo_c="\c";; *) echo_n=-n; echo_c=;; esac
 
 Echo() {
 	case "$1" in
-	-n) _n=$N _c=$C; shift;;
-	*) _n= _c=;;
+	-n) shift; echo $echo_n "$@$echo_c";;
+	*)  echo "$@";;
 	esac
-	echo $_n "$@" $_c
 }
+
+# for systems that deprecate egrep
+case "`echo egrep | egrep 'e|g' 2>&1`" in
+egrep) ;;
+*) egrep() { grep -E "$@"; };;
+esac
 
 export HOSTNAME HOST	    
 export OS MACHINE MACHINE_ARCH OSREL OSMAJOR LOCAL_FS TMP_DIRS MAILER N C K PS_AXC

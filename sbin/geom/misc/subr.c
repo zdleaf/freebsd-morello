@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2004-2010 Pawel Jakub Dawidek <pjd@FreeBSD.org>
  * All rights reserved.
@@ -27,8 +27,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/disk.h>
 #include <sys/endian.h>
@@ -398,6 +396,8 @@ gctl_error(struct gctl_req *req, const char *error, ...)
 		fprintf(stderr, "\n");
 	}
 	va_end(ap);
+	if (req != NULL && req->nerror == 0)
+		req->nerror = EINVAL;
 }
 
 static void *

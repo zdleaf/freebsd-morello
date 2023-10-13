@@ -1,4 +1,3 @@
-# $FreeBSD$
 .PATH:  ${SRCTOP}/sys/ofed/drivers/infiniband/core
 
 KMOD=	ibcore
@@ -49,11 +48,12 @@ SRCS+=	opt_inet.h opt_inet6.h
 
 CFLAGS+= -I${SRCTOP}/sys/ofed/include
 CFLAGS+= -I${SRCTOP}/sys/ofed/include/uapi
-CFLAGS+= -I${SRCTOP}/sys/compat/linuxkpi/common/include
+CFLAGS+= ${LINUXKPI_INCLUDES}
 CFLAGS+= -DINET6 -DINET -DCONFIG_INFINIBAND_USER_MEM
 
 EXPORT_SYMS=	YES
 
 .include <bsd.kmod.mk>
 
-CWARNFLAGS+= -Wno-cast-qual -Wno-pointer-arith -Wno-redundant-decls
+CWARNFLAGS+= -Wno-cast-qual -Wno-pointer-arith
+CWARNFLAGS+=	${NO_WUNUSED_BUT_SET_VARIABLE}

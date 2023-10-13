@@ -36,8 +36,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include "opt_ddb.h"
 
 #include <sys/param.h>
@@ -481,7 +479,7 @@ g_wither_geom_close(struct g_geom *gp, int error)
  * withered bits at present.
  */
 void
-g_wither_washer()
+g_wither_washer(void)
 {
 	struct g_class *mp;
 	struct g_geom *gp, *gp2;

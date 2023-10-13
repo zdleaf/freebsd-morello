@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (C) 2002 Benno Rice.
  * All rights reserved.
@@ -23,8 +23,6 @@
  * WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR
  * OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 #include "opt_ddb.h"
@@ -70,10 +68,7 @@ static driver_t pswitch_driver = {
 	sizeof(struct pswitch_softc)
 };
 
-static devclass_t pswitch_devclass;
-
-EARLY_DRIVER_MODULE(pswitch, macgpio, pswitch_driver, pswitch_devclass,
-    0, 0, BUS_PASS_RESOURCE);
+EARLY_DRIVER_MODULE(pswitch, macgpio, pswitch_driver, 0, 0, BUS_PASS_RESOURCE);
 
 static int
 pswitch_probe(device_t dev)

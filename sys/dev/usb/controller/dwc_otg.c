@@ -1,6 +1,5 @@
-/* $FreeBSD$ */
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2015 Daisuke Aoyama. All rights reserved.
  * Copyright (c) 2012-2015 Hans Petter Selasky. All rights reserved.
@@ -2139,7 +2138,7 @@ dwc_otg_data_tx(struct dwc_otg_softc *sc, struct dwc_otg_td *td)
 	max_buffer = sc->sc_hw_ep_profile[td->ep_no].max_buffer;
 
 repeat:
-	/* check for for endpoint 0 data */
+	/* check for endpoint 0 data */
 
 	temp = sc->sc_last_rx_status;
 

@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2019 Emmanuel Vadot <manu@FreeBSD.Org>
  *
@@ -30,8 +30,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/bus.h>
@@ -139,8 +137,6 @@ static device_method_t aw_dwc3_methods[] = {
 	DEVMETHOD_END
 };
 
-static devclass_t aw_dwc3_devclass;
-
 DEFINE_CLASS_1(aw_dwc3, aw_dwc3_driver, aw_dwc3_methods,
     sizeof(struct aw_dwc3_softc), simplebus_driver);
-DRIVER_MODULE(aw_dwc3, simplebus, aw_dwc3_driver, aw_dwc3_devclass, 0, 0);
+DRIVER_MODULE(aw_dwc3, simplebus, aw_dwc3_driver, 0, 0);

@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 1998 Michael Smith
  * All rights reserved.
@@ -37,23 +37,21 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
-#include <sys/proc.h>
-#include <sys/queue.h>
+#include <sys/eventhandler.h>
+#include <sys/systm.h>
+#include <sys/kenv.h>
+#include <sys/kernel.h>
+#include <sys/libkern.h>
+#include <sys/limits.h>
 #include <sys/lock.h>
 #include <sys/malloc.h>
 #include <sys/mutex.h>
 #include <sys/priv.h>
-#include <sys/kenv.h>
-#include <sys/kernel.h>
-#include <sys/systm.h>
+#include <sys/proc.h>
+#include <sys/queue.h>
 #include <sys/sysent.h>
 #include <sys/sysproto.h>
-#include <sys/libkern.h>
-#include <sys/kenv.h>
-#include <sys/limits.h>
 
 #include <security/mac/mac_framework.h>
 
@@ -360,11 +358,33 @@ init_static_kenv(char *buf, size_t len)
 	}
 }
 
+/* Maximum suffix number appended for duplicate environment variable names. */
+#define MAXSUFFIX 9999
+#define SUFFIXLEN strlen("_" __XSTRING(MAXSUFFIX))
+
+static void
+getfreesuffix(char *cp, size_t *n)
+{
+	size_t len = strlen(cp);
+	char * ncp;
+
+	ncp = malloc(len + SUFFIXLEN + 1, M_KENV, M_WAITOK);
+	memcpy(ncp, cp, len);
+	for (*n = 1; *n <= MAXSUFFIX; (*n)++) {
+		sprintf(&ncp[len], "_%zu", *n);
+		if (!_getenv_dynamic_locked(ncp, NULL))
+			break;
+	}
+	free(ncp, M_KENV);
+	if (*n > MAXSUFFIX)
+		panic("Too many duplicate kernel environment values: %s", cp);
+}
+
 static void
 init_dynamic_kenv_from(char *init_env, int *curpos)
 {
 	char *cp, *cpnext, *eqpos, *found;
-	size_t len;
+	size_t len, n;
 	int i;
 
 	if (init_env && *init_env != '\0') {
@@ -373,6 +393,12 @@ init_dynamic_kenv_from(char *init_env, int *curpos)
 		for (cp = init_env; cp != NULL; cp = cpnext) {
 			cpnext = kernenv_next(cp);
 			len = strlen(cp) + 1;
+			if (i > KENV_SIZE) {
+				printf(
+				"WARNING: too many kenv strings, ignoring %s\n",
+				    cp);
+				goto sanitize;
+			}
 			if (len > KENV_MNAMELEN + 1 + kenv_mvallen + 1) {
 				printf(
 				"WARNING: too long kenv string, ignoring %s\n",
@@ -388,25 +414,31 @@ init_dynamic_kenv_from(char *init_env, int *curpos)
 			}
 			*eqpos = 0;
 			/*
-			 * De-dupe the environment as we go.  We don't add the
-			 * duplicated assignments because config(8) will flip
-			 * the order of the static environment around to make
-			 * kernel processing match the order of specification
-			 * in the kernel config.
+			 * Handle duplicates in the environment as we go; we
+			 * add the duplicated assignments with _N suffixes.
+			 * This ensures that (a) if a variable is set in the
+			 * static environment and in the "loader" environment
+			 * provided by MD code, the value from the loader will
+			 * have the expected variable name and the value from
+			 * the static environment will have the suffix; and (b)
+			 * if the "loader" environment has the same variable
+			 * set multiple times (as is possible with values being
+			 * passed via the kernel "command line") the extra
+			 * values are visible to code which knows where to look
+			 * for them.
 			 */
 			found = _getenv_dynamic_locked(cp, NULL);
-			*eqpos = '=';
-			if (found != NULL)
-				goto sanitize;
-			if (i > KENV_SIZE) {
-				printf(
-				"WARNING: too many kenv strings, ignoring %s\n",
-				    cp);
-				goto sanitize;
+			if (found != NULL) {
+				getfreesuffix(cp, &n);
+				kenvp[i] = malloc(len + SUFFIXLEN,
+				    M_KENV, M_WAITOK);
+				sprintf(kenvp[i++], "%s_%zu=%s", cp, n,
+				    &eqpos[1]);
+			} else {
+				kenvp[i] = malloc(len, M_KENV, M_WAITOK);
+				*eqpos = '=';
+				strcpy(kenvp[i++], cp);
 			}
-
-			kenvp[i] = malloc(len, M_KENV, M_WAITOK);
-			strcpy(kenvp[i++], cp);
 sanitize:
 #ifdef PRESERVE_EARLY_KENV
 			continue;
@@ -635,6 +667,7 @@ kern_setenv(const char *name, const char *value)
 		kenvp[i + 1] = NULL;
 		mtx_unlock(&kenv_lock);
 	}
+	EVENTHANDLER_INVOKE(setenv, name);
 	return (0);
 }
 
@@ -658,6 +691,7 @@ kern_unsetenv(const char *name)
 		kenvp[i] = NULL;
 		mtx_unlock(&kenv_lock);
 		zfree(oldenv, M_KENV);
+		EVENTHANDLER_INVOKE(unsetenv, name);
 		return (0);
 	}
 	mtx_unlock(&kenv_lock);
@@ -749,7 +783,7 @@ getenv_array(const char *name, void *pdata, int size, int *psize,
 		/* check for invalid value */
 		if (ptr == end)
 			goto error;
-		
+
 		/* check for valid suffix */
 		switch (*end) {
 		case 't':

@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2011-2012 Stefan Bethke.
  * All rights reserved.
@@ -24,8 +24,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 #include <sys/param.h>
@@ -55,8 +53,6 @@ static int etherswitch_probe(device_t);
 static int etherswitch_attach(device_t);
 static int etherswitch_detach(device_t);
 static void etherswitch_identify(driver_t *driver, device_t parent);
-
-devclass_t etherswitch_devclass;
 
 static device_method_t etherswitch_methods[] = {
 	/* device interface */

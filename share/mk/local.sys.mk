@@ -1,4 +1,6 @@
-# $FreeBSD$
+
+.if !target(_${_this}_)
+_${_this}_: .NOTMAIN
 
 .if ${MK_DIRDEPS_BUILD} == "yes" || ${MK_META_MODE} == "yes"
 
@@ -21,10 +23,12 @@ MAKE_PRINT_VAR_ON_ERROR+= \
 	.MAKE \
 	.OBJDIR \
 	.TARGETS \
+	CPUTYPE \
 	DESTDIR \
 	LD_LIBRARY_PATH \
 	MACHINE \
 	MACHINE_ARCH \
+	MACHINE_CPUARCH \
 	MAKEOBJDIRPREFIX \
 	MAKESYSPATH \
 	MAKE_VERSION \
@@ -52,6 +56,10 @@ _PREMK_LIBDIR:=	${LIBDIR}
 .endif
 
 .include "src.sys.mk"
+.-include <site.sys.mk>
+
+# this will be set via local.meta.sys.env.mk if appropriate
+MK_host_egacy?= no
 
 .if ${.MAKE.MODE:Mmeta*} != ""
 # we can afford to use cookies to prevent some targets
@@ -86,3 +94,14 @@ META_NOPHONY?=
 META_COOKIE_RM?=
 META_COOKIE_TOUCH?=
 META_DEPS+=	${META_NOPHONY}
+
+.if ${MK_DIRDEPS_BUILD} == "yes"
+.if ${MACHINE:Nhost*:Ncommon} != "" && ${MACHINE} != ${HOST_MACHINE}
+# cross-building
+CROSS_TARGET_FLAGS?= -target ${MACHINE_ARCH}-unknown-freebsd${FREEBSD_REVISION}
+CFLAGS+= ${CROSS_TARGET_FLAGS}
+ACFLAGS+= ${CROSS_TARGET_FLAGS}
+.endif
+.endif
+
+.endif

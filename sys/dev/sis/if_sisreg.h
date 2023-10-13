@@ -30,8 +30,6 @@
  * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 /*
@@ -454,7 +452,7 @@ struct sis_rxdesc {
 };
 
 struct sis_softc {
-	struct ifnet		*sis_ifp;	/* interface info */
+	if_t			sis_ifp;	/* interface info */
 	struct resource		*sis_res[2];
 	void			*sis_intrhand;
 	device_t		sis_dev;

@@ -25,8 +25,6 @@
  * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 #ifndef	_LINUXKPI_LINUX_SLAB_H_
 #define	_LINUXKPI_LINUX_SLAB_H_
@@ -67,6 +65,7 @@ MALLOC_DECLARE(M_KMALLOC);
 #define	kmem_cache_zalloc(...)	lkpi_kmem_cache_zalloc(__VA_ARGS__)
 #define	kmem_cache_free(...)	lkpi_kmem_cache_free(__VA_ARGS__)
 #define	kmem_cache_destroy(...) linux_kmem_cache_destroy(__VA_ARGS__)
+#define	kmem_cache_shrink(x)	(0)
 
 #define	KMEM_CACHE(__struct, flags)					\
 	linux_kmem_cache_create(#__struct, sizeof(struct __struct),	\
@@ -88,6 +87,9 @@ struct linux_kmem_cache;
 
 /* drm-kmod 5.4 compat */
 #define kfree_async(ptr)	kfree(ptr);
+
+#define	ZERO_SIZE_PTR		((void *)16)
+#define ZERO_OR_NULL_PTR(x)	((x) == NULL || (x) == ZERO_SIZE_PTR)
 
 static inline gfp_t
 linux_check_m_flags(gfp_t flags)
@@ -177,11 +179,24 @@ krealloc(void *ptr, size_t size, gfp_t flags)
 	return (realloc(ptr, size, M_KMALLOC, linux_check_m_flags(flags)));
 }
 
+static inline void *
+krealloc_array(void *ptr, size_t n, size_t size, gfp_t flags)
+{
+	if (WOULD_OVERFLOW(n, size)) {
+		return NULL;
+	}
+
+	return (realloc(ptr, n * size, M_KMALLOC, linux_check_m_flags(flags)));
+}
+
 extern void linux_kfree_async(void *);
 
 static inline void
 kfree(const void *ptr)
 {
+	if (ZERO_OR_NULL_PTR(ptr))
+		return;
+
 	if (curthread->td_critnest != 0)
 		linux_kfree_async(__DECONST(void *, ptr));
 	else
@@ -191,6 +206,9 @@ kfree(const void *ptr)
 static __inline void
 kfree_sensitive(const void *ptr)
 {
+	if (ZERO_OR_NULL_PTR(ptr))
+		return;
+
 	zfree(__DECONST(void *, ptr), M_KMALLOC);
 }
 

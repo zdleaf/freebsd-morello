@@ -25,8 +25,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
@@ -38,6 +36,7 @@ __FBSDID("$FreeBSD$");
 #if defined(__amd64__) || defined(__i386__)
 #include <machine/cpufunc.h>
 #include <machine/cputypes.h>
+#include <machine/fpu.h>
 #include <machine/md_var.h>
 #include <machine/specialreg.h>
 #endif
@@ -124,13 +123,11 @@ padlock_do_sha1(const u_char *in, u_char *out, int count)
 	((uint32_t *)result)[3] = 0x10325476;
 	((uint32_t *)result)[4] = 0xC3D2E1F0;
 
-#ifdef __GNUCLIKE_ASM
 	__asm __volatile(
 		".byte  0xf3, 0x0f, 0xa6, 0xc8" /* rep xsha1 */
 			: "+S"(in), "+D"(result)
 			: "c"(count), "a"(0)
 		);
-#endif
 
 	padlock_output_block((uint32_t *)result, (uint32_t *)out,
 	    SHA1_HASH_LEN / sizeof(uint32_t));
@@ -151,13 +148,11 @@ padlock_do_sha256(const char *in, char *out, int count)
 	((uint32_t *)result)[6] = 0x1F83D9AB;
 	((uint32_t *)result)[7] = 0x5BE0CD19;
 
-#ifdef __GNUCLIKE_ASM
 	__asm __volatile(
 		".byte  0xf3, 0x0f, 0xa6, 0xd0" /* rep xsha256 */
 			: "+S"(in), "+D"(result)
 			: "c"(count), "a"(0)
 		);
-#endif
 
 	padlock_output_block((uint32_t *)result, (uint32_t *)out,
 	    SHA2_256_HASH_LEN / sizeof(uint32_t));
@@ -398,13 +393,13 @@ padlock_hash_process(struct padlock_session *ses, struct cryptop *crp,
 	int error;
 
 	td = curthread;
-	fpu_kern_enter(td, ses->ses_fpu_ctx, FPU_KERN_NORMAL | FPU_KERN_KTHR);
+	fpu_kern_enter(td, NULL, FPU_KERN_NORMAL | FPU_KERN_NOCTX);
 	if (crp->crp_auth_key != NULL)
 		padlock_hash_key_setup(ses, crp->crp_auth_key,
 		    csp->csp_auth_klen);
 
 	error = padlock_authcompute(ses, crp);
-	fpu_kern_leave(td, ses->ses_fpu_ctx);
+	fpu_kern_leave(td, NULL);
 	return (error);
 }
 

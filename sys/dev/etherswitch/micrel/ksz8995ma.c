@@ -25,8 +25,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 /*
@@ -151,7 +149,7 @@ struct ksz8995ma_softc {
 	int		*portphy;
 	char		**ifname;
 	device_t	**miibus;
-	struct ifnet	**ifp;
+	if_t *ifp;
 	struct callout	callout_tick;
 	etherswitch_info_t	info;
 };
@@ -173,8 +171,8 @@ struct ksz8995ma_softc {
 
 static inline int ksz8995ma_portforphy(struct ksz8995ma_softc *, int);
 static void ksz8995ma_tick(void *);
-static int ksz8995ma_ifmedia_upd(struct ifnet *);
-static void ksz8995ma_ifmedia_sts(struct ifnet *, struct ifmediareq *);
+static int ksz8995ma_ifmedia_upd(if_t);
+static void ksz8995ma_ifmedia_sts(if_t, struct ifmediareq *);
 static int ksz8995ma_readreg(device_t dev, int addr);
 static int ksz8995ma_writereg(device_t dev, int addr, int value);
 static void ksz8995ma_portvlanreset(device_t dev);
@@ -304,7 +302,7 @@ ksz8995ma_attach(device_t dev)
 	sc->info.es_nvlangroups = 16;
 	sc->info.es_vlan_caps = ETHERSWITCH_VLAN_PORT | ETHERSWITCH_VLAN_DOT1Q;
 
-	sc->ifp = malloc(sizeof(struct ifnet *) * sc->numports, M_KSZ8995MA,
+	sc->ifp = malloc(sizeof(if_t) * sc->numports, M_KSZ8995MA,
 	    M_WAITOK | M_ZERO);
 	sc->ifname = malloc(sizeof(char *) * sc->numports, M_KSZ8995MA,
 	    M_WAITOK | M_ZERO);
@@ -413,7 +411,7 @@ ksz8995ma_miiforport(struct ksz8995ma_softc *sc, int port)
 	return (device_get_softc(*sc->miibus[port]));
 }
 
-static inline struct ifnet *
+static inline if_t 
 ksz8995ma_ifpforport(struct ksz8995ma_softc *sc, int port)
 {
 
@@ -565,7 +563,7 @@ ksz8995ma_setport(device_t dev, etherswitch_port_t *p)
 	struct ksz8995ma_softc *sc;
 	struct mii_data *mii;
         struct ifmedia *ifm;
-        struct ifnet *ifp;
+        if_t ifp;
 	int phy, err;
 	int portreg;
 
@@ -771,13 +769,13 @@ ksz8995ma_statchg(device_t dev)
 }
 
 static int
-ksz8995ma_ifmedia_upd(struct ifnet *ifp)
+ksz8995ma_ifmedia_upd(if_t ifp)
 {
 	struct ksz8995ma_softc *sc;
 	struct mii_data *mii;
 
-	sc = ifp->if_softc;
-	mii = ksz8995ma_miiforport(sc, ifp->if_dunit);
+	sc = if_getsoftc(ifp);
+	mii = ksz8995ma_miiforport(sc, if_getdunit(ifp));
 
 	DPRINTF(sc->sc_dev, "%s\n", __func__);
 	if (mii == NULL)
@@ -787,13 +785,13 @@ ksz8995ma_ifmedia_upd(struct ifnet *ifp)
 }
 
 static void
-ksz8995ma_ifmedia_sts(struct ifnet *ifp, struct ifmediareq *ifmr)
+ksz8995ma_ifmedia_sts(if_t ifp, struct ifmediareq *ifmr)
 {
 	struct ksz8995ma_softc *sc;
 	struct mii_data *mii;
 
-	sc = ifp->if_softc;
-	mii = ksz8995ma_miiforport(sc, ifp->if_dunit);
+	sc = if_getsoftc(ifp);
+	mii = ksz8995ma_miiforport(sc, if_getdunit(ifp));
 
 	DPRINTF(sc->sc_dev, "%s\n", __func__);
 
@@ -954,12 +952,10 @@ static device_method_t ksz8995ma_methods[] = {
 
 DEFINE_CLASS_0(ksz8995ma, ksz8995ma_driver, ksz8995ma_methods,
     sizeof(struct ksz8995ma_softc));
-static devclass_t ksz8995ma_devclass;
 
-DRIVER_MODULE(ksz8995ma, spibus, ksz8995ma_driver, ksz8995ma_devclass, 0, 0);
-DRIVER_MODULE(miibus, ksz8995ma, miibus_driver, miibus_devclass, 0, 0);
-DRIVER_MODULE(etherswitch, ksz8995ma, etherswitch_driver, etherswitch_devclass,
-    0, 0);
+DRIVER_MODULE(ksz8995ma, spibus, ksz8995ma_driver, 0, 0);
+DRIVER_MODULE(miibus, ksz8995ma, miibus_driver, 0, 0);
+DRIVER_MODULE(etherswitch, ksz8995ma, etherswitch_driver, 0, 0);
 MODULE_VERSION(ksz8995ma, 1);
 MODULE_DEPEND(ksz8995ma, spibus, 1, 1, 1); /* XXX which versions? */
 MODULE_DEPEND(ksz8995ma, miibus, 1, 1, 1); /* XXX which versions? */

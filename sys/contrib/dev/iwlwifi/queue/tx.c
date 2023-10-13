@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0 OR BSD-3-Clause
 /*
- * Copyright (C) 2020-2021 Intel Corporation
+ * Copyright (C) 2020-2023 Intel Corporation
  */
 #ifdef CONFIG_INET
 #include <net/tso.h>
@@ -9,7 +9,9 @@
 
 #include "iwl-debug.h"
 #include "iwl-io.h"
+#include "fw/api/commands.h"
 #include "fw/api/tx.h"
+#include "fw/api/datapath.h"
 #include "queue/tx.h"
 #include "iwl-fh.h"
 #include "iwl-scd.h"
@@ -46,13 +48,13 @@ static void iwl_pcie_gen2_update_byte_tbl(struct iwl_trans *trans,
 	num_fetch_chunks = DIV_ROUND_UP(filled_tfd_size, 64) - 1;
 
 	if (trans->trans_cfg->device_family >= IWL_DEVICE_FAMILY_AX210) {
-		struct iwl_gen3_bc_tbl *scd_bc_tbl_gen3 = txq->bc_tbl.addr;
+		struct iwl_gen3_bc_tbl_entry *scd_bc_tbl_gen3 = txq->bc_tbl.addr;
 
 		/* Starting from AX210, the HW expects bytes */
 		WARN_ON(trans->txqs.bc_table_dword);
 		WARN_ON(len > 0x3FFF);
 		bc_ent = cpu_to_le16(len | (num_fetch_chunks << 14));
-		scd_bc_tbl_gen3->tfd_offset[idx] = bc_ent;
+		scd_bc_tbl_gen3[idx].tfd_offset = bc_ent;
 	} else {
 		struct iwlagn_scd_bc_tbl *scd_bc_tbl = txq->bc_tbl.addr;
 
@@ -194,8 +196,7 @@ static struct page *get_workaround_page(struct iwl_trans *trans,
 		return NULL;
 
 	/* set the chaining pointer to the previous page if there */
-	*(void **)((u8 *)page_address(ret) + PAGE_SIZE - sizeof(void *)) =
-	    *page_ptr;
+	*(void **)((u8 *)page_address(ret) + PAGE_SIZE - sizeof(void *)) = *page_ptr;
 	*page_ptr = ret;
 
 	return ret;
@@ -320,8 +321,7 @@ alloc:
 		return NULL;
 	p->pos = page_address(p->page);
 	/* set the chaining pointer to NULL */
-	*(void **)((u8 *)page_address(p->page) + PAGE_SIZE - sizeof(void *)) =
-	    NULL;
+	*(void **)((u8 *)page_address(p->page) + PAGE_SIZE - sizeof(void *)) = NULL;
 out:
 	*page_ptr = p->page;
 	get_page(p->page);
@@ -653,6 +653,13 @@ struct iwl_tfh_tfd *iwl_txq_gen2_build_tfd(struct iwl_trans *trans,
 
 	/* There must be data left over for TB1 or this code must be changed */
 	BUILD_BUG_ON(sizeof(struct iwl_tx_cmd_gen2) < IWL_FIRST_TB_SIZE);
+	BUILD_BUG_ON(sizeof(struct iwl_cmd_header) +
+		     offsetofend(struct iwl_tx_cmd_gen2, dram_info) >
+		     IWL_FIRST_TB_SIZE);
+	BUILD_BUG_ON(sizeof(struct iwl_tx_cmd_gen3) < IWL_FIRST_TB_SIZE);
+	BUILD_BUG_ON(sizeof(struct iwl_cmd_header) +
+		     offsetofend(struct iwl_tx_cmd_gen3, dram_info) >
+		     IWL_FIRST_TB_SIZE);
 
 	memset(tfd, 0, sizeof(*tfd));
 
@@ -985,9 +992,22 @@ void iwl_txq_log_scd_error(struct iwl_trans *trans, struct iwl_txq *txq)
 	bool active;
 	u8 fifo;
 
-	if (trans->trans_cfg->use_tfh) {
+	if (trans->trans_cfg->gen2) {
 		IWL_ERR(trans, "Queue %d is stuck %d %d\n", txq_id,
 			txq->read_ptr, txq->write_ptr);
+#if defined(__FreeBSD__)
+		/*
+		 * Dump some more queue and timer information to rule
+		 * out a LinuxKPI issues and gather some extra data.
+		 */
+		IWL_ERR(trans, "  need_update %d frozen %d ampdu %d "
+		   "now %ju stuck_timer.expires %ju "
+		   "frozen_expiry_remainder %ju wd_timeout %ju\n",
+		    txq->need_update, txq->frozen, txq->ampdu,
+		    (uintmax_t)jiffies, (uintmax_t)txq->stuck_timer.expires,
+		    (uintmax_t)txq->frozen_expiry_remainder,
+		    (uintmax_t)txq->wd_timeout);
+#endif
 		/* TODO: access new SCD registers and dump them */
 		return;
 	}
@@ -1034,10 +1054,13 @@ int iwl_txq_alloc(struct iwl_trans *trans, struct iwl_txq *txq, int slots_num,
 	size_t tb0_buf_sz;
 	int i;
 
+	if (WARN_ONCE(slots_num <= 0, "Invalid slots num:%d\n", slots_num))
+		return -EINVAL;
+
 	if (WARN_ON(txq->entries || txq->tfds))
 		return -EINVAL;
 
-	if (trans->trans_cfg->use_tfh)
+	if (trans->trans_cfg->gen2)
 		tfd_sz = trans->txqs.tfd.size * slots_num;
 
 	timer_setup(&txq->stuck_timer, iwl_txq_stuck_timer, 0);
@@ -1092,9 +1115,8 @@ error:
 	return -ENOMEM;
 }
 
-static int iwl_txq_dyn_alloc_dma(struct iwl_trans *trans,
-				 struct iwl_txq **intxq, int size,
-				 unsigned int timeout)
+static struct iwl_txq *
+iwl_txq_dyn_alloc_dma(struct iwl_trans *trans, int size, unsigned int timeout)
 {
 	size_t bc_tbl_size, bc_tbl_entries;
 	struct iwl_txq *txq;
@@ -1106,18 +1128,18 @@ static int iwl_txq_dyn_alloc_dma(struct iwl_trans *trans,
 	bc_tbl_entries = bc_tbl_size / sizeof(u16);
 
 	if (WARN_ON(size > bc_tbl_entries))
-		return -EINVAL;
+		return ERR_PTR(-EINVAL);
 
 	txq = kzalloc(sizeof(*txq), GFP_KERNEL);
 	if (!txq)
-		return -ENOMEM;
+		return ERR_PTR(-ENOMEM);
 
 	txq->bc_tbl.addr = dma_pool_alloc(trans->txqs.bc_pool, GFP_KERNEL,
 					  &txq->bc_tbl.dma);
 	if (!txq->bc_tbl.addr) {
 		IWL_ERR(trans, "Scheduler BC Table allocation failed\n");
 		kfree(txq);
-		return -ENOMEM;
+		return ERR_PTR(-ENOMEM);
 	}
 
 	ret = iwl_txq_alloc(trans, txq, size, false);
@@ -1133,12 +1155,11 @@ static int iwl_txq_dyn_alloc_dma(struct iwl_trans *trans,
 
 	txq->wd_timeout = msecs_to_jiffies(timeout);
 
-	*intxq = txq;
-	return 0;
+	return txq;
 
 error:
 	iwl_txq_gen2_free_memory(trans, txq);
-	return ret;
+	return ERR_PTR(ret);
 }
 
 static int iwl_txq_alloc_response(struct iwl_trans *trans, struct iwl_txq *txq,
@@ -1195,30 +1216,61 @@ error_free_resp:
 	return ret;
 }
 
-int iwl_txq_dyn_alloc(struct iwl_trans *trans, __le16 flags, u8 sta_id, u8 tid,
-		      int cmd_id, int size, unsigned int timeout)
+int iwl_txq_dyn_alloc(struct iwl_trans *trans, u32 flags, u32 sta_mask,
+		      u8 tid, int size, unsigned int timeout)
 {
-	struct iwl_txq *txq = NULL;
-	struct iwl_tx_queue_cfg_cmd cmd = {
-		.flags = flags,
-		.sta_id = sta_id,
-		.tid = tid,
-	};
+	struct iwl_txq *txq;
+	union {
+		struct iwl_tx_queue_cfg_cmd old;
+		struct iwl_scd_queue_cfg_cmd new;
+	} cmd;
 	struct iwl_host_cmd hcmd = {
-		.id = cmd_id,
-		.len = { sizeof(cmd) },
-		.data = { &cmd, },
 		.flags = CMD_WANT_SKB,
 	};
 	int ret;
 
-	ret = iwl_txq_dyn_alloc_dma(trans, &txq, size, timeout);
-	if (ret)
-		return ret;
+	if (trans->trans_cfg->device_family == IWL_DEVICE_FAMILY_BZ &&
+	    trans->hw_rev_step == SILICON_A_STEP)
+		size = 4096;
 
-	cmd.tfdq_addr = cpu_to_le64(txq->dma_addr);
-	cmd.byte_cnt_addr = cpu_to_le64(txq->bc_tbl.dma);
-	cmd.cb_size = cpu_to_le32(TFD_QUEUE_CB_SIZE(size));
+	txq = iwl_txq_dyn_alloc_dma(trans, size, timeout);
+	if (IS_ERR(txq))
+		return PTR_ERR(txq);
+
+	if (trans->txqs.queue_alloc_cmd_ver == 0) {
+		memset(&cmd.old, 0, sizeof(cmd.old));
+		cmd.old.tfdq_addr = cpu_to_le64(txq->dma_addr);
+		cmd.old.byte_cnt_addr = cpu_to_le64(txq->bc_tbl.dma);
+		cmd.old.cb_size = cpu_to_le32(TFD_QUEUE_CB_SIZE(size));
+		cmd.old.flags = cpu_to_le16(flags | TX_QUEUE_CFG_ENABLE_QUEUE);
+		cmd.old.tid = tid;
+
+		if (hweight32(sta_mask) != 1) {
+			ret = -EINVAL;
+			goto error;
+		}
+		cmd.old.sta_id = ffs(sta_mask) - 1;
+
+		hcmd.id = SCD_QUEUE_CFG;
+		hcmd.len[0] = sizeof(cmd.old);
+		hcmd.data[0] = &cmd.old;
+	} else if (trans->txqs.queue_alloc_cmd_ver == 3) {
+		memset(&cmd.new, 0, sizeof(cmd.new));
+		cmd.new.operation = cpu_to_le32(IWL_SCD_QUEUE_ADD);
+		cmd.new.u.add.tfdq_dram_addr = cpu_to_le64(txq->dma_addr);
+		cmd.new.u.add.bc_dram_addr = cpu_to_le64(txq->bc_tbl.dma);
+		cmd.new.u.add.cb_size = cpu_to_le32(TFD_QUEUE_CB_SIZE(size));
+		cmd.new.u.add.flags = cpu_to_le32(flags);
+		cmd.new.u.add.sta_mask = cpu_to_le32(sta_mask);
+		cmd.new.u.add.tid = tid;
+
+		hcmd.id = WIDE_ID(DATA_PATH_GROUP, SCD_QUEUE_CONFIG_CMD);
+		hcmd.len[0] = sizeof(cmd.new);
+		hcmd.data[0] = &cmd.new;
+	} else {
+		ret = -EOPNOTSUPP;
+		goto error;
+	}
 
 	ret = iwl_trans_send_cmd(trans, &hcmd);
 	if (ret)
@@ -1315,11 +1367,11 @@ static inline dma_addr_t iwl_txq_gen1_tfd_tb_get_addr(struct iwl_trans *trans,
 	dma_addr_t addr;
 	dma_addr_t hi_len;
 
-	if (trans->trans_cfg->use_tfh) {
-		struct iwl_tfh_tfd *tfd = _tfd;
-		struct iwl_tfh_tb *tb = &tfd->tbs[idx];
+	if (trans->trans_cfg->gen2) {
+		struct iwl_tfh_tfd *tfh_tfd = _tfd;
+		struct iwl_tfh_tb *tfh_tb = &tfh_tfd->tbs[idx];
 
-		return (dma_addr_t)(le64_to_cpu(tb->addr));
+		return (dma_addr_t)(le64_to_cpu(tfh_tb->addr));
 	}
 
 	tfd = _tfd;
@@ -1376,7 +1428,7 @@ void iwl_txq_gen1_tfd_unmap(struct iwl_trans *trans,
 
 	meta->tbs = 0;
 
-	if (trans->trans_cfg->use_tfh) {
+	if (trans->trans_cfg->gen2) {
 		struct iwl_tfh_tfd *tfd_fh = (void *)tfd;
 
 		tfd_fh->num_tbs = 0;
@@ -1532,13 +1584,17 @@ void iwl_txq_reclaim(struct iwl_trans *trans, int txq_id, int ssn,
 		     struct sk_buff_head *skbs)
 {
 	struct iwl_txq *txq = trans->txqs.txq[txq_id];
-	int tfd_num = iwl_txq_get_cmd_index(txq, ssn);
-	int read_ptr = iwl_txq_get_cmd_index(txq, txq->read_ptr);
-	int last_to_free;
+	int tfd_num, read_ptr, last_to_free;
 
 	/* This function is not meant to release cmd queue*/
 	if (WARN_ON(txq_id == trans->txqs.cmd.q_id))
 		return;
+
+	if (WARN_ON(!txq))
+		return;
+
+	tfd_num = iwl_txq_get_cmd_index(txq, ssn);
+	read_ptr = iwl_txq_get_cmd_index(txq, txq->read_ptr);
 
 	spin_lock_bh(&txq->lock);
 
@@ -1589,7 +1645,7 @@ void iwl_txq_reclaim(struct iwl_trans *trans, int txq_id, int ssn,
 
 		txq->entries[read_ptr].skb = NULL;
 
-		if (!trans->trans_cfg->use_tfh)
+		if (!trans->trans_cfg->gen2)
 			iwl_txq_gen1_inval_byte_cnt_tbl(trans, txq);
 
 		iwl_txq_free_tfd(trans, txq);
@@ -1762,8 +1818,11 @@ static int iwl_trans_txq_send_hcmd_sync(struct iwl_trans *trans,
 	}
 
 	if (test_bit(STATUS_FW_ERROR, &trans->status)) {
-		IWL_ERR(trans, "FW error in SYNC CMD %s\n", cmd_str);
-		dump_stack();
+		if (!test_and_clear_bit(STATUS_SUPPRESS_CMD_ERROR_ONCE,
+					&trans->status)) {
+			IWL_ERR(trans, "FW error in SYNC CMD %s\n", cmd_str);
+			dump_stack();
+		}
 		ret = -EIO;
 		goto cancel;
 	}

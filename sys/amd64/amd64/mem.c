@@ -39,8 +39,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 /*
  * Memory special file
  */
@@ -148,7 +146,7 @@ memrw(struct cdev *dev, struct uio *uio, int flags)
 			}
 			p = pmap_mapdev(v, PAGE_SIZE);
 			error = uiomove(p, c, uio);
-			pmap_unmapdev((vm_offset_t)p, PAGE_SIZE);
+			pmap_unmapdev(p, PAGE_SIZE);
 			break;
 		}
 	}

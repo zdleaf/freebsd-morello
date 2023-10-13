@@ -36,7 +36,6 @@
  * SUCH DAMAGE.
  *
  *	@(#)union_vnops.c	8.32 (Berkeley) 6/23/95
- * $FreeBSD$
  *
  */
 
@@ -76,8 +75,8 @@
 #endif
 
 #define KASSERT_UNIONFS_VNODE(vp) \
-	KASSERT(((vp)->v_op == &unionfs_vnodeops), \
-	    ("unionfs: it is not unionfs-vnode"))
+	VNASSERT(((vp)->v_op == &unionfs_vnodeops), vp, \
+	    ("%s: non-unionfs vnode", __func__))
 
 static int
 unionfs_lookup(struct vop_cachedlookup_args *ap)
@@ -347,10 +346,6 @@ unionfs_lookup_cleanup:
 		cache_enter(dvp, NULLVP, cnp);
 
 unionfs_lookup_return:
-
-	/* Ensure subsequent vnops will get a valid pathname buffer. */
-	if (nameiop != LOOKUP && (error == 0 || error == EJUSTRETURN))
-		cnp->cn_flags |= SAVENAME;
 
 	UNIONFS_INTERNAL_DEBUG("unionfs_lookup: leave (%d)\n", error);
 
@@ -1205,11 +1200,6 @@ unionfs_rename(struct vop_rename_args *ap)
 	rtvp = tvp;
 	needrelookup = 0;
 
-#ifdef DIAGNOSTIC
-	if (!(fcnp->cn_flags & HASBUF) || !(tcnp->cn_flags & HASBUF))
-		panic("unionfs_rename: no name");
-#endif
-
 	/* check for cross device rename */
 	if (fvp->v_mount != tdvp->v_mount ||
 	    (tvp != NULLVP && fvp->v_mount != tvp->v_mount)) {
@@ -1398,6 +1388,7 @@ unionfs_mkdir(struct vop_mkdir_args *ap)
 {
 	struct unionfs_node *dunp;
 	struct componentname *cnp;
+	struct vnode   *dvp;
 	struct vnode   *udvp;
 	struct vnode   *uvp;
 	struct vattr	va;
@@ -1409,17 +1400,19 @@ unionfs_mkdir(struct vop_mkdir_args *ap)
 	KASSERT_UNIONFS_VNODE(ap->a_dvp);
 
 	error = EROFS;
-	dunp = VTOUNIONFS(ap->a_dvp);
+	dvp = ap->a_dvp;
+	dunp = VTOUNIONFS(dvp);
 	cnp = ap->a_cnp;
 	lkflags = cnp->cn_lkflags;
 	udvp = dunp->un_uppervp;
 
 	if (udvp != NULLVP) {
+		vref(udvp);
 		/* check opaque */
 		if (!(cnp->cn_flags & ISWHITEOUT)) {
 			error = VOP_GETATTR(udvp, &va, cnp->cn_cred);
 			if (error != 0)
-				return (error);
+				goto unionfs_mkdir_cleanup;
 			if ((va.va_flags & OPAQUE) != 0)
 				cnp->cn_flags |= ISWHITEOUT;
 		}
@@ -1427,12 +1420,34 @@ unionfs_mkdir(struct vop_mkdir_args *ap)
 		if ((error = VOP_MKDIR(udvp, &uvp, cnp, ap->a_vap)) == 0) {
 			VOP_UNLOCK(uvp);
 			cnp->cn_lkflags = LK_EXCLUSIVE;
-			error = unionfs_nodeget(ap->a_dvp->v_mount, uvp, NULLVP,
-			    ap->a_dvp, ap->a_vpp, cnp);
+			/*
+			 * The underlying VOP_MKDIR() implementation may have
+			 * temporarily dropped the parent directory vnode lock.
+			 * Because the unionfs vnode ordinarily shares that
+			 * lock, this may allow the unionfs vnode to be reclaimed
+			 * and its lock field reset.  In that case, the unionfs
+			 * vnode is effectively no longer locked, and we must
+			 * explicitly lock it before returning in order to meet
+			 * the locking requirements of VOP_MKDIR().
+			 */
+			if (__predict_false(VTOUNIONFS(dvp) == NULL)) {
+				error = ENOENT;
+				goto unionfs_mkdir_cleanup;
+			}
+			error = unionfs_nodeget(dvp->v_mount, uvp, NULLVP,
+			    dvp, ap->a_vpp, cnp);
 			cnp->cn_lkflags = lkflags;
 			vrele(uvp);
 		}
 	}
+
+unionfs_mkdir_cleanup:
+
+	if (__predict_false(VTOUNIONFS(dvp) == NULL)) {
+		vput(udvp);
+		vn_lock(dvp, LK_EXCLUSIVE | LK_RETRY);
+	} else if (udvp != NULLVP)
+		vrele(udvp);
 
 	UNIONFS_INTERNAL_DEBUG("unionfs_mkdir: leave (%d)\n", error);
 
@@ -1764,33 +1779,52 @@ unionfs_readlink(struct vop_readlink_args *ap)
 static int
 unionfs_getwritemount(struct vop_getwritemount_args *ap)
 {
+	struct unionfs_node *unp;
 	struct vnode   *uvp;
-	struct vnode   *vp;
+	struct vnode   *vp, *ovp;
 	int		error;
 
 	UNIONFS_INTERNAL_DEBUG("unionfs_getwritemount: enter\n");
 
 	error = 0;
 	vp = ap->a_vp;
+	uvp = NULLVP;
 
-	if (vp == NULLVP || (vp->v_mount->mnt_flag & MNT_RDONLY))
-		return (EACCES);
+	VI_LOCK(vp);
+	unp = VTOUNIONFS(vp);
+	if (unp != NULL)
+		uvp = unp->un_uppervp;
 
-	KASSERT_UNIONFS_VNODE(vp);
-
-	uvp = UNIONFSVPTOUPPERVP(vp);
-	if (uvp == NULLVP && VREG == vp->v_type)
-		uvp = UNIONFSVPTOUPPERVP(VTOUNIONFS(vp)->un_dvp);
-
-	if (uvp != NULLVP)
-		error = VOP_GETWRITEMOUNT(uvp, ap->a_mpp);
-	else {
+	/*
+	 * If our node has no upper vnode, check the parent directory.
+	 * We may be initiating a write operation that will produce a
+	 * new upper vnode through CoW.
+	 */
+	if (uvp == NULLVP && unp != NULL) {
+		ovp = vp;
+		vp = unp->un_dvp;
+		/*
+		 * Only the root vnode should have an empty parent, but it
+		 * should not have an empty uppervp, so we shouldn't get here.
+		 */
+		VNASSERT(vp != NULL, ovp, ("%s: NULL parent vnode", __func__));
+		VI_UNLOCK(ovp);
 		VI_LOCK(vp);
-		if (vp->v_holdcnt == 0)
-			error = EOPNOTSUPP;
-		else
+		unp = VTOUNIONFS(vp);
+		if (unp != NULL)
+			uvp = unp->un_uppervp;
+		if (uvp == NULLVP)
 			error = EACCES;
+	}
+
+	if (uvp != NULLVP) {
+		vholdnz(uvp);
 		VI_UNLOCK(vp);
+		error = VOP_GETWRITEMOUNT(uvp, ap->a_mpp);
+		vdrop(uvp);
+	} else {
+		VI_UNLOCK(vp);
+		*(ap->a_mpp) = NULL;
 	}
 
 	UNIONFS_INTERNAL_DEBUG("unionfs_getwritemount: leave (%d)\n", error);
@@ -1840,24 +1874,6 @@ unionfs_print(struct vop_print_args *ap)
 		vn_printf(unp->un_lowervp, "unionfs: lower ");
 
 	return (0);
-}
-
-static int
-unionfs_islocked(struct vop_islocked_args *ap)
-{
-	struct unionfs_node *unp;
-
-	KASSERT_UNIONFS_VNODE(ap->a_vp);
-
-	unp = VTOUNIONFS(ap->a_vp);
-	if (unp == NULL)
-		return (vop_stdislocked(ap));
-
-	if (unp->un_uppervp != NULLVP)
-		return (VOP_ISLOCKED(unp->un_uppervp));
-	if (unp->un_lowervp != NULLVP)
-		return (VOP_ISLOCKED(unp->un_lowervp));
-	return (vop_stdislocked(ap));
 }
 
 static int
@@ -1918,8 +1934,6 @@ unionfs_lock(struct vop_lock1_args *ap)
 	int		interlock;
 	int		uhold;
 
-	KASSERT_UNIONFS_VNODE(ap->a_vp);
-
 	/*
 	 * TODO: rework the unionfs locking scheme.
 	 * It's not guaranteed to be safe to blindly lock two vnodes on
@@ -1945,19 +1959,21 @@ unionfs_lock(struct vop_lock1_args *ap)
 	unp = VTOUNIONFS(vp);
 	if (unp == NULL)
 		goto unionfs_lock_null_vnode;
+
+	KASSERT_UNIONFS_VNODE(ap->a_vp);
+
 	lvp = unp->un_lowervp;
 	uvp = unp->un_uppervp;
 
 	if ((revlock = unionfs_get_llt_revlock(vp, flags)) == 0)
 		panic("unknown lock type: 0x%x", flags & LK_TYPE_MASK);
 
-	if ((flags & LK_TYPE_MASK) != LK_DOWNGRADE &&
-	    (vp->v_iflag & VI_OWEINACT) != 0)
-		flags |= LK_NOWAIT;
-
 	/*
-	 * Sometimes, lower or upper is already exclusive locked.
-	 * (ex. vfs_domount: mounted vnode is already locked.)
+	 * During unmount, the root vnode lock may be taken recursively,
+	 * because it may share the same v_vnlock field as the vnode covered by
+	 * the unionfs mount.  The covered vnode is locked across VFS_UNMOUNT(),
+	 * and the same lock may be taken recursively here during vflush()
+	 * issued by unionfs_unmount().
 	 */
 	if ((flags & LK_TYPE_MASK) == LK_EXCLUSIVE &&
 	    (vp->v_vflag & VV_ROOT) != 0)
@@ -1972,14 +1988,6 @@ unionfs_lock(struct vop_lock1_args *ap)
 			vholdnz(uvp);
 			uhold = 1;
 			VOP_UNLOCK(uvp);
-			unp = VTOUNIONFS(vp);
-			if (unp == NULL) {
-				/* vnode is released. */
-				VI_UNLOCK(vp);
-				VOP_UNLOCK(lvp);
-				vdrop(uvp);
-				return (EBUSY);
-			}
 		}
 		VI_LOCK_FLAGS(lvp, MTX_DUPOK);
 		flags |= LK_INTERLOCK;
@@ -2000,7 +2008,7 @@ unionfs_lock(struct vop_lock1_args *ap)
 			vdrop(lvp);
 			if (uhold != 0)
 				vdrop(uvp);
-			return (vop_stdlock(ap));
+			goto unionfs_lock_fallback;
 		}
 	}
 
@@ -2033,7 +2041,7 @@ unionfs_lock(struct vop_lock1_args *ap)
 				VOP_UNLOCK(lvp);
 				vdrop(lvp);
 			}
-			return (vop_stdlock(ap));
+			goto unionfs_lock_fallback;
 		}
 		if (error != 0 && lvp != NULLVP) {
 			/* rollback */
@@ -2054,6 +2062,22 @@ unionfs_lock(struct vop_lock1_args *ap)
 
 unionfs_lock_null_vnode:
 	ap->a_flags |= LK_INTERLOCK;
+	return (vop_stdlock(ap));
+
+unionfs_lock_fallback:
+	/*
+	 * If we reach this point, we've discovered the unionfs vnode
+	 * has been reclaimed while the upper/lower vnode locks were
+	 * temporarily dropped.  Such temporary droppage may happen
+	 * during the course of an LK_UPGRADE operation itself, and in
+	 * that case LK_UPGRADE must be cleared as the unionfs vnode's
+	 * lock has been reset to point to the standard v_lock field,
+	 * which has not previously been held.
+	 */
+	if (flags & LK_UPGRADE) {
+		ap->a_flags &= ~LK_TYPE_MASK;
+		ap->a_flags |= LK_EXCLUSIVE;
+	}
 	return (vop_stdlock(ap));
 }
 
@@ -2575,7 +2599,7 @@ unionfs_add_writecount(struct vop_add_writecount_args *ap)
 {
 	struct vnode *tvp, *vp;
 	struct unionfs_node *unp;
-	int error, writerefs;
+	int error, writerefs __diagused;
 
 	vp = ap->a_vp;
 	unp = VTOUNIONFS(vp);
@@ -2772,7 +2796,7 @@ struct vop_vector unionfs_vnodeops = {
 	.vop_getwritemount =	unionfs_getwritemount,
 	.vop_inactive =		unionfs_inactive,
 	.vop_need_inactive =	vop_stdneed_inactive,
-	.vop_islocked =		unionfs_islocked,
+	.vop_islocked =		vop_stdislocked,
 	.vop_ioctl =		unionfs_ioctl,
 	.vop_link =		unionfs_link,
 	.vop_listextattr =	unionfs_listextattr,

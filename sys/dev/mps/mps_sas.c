@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2009 Yahoo! Inc.
  * Copyright (c) 2011-2015 LSI Corp.
@@ -28,13 +28,9 @@
  * SUCH DAMAGE.
  *
  * Avago Technologies (LSI) MPT-Fusion Host Adapter FreeBSD
- *
- * $FreeBSD$
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 /* Communications core for Avago Technologies (LSI) MPT2 */
 
 /* TODO Move headers to mpsvar */
@@ -588,7 +584,9 @@ mpssas_remove_device(struct mps_softc *sc, struct mps_command *tm)
 	 * if so.
 	 */
 	if (TAILQ_FIRST(&targ->commands) == NULL) {
-		mps_dprint(sc, MPS_INFO, "No pending commands: starting remove_device\n");
+		mps_dprint(sc, MPS_INFO,
+		    "No pending commands: starting remove_device target %u handle 0x%04x\n",
+		    targ->tid, handle);
 		mps_map_command(sc, tm);
 		targ->pending_remove_tm = NULL;
 	} else {
@@ -2383,7 +2381,9 @@ mpssas_scsiio_complete(struct mps_softc *sc, struct mps_command *cm)
 	if (cm->cm_targ->flags & MPSSAS_TARGET_INREMOVAL) {
 		if (TAILQ_FIRST(&cm->cm_targ->commands) == NULL &&
 		    cm->cm_targ->pending_remove_tm != NULL) {
-			mps_dprint(sc, MPS_INFO, "Last pending command complete: starting remove_device\n");
+			mps_dprint(sc, MPS_INFO,
+			    "Last pending command complete: starting remove_device target %u handle 0x%04x\n",
+			    cm->cm_targ->tid, cm->cm_targ->handle);
 			mps_map_command(sc, cm->cm_targ->pending_remove_tm);
 			cm->cm_targ->pending_remove_tm = NULL;
 		}

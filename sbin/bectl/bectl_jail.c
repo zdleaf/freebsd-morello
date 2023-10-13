@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2018 Kyle Evans <kevans@FreeBSD.org>
  *
@@ -26,8 +26,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/jail.h>
 #include <sys/mount.h>
@@ -133,7 +131,8 @@ jailparam_delarg(char *arg)
 static int
 build_jailcmd(char ***argvp, bool interactive, int argc, char *argv[])
 {
-	char *cmd, **jargv, *name, *val;
+	char *cmd, **jargv;
+	const char *name, *val;
 	nvpair_t *nvp;
 	size_t i, iarg, nargv;
 
@@ -404,7 +403,7 @@ static int
 bectl_locate_jail(const char *ident)
 {
 	nvlist_t *belist, *props;
-	char *mnt;
+	const char *mnt;
 	int jid;
 
 	/* Try the easy-match first */

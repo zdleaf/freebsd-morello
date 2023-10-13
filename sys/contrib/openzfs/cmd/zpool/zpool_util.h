@@ -6,7 +6,7 @@
  * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
- * or http://www.opensolaris.org/os/licensing.
+ * or https://opensource.org/licenses/CDDL-1.0.
  * See the License for the specific language governing permissions
  * and limitations under the License.
  *
@@ -125,6 +125,10 @@ vdev_cmd_data_list_t *all_pools_for_each_vdev_run(int argc, char **argv,
     int cb_name_flags);
 
 void free_vdev_cmd_data_list(vdev_cmd_data_list_t *vcdl);
+
+void free_vdev_cmd_data(vdev_cmd_data_t *data);
+
+int vdev_run_cmd_simple(char *path, char *cmd);
 
 int check_device(const char *path, boolean_t force,
     boolean_t isspare, boolean_t iswholedisk);

@@ -1,5 +1,4 @@
 #	@(#)Makefile	8.1 (Berkeley) 6/5/93
-#	$FreeBSD$
 
 .include <src.opts.mk>
 
@@ -32,6 +31,7 @@ MAN=	acct.5 \
 	hosts.lpd.5 \
 	intro.5 \
 	libmap.conf.5 \
+	lindebugfs.5 \
 	link.5 \
 	linprocfs.5 \
 	linsysfs.5 \
@@ -52,7 +52,6 @@ MAN=	acct.5 \
 	periodic.conf.5 \
 	phones.5 \
 	portindex.5 \
-	portsnap.conf.5 \
 	procfs.5 \
 	protocols.5 \
 	quota.user.5 \
@@ -69,6 +68,7 @@ MAN=	acct.5 \
 	style.Makefile.5 \
 	style.mdoc.5 \
 	sysctl.conf.5 \
+	tarfs.5 \
 	tmpfs.5 \
 	unionfs.5
 
@@ -78,6 +78,8 @@ MLINKS+=fs.5 inode.5
 MLINKS+=hosts.equiv.5 rhosts.5
 MLINKS+=msdosfs.5 msdos.5
 MLINKS+=passwd.5 master.passwd.5
+MLINKS+=passwd.5 pwd.db.5
+MLINKS+=passwd.5 spwd.db.5
 MLINKS+=portindex.5 INDEX.5
 MLINKS+=quota.user.5 quota.group.5
 MLINKS+=rc.conf.5 rc.conf.local.5
@@ -99,7 +101,7 @@ MAN+=	freebsd-update.conf.5
 .endif
 
 .if ${MK_HESIOD} != "no"
-MAN+=	hesiod.conf.5 
+MAN+=	hesiod.conf.5
 .endif
 
 .if ${MK_PF} != "no"

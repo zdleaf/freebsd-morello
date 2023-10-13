@@ -22,8 +22,6 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 /*
@@ -31,8 +29,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/bus.h>
@@ -108,26 +104,32 @@ static const struct cpufreq_dt_opp *
 cpufreq_dt_find_opp(device_t dev, uint64_t freq)
 {
 	struct cpufreq_dt_softc *sc;
-	ssize_t n;
+	uint64_t diff, best_diff;
+	ssize_t n, best_n;
 
 	sc = device_get_softc(dev);
 
+	diff = 0;
+	best_diff = ~0;
 	DPRINTF(dev, "Looking for freq %ju\n", freq);
-	for (n = 0; n < sc->nopp; n++)
-		if (CPUFREQ_CMP(sc->opp[n].freq, freq))
-			return (&sc->opp[n]);
+	for (n = 0; n < sc->nopp; n++) {
+		diff = abs64((int64_t)sc->opp[n].freq - (int64_t)freq);
+		DPRINTF(dev, "Testing %ju, diff is %ju\n", sc->opp[n].freq, diff);
+		if (diff < best_diff) {
+			best_diff = diff;
+			best_n = n;
+			DPRINTF(dev, "%ju is best for now\n", sc->opp[n].freq);
+		}
+	}
 
-	DPRINTF(dev, "Couldn't find one\n");
-	return (NULL);
+	DPRINTF(dev, "Will use %ju\n", sc->opp[best_n].freq);
+	return (&sc->opp[best_n]);
 }
 
 static void
 cpufreq_dt_opp_to_setting(device_t dev, const struct cpufreq_dt_opp *opp,
     struct cf_setting *set)
 {
-	struct cpufreq_dt_softc *sc;
-
-	sc = device_get_softc(dev);
 
 	memset(set, 0, sizeof(*set));
 	set->freq = opp->freq / 1000000;
@@ -622,7 +624,5 @@ static driver_t cpufreq_dt_driver = {
 	sizeof(struct cpufreq_dt_softc),
 };
 
-static devclass_t cpufreq_dt_devclass;
-
-DRIVER_MODULE(cpufreq_dt, cpu, cpufreq_dt_driver, cpufreq_dt_devclass, 0, 0);
+DRIVER_MODULE(cpufreq_dt, cpu, cpufreq_dt_driver, 0, 0);
 MODULE_VERSION(cpufreq_dt, 1);

@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2011
  *	Ben Gray <ben.r.gray@gmail.com>.
@@ -28,8 +28,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/bus.h>
@@ -1242,7 +1240,6 @@ static driver_t ti_sdma_driver = {
 	ti_sdma_methods,
 	sizeof(struct ti_sdma_softc),
 };
-static devclass_t ti_sdma_devclass;
 
-DRIVER_MODULE(ti_sdma, simplebus, ti_sdma_driver, ti_sdma_devclass, 0, 0);
+DRIVER_MODULE(ti_sdma, simplebus, ti_sdma_driver, 0, 0);
 MODULE_DEPEND(ti_sdma, ti_sysc, 1, 1, 1);

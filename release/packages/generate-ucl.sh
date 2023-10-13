@@ -1,6 +1,5 @@
 #!/bin/sh
 #
-# $FreeBSD$
 #
 
 main() {
@@ -42,8 +41,26 @@ main() {
 			# clibs should not have any dependencies or anything
 			# else imposed on it.
 			;;
-		caroot)
-			pkgdeps="openssl"
+		certctl)
+			pkgdeps="caroot openssl"
+			;;
+		clang)
+			pkgdeps="lld clang-dev libcompiler_rt-dev"
+			;;
+
+		# -dev packages that have no corresponding non-dev package
+		# as a dependency.
+		libcompat-dev|libcompiler_rt-dev|liby-dev)
+			outname=${outname%%-dev}
+			_descr="Development Files"
+			;;
+		libcompat-lib32_dev|libcompiler_rt-lib32_dev|liby-lib32_dev)
+			outname=${outname%%-lib32_dev}
+			_descr="32-bit Libraries, Development Files"
+			;;
+		libcompat-man|libelftc-man)
+			outname=${outname%%-man}
+			_descr="Manual Pages"
 			;;
 		utilities)
 			uclfile="${uclfile}"
@@ -84,7 +101,6 @@ main() {
 			pkgdeps="${outname}"
 			;;
 		${origname})
-			pkgdeps="runtime"
 			;;
 		*)
 			uclfile="${outname##*}${origname}"
@@ -125,14 +141,16 @@ main() {
 
 	cp "${uclsource}" "${uclfile}"
 	if [ ! -z "${pkgdeps}" ]; then
-		cat <<EOF >> ${uclfile}
-deps: {
-	FreeBSD-${pkgdeps}: {
+		echo 'deps: {' >> ${uclfile}
+		for dep in ${pkgdeps}; do
+			cat <<EOF >> ${uclfile}
+	FreeBSD-${dep}: {
 		origin: "base",
 		version: "${PKG_VERSION}"
 	}
-}
 EOF
+		done
+		echo '}' >> ${uclfile}
 	fi
 	cap_arg="$( make -f ${srctree}/share/mk/bsd.endian.mk -VCAP_MKDB_ENDIAN )"
 	sed -i '' -e "s/%VERSION%/${PKG_VERSION}/" \

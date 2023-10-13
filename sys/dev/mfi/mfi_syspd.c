@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -32,8 +32,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include "opt_mfi.h"
 
 #include <sys/param.h>
@@ -73,8 +71,6 @@ static disk_close_t	mfi_syspd_close;
 static disk_strategy_t	mfi_syspd_strategy;
 static dumper_t		mfi_syspd_dump;
 
-static devclass_t	mfi_syspd_devclass;
-
 static device_method_t mfi_syspd_methods[] = {
 	DEVMETHOD(device_probe,		mfi_syspd_probe),
 	DEVMETHOD(device_attach,	mfi_syspd_attach),
@@ -88,7 +84,7 @@ static driver_t mfi_syspd_driver = {
 	sizeof(struct mfi_system_pd)
 };
 
-DRIVER_MODULE(mfisyspd, mfi, mfi_syspd_driver, mfi_syspd_devclass, 0, 0);
+DRIVER_MODULE(mfisyspd, mfi, mfi_syspd_driver, 0, 0);
 
 static int
 mfi_syspd_probe(device_t dev)
@@ -266,8 +262,7 @@ mfi_syspd_strategy(struct bio *bio)
 }
 
 static int
-mfi_syspd_dump(void *arg, void *virt, vm_offset_t phys, off_t offset,
-    size_t len)
+mfi_syspd_dump(void *arg, void *virt, off_t offset, size_t len)
 {
 	struct mfi_system_pd *sc;
 	struct mfi_softc *parent_sc;

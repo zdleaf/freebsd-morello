@@ -1,4 +1,3 @@
-/*	$FreeBSD$	*/
 
 /*
  * Copyright (C) 2012 by Darren Reed.
@@ -42,6 +41,9 @@ struct file;
 #include <sys/socket.h>
 #if defined(_KERNEL)
 # include <sys/systm.h>
+# if defined(__FreeBSD__)
+#  include <sys/jail.h>
+# endif
 # if !defined(__SVR4)
 #  include <sys/mbuf.h>
 # endif
@@ -105,7 +107,6 @@ extern struct ifnet vpnif;
 
 #if !defined(lint)
 static const char sccsid[] = "@(#)ip_nat.c	1.11 6/5/96 (C) 1995 Darren Reed";
-static const char rcsid[] = "@(#)$FreeBSD$";
 /* static const char rcsid[] = "@(#)$Id: ip_nat.c,v 2.195.2.102 2007/10/16 10:08:10 darrenr Exp $"; */
 #endif
 
@@ -999,6 +1000,12 @@ ipf_nat_ioctl(ipf_main_softc_t *softc, caddr_t data, ioctlcmd_t cmd,
 		IPFERROR(60001);
 		return (EPERM);
 	}
+# if defined(__FreeBSD__)
+	if (jailed_without_vnet(curthread->td_ucred)) {
+		IPFERROR(60076);
+		return (EOPNOTSUPP);
+	}
+# endif
 #endif
 
 	getlock = (mode & NAT_LOCKHELD) ? 0 : 1;
@@ -1710,7 +1717,7 @@ ipf_nat_getsz(ipf_main_softc_t *softc, caddr_t data, int getlock)
 	}
 
 	/*
-	 * Incluse any space required for proxy data structures.
+	 * Include any space required for proxy data structures.
 	 */
 	ng.ng_sz = sizeof(nat_save_t);
 	aps = nat->nat_aps;

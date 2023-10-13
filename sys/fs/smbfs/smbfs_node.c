@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2000-2001 Boris Popov
  * All rights reserved.
@@ -24,8 +24,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -217,6 +215,7 @@ smbfs_node_alloc(struct mount *mp, struct vnode *dvp, const char *dirnm,
 		free(np, M_SMBNODE);
 		return (error);
 	}
+	vn_set_state(vp, VSTATE_CONSTRUCTED);
 	error = vfs_hash_insert(vp, smbfs_hash(name, nmlen), LK_EXCLUSIVE,
 	    td, &vp2, smbfs_vnode_cmp, &sc);
 	if (error) 
@@ -230,7 +229,7 @@ int
 smbfs_nget(struct mount *mp, struct vnode *dvp, const char *name, int nmlen,
 	struct smbfattr *fap, struct vnode **vpp)
 {
-	struct smbnode *dnp, *np;
+	struct smbnode *dnp;
 	struct vnode *vp;
 	int error, sep;
 
@@ -246,7 +245,6 @@ smbfs_nget(struct mount *mp, struct vnode *dvp, const char *name, int nmlen,
 	if (error)
 		return error;
 	MPASS(vp != NULL);
-	np = VTOSMB(vp);
 	if (fap)
 		smbfs_attr_cacheenter(vp, fap);
 	*vpp = vp;
@@ -257,10 +255,7 @@ smbfs_nget(struct mount *mp, struct vnode *dvp, const char *name, int nmlen,
  * Free smbnode, and give vnode back to system
  */
 int
-smbfs_reclaim(ap)                     
-        struct vop_reclaim_args /* {
-		struct vnode *a_vp;
-        } */ *ap;
+smbfs_reclaim(struct vop_reclaim_args *ap)
 {
 	struct vnode *vp = ap->a_vp;
 	struct vnode *dvp;
@@ -296,10 +291,7 @@ smbfs_reclaim(ap)
 }
 
 int
-smbfs_inactive(ap)
-	struct vop_inactive_args /* {
-		struct vnode *a_vp;
-	} */ *ap;
+smbfs_inactive(struct vop_inactive_args *ap)
 {
 	struct thread *td = curthread;
 	struct ucred *cred = td->td_ucred;

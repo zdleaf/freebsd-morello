@@ -1,7 +1,7 @@
 #!/bin/sh
 
 #
-# SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+# SPDX-License-Identifier: BSD-2-Clause
 #
 # Copyright (c) 2019 Dell EMC Isilon
 #
@@ -31,5 +31,8 @@
 # https://people.freebsd.org/~pho/stress/log/devfs4.txt
 
 [ `id -u ` -ne 0 ] && echo "Must be root!" && exit 1
+
+# This test creates havoc for a lot of programs
+exit 0
 
 umount -f /dev && mount /dev

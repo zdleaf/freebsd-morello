@@ -14,8 +14,6 @@
  * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
  * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
- *
- * $FreeBSD$
  */
 
 #ifndef _IF_VMXVAR_H
@@ -114,7 +112,7 @@ struct vmxnet3_softc {
 	if_ctx_t			 vmx_ctx;
 	if_shared_ctx_t			 vmx_sctx;
 	if_softc_ctx_t			 vmx_scctx;
-	struct ifnet			*vmx_ifp;
+	if_t				 vmx_ifp;
 	struct vmxnet3_driver_shared	*vmx_ds;
 	uint32_t			 vmx_flags;
 #define VMXNET3_FLAG_RSS	0x0002

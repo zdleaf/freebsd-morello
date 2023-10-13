@@ -23,8 +23,6 @@
  * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 #ifndef _LINUXKPI_LINUX_RCULIST_H_
@@ -41,6 +39,11 @@
 
 #define	list_for_each_entry_rcu(pos, head, member) \
 	for (pos = list_entry_rcu((head)->next, typeof(*(pos)), member); \
+	     &(pos)->member != (head);					\
+	     pos = list_entry_rcu((pos)->member.next, typeof(*(pos)), member))
+
+#define	list_for_each_entry_from_rcu(pos, head, member) \
+	for (; \
 	     &(pos)->member != (head);					\
 	     pos = list_entry_rcu((pos)->member.next, typeof(*(pos)), member))
 

@@ -1,6 +1,5 @@
-# $FreeBSD$
 #
-# SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+# SPDX-License-Identifier: BSD-2-Clause
 #
 # Copyright (c) 2018 Kristof Provost <kp@FreeBSD.org>
 #
@@ -230,7 +229,8 @@ multiwanlocal_body()
 		"block in"	\
 		"block out"	\
 		"pass out quick route-to (${epair_cl_two}a 203.0.113.129) inet proto tcp from 203.0.113.128 to any port 7" \
-		"pass out on ${epair_cl_one}a inet proto tcp from any to any port 7"
+		"pass out on ${epair_cl_one}a inet proto tcp from any to any port 7" \
+		"set skip on lo"
 
 	# This should work
 	result=$(jexec client nc -N -w 1 192.0.2.2 7 | wc -c)
@@ -309,6 +309,62 @@ icmp_nat_cleanup()
 	pft_cleanup
 }
 
+atf_test_case "dummynet" "cleanup"
+dummynet_head()
+{
+	atf_set descr 'Test that dummynet applies to route-to packets'
+	atf_set require.user root
+}
+
+dummynet_body()
+{
+	dummynet_init
+
+	epair_srv=$(vnet_mkepair)
+	epair_gw=$(vnet_mkepair)
+
+	vnet_mkjail srv ${epair_srv}a
+	jexec srv ifconfig ${epair_srv}a 192.0.2.1/24 up
+	jexec srv route add default 192.0.2.2
+
+	vnet_mkjail gw ${epair_srv}b ${epair_gw}a
+	jexec gw ifconfig ${epair_srv}b 192.0.2.2/24 up
+	jexec gw ifconfig ${epair_gw}a 198.51.100.1/24 up
+	jexec gw sysctl net.inet.ip.forwarding=1
+
+	ifconfig ${epair_gw}b 198.51.100.2/24 up
+	route add -net 192.0.2.0/24 198.51.100.1
+
+	# Sanity check
+	atf_check -s exit:0 -o ignore ping -c 1 -t 1 192.0.2.1
+
+	jexec gw dnctl pipe 1 config delay 1200
+	pft_set_rules gw \
+		"pass out route-to (${epair_srv}b 192.0.2.1) to 192.0.2.1 dnpipe 1"
+	jexec gw pfctl -e
+
+	# The ping request will pass, but take 1.2 seconds
+	# So this works:
+	atf_check -s exit:0 -o ignore ping -c 1 192.0.2.1
+	# But this times out:
+	atf_check -s exit:2 -o ignore ping -c 1 -t 1 192.0.2.1
+
+	# return path dummynet
+	pft_set_rules gw \
+		"pass out route-to (${epair_srv}b 192.0.2.1) to 192.0.2.1 dnpipe (0, 1)"
+
+	# The ping request will pass, but take 1.2 seconds
+	# So this works:
+	atf_check -s exit:0 -o ignore ping -c 1 192.0.2.1
+	# But this times out:
+	atf_check -s exit:2 -o ignore ping -c 1 -t 1 192.0.2.1
+}
+
+dummynet_cleanup()
+{
+	pft_cleanup
+}
+
 atf_init_test_cases()
 {
 	atf_add_test_case "v4"
@@ -316,4 +372,5 @@ atf_init_test_cases()
 	atf_add_test_case "multiwan"
 	atf_add_test_case "multiwanlocal"
 	atf_add_test_case "icmp_nat"
+	atf_add_test_case "dummynet"
 }

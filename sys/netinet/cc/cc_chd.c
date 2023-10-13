@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2009-2010
  *	Swinburne University of Technology, Melbourne, Australia
@@ -53,8 +53,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/kernel.h>
 #include <sys/khelp.h>
@@ -244,7 +242,7 @@ chd_ack_received(struct cc_var *ccv, uint16_t ack_type)
 	struct ertt *e_t;
 	int backoff, new_measurement, qdly, rtt;
 
-	e_t = khelp_get_osd(CCV(ccv, osd), ertt_id);
+	e_t = khelp_get_osd(&CCV(ccv, t_osd), ertt_id);
 	chd_data = ccv->cc_data;
 	new_measurement = e_t->flags & ERTT_NEW_MEASUREMENT;
 	backoff = qdly = 0;
@@ -324,7 +322,7 @@ chd_cb_init(struct cc_var *ccv, void *ptr)
 {
 	struct chd *chd_data;
 
-	INP_WLOCK_ASSERT(ccv->ccvc.tcp->t_inpcb);
+	INP_WLOCK_ASSERT(tptoinpcb(ccv->ccvc.tcp));
 	if (ptr == NULL) {
 		chd_data = malloc(sizeof(struct chd), M_CC_MEM, M_NOWAIT);
 		if (chd_data == NULL)
@@ -345,7 +343,7 @@ chd_cong_signal(struct cc_var *ccv, uint32_t signal_type)
 	struct chd *chd_data;
 	int qdly;
 
-	e_t = khelp_get_osd(CCV(ccv, osd), ertt_id);
+	e_t = khelp_get_osd(&CCV(ccv, t_osd), ertt_id);
 	chd_data = ccv->cc_data;
 	qdly = imax(e_t->rtt, chd_data->maxrtt_in_rtt) - e_t->minrtt;
 

@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2019 The FreeBSD Foundation
  *
@@ -26,8 +26,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 extern "C" {
@@ -52,10 +50,7 @@ using namespace testing;
 class Write: public FuseTest {
 
 public:
-static sig_atomic_t s_sigxfsz;
-
 void SetUp() {
-	s_sigxfsz = 0;
 	FuseTest::SetUp();
 }
 
@@ -100,6 +95,8 @@ void maybe_expect_write(uint64_t ino, uint64_t offset, uint64_t size,
 			const char *buf = (const char*)in.body.bytes +
 				sizeof(struct fuse_write_in);
 
+			assert(size <= sizeof(in.body.bytes) -
+				sizeof(struct fuse_write_in));
 			return (in.header.opcode == FUSE_WRITE &&
 				in.header.nodeid == ino &&
 				in.body.write.offset == offset  &&
@@ -117,8 +114,6 @@ void maybe_expect_write(uint64_t ino, uint64_t offset, uint64_t size,
 }
 
 };
-
-sig_atomic_t Write::s_sigxfsz = 0;
 
 class Write_7_8: public FuseTest {
 
@@ -211,8 +206,28 @@ virtual void SetUp() {
 class WriteEofDuringVnopStrategy: public Write, public WithParamInterface<int>
 {};
 
+class WriteRlimitFsize: public Write, public WithParamInterface<int> {
+public:
+static sig_atomic_t s_sigxfsz;
+struct rlimit	m_initial_limit;
+
+void SetUp() {
+	s_sigxfsz = 0;
+	getrlimit(RLIMIT_FSIZE, &m_initial_limit);
+	FuseTest::SetUp();
+}
+
+void TearDown() {
+	setrlimit(RLIMIT_FSIZE, &m_initial_limit);
+
+	FuseTest::TearDown();
+}
+};
+
+sig_atomic_t WriteRlimitFsize::s_sigxfsz = 0;
+
 void sigxfsz_handler(int __unused sig) {
-	Write::s_sigxfsz = 1;
+	WriteRlimitFsize::s_sigxfsz = 1;
 }
 
 /* AIO writes need to set the header's pid field correctly */
@@ -410,6 +425,67 @@ TEST_F(Write, indirect_io_short_write)
 	leak(fd);
 }
 
+/* It is an error if the daemon claims to have written more data than we sent */
+TEST_F(Write, indirect_io_long_write)
+{
+	const char FULLPATH[] = "mountpoint/some_file.txt";
+	const char RELPATH[] = "some_file.txt";
+	const char *CONTENTS = "abcdefghijklmnop";
+	uint64_t ino = 42;
+	int fd;
+	ssize_t bufsize = strlen(CONTENTS);
+	ssize_t bufsize_out = 100;
+	off_t some_other_size = 25;
+	struct stat sb;
+
+	expect_lookup(RELPATH, ino, 0);
+	expect_open(ino, 0, 1);
+	expect_write(ino, 0, bufsize, bufsize_out, CONTENTS);
+	expect_getattr(ino, some_other_size);
+
+	fd = open(FULLPATH, O_WRONLY);
+	ASSERT_LE(0, fd) << strerror(errno);
+
+	ASSERT_EQ(-1, write(fd, CONTENTS, bufsize)) << strerror(errno);
+	ASSERT_EQ(EINVAL, errno);
+
+	/*
+	 * Following such an error, we should requery the server for the file's
+	 * size.
+	 */
+	fstat(fd, &sb);
+	ASSERT_EQ(sb.st_size, some_other_size);
+
+	leak(fd);
+}
+
+/*
+ * Don't crash if the server returns a write that can't be represented as a
+ * signed 32 bit number.  Regression test for
+ * https://bugs.freebsd.org/bugzilla/show_bug.cgi?id=263263
+ */
+TEST_F(Write, indirect_io_very_long_write)
+{
+	const char FULLPATH[] = "mountpoint/some_file.txt";
+	const char RELPATH[] = "some_file.txt";
+	const char *CONTENTS = "abcdefghijklmnop";
+	uint64_t ino = 42;
+	int fd;
+	ssize_t bufsize = strlen(CONTENTS);
+	ssize_t bufsize_out = 3 << 30;
+
+	expect_lookup(RELPATH, ino, 0);
+	expect_open(ino, 0, 1);
+	expect_write(ino, 0, bufsize, bufsize_out, CONTENTS);
+
+	fd = open(FULLPATH, O_WRONLY);
+	ASSERT_LE(0, fd) << strerror(errno);
+
+	ASSERT_EQ(-1, write(fd, CONTENTS, bufsize)) << strerror(errno);
+	ASSERT_EQ(EINVAL, errno);
+	leak(fd);
+}
+
 /* 
  * When the direct_io option is used, filesystems are allowed to write less
  * data than requested.  We should return the short write to userland.
@@ -470,7 +546,7 @@ TEST_F(Write, direct_io_short_write_iov)
 }
 
 /* fusefs should respect RLIMIT_FSIZE */
-TEST_F(Write, rlimit_fsize)
+TEST_P(WriteRlimitFsize, rlimit_fsize)
 {
 	const char FULLPATH[] = "mountpoint/some_file.txt";
 	const char RELPATH[] = "some_file.txt";
@@ -479,17 +555,19 @@ TEST_F(Write, rlimit_fsize)
 	ssize_t bufsize = strlen(CONTENTS);
 	off_t offset = 1'000'000'000;
 	uint64_t ino = 42;
-	int fd;
+	int fd, oflag;
+
+	oflag = GetParam();
 
 	expect_lookup(RELPATH, ino, 0);
 	expect_open(ino, 0, 1);
 
 	rl.rlim_cur = offset;
-	rl.rlim_max = 10 * offset;
+	rl.rlim_max = m_initial_limit.rlim_max;
 	ASSERT_EQ(0, setrlimit(RLIMIT_FSIZE, &rl)) << strerror(errno);
 	ASSERT_NE(SIG_ERR, signal(SIGXFSZ, sigxfsz_handler)) << strerror(errno);
 
-	fd = open(FULLPATH, O_WRONLY);
+	fd = open(FULLPATH, O_WRONLY | oflag);
 
 	ASSERT_LE(0, fd) << strerror(errno);
 
@@ -498,6 +576,47 @@ TEST_F(Write, rlimit_fsize)
 	EXPECT_EQ(1, s_sigxfsz);
 	leak(fd);
 }
+
+/*
+ * When crossing the RLIMIT_FSIZE boundary, writes should be truncated, not
+ * aborted.
+ * https://bugs.freebsd.org/bugzilla/show_bug.cgi?id=164793
+ */
+TEST_P(WriteRlimitFsize, rlimit_fsize_truncate)
+{
+	const char FULLPATH[] = "mountpoint/some_file.txt";
+	const char RELPATH[] = "some_file.txt";
+	const char *CONTENTS = "abcdefghijklmnopqrstuvwxyz";
+	struct rlimit rl;
+	ssize_t bufsize = strlen(CONTENTS);
+	uint64_t ino = 42;
+	off_t offset = 1 << 30;
+	off_t limit = offset + strlen(CONTENTS) / 2;
+	int fd, oflag;
+
+	oflag = GetParam();
+
+	expect_lookup(RELPATH, ino, 0);
+	expect_open(ino, 0, 1);
+	expect_write(ino, offset, bufsize / 2, bufsize / 2, CONTENTS);
+
+	rl.rlim_cur = limit;
+	rl.rlim_max = m_initial_limit.rlim_max;
+	ASSERT_EQ(0, setrlimit(RLIMIT_FSIZE, &rl)) << strerror(errno);
+	ASSERT_NE(SIG_ERR, signal(SIGXFSZ, sigxfsz_handler)) << strerror(errno);
+
+	fd = open(FULLPATH, O_WRONLY | oflag);
+
+	ASSERT_LE(0, fd) << strerror(errno);
+
+	ASSERT_EQ(bufsize / 2, pwrite(fd, CONTENTS, bufsize, offset))
+		<< strerror(errno);
+	leak(fd);
+}
+
+INSTANTIATE_TEST_SUITE_P(W, WriteRlimitFsize,
+	Values(0, O_DIRECT)
+);
 
 /* 
  * A short read indicates EOF.  Test that nothing bad happens if we get EOF
@@ -603,7 +722,7 @@ TEST_P(WriteEofDuringVnopStrategy, eof_during_vop_strategy)
 
 }
 
-INSTANTIATE_TEST_CASE_P(W, WriteEofDuringVnopStrategy,
+INSTANTIATE_TEST_SUITE_P(W, WriteEofDuringVnopStrategy,
 	Values(1, 2, 3)
 );
 
@@ -1425,7 +1544,7 @@ TEST_P(TimeGran, timestamps_during_setattr)
 	leak(fd);
 }
 
-INSTANTIATE_TEST_CASE_P(RA, TimeGran, Range(0u, 10u));
+INSTANTIATE_TEST_SUITE_P(RA, TimeGran, Range(0u, 10u));
 
 /*
  * Without direct_io, writes should be committed to cache

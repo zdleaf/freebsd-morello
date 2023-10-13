@@ -1,13 +1,14 @@
-# $FreeBSD$
 
 .PATH: ${SRCTOP}/sys/contrib/openzfs/module/nvpair
 .PATH: ${SRCTOP}/sys/contrib/openzfs/lib/libnvpair
+.PATH: ${SRCTOP}/sys/contrib/openzfs/include
 
 LIB=	nvpair
 LIBADD=	spl
 
-PACKAGE=	runtime
+PACKAGE=	zfs
 # user
+INCS=	libnvpair.h
 SRCS=	libnvpair.c \
 	libnvpair_json.c \
 	nvpair_alloc_system.c

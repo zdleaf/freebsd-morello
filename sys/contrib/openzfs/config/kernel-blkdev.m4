@@ -16,12 +16,63 @@ AC_DEFUN([ZFS_AC_KERNEL_SRC_BLKDEV_GET_BY_PATH], [
 	])
 ])
 
+dnl #
+dnl # 6.5.x API change,
+dnl # blkdev_get_by_path() takes 4 args
+dnl #
+AC_DEFUN([ZFS_AC_KERNEL_SRC_BLKDEV_GET_BY_PATH_4ARG], [
+	ZFS_LINUX_TEST_SRC([blkdev_get_by_path_4arg], [
+		#include <linux/fs.h>
+		#include <linux/blkdev.h>
+	], [
+		struct block_device *bdev __attribute__ ((unused)) = NULL;
+		const char *path = "path";
+		fmode_t mode = 0;
+		void *holder = NULL;
+		struct blk_holder_ops h;
+
+		bdev = blkdev_get_by_path(path, mode, holder, &h);
+	])
+])
+
 AC_DEFUN([ZFS_AC_KERNEL_BLKDEV_GET_BY_PATH], [
-	AC_MSG_CHECKING([whether blkdev_get_by_path() exists])
+	AC_MSG_CHECKING([whether blkdev_get_by_path() exists and takes 3 args])
 	ZFS_LINUX_TEST_RESULT([blkdev_get_by_path], [
 		AC_MSG_RESULT(yes)
 	], [
-		ZFS_LINUX_TEST_ERROR([blkdev_get_by_path()])
+		AC_MSG_RESULT(no)
+		AC_MSG_CHECKING([whether blkdev_get_by_path() exists and takes 4 args])
+		ZFS_LINUX_TEST_RESULT([blkdev_get_by_path_4arg], [
+			AC_DEFINE(HAVE_BLKDEV_GET_BY_PATH_4ARG, 1,
+				[blkdev_get_by_path() exists and takes 4 args])
+			AC_MSG_RESULT(yes)
+		], [
+			ZFS_LINUX_TEST_ERROR([blkdev_get_by_path()])
+		])
+	])
+])
+
+dnl #
+dnl # 6.5.x API change
+dnl # blk_mode_t was added as a type to supercede some places where fmode_t
+dnl # is used
+dnl #
+AC_DEFUN([ZFS_AC_KERNEL_SRC_BLKDEV_BLK_MODE_T], [
+	ZFS_LINUX_TEST_SRC([blk_mode_t], [
+		#include <linux/fs.h>
+		#include <linux/blkdev.h>
+	], [
+		blk_mode_t m __attribute((unused)) = (blk_mode_t)0;
+	])
+])
+
+AC_DEFUN([ZFS_AC_KERNEL_BLKDEV_BLK_MODE_T], [
+	AC_MSG_CHECKING([whether blk_mode_t is defined])
+	ZFS_LINUX_TEST_RESULT([blk_mode_t], [
+		AC_MSG_RESULT(yes)
+		AC_DEFINE(HAVE_BLK_MODE_T, 1, [blk_mode_t is defined])
+	], [
+		AC_MSG_RESULT(no)
 	])
 ])
 
@@ -41,12 +92,35 @@ AC_DEFUN([ZFS_AC_KERNEL_SRC_BLKDEV_PUT], [
 	])
 ])
 
+dnl #
+dnl # 6.5.x API change.
+dnl # blkdev_put() takes (void* holder) as arg 2
+dnl #
+AC_DEFUN([ZFS_AC_KERNEL_SRC_BLKDEV_PUT_HOLDER], [
+	ZFS_LINUX_TEST_SRC([blkdev_put_holder], [
+		#include <linux/fs.h>
+		#include <linux/blkdev.h>
+	], [
+		struct block_device *bdev = NULL;
+		void *holder = NULL;
+
+		blkdev_put(bdev, holder);
+	])
+])
+
 AC_DEFUN([ZFS_AC_KERNEL_BLKDEV_PUT], [
 	AC_MSG_CHECKING([whether blkdev_put() exists])
 	ZFS_LINUX_TEST_RESULT([blkdev_put], [
 		AC_MSG_RESULT(yes)
 	], [
-		ZFS_LINUX_TEST_ERROR([blkdev_put()])
+		AC_MSG_CHECKING([whether blkdev_put() accepts void* as arg 2])
+		ZFS_LINUX_TEST_RESULT([blkdev_put_holder], [
+			AC_MSG_RESULT(yes)
+			AC_DEFINE(HAVE_BLKDEV_PUT_HOLDER, 1,
+				[blkdev_put() accepts void* as arg 2])
+		], [
+			ZFS_LINUX_TEST_ERROR([blkdev_put()])
+		])
 	])
 ])
 
@@ -98,6 +172,84 @@ AC_DEFUN([ZFS_AC_KERNEL_BLKDEV_CHECK_DISK_CHANGE], [
 		AC_MSG_RESULT(yes)
 		AC_DEFINE(HAVE_CHECK_DISK_CHANGE, 1,
 		    [check_disk_change() exists])
+	], [
+		AC_MSG_RESULT(no)
+	])
+])
+
+dnl #
+dnl # 6.5.x API change
+dnl # disk_check_media_change() was added
+dnl #
+AC_DEFUN([ZFS_AC_KERNEL_SRC_BLKDEV_DISK_CHECK_MEDIA_CHANGE], [
+	ZFS_LINUX_TEST_SRC([disk_check_media_change], [
+		#include <linux/fs.h>
+		#include <linux/blkdev.h>
+	], [
+		struct block_device *bdev = NULL;
+		bool error;
+
+		error = disk_check_media_change(bdev->bd_disk);
+	])
+])
+
+AC_DEFUN([ZFS_AC_KERNEL_BLKDEV_DISK_CHECK_MEDIA_CHANGE], [
+	AC_MSG_CHECKING([whether disk_check_media_change() exists])
+	ZFS_LINUX_TEST_RESULT([disk_check_media_change], [
+		AC_MSG_RESULT(yes)
+		AC_DEFINE(HAVE_DISK_CHECK_MEDIA_CHANGE, 1,
+		    [disk_check_media_change() exists])
+	], [
+		AC_MSG_RESULT(no)
+	])
+])
+
+dnl #
+dnl # bdev_kobj() is introduced from 5.12
+dnl #
+AC_DEFUN([ZFS_AC_KERNEL_SRC_BLKDEV_BDEV_KOBJ], [
+	ZFS_LINUX_TEST_SRC([bdev_kobj], [
+		#include <linux/fs.h>
+		#include <linux/blkdev.h>
+		#include <linux/kobject.h>
+	], [
+		struct block_device *bdev = NULL;
+		struct kobject *disk_kobj;
+		disk_kobj = bdev_kobj(bdev);
+	])
+])
+
+AC_DEFUN([ZFS_AC_KERNEL_BLKDEV_BDEV_KOBJ], [
+	AC_MSG_CHECKING([whether bdev_kobj() exists])
+	ZFS_LINUX_TEST_RESULT([bdev_kobj], [
+		AC_MSG_RESULT(yes)
+		AC_DEFINE(HAVE_BDEV_KOBJ, 1,
+		    [bdev_kobj() exists])
+	], [
+		AC_MSG_RESULT(no)
+	])
+])
+
+dnl #
+dnl # part_to_dev() was removed in 5.12
+dnl #
+AC_DEFUN([ZFS_AC_KERNEL_SRC_BLKDEV_PART_TO_DEV], [
+	ZFS_LINUX_TEST_SRC([part_to_dev], [
+		#include <linux/fs.h>
+		#include <linux/blkdev.h>
+	], [
+		struct hd_struct *p = NULL;
+		struct device *pdev;
+		pdev = part_to_dev(p);
+	])
+])
+
+AC_DEFUN([ZFS_AC_KERNEL_BLKDEV_PART_TO_DEV], [
+	AC_MSG_CHECKING([whether part_to_dev() exists])
+	ZFS_LINUX_TEST_RESULT([part_to_dev], [
+		AC_MSG_RESULT(yes)
+		AC_DEFINE(HAVE_PART_TO_DEV, 1,
+		    [part_to_dev() exists])
 	], [
 		AC_MSG_RESULT(no)
 	])
@@ -295,6 +447,83 @@ AC_DEFUN([ZFS_AC_KERNEL_BLKDEV_BDEV_WHOLE], [
 ])
 
 dnl #
+dnl # 5.20 API change,
+dnl # Removed bdevname(), snprintf(.., %pg) should be used.
+dnl #
+AC_DEFUN([ZFS_AC_KERNEL_SRC_BLKDEV_BDEVNAME], [
+	ZFS_LINUX_TEST_SRC([bdevname], [
+		#include <linux/fs.h>
+		#include <linux/blkdev.h>
+	], [
+		struct block_device *bdev __attribute__ ((unused)) = NULL;
+		char path[BDEVNAME_SIZE];
+
+		(void) bdevname(bdev, path);
+	])
+])
+
+AC_DEFUN([ZFS_AC_KERNEL_BLKDEV_BDEVNAME], [
+	AC_MSG_CHECKING([whether bdevname() exists])
+	ZFS_LINUX_TEST_RESULT([bdevname], [
+		AC_DEFINE(HAVE_BDEVNAME, 1, [bdevname() is available])
+		AC_MSG_RESULT(yes)
+	], [
+		AC_MSG_RESULT(no)
+	])
+])
+
+dnl #
+dnl # 5.19 API: blkdev_issue_secure_erase()
+dnl # 3.10 API: blkdev_issue_discard(..., BLKDEV_DISCARD_SECURE)
+dnl #
+AC_DEFUN([ZFS_AC_KERNEL_SRC_BLKDEV_ISSUE_SECURE_ERASE], [
+	ZFS_LINUX_TEST_SRC([blkdev_issue_secure_erase], [
+		#include <linux/blkdev.h>
+	],[
+		struct block_device *bdev = NULL;
+		sector_t sector = 0;
+		sector_t nr_sects = 0;
+		int error __attribute__ ((unused));
+
+		error = blkdev_issue_secure_erase(bdev,
+		    sector, nr_sects, GFP_KERNEL);
+	])
+
+	ZFS_LINUX_TEST_SRC([blkdev_issue_discard_flags], [
+		#include <linux/blkdev.h>
+	],[
+		struct block_device *bdev = NULL;
+		sector_t sector = 0;
+		sector_t nr_sects = 0;
+		unsigned long flags = 0;
+		int error __attribute__ ((unused));
+
+		error = blkdev_issue_discard(bdev,
+		    sector, nr_sects, GFP_KERNEL, flags);
+	])
+])
+
+AC_DEFUN([ZFS_AC_KERNEL_BLKDEV_ISSUE_SECURE_ERASE], [
+	AC_MSG_CHECKING([whether blkdev_issue_secure_erase() is available])
+	ZFS_LINUX_TEST_RESULT([blkdev_issue_secure_erase], [
+		AC_MSG_RESULT(yes)
+		AC_DEFINE(HAVE_BLKDEV_ISSUE_SECURE_ERASE, 1,
+		    [blkdev_issue_secure_erase() is available])
+	],[
+		AC_MSG_RESULT(no)
+
+		AC_MSG_CHECKING([whether blkdev_issue_discard() is available])
+		ZFS_LINUX_TEST_RESULT([blkdev_issue_discard_flags], [
+			AC_MSG_RESULT(yes)
+			AC_DEFINE(HAVE_BLKDEV_ISSUE_DISCARD, 1,
+			    [blkdev_issue_discard() is available])
+		],[
+			ZFS_LINUX_TEST_ERROR([blkdev_issue_discard()])
+		])
+	])
+])
+
+dnl #
 dnl # 5.13 API change
 dnl # blkdev_get_by_path() no longer handles ERESTARTSYS
 dnl #
@@ -315,9 +544,34 @@ AC_DEFUN([ZFS_AC_KERNEL_BLKDEV_GET_ERESTARTSYS], [
 	])
 ])
 
+dnl #
+dnl # 6.5.x API change
+dnl # BLK_STS_NEXUS replaced with BLK_STS_RESV_CONFLICT
+dnl #
+AC_DEFUN([ZFS_AC_KERNEL_SRC_BLKDEV_BLK_STS_RESV_CONFLICT], [
+	ZFS_LINUX_TEST_SRC([blk_sts_resv_conflict], [
+		#include <linux/blkdev.h>
+	],[
+		blk_status_t s __attribute__ ((unused)) = BLK_STS_RESV_CONFLICT;
+	])
+])
+
+AC_DEFUN([ZFS_AC_KERNEL_BLKDEV_BLK_STS_RESV_CONFLICT], [
+	AC_MSG_CHECKING([whether BLK_STS_RESV_CONFLICT is defined])
+		ZFS_LINUX_TEST_RESULT([blk_sts_resv_conflict], [
+			AC_DEFINE(HAVE_BLK_STS_RESV_CONFLICT, 1, [BLK_STS_RESV_CONFLICT is defined])
+			AC_MSG_RESULT(yes)
+		], [
+			AC_MSG_RESULT(no)
+		])
+	])
+])
+
 AC_DEFUN([ZFS_AC_KERNEL_SRC_BLKDEV], [
 	ZFS_AC_KERNEL_SRC_BLKDEV_GET_BY_PATH
+	ZFS_AC_KERNEL_SRC_BLKDEV_GET_BY_PATH_4ARG
 	ZFS_AC_KERNEL_SRC_BLKDEV_PUT
+	ZFS_AC_KERNEL_SRC_BLKDEV_PUT_HOLDER
 	ZFS_AC_KERNEL_SRC_BLKDEV_REREAD_PART
 	ZFS_AC_KERNEL_SRC_BLKDEV_INVALIDATE_BDEV
 	ZFS_AC_KERNEL_SRC_BLKDEV_LOOKUP_BDEV
@@ -326,6 +580,13 @@ AC_DEFUN([ZFS_AC_KERNEL_SRC_BLKDEV], [
 	ZFS_AC_KERNEL_SRC_BLKDEV_CHECK_DISK_CHANGE
 	ZFS_AC_KERNEL_SRC_BLKDEV_BDEV_CHECK_MEDIA_CHANGE
 	ZFS_AC_KERNEL_SRC_BLKDEV_BDEV_WHOLE
+	ZFS_AC_KERNEL_SRC_BLKDEV_BDEVNAME
+	ZFS_AC_KERNEL_SRC_BLKDEV_ISSUE_SECURE_ERASE
+	ZFS_AC_KERNEL_SRC_BLKDEV_BDEV_KOBJ
+	ZFS_AC_KERNEL_SRC_BLKDEV_PART_TO_DEV
+	ZFS_AC_KERNEL_SRC_BLKDEV_DISK_CHECK_MEDIA_CHANGE
+	ZFS_AC_KERNEL_SRC_BLKDEV_BLK_STS_RESV_CONFLICT
+	ZFS_AC_KERNEL_SRC_BLKDEV_BLK_MODE_T
 ])
 
 AC_DEFUN([ZFS_AC_KERNEL_BLKDEV], [
@@ -339,5 +600,12 @@ AC_DEFUN([ZFS_AC_KERNEL_BLKDEV], [
 	ZFS_AC_KERNEL_BLKDEV_CHECK_DISK_CHANGE
 	ZFS_AC_KERNEL_BLKDEV_BDEV_CHECK_MEDIA_CHANGE
 	ZFS_AC_KERNEL_BLKDEV_BDEV_WHOLE
+	ZFS_AC_KERNEL_BLKDEV_BDEVNAME
 	ZFS_AC_KERNEL_BLKDEV_GET_ERESTARTSYS
+	ZFS_AC_KERNEL_BLKDEV_ISSUE_SECURE_ERASE
+	ZFS_AC_KERNEL_BLKDEV_BDEV_KOBJ
+	ZFS_AC_KERNEL_BLKDEV_PART_TO_DEV
+	ZFS_AC_KERNEL_BLKDEV_DISK_CHECK_MEDIA_CHANGE
+	ZFS_AC_KERNEL_BLKDEV_BLK_STS_RESV_CONFLICT
+	ZFS_AC_KERNEL_BLKDEV_BLK_MODE_T
 ])

@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2009 Yahoo! Inc.
  * Copyright (c) 2011-2015 LSI Corp.
@@ -28,8 +28,6 @@
  * SUCH DAMAGE.
  *
  * Avago Technologies (LSI) MPT-Fusion Host Adapter FreeBSD
- *
- * $FreeBSD$
  */
 
 #ifndef _MPSVAR_H
@@ -53,7 +51,7 @@
 #define MPS_MSIX_MAX		16
 #define MPS_SGE64_SIZE		12
 #define MPS_SGE32_SIZE		8
-#define MPS_SGC_SIZE		8
+#define MPS_SGC_SIZE		12
 
 #define	 CAN_SLEEP			1
 #define  NO_SLEEP			0
@@ -199,7 +197,7 @@ typedef void mps_command_callback_t(struct mps_softc *, struct mps_command *cm);
 struct mps_chain {
 	TAILQ_ENTRY(mps_chain)		chain_link;
 	MPI2_SGE_IO_UNION		*chain;
-	uint32_t			chain_busaddr;
+	uint64_t			chain_busaddr;
 };
 
 /*

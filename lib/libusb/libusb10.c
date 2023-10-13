@@ -1,9 +1,8 @@
-/* $FreeBSD$ */
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2009 Sylvestre Gallon. All rights reserved.
- * Copyright (c) 2009 Hans Petter Selasky. All rights reserved.
+ * Copyright (c) 2009-2023 Hans Petter Selasky
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -34,6 +33,7 @@
 #include <errno.h>
 #include <poll.h>
 #include <pthread.h>
+#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -115,12 +115,16 @@ libusb_set_nonblocking(int f)
 	fcntl(f, F_SETFL, flags);
 }
 
-static void
-libusb10_wakeup_event_loop(libusb_context *ctx)
+void
+libusb_interrupt_event_handler(libusb_context *ctx)
 {
-	uint8_t dummy = 0;
+	uint8_t dummy;
 	int err;
 
+	if (ctx == NULL)
+		return;
+
+	dummy = 0;
 	err = write(ctx->ctrl_pipe[1], &dummy, sizeof(dummy));
 	if (err < (int)sizeof(dummy)) {
 		/* ignore error, if any */
@@ -131,10 +135,20 @@ libusb10_wakeup_event_loop(libusb_context *ctx)
 int
 libusb_init(libusb_context **context)
 {
+	return (libusb_init_context(context, NULL, 0));
+}
+
+int
+libusb_init_context(libusb_context **context,
+    const struct libusb_init_option option[], int num_options)
+{
 	struct libusb_context *ctx;
 	pthread_condattr_t attr;
 	char *debug, *ep;
 	int ret;
+
+	if (num_options < 0)
+		return (LIBUSB_ERROR_INVALID_PARAM);
 
 	ctx = malloc(sizeof(*ctx));
 	if (!ctx)
@@ -145,8 +159,9 @@ libusb_init(libusb_context **context)
 	debug = getenv("LIBUSB_DEBUG");
 	if (debug != NULL) {
 		/*
-		 * If LIBUSB_DEBUG is set, we'll honor that and use it to
-		 * override libusb_set_debug calls.
+		 * If LIBUSB_DEBUG is set, we'll honor that first and
+		 * use it to override any future libusb_set_debug()
+		 * calls or init options.
 		 */
 		errno = 0;
 		ctx->debug = strtol(debug, &ep, 10);
@@ -161,7 +176,24 @@ libusb_init(libusb_context **context)
 			 */
 			ctx->debug = 0;
 		}
+	} else {
+		/*
+		 * If the LIBUSB_OPTION_LOG_LEVEL is set, honor that.
+		 */
+		for (int i = 0; i != num_options; i++) {
+			if (option[i].option != LIBUSB_OPTION_LOG_LEVEL)
+				continue;
+
+			ctx->debug = (int)option[i].value.ival;
+			if ((int64_t)ctx->debug == option[i].value.ival) {
+				ctx->debug_fixed = 1;
+			} else {
+				free(ctx);
+				return (LIBUSB_ERROR_INVALID_PARAM);
+			}
+		}
 	}
+
 	TAILQ_INIT(&ctx->pollfds);
 	TAILQ_INIT(&ctx->tr_done);
 	TAILQ_INIT(&ctx->hotplug_cbh);
@@ -225,6 +257,8 @@ libusb_init(libusb_context **context)
 		*context = ctx;
 
 	DPRINTF(ctx, LIBUSB_DEBUG_FUNCTION, "libusb_init complete");
+
+	signal(SIGPIPE, SIG_IGN);
 
 	return (0);
 }
@@ -542,7 +576,7 @@ libusb_open(libusb_device *dev, libusb_device_handle **devh)
 	    POLLOUT | POLLRDNORM | POLLWRNORM);
 
 	/* make sure our event loop detects the new device */
-	libusb10_wakeup_event_loop(ctx);
+	libusb_interrupt_event_handler(ctx);
 
 	*devh = pdev;
 
@@ -611,7 +645,7 @@ libusb_close(struct libusb20_device *pdev)
 	libusb_unref_device(dev);
 
 	/* make sure our event loop detects the closed device */
-	libusb10_wakeup_event_loop(ctx);
+	libusb_interrupt_event_handler(ctx);
 }
 
 libusb_device *
@@ -1440,7 +1474,7 @@ found:
 failure:
 	libusb10_complete_transfer(pxfer0, sxfer, LIBUSB_TRANSFER_ERROR);
 	/* make sure our event loop spins the done handler */
-	libusb10_wakeup_event_loop(dev->ctx);
+	libusb_interrupt_event_handler(dev->ctx);
 }
 
 /* The following function must be called unlocked */
@@ -1552,7 +1586,7 @@ libusb_cancel_transfer(struct libusb_transfer *uxfer)
 		libusb10_complete_transfer(NULL,
 		    sxfer, LIBUSB_TRANSFER_CANCELLED);
 		/* make sure our event loop spins the done handler */
-		libusb10_wakeup_event_loop(dev->ctx);
+		libusb_interrupt_event_handler(dev->ctx);
 	} else if (pxfer0 == NULL || pxfer1 == NULL) {
 		/* not started */
 		retval = LIBUSB_ERROR_NOT_FOUND;
@@ -1563,7 +1597,7 @@ libusb_cancel_transfer(struct libusb_transfer *uxfer)
 			/* clear transfer pointer */
 			libusb20_tr_set_priv_sc1(pxfer0, NULL);
 			/* make sure our event loop spins the done handler */
-			libusb10_wakeup_event_loop(dev->ctx);
+			libusb_interrupt_event_handler(dev->ctx);
 		} else {
 			libusb20_tr_stop(pxfer0);
 			/* make sure the queue doesn't stall */
@@ -1577,7 +1611,7 @@ libusb_cancel_transfer(struct libusb_transfer *uxfer)
 			/* clear transfer pointer */
 			libusb20_tr_set_priv_sc1(pxfer1, NULL);
 			/* make sure our event loop spins the done handler */
-			libusb10_wakeup_event_loop(dev->ctx);
+			libusb_interrupt_event_handler(dev->ctx);
 		} else {
 			libusb20_tr_stop(pxfer1);
 			/* make sure the queue doesn't stall */

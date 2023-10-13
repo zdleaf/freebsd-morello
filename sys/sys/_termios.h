@@ -29,7 +29,6 @@
  * SUCH DAMAGE.
  *
  *	@(#)termios.h	8.3 (Berkeley) 3/28/94
- * $FreeBSD$
  */
 
 #ifndef _SYS__TERMIOS_H_
@@ -98,6 +97,7 @@
 #endif
 #if __BSD_VISIBLE
 #define	IMAXBEL		0x00002000	/* ring bell on input queue full */
+#define IUTF8		0x00004000	/* assume input is utf-8 encoded */
 #endif
 
 /*

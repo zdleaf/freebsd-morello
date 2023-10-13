@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2005-2009 Ariff Abdullah <ariff@FreeBSD.org>
  * Portions Copyright (c) Ryan Beasley <ryan.beasley@gmail.com> - GSoC 2006
@@ -42,8 +42,6 @@
 #include <vm/vm_object.h>
 #include <vm/vm_page.h>
 #include <vm/vm_pager.h>
-
-SND_DECLARE_FILE("$FreeBSD$");
 
 static int dsp_mmap_allow_prot_exec = 0;
 SYSCTL_INT(_hw_snd, OID_AUTO, compat_linux_mmap, CTLFLAG_RWTUN,
@@ -2291,7 +2289,7 @@ dsp_mmap_single(struct cdev *i_dev, vm_ooffset_t *offset,
 
 	c = ((nprot & PROT_WRITE) != 0) ? wrch : rdch;
 	if (c == NULL || (c->flags & CHN_F_MMAP_INVALID) ||
-	    (*offset  + size) > sndbuf_getsize(c->bufsoft) ||
+	    (*offset  + size) > sndbuf_getallocsize(c->bufsoft) ||
 	    (wrch != NULL && (wrch->flags & CHN_F_MMAP_INVALID)) ||
 	    (rdch != NULL && (rdch->flags & CHN_F_MMAP_INVALID))) {
 		relchns(i_dev, rdch, wrch, SD_F_PRIO_RD | SD_F_PRIO_WR);

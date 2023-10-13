@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2008 Alexander Motin <mav@FreeBSD.org>
  * Copyright (c) 2017 Marius Strobl <marius@FreeBSD.org>
@@ -27,8 +27,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/bus.h>
@@ -132,7 +130,7 @@ static int sdhci_cam_update_ios(struct sdhci_slot *slot);
 #endif
 
 /* helper routines */
-static int sdhci_dma_alloc(struct sdhci_slot *slot, uint32_t caps);
+static int sdhci_dma_alloc(struct sdhci_slot *slot);
 static void sdhci_dma_free(struct sdhci_slot *slot);
 static void sdhci_dumpcaps(struct sdhci_slot *slot);
 static void sdhci_dumpcaps_buf(struct sdhci_slot *slot, struct sbuf *s);
@@ -419,6 +417,7 @@ sdhci_set_clock(struct sdhci_slot *slot, uint32_t clock)
 
 	if (clock == slot->clock)
 		return;
+	clock = SDHCI_SET_CLOCK(slot->bus, slot, clock);
 	slot->clock = clock;
 
 	/* Turn off the clock. */
@@ -683,7 +682,9 @@ static void
 sdhci_card_task(void *arg, int pending __unused)
 {
 	struct sdhci_slot *slot = arg;
+#ifndef MMCCAM
 	device_t d;
+#endif
 
 	SDHCI_LOCK(slot);
 	if (SDHCI_GET_CARD_PRESENT(slot->bus, slot)) {
@@ -714,11 +715,11 @@ sdhci_card_task(void *arg, int pending __unused)
 		if (slot->card_present == 1) {
 #else
 		if (slot->dev != NULL) {
+			d = slot->dev;
 #endif
 			/* If no card present - detach mmc bus. */
 			if (bootverbose || sdhci_debug)
 				slot_printf(slot, "Card removed\n");
-			d = slot->dev;
 			slot->dev = NULL;
 #ifdef MMCCAM
 			slot->card_present = 0;
@@ -788,7 +789,7 @@ sdhci_card_poll(void *arg)
 }
 
 static int
-sdhci_dma_alloc(struct sdhci_slot *slot, uint32_t caps)
+sdhci_dma_alloc(struct sdhci_slot *slot)
 {
 	int err;
 
@@ -821,8 +822,7 @@ sdhci_dma_alloc(struct sdhci_slot *slot, uint32_t caps)
 	 * be aligned to the SDMA boundary.
 	 */
 	err = bus_dma_tag_create(bus_get_dma_tag(slot->bus), slot->sdma_bbufsz,
-	    0, (caps & SDHCI_CAN_DO_64BIT) ? BUS_SPACE_MAXADDR :
-	    BUS_SPACE_MAXADDR_32BIT, BUS_SPACE_MAXADDR, NULL, NULL,
+	    0, BUS_SPACE_MAXADDR_32BIT, BUS_SPACE_MAXADDR, NULL, NULL,
 	    slot->sdma_bbufsz, 1, slot->sdma_bbufsz, BUS_DMA_ALLOCNOW,
 	    NULL, NULL, &slot->dmatag);
 	if (err != 0) {
@@ -1107,7 +1107,7 @@ no_tuning:
 		slot->opt &= ~SDHCI_HAVE_DMA;
 
 	if (slot->opt & SDHCI_HAVE_DMA) {
-		err = sdhci_dma_alloc(slot, caps);
+		err = sdhci_dma_alloc(slot);
 		if (err != 0) {
 			if (slot->opt & SDHCI_TUNING_SUPPORTED) {
 				free(slot->tune_req, M_DEVBUF);
@@ -1490,10 +1490,12 @@ sdhci_generic_tune(device_t brdev __unused, device_t reqdev, bool hs400)
 	case bus_timing_uhs_sdr50:
 		if (slot->opt & SDHCI_SDR50_NEEDS_TUNING)
 			break;
-		/* FALLTHROUGH */
-	default:
 		SDHCI_UNLOCK(slot);
 		return (0);
+	default:
+		slot_printf(slot, "Tuning requested but not required.\n");
+		SDHCI_UNLOCK(slot);
+		return (EINVAL);
 	}
 
 	tune_cmd = slot->tune_cmd;

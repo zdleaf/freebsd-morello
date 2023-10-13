@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2004-2005 Nate Lawson (SDG)
  * All rights reserved.
@@ -27,8 +27,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/bus.h>
 #include <sys/cpu.h>
@@ -117,11 +115,12 @@ static device_method_t ichss_methods[] = {
 	DEVMETHOD(cpufreq_drv_settings,	ichss_settings),
 	DEVMETHOD_END
 };
+
 static driver_t ichss_driver = {
 	"ichss", ichss_methods, sizeof(struct ichss_softc)
 };
-static devclass_t ichss_devclass;
-DRIVER_MODULE(ichss, cpu, ichss_driver, ichss_devclass, 0, 0);
+
+DRIVER_MODULE(ichss, cpu, ichss_driver, 0, 0);
 
 static device_t ich_device;
 

@@ -1,4 +1,3 @@
-/* $FreeBSD$ */
 /*	$OpenBSD: umoscom.c,v 1.2 2006/10/26 06:02:43 jsg Exp $	*/
 
 /*
@@ -270,8 +269,6 @@ static device_method_t umoscom_methods[] = {
 	DEVMETHOD_END
 };
 
-static devclass_t umoscom_devclass;
-
 static driver_t umoscom_driver = {
 	.name = "umoscom",
 	.methods = umoscom_methods,
@@ -282,7 +279,7 @@ static const STRUCT_USB_HOST_ID umoscom_devs[] = {
 	{USB_VPI(USB_VENDOR_MOSCHIP, USB_PRODUCT_MOSCHIP_MCS7703, 0)}
 };
 
-DRIVER_MODULE(umoscom, uhub, umoscom_driver, umoscom_devclass, NULL, 0);
+DRIVER_MODULE(umoscom, uhub, umoscom_driver, NULL, NULL);
 MODULE_DEPEND(umoscom, ucom, 1, 1, 1);
 MODULE_DEPEND(umoscom, usb, 1, 1, 1);
 MODULE_VERSION(umoscom, 1);

@@ -65,8 +65,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include "opt_vm.h"
 
 #include <sys/param.h>
@@ -77,8 +75,10 @@ __FBSDID("$FreeBSD$");
 #include <sys/kernel.h>
 #include <sys/lock.h>
 #include <sys/malloc.h>
+#include <sys/msan.h>
 #include <sys/proc.h>
 #include <sys/rwlock.h>
+#include <sys/smp.h>
 #include <sys/sysctl.h>
 #include <sys/vmem.h>
 #include <sys/vmmeter.h>
@@ -147,9 +147,11 @@ kva_alloc(vm_size_t size)
 {
 	vm_offset_t addr;
 
+	TSENTER();
 	size = round_page(size);
 	if (vmem_alloc(kernel_arena, size, M_BESTFIT | M_NOWAIT, &addr))
 		return (0);
+	TSEXIT();
 
 	return (addr);
 }
@@ -169,6 +171,23 @@ kva_free(vm_offset_t addr, vm_size_t size)
 
 	size = round_page(size);
 	vmem_free(kernel_arena, addr, size);
+}
+
+/*
+ * Update sanitizer shadow state to reflect a new allocation.  Force inlining to
+ * help make KMSAN origin tracking more precise.
+ */
+static __always_inline void
+kmem_alloc_san(vm_offset_t addr, vm_size_t size, vm_size_t asize, int flags)
+{
+	if ((flags & M_ZERO) == 0) {
+		kmsan_mark((void *)addr, asize, KMSAN_STATE_UNINIT);
+		kmsan_orig((void *)addr, asize, KMSAN_TYPE_KMEM,
+		    KMSAN_RET_ADDR);
+	} else {
+		kmsan_mark((void *)addr, asize, KMSAN_STATE_INITED);
+	}
+	kasan_mark((void *)addr, size, asize, KASAN_KMEM_REDZONE);
 }
 
 static vm_page_t
@@ -209,7 +228,7 @@ kmem_alloc_contig_pages(vm_object_t object, vm_pindex_t pindex, int domain,
  *	necessarily physically contiguous.  If M_ZERO is specified through the
  *	given flags, then the pages are zeroed before they are mapped.
  */
-static vm_offset_t
+static void *
 kmem_alloc_attr_domain(int domain, vm_size_t size, int flags, vm_paddr_t low,
     vm_paddr_t high, vm_memattr_t memattr)
 {
@@ -249,11 +268,11 @@ kmem_alloc_attr_domain(int domain, vm_size_t size, int flags, vm_paddr_t low,
 		    prot | PMAP_ENTER_WIRED, 0);
 	}
 	VM_OBJECT_WUNLOCK(object);
-	kasan_mark((void *)addr, size, asize, KASAN_KMEM_REDZONE);
-	return (addr);
+	kmem_alloc_san(addr, size, asize, flags);
+	return ((void *)addr);
 }
 
-vm_offset_t
+void *
 kmem_alloc_attr(vm_size_t size, int flags, vm_paddr_t low, vm_paddr_t high,
     vm_memattr_t memattr)
 {
@@ -262,19 +281,19 @@ kmem_alloc_attr(vm_size_t size, int flags, vm_paddr_t low, vm_paddr_t high,
 	    high, memattr));
 }
 
-vm_offset_t
+void *
 kmem_alloc_attr_domainset(struct domainset *ds, vm_size_t size, int flags,
     vm_paddr_t low, vm_paddr_t high, vm_memattr_t memattr)
 {
 	struct vm_domainset_iter di;
-	vm_offset_t addr;
+	void *addr;
 	int domain;
 
 	vm_domainset_iter_policy_init(&di, ds, &domain, &flags);
 	do {
 		addr = kmem_alloc_attr_domain(domain, size, flags, low, high,
 		    memattr);
-		if (addr != 0)
+		if (addr != NULL)
 			break;
 	} while (vm_domainset_iter_policy(&di, &domain) == 0);
 
@@ -289,7 +308,7 @@ kmem_alloc_attr_domainset(struct domainset *ds, vm_size_t size, int flags,
  *	through the given flags, then the pages are zeroed before they are
  *	mapped.
  */
-static vm_offset_t
+static void *
 kmem_alloc_contig_domain(int domain, vm_size_t size, int flags, vm_paddr_t low,
     vm_paddr_t high, u_long alignment, vm_paddr_t boundary,
     vm_memattr_t memattr)
@@ -306,7 +325,7 @@ kmem_alloc_contig_domain(int domain, vm_size_t size, int flags, vm_paddr_t low,
 	asize = round_page(size);
 	vmem = vm_dom[domain].vmd_kernel_arena;
 	if (vmem_alloc(vmem, asize, flags | M_BESTFIT, &addr))
-		return (0);
+		return (NULL);
 	offset = addr - VM_MIN_KERNEL_ADDRESS;
 	pflags = malloc2vm_flags(flags) | VM_ALLOC_WIRED;
 	npages = atop(asize);
@@ -316,7 +335,7 @@ kmem_alloc_contig_domain(int domain, vm_size_t size, int flags, vm_paddr_t low,
 	if (m == NULL) {
 		VM_OBJECT_WUNLOCK(object);
 		vmem_free(vmem, addr, asize);
-		return (0);
+		return (NULL);
 	}
 	KASSERT(vm_page_domain(m) == domain,
 	    ("kmem_alloc_contig_domain: Domain mismatch %d != %d",
@@ -332,11 +351,11 @@ kmem_alloc_contig_domain(int domain, vm_size_t size, int flags, vm_paddr_t low,
 		tmp += PAGE_SIZE;
 	}
 	VM_OBJECT_WUNLOCK(object);
-	kasan_mark((void *)addr, size, asize, KASAN_KMEM_REDZONE);
-	return (addr);
+	kmem_alloc_san(addr, size, asize, flags);
+	return ((void *)addr);
 }
 
-vm_offset_t
+void *
 kmem_alloc_contig(vm_size_t size, int flags, vm_paddr_t low, vm_paddr_t high,
     u_long alignment, vm_paddr_t boundary, vm_memattr_t memattr)
 {
@@ -345,20 +364,20 @@ kmem_alloc_contig(vm_size_t size, int flags, vm_paddr_t low, vm_paddr_t high,
 	    high, alignment, boundary, memattr));
 }
 
-vm_offset_t
+void *
 kmem_alloc_contig_domainset(struct domainset *ds, vm_size_t size, int flags,
     vm_paddr_t low, vm_paddr_t high, u_long alignment, vm_paddr_t boundary,
     vm_memattr_t memattr)
 {
 	struct vm_domainset_iter di;
-	vm_offset_t addr;
+	void *addr;
 	int domain;
 
 	vm_domainset_iter_policy_init(&di, ds, &domain, &flags);
 	do {
 		addr = kmem_alloc_contig_domain(domain, size, flags, low, high,
 		    alignment, boundary, memattr);
-		if (addr != 0)
+		if (addr != NULL)
 			break;
 	} while (vm_domainset_iter_policy(&di, &domain) == 0);
 
@@ -403,7 +422,7 @@ kmem_subinit(vm_map_t map, vm_map_t parent, vm_offset_t *min, vm_offset_t *max,
  *
  *	Allocate wired-down pages in the kernel's address space.
  */
-static vm_offset_t
+static void *
 kmem_malloc_domain(int domain, vm_size_t size, int flags)
 {
 	vmem_t *arena;
@@ -425,27 +444,31 @@ kmem_malloc_domain(int domain, vm_size_t size, int flags)
 		return (0);
 	}
 	kasan_mark((void *)addr, size, asize, KASAN_KMEM_REDZONE);
-	return (addr);
+	return ((void *)addr);
 }
 
-vm_offset_t
+void *
 kmem_malloc(vm_size_t size, int flags)
 {
+	void * p;
 
-	return (kmem_malloc_domainset(DOMAINSET_RR(), size, flags));
+	TSENTER();
+	p = kmem_malloc_domainset(DOMAINSET_RR(), size, flags);
+	TSEXIT();
+	return (p);
 }
 
-vm_offset_t
+void *
 kmem_malloc_domainset(struct domainset *ds, vm_size_t size, int flags)
 {
 	struct vm_domainset_iter di;
-	vm_offset_t addr;
+	void *addr;
 	int domain;
 
 	vm_domainset_iter_policy_init(&di, ds, &domain, &flags);
 	do {
 		addr = kmem_malloc_domain(domain, size, flags);
-		if (addr != 0)
+		if (addr != NULL)
 			break;
 	} while (vm_domainset_iter_policy(&di, &domain) == 0);
 
@@ -511,7 +534,7 @@ retry:
 			m->oflags |= VPO_KMEM_EXEC;
 	}
 	VM_OBJECT_WUNLOCK(object);
-
+	kmem_alloc_san(addr, size, size, flags);
 	return (KERN_SUCCESS);
 }
 
@@ -611,15 +634,15 @@ kmem_unback(vm_object_t object, vm_offset_t addr, vm_size_t size)
  *	original allocation.
  */
 void
-kmem_free(vm_offset_t addr, vm_size_t size)
+kmem_free(void *addr, vm_size_t size)
 {
 	struct vmem *arena;
 
 	size = round_page(size);
-	kasan_mark((void *)addr, size, size, 0);
-	arena = _kmem_unback(kernel_object, addr, size);
+	kasan_mark(addr, size, size, 0);
+	arena = _kmem_unback(kernel_object, (uintptr_t)addr, size);
 	if (arena != NULL)
-		vmem_free(arena, addr, size);
+		vmem_free(arena, (uintptr_t)addr, size);
 }
 
 /*
@@ -711,17 +734,21 @@ kva_import(void *unused, vmem_size_t size, int flags, vmem_addr_t *addrp)
 	vm_offset_t addr;
 	int result;
 
+	TSENTER();
 	KASSERT((size % KVA_QUANTUM) == 0,
 	    ("kva_import: Size %jd is not a multiple of %d",
 	    (intmax_t)size, (int)KVA_QUANTUM));
 	addr = vm_map_min(kernel_map);
 	result = vm_map_find(kernel_map, NULL, 0, &addr, size, 0,
 	    VMFS_SUPER_SPACE, VM_PROT_ALL, VM_PROT_ALL, MAP_NOFAULT);
-	if (result != KERN_SUCCESS)
+	if (result != KERN_SUCCESS) {
+		TSEXIT();
                 return (ENOMEM);
+	}
 
 	*addrp = addr;
 
+	TSEXIT();
 	return (0);
 }
 
@@ -880,6 +907,31 @@ kmem_bootstrap_free(vm_offset_t start, vm_size_t size)
 	(void)vmem_add(kernel_arena, start, end - start, M_WAITOK);
 #endif
 }
+
+#ifdef PMAP_WANT_ACTIVE_CPUS_NAIVE
+void
+pmap_active_cpus(pmap_t pmap, cpuset_t *res)
+{
+	struct thread *td;
+	struct proc *p;
+	struct vmspace *vm;
+	int c;
+
+	CPU_ZERO(res);
+	CPU_FOREACH(c) {
+		td = cpuid_to_pcpu[c]->pc_curthread;
+		p = td->td_proc;
+		if (p == NULL)
+			continue;
+		vm = vmspace_acquire_ref(p);
+		if (vm == NULL)
+			continue;
+		if (pmap == vmspace_pmap(vm))
+			CPU_SET(c, res);
+		vmspace_free(vm);
+	}
+}
+#endif
 
 /*
  * Allow userspace to directly trigger the VM drain routine for testing

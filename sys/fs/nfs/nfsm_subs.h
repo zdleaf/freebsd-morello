@@ -30,8 +30,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 #ifndef _NFS_NFSM_SUBS_H_
@@ -43,7 +41,6 @@
  * other purpose will be dangerous. (they make weird assumptions)
  */
 
-#ifndef APPLE
 /*
  * First define what the actual subs. return
  */
@@ -142,7 +139,6 @@ nfsm_dissect_nonblock(struct nfsrv_descript *nd, int siz)
 			goto nfsmout; 					\
 		}							\
 	} while (0)
-#endif	/* !APPLE */
 
 #define	NFSM_STRSIZ(s, m)  						\
 	do {								\

@@ -23,8 +23,6 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD$
- *
  */
 
 /*
@@ -40,8 +38,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/bitset.h>
@@ -155,9 +151,7 @@ static driver_t vnicpf_driver = {
 	sizeof(struct nicpf),
 };
 
-static devclass_t vnicpf_devclass;
-
-DRIVER_MODULE(vnicpf, pci, vnicpf_driver, vnicpf_devclass, 0, 0);
+DRIVER_MODULE(vnicpf, pci, vnicpf_driver, 0, 0);
 MODULE_VERSION(vnicpf, 1);
 MODULE_DEPEND(vnicpf, pci, 1, 1, 1);
 MODULE_DEPEND(vnicpf, ether, 1, 1, 1);

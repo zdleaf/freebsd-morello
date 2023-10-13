@@ -35,8 +35,6 @@ static char sccsid[] = "@(#)send.c	8.1 (Berkeley) 6/6/93";
 #endif
 #endif /* not lint */
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include "rcv.h"
 #include "extern.h"
 
@@ -268,7 +266,7 @@ mail(struct name *to, struct name *cc, struct name *bcc, struct name *smopts,
  * the mail routine below.
  */
 int
-sendmail(char *str)
+sendmail(void *str)
 {
 	struct header head;
 

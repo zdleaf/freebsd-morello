@@ -1,10 +1,9 @@
 #	@(#)Makefile	8.1 (Berkeley) 6/6/93
-# $FreeBSD$
 
 .include <src.opts.mk>
 
 PROG=	systat
-SRCS=	cmds.c cmdtab.c devs.c fetch.c iostat.c keyboard.c main.c sysput.c \
+SRCS=	cmds.c cmdtab.c devs.c fetch.c iolat.c iostat.c keyboard.c main.c sysput.c \
 	netcmds.c netstat.c pigs.c proc.c swap.c icmp.c \
 	mode.c ip.c sctp.c tcp.c zarc.c \
 	vmstat.c convtbl.c ifcmds.c ifstat.c

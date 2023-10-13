@@ -28,8 +28,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/lock.h>
@@ -68,8 +66,8 @@ stack_save_td(struct stack *st, struct thread *td)
 	if (TD_IS_RUNNING(td))
 		return (EOPNOTSUPP);
 
-	frame.fp = td->td_pcb->pcb_x[29];
-	frame.pc = ADDR_MAKE_CANONICAL(td->td_pcb->pcb_lr);
+	frame.fp = td->td_pcb->pcb_x[PCB_FP];
+	frame.pc = ADDR_MAKE_CANONICAL(td->td_pcb->pcb_x[PCB_LR]);
 
 	stack_capture(td, st, &frame);
 	return (0);

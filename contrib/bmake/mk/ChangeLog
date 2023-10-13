@@ -1,3 +1,340 @@
+2023-09-09  Simon J Gerraty  <sjg@beast.crufty.net>
+
+	* jobs.mk (JOB_MAX): use -jC if we can
+	we actually use JOB_MAX_C which defaults to 1.33C
+
+2023-08-18  Simon J Gerraty  <sjg@beast.crufty.net>
+
+	* now_utc: %s only works with :localtime
+
+2023-07-14  Simon J Gerraty  <sjg@beast.crufty.net>
+
+	* install-sh: ignore -c as claimed and only insist on
+	a directory for destination when more than one file to copy.
+
+	* sys.mk: when looking for SYS_OS_MK try ${.MAKE.OS} and
+	${.MAKE.OS:S,64,,} early (so we find sys/IRIX.mk for IRIX64)
+
+2023-07-13  Simon J Gerraty  <sjg@beast.crufty.net>
+
+	* install-mk (MK_VERSION): 20230711
+
+	* sys.mk: set SYS_MK and INSTALL_SH for systems with incompatible
+	install(1)
+
+	* sys/IRIX.mk:  when setting ROOT_GROUP only match the first :0:
+	set INSTALL to install-sh rather than pathname that may not exist
+	(yet).
+
+2023-07-07  Simon J Gerraty  <sjg@beast.crufty.net>
+
+	* dirdeps.mk: pass DIRDEP_TARGETS to DIRDEP_MAKE
+	normally this is empty - for the default target, but there are
+	use-cases where we might set it to something else.
+
+2023-07-04  Simon J Gerraty  <sjg@beast.crufty.net>
+
+	* install-mk (MK_VERSION): 20230704
+
+	* dirdeps.mk: apply DEBUG_DIRDEPS_LIST_FILTER to lists we output
+	when DEBUG_DIRDEPS is in effect.
+	Eg. DEBUG_DIRDEPS_LIST_FILTER=ts\n
+	can greatly improve readability.
+
+2023-05-25  Simon J Gerraty  <sjg@beast.crufty.net>
+
+	* meta.autodep.mk (beforegendirdeps): allow tasks to be done
+	at END but before gendirdeps
+
+2023-05-22  Simon J Gerraty  <sjg@beast.crufty.net>
+
+	* install-mk (MK_VERSION): 20230522
+
+	* host-target.mk: deal with garbage from uname -m on
+	Darwin ppc, also NetBSD appears to use x86_64 for MACHINE_ARCH
+	these days so just leave it be.
+	For Darwin arm and i386 use _HOST_MACHINE for _HOST_ARCH so we get
+	arm64 and x86_64 in HOST_TARGET.
+
+2023-05-15  Simon J Gerraty  <sjg@beast.crufty.net>
+
+	* sys.vars.mk: M_mtime use :mtime or 'stat -f %m' for older
+	versions of bmake.
+
+	* dirdeps.mk (TARGET_SPEC_VARS.host):
+	While *most* projects need only DEP_MACHINE for host,
+	there is always an exception.  So we allow for
+	TARGET_SPEC_VARS.host to be a subset of TARGET_SPEC_VARS.
+	The default will *just work* for most projects.
+	We set DEP_TARGET_SPEC_VARS and hence DEP_TARGET_SPEC
+	based on DEP_MACHINE.
+	Allow for M_dep_qual_fixes.host to be different too
+	and take care to apply the right set.
+
+2023-05-14  Simon J Gerraty  <sjg@beast.crufty.net>
+
+	* sys.dirdeps.mk: we *do* want to override OBJTOP
+	and if MAKEOBJDIR was not in env as we want it;
+	put it there - carefully.
+	Ensure OBJROOT ends in / or - (/ preferred)
+	Add more comments to explain what/why.
+
+2023-05-13  Simon J Gerraty  <sjg@beast.crufty.net>
+
+	* install-mk (MK_VERSION): 20230512
+
+	* dirdeps.mk: take care not to qualify "host" dirdeps
+
+	* sys.dirdeps.mk (OBJTOP): must use ?=
+
+2023-05-10  Simon J Gerraty  <sjg@beast.crufty.net>
+
+	* meta.autodep.mk: if LOCAL_DEPENDS_GUARD is "no"
+	suppress processing of .depend
+
+2023-05-09  Simon J Gerraty  <sjg@beast.crufty.net>
+
+	* dirdeps.mk: do not add _CURDIR to DIRDEPS for SRCTOP
+
+	* meta.sys.mk sys.dirdeps.mk:
+	originally DIRDEPS_BUILD and META_MODE were the same thing,
+	but META_MODE is useful by itself.
+	Move things from meta.sys.mk which actually pertain to
+	DIRDEPS_BUILD to sys.dirdeps.mk
+
+2023-05-04  Simon J Gerraty  <sjg@beast.crufty.net>
+
+	* install-mk (MK_VERSION): 20230504 May the Forth be with you
+
+	* dirdeps.mk: as with meta.sys.mk we treat "host" as special.
+	DEP_TARGET_SPEC is just ${DEP_MACHINE}
+
+	* meta.sys.mk: ensure DEP_* for TARGET_SPEC_VARS are set at
+	level > 0 since these are often refered to in Makefile.depend*
+
+2023-04-26  Simon J Gerraty  <sjg@beast.crufty.net>
+
+	* jobs.mk: report ${.TARGET} ${JOB_ARGS} ${JOB_LOG} and
+	anything in ${JOB_LOG_START}
+
+	* jobs.mk: look for newlog.sh in ${.SYSPATH:U${.PARSEDIR}}
+	or a scripts subdir before searching $PATH.
+
+	* FILES: include newlog.sh for jobs.mk
+
+2023-04-20  Simon J Gerraty  <sjg@beast.crufty.net>
+
+	* install-mk (MK_VERSION): 20230420
+
+	* lib.mk: include LDFLAGS and LDADD when linking shared libs
+
+	* gendirdeps.mk: document setting GENDIRDEPS_FILTER_VARS etc
+	via local.meta.sys.mk rather than local.gendirdeps.mk
+	so DEP_* variables can be set at level 1+ to avoid syntax errors
+	when used in conditionals in manually maintained Makefile.depend
+	files.
+
+	* dirdeps.mk: ensure M_dep_qual_fixes is applied to all _machines
+
+2023-04-18  Simon J Gerraty  <sjg@beast.crufty.net>
+
+	* dirdeps.mk: check we were not included by
+	Makefile.depend.options as the result is bad.
+
+2023-04-14  Simon J Gerraty  <sjg@beast.crufty.net>
+
+	* install-mk (MK_VERSION): 20230414
+
+	* meta.sys.mk: since we have :range we can put the logic for
+	processing TARGET_SPEC from env here.
+
+	* dirdeps.mk: reset DIRDEPS and DEP_RELDIR before including
+	local.dirdeps-missing.mk, also improve debug output.
+
+	* dirdeps.mk: to allow make -f dirdeps.mk include.$TARGET_SPEC
+	we need to use :M*[/.]* same as for when actually setting DIRDEPS
+	from the targets on command line.
+
+2023-04-12  Simon J Gerraty  <sjg@beast.crufty.net>
+
+	* Add jobs.mk
+
+2023-03-21  Simon J Gerraty  <sjg@beast.crufty.net>
+
+	* install-mk (MK_VERSION): 20230321
+
+	* meta.stage.mk: allow STAGE_SHLIB_LINKS_FILTER to filter
+	STAGE_LIBS for SHLIB_LINKS.
+
+	* autoconf.mk: add .WAIT after config.status
+
+2023-02-17  Simon J Gerraty  <sjg@beast.crufty.net>
+
+	* sys.vars.mk: add M_Index to report the index of a word in a list.
+
+2023-02-15  Simon J Gerraty  <sjg@beast.crufty.net>
+
+	* install-mk (MK_VERSION): 20230215
+
+	* warnings.mk: allow better control of -Werror
+	allow -Wno-error or similar to be added if
+	WARNINGS_SET < WERROR_SET
+	account for COMPILER_TYPE
+
+2023-01-29  Simon J Gerraty  <sjg@beast.crufty.net>
+
+	* autoconf.mk: hook config.status to beforebuild.
+
+	* whats.mk: what*.c is NOTMAIN
+
+2023-01-27  Simon J Gerraty  <sjg@beast.crufty.net>
+
+	* install-mk (MK_VERSION): 20230127
+	control umask so directories are created with suitable mode.
+
+2023-01-20  Simon J Gerraty  <sjg@beast.crufty.net>
+
+	* install-mk (MK_VERSION): 20230120
+
+	* sys.vars.mk: add M_On and M_Onr also cleanup to be more
+	consistent wrt testing MAKE_VERSION
+
+2023-01-12  Simon J Gerraty  <sjg@beast.crufty.net>
+
+	* install-mk (MK_VERSION): 20230112
+
+	* meta2deps.{py,sh}: assert if filemon data is truncated
+	we should see the '# Bye bye' record - assert if we do not.
+
+2022-09-09  Simon J Gerraty  <sjg@beast.crufty.net>
+
+	* install-mk (MK_VERSION): 20220909
+
+	* sys/Linux.mk set EGREP to grep -E to avoid deprecation warnings
+
+2022-09-06  Simon J Gerraty  <sjg@beast.crufty.net>
+
+	* dirdeps-options.mk: explain the need to use
+	${DEP_${TARGET_SPEC_VAR}:U${TARGET_SPEC_VAR}} when refering to
+	${TARGET_SPEC_VAR}
+
+2022-09-03  Simon J Gerraty  <sjg@beast.crufty.net>
+
+	* install-mk (MK_VERSION): 20220903
+	
+	* M_cmpv handle more than 3 dots and clear leading 0's
+
+2022-07-20  Simon J Gerraty  <sjg@beast.crufty.net>
+
+	* install-mk (MK_VERSION): 20220720
+
+	* prog.mk: handle PROG_CXX for more than just NetBSD
+
+2022-06-20  Simon J Gerraty  <sjg@beast.crufty.net>
+
+	* install-mk (MK_VERSION): 20220620
+
+	* yacc.mk: when we have *.y in SRCS used explicit rules and .ORDER
+	rather than just suffix rules
+
+2022-04-23  Simon J Gerraty  <sjg@beast.crufty.net>
+
+	* install-mk (MK_VERSION): 20220422
+
+	* gendirdeps.mk: If LOCAL_DEPENDS_GUARD is set to "no"
+	do not capture any local depends in Makefile.depend
+
+2022-03-25  Simon J Gerraty  <sjg@beast.crufty.net>
+
+	* install-mk (MK_VERSION): 20220323
+	* posix.mk: default rules for .POSIX:
+
+2022-03-17  Simon J Gerraty  <sjg@beast.crufty.net>
+
+	* sys/*.mk: remove l from ARFLAGS
+
+2022-03-14  Simon J Gerraty  <sjg@beast.crufty.net>
+
+	* install-mk (MK_VERSION): 20220314
+
+	* dirdeps-options.mk: allow options to be per RELDIR
+	try DIRDEPS_OPTIONS_QUALIFIER_LIST first prefixed
+	with ${DEP_RELDIR}.
+
+2022-02-14  Simon J Gerraty  <sjg@beast.crufty.net>
+
+	* install-mk (MK_VERSION): 20220214
+
+	* cc-wrap.mk: fix :@ modifier
+
+2022-02-06  Simon J Gerraty  <sjg@beast.crufty.net>
+
+	* install-mk (MK_VERSION): 20220206
+
+	* cc-wrap.mk: docuement how CCACHE etc might be set for
+	maximum flexibility
+
+2022-02-05  Simon J Gerraty  <sjg@beast.crufty.net>
+
+	* sys.vars.mk: use JOT_CMD (jot or seq) if available for M_JOT
+
+2022-02-04  Simon J Gerraty  <sjg@beast.crufty.net>
+
+	* install-mk (MK_VERSION): 20220204
+
+	* host-target.mk: use .MAKE.OS if available
+
+2022-02-02  Simon J Gerraty  <sjg@beast.crufty.net>
+
+	* install-mk (MK_VERSION): 20220202
+
+	* cc-wrap.mk: allow other entries in CC_WRAP_FILTER
+	We add our filter on extensions last, so prior filters
+	can apply to the whole value of .IMPSRC
+
+2022-02-01  Simon J Gerraty  <sjg@beast.crufty.net>
+
+	* cc-wrap.mk: take advantage of target local variables to
+	wrap compilers like CC CXX with wrappers like ccache distcc etc
+
+2022-01-28  Simon J Gerraty  <sjg@beast.crufty.net>
+
+	* meta2deps: we do not expect any trace data for setid apps
+
+2022-01-26  Simon J Gerraty  <sjg@beast.crufty.net>
+
+	* dirdeps.mk: ensure TARGET_SPEC and TARGET_SPEC_VARS are passed
+	to sub-make using DIRDEPS_CACHE
+
+2022-01-07  Simon J Gerraty  <sjg@beast.crufty.net>
+
+	* dirdeps.mk: use _cache_script to minimize the number of shells
+	forked when generating dirdeps.cache
+
+2022-01-02  Simon J Gerraty  <sjg@beast.crufty.net>
+
+	* install-mk (MK_VERSION): 20220101
+
+	* dirdeps.mk: initialize DEP_* and _debug_reldir earlier.
+	If initial DIRDEPS are from command line, create the target
+	_dirdeps_cmdline as an indication.
+
+2022-01-01  Simon J Gerraty  <sjg@beast.crufty.net>
+
+	* init.mk (_SKIP_BUILD): when doing DIRDEPS_BUILD
+	at top-level only some targets are allowed at level 0,
+	for leaf makefiles only the default (all) target is restricted
+
+2021-12-28  Simon J Gerraty  <sjg@beast.crufty.net>
+
+	* install-mk (MK_VERSION): 20211228
+	
+	* meta2deps.py: filemon on Linux is not as reliable as we might
+	like, we do not want to update DIRDEPS if filemon output is
+	incomplete.   Track pids that we 'E'xec and make sure we see an
+	e'X'it for each one.  Throw an error if we are missing any 'X'
+	records.
+
 2021-12-12  Simon J Gerraty  <sjg@beast.crufty.net>
 
 	* sys.mk: simplify; include meta.sys.mk if MK_META_MODE is yes.

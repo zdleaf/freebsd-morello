@@ -32,7 +32,7 @@
  *    must display the following acknowledgement:
  *    "This product includes cryptographic software written by
  *     Eric Young (eay@cryptsoft.com)"
- *    The word 'cryptographic' can be left out if the rouines from the library
+ *    The word 'cryptographic' can be left out if the routines from the library
  *    being used are not cryptographic related :-).
  * 4. If you include any Windows specific code (or a derivative thereof) from 
  *    the apps directory (application code) you must include an acknowledgement:
@@ -57,8 +57,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/types.h>
 
 #include <stdio.h>
@@ -129,8 +127,7 @@ char *SHA1_version="SHA1 part of SSLeay 0.9.0b 11-Oct-1998";
 #  define	M_nl2c		nl2c
 #endif
 
-void SHA1_Init(c)
-SHA_CTX *c;
+void SHA1_Init(SHA_CTX *c)
 	{
 	c->h0=INIT_DATA_h0;
 	c->h1=INIT_DATA_h1;
@@ -143,10 +140,7 @@ SHA_CTX *c;
 	}
 
 void
-SHA1_Update(c, in, len)
-	SHA_CTX *c;
-	const void *in;
-	size_t len;
+SHA1_Update(SHA_CTX *c, const void *in, size_t len)
 {
 	u_int32_t *p;
 	int ew,ec,sw,sc;
@@ -277,9 +271,7 @@ SHA1_Update(c, in, len)
 	p[sw]=l;
 	}
 
-void SHA1_Transform(c,b)
-SHA_CTX *c;
-unsigned char *b;
+void SHA1_Transform(SHA_CTX *c, unsigned char *b)
 	{
 	u_int32_t p[16];
 #if BYTE_ORDER != BIG_ENDIAN
@@ -317,10 +309,7 @@ unsigned char *b;
 #ifndef SHA1_ASM
 
 void 
-sha1_block(c, W, num)
-	SHA_CTX *c;
-	const u_int32_t *W;
-	int num;
+sha1_block(SHA_CTX *c, const u_int32_t *W, int num)
 {
 	u_int32_t A,B,C,D,E,T;
 	u_int32_t X[16];
@@ -437,9 +426,7 @@ sha1_block(c, W, num)
 	}
 #endif
 
-void SHA1_Final(md, c)
-unsigned char *md;
-SHA_CTX *c;
+void SHA1_Final(unsigned char *md, SHA_CTX *c)
 	{
 	int i,j;
 	u_int32_t l;

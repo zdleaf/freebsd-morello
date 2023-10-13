@@ -42,8 +42,6 @@ static const char copyright[] =
 #if 0
 static char sccsid[] = "@(#)showmount.c	8.3 (Berkeley) 3/29/95";
 #endif
-static const char rcsid[] =
-  "$FreeBSD$";
 #endif /* not lint */
 
 #include <sys/types.h>
@@ -97,7 +95,7 @@ static struct exportslist *exportslist;
 static int type = 0;
 
 void print_dump(struct mountlist *);
-static void usage(void);
+static void usage(void) __dead2;
 int xdr_mntdump(XDR *, struct mountlist **);
 int xdr_exportslist(XDR *, struct exportslist **);
 int tcp_callrpc(const char *host, int prognum, int versnum, int procnum,

@@ -17,7 +17,7 @@
  * This software is provided ``AS IS'' without any warranties of any kind.
  */
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2003-2005 McAfee, Inc.
  * Copyright (c) 2016-2017 Robert N. M. Watson
@@ -56,8 +56,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include "opt_sysvipc.h"
 
 #include <sys/param.h>
@@ -210,7 +208,7 @@ static struct syscall_helper_data msg32_syscalls[] = {
 #endif
 
 static int
-msginit()
+msginit(void)
 {
 	struct prison *pr;
 	void **rsv;
@@ -313,7 +311,7 @@ msginit()
 }
 
 static int
-msgunload()
+msgunload(void)
 {
 	struct msqid_kernel *msqkptr;
 	int msqid;

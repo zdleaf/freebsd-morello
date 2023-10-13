@@ -28,7 +28,8 @@
 
 [ `id -u ` -ne 0 ] && echo "Must be root!" && exit 1
 
-# Deadlock seen
+# "panic: general protection fault" seen:
+# https://people.freebsd.org/~pho/stress/log/log0398.txt
 
 . ../default.cfg
 
@@ -42,9 +43,8 @@ cd $here
 mount | grep $mntpoint | grep -q /dev/md && umount -f $mntpoint
 mdconfig -l | grep -q md$mdstart &&  mdconfig -d -u $mdstart
 mdconfig -a -t swap -s 1g -u $mdstart
-bsdlabel -w md$mdstart auto
-newfs -j md${mdstart}$part > /dev/null
-mount /dev/md${mdstart}$part $mntpoint
+newfs -j md$mdstart > /dev/null
+mount /dev/md$mdstart $mntpoint
 chmod 777 $mntpoint
 
 su $testuser -c "cd $mntpoint; /tmp/suj5" > /dev/null

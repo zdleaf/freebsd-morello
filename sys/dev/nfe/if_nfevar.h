@@ -14,8 +14,6 @@
  * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
  * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
- *
- * $FreeBSD$
  */
 
 struct nfe_tx_data {
@@ -104,7 +102,7 @@ struct nfe_hw_stats {
 };
 
 struct nfe_softc {
-	struct ifnet		*nfe_ifp;
+	if_t			nfe_ifp;
 	device_t		nfe_dev;
 	uint16_t		nfe_devid;
 	uint16_t		nfe_revid;

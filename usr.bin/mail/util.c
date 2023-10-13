@@ -35,8 +35,6 @@ static char sccsid[] = "@(#)aux.c	8.1 (Berkeley) 6/6/93";
 #endif
 #endif /* not lint */
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/time.h>
 
 #include <fcntl.h>
@@ -265,8 +263,9 @@ static struct sstack sstack[SSTACK_SIZE];
  * that they are no longer reading from a tty (in all probability).
  */
 int
-source(char **arglist)
+source(void *arg)
 {
+	char **arglist = arg;
 	FILE *fi;
 	char *cp;
 

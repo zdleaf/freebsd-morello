@@ -26,8 +26,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 #ifndef	_MACHINE_DB_MACHDEP_H_
@@ -44,7 +42,7 @@
 typedef vm_offset_t	db_addr_t;
 typedef long		db_expr_t;
 
-#define	PC_REGS()	((db_addr_t)kdb_thrctx->pcb_lr)
+#define	PC_REGS()	((db_addr_t)kdb_thrctx->pcb_x[PCB_LR])
 
 #define	BKPT_INST	(0xd4200000)
 #define	BKPT_SIZE	(4)
@@ -52,7 +50,7 @@ typedef long		db_expr_t;
 
 #define	BKPT_SKIP do {				\
 	kdb_frame->tf_elr += BKPT_SIZE;		\
-	kdb_thrctx->pcb_lr += BKPT_SIZE;	\
+	kdb_thrctx->pcb_x[PCB_LR] += BKPT_SIZE;	\
 } while (0)
 
 #define	db_clear_single_step	kdb_cpu_clear_singlestep

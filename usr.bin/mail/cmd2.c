@@ -35,8 +35,6 @@ static char sccsid[] = "@(#)cmd2.c	8.1 (Berkeley) 6/6/93";
 #endif
 #endif /* not lint */
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include "rcv.h"
 #include <sys/wait.h>
 #include "extern.h"
@@ -360,7 +358,7 @@ undeletecmd(void *v)
  * Interactively dump core on "core"
  */
 int
-core(void)
+core(void *arg __unused)
 {
 	int pid;
 
@@ -386,8 +384,9 @@ core(void)
  * Clobber as many bytes of stack as the user requests.
  */
 int
-clobber(char **argv)
+clobber(void *arg)
 {
+	char **argv = arg;
 	int times;
 
 	if (argv[0] == 0)

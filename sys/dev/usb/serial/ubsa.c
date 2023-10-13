@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD AND BSD-2-Clause-NetBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2002, Alexander Kabaev <kan.FreeBSD.org>.
  * All rights reserved.
@@ -27,7 +27,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
 /*-
  * Copyright (c) 2001 The NetBSD Foundation, Inc.
  * All rights reserved.
@@ -263,15 +262,13 @@ static device_method_t ubsa_methods[] = {
 	DEVMETHOD_END
 };
 
-static devclass_t ubsa_devclass;
-
 static driver_t ubsa_driver = {
 	.name = "ubsa",
 	.methods = ubsa_methods,
 	.size = sizeof(struct ubsa_softc),
 };
 
-DRIVER_MODULE(ubsa, uhub, ubsa_driver, ubsa_devclass, NULL, 0);
+DRIVER_MODULE(ubsa, uhub, ubsa_driver, NULL, NULL);
 MODULE_DEPEND(ubsa, ucom, 1, 1, 1);
 MODULE_DEPEND(ubsa, usb, 1, 1, 1);
 MODULE_VERSION(ubsa, 1);

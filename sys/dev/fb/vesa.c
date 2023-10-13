@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 1998 Kazutaka YOKOTA and Michael Smith
  * Copyright (c) 2009-2013 Jung-uk Kim <jkim@FreeBSD.org>
@@ -28,8 +28,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include "opt_vga.h"
 #include "opt_vesa.h"
 
@@ -1305,7 +1303,8 @@ vesa_set_mode(video_adapter_t *adp, int mode)
 			}
 			int10_set_mode(adp->va_initial_bios_mode);
 			if (adp->va_info.vi_flags & V_INFO_LINEAR)
-				pmap_unmapdev(adp->va_buffer, vesa_vmem_max);
+				pmap_unmapdev((void *)adp->va_buffer,
+				    vesa_vmem_max);
 			/* 
 			 * Once (*prevvidsw->get_info)() succeeded, 
 			 * (*prevvidsw->set_mode)() below won't fail...
@@ -1350,7 +1349,7 @@ vesa_set_mode(video_adapter_t *adp, int mode)
 		adp->va_flags |= V_ADP_DAC8;
 
 	if (adp->va_info.vi_flags & V_INFO_LINEAR)
-		pmap_unmapdev(adp->va_buffer, vesa_vmem_max);
+		pmap_unmapdev((void *)adp->va_buffer, vesa_vmem_max);
 
 #if VESA_DEBUG > 0
 	printf("VESA: mode set!\n");

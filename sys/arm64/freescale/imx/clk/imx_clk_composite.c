@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2018 Emmanuel Vadot <manu@freebsd.org>
  *
@@ -23,13 +23,9 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/bus.h>
@@ -212,7 +208,8 @@ imx_clk_composite_set_freq(struct clknode *clk, uint64_t fparent, uint64_t *fout
 	const char **p_names;
 	int p_idx, best_parent;
 	int64_t best_diff, diff;
-	int32_t best_pre_div, best_post_div, pre_div, post_div;
+	int32_t best_pre_div __unused, best_post_div __unused;
+	int32_t pre_div, post_div;
 	uint64_t cur, best;
 	uint32_t val;
 
@@ -236,7 +233,7 @@ imx_clk_composite_set_freq(struct clknode *clk, uint64_t fparent, uint64_t *fout
 			best = cur;
 			best_diff = diff;
 			best_pre_div = pre_div;
-			best_post_div = pre_div;
+			best_post_div = post_div;
 			best_parent = p_idx;
 			dprintf("Best parent so far %s (%d) with best freq at "
 			    "%ju\n", clknode_get_name(p_clk), p_idx, best);

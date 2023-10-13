@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (C) 2014,2019 Andrew Turner
  * Copyright (c) 2014-2015 The FreeBSD Foundation
@@ -31,8 +31,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 #ifndef	_SYS_REG_H_
@@ -41,6 +39,8 @@
 #include <machine/reg.h>
 
 #ifdef _KERNEL
+#include <sys/linker_set.h>
+
 struct sbuf;
 struct regset;
 
@@ -58,6 +58,10 @@ struct regset {
 #if defined(__ELF_WORD_SIZE)
 SET_DECLARE(__elfN(regset), struct regset);
 #define	ELF_REGSET(_regset)	DATA_SET(__elfN(regset), _regset)
+#endif
+#ifdef COMPAT_FREEBSD32
+SET_DECLARE(elf32_regset, struct regset);
+#define	ELF32_REGSET(_regset)	DATA_SET(elf32_regset, _regset)
 #endif
 
 int	fill_regs(struct thread *, struct reg *);

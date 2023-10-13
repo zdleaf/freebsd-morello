@@ -28,8 +28,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include "opt_stack.h"
 
 #include <sys/param.h>
@@ -83,10 +81,12 @@ __FBSDID("$FreeBSD$");
 #include <linux/timer.h>
 #include <linux/interrupt.h>
 #include <linux/uaccess.h>
+#include <linux/utsname.h>
 #include <linux/list.h>
 #include <linux/kthread.h>
 #include <linux/kernel.h>
 #include <linux/compat.h>
+#include <linux/io-mapping.h>
 #include <linux/poll.h>
 #include <linux/smp.h>
 #include <linux/wait_bit.h>
@@ -96,6 +96,7 @@ __FBSDID("$FreeBSD$");
 
 #if defined(__i386__) || defined(__amd64__)
 #include <asm/smp.h>
+#include <asm/processor.h>
 #endif
 
 SYSCTL_NODE(_compat, OID_AUTO, linuxkpi, CTLFLAG_RW | CTLFLAG_MPSAFE, 0,
@@ -130,12 +131,14 @@ static void linux_cdev_deref(struct linux_cdev *ldev);
 static struct vm_area_struct *linux_cdev_handle_find(void *handle);
 
 cpumask_t cpu_online_mask;
+static cpumask_t static_single_cpu_mask[MAXCPU];
 struct kobject linux_class_root;
 struct device linux_root_device;
 struct class linux_class_misc;
 struct list_head pci_drivers;
 struct list_head pci_devices;
 spinlock_t pci_lock;
+struct uts_namespace init_uts_ns;
 
 unsigned long linux_timer_hz_mask;
 
@@ -155,6 +158,20 @@ RB_GENERATE(linux_root, rb_node, __entry, panic_cmp);
 
 INTERVAL_TREE_DEFINE(struct interval_tree_node, rb, unsigned long,, START,
     LAST,, lkpi_interval_tree)
+
+struct kobject *
+kobject_create(void)
+{
+	struct kobject *kobj;
+
+	kobj = kzalloc(sizeof(*kobj), GFP_KERNEL);
+	if (kobj == NULL)
+		return (NULL);
+	kobject_init(kobj, &linux_kfree_type);
+
+	return (kobj);
+}
+
 
 int
 kobject_set_name_vargs(struct kobject *kobj, const char *fmt, va_list args)
@@ -441,6 +458,66 @@ device_create(struct class *class, struct device *parent, dev_t devt,
 	return (dev);
 }
 
+struct device *
+device_create_groups_vargs(struct class *class, struct device *parent,
+    dev_t devt, void *drvdata, const struct attribute_group **groups,
+    const char *fmt, va_list args)
+{
+	struct device *dev = NULL;
+	int retval = -ENODEV;
+
+	if (class == NULL || IS_ERR(class))
+		goto error;
+
+	dev = kzalloc(sizeof(*dev), GFP_KERNEL);
+	if (!dev) {
+		retval = -ENOMEM;
+		goto error;
+	}
+
+	dev->devt = devt;
+	dev->class = class;
+	dev->parent = parent;
+	dev->groups = groups;
+	dev->release = device_create_release;
+	/* device_initialize() needs the class and parent to be set */
+	device_initialize(dev);
+	dev_set_drvdata(dev, drvdata);
+
+	retval = kobject_set_name_vargs(&dev->kobj, fmt, args);
+	if (retval)
+		goto error;
+
+	retval = device_add(dev);
+	if (retval)
+		goto error;
+
+	return dev;
+
+error:
+	put_device(dev);
+	return ERR_PTR(retval);
+}
+
+struct class *
+class_create(struct module *owner, const char *name)
+{
+	struct class *class;
+	int error;
+
+	class = kzalloc(sizeof(*class), M_WAITOK);
+	class->owner = owner;
+	class->name = name;
+	class->class_release = linux_class_kfree;
+	error = class_register(class);
+	if (error) {
+		kfree(class);
+		return (NULL);
+	}
+
+	return (class);
+}
+
 int
 kobject_init_and_add(struct kobject *kobj, const struct kobj_type *ktype,
     struct kobject *parent, const char *fmt, ...)
@@ -526,6 +603,17 @@ linux_file_free(struct linux_file *filp)
 		 */
 		_fdrop(filp->_file, curthread);
 	}
+}
+
+struct linux_cdev *
+cdev_alloc(void)
+{
+	struct linux_cdev *cdev;
+
+	cdev = kzalloc(sizeof(struct linux_cdev), M_WAITOK);
+	kobject_init(&cdev->kobj, &linux_cdev_ktype);
+	cdev->refs = 1;
+	return (cdev);
 }
 
 static int
@@ -744,6 +832,18 @@ zap_vma_ptes(struct vm_area_struct *vma, unsigned long address,
 		pmap_remove_all(m);
 	VM_OBJECT_RUNLOCK(obj);
 	return (0);
+}
+
+void
+vma_set_file(struct vm_area_struct *vma, struct linux_file *file)
+{
+	struct linux_file *tmp;
+
+	/* Changing an anonymous vma with this is illegal */
+	get_file(file);
+	tmp = vma->vm_file;
+	vma->vm_file = file;
+	fput(tmp);
 }
 
 static struct file_operations dummy_ldev_ops = {
@@ -1889,7 +1989,7 @@ iounmap(void *addr)
 	if (vmmap == NULL)
 		return;
 #if defined(__i386__) || defined(__amd64__) || defined(__powerpc__) || defined(__aarch64__) || defined(__riscv)
-	pmap_unmapdev((vm_offset_t)addr, vmmap->vm_size);
+	pmap_unmapdev(addr, vmmap->vm_size);
 #endif
 	kfree(vmmap);
 }
@@ -2043,6 +2143,20 @@ del_timer_sync(struct timer_list *timer)
 	if (callout_drain(&(timer)->callout) == -1)
 		return (0);
 	return (1);
+}
+
+int
+timer_delete_sync(struct timer_list *timer)
+{
+
+	return (del_timer_sync(timer));
+}
+
+int
+timer_shutdown_sync(struct timer_list *timer)
+{
+
+	return (del_timer_sync(timer));
 }
 
 /* greatest common divisor, Euclid equation */
@@ -2475,7 +2589,7 @@ struct list_sort_thunk {
 };
 
 static inline int
-linux_le_cmp(void *priv, const void *d1, const void *d2)
+linux_le_cmp(const void *d1, const void *d2, void *priv)
 {
 	struct list_head *le1, *le2;
 	struct list_sort_thunk *thunk;
@@ -2503,7 +2617,7 @@ list_sort(void *priv, struct list_head *head, int (*cmp)(void *priv,
 		ar[i++] = le;
 	thunk.cmp = cmp;
 	thunk.priv = priv;
-	qsort_r(ar, count, sizeof(struct list_head *), &thunk, linux_le_cmp);
+	qsort_r(ar, count, sizeof(struct list_head *), linux_le_cmp, &thunk);
 	INIT_LIST_HEAD(head);
 	for (i = 0; i < count; i++)
 		list_add_tail(ar[i], head);
@@ -2618,7 +2732,6 @@ linux_dump_stack(void)
 #ifdef STACK
 	struct stack st;
 
-	stack_zero(&st);
 	stack_save(&st);
 	stack_print(&st);
 #endif
@@ -2632,9 +2745,32 @@ linuxkpi_net_ratelimit(void)
 	   lkpi_net_maxpps));
 }
 
+struct io_mapping *
+io_mapping_create_wc(resource_size_t base, unsigned long size)
+{
+	struct io_mapping *mapping;
+
+	mapping = kmalloc(sizeof(*mapping), GFP_KERNEL);
+	if (mapping == NULL)
+		return (NULL);
+	return (io_mapping_init_wc(mapping, base, size));
+}
+
 #if defined(__i386__) || defined(__amd64__)
 bool linux_cpu_has_clflush;
+struct cpuinfo_x86 boot_cpu_data;
+struct cpuinfo_x86 __cpu_data[MAXCPU];
 #endif
+
+cpumask_t *
+lkpi_get_static_single_cpu_mask(int cpuid)
+{
+
+	KASSERT((cpuid >= 0 && cpuid < MAXCPU), ("%s: invalid cpuid %d\n",
+	    __func__, cpuid));
+
+	return (&static_single_cpu_mask[cpuid]);
+}
 
 static void
 linux_compat_init(void *arg)
@@ -2644,6 +2780,17 @@ linux_compat_init(void *arg)
 
 #if defined(__i386__) || defined(__amd64__)
 	linux_cpu_has_clflush = (cpu_feature & CPUID_CLFSH);
+	boot_cpu_data.x86_clflush_size = cpu_clflush_line_size;
+	boot_cpu_data.x86_max_cores = mp_ncpus;
+	boot_cpu_data.x86 = CPUID_TO_FAMILY(cpu_id);
+	boot_cpu_data.x86_model = CPUID_TO_MODEL(cpu_id);
+
+	for (i = 0; i < MAXCPU; i++) {
+		__cpu_data[i].x86_clflush_size = cpu_clflush_line_size;
+		__cpu_data[i].x86_max_cores = mp_ncpus;
+		__cpu_data[i].x86 = CPUID_TO_FAMILY(cpu_id);
+		__cpu_data[i].x86_model = CPUID_TO_MODEL(cpu_id);
+	}
 #endif
 	rw_init(&linux_vma_lock, "lkpi-vma-lock");
 
@@ -2671,6 +2818,17 @@ linux_compat_init(void *arg)
 	init_waitqueue_head(&linux_var_waitq);
 
 	CPU_COPY(&all_cpus, &cpu_online_mask);
+	/*
+	 * Generate a single-CPU cpumask_t for each CPU (possibly) in the system.
+	 * CPUs are indexed from 0..(MAXCPU-1).  The entry for cpuid 0 will only
+	 * have itself in the cpumask, cupid 1 only itself on entry 1, and so on.
+	 * This is used by cpumask_of() (and possibly others in the future) for,
+	 * e.g., drivers to pass hints to irq_set_affinity_hint().
+	 */
+	for (i = 0; i < MAXCPU; i++)
+		CPU_SET(i, &static_single_cpu_mask[i]);
+
+	strlcpy(init_uts_ns.name.release, osrelease, sizeof(init_uts_ns.name.release));
 }
 SYSINIT(linux_compat, SI_SUB_DRIVERS, SI_ORDER_SECOND, linux_compat_init, NULL);
 

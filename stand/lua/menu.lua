@@ -1,5 +1,5 @@
 --
--- SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+-- SPDX-License-Identifier: BSD-2-Clause
 --
 -- Copyright (c) 2015 Pedro Souza <pedrosouza@freebsd.org>
 -- Copyright (c) 2018 Kyle Evans <kevans@FreeBSD.org>
@@ -25,8 +25,6 @@
 -- LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
 -- OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 -- SUCH DAMAGE.
---
--- $FreeBSD$
 --
 
 local cli = require("cli")
@@ -58,6 +56,13 @@ local function bootenvSet(env)
 	loader.setenv("vfs.root.mountfrom", env)
 	loader.setenv("currdev", env .. ":")
 	config.reload()
+	if loader.getenv("kernelname") ~= nil then
+		loader.perform("unload")
+	end
+end
+
+local function multiUserPrompt()
+	return loader.getenv("loader_menu_multi_user_prompt") or "Multi user"
 end
 
 -- Module exports
@@ -263,11 +268,16 @@ menu.welcome = {
 	all_entries = {
 		multi_user = {
 			entry_type = core.MENU_ENTRY,
-			name = color.highlight("B") .. "oot Multi user " ..
-			    color.highlight("[Enter]"),
+			name = function()
+				return color.highlight("B") .. "oot " ..
+				    multiUserPrompt() .. " " ..
+				    color.highlight("[Enter]")
+			end,
 			-- Not a standard menu entry function!
-			alternate_name = color.highlight("B") ..
-			    "oot Multi user",
+			alternate_name = function()
+				return color.highlight("B") .. "oot " ..
+				    multiUserPrompt()
+			end,
 			func = function()
 				core.setSingleUser(false)
 				core.boot()

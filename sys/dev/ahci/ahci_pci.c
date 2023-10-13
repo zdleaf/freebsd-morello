@@ -25,8 +25,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/module.h>
 #include <sys/systm.h>
@@ -85,6 +83,7 @@ static const struct {
 	{0x79021022, 0x00, "AMD KERNCZ",	0},
 	{0x79031022, 0x00, "AMD KERNCZ",	0},
 	{0x79041022, 0x00, "AMD KERNCZ",	0},
+	{0x79161022, 0x00, "AMD KERNCZ (RAID)",	0},
 	{0x06011b21, 0x00, "ASMedia ASM1060",	AHCI_Q_NOCCS|AHCI_Q_NOAUX},
 	{0x06021b21, 0x00, "ASMedia ASM1060",	AHCI_Q_NOCCS|AHCI_Q_NOAUX},
 	{0x06111b21, 0x00, "ASMedia ASM1061",	AHCI_Q_NOCCS|AHCI_Q_NOAUX},
@@ -293,7 +292,7 @@ static const struct {
 	{0x92201b4b, 0x00, "Marvell 88SE9220",  AHCI_Q_ALTSIG |
 	    AHCI_Q_IOMMU_BUSWIDE},
 	{0x92301b4b, 0x00, "Marvell 88SE9230",  AHCI_Q_ALTSIG |
-	    AHCI_Q_IOMMU_BUSWIDE},
+	    AHCI_Q_IOMMU_BUSWIDE | AHCI_Q_SLOWDEV},
 	{0x92351b4b, 0x00, "Marvell 88SE9235",  0},
 	{0x06201103, 0x00, "HighPoint RocketRAID 620",	0},
 	{0x06201b4b, 0x00, "HighPoint RocketRAID 620",	0},
@@ -384,6 +383,7 @@ static const struct {
 	{0xa01c177d, 0x00, "ThunderX",		AHCI_Q_ABAR0|AHCI_Q_1MSI},
 	{0x00311c36, 0x00, "Annapurna",		AHCI_Q_FORCE_PI|AHCI_Q_RESTORE_CAP|AHCI_Q_NOMSIX},
 	{0x1600144d, 0x00, "Samsung",		AHCI_Q_NOMSI},
+	{0x07e015ad, 0x00, "VMware",		0},
 	{0x00000000, 0x00, NULL,		0}
 };
 
@@ -746,15 +746,18 @@ static device_method_t ahci_methods[] = {
 	DEVMETHOD(bus_get_dma_tag,  ahci_get_dma_tag),
 	DEVMETHOD_END
 };
+
 static driver_t ahci_driver = {
         "ahci",
         ahci_methods,
         sizeof(struct ahci_controller)
 };
-DRIVER_MODULE(ahci, pci, ahci_driver, ahci_devclass, NULL, NULL);
+
+DRIVER_MODULE(ahci, pci, ahci_driver, NULL, NULL);
 /* Also matches class / subclass / progid XXX need to add when we have masking support */
 MODULE_PNP_INFO("W32:vendor/device", pci, ahci, ahci_ids,
     nitems(ahci_ids) - 1);
+
 static device_method_t ahci_ata_methods[] = {
 	DEVMETHOD(device_probe,     ahci_ata_probe),
 	DEVMETHOD(device_attach,    ahci_pci_attach),
@@ -769,9 +772,11 @@ static device_method_t ahci_ata_methods[] = {
 	DEVMETHOD(bus_child_location, ahci_child_location),
 	DEVMETHOD_END
 };
+
 static driver_t ahci_ata_driver = {
         "ahci",
         ahci_ata_methods,
         sizeof(struct ahci_controller)
 };
-DRIVER_MODULE(ahci, atapci, ahci_ata_driver, ahci_devclass, NULL, NULL);
+
+DRIVER_MODULE(ahci, atapci, ahci_ata_driver, NULL, NULL);

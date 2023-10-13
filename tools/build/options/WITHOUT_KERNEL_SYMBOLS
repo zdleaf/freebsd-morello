@@ -1,2 +1,2 @@
-.\" $FreeBSD$
-Do not install kernel debug symbol files.
+Do not install standalone kernel debug symbol files.
+This option has no effect at build time.

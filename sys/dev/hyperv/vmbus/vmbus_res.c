@@ -25,8 +25,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/kernel.h>
 #include <sys/bus.h>
@@ -62,10 +60,7 @@ static driver_t vmbus_res_driver = {
 	1
 };
 
-static devclass_t vmbus_res_devclass;
-
-DRIVER_MODULE(vmbus_res, acpi, vmbus_res_driver, vmbus_res_devclass,
-    NULL, NULL);
+DRIVER_MODULE(vmbus_res, acpi, vmbus_res_driver, NULL, NULL);
 MODULE_DEPEND(vmbus_res, acpi, 1, 1, 1);
 MODULE_VERSION(vmbus_res, 1);
 

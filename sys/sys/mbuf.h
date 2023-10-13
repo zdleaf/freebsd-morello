@@ -30,7 +30,6 @@
  * SUCH DAMAGE.
  *
  *	@(#)mbuf.h	8.5 (Berkeley) 2/19/95
- * $FreeBSD$
  */
 
 #ifndef _SYS_MBUF_H_
@@ -42,12 +41,7 @@
 #include <sys/systm.h>
 #include <sys/refcount.h>
 #include <vm/uma.h>
-#ifdef WITNESS
-#include <sys/lock.h>
-#endif
-#endif
 
-#ifdef _KERNEL
 #include <sys/sdt.h>
 
 #define	MBUF_PROBE1(probe, arg0)					\
@@ -150,8 +144,8 @@ struct m_snd_tag {
 
 /*
  * Record/packet header in first mbuf of chain; valid only if M_PKTHDR is set.
- * Size ILP32: 48
- *	 LP64: 56
+ * Size ILP32: 56
+ *	 LP64: 64
  * Compile-time assertions in uipc_mbuf.c test these values to ensure that
  * they are correct.
  */
@@ -164,6 +158,13 @@ struct pkthdr {
 			uint16_t rcvgen;	/* ... and generation count */
 		};
 	};
+	union {
+		struct ifnet	*leaf_rcvif;	/* leaf rcv interface */
+		struct {
+			uint16_t leaf_rcvidx;	/* leaf rcv interface index ... */
+			uint16_t leaf_rcvgen;	/* ... and generation count */
+		};
+	};
 	SLIST_HEAD(packet_tags, m_tag) tags; /* list of packet tags */
 	int32_t		 len;		/* total packet length */
 
@@ -173,6 +174,9 @@ struct pkthdr {
 	uint16_t	 fibnum;	/* this packet should use this fib */
 	uint8_t		 numa_domain;	/* NUMA domain of recvd pkt */
 	uint8_t		 rsstype;	/* hash type */
+#if !defined(__LP64__)
+	uint32_t	 pad;		/* pad for 64bit alignment */
+#endif
 	union {
 		uint64_t	rcv_tstmp;	/* timestamp in ns */
 		struct {
@@ -197,18 +201,21 @@ struct pkthdr {
 
 	/* Layer specific non-persistent local storage for reassembly, etc. */
 	union {
-		uint8_t  eight[8];
-		uint16_t sixteen[4];
-		uint32_t thirtytwo[2];
-		uint64_t sixtyfour[1];
-		uintptr_t unintptr[1];
-		void 	*ptr;
-	} PH_loc;
+		union {
+			uint8_t  eight[8];
+			uint16_t sixteen[4];
+			uint32_t thirtytwo[2];
+			uint64_t sixtyfour[1];
+			uintptr_t unintptr[1];
+			void 	*ptr;
+		} PH_loc;
+		/* Upon allocation: total packet memory consumption. */
+		u_int	memlen;
+	};
 };
 #define	ether_vtag	PH_per.sixteen[0]
 #define tcp_tun_port	PH_per.sixteen[0] /* outbound */
-#define	PH_vt		PH_per
-#define	vt_nrecs	sixteen[0]	  /* mld and v6-ND */
+#define	vt_nrecs	PH_per.sixteen[0]	  /* mld and v6-ND */
 #define	tso_segsz	PH_per.sixteen[1] /* inbound after LRO */
 #define	lro_nsegs	tso_segsz	  /* inbound after LRO */
 #define	csum_data	PH_per.thirtytwo[1] /* inbound from hardware up */
@@ -239,7 +246,7 @@ struct pkthdr {
 #if defined(__LP64__)
 #define MBUF_PEXT_MAX_PGS (40 / sizeof(vm_paddr_t))
 #else
-#define MBUF_PEXT_MAX_PGS (72 / sizeof(vm_paddr_t))
+#define MBUF_PEXT_MAX_PGS (64 / sizeof(vm_paddr_t))
 #endif
 
 #define	MBUF_PEXT_MAX_BYTES						\
@@ -778,15 +785,11 @@ m_epg_pagelen(const struct mbuf *m, int pidx, int pgoff)
 #ifdef _KERNEL
 union if_snd_tag_alloc_params;
 
-#ifdef WITNESS
 #define	MBUF_CHECKSLEEP(how) do {					\
 	if (how == M_WAITOK)						\
 		WITNESS_WARN(WARN_GIANTOK | WARN_SLEEPOK, NULL,		\
 		    "Sleeping in \"%s\"", __func__);			\
 } while (0)
-#else
-#define	MBUF_CHECKSLEEP(how) do {} while (0)
-#endif
 
 /*
  * Network buffer allocation API
@@ -881,11 +884,9 @@ m_gettype(int size)
 	case MCLBYTES:
 		type = EXT_CLUSTER;
 		break;
-#if MJUMPAGESIZE != MCLBYTES
 	case MJUMPAGESIZE:
 		type = EXT_JUMBOP;
 		break;
-#endif
 	case MJUM9BYTES:
 		type = EXT_JUMBO9;
 		break;
@@ -931,11 +932,9 @@ m_getzone(int size)
 	case MCLBYTES:
 		zone = zone_clust;
 		break;
-#if MJUMPAGESIZE != MCLBYTES
 	case MJUMPAGESIZE:
 		zone = zone_jumbop;
 		break;
-#endif
 	case MJUM9BYTES:
 		zone = zone_jumbo9;
 		break;
@@ -1055,11 +1054,9 @@ m_cljset(struct mbuf *m, void *cl, int type)
 	case EXT_CLUSTER:
 		size = MCLBYTES;
 		break;
-#if MJUMPAGESIZE != MCLBYTES
 	case EXT_JUMBOP:
 		size = MJUMPAGESIZE;
 		break;
-#endif
 	case EXT_JUMBO9:
 		size = MJUM9BYTES;
 		break;
@@ -1238,6 +1235,16 @@ m_align(struct mbuf *m, int len)
 	(M_WRITABLE(m) ? ((m)->m_data - M_START(m)) : 0)
 
 /*
+ * So M_TRAILINGROOM() is for when you want to know how much space
+ * would be there if it was writable. This can be used to
+ * detect changes in mbufs by knowing the value at one point
+ * and then being able to compare it later to the current M_TRAILINGROOM().
+ * The TRAILINGSPACE() macro is not suitable for this since an mbuf
+ * at one point might not be writable and then later it becomes writable
+ * even though the space at the back of it has not changed.
+ */
+#define M_TRAILINGROOM(m) ((M_START(m) + M_SIZE(m)) - ((m)->m_data + (m)->m_len))
+/*
  * Compute the amount of space available after the end of data in an mbuf.
  *
  * The M_WRITABLE() is a temporary, conservative safety measure: the burden
@@ -1247,9 +1254,7 @@ m_align(struct mbuf *m, int len)
  * for mbufs with external storage.  We now allow mbuf-embedded data to be
  * read-only as well.
  */
-#define	M_TRAILINGSPACE(m)						\
-	(M_WRITABLE(m) ?						\
-	    ((M_START(m) + M_SIZE(m)) - ((m)->m_data + (m)->m_len)) : 0)
+#define	M_TRAILINGSPACE(m) (M_WRITABLE(m) ? M_TRAILINGROOM(m) : 0)
 
 /*
  * Arrange to prepend space of size plen to mbuf m.  If a new mbuf must be
@@ -1293,10 +1298,12 @@ m_rcvif(struct mbuf *m)
 /* Length to m_copy to copy all. */
 #define	M_COPYALL	1000000000
 
-extern int		max_datalen;	/* MHLEN - max_hdr */
-extern int		max_hdr;	/* Largest link + protocol header */
-extern int		max_linkhdr;	/* Largest link-level header */
-extern int		max_protohdr;	/* Largest protocol header */
+extern u_int		max_linkhdr;	/* Largest link-level header */
+extern u_int		max_hdr;	/* Largest link + protocol header */
+extern u_int		max_protohdr;	/* Largest protocol header */
+void max_linkhdr_grow(u_int);
+void max_protohdr_grow(u_int);
+
 extern int		nmbclusters;	/* Maximum number of clusters */
 extern bool		mb_use_ext_pgs;	/* Use ext_pgs for sendfile */
 
@@ -1372,11 +1379,12 @@ extern bool		mb_use_ext_pgs;	/* Use ext_pgs for sendfile */
 #define	PACKET_TAG_IPFORWARD			18 /* ipforward info */
 #define	PACKET_TAG_MACLABEL	(19 | MTAG_PERSISTENT) /* MAC label */
 #define	PACKET_TAG_PF				21 /* PF/ALTQ information */
-#define	PACKET_TAG_RTSOCKFAM			25 /* rtsock sa family */
+/* was	PACKET_TAG_RTSOCKFAM			25    rtsock sa family */
 #define	PACKET_TAG_IPOPTIONS			27 /* Saved IP options */
 #define	PACKET_TAG_CARP				28 /* CARP info */
 #define	PACKET_TAG_IPSEC_NAT_T_PORTS		29 /* two uint16_t */
 #define	PACKET_TAG_ND_OUTGOING			30 /* ND outgoing */
+#define	PACKET_TAG_PF_REASSEMBLED		31
 
 /* Specific cookies and tags. */
 
@@ -1666,11 +1674,23 @@ mbuf_tstmp2timespec(struct mbuf *m, struct timespec *ts)
 {
 
 	KASSERT((m->m_flags & M_PKTHDR) != 0, ("mbuf %p no M_PKTHDR", m));
-	KASSERT((m->m_flags & (M_TSTMP|M_TSTMP_LRO)) != 0, ("mbuf %p no M_TSTMP or M_TSTMP_LRO", m));
+	KASSERT((m->m_flags & (M_TSTMP|M_TSTMP_LRO)) != 0,
+	    ("mbuf %p no M_TSTMP or M_TSTMP_LRO", m));
 	ts->tv_sec = m->m_pkthdr.rcv_tstmp / 1000000000;
 	ts->tv_nsec = m->m_pkthdr.rcv_tstmp % 1000000000;
 }
 #endif
+
+static inline void
+mbuf_tstmp2timeval(struct mbuf *m, struct timeval *tv)
+{
+
+	KASSERT((m->m_flags & M_PKTHDR) != 0, ("mbuf %p no M_PKTHDR", m));
+	KASSERT((m->m_flags & (M_TSTMP|M_TSTMP_LRO)) != 0,
+	    ("mbuf %p no M_TSTMP or M_TSTMP_LRO", m));
+	tv->tv_sec = m->m_pkthdr.rcv_tstmp / 1000000000;
+	tv->tv_usec = (m->m_pkthdr.rcv_tstmp % 1000000000) / 1000;
+}
 
 #ifdef DEBUGNET
 /* Invoked from the debugnet client code. */

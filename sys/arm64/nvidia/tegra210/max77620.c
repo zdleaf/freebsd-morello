@@ -24,8 +24,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 /*
  * MAX77620 PMIC driver
  */
@@ -291,7 +289,7 @@ max77620_encode_fps_period(struct max77620_softc *sc, int val)
 static int
 max77620_init(struct max77620_softc *sc)
 {
-	uint8_t mask, val, tmp;;
+	uint8_t mask, val, tmp;
 	int i, rv;
 
 	mask = 0;
@@ -383,16 +381,13 @@ static int
 max77620_attach(device_t dev)
 {
 	struct max77620_softc *sc;
-	const char *dname;
-	int dunit, rv, rid;
+	int rv, rid;
 	phandle_t node;
 
 	sc = device_get_softc(dev);
 	sc->dev = dev;
 	sc->bus_addr = iicbus_get_addr(dev);
 	node = ofw_bus_get_node(sc->dev);
-	dname = device_get_name(dev);
-	dunit = device_get_unit(dev);
 	rv = 0;
 	LOCK_INIT(sc);
 
@@ -504,8 +499,6 @@ static device_method_t max77620_methods[] = {
 	DEVMETHOD_END
 };
 
-static devclass_t max77620_devclass;
 static DEFINE_CLASS_0(gpio, max77620_driver, max77620_methods,
     sizeof(struct max77620_softc));
-EARLY_DRIVER_MODULE(max77620, iicbus, max77620_driver, max77620_devclass,
-    NULL, NULL, 74);
+EARLY_DRIVER_MODULE(max77620, iicbus, max77620_driver, NULL, NULL, 74);

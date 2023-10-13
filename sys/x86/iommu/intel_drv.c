@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2013-2015 The FreeBSD Foundation
  *
@@ -29,8 +29,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include "opt_acpi.h"
 #if defined(__amd64__)
 #define	DEV_APIC
@@ -83,7 +81,6 @@ __FBSDID("$FreeBSD$");
 #define	DMAR_QI_IRQ_RID		1
 #define	DMAR_REG_RID		2
 
-static devclass_t dmar_devclass;
 static device_t *dmar_devs;
 static int dmar_devcnt;
 
@@ -405,6 +402,7 @@ dmar_attach(device_t dev)
 	struct dmar_unit *unit;
 	ACPI_DMAR_HARDWARE_UNIT *dmaru;
 	uint64_t timeout;
+	int disable_pmr;
 	int i, error;
 
 	unit = device_get_softc(dev);
@@ -528,6 +526,16 @@ dmar_attach(device_t dev)
 		dmar_release_resources(dev, unit);
 		return (error);
 	}
+
+	disable_pmr = 0;
+	TUNABLE_INT_FETCH("hw.dmar.pmr.disable", &disable_pmr);
+	if (disable_pmr) {
+		error = dmar_disable_protected_regions(unit);
+		if (error != 0)
+			device_printf(dev,
+			    "Failed to disable protected regions\n");
+	}
+
 	error = iommu_init_busdma(&unit->iommu);
 	if (error != 0) {
 		dmar_release_resources(dev, unit);
@@ -589,7 +597,7 @@ static driver_t	dmar_driver = {
 	sizeof(struct dmar_unit),
 };
 
-DRIVER_MODULE(dmar, acpi, dmar_driver, dmar_devclass, 0, 0);
+DRIVER_MODULE(dmar, acpi, dmar_driver, 0, 0);
 MODULE_DEPEND(dmar, acpi, 1, 1, 1);
 
 static void
@@ -922,7 +930,7 @@ dmar_rmrr_iter(ACPI_DMAR_HEADER *dmarh, void *arg)
 			/* The RMRR entry end address is inclusive. */
 			entry->end = resmem->EndAddress;
 			TAILQ_INSERT_TAIL(ria->rmrr_entries, entry,
-			    unroll_link);
+			    dmamap_link);
 		}
 	}
 
@@ -1162,7 +1170,7 @@ dmar_print_domain(struct dmar_domain *domain, bool show_mappings)
 	}
 }
 
-DB_FUNC(dmar_domain, db_dmar_print_domain, db_show_table, CS_OWN, NULL)
+DB_SHOW_COMMAND_FLAGS(dmar_domain, db_dmar_print_domain, CS_OWN)
 {
 	struct dmar_unit *unit;
 	struct dmar_domain *domain;

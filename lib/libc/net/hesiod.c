@@ -49,8 +49,6 @@
 static char *orig_rcsid = "$NetBSD: hesiod.c,v 1.9 1999/02/11 06:16:38 simonb Exp $";
 #endif
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <netinet/in.h>
 #include <arpa/nameser.h>
@@ -92,10 +90,7 @@ hesiod_init(context)
 	ctx = malloc(sizeof(struct hesiod_p));
 	if (ctx) {
 		*context = ctx;
-		if (!issetugid())
-			configname = getenv("HESIOD_CONFIG");
-		else
-			configname = NULL;
+		configname = secure_getenv("HESIOD_CONFIG");
 		if (!configname)
 			configname = _PATH_HESIOD_CONF;
 		if (read_config_file(ctx, configname) >= 0) {
@@ -103,10 +98,7 @@ hesiod_init(context)
 			 * The default rhs can be overridden by an
 			 * environment variable.
 			 */
-			if (!issetugid())
-				p = getenv("HES_DOMAIN");
-			else
-				p = NULL;
+			p = secure_getenv("HES_DOMAIN");
 			if (p) {
 				if (ctx->rhs)
 					free(ctx->rhs);

@@ -31,8 +31,6 @@
 
 #include <sys/cdefs.h>
 __SCCSID("@(#)times.c	8.1 (Berkeley) 6/4/93");
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/time.h>
 #include <sys/times.h>
@@ -45,8 +43,7 @@ __FBSDID("$FreeBSD$");
 #define	CONVTCK(r)	(r.tv_sec * CLK_TCK + r.tv_usec / (1000000 / CLK_TCK))
 
 clock_t
-times(tp)
-	struct tms *tp;
+times(struct tms *tp)
 {
 	struct rusage ru;
 	struct timespec t;

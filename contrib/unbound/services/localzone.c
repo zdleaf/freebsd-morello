@@ -56,6 +56,44 @@
  * with 16 bytes for an A record, a 64K packet has about 4000 max */
 #define LOCALZONE_RRSET_COUNT_MAX 4096
 
+/** print all RRsets in local zone */
+static void
+local_zone_out(struct local_zone* z)
+{
+	struct local_data* d;
+	struct local_rrset* p;
+	RBTREE_FOR(d, struct local_data*, &z->data) {
+		for(p = d->rrsets; p; p = p->next) {
+			log_nametypeclass(NO_VERBOSE, "rrset", d->name,
+				ntohs(p->rrset->rk.type),
+				ntohs(p->rrset->rk.rrset_class));
+		}
+	}
+}
+
+static void
+local_zone_print(struct local_zone* z)
+{
+	char buf[64];
+	lock_rw_rdlock(&z->lock);
+	snprintf(buf, sizeof(buf), "%s zone",
+		local_zone_type2str(z->type));
+	log_nametypeclass(NO_VERBOSE, buf, z->name, 0, z->dclass);
+	local_zone_out(z);
+	lock_rw_unlock(&z->lock);
+}
+
+void local_zones_print(struct local_zones* zones)
+{
+	struct local_zone* z;
+	lock_rw_rdlock(&zones->lock);
+	log_info("number of auth zones %u", (unsigned)zones->ztree.count);
+	RBTREE_FOR(z, struct local_zone*, &zones->ztree) {
+		local_zone_print(z);
+	}
+	lock_rw_unlock(&zones->lock);
+}
+
 struct local_zones* 
 local_zones_create(void)
 {
@@ -1010,6 +1048,38 @@ lz_setup_implicit(struct local_zones* zones, struct config_file* cfg)
 		lock_rw_rdlock(&zones->lock);
 		if(!local_zones_lookup(zones, rr_name, len, labs, rr_class,
 			rr_type)) {
+			/* Check if there is a zone that this could go
+			 * under but for different class; created zones are
+			 * always for LDNS_RR_CLASS_IN. Create the zone with
+			 * a different class but the same configured
+			 * local_zone_type. */
+			struct local_zone* z = local_zones_lookup(zones,
+				rr_name, len, labs, LDNS_RR_CLASS_IN, rr_type);
+			if(z) {
+				uint8_t* name = memdup(z->name, z->namelen);
+				size_t znamelen = z->namelen;
+				int znamelabs = z->namelabs;
+				enum localzone_type ztype = z->type;
+				lock_rw_unlock(&zones->lock);
+				if(!name) {
+					log_err("out of memory");
+					free(rr_name);
+					return 0;
+				}
+				if(!(
+#ifndef THREADS_DISABLED
+					z =
+#endif
+					lz_enter_zone_dname(zones, name,
+						znamelen, znamelabs,
+						ztype, rr_class))) {
+					free(rr_name);
+					return 0;
+				}
+				lock_rw_unlock(&z->lock);
+				free(rr_name);
+				continue;
+			}
 			if(!have_name) {
 				dclass = rr_class;
 				nm = rr_name;
@@ -1220,38 +1290,6 @@ local_zones_find_le(struct local_zones* zones,
 	return (struct local_zone*)node;
 }
 
-/** print all RRsets in local zone */
-static void 
-local_zone_out(struct local_zone* z)
-{
-	struct local_data* d;
-	struct local_rrset* p;
-	RBTREE_FOR(d, struct local_data*, &z->data) {
-		for(p = d->rrsets; p; p = p->next) {
-			log_nametypeclass(NO_VERBOSE, "rrset", d->name,
-				ntohs(p->rrset->rk.type),
-				ntohs(p->rrset->rk.rrset_class));
-		}
-	}
-}
-
-void local_zones_print(struct local_zones* zones)
-{
-	struct local_zone* z;
-	lock_rw_rdlock(&zones->lock);
-	log_info("number of auth zones %u", (unsigned)zones->ztree.count);
-	RBTREE_FOR(z, struct local_zone*, &zones->ztree) {
-		char buf[64];
-		lock_rw_rdlock(&z->lock);
-		snprintf(buf, sizeof(buf), "%s zone",
-			local_zone_type2str(z->type));
-		log_nametypeclass(NO_VERBOSE, buf, z->name, 0, z->dclass);
-		local_zone_out(z);
-		lock_rw_unlock(&z->lock);
-	}
-	lock_rw_unlock(&zones->lock);
-}
-
 /** encode answer consisting of 1 rrset */
 static int
 local_encode(struct query_info* qinfo, struct module_env* env,
@@ -1270,6 +1308,7 @@ local_encode(struct query_info* qinfo, struct module_env* env,
 	else	rep.ns_numrrsets = 1;
 	rep.rrset_count = 1;
 	rep.rrsets = &rrset;
+	rep.reason_bogus = LDNS_EDE_NONE;
 	udpsize = edns->udp_size;
 	edns->edns_version = EDNS_ADVERTISED_VERSION;
 	edns->udp_size = EDNS_ADVERTISED_SIZE;
@@ -1290,7 +1329,8 @@ local_encode(struct query_info* qinfo, struct module_env* env,
 static void
 local_error_encode(struct query_info* qinfo, struct module_env* env,
 	struct edns_data* edns, struct comm_reply* repinfo, sldns_buffer* buf,
-	struct regional* temp, int rcode, int r)
+	struct regional* temp, int rcode, int r, int ede_code,
+	const char* ede_txt)
 {
 	edns->edns_version = EDNS_ADVERTISED_VERSION;
 	edns->udp_size = EDNS_ADVERTISED_SIZE;
@@ -1300,6 +1340,12 @@ local_error_encode(struct query_info* qinfo, struct module_env* env,
 	if(!inplace_cb_reply_local_call(env, qinfo, NULL, NULL,
 		rcode, edns, repinfo, temp, env->now_tv))
 		edns->opt_list_inplace_cb_out = NULL;
+
+	if(ede_code != LDNS_EDE_NONE && env->cfg->ede) {
+		edns_opt_list_append_ede(&edns->opt_list_out, temp,
+			ede_code, ede_txt);
+	}
+
 	error_encode(buf, r, qinfo, *(uint16_t*)sldns_buffer_begin(buf),
 		sldns_buffer_read_u16_at(buf, 2), edns);
 }
@@ -1497,7 +1543,9 @@ local_data_answer(struct local_zone* z, struct module_env* env,
 				qinfo->local_alias = NULL;
 				local_error_encode(qinfo, env, edns, repinfo,
 					buf, temp, LDNS_RCODE_YXDOMAIN,
-					(LDNS_RCODE_YXDOMAIN|BIT_AA));
+					(LDNS_RCODE_YXDOMAIN|BIT_AA),
+					LDNS_EDE_OTHER,
+					"DNAME expansion became too large");
 				return 1;
 			}
 			memset(&qinfo->local_alias->rrset->entry, 0,
@@ -1556,7 +1604,7 @@ local_zone_does_not_cover(struct local_zone* z, struct query_info* qinfo,
 	struct local_data key;
 	struct local_data* ld = NULL;
 	struct local_rrset* lr = NULL;
-	if(z->type == local_zone_always_transparent)
+	if(z->type == local_zone_always_transparent || z->type == local_zone_block_a)
 		return 1;
 	if(z->type != local_zone_transparent
 		&& z->type != local_zone_typetransparent
@@ -1600,7 +1648,8 @@ local_zones_zone_answer(struct local_zone* z, struct module_env* env,
 	} else if(lz_type == local_zone_refuse
 		|| lz_type == local_zone_always_refuse) {
 		local_error_encode(qinfo, env, edns, repinfo, buf, temp,
-			LDNS_RCODE_REFUSED, (LDNS_RCODE_REFUSED|BIT_AA));
+			LDNS_RCODE_REFUSED, (LDNS_RCODE_REFUSED|BIT_AA),
+			LDNS_EDE_NONE, NULL);
 		return 1;
 	} else if(lz_type == local_zone_static ||
 		lz_type == local_zone_redirect ||
@@ -1625,12 +1674,22 @@ local_zones_zone_answer(struct local_zone* z, struct module_env* env,
 		if(z != NULL && z->soa && z->soa_negative)
 			return local_encode(qinfo, env, edns, repinfo, buf, temp,
 				z->soa_negative, 0, rcode);
-		local_error_encode(qinfo, env, edns, repinfo, buf, temp, rcode,
-			(rcode|BIT_AA));
+		local_error_encode(qinfo, env, edns, repinfo, buf, temp,
+			rcode, (rcode|BIT_AA), LDNS_EDE_NONE, NULL);
 		return 1;
 	} else if(lz_type == local_zone_typetransparent
 		|| lz_type == local_zone_always_transparent) {
 		/* no NODATA or NXDOMAINS for this zone type */
+		return 0;
+	} else if(lz_type == local_zone_block_a) {
+		/* Return NODATA for all A queries */
+		if(qinfo->qtype == LDNS_RR_TYPE_A) {
+			local_error_encode(qinfo, env, edns, repinfo, buf, temp,
+				LDNS_RCODE_NOERROR, (LDNS_RCODE_NOERROR|BIT_AA),
+				LDNS_EDE_NONE, NULL);
+				return 1;
+		}
+
 		return 0;
 	} else if(lz_type == local_zone_always_null) {
 		/* 0.0.0.0 or ::0 or noerror/nodata for this zone type,
@@ -1667,9 +1726,10 @@ local_zones_zone_answer(struct local_zone* z, struct module_env* env,
 			return local_encode(qinfo, env, edns, repinfo, buf, temp,
 				&lrr, 1, LDNS_RCODE_NOERROR);
 		} else {
+			/* NODATA: No EDE needed */
 			local_error_encode(qinfo, env, edns, repinfo, buf,
 				temp, LDNS_RCODE_NOERROR,
-				(LDNS_RCODE_NOERROR|BIT_AA));
+				(LDNS_RCODE_NOERROR|BIT_AA), -1, NULL);
 		}
 		return 1;
 	}
@@ -1682,8 +1742,9 @@ local_zones_zone_answer(struct local_zone* z, struct module_env* env,
 		if(z != NULL && z->soa && z->soa_negative)
 			return local_encode(qinfo, env, edns, repinfo, buf, temp,
 				z->soa_negative, 0, rcode);
+		/* NODATA: No EDE needed */
 		local_error_encode(qinfo, env, edns, repinfo, buf, temp, rcode,
-			(rcode|BIT_AA));
+			(rcode|BIT_AA), LDNS_EDE_NONE, NULL);
 		return 1;
 	}
 
@@ -1694,13 +1755,13 @@ local_zones_zone_answer(struct local_zone* z, struct module_env* env,
 /** print log information for an inform zone query */
 static void
 lz_inform_print(struct local_zone* z, struct query_info* qinfo,
-	struct comm_reply* repinfo)
+	struct sockaddr_storage* addr, socklen_t addrlen)
 {
 	char ip[128], txt[512];
 	char zname[LDNS_MAX_DOMAINLEN+1];
-	uint16_t port = ntohs(((struct sockaddr_in*)&repinfo->addr)->sin_port);
+	uint16_t port = ntohs(((struct sockaddr_in*)addr)->sin_port);
 	dname_str(z->name, zname);
-	addr_to_str(&repinfo->addr, repinfo->addrlen, ip, sizeof(ip));
+	addr_to_str(addr, addrlen, ip, sizeof(ip));
 	snprintf(txt, sizeof(txt), "%s %s %s@%u", zname, local_zone_type2str(z->type), ip,
 		(unsigned)port);
 	log_nametypeclass(NO_VERBOSE, txt, qinfo->qname, qinfo->qtype, qinfo->qclass);
@@ -1715,7 +1776,8 @@ lz_type(uint8_t *taglist, size_t taglen, uint8_t *taglist2, size_t taglen2,
 	struct local_zone_override* lzo;	
 	if(repinfo && override_tree) {
 		lzo = (struct local_zone_override*)addr_tree_lookup(
-			override_tree, &repinfo->addr, repinfo->addrlen);
+			override_tree, &repinfo->client_addr,
+			repinfo->client_addrlen);
 		if(lzo && lzo->type) {
 			verbose(VERB_ALGO, "local zone override to type %s",
 				local_zone_type2str(lzo->type));
@@ -1795,7 +1857,8 @@ local_zones_answer(struct local_zones* zones, struct module_env* env,
 		if(z && (lzt == local_zone_transparent ||
 			lzt == local_zone_typetransparent ||
 			lzt == local_zone_inform ||
-			lzt == local_zone_always_transparent) &&
+			lzt == local_zone_always_transparent ||
+			lzt == local_zone_block_a) &&
 			local_zone_does_not_cover(z, qinfo, labs)) {
 			lock_rw_unlock(&z->lock);
 			z = NULL;
@@ -1838,10 +1901,12 @@ local_zones_answer(struct local_zones* zones, struct module_env* env,
 			lzt == local_zone_inform_deny ||
 			lzt == local_zone_inform_redirect)
 			&& repinfo)
-		lz_inform_print(z, qinfo, repinfo);
+		lz_inform_print(z, qinfo, &repinfo->client_addr,
+			repinfo->client_addrlen);
 
 	if(lzt != local_zone_always_refuse
 		&& lzt != local_zone_always_transparent
+		&& lzt != local_zone_block_a
 		&& lzt != local_zone_always_nxdomain
 		&& lzt != local_zone_always_nodata
 		&& lzt != local_zone_always_deny
@@ -1872,6 +1937,7 @@ const char* local_zone_type2str(enum localzone_type t)
 		case local_zone_inform_deny: return "inform_deny";
 		case local_zone_inform_redirect: return "inform_redirect";
 		case local_zone_always_transparent: return "always_transparent";
+		case local_zone_block_a: return "block_a";
 		case local_zone_always_refuse: return "always_refuse";
 		case local_zone_always_nxdomain: return "always_nxdomain";
 		case local_zone_always_nodata: return "always_nodata";
@@ -1906,6 +1972,8 @@ int local_zone_str2type(const char* type, enum localzone_type* t)
 		*t = local_zone_inform_redirect;
 	else if(strcmp(type, "always_transparent") == 0)
 		*t = local_zone_always_transparent;
+	else if(strcmp(type, "block_a") == 0)
+		*t = local_zone_block_a;
 	else if(strcmp(type, "always_refuse") == 0)
 		*t = local_zone_always_refuse;
 	else if(strcmp(type, "always_nxdomain") == 0)

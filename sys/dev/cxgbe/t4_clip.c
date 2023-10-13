@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2012-2021 Chelsio Communications, Inc.
  * All rights reserved.
@@ -28,8 +28,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include "opt_inet.h"
 #include "opt_inet6.h"
 
@@ -416,7 +414,7 @@ update_clip_db(void)
 	VNET_FOREACH(vnet_iter) {
 		CURVNET_SET_QUIET(vnet_iter);
 		CK_STAILQ_FOREACH(ia, &V_in6_ifaddrhead, ia_link) {
-			if (ia->ia_ifp->if_flags & IFF_LOOPBACK)
+			if (if_getflags(ia->ia_ifp) & IFF_LOOPBACK)
 				continue;
 			in6 = &ia->ia_addr.sin6_addr;
 			KASSERT(!IN6_IS_ADDR_MULTICAST(in6),
@@ -719,7 +717,7 @@ done:
 }
 
 static void
-t4_ifaddr_event(void *arg __unused, struct ifnet *ifp, struct ifaddr *ifa,
+t4_ifaddr_event(void *arg __unused, if_t ifp, struct ifaddr *ifa,
     int event)
 {
 	struct in6_addr *in6;
@@ -728,7 +726,7 @@ t4_ifaddr_event(void *arg __unused, struct ifnet *ifp, struct ifaddr *ifa,
 		return;		/* Automatic updates not allowed. */
 	if (ifa->ifa_addr->sa_family != AF_INET6)
 		return;
-	if (ifp->if_flags & IFF_LOOPBACK)
+	if (if_getflags(ifp) & IFF_LOOPBACK)
 		return;
 	in6 = &((struct in6_ifaddr *)ifa)->ia_addr.sin6_addr;
 	if (IN6_IS_ADDR_LOOPBACK(in6) || IN6_IS_ADDR_MULTICAST(in6))

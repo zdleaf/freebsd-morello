@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2003-2008, Joseph Koshy
  * Copyright (c) 2007 The FreeBSD Foundation
@@ -31,8 +31,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/cpuset.h>
 #include <sys/event.h>
@@ -59,6 +57,7 @@ __FBSDID("$FreeBSD$");
 #include <regex.h>
 #include <signal.h>
 #include <stdarg.h>
+#include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -95,7 +94,7 @@ __FBSDID("$FreeBSD$");
  *
  *   /Parent/				/Child/
  *
- *   - Wait for childs token.
+ *   - Wait for child's token.
  *					- Sends token.
  *					- Awaits signal to start.
  *  - Attaches PMCs to the child's pid
@@ -116,6 +115,7 @@ static int	pmcstat_kq;
 static kvm_t	*pmcstat_kvm;
 static struct kinfo_proc *pmcstat_plist;
 struct pmcstat_args args;
+static bool	libpmc_initialized = false;
 
 static void
 pmcstat_get_cpumask(const char *cpuspec, cpuset_t *cpumask)
@@ -347,8 +347,6 @@ pmcstat_print_pmcs(void)
 	(void) fprintf(args.pa_printfile, "\n");
 
 	pmcstat_print_counters();
-
-	return;
 }
 
 void
@@ -383,7 +381,6 @@ pmcstat_show_usage(void)
 	    "\t -f spec\t pass \"spec\" to as plugin option\n"
 	    "\t -g\t\t produce gprof(1) compatible profiles\n"
 	    "\t -i lwp\t\t filter on thread id \"lwp\" in post-processing\n"
-	    "\t -k dir\t\t set the path to the kernel\n"
 	    "\t -l secs\t set duration time\n"
 	    "\t -m file\t print sampled PCs to \"file\"\n"
 	    "\t -n rate\t set sampling rate\n"
@@ -419,6 +416,22 @@ pmcstat_topexit(void)
 	endwin();
 }
 
+static inline void
+libpmc_initialize(int *npmc)
+{
+
+	if (libpmc_initialized)
+		return;
+	if (pmc_init() < 0)
+		err(EX_UNAVAILABLE, "ERROR: Initialization of the pmc(3)"
+		    " library failed");
+
+	/* assume all CPUs are identical */
+	if ((*npmc = pmc_npmc(0)) < 0)
+		err(EX_OSERR, "ERROR: Cannot determine the number of PMCs on "
+		    "CPU %d", 0);
+	libpmc_initialized = true;
+}
 /*
  * Main
  */
@@ -426,21 +439,21 @@ pmcstat_topexit(void)
 int
 main(int argc, char **argv)
 {
-	cpuset_t cpumask, rootmask;
+	cpuset_t cpumask, dommask, rootmask;
 	double interval;
 	double duration;
 	int option, npmc;
 	int c, check_driver_stats; 
 	int do_callchain, do_descendants, do_logproccsw, do_logprocexit;
-	int do_print, do_read, do_listcounters, do_descr;
-	int do_userspace;
+	int do_print, do_read, do_listcounters, do_descr, domains;
+	int do_userspace, i;
 	size_t len;
 	int graphdepth;
 	int pipefd[2], rfd;
 	int use_cumulative_counts;
 	short cf, cb;
 	uint64_t current_sampling_count;
-	char *end, *tmp, *event;
+	char *end, *event;
 	const char *errmsg, *graphfilename;
 	enum pmcstat_state runstate;
 	struct pmc_driverstats ds_start, ds_end;
@@ -449,7 +462,7 @@ main(int argc, char **argv)
 	struct kevent kev;
 	struct winsize ws;
 	struct stat sb;
-	char buffer[PATH_MAX];
+	uint32_t caps;
 
 	check_driver_stats      = 0;
 	current_sampling_count  = 0;
@@ -460,6 +473,7 @@ main(int argc, char **argv)
 	do_logproccsw           = 0;
 	do_logprocexit          = 0;
 	do_listcounters         = 0;
+	domains			= 0;
 	use_cumulative_counts   = 0;
 	graphfilename		= "-";
 	args.pa_required	= 0;
@@ -489,17 +503,12 @@ main(int argc, char **argv)
 	bzero(&ds_end, sizeof(ds_end));
 	ev = NULL;
 	event = NULL;
+	caps = 0;
 	CPU_ZERO(&cpumask);
 
-	/* Default to using the running system kernel. */
-	len = 0;
-	if (sysctlbyname("kern.bootfile", NULL, &len, NULL, 0) == -1)
-		err(EX_OSERR, "ERROR: Cannot determine path of running kernel");
-	args.pa_kernel = malloc(len);
-	if (args.pa_kernel == NULL)
-		errx(EX_SOFTWARE, "ERROR: Out of memory.");
-	if (sysctlbyname("kern.bootfile", args.pa_kernel, &len, NULL, 0) == -1)
-		err(EX_OSERR, "ERROR: Cannot determine path of running kernel");
+	len = sizeof(domains);
+	if (sysctlbyname("vm.ndomains", &domains, &len, NULL, 0) == -1)
+		err(EX_OSERR, "ERROR: Cannot get number of domains");
 
 	/*
 	 * The initial CPU mask specifies the root mask of this process
@@ -600,12 +609,8 @@ main(int argc, char **argv)
 			break;
 
 		case 'k':	/* pathname to the kernel */
-			free(args.pa_kernel);
-			args.pa_kernel = strdup(optarg);
-			if (args.pa_kernel == NULL)
-				errx(EX_SOFTWARE, "ERROR: Out of memory");
-			args.pa_required |= FLAG_DO_ANALYSIS;
-			args.pa_flags    |= FLAG_HAS_KERNELPATH;
+			warnx("WARNING: -k is obsolete, has no effect "
+			    "and will be removed in FreeBSD 15.");
 			break;
 
 		case 'L':
@@ -640,6 +645,7 @@ main(int argc, char **argv)
 		case 's':	/* system-wide counting PMC */
 		case 'P':	/* process virtual sampling PMC */
 		case 'S':	/* system-wide sampling PMC */
+			caps = 0;
 			if ((ev = malloc(sizeof(*ev))) == NULL)
 				errx(EX_SOFTWARE, "ERROR: Out of memory.");
 
@@ -708,8 +714,55 @@ main(int argc, char **argv)
 			(void) strncpy(ev->ev_name, optarg, c);
 			*(ev->ev_name + c) = '\0';
 
+			libpmc_initialize(&npmc);
+
+			if (args.pa_flags & FLAG_HAS_SYSTEM_PMCS) {
+				/*
+				 * We need to check the capabilities of the
+				 * desired event to determine if it should be
+				 * allocated on every CPU, or only a subset of
+				 * them. This requires allocating a PMC now.
+				 */
+				if (pmc_allocate(ev->ev_spec, ev->ev_mode,
+				    ev->ev_flags, ev->ev_cpu, &ev->ev_pmcid,
+				    ev->ev_count) < 0)
+					err(EX_OSERR, "ERROR: Cannot allocate "
+					    "system-mode pmc with specification"
+					    " \"%s\"", ev->ev_spec);
+				if (pmc_capabilities(ev->ev_pmcid, &caps)) {
+					pmc_release(ev->ev_pmcid);
+					err(EX_OSERR, "ERROR: Cannot get pmc "
+					    "capabilities");
+				}
+
+				/*
+				 * Release the PMC now that we have caps; we
+				 * will reallocate shortly.
+				 */
+				pmc_release(ev->ev_pmcid);
+				ev->ev_pmcid = PMC_ID_INVALID;
+			}
+
 			STAILQ_INSERT_TAIL(&args.pa_events, ev, ev_next);
 
+			if ((caps & PMC_CAP_SYSWIDE) == PMC_CAP_SYSWIDE)
+				break;
+			if ((caps & PMC_CAP_DOMWIDE) == PMC_CAP_DOMWIDE) {
+				CPU_ZERO(&cpumask);
+				/*
+				 * Get number of domains and allocate one
+				 * counter in each.
+				 * First already allocated.
+				 */
+				for (i = 1; i < domains; i++) {
+					CPU_ZERO(&dommask);
+					cpuset_getaffinity(CPU_LEVEL_WHICH,
+					    CPU_WHICH_DOMAIN, i, sizeof(dommask),
+					    &dommask);
+					CPU_SET(CPU_FFS(&dommask) - 1, &cpumask);
+				}
+				args.pa_flags |= FLAGS_HAS_CPUMASK;
+			}
 			if (option == 's' || option == 'S') {
 				CPU_CLR(ev->ev_cpu, &cpumask);
 				pmcstat_clone_event_descriptor(ev, &cpumask, &args);
@@ -923,7 +976,7 @@ main(int argc, char **argv)
 	if ((args.pa_required & FLAG_HAS_PROCESS_PMCS) &&
 	    (args.pa_flags & FLAG_HAS_PROCESS_PMCS) == 0)
 		errx(EX_USAGE,
-"ERROR: options -d, -E, and -W require a process mode PMC to be specified."
+"ERROR: options -d, -E, -t, and -W require a process mode PMC to be specified."
 		    );
 
 	/* check for -c cpu with no system mode PMCs or logfile. */
@@ -969,12 +1022,6 @@ main(int argc, char **argv)
 "ERROR: option -O is used only with options -E, -P, -S and -W."
 		    );
 
-	/* -k kernel path require -g/-G/-m/-T or -R */
-	if ((args.pa_flags & FLAG_HAS_KERNELPATH) &&
-	    (args.pa_flags & FLAG_DO_ANALYSIS) == 0 &&
-	    (args.pa_flags & FLAG_READ_LOGFILE) == 0)
-	    errx(EX_USAGE, "ERROR: option -k is only used with -g/-R/-m/-T.");
-
 	/* -D only applies to gprof output mode (-g) */
 	if ((args.pa_flags & FLAG_HAS_SAMPLESDIR) &&
 	    (args.pa_flags & FLAG_DO_GPROF) == 0)
@@ -999,36 +1046,6 @@ main(int argc, char **argv)
 		    );
 
 	/*
-	 * Check if 'kerneldir' refers to a file rather than a
-	 * directory.  If so, use `dirname path` to determine the
-	 * kernel directory.
-	 */
-	(void) snprintf(buffer, sizeof(buffer), "%s%s", args.pa_fsroot,
-	    args.pa_kernel);
-	if (stat(buffer, &sb) < 0)
-		err(EX_OSERR, "ERROR: Cannot locate kernel \"%s\"",
-		    buffer);
-	if (!S_ISREG(sb.st_mode) && !S_ISDIR(sb.st_mode))
-		errx(EX_USAGE, "ERROR: \"%s\": Unsupported file type.",
-		    buffer);
-	if (!S_ISDIR(sb.st_mode)) {
-		tmp = args.pa_kernel;
-		args.pa_kernel = strdup(dirname(args.pa_kernel));
-		if (args.pa_kernel == NULL)
-			errx(EX_SOFTWARE, "ERROR: Out of memory");
-		free(tmp);
-		(void) snprintf(buffer, sizeof(buffer), "%s%s",
-		    args.pa_fsroot, args.pa_kernel);
-		if (stat(buffer, &sb) < 0)
-			err(EX_OSERR, "ERROR: Cannot stat \"%s\"",
-			    buffer);
-		if (!S_ISDIR(sb.st_mode))
-			errx(EX_USAGE,
-			    "ERROR: \"%s\" is not a directory.",
-			    buffer);
-	}
-
-	/*
 	 * If we have a callgraph be created, select the outputfile.
 	 */
 	if (args.pa_flags & FLAG_DO_CALLGRAPHS) {
@@ -1050,17 +1067,8 @@ main(int argc, char **argv)
 	}
 
 	/* if we've been asked to process a log file, skip init */
-	if ((args.pa_flags & FLAG_READ_LOGFILE) == 0) {
-		if (pmc_init() < 0)
-			err(EX_UNAVAILABLE,
-			    "ERROR: Initialization of the pmc(3) library failed"
-			    );
-
-		if ((npmc = pmc_npmc(0)) < 0) /* assume all CPUs are identical */
-			err(EX_OSERR,
-"ERROR: Cannot determine the number of PMCs on CPU %d",
-			    0);
-	}
+	if ((args.pa_flags & FLAG_READ_LOGFILE) == 0)
+		libpmc_initialize(&npmc);
 
 	/* Allocate a kqueue */
 	if ((pmcstat_kq = kqueue()) < 0)

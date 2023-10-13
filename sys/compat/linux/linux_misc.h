@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2006 Roman Divacky
  * All rights reserved.
@@ -24,14 +24,10 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 #ifndef _LINUX_MISC_H_
 #define	_LINUX_MISC_H_
-
-#include <sys/sysctl.h>
 
 #define	LINUX_MAX_PID_NS_LEVEL	32
 
@@ -95,6 +91,10 @@
 
 #define	LINUX_AT_RANDOM_LEN	16	/* size of random bytes */
 
+#ifndef LINUX_AT_MINSIGSTKSZ
+#define	LINUX_AT_MINSIGSTKSZ	51	/* min stack size required by the kernel */
+#endif
+
 /* Linux sets the i387 to extended precision. */
 #if defined(__i386__) || defined(__amd64__)
 #define	__LINUX_NPXCW__		0x37f
@@ -136,6 +136,7 @@ extern int stclohz;
 #define	LINUX_P_ALL		0
 #define	LINUX_P_PID		1
 #define	LINUX_P_PGID		2
+#define	LINUX_P_PIDFD		3
 
 #define	LINUX_RLIMIT_LOCKS	10
 #define	LINUX_RLIMIT_SIGPENDING	11
@@ -155,6 +156,10 @@ extern int stclohz;
 
 /* Linux seccomp flags */
 #define	LINUX_SECCOMP_GET_ACTION_AVAIL	2
+
+/* Linux /proc/self/oom_score_adj */
+#define	LINUX_OOM_SCORE_ADJ_MIN	-1000
+#define	LINUX_OOM_SCORE_ADJ_MAX	1000
 
 #if defined(__aarch64__) || (defined(__amd64__) && !defined(COMPAT_LINUX32))
 int linux_ptrace_status(struct thread *td, int pid, int status);
@@ -183,5 +188,29 @@ struct syscall_info {
 		} seccomp;
 	};
 };
+
+/* Linux ioprio set/get syscalls */
+#define	LINUX_IOPRIO_CLASS_SHIFT	13
+#define	LINUX_IOPRIO_CLASS_MASK		0x07
+#define	LINUX_IOPRIO_PRIO_MASK		((1UL << LINUX_IOPRIO_CLASS_SHIFT) - 1)
+
+#define	LINUX_IOPRIO_PRIO_CLASS(ioprio)						\
+    (((ioprio) >> LINUX_IOPRIO_CLASS_SHIFT) & LINUX_IOPRIO_CLASS_MASK)
+#define	LINUX_IOPRIO_PRIO_DATA(ioprio)	((ioprio) & LINUX_IOPRIO_PRIO_MASK)
+#define	LINUX_IOPRIO_PRIO(class, data)						\
+    ((((class) & LINUX_IOPRIO_CLASS_MASK) << LINUX_IOPRIO_CLASS_SHIFT) |	\
+    ((data) & LINUX_IOPRIO_PRIO_MASK))
+
+#define	LINUX_IOPRIO_CLASS_NONE		0
+#define	LINUX_IOPRIO_CLASS_RT		1
+#define	LINUX_IOPRIO_CLASS_BE		2
+#define	LINUX_IOPRIO_CLASS_IDLE		3
+
+#define	LINUX_IOPRIO_MIN		0
+#define	LINUX_IOPRIO_MAX		7
+
+#define	LINUX_IOPRIO_WHO_PROCESS	1
+#define	LINUX_IOPRIO_WHO_PGRP		2
+#define	LINUX_IOPRIO_WHO_USER		3
 
 #endif	/* _LINUX_MISC_H_ */

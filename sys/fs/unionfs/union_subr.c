@@ -35,7 +35,6 @@
  * SUCH DAMAGE.
  *
  *	@(#)union_subr.c	8.20 (Berkeley) 5/20/95
- * $FreeBSD$
  */
 
 #include <sys/param.h>
@@ -308,7 +307,7 @@ unionfs_nodeget(struct mount *mp, struct vnode *uppervp,
 	u_long		hashmask;
 	int		error;
 	int		lkflags;
-	enum vtype	vt;
+	__enum_uint8(vtype)	vt;
 
 	error = 0;
 	ump = MOUNTTOUNIONFSMOUNT(mp);
@@ -388,7 +387,8 @@ unionfs_nodeget(struct mount *mp, struct vnode *uppervp,
 	KASSERT(dvp != NULL || (vp->v_vflag & VV_ROOT) != 0,
 	    ("%s: NULL dvp for non-root vp %p", __func__, vp));
 
-	vn_lock_pair(lowervp, false, uppervp, false); 
+	vn_lock_pair(lowervp, false, LK_EXCLUSIVE, uppervp, false,
+	    LK_EXCLUSIVE);
 	error = insmntque1(vp, mp);
 	if (error != 0) {
 		unionfs_nodeget_cleanup(vp, unp);
@@ -396,16 +396,20 @@ unionfs_nodeget(struct mount *mp, struct vnode *uppervp,
 	}
 	if (lowervp != NULL && VN_IS_DOOMED(lowervp)) {
 		vput(lowervp);
-		unp->un_lowervp = NULL;
+		unp->un_lowervp = lowervp = NULL;
 	}
 	if (uppervp != NULL && VN_IS_DOOMED(uppervp)) {
 		vput(uppervp);
-		unp->un_uppervp = NULL;
+		unp->un_uppervp = uppervp = NULL;
+		if (lowervp != NULLVP)
+			vp->v_vnlock = lowervp->v_vnlock;
 	}
-	if (unp->un_lowervp == NULL && unp->un_uppervp == NULL) {
+	if (lowervp == NULL && uppervp == NULL) {
 		unionfs_nodeget_cleanup(vp, unp);
 		return (ENOENT);
 	}
+
+	vn_set_state(vp, VSTATE_CONSTRUCTED);
 
 	if (dvp != NULLVP && vt == VDIR)
 		*vpp = unionfs_ins_cached_vnode(unp, dvp);
@@ -442,7 +446,16 @@ unionfs_noderem(struct vnode *vp)
 	int		count;
 	int		writerefs;
 
-	KASSERT(vp->v_vnlock->lk_recurse == 0,
+	/*
+	 * The root vnode lock may be recursed during unmount, because
+	 * it may share the same lock as the unionfs mount's covered vnode,
+	 * which is locked across VFS_UNMOUNT().  This lock will then be
+	 * recursively taken during the vflush() issued by unionfs_unmount().
+	 * But we still only need to lock the unionfs lock once, because only
+	 * one of those lock operations was taken against a unionfs vnode and
+	 * will be undone against a unionfs vnode.
+	 */
+	KASSERT(vp->v_vnlock->lk_recurse == 0 || (vp->v_vflag & VV_ROOT) != 0,
 	    ("%s: vnode %p locked recursively", __func__, vp));
 	if (lockmgr(&vp->v_lock, LK_EXCLUSIVE | LK_NOWAIT, NULL) != 0)
 		panic("%s: failed to acquire lock for vnode lock", __func__);
@@ -653,34 +666,33 @@ unionfs_relookup(struct vnode *dvp, struct vnode **vpp,
     char *path, int pathlen, u_long nameiop)
 {
 	int error;
+	bool refstart;
 
 	cn->cn_namelen = pathlen;
 	cn->cn_pnbuf = path;
 	cn->cn_nameiop = nameiop;
-	cn->cn_flags = (LOCKPARENT | LOCKLEAF | HASBUF | SAVENAME | ISLASTCN);
+	cn->cn_flags = (LOCKPARENT | LOCKLEAF | ISLASTCN);
 	cn->cn_lkflags = LK_EXCLUSIVE;
 	cn->cn_cred = cnp->cn_cred;
 	cn->cn_nameptr = cn->cn_pnbuf;
 
-	if (nameiop == DELETE)
-		cn->cn_flags |= (cnp->cn_flags & (DOWHITEOUT | SAVESTART));
-	else if (RENAME == nameiop)
-		cn->cn_flags |= (cnp->cn_flags & SAVESTART);
-	else if (nameiop == CREATE)
+	refstart = false;
+	if (nameiop == DELETE) {
+		cn->cn_flags |= (cnp->cn_flags & DOWHITEOUT);
+	} else if (nameiop == RENAME) {
+		refstart = true;
+	} else if (nameiop == CREATE) {
 		cn->cn_flags |= NOCACHE;
+	}
 
 	vref(dvp);
 	VOP_UNLOCK(dvp);
 
-	if ((error = relookup(dvp, vpp, cn))) {
+	if ((error = vfs_relookup(dvp, vpp, cn, refstart))) {
 		vn_lock(dvp, LK_EXCLUSIVE | LK_RETRY);
 	} else
 		vrele(dvp);
 
-	KASSERT((cn->cn_flags & HASBUF) != 0,
-	    ("%s: HASBUF cleared", __func__));
-	KASSERT((cn->cn_flags & SAVENAME) != 0,
-	    ("%s: SAVENAME cleared", __func__));
 	KASSERT(cn->cn_pnbuf == path, ("%s: cn_pnbuf changed", __func__));
 
 	return (error);
@@ -707,8 +719,6 @@ unionfs_relookup_for_create(struct vnode *dvp, struct componentname *cnp,
 	udvp = UNIONFSVPTOUPPERVP(dvp);
 	vp = NULLVP;
 
-	KASSERT((cnp->cn_flags & HASBUF) != 0,
-	    ("%s called without HASBUF", __func__));
 	error = unionfs_relookup(udvp, &vp, cnp, &cn, td, cnp->cn_nameptr,
 	    cnp->cn_namelen, CREATE);
 	if (error)
@@ -743,8 +753,6 @@ unionfs_relookup_for_delete(struct vnode *dvp, struct componentname *cnp,
 	udvp = UNIONFSVPTOUPPERVP(dvp);
 	vp = NULLVP;
 
-	KASSERT((cnp->cn_flags & HASBUF) != 0,
-	    ("%s called without HASBUF", __func__));
 	error = unionfs_relookup(udvp, &vp, cnp, &cn, td, cnp->cn_nameptr,
 	    cnp->cn_namelen, DELETE);
 	if (error)
@@ -779,8 +787,6 @@ unionfs_relookup_for_rename(struct vnode *dvp, struct componentname *cnp,
 	udvp = UNIONFSVPTOUPPERVP(dvp);
 	vp = NULLVP;
 
-	KASSERT((cnp->cn_flags & HASBUF) != 0,
-	    ("%s called without HASBUF", __func__));
 	error = unionfs_relookup(udvp, &vp, cnp, &cn, td, cnp->cn_nameptr,
 	    cnp->cn_namelen, RENAME);
 	if (error)
@@ -821,7 +827,7 @@ unionfs_node_update(struct unionfs_node *unp, struct vnode *uvp,
 	VNASSERT(vp->v_writecount == 0, vp,
 	    ("%s: non-zero writecount", __func__));
 	/*
-	 * Uppdate the upper vnode's lock state to match the lower vnode,
+	 * Update the upper vnode's lock state to match the lower vnode,
 	 * and then switch the unionfs vnode's lock to the upper vnode.
 	 */
 	lockrec = lvp->v_vnlock->lk_recurse;
@@ -908,7 +914,7 @@ unionfs_mkshadowdir(struct unionfs_mount *ump, struct vnode *udvp,
 		goto unionfs_mkshadowdir_abort;
 	}
 
-	if ((error = vn_start_write(udvp, &mp, V_WAIT | PCATCH)))
+	if ((error = vn_start_write(udvp, &mp, V_WAIT | V_PCATCH)))
 		goto unionfs_mkshadowdir_abort;
 	unionfs_create_uppervattr_core(ump, &lva, &va, td);
 
@@ -963,7 +969,7 @@ unionfs_mkwhiteout(struct vnode *dvp, struct componentname *cnp,
 		return (EEXIST);
 	}
 
-	if ((error = vn_start_write(dvp, &mp, V_WAIT | PCATCH)))
+	if ((error = vn_start_write(dvp, &mp, V_WAIT | V_PCATCH)))
 		goto unionfs_mkwhiteout_free_out;
 	error = VOP_WHITEOUT(dvp, &nd.ni_cnd, CREATE);
 
@@ -1011,15 +1017,14 @@ unionfs_vn_create_on_upper(struct vnode **vpp, struct vnode *udvp,
 	nd.ni_cnd.cn_namelen = unp->un_pathlen;
 	nd.ni_cnd.cn_pnbuf = unp->un_path;
 	nd.ni_cnd.cn_nameiop = CREATE;
-	nd.ni_cnd.cn_flags = LOCKPARENT | LOCKLEAF | HASBUF | SAVENAME |
-	    ISLASTCN;
+	nd.ni_cnd.cn_flags = LOCKPARENT | LOCKLEAF | ISLASTCN;
 	nd.ni_cnd.cn_lkflags = LK_EXCLUSIVE;
 	nd.ni_cnd.cn_cred = cred;
 	nd.ni_cnd.cn_nameptr = nd.ni_cnd.cn_pnbuf;
 	NDPREINIT(&nd);
 
 	vref(udvp);
-	if ((error = relookup(udvp, &vp, &nd.ni_cnd)) != 0)
+	if ((error = vfs_relookup(udvp, &vp, &nd.ni_cnd, false)) != 0)
 		goto unionfs_vn_create_on_upper_free_out2;
 	vrele(udvp);
 
@@ -1052,10 +1057,6 @@ unionfs_vn_create_on_upper_free_out1:
 	VOP_UNLOCK(udvp);
 
 unionfs_vn_create_on_upper_free_out2:
-	KASSERT((nd.ni_cnd.cn_flags & HASBUF) != 0,
-	    ("%s: HASBUF cleared", __func__));
-	KASSERT((nd.ni_cnd.cn_flags & SAVENAME) != 0,
-	    ("%s: SAVENAME cleared", __func__));
 	KASSERT(nd.ni_cnd.cn_pnbuf == unp->un_path,
 	    ("%s: cn_pnbuf changed", __func__));
 
@@ -1166,7 +1167,7 @@ unionfs_copyfile(struct unionfs_node *unp, int docopy, struct ucred *cred,
 	if (error != 0)
 		return (error);
 
-	if ((error = vn_start_write(udvp, &mp, V_WAIT | PCATCH)) != 0)
+	if ((error = vn_start_write(udvp, &mp, V_WAIT | V_PCATCH)) != 0)
 		return (error);
 	error = unionfs_vn_create_on_upper(&uvp, udvp, unp, &uva, td);
 	if (error != 0) {
@@ -1281,8 +1282,7 @@ unionfs_check_rmdir(struct vnode *vp, struct ucred *cred, struct thread *td)
 			cn.cn_pnbuf = NULL;
 			cn.cn_nameptr = dp->d_name;
 			cn.cn_nameiop = LOOKUP;
-			cn.cn_flags = LOCKPARENT | LOCKLEAF | SAVENAME |
-			    RDONLY | ISLASTCN;
+			cn.cn_flags = LOCKPARENT | LOCKLEAF | RDONLY | ISLASTCN;
 			cn.cn_lkflags = LK_EXCLUSIVE;
 			cn.cn_cred = cred;
 
@@ -1303,8 +1303,7 @@ unionfs_check_rmdir(struct vnode *vp, struct ucred *cred, struct thread *td)
 			 * If it has no exist/whiteout entry in upper,
 			 * directory is not empty.
 			 */
-			cn.cn_flags = LOCKPARENT | LOCKLEAF | SAVENAME |
-			    RDONLY | ISLASTCN;
+			cn.cn_flags = LOCKPARENT | LOCKLEAF | RDONLY | ISLASTCN;
 			lookuperr = VOP_LOOKUP(uvp, &tvp, &cn);
 
 			if (!lookuperr)

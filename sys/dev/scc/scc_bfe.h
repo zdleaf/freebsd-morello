@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2004-2006 Marcel Moolenaar
  * All rights reserved.
@@ -24,8 +24,6 @@
  * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 #ifndef _DEV_SCC_BFE_H_
@@ -72,11 +70,11 @@ struct scc_mode {
 	device_t	m_dev;
 
 	u_int		m_mode;
-	int		m_attached:1;
-	int		m_fastintr:1;
-	int		m_hasintr:1;
-	int		m_probed:1;
-	int		m_sysdev:1;
+	bool		m_attached:1;
+	bool		m_fastintr:1;
+	bool		m_hasintr:1;
+	bool		m_probed:1;
+	bool		m_sysdev:1;
 
 	driver_filter_t	*ih;
 	serdev_intr_t	*ih_src[SCC_ISRCCNT];
@@ -94,8 +92,8 @@ struct scc_chan {
 	struct scc_mode	ch_mode[SCC_NMODES];
 
 	u_int		ch_nr;
-	int		ch_enabled:1;
-	int		ch_sysdev:1;
+	bool		ch_enabled:1;
+	bool		ch_sysdev:1;
 
 	uint32_t	ch_ipend;
 	uint32_t	ch_hwsig;
@@ -130,14 +128,13 @@ struct scc_softc {
 
 	struct scc_chan	*sc_chan;
 
-	int		sc_fastintr:1;
-	int		sc_leaving:1;
-	int		sc_polled:1;
+	bool		sc_fastintr:1;
+	bool		sc_leaving:1;
+	bool		sc_polled:1;
 
 	uint32_t        sc_hwsig;       /* Signal state. Used by HW driver. */
 };
 
-extern devclass_t scc_devclass;
 extern const char scc_driver_name[];
 
 int scc_bfe_attach(device_t dev, u_int ipc);

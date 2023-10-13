@@ -25,8 +25,6 @@
  * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 #ifndef _LINUXKPI_LINUX_HARDIRQ_H_
 #define	_LINUXKPI_LINUX_HARDIRQ_H_
@@ -39,5 +37,15 @@
 #include <sys/interrupt.h>
 
 #define	synchronize_irq(irq)	_intr_drain((irq))
+
+/*
+ * FIXME: In the i915 driver's `intel_engine_cs.c` file,
+ * `synchronize_hardirq()` was replaced by `synchronize_rcu()` with the
+ * following comment:
+ *   "Is it enough to wait that all cpu have context-switched?"
+ *
+ * See commit f6d50b7af554e21c380486d6f41c8537b265c777 in drm-kmod.
+ */
+#define	synchronize_hardirq(irq) _intr_drain((irq))
 
 #endif	/* _LINUXKPI_LINUX_HARDIRQ_H_ */

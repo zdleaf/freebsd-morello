@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2003 - 2008 Søren Schmidt <sos@FreeBSD.org>
  * All rights reserved.
@@ -24,8 +24,6 @@
  * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 /* structure holding chipset config info */
@@ -561,8 +559,6 @@ int ata_mode2idx(int mode);
 int ata_sii_chipinit(device_t);
 
 /* externs */
-extern devclass_t ata_pci_devclass;
-
 MALLOC_DECLARE(M_ATAPCI);
 
 /* macro for easy definition of all driver module stuff */
@@ -593,7 +589,7 @@ static driver_t __CONCAT(dname,_driver) = { \
         __CONCAT(dname,_methods), \
         sizeof(struct ata_pci_controller) \
 }; \
-DRIVER_MODULE(dname, pci, __CONCAT(dname,_driver), ata_pci_devclass, NULL, NULL); \
+DRIVER_MODULE(dname, pci, __CONCAT(dname,_driver), NULL, NULL); \
 MODULE_VERSION(dname, 1); \
 MODULE_DEPEND(dname, ata, 1, 1, 1); \
 MODULE_DEPEND(dname, atapci, 1, 1, 1);

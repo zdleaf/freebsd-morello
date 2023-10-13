@@ -20,8 +20,6 @@
 .\" (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 .\" THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 .\"
-.\" $FreeBSD$
-.\"
 .Dd June 19, 2019
 .Dt SLEEPQUEUE 9
 .Os
@@ -383,8 +381,8 @@ interfaces.
 Almost all other code in the kernel should use one of those interfaces rather
 than manipulating sleep queues directly.
 .Sh SEE ALSO
+.Xr callout 9 ,
 .Xr condvar 9 ,
 .Xr runqueue 9 ,
 .Xr scheduler 9 ,
-.Xr sleep 9 ,
-.Xr timeout 9
+.Xr sleep 9

@@ -6,6 +6,7 @@ auto.obj.mk
 autoconf.mk
 autodep.mk
 auto.dep.mk
+cc-wrap.mk
 compiler.mk
 cython.mk
 dep.mk
@@ -18,7 +19,9 @@ host.libnames.mk
 inc.mk
 init.mk
 install-mk
+install-sh
 java.mk
+jobs.mk
 ldorder.mk
 lib.mk
 libnames.mk
@@ -28,10 +31,12 @@ man.mk
 manifest.mk
 mk-files.txt
 mkopt.sh
+newlog.sh
 nls.mk
 obj.mk
 options.mk
 own.mk
+posix.mk
 prlist.mk
 prog.mk
 progs.mk
@@ -44,6 +49,7 @@ sys.mk
 sys.clean-env.mk
 sys.debug.mk
 sys.dependfile.mk
+sys.dirdeps.mk
 sys.vars.mk
 sys/AIX.mk
 sys/Darwin.mk

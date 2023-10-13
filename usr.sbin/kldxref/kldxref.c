@@ -30,8 +30,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 #include <sys/types.h>
@@ -685,6 +683,7 @@ main(int argc, char *argv[])
 {
 	FTS *ftsp;
 	FTSENT *p;
+	char *dot = NULL;
 	int opt, fts_options, ival;
 	struct stat sb;
 
@@ -752,14 +751,15 @@ main(int argc, char *argv[])
 			fwrite(&ival, sizeof(ival), 1, fxref);
 			reccnt = 0;
 		}
-		/* skip non-files and separate debug files */
+		/* skip non-files.. */
 		if (p->fts_info != FTS_F)
 			continue;
-		if (p->fts_namelen >= 6 &&
-		    strcmp(p->fts_name + p->fts_namelen - 6, ".debug") == 0)
-			continue;
-		if (p->fts_namelen >= 8 &&
-		    strcmp(p->fts_name + p->fts_namelen - 8, ".symbols") == 0)
+		/*
+		 * Skip files that generate errors like .debug, .symbol and .pkgsave
+		 * by generally skipping all files with 2 dots.
+		 */
+		dot = strchr(p->fts_name, '.');
+		if (dot && strchr(dot + 1, '.') != NULL)
 			continue;
 		read_kld(p->fts_path, p->fts_name);
 	}

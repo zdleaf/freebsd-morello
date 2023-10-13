@@ -24,7 +24,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/buf.h>
@@ -54,7 +53,7 @@ static driver_t nvme_ahci_driver = {
 	sizeof(struct nvme_controller),
 };
 
-DRIVER_MODULE(nvme, ahci, nvme_ahci_driver, nvme_devclass, NULL, 0);
+DRIVER_MODULE(nvme, ahci, nvme_ahci_driver, NULL, NULL);
 
 static int
 nvme_ahci_probe (device_t device)

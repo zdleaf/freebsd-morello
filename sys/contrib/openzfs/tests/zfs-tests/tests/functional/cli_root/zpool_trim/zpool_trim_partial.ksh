@@ -60,11 +60,11 @@ log_must set_tunable64 VDEV_MIN_MS_COUNT 64
 
 # Minimum trim size is decreased to verify all trim sizes.
 typeset trim_extent_bytes_min=$(get_tunable TRIM_EXTENT_BYTES_MIN)
-log_must set_tunable64 TRIM_EXTENT_BYTES_MIN 4096
+log_must set_tunable64 TRIM_EXTENT_BYTES_MIN 512
 
 log_must mkdir "$TESTDIR"
 log_must truncate -s $LARGESIZE "$LARGEFILE"
-log_must zpool create $TESTPOOL "$LARGEFILE"
+log_must zpool create -O compression=off $TESTPOOL "$LARGEFILE"
 log_must mkfile $(( floor(LARGESIZE * 0.80) )) /$TESTPOOL/file
 sync_all_pools
 

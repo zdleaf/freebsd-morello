@@ -1,12 +1,10 @@
-# $FreeBSD$
 
-LIB=	pmc
+LIB_CXX= pmc
 
 SRCS=	libpmc.c pmclog.c libpmc_pmu_util.c libpmc_json.cc
 INCS=	pmc.h pmclog.h pmcformat.h
 
 CFLAGS+= -I${SRCTOP}/${RELDIR:H}/libpmcstat
-LDADD+=	-lc++
 
 .if ${MACHINE_CPUARCH} == "aarch64"
 EVENT_ARCH="arm64"
@@ -43,11 +41,8 @@ SRCS+=	libpmc_events.c
 
 WARNS?=	3
 
-CFLAGS+= -I${.CURDIR}
+CFLAGS+= -I${.CURDIR} -I${SRCTOP}/sys
 CWARNFLAGS.gcc+= -Wno-shadow -Wno-cast-align
-
-# Silence warnings about usage of deprecated std::auto_ptr
-CXXWARNFLAGS+=	-Wno-deprecated-declarations
 
 MAN=	pmc.3
 MAN+=	pmc_allocate.3
@@ -69,10 +64,12 @@ MAN+=	pmc.soft.3
 # PMC-dependent manual pages
 MAN+=	pmc.atom.3
 MAN+=	pmc.atomsilvermont.3
+MAN+=	pmc.cmn-600.3
 MAN+=	pmc.core.3
 MAN+=	pmc.core2.3
 MAN+=	pmc.corei7.3
 MAN+=	pmc.corei7uc.3
+MAN+=	pmc.dmc-620.3
 MAN+=	pmc.haswell.3
 MAN+=	pmc.haswelluc.3
 MAN+=	pmc.haswellxeon.3

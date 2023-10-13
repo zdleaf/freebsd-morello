@@ -21,8 +21,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/stdint.h>
 #include <sys/stddef.h>
 #include <sys/param.h>
@@ -161,8 +159,6 @@ static driver_t urndis_driver = {
 	.size = sizeof(struct urndis_softc),
 };
 
-static devclass_t urndis_devclass;
-
 static const STRUCT_USB_HOST_ID urndis_host_devs[] = {
 	/* Generic RNDIS class match */
 	{USB_IFACE_CLASS(UICLASS_CDC),
@@ -184,7 +180,7 @@ static const STRUCT_USB_HOST_ID urndis_host_devs[] = {
 		USB_IFACE_PROTOCOL(UIPROTO_RNDIS)},
 };
 
-DRIVER_MODULE(urndis, uhub, urndis_driver, urndis_devclass, NULL, NULL);
+DRIVER_MODULE(urndis, uhub, urndis_driver, NULL, NULL);
 MODULE_VERSION(urndis, 1);
 MODULE_DEPEND(urndis, uether, 1, 1, 1);
 MODULE_DEPEND(urndis, usb, 1, 1, 1);
@@ -371,11 +367,11 @@ static void
 urndis_init(struct usb_ether *ue)
 {
 	struct urndis_softc *sc = uether_getsc(ue);
-	struct ifnet *ifp = uether_getifp(ue);
+	if_t ifp = uether_getifp(ue);
 
 	URNDIS_LOCK_ASSERT(sc, MA_OWNED);
 
-	ifp->if_drv_flags |= IFF_DRV_RUNNING;
+	if_setdrvflagbits(ifp, IFF_DRV_RUNNING, 0);
 
 	/* stall data write direction, which depends on USB mode */
 	usbd_xfer_set_stall(sc->sc_xfer[URNDIS_BULK_TX]);
@@ -388,11 +384,11 @@ static void
 urndis_stop(struct usb_ether *ue)
 {
 	struct urndis_softc *sc = uether_getsc(ue);
-	struct ifnet *ifp = uether_getifp(ue);
+	if_t ifp = uether_getifp(ue);
 
 	URNDIS_LOCK_ASSERT(sc, MA_OWNED);
 
-	ifp->if_drv_flags &= ~IFF_DRV_RUNNING;
+	if_setdrvflagbits(ifp, 0, IFF_DRV_RUNNING);
 
 	/*
 	 * stop all the transfers, if not already stopped:
@@ -820,7 +816,7 @@ urndis_bulk_read_callback(struct usb_xfer *xfer, usb_error_t error)
 {
 	struct urndis_softc *sc = usbd_xfer_softc(xfer);
 	struct usb_page_cache *pc = usbd_xfer_get_frame(xfer, 0);
-	struct ifnet *ifp = uether_getifp(&sc->sc_ue);
+	if_t ifp = uether_getifp(&sc->sc_ue);
 	struct rndis_packet_msg msg;
 	struct mbuf *m;
 	int actlen;
@@ -949,7 +945,7 @@ urndis_bulk_write_callback(struct usb_xfer *xfer, usb_error_t error)
 {
 	struct rndis_packet_msg msg;
 	struct urndis_softc *sc = usbd_xfer_softc(xfer);
-	struct ifnet *ifp = uether_getifp(&sc->sc_ue);
+	if_t ifp = uether_getifp(&sc->sc_ue);
 	struct mbuf *m;
 	unsigned x;
 	int actlen;
@@ -976,7 +972,7 @@ tr_setup:
 			usbd_xfer_set_frame_offset(xfer, x * RNDIS_TX_MAXLEN, x);
 
 next_pkt:
-			IFQ_DRV_DEQUEUE(&ifp->if_snd, m);
+			m = if_dequeue(ifp);
 
 			if (m == NULL)
 				break;

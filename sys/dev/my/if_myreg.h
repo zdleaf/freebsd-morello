@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2002 Myson Technology Inc.
  * All rights reserved.
@@ -26,8 +26,6 @@
  * SUCH DAMAGE.
  *
  * Written by: yen_cw@myson.com.tw  available at: http://www.myson.com.tw/
- *
- * $FreeBSD$
  *
  * Myson MTD80x register definitions.
  *
@@ -352,7 +350,7 @@ struct my_type {
 #define MY_FLAG_DELAYTIMEO      3
 
 struct my_softc {
-        struct ifnet            *my_ifp;
+        if_t			my_ifp;
 	device_t		my_dev;
         struct ifmedia          ifmedia;        /* media info */
         bus_space_handle_t      my_bhandle;

@@ -35,7 +35,6 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  * 
- * $FreeBSD$
  */
 
 #ifdef HAVE_KERNEL_OPTION_HEADERS
@@ -80,13 +79,13 @@
 #define TX_MAX_QUEUE	(FWMAXQUEUE - 1)
 
 /* network interface */
-static void fwip_start (struct ifnet *);
-static int fwip_ioctl (struct ifnet *, u_long, caddr_t);
+static void fwip_start (if_t);
+static int fwip_ioctl (if_t, u_long, caddr_t);
 static void fwip_init (void *);
 
 static void fwip_post_busreset (void *);
 static void fwip_output_callback (struct fw_xfer *);
-static void fwip_async_output (struct fwip_softc *, struct ifnet *);
+static void fwip_async_output (struct fwip_softc *, if_t);
 static void fwip_start_send (void *, int);
 static void fwip_stream_input (struct fw_xferq *);
 static void fwip_unicast_input(struct fw_xfer *);
@@ -108,15 +107,15 @@ SYSCTL_INT(_hw_firewire_fwip, OID_AUTO, rx_queue_len, CTLFLAG_RWTUN, &rx_queue_l
 static poll_handler_t fwip_poll;
 
 static int
-fwip_poll(struct ifnet *ifp, enum poll_cmd cmd, int count)
+fwip_poll(if_t ifp, enum poll_cmd cmd, int count)
 {
 	struct fwip_softc *fwip;
 	struct firewire_comm *fc;
 
-	if (!(ifp->if_drv_flags & IFF_DRV_RUNNING))
+	if (!(if_getdrvflags(ifp) & IFF_DRV_RUNNING))
 		return (0);
 
-	fwip = ((struct fwip_eth_softc *)ifp->if_softc)->fwip;
+	fwip = ((struct fwip_eth_softc *)if_getsoftc(ifp))->fwip;
 	fc = fwip->fd.fc;
 	fc->poll(fc, (cmd == POLL_AND_CHECK_STATUS)?0:1, count);
 	return (0);
@@ -147,7 +146,7 @@ static int
 fwip_attach(device_t dev)
 {
 	struct fwip_softc *fwip;
-	struct ifnet *ifp;
+	if_t ifp;
 	int unit, s;
 	struct fw_hwaddr *hwaddr;
 
@@ -183,16 +182,16 @@ fwip_attach(device_t dev)
 	hwaddr->sender_unicast_FIFO_lo = htonl((uint32_t)INET_FIFO);
 
 	/* fill the rest and attach interface */	
-	ifp->if_softc = &fwip->fw_softc;
+	if_setsoftc(ifp, &fwip->fw_softc);
 
 	if_initname(ifp, device_get_name(dev), unit);
-	ifp->if_init = fwip_init;
-	ifp->if_start = fwip_start;
-	ifp->if_ioctl = fwip_ioctl;
-	ifp->if_flags = (IFF_BROADCAST|IFF_SIMPLEX|IFF_MULTICAST);
-	ifp->if_snd.ifq_maxlen = TX_MAX_QUEUE;
+	if_setinitfn(ifp, fwip_init);
+	if_setstartfn(ifp, fwip_start);
+	if_setioctlfn(ifp, fwip_ioctl);
+	if_setflags(ifp, (IFF_BROADCAST|IFF_SIMPLEX|IFF_MULTICAST));
+	if_setsendqlen(ifp, TX_MAX_QUEUE);
 #ifdef DEVICE_POLLING
-	ifp->if_capabilities |= IFCAP_POLLING;
+	if_setcapabilitiesbit(ifp, IFCAP_POLLING, 0);
 #endif
 
 	s = splimp();
@@ -208,7 +207,7 @@ fwip_stop(struct fwip_softc *fwip)
 {
 	struct firewire_comm *fc;
 	struct fw_xferq *xferq;
-	struct ifnet *ifp = fwip->fw_softc.fwip_ifp;
+	if_t ifp = fwip->fw_softc.fwip_ifp;
 	struct fw_xfer *xfer, *next;
 	int i;
 
@@ -246,21 +245,21 @@ fwip_stop(struct fwip_softc *fwip)
 		fwip->dma_ch = -1;
 	}
 
-	ifp->if_drv_flags &= ~(IFF_DRV_RUNNING | IFF_DRV_OACTIVE);
+	if_setdrvflagbits(ifp, 0, (IFF_DRV_RUNNING | IFF_DRV_OACTIVE));
 }
 
 static int
 fwip_detach(device_t dev)
 {
 	struct fwip_softc *fwip;
-	struct ifnet *ifp;
+	if_t ifp;
 	int s;
 
 	fwip = (struct fwip_softc *)device_get_softc(dev);
 	ifp = fwip->fw_softc.fwip_ifp;
 
 #ifdef DEVICE_POLLING
-	if (ifp->if_capenable & IFCAP_POLLING)
+	if (if_getcapenable(ifp) & IFCAP_POLLING)
 		ether_poll_deregister(ifp);
 #endif
 
@@ -280,7 +279,7 @@ fwip_init(void *arg)
 {
 	struct fwip_softc *fwip = ((struct fwip_eth_softc *)arg)->fwip;
 	struct firewire_comm *fc;
-	struct ifnet *ifp = fwip->fw_softc.fwip_ifp;
+	if_t ifp = fwip->fw_softc.fwip_ifp;
 	struct fw_xferq *xferq;
 	struct fw_xfer *xfer;
 	struct mbuf *m;
@@ -367,8 +366,8 @@ fwip_init(void *arg)
 	if ((xferq->flag & FWXFERQ_RUNNING) == 0)
 		fc->irx_enable(fc, fwip->dma_ch);
 
-	ifp->if_drv_flags |= IFF_DRV_RUNNING;
-	ifp->if_drv_flags &= ~IFF_DRV_OACTIVE;
+	if_setdrvflagbits(ifp, IFF_DRV_RUNNING, 0);
+	if_setdrvflagbits(ifp, 0, IFF_DRV_OACTIVE);
 
 #if 0
 	/* attempt to start output */
@@ -377,19 +376,19 @@ fwip_init(void *arg)
 }
 
 static int
-fwip_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
+fwip_ioctl(if_t ifp, u_long cmd, caddr_t data)
 {
-	struct fwip_softc *fwip = ((struct fwip_eth_softc *)ifp->if_softc)->fwip;
+	struct fwip_softc *fwip = ((struct fwip_eth_softc *)if_getsoftc(ifp))->fwip;
 	int s, error;
 
 	switch (cmd) {
 	case SIOCSIFFLAGS:
 		s = splimp();
-		if (ifp->if_flags & IFF_UP) {
-			if (!(ifp->if_drv_flags & IFF_DRV_RUNNING))
+		if (if_getflags(ifp) & IFF_UP) {
+			if (!(if_getdrvflags(ifp) & IFF_DRV_RUNNING))
 				fwip_init(&fwip->fw_softc);
 		} else {
-			if (ifp->if_drv_flags & IFF_DRV_RUNNING)
+			if (if_getdrvflags(ifp) & IFF_DRV_RUNNING)
 				fwip_stop(fwip);
 		}
 		splx(s);
@@ -404,21 +403,21 @@ fwip_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		struct firewire_comm *fc = fwip->fd.fc;
 
 		if (ifr->ifr_reqcap & IFCAP_POLLING &&
-		    !(ifp->if_capenable & IFCAP_POLLING)) {
+		    !(if_getcapenable(ifp) & IFCAP_POLLING)) {
 			error = ether_poll_register(fwip_poll, ifp);
 			if (error)
 				return (error);
 			/* Disable interrupts */
 			fc->set_intr(fc, 0);
-			ifp->if_capenable |= IFCAP_POLLING;
+			if_setcapenablebit(ifp, IFCAP_POLLING, 0);
 			return (error);
 		}
 		if (!(ifr->ifr_reqcap & IFCAP_POLLING) &&
-		    ifp->if_capenable & IFCAP_POLLING) {
+		    if_getcapenable(ifp) & IFCAP_POLLING) {
 			error = ether_poll_deregister(ifp);
 			/* Enable interrupts. */
 			fc->set_intr(fc, 1);
-			ifp->if_capenable &= ~IFCAP_POLLING;
+			if_setcapenablebit(ifp, 0, IFCAP_POLLING);
 			return (error);
 		}
 	    }
@@ -469,7 +468,7 @@ static void
 fwip_output_callback(struct fw_xfer *xfer)
 {
 	struct fwip_softc *fwip;
-	struct ifnet *ifp;
+	if_t ifp;
 	int s;
 
 	fwip = (struct fwip_softc *)xfer->sc;
@@ -488,15 +487,15 @@ fwip_output_callback(struct fw_xfer *xfer)
 	splx(s);
 
 	/* for queue full */
-	if (ifp->if_snd.ifq_head != NULL) {
+	if (!if_sendq_empty(ifp)) {
 		fwip_start(ifp);
 	}
 }
 
 static void
-fwip_start(struct ifnet *ifp)
+fwip_start(if_t ifp)
 {
-	struct fwip_softc *fwip = ((struct fwip_eth_softc *)ifp->if_softc)->fwip;
+	struct fwip_softc *fwip = ((struct fwip_eth_softc *)if_getsoftc(ifp))->fwip;
 	int s;
 
 	FWIPDEBUG(ifp, "starting\n");
@@ -508,7 +507,7 @@ fwip_start(struct ifnet *ifp)
 
 		s = splimp();
 		do {
-			IF_DEQUEUE(&ifp->if_snd, m);
+			m = if_dequeue(ifp);
 			if (m != NULL)
 				m_freem(m);
 			if_inc_counter(ifp, IFCOUNTER_OERRORS, 1);
@@ -519,18 +518,18 @@ fwip_start(struct ifnet *ifp)
 	}
 
 	s = splimp();
-	ifp->if_drv_flags |= IFF_DRV_OACTIVE;
+	if_setdrvflagbits(ifp, IFF_DRV_OACTIVE, 0);
 
-	if (ifp->if_snd.ifq_len != 0)
+	if (!if_sendq_empty(ifp))
 		fwip_async_output(fwip, ifp);
 
-	ifp->if_drv_flags &= ~IFF_DRV_OACTIVE;
+	if_setdrvflagbits(ifp, 0, IFF_DRV_OACTIVE);
 	splx(s);
 }
 
 /* Async. stream output */
 static void
-fwip_async_output(struct fwip_softc *fwip, struct ifnet *ifp)
+fwip_async_output(struct fwip_softc *fwip, if_t ifp)
 {
 	struct firewire_comm *fc = fwip->fd.fc;
 	struct mbuf *m;
@@ -546,7 +545,7 @@ fwip_async_output(struct fwip_softc *fwip, struct ifnet *ifp)
 	xfer = NULL;
 	xferq = fc->atq;
 	while ((xferq->queued < xferq->maxq - 1) &&
-			(ifp->if_snd.ifq_head != NULL)) {
+			!if_sendq_empty(ifp)) {
 		FWIP_LOCK(fwip);
 		xfer = STAILQ_FIRST(&fwip->xferlist);
 		if (xfer == NULL) {
@@ -559,7 +558,7 @@ fwip_async_output(struct fwip_softc *fwip, struct ifnet *ifp)
 		STAILQ_REMOVE_HEAD(&fwip->xferlist, link);
 		FWIP_UNLOCK(fwip);
 
-		IF_DEQUEUE(&ifp->if_snd, m);
+		m = if_dequeue(ifp);
 		if (m == NULL) {
 			FWIP_LOCK(fwip);
 			STAILQ_INSERT_HEAD(&fwip->xferlist, xfer, link);
@@ -674,7 +673,7 @@ fwip_async_output(struct fwip_softc *fwip, struct ifnet *ifp)
 			FWIP_LOCK(fwip);
 			STAILQ_INSERT_TAIL(&fwip->xferlist, xfer, link);
 			FWIP_UNLOCK(fwip);
-			IF_PREPEND(&ifp->if_snd, m);
+			if_sendq_prepend(ifp, m);
 			break;
 		}
 		if (error) {
@@ -711,7 +710,7 @@ fwip_stream_input(struct fw_xferq *xferq)
 	struct epoch_tracker et;
 	struct mbuf *m, *m0;
 	struct m_tag *mtag;
-	struct ifnet *ifp;
+	if_t ifp;
 	struct fwip_softc *fwip;
 	struct fw_bulkxfer *sxfer;
 	struct fw_pkt *fp;
@@ -781,7 +780,7 @@ fwip_stream_input(struct fw_xferq *xferq)
 		 * Record the sender ID for possible BPF usage.
 		 */
 		src = ntohl(p[1]) >> 16;
-		if (bpf_peers_present(ifp->if_bpf)) {
+		if (bpf_peers_present(if_getbpf(ifp))) {
 			mtag = m_tag_alloc(MTAG_FIREWIRE,
 			    MTAG_FIREWIRE_SENDER_EUID,
 			    2*sizeof(uint32_t), M_NOWAIT);
@@ -839,7 +838,7 @@ fwip_unicast_input(struct fw_xfer *xfer)
 	struct mbuf *m;
 	struct m_tag *mtag;
 	struct epoch_tracker et;
-	struct ifnet *ifp;
+	if_t ifp;
 	struct fwip_softc *fwip;
 	struct fw_pkt *fp;
 	//struct fw_pkt *sfp;
@@ -881,7 +880,7 @@ fwip_unicast_input(struct fw_xfer *xfer)
 		goto done;
 	}
 
-	if (bpf_peers_present(ifp->if_bpf)) {
+	if (bpf_peers_present(if_getbpf(ifp))) {
 		/*
 		 * Record the sender ID for possible BPF usage.
 		 */
@@ -906,7 +905,7 @@ fwip_unicast_input(struct fw_xfer *xfer)
 
 	/*
 	 * Hand off to the generic encapsulation code. We don't use
-	 * ifp->if_input so that we can pass the source nodeid as an
+	 * ifp->if_input so that we can pass the source nodeid as an 
 	 * argument to facilitate link-level fragment reassembly.
 	 */
 	m->m_len = m->m_pkthdr.len = fp->mode.wreqb.len;
@@ -916,8 +915,6 @@ fwip_unicast_input(struct fw_xfer *xfer)
 done:
 	NET_EPOCH_EXIT(et);
 }
-
-static devclass_t fwip_devclass;
 
 static device_method_t fwip_methods[] = {
 	/* device interface */
@@ -935,6 +932,6 @@ static driver_t fwip_driver = {
 };
 
 
-DRIVER_MODULE(fwip, firewire, fwip_driver, fwip_devclass, 0, 0);
+DRIVER_MODULE(fwip, firewire, fwip_driver, 0, 0);
 MODULE_VERSION(fwip, 1);
 MODULE_DEPEND(fwip, firewire, 1, 1, 1);

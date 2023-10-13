@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2004-2009 University of Zagreb
  * Copyright (c) 2006-2009 FreeBSD Foundation
@@ -36,8 +36,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include "opt_ddb.h"
 #include "opt_kdb.h"
 
@@ -181,6 +179,11 @@ static MALLOC_DEFINE(M_VNET_DATA, "vnet_data", "VNET data");
 VNET_DEFINE_STATIC(char, modspace[VNET_MODMIN] __aligned(__alignof(void *)));
 
 /*
+ * A copy of the initial values of all virtualized global variables.
+ */
+static uintptr_t vnet_init_var;
+
+/*
  * Global lists of subsystem constructor and destructors for vnets.  They are
  * registered via VNET_SYSINIT() and VNET_SYSUNINIT().  Both lists are
  * protected by the vnet_sysinit_sxlock global lock.
@@ -220,6 +223,12 @@ SDT_PROBE_DEFINE2(vnet, functions, vnet_destroy, entry,
 SDT_PROBE_DEFINE1(vnet, functions, vnet_destroy, return,
     "int");
 
+/*
+ * Run per-vnet sysinits or sysuninits during vnet creation/destruction.
+ */
+static void vnet_sysinit(void);
+static void vnet_sysuninit(void);
+
 #ifdef DDB
 static void db_show_vnet_print_vs(struct vnet_sysinit *, int);
 #endif
@@ -239,7 +248,7 @@ vnet_alloc(void)
 
 	/*
 	 * Allocate storage for virtualized global variables and copy in
-	 * initial values form our 'master' copy.
+	 * initial values from our 'master' copy.
 	 */
 	vnet->vnet_data_mem = malloc(VNET_SIZE, M_VNET_DATA, M_WAITOK);
 	memcpy(vnet->vnet_data_mem, (void *)VNET_START, VNET_BYTES);
@@ -352,6 +361,7 @@ vnet_data_startup(void *dummy __unused)
 	df->vnd_len = VNET_MODMIN;
 	TAILQ_INSERT_HEAD(&vnet_data_free_head, df, vnd_link);
 	sx_init(&vnet_data_free_lock, "vnet_data alloc lock");
+	vnet_init_var = (uintptr_t)malloc(VNET_BYTES, M_VNET_DATA, M_WAITOK);
 }
 SYSINIT(vnet_data, SI_SUB_KLD, SI_ORDER_FIRST, vnet_data_startup, NULL);
 
@@ -470,6 +480,33 @@ vnet_data_copy(void *start, int size)
 }
 
 /*
+ * Save a copy of the initial values of virtualized global variables.
+ */
+void
+vnet_save_init(void *start, size_t size)
+{
+	MPASS(vnet_init_var != 0);
+	MPASS(VNET_START <= (uintptr_t)start &&
+	    (uintptr_t)start + size <= VNET_STOP);
+	memcpy((void *)(vnet_init_var + ((uintptr_t)start - VNET_START)),
+	    start, size);
+}
+
+/*
+ * Restore the 'master' copies of virtualized global variables to theirs
+ * initial values.
+ */
+void
+vnet_restore_init(void *start, size_t size)
+{
+	MPASS(vnet_init_var != 0);
+	MPASS(VNET_START <= (uintptr_t)start &&
+	    (uintptr_t)start + size <= VNET_STOP);
+	memcpy(start,
+	    (void *)(vnet_init_var + ((uintptr_t)start - VNET_START)), size);
+}
+
+/*
  * Support for special SYSINIT handlers registered via VNET_SYSINIT()
  * and VNET_SYSUNINIT().
  */
@@ -571,7 +608,7 @@ vnet_deregister_sysuninit(void *arg)
  * vnet construction.  The caller is responsible for ensuring the new vnet is
  * the current vnet and that the vnet_sysinit_sxlock lock is locked.
  */
-void
+static void
 vnet_sysinit(void)
 {
 	struct vnet_sysinit *vs;
@@ -589,7 +626,7 @@ vnet_sysinit(void)
  * vnet destruction.  The caller is responsible for ensuring the dying vnet
  * the current vnet and that the vnet_sysinit_sxlock lock is locked.
  */
-void
+static void
 vnet_sysuninit(void)
 {
 	struct vnet_sysinit *vs;
@@ -769,7 +806,7 @@ db_show_vnet_print_vs(struct vnet_sysinit *vs, int ddb)
 #undef xprint
 }
 
-DB_SHOW_COMMAND(vnet_sysinit, db_show_vnet_sysinit)
+DB_SHOW_COMMAND_FLAGS(vnet_sysinit, db_show_vnet_sysinit, DB_CMD_MEMSAFE)
 {
 	struct vnet_sysinit *vs;
 
@@ -783,7 +820,7 @@ DB_SHOW_COMMAND(vnet_sysinit, db_show_vnet_sysinit)
 	}
 }
 
-DB_SHOW_COMMAND(vnet_sysuninit, db_show_vnet_sysuninit)
+DB_SHOW_COMMAND_FLAGS(vnet_sysuninit, db_show_vnet_sysuninit, DB_CMD_MEMSAFE)
 {
 	struct vnet_sysinit *vs;
 
@@ -799,7 +836,7 @@ DB_SHOW_COMMAND(vnet_sysuninit, db_show_vnet_sysuninit)
 }
 
 #ifdef VNET_DEBUG
-DB_SHOW_COMMAND(vnetrcrs, db_show_vnetrcrs)
+DB_SHOW_COMMAND_FLAGS(vnetrcrs, db_show_vnetrcrs, DB_CMD_MEMSAFE)
 {
 	struct vnet_recursion *vnr;
 

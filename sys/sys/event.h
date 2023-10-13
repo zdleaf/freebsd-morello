@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 1999,2000,2001 Jonathan Lemon <jlemon@FreeBSD.org>
  * All rights reserved.
@@ -24,8 +24,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 #ifndef _SYS_EVENT_H_
@@ -218,6 +216,9 @@ struct freebsd11_kevent32 {
 #define NOTE_NSECONDS		0x00000008	/* data is nanoseconds */
 #define	NOTE_ABSTIME		0x00000010	/* timeout is absolute */
 
+/* Flags for kqueuex(2) */
+#define	KQUEUE_CLOEXEC	0x00000001	/* close on exec */
+
 struct knote;
 SLIST_HEAD(klist, knote);
 struct kqueue;
@@ -305,7 +306,7 @@ struct knote {
 		struct		aioliojob *p_lio;	/* LIO job pointer */
 		void		*p_v;		/* generic other pointer */
 	} kn_ptr;
-	struct			filterops *kn_fop;
+	const struct		filterops *kn_fop;
 
 #define kn_id		kn_kevent.ident
 #define kn_filter	kn_kevent.filter
@@ -337,7 +338,6 @@ int	knlist_empty(struct knlist *knl);
 void	knlist_init(struct knlist *knl, void *lock, void (*kl_lock)(void *),
 	    void (*kl_unlock)(void *), void (*kl_assert_lock)(void *, int));
 void	knlist_init_mtx(struct knlist *knl, struct mtx *lock);
-void	knlist_init_rw_reader(struct knlist *knl, struct rwlock *lock);
 void	knlist_destroy(struct knlist *knl);
 void	knlist_cleardel(struct knlist *knl, struct thread *td,
 	    int islocked, int killkn);
@@ -348,7 +348,7 @@ void	knlist_cleardel(struct knlist *knl, struct thread *td,
 void	knote_fdclose(struct thread *p, int fd);
 int 	kqfd_register(int fd, struct kevent *kev, struct thread *p,
 	    int mflag);
-int	kqueue_add_filteropts(int filt, struct filterops *filtops);
+int	kqueue_add_filteropts(int filt, const struct filterops *filtops);
 int	kqueue_del_filteropts(int filt);
 void	kqueue_drain_schedtask(void);
 
@@ -359,6 +359,8 @@ struct timespec;
 
 __BEGIN_DECLS
 int     kqueue(void);
+int     kqueuex(unsigned flags);
+int     kqueue1(int flags);
 int     kevent(int kq, const struct kevent *changelist, int nchanges,
 	    struct kevent *eventlist, int nevents,
 	    const struct timespec *timeout);

@@ -28,8 +28,6 @@
  * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 /*
@@ -863,7 +861,7 @@ struct rl_list_data {
 enum rl_twist { DONE, CHK_LINK, FIND_ROW, SET_PARAM, RECHK_LONG, RETUNE };
 
 struct rl_softc {
-	struct ifnet		*rl_ifp;	/* interface info */
+	if_t			rl_ifp;	/* interface info */
 	bus_space_handle_t	rl_bhandle;	/* bus space handle */
 	bus_space_tag_t		rl_btag;	/* bus space tag */
 	device_t		rl_dev;
@@ -993,6 +991,7 @@ struct rl_softc {
 /*
  * RealTek chip device IDs.
  */
+#define	RT_DEVICEID_2600          		0x2600
 #define	RT_DEVICEID_8139D			0x8039
 #define	RT_DEVICEID_8129			0x8129
 #define	RT_DEVICEID_8101E			0x8136

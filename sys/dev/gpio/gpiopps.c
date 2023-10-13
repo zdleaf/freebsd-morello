@@ -25,8 +25,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/gpio.h>
 #include <sys/kernel.h>
@@ -49,8 +47,6 @@ static struct ofw_compat_data compat_data[] = {
 };
 SIMPLEBUS_PNP_INFO(compat_data);
 #endif /* FDT */
-
-static devclass_t pps_devclass;
 
 struct pps_softc {
 	device_t         dev;
@@ -285,6 +281,6 @@ static driver_t pps_fdt_driver = {
 	sizeof(struct pps_softc),
 };
 
-DRIVER_MODULE(gpiopps, simplebus, pps_fdt_driver, pps_devclass, 0, 0);
+DRIVER_MODULE(gpiopps, simplebus, pps_fdt_driver, 0, 0);
 
 #endif /* FDT */

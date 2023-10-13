@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2014, Neel Natu (neel@freebsd.org)
  * All rights reserved.
@@ -27,8 +27,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include "opt_bhyve_snapshot.h"
 
 #include <sys/param.h>
@@ -285,12 +283,13 @@ rtc_to_secs(struct vrtc *vrtc)
 	struct clocktime ct;
 	struct timespec ts;
 	struct rtcdev *rtc;
-	struct vm *vm;
+#ifdef KTR
+	struct vm *vm = vrtc->vm;
+#endif
 	int century, error, hour, pm, year;
 
 	KASSERT(VRTC_LOCKED(vrtc), ("%s: vrtc not locked", __func__));
 
-	vm = vrtc->vm;
 	rtc = &vrtc->rtcdev;
 
 	bzero(&ct, sizeof(struct clocktime));
@@ -401,7 +400,6 @@ static int
 vrtc_time_update(struct vrtc *vrtc, time_t newtime, sbintime_t newbase)
 {
 	struct rtcdev *rtc;
-	sbintime_t oldbase;
 	time_t oldtime;
 	uint8_t alarm_sec, alarm_min, alarm_hour;
 
@@ -416,9 +414,8 @@ vrtc_time_update(struct vrtc *vrtc, time_t newtime, sbintime_t newbase)
 	VM_CTR2(vrtc->vm, "Updating RTC secs from %#lx to %#lx",
 	    oldtime, newtime);
 
-	oldbase = vrtc->base_uptime;
 	VM_CTR2(vrtc->vm, "Updating RTC base uptime from %#lx to %#lx",
-	    oldbase, newbase);
+	    vrtc->base_uptime, newbase);
 	vrtc->base_uptime = newbase;
 
 	if (newtime == oldtime)
@@ -545,7 +542,7 @@ vrtc_callout_handler(void *arg)
 	struct vrtc *vrtc = arg;
 	sbintime_t freqsbt, basetime;
 	time_t rtctime;
-	int error;
+	int error __diagused;
 
 	VM_CTR0(vrtc->vm, "vrtc callout fired");
 
@@ -581,7 +578,7 @@ done:
 static __inline void
 vrtc_callout_check(struct vrtc *vrtc, sbintime_t freq)
 {
-	int active;
+	int active __diagused;
 
 	active = callout_active(&vrtc->callout) ? 1 : 0;
 	KASSERT((freq == 0 && !active) || (freq != 0 && active),
@@ -633,7 +630,7 @@ vrtc_set_reg_b(struct vrtc *vrtc, uint8_t newval)
 	struct rtcdev *rtc;
 	sbintime_t oldfreq, newfreq, basetime;
 	time_t curtime, rtctime;
-	int error;
+	int error __diagused;
 	uint8_t oldval, changed;
 
 	KASSERT(VRTC_LOCKED(vrtc), ("%s: vrtc not locked", __func__));
@@ -845,8 +842,7 @@ vrtc_nvram_read(struct vm *vm, int offset, uint8_t *retval)
 }
 
 int
-vrtc_addr_handler(struct vm *vm, int vcpuid, bool in, int port, int bytes,
-    uint32_t *val)
+vrtc_addr_handler(struct vm *vm, bool in, int port, int bytes, uint32_t *val)
 {
 	struct vrtc *vrtc;
 
@@ -868,8 +864,7 @@ vrtc_addr_handler(struct vm *vm, int vcpuid, bool in, int port, int bytes,
 }
 
 int
-vrtc_data_handler(struct vm *vm, int vcpuid, bool in, int port, int bytes,
-    uint32_t *val)
+vrtc_data_handler(struct vm *vm, bool in, int port, int bytes, uint32_t *val)
 {
 	struct vrtc *vrtc;
 	struct rtcdev *rtc;
@@ -916,24 +911,24 @@ vrtc_data_handler(struct vm *vm, int vcpuid, bool in, int port, int bytes,
 		} else {
 			*val = *((uint8_t *)rtc + offset);
 		}
-		VCPU_CTR2(vm, vcpuid, "Read value %#x from RTC offset %#x",
+		VM_CTR2(vm, "Read value %#x from RTC offset %#x",
 		    *val, offset);
 	} else {
 		switch (offset) {
 		case 10:
-			VCPU_CTR1(vm, vcpuid, "RTC reg_a set to %#x", *val);
+			VM_CTR1(vm, "RTC reg_a set to %#x", *val);
 			vrtc_set_reg_a(vrtc, *val);
 			break;
 		case 11:
-			VCPU_CTR1(vm, vcpuid, "RTC reg_b set to %#x", *val);
+			VM_CTR1(vm, "RTC reg_b set to %#x", *val);
 			error = vrtc_set_reg_b(vrtc, *val);
 			break;
 		case 12:
-			VCPU_CTR1(vm, vcpuid, "RTC reg_c set to %#x (ignored)",
+			VM_CTR1(vm, "RTC reg_c set to %#x (ignored)",
 			    *val);
 			break;
 		case 13:
-			VCPU_CTR1(vm, vcpuid, "RTC reg_d set to %#x (ignored)",
+			VM_CTR1(vm, "RTC reg_d set to %#x (ignored)",
 			    *val);
 			break;
 		case 0:
@@ -943,7 +938,7 @@ vrtc_data_handler(struct vm *vm, int vcpuid, bool in, int port, int bytes,
 			*val &= 0x7f;
 			/* FALLTHRU */
 		default:
-			VCPU_CTR2(vm, vcpuid, "RTC offset %#x set to %#x",
+			VM_CTR2(vm, "RTC offset %#x set to %#x",
 			    offset, *val);
 			*((uint8_t *)rtc + offset) = *val;
 			break;
@@ -1021,6 +1016,7 @@ vrtc_cleanup(struct vrtc *vrtc)
 {
 
 	callout_drain(&vrtc->callout);
+	mtx_destroy(&vrtc->mtx);
 	free(vrtc, M_VRTC);
 }
 

@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2013-2016 Qlogic Corporation
  * All rights reserved.
@@ -34,8 +34,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include "ql_os.h"
 #include "ql_hw.h"
 #include "ql_def.h"
@@ -2163,7 +2161,7 @@ ql_get_stats(qla_host_t *ha)
 	q80_rcv_stats_t		*rstat;
 	uint32_t		cmd;
 	int			i;
-	struct ifnet *ifp = ha->ifp;
+	if_t ifp = ha->ifp;
 
 	if (ifp == NULL)
 		return;
@@ -2173,7 +2171,7 @@ ql_get_stats(qla_host_t *ha)
 		return;
 	}
 
-	if (!(ifp->if_drv_flags & IFF_DRV_RUNNING)) {
+	if (!(if_getdrvflags(ifp) & IFF_DRV_RUNNING)) {
 		QLA_UNLOCK(ha, __func__);
 		return;
 	}
@@ -2187,7 +2185,7 @@ ql_get_stats(qla_host_t *ha)
 
 	cmd |= ((ha->pci_func & 0x1) << 16);
 
-	if (ha->qla_watchdog_pause || (!(ifp->if_drv_flags & IFF_DRV_RUNNING)) ||
+	if (ha->qla_watchdog_pause || (!(if_getdrvflags(ifp) & IFF_DRV_RUNNING)) ||
 		ha->offline)
 		goto ql_get_stats_exit;
 
@@ -2205,7 +2203,7 @@ ql_get_stats(qla_host_t *ha)
 //	cmd |= Q8_GET_STATS_CMD_CLEAR;
 	cmd |= (ha->hw.rcv_cntxt_id << 16);
 
-	if (ha->qla_watchdog_pause || (!(ifp->if_drv_flags & IFF_DRV_RUNNING)) ||
+	if (ha->qla_watchdog_pause || (!(if_getdrvflags(ifp) & IFF_DRV_RUNNING)) ||
 		ha->offline)
 		goto ql_get_stats_exit;
 
@@ -2217,7 +2215,7 @@ ql_get_stats(qla_host_t *ha)
 			__func__, ha->hw.mbox[0]);
 	}
 
-	if (ha->qla_watchdog_pause || (!(ifp->if_drv_flags & IFF_DRV_RUNNING)) ||
+	if (ha->qla_watchdog_pause || (!(if_getdrvflags(ifp) & IFF_DRV_RUNNING)) ||
 		ha->offline)
 		goto ql_get_stats_exit;
 	/*
@@ -2225,7 +2223,7 @@ ql_get_stats(qla_host_t *ha)
 	 */
 	for (i = 0 ; (i < ha->hw.num_tx_rings); i++) {
 		if (ha->qla_watchdog_pause ||
-			(!(ifp->if_drv_flags & IFF_DRV_RUNNING)) ||
+			(!(if_getdrvflags(ifp) & IFF_DRV_RUNNING)) ||
 			ha->offline)
 			goto ql_get_stats_exit;
 
@@ -2264,9 +2262,6 @@ qla_tx_tso(qla_host_t *ha, struct mbuf *mp, q80_tx_cmd_t *tx_cmd, uint8_t *hdr)
 	struct tcphdr *th = NULL;
 	uint32_t ehdrlen,  hdrlen, ip_hlen, tcp_hlen, tcp_opt_off;
 	uint16_t etype, opcode, offload = 1;
-	device_t dev;
-
-	dev = ha->pci_dev;
 
 	eh = mtod(mp, struct ether_vlan_header *);
 
@@ -2330,7 +2325,7 @@ qla_tx_tso(qla_host_t *ha, struct mbuf *mp, q80_tx_cmd_t *tx_cmd, uint8_t *hdr)
 		break;
 
 		default:
-			QL_DPRINT8(ha, (dev, "%s: type!=ip\n", __func__));
+			QL_DPRINT8(ha, (ha->pci_dev, "%s: type!=ip\n", __func__));
 			offload = 0;
 		break;
 	}
@@ -2387,10 +2382,7 @@ qla_tx_chksum(qla_host_t *ha, struct mbuf *mp, uint32_t *op_code,
 	struct ip6_hdr *ip6;
 	uint32_t ehdrlen, ip_hlen;
 	uint16_t etype, opcode, offload = 1;
-	device_t dev;
 	uint8_t buf[sizeof(struct ip6_hdr)];
-
-	dev = ha->pci_dev;
 
 	*op_code = 0;
 
@@ -2757,6 +2749,7 @@ qla_config_rss_ind_table(qla_host_t *ha)
 static int
 qla_config_soft_lro(qla_host_t *ha)
 {
+#if defined(INET) || defined(INET6)
         int i;
         qla_hw_t *hw = &ha->hw;
         struct lro_ctrl *lro;
@@ -2766,32 +2759,25 @@ qla_config_soft_lro(qla_host_t *ha)
 
 		bzero(lro, sizeof(struct lro_ctrl));
 
-#if (__FreeBSD_version >= 1100101)
                 if (tcp_lro_init_args(lro, ha->ifp, 0, NUM_RX_DESCRIPTORS)) {
                         device_printf(ha->pci_dev,
 				"%s: tcp_lro_init_args [%d] failed\n",
                                 __func__, i);
                         return (-1);
                 }
-#else
-                if (tcp_lro_init(lro)) {
-                        device_printf(ha->pci_dev,
-				"%s: tcp_lro_init [%d] failed\n",
-                                __func__, i);
-                        return (-1);
-                }
-#endif /* #if (__FreeBSD_version >= 1100101) */
 
                 lro->ifp = ha->ifp;
         }
 
         QL_DPRINT2(ha, (ha->pci_dev, "%s: LRO initialized\n", __func__));
+#endif
         return (0);
 }
 
 static void
 qla_drain_soft_lro(qla_host_t *ha)
 {
+#if defined(INET) || defined(INET6)
         int i;
         qla_hw_t *hw = &ha->hw;
         struct lro_ctrl *lro;
@@ -2799,18 +2785,9 @@ qla_drain_soft_lro(qla_host_t *ha)
        	for (i = 0; i < hw->num_sds_rings; i++) {
                	lro = &hw->sds[i].lro;
 
-#if (__FreeBSD_version >= 1100101)
 		tcp_lro_flush_all(lro);
-#else
-                struct lro_entry *queued;
-
-		while ((!SLIST_EMPTY(&lro->lro_active))) {
-			queued = SLIST_FIRST(&lro->lro_active);
-			SLIST_REMOVE_HEAD(&lro->lro_active, next);
-			tcp_lro_flush(lro, queued);
-		}
-#endif /* #if (__FreeBSD_version >= 1100101) */
 	}
+#endif
 
 	return;
 }
@@ -2818,6 +2795,7 @@ qla_drain_soft_lro(qla_host_t *ha)
 static void
 qla_free_soft_lro(qla_host_t *ha)
 {
+#if defined(INET) || defined(INET6)
         int i;
         qla_hw_t *hw = &ha->hw;
         struct lro_ctrl *lro;
@@ -2826,6 +2804,7 @@ qla_free_soft_lro(qla_host_t *ha)
                	lro = &hw->sds[i].lro;
 		tcp_lro_free(lro);
 	}
+#endif
 
 	return;
 }
@@ -2903,13 +2882,10 @@ qla_confirm_9kb_enable(qla_host_t *ha)
 int
 ql_init_hw_if(qla_host_t *ha)
 {
-	device_t	dev;
 	uint32_t	i;
 	uint8_t		bcast_mac[6];
 	qla_rdesc_t	*rdesc;
 	uint32_t	num_msix;
-
-	dev = ha->pci_dev;
 
 	for (i = 0; i < ha->hw.num_sds_rings; i++) {
 		bzero(ha->hw.dma_buf.sds_ring[i].dma_b,
@@ -2999,7 +2975,7 @@ ql_init_hw_if(qla_host_t *ha)
 	if (qla_link_event_req(ha, ha->hw.rcv_cntxt_id))
 		return (-1);
 
-	if (ha->ifp->if_capenable & IFCAP_LRO) {
+	if (if_getcapenable(ha->ifp) & IFCAP_LRO) {
 		if (ha->hw.enable_hw_lro) {
 			ha->hw.enable_soft_lro = 0;
 
@@ -3808,7 +3784,7 @@ ql_update_link_state(qla_host_t *ha)
 
 	prev_link_state =  ha->hw.link_up;
 
-	if (ha->ifp->if_drv_flags & IFF_DRV_RUNNING) {
+	if (if_getdrvflags(ha->ifp) & IFF_DRV_RUNNING) {
 		link_state = READ_REG32(ha, Q8_LINK_STATE);
 
 		if (ha->pci_func == 0) {
@@ -4652,7 +4628,7 @@ static int
 ql_parse_template(qla_host_t *ha)
 {
 	uint32_t num_of_entries, buff_level, e_cnt, esize;
-	uint32_t end_cnt, rv = 0;
+	uint32_t rv = 0;
 	char *dump_buff, *dbuff;
 	int sane_start = 0, sane_end = 0;
 	ql_minidump_template_hdr_t *template_hdr;
@@ -4729,9 +4705,6 @@ ql_parse_template(qla_host_t *ha)
 			break;
 
 		case RDEND:
-			if (sane_end == 0) {
-				end_cnt = e_cnt;
-			}
 			sane_end++;
 			break;
 
@@ -5176,8 +5149,7 @@ ql_rdmux2(qla_host_t *ha,
 
         read_addr = muxEntry->read_addr;
 
-        for (loop_cnt = 0; loop_cnt < muxEntry->select_value_count;
-		loop_cnt++) {
+        for (loop_cnt = 0; loop_cnt < select_value_count; loop_cnt++) {
                 uint32_t temp_sel_val;
 
 		ret = ql_rdwr_indreg32(ha, select_addr_1, &select_value_1, 0);
@@ -5458,7 +5430,7 @@ ql_pollrd(qla_host_t *ha, ql_minidump_entry_pollrd_t *entry,
         int ret;
         int loop_cnt;
         uint32_t op_count, select_addr, select_value_stride, select_value;
-        uint32_t read_addr, poll, mask, data_size, data;
+        uint32_t read_addr, poll, mask, data;
         uint32_t wait_count = 0;
 
         select_addr            = entry->select_addr;
@@ -5468,7 +5440,6 @@ ql_pollrd(qla_host_t *ha, ql_minidump_entry_pollrd_t *entry,
         op_count               = entry->op_count;
         poll                   = entry->poll;
         mask                   = entry->mask;
-        data_size              = entry->data_size;
 
         for (loop_cnt = 0; loop_cnt < op_count; loop_cnt++) {
                 ret = ql_rdwr_indreg32(ha, select_addr, &select_value, 0);
@@ -5525,7 +5496,7 @@ ql_pollrd_modify_write(qla_host_t *ha,
 {
 	int ret;
         uint32_t addr_1, addr_2, value_1, value_2, data;
-        uint32_t poll, mask, data_size, modify_mask;
+        uint32_t poll, mask, modify_mask;
         uint32_t wait_count = 0;
 
         addr_1		= entry->addr_1;
@@ -5536,7 +5507,6 @@ ql_pollrd_modify_write(qla_host_t *ha,
         poll		= entry->poll;
         mask		= entry->mask;
         modify_mask	= entry->modify_mask;
-        data_size	= entry->data_size;
 
 	ret = ql_rdwr_indreg32(ha, addr_1, &value_1, 0);
 	if (ret)

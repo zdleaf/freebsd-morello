@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: BSD-3-Clause */
-/*  Copyright (c) 2021, Intel Corporation
+/*  Copyright (c) 2023, Intel Corporation
  *  All rights reserved.
  *
  *  Redistribution and use in source and binary forms, with or without
@@ -28,7 +28,6 @@
  *  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  *  POSSIBILITY OF SUCH DAMAGE.
  */
-/*$FreeBSD$*/
 
 #ifndef _VIRTCHNL_INLINE_IPSEC_H_
 #define _VIRTCHNL_INLINE_IPSEC_H_
@@ -49,6 +48,16 @@
 #define VIRTCHNL_AUTH		1
 #define VIRTCHNL_CIPHER		2
 #define VIRTCHNL_AEAD		3
+
+/* caps enabled */
+#define VIRTCHNL_IPSEC_ESN_ENA			BIT(0)
+#define VIRTCHNL_IPSEC_UDP_ENCAP_ENA		BIT(1)
+#define VIRTCHNL_IPSEC_SA_INDEX_SW_ENA		BIT(2)
+#define VIRTCHNL_IPSEC_AUDIT_ENA		BIT(3)
+#define VIRTCHNL_IPSEC_BYTE_LIMIT_ENA		BIT(4)
+#define VIRTCHNL_IPSEC_DROP_ON_AUTH_FAIL_ENA	BIT(5)
+#define VIRTCHNL_IPSEC_ARW_CHECK_ENA		BIT(6)
+#define VIRTCHNL_IPSEC_24BIT_SPI_ENA		BIT(7)
 
 /* algorithm type */
 /* Hash Algorithm */
@@ -162,6 +171,7 @@ struct virtchnl_sym_crypto_cap {
  * VF pass virtchnl_ipsec_cap to PF
  * and PF return capability of ipsec from virtchnl.
  */
+#pragma pack(1)
 struct virtchnl_ipsec_cap {
 	/* max number of SA per VF */
 	u16 max_sa_num;
@@ -175,29 +185,8 @@ struct virtchnl_ipsec_cap {
 	/* IPSec SA Direction - value ref VIRTCHNL_DIR_XXX */
 	u8 virtchnl_direction;
 
-	/* type of esn - !0:enable/0:disable */
-	u8 esn_enabled;
-
-	/* type of udp_encap - !0:enable/0:disable */
-	u8 udp_encap_enabled;
-
 	/* termination mode - value ref VIRTCHNL_TERM_XXX */
 	u8 termination_mode;
-
-	/* SA index mode - !0:enable/0:disable */
-	u8 sa_index_sw_enabled;
-
-	/* auditing mode - !0:enable/0:disable */
-	u8 audit_enabled;
-
-	/* lifetime byte limit - !0:enable/0:disable */
-	u8 byte_limit_enabled;
-
-	/* drop on authentication failure - !0:enable/0:disable */
-	u8 drop_on_auth_fail_enabled;
-
-	/* anti-replay window check - !0:enable/0:disable */
-	u8 arw_check_enabled;
 
 	/* number of supported crypto capability */
 	u8 crypto_cap_num;
@@ -205,11 +194,13 @@ struct virtchnl_ipsec_cap {
 	/* descriptor ID */
 	u16 desc_id;
 
+	/* capabilities enabled - value ref VIRTCHNL_IPSEC_XXX_ENA */
+	u32 caps_enabled;
+
 	/* crypto capabilities */
 	struct virtchnl_sym_crypto_cap cap[VIRTCHNL_IPSEC_MAX_CRYPTO_CAP_NUM];
 };
 
-#pragma pack(1)
 /* configuration of crypto function */
 struct virtchnl_ipsec_crypto_cfg_item {
 	u8 crypto_type;
@@ -486,6 +477,15 @@ struct virtchnl_ipsec_sp_cfg {
 
 	/* Set TC (congestion domain) if true. For future use. */
 	u8 set_tc;
+
+	/* 0 for NAT-T unsupported, 1 for NAT-T supported */
+	u8 is_udp;
+
+	/* reserved */
+	u8 reserved;
+
+	/* NAT-T UDP port number. Only valid in case NAT-T supported */
+	u16 udp_port;
 };
 
 #pragma pack(1)

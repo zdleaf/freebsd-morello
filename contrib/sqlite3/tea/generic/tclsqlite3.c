@@ -60,6 +60,25 @@
 # include <string.h>
 # include <assert.h>
   typedef unsigned char u8;
+# ifndef SQLITE_PTRSIZE
+#   if defined(__SIZEOF_POINTER__)
+#     define SQLITE_PTRSIZE __SIZEOF_POINTER__
+#   elif defined(i386)     || defined(__i386__)   || defined(_M_IX86) ||    \
+         defined(_M_ARM)   || defined(__arm__)    || defined(__x86)   ||    \
+        (defined(__APPLE__) && defined(__POWERPC__)) ||                     \
+        (defined(__TOS_AIX__) && !defined(__64BIT__))
+#     define SQLITE_PTRSIZE 4
+#   else
+#     define SQLITE_PTRSIZE 8
+#   endif
+# endif /* SQLITE_PTRSIZE */
+# if defined(HAVE_STDINT_H)
+    typedef uintptr_t uptr;
+# elif SQLITE_PTRSIZE==4
+    typedef unsigned int uptr;
+# else
+    typedef sqlite3_uint64 uptr;
+# endif
 #endif
 #include <ctype.h>
 
@@ -680,7 +699,7 @@ static int DbTraceV2Handler(
       pCmd = Tcl_NewStringObj(pDb->zTraceV2, -1);
       Tcl_IncrRefCount(pCmd);
       Tcl_ListObjAppendElement(pDb->interp, pCmd,
-                               Tcl_NewWideIntObj((Tcl_WideInt)pStmt));
+                               Tcl_NewWideIntObj((Tcl_WideInt)(uptr)pStmt));
       Tcl_ListObjAppendElement(pDb->interp, pCmd,
                                Tcl_NewStringObj(zSql, -1));
       Tcl_EvalObjEx(pDb->interp, pCmd, TCL_EVAL_DIRECT);
@@ -695,7 +714,7 @@ static int DbTraceV2Handler(
       pCmd = Tcl_NewStringObj(pDb->zTraceV2, -1);
       Tcl_IncrRefCount(pCmd);
       Tcl_ListObjAppendElement(pDb->interp, pCmd,
-                               Tcl_NewWideIntObj((Tcl_WideInt)pStmt));
+                               Tcl_NewWideIntObj((Tcl_WideInt)(uptr)pStmt));
       Tcl_ListObjAppendElement(pDb->interp, pCmd,
                                Tcl_NewWideIntObj((Tcl_WideInt)ns));
       Tcl_EvalObjEx(pDb->interp, pCmd, TCL_EVAL_DIRECT);
@@ -709,7 +728,7 @@ static int DbTraceV2Handler(
       pCmd = Tcl_NewStringObj(pDb->zTraceV2, -1);
       Tcl_IncrRefCount(pCmd);
       Tcl_ListObjAppendElement(pDb->interp, pCmd,
-                               Tcl_NewWideIntObj((Tcl_WideInt)pStmt));
+                               Tcl_NewWideIntObj((Tcl_WideInt)(uptr)pStmt));
       Tcl_EvalObjEx(pDb->interp, pCmd, TCL_EVAL_DIRECT);
       Tcl_DecrRefCount(pCmd);
       Tcl_ResetResult(pDb->interp);
@@ -721,7 +740,7 @@ static int DbTraceV2Handler(
       pCmd = Tcl_NewStringObj(pDb->zTraceV2, -1);
       Tcl_IncrRefCount(pCmd);
       Tcl_ListObjAppendElement(pDb->interp, pCmd,
-                               Tcl_NewWideIntObj((Tcl_WideInt)db));
+                               Tcl_NewWideIntObj((Tcl_WideInt)(uptr)db));
       Tcl_EvalObjEx(pDb->interp, pCmd, TCL_EVAL_DIRECT);
       Tcl_DecrRefCount(pCmd);
       Tcl_ResetResult(pDb->interp);
@@ -1785,7 +1804,7 @@ static Tcl_Obj *dbEvalColumnValue(DbEvalContext *p, int iCol){
 
 /*
 ** If using Tcl version 8.6 or greater, use the NR functions to avoid
-** recursive evalution of scripts by the [db eval] and [db trans]
+** recursive evaluation of scripts by the [db eval] and [db trans]
 ** commands. Even if the headers used while compiling the extension
 ** are 8.6 or newer, the code still tests the Tcl version at runtime.
 ** This allows stubs-enabled builds to be used with older Tcl libraries.
@@ -1948,15 +1967,16 @@ static int SQLITE_TCLAPI DbObjCmd(
     "close",                  "collate",               "collation_needed",
     "commit_hook",            "complete",              "config",
     "copy",                   "deserialize",           "enable_load_extension",
-    "errorcode",              "eval",                  "exists",
-    "function",               "incrblob",              "interrupt",
-    "last_insert_rowid",      "nullvalue",             "onecolumn",
-    "preupdate",              "profile",               "progress",
-    "rekey",                  "restore",               "rollback_hook",
-    "serialize",              "status",                "timeout",
-    "total_changes",          "trace",                 "trace_v2",
-    "transaction",            "unlock_notify",         "update_hook",
-    "version",                "wal_hook",              0
+    "errorcode",              "erroroffset",           "eval",
+    "exists",                 "function",              "incrblob",
+    "interrupt",              "last_insert_rowid",     "nullvalue",
+    "onecolumn",              "preupdate",             "profile",
+    "progress",               "rekey",                 "restore",
+    "rollback_hook",          "serialize",             "status",
+    "timeout",                "total_changes",         "trace",
+    "trace_v2",               "transaction",           "unlock_notify",
+    "update_hook",            "version",               "wal_hook",
+    0                        
   };
   enum DB_enum {
     DB_AUTHORIZER,            DB_BACKUP,               DB_BIND_FALLBACK,
@@ -1964,15 +1984,15 @@ static int SQLITE_TCLAPI DbObjCmd(
     DB_CLOSE,                 DB_COLLATE,              DB_COLLATION_NEEDED,
     DB_COMMIT_HOOK,           DB_COMPLETE,             DB_CONFIG,
     DB_COPY,                  DB_DESERIALIZE,          DB_ENABLE_LOAD_EXTENSION,
-    DB_ERRORCODE,             DB_EVAL,                 DB_EXISTS,
-    DB_FUNCTION,              DB_INCRBLOB,             DB_INTERRUPT,
-    DB_LAST_INSERT_ROWID,     DB_NULLVALUE,            DB_ONECOLUMN,
-    DB_PREUPDATE,             DB_PROFILE,              DB_PROGRESS,
-    DB_REKEY,                 DB_RESTORE,              DB_ROLLBACK_HOOK,
-    DB_SERIALIZE,             DB_STATUS,               DB_TIMEOUT,
-    DB_TOTAL_CHANGES,         DB_TRACE,                DB_TRACE_V2,
-    DB_TRANSACTION,           DB_UNLOCK_NOTIFY,        DB_UPDATE_HOOK,
-    DB_VERSION,               DB_WAL_HOOK             
+    DB_ERRORCODE,             DB_ERROROFFSET,          DB_EVAL,
+    DB_EXISTS,                DB_FUNCTION,             DB_INCRBLOB,
+    DB_INTERRUPT,             DB_LAST_INSERT_ROWID,    DB_NULLVALUE,
+    DB_ONECOLUMN,             DB_PREUPDATE,            DB_PROFILE,
+    DB_PROGRESS,              DB_REKEY,                DB_RESTORE,
+    DB_ROLLBACK_HOOK,         DB_SERIALIZE,            DB_STATUS,
+    DB_TIMEOUT,               DB_TOTAL_CHANGES,        DB_TRACE,
+    DB_TRACE_V2,              DB_TRANSACTION,          DB_UNLOCK_NOTIFY,
+    DB_UPDATE_HOOK,           DB_VERSION,              DB_WAL_HOOK,
   };
   /* don't leave trailing commas on DB_enum, it confuses the AIX xlc compiler */
 
@@ -2445,7 +2465,7 @@ static int SQLITE_TCLAPI DbObjCmd(
   **
   ** This command usage is equivalent to the sqlite2.x COPY statement,
   ** which imports file data into a table using the PostgreSQL COPY file format:
-  **   $db copy $conflit_algo $table_name $filename \t \\N
+  **   $db copy $conflict_algorithm $table_name $filename \t \\N
   */
   case DB_COPY: {
     char *zTable;               /* Insert data into this table */
@@ -2736,6 +2756,17 @@ deserialize_error:
   }
 
   /*
+  **    $db erroroffset
+  **
+  ** Return the numeric error code that was returned by the most recent
+  ** call to sqlite3_exec().
+  */
+  case DB_ERROROFFSET: {
+    Tcl_SetObjResult(interp, Tcl_NewIntObj(sqlite3_error_offset(pDb->db)));
+    break;
+  }
+
+  /*
   **    $db exists $sql
   **    $db onecolumn $sql
   **
@@ -2958,7 +2989,7 @@ deserialize_error:
     }
 
     if( objc==(6+isReadonly) ){
-      zDb = Tcl_GetString(objv[2]);
+      zDb = Tcl_GetString(objv[2+isReadonly]);
     }
     zTable = Tcl_GetString(objv[objc-3]);
     zColumn = Tcl_GetString(objv[objc-2]);
@@ -3047,6 +3078,9 @@ deserialize_error:
       if( pDb->zProgress ){
         Tcl_AppendResult(interp, pDb->zProgress, (char*)0);
       }
+#ifndef SQLITE_OMIT_PROGRESS_CALLBACK
+      sqlite3_progress_handler(pDb->db, 0, 0, 0);
+#endif
     }else if( objc==4 ){
       char *zProgress;
       int len;
@@ -3417,7 +3451,7 @@ deserialize_error:
   ** Start a new transaction (if we are not already in the midst of a
   ** transaction) and execute the TCL script SCRIPT.  After SCRIPT
   ** completes, either commit the transaction or roll it back if SCRIPT
-  ** throws an exception.  Or if no new transation was started, do nothing.
+  ** throws an exception.  Or if no new transaction was started, do nothing.
   ** pass the exception on up the stack.
   **
   ** This command was inspired by Dave Thomas's talk on Ruby at the

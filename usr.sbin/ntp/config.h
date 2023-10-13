@@ -1,6 +1,5 @@
 /* config.h.  Generated from config.h.in by configure.  */
 /* config.h.in.  Generated from configure.ac by autoheader.  */
-/* $FreeBSD$ */
 
 /* Define if building universal (internal helper macro) */
 /* #undef AC_APPLE_UNIVERSAL_BUILD */
@@ -1468,7 +1467,7 @@
 #define PACKAGE_NAME "ntp"
 
 /* Define to the full name and version of this package. */
-#define PACKAGE_STRING "ntp 4.2.8p15"
+#define PACKAGE_STRING "ntp 4.2.8p17"
 
 /* Define to the one symbol short name of this package. */
 #define PACKAGE_TARNAME "ntp"
@@ -1477,7 +1476,7 @@
 #define PACKAGE_URL "http://www.ntp.org./"
 
 /* Define to the version of this package. */
-#define PACKAGE_VERSION "4.2.8p15"
+#define PACKAGE_VERSION "4.2.8p17"
 
 /* data dir */
 #define PERLLIBDIR "/usr/share/ntp/lib"
@@ -1586,10 +1585,6 @@
 #define STR_SYSTEM "powerpc64-undermydesk-freebsd"
 #elif defined(__powerpc__)
 #define STR_SYSTEM "powerpc-undermydesk-freebsd"
-#elif defined(__mips64)
-#define STR_SYSTEM "mips64-undermydesk-freebsd"
-#elif defined(__mips__)
-#define STR_SYSTEM "mips-undermydesk-freebsd"
 #elif defined(__aarch64__)
 #define STR_SYSTEM "arm64-undermydesk-freebsd"
 #elif defined(__arm__)
@@ -1652,7 +1647,7 @@ typedef unsigned int	uintptr_t;
 /* #undef USE_UDP_SIGPOLL */
 
 /* Version number of package */
-#define VERSION "4.2.8p15"
+#define VERSION "4.2.8p17"
 
 /* vsnprintf expands "%m" to strerror(errno) */
 #define VSNPRINTF_PERCENT_M 1

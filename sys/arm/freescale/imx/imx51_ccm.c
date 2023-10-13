@@ -1,6 +1,6 @@
 /*	$NetBSD: imx51_ccm.c,v 1.1 2012/04/17 09:33:31 bsh Exp $	*/
 /*-
- * SPDX-License-Identifier: BSD-2-Clause AND BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2010, 2011, 2012  Genetec Corporation.  All rights reserved.
  * Written by Hashimoto Kenichi for Genetec Corporation.
@@ -61,8 +61,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/bus.h>
@@ -148,10 +146,7 @@ static driver_t imxccm_driver = {
 	sizeof(struct imxccm_softc),
 };
 
-static devclass_t imxccm_devclass;
-
-EARLY_DRIVER_MODULE(imxccm, simplebus, imxccm_driver, imxccm_devclass, 0, 0,
-    BUS_PASS_CPU);
+EARLY_DRIVER_MODULE(imxccm, simplebus, imxccm_driver, 0, 0, BUS_PASS_CPU);
 
 static inline uint32_t
 pll_read_4(struct imxccm_softc *sc, int pll, int reg)

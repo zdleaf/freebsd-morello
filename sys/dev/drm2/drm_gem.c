@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2011 The FreeBSD Foundation
  *
@@ -29,8 +29,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include "opt_vm.h"
 
 #include <sys/param.h>
@@ -111,7 +109,7 @@ int drm_gem_object_init(struct drm_device *dev,
 	    ("Bad size %ju", (uintmax_t)size));
 
 	obj->dev = dev;
-	obj->vm_obj = vm_pager_allocate(OBJT_DEFAULT, NULL, size,
+	obj->vm_obj = vm_pager_allocate(OBJT_SWAP, NULL, size,
 	    VM_PROT_READ | VM_PROT_WRITE, 0, curthread->td_ucred);
 
 	obj->refcount = 1;

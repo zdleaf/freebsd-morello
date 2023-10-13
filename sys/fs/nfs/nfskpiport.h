@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2009 Rick Macklem, University of Guelph
  * All rights reserved.
@@ -24,8 +24,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 #ifndef _NFS_NFSKPIPORT_H_
@@ -36,9 +34,7 @@
  * Darwin8 and hopefully subsequent releases from Apple.)
  */
 typedef	struct mount *		mount_t;
-#define	vfs_flags(m)		((m)->mnt_flag)
 
 typedef struct vnode *		vnode_t;
-#define	vnode_vtype(v)		((v)->v_type)
 
 #endif	/* _NFS_NFSKPIPORT_H */

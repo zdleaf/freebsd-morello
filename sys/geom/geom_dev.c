@@ -36,8 +36,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/malloc.h>
@@ -273,8 +271,8 @@ g_dev_set_physpath(struct g_consumer *cp)
 		dev = sc->sc_dev;
 		old_alias_dev = sc->sc_alias;
 		alias_devp = (struct cdev **)&sc->sc_alias;
-		make_dev_physpath_alias(MAKEDEV_WAITOK, alias_devp, dev,
-		    old_alias_dev, physpath);
+		make_dev_physpath_alias(MAKEDEV_WAITOK | MAKEDEV_CHECKNAME,
+		    alias_devp, dev, old_alias_dev, physpath);
 	} else if (sc->sc_alias) {
 		destroy_dev((struct cdev *)sc->sc_alias);
 		sc->sc_alias = NULL;
@@ -471,6 +469,7 @@ g_dev_open(struct cdev *dev, int flags, int fmt, struct thread *td)
 			atomic_clear_int(&sc->sc_active, SC_A_OPEN);
 		else
 			atomic_set_int(&sc->sc_active, SC_A_OPEN);
+		KNOTE_LOCKED(&sc->sc_selinfo.si_note, NOTE_OPEN);
 		mtx_unlock(&sc->sc_mtx);
 	}
 	return (error);
@@ -517,6 +516,7 @@ g_dev_close(struct cdev *dev, int flags, int fmt, struct thread *td)
 		atomic_set_int(&sc->sc_active, SC_A_OPEN);
 	while (sc->sc_open == 0 && (sc->sc_active & SC_A_ACTIVE) != 0)
 		msleep(&sc->sc_active, &sc->sc_mtx, 0, "g_dev_close", hz / 10);
+	KNOTE_LOCKED(&sc->sc_selinfo.si_note, NOTE_CLOSE | (w ? NOTE_CLOSE_WRITE : 0));
 	mtx_unlock(&sc->sc_mtx);
 	g_topology_lock();
 	error = g_access(cp, r, w, e);
@@ -531,9 +531,6 @@ g_dev_ioctl(struct cdev *dev, u_long cmd, caddr_t data, int fflag, struct thread
 	struct g_provider *pp;
 	off_t offset, length, chunk, odd;
 	int i, error;
-#ifdef COMPAT_FREEBSD12
-	struct diocskerneldump_arg kda_copy;
-#endif
 
 	cp = dev->si_drv2;
 	pp = cp->provider;
@@ -570,41 +567,6 @@ g_dev_ioctl(struct cdev *dev, u_long cmd, caddr_t data, int fflag, struct thread
 		if (error == 0 && *(u_int *)data == 0)
 			error = ENOENT;
 		break;
-#ifdef COMPAT_FREEBSD11
-	case DIOCSKERNELDUMP_FREEBSD11:
-	    {
-		struct diocskerneldump_arg kda;
-
-		gone_in(13, "FreeBSD 11.x ABI compat");
-
-		bzero(&kda, sizeof(kda));
-		kda.kda_encryption = KERNELDUMP_ENC_NONE;
-		kda.kda_index = (*(u_int *)data ? 0 : KDA_REMOVE_ALL);
-		if (kda.kda_index == KDA_REMOVE_ALL)
-			error = dumper_remove(devtoname(dev), &kda);
-		else
-			error = g_dev_setdumpdev(dev, &kda);
-		break;
-	    }
-#endif
-#ifdef COMPAT_FREEBSD12
-	case DIOCSKERNELDUMP_FREEBSD12:
-	    {
-		struct diocskerneldump_arg_freebsd12 *kda12;
-
-		gone_in(14, "FreeBSD 12.x ABI compat");
-
-		kda12 = (void *)data;
-		memcpy(&kda_copy, kda12, sizeof(kda_copy));
-		kda_copy.kda_index = (kda12->kda12_enable ?
-		    0 : KDA_REMOVE_ALL);
-
-		explicit_bzero(kda12, sizeof(*kda12));
-		/* Kludge to pass kda_copy to kda in fallthrough. */
-		data = (void *)&kda_copy;
-	    }
-	    /* FALLTHROUGH */
-#endif
 	case DIOCSKERNELDUMP:
 	    {
 		struct diocskerneldump_arg *kda;
@@ -737,8 +699,7 @@ g_dev_ioctl(struct cdev *dev, u_long cmd, caddr_t data, int fflag, struct thread
 			error = copyout(new_entries, old_entries, alloc_size);
 		if (old_entries != NULL && rep != NULL)
 			rep->entries = old_entries;
-		if (new_entries != NULL)
-			g_free(new_entries);
+		g_free(new_entries);
 		break;
 	}
 	default:
@@ -774,6 +735,10 @@ g_dev_done(struct bio *bp2)
 		    bp2, bp2->bio_error);
 		bp->bio_flags |= BIO_ERROR;
 	} else {
+		if (bp->bio_cmd == BIO_READ)
+			KNOTE_UNLOCKED(&sc->sc_selinfo.si_note, NOTE_READ);
+		if (bp->bio_cmd == BIO_WRITE)
+			KNOTE_UNLOCKED(&sc->sc_selinfo.si_note, NOTE_WRITE);
 		g_trace(G_T_BIO, "g_dev_done(%p/%p) resid %ld completed %jd",
 		    bp2, bp, bp2->bio_resid, (intmax_t)bp2->bio_completed);
 	}
@@ -931,9 +896,10 @@ g_dev_kqfilter(struct cdev *dev, struct knote *kn)
 	if (kn->kn_filter != EVFILT_VNODE)
 		return (EINVAL);
 
-	/* XXX: extend support for other NOTE_* events */
-	if (kn->kn_sfflags != NOTE_ATTRIB)
-		return (EINVAL);
+#define SUPPORTED_EVENTS (NOTE_ATTRIB | NOTE_OPEN | NOTE_CLOSE | \
+    NOTE_CLOSE_WRITE | NOTE_READ | NOTE_WRITE)
+	if (kn->kn_sfflags & ~SUPPORTED_EVENTS)
+		return (EOPNOTSUPP);
 
 	kn->kn_fop = &gdev_filterops_vnode;
 	kn->kn_hook = sc;

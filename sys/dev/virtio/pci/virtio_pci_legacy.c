@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2011, Bryan Venteicher <bryanv@FreeBSD.org>
  * All rights reserved.
@@ -29,8 +29,6 @@
 /* Driver for the legacy VirtIO PCI interface. */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/bus.h>
@@ -88,8 +86,8 @@ static int	vtpci_legacy_register_vq_msix(device_t, int idx,
 		    struct vtpci_interrupt *);
 
 static uint64_t	vtpci_legacy_negotiate_features(device_t, uint64_t);
-static int	vtpci_legacy_with_feature(device_t, uint64_t);
-static int	vtpci_legacy_alloc_virtqueues(device_t, int, int,
+static bool	vtpci_legacy_with_feature(device_t, uint64_t);
+static int	vtpci_legacy_alloc_virtqueues(device_t, int,
 		    struct vq_alloc_info *);
 static int	vtpci_legacy_setup_interrupts(device_t, enum intr_type);
 static void	vtpci_legacy_stop(device_t);
@@ -188,10 +186,7 @@ static driver_t vtpci_legacy_driver = {
 	.size = sizeof(struct vtpci_legacy_softc)
 };
 
-devclass_t vtpci_legacy_devclass;
-
-DRIVER_MODULE(virtio_pci_legacy, pci, vtpci_legacy_driver,
-    vtpci_legacy_devclass, 0, 0);
+DRIVER_MODULE(virtio_pci_legacy, pci, vtpci_legacy_driver, 0, 0);
 
 static int
 vtpci_legacy_probe(device_t dev)
@@ -384,7 +379,7 @@ vtpci_legacy_negotiate_features(device_t dev, uint64_t child_features)
 	return (features);
 }
 
-static int
+static bool
 vtpci_legacy_with_feature(device_t dev, uint64_t feature)
 {
 	struct vtpci_legacy_softc *sc;
@@ -395,7 +390,7 @@ vtpci_legacy_with_feature(device_t dev, uint64_t feature)
 }
 
 static int
-vtpci_legacy_alloc_virtqueues(device_t dev, int flags, int nvqs,
+vtpci_legacy_alloc_virtqueues(device_t dev, int nvqs,
     struct vq_alloc_info *vq_info)
 {
 	struct vtpci_legacy_softc *sc;
@@ -404,7 +399,7 @@ vtpci_legacy_alloc_virtqueues(device_t dev, int flags, int nvqs,
 	sc = device_get_softc(dev);
 	cn = &sc->vtpci_common;
 
-	return (vtpci_alloc_virtqueues(cn, flags, nvqs, vq_info));
+	return (vtpci_alloc_virtqueues(cn, nvqs, vq_info));
 }
 
 static int
@@ -654,10 +649,7 @@ static int
 vtpci_legacy_register_msix(struct vtpci_legacy_softc *sc, int offset,
     struct vtpci_interrupt *intr)
 {
-	device_t dev;
 	uint16_t vector;
-
-	dev = sc->vtpci_dev;
 
 	if (intr != NULL) {
 		/* Map from guest rid to host vector. */

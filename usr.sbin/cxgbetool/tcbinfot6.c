@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2018 Chelsio Communications, Inc.
  * All rights reserved.
@@ -27,8 +27,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 /* Auto-generated file.  Avoid direct editing.     */
 /* Edits will be lost when file regenerated.       */
 #include <stdio.h>
@@ -879,7 +877,7 @@ _TCBVAR g_tcb_info6[]={
    NULL                           ,        0,   0, /* faka,flo,fhi */
    "rq_start"                     , /* aka */
    COMP_NONE                      , /* comp */
-   "DW aligned starting addres of RQ", /*desc*/
+   "DW aligned starting address of RQ", /*desc*/
     NULL, /*akadesc */
   },
   {"rq_MSN"                       , 2,  986,  998, /* name,aux,lo,hi */

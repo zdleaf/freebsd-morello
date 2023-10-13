@@ -42,12 +42,11 @@ static const char copyright[] =
 #if 0
 static char sccsid[] = "@(#)mount_null.c	8.6 (Berkeley) 4/26/95";
 #endif
-static const char rcsid[] =
-  "$FreeBSD$";
 #endif /* not lint */
 
 #include <sys/param.h>
 #include <sys/mount.h>
+#include <sys/stat.h>
 #include <sys/uio.h>
 
 #include <err.h>
@@ -61,6 +60,14 @@ static const char rcsid[] =
 
 static void	usage(void) __dead2;
 
+static int
+stat_realpath(const char *path, char *resolved, struct stat *sbp)
+{
+	if (realpath(path, resolved) == NULL || stat(resolved, sbp) != 0)
+		return (1);
+	return (0);
+}
+
 int
 main(int argc, char *argv[])
 {
@@ -71,6 +78,8 @@ main(int argc, char *argv[])
 	char errmsg[255];
 	int ch, iovlen;
 	char nullfs[] = "nullfs";
+	struct stat target_stat;
+	struct stat mountpoint_stat;
 
 	iov = NULL;
 	iovlen = 0;
@@ -98,10 +107,18 @@ main(int argc, char *argv[])
 		usage();
 
 	/* resolve target and mountpoint with realpath(3) */
-	if (checkpath(argv[0], target) != 0)
+	if (stat_realpath(argv[0], target, &target_stat) != 0)
 		err(EX_USAGE, "%s", target);
-	if (checkpath(argv[1], mountpoint) != 0)
+	if (stat_realpath(argv[1], mountpoint, &mountpoint_stat) != 0)
 		err(EX_USAGE, "%s", mountpoint);
+	if (!S_ISDIR(target_stat.st_mode) && !S_ISREG(target_stat.st_mode))
+		errx(EX_USAGE, "%s: must be either a file or directory",
+		    target);
+	if ((target_stat.st_mode & S_IFMT) !=
+	    (mountpoint_stat.st_mode & S_IFMT))
+		errx(EX_USAGE,
+		    "%s: must be same type as %s (file or directory)",
+		    mountpoint, target);
 
 	build_iovec(&iov, &iovlen, "fstype", nullfs, (size_t)-1);
 	build_iovec(&iov, &iovlen, "fspath", mountpoint, (size_t)-1);

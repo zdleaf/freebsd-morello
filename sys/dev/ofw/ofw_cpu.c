@@ -29,8 +29,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
@@ -45,7 +43,7 @@ __FBSDID("$FreeBSD$");
 #include <dev/ofw/ofw_bus_subr.h>
 #include <dev/ofw/ofw_cpu.h>
 
-#ifdef EXT_RESOURCES
+#if defined(__arm__) || defined(__arm64__) || defined(__riscv__)
 #include <dev/extres/clk/clk.h>
 #endif
 
@@ -68,6 +66,7 @@ static device_method_t ofw_cpulist_methods[] = {
 	/* Bus interface */
 	DEVMETHOD(bus_add_child,	bus_generic_add_child),
 	DEVMETHOD(bus_child_pnpinfo,	ofw_bus_gen_child_pnpinfo),
+	DEVMETHOD(bus_get_device_path,  ofw_bus_gen_get_device_path),
 
 	/* ofw_bus interface */
 	DEVMETHOD(ofw_bus_get_devinfo,	ofw_cpulist_get_devinfo),
@@ -86,15 +85,12 @@ static driver_t ofw_cpulist_driver = {
 	sizeof(struct ofw_cpulist_softc)
 };
 
-static devclass_t ofw_cpulist_devclass;
+DRIVER_MODULE(ofw_cpulist, ofwbus, ofw_cpulist_driver, 0, 0);
 
-DRIVER_MODULE(ofw_cpulist, ofwbus, ofw_cpulist_driver, ofw_cpulist_devclass,
-    0, 0);
-
-static int 
-ofw_cpulist_probe(device_t dev) 
+static int
+ofw_cpulist_probe(device_t dev)
 {
-	const char	*name;
+	const char *name;
 
 	name = ofw_bus_get_name(dev);
 
@@ -106,8 +102,8 @@ ofw_cpulist_probe(device_t dev)
 	return (0);
 }
 
-static int 
-ofw_cpulist_attach(device_t dev) 
+static int
+ofw_cpulist_attach(device_t dev)
 {
 	struct ofw_cpulist_softc *sc;
 	phandle_t root, child;
@@ -124,18 +120,18 @@ ofw_cpulist_attach(device_t dev)
 	for (child = OF_child(root); child != 0; child = OF_peer(child)) {
 		dinfo = malloc(sizeof(*dinfo), M_OFWCPU, M_WAITOK | M_ZERO);
 
-                if (ofw_bus_gen_setup_devinfo(dinfo, child) != 0) {
-                        free(dinfo, M_OFWCPU);
-                        continue;
-                }
-                cdev = device_add_child(dev, NULL, -1);
-                if (cdev == NULL) {
-                        device_printf(dev, "<%s>: device_add_child failed\n",
-                            dinfo->obd_name);
-                        ofw_bus_gen_destroy_devinfo(dinfo);
-                        free(dinfo, M_OFWCPU);
-                        continue;
-                }
+		if (ofw_bus_gen_setup_devinfo(dinfo, child) != 0) {
+			free(dinfo, M_OFWCPU);
+			continue;
+		}
+		cdev = device_add_child(dev, NULL, -1);
+		if (cdev == NULL) {
+			device_printf(dev, "<%s>: device_add_child failed\n",
+			    dinfo->obd_name);
+			ofw_bus_gen_destroy_devinfo(dinfo);
+			free(dinfo, M_OFWCPU);
+			continue;
+		}
 		device_set_ivars(cdev, dinfo);
 	}
 
@@ -143,9 +139,9 @@ ofw_cpulist_attach(device_t dev)
 }
 
 static const struct ofw_bus_devinfo *
-ofw_cpulist_get_devinfo(device_t dev, device_t child) 
+ofw_cpulist_get_devinfo(device_t dev, device_t child)
 {
-	return (device_get_ivars(child));	
+	return (device_get_ivars(child));
 }
 
 static int	ofw_cpu_probe(device_t);
@@ -183,9 +179,7 @@ static driver_t ofw_cpu_driver = {
 	sizeof(struct ofw_cpu_softc)
 };
 
-static devclass_t ofw_cpu_devclass;
-
-DRIVER_MODULE(ofw_cpu, cpulist, ofw_cpu_driver, ofw_cpu_devclass, 0, 0);
+DRIVER_MODULE(ofw_cpu, cpulist, ofw_cpu_driver, 0, 0);
 
 static int
 ofw_cpu_probe(device_t dev)
@@ -196,6 +190,11 @@ ofw_cpu_probe(device_t dev)
 		return (ENXIO);
 
 	device_set_desc(dev, "Open Firmware CPU");
+	if (!bootverbose && device_get_unit(dev) != 0) {
+		device_quiet(dev);
+		device_quiet_children(dev);
+	}
+
 	return (0);
 }
 
@@ -207,7 +206,7 @@ ofw_cpu_attach(device_t dev)
 	phandle_t node;
 	pcell_t cell;
 	int rv;
-#ifdef EXT_RESOURCES
+#if defined(__arm__) || defined(__arm64__) || defined(__riscv__)
 	clk_t cpuclk;
 	uint64_t freq;
 #endif
@@ -246,8 +245,8 @@ ofw_cpu_attach(device_t dev)
 		struct cpuref cpuref;
 		cell_t *servers;
 		int i, nservers, rv;
-		
-		if ((nservers = OF_getencprop_alloc(node, 
+
+		if ((nservers = OF_getencprop_alloc(node,
 		    "ibm,ppc-interrupt-server#s", (void **)&servers)) < 0)
 			return (ENXIO);
 		nservers /= sizeof(cell_t);
@@ -277,7 +276,7 @@ ofw_cpu_attach(device_t dev)
 	sc->sc_cpu_pcpu = pcpu_find(device_get_unit(dev));
 
 	if (OF_getencprop(node, "clock-frequency", &cell, sizeof(cell)) < 0) {
-#ifdef EXT_RESOURCES
+#if defined(__arm__) || defined(__arm64__) || defined(__riscv__)
 		rv = clk_get_by_ofw_index(dev, 0, 0, &cpuclk);
 		if (rv == 0) {
 			rv = clk_get_freq(cpuclk, &freq);

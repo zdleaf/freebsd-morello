@@ -1,8 +1,7 @@
-/* $FreeBSD$ */
 
 /*-
  * Copyright (c) 2011 Anybots Inc
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * written by Akinori Furukoshi <moonlightakkiy@yahoo.ca>
  *  - ucom part is based on u3g.c
@@ -229,7 +228,7 @@ struct usie_softc {
 	struct usb_xfer *sc_uc_xfer[USIE_UCOM_MAX][USIE_UC_N_XFER];
 	struct usb_xfer *sc_if_xfer[USIE_IF_N_XFER];
 
-	struct ifnet *sc_ifp;
+	if_t sc_ifp;
 	struct usb_device *sc_udev;
 	device_t sc_dev;
 

@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2004-2005 Gleb Smirnoff <glebius@FreeBSD.org>
  * Copyright (c) 2001-2003 Roman V. Palagin <romanp@unshadow.net>
@@ -28,11 +28,6 @@
  *
  * $SourceForge: flowctl.c,v 1.15 2004/08/31 20:24:58 glebius Exp $
  */
-
-#ifndef lint
-static const char rcs_id[] =
-    "@(#) $FreeBSD$";
-#endif
 
 #include <sys/types.h>
 #include <sys/time.h>

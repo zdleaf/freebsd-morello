@@ -34,7 +34,6 @@
  * SUCH DAMAGE.
  *
  * 	from: @(#) ieeefp.h 	1.0 (Berkeley) 9/23/93
- * $FreeBSD$
  */
 
 #ifndef _X86_X86_IEEEFP_H_
@@ -46,10 +45,6 @@
  * IEEE floating point type, constant and function definitions.
  * XXX: {FP,SSE}*FLD and {FP,SSE}*OFF are undocumented pollution.
  */
-
-#ifndef _SYS_CDEFS_H_
-#error this file needs sys/cdefs.h as a prerequisite
-#endif
 
 /*
  * Rounding modes.
@@ -108,8 +103,6 @@ typedef enum {
  */
 #define FP_STKY_OFF	0	/* sticky flags offset */
 
-#ifdef __GNUCLIKE_ASM
-
 #define	__fldcw(addr)	__asm __volatile("fldcw %0" : : "m" (*(addr)))
 #define	__fldenv(addr)	__asm __volatile("fldenv %0" : : "m" (*(addr)))
 #define	__fnclex()	__asm __volatile("fnclex")
@@ -146,7 +139,5 @@ __fnldcw(unsigned short _cw, unsigned short _newcw)
 	}
 	__fldcw(&_newcw);
 }
-
-#endif /* __GNUCLIKE_ASM */
 
 #endif/* _X86_X86_IEEEFP_H_ */

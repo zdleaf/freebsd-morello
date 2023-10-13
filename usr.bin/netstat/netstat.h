@@ -29,7 +29,6 @@
  * SUCH DAMAGE.
  *
  *	@(#)netstat.h	8.2 (Berkeley) 1/4/94
- * $FreeBSD$
  */
 
 #include <sys/cdefs.h>
@@ -92,6 +91,7 @@ void	sctp_protopr(u_long, const char *, int, int);
 void	sctp_stats(u_long, const char *, int, int);
 #endif
 void	arp_stats(u_long, const char *, int, int);
+void	divert_stats(u_long, const char *, int, int);
 void	ip_stats(u_long, const char *, int, int);
 void	icmp_stats(u_long, const char *, int, int);
 void	igmp_stats(u_long, const char *, int, int);

@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2018 The FreeBSD Foundation
  *
@@ -28,16 +28,11 @@
  * SUCH DAMAGE.
  */
 
-#include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
-#include "opt_compat.h"
-
 #include <sys/param.h>
-#include <sys/systm.h>
 #include <sys/imgact.h>
 #include <sys/lock.h>
 #include <sys/sx.h>
+
 #include <vm/vm.h>
 #include <vm/vm_param.h>
 #include <vm/vm_extern.h>
@@ -46,6 +41,7 @@ __FBSDID("$FreeBSD$");
 #include <machine/atomic.h>
 #include <machine/md_var.h>
 
+#include <i386/linux/linux.h>
 #include <compat/linux/linux_emul.h>
 #include <compat/linux/linux_futex.h>
 
@@ -72,7 +68,7 @@ futex_xchgl(int oparg, uint32_t *uaddr, int *oldval)
 	st.oldval = oldval;
 	if (cp_slow0((vm_offset_t)uaddr, sizeof(uint32_t), true,
 	    futex_xchgl_slow0, &st) != 0)
-		return (-EFAULT);
+		return (EFAULT);
 	return (0);
 }
 
@@ -94,7 +90,7 @@ futex_addl(int oparg, uint32_t *uaddr, int *oldval)
 	st.oldval = oldval;
 	if (cp_slow0((vm_offset_t)uaddr, sizeof(uint32_t), true,
 	    futex_addl_slow0, &st) != 0)
-		return (-EFAULT);
+		return (EFAULT);
 	return (0);
 }
 
@@ -120,7 +116,7 @@ futex_orl(int oparg, uint32_t *uaddr, int *oldval)
 	st.oldval = oldval;
 	if (cp_slow0((vm_offset_t)uaddr, sizeof(uint32_t), true,
 	    futex_orl_slow0, &st) != 0)
-		return (-EFAULT);
+		return (EFAULT);
 	return (0);
 }
 
@@ -146,7 +142,7 @@ futex_andl(int oparg, uint32_t *uaddr, int *oldval)
 	st.oldval = oldval;
 	if (cp_slow0((vm_offset_t)uaddr, sizeof(uint32_t), true,
 	    futex_andl_slow0, &st) != 0)
-		return (-EFAULT);
+		return (EFAULT);
 	return (0);
 }
 
@@ -172,6 +168,6 @@ futex_xorl(int oparg, uint32_t *uaddr, int *oldval)
 	st.oldval = oldval;
 	if (cp_slow0((vm_offset_t)uaddr, sizeof(uint32_t), true,
 	    futex_xorl_slow0, &st) != 0)
-		return (-EFAULT);
+		return (EFAULT);
 	return (0);
 }

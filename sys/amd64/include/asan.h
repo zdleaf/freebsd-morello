@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2020 The FreeBSD Foundation
  *
@@ -64,6 +64,12 @@ kasan_md_unsupported(vm_offset_t addr)
 static inline void
 kasan_md_init(void)
 {
+}
+
+static inline void
+kasan_md_init_early(vm_offset_t bootstack, size_t size)
+{
+	kasan_shadow_map(bootstack, size);
 }
 
 #endif /* KASAN */

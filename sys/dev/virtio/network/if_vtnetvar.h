@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2011, Bryan Venteicher <bryanv@FreeBSD.org>
  * All rights reserved.
@@ -24,8 +24,6 @@
  * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 #ifndef _IF_VTNETVAR_H
@@ -142,7 +140,7 @@ struct vtnet_txq {
 
 struct vtnet_softc {
 	device_t		 vtnet_dev;
-	struct ifnet		*vtnet_ifp;
+	if_t			 vtnet_ifp;
 	struct vtnet_rxq	*vtnet_rxqs;
 	struct vtnet_txq	*vtnet_txqs;
 	pfil_head_t		 vtnet_pfil;

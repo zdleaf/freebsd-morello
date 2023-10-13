@@ -28,8 +28,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 #include <machine/asmacros.h>
@@ -47,6 +45,8 @@
 	.set    kernload,KERNLOAD
 	.set	dmapbase,DMAP_MIN_ADDRESS
 	.set	dmapend,DMAP_MAX_ADDRESS
+
+#define	BOOTSTACK_SIZE	(PAGE_SIZE * KSTACK_PAGES)
 
 	.text
 /**********************************************************************
@@ -66,14 +66,22 @@ ENTRY(btext)
 	pushq	$PSL_KERNEL
 	popfq
 
-	/* Find the metadata pointers before we lose them */
+	/* Get onto a stack that we can trust - there is no going back now. */
 	movq	%rsp, %rbp
+	movq	$bootstack,%rsp
+
+#ifdef KASAN
+	/* Bootstrap a shadow map for the boot stack. */
+	movq	$bootstack, %rdi
+	subq	$BOOTSTACK_SIZE, %rdi
+	movq	$BOOTSTACK_SIZE, %rsi
+	call	kasan_init_early
+#endif
+
+	/* Grab metadata pointers from the loader. */
 	movl	4(%rbp),%edi		/* modulep (arg 1) */
 	movl	8(%rbp),%esi		/* kernend (arg 2) */
-
-	/* Get onto a stack that we can trust - there is no going back now. */
-	movq	$bootstack,%rsp
-	xorl	%ebp, %ebp
+	xorq	%rbp, %rbp
 
 	call	hammer_time		/* set up cpu for unix operation */
 	movq	%rax,%rsp		/* set up kstack for mi_startup() */
@@ -138,7 +146,7 @@ ENTRY(la57_trampoline_gdt)
 ENTRY(la57_trampoline_end)
 
 	.bss
-	ALIGN_DATA			/* just to be sure */
+	.p2align PAGE_SHIFT
 	.globl	bootstack
-	.space	0x1000			/* space for bootstack - temporary stack */
+	.space	BOOTSTACK_SIZE		/* space for bootstack - temporary stack */
 bootstack:

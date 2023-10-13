@@ -36,8 +36,6 @@
 #include "opt_platform.h"
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/ktr.h>
@@ -119,10 +117,7 @@ static driver_t lbc_driver = {
 	sizeof(struct lbc_softc)
 };
 
-devclass_t lbc_devclass;
-
-EARLY_DRIVER_MODULE(lbc, ofwbus, lbc_driver, lbc_devclass,
-    0, 0, BUS_PASS_BUS);
+EARLY_DRIVER_MODULE(lbc, ofwbus, lbc_driver, 0, 0, BUS_PASS_BUS);
 
 /*
  * Calculate address mask used by OR(n) registers. Use memory region size to
@@ -160,7 +155,8 @@ lbc_banks_unmap(struct lbc_softc *sc)
 		if (sc->sc_range[r].size == 0)
 			return;
 
-		pmap_unmapdev(sc->sc_range[r].kva, sc->sc_range[r].size);
+		pmap_unmapdev((void *)sc->sc_range[r].kva,
+		    sc->sc_range[r].size);
 		law_disable(OCP85XX_TGTIF_LBC, sc->sc_range[r].addr,
 		    sc->sc_range[r].size);
 		r++;

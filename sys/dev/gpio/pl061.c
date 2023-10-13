@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2020 Amazon.com, Inc. or its affiliates.
  * All rights reserved.
@@ -27,8 +27,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/bus.h>
@@ -103,9 +101,6 @@ pl061_pin_max(device_t dev, int *maxpin)
 static int
 pl061_pin_getname(device_t dev, uint32_t pin, char *name)
 {
-	struct pl061_softc *sc;
-
-	sc = device_get_softc(dev);
 	if (pin >= PL061_NUM_GPIO)
 		return (EINVAL);
 
@@ -140,9 +135,6 @@ pl061_pin_getflags(device_t dev, uint32_t pin, uint32_t *flags)
 static int
 pl061_pin_getcaps(device_t dev, uint32_t pin, uint32_t *caps)
 {
-	struct pl061_softc *sc;
-
-	sc = device_get_softc(dev);
 	if (pin >= PL061_NUM_GPIO)
 		return (EINVAL);
 

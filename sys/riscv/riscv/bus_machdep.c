@@ -36,8 +36,6 @@
 #include "opt_platform.h"
 
 #include <sys/param.h>
-__FBSDID("$FreeBSD$");
-
 #include <vm/vm.h>
 #include <vm/pmap.h>
 
@@ -106,7 +104,7 @@ static void
 generic_bs_unmap(void *t, bus_space_handle_t bsh, bus_size_t size)
 {
 
-	pmap_unmapdev(bsh, size);
+	pmap_unmapdev((void *)bsh, size);
 }
 
 static void

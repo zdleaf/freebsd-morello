@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2012, 2015 Chelsio Communications, Inc.
  * All rights reserved.
@@ -25,8 +25,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  *
  */
 
@@ -71,11 +69,11 @@ enum {
 	TPF_CPL_PENDING    = (1 << 7),	/* haven't received the last CPL */
 	TPF_SYNQE	   = (1 << 8),	/* synq_entry, not really a toepcb */
 	TPF_SYNQE_EXPANDED = (1 << 9),	/* toepcb ready, tid context updated */
-	TPF_FORCE_CREDITS  = (1 << 10), /* always send credits */
+	TPF_TLS_STARTING   = (1 << 10), /* starting TLS receive */
 	TPF_KTLS           = (1 << 11), /* send TLS records from KTLS */
 	TPF_INITIALIZED    = (1 << 12), /* init_toepcb has been called */
 	TPF_TLS_RECEIVE	   = (1 << 13), /* should receive TLS records */
-	TPF_TLS_ESTABLISHED = (1 << 14), /* TLS handshake timer initialized */
+	TPF_TLS_RX_QUIESCED = (1 << 14), /* RX quiesced for TLS RX startup */
 	TPF_WAITING_FOR_FINAL = (1<< 15), /* waiting for wakeup on final CPL */
 };
 
@@ -89,6 +87,7 @@ enum {
 	DDP_DEAD	= (1 << 6),	/* toepcb is shutting down */
 };
 
+struct bio;
 struct ctl_sg_entry;
 struct sockopt;
 struct offload_settings;
@@ -470,7 +469,6 @@ void send_abort_rpl(struct adapter *, struct sge_ofld_txq *, int , int);
 void send_flowc_wr(struct toepcb *, struct tcpcb *);
 void send_reset(struct adapter *, struct toepcb *, uint32_t);
 int send_rx_credits(struct adapter *, struct toepcb *, int);
-void send_rx_modulate(struct adapter *, struct toepcb *);
 void make_established(struct toepcb *, uint32_t, uint32_t, uint16_t);
 int t4_close_conn(struct adapter *, struct toepcb *);
 void t4_rcvd(struct toedev *, struct tcpcb *);
@@ -488,19 +486,21 @@ int t4_init_ppod_region(struct ppod_region *, struct t4_range *, u_int,
     const char *);
 void t4_free_ppod_region(struct ppod_region *);
 int t4_alloc_page_pods_for_ps(struct ppod_region *, struct pageset *);
+int t4_alloc_page_pods_for_bio(struct ppod_region *, struct bio *,
+    struct ppod_reservation *);
 int t4_alloc_page_pods_for_buf(struct ppod_region *, vm_offset_t, int,
     struct ppod_reservation *);
 int t4_alloc_page_pods_for_sgl(struct ppod_region *, struct ctl_sg_entry *, int,
     struct ppod_reservation *);
 int t4_write_page_pods_for_ps(struct adapter *, struct sge_wrq *, int,
     struct pageset *);
+int t4_write_page_pods_for_bio(struct adapter *, struct toepcb *,
+    struct ppod_reservation *, struct bio *, struct mbufq *);
 int t4_write_page_pods_for_buf(struct adapter *, struct toepcb *,
     struct ppod_reservation *, vm_offset_t, int, struct mbufq *);
 int t4_write_page_pods_for_sgl(struct adapter *, struct toepcb *,
     struct ppod_reservation *, struct ctl_sg_entry *, int, int, struct mbufq *);
 void t4_free_page_pods(struct ppod_reservation *);
-int t4_soreceive_ddp(struct socket *, struct sockaddr **, struct uio *,
-    struct mbuf **, struct mbuf **, int *);
 int t4_aio_queue_ddp(struct socket *, struct kaiocb *);
 void t4_ddp_mod_load(void);
 void t4_ddp_mod_unload(void);
@@ -519,12 +519,11 @@ const struct offload_settings *lookup_offload_policy(struct adapter *, int,
 bool can_tls_offload(struct adapter *);
 void do_rx_data_tls(const struct cpl_rx_data *, struct toepcb *, struct mbuf *);
 void t4_push_ktls(struct adapter *, struct toepcb *, int);
+void tls_received_starting_data(struct adapter *, struct toepcb *,
+    struct sockbuf *, int);
 void t4_tls_mod_load(void);
 void t4_tls_mod_unload(void);
-void tls_detach(struct toepcb *);
-void tls_establish(struct toepcb *);
 void tls_init_toep(struct toepcb *);
-void tls_stop_handshake_timer(struct toepcb *);
 int tls_tx_key(struct toepcb *);
 void tls_uninit_toep(struct toepcb *);
 int tls_alloc_ktls(struct toepcb *, struct ktls_session *, int);

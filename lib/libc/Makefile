@@ -1,22 +1,20 @@
 #	@(#)Makefile	8.2 (Berkeley) 2/3/94
-# $FreeBSD$
 
 PACKAGE=	clibs
 SHLIBDIR?= /lib
 
 .include <src.opts.mk>
 
-# Force building of libc_pic.a
-MK_TOOLCHAIN=	yes
-
 LIBC_SRCTOP?= ${.CURDIR}
 
-# Pick the current architecture directory for libc. In general, this is
-# named MACHINE_CPUARCH, but some ABIs are different enough to require
-# their own libc, so allow a directory named MACHINE_ARCH to override this.
-
-.if exists(${LIBC_SRCTOP}/${MACHINE_ARCH:S/powerpc64le/powerpc64/})
-LIBC_ARCH=${MACHINE_ARCH:S/powerpc64le/powerpc64/}
+# Pick the current architecture directory for libc. In general, this is named
+# MACHINE_CPUARCH, but some ABIs are different enough to require their own libc,
+# so allow a directory named MACHINE_ARCH to override this (though treat
+# powerpc64le and powerpc64 the same).
+# Note: This is copeid to msun/Makefile
+M=${MACHINE_ARCH:S/powerpc64le/powerpc64/}
+.if exists(${LIBC_SRCTOP}/${M})
+LIBC_ARCH=${M}
 .else
 LIBC_ARCH=${MACHINE_CPUARCH}
 .endif
@@ -32,7 +30,7 @@ CFLAGS+=-DNO__SCCSID -DNO__RCSID
 LIB=c
 SHLIB_MAJOR= 7
 .if ${MK_SSP} != "no" && \
-    (${LIBC_ARCH} == "i386" || ${MACHINE_ARCH:Mpower*} != "")
+    (${LIBC_ARCH} == "i386" || ${LIBC_ARCH:Mpowerpc*} != "")
 SHLIB_LDSCRIPT=libc.ldscript
 .else
 SHLIB_LDSCRIPT=libc_nossp.ldscript
@@ -57,7 +55,8 @@ CFLAGS+=${CANCELPOINTS_CFLAGS}
 # Use a more efficient TLS model for libc since we can reasonably assume that
 # it will be loaded during program startup.
 .if ${LIBC_ARCH} == "aarch64" || ${LIBC_ARCH} == "amd64" || \
-    ${LIBC_ARCH} == "i386" || ${LIBC_ARCH} == "riscv"
+    ${LIBC_ARCH} == "i386" || ${LIBC_ARCH} == "riscv" || \
+    ${LIBC_ARCH:Mpowerpc*} != ""
 CFLAGS+= -ftls-model=initial-exec
 .endif
 
@@ -68,7 +67,7 @@ LDFLAGS+= -nodefaultlibs
 LIBADD+=	compiler_rt
 
 .if ${MK_SSP} != "no" && \
-    (${LIBC_ARCH} == "i386" || ${MACHINE_ARCH:Mpower*} != "")
+    (${LIBC_ARCH} == "i386" || ${LIBC_ARCH:Mpowerpc*} != "")
 LIBADD+=	ssp_nonshared
 .endif
 
@@ -92,6 +91,7 @@ MIASM=
 NOASM=
 
 .include "${LIBC_SRCTOP}/${LIBC_ARCH}/Makefile.inc"
+.include "${LIBC_SRCTOP}/csu/Makefile.inc"
 .include "${LIBC_SRCTOP}/db/Makefile.inc"
 .include "${LIBC_SRCTOP}/compat-43/Makefile.inc"
 .include "${LIBC_SRCTOP}/gdtoa/Makefile.inc"
@@ -108,17 +108,13 @@ NOASM=
 .include "${LIBC_SRCTOP}/net/Makefile.inc"
 .include "${LIBC_SRCTOP}/nls/Makefile.inc"
 .include "${LIBC_SRCTOP}/posix1e/Makefile.inc"
-.if ${LIBC_ARCH} != "aarch64" && \
-    ${LIBC_ARCH} != "amd64" && \
-    ${LIBC_ARCH} != "powerpc64" && \
-    ${LIBC_ARCH} != "riscv"
+.if ${MACHINE_ABI:Mlong32}
 .include "${LIBC_SRCTOP}/quad/Makefile.inc"
 .endif
 .include "${LIBC_SRCTOP}/regex/Makefile.inc"
 .include "${LIBC_SRCTOP}/resolv/Makefile.inc"
 .include "${LIBC_SRCTOP}/stdio/Makefile.inc"
 .include "${LIBC_SRCTOP}/stdlib/Makefile.inc"
-.include "${LIBC_SRCTOP}/stdlib/jemalloc/Makefile.inc"
 .include "${LIBC_SRCTOP}/stdtime/Makefile.inc"
 .include "${LIBC_SRCTOP}/string/Makefile.inc"
 .include "${LIBC_SRCTOP}/sys/Makefile.inc"
@@ -126,9 +122,7 @@ NOASM=
 .include "${LIBC_SRCTOP}/rpc/Makefile.inc"
 .include "${LIBC_SRCTOP}/uuid/Makefile.inc"
 .include "${LIBC_SRCTOP}/xdr/Makefile.inc"
-.if (${LIBC_ARCH} == "arm" && \
-	(${MACHINE_ARCH:Marmv[67]*} == "" || (defined(CPUTYPE) && ${CPUTYPE:M*soft*}))) || \
-    (${LIBC_ARCH} == "riscv" && ${MACHINE_ARCH:Mriscv*sf} != "")
+.if (${LIBC_ARCH} == "arm" && (defined(CPUTYPE) && ${CPUTYPE:M*soft*}))
 .include "${LIBC_SRCTOP}/softfloat/Makefile.inc"
 .endif
 .if ${LIBC_ARCH} == "i386" || ${LIBC_ARCH} == "amd64"
@@ -161,7 +155,7 @@ CFLAGS+= -DSYMBOL_VERSIONING
 
 # If there are no machine dependent sources, append all the
 # machine-independent sources:
-.if empty(MDSRCS)
+.if empty(MDSRCS) || ${MK_MACHDEP_OPTIMIZATIONS} == no
 SRCS+=	${MISRCS}
 .else
 # Append machine-dependent sources, then append machine-independent sources

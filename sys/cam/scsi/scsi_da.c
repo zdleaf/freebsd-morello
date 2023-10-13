@@ -1,7 +1,7 @@
 /*-
  * Implementation of SCSI Direct Access Peripheral driver for CAM.
  *
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 1997 Justin T. Gibbs.
  * All rights reserved.
@@ -29,8 +29,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 
 #ifdef _KERNEL
@@ -302,11 +300,11 @@ static const char *da_delete_method_desc[] =
 #define ccb_bp		ppriv_ptr1
 
 struct disk_params {
-	u_int8_t  heads;
-	u_int32_t cylinders;
-	u_int8_t  secs_per_track;
-	u_int32_t secsize;	/* Number of bytes/sector */
-	u_int64_t sectors;	/* total number sectors */
+	uint8_t  heads;
+	uint32_t cylinders;
+	uint8_t  secs_per_track;
+	uint32_t secsize;	/* Number of bytes/sector */
+	uint64_t sectors;	/* total number sectors */
 	u_int     stripesize;
 	u_int     stripeoffset;
 };
@@ -329,7 +327,6 @@ typedef enum {
 	DA_REF_OPEN = 1,
 	DA_REF_OPEN_HOLD,
 	DA_REF_CLOSE_HOLD,
-	DA_REF_PROBE_HOLD,
 	DA_REF_TUR,
 	DA_REF_GEOM,
 	DA_REF_SYSCTL,
@@ -1471,7 +1468,7 @@ static struct da_quirk_entry da_quirk_table[] =
 static	disk_strategy_t	dastrategy;
 static	dumper_t	dadump;
 static	periph_init_t	dainit;
-static	void		daasync(void *callback_arg, u_int32_t code,
+static	void		daasync(void *callback_arg, uint32_t code,
 				struct cam_path *path, void *arg);
 static	void		dasysctlinit(void *context, int pending);
 static	int		dasysctlsofttimeout(SYSCTL_HANDLER_ARGS);
@@ -1521,8 +1518,8 @@ static void		dadone_probezone(struct cam_periph *periph,
 					 union ccb *done_ccb);
 static void		dadone_tur(struct cam_periph *periph,
 				   union ccb *done_ccb);
-static  int		daerror(union ccb *ccb, u_int32_t cam_flags,
-				u_int32_t sense_flags);
+static  int		daerror(union ccb *ccb, uint32_t cam_flags,
+				uint32_t sense_flags);
 static void		daprevent(struct cam_periph *periph, int action);
 static void		dareprobe(struct cam_periph *periph);
 static void		dasetgeom(struct cam_periph *periph, uint32_t block_len,
@@ -1915,7 +1912,7 @@ dastrategy(struct bio *bp)
 }
 
 static int
-dadump(void *arg, void *virtual, vm_offset_t physical, off_t offset, size_t length)
+dadump(void *arg, void *virtual, off_t offset, size_t length)
 {
 	struct	    cam_periph *periph;
 	struct	    da_softc *softc;
@@ -1945,7 +1942,7 @@ dadump(void *arg, void *virtual, vm_offset_t physical, off_t offset, size_t leng
 				/*minimum_cmd_size*/ softc->minimum_cmd_size,
 				offset / secsize,
 				length / secsize,
-				/*data_ptr*/(u_int8_t *) virtual,
+				/*data_ptr*/(uint8_t *) virtual,
 				/*dxfer_len*/length,
 				/*sense_len*/SSD_FULL_SIZE,
 				da_default_timeout * 1000);
@@ -2055,9 +2052,10 @@ daoninvalidate(struct cam_periph *periph)
 #endif
 
 	/*
-	 * Return all queued I/O with ENXIO.
-	 * XXX Handle any transactions queued to the card
-	 *     with XPT_ABORT_CCB.
+	 * Return all queued I/O with ENXIO. Transactions may be queued up here
+	 * for retry (since we are called while there's other transactions
+	 * pending). Any requests in the hardware will drain before dacleanup
+	 * is called.
 	 */
 	cam_iosched_flush(softc->cam_iosched, NULL, ENXIO);
 
@@ -2101,7 +2099,7 @@ dacleanup(struct cam_periph *periph)
 }
 
 static void
-daasync(void *callback_arg, u_int32_t code,
+daasync(void *callback_arg, uint32_t code,
 	struct cam_path *path, void *arg)
 {
 	struct cam_periph *periph;
@@ -2353,11 +2351,11 @@ dasysctlinit(void *context, int pending)
 	SYSCTL_ADD_PROC(&softc->sysctl_ctx, SYSCTL_CHILDREN(softc->sysctl_tree),
 	    OID_AUTO, "rotating", CTLTYPE_INT | CTLFLAG_RD | CTLFLAG_MPSAFE,
 	    &softc->flags, (u_int)DA_FLAG_ROTATING, dabitsysctl, "I",
-	    "Rotating media *DEPRECATED* gone in FreeBSD 14");
+	    "Rotating media *DEPRECATED* gone in FreeBSD 15");
 	SYSCTL_ADD_PROC(&softc->sysctl_ctx, SYSCTL_CHILDREN(softc->sysctl_tree),
 	    OID_AUTO, "unmapped_io", CTLTYPE_INT | CTLFLAG_RD | CTLFLAG_MPSAFE,
 	    &softc->flags, (u_int)DA_FLAG_UNMAPPEDIO, dabitsysctl, "I",
-	    "Unmapped I/O support *DEPRECATED* gone in FreeBSD 14");
+	    "Unmapped I/O support *DEPRECATED* gone in FreeBSD 15");
 
 #ifdef CAM_TEST_FAILURE
 	SYSCTL_ADD_PROC(&softc->sysctl_ctx, SYSCTL_CHILDREN(softc->sysctl_tree),
@@ -2601,9 +2599,17 @@ daprobedone(struct cam_periph *periph, union ccb *ccb)
 	wakeup(&softc->disk->d_mediasize);
 	if ((softc->flags & DA_FLAG_ANNOUNCED) == 0) {
 		softc->flags |= DA_FLAG_ANNOUNCED;
-		da_periph_unhold(periph, DA_REF_PROBE_HOLD);
-	} else
-		da_periph_release_locked(periph, DA_REF_REPROBE);
+
+		/*
+		 * We'll release this reference once GEOM calls us back via
+		 * dadiskgonecb(), telling us that our provider has been freed.
+		 */
+		if (da_periph_acquire(periph, DA_REF_GEOM) == 0)
+			disk_create(softc->disk, DISK_VERSION);
+
+		cam_periph_release_boot(periph);
+	}
+	da_periph_release_locked(periph, DA_REF_REPROBE);
 }
 
 static void
@@ -2863,14 +2869,10 @@ daregister(struct cam_periph *periph, void *arg)
 	}
 
 	/*
-	 * Take an exclusive section lock on the periph while dastart is called
-	 * to finish the probe.  The lock will be dropped in dadone at the end
-	 * of probe. This locks out daopen and daclose from racing with the
-	 * probe.
-	 *
-	 * XXX if cam_periph_hold returns an error, we don't hold a refcount.
+	 * Take a reference on the periph while dastart is called to finish the
+	 * probe.  The reference will be dropped in dadone at the end of probe.
 	 */
-	(void)da_periph_hold(periph, PRIBIO, DA_REF_PROBE_HOLD);
+	(void)da_periph_acquire(periph, DA_REF_REPROBE);
 
 	/*
 	 * Schedule a periodic event to occasionally send an
@@ -2966,20 +2968,6 @@ daregister(struct cam_periph *periph, void *arg)
 	softc->disk->d_hba_subdevice = cpi.hba_subdevice;
 	snprintf(softc->disk->d_attachment, sizeof(softc->disk->d_attachment),
 	    "%s%d", cpi.dev_name, cpi.unit_number);
-
-	/*
-	 * Acquire a reference to the periph before we register with GEOM.
-	 * We'll release this reference once GEOM calls us back (via
-	 * dadiskgonecb()) telling us that our provider has been freed.
-	 */
-	if (da_periph_acquire(periph, DA_REF_GEOM) != 0) {
-		xpt_print(periph->path, "%s: lost periph during "
-			  "registration!\n", __func__);
-		cam_periph_lock(periph);
-		return (CAM_REQ_CMP_ERR);
-	}
-
-	disk_create(softc->disk, DISK_VERSION);
 	cam_periph_lock(periph);
 
 	/*
@@ -2994,14 +2982,6 @@ daregister(struct cam_periph *periph, void *arg)
 	    AC_INQ_CHANGED, daasync, periph, periph->path);
 
 	/*
-	 * Emit an attribute changed notification just in case
-	 * physical path information arrived before our async
-	 * event handler was registered, but after anyone attaching
-	 * to our disk device polled it.
-	 */
-	disk_attr_changed(softc->disk, "GEOM::physpath", M_NOWAIT);
-
-	/*
 	 * Schedule a periodic media polling events.
 	 */
 	callout_init_mtx(&softc->mediapoll_c, cam_periph_mtx(periph), 0);
@@ -3012,8 +2992,10 @@ daregister(struct cam_periph *periph, void *arg)
 		    0, damediapoll, periph, C_PREL(1));
 	}
 
-	xpt_schedule(periph, CAM_PRIORITY_DEV);
+	/* Released after probe when disk_create() call pass it to GEOM. */
+	cam_periph_hold_boot(periph);
 
+	xpt_schedule(periph, CAM_PRIORITY_DEV);
 	return(CAM_REQ_CMP);
 }
 
@@ -3621,7 +3603,7 @@ out:
 			     /*retries*/da_retry_count,
 			     /*cbfcnp*/dadone_probelbp,
 			     /*tag_action*/MSG_SIMPLE_Q_TAG,
-			     /*inq_buf*/(u_int8_t *)lbp,
+			     /*inq_buf*/(uint8_t *)lbp,
 			     /*inq_len*/sizeof(*lbp),
 			     /*evpd*/TRUE,
 			     /*page_code*/SVPD_LBP,
@@ -3655,7 +3637,7 @@ out:
 			     /*retries*/da_retry_count,
 			     /*cbfcnp*/dadone_probeblklimits,
 			     /*tag_action*/MSG_SIMPLE_Q_TAG,
-			     /*inq_buf*/(u_int8_t *)block_limits,
+			     /*inq_buf*/(uint8_t *)block_limits,
 			     /*inq_len*/sizeof(*block_limits),
 			     /*evpd*/TRUE,
 			     /*page_code*/SVPD_BLOCK_LIMITS,
@@ -3688,7 +3670,7 @@ out:
 			     /*retries*/da_retry_count,
 			     /*cbfcnp*/dadone_probebdc,
 			     /*tag_action*/MSG_SIMPLE_Q_TAG,
-			     /*inq_buf*/(u_int8_t *)bdc,
+			     /*inq_buf*/(uint8_t *)bdc,
 			     /*inq_len*/sizeof(*bdc),
 			     /*evpd*/TRUE,
 			     /*page_code*/SVPD_BDC,
@@ -3726,7 +3708,7 @@ out:
 				  /*retries*/da_retry_count,
 				  /*cbfcnp*/dadone_probeata,
                                   /*tag_action*/MSG_SIMPLE_Q_TAG,
-				  /*data_ptr*/(u_int8_t *)ata_params,
+				  /*data_ptr*/(uint8_t *)ata_params,
 				  /*dxfer_len*/sizeof(*ata_params),
 				  /*sense_len*/SSD_FULL_SIZE,
 				  /*timeout*/da_default_timeout * 1000);
@@ -3969,7 +3951,7 @@ out:
 			     /*retries*/da_retry_count,
 			     /*cbfcnp*/dadone_probezone,
 			     /*tag_action*/MSG_SIMPLE_Q_TAG,
-			     /*inq_buf*/(u_int8_t *)bdc,
+			     /*inq_buf*/(uint8_t *)bdc,
 			     /*inq_len*/sizeof(*bdc),
 			     /*evpd*/TRUE,
 			     /*page_code*/SVPD_ZONED_BDC,
@@ -4284,7 +4266,7 @@ cmd6workaround(union ccb *ccb)
 	struct scsi_rw_6 cmd6;
 	struct scsi_rw_10 *cmd10;
 	struct da_softc *softc;
-	u_int8_t *cdb;
+	uint8_t *cdb;
 	struct bio *bp;
 	int frozen;
 
@@ -4691,7 +4673,7 @@ dadone_probewp(struct cam_periph *periph, union ccb *done_ccb)
 {
 	struct da_softc *softc;
 	struct ccb_scsiio *csio;
-	u_int32_t  priority;
+	uint32_t  priority;
 
 	CAM_DEBUG(periph->path, CAM_DEBUG_TRACE, ("dadone_probewp\n"));
 
@@ -4775,7 +4757,7 @@ dadone_proberc(struct cam_periph *periph, union ccb *done_ccb)
 	struct ccb_scsiio *csio;
 	da_ccb_state state;
 	char *announce_buf;
-	u_int32_t  priority;
+	uint32_t  priority;
 	int lbp, n;
 
 	CAM_DEBUG(periph->path, CAM_DEBUG_TRACE, ("dadone_proberc\n"));
@@ -5061,7 +5043,7 @@ dadone_probelbp(struct cam_periph *periph, union ccb *done_ccb)
 	struct scsi_vpd_logical_block_prov *lbp;
 	struct da_softc *softc;
 	struct ccb_scsiio *csio;
-	u_int32_t  priority;
+	uint32_t  priority;
 
 	CAM_DEBUG(periph->path, CAM_DEBUG_TRACE, ("dadone_probelbp\n"));
 
@@ -5119,7 +5101,7 @@ dadone_probeblklimits(struct cam_periph *periph, union ccb *done_ccb)
 	struct scsi_vpd_block_limits *block_limits;
 	struct da_softc *softc;
 	struct ccb_scsiio *csio;
-	u_int32_t  priority;
+	uint32_t  priority;
 
 	CAM_DEBUG(periph->path, CAM_DEBUG_TRACE, ("dadone_probeblklimits\n"));
 
@@ -5213,7 +5195,7 @@ dadone_probebdc(struct cam_periph *periph, union ccb *done_ccb)
 	struct scsi_vpd_block_device_characteristics *bdc;
 	struct da_softc *softc;
 	struct ccb_scsiio *csio;
-	u_int32_t  priority;
+	uint32_t  priority;
 
 	CAM_DEBUG(periph->path, CAM_DEBUG_TRACE, ("dadone_probebdc\n"));
 
@@ -5231,7 +5213,7 @@ dadone_probebdc(struct cam_periph *periph, union ccb *done_ccb)
 		 * Disable queue sorting for non-rotational media
 		 * by default.
 		 */
-		u_int16_t old_rate = softc->disk->d_rotation_rate;
+		uint16_t old_rate = softc->disk->d_rotation_rate;
 
 		valid_len = csio->dxfer_len - csio->resid;
 		if (SBDC_IS_PRESENT(bdc, valid_len,
@@ -5313,7 +5295,7 @@ dadone_probeata(struct cam_periph *periph, union ccb *done_ccb)
 	struct ata_params *ata_params;
 	struct ccb_scsiio *csio;
 	struct da_softc *softc;
-	u_int32_t  priority;
+	uint32_t  priority;
 	int continue_probe;
 	int error;
 
@@ -5452,7 +5434,7 @@ dadone_probeatalogdir(struct cam_periph *periph, union ccb *done_ccb)
 {
 	struct da_softc *softc;
 	struct ccb_scsiio *csio;
-	u_int32_t  priority;
+	uint32_t  priority;
 	int error;
 
 	CAM_DEBUG(periph->path, CAM_DEBUG_TRACE, ("dadone_probeatalogdir\n"));
@@ -5533,7 +5515,7 @@ dadone_probeataiddir(struct cam_periph *periph, union ccb *done_ccb)
 {
 	struct da_softc *softc;
 	struct ccb_scsiio *csio;
-	u_int32_t  priority;
+	uint32_t  priority;
 	int error;
 
 	CAM_DEBUG(periph->path, CAM_DEBUG_TRACE, ("dadone_probeataiddir\n"));
@@ -5624,7 +5606,7 @@ dadone_probeatasup(struct cam_periph *periph, union ccb *done_ccb)
 {
 	struct da_softc *softc;
 	struct ccb_scsiio *csio;
-	u_int32_t  priority;
+	uint32_t  priority;
 	int error;
 
 	CAM_DEBUG(periph->path, CAM_DEBUG_TRACE, ("dadone_probeatasup\n"));
@@ -5953,7 +5935,7 @@ dareprobe(struct cam_periph *periph)
 }
 
 static int
-daerror(union ccb *ccb, u_int32_t cam_flags, u_int32_t sense_flags)
+daerror(union ccb *ccb, uint32_t cam_flags, uint32_t sense_flags)
 {
 	struct da_softc	  *softc;
 	struct cam_periph *periph;
@@ -6273,7 +6255,7 @@ dashutdown(void * arg, int howto)
 			/* If we paniced with the lock held, do not recurse. */
 			if (!cam_periph_owned(periph) &&
 			    (softc->flags & DA_FLAG_OPEN)) {
-				dadump(softc->disk, NULL, 0, 0, 0);
+				dadump(softc->disk, NULL, 0, 0);
 			}
 			continue;
 		}
@@ -6317,11 +6299,11 @@ dashutdown(void * arg, int howto)
  * be moved so they are included both in the kernel and userland.
  */
 void
-scsi_format_unit(struct ccb_scsiio *csio, u_int32_t retries,
+scsi_format_unit(struct ccb_scsiio *csio, uint32_t retries,
 		 void (*cbfcnp)(struct cam_periph *, union ccb *),
-		 u_int8_t tag_action, u_int8_t byte2, u_int16_t ileave,
-		 u_int8_t *data_ptr, u_int32_t dxfer_len, u_int8_t sense_len,
-		 u_int32_t timeout)
+		 uint8_t tag_action, uint8_t byte2, uint16_t ileave,
+		 uint8_t *data_ptr, uint32_t dxfer_len, uint8_t sense_len,
+		 uint32_t timeout)
 {
 	struct scsi_format_unit *scsi_cmd;
 
@@ -6396,11 +6378,11 @@ scsi_read_defects(struct ccb_scsiio *csio, uint32_t retries,
 }
 
 void
-scsi_sanitize(struct ccb_scsiio *csio, u_int32_t retries,
+scsi_sanitize(struct ccb_scsiio *csio, uint32_t retries,
 	      void (*cbfcnp)(struct cam_periph *, union ccb *),
-	      u_int8_t tag_action, u_int8_t byte2, u_int16_t control,
-	      u_int8_t *data_ptr, u_int32_t dxfer_len, u_int8_t sense_len,
-	      u_int32_t timeout)
+	      uint8_t tag_action, uint8_t byte2, uint16_t control,
+	      uint8_t *data_ptr, uint32_t dxfer_len, uint8_t sense_len,
+	      uint32_t timeout)
 {
 	struct scsi_sanitize *scsi_cmd;
 

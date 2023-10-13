@@ -17,8 +17,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/types.h>
 #include <sys/ioctl.h>
 #include <sys/socket.h>
@@ -817,7 +815,6 @@ block_feedback(struct pfctl *pf, struct superblock *block)
 {
 	TAILQ_HEAD( , pf_opt_rule) queue;
 	struct pf_opt_rule *por1, *por2;
-	u_int64_t total_count = 0;
 	struct pfctl_rule a, b;
 
 
@@ -827,8 +824,6 @@ block_feedback(struct pfctl *pf, struct superblock *block)
 	 */
 	TAILQ_FOREACH(por1, &block->sb_profiled_block->sb_rules, por_entry) {
 		comparable_rule(&a, &por1->por_rule, DC);
-		total_count += por1->por_rule.packets[0] +
-		    por1->por_rule.packets[1];
 		TAILQ_FOREACH(por2, &block->sb_rules, por_entry) {
 			if (por2->por_profile_count)
 				continue;
@@ -1479,7 +1474,7 @@ superblock_inclusive(struct superblock *block, struct pf_opt_rule *por)
 			}
 
 			if (closest >= 0)
-				DEBUG("superblock break @ %d on %s+%xh",
+				DEBUG("superblock break @ %d on %s+%zxh",
 				    por->por_rule.nr,
 				    pf_rule_desc[closest].prf_name,
 				    i - pf_rule_desc[closest].prf_offset -

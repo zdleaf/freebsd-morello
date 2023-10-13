@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 1998, 2001 Nicolas Souchu
  * All rights reserved.
@@ -27,8 +27,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 /*
  * Generic I2C bit-banging code
  *
@@ -131,8 +129,6 @@ driver_t iicbb_driver = {
 	iicbb_methods,
 	sizeof(struct iicbb_softc),
 };
-
-devclass_t iicbb_devclass;
 
 static int
 iicbb_probe(device_t dev)
@@ -595,7 +591,7 @@ iicbb_set_speed(struct iicbb_softc *sc, u_char speed)
 	sc->udelay = MAX(period, 1);
 }
 
-DRIVER_MODULE(iicbus, iicbb, iicbus_driver, iicbus_devclass, 0, 0);
+DRIVER_MODULE(iicbus, iicbb, iicbus_driver, 0, 0);
 
 MODULE_DEPEND(iicbb, iicbus, IICBUS_MINVER, IICBUS_PREFVER, IICBUS_MAXVER);
 MODULE_VERSION(iicbb, IICBB_MODVER);

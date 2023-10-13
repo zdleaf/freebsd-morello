@@ -27,9 +27,6 @@
  * SUCH DAMAGE.
  */
 
-#include <sys/cdefs.h>
-__FBSDID("* $FreeBSD$");
-
 /*
  * Common routines for the DMA engine on both the Apple Kauai and MacIO
  * ATA controllers.
@@ -260,9 +257,8 @@ void
 ata_dbdma_dmainit(device_t dev)
 {
 	struct ata_dbdma_channel *sc = device_get_softc(dev);
-	int error;
 
-	error = dbdma_allocate_channel(sc->dbdma_regs, sc->dbdma_offset,
+	dbdma_allocate_channel(sc->dbdma_regs, sc->dbdma_offset,
 	    bus_get_dma_tag(dev), 256, &sc->dbdma);
 
 	dbdma_set_wait_selector(sc->dbdma,1 << 7, 1 << 7);

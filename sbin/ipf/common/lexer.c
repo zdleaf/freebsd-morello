@@ -1,4 +1,3 @@
-/*	$FreeBSD$	*/
 
 /*
  * Copyright (C) 2012 by Darren Reed.
@@ -603,8 +602,7 @@ done:
 }
 
 
-static wordtab_t *yyfindkey(key)
-	char *key;
+static wordtab_t *yyfindkey(char *key)
 {
 	wordtab_t *w;
 

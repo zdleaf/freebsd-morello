@@ -42,8 +42,6 @@ static char sccsid[] = "@(#)logger.c	8.1 (Berkeley) 6/6/93";
 #endif
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/capsicum.h>
 #include <sys/param.h>
 #include <sys/socket.h>
@@ -182,7 +180,7 @@ main(int argc, char *argv[])
 	caph_cache_catpages();
 	caph_cache_tzdata();
 	if (nsock == 0) {
-		if (caph_enter() < 0)
+		if (caph_enter_casper() < 0)
 			err(1, "Unable to enter capability mode");
 	}
 	capsyslog = cap_service_open(capcas, "system.syslog");
@@ -198,21 +196,22 @@ main(int argc, char *argv[])
 	if (host == NULL)
 		cap_openlog(capsyslog, tag, logflags, 0);
 
-	(void )time(&now);
-	(void )ctime_r(&now, tbuf);
-	tbuf[19] = '\0';
-	timestamp = tbuf + 4;
-
 	if (hostname == NULL) {
 		hostname = hbuf;
 		(void )gethostname(hbuf, MAXHOSTNAMELEN);
 		*strchrnul(hostname, '.') = '\0';
 	}
 
+	timestamp = tbuf + 4;
+
 	/* log input line if appropriate */
 	if (argc > 0) {
 		char *p, *endp;
 		size_t len;
+
+		(void )time(&now);
+		(void )ctime_r(&now, tbuf);
+		tbuf[19] = '\0';
 
 		for (p = buf, endp = buf + sizeof(buf) - 2; *argv;) {
 			len = strlen(*argv);
@@ -235,9 +234,14 @@ main(int argc, char *argv[])
 			logmessage(pri, timestamp, hostname, tag, socks, nsock,
 			    buf);
 	} else
-		while (fgets(buf, sizeof(buf), stdin) != NULL)
+		while (fgets(buf, sizeof(buf), stdin) != NULL) {
+			(void )time(&now);
+			(void )ctime_r(&now, tbuf);
+			tbuf[19] = '\0';
+
 			logmessage(pri, timestamp, hostname, tag, socks, nsock,
 			    buf);
+		}
 	exit(0);
 }
 

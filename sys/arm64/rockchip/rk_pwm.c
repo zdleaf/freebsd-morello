@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2018 Emmanuel Vadot <manu@FreeBSD.org>
  * Copyright (c) 2019 Brandon Bergren <git@bdragon.rtk0.net>
@@ -24,13 +24,9 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/bus.h>
@@ -398,7 +394,5 @@ static driver_t rk_pwm_driver = {
 	sizeof(struct rk_pwm_softc),
 };
 
-static devclass_t rk_pwm_devclass;
-
-DRIVER_MODULE(rk_pwm, simplebus, rk_pwm_driver, rk_pwm_devclass, 0, 0);
+DRIVER_MODULE(rk_pwm, simplebus, rk_pwm_driver, 0, 0);
 SIMPLEBUS_PNP_INFO(compat_data);

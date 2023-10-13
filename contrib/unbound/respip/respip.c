@@ -833,8 +833,11 @@ static int
 respip_use_rpz(struct resp_addr* raddr, struct rpz* r,
 	enum respip_action* action,
 	struct ub_packed_rrset_key** data, int* rpz_log, char** log_name,
-	int* rpz_cname_override, struct regional* region, int* is_rpz)
+	int* rpz_cname_override, struct regional* region, int* is_rpz,
+	int* rpz_passthru)
 {
+	if(rpz_passthru && *rpz_passthru)
+		return 0;
 	if(r->action_override == RPZ_DISABLED_ACTION) {
 		*is_rpz = 0;
 		return 1;
@@ -848,6 +851,9 @@ respip_use_rpz(struct resp_addr* raddr, struct rpz* r,
 		*data = r->cname_override;
 		*rpz_cname_override = 1;
 	}
+	if(*action == respip_always_transparent /* RPZ_PASSTHRU_ACTION */
+		&& rpz_passthru)
+		*rpz_passthru = 1;
 	*rpz_log = r->log;
 	if(r->log_name)
 		if(!(*log_name = regional_strdup(region, r->log_name)))
@@ -861,7 +867,7 @@ respip_rewrite_reply(const struct query_info* qinfo,
 	const struct respip_client_info* cinfo, const struct reply_info* rep,
 	struct reply_info** new_repp, struct respip_action_info* actinfo,
 	struct ub_packed_rrset_key** alias_rrset, int search_only,
-	struct regional* region, struct auth_zones* az)
+	struct regional* region, struct auth_zones* az, int* rpz_passthru)
 {
 	const uint8_t* ctaglist;
 	size_t ctaglen;
@@ -934,7 +940,7 @@ respip_rewrite_reply(const struct query_info* qinfo,
 			ipset->tagname, ipset->num_tags);
 	}
 	lock_rw_rdlock(&az->rpz_lock);
-	for(a = az->rpz_first; a && !raddr; a = a->rpz_az_next) {
+	for(a = az->rpz_first; a && !raddr && !(rpz_passthru && *rpz_passthru); a = a->rpz_az_next) {
 		lock_rw_rdlock(&a->lock);
 		r = a->rpz;
 		if(!r->taglist || taglist_intersect(r->taglist, 
@@ -943,7 +949,7 @@ respip_rewrite_reply(const struct query_info* qinfo,
 				r->respip_set, &rrset_id, &rr_id))) {
 				if(!respip_use_rpz(raddr, r, &action, &data,
 					&rpz_log, &log_name, &rpz_cname_override,
-					region, &rpz_used)) {
+					region, &rpz_used, rpz_passthru)) {
 					log_err("out of memory");
 					lock_rw_unlock(&raddr->lock);
 					lock_rw_unlock(&a->lock);
@@ -964,7 +970,7 @@ respip_rewrite_reply(const struct query_info* qinfo,
 						addr_to_str(&raddr->node.addr,
 							raddr->node.addrlen,
 							nm, sizeof(nm));
-						verbose(VERB_ALGO, "respip: rpz response-ip trigger %s/%d on %s %s with action %s", nm, raddr->node.net, qn, ip, rpz_action_to_string(respip_action_to_rpz_action(action)));
+						verbose(VERB_ALGO, "respip: rpz: response-ip trigger %s/%d on %s %s with action %s", nm, raddr->node.net, qn, ip, rpz_action_to_string(respip_action_to_rpz_action(action)));
 					}
 					/* break to make sure 'a' stays pointed
 					 * to used auth_zone, and keeps lock */
@@ -1094,7 +1100,8 @@ respip_operate(struct module_qstate* qstate, enum module_ev event, int id,
 			if(!respip_rewrite_reply(&qstate->qinfo,
 				qstate->client_info, qstate->return_msg->rep,
 				&new_rep, &actinfo, &alias_rrset, 0,
-				qstate->region, qstate->env->auth_zones)) {
+				qstate->region, qstate->env->auth_zones,
+				&qstate->rpz_passthru)) {
 				goto servfail;
 			}
 			if(actinfo.action != respip_none) {
@@ -1169,7 +1176,7 @@ respip_merge_cname(struct reply_info* base_rep,
 
 	/* see if the target reply would be subject to a response-ip action. */
 	if(!respip_rewrite_reply(qinfo, cinfo, tgt_rep, &tmp_rep, &actinfo,
-		&alias_rrset, 1, region, az))
+		&alias_rrset, 1, region, az, NULL))
 		return 0;
 	if(actinfo.action != respip_none) {
 		log_info("CNAME target of redirect response-ip action would "
@@ -1283,7 +1290,7 @@ respip_set_is_empty(const struct respip_set* set)
 void
 respip_inform_print(struct respip_action_info* respip_actinfo, uint8_t* qname,
 	uint16_t qtype, uint16_t qclass, struct local_rrset* local_alias,
-	struct comm_reply* repinfo)
+	struct sockaddr_storage* addr, socklen_t addrlen)
 {
 	char srcip[128], respip[128], txt[512];
 	unsigned port;
@@ -1293,15 +1300,15 @@ respip_inform_print(struct respip_action_info* respip_actinfo, uint8_t* qname,
 
 	if(local_alias)
 		qname = local_alias->rrset->rk.dname;
-	port = (unsigned)((repinfo->addr.ss_family == AF_INET) ?
-		ntohs(((struct sockaddr_in*)&repinfo->addr)->sin_port) :
-		ntohs(((struct sockaddr_in6*)&repinfo->addr)->sin6_port));
-	addr_to_str(&repinfo->addr, repinfo->addrlen, srcip, sizeof(srcip));
+	port = (unsigned)((addr->ss_family == AF_INET) ?
+		ntohs(((struct sockaddr_in*)addr)->sin_port) :
+		ntohs(((struct sockaddr_in6*)addr)->sin6_port));
+	addr_to_str(addr, addrlen, srcip, sizeof(srcip));
 	addr_to_str(&respip_addr->addr, respip_addr->addrlen,
 		respip, sizeof(respip));
 	if(respip_actinfo->rpz_log) {
 		txtlen += snprintf(txt+txtlen, sizeof(txt)-txtlen, "%s",
-			"RPZ applied ");
+			"rpz: applied ");
 		if(respip_actinfo->rpz_cname_override)
 			actionstr = rpz_action_to_string(
 				RPZ_CNAME_OVERRIDE_ACTION);

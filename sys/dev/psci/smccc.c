@@ -33,8 +33,6 @@
 #include "opt_platform.h"
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
@@ -45,14 +43,15 @@ __FBSDID("$FreeBSD$");
 #define	SMCCC_VERSION_1_0	0x10000
 
 /* Assume 1.0 until we detect a later version */
-static uint32_t	smccc_version = SMCCC_VERSION_1_0;
+static uint32_t	smccc_version;
 
-static void
-smccc_init(void *dummy)
+void
+smccc_init(void)
 {
 	int32_t features;
 	uint32_t ret;
 
+	smccc_version = SMCCC_VERSION_1_0;
 	features = psci_features(SMCCC_VERSION);
 	if (features != PSCI_RETVAL_NOT_SUPPORTED) {
 		ret = psci_call(SMCCC_VERSION, 0, 0, 0);
@@ -67,12 +66,19 @@ smccc_init(void *dummy)
 		    SMCCC_VERSION_MINOR(smccc_version));
 	}
 }
-SYSINIT(smccc_start, SI_SUB_CONFIGURE, SI_ORDER_ANY, smccc_init, NULL);
+
+uint32_t
+smccc_get_version(void)
+{
+	MPASS(smccc_version != 0);
+	return (smccc_version);
+}
 
 int32_t
 smccc_arch_features(uint32_t smccc_func_id)
 {
 
+	MPASS(smccc_version != 0);
 	if (smccc_version == SMCCC_VERSION_1_0)
 		return (PSCI_RETVAL_NOT_SUPPORTED);
 
@@ -87,6 +93,7 @@ int
 smccc_arch_workaround_1(void)
 {
 
+	MPASS(smccc_version != 0);
 	KASSERT(smccc_version != SMCCC_VERSION_1_0,
 	    ("SMCCC arch workaround 1 called with an invalid SMCCC interface"));
 	return (psci_call(SMCCC_ARCH_WORKAROUND_1, 0, 0, 0));
@@ -96,6 +103,7 @@ int
 smccc_arch_workaround_2(int enable)
 {
 
+	MPASS(smccc_version != 0);
 	KASSERT(smccc_version != SMCCC_VERSION_1_0,
 	    ("SMCCC arch workaround 2 called with an invalid SMCCC interface"));
 	return (psci_call(SMCCC_ARCH_WORKAROUND_2, enable, 0, 0));

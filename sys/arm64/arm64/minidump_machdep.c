@@ -30,8 +30,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include "opt_watchdog.h"
 
 #include <sys/param.h>
@@ -75,7 +73,7 @@ blk_flush(struct dumperinfo *di)
 	if (fragsz == 0)
 		return (0);
 
-	error = dump_append(di, dump_va, 0, fragsz);
+	error = dump_append(di, dump_va, fragsz);
 	fragsz = 0;
 	return (error);
 }
@@ -121,7 +119,7 @@ blk_write(struct dumperinfo *di, char *ptr, vm_paddr_t pa, size_t sz)
 		wdog_kern_pat(WD_LASTVAL);
 
 		if (ptr) {
-			error = dump_append(di, ptr, 0, len);
+			error = dump_append(di, ptr, len);
 			if (error)
 				return (error);
 			ptr += len;
@@ -183,7 +181,7 @@ cpu_minidumpsys(struct dumperinfo *di, const struct minidumpstate *state)
 		l1e = atomic_load_64(l1);
 		l2e = atomic_load_64(l2);
 		if ((l1e & ATTR_DESCR_MASK) == L1_BLOCK) {
-			pa = l1e & ~ATTR_MASK;
+			pa = PTE_TO_PHYS(l1e);
 			for (i = 0; i < Ln_ENTRIES * Ln_ENTRIES;
 			    i++, pa += PAGE_SIZE)
 				if (vm_phys_is_dumpable(pa))
@@ -192,7 +190,7 @@ cpu_minidumpsys(struct dumperinfo *di, const struct minidumpstate *state)
 			pmapsize += (Ln_ENTRIES - 1) * PAGE_SIZE;
 			va += L1_SIZE - L2_SIZE;
 		} else if ((l2e & ATTR_DESCR_MASK) == L2_BLOCK) {
-			pa = l2e & ~ATTR_MASK;
+			pa = PTE_TO_PHYS(l2e);
 			for (i = 0; i < Ln_ENTRIES; i++, pa += PAGE_SIZE) {
 				if (vm_phys_is_dumpable(pa))
 					vm_page_dump_add(state->dump_bitset,
@@ -203,7 +201,7 @@ cpu_minidumpsys(struct dumperinfo *di, const struct minidumpstate *state)
 				l3e = atomic_load_64(&l3[i]);
 				if ((l3e & ATTR_DESCR_MASK) != L3_PAGE)
 					continue;
-				pa = l3e & ~ATTR_MASK;
+				pa = PTE_TO_PHYS(l3e);
 				if (PHYS_IN_DMAP(pa) && vm_phys_is_dumpable(pa))
 					vm_page_dump_add(state->dump_bitset,
 					    pa);
@@ -239,6 +237,13 @@ cpu_minidumpsys(struct dumperinfo *di, const struct minidumpstate *state)
 	mdhdr.dmapbase = DMAP_MIN_ADDRESS;
 	mdhdr.dmapend = DMAP_MAX_ADDRESS;
 	mdhdr.dumpavailsize = round_page(sizeof(dump_avail));
+#if PAGE_SIZE == PAGE_SIZE_4K
+	mdhdr.flags = MINIDUMP_FLAG_PS_4K;
+#elif PAGE_SIZE == PAGE_SIZE_16K
+	mdhdr.flags = MINIDUMP_FLAG_PS_16K;
+#else
+#error Unsupported page size
+#endif
 
 	dump_init_header(di, &kdh, KERNELDUMPMAGIC, KERNELDUMP_AARCH64_VERSION,
 	    dumpsize);
@@ -299,7 +304,7 @@ cpu_minidumpsys(struct dumperinfo *di, const struct minidumpstate *state)
 			 * Handle a 1GB block mapping: write out 512 fake L2
 			 * pages.
 			 */
-			pa = (l1e & ~ATTR_MASK) | (va & L1_OFFSET);
+			pa = PTE_TO_PHYS(l1e) | (va & L1_OFFSET);
 
 			for (i = 0; i < Ln_ENTRIES; i++) {
 				for (j = 0; j < Ln_ENTRIES; j++) {
@@ -319,7 +324,7 @@ cpu_minidumpsys(struct dumperinfo *di, const struct minidumpstate *state)
 			bzero(&tmpbuffer, sizeof(tmpbuffer));
 			va += L1_SIZE - L2_SIZE;
 		} else if ((l2e & ATTR_DESCR_MASK) == L2_BLOCK) {
-			pa = (l2e & ~ATTR_MASK) | (va & L2_OFFSET);
+			pa = PTE_TO_PHYS(l2e) | (va & L2_OFFSET);
 
 			/* Generate fake l3 entries based upon the l1 entry */
 			for (i = 0; i < Ln_ENTRIES; i++) {
@@ -336,7 +341,7 @@ cpu_minidumpsys(struct dumperinfo *di, const struct minidumpstate *state)
 			bzero(&tmpbuffer, sizeof(tmpbuffer));
 			continue;
 		} else {
-			pa = l2e & ~ATTR_MASK;
+			pa = PTE_TO_PHYS(l2e);
 
 			/*
 			 * We always write a page, even if it is zero. If pa

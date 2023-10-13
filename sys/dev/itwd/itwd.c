@@ -26,8 +26,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/kernel.h>
 #include <sys/bus.h>
@@ -229,8 +227,6 @@ static driver_t itwd_driver = {
 	sizeof (struct itwd_softc)
 };
 
-static devclass_t itwd_devclass;
-
-DRIVER_MODULE(itwd, superio, itwd_driver, itwd_devclass, NULL, NULL);
+DRIVER_MODULE(itwd, superio, itwd_driver, NULL, NULL);
 MODULE_DEPEND(itwd, superio, 1, 1, 1);
 MODULE_VERSION(itwd, 1);

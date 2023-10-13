@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2009-2013, 2016 Chelsio, Inc. All rights reserved.
  *
@@ -29,8 +29,6 @@
  * ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
  * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
- *
- * $FreeBSD$
  */
 #ifndef __IW_CXGB4_H__
 #define __IW_CXGB4_H__
@@ -680,14 +678,14 @@ enum c4iw_mmid_state {
 
 #define c4iw_put_ep(ep) { \
 	CTR4(KTR_IW_CXGBE, "put_ep (%s:%u) ep %p, refcnt %d", \
-	     __func__, __LINE__, ep, atomic_read(&(ep)->kref.refcount)); \
-	WARN_ON(atomic_read(&(ep)->kref.refcount) < 1); \
+	     __func__, __LINE__, ep, kref_read(&(ep)->kref)); \
+	WARN_ON(kref_read(&(ep)->kref) < 1); \
         kref_put(&((ep)->kref), _c4iw_free_ep); \
 }
 
 #define c4iw_get_ep(ep) { \
 	CTR4(KTR_IW_CXGBE, "get_ep (%s:%u) ep %p, refcnt %d", \
-	      __func__, __LINE__, ep, atomic_read(&(ep)->kref.refcount)); \
+	      __func__, __LINE__, ep, kref_read(&(ep)->kref)); \
         kref_get(&((ep)->kref));  \
 }
 
@@ -982,4 +980,6 @@ u32 c4iw_get_qpid(struct c4iw_rdev *rdev, struct c4iw_dev_ucontext *uctx);
 void c4iw_put_qpid(struct c4iw_rdev *rdev, u32 qid,
 		struct c4iw_dev_ucontext *uctx);
 void c4iw_ev_dispatch(struct c4iw_dev *dev, struct t4_cqe *err_cqe);
+void t4_dump_stag(struct adapter *sc, const u32 stag);
+void t4_dump_all_stag(struct adapter *sc);
 #endif

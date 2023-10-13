@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2009 Robert N. M. Watson
  * All rights reserved.
@@ -30,8 +30,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/conf.h>
@@ -541,7 +539,7 @@ dtnfsclient_load(void *dummy)
 }
 
 static int
-dtnfsclient_unload()
+dtnfsclient_unload(void)
 {
 
 	dtrace_nfscl_nfs234_start_probe = NULL;

@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2011 Nathan Whitehorn
  * Copyright (c) 2014 Devin Teske <dteske@FreeBSD.org>
@@ -28,8 +28,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 
 #include <archive.h>
@@ -44,6 +42,8 @@ __FBSDID("$FreeBSD$");
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+
+#include "opt_osname.h"
 
 /* Data to process */
 static const char *distdir = NULL;
@@ -82,7 +82,7 @@ main(void)
 		errx(EXIT_FAILURE, "Error libbsdialog: %s",
 		    bsddialog_geterror());
 	bsddialog_initconf(&conf);
-	bsddialog_backtitle(&conf, "FreeBSD Installer");
+	bsddialog_backtitle(&conf, OSNAME " Installer");
 	bsddialog_infobox(&conf,
 	    "Checking distribution archives.\nPlease wait...", 4, 35);
 

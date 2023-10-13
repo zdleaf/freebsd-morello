@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 1998, 2001 Nicolas Souchu
  * All rights reserved.
@@ -27,8 +27,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 /*
  * Autoconfiguration and support routines for the Philips serial I2C bus
  */
@@ -323,7 +321,7 @@ iicbus_init_frequency(device_t dev, u_int bus_freq)
 	 */
 	SYSCTL_ADD_UINT(device_get_sysctl_ctx(dev),
 	    SYSCTL_CHILDREN(device_get_sysctl_tree(dev)),
-	    OID_AUTO, "frequency", CTLFLAG_RW | CTLFLAG_TUN, &sc->bus_freq,
+	    OID_AUTO, "frequency", CTLFLAG_RWTUN, &sc->bus_freq,
 	    sc->bus_freq, "Bus frequency in Hz");
 }
 
@@ -383,7 +381,5 @@ driver_t iicbus_driver = {
         sizeof(struct iicbus_softc),
 };
 
-devclass_t iicbus_devclass;
-
 MODULE_VERSION(iicbus, IICBUS_MODVER);
-DRIVER_MODULE(iicbus, iichb, iicbus_driver, iicbus_devclass, 0, 0);
+DRIVER_MODULE(iicbus, iichb, iicbus_driver, 0, 0);

@@ -27,7 +27,6 @@
  * SUCH DAMAGE.
  *
  *	from: FreeBSD: src/sys/i386/include/md_var.h,v 1.40 2001/07/12
- * $FreeBSD$
  */
 
 #ifndef	_MACHINE_MD_VAR_H_
@@ -56,5 +55,16 @@ void generic_bs_poke_1(void) __asm(__STRING(generic_bs_poke_1));
 void generic_bs_poke_2(void) __asm(__STRING(generic_bs_poke_2));
 void generic_bs_poke_4(void) __asm(__STRING(generic_bs_poke_4));
 void generic_bs_poke_8(void) __asm(__STRING(generic_bs_poke_8));
+
+#ifdef _MD_WANT_SWAPWORD
+/*
+ * XXX These are implemented primarily for swp/swpb emulation at the moment, and
+ * should be used sparingly with consideration -- they aren't implemented for
+ * any other platform.  If we use them anywhere else, at a minimum they need
+ * KASAN/KMSAN interceptors added.
+ */
+int	swapueword8(volatile uint8_t *base, uint8_t *val);
+int	swapueword32(volatile uint32_t *base, uint32_t *val);
+#endif
 
 #endif /* !_MACHINE_MD_VAR_H_ */

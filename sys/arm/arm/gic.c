@@ -34,9 +34,8 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include "opt_acpi.h"
+#include "opt_ddb.h"
 #include "opt_platform.h"
 
 #include <sys/param.h>
@@ -70,6 +69,11 @@ __FBSDID("$FreeBSD$");
 #ifdef DEV_ACPI
 #include <contrib/dev/acpica/include/acpi.h>
 #include <dev/acpica/acpivar.h>
+#endif
+
+#ifdef DDB
+#include <ddb/ddb.h>
+#include <ddb/db_lex.h>
 #endif
 
 #include <arm/arm/gic.h>
@@ -140,7 +144,7 @@ static int gic_debug_spurious = 0;
 #endif
 TUNABLE_INT("hw.gic.debug_spurious", &gic_debug_spurious);
 
-static u_int arm_gic_map[MAXCPU];
+static u_int arm_gic_map[GIC_MAXCPU];
 
 static struct arm_gic_softc *gic_sc = NULL;
 
@@ -203,6 +207,7 @@ arm_gic_init_secondary(device_t dev)
 
 	/* Set the mask so we can find this CPU to send it IPIs */
 	cpu = PCPU_GET(cpuid);
+	MPASS(cpu < GIC_MAXCPU);
 	arm_gic_map[cpu] = gic_cpu_mask(sc);
 
 	for (irq = 0; irq < sc->nirqs; irq += 4)
@@ -282,7 +287,7 @@ arm_gic_reserve_msi_range(device_t dev, u_int start, u_int count)
 
 	sc = device_get_softc(dev);
 
-	KASSERT((start + count) < sc->nirqs,
+	KASSERT((start + count) <= sc->nirqs,
 	    ("%s: Trying to allocate too many MSI IRQs: %d + %d > %d", __func__,
 	    start, count, sc->nirqs));
 	for (i = 0; i < count; i++) {
@@ -310,6 +315,12 @@ arm_gic_attach(device_t dev)
 
 	if (gic_sc)
 		return (ENXIO);
+
+	if (mp_ncpus > GIC_MAXCPU) {
+		device_printf(dev, "Too many CPUs for IPIs to work (%d > %d)\n",
+		    mp_ncpus, GIC_MAXCPU);
+		return (ENXIO);
+	}
 
 	sc = device_get_softc(dev);
 
@@ -356,6 +367,7 @@ arm_gic_attach(device_t dev)
 	/* Find the current cpu mask */
 	mask = gic_cpu_mask(sc);
 	/* Set the mask so we can find this CPU to send it IPIs */
+	MPASS(PCPU_GET(cpuid) < GIC_MAXCPU);
 	arm_gic_map[PCPU_GET(cpuid)] = mask;
 	/* Set all four targets to this cpu */
 	mask |= mask << 8;
@@ -567,7 +579,7 @@ dispatch_irq:
 #ifdef SMP
 		/* Call EOI for all IPI before dispatch. */
 		gic_c_write_4(sc, GICC_EOIR, irq_active_reg);
-		intr_ipi_dispatch(sgi_to_ipi[gi->gi_irq], tf);
+		intr_ipi_dispatch(sgi_to_ipi[gi->gi_irq]);
 		goto next_irq;
 #else
 		device_printf(sc->gic_dev, "SGI %u on UP system detected\n",
@@ -643,7 +655,7 @@ gic_bind(struct arm_gic_softc *sc, u_int irq, cpuset_t *cpus)
 {
 	uint32_t cpu, end, mask;
 
-	end = min(mp_ncpus, 8);
+	end = min(mp_ncpus, GIC_MAXCPU);
 	for (cpu = end; cpu < MAXCPU; cpu++)
 		if (CPU_ISSET(cpu, cpus))
 			return (EINVAL);
@@ -982,9 +994,12 @@ arm_gic_ipi_send(device_t dev, struct intr_irqsrc *isrc, cpuset_t cpus,
 	struct gic_irqsrc *gi = (struct gic_irqsrc *)isrc;
 	uint32_t val = 0, i;
 
-	for (i = 0; i < MAXCPU; i++)
-		if (CPU_ISSET(i, &cpus))
+	for (i = 0; i < MAXCPU; i++) {
+		if (CPU_ISSET(i, &cpus)) {
+			MPASS(i < GIC_MAXCPU);
 			val |= arm_gic_map[i] << GICD_SGI_TARGET_SHIFT;
+		}
+	}
 
 	gic_d_write_4(sc, GICD_SGIR, val | gi->gi_irq);
 }
@@ -1147,6 +1162,58 @@ arm_gic_release_msix(device_t dev, struct intr_irqsrc *isrc)
 	return (0);
 }
 
+#ifdef DDB
+static void
+arm_gic_db_show(device_t dev)
+{
+	struct arm_gic_softc *sc = device_get_softc(dev);
+	uint32_t val;
+	u_int i;
+
+	db_printf("%s CPU registers:\n", device_get_nameunit(dev));
+	db_printf(" CTLR: %08x   PMR: %08x   BPR: %08x   RPR: %08x\n",
+	    gic_c_read_4(sc, GICC_CTLR), gic_c_read_4(sc, GICC_PMR),
+	    gic_c_read_4(sc, GICC_BPR), gic_c_read_4(sc, GICC_RPR));
+	db_printf("HPPIR: %08x  IIDR: %08x\n", gic_c_read_4(sc, GICC_HPPIR),
+	    gic_c_read_4(sc, GICC_IIDR));
+
+	db_printf("%s Distributor registers:\n", device_get_nameunit(dev));
+	db_printf(" CTLR: %08x TYPER: %08x  IIDR: %08x\n",
+	    gic_d_read_4(sc, GICD_CTLR), gic_d_read_4(sc, GICD_TYPER),
+	    gic_d_read_4(sc, GICD_IIDR));
+	for (i = 0; i < sc->nirqs; i++) {
+		if (i <= GIC_LAST_SGI)
+			db_printf("SGI %2u ", i);
+		else if (i <= GIC_LAST_PPI)
+			db_printf("PPI %2u ", i - GIC_FIRST_PPI);
+		else
+			db_printf("SPI %2u ", i - GIC_FIRST_SPI);
+		db_printf(" grp:%u",
+		    !!(gic_d_read_4(sc, GICD_IGROUPR(i)) & GICD_I_MASK(i)));
+		db_printf(" enable:%u pend:%u active:%u",
+		    !!(gic_d_read_4(sc, GICD_ISENABLER(i)) & GICD_I_MASK(i)),
+		    !!(gic_d_read_4(sc, GICD_ISPENDR(i)) & GICD_I_MASK(i)),
+		    !!(gic_d_read_4(sc, GICD_ISACTIVER(i)) & GICD_I_MASK(i)));
+		db_printf(" pri:%u",
+		    (gic_d_read_4(sc, GICD_IPRIORITYR(i)) >> 8 * (i & 0x3)) &
+		    0xff);
+		db_printf(" trg:%u",
+		    (gic_d_read_4(sc, GICD_ITARGETSR(i)) >> 8 * (i & 0x3)) &
+		    0xff);
+		val = gic_d_read_4(sc, GICD_ICFGR(i)) >> 2 * (i & 0xf);
+		if ((val & GICD_ICFGR_POL_MASK) == GICD_ICFGR_POL_LOW)
+			db_printf(" LO");
+		else
+			db_printf(" HI");
+		if ((val & GICD_ICFGR_TRIG_MASK) == GICD_ICFGR_TRIG_LVL)
+			db_printf(" LV");
+		else
+			db_printf(" ED");
+		db_printf("\n");
+	}
+}
+#endif
+
 static device_method_t arm_gic_methods[] = {
 	/* Bus interface */
 	DEVMETHOD(bus_print_child,	arm_gic_print_child),
@@ -1179,12 +1246,63 @@ static device_method_t arm_gic_methods[] = {
 	DEVMETHOD(gic_release_msi,	arm_gic_release_msi),
 	DEVMETHOD(gic_alloc_msix,	arm_gic_alloc_msix),
 	DEVMETHOD(gic_release_msix,	arm_gic_release_msix),
+#ifdef DDB
+	DEVMETHOD(gic_db_show,		arm_gic_db_show),
+#endif
 
 	{ 0, 0 }
 };
 
 DEFINE_CLASS_0(gic, arm_gic_driver, arm_gic_methods,
     sizeof(struct arm_gic_softc));
+
+#ifdef DDB
+DB_SHOW_COMMAND_FLAGS(gic, db_show_gic, CS_OWN)
+{
+	device_t dev;
+	int t;
+	bool valid;
+
+	valid = false;
+	t = db_read_token();
+	if (t == tIDENT) {
+		dev = device_lookup_by_name(db_tok_string);
+		valid = true;
+	}
+	db_skip_to_eol();
+	if (!valid) {
+		db_printf("usage: show gic <name>\n");
+		return;
+	}
+
+	if (dev == NULL) {
+		db_printf("device not found\n");
+		return;
+	}
+
+	GIC_DB_SHOW(dev);
+}
+
+DB_SHOW_ALL_COMMAND(gics, db_show_all_gics)
+{
+	devclass_t dc;
+	device_t dev;
+	int i;
+
+	dc = devclass_find("gic");
+	if (dc == NULL)
+		return;
+
+	for (i = 0; i < devclass_get_maxunit(dc); i++) {
+		dev = devclass_get_device(dc, i);
+		if (dev != NULL)
+			GIC_DB_SHOW(dev);
+		if (db_pager_quit)
+			break;
+	}
+}
+
+#endif
 
 /*
  * GICv2m support -- the GICv2 MSI/MSI-X controller.

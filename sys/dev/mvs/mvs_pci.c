@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2010 Alexander Motin <mav@FreeBSD.org>
  * All rights reserved.
@@ -27,8 +27,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/module.h>
 #include <sys/systm.h>
@@ -520,7 +518,7 @@ static driver_t mvs_driver = {
         mvs_methods,
         sizeof(struct mvs_controller)
 };
-DRIVER_MODULE(mvs, pci, mvs_driver, mvs_devclass, 0, 0);
+DRIVER_MODULE(mvs, pci, mvs_driver, 0, 0);
 MODULE_PNP_INFO("W32:vendor/device", pci, mvs, mvs_ids,
     nitems(mvs_ids) - 1);
 MODULE_VERSION(mvs, 1);

@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2012 Konstantin Belousov <kib@FreeBSD.org>
  *
@@ -26,8 +26,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/elf.h>
 #include <sys/time.h>
 #include <sys/vdso.h>
@@ -83,9 +81,9 @@ binuptime(struct bintime *bt, struct vdso_timekeep *tk, bool abs)
 			return (error);
 		scale = th->th_scale;
 #ifdef _LP64
-		scale_bits = ffsl(scale);
+		scale_bits = flsl(scale);
 #else
-		scale_bits = ffsll(scale);
+		scale_bits = flsll(scale);
 #endif
 		if (__predict_false(scale_bits + fls(delta) > 63)) {
 			x = (scale >> 32) * delta;

@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2010-2016 Solarflare Communications Inc.
  * All rights reserved.
@@ -31,8 +31,6 @@
  * The views and conclusions contained in the software and documentation are
  * those of the authors and should not be interpreted as representing official
  * policies, either expressed or implied, of the FreeBSD Project.
- *
- * $FreeBSD$
  */
 
 #ifndef	_SYS_EFSYS_H
@@ -846,6 +844,7 @@ typedef struct efsys_bar_s {
 		    ("not power of 2 aligned"));			\
 									\
 		(void) (_esbp);						\
+		(void) (_eqp);						\
 									\
 		/* FIXME: Perform a 64-bit write */			\
 		KASSERT(0, ("not implemented"));			\

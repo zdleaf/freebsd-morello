@@ -25,8 +25,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include "opt_wlan.h"
 #include "opt_iwn.h"
 
@@ -374,9 +372,8 @@ static driver_t iwn_driver = {
 	iwn_methods,
 	sizeof(struct iwn_softc)
 };
-static devclass_t iwn_devclass;
 
-DRIVER_MODULE(iwn, pci, iwn_driver, iwn_devclass, NULL, NULL);
+DRIVER_MODULE(iwn, pci, iwn_driver, NULL, NULL);
 MODULE_PNP_INFO("U16:vendor;U16:device;D:#", pci, iwn, iwn_ident_table,
     nitems(iwn_ident_table) - 1);
 MODULE_VERSION(iwn, 1);
@@ -7026,7 +7023,7 @@ iwn_scan(struct iwn_softc *sc, struct ieee80211vap *vap,
 	int buflen, error;
 	int is_active;
 	uint16_t dwell_active, dwell_passive;
-	uint32_t extra, scan_service_time;
+	uint32_t scan_service_time;
 
 	DPRINTF(sc, IWN_DEBUG_TRACE, "->%s begin\n", __func__);
 
@@ -7070,9 +7067,12 @@ iwn_scan(struct iwn_softc *sc, struct ieee80211vap *vap,
 	 * suspend_time: 100 (TU)
 	 *
 	 */
+#if 0
 	extra = (100 /* suspend_time */ / 100 /* beacon interval */) << 22;
-	//scan_service_time = extra | ((100 /* susp */ % 100 /* int */) * 1024);
+	scan_service_time = extra | ((100 /* susp */ % 100 /* int */) * 1024);
+#else
 	scan_service_time = (4 << 22) | (100 * 1024);	/* Hardcode for now! */
+#endif
 	hdr->pause_svc = htole32(scan_service_time);
 
 	/* Select antennas for scanning. */
@@ -7150,9 +7150,9 @@ iwn_scan(struct iwn_softc *sc, struct ieee80211vap *vap,
 	wh->i_fc[0] = IEEE80211_FC0_VERSION_0 | IEEE80211_FC0_TYPE_MGT |
 	    IEEE80211_FC0_SUBTYPE_PROBE_REQ;
 	wh->i_fc[1] = IEEE80211_FC1_DIR_NODS;
-	IEEE80211_ADDR_COPY(wh->i_addr1, vap->iv_ifp->if_broadcastaddr);
-	IEEE80211_ADDR_COPY(wh->i_addr2, IF_LLADDR(vap->iv_ifp));
-	IEEE80211_ADDR_COPY(wh->i_addr3, vap->iv_ifp->if_broadcastaddr);
+	IEEE80211_ADDR_COPY(wh->i_addr1, if_getbroadcastaddr(vap->iv_ifp));
+	IEEE80211_ADDR_COPY(wh->i_addr2, if_getlladdr(vap->iv_ifp));
+	IEEE80211_ADDR_COPY(wh->i_addr3, if_getbroadcastaddr(vap->iv_ifp));
 	*(uint16_t *)&wh->i_dur[0] = 0;	/* filled by HW */
 	*(uint16_t *)&wh->i_seq[0] = 0;	/* filled by HW */
 
@@ -9121,7 +9121,7 @@ iwn_set_channel(struct ieee80211com *ic)
 		error = iwn_config(sc);
 		if (error != 0)
 		device_printf(sc->sc_dev,
-		    "%s: error %d settting channel\n", __func__, error);
+		    "%s: error %d setting channel\n", __func__, error);
 	}
 	IWN_UNLOCK(sc);
 }

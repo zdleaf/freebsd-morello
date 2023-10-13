@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (C) 2012-2014 Matteo Landi
  * Copyright (C) 2012-2016 Luigi Rizzo
@@ -38,8 +38,6 @@
 
 #ifdef __FreeBSD__
 #include <sys/cdefs.h> /* prerequisite */
-__FBSDID("$FreeBSD$");
-
 #include <sys/types.h>
 #include <sys/malloc.h>
 #include <sys/kernel.h>		/* MALLOC_DEFINE */
@@ -323,7 +321,7 @@ netmap_mem_get_id(struct netmap_mem_d *nmd)
 
 #ifdef NM_DEBUG_MEM_PUTGET
 #define NM_DBG_REFC(nmd, func, line)	\
-	nm_prinf("%d mem[%d:%d] -> %d", line, (nmd)->nm_id, (nmd)->nm_grp, (nmd)->refcount);
+	nm_prinf("%s:%d mem[%d:%d] -> %d", func, line, (nmd)->nm_id, (nmd)->nm_grp, (nmd)->refcount);
 #else
 #define NM_DBG_REFC(nmd, func, line)
 #endif
@@ -2476,7 +2474,7 @@ out:
 #ifdef WITH_PTNETMAP
 struct mem_pt_if {
 	struct mem_pt_if *next;
-	struct ifnet *ifp;
+	if_t ifp;
 	unsigned int nifp_offset;
 };
 
@@ -2494,7 +2492,7 @@ struct netmap_mem_ptg {
 
 /* Link a passthrough interface to a passthrough netmap allocator. */
 static int
-netmap_mem_pt_guest_ifp_add(struct netmap_mem_d *nmd, struct ifnet *ifp,
+netmap_mem_pt_guest_ifp_add(struct netmap_mem_d *nmd, if_t ifp,
 			    unsigned int nifp_offset)
 {
 	struct netmap_mem_ptg *ptnmd = (struct netmap_mem_ptg *)nmd;
@@ -2517,14 +2515,14 @@ netmap_mem_pt_guest_ifp_add(struct netmap_mem_d *nmd, struct ifnet *ifp,
 	NMA_UNLOCK(nmd);
 
 	nm_prinf("ifp=%s,nifp_offset=%u",
-		ptif->ifp->if_xname, ptif->nifp_offset);
+		if_name(ptif->ifp), ptif->nifp_offset);
 
 	return 0;
 }
 
 /* Called with NMA_LOCK(nmd) held. */
 static struct mem_pt_if *
-netmap_mem_pt_guest_ifp_lookup(struct netmap_mem_d *nmd, struct ifnet *ifp)
+netmap_mem_pt_guest_ifp_lookup(struct netmap_mem_d *nmd, if_t ifp)
 {
 	struct netmap_mem_ptg *ptnmd = (struct netmap_mem_ptg *)nmd;
 	struct mem_pt_if *curr;
@@ -2540,7 +2538,7 @@ netmap_mem_pt_guest_ifp_lookup(struct netmap_mem_d *nmd, struct ifnet *ifp)
 
 /* Unlink a passthrough interface from a passthrough netmap allocator. */
 int
-netmap_mem_pt_guest_ifp_del(struct netmap_mem_d *nmd, struct ifnet *ifp)
+netmap_mem_pt_guest_ifp_del(struct netmap_mem_d *nmd, if_t ifp)
 {
 	struct netmap_mem_ptg *ptnmd = (struct netmap_mem_ptg *)nmd;
 	struct mem_pt_if *prev = NULL;
@@ -2557,7 +2555,7 @@ netmap_mem_pt_guest_ifp_del(struct netmap_mem_d *nmd, struct ifnet *ifp)
 				ptnmd->pt_ifs = curr->next;
 			}
 			nm_prinf("removed (ifp=%s,nifp_offset=%u)",
-			  curr->ifp->if_xname, curr->nifp_offset);
+			  if_name(curr->ifp), curr->nifp_offset);
 			nm_os_free(curr);
 			ret = 0;
 			break;
@@ -2949,7 +2947,7 @@ netmap_mem_pt_guest_attach(struct ptnetmap_memdev *ptn_dev, nm_memid_t mem_id)
 
 /* Called when ptnet device is attaching */
 struct netmap_mem_d *
-netmap_mem_pt_guest_new(struct ifnet *ifp,
+netmap_mem_pt_guest_new(if_t ifp,
 			unsigned int nifp_offset,
 			unsigned int memid)
 {

@@ -1,6 +1,6 @@
 #!/bin/sh
 #
-# SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+# SPDX-License-Identifier: BSD-2-Clause
 #
 # Copyright (c) 2019-2021 Mark Johnston <markj@FreeBSD.org>
 # Copyright (c) 2021 John Baldwin <jhb@FreeBSD.org>
@@ -53,7 +53,7 @@ Commands:
   list <commit>|<commit range>
   patch <diff1> [<diff2> ...]
   stage [-b branch] [<commit>|<commit range>]
-  update [<commit>|<commit range>]
+  update [-m message] [<commit>|<commit range>]
 
 Description:
   Create or manage FreeBSD Phabricator reviews based on git commits.  There
@@ -187,6 +187,22 @@ log2diff()
     fi
 }
 
+# Look for an open revision with a title equal to the input string.  Return
+# a possibly empty list of Differential revision IDs.
+title2diff()
+{
+    local title
+
+    title=$(echo $1 | sed 's/"/\\"/g')
+    # arc list output always includes ANSI escape sequences, strip them.
+    arc list | sed 's/\x1b\[[0-9;]*m//g' | \
+        awk -F': ' '{
+            if (substr($0, index($0, FS) + length(FS)) == "'"$title"'") {
+                print substr($1, match($1, "D[1-9][0-9]*"))
+            }
+        }'
+}
+
 commit2diff()
 {
     local commit diff title
@@ -204,7 +220,7 @@ commit2diff()
     # Second, search the open reviews returned by 'arc list' looking
     # for a subject match.
     title=$(git show -s --format=%s "$commit")
-    diff=$(arc list | grep -F "$title" | grep -E -o 'D[1-9][0-9]*:' | tr -d ':')
+    diff=$(title2diff "$title")
     if [ -z "$diff" ]; then
         err "could not find review for '${title}'"
     elif [ "$(echo "$diff" | wc -l)" -ne 1 ]; then
@@ -229,8 +245,6 @@ create_one_review()
         return 1
     fi
 
-    git checkout -q "$commit"
-
     msg=$(mktemp)
     git show -s --format='%B' "$commit" > "$msg"
     printf "\nTest Plan:\n" >> "$msg"
@@ -240,7 +254,8 @@ create_one_review()
     printf "%s\n" "${subscribers}" >> "$msg"
 
     yes | env EDITOR=true \
-        arc diff --message-file "$msg" --never-apply-patches --create --allow-untracked $BROWSE HEAD~
+        arc diff --message-file "$msg" --never-apply-patches --create \
+        --allow-untracked $BROWSE --head "$commit" "${commit}~"
     [ $? -eq 0 ] || err "could not create Phabricator diff"
 
     if [ -n "$parent" ]; then
@@ -291,7 +306,7 @@ prompt()
     local resp
 
     if [ "$ASSUME_YES" ]; then
-        return 1
+        return 0
     fi
 
     printf "\nDoes this look OK? [y/N] "
@@ -315,24 +330,6 @@ show_and_prompt()
 
     git show "$commit"
     prompt
-}
-
-save_head()
-{
-    local orig
-
-    if ! orig=$(git symbolic-ref --short -q HEAD); then
-        orig=$(git show -s --pretty=%H HEAD)
-    fi
-    SAVED_HEAD=$orig
-}
-
-restore_head()
-{
-    if [ -n "$SAVED_HEAD" ]; then
-        git checkout -q "$SAVED_HEAD"
-        SAVED_HEAD=
-    fi
 }
 
 build_commit_list()
@@ -366,9 +363,9 @@ gitarc__create()
         l)
             list=1
             ;;
-	p)
-	    prev="$OPTARG"
-	    ;;
+        p)
+            prev="$OPTARG"
+            ;;
         r)
             reviewers="$OPTARG"
             ;;
@@ -394,7 +391,6 @@ gitarc__create()
         doprompt=
     fi
 
-    save_head
     for commit in ${commits}; do
         if create_one_review "$commit" "$reviewers" "$subscribers" "$prev" \
                              "$doprompt"; then
@@ -403,14 +399,14 @@ gitarc__create()
             prev=""
         fi
     done
-    restore_head
 }
 
 gitarc__list()
 {
-    local chash commit commits diff title
+    local chash commit commits diff openrevs title
 
     commits=$(build_commit_list "$@")
+    openrevs=$(arc list)
 
     for commit in $commits; do
         chash=$(git show -s --format='%C(auto)%h' "$commit")
@@ -423,10 +419,11 @@ gitarc__list()
         fi
 
         # This does not use commit2diff as it needs to handle errors
-        # differently and keep the entire status.  The extra 'cat'
-        # after 'fgrep' avoids erroring due to -e.
+        # differently and keep the entire status.
         title=$(git show -s --format=%s "$commit")
-        diff=$(arc list | grep -F "$title" | cat)
+        diff=$(echo "$openrevs" | \
+            awk -F'D[1-9][0-9]*:\.\\[m ' \
+                '{if ($2 == "'"$(echo $title | sed 's/"/\\"/g')"'") print $0}')
         if [ -z "$diff" ]; then
             echo "No Review      : $title"
         elif [ "$(echo "$diff" | wc -l)" -ne 1 ]; then
@@ -456,7 +453,7 @@ gitarc__patch()
 
 gitarc__stage()
 {
-    local author branch commit commits diff reviewers tmp
+    local author branch commit commits diff reviewers title tmp
 
     branch=main
     while getopts b: o; do
@@ -482,8 +479,8 @@ gitarc__stage()
     tmp=$(mktemp)
     for commit in $commits; do
         git show -s --format=%B "$commit" > "$tmp"
-        diff=$(arc list | grep -F "$(git show -s --format=%s "$commit")" |
-            grep -E -o 'D[1-9][0-9]*:' | tr -d ':')
+        title=$(git show -s --format=%s "$commit")
+        diff=$(title2diff "$title")
         if [ -n "$diff" ]; then
             # XXX this leaves an extra newline in some cases.
             reviewers=$(diff2reviewers "$diff" | sed '/^$/d' | paste -sd ',' - | sed 's/,/, /g')
@@ -504,10 +501,22 @@ gitarc__stage()
 
 gitarc__update()
 {
-    local commit commits diff
+    local commit commits diff have_msg msg
+
+    while getopts m: o; do
+        case "$o" in
+        m)
+            msg="$OPTARG"
+            have_msg=1
+            ;;
+        *)
+            err_usage
+            ;;
+        esac
+    done
+    shift $((OPTIND-1))
 
     commits=$(build_commit_list "$@")
-    save_head
     for commit in ${commits}; do
         diff=$(commit2diff "$commit")
 
@@ -515,14 +524,17 @@ gitarc__update()
             break
         fi
 
-        git checkout -q "$commit"
-
         # The linter is stupid and applies patches to the working copy.
         # This would be tolerable if it didn't try to correct "misspelled" variable
         # names.
-        arc diff --allow-untracked --never-apply-patches --update "$diff" HEAD~
+        if [ -n "$have_msg" ]; then
+            arc diff --message "$msg" --allow-untracked --never-apply-patches \
+                --update "$diff" --head "$commit" "${commit}~"
+        else
+            arc diff --allow-untracked --never-apply-patches --update "$diff" \
+                --head "$commit" "${commit}~"
+        fi
     done
-    restore_head
 }
 
 set -e
@@ -582,6 +594,16 @@ USAGE=
 # shellcheck disable=SC1090
 . "$git_sh_setup"
 
+# git commands use GIT_EDITOR instead of EDITOR, so try to provide consistent
+# behaviour.  Ditto for PAGER.  This makes git-arc play nicer with editor
+# plugins like vim-fugitive.
+if [ -n "$GIT_EDITOR" ]; then
+    EDITOR=$GIT_EDITOR
+fi
+if [ -n "$GIT_PAGER" ]; then
+    PAGER=$GIT_PAGER
+fi
+
 # Bail if the working tree is unclean, except for "list" and "patch"
 # operations.
 case $verb in
@@ -595,7 +617,5 @@ esac
 if [ "$(git config --bool --get arc.browse 2>/dev/null || echo false)" != "false" ]; then
     BROWSE=--browse
 fi
-
-trap restore_head EXIT INT
 
 gitarc__"${verb}" "$@"

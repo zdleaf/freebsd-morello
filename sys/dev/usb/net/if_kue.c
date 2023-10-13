@@ -33,8 +33,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 /*
  * Kawasaki LSI KL5KUSB101B USB to ethernet adapter driver.
  *
@@ -214,9 +212,7 @@ static driver_t kue_driver = {
 	.size = sizeof(struct kue_softc),
 };
 
-static devclass_t kue_devclass;
-
-DRIVER_MODULE(kue, uhub, kue_driver, kue_devclass, NULL, 0);
+DRIVER_MODULE(kue, uhub, kue_driver, NULL, NULL);
 MODULE_DEPEND(kue, uether, 1, 1, 1);
 MODULE_DEPEND(kue, usb, 1, 1, 1);
 MODULE_DEPEND(kue, ether, 1, 1, 1);
@@ -344,11 +340,11 @@ static void
 kue_setpromisc(struct usb_ether *ue)
 {
 	struct kue_softc *sc = uether_getsc(ue);
-	struct ifnet *ifp = uether_getifp(ue);
+	if_t ifp = uether_getifp(ue);
 
 	KUE_LOCK_ASSERT(sc, MA_OWNED);
 
-	if (ifp->if_flags & IFF_PROMISC)
+	if (if_getflags(ifp) & IFF_PROMISC)
 		sc->sc_rxfilt |= KUE_RXFILT_PROMISC;
 	else
 		sc->sc_rxfilt &= ~KUE_RXFILT_PROMISC;
@@ -373,12 +369,12 @@ static void
 kue_setmulti(struct usb_ether *ue)
 {
 	struct kue_softc *sc = uether_getsc(ue);
-	struct ifnet *ifp = uether_getifp(ue);
+	if_t ifp = uether_getifp(ue);
 	int i;
 
 	KUE_LOCK_ASSERT(sc, MA_OWNED);
 
-	if (ifp->if_flags & IFF_ALLMULTI || ifp->if_flags & IFF_PROMISC) {
+	if (if_getflags(ifp) & IFF_ALLMULTI || if_getflags(ifp) & IFF_PROMISC) {
 		sc->sc_rxfilt |= KUE_RXFILT_ALLMULTI;
 		sc->sc_rxfilt &= ~KUE_RXFILT_MULTICAST;
 		kue_setword(sc, KUE_CMD_SET_PKT_FILTER, sc->sc_rxfilt);
@@ -536,7 +532,7 @@ kue_bulk_read_callback(struct usb_xfer *xfer, usb_error_t error)
 {
 	struct kue_softc *sc = usbd_xfer_softc(xfer);
 	struct usb_ether *ue = &sc->sc_ue;
-	struct ifnet *ifp = uether_getifp(ue);
+	if_t ifp = uether_getifp(ue);
 	struct usb_page_cache *pc;
 	uint8_t buf[2];
 	int len;
@@ -583,7 +579,7 @@ static void
 kue_bulk_write_callback(struct usb_xfer *xfer, usb_error_t error)
 {
 	struct kue_softc *sc = usbd_xfer_softc(xfer);
-	struct ifnet *ifp = uether_getifp(&sc->sc_ue);
+	if_t ifp = uether_getifp(&sc->sc_ue);
 	struct usb_page_cache *pc;
 	struct mbuf *m;
 	int total_len;
@@ -598,7 +594,7 @@ kue_bulk_write_callback(struct usb_xfer *xfer, usb_error_t error)
 		/* FALLTHROUGH */
 	case USB_ST_SETUP:
 tr_setup:
-		IFQ_DRV_DEQUEUE(&ifp->if_snd, m);
+		m = if_dequeue(ifp);
 
 		if (m == NULL)
 			return;
@@ -662,13 +658,13 @@ static void
 kue_init(struct usb_ether *ue)
 {
 	struct kue_softc *sc = uether_getsc(ue);
-	struct ifnet *ifp = uether_getifp(ue);
+	if_t ifp = uether_getifp(ue);
 
 	KUE_LOCK_ASSERT(sc, MA_OWNED);
 
 	/* set MAC address */
 	kue_ctl(sc, KUE_CTL_WRITE, KUE_CMD_SET_MAC,
-	    0, IF_LLADDR(ifp), ETHER_ADDR_LEN);
+	    0, if_getlladdr(ifp), ETHER_ADDR_LEN);
 
 	/* I'm not sure how to tune these. */
 #if 0
@@ -685,7 +681,7 @@ kue_init(struct usb_ether *ue)
 
 	usbd_xfer_set_stall(sc->sc_xfer[KUE_BULK_DT_WR]);
 
-	ifp->if_drv_flags |= IFF_DRV_RUNNING;
+	if_setdrvflagbits(ifp, IFF_DRV_RUNNING, 0);
 	kue_start(ue);
 }
 
@@ -693,11 +689,11 @@ static void
 kue_stop(struct usb_ether *ue)
 {
 	struct kue_softc *sc = uether_getsc(ue);
-	struct ifnet *ifp = uether_getifp(ue);
+	if_t ifp = uether_getifp(ue);
 
 	KUE_LOCK_ASSERT(sc, MA_OWNED);
 
-	ifp->if_drv_flags &= ~IFF_DRV_RUNNING;
+	if_setdrvflagbits(ifp, 0, IFF_DRV_RUNNING);
 
 	/*
 	 * stop all the transfers, if not already stopped:

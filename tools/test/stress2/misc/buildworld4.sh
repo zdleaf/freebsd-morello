@@ -1,7 +1,7 @@
 #!/bin/sh
 
 #
-# SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+# SPDX-License-Identifier: BSD-2-Clause
 #
 # Copyright (c) 2018 Dell EMC Isilon
 #
@@ -38,10 +38,9 @@
 rm -f $diskimage
 mount | grep -q "on $mntpoint " && umount $mntpoint
 mdconfig -a -t swap -s 5g -u $mdstart
-bsdlabel -w md$mdstart auto
 [ "$newfs_flags" = "-U" ] && newfs_flags="-j"
-newfs $newfs_flags md${mdstart}$part > /dev/null
-mount /dev/md${mdstart}$part $mntpoint
+newfs $newfs_flags md$mdstart > /dev/null
+mount /dev/md$mdstart $mntpoint
 mount | grep $mntpoint
 
 cd /usr/src

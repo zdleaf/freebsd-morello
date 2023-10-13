@@ -70,8 +70,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/acct.h>
@@ -90,7 +88,6 @@ __FBSDID("$FreeBSD$");
 #include <sys/sched.h>
 #include <sys/sx.h>
 #include <sys/sysctl.h>
-#include <sys/sysent.h>
 #include <sys/syslog.h>
 #include <sys/sysproto.h>
 #include <sys/tty.h>
@@ -222,7 +219,7 @@ sys_acct(struct thread *td, struct acct_args *uap)
 		error = vn_open(&nd, &flags, 0, NULL);
 		if (error)
 			return (error);
-		NDFREE(&nd, NDF_ONLY_PNBUF);
+		NDFREE_PNBUF(&nd);
 #ifdef MAC
 		error = mac_system_check_acct(td->td_ucred, nd.ni_vp);
 		if (error) {

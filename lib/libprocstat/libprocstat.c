@@ -36,8 +36,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/elf.h>
 #include <sys/time.h>
@@ -349,7 +347,7 @@ struct filestat_list *
 procstat_getfiles(struct procstat *procstat, struct kinfo_proc *kp, int mmapped)
 {
 
-	switch(procstat->type) {
+	switch (procstat->type) {
 	case PROCSTAT_KVM:
 		return (procstat_getfiles_kvm(procstat, kp, mmapped));
 	case PROCSTAT_SYSCTL:
@@ -1529,7 +1527,7 @@ procstat_get_socket_info_kvm(kvm_t *kd, struct filestat *fst,
 	/*
 	 * Protocol specific data.
 	 */
-	switch(dom.dom_family) {
+	switch (dom.dom_family) {
 	case AF_INET:
 	case AF_INET6:
 		if (proto.pr_protocol == IPPROTO_TCP) {
@@ -1602,7 +1600,7 @@ procstat_get_socket_info_sysctl(struct filestat *fst, struct sockstat *sock,
 	/*
 	 * Protocol specific data.
 	 */
-	switch(sock->dom_family) {
+	switch (sock->dom_family) {
 	case AF_INET:
 	case AF_INET6:
 		if (sock->proto == IPPROTO_TCP) {
@@ -1963,7 +1961,7 @@ procstat_getvmmap(struct procstat *procstat, struct kinfo_proc *kp,
     unsigned int *cntp)
 {
 
-	switch(procstat->type) {
+	switch (procstat->type) {
 	case PROCSTAT_KVM:
 		warnx("kvm method is not supported");
 		return (NULL);
@@ -2068,7 +2066,7 @@ gid_t *
 procstat_getgroups(struct procstat *procstat, struct kinfo_proc *kp,
     unsigned int *cntp)
 {
-	switch(procstat->type) {
+	switch (procstat->type) {
 	case PROCSTAT_KVM:
 		return (procstat_getgroups_kvm(procstat->kd, kp, cntp));
 	case PROCSTAT_SYSCTL:
@@ -2146,7 +2144,7 @@ int
 procstat_getumask(struct procstat *procstat, struct kinfo_proc *kp,
     unsigned short *maskp)
 {
-	switch(procstat->type) {
+	switch (procstat->type) {
 	case PROCSTAT_KVM:
 		return (procstat_getumask_kvm(procstat->kd, kp, maskp));
 	case PROCSTAT_SYSCTL:
@@ -2236,7 +2234,7 @@ int
 procstat_getrlimit(struct procstat *procstat, struct kinfo_proc *kp, int which,
     struct rlimit* rlimit)
 {
-	switch(procstat->type) {
+	switch (procstat->type) {
 	case PROCSTAT_KVM:
 		return (procstat_getrlimit_kvm(procstat->kd, kp, which,
 		    rlimit));
@@ -2295,7 +2293,7 @@ int
 procstat_getpathname(struct procstat *procstat, struct kinfo_proc *kp,
     char *pathname, size_t maxlen)
 {
-	switch(procstat->type) {
+	switch (procstat->type) {
 	case PROCSTAT_KVM:
 		/* XXX: Return empty string. */
 		if (maxlen > 0)
@@ -2368,7 +2366,7 @@ procstat_getosrel_core(struct procstat_core *core, int *osrelp)
 int
 procstat_getosrel(struct procstat *procstat, struct kinfo_proc *kp, int *osrelp)
 {
-	switch(procstat->type) {
+	switch (procstat->type) {
 	case PROCSTAT_KVM:
 		return (procstat_getosrel_kvm(procstat->kd, kp, osrelp));
 	case PROCSTAT_SYSCTL:
@@ -2508,7 +2506,7 @@ Elf_Auxinfo *
 procstat_getauxv(struct procstat *procstat, struct kinfo_proc *kp,
     unsigned int *cntp)
 {
-	switch(procstat->type) {
+	switch (procstat->type) {
 	case PROCSTAT_KVM:
 		warnx("kvm method is not supported");
 		return (NULL);
@@ -2622,7 +2620,7 @@ struct kinfo_kstack *
 procstat_getkstack(struct procstat *procstat, struct kinfo_proc *kp,
     unsigned int *cntp)
 {
-	switch(procstat->type) {
+	switch (procstat->type) {
 	case PROCSTAT_KVM:
 		warnx("kvm method is not supported");
 		return (NULL);
@@ -2644,3 +2642,138 @@ procstat_freekstack(struct procstat *procstat __unused,
 
 	free(kkstp);
 }
+
+static struct advlock_list *
+procstat_getadvlock_sysctl(struct procstat *procstat __unused)
+{
+	struct advlock_list *res;
+	struct advlock *a;
+	void *buf;
+	char *c;
+	struct kinfo_lockf *kl;
+	size_t buf_len;
+	int error;
+	static const int kl_name[] = { CTL_KERN, KERN_LOCKF };
+
+	res = malloc(sizeof(*res));
+	if (res == NULL)
+		return (NULL);
+	STAILQ_INIT(res);
+	buf = NULL;
+
+	buf_len = 0;
+	error = sysctl(kl_name, nitems(kl_name), NULL, &buf_len, NULL, 0);
+	if (error != 0) {
+		warn("sysctl KERN_LOCKF size");
+		goto fail;
+	}
+	buf_len *= 2;
+	buf = malloc(buf_len);
+	if (buf == NULL) {
+		warn("malloc");
+		goto fail;
+	}
+	error = sysctl(kl_name, nitems(kl_name), buf, &buf_len, NULL, 0);
+	if (error != 0) {
+		warn("sysctl KERN_LOCKF data");
+		goto fail;
+	}
+
+	for (c = buf; (char *)c < (char *)buf + buf_len;
+	    c += kl->kl_structsize) {
+		kl = (struct kinfo_lockf *)(void *)c;
+		if (sizeof(*kl) < (size_t)kl->kl_structsize) {
+			warn("ABI broken");
+			goto fail;
+		}
+		a = malloc(sizeof(*a));
+		if (a == NULL) {
+			warn("malloc advlock");
+			goto fail;
+		}
+		switch (kl->kl_rw) {
+		case KLOCKF_RW_READ:
+			a->rw = PS_ADVLOCK_RO;
+			break;
+		case KLOCKF_RW_WRITE:
+			a->rw = PS_ADVLOCK_RW;
+			break;
+		default:
+			warn("ABI broken");
+			free(a);
+			goto fail;
+		}
+		switch (kl->kl_type) {
+		case KLOCKF_TYPE_FLOCK:
+			a->type = PS_ADVLOCK_TYPE_FLOCK;
+			break;
+		case KLOCKF_TYPE_PID:
+			a->type = PS_ADVLOCK_TYPE_PID;
+			break;
+		case KLOCKF_TYPE_REMOTE:
+			a->type = PS_ADVLOCK_TYPE_REMOTE;
+			break;
+		default:
+			warn("ABI broken");
+			free(a);
+			goto fail;
+		}
+		a->pid = kl->kl_pid;
+		a->sysid = kl->kl_sysid;
+		a->file_fsid = kl->kl_file_fsid;
+		a->file_rdev = kl->kl_file_rdev;
+		a->file_fileid = kl->kl_file_fileid;
+		a->start = kl->kl_start;
+		a->len = kl->kl_len;
+		if (kl->kl_path[0] != '\0') {
+			a->path = strdup(kl->kl_path);
+			if (a->path == NULL) {
+				warn("malloc");
+				free(a);
+				goto fail;
+			}
+		} else
+			a->path = NULL;
+		STAILQ_INSERT_TAIL(res, a, next);
+	}
+
+	free(buf);
+	return (res);
+
+fail:
+	free(buf);
+	procstat_freeadvlock(procstat, res);
+	return (NULL);
+}
+
+struct advlock_list *
+procstat_getadvlock(struct procstat *procstat)
+{
+	switch (procstat->type) {
+	case PROCSTAT_KVM:
+		warnx("kvm method is not supported");
+		return (NULL);
+	case PROCSTAT_SYSCTL:
+		return (procstat_getadvlock_sysctl(procstat));
+	case PROCSTAT_CORE:
+		warnx("core method is not supported");
+		return (NULL);
+	default:
+		warnx("unknown access method: %d", procstat->type);
+		return (NULL);
+	}
+}
+
+void
+procstat_freeadvlock(struct procstat *procstat __unused,
+    struct advlock_list *lst)
+{
+	struct advlock *a, *a1;
+
+	STAILQ_FOREACH_SAFE(a, lst, next, a1) {
+		free(__DECONST(char *, a->path));
+		free(a);
+	}
+	free(lst);
+}
+

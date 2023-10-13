@@ -29,8 +29,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 #ifndef _MACHINE_PMAP_H_
@@ -44,6 +42,7 @@
 #include <sys/_cpuset.h>
 #include <sys/_lock.h>
 #include <sys/_mutex.h>
+#include <sys/_pv_entry.h>
 
 #include <vm/_vm_radix.h>
 
@@ -56,6 +55,7 @@
 #define	pmap_page_get_memattr(m)	((m)->md.pv_memattr)
 #define	pmap_page_is_write_mapped(m)	(((m)->a.flags & PGA_WRITEABLE) != 0)
 void pmap_page_set_memattr(vm_page_t m, vm_memattr_t ma);
+#define	pmap_map_delete(pmap, sva, eva)	pmap_remove(pmap, sva, eva)
 
 /*
  * Pmap stuff
@@ -80,31 +80,12 @@ struct pv_addr {
 struct pmap {
 	struct mtx		pm_mtx;
 	struct pmap_statistics	pm_stats;	/* pmap statictics */
-	pd_entry_t		*pm_l1;
+	pd_entry_t		*pm_top;	/* top-level page table page */
 	u_long			pm_satp;	/* value for SATP register */
 	cpuset_t		pm_active;	/* active on cpus */
 	TAILQ_HEAD(,pv_chunk)	pm_pvchunk;	/* list of mappings in pmap */
 	LIST_ENTRY(pmap)	pm_list;	/* List of all pmaps */
 	struct vm_radix		pm_root;
-};
-
-typedef struct pv_entry {
-	vm_offset_t		pv_va;	/* virtual address for mapping */
-	TAILQ_ENTRY(pv_entry)	pv_next;
-} *pv_entry_t;
-
-/*
- * pv_entries are allocated in chunks per-process.  This avoids the
- * need to track per-pmap assignments.
- */
-#define	_NPCM	3
-#define	_NPCPV	168
-struct pv_chunk {
-	struct pmap *		pc_pmap;
-	TAILQ_ENTRY(pv_chunk)	pc_list;
-	uint64_t		pc_map[_NPCM];  /* bitmap; 1 = free */
-	TAILQ_ENTRY(pv_chunk)	pc_lru;
-	struct pv_entry		pc_pventry[_NPCPV];
 };
 
 typedef struct pmap *pmap_t;
@@ -137,6 +118,18 @@ extern vm_offset_t virtual_end;
 #define	L1_MAPPABLE_P(va, pa, size)					\
 	((((va) | (pa)) & L1_OFFSET) == 0 && (size) >= L1_SIZE)
 
+enum pmap_mode {
+	PMAP_MODE_SV39,
+	PMAP_MODE_SV48,
+};
+
+extern enum pmap_mode pmap_mode;
+
+/* Check if an address resides in a mappable region. */
+#define	VIRT_IS_VALID(va)						\
+	((va) < (pmap_mode == PMAP_MODE_SV39 ? VM_MAX_USER_ADDRESS_SV39 : \
+	    VM_MAX_USER_ADDRESS_SV48) || (va) >= VM_MIN_KERNEL_ADDRESS)
+
 struct thread;
 
 #define	pmap_vm_page_alloc_check(m)
@@ -150,17 +143,17 @@ void	pmap_kenter_device(vm_offset_t, vm_size_t, vm_paddr_t);
 vm_paddr_t pmap_kextract(vm_offset_t va);
 void	pmap_kremove(vm_offset_t);
 void	pmap_kremove_device(vm_offset_t, vm_size_t);
-void	*pmap_mapdev_attr(vm_offset_t pa, vm_size_t size, vm_memattr_t ma);
+void	*pmap_mapdev_attr(vm_paddr_t pa, vm_size_t size, vm_memattr_t ma);
 bool	pmap_page_is_mapped(vm_page_t m);
 bool	pmap_ps_enabled(pmap_t);
 
-void	*pmap_mapdev(vm_offset_t, vm_size_t);
+void	*pmap_mapdev(vm_paddr_t, vm_size_t);
 void	*pmap_mapbios(vm_paddr_t, vm_size_t);
-void	pmap_unmapdev(vm_offset_t, vm_size_t);
-void	pmap_unmapbios(vm_offset_t, vm_size_t);
+void	pmap_unmapdev(void *, vm_size_t);
+void	pmap_unmapbios(void *, vm_size_t);
 
-boolean_t pmap_map_io_transient(vm_page_t *, vm_offset_t *, int, boolean_t);
-void	pmap_unmap_io_transient(vm_page_t *, vm_offset_t *, int, boolean_t);
+bool	pmap_map_io_transient(vm_page_t *, vm_offset_t *, int, bool);
+void	pmap_unmap_io_transient(vm_page_t *, vm_offset_t *, int, bool);
 
 bool	pmap_get_tables(pmap_t, vm_offset_t, pd_entry_t **, pd_entry_t **,
     pt_entry_t **);

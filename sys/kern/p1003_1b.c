@@ -36,8 +36,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include "opt_posix.h"
 
 #include <sys/param.h>
@@ -51,7 +49,6 @@ __FBSDID("$FreeBSD$");
 #include <sys/posix4.h>
 #include <sys/syscallsubr.h>
 #include <sys/sysctl.h>
-#include <sys/sysent.h>
 #include <sys/syslog.h>
 #include <sys/sysproto.h>
 

@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
  * All rights reserved.
@@ -31,8 +31,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 /* Universal Host Controller Interface
  *
  * UHCI spec: http://www.intel.com/
@@ -81,6 +79,8 @@ __FBSDID("$FreeBSD$");
 #define	PCI_UHCI_VENDORID_INTEL		0x8086
 #define	PCI_UHCI_VENDORID_HP		0x103c
 #define	PCI_UHCI_VENDORID_VIA		0x1106
+#define	PCI_UHCI_VENDORID_VMWARE	0x15ad
+#define	PCI_UHCI_VENDORID_ZHAOXIN	0x1d17
 
 /* PIIX4E has no separate stepping */
 
@@ -237,6 +237,12 @@ uhci_pci_match(device_t self)
 	case 0x30381106:
 		return ("VIA 83C572 USB controller");
 
+	case 0x077415ad:
+		return ("VMware USB controller");
+
+	case 0x30381d17:
+		return ("Zhaoxin ZX-100/ZX-200/ZX-E USB controller");
+
 	default:
 		break;
 	}
@@ -327,6 +333,12 @@ uhci_pci_attach(device_t self)
 	case PCI_UHCI_VENDORID_VIA:
 		sprintf(sc->sc_vendor, "VIA");
 		break;
+	case PCI_UHCI_VENDORID_VMWARE:
+		sprintf(sc->sc_vendor, "VMware");
+		break;
+	case PCI_UHCI_VENDORID_ZHAOXIN:
+		sprintf(sc->sc_vendor, "Zhaoxin");
+		break;
 	default:
 		if (bootverbose) {
 			device_printf(self, "(New UHCI DeviceId=0x%08x)\n",
@@ -349,13 +361,8 @@ uhci_pci_attach(device_t self)
 		break;
 	}
 
-#if (__FreeBSD_version >= 700031)
 	err = bus_setup_intr(self, sc->sc_irq_res, INTR_TYPE_BIO | INTR_MPSAFE,
 	    NULL, (driver_intr_t *)uhci_interrupt, sc, &sc->sc_intr_hdl);
-#else
-	err = bus_setup_intr(self, sc->sc_irq_res, INTR_TYPE_BIO | INTR_MPSAFE,
-	    (driver_intr_t *)uhci_interrupt, sc, &sc->sc_intr_hdl);
-#endif
 
 	if (err) {
 		device_printf(self, "Could not setup irq, %d\n", err);
@@ -456,7 +463,5 @@ static driver_t uhci_driver = {
 	.size = sizeof(struct uhci_softc),
 };
 
-static devclass_t uhci_devclass;
-
-DRIVER_MODULE(uhci, pci, uhci_driver, uhci_devclass, 0, 0);
+DRIVER_MODULE(uhci, pci, uhci_driver, 0, 0);
 MODULE_DEPEND(uhci, usb, 1, 1, 1);

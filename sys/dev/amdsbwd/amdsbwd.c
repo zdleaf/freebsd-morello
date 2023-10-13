@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2009 Andriy Gapon <avg@FreeBSD.org>
  * All rights reserved.
@@ -47,8 +47,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include "opt_amdsbwd.h"
 
 #include <sys/param.h>
@@ -123,14 +121,13 @@ static device_method_t amdsbwd_methods[] = {
 	DEVMETHOD_END
 };
 
-static devclass_t	amdsbwd_devclass;
 static driver_t		amdsbwd_driver = {
 	"amdsbwd",
 	amdsbwd_methods,
 	sizeof(struct amdsbwd_softc)
 };
 
-DRIVER_MODULE(amdsbwd, isa, amdsbwd_driver, amdsbwd_devclass, NULL, NULL);
+DRIVER_MODULE(amdsbwd, isa, amdsbwd_driver, NULL, NULL);
 
 static uint8_t
 pmio_read(struct resource *res, uint8_t reg)

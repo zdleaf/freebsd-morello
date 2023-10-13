@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2007-2009 Sam Leffler, Errno Consulting
  * Copyright (c) 2007-2009 Marvell Semiconductor, Inc.
@@ -28,8 +28,6 @@
  * IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGES.
- *
- * $FreeBSD$
  */
 
 #include <sys/param.h>
@@ -2345,13 +2343,12 @@ mwl_hal_getdiagstate(struct mwl_hal *mh0, int request,
 static void
 mwlSendCmd(struct mwl_hal_priv *mh)
 {
-	uint32_t dummy;
 
 	bus_dmamap_sync(mh->mh_dmat, mh->mh_dmamap,
 	    BUS_DMASYNC_PREREAD | BUS_DMASYNC_PREWRITE);
 
 	WR4(mh, MACREG_REG_GEN_PTR, mh->mh_cmdaddr);
-	dummy = RD4(mh, MACREG_REG_INT_CODE);
+	RD4(mh, MACREG_REG_INT_CODE);
 
 	WR4(mh, MACREG_REG_H2A_INTERRUPT_EVENTS, MACREG_H2ARIC_BIT_DOOR_BELL);
 }
@@ -2446,18 +2443,17 @@ mwlFwReset(struct mwl_hal_priv *mh)
 static void
 mwlTriggerPciCmd(struct mwl_hal_priv *mh)
 {
-	uint32_t dummy;
 
 	bus_dmamap_sync(mh->mh_dmat, mh->mh_dmamap, BUS_DMASYNC_PREWRITE);
 
 	WR4(mh, MACREG_REG_GEN_PTR, mh->mh_cmdaddr);
-	dummy = RD4(mh, MACREG_REG_INT_CODE);
+	RD4(mh, MACREG_REG_INT_CODE);
 
 	WR4(mh, MACREG_REG_INT_CODE, 0x00);
-	dummy = RD4(mh, MACREG_REG_INT_CODE);
+	RD4(mh, MACREG_REG_INT_CODE);
 
 	WR4(mh, MACREG_REG_H2A_INTERRUPT_EVENTS, MACREG_H2ARIC_BIT_DOOR_BELL);
-	dummy = RD4(mh, MACREG_REG_INT_CODE);
+	RD4(mh, MACREG_REG_INT_CODE);
 }
 
 static int

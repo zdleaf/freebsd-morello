@@ -30,7 +30,6 @@
  *   (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  *   OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-/*$FreeBSD$*/
 
 #ifndef _LIO_RXTX_H_
 #define _LIO_RXTX_H_
@@ -80,7 +79,7 @@ union lio_tx_info {
 
 int	lio_xmit(struct lio *lio, struct lio_instr_queue *iq,
 		 struct mbuf **m_headp);
-int	lio_mq_start_locked(struct ifnet *ifp, struct lio_instr_queue *iq);
-int	lio_mq_start(struct ifnet *ifp, struct mbuf *m);
-void	lio_qflush(struct ifnet *ifp);
+int	lio_mq_start_locked(if_t ifp, struct lio_instr_queue *iq);
+int	lio_mq_start(if_t ifp, struct mbuf *m);
+void	lio_qflush(if_t ifp);
 #endif	/* _LIO_RXTX_H_ */

@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2005 Nate Lawson
  * All rights reserved.
@@ -39,8 +39,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/bus.h>
@@ -106,8 +104,7 @@ static driver_t p4tcc_driver = {
 	sizeof(struct p4tcc_softc),
 };
 
-static devclass_t p4tcc_devclass;
-DRIVER_MODULE(p4tcc, cpu, p4tcc_driver, p4tcc_devclass, 0, 0);
+DRIVER_MODULE(p4tcc, cpu, p4tcc_driver, 0, 0);
 
 static int
 p4tcc_features(driver_t *driver, u_int *features)

@@ -55,8 +55,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include "opt_ddb.h"
 #include "opt_kstack_pages.h"
 #include "opt_platform.h"
@@ -649,7 +647,6 @@ flush_disable_caches(void)
 	register_t msscr0;
 	register_t cache_reg;
 	volatile uint32_t *memp;
-	uint32_t temp;
 	int i;
 	int x;
 
@@ -682,7 +679,7 @@ flush_disable_caches(void)
 	 */
 	memp = (volatile uint32_t *)0x00000000;
 	for (i = 0; i < 128 * 1024; i++) {
-		temp = *memp;
+		(void)*memp;
 		__asm__ __volatile__("dcbf 0,%0" :: "r"(memp));
 		memp += 32/sizeof(*memp);
 	}
@@ -693,7 +690,7 @@ flush_disable_caches(void)
 	for (; x != 0xff;) {
 		mtspr(SPR_LDSTCR, x);
 		for (i = 0; i < 128; i++) {
-			temp = *memp;
+			(void)*memp;
 			__asm__ __volatile__("dcbf 0,%0" :: "r"(memp));
 			memp += 32/sizeof(*memp);
 		}
@@ -748,7 +745,7 @@ flush_disable_caches(void)
 
 #ifndef __powerpc64__
 void
-mpc745x_sleep()
+mpc745x_sleep(void)
 {
 	static u_quad_t timebase = 0;
 	static register_t sprgs[4];

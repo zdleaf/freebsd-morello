@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (C) 2010 Nathan Whitehorn
  * All rights reserved.
@@ -23,13 +23,9 @@
  * WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR
  * OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/stdint.h>
 #include <sys/stddef.h>
 #include <sys/param.h>
@@ -167,7 +163,5 @@ static driver_t ohci_ps3_driver = {
 	.size = sizeof(ohci_softc_t),
 };
 
-static devclass_t ohci_ps3_devclass;
-
-DRIVER_MODULE(ohci_ps3, ps3bus, ohci_ps3_driver, ohci_ps3_devclass, 0, 0);
+DRIVER_MODULE(ohci_ps3, ps3bus, ohci_ps3_driver, 0, 0);
 MODULE_DEPEND(ohci_ps3, usb, 1, 1, 1);

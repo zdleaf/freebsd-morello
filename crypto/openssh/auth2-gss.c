@@ -1,4 +1,4 @@
-/* $OpenBSD: auth2-gss.c,v 1.32 2021/01/27 10:15:08 djm Exp $ */
+/* $OpenBSD: auth2-gss.c,v 1.34 2023/03/31 04:22:27 djm Exp $ */
 
 /*
  * Copyright (c) 2001-2003 Simon Wilkinson. All rights reserved.
@@ -48,6 +48,8 @@
 #include "ssh-gss.h"
 #include "monitor_wrap.h"
 
+#define SSH_GSSAPI_MAX_MECHS	2048
+
 extern ServerOptions options;
 
 static int input_gssapi_token(int type, u_int32_t plen, struct ssh *ssh);
@@ -60,7 +62,7 @@ static int input_gssapi_errtok(int, u_int32_t, struct ssh *);
  * how to check local user kuserok and the like)
  */
 static int
-userauth_gssapi(struct ssh *ssh)
+userauth_gssapi(struct ssh *ssh, const char *method)
 {
 	Authctxt *authctxt = ssh->authctxt;
 	gss_OID_desc goid = {0, NULL};
@@ -75,7 +77,11 @@ userauth_gssapi(struct ssh *ssh)
 		fatal_fr(r, "parse packet");
 
 	if (mechs == 0) {
-		debug("Mechanism negotiation is not supported");
+		logit_f("mechanism negotiation is not supported");
+		return (0);
+	} else if (mechs > SSH_GSSAPI_MAX_MECHS) {
+		logit_f("too many mechanisms requested %u > %u", mechs,
+		    SSH_GSSAPI_MAX_MECHS);
 		return (0);
 	}
 
@@ -94,7 +100,7 @@ userauth_gssapi(struct ssh *ssh)
 			goid.length   = len - 2;
 			ssh_gssapi_test_oid_supported(&ms, &goid, &present);
 		} else {
-			logit("Badly formed OID received");
+			logit_f("badly formed OID received");
 		}
 	} while (mechs > 0 && !present);
 
@@ -329,6 +335,7 @@ input_gssapi_mic(int type, u_int32_t plen, struct ssh *ssh)
 
 Authmethod method_gssapi = {
 	"gssapi-with-mic",
+	NULL,
 	userauth_gssapi,
 	&options.gss_authentication
 };

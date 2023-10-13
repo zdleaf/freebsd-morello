@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2003 Peter Wemm
  * Copyright (c) 2017, 2018 The FreeBSD Foundation
@@ -31,11 +31,8 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
-#define	IN_RTLD	1
+#define _WANT_P_OSREL
 #include <sys/param.h>
-#undef IN_RTLD
 #include <machine/cpufunc.h>
 #include <machine/specialreg.h>
 #include <machine/sysarch.h>

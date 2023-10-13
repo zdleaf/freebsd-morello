@@ -32,8 +32,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 #pragma once
 #include_next <sys/types.h>
@@ -68,4 +66,8 @@ typedef unsigned long cap_ioctl_t;
 struct cap_rights;
 
 typedef struct cap_rights cap_rights_t;
+
+/* Needed for bitstring */
+#include <sys/bitcount.h>
+
 #endif
