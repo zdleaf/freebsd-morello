@@ -269,6 +269,4 @@ static driver_t fmem_driver = {
 	sizeof(struct fmem_softc),
 };
 
-static devclass_t fmem_devclass;
-
-DRIVER_MODULE(fmem, simplebus, fmem_driver, fmem_devclass, 0, 0);
+DRIVER_MODULE(fmem, simplebus, fmem_driver, 0, 0);

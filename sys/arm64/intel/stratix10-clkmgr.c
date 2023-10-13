@@ -90,11 +90,8 @@ static int
 s10_clkmgr_attach(device_t dev)
 {
 	struct s10_clkmgr_softc *sc;
-	phandle_t node;
 	int rid;
 	int i;
-
-	node = ofw_bus_get_node(dev);
 
 	sc = device_get_softc(dev);
 	sc->dev = dev;
@@ -134,7 +131,5 @@ static driver_t s10_clkmgr_driver = {
 	sizeof(struct s10_clkmgr_softc),
 };
 
-static devclass_t s10_clkmgr_devclass;
-
 EARLY_DRIVER_MODULE(s10_clkmgr, simplebus, s10_clkmgr_driver,
-    s10_clkmgr_devclass, 0, 0, BUS_PASS_BUS + BUS_PASS_ORDER_MIDDLE);
+    0, 0, BUS_PASS_BUS + BUS_PASS_ORDER_MIDDLE);
