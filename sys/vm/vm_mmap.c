@@ -42,6 +42,7 @@
 
 #include <sys/cdefs.h>
 #include "opt_hwpmc_hooks.h"
+#include "opt_hwt_hooks.h"
 #include "opt_vm.h"
 
 #include <sys/param.h>
@@ -598,7 +599,7 @@ kern_munmap(struct thread *td, uintptr_t addr0, size_t size)
 	struct hwt_record_entry ent;
 	if (rv == KERN_SUCCESS) {
 		ent.addr = (uintptr_t) addr;
-		ent.size = (size_t) size;
+		ent.fullpath = NULL;
 		ent.record_type = HWT_RECORD_MUNMAP;
 		HWT_CALL_HOOK(td, HWT_RECORD, &ent);
 	}
