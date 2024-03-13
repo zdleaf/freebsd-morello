@@ -206,28 +206,6 @@ hwt_ncpu(void)
 	return (ncpu);
 }
 
-int
-hwt_get_offs(struct trace_context *tc, size_t *offs)
-{
-	struct hwt_bufptr_get bget;
-	vm_offset_t curpage_offset;
-	int curpage;
-	int error;
-
-	bget.curpage = &curpage;
-	bget.curpage_offset = &curpage_offset;
-
-	error = ioctl(tc->thr_fd, HWT_IOC_BUFPTR_GET, &bget);
-	if (error)
-		return (error);
-
-	dprintf("curpage %d curpage_offset %ld\n", curpage, curpage_offset);
-
-	*offs = curpage * PAGE_SIZE + curpage_offset;
-
-	return (0);
-}
-
 static int
 hwt_get_records(struct trace_context *tc, uint32_t *nrec)
 {
@@ -271,6 +249,17 @@ hwt_start_tracing(struct trace_context *tc)
 	int error;
 
 	error = ioctl(tc->thr_fd, HWT_IOC_START, &s);
+
+	return (error);
+}
+
+int
+hwt_stop_tracing(struct trace_context *tc)
+{
+	struct hwt_stop s;
+	int error;
+
+	error = ioctl(tc->thr_fd, HWT_IOC_STOP, &s);
 
 	return (error);
 }

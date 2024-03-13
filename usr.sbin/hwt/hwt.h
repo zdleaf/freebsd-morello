@@ -91,11 +91,11 @@ int hwt_process_create(int *sockpair, char **cmd, char **env, int *pid0);
 int hwt_process_start(int *sockpair);
 int hwt_record_fetch(struct trace_context *tc, int *nrecords);
 void hwt_procexit(pid_t pid, int status);
-int hwt_get_offs(struct trace_context *tc, size_t *offs);
 void hwt_sleep(int msec);
 int hwt_elf_count_libs(const char *elf_path, uint32_t *nlibs0);
 int hwt_find_sym(struct trace_context *tc);
 int hwt_start_tracing(struct trace_context *tc);
+int hwt_stop_tracing(struct trace_context *tc);
 int hwt_mmap_received(struct trace_context *tc,
     struct hwt_record_user_entry *entry);
 int hwt_ncpu(void);

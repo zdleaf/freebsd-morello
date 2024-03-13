@@ -242,3 +242,23 @@ hwt_backend_unload(void)
 
 	mtx_destroy(&hwt_backend_mtx);
 }
+
+void
+hwt_backend_stop(struct hwt_context *ctx)
+{
+	dprintf("%s\n", __func__);
+
+	ctx->hwt_backend->ops->hwt_backend_stop(ctx);
+}
+
+int
+hwt_backend_svc_buf(struct hwt_context *ctx, int cpu_id)
+{
+	int error;
+
+	dprintf("%s\n", __func__);
+
+	error = ctx->hwt_backend->ops->hwt_backend_svc_buf(ctx, cpu_id);
+
+	return (error);
+}
