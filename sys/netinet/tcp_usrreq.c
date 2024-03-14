@@ -179,6 +179,12 @@ tcp_usr_attach(struct socket *so, int proto, struct thread *td)
 		goto out;
 	}
 	tp->t_state = TCPS_CLOSED;
+	/* Can we inherit anything from the listener? */
+	if ((so->so_listen != NULL) &&
+	    (so->so_listen->so_pcb != NULL) &&
+	    (tp->t_fb->tfb_inherit != NULL)) {
+		(*tp->t_fb->tfb_inherit)(tp, sotoinpcb(so->so_listen));
+	}
 	tcp_bblog_pru(tp, PRU_ATTACH, error);
 	INP_WUNLOCK(inp);
 	TCPSTATES_INC(TCPS_CLOSED);
@@ -799,31 +805,56 @@ tcp6_usr_accept(struct socket *so, struct sockaddr *sa)
  * Mark the connection as being incapable of further output.
  */
 static int
-tcp_usr_shutdown(struct socket *so)
+tcp_usr_shutdown(struct socket *so, enum shutdown_how how)
 {
-	int error = 0;
-	struct inpcb *inp;
-	struct tcpcb *tp;
 	struct epoch_tracker et;
+	struct inpcb *inp = sotoinpcb(so);
+	struct tcpcb *tp = intotcpcb(inp);
+	int error = 0;
 
-	inp = sotoinpcb(so);
-	KASSERT(inp != NULL, ("inp == NULL"));
-	INP_WLOCK(inp);
-	if (inp->inp_flags & INP_DROPPED) {
-		INP_WUNLOCK(inp);
-		return (ECONNRESET);
+	SOCK_LOCK(so);
+	if (SOLISTENING(so)) {
+		if (how != SHUT_WR) {
+			so->so_error = ECONNABORTED;
+			solisten_wakeup(so);	/* unlocks so */
+		} else
+			SOCK_UNLOCK(so);
+		return (ENOTCONN);
+	} else if ((so->so_state &
+	    (SS_ISCONNECTED | SS_ISCONNECTING | SS_ISDISCONNECTING)) == 0) {
+		SOCK_UNLOCK(so);
+		return (ENOTCONN);
 	}
-	tp = intotcpcb(inp);
+	SOCK_UNLOCK(so);
 
-	NET_EPOCH_ENTER(et);
-	socantsendmore(so);
-	tcp_usrclosed(tp);
-	if (!(inp->inp_flags & INP_DROPPED))
+	switch (how) {
+	case SHUT_RD:
+		sorflush(so);
+		break;
+	case SHUT_RDWR:
+		sorflush(so);
+		/* FALLTHROUGH */
+	case SHUT_WR:
+		/*
+		 * XXXGL: mimicing old soshutdown() here. But shouldn't we
+		 * return ECONNRESEST for SHUT_RD as well?
+		 */
+		INP_WLOCK(inp);
+		if (inp->inp_flags & INP_DROPPED) {
+			INP_WUNLOCK(inp);
+			return (ECONNRESET);
+		}
+
+		socantsendmore(so);
+		NET_EPOCH_ENTER(et);
+		tcp_usrclosed(tp);
 		error = tcp_output_nodrop(tp);
-	tcp_bblog_pru(tp, PRU_SHUTDOWN, error);
-	TCP_PROBE2(debug__user, tp, PRU_SHUTDOWN);
-	error = tcp_unlock_or_drop(tp, error);
-	NET_EPOCH_EXIT(et);
+		tcp_bblog_pru(tp, PRU_SHUTDOWN, error);
+		TCP_PROBE2(debug__user, tp, PRU_SHUTDOWN);
+		error = tcp_unlock_or_drop(tp, error);
+		NET_EPOCH_EXIT(et);
+	}
+	wakeup(&so->so_timeo);
 
 	return (error);
 }
@@ -1576,6 +1607,7 @@ tcp_fill_info(const struct tcpcb *tp, struct tcp_info *ti)
 	ti->tcpi_rcv_numsacks = tp->rcv_numsacks;
 	ti->tcpi_rcv_adv = tp->rcv_adv;
 	ti->tcpi_dupacks = tp->t_dupacks;
+	ti->tcpi_rttmin = tp->t_rttlow;
 #ifdef TCP_OFFLOAD
 	if (tp->t_flags & TF_TOE) {
 		ti->tcpi_options |= TCPI_OPT_TOE;
@@ -1880,37 +1912,6 @@ tcp_ctloutput(struct socket *so, struct sockopt *sopt)
 #ifdef CTASSERT
 CTASSERT(TCP_CA_NAME_MAX <= TCP_LOG_ID_LEN);
 CTASSERT(TCP_LOG_REASON_LEN <= TCP_LOG_ID_LEN);
-#endif
-
-#ifdef KERN_TLS
-static int
-copyin_tls_enable(struct sockopt *sopt, struct tls_enable *tls)
-{
-	struct tls_enable_v0 tls_v0;
-	int error;
-
-	if (sopt->sopt_valsize == sizeof(tls_v0)) {
-		error = sooptcopyin(sopt, &tls_v0, sizeof(tls_v0),
-		    sizeof(tls_v0));
-		if (error)
-			return (error);
-		memset(tls, 0, sizeof(*tls));
-		tls->cipher_key = tls_v0.cipher_key;
-		tls->iv = tls_v0.iv;
-		tls->auth_key = tls_v0.auth_key;
-		tls->cipher_algorithm = tls_v0.cipher_algorithm;
-		tls->cipher_key_len = tls_v0.cipher_key_len;
-		tls->iv_len = tls_v0.iv_len;
-		tls->auth_algorithm = tls_v0.auth_algorithm;
-		tls->auth_key_len = tls_v0.auth_key_len;
-		tls->flags = tls_v0.flags;
-		tls->tls_vmajor = tls_v0.tls_vmajor;
-		tls->tls_vminor = tls_v0.tls_vminor;
-		return (0);
-	}
-
-	return (sooptcopyin(sopt, tls, sizeof(*tls), sizeof(*tls)));
-}
 #endif
 
 extern struct cc_algo newreno_cc_algo;
@@ -2260,15 +2261,16 @@ unlock_and_done:
 #ifdef KERN_TLS
 		case TCP_TXTLS_ENABLE:
 			INP_WUNLOCK(inp);
-			error = copyin_tls_enable(sopt, &tls);
-			if (error)
+			error = ktls_copyin_tls_enable(sopt, &tls);
+			if (error != 0)
 				break;
 			error = ktls_enable_tx(so, &tls);
+			ktls_cleanup_tls_enable(&tls);
 			break;
 		case TCP_TXTLS_MODE:
 			INP_WUNLOCK(inp);
 			error = sooptcopyin(sopt, &ui, sizeof(ui), sizeof(ui));
-			if (error)
+			if (error != 0)
 				return (error);
 
 			INP_WLOCK_RECHECK(inp);
@@ -2277,11 +2279,11 @@ unlock_and_done:
 			break;
 		case TCP_RXTLS_ENABLE:
 			INP_WUNLOCK(inp);
-			error = sooptcopyin(sopt, &tls, sizeof(tls),
-			    sizeof(tls));
-			if (error)
+			error = ktls_copyin_tls_enable(sopt, &tls);
+			if (error != 0)
 				break;
 			error = ktls_enable_rx(so, &tls);
+			ktls_cleanup_tls_enable(&tls);
 			break;
 #endif
 		case TCP_MAXUNACKTIME:
@@ -2751,6 +2753,7 @@ tcp_usrclosed(struct tcpcb *tp)
 	if (tp->t_acktime == 0)
 		tp->t_acktime = ticks;
 	if (tp->t_state >= TCPS_FIN_WAIT_2) {
+		tcp_free_sackholes(tp);
 		soisdisconnected(tptosocket(tp));
 		/* Prevent the connection hanging in FIN_WAIT_2 forever. */
 		if (tp->t_state == TCPS_FIN_WAIT_2) {

@@ -108,6 +108,12 @@
 /* bdev_max_secure_erase_sectors() is available */
 /* #undef HAVE_BDEV_MAX_SECURE_ERASE_SECTORS */
 
+/* bdev_open_by_path() exists */
+/* #undef HAVE_BDEV_OPEN_BY_PATH */
+
+/* bdev_release() exists */
+/* #undef HAVE_BDEV_RELEASE */
+
 /* block_device_operations->submit_bio() returns void */
 /* #undef HAVE_BDEV_SUBMIT_BIO_RETURNS_VOID */
 
@@ -155,6 +161,9 @@
 
 /* blkdev_issue_discard() is available */
 /* #undef HAVE_BLKDEV_ISSUE_DISCARD */
+
+/* __blkdev_issue_discard() is available */
+/* #undef HAVE_BLKDEV_ISSUE_DISCARD_ASYNC */
 
 /* blkdev_issue_secure_erase() is available */
 /* #undef HAVE_BLKDEV_ISSUE_SECURE_ERASE */
@@ -427,14 +436,23 @@
 /* APIs for idmapped mount are present */
 /* #undef HAVE_IDMAP_MNT_API */
 
+/* mnt_idmap does not have user_namespace */
+/* #undef HAVE_IDMAP_NO_USERNS */
+
 /* Define if compiler supports -Wimplicit-fallthrough */
 /* #undef HAVE_IMPLICIT_FALLTHROUGH */
 
 /* Define if compiler supports -Winfinite-recursion */
 /* #undef HAVE_INFINITE_RECURSION */
 
+/* inode_get_atime() exists in linux/fs.h */
+/* #undef HAVE_INODE_GET_ATIME */
+
 /* inode_get_ctime() exists in linux/fs.h */
 /* #undef HAVE_INODE_GET_CTIME */
+
+/* inode_get_mtime() exists in linux/fs.h */
+/* #undef HAVE_INODE_GET_MTIME */
 
 /* yes */
 /* #undef HAVE_INODE_LOCK_SHARED */
@@ -448,6 +466,9 @@
 /* inode_owner_or_capable() takes user_ns */
 /* #undef HAVE_INODE_OWNER_OR_CAPABLE_USERNS */
 
+/* inode_set_atime_to_ts() exists in linux/fs.h */
+/* #undef HAVE_INODE_SET_ATIME_TO_TS */
+
 /* inode_set_ctime_to_ts() exists in linux/fs.h */
 /* #undef HAVE_INODE_SET_CTIME_TO_TS */
 
@@ -456,6 +477,9 @@
 
 /* inode_set_iversion() exists */
 /* #undef HAVE_INODE_SET_IVERSION */
+
+/* inode_set_mtime_to_ts() exists in linux/fs.h */
+/* #undef HAVE_INODE_SET_MTIME_TO_TS */
 
 /* inode->i_*time's are timespec64 */
 /* #undef HAVE_INODE_TIMESPEC64_TIMES */
@@ -553,6 +577,9 @@
 /* Define if compiler supports -Winfinite-recursion */
 /* #undef HAVE_KERNEL_INFINITE_RECURSION */
 
+/* kernel has kernel_neon_* functions */
+/* #undef HAVE_KERNEL_NEON */
+
 /* kernel does stack verification */
 /* #undef HAVE_KERNEL_OBJTOOL */
 
@@ -561,6 +588,12 @@
 
 /* kernel_read() take loff_t pointer */
 /* #undef HAVE_KERNEL_READ_PPOS */
+
+/* strlcpy() exists */
+/* #undef HAVE_KERNEL_STRLCPY */
+
+/* strscpy() exists */
+/* #undef HAVE_KERNEL_STRSCPY */
 
 /* timer_list.function gets a timer_list */
 /* #undef HAVE_KERNEL_TIMER_FUNCTION_TIMER_LIST */
@@ -772,6 +805,9 @@
 /* set_special_state() exists */
 /* #undef HAVE_SET_SPECIAL_STATE */
 
+/* shrinker_register exists */
+/* #undef HAVE_SHRINKER_REGISTER */
+
 /* struct shrink_control exists */
 /* #undef HAVE_SHRINK_CONTROL_STRUCT */
 
@@ -836,6 +872,12 @@
 
 /* submit_bio is member of struct block_device_operations */
 /* #undef HAVE_SUBMIT_BIO_IN_BLOCK_DEVICE_OPERATIONS */
+
+/* have super_block s_shrink */
+/* #undef HAVE_SUPER_BLOCK_S_SHRINK */
+
+/* have super_block s_shrink pointer */
+/* #undef HAVE_SUPER_BLOCK_S_SHRINK_PTR */
 
 /* super_setup_bdi_name() exits */
 /* #undef HAVE_SUPER_SETUP_BDI_NAME */
@@ -1113,7 +1155,7 @@
 /* #undef ZFS_IS_GPL_COMPATIBLE */
 
 /* Define the project alias string. */
-#define ZFS_META_ALIAS "zfs-2.2.99-270-FreeBSD_gdbda45160"
+#define ZFS_META_ALIAS "zfs-2.2.99-365-FreeBSD_g8f2f6cd2a"
 
 /* Define the project author. */
 #define ZFS_META_AUTHOR "OpenZFS"
@@ -1122,7 +1164,7 @@
 /* #undef ZFS_META_DATA */
 
 /* Define the maximum compatible kernel version. */
-#define ZFS_META_KVER_MAX "6.6"
+#define ZFS_META_KVER_MAX "6.7"
 
 /* Define the minimum compatible kernel version. */
 #define ZFS_META_KVER_MIN "3.10"
@@ -1143,7 +1185,7 @@
 #define ZFS_META_NAME "zfs"
 
 /* Define the project release. */
-#define ZFS_META_RELEASE "270-FreeBDS_gdbda45160"
+#define ZFS_META_RELEASE "365-FreeBSD_g8f2f6cd2a"
 
 /* Define the project version. */
 #define ZFS_META_VERSION "2.2.99"

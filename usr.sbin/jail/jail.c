@@ -98,6 +98,7 @@ static const enum intparam startcommands[] = {
     IP_EXEC_PRESTART,
     IP__OP,
     IP_EXEC_CREATED,
+    IP_ZFS_DATASET,
     IP_VNET_INTERFACE,
     IP_EXEC_START,
     IP_COMMAND,
@@ -399,7 +400,7 @@ main(int argc, char **argv)
 				continue;
 		}
 		if (j->intparams[IP_ALLOW_DYING] && !dying_warned) {
-			warnx("%s", "the 'allow.dying' parameter and '-d' flag"
+			warnx("%s", "the 'allow.dying' parameter and '-d' flag "
 			    "are deprecated and have no effect.");
 			dying_warned = 1;
 		}

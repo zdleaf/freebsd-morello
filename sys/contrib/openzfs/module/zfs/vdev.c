@@ -677,6 +677,8 @@ vdev_alloc_common(spa_t *spa, uint_t id, uint64_t guid, vdev_ops_t *ops)
 	vd->vdev_checksum_t = vdev_prop_default_numeric(VDEV_PROP_CHECKSUM_T);
 	vd->vdev_io_n = vdev_prop_default_numeric(VDEV_PROP_IO_N);
 	vd->vdev_io_t = vdev_prop_default_numeric(VDEV_PROP_IO_T);
+	vd->vdev_slow_io_n = vdev_prop_default_numeric(VDEV_PROP_SLOW_IO_N);
+	vd->vdev_slow_io_t = vdev_prop_default_numeric(VDEV_PROP_SLOW_IO_T);
 
 	list_link_init(&vd->vdev_config_dirty_node);
 	list_link_init(&vd->vdev_state_dirty_node);
@@ -2493,22 +2495,36 @@ vdev_validate(vdev_t *vd)
 }
 
 static void
+vdev_update_path(const char *prefix, char *svd, char **dvd, uint64_t guid)
+{
+	if (svd != NULL && *dvd != NULL) {
+		if (strcmp(svd, *dvd) != 0) {
+			zfs_dbgmsg("vdev_copy_path: vdev %llu: %s changed "
+			    "from '%s' to '%s'", (u_longlong_t)guid, prefix,
+			    *dvd, svd);
+			spa_strfree(*dvd);
+			*dvd = spa_strdup(svd);
+		}
+	} else if (svd != NULL) {
+		*dvd = spa_strdup(svd);
+		zfs_dbgmsg("vdev_copy_path: vdev %llu: path set to '%s'",
+		    (u_longlong_t)guid, *dvd);
+	}
+}
+
+static void
 vdev_copy_path_impl(vdev_t *svd, vdev_t *dvd)
 {
 	char *old, *new;
-	if (svd->vdev_path != NULL && dvd->vdev_path != NULL) {
-		if (strcmp(svd->vdev_path, dvd->vdev_path) != 0) {
-			zfs_dbgmsg("vdev_copy_path: vdev %llu: path changed "
-			    "from '%s' to '%s'", (u_longlong_t)dvd->vdev_guid,
-			    dvd->vdev_path, svd->vdev_path);
-			spa_strfree(dvd->vdev_path);
-			dvd->vdev_path = spa_strdup(svd->vdev_path);
-		}
-	} else if (svd->vdev_path != NULL) {
-		dvd->vdev_path = spa_strdup(svd->vdev_path);
-		zfs_dbgmsg("vdev_copy_path: vdev %llu: path set to '%s'",
-		    (u_longlong_t)dvd->vdev_guid, dvd->vdev_path);
-	}
+
+	vdev_update_path("vdev_path", svd->vdev_path, &dvd->vdev_path,
+	    dvd->vdev_guid);
+
+	vdev_update_path("vdev_devid", svd->vdev_devid, &dvd->vdev_devid,
+	    dvd->vdev_guid);
+
+	vdev_update_path("vdev_physpath", svd->vdev_physpath,
+	    &dvd->vdev_physpath, dvd->vdev_guid);
 
 	/*
 	 * Our enclosure sysfs path may have changed between imports
@@ -3738,6 +3754,18 @@ vdev_load(vdev_t *vd)
 
 		error = vdev_prop_get_int(vd, VDEV_PROP_IO_T,
 		    &vd->vdev_io_t);
+		if (error && error != ENOENT)
+			vdev_dbgmsg(vd, "vdev_load: zap_lookup(zap=%llu) "
+			    "failed [error=%d]", (u_longlong_t)zapobj, error);
+
+		error = vdev_prop_get_int(vd, VDEV_PROP_SLOW_IO_N,
+		    &vd->vdev_slow_io_n);
+		if (error && error != ENOENT)
+			vdev_dbgmsg(vd, "vdev_load: zap_lookup(zap=%llu) "
+			    "failed [error=%d]", (u_longlong_t)zapobj, error);
+
+		error = vdev_prop_get_int(vd, VDEV_PROP_SLOW_IO_T,
+		    &vd->vdev_slow_io_t);
 		if (error && error != ENOENT)
 			vdev_dbgmsg(vd, "vdev_load: zap_lookup(zap=%llu) "
 			    "failed [error=%d]", (u_longlong_t)zapobj, error);
@@ -5956,6 +5984,20 @@ vdev_prop_set(vdev_t *vd, nvlist_t *innvl, nvlist_t *outnvl)
 			}
 			vd->vdev_io_t = intval;
 			break;
+		case VDEV_PROP_SLOW_IO_N:
+			if (nvpair_value_uint64(elem, &intval) != 0) {
+				error = EINVAL;
+				break;
+			}
+			vd->vdev_slow_io_n = intval;
+			break;
+		case VDEV_PROP_SLOW_IO_T:
+			if (nvpair_value_uint64(elem, &intval) != 0) {
+				error = EINVAL;
+				break;
+			}
+			vd->vdev_slow_io_t = intval;
+			break;
 		default:
 			/* Most processing is done in vdev_props_set_sync */
 			break;
@@ -6299,6 +6341,8 @@ vdev_prop_get(vdev_t *vd, nvlist_t *innvl, nvlist_t *outnvl)
 			case VDEV_PROP_CHECKSUM_T:
 			case VDEV_PROP_IO_N:
 			case VDEV_PROP_IO_T:
+			case VDEV_PROP_SLOW_IO_N:
+			case VDEV_PROP_SLOW_IO_T:
 				err = vdev_prop_get_int(vd, prop, &intval);
 				if (err && err != ENOENT)
 					break;

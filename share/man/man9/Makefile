@@ -810,7 +810,6 @@ MLINKS+=byteorder.9 be16dec.9 \
 	byteorder.9 le64enc.9 \
 	byteorder.9 le64toh.9
 MLINKS+=callout.9 callout_active.9 \
-	callout.9 callout_async_drain.9 \
 	callout.9 callout_deactivate.9 \
 	callout.9 callout_drain.9 \
 	callout.9 callout_init.9 \
@@ -1012,6 +1011,7 @@ MLINKS+=device_get_sysctl.9 device_get_sysctl_ctx.9 \
 MLINKS+=device_quiet.9 device_is_quiet.9 \
 	device_quiet.9 device_verbose.9
 MLINKS+=device_set_desc.9 device_get_desc.9 \
+	device_set_desc.9 device_set_descf.9 \
 	device_set_desc.9 device_set_desc_copy.9
 MLINKS+=device_set_flags.9 device_get_flags.9
 MLINKS+=devstat.9 devicestat.9 \
@@ -1811,10 +1811,8 @@ MLINKS+=PHOLD.9 PRELE.9 \
 MLINKS+=pmap_copy.9 pmap_copy_page.9
 MLINKS+=pmap_extract.9 pmap_extract_and_hold.9
 MLINKS+=pmap_kextract.9 vtophys.9
-MLINKS+=pmap_init.9 pmap_init2.9
 MLINKS+=pmap_is_modified.9 pmap_ts_referenced.9
-MLINKS+=pmap_pinit.9 pmap_pinit0.9 \
-	pmap_pinit.9 pmap_pinit2.9
+MLINKS+=pmap_pinit.9 pmap_pinit0.9
 MLINKS+=pmap_qenter.9 pmap_qremove.9
 MLINKS+=pmap_quick_enter_page.9 pmap_quick_remove_page.9
 MLINKS+=pmap_remove.9 pmap_remove_all.9 \
@@ -1871,6 +1869,7 @@ MLINKS+=rman.9 rman_activate_resource.9 \
 	rman.9 rman_get_rid.9 \
 	rman.9 rman_get_size.9 \
 	rman.9 rman_get_start.9 \
+	rman.9 rman_get_type.9 \
 	rman.9 rman_get_virtual.9 \
 	rman.9 rman_init.9 \
 	rman.9 rman_init_from_resource.9 \
@@ -1885,6 +1884,7 @@ MLINKS+=rman.9 rman_activate_resource.9 \
 	rman.9 rman_set_bustag.9 \
 	rman.9 rman_set_mapping.9 \
 	rman.9 rman_set_rid.9 \
+	rman.9 rman_set_type.9 \
 	rman.9 rman_set_virtual.9
 MLINKS+=rmlock.9 rm_assert.9 \
 	rmlock.9 rm_destroy.9 \

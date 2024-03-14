@@ -308,6 +308,7 @@ SUBDIR=	\
 	${_pcfclock} \
 	${_pf} \
 	${_pflog} \
+	${_pflow} \
 	${_pfsync} \
 	plip \
 	${_pms} \
@@ -613,6 +614,7 @@ _netgraph=	netgraph
 	${MK_INET6_SUPPORT} != "no")) || defined(ALL_MODULES)
 _pf=		pf
 _pflog=		pflog
+_pflow=		pflow
 .if ${MK_INET_SUPPORT} != "no"
 _pfsync=	pfsync
 .endif
@@ -847,7 +849,9 @@ _sgx=		sgx
 _sgx_linux=	sgx_linux
 _smartpqi=	smartpqi
 _p2sb=		p2sb
+.endif
 
+.if ${MACHINE_CPUARCH} == "aarch64" || ${MACHINE_CPUARCH} == "amd64"
 .if ${MK_BHYVE} != "no" || defined(ALL_MODULES)
 .if ${KERN_OPTS:MSMP}
 _vmm=		vmm

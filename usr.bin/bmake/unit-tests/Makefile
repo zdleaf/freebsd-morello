@@ -1,9 +1,9 @@
 # This is a generated file, do NOT edit!
 # See contrib/bmake/bsd.after-import.mk
 #
-# $Id: Makefile,v 1.207 2023/09/09 16:44:03 sjg Exp $
+# $Id: Makefile,v 1.211 2024/03/10 17:46:44 sjg Exp $
 #
-# $NetBSD: Makefile,v 1.341 2023/09/09 16:41:04 sjg Exp $
+# $NetBSD: Makefile,v 1.342 2024/01/07 02:07:44 sjg Exp $
 #
 # Unit tests for make(1)
 #
@@ -220,7 +220,7 @@ TESTS+=		hanoi-include
 TESTS+=		impsrc
 TESTS+=		include-main
 TESTS+=		job-flags
-#TESTS+=		job-output-long-lines
+TESTS+=		job-output-long-lines
 TESTS+=		job-output-null
 TESTS+=		jobs-empty-commands
 TESTS+=		jobs-empty-commands-error
@@ -252,7 +252,7 @@ TESTS+=		opt-debug-graph1
 TESTS+=		opt-debug-graph2
 TESTS+=		opt-debug-graph3
 TESTS+=		opt-debug-hash
-#TESTS+=		opt-debug-jobs
+TESTS+=		opt-debug-jobs
 TESTS+=		opt-debug-lint
 TESTS+=		opt-debug-loud
 TESTS+=		opt-debug-meta
@@ -476,6 +476,15 @@ BROKEN_TESTS+= sh-flags
 # this will not work if UTC_1 is set empty
 BROKEN_TESTS+= varmod-localtime
 .endif
+
+.if ${.MAKE.OS:NCYGWIN*} == ""
+BROKEN_TESTS+= \
+	export \
+	opt-chdir \
+	opt-keep-going-indirect \
+
+.endif
+
 
 .if ${.MAKE.OS:NDarwin} == ""
 BROKEN_TESTS+= shell-ksh
@@ -824,6 +833,7 @@ _SED_CMDS+=	-e 's,${.OBJDIR},<curdir>,g' -e 's,${.OBJDIR:tA},<curdir>,g'
 _SED_CMDS+=	-e 's,^${TEST_MAKE:T:S,.,\\.,g}[][0-9]*:,make:,'
 _SED_CMDS+=	-e 's,${TEST_MAKE:S,.,\\.,g},make,'
 _SED_CMDS+=	-e 's,^usage: ${TEST_MAKE:T:S,.,\\.,g} ,usage: make ,'
+_SED_CMDS+=	-e 's,${TEST_MAKE:T:S,.,\\.,g}\(\[[1-9][0-9]*\]:\),make\1,'
 _SED_CMDS+=	-e 's,<curdir>/,,g'
 _SED_CMDS+=	-e 's,${UNIT_TESTS:S,.,\\.,g}/,,g'
 _SED_CMDS+=	-e '/MAKE_VERSION/d'

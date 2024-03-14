@@ -2,6 +2,7 @@
  * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2012-2016 Ruslan Bukin <br@bsdpad.com>
+ * Copyright (c) 2023-2024 Florian Walpen <dev@submerge.ch>
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -43,6 +44,14 @@
 
 #include <mixer_if.h>
 
+static bool hdspe_unified_pcm = false;
+
+static SYSCTL_NODE(_hw, OID_AUTO, hdspe, CTLFLAG_RW | CTLFLAG_MPSAFE, 0,
+    "PCI HDSPe");
+
+SYSCTL_BOOL(_hw_hdspe, OID_AUTO, unified_pcm, CTLFLAG_RWTUN,
+    &hdspe_unified_pcm, 0, "Combine physical ports in one unified pcm device");
+
 static struct hdspe_clock_source hdspe_clock_source_table_rd[] = {
 	{ "internal", 0 << 1 | 1, HDSPE_STATUS1_CLOCK(15),       0,       0 },
 	{ "word",     0 << 1 | 0, HDSPE_STATUS1_CLOCK( 0), 1 << 24, 1 << 25 },
@@ -69,47 +78,32 @@ static struct hdspe_clock_source hdspe_clock_source_table_aio[] = {
 };
 
 static struct hdspe_channel chan_map_aio[] = {
-	{  0,  1,   "line", 1, 1 },
-	{  6,  7,  "phone", 1, 0 },
-	{  8,  9,    "aes", 1, 1 },
-	{ 10, 11, "s/pdif", 1, 1 },
-	{ 12, 16,   "adat", 1, 1 },
+	{ HDSPE_CHAN_AIO_LINE,    "line" },
+	{ HDSPE_CHAN_AIO_PHONE,  "phone" },
+	{ HDSPE_CHAN_AIO_AES,      "aes" },
+	{ HDSPE_CHAN_AIO_SPDIF, "s/pdif" },
+	{ HDSPE_CHAN_AIO_ADAT,    "adat" },
+	{ 0,                        NULL },
+};
 
-	/* Single or double speed. */
-	{ 14, 18,   "adat", 1, 1 },
-
-	/* Single speed only. */
-	{ 13, 15,   "adat", 1, 1 },
-	{ 17, 19,   "adat", 1, 1 },
-
-	{  0,  0,     NULL, 0, 0 },
+static struct hdspe_channel chan_map_aio_uni[] = {
+	{ HDSPE_CHAN_AIO_ALL, "all" },
+	{ 0,                   NULL },
 };
 
 static struct hdspe_channel chan_map_rd[] = {
-	{   0, 1,    "aes", 1, 1 },
-	{   2, 3, "s/pdif", 1, 1 },
-	{   4, 5,   "adat", 1, 1 },
-	{   6, 7,   "adat", 1, 1 },
-	{   8, 9,   "adat", 1, 1 },
-	{ 10, 11,   "adat", 1, 1 },
+	{ HDSPE_CHAN_RAY_AES,      "aes" },
+	{ HDSPE_CHAN_RAY_SPDIF, "s/pdif" },
+	{ HDSPE_CHAN_RAY_ADAT1,  "adat1" },
+	{ HDSPE_CHAN_RAY_ADAT2,  "adat2" },
+	{ HDSPE_CHAN_RAY_ADAT3,  "adat3" },
+	{ HDSPE_CHAN_RAY_ADAT4,  "adat4" },
+	{ 0,                        NULL },
+};
 
-	/* Single or double speed. */
-	{ 12, 13,   "adat", 1, 1 },
-	{ 14, 15,   "adat", 1, 1 },
-	{ 16, 17,   "adat", 1, 1 },
-	{ 18, 19,   "adat", 1, 1 },
-
-	/* Single speed only. */
-	{ 20, 21,   "adat", 1, 1 },
-	{ 22, 23,   "adat", 1, 1 },
-	{ 24, 25,   "adat", 1, 1 },
-	{ 26, 27,   "adat", 1, 1 },
-	{ 28, 29,   "adat", 1, 1 },
-	{ 30, 31,   "adat", 1, 1 },
-	{ 32, 33,   "adat", 1, 1 },
-	{ 34, 35,   "adat", 1, 1 },
-
-	{ 0,  0,      NULL, 0, 0 },
+static struct hdspe_channel chan_map_rd_uni[] = {
+	{ HDSPE_CHAN_RAY_ALL, "all" },
+	{ 0,                   NULL },
 };
 
 static void
@@ -250,6 +244,66 @@ hdspe_map_dmabuf(struct sc_info *sc)
 		hdspe_write_4(sc, HDSPE_PAGE_ADDR_BUF_IN + 4 * i,
                     raddr + i * 4096);
 	}
+}
+
+static int
+hdspe_sysctl_sample_rate(SYSCTL_HANDLER_ARGS)
+{
+	struct sc_info *sc = oidp->oid_arg1;
+	int error;
+	unsigned int speed, multiplier;
+
+	speed = sc->force_speed;
+
+	/* Process sysctl (unsigned) integer request. */
+	error = sysctl_handle_int(oidp, &speed, 0, req);
+	if (error != 0 || req->newptr == NULL)
+		return (error);
+
+	/* Speed from 32000 to 192000, 0 falls back to pcm speed setting. */
+	sc->force_speed = 0;
+	if (speed > 0) {
+		multiplier = 1;
+		if (speed > (96000 + 128000) / 2)
+			multiplier = 4;
+		else if (speed > (48000 + 64000) / 2)
+			multiplier = 2;
+
+		if (speed < ((32000 + 44100) / 2) * multiplier)
+			sc->force_speed = 32000 * multiplier;
+		else if (speed < ((44100 + 48000) / 2) * multiplier)
+			sc->force_speed = 44100 * multiplier;
+		else
+			sc->force_speed = 48000 * multiplier;
+	}
+
+	return (0);
+}
+
+
+static int
+hdspe_sysctl_period(SYSCTL_HANDLER_ARGS)
+{
+	struct sc_info *sc = oidp->oid_arg1;
+	int error;
+	unsigned int period;
+
+	period = sc->force_period;
+
+	/* Process sysctl (unsigned) integer request. */
+	error = sysctl_handle_int(oidp, &period, 0, req);
+	if (error != 0 || req->newptr == NULL)
+		return (error);
+
+	/* Period is from 2^5 to 2^14, 0 falls back to pcm latency settings. */
+	sc->force_period = 0;
+	if (period > 0) {
+		sc->force_period = 32;
+		while (sc->force_period < period && sc->force_period < 4096)
+			sc->force_period <<= 1;
+	}
+
+	return (0);
 }
 
 static int
@@ -443,10 +497,18 @@ hdspe_init(struct sc_info *sc)
 
 	/* Set latency. */
 	sc->period = 32;
+	/*
+	 * The pcm channel latency settings propagate unreliable blocksizes,
+	 * different for recording and playback, and skewed due to rounding
+	 * and total buffer size limits.
+	 * Force period to a consistent default until these issues are fixed.
+	 */
+	sc->force_period = 256;
 	sc->ctrl_register = hdspe_encode_latency(7);
 
 	/* Set rate. */
 	sc->speed = HDSPE_SPEED_DEFAULT;
+	sc->force_speed = 0;
 	sc->ctrl_register &= ~HDSPE_FREQ_MASK;
 	sc->ctrl_register |= HDSPE_FREQ_MASK_DEFAULT;
 	hdspe_write_4(sc, HDSPE_CONTROL_REG, sc->ctrl_register);
@@ -494,11 +556,11 @@ hdspe_attach(device_t dev)
 	switch (rev) {
 	case PCI_REVISION_AIO:
 		sc->type = HDSPE_AIO;
-		chan_map = chan_map_aio;
+		chan_map = hdspe_unified_pcm ? chan_map_aio_uni : chan_map_aio;
 		break;
 	case PCI_REVISION_RAYDAT:
 		sc->type = HDSPE_RAYDAT;
-		chan_map = chan_map_rd;
+		chan_map = hdspe_unified_pcm ? chan_map_rd_uni : chan_map_rd;
 		break;
 	default:
 		return (ENXIO);
@@ -547,6 +609,18 @@ hdspe_attach(device_t dev)
 	    "clock_list", CTLTYPE_STRING | CTLFLAG_RD | CTLFLAG_MPSAFE,
 	    sc, 0, hdspe_sysctl_clock_list, "A",
 	    "List of supported clock sources");
+
+	SYSCTL_ADD_PROC(device_get_sysctl_ctx(dev),
+	    SYSCTL_CHILDREN(device_get_sysctl_tree(dev)), OID_AUTO,
+	    "period", CTLTYPE_UINT | CTLFLAG_RW | CTLFLAG_MPSAFE,
+	    sc, 0, hdspe_sysctl_period, "A",
+	    "Force period of samples per interrupt (32, 64, ... 4096)");
+
+	SYSCTL_ADD_PROC(device_get_sysctl_ctx(dev),
+	    SYSCTL_CHILDREN(device_get_sysctl_tree(dev)), OID_AUTO,
+	    "sample_rate", CTLTYPE_UINT | CTLFLAG_RW | CTLFLAG_MPSAFE,
+	    sc, 0, hdspe_sysctl_sample_rate, "A",
+	    "Force sample rate (32000, 44100, 48000, ... 192000)");
 
 	return (bus_generic_attach(dev));
 }

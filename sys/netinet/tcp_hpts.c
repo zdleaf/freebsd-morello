@@ -47,7 +47,7 @@
  *
  * tcp_hpts_insert(tp, HPTS_USEC_TO_SLOTS(550));
  *
- * The above would schedule tcp_ouput() to be called in 550 useconds.
+ * The above would schedule tcp_output() to be called in 550 useconds.
  * Note that if using this mechanism the stack will want to add near
  * its top a check to prevent unwanted calls (from user land or the
  * arrival of incoming ack's). So it would add something like:
@@ -820,7 +820,7 @@ tcp_hpts_insert_diag(struct tcpcb *tp, uint32_t slot, int32_t line, struct hpts_
 
 	INP_WLOCK_ASSERT(tptoinpcb(tp));
 	MPASS(!(tptoinpcb(tp)->inp_flags & INP_DROPPED));
-	MPASS(!tcp_in_hpts(tp));
+	MPASS(!(tp->t_in_hpts == IHPTS_ONQUEUE));
 
 	/*
 	 * We now return the next-slot the hpts will be on, beyond its

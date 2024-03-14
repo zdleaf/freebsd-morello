@@ -47,6 +47,7 @@
 #include <sys/ktr.h>
 #include <sys/limits.h>
 #include <sys/linker.h>
+#include <sys/msan.h>
 #include <sys/msgbuf.h>
 #include <sys/pcpu.h>
 #include <sys/physmem.h>
@@ -137,6 +138,15 @@ struct kva_md_info kmi;
 int64_t dczva_line_size;	/* The size of cache line the dc zva zeroes */
 int has_pan;
 
+#if defined(SOCDEV_PA)
+/*
+ * This is the virtual address used to access SOCDEV_PA. As it's set before
+ * .bss is cleared we need to ensure it's preserved. To do this use
+ * __read_mostly as it's only ever set once but read in the putc functions.
+ */
+uintptr_t socdev_va __read_mostly;
+#endif
+
 /*
  * Physical address of the EFI System Table. Stashed from the metadata hints
  * passed into the kernel and used by the EFI code to call runtime services.
@@ -202,7 +212,15 @@ has_hyp(void)
 	 * XXX The E2H check is wrong, but it's close enough for now.  Needs to
 	 * be re-evaluated once we're running regularly in EL2.
 	 */
-	return (boot_el == 2 && (hcr_el2 & HCR_E2H) == 0);
+	return (boot_el == CURRENTEL_EL_EL2 && (hcr_el2 & HCR_E2H) == 0);
+}
+
+bool
+in_vhe(void)
+{
+	/* If we are currently in EL2 then must be in VHE */
+	return ((READ_SPECIALREG(CurrentEL) & CURRENTEL_EL_MASK) ==
+	    CURRENTEL_EL_EL2);
 }
 
 static void
@@ -971,7 +989,7 @@ initarm(struct arm64_bootparams *abp)
 	 * we'll end up searching for segments that we can safely use.  Those
 	 * segments also get excluded from phys_avail.
 	 */
-#if defined(KASAN)
+#if defined(KASAN) || defined(KMSAN)
 	pmap_bootstrap_san();
 #endif
 
@@ -1019,6 +1037,7 @@ initarm(struct arm64_bootparams *abp)
 
 	kcsan_cpu_init(0);
 	kasan_init();
+	kmsan_init();
 
 	env = kern_getenv("kernelname");
 	if (env != NULL)

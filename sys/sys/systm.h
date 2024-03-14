@@ -99,6 +99,16 @@ struct ucred;
 #include <sys/pcpu.h>		/* curthread */
 #include <sys/kpilite.h>
 
+extern bool scheduler_stopped;
+
+/*
+ * If we have already panic'd and this is the thread that called
+ * panic(), then don't block on any mutexes but silently succeed.
+ * Otherwise, the kernel will deadlock since the scheduler isn't
+ * going to run the thread that holds any lock we need.
+ */
+#define	SCHEDULER_STOPPED()	__predict_false(scheduler_stopped)
+
 extern int osreldate;
 
 extern const void *zero_region;	/* address space maps to a zeroed page	*/
@@ -198,6 +208,16 @@ critical_exit(void)
 #ifdef  EARLY_PRINTF
 typedef void early_putc_t(int ch);
 extern early_putc_t *early_putc;
+#define	CHECK_EARLY_PRINTF(x)	\
+    __CONCAT(early_printf_, EARLY_PRINTF) == __CONCAT(early_printf_, x)
+#define	early_printf_1		1
+#define	early_printf_mvebu	2
+#define	early_printf_ns8250	3
+#define	early_printf_pl011	4
+#define	early_printf_snps	5
+#define	early_printf_sbi	6
+#else
+#define	CHECK_EARLY_PRINTF(x)	0
 #endif
 int	kvprintf(char const *, void (*)(int, void*), void *, int,
 	    __va_list) __printflike(1, 0);
@@ -289,10 +309,11 @@ int __result_use_check copyin(const void * __restrict udaddr,
     void * _Nonnull __restrict kaddr, size_t len);
 int __result_use_check copyin_nofault(const void * __restrict udaddr,
     void * _Nonnull __restrict kaddr, size_t len);
-int __result_use_check copyout(const void * _Nonnull __restrict kaddr,
+int __result_use_or_ignore_check copyout(const void * _Nonnull __restrict kaddr,
     void * __restrict udaddr, size_t len);
-int __result_use_check copyout_nofault(const void * _Nonnull __restrict kaddr,
-    void * __restrict udaddr, size_t len);
+int __result_use_or_ignore_check copyout_nofault(
+    const void * _Nonnull __restrict kaddr, void * __restrict udaddr,
+    size_t len);
 
 #ifdef SAN_NEEDS_INTERCEPTORS
 int	SAN_INTERCEPTOR(copyin)(const void *, void *, size_t);
@@ -313,11 +334,11 @@ int64_t	fuword64(volatile const void *base);
 int __result_use_check fueword(volatile const void *base, long *val);
 int __result_use_check fueword32(volatile const void *base, int32_t *val);
 int __result_use_check fueword64(volatile const void *base, int64_t *val);
-int __result_use_check subyte(volatile void *base, int byte);
-int __result_use_check suword(volatile void *base, long word);
-int __result_use_check suword16(volatile void *base, int word);
-int __result_use_check suword32(volatile void *base, int32_t word);
-int __result_use_check suword64(volatile void *base, int64_t word);
+int __result_use_or_ignore_check subyte(volatile void *base, int byte);
+int __result_use_or_ignore_check suword(volatile void *base, long word);
+int __result_use_or_ignore_check suword16(volatile void *base, int word);
+int __result_use_or_ignore_check suword32(volatile void *base, int32_t word);
+int __result_use_or_ignore_check suword64(volatile void *base, int64_t word);
 uint32_t casuword32(volatile uint32_t *base, uint32_t oldval, uint32_t newval);
 u_long	casuword(volatile u_long *p, u_long oldval, u_long newval);
 int	casueword32(volatile uint32_t *base, uint32_t oldval, uint32_t *oldvalp,
@@ -484,6 +505,8 @@ int poll_no_poll(int events);
 
 /* XXX: Should be void nanodelay(u_int nsec); */
 void	DELAY(int usec);
+
+int kcmp_cmp(uintptr_t a, uintptr_t b);
 
 /* Root mount holdback API */
 struct root_hold_token {

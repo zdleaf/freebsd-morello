@@ -31,7 +31,6 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <sys/cdefs.h>
 #include "opt_capsicum.h"
 #include "opt_hwt_hooks.h"
 
@@ -94,8 +93,9 @@ static Elf_Brandinfo *__elfN(get_brandinfo)(struct image_params *imgp,
     const char *interp, int32_t *osrel, uint32_t *fctl0);
 static int __elfN(load_file)(struct proc *p, const char *file, u_long *addr,
     u_long *entry);
-static int __elfN(load_section)(struct image_params *imgp, vm_ooffset_t offset,
-    caddr_t vmaddr, size_t memsz, size_t filsz, vm_prot_t prot);
+static int __elfN(load_section)(const struct image_params *imgp,
+    vm_ooffset_t offset, caddr_t vmaddr, size_t memsz, size_t filsz,
+    vm_prot_t prot);
 static int __CONCAT(exec_, __elfN(imgact))(struct image_params *imgp);
 static bool __elfN(freebsd_trans_osrel)(const Elf_Note *note,
     int32_t *osrel);
@@ -551,9 +551,9 @@ __elfN(map_partial)(vm_map_t map, vm_object_t object, vm_ooffset_t offset,
 }
 
 static int
-__elfN(map_insert)(struct image_params *imgp, vm_map_t map, vm_object_t object,
-    vm_ooffset_t offset, vm_offset_t start, vm_offset_t end, vm_prot_t prot,
-    int cow)
+__elfN(map_insert)(const struct image_params *imgp, vm_map_t map,
+    vm_object_t object, vm_ooffset_t offset, vm_offset_t start, vm_offset_t end,
+    vm_prot_t prot, int cow)
 {
 	struct sf_buf *sf;
 	vm_offset_t off;
@@ -622,9 +622,9 @@ __elfN(map_insert)(struct image_params *imgp, vm_map_t map, vm_object_t object,
 	return (KERN_SUCCESS);
 }
 
-static int
-__elfN(load_section)(struct image_params *imgp, vm_ooffset_t offset,
-    caddr_t vmaddr, size_t memsz, size_t filsz, vm_prot_t prot)
+static int __elfN(load_section)(const struct image_params *imgp,
+    vm_ooffset_t offset, caddr_t vmaddr, size_t memsz, size_t filsz,
+    vm_prot_t prot)
 {
 	struct sf_buf *sf;
 	size_t map_len;
@@ -727,7 +727,7 @@ __elfN(load_section)(struct image_params *imgp, vm_ooffset_t offset,
 }
 
 static int
-__elfN(load_sections)(struct image_params *imgp, const Elf_Ehdr *hdr,
+__elfN(load_sections)(const struct image_params *imgp, const Elf_Ehdr *hdr,
     const Elf_Phdr *phdr, u_long rbase, u_long *base_addrp)
 {
 	vm_prot_t prot;
@@ -2737,8 +2737,9 @@ __elfN(note_procstat_auxv)(void *arg, struct sbuf *sb, size_t *sizep)
 	}
 }
 
+#define	MAX_NOTES_LOOP	4096
 bool
-__elfN(parse_notes)(struct image_params *imgp, Elf_Note *checknote,
+__elfN(parse_notes)(const struct image_params *imgp, const Elf_Note *checknote,
     const char *note_vendor, const Elf_Phdr *pnote,
     bool (*cb)(const Elf_Note *, void *, bool *), void *cb_arg)
 {
@@ -2776,9 +2777,15 @@ __elfN(parse_notes)(struct image_params *imgp, Elf_Note *checknote,
 		    pnote->p_offset + pnote->p_filesz);
 		buf = NULL;
 	}
-	for (i = 0; i < 100 && note >= note0 && note < note_end; i++) {
-		if (!aligned(note, Elf32_Addr) || (const char *)note_end -
-		    (const char *)note < sizeof(Elf_Note)) {
+	for (i = 0; i < MAX_NOTES_LOOP && note >= note0 && note < note_end;
+	    i++) {
+		if (!aligned(note, Elf32_Addr)) {
+			uprintf("Unaligned ELF note\n");
+			goto retf;
+		}
+		if ((const char *)note_end - (const char *)note <
+		    sizeof(Elf_Note)) {
+			uprintf("ELF note to short\n");
 			goto retf;
 		}
 		if (note->n_namesz != checknote->n_namesz ||
@@ -2798,6 +2805,8 @@ nextnote:
 		    roundup2(note->n_namesz, ELF_NOTE_ROUNDSIZE) +
 		    roundup2(note->n_descsz, ELF_NOTE_ROUNDSIZE));
 	}
+	if (i >= MAX_NOTES_LOOP)
+		uprintf("ELF note parser reached %d notes\n", i);
 retf:
 	res = false;
 ret:

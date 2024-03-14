@@ -89,6 +89,7 @@
 #include <vm/vm_object.h>
 #include <vm/vm_page.h>
 #include <vm/vm_pager.h>
+#include <vm/vnode_pager.h>
 
 #ifdef HWPMC_HOOKS
 #include <sys/pmckern.h>
@@ -127,6 +128,7 @@ struct 	fileops vnops = {
 	.fo_mmap = vn_mmap,
 	.fo_fallocate = vn_fallocate,
 	.fo_fspacectl = vn_fspacectl,
+	.fo_cmp = vn_cmp,
 	.fo_flags = DFLAG_PASSABLE | DFLAG_SEEKABLE
 };
 
@@ -1445,7 +1447,7 @@ vn_io_fault1(struct vnode *vp, struct uio *uio, struct vn_io_fault_args *args,
 	td->td_ma_cnt = prev_td_ma_cnt;
 	curthread_pflags_restore(saveheld);
 out:
-	free(uio_clone, M_IOV);
+	freeuio(uio_clone);
 	return (error);
 }
 
@@ -2580,7 +2582,6 @@ int
 vn_bmap_seekhole_locked(struct vnode *vp, u_long cmd, off_t *off,
     struct ucred *cred)
 {
-	vm_object_t obj;
 	off_t size;
 	daddr_t bn, bnp;
 	uint64_t bsize;
@@ -2605,12 +2606,7 @@ vn_bmap_seekhole_locked(struct vnode *vp, u_long cmd, off_t *off,
 	}
 
 	/* See the comment in ufs_bmap_seekdata(). */
-	obj = vp->v_object;
-	if (obj != NULL) {
-		VM_OBJECT_WLOCK(obj);
-		vm_object_page_clean(obj, 0, 0, OBJPC_SYNC);
-		VM_OBJECT_WUNLOCK(obj);
-	}
+	vnode_pager_clean_sync(vp);
 
 	bsize = vp->v_mount->mnt_stat.f_iosize;
 	for (bn = noff / bsize; noff < size; bn++, noff += bsize -
@@ -4129,9 +4125,11 @@ vn_lock_pair(struct vnode *vp1, bool vp1_locked, int lkflags1,
 {
 	int error, locked1;
 
-	MPASS(((lkflags1 & LK_SHARED) != 0) ^ ((lkflags1 & LK_EXCLUSIVE) != 0));
+	MPASS((((lkflags1 & LK_SHARED) != 0) ^ ((lkflags1 & LK_EXCLUSIVE) != 0)) ||
+	    (vp1 == NULL && lkflags1 == 0));
 	MPASS((lkflags1 & ~(LK_SHARED | LK_EXCLUSIVE | LK_NODDLKTREAT)) == 0);
-	MPASS(((lkflags2 & LK_SHARED) != 0) ^ ((lkflags2 & LK_EXCLUSIVE) != 0));
+	MPASS((((lkflags2 & LK_SHARED) != 0) ^ ((lkflags2 & LK_EXCLUSIVE) != 0)) ||
+	    (vp2 == NULL && lkflags2 == 0));
 	MPASS((lkflags2 & ~(LK_SHARED | LK_EXCLUSIVE | LK_NODDLKTREAT)) == 0);
 
 	if (vp1 == NULL && vp2 == NULL)
@@ -4256,4 +4254,12 @@ vn_lktype_write(struct mount *mp, struct vnode *vp)
 	    (mp == NULL && MNT_SHARED_WRITES(vp->v_mount)))
 		return (LK_SHARED);
 	return (LK_EXCLUSIVE);
+}
+
+int
+vn_cmp(struct file *fp1, struct file *fp2, struct thread *td)
+{
+	if (fp2->f_type != DTYPE_VNODE)
+		return (3);
+	return (kcmp_cmp((uintptr_t)fp1->f_vnode, (uintptr_t)fp2->f_vnode));
 }

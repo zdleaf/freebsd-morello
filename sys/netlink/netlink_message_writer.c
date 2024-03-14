@@ -65,6 +65,13 @@ nlmsg_get_buf(struct nl_writer *nw, u_int len, bool waitok)
 	return (true);
 }
 
+static bool
+nl_send_one(struct nl_writer *nw)
+{
+
+	return (nl_send(nw, nw->nlp));
+}
+
 bool
 _nlmsg_get_unicast_writer(struct nl_writer *nw, int size, struct nlpcb *nlp)
 {
@@ -93,6 +100,7 @@ _nlmsg_ignore_limit(struct nl_writer *nw)
 bool
 _nlmsg_flush(struct nl_writer *nw)
 {
+	bool result;
 
 	if (__predict_false(nw->hdr != NULL)) {
 		/* Last message has not been completed, skip it. */
@@ -102,8 +110,14 @@ _nlmsg_flush(struct nl_writer *nw)
 		nw->hdr = NULL;
         }
 
-	NL_LOG(LOG_DEBUG2, "OUT");
-	bool result = nw->cb(nw);
+	if (nw->buf->datalen == 0) {
+		MPASS(nw->num_messages == 0);
+		nl_buf_free(nw->buf);
+		nw->buf = NULL;
+		return (true);
+	}
+
+	result = nw->cb(nw);
 	nw->num_messages = 0;
 
 	if (!result) {

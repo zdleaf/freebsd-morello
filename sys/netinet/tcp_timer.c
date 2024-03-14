@@ -299,7 +299,7 @@ tcp_output_locked(struct tcpcb *tp)
 		KASSERT(tp->t_fb->tfb_flags & TCP_FUNC_OUTPUT_CANDROP,
 		    ("TCP stack %s requested tcp_drop(%p)",
 		    tp->t_fb->tfb_tcp_block_name, tp));
-		tp = tcp_drop(tp, rv);
+		tp = tcp_drop(tp, -rv);
 	}
 
 	return (tp != NULL);
@@ -907,6 +907,7 @@ tcp_timer_activate(struct tcpcb *tp, tt_which which, u_int delta)
 #endif
 
 	INP_WLOCK_ASSERT(inp);
+	MPASS(tp->t_state > TCPS_CLOSED);
 
 	if (delta > 0) {
 		what = TT_STARTING;

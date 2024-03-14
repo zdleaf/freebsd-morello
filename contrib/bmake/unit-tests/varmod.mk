@@ -1,4 +1,4 @@
-# $NetBSD: varmod.mk,v 1.8 2023/06/01 20:56:35 rillig Exp $
+# $NetBSD: varmod.mk,v 1.10 2024/02/03 00:20:23 sjg Exp $
 #
 # Tests for variable modifiers, such as :Q, :S,from,to or :Ufallback.
 #
@@ -56,10 +56,13 @@
 # | `u`          | strict       |                    | yes      |
 # | `from=to`    | greedy       | SysV, fallback     | N/A      |
 
+# These tests assume
+.MAKE.SAVE_DOLLARS = yes
+
 DOLLAR1=	$$
 DOLLAR2=	${:U\$}
 
-# To get a single '$' sign in the value of a variable expression, it has to
+# To get a single '$' sign in the value of an expression, it has to
 # be written as '$$' in a literal variable value.
 #
 # See Var_Parse, where it calls Var_Subst.
@@ -107,7 +110,7 @@ DOLLAR2=	${:U\$}
 
 # The variable modifier :P does not fall back to the SysV modifier.
 # Therefore the modifier :P=RE generates a parse error.
-# XXX: The .error should not be reached since the variable expression is
+# XXX: The .error should not be reached since the expression is
 # malformed, and this error should be propagated up to Cond_EvalLine.
 VAR=	STOP
 # expect+1: Missing delimiter ':' after modifier "P"

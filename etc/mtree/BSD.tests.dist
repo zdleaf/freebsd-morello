@@ -33,6 +33,8 @@
         ..
         expr
         ..
+        hostname
+        ..
         ln
         ..
         ls
@@ -161,6 +163,8 @@
                     multiaggs
                     ..
                     offsetof
+                    ..
+                    oformat
                     ..
                     operators
                     ..
@@ -1133,6 +1137,8 @@
         ..
         lockf
         ..
+        lorder
+        ..
         m4
         ..
         mkimg
@@ -1222,8 +1228,6 @@
         jail
         ..
         makefs
-        ..
-        mixer
         ..
         newsyslog
         ..

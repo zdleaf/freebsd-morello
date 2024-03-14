@@ -772,7 +772,8 @@ kern_sendit(struct thread *td, int s, struct msghdr *mp, int flags,
 		td->td_retval[0] = len - auio.uio_resid;
 #ifdef KTRACE
 	if (ktruio != NULL) {
-		ktruio->uio_resid = td->td_retval[0];
+		if (error == 0)
+			ktruio->uio_resid = td->td_retval[0];
 		ktrgenio(s, UIO_WRITE, ktruio, error);
 	}
 #endif
@@ -1172,6 +1173,9 @@ kern_shutdown(struct thread *td, int s, int how)
 	struct file *fp;
 	int error;
 
+	if (__predict_false(how < SHUT_RD || how > SHUT_RDWR))
+		return (EINVAL);
+
 	AUDIT_ARG_FD(s);
 	error = getsock(td, s, &cap_shutdown_rights, &fp);
 	if (error == 0) {
@@ -1409,7 +1413,7 @@ kern_getpeername(struct thread *td, int fd, struct sockaddr *sa)
 	if (error != 0)
 		return (error);
 	so = fp->f_data;
-	if ((so->so_state & (SS_ISCONNECTED|SS_ISCONFIRMING)) == 0) {
+	if ((so->so_state & SS_ISCONNECTED) == 0) {
 		error = ENOTCONN;
 		goto done;
 	}

@@ -25,9 +25,11 @@ ATF_TESTS_SH+=	altq \
 		nat \
 		pass_block \
 		pflog \
+		pflow \
 		pfsync	\
 		prio \
 		proxy \
+		rdr \
 		ridentifier \
 		route_to \
 		rtable \
@@ -45,6 +47,7 @@ ATF_TESTS_SH+=	altq \
 		tos
 
 ATF_TESTS_PYTEST+=	frag6.py
+ATF_TESTS_PYTEST+=	nat66.py
 ATF_TESTS_PYTEST+=	sctp.py
 
 # Tests reuse jail names and so cannot run in parallel.
@@ -62,6 +65,7 @@ ${PACKAGE}FILES+=	CVE-2019-5597.py \
 			frag-overreplace.py \
 			pfsync_defer.py \
 			pft_ether.py \
+			pft_read_ipfix.py \
 			utils.subr
 
 ${PACKAGE}FILESMODE_CVE-2019-5597.py=	0555
@@ -72,5 +76,6 @@ ${PACKAGE}FILESMODE_frag-overlimit.py=	0555
 ${PACKAGE}FILESMODE_frag-overreplace.py=	0555
 ${PACKAGE}FILESMODE_pfsync_defer.py=	0555
 ${PACKAGE}FILESMODE_pft_ether.py=	0555
+${PACKAGE}FILESMODE_pft_read_ipfix.py=	0555
 
 .include <bsd.test.mk>
