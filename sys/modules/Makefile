@@ -320,6 +320,7 @@ SUBDIR=	\
 	proto \
 	pseudofs \
 	${_pst} \
+	${_pt} \
 	pty  \
 	puc \
 	pwm \
@@ -832,6 +833,7 @@ _iavf=		iavf
 _ioat=		ioat
 _ixl=		ixl
 _nvdimm=	nvdimm
+_pt=		pt
 _pms=		pms
 _qat=		qat
 .if ${MK_SOURCELESS_UCODE} != "no"
