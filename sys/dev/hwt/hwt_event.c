@@ -54,16 +54,15 @@ hwt_event_record_handler(void *arg, int pending __unused)
 	    ("%s: kqueue fd register failed: %d\n", __func__, ret));
 }
 
-
 int
-hwt_event_send(int ev_type, struct task *task, task_fn_t *handler, void *ctx)
+hwt_event_send(int ev_type, struct task *task, task_fn_t *handler, void *arg)
 {
 	int error;
 
 	/* TODO: validate event type - EINVAL */
 	if (ev_type == HWT_KQ_NEW_RECORD_EV)
 		handler = hwt_event_record_handler;
-	TASK_INIT(task, 0, handler, ctx);
+	TASK_INIT(task, 0, handler, arg);
 	error = taskqueue_enqueue(taskqueue_hwt, task);
 
 	return (error);
@@ -72,5 +71,6 @@ hwt_event_send(int ev_type, struct task *task, task_fn_t *handler, void *ctx)
 void
 hwt_event_drain_all(void)
 {
+
 	taskqueue_drain_all(taskqueue_hwt);
 }
