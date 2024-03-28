@@ -44,11 +44,11 @@ struct hwt_thread {
 	struct mtx			mtx;
 	u_int				refcnt;
 	int				cpu_id; /* last cpu_id */
-	void				*cookie; /* backend-specific private data */
+	void				*private; /* backend-specific private data */
 };
 
 /* Thread allocation. */
-int hwt_thread_alloc(struct hwt_context *ctx, struct hwt_thread **thr0, char *path, size_t bufsize,
+int hwt_thread_alloc(struct hwt_thread **thr0, char *path, size_t bufsize,
     int kva_req);
 void hwt_thread_free(struct hwt_thread *thr);
 

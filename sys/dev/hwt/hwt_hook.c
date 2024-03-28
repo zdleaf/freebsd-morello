@@ -236,7 +236,7 @@ hwt_hook_thread_create(struct thread *td)
 	hwt_ctx_put(ctx);
 
 	/* Step 2. Allocate some memory without holding ctx ref. */
-	error = hwt_thread_alloc(ctx, &thr, path, bufsize, kva_req);
+	error = hwt_thread_alloc(&thr, path, bufsize, kva_req);
 	if (error) {
 		printf("%s: could not allocate thread, error %d\n",
 		    __func__, error);
@@ -254,6 +254,13 @@ hwt_hook_thread_create(struct thread *td)
 		hwt_thread_free(thr);
 		/* ctx->thread_counter does not matter. */
 		return (ENXIO);
+	}
+	/* Allocate backend-specific thread data. */
+	error = hwt_backend_thread_alloc(ctx, thr);
+	if (error != 0) {
+		dprintf("%s: failed to allocate backend thread data\n",
+			    __func__);
+		return (error);
 	}
 
 	thr->vm->ctx = ctx;
