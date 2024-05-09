@@ -105,8 +105,9 @@ struct hwt_record_get {
 } __aligned(16);
 
 struct hwt_bufptr_get {
-	int		*curpage;
-	vm_offset_t	*curpage_offset;
+	int		*ident;
+	vm_offset_t	*offset;
+	uint64_t	*data;
 } __aligned(16);
 
 struct hwt_set_config {

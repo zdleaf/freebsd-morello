@@ -239,10 +239,11 @@ hwt_vm_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 	struct hwt_vm *vm;
 	struct hwt_owner *ho;
 
-	vm_offset_t curpage_offset;
+	vm_offset_t offset;
 	int cpu_id;
-	int curpage;
+	int ident;
 	int error;
+	uint64_t data = 0;
 
 	vm = dev->si_drv1;
 	KASSERT(vm != NULL, ("si_drv1 is NULL"));
@@ -318,18 +319,26 @@ hwt_vm_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 	case HWT_IOC_BUFPTR_GET:
 		ptr_get = (struct hwt_bufptr_get *)addr;
 
-		error = hwt_backend_read(ctx, vm, &curpage,
-		    &curpage_offset);
+		error = hwt_backend_read(ctx, vm, &ident, &offset, &data);
 		if (error)
 			return (error);
 
-		error = copyout(&curpage, ptr_get->curpage, sizeof(int));
+		if (ptr_get->ident)
+			error = copyout(&ident, ptr_get->ident, sizeof(int));
 		if (error)
 			return (error);
-		error = copyout(&curpage_offset, ptr_get->curpage_offset,
-		    sizeof(vm_offset_t));
+
+		if (ptr_get->offset)
+			error = copyout(&offset, ptr_get->offset,
+			    sizeof(vm_offset_t));
 		if (error)
 			return (error);
+
+		if (ptr_get->data)
+			error = copyout(&data, ptr_get->data, sizeof(uint64_t));
+		if (error)
+			return (error);
+
 		break;
 
 	case HWT_IOC_SVC_BUF:

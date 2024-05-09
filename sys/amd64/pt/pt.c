@@ -661,7 +661,8 @@ pt_backend_deinit(struct hwt_context *ctx)
  * Fetches current offset into the tracing buffer.
  */
 static int
-pt_backend_read(struct hwt_vm *vm, int *curpage, vm_offset_t *curpage_offset)
+pt_backend_read(struct hwt_vm *vm, int *curpage, vm_offset_t *curpage_offset,
+    uint64_t *data)
 {
 	struct pt_buffer *buf;
 

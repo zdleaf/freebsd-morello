@@ -39,8 +39,8 @@ struct hwt_backend_ops {
 	int (*hwt_backend_svc_buf)(struct hwt_context *, int cpu_id);
 	void (*hwt_backend_enable)(struct hwt_context *, int cpu_id);
 	void (*hwt_backend_disable)(struct hwt_context *, int cpu_id);
-	int (*hwt_backend_read)(struct hwt_vm *, int *curpage,
-	    vm_offset_t *curpage_offset);
+	int (*hwt_backend_read)(struct hwt_vm *, int *ident,
+	    vm_offset_t *offset, uint64_t *data);
 	void (*hwt_backend_stop)(struct hwt_context *);
 	/* For backends that are tied to local CPU registers */
 	void (*hwt_backend_enable_smp)(struct hwt_context *);
@@ -65,8 +65,8 @@ void hwt_backend_disable(struct hwt_context *ctx, int cpu_id);
 void hwt_backend_enable_smp(struct hwt_context *ctx);
 void hwt_backend_disable_smp(struct hwt_context *ctx);
 void hwt_backend_dump(struct hwt_context *ctx, int cpu_id);
-int hwt_backend_read(struct hwt_context *ctx, struct hwt_vm *vm, int *curpage,
-    vm_offset_t *curpage_offset);
+int hwt_backend_read(struct hwt_context *ctx, struct hwt_vm *vm, int *ident,
+    vm_offset_t *offset, uint64_t *data);
 int hwt_backend_register(struct hwt_backend *);
 int hwt_backend_unregister(struct hwt_backend *);
 void hwt_backend_stop(struct hwt_context *);
