@@ -304,8 +304,9 @@ usage(void)
 			" [-f name] [path to executable]\n"
 		"\t -s\tcpu_id\t\tCPU (kernel) mode.\n"
 		"\t -c\tname\t\tName of tracing device, e.g. 'coresight'.\n"
-		"\t -b\tbufsize\t\tSize of trace buffer (per each thread)"
-		    " in bytes.\n"
+		"\t -b\tbufsize\t\tSize of trace buffer (per each thread/cpu)\n"
+		"\t\t\t\tin bytes. Must be a multiple of page size\n"
+		"\t\t\t\te.g. 4096.\n"
 		"\t -t\tid\t\tThread index of application passed to decoder.\n"
 		"\t -r\t\t\tRaw flag. Do not decode results.\n"
 		"\t -w\tfilename\tStore results into file.\n"
@@ -398,7 +399,10 @@ hwt_mode_cpu(struct trace_context *tc)
 		printf("%s: failed to alloc cpu-mode ctx, error %d errno %d\n",
 		    __func__, error, errno);
 		if (errno == EPERM)
-			printf("Permission denied.");
+			printf("Permission denied");
+		else if (errno == EINVAL)
+			printf("Invalid argument: buffer size is not a multiple"
+			    " of page size, or is too small/large");
 		printf("\n");
 		return (error);
 	}
@@ -545,7 +549,10 @@ hwt_mode_thread(struct trace_context *tc, char **cmd, char **env)
 		       "error %d errno %d\n",
 		    __func__, error, errno);
 		if (errno == EPERM)
-			printf("Permission denied.");
+			printf("Permission denied");
+		else if (errno == EINVAL)
+			printf("Invalid argument: buffer size is not a multiple"
+			    " of page size, or is too small/large");
 		printf("\n");
 		return (error);
 	}
