@@ -26,6 +26,9 @@
  * SUCH DAMAGE.
  *
  */
+#include <sys/cdefs.h>
+#include "opt_inet.h"
+#include "opt_inet6.h"
 
 #include <sys/param.h>
 #include <sys/malloc.h>
@@ -529,7 +532,7 @@ nlattr_get_nested_pf_rule_labels(struct nlattr *nla, struct nl_pstate *npt, cons
 	if (error != 0)
 		return (error);
 
-	memcpy(target, parsed_labels.labels, sizeof(parsed_labels));
+	memcpy(target, parsed_labels.labels, sizeof(parsed_labels.labels));
 
 	return (0);
 }
@@ -982,7 +985,7 @@ pf_handle_getrule(struct nlmsghdr *hdr, struct nl_pstate *npt)
 	nlattr_add_u64(nw, PF_RT_STATES_TOTAL, counter_u64_fetch(rule->states_tot));
 	nlattr_add_u64(nw, PF_RT_SRC_NODES, counter_u64_fetch(rule->src_nodes));
 
-	error = pf_kanchor_copyout(ruleset, rule, anchor_call);
+	error = pf_kanchor_copyout(ruleset, rule, anchor_call, sizeof(anchor_call));
 	MPASS(error == 0);
 
 	nlattr_add_string(nw, PF_RT_ANCHOR_CALL, anchor_call);
@@ -1079,11 +1082,435 @@ pf_handle_kill_states(struct nlmsghdr *hdr, struct nl_pstate *npt)
 	return (pf_handle_killclear_states(hdr, npt, PFNL_CMD_KILLSTATES));
 }
 
+struct nl_parsed_set_statusif {
+	char ifname[IFNAMSIZ];
+};
+#define	_IN(_field)	offsetof(struct genlmsghdr, _field)
+#define	_OUT(_field)	offsetof(struct nl_parsed_set_statusif, _field)
+static const struct nlattr_parser nla_p_set_statusif[] = {
+	{ .type = PF_SS_IFNAME, .off = _OUT(ifname), .arg = (const void *)IFNAMSIZ, .cb = nlattr_get_chara },
+};
+static const struct nlfield_parser nlf_p_set_statusif[] = {};
+#undef _IN
+#undef _OUT
+NL_DECLARE_PARSER(set_statusif_parser, struct genlmsghdr, nlf_p_set_statusif, nla_p_set_statusif);
+
+static int
+pf_handle_set_statusif(struct nlmsghdr *hdr, struct nl_pstate *npt)
+{
+	int error;
+	struct nl_parsed_set_statusif attrs = {};
+
+	error = nl_parse_nlmsg(hdr, &set_statusif_parser, npt, &attrs);
+	if (error != 0)
+		return (error);
+
+	PF_RULES_WLOCK();
+	strlcpy(V_pf_status.ifname, attrs.ifname, IFNAMSIZ);
+	PF_RULES_WUNLOCK();
+
+	return (0);
+}
+
+static bool
+nlattr_add_counters(struct nl_writer *nw, int attr, size_t number, char **names,
+    counter_u64_t *counters)
+{
+	for (int i = 0; i < number; i++) {
+		int off = nlattr_add_nested(nw, attr);
+		nlattr_add_u32(nw, PF_C_ID, i);
+		nlattr_add_string(nw, PF_C_NAME, names[i]);
+		nlattr_add_u64(nw, PF_C_COUNTER, counter_u64_fetch(counters[i]));
+		nlattr_set_len(nw, off);
+	}
+
+	return (true);
+}
+
+static bool
+nlattr_add_fcounters(struct nl_writer *nw, int attr, size_t number, char **names,
+    struct pf_counter_u64 *counters)
+{
+	for (int i = 0; i < number; i++) {
+		int off = nlattr_add_nested(nw, attr);
+		nlattr_add_u32(nw, PF_C_ID, i);
+		nlattr_add_string(nw, PF_C_NAME, names[i]);
+		nlattr_add_u64(nw, PF_C_COUNTER, pf_counter_u64_fetch(&counters[i]));
+		nlattr_set_len(nw, off);
+	}
+
+	return (true);
+}
+
+static bool
+nlattr_add_u64_array(struct nl_writer *nw, int attr, size_t number, uint64_t *array)
+{
+	int off = nlattr_add_nested(nw, attr);
+
+	for (size_t i = 0; i < number; i++)
+		nlattr_add_u64(nw, 0, array[i]);
+
+	nlattr_set_len(nw, off);
+
+	return (true);
+}
+
+static int
+pf_handle_get_status(struct nlmsghdr *hdr, struct nl_pstate *npt)
+{
+	struct pf_status s;
+	struct nl_writer *nw = npt->nw;
+	struct genlmsghdr *ghdr_new;
+	char *pf_reasons[PFRES_MAX+1] = PFRES_NAMES;
+	char *pf_lcounter[KLCNT_MAX+1] = KLCNT_NAMES;
+	char *pf_fcounter[FCNT_MAX+1] = FCNT_NAMES;
+	int error;
+
+	PF_RULES_RLOCK_TRACKER;
+
+	if (!nlmsg_reply(nw, hdr, sizeof(struct genlmsghdr)))
+		return (ENOMEM);
+
+	ghdr_new = nlmsg_reserve_object(nw, struct genlmsghdr);
+	ghdr_new->cmd = PFNL_CMD_GET_STATUS;
+	ghdr_new->version = 0;
+	ghdr_new->reserved = 0;
+
+	PF_RULES_RLOCK();
+
+	nlattr_add_string(nw, PF_GS_IFNAME, V_pf_status.ifname);
+	nlattr_add_bool(nw, PF_GS_RUNNING, V_pf_status.running);
+	nlattr_add_u32(nw, PF_GS_SINCE, V_pf_status.since);
+	nlattr_add_u32(nw, PF_GS_DEBUG, V_pf_status.debug);
+	nlattr_add_u32(nw, PF_GS_HOSTID, ntohl(V_pf_status.hostid));
+	nlattr_add_u32(nw, PF_GS_STATES, V_pf_status.states);
+	nlattr_add_u32(nw, PF_GS_SRC_NODES, V_pf_status.src_nodes);
+	nlattr_add_u32(nw, PF_GS_REASSEMBLE, V_pf_status.reass);
+	nlattr_add_u32(nw, PF_GS_SYNCOOKIES_ACTIVE, V_pf_status.syncookies_active);
+
+	nlattr_add_counters(nw, PF_GS_COUNTERS, PFRES_MAX, pf_reasons,
+	    V_pf_status.counters);
+	nlattr_add_counters(nw, PF_GS_LCOUNTERS, KLCNT_MAX, pf_lcounter,
+	    V_pf_status.lcounters);
+	nlattr_add_fcounters(nw, PF_GS_FCOUNTERS, FCNT_MAX, pf_fcounter,
+	    V_pf_status.fcounters);
+	nlattr_add_counters(nw, PF_GS_SCOUNTERS, SCNT_MAX, pf_fcounter,
+	    V_pf_status.scounters);
+
+	pfi_update_status(V_pf_status.ifname, &s);
+	nlattr_add_u64_array(nw, PF_GS_BCOUNTERS, 2 * 2, (uint64_t *)s.bcounters);
+	nlattr_add_u64_array(nw, PF_GS_PCOUNTERS, 2 * 2 * 2, (uint64_t *)s.pcounters);
+
+	nlattr_add(nw, PF_GS_CHKSUM, PF_MD5_DIGEST_LENGTH, V_pf_status.pf_chksum);
+
+	PF_RULES_RUNLOCK();
+
+	if (!nlmsg_end(nw)) {
+		error = ENOMEM;
+		goto out;
+	}
+
+	return (0);
+
+out:
+	nlmsg_abort(nw);
+	return (error);
+}
+
+static int
+pf_handle_clear_status(struct nlmsghdr *hdr, struct nl_pstate *npt)
+{
+	pf_ioctl_clear_status();
+
+	return (0);
+}
+
+struct pf_nl_natlook {
+	sa_family_t af;
+	uint8_t direction;
+	uint8_t proto;
+	struct pf_addr src;
+	struct pf_addr dst;
+	uint16_t sport;
+	uint16_t dport;
+};
+
+#define	_IN(_field)	offsetof(struct genlmsghdr, _field)
+#define	_OUT(_field)	offsetof(struct pf_nl_natlook, _field)
+static const struct nlattr_parser nla_p_natlook[] = {
+	{ .type = PF_NL_AF, .off = _OUT(af), .cb = nlattr_get_uint8 },
+	{ .type = PF_NL_DIRECTION, .off = _OUT(direction), .cb = nlattr_get_uint8 },
+	{ .type = PF_NL_PROTO, .off = _OUT(proto), .cb = nlattr_get_uint8 },
+	{ .type = PF_NL_SRC_ADDR, .off = _OUT(src), .cb = nlattr_get_in6_addr },
+	{ .type = PF_NL_DST_ADDR, .off = _OUT(dst), .cb = nlattr_get_in6_addr },
+	{ .type = PF_NL_SRC_PORT, .off = _OUT(sport), .cb = nlattr_get_uint16 },
+	{ .type = PF_NL_DST_PORT, .off = _OUT(dport), .cb = nlattr_get_uint16 },
+};
+static const struct nlfield_parser nlf_p_natlook[] = {};
+#undef _IN
+#undef _OUT
+NL_DECLARE_PARSER(natlook_parser, struct genlmsghdr, nlf_p_natlook, nla_p_natlook);
+
+static int
+pf_handle_natlook(struct nlmsghdr *hdr, struct nl_pstate *npt)
+{
+	struct pf_nl_natlook	 attrs = {};
+	struct pf_state_key_cmp	 key = {};
+	struct nl_writer	*nw = npt->nw;
+	struct pf_state_key	*sk;
+	struct pf_kstate	*state;
+	struct genlmsghdr	*ghdr_new;
+	int			 error, m;
+	int			 sidx, didx;
+
+	error = nl_parse_nlmsg(hdr, &natlook_parser, npt, &attrs);
+	if (error != 0)
+		return (error);
+
+	if (attrs.proto == 0 ||
+	    PF_AZERO(&attrs.src, attrs.af) ||
+	    PF_AZERO(&attrs.dst, attrs.af) ||
+	    ((attrs.proto == IPPROTO_TCP || attrs.proto == IPPROTO_UDP) &&
+	     (attrs.sport == 0 || attrs.dport == 0)))
+		return (EINVAL);
+
+	/* NATLOOK src and dst are reversed, so reverse sidx/didx */
+	sidx = (attrs.direction == PF_IN) ? 1 : 0;
+	didx = (attrs.direction == PF_IN) ? 0 : 1;
+
+	key.af = attrs.af;
+	key.proto = attrs.proto;
+	PF_ACPY(&key.addr[sidx], &attrs.src, attrs.af);
+	key.port[sidx] = attrs.sport;
+	PF_ACPY(&key.addr[didx], &attrs.dst, attrs.af);
+	key.port[didx] = attrs.dport;
+
+	state = pf_find_state_all(&key, attrs.direction, &m);
+	if (state == NULL)
+		return (ENOENT);
+	if (m > 1) {
+		PF_STATE_UNLOCK(state);
+		return (E2BIG);
+	}
+
+	if (!nlmsg_reply(nw, hdr, sizeof(struct genlmsghdr))) {
+		PF_STATE_UNLOCK(state);
+		return (ENOMEM);
+	}
+
+	ghdr_new = nlmsg_reserve_object(nw, struct genlmsghdr);
+	ghdr_new->cmd = PFNL_CMD_NATLOOK;
+	ghdr_new->version = 0;
+	ghdr_new->reserved = 0;
+
+	sk = state->key[sidx];
+
+	nlattr_add_in6_addr(nw, PF_NL_SRC_ADDR, &sk->addr[sidx].v6);
+	nlattr_add_in6_addr(nw, PF_NL_DST_ADDR, &sk->addr[didx].v6);
+	nlattr_add_u16(nw, PF_NL_SRC_PORT, sk->port[sidx]);
+	nlattr_add_u16(nw, PF_NL_DST_PORT, sk->port[didx]);
+
+	PF_STATE_UNLOCK(state);
+
+	if (!nlmsg_end(nw)) {
+		nlmsg_abort(nw);
+		return (ENOMEM);
+	}
+
+	return (0);
+}
+
+struct pf_nl_set_debug
+{
+	uint32_t level;
+};
+#define	_OUT(_field)	offsetof(struct pf_nl_set_debug, _field)
+static const struct nlattr_parser nla_p_set_debug[] = {
+	{ .type = PF_SD_LEVEL, .off = _OUT(level), .cb = nlattr_get_uint32 },
+};
+static const struct nlfield_parser nlf_p_set_debug[] = {};
+#undef _OUT
+NL_DECLARE_PARSER(set_debug_parser, struct genlmsghdr, nlf_p_set_debug, nla_p_set_debug);
+
+static int
+pf_handle_set_debug(struct nlmsghdr *hdr, struct nl_pstate *npt)
+{
+	struct pf_nl_set_debug attrs = {};
+	int error;
+
+	error = nl_parse_nlmsg(hdr, &set_debug_parser, npt, &attrs);
+	if (error != 0)
+		return (error);
+
+	PF_RULES_WLOCK();
+	V_pf_status.debug = attrs.level;
+	PF_RULES_WUNLOCK();
+
+	return (0);
+}
+
+struct pf_nl_set_timeout
+{
+	uint32_t timeout;
+	uint32_t seconds;
+};
+#define	_OUT(_field)	offsetof(struct pf_nl_set_timeout, _field)
+static const struct nlattr_parser nla_p_set_timeout[] = {
+	{ .type = PF_TO_TIMEOUT, .off = _OUT(timeout), .cb = nlattr_get_uint32 },
+	{ .type = PF_TO_SECONDS, .off = _OUT(seconds), .cb = nlattr_get_uint32 },
+};
+static const struct nlfield_parser nlf_p_set_timeout[] = {};
+#undef _OUT
+NL_DECLARE_PARSER(set_timeout_parser, struct genlmsghdr, nlf_p_set_timeout, nla_p_set_timeout);
+
+static int
+pf_handle_set_timeout(struct nlmsghdr *hdr, struct nl_pstate *npt)
+{
+	struct pf_nl_set_timeout attrs = {};
+	int error;
+
+	error = nl_parse_nlmsg(hdr, &set_timeout_parser, npt, &attrs);
+	if (error != 0)
+		return (error);
+
+	return (pf_ioctl_set_timeout(attrs.timeout, attrs.seconds, NULL));
+}
+
+static int
+pf_handle_get_timeout(struct nlmsghdr *hdr, struct nl_pstate *npt)
+{
+	struct pf_nl_set_timeout attrs = {};
+	struct nl_writer *nw = npt->nw;
+	struct genlmsghdr *ghdr_new;
+	int error;
+
+	error = nl_parse_nlmsg(hdr, &set_timeout_parser, npt, &attrs);
+	if (error != 0)
+		return (error);
+
+	error = pf_ioctl_get_timeout(attrs.timeout, &attrs.seconds);
+	if (error != 0)
+		return (error);
+
+	if (!nlmsg_reply(nw, hdr, sizeof(struct genlmsghdr)))
+		return (ENOMEM);
+
+	ghdr_new = nlmsg_reserve_object(nw, struct genlmsghdr);
+	ghdr_new->cmd = PFNL_CMD_GET_TIMEOUT;
+	ghdr_new->version = 0;
+	ghdr_new->reserved = 0;
+
+	nlattr_add_u32(nw, PF_TO_SECONDS, attrs.seconds);
+
+	if (!nlmsg_end(nw)) {
+		nlmsg_abort(nw);
+		return (ENOMEM);
+	}
+
+	return (0);
+}
+
+struct pf_nl_set_limit
+{
+	uint32_t index;
+	uint32_t limit;
+};
+#define	_OUT(_field)	offsetof(struct pf_nl_set_limit, _field)
+static const struct nlattr_parser nla_p_set_limit[] = {
+	{ .type = PF_LI_INDEX, .off = _OUT(index), .cb = nlattr_get_uint32 },
+	{ .type = PF_LI_LIMIT, .off = _OUT(limit), .cb = nlattr_get_uint32 },
+};
+static const struct nlfield_parser nlf_p_set_limit[] = {};
+#undef _OUT
+NL_DECLARE_PARSER(set_limit_parser, struct genlmsghdr, nlf_p_set_limit, nla_p_set_limit);
+
+static int
+pf_handle_set_limit(struct nlmsghdr *hdr, struct nl_pstate *npt)
+{
+	struct pf_nl_set_limit attrs = {};
+	int error;
+
+	error = nl_parse_nlmsg(hdr, &set_limit_parser, npt, &attrs);
+	if (error != 0)
+		return (error);
+
+	return (pf_ioctl_set_limit(attrs.index, attrs.limit, NULL));
+}
+
+static int
+pf_handle_get_limit(struct nlmsghdr *hdr, struct nl_pstate *npt)
+{
+	struct pf_nl_set_limit attrs = {};
+	struct nl_writer *nw = npt->nw;
+	struct genlmsghdr *ghdr_new;
+	int error;
+
+	error = nl_parse_nlmsg(hdr, &set_limit_parser, npt, &attrs);
+	if (error != 0)
+		return (error);
+
+	error = pf_ioctl_get_limit(attrs.index, &attrs.limit);
+	if (error != 0)
+		return (error);
+
+	if (!nlmsg_reply(nw, hdr, sizeof(struct genlmsghdr)))
+		return (ENOMEM);
+
+	ghdr_new = nlmsg_reserve_object(nw, struct genlmsghdr);
+	ghdr_new->cmd = PFNL_CMD_GET_LIMIT;
+	ghdr_new->version = 0;
+	ghdr_new->reserved = 0;
+
+	nlattr_add_u32(nw, PF_LI_LIMIT, attrs.limit);
+
+	if (!nlmsg_end(nw)) {
+		nlmsg_abort(nw);
+		return (ENOMEM);
+	}
+
+	return (0);
+}
+
+static int
+pf_handle_begin_addrs(struct nlmsghdr *hdr, struct nl_pstate *npt)
+{
+	struct nl_writer *nw = npt->nw;
+	struct genlmsghdr *ghdr_new;
+	uint32_t ticket;
+	int error;
+
+	error = pf_ioctl_begin_addrs(&ticket);
+	if (error != 0)
+		return (error);
+
+	if (!nlmsg_reply(nw, hdr, sizeof(struct genlmsghdr)))
+		return (ENOMEM);
+
+	ghdr_new = nlmsg_reserve_object(nw, struct genlmsghdr);
+	ghdr_new->cmd = PFNL_CMD_BEGIN_ADDRS;
+	ghdr_new->version = 0;
+	ghdr_new->reserved = 0;
+
+	nlattr_add_u32(nw, PF_BA_TICKET, ticket);
+
+	if (!nlmsg_end(nw)) {
+		nlmsg_abort(nw);
+		return (ENOMEM);
+	}
+
+	return (0);
+}
+
 static const struct nlhdr_parser *all_parsers[] = {
 	&state_parser,
 	&addrule_parser,
 	&getrules_parser,
 	&clear_states_parser,
+	&set_statusif_parser,
+	&natlook_parser,
+	&set_debug_parser,
+	&set_timeout_parser,
+	&set_limit_parser,
 };
 
 static int family_id;
@@ -1149,6 +1576,76 @@ static const struct genl_cmd pf_cmds[] = {
 		.cmd_num = PFNL_CMD_KILLSTATES,
 		.cmd_name = "KILLSTATES",
 		.cmd_cb = pf_handle_kill_states,
+		.cmd_flags = GENL_CMD_CAP_DO | GENL_CMD_CAP_DUMP | GENL_CMD_CAP_HASPOL,
+		.cmd_priv = PRIV_NETINET_PF,
+	},
+	{
+		.cmd_num = PFNL_CMD_SET_STATUSIF,
+		.cmd_name = "SETSTATUSIF",
+		.cmd_cb = pf_handle_set_statusif,
+		.cmd_flags = GENL_CMD_CAP_DO | GENL_CMD_CAP_HASPOL,
+		.cmd_priv = PRIV_NETINET_PF,
+	},
+	{
+		.cmd_num = PFNL_CMD_GET_STATUS,
+		.cmd_name = "GETSTATUS",
+		.cmd_cb = pf_handle_get_status,
+		.cmd_flags = GENL_CMD_CAP_DUMP | GENL_CMD_CAP_HASPOL,
+		.cmd_priv = PRIV_NETINET_PF,
+	},
+	{
+		.cmd_num = PFNL_CMD_CLEAR_STATUS,
+		.cmd_name = "CLEARSTATUS",
+		.cmd_cb = pf_handle_clear_status,
+		.cmd_flags = GENL_CMD_CAP_DO | GENL_CMD_CAP_HASPOL,
+		.cmd_priv = PRIV_NETINET_PF,
+	},
+	{
+		.cmd_num = PFNL_CMD_NATLOOK,
+		.cmd_name = "NATLOOK",
+		.cmd_cb = pf_handle_natlook,
+		.cmd_flags = GENL_CMD_CAP_DUMP | GENL_CMD_CAP_HASPOL,
+		.cmd_priv = PRIV_NETINET_PF,
+	},
+	{
+		.cmd_num = PFNL_CMD_SET_DEBUG,
+		.cmd_name = "SET_DEBUG",
+		.cmd_cb = pf_handle_set_debug,
+		.cmd_flags = GENL_CMD_CAP_DO | GENL_CMD_CAP_HASPOL,
+		.cmd_priv = PRIV_NETINET_PF,
+	},
+	{
+		.cmd_num = PFNL_CMD_SET_TIMEOUT,
+		.cmd_name = "SET_TIMEOUT",
+		.cmd_cb = pf_handle_set_timeout,
+		.cmd_flags = GENL_CMD_CAP_DO | GENL_CMD_CAP_HASPOL,
+		.cmd_priv = PRIV_NETINET_PF,
+	},
+	{
+		.cmd_num = PFNL_CMD_GET_TIMEOUT,
+		.cmd_name = "GET_TIMEOUT",
+		.cmd_cb = pf_handle_get_timeout,
+		.cmd_flags = GENL_CMD_CAP_DUMP | GENL_CMD_CAP_HASPOL,
+		.cmd_priv = PRIV_NETINET_PF,
+	},
+	{
+		.cmd_num = PFNL_CMD_SET_LIMIT,
+		.cmd_name = "SET_LIMIT",
+		.cmd_cb = pf_handle_set_limit,
+		.cmd_flags = GENL_CMD_CAP_DO | GENL_CMD_CAP_HASPOL,
+		.cmd_priv = PRIV_NETINET_PF,
+	},
+	{
+		.cmd_num = PFNL_CMD_GET_LIMIT,
+		.cmd_name = "GET_LIMIT",
+		.cmd_cb = pf_handle_get_limit,
+		.cmd_flags = GENL_CMD_CAP_DUMP | GENL_CMD_CAP_HASPOL,
+		.cmd_priv = PRIV_NETINET_PF,
+	},
+	{
+		.cmd_num = PFNL_CMD_BEGIN_ADDRS,
+		.cmd_name = "BEGIN_ADDRS",
+		.cmd_cb = pf_handle_begin_addrs,
 		.cmd_flags = GENL_CMD_CAP_DO | GENL_CMD_CAP_DUMP | GENL_CMD_CAP_HASPOL,
 		.cmd_priv = PRIV_NETINET_PF,
 	},

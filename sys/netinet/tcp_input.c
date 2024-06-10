@@ -833,6 +833,7 @@ tcp_input_with_port(struct mbuf **mp, int *offp, int proto, uint16_t port)
 	    ((thflags & (TH_ACK|TH_SYN)) == TH_SYN ?
 	    INPLOOKUP_RLOCKPCB : INPLOOKUP_WLOCKPCB);
 findpcb:
+	tp = NULL;
 #ifdef INET6
 	if (isipv6 && fwd_tag != NULL) {
 		struct sockaddr_in6 *next_hop6;
@@ -915,23 +916,6 @@ findpcb:
 				log(LOG_INFO, "%s; %s: Connection attempt "
 				    "to closed port\n", s, __func__);
 		}
-		/*
-		 * When blackholing do not respond with a RST but
-		 * completely ignore the segment and drop it.
-		 */
-		if (((V_blackhole == 1 && (thflags & TH_SYN)) ||
-		    V_blackhole == 2) && (V_blackhole_local || (
-#ifdef INET6
-		    isipv6 ? !in6_localaddr(&ip6->ip6_src) :
-#endif
-#ifdef INET
-		    !in_localip(ip->ip_src)
-#else
-		    true
-#endif
-		    )))
-			goto dropunlock;
-
 		rstreason = BANDLIM_RST_CLOSEDPORT;
 		goto dropwithreset;
 	}
@@ -1410,15 +1394,27 @@ tfo_socket_result:
 	return (IPPROTO_DONE);
 
 dropwithreset:
+	/*
+	 * When blackholing do not respond with a RST but
+	 * completely ignore the segment and drop it.
+	 */
+	if (((rstreason == BANDLIM_RST_OPENPORT && V_blackhole == 3) ||
+	    (rstreason == BANDLIM_RST_CLOSEDPORT &&
+	    ((V_blackhole == 1 && (thflags & TH_SYN)) || V_blackhole > 1))) &&
+	    (V_blackhole_local || (
+#ifdef INET6
+	    isipv6 ? !in6_localaddr(&ip6->ip6_src) :
+#endif
+#ifdef INET
+	    !in_localip(ip->ip_src)
+#else
+	    true
+#endif
+	    )))
+		goto dropunlock;
 	TCP_PROBE5(receive, NULL, tp, m, tp, th);
-
-	if (inp != NULL) {
-		tcp_dropwithreset(m, th, tp, tlen, rstreason);
-		INP_UNLOCK(inp);
-	} else
-		tcp_dropwithreset(m, th, NULL, tlen, rstreason);
+	tcp_dropwithreset(m, th, tp, tlen, rstreason);
 	m = NULL;	/* mbuf chain got consumed. */
-	goto drop;
 
 dropunlock:
 	if (m != NULL)
@@ -1615,7 +1611,14 @@ tcp_do_segment(struct tcpcb *tp, struct mbuf *m, struct tcphdr *th,
 	tcp_dooptions(&to, (u_char *)(th + 1),
 	    (th->th_off << 2) - sizeof(struct tcphdr),
 	    (thflags & TH_SYN) ? TO_SYN : 0);
-
+	if (tp->t_flags2 & TF2_PROC_SACK_PROHIBIT) {
+		/*
+		 * We don't look at sack's from the
+		 * peer because the MSS is too small which
+		 * can subject us to an attack.
+		 */
+		to.to_flags &= ~TOF_SACK;
+	}
 #if defined(IPSEC_SUPPORT) || defined(TCP_SIGNATURE)
 	if ((tp->t_flags & TF_SIGNATURE) != 0 &&
 	    (to.to_flags & TOF_SIGNATURE) == 0) {
@@ -1680,7 +1683,7 @@ tcp_do_segment(struct tcpcb *tp, struct mbuf *m, struct tcphdr *th,
 		    (tp->t_flags & TF_NOOPT))) {
 			tp->t_flags &= ~TF_SACK_PERMIT;
 		}
-		if (IS_FASTOPEN(tp->t_flags)) {
+		if (tp->t_flags & TF_FASTOPEN) {
 			if ((to.to_flags & TOF_FASTOPEN) &&
 			    !(tp->t_flags & TF_NOOPT)) {
 				uint16_t mss;
@@ -1955,7 +1958,7 @@ tcp_do_segment(struct tcpcb *tp, struct mbuf *m, struct tcphdr *th,
 				tp->t_flags |= TF_DELACK;
 			} else {
 				tp->t_flags |= TF_ACKNOW;
-				tcp_output(tp);
+				(void) tcp_output(tp);
 			}
 			goto check_delack;
 		}
@@ -1989,7 +1992,7 @@ tcp_do_segment(struct tcpcb *tp, struct mbuf *m, struct tcphdr *th,
 				tcp_log_end_status(tp, TCP_EI_STATUS_RST_IN_FRONT);
 				goto dropwithreset;
 		}
-		if (IS_FASTOPEN(tp->t_flags)) {
+		if (tp->t_flags & TF_FASTOPEN) {
 			/*
 			 * When a TFO connection is in SYN_RECEIVED, the
 			 * only valid packets are the initial SYN, a
@@ -2063,7 +2066,7 @@ tcp_do_segment(struct tcpcb *tp, struct mbuf *m, struct tcphdr *th,
 			 * If not all the data that was sent in the TFO SYN
 			 * has been acked, resend the remainder right away.
 			 */
-			if (IS_FASTOPEN(tp->t_flags) &&
+			if ((tp->t_flags & TF_FASTOPEN) &&
 			    (tp->snd_una != tp->snd_max)) {
 				tp->snd_nxt = th->th_ack;
 				tfo_partial_ack = 1;
@@ -2337,9 +2340,11 @@ tcp_do_segment(struct tcpcb *tp, struct mbuf *m, struct tcphdr *th,
 
 	/*
 	 * If new data are received on a connection after the
-	 * user processes are gone, then RST the other end.
+	 * user processes are gone, then RST the other end if
+	 * no FIN has been processed.
 	 */
-	if ((tp->t_flags & TF_CLOSED) && tlen) {
+	if ((tp->t_flags & TF_CLOSED) && tlen > 0 &&
+	    TCPS_HAVERCVDFIN(tp->t_state) == 0) {
 		if ((s = tcp_log_addrs(inc, th, NULL, NULL))) {
 			log(LOG_DEBUG, "%s; %s: %s: Received %d bytes of data "
 			    "after socket was closed, "
@@ -2419,7 +2424,7 @@ tcp_do_segment(struct tcpcb *tp, struct mbuf *m, struct tcphdr *th,
 		if (tp->t_state == TCPS_SYN_RECEIVED ||
 		    (tp->t_flags & TF_NEEDSYN)) {
 			if (tp->t_state == TCPS_SYN_RECEIVED &&
-			    IS_FASTOPEN(tp->t_flags)) {
+			    (tp->t_flags & TF_FASTOPEN)) {
 				tp->snd_wnd = tiwin;
 				cc_conn_init(tp);
 			}
@@ -2467,7 +2472,7 @@ tcp_do_segment(struct tcpcb *tp, struct mbuf *m, struct tcphdr *th,
 		 *      SYN-RECEIVED* -> FIN-WAIT-1
 		 */
 		tp->t_starttime = ticks;
-		if (IS_FASTOPEN(tp->t_flags) && tp->t_tfo_pending) {
+		if ((tp->t_flags & TF_FASTOPEN) && tp->t_tfo_pending) {
 			tcp_fastopen_decrement_counter(tp->t_tfo_pending);
 			tp->t_tfo_pending = NULL;
 		}
@@ -2486,7 +2491,7 @@ tcp_do_segment(struct tcpcb *tp, struct mbuf *m, struct tcphdr *th,
 			 * snd_cwnd reduction that occurs when a TFO SYN|ACK
 			 * is retransmitted.
 			 */
-			if (!IS_FASTOPEN(tp->t_flags))
+			if (!(tp->t_flags & TF_FASTOPEN))
 				cc_conn_init(tp);
 			tcp_timer_activate(tp, TT_KEEP, TP_KEEPIDLE(tp));
 		}
@@ -3167,7 +3172,7 @@ dodata:							/* XXX */
 	 * connection then we just ignore the text.
 	 */
 	tfo_syn = ((tp->t_state == TCPS_SYN_RECEIVED) &&
-		   IS_FASTOPEN(tp->t_flags));
+	    (tp->t_flags & TF_FASTOPEN));
 	if ((tlen || (thflags & TH_FIN) || (tfo_syn && tlen > 0)) &&
 	    TCPS_HAVERCVDFIN(tp->t_state) == 0) {
 		tcp_seq save_start = th->th_seq;
@@ -3272,6 +3277,35 @@ dodata:							/* XXX */
 			len = so->so_rcv.sb_hiwat;
 #endif
 	} else {
+		if ((s = tcp_log_addrs(inc, th, NULL, NULL))) {
+			if (tlen > 0) {
+				if ((thflags & TH_FIN) != 0) {
+					log(LOG_DEBUG, "%s; %s: %s: "
+					    "Received %d bytes of data and FIN "
+					    "after having received a FIN, "
+					    "just dropping both\n",
+					    s, __func__,
+					    tcpstates[tp->t_state], tlen);
+				} else {
+					log(LOG_DEBUG, "%s; %s: %s: "
+					    "Received %d bytes of data "
+					    "after having received a FIN, "
+					    "just dropping it\n",
+					    s, __func__,
+					    tcpstates[tp->t_state], tlen);
+				}
+			} else {
+				if ((thflags & TH_FIN) != 0) {
+					log(LOG_DEBUG, "%s; %s: %s: "
+					    "Received FIN "
+					    "after having received a FIN, "
+					    "just dropping it\n",
+					    s, __func__,
+					    tcpstates[tp->t_state]);
+				}
+			}
+			free(s, M_TCPLOG);
+		}
 		m_freem(m);
 		thflags &= ~TH_FIN;
 	}
@@ -3852,6 +3886,17 @@ tcp_mss_update(struct tcpcb *tp, int offer, int mtuoffer,
 	mss = max(mss, 64);
 
 	tp->t_maxseg = mss;
+	if (tp->t_maxseg < V_tcp_mssdflt) {
+		/*
+		 * The MSS is so small we should not process incoming
+		 * SACK's since we are subject to attack in such a
+		 * case.
+		 */
+		tp->t_flags2 |= TF2_PROC_SACK_PROHIBIT;
+	} else {
+		tp->t_flags2 &= ~TF2_PROC_SACK_PROHIBIT;
+	}
+
 }
 
 void
@@ -3903,6 +3948,16 @@ tcp_mss(struct tcpcb *tp, int offer)
 	 * XXXGL: shouldn't we reserve space for IP/IPv6 options?
 	 */
 	tp->t_maxseg = max(mss, 64);
+	if (tp->t_maxseg < V_tcp_mssdflt) {
+		/*
+		 * The MSS is so small we should not process incoming
+		 * SACK's since we are subject to attack in such a
+		 * case.
+		 */
+		tp->t_flags2 |= TF2_PROC_SACK_PROHIBIT;
+	} else {
+		tp->t_flags2 &= ~TF2_PROC_SACK_PROHIBIT;
+	}
 
 	SOCKBUF_LOCK(&so->so_rcv);
 	if ((so->so_rcv.sb_hiwat == V_tcp_recvspace) && metrics.rmx_recvpipe)

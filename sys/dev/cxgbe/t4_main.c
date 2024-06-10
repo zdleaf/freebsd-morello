@@ -412,6 +412,15 @@ SYSCTL_INT(_hw_cxgbe_toe_rexmt_backoff, OID_AUTO, 14, CTLFLAG_RDTUN,
     &t4_toe_rexmt_backoff[14], 0, "");
 SYSCTL_INT(_hw_cxgbe_toe_rexmt_backoff, OID_AUTO, 15, CTLFLAG_RDTUN,
     &t4_toe_rexmt_backoff[15], 0, "");
+
+int t4_ddp_rcvbuf_len = 256 * 1024;
+SYSCTL_INT(_hw_cxgbe_toe, OID_AUTO, ddp_rcvbuf_len, CTLFLAG_RWTUN,
+    &t4_ddp_rcvbuf_len, 0, "length of each DDP RX buffer");
+
+unsigned int t4_ddp_rcvbuf_cache = 4;
+SYSCTL_UINT(_hw_cxgbe_toe, OID_AUTO, ddp_rcvbuf_cache, CTLFLAG_RWTUN,
+    &t4_ddp_rcvbuf_cache, 0,
+    "maximum number of free DDP RX buffers to cache per connection");
 #endif
 
 #ifdef DEV_NETMAP
@@ -1324,7 +1333,6 @@ t4_attach(device_t dev)
 		rc = partition_resources(sc);
 		if (rc != 0)
 			goto done; /* error message displayed already */
-		t4_intr_clear(sc);
 	}
 
 	rc = get_params__post_init(sc);
@@ -1393,13 +1401,10 @@ t4_attach(device_t dev)
 		 * depends on the link settings which will be known when the
 		 * link comes up.
 		 */
-		if (is_t6(sc)) {
+		if (is_t6(sc))
 			pi->fcs_reg = -1;
-		} else if (is_t4(sc)) {
-			pi->fcs_reg = PORT_REG(pi->tx_chan,
-			    A_MPS_PORT_STAT_RX_PORT_CRC_ERROR_L);
-		} else {
-			pi->fcs_reg = T5_PORT_REG(pi->tx_chan,
+		else {
+			pi->fcs_reg = t4_port_reg(sc, pi->tx_chan,
 			    A_MPS_PORT_STAT_RX_PORT_CRC_ERROR_L);
 		}
 		pi->fcs_base = 0;
@@ -2283,7 +2288,6 @@ t4_resume(device_t dev)
 		rc = partition_resources(sc);
 		if (rc != 0)
 			goto done; /* error message displayed already */
-		t4_intr_clear(sc);
 	}
 
 	rc = get_params__post_init(sc);
@@ -2518,11 +2522,9 @@ reset_adapter_task(void *arg, int pending)
 static int
 cxgbe_probe(device_t dev)
 {
-	char buf[128];
 	struct port_info *pi = device_get_softc(dev);
 
-	snprintf(buf, sizeof(buf), "port %d", pi->port_id);
-	device_set_desc_copy(dev, buf);
+	device_set_descf(dev, "port %d", pi->port_id);
 
 	return (BUS_PROBE_DEFAULT);
 }
@@ -3495,12 +3497,10 @@ done:
 static int
 vcxgbe_probe(device_t dev)
 {
-	char buf[128];
 	struct vi_info *vi = device_get_softc(dev);
 
-	snprintf(buf, sizeof(buf), "port %d vi %td", vi->pi->port_id,
+	device_set_descf(dev, "port %d vi %td", vi->pi->port_id,
 	    vi - vi->pi->vi);
-	device_set_desc_copy(dev, buf);
 
 	return (BUS_PROBE_DEFAULT);
 }
@@ -3900,6 +3900,9 @@ rw_via_memwin(struct adapter *sc, int idx, uint32_t addr, uint32_t *val,
 
 	return (0);
 }
+
+CTASSERT(M_TID_COOKIE == M_COOKIE);
+CTASSERT(MAX_ATIDS <= (M_TID_TID + 1));
 
 static void
 t4_init_atid_table(struct adapter *sc)
@@ -5310,9 +5313,13 @@ get_params__post_init(struct adapter *sc)
 	}
 
 	/*
-	 * MPSBGMAP is queried separately because only recent firmwares support
-	 * it as a parameter and we don't want the compound query above to fail
-	 * on older firmwares.
+	 * The parameters that follow may not be available on all firmwares.  We
+	 * query them individually rather than in a compound query because old
+	 * firmwares fail the entire query if an unknown parameter is queried.
+	 */
+
+	/*
+	 * MPS buffer group configuration.
 	 */
 	param[0] = FW_PARAM_DEV(MPSBGMAP);
 	val[0] = 0;
@@ -5320,11 +5327,18 @@ get_params__post_init(struct adapter *sc)
 	if (rc == 0)
 		sc->params.mps_bg_map = val[0];
 	else
-		sc->params.mps_bg_map = 0;
+		sc->params.mps_bg_map = UINT32_MAX;	/* Not a legal value. */
+
+	param[0] = FW_PARAM_DEV(TPCHMAP);
+	val[0] = 0;
+	rc = -t4_query_params(sc, sc->mbox, sc->pf, 0, 1, param, val);
+	if (rc == 0)
+		sc->params.tp_ch_map = val[0];
+	else
+		sc->params.tp_ch_map = UINT32_MAX;	/* Not a legal value. */
 
 	/*
 	 * Determine whether the firmware supports the filter2 work request.
-	 * This is queried separately for the same reason as MPSBGMAP above.
 	 */
 	param[0] = FW_PARAM_DEV(FILTER2_WR);
 	val[0] = 0;
@@ -5336,7 +5350,6 @@ get_params__post_init(struct adapter *sc)
 
 	/*
 	 * Find out whether we're allowed to use the ULPTX MEMWRITE DSGL.
-	 * This is queried separately for the same reason as other params above.
 	 */
 	param[0] = FW_PARAM_DEV(ULPTX_MEMWRITE_DSGL);
 	val[0] = 0;
@@ -5751,12 +5764,9 @@ set_params__post_init(struct adapter *sc)
 static void
 t4_set_desc(struct adapter *sc)
 {
-	char buf[128];
 	struct adapter_params *p = &sc->params;
 
-	snprintf(buf, sizeof(buf), "Chelsio %s", p->vpd.id);
-
-	device_set_desc_copy(sc->dev, buf);
+	device_set_descf(sc->dev, "Chelsio %s", p->vpd.id);
 }
 
 static inline void
@@ -6653,7 +6663,8 @@ adapter_full_init(struct adapter *sc)
 	if (rc != 0)
 		return (rc);
 
-	for (i = 0; i < nitems(sc->tq); i++) {
+	MPASS(sc->params.nports <= nitems(sc->tq));
+	for (i = 0; i < sc->params.nports; i++) {
 		if (sc->tq[i] != NULL)
 			continue;
 		sc->tq[i] = taskqueue_create("t4 taskq", M_NOWAIT,
@@ -6702,7 +6713,9 @@ adapter_full_uninit(struct adapter *sc)
 
 	t4_teardown_adapter_queues(sc);
 
-	for (i = 0; i < nitems(sc->tq) && sc->tq[i]; i++) {
+	for (i = 0; i < nitems(sc->tq); i++) {
+		if (sc->tq[i] == NULL)
+			continue;
 		taskqueue_free(sc->tq[i]);
 		sc->tq[i] = NULL;
 	}
@@ -7960,8 +7973,10 @@ cxgbe_sysctls(struct port_info *pi)
 	    pi->mps_bg_map, "MPS buffer group map");
 	SYSCTL_ADD_INT(ctx, children, OID_AUTO, "rx_e_chan_map", CTLFLAG_RD,
 	    NULL, pi->rx_e_chan_map, "TP rx e-channel map");
-	SYSCTL_ADD_INT(ctx, children, OID_AUTO, "rx_c_chan", CTLFLAG_RD, NULL,
-	    pi->rx_c_chan, "TP rx c-channel");
+	SYSCTL_ADD_INT(ctx, children, OID_AUTO, "tx_chan", CTLFLAG_RD, NULL,
+	    pi->tx_chan, "TP tx c-channel");
+	SYSCTL_ADD_INT(ctx, children, OID_AUTO, "rx_chan", CTLFLAG_RD, NULL,
+	    pi->rx_chan, "TP rx c-channel");
 
 	if (sc->flags & IS_VF)
 		return;
@@ -8011,9 +8026,8 @@ cxgbe_sysctls(struct port_info *pi)
 
 #define T4_REGSTAT(name, stat, desc) \
     SYSCTL_ADD_OID(ctx, children, OID_AUTO, #name, \
-        CTLTYPE_U64 | CTLFLAG_RD | CTLFLAG_MPSAFE, sc, \
-	(is_t4(sc) ? PORT_REG(pi->tx_chan, A_MPS_PORT_STAT_##stat##_L) : \
-	T5_PORT_REG(pi->tx_chan, A_MPS_PORT_STAT_##stat##_L)), \
+	CTLTYPE_U64 | CTLFLAG_RD | CTLFLAG_MPSAFE, sc, \
+	t4_port_reg(sc, pi->tx_chan, A_MPS_PORT_STAT_##stat##_L), \
         sysctl_handle_t4_reg64, "QU", desc)
 
 /* We get these from port_stats and they may be stale by up to 1s */
@@ -12046,6 +12060,10 @@ clear_stats(struct adapter *sc, u_int port_id)
 				ofld_rxq->rx_aio_ddp_octets = 0;
 				ofld_rxq->rx_toe_tls_records = 0;
 				ofld_rxq->rx_toe_tls_octets = 0;
+				ofld_rxq->rx_toe_ddp_octets = 0;
+				counter_u64_zero(ofld_rxq->ddp_buffer_alloc);
+				counter_u64_zero(ofld_rxq->ddp_buffer_reuse);
+				counter_u64_zero(ofld_rxq->ddp_buffer_free);
 			}
 #endif
 

@@ -45,6 +45,16 @@ enum {
 	PFNL_CMD_GETRULE = 7,
 	PFNL_CMD_CLRSTATES = 8,
 	PFNL_CMD_KILLSTATES = 9,
+	PFNL_CMD_SET_STATUSIF = 10,
+	PFNL_CMD_GET_STATUS = 11,
+	PFNL_CMD_CLEAR_STATUS = 12,
+	PFNL_CMD_NATLOOK = 13,
+	PFNL_CMD_SET_DEBUG = 14,
+	PFNL_CMD_SET_TIMEOUT = 15,
+	PFNL_CMD_GET_TIMEOUT = 16,
+	PFNL_CMD_SET_LIMIT = 17,
+	PFNL_CMD_GET_LIMIT = 18,
+	PFNL_CMD_BEGIN_ADDRS = 19,
 	__PFNL_CMD_MAX,
 };
 #define PFNL_CMD_MAX (__PFNL_CMD_MAX -1)
@@ -279,6 +289,71 @@ enum pf_clear_states_type_t {
 	PF_CS_KILL_MATCH	= 11, /* bool */
 	PF_CS_NAT		= 12, /* bool */
 	PF_CS_KILLED		= 13, /* u32 */
+};
+
+enum pf_set_statusif_types_t {
+	PF_SS_UNSPEC,
+	PF_SS_IFNAME		= 1, /* string */
+};
+
+enum pf_counter_types_t {
+	PF_C_UNSPEC,
+	PF_C_COUNTER		= 1, /* u64 */
+	PF_C_NAME		= 2, /* string */
+	PF_C_ID			= 3, /* u32 */
+};
+
+enum pf_get_status_types_t {
+	PF_GS_UNSPEC,
+	PF_GS_IFNAME		= 1, /* string */
+	PF_GS_RUNNING		= 2, /* bool */
+	PF_GS_SINCE		= 3, /* u32 */
+	PF_GS_DEBUG		= 4, /* u32 */
+	PF_GS_HOSTID		= 5, /* u32 */
+	PF_GS_STATES		= 6, /* u32 */
+	PF_GS_SRC_NODES		= 7, /* u32 */
+	PF_GS_REASSEMBLE	= 8, /* u32 */
+	PF_GS_SYNCOOKIES_ACTIVE	= 9, /* bool */
+	PF_GS_COUNTERS		= 10, /* nested, */
+	PF_GS_LCOUNTERS		= 11, /* nested, */
+	PF_GS_FCOUNTERS		= 12, /* nested, */
+	PF_GS_SCOUNTERS		= 13, /* nested, */
+	PF_GS_CHKSUM		= 14, /* byte array */
+	PF_GS_PCOUNTERS		= 15, /* u64 array */
+	PF_GS_BCOUNTERS		= 16, /* u64 array */
+};
+
+enum pf_natlook_types_t {
+	PF_NL_UNSPEC,
+	PF_NL_AF		= 1, /* u8 */
+	PF_NL_DIRECTION		= 2, /* u8 */
+	PF_NL_PROTO		= 3, /* u8 */
+	PF_NL_SRC_ADDR		= 4, /* in6_addr */
+	PF_NL_DST_ADDR		= 5, /* in6_addr */
+	PF_NL_SRC_PORT		= 6, /* u16 */
+	PF_NL_DST_PORT		= 7, /* u16 */
+};
+
+enum pf_set_debug_types_t {
+	PF_SD_UNSPEC,
+	PF_SD_LEVEL		= 1, /* u32 */
+};
+
+enum pf_timeout_types_t {
+	PF_TO_UNSPEC,
+	PF_TO_TIMEOUT		= 1, /* u32 */
+	PF_TO_SECONDS		= 2, /* u32 */
+};
+
+enum pf_limit_types_t {
+	PF_LI_UNSPEC,
+	PF_LI_INDEX		= 1, /* u32 */
+	PF_LI_LIMIT		= 2, /* u32 */
+};
+
+enum pf_begin_addrs_types_t {
+	PF_BA_UNSPEC,
+	PF_BA_TICKET		= 1, /* u32 */
 };
 
 #ifdef _KERNEL

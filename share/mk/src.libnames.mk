@@ -43,7 +43,9 @@ _INTERNALLIBS=	\
 		bsnmptools \
 		c_nossp_pic \
 		cron \
+		diff \
 		elftc \
+		fdt \
 		fifolog \
 		ifconfig \
 		ipf \
@@ -54,6 +56,7 @@ _INTERNALLIBS=	\
 		netbsd \
 		ntp \
 		ntpevent \
+		nvmf \
 		openbsd \
 		opts \
 		parse \
@@ -543,8 +546,14 @@ LDADD+=		${LDADD_${_l}}
 
 _LIB_OBJTOP?=	${OBJTOP}
 # INTERNALLIB definitions.
+LIBDIFFDIR=	${_LIB_OBJTOP}/lib/libdiff
+LIBDIFF?=	${LIBDIFFDIR}/libdiff${PIE_SUFFIX}.a
+
 LIBELFTCDIR=	${_LIB_OBJTOP}/lib/libelftc
 LIBELFTC?=	${LIBELFTCDIR}/libelftc${PIE_SUFFIX}.a
+
+LIBFDTDIR=	${_LIB_OBJTOP}/lib/libfdt
+LIBFDT?=	${LIBFDTDIR}/libfdt${PIE_SUFFIX}.a
 
 LIBLUADIR=	${_LIB_OBJTOP}/lib/liblua
 LIBLUA?=	${LIBLUADIR}/liblua${PIE_SUFFIX}.a
@@ -591,6 +600,9 @@ LIBNV?=		${LIBNVDIR}/libnv${PIE_SUFFIX}.a
 LIBISCSIUTILDIR=	${_LIB_OBJTOP}/lib/libiscsiutil
 LIBISCSIUTIL?=	${LIBISCSIUTILDIR}/libiscsiutil${PIE_SUFFIX}.a
 
+LIBNVMFDIR=	${_LIB_OBJTOP}/lib/libnvmf
+LIBNVMF?=	${LIBNVMFDIR}/libnvmf${PIE_SUFFIX}.a
+
 LIBTELNETDIR=	${_LIB_OBJTOP}/lib/libtelnet
 LIBTELNET?=	${LIBTELNETDIR}/libtelnet${PIE_SUFFIX}.a
 
@@ -609,7 +621,7 @@ LIBOPTS?=	${LIBOPTSDIR}/libopts${PIE_SUFFIX}.a
 LIBPARSEDIR=	${_LIB_OBJTOP}/usr.sbin/ntp/libparse
 LIBPARSE?=	${LIBPARSEDIR}/libparse${PIE_SUFFIX}.a
 
-LIBPFCTL=	${_LIB_OBJTOP}/lib/libpfctl
+LIBPFCTLDIR=	${_LIB_OBJTOP}/lib/libpfctl
 LIBPFCTL?=	${LIBPFCTLDIR}/libpfctl${PIE_SUFFIX}.a
 
 LIBLPRDIR=	${_LIB_OBJTOP}/usr.sbin/lpr/common_source

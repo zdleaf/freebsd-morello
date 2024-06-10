@@ -130,6 +130,10 @@ SDT_PROBE_DEFINE2(pf, ip, , bound_iface, "struct pf_kstate *",
     "struct pfi_kkif *");
 SDT_PROBE_DEFINE4(pf, sctp, multihome, test, "struct pfi_kkif *",
     "struct pf_krule *", "struct mbuf *", "int");
+SDT_PROBE_DEFINE2(pf, sctp, multihome, add, "uint32_t",
+    "struct pf_sctp_source *");
+SDT_PROBE_DEFINE3(pf, sctp, multihome, remove, "uint32_t",
+    "struct pf_kstate *", "struct pf_sctp_source *");
 
 SDT_PROBE_DEFINE3(pf, eth, test_rule, entry, "int", "struct ifnet *",
     "struct mbuf *");
@@ -723,14 +727,11 @@ pf_addrcpy(struct pf_addr *dst, struct pf_addr *src, sa_family_t af)
 	switch (af) {
 #ifdef INET
 	case AF_INET:
-		dst->addr32[0] = src->addr32[0];
+		memcpy(&dst->v4, &src->v4, sizeof(dst->v4));
 		break;
 #endif /* INET */
 	case AF_INET6:
-		dst->addr32[0] = src->addr32[0];
-		dst->addr32[1] = src->addr32[1];
-		dst->addr32[2] = src->addr32[2];
-		dst->addr32[3] = src->addr32[3];
+		memcpy(&dst->v6, &src->v6, sizeof(dst->v6));
 		break;
 	}
 }
@@ -1353,6 +1354,7 @@ keyattach:
 						    sk : NULL);
 						printf("\n");
 					}
+					s->timeout = PFTM_UNLINKED;
 					PF_HASHROW_UNLOCK(ih);
 					KEYS_UNLOCK();
 					uma_zfree(V_pf_state_key_z, sk);
@@ -1421,6 +1423,7 @@ pf_detach_state(struct pf_kstate *s)
 	struct pf_keyhash *kh;
 
 	NET_EPOCH_ASSERT();
+	MPASS(s->timeout >= PFTM_MAX);
 
 	pf_sctp_multihome_detach_addr(s);
 
@@ -1552,6 +1555,7 @@ pf_state_insert(struct pfi_kkif *kif, struct pfi_kkif *orig_kif,
 			break;
 
 	if (cur != NULL) {
+		s->timeout = PFTM_UNLINKED;
 		PF_HASHROW_UNLOCK(ih);
 		if (V_pf_status.debug >= PF_DEBUG_MISC) {
 			printf("pf: state ID collision: "
@@ -3405,21 +3409,13 @@ pf_match_addr(u_int8_t n, struct pf_addr *a, struct pf_addr *m,
 	switch (af) {
 #ifdef INET
 	case AF_INET:
-		if ((a->addr32[0] & m->addr32[0]) ==
-		    (b->addr32[0] & m->addr32[0]))
+		if (IN_ARE_MASKED_ADDR_EQUAL(a->v4, b->v4, m->v4))
 			match++;
 		break;
 #endif /* INET */
 #ifdef INET6
 	case AF_INET6:
-		if (((a->addr32[0] & m->addr32[0]) ==
-		     (b->addr32[0] & m->addr32[0])) &&
-		    ((a->addr32[1] & m->addr32[1]) ==
-		     (b->addr32[1] & m->addr32[1])) &&
-		    ((a->addr32[2] & m->addr32[2]) ==
-		     (b->addr32[2] & m->addr32[2])) &&
-		    ((a->addr32[3] & m->addr32[3]) ==
-		     (b->addr32[3] & m->addr32[3])))
+		if (IN6_ARE_MASKED_ADDR_EQUAL(&a->v6, &b->v6, &m->v6))
 			match++;
 		break;
 #endif /* INET6 */
@@ -6039,11 +6035,12 @@ pf_sctp_multihome_detach_addr(const struct pf_kstate *s)
 	key.v_tag = s->dst.scrub->pfss_v_tag;
 	ep  = RB_FIND(pf_sctp_endpoints, &V_pf_sctp_endpoints, &key);
 	if (ep != NULL) {
-		/* XXX Actually remove! */
 		TAILQ_FOREACH_SAFE(i, &ep->sources, entry, tmp) {
 			if (pf_addr_cmp(&i->addr,
 			    &s->key[PF_SK_WIRE]->addr[s->direction == PF_OUT],
 			    s->key[PF_SK_WIRE]->af) == 0) {
+				SDT_PROBE3(pf, sctp, multihome, remove,
+				    key.v_tag, s, i);
 				TAILQ_REMOVE(&ep->sources, i, entry);
 				free(i, M_PFTEMP);
 				break;
@@ -6064,6 +6061,8 @@ pf_sctp_multihome_detach_addr(const struct pf_kstate *s)
 			if (pf_addr_cmp(&i->addr,
 			    &s->key[PF_SK_WIRE]->addr[s->direction == PF_IN],
 			    s->key[PF_SK_WIRE]->af) == 0) {
+				SDT_PROBE3(pf, sctp, multihome, remove,
+				    key.v_tag, s, i);
 				TAILQ_REMOVE(&ep->sources, i, entry);
 				free(i, M_PFTEMP);
 				break;
@@ -6121,6 +6120,7 @@ pf_sctp_multihome_add_addr(struct pf_pdesc *pd, struct pf_addr *a, uint32_t v_ta
 	i->af = pd->af;
 	memcpy(&i->addr, a, sizeof(*a));
 	TAILQ_INSERT_TAIL(&ep->sources, i, entry);
+	SDT_PROBE2(pf, sctp, multihome, add, v_tag, i);
 
 	PF_SCTP_ENDPOINTS_UNLOCK();
 }
@@ -6196,7 +6196,7 @@ again:
 				break;
 			}
 
-			/* Only add the addres if we've actually allowed the state. */
+			/* Only add the address if we've actually allowed the state. */
 			pf_sctp_multihome_add_addr(pd, &j->src, v_tag);
 
 			if (! do_extra) {
@@ -7240,6 +7240,7 @@ pf_route(struct mbuf **m, struct pf_krule *r, struct ifnet *oifp,
 	struct pf_ksrc_node	*sn = NULL;
 	int			 error = 0;
 	uint16_t		 ip_len, ip_off;
+	uint16_t		 tmp;
 	int			 r_rt, r_dir;
 
 	KASSERT(m && *m && r && oifp, ("%s: invalid parameters", __func__));
@@ -7381,11 +7382,26 @@ pf_route(struct mbuf **m, struct pf_krule *r, struct ifnet *oifp,
 		m0->m_pkthdr.csum_flags &= ~CSUM_SCTP;
 	}
 
-	/*
-	 * Make sure dummynet gets the correct direction, in case it needs to
-	 * re-inject later.
-	 */
-	pd->dir = PF_OUT;
+	if (pd->dir == PF_IN) {
+		/*
+		 * Make sure dummynet gets the correct direction, in case it needs to
+		 * re-inject later.
+		 */
+		pd->dir = PF_OUT;
+
+		/*
+		 * The following processing is actually the rest of the inbound processing, even
+		 * though we've marked it as outbound (so we don't look through dummynet) and it
+		 * happens after the outbound processing (pf_test(PF_OUT) above).
+		 * Swap the dummynet pipe numbers, because it's going to come to the wrong
+		 * conclusion about what direction it's processing, and we can't fix it or it
+		 * will re-inject incorrectly. Swapping the pipe numbers means that its incorrect
+		 * decision will pick the right pipe, and everything will mostly work as expected.
+		 */
+		tmp = pd->act.dnrpipe;
+		pd->act.dnrpipe = pd->act.dnpipe;
+		pd->act.dnpipe = tmp;
+	}
 
 	/*
 	 * If small enough for interface, or the interface will take
@@ -7434,6 +7450,7 @@ pf_route(struct mbuf **m, struct pf_krule *r, struct ifnet *oifp,
 		if (error == 0) {
 			m_clrprotoflags(m0);
 			md = m0;
+			pd->pf_mtag = pf_find_mtag(md);
 			error = pf_dummynet_route(pd, s, r, ifp,
 			    sintosa(&dst), &md);
 			if (md != NULL)
@@ -7795,6 +7812,9 @@ pf_pdesc_to_dnflow(const struct pf_pdesc *pd, const struct pf_krule *r,
 		dndir = pd->dir;
 	}
 
+	if (pd->pf_mtag->flags & PF_MTAG_FLAG_DUMMYNETED)
+		return (false);
+
 	memset(dnflow, 0, sizeof(*dnflow));
 
 	if (pd->dport != NULL)
@@ -7934,8 +7954,24 @@ pf_dummynet_route(struct pf_pdesc *pd, struct pf_kstate *s,
 				    sizeof(struct sockaddr_in6));
 		}
 
+		if (s != NULL && s->nat_rule.ptr != NULL &&
+		    s->nat_rule.ptr->action == PF_RDR &&
+		    (
+#ifdef INET
+		    (pd->af == AF_INET && IN_LOOPBACK(ntohl(pd->dst->v4.s_addr))) ||
+#endif
+		    (pd->af == AF_INET6 && IN6_IS_ADDR_LOOPBACK(&pd->dst->v6)))) {
+			/*
+			 * If we're redirecting to loopback mark this packet
+			 * as being local. Otherwise it might get dropped
+			 * if dummynet re-injects.
+			 */
+			(*m0)->m_pkthdr.rcvif = V_loif;
+		}
+
 		if (pf_pdesc_to_dnflow(pd, r, s, &dnflow)) {
 			pd->pf_mtag->flags |= PF_MTAG_FLAG_DUMMYNET;
+			pd->pf_mtag->flags |= PF_MTAG_FLAG_DUMMYNETED;
 			ip_dn_io_ptr(m0, &dnflow);
 			if (*m0 != NULL) {
 				pd->pf_mtag->flags &= ~PF_MTAG_FLAG_ROUTE_TO;

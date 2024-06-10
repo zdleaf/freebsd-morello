@@ -718,10 +718,6 @@ nvme_ctrlr_async_event_log_page_cb(void *arg, const struct nvme_completion *cpl)
 			nvme_sanitize_status_page_swapbytes(
 			    (struct nvme_sanitize_status_page *)aer->log_page_buffer);
 			break;
-		case INTEL_LOG_TEMP_STATS:
-			intel_log_temp_stats_swapbytes(
-			    (struct intel_log_temp_stats *)aer->log_page_buffer);
-			break;
 		default:
 			break;
 		}
@@ -783,10 +779,11 @@ nvme_ctrlr_async_event_cb(void *arg, const struct nvme_completion *cpl)
 	}
 
 	/* Associated log page is in bits 23:16 of completion entry dw0. */
-	aer->log_page_id = (cpl->cdw0 & 0xFF0000) >> 16;
+	aer->log_page_id = NVMEV(NVME_ASYNC_EVENT_LOG_PAGE_ID, cpl->cdw0);
 
 	nvme_printf(aer->ctrlr, "async event occurred (type 0x%x, info 0x%02x,"
-	    " page 0x%02x)\n", (cpl->cdw0 & 0x07), (cpl->cdw0 & 0xFF00) >> 8,
+	    " page 0x%02x)\n", NVMEV(NVME_ASYNC_EVENT_TYPE, cpl->cdw0),
+	    NVMEV(NVME_ASYNC_EVENT_INFO, cpl->cdw0),
 	    aer->log_page_id);
 
 	if (is_log_page_id_valid(aer->log_page_id)) {
@@ -1337,9 +1334,8 @@ nvme_ctrlr_ioctl(struct cdev *cdev, u_long cmd, caddr_t arg, int flag,
 	case NVME_GET_NSID:
 	{
 		struct nvme_get_nsid *gnsid = (struct nvme_get_nsid *)arg;
-		strncpy(gnsid->cdev, device_get_nameunit(ctrlr->dev),
+		strlcpy(gnsid->cdev, device_get_nameunit(ctrlr->dev),
 		    sizeof(gnsid->cdev));
-		gnsid->cdev[sizeof(gnsid->cdev) - 1] = '\0';
 		gnsid->nsid = 0;
 		break;
 	}
@@ -1446,6 +1442,8 @@ nvme_ctrlr_construct(struct nvme_controller *ctrlr, device_t dev)
 	ctrlr->enable_aborts = 0;
 	TUNABLE_INT_FETCH("hw.nvme.enable_aborts", &ctrlr->enable_aborts);
 
+	ctrlr->alignment_splits = counter_u64_alloc(M_WAITOK);
+
 	/* Cap transfers by the maximum addressable by page-sized PRP (4KB pages -> 2MB). */
 	ctrlr->max_xfer_size = MIN(maxphys, (ctrlr->page_size / 8 * ctrlr->page_size));
 	if (nvme_ctrlr_construct_admin_qpair(ctrlr) != 0)
@@ -1480,8 +1478,8 @@ nvme_ctrlr_construct(struct nvme_controller *ctrlr, device_t dev)
 	md_args.mda_mode = 0600;
 	md_args.mda_unit = device_get_unit(dev);
 	md_args.mda_si_drv1 = (void *)ctrlr;
-	status = make_dev_s(&md_args, &ctrlr->cdev, "nvme%d",
-	    device_get_unit(dev));
+	status = make_dev_s(&md_args, &ctrlr->cdev, "%s",
+	    device_get_nameunit(dev));
 	if (status != 0)
 		return (ENXIO);
 
@@ -1564,6 +1562,9 @@ noadminq:
 	    ctrlr->resource_id, ctrlr->resource);
 
 nores:
+	if (ctrlr->alignment_splits)
+		counter_u64_free(ctrlr->alignment_splits);
+
 	mtx_destroy(&ctrlr->lock);
 }
 

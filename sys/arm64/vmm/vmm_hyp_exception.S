@@ -215,7 +215,10 @@ LENTRY(handle_hyp_init)
 	/* Load the base address for the translation tables */
 	msr	ttbr0_el2, x0
 	/* Invalidate the TLB */
+	dsb	ish
 	tlbi	alle2
+	dsb	ishst
+	isb
 	/* Use the same memory attributes as EL1 */
 	mrs	x9, mair_el1
 	msr	mair_el2, x9
@@ -329,7 +332,7 @@ LENTRY(handle_el2_el1_irq64)
 2:
 	ldr	x9, [sp], #16
 	ret
-LEND(handle_el2_el1_irq)
+LEND(handle_el2_el1_irq64)
 
 LENTRY(handle_el2_el1_fiq64)
 	do_world_switch_to_host

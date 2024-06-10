@@ -96,7 +96,7 @@
 #
 # Once you have installed the necessary cross toolchain, simply pass
 # CROSS_TOOLCHAIN=${TARGET_ARCH}-gccN while building with the above steps,
-# e.g., `make buildworld CROSS_TOOLCHAIN=amd64-gcc6`.
+# e.g., `make buildworld CROSS_TOOLCHAIN=amd64-gcc13`.
 #
 # The ${TARGET_ARCH}-gccN packages are provided as flavors of the
 # devel/freebsd-gccN ports.
@@ -232,6 +232,7 @@ META_TGT_WHITELIST+=	build${libcompat}
 .ORDER: buildkernel installkernel.debug
 .ORDER: buildkernel reinstallkernel
 .ORDER: buildkernel reinstallkernel.debug
+.ORDER: kernel-toolchain buildkernel
 
 # Only sanitize PATH on FreeBSD.
 # PATH may include tools that are required to cross-build

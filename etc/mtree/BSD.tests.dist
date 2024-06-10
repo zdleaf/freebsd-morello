@@ -419,6 +419,8 @@
         ..
         libdevdctl
         ..
+        libdiff
+        ..
         libexecinfo
         ..
         libkvm
@@ -1187,6 +1189,8 @@
         ..
         tftp
         ..
+        touch
+        ..
         tr
         ..
         truncate
@@ -1218,6 +1222,8 @@
     ..
     usr.sbin
         chown
+        ..
+        ctladm
         ..
         daemon
         ..

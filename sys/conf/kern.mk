@@ -6,7 +6,7 @@ CWARNFLAGS?=	-Wall -Wstrict-prototypes \
 		-Wmissing-prototypes -Wpointer-arith -Wcast-qual \
 		-Wundef -Wno-pointer-sign ${FORMAT_EXTENSIONS} \
 		-Wmissing-include-dirs -fdiagnostics-show-option \
-		-Wno-unknown-pragmas \
+		-Wno-unknown-pragmas -Wswitch \
 		${CWARNEXTRA}
 #
 # The following flags are next up for working on:
@@ -143,6 +143,8 @@ CFLAGS += -mgeneral-regs-only
 CFLAGS += -ffixed-x18
 # Build with BTI+PAC
 CFLAGS += -mbranch-protection=standard
+# TODO: support outline atomics
+CFLAGS += -mno-outline-atomics
 INLINE_LIMIT?=	8000
 .endif
 
@@ -284,14 +286,10 @@ PHONY_NOTMAIN = afterdepend afterinstall all beforedepend beforeinstall \
 
 CSTD?=		gnu99
 
-.if ${CSTD} == "k&r"
-CFLAGS+=        -traditional
-.elif ${CSTD} == "c89" || ${CSTD} == "c90"
-CFLAGS+=        -std=iso9899:1990
-.elif ${CSTD} == "c94" || ${CSTD} == "c95"
-CFLAGS+=        -std=iso9899:199409
-.elif ${CSTD} == "c99"
-CFLAGS+=        -std=iso9899:1999
+# c99/gnu99 is the minimum C standard version supported for kernel build
+.if ${CSTD} == "k&r" || ${CSTD} == "c89" || ${CSTD} == "c90" || \
+    ${CSTD} == "c94" || ${CSTD} == "c95"
+.error "Only c99/gnu99 or later is supported"
 .else # CSTD
 CFLAGS+=        -std=${CSTD}
 .endif # CSTD

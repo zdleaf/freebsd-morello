@@ -139,58 +139,6 @@ VNET_DEFINE(int, tcp_mssdflt) = TCP_MSS;
 VNET_DEFINE(int, tcp_v6mssdflt) = TCP6_MSS;
 #endif
 
-#ifdef TCP_SAD_DETECTION
-/*  Sack attack detection thresholds and such */
-SYSCTL_NODE(_net_inet_tcp, OID_AUTO, sack_attack,
-    CTLFLAG_RW | CTLFLAG_MPSAFE, 0,
-    "Sack Attack detection thresholds");
-int32_t tcp_force_detection = 0;
-SYSCTL_INT(_net_inet_tcp_sack_attack, OID_AUTO, force_detection,
-    CTLFLAG_RW,
-    &tcp_force_detection, 0,
-    "Do we force detection even if the INP has it off?");
-int32_t tcp_sad_limit = 10000;
-SYSCTL_INT(_net_inet_tcp_sack_attack, OID_AUTO, limit,
-    CTLFLAG_RW,
-    &tcp_sad_limit, 10000,
-    "If SaD is enabled, what is the limit to sendmap entries (0 = unlimited)?");
-int32_t tcp_sack_to_ack_thresh = 700;	/* 70 % */
-SYSCTL_INT(_net_inet_tcp_sack_attack, OID_AUTO, sack_to_ack_thresh,
-    CTLFLAG_RW,
-    &tcp_sack_to_ack_thresh, 700,
-    "Percentage of sacks to acks we must see above (10.1 percent is 101)?");
-int32_t tcp_sack_to_move_thresh = 600;	/* 60 % */
-SYSCTL_INT(_net_inet_tcp_sack_attack, OID_AUTO, move_thresh,
-    CTLFLAG_RW,
-    &tcp_sack_to_move_thresh, 600,
-    "Percentage of sack moves we must see above (10.1 percent is 101)");
-int32_t tcp_restoral_thresh = 450;	/* 45 % (sack:2:ack -25%) (mv:ratio -15%) **/
-SYSCTL_INT(_net_inet_tcp_sack_attack, OID_AUTO, restore_thresh,
-    CTLFLAG_RW,
-    &tcp_restoral_thresh, 450,
-    "Percentage of sack to ack percentage we must see below to restore(10.1 percent is 101)");
-int32_t tcp_sad_decay_val = 800;
-SYSCTL_INT(_net_inet_tcp_sack_attack, OID_AUTO, decay_per,
-    CTLFLAG_RW,
-    &tcp_sad_decay_val, 800,
-    "The decay percentage (10.1 percent equals 101 )");
-int32_t tcp_map_minimum = 500;
-SYSCTL_INT(_net_inet_tcp_sack_attack, OID_AUTO, nummaps,
-    CTLFLAG_RW,
-    &tcp_map_minimum, 500,
-    "Number of Map enteries before we start detection");
-int32_t tcp_sad_pacing_interval = 2000;
-SYSCTL_INT(_net_inet_tcp_sack_attack, OID_AUTO, sad_pacing_int,
-    CTLFLAG_RW,
-    &tcp_sad_pacing_interval, 2000,
-    "What is the minimum pacing interval for a classified attacker?");
-
-int32_t tcp_sad_low_pps = 100;
-SYSCTL_INT(_net_inet_tcp_sack_attack, OID_AUTO, sad_low_pps,
-    CTLFLAG_RW,
-    &tcp_sad_low_pps, 100,
-    "What is the input pps that below which we do not decay?");
-#endif
 uint32_t tcp_ack_war_time_window = 1000;
 SYSCTL_UINT(_net_inet_tcp, OID_AUTO, ack_war_timewindow,
     CTLFLAG_RW,
@@ -568,8 +516,7 @@ tcp_switch_back_to_default(struct tcpcb *tp)
 		tfb = NULL;
 	}
 	/* Does the stack accept this connection? */
-	if (tfb != NULL && tfb->tfb_tcp_handoff_ok != NULL &&
-	    (*tfb->tfb_tcp_handoff_ok)(tp)) {
+	if (tfb != NULL && (*tfb->tfb_tcp_handoff_ok)(tp)) {
 		refcount_release(&tfb->tfb_refcnt);
 		tfb = NULL;
 	}
@@ -603,11 +550,9 @@ tcp_switch_back_to_default(struct tcpcb *tp)
 		/* there always should be a default */
 		panic("Can't refer to tcp_def_funcblk");
 	}
-	if (tfb->tfb_tcp_handoff_ok != NULL) {
-		if ((*tfb->tfb_tcp_handoff_ok) (tp)) {
-			/* The default stack cannot say no */
-			panic("Default stack rejects a new session?");
-		}
+	if ((*tfb->tfb_tcp_handoff_ok)(tp)) {
+		/* The default stack cannot say no */
+		panic("Default stack rejects a new session?");
 	}
 	if (tfb->tfb_tcp_fb_init != NULL &&
 	    (*tfb->tfb_tcp_fb_init)(tp, &ptr)) {
@@ -1086,7 +1031,7 @@ tcp_default_fb_init(struct tcpcb *tp, void **ptr)
 	/* We don't use the pointer */
 	*ptr = NULL;
 
-	KASSERT(tp->t_state >= 0 && tp->t_state < TCPS_TIME_WAIT,
+	KASSERT(tp->t_state < TCPS_TIME_WAIT,
 	    ("%s: connection %p in unexpected state %d", __func__, tp,
 	    tp->t_state));
 
@@ -1238,6 +1183,7 @@ register_tcp_functions_as_names(struct tcp_function_block *blk, int wait,
 	if ((blk->tfb_tcp_output == NULL) ||
 	    (blk->tfb_tcp_do_segment == NULL) ||
 	    (blk->tfb_tcp_ctloutput == NULL) ||
+	    (blk->tfb_tcp_handoff_ok == NULL) ||
 	    (strlen(blk->tfb_tcp_block_name) == 0)) {
 		/*
 		 * These functions are required and you
@@ -1793,6 +1739,7 @@ tcpip_maketemplate(struct inpcb *inp)
  *
  * NOTE: If m != NULL, then th must point to *inside* the mbuf.
  */
+
 void
 tcp_respond(struct tcpcb *tp, void *ipgen, struct tcphdr *th, struct mbuf *m,
     tcp_seq ack, tcp_seq seq, uint16_t flags)
@@ -2395,9 +2342,8 @@ tcp_discardcb(struct tcpcb *tp)
 #endif
 
 	INP_WLOCK_ASSERT(inp);
+	MPASS(!callout_active(&tp->t_callout));
 	MPASS(TAILQ_EMPTY(&tp->snd_holes));
-
-	tcp_timer_stop(tp);
 
 	/* free the reassembly queue, if any */
 	tcp_reass_flush(tp);
@@ -3282,7 +3228,7 @@ tcp_drop_syn_sent(struct inpcb *inp, int errno)
 	if (tp->t_state != TCPS_SYN_SENT)
 		return (inp);
 
-	if (IS_FASTOPEN(tp->t_flags))
+	if (tp->t_flags & TF_FASTOPEN)
 		tcp_fastopen_disable_path(tp);
 
 	tp = tcp_drop(tp, errno);
@@ -3321,8 +3267,19 @@ tcp_mtudisc(struct inpcb *inp, int mtuoffer)
 	so = inp->inp_socket;
 	SOCKBUF_LOCK(&so->so_snd);
 	/* If the mss is larger than the socket buffer, decrease the mss. */
-	if (so->so_snd.sb_hiwat < tp->t_maxseg)
+	if (so->so_snd.sb_hiwat < tp->t_maxseg) {
 		tp->t_maxseg = so->so_snd.sb_hiwat;
+		if (tp->t_maxseg < V_tcp_mssdflt) {
+			/*
+			 * The MSS is so small we should not process incoming
+			 * SACK's since we are subject to attack in such a
+			 * case.
+			 */
+			tp->t_flags2 |= TF2_PROC_SACK_PROHIBIT;
+		} else {
+			tp->t_flags2 &= ~TF2_PROC_SACK_PROHIBIT;
+		}
+	}
 	SOCKBUF_UNLOCK(&so->so_snd);
 
 	TCPSTAT_INC(tcps_mturesent);
@@ -3455,8 +3412,19 @@ tcp6_use_min_mtu(struct tcpcb *tp)
 
 		opt = inp->in6p_outputopts;
 		if (opt != NULL && opt->ip6po_minmtu == IP6PO_MINMTU_ALL &&
-		    tp->t_maxseg > TCP6_MSS)
+		    tp->t_maxseg > TCP6_MSS) {
 			tp->t_maxseg = TCP6_MSS;
+			if (tp->t_maxseg < V_tcp_mssdflt) {
+				/*
+				 * The MSS is so small we should not process incoming
+				 * SACK's since we are subject to attack in such a
+				 * case.
+				 */
+				tp->t_flags2 |= TF2_PROC_SACK_PROHIBIT;
+			} else {
+				tp->t_flags2 &= ~TF2_PROC_SACK_PROHIBIT;
+			}
+		}
 	}
 }
 #endif /* INET6 */
@@ -3508,7 +3476,6 @@ tcp_maxseg(const struct tcpcb *tp)
 		if (tp->t_flags & TF_SACK_PERMIT)
 			optlen += PADTCPOLEN(TCPOLEN_SACK_PERMITTED);
 	}
-#undef PAD
 	optlen = min(optlen, TCP_MAXOLEN);
 	return (tp->t_maxseg - optlen);
 }
@@ -3530,7 +3497,6 @@ tcp_fixed_maxseg(const struct tcpcb *tp)
 	 * for cc modules to figure out what the modulo of the
 	 * cwnd should be.
 	 */
-#define	PAD(len)	((((len) / 4) + !!((len) % 4)) * 4)
 	if (TCPS_HAVEESTABLISHED(tp->t_state)) {
 		if (tp->t_flags & TF_RCVD_TSTMP)
 			optlen = TCPOLEN_TSTAMP_APPA;
@@ -3538,23 +3504,22 @@ tcp_fixed_maxseg(const struct tcpcb *tp)
 			optlen = 0;
 #if defined(IPSEC_SUPPORT) || defined(TCP_SIGNATURE)
 		if (tp->t_flags & TF_SIGNATURE)
-			optlen += PAD(TCPOLEN_SIGNATURE);
+			optlen += PADTCPOLEN(TCPOLEN_SIGNATURE);
 #endif
 	} else {
 		if (tp->t_flags & TF_REQ_TSTMP)
 			optlen = TCPOLEN_TSTAMP_APPA;
 		else
-			optlen = PAD(TCPOLEN_MAXSEG);
+			optlen = PADTCPOLEN(TCPOLEN_MAXSEG);
 		if (tp->t_flags & TF_REQ_SCALE)
-			optlen += PAD(TCPOLEN_WINDOW);
+			optlen += PADTCPOLEN(TCPOLEN_WINDOW);
 #if defined(IPSEC_SUPPORT) || defined(TCP_SIGNATURE)
 		if (tp->t_flags & TF_SIGNATURE)
-			optlen += PAD(TCPOLEN_SIGNATURE);
+			optlen += PADTCPOLEN(TCPOLEN_SIGNATURE);
 #endif
 		if (tp->t_flags & TF_SACK_PERMIT)
-			optlen += PAD(TCPOLEN_SACK_PERMITTED);
+			optlen += PADTCPOLEN(TCPOLEN_SACK_PERMITTED);
 	}
-#undef PAD
 	optlen = min(optlen, TCP_MAXOLEN);
 	return (tp->t_maxseg - optlen);
 }
@@ -3981,13 +3946,6 @@ tcp_inptoxtp(const struct inpcb *inp, struct xtcpcb *xt)
 
 	xt->xt_len = sizeof(struct xtcpcb);
 	in_pcbtoxinpcb(inp, &xt->xt_inp);
-	/*
-	 * TCP doesn't use inp_ppcb pointer, we embed inpcb into tcpcb.
-	 * Fixup the pointer that in_pcbtoxinpcb() has set.  When printing
-	 * TCP netstat(1) used to use this pointer, so this fixup needs to
-	 * stay for stable/14.
-	 */
-	xt->xt_inp.inp_ppcb = (uintptr_t)tp;
 }
 
 void
@@ -4248,19 +4206,19 @@ tcp_change_time_units(struct tcpcb *tp, int granularity)
 			uint32_t val, frac;
 
 			val = USEC_2_TICKS(tp->t_rttvar);
-			frac = tp->t_srtt % (HPTS_USEC_IN_SEC / hz);
+			frac = tp->t_rttvar % (HPTS_USEC_IN_SEC / hz);
 			tp->t_rttvar = val <<  TCP_RTTVAR_SHIFT;
 			/*
 			 * frac is the fractional part here is left
 			 * over from converting to hz and shifting.
-			 * We need to convert this to the 5 bit
+			 * We need to convert this to the 4 bit
 			 * remainder.
 			 */
 			if (frac) {
 				if (hz == 1000) {
-					frac = (((uint64_t)frac *  (uint64_t)TCP_RTT_SCALE) / (uint64_t)HPTS_USEC_IN_MSEC);
+					frac = (((uint64_t)frac *  (uint64_t)TCP_RTTVAR_SCALE) / (uint64_t)HPTS_USEC_IN_MSEC);
 				} else {
-					frac = (((uint64_t)frac * (uint64_t)(hz) * (uint64_t)TCP_RTT_SCALE) /(uint64_t)HPTS_USEC_IN_SEC);
+					frac = (((uint64_t)frac * (uint64_t)(hz) * (uint64_t)TCP_RTTVAR_SCALE) /(uint64_t)HPTS_USEC_IN_SEC);
 				}
 				tp->t_rttvar += frac;
 			}

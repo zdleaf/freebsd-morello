@@ -179,12 +179,6 @@ tcp_usr_attach(struct socket *so, int proto, struct thread *td)
 		goto out;
 	}
 	tp->t_state = TCPS_CLOSED;
-	/* Can we inherit anything from the listener? */
-	if ((so->so_listen != NULL) &&
-	    (so->so_listen->so_pcb != NULL) &&
-	    (tp->t_fb->tfb_inherit != NULL)) {
-		(*tp->t_fb->tfb_inherit)(tp, sotoinpcb(so->so_listen));
-	}
 	tcp_bblog_pru(tp, PRU_ATTACH, error);
 	INP_WUNLOCK(inp);
 	TCPSTATES_INC(TCPS_CLOSED);
@@ -397,7 +391,7 @@ tcp_usr_listen(struct socket *so, int backlog, struct thread *td)
 	}
 	SOCK_UNLOCK(so);
 
-	if (IS_FASTOPEN(tp->t_flags))
+	if (tp->t_flags & TF_FASTOPEN)
 		tp->t_tfo_pending = tcp_fastopen_alloc_counter();
 
 out:
@@ -454,7 +448,7 @@ tcp6_usr_listen(struct socket *so, int backlog, struct thread *td)
 	}
 	SOCK_UNLOCK(so);
 
-	if (IS_FASTOPEN(tp->t_flags))
+	if (tp->t_flags & TF_FASTOPEN)
 		tp->t_tfo_pending = tcp_fastopen_alloc_counter();
 
 	if (error != 0)
@@ -887,8 +881,7 @@ tcp_usr_rcvd(struct socket *so, int flags)
 	 * application response data, or failing that, when the DELACK timer
 	 * expires.
 	 */
-	if (IS_FASTOPEN(tp->t_flags) &&
-	    (tp->t_state == TCPS_SYN_RECEIVED))
+	if ((tp->t_flags & TF_FASTOPEN) && (tp->t_state == TCPS_SYN_RECEIVED))
 		goto out;
 #ifdef TCP_OFFLOAD
 	if (tp->t_flags & TF_TOE)
@@ -1095,7 +1088,7 @@ tcp_usr_send(struct socket *so, int flags, struct mbuf *m,
 				sbflush(&so->so_snd);
 				goto out;
 			}
-			if (IS_FASTOPEN(tp->t_flags))
+			if (tp->t_flags & TF_FASTOPEN)
 				tcp_fastopen_connect(tp);
 			else {
 				tp->snd_wnd = TTCP_CLIENT_SND_WND;
@@ -1161,7 +1154,7 @@ tcp_usr_send(struct socket *so, int flags, struct mbuf *m,
 			/*
 			 * Not going to contemplate SYN|URG
 			 */
-			if (IS_FASTOPEN(tp->t_flags))
+			if (tp->t_flags & TF_FASTOPEN)
 				tp->t_flags &= ~TF_FASTOPEN;
 #ifdef INET6
 			if (isipv6)
@@ -1578,7 +1571,7 @@ tcp_fill_info(const struct tcpcb *tp, struct tcp_info *ti)
 		default:
 			break;
 	}
-	if (IS_FASTOPEN(tp->t_flags))
+	if (tp->t_flags & TF_FASTOPEN)
 		ti->tcpi_options |= TCPI_OPT_TFO;
 
 	ti->tcpi_rto = tp->t_rxtcur * tick;
@@ -1710,11 +1703,7 @@ tcp_ctloutput_set(struct inpcb *inp, struct sockopt *sopt)
 		default:
 			return (error);
 		}
-		INP_WLOCK(inp);
-		if (inp->inp_flags & INP_DROPPED) {
-			INP_WUNLOCK(inp);
-			return (ECONNRESET);
-		}
+		INP_WLOCK_RECHECK(inp);
 	} else if (sopt->sopt_name == TCP_FUNCTION_BLK) {
 		/*
 		 * Protect the TCP option TCP_FUNCTION_BLK so
@@ -1729,8 +1718,7 @@ tcp_ctloutput_set(struct inpcb *inp, struct sockopt *sopt)
 		if (error)
 			return (error);
 
-		INP_WLOCK(inp);
-		tp = intotcpcb(inp);
+		INP_WLOCK_RECHECK(inp);
 
 		blk = find_and_ref_tcp_functions(&fsn);
 		if (blk == NULL) {
@@ -1743,31 +1731,16 @@ tcp_ctloutput_set(struct inpcb *inp, struct sockopt *sopt)
 			INP_WUNLOCK(inp);
 			return (0);
 		}
-		if (tp->t_state != TCPS_CLOSED) {
-			/*
-			 * The user has advanced the state
-			 * past the initial point, we may not
-			 * be able to switch.
-			 */
-			if (blk->tfb_tcp_handoff_ok != NULL) {
-				/*
-				 * Does the stack provide a
-				 * query mechanism, if so it may
-				 * still be possible?
-				 */
-				error = (*blk->tfb_tcp_handoff_ok)(tp);
-			} else
-				error = EINVAL;
-			if (error) {
-				refcount_release(&blk->tfb_refcnt);
-				INP_WUNLOCK(inp);
-				return(error);
-			}
-		}
 		if (blk->tfb_flags & TCP_FUNC_BEING_REMOVED) {
 			refcount_release(&blk->tfb_refcnt);
 			INP_WUNLOCK(inp);
 			return (ENOENT);
+		}
+		error = (*blk->tfb_tcp_handoff_ok)(tp);
+		if (error) {
+			refcount_release(&blk->tfb_refcnt);
+			INP_WUNLOCK(inp);
+			return (error);
 		}
 		/*
 		 * Ensure the new stack takes ownership with a
@@ -2204,9 +2177,19 @@ unlock_and_done:
 
 			INP_WLOCK_RECHECK(inp);
 			if (optval > 0 && optval <= tp->t_maxseg &&
-			    optval + 40 >= V_tcp_minmss)
+			    optval + 40 >= V_tcp_minmss) {
 				tp->t_maxseg = optval;
-			else
+				if (tp->t_maxseg < V_tcp_mssdflt) {
+					/*
+					 * The MSS is so small we should not process incoming
+					 * SACK's since we are subject to attack in such a
+					 * case.
+					 */
+					tp->t_flags2 |= TF2_PROC_SACK_PROHIBIT;
+				} else {
+					tp->t_flags2 &= ~TF2_PROC_SACK_PROHIBIT;
+				}
+			} else
 				error = EINVAL;
 			goto unlock_and_done;
 
@@ -2685,7 +2668,7 @@ tcp_disconnect(struct tcpcb *tp)
 	 * socket is still open.
 	 */
 	if (tp->t_state < TCPS_ESTABLISHED &&
-	    !(tp->t_state > TCPS_LISTEN && IS_FASTOPEN(tp->t_flags))) {
+	    !(tp->t_state > TCPS_LISTEN && (tp->t_flags & TF_FASTOPEN))) {
 		tp = tcp_close(tp);
 		KASSERT(tp != NULL,
 		    ("tcp_disconnect: tcp_close() returned NULL"));

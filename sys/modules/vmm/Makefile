@@ -34,25 +34,24 @@ SRCS+=	vgic.c \
 	vgic_v3.c \
 	vtimer.c
 
-SRCS+=	vmm_hyp_exception.S vmm_hyp.c
-
+CLEANFILES+=	vmm_hyp_exception.o vmm_hyp.o
 CLEANFILES+=	vmm_hyp_blob.elf.full
 CLEANFILES+=	vmm_hyp_blob.elf vmm_hyp_blob.bin
 
 vmm_hyp_exception.o: vmm_hyp_exception.S
 	${CC} -c -x assembler-with-cpp -DLOCORE \
-	    ${CFLAGS:N-fsanitize*:N-mbranch-protection*} \
+		${CFLAGS:N-fsanitize*:N-fno-sanitize*:N-mbranch-protection*} \
 	    ${.IMPSRC} -o ${.TARGET} -fpie
 
 vmm_hyp.o: vmm_hyp.c
-	${CC} -c ${CFLAGS:N-fsanitize*:N-mbranch-protection*} \
+	${CC} -c ${CFLAGS:N-fsanitize*:N-fno-sanitize*:N-mbranch-protection*} \
 	    ${.IMPSRC} -o ${.TARGET} -fpie
 
 vmm_hyp_blob.elf.full:	vmm_hyp_exception.o vmm_hyp.o
 	${LD} -m ${LD_EMULATION} -Bdynamic -T ${SYSDIR}/conf/ldscript.arm64 \
-	${_LDFLAGS} --no-warn-mismatch --warn-common --export-dynamic \
-	--dynamic-linker /red/herring -X -o ${.TARGET} ${.ALLSRC} \
-	--defsym=text_start='0x0'
+	    ${_LDFLAGS:N-zbti-report*} --no-warn-mismatch --warn-common --export-dynamic \
+	    --dynamic-linker /red/herring -X -o ${.TARGET} ${.ALLSRC} \
+	    --defsym=_start='0x0' --defsym=text_start='0x0'
 
 vmm_hyp_blob.elf:	vmm_hyp_blob.elf.full
 	${OBJCOPY} --strip-debug ${.ALLSRC} ${.TARGET}
