@@ -163,7 +163,7 @@ retry:
 
 #ifdef __aarch64__
 		va = PHYS_TO_DMAP(VM_PAGE_TO_PHYS(m));
-		cpu_dcache_wb_range(va, PAGE_SIZE);
+		cpu_dcache_wb_range((void *)va, PAGE_SIZE);
 #endif
 
 		m->valid = VM_PAGE_BITS_ALL;
