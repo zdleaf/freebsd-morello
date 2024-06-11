@@ -86,7 +86,8 @@ struct cs_decoder {
 };
 
 static int
-hwt_coresight_mmap(struct trace_context *tc)
+hwt_coresight_mmap(struct trace_context *tc,
+    struct hwt_record_user_entry *entry __unused)
 {
 	char filename[32];
 	int tid;
