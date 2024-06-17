@@ -260,7 +260,8 @@ coresight_backend_disable(struct hwt_context *ctx, int cpu_id)
 }
 
 static int
-coresight_backend_read(int cpu_id, int *curpage, vm_offset_t *curpage_offset)
+coresight_backend_read(struct hwt_vm *vm, int *curpage,
+    vm_offset_t *curpage_offset)
 {
 	struct coresight_pipeline *pipeline;
 	int error;
