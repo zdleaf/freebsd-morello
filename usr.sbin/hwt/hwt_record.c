@@ -79,7 +79,10 @@ hwt_record_to_elf_img(struct trace_context *tc,
 	memset(&plugins, 0, sizeof(struct pmc_plugins));
 	memset(&args, 0, sizeof(struct pmcstat_args));
 	args.pa_fsroot = "/";
-	path = pmcstat_string_intern(entry->fullpath);
+	snprintf(imagepath, sizeof(imagepath), "%s/%s", tc->fs_root,
+	    entry->fullpath);
+	path = pmcstat_string_intern(imagepath);
+
 	image = pmcstat_image_from_path(path, 0, &args, &plugins);
 	if (image == NULL)
 		return (-1);
@@ -105,7 +108,7 @@ hwt_record_to_elf_img(struct trace_context *tc,
 	    (unsigned long)image->pi_vaddr, (unsigned long)image->pi_start,
 	    (unsigned long)image->pi_end, (unsigned long)image->pi_entry);
 
-	if (hwt_elf_get_text_offs(entry->fullpath, &img->offs))
+	if (hwt_elf_get_text_offs(imagepath, &img->offs))
 		return (-1);
 	img->size = image->pi_end - image->pi_start;
 	img->addr = addr;
