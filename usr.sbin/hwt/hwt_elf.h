@@ -1,8 +1,7 @@
 /*-
- * Copyright (c) 2023 Ruslan Bukin <br@bsdpad.com>
+ * SPDX-License-Identifier: BSD-2-Clause
  *
- * This work was supported by Innovate UK project 105694, "Digital Security
- * by Design (DSbD) Technology Platform Prototype".
+ * Copyright (c) 2024 Bojan Novković <bnovkov@freebsd.org>
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -24,36 +23,23 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
-/* User-visible header. */
+#ifndef HWT_ELF_H_
+#define HWT_ELF_H_
 
-#ifndef _SYS_HWT_RECORD_H_
-#define _SYS_HWT_RECORD_H_
-
-enum hwt_record_type {
-	HWT_RECORD_MMAP,
-	HWT_RECORD_MUNMAP,
-	HWT_RECORD_EXECUTABLE,
-	HWT_RECORD_INTERP,
-	HWT_RECORD_THREAD_CREATE,
-	HWT_RECORD_THREAD_SET_NAME,
-	HWT_RECORD_KERNEL,
+/*
+ * Metadata for the .text loaded from executable
+ * 'path' into the traced process's address space.
+ */
+struct hwt_exec_img {
+	size_t size;
+	uint64_t offs;
+	uint64_t addr;
+	const char *path;
 };
 
-#ifdef _KERNEL
-#include <sys/taskqueue.h>
+int hwt_elf_count_libs(const char *elf_path, uint32_t *nlibs0);
+int hwt_elf_get_text_offs(const char *elf_path, uint64_t *offs);
 
-struct hwt_record_entry {
-	enum hwt_record_type		record_type;
-	TAILQ_ENTRY(hwt_record_entry)	next;
-	char				*fullpath;
-	int				thread_id;
-	uintptr_t			addr;
-	struct task			task;
-};
-#endif
-
-#endif /* !_SYS_HWT_RECORD_H_ */
+#endif /* HWT_ELF_H_ */

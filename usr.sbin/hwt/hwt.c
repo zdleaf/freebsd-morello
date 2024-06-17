@@ -53,9 +53,11 @@
 
 #include "libpmcstat_stubs.h"
 #include <libpmcstat.h>
+#include <libgen.h>
 #include <libxo/xo.h>
 
 #include "hwt.h"
+#include "hwt_elf.h"
 
 #if defined(__aarch64__)
 #include "hwt_coresight.h"
@@ -219,6 +221,34 @@ hwt_get_records(struct trace_context *tc, uint32_t *nrec)
 	*nrec = nrecords;
 
 	return (0);
+}
+
+struct pmcstat_symbol *
+hwt_sym_lookup(const struct trace_context *tc, uint64_t ip,
+    struct pmcstat_image **img, uint64_t *newpc0)
+{
+	struct pmcstat_image *image;
+	struct pmcstat_symbol *sym;
+	struct pmcstat_pcmap *map;
+	uint64_t newpc;
+
+	map = pmcstat_process_find_map(tc->pp, ip);
+	if (map != NULL) {
+		image = map->ppm_image;
+		newpc = ip -
+		    ((unsigned long)map->ppm_lowpc +
+			(image->pi_vaddr - image->pi_start));
+		sym = pmcstat_symbol_search(image, newpc); /* Could be NULL. */
+		newpc += image->pi_vaddr;
+
+		*img = image;
+		*newpc0 = newpc;
+
+		return (sym);
+	} else
+		*img = NULL;
+
+	return (NULL);
 }
 
 int
@@ -628,7 +658,10 @@ main(int argc, char **argv, char **env)
 			 * Name of dynamic lib or main executable for IP
 			 * address range filtering.
 			 */
-			tc->image_name = strdup(optarg);
+			tc->image_name = strdup(basename(optarg));
+			if (*tc->image_name == '.' || *tc->image_name == '/')
+				err(EX_USAGE,
+				    "Invalid executable path provided");
 			break;
 		case 'f':
 			/* Name of the func to trace. */
