@@ -49,7 +49,6 @@
 #include <dev/hwt/hwt_context.h>
 #include <dev/hwt/hwt_contexthash.h>
 #include <dev/hwt/hwt_config.h>
-#include <dev/hwt/hwt_event.h>
 #include <dev/hwt/hwt_thread.h>
 #include <dev/hwt/hwt_owner.h>
 #include <dev/hwt/hwt_backend.h>
@@ -273,7 +272,6 @@ hwt_hook_thread_create(struct thread *td)
 	HWT_CTX_UNLOCK(ctx);
 
 	/* Notify userspace. */
-	hwt_event_send(HWT_KQ_NEW_RECORD_EV, &entry->task, NULL, (void *)ctx);
 
 	hwt_ctx_put(ctx);
 

@@ -47,7 +47,6 @@
 #include <unistd.h>
 
 #include "amd64/pt/pt.h"
-#include "dev/hwt/hwt_event.h"
 #include "hwt.h"
 #include "hwt_elf.h"
 #include "hwt_pt.h"
@@ -86,8 +85,6 @@ static struct pt_image_section_cache *pt_iscache;
 static struct pt_dec_ctx *cpus;
 static RB_HEAD(threads, pt_dec_ctx) threads;
 RB_GENERATE_STATIC(threads, pt_dec_ctx, entry, pt_ctx_compare);
-
-static int kq_fd = -1;
 
 static void
 pt_ctx_sync_ts(struct trace_context *tc, struct pt_dec_ctx *dctx,
@@ -204,8 +201,6 @@ hwt_pt_image_load_cb(struct trace_context *tc, struct hwt_exec_img *img)
 static int
 hwt_pt_init(struct trace_context *tc)
 {
-	struct kevent ev[2];
-	int error;
 
 	/* Buffer size must be power of two. */
 	assert((tc->bufsize & (tc->bufsize - 1)) == 0);
@@ -219,6 +214,11 @@ hwt_pt_init(struct trace_context *tc)
 			return (ENXIO);
 		}
 	}
+
+	pt_iscache = pt_iscache_alloc(tc->image_name);
+	if (pt_iscache == NULL)
+		errx(EXIT_FAILURE, "%s: failed to allocate section cache",
+		    __func__);
 
 	switch (tc->mode) {
 	case HWT_MODE_CPU:
@@ -235,32 +235,6 @@ hwt_pt_init(struct trace_context *tc)
 		printf("%s: invalid tracing mode %d\n", __func__, tc->mode);
 		return (EINVAL);
 	}
-
-	tc->kqueue_fd = kqueue();
-	if (tc->kqueue_fd == -1)
-		errx(EXIT_FAILURE, "kqueue() failed");
-	kq_fd = tc->kqueue_fd; /* sig handler needs access to kq via global */
-
-	/* Let hwt notify us when the buffer is ready. */
-	EV_SET(&ev[0], HWT_KQ_BUFRDY_EV, EVFILT_USER, EV_ADD | EV_CLEAR,
-	    NOTE_FFCOPY, 0, NULL);
-	/* Let hwt notify us when something gets mapped into the process. */
-	EV_SET(&ev[1], HWT_KQ_NEW_RECORD_EV, EVFILT_USER, EV_ADD | EV_CLEAR,
-	    NOTE_FFCOPY, 0, NULL);
-
-	error = kevent(tc->kqueue_fd, ev, 2, NULL, 0, NULL);
-	if (error == -1)
-		errx(EXIT_FAILURE, "kevent register");
-	if ((ev[0].flags | ev[1].flags) & EV_ERROR)
-		// TODO: properly check per-event errors
-		errx(EXIT_FAILURE, "Event error: %s", strerror(ev[0].data));
-
-	pt_iscache = pt_iscache_alloc(tc->image_name);
-	if (pt_iscache == NULL)
-		errx(EXIT_FAILURE, "%s: failed to allocate section cache",
-		    __func__);
-
-	printf("%s kqueue_fd:%d\n", __func__, tc->kqueue_fd);
 
 	return (0);
 }

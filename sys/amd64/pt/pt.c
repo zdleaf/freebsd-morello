@@ -99,9 +99,8 @@ struct pt_buffer {
 struct pt_ctx {
 	struct pt_buffer buf;	       /* ToPA buffer metadata */
 	struct task task;	       /* ToPA buffer kevent task */
-	struct thread *trace_td;       /* hwt(8) tracing thread */
+	struct hwt_context *hwt_ctx;
 	struct pt_save_area save_area; /* PT XSAVE area */
-	int kqueue_fd;
 	int id;
 };
 
@@ -251,29 +250,6 @@ pt_cpu_dump(int cpu_id)
 
 	lapic_dump("");
 #endif
-}
-
-/*
- * ToPA PMI kevent task.
- */
-static void
-pt_buffer_ready(void *arg, int pending __unused)
-{
-	struct pt_ctx *ctx = arg;
-	struct kevent kev;
-	int ret __diagused;
-	uint64_t data;
-	u_int flags;
-
-	data = (ctx->buf.wrap_count * ctx->buf.size) +
-	    ((ctx->buf.curpage * PAGE_SIZE) + ctx->buf.offset);
-	flags = ctx->id & HWT_KQ_BUFRDY_ID_MASK;
-
-	EV_SET(&kev, HWT_KQ_BUFRDY_EV, EVFILT_USER, 0,
-	    NOTE_TRIGGER | NOTE_FFCOPY | flags, data, NULL);
-	ret = kqfd_register(ctx->kqueue_fd, &kev, ctx->trace_td, M_WAITOK);
-	KASSERT(ret == 0,
-	    ("%s: kqueue fd register failed: %d\n", __func__, ret));
 }
 
 /*
@@ -514,9 +490,8 @@ pt_backend_configure(struct hwt_context *ctx, int cpu_id, int thread_id)
 		if ((error = pt_configure_ranges(pt_ctx, cfg)) != 0)
 			return (error);
 	}
-	/* Save hwt_td for kevent */
-	pt_ctx->trace_td = ctx->hwt_td;
-	pt_ctx->kqueue_fd = ctx->kqueue_fd;
+	/* Save hwt context for buffer records. */
+	pt_ctx->hwt_ctx = ctx;
 	/* Prepare ToPA MSR values. */
 	pt_ext->rtit_ctl |= RTIT_CTL_TOPA;
 	pt_ext->rtit_output_base = (uint64_t)vtophys(pt_ctx->buf.topa_hw);
@@ -635,7 +610,6 @@ pt_backend_deinit(struct hwt_context *ctx)
 
 	/* Stop tracing on all active CPUs */
 	pt_backend_disable_smp(ctx);
-	hwt_event_drain_all();
 	if (ctx->mode == HWT_MODE_THREAD) {
 		TAILQ_FOREACH(thr, &ctx->threads, next) {
 			KASSERT(thr->private != NULL,
@@ -783,10 +757,6 @@ pt_topa_intr(struct trapframe *tf)
 		/* Re-enable tracing. */
 		pt_cpu_toggle_local(&ctx->save_area, true);
 	}
-
-	/* Notify userspace. */
-	hwt_event_send(HWT_KQ_BUFRDY_EV, &ctx->task, pt_buffer_ready, ctx);
-
 	/* Enable preemption. */
 	critical_exit();
 

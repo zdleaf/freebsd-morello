@@ -161,9 +161,9 @@
 #include <dev/hwt/hwt_owner.h>
 #include <dev/hwt/hwt_ownerhash.h>
 #include <dev/hwt/hwt_backend.h>
+#include <dev/hwt/hwt_record.h>
 #include <dev/hwt/hwt_ioctl.h>
 #include <dev/hwt/hwt_hook.h>
-#include <dev/hwt/hwt_event.h>
 
 #define	HWT_DEBUG
 #undef	HWT_DEBUG
