@@ -70,6 +70,7 @@ struct hwt_context {
 	struct hwt_backend		*hwt_backend;
 
 	struct mtx			mtx;
+	struct mtx			rec_mtx;
 	enum hwt_ctx_state		state;
 	int				refcnt;
 };
@@ -81,7 +82,6 @@ struct hwt_context {
 int hwt_ctx_alloc(struct hwt_context **ctx0);
 void hwt_ctx_free(struct hwt_context *ctx);
 void hwt_ctx_put(struct hwt_context *ctx);
-void hwt_ctx_ref(struct hwt_context *ctx);
 
 void hwt_ctx_load(void);
 void hwt_ctx_unload(void);
