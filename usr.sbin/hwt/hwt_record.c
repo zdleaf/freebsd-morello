@@ -84,7 +84,8 @@ hwt_record_to_elf_img(struct trace_context *tc,
 	    entry->fullpath);
 	path = pmcstat_string_intern(imagepath);
 
-	image = pmcstat_image_from_path(path, 0, &args, &plugins);
+	image = pmcstat_image_from_path(path,
+	    !!(entry->record_type == HWT_RECORD_KERNEL), &args, &plugins);
 	if (image == NULL)
 		return (-1);
 
