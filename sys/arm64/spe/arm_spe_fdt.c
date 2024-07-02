@@ -42,7 +42,7 @@
 #include <dev/ofw/ofw_bus.h>
 #include <dev/ofw/ofw_bus_subr.h>
 
-#include <arm64/arm64/arm_spe_dev.h>
+#include <arm64/spe/arm_spe_dev.h>
 
 static device_probe_t arm_spe_fdt_probe;
 

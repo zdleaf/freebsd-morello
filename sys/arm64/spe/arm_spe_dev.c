@@ -46,8 +46,8 @@
 #include <sys/taskqueue.h>
 #include <machine/bus.h>
 
-#include <arm64/arm64/arm_spe.h>
-#include <arm64/arm64/arm_spe_dev.h>
+#include <arm64/spe/arm_spe.h>
+#include <arm64/spe/arm_spe_dev.h>
 
 MALLOC_DEFINE(M_ARM_SPE, "armspe", "Arm SPE tracing");
 

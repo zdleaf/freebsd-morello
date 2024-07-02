@@ -37,7 +37,7 @@
 
 #include <vm/vm.h>
 
-#include <arm64/arm64/arm_spe.h>
+#include <arm64/spe/arm_spe.h>
 
 #include <dev/hwt/hwt_context.h>
 

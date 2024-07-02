@@ -62,7 +62,7 @@
 
 #include "hwt.h"
 #include "hwt_spe.h"
-#include "arm64/arm64/arm_spe.h"
+#include "arm64/spe/arm_spe.h"
 
 #define	HWT_SPE_DEBUG
 #undef	HWT_SPE_DEBUG

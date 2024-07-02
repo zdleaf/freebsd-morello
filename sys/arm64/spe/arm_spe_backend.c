@@ -88,7 +88,7 @@
 #include <sys/mman.h>
 #include <machine/bus.h>
 
-#include <arm64/arm64/arm_spe_dev.h>
+#include <arm64/spe/arm_spe_dev.h>
 
 #include <dev/hwt/hwt_context.h>
 #include <dev/hwt/hwt_config.h>

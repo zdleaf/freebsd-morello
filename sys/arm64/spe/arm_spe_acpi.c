@@ -41,7 +41,7 @@
 #include <contrib/dev/acpica/include/acpi.h>
 #include <dev/acpica/acpivar.h>
 
-#include <arm64/arm64/arm_spe_dev.h>
+#include <arm64/spe/arm_spe_dev.h>
 
 static device_identify_t arm_spe_acpi_identify;
 static device_probe_t arm_spe_acpi_probe;
