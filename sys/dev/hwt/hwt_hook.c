@@ -64,8 +64,6 @@
 #define	dprintf(fmt, ...)
 #endif
 
-bool hwt_log_pid = false;
-
 static void
 hwt_switch_in(struct thread *td)
 {
@@ -288,17 +286,8 @@ hwt_hook_handler(struct thread *td, int func, void *arg)
 	struct proc *p;
 
 	p = td->td_proc;
-	if ((p->p_flag2 & P2_HWT) == 0) {
-#ifdef __aarch64__
-		if (hwt_log_pid) {
-			if (func == HWT_SWITCH_IN)
-				WRITE_SPECIALREG(CONTEXTIDR_EL1_REG, p->p_pid);
-			if (func == HWT_SWITCH_OUT)
-				WRITE_SPECIALREG(CONTEXTIDR_EL1_REG, 0);
-		}
-#endif
+	if ((p->p_flag2 & P2_HWT) == 0)
 		return;
-	}
 
 	switch (func) {
 	case HWT_SWITCH_IN:

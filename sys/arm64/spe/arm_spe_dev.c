@@ -307,8 +307,6 @@ arm_spe_error(void *arg, int pending __unused)
 	struct kevent kev;
 	int ret;
 
-	hwt_log_pid = false;
-
 	smp_rendezvous_cpus(ctx->cpu_map, smp_no_rendezvous_barrier,
 	    arm_spe_disable, smp_no_rendezvous_barrier, NULL);
 

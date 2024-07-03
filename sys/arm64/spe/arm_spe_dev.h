@@ -55,7 +55,7 @@ DECLARE_CLASS(arm_spe_driver);
 struct cdev;
 struct resource;
 
-extern bool hwt_log_pid;
+extern bool arm64_pid_in_contextidr;
 
 int spe_register(device_t dev);
 void arm_spe_disable(void *arg __unused);

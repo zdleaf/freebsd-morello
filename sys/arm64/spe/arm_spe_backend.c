@@ -86,6 +86,7 @@
 #include <sys/rwlock.h>
 #include <sys/proc.h>
 #include <sys/mman.h>
+#include <sys/sysctl.h>
 #include <machine/bus.h>
 
 #include <arm64/spe/arm_spe_dev.h>
@@ -172,8 +173,6 @@ spe_backend_init(struct hwt_context *ctx)
 	sc->kqueue_fd = ctx->kqueue_fd;
 	sc->hwt_td = ctx->hwt_td;
 
-	hwt_log_pid = false; /* reset */
-
 	if (ctx->mode == HWT_MODE_THREAD)
 		error = spe_backend_init_thread(ctx);
 	else
@@ -217,8 +216,6 @@ spe_backend_deinit(struct hwt_context *ctx)
 		hex_dump((void *)(info->kvaddr + (info->buf_size/2)), 128);
 	}
 #endif
-
-	hwt_log_pid = false;
 
 	if (ctx->state == CTX_STATE_RUNNING) {
 		spe_backend_disable_smp(ctx);
@@ -302,10 +299,6 @@ spe_backend_configure(struct hwt_context *ctx, int cpu_id, int session_id)
 			info->pmscr &= ~(PMSCR_E1SPE); /* turn off kern */
 		if (cfg->ctx_field)
 			info->ctx_field = cfg->ctx_field;
-		/* log PID in CONTEXTIDR_EL1 on process switch */
-		if (cfg->ctx_field == ARM_SPE_CTX_PID)
-			hwt_log_pid = true;
-		/* else setting CPU_ID is configured per cpu in arm_spe_enable() */
 	} else
 		err = (EINVAL);
 	mtx_unlock_spin(&info->lock);
@@ -378,6 +371,13 @@ spe_backend_enable_smp(struct hwt_context *ctx)
 	}
 	HWT_CTX_UNLOCK(ctx);
 
+	cpu_id = CPU_FFS(&ctx->cpu_map);
+	info = &spe_info[cpu_id];
+	if (info->ctx_field == ARM_SPE_CTX_PID)
+		arm64_pid_in_contextidr = true;
+	else
+		arm64_pid_in_contextidr = false;
+
 	smp_rendezvous_cpus(ctx->cpu_map, smp_no_rendezvous_barrier,
 	    arm_spe_enable, smp_no_rendezvous_barrier, NULL);
 }
@@ -408,9 +408,10 @@ arm_spe_disable(void *arg __unused)
 	/* Clear interrupt status reg */
 	WRITE_SPECIALREG(PMBSR_EL1_REG, 0x0);
 
+	/* Clear PID/CPU_ID from context ID reg */
+	WRITE_SPECIALREG(CONTEXTIDR_EL1_REG, 0);
+
 	mtx_lock_spin(&info->lock);
-	if (info->ctx_field == ARM_SPE_CTX_CPU_ID)
-		WRITE_SPECIALREG(CONTEXTIDR_EL1_REG, 0);
 	buf->pmbptr = READ_SPECIALREG(PMBPTR_EL1_REG);
 	info->enabled = false;
 	mtx_unlock_spin(&info->lock);
@@ -434,6 +435,8 @@ spe_backend_disable_smp(struct hwt_context *ctx)
 		buf = &info->buf_info[info->buf_idx];
 		arm_spe_send_buffer(buf, 0);
 	}
+
+	arm64_pid_in_contextidr = false;
 
 	/*
 	 * Tracing on all CPUs has been disabled, and we've sent write ptr
