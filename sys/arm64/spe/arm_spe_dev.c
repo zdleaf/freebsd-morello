@@ -32,18 +32,19 @@
 #include <sys/cdefs.h>
 
 #include <sys/param.h>
-#include <sys/systm.h>
 #include <sys/bus.h>
 #include <sys/conf.h>
 #include <sys/event.h>
-#include <sys/rman.h>
+#include <sys/hwt.h>
 #include <sys/kernel.h>
+#include <sys/malloc.h>
 #include <sys/module.h>
 #include <sys/mutex.h>
-#include <sys/malloc.h>
+#include <sys/rman.h>
 #include <sys/smp.h>
-#include <sys/hwt.h>
+#include <sys/systm.h>
 #include <sys/taskqueue.h>
+
 #include <machine/bus.h>
 
 #include <arm64/spe/arm_spe.h>

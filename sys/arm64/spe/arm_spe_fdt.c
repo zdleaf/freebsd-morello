@@ -38,9 +38,9 @@
 #include <sys/module.h>
 #include <sys/mutex.h>
 
-#include <dev/ofw/openfirm.h>
 #include <dev/ofw/ofw_bus.h>
 #include <dev/ofw/ofw_bus_subr.h>
+#include <dev/ofw/openfirm.h>
 
 #include <arm64/spe/arm_spe_dev.h>
 

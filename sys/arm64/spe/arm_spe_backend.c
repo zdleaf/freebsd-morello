@@ -72,31 +72,32 @@
 #include <sys/cdefs.h>
 
 #include <sys/param.h>
-#include <sys/systm.h>
 #include <sys/bus.h>
 #include <sys/conf.h>
-#include <sys/rman.h>
+#include <sys/hwt.h>
 #include <sys/kernel.h>
 #include <sys/lock.h>
 #include <sys/malloc.h>
+#include <sys/mman.h>
 #include <sys/module.h>
 #include <sys/mutex.h>
-#include <sys/smp.h>
-#include <sys/hwt.h>
-#include <sys/rwlock.h>
 #include <sys/proc.h>
-#include <sys/mman.h>
+#include <sys/rman.h>
+#include <sys/rwlock.h>
+#include <sys/smp.h>
 #include <sys/sysctl.h>
+#include <sys/systm.h>
+
 #include <machine/bus.h>
 
 #include <arm64/spe/arm_spe_dev.h>
 
-#include <dev/hwt/hwt_context.h>
+#include <dev/hwt/hwt_vm.h>
+#include <dev/hwt/hwt_backend.h>
 #include <dev/hwt/hwt_config.h>
+#include <dev/hwt/hwt_context.h>
 #include <dev/hwt/hwt_cpu.h>
 #include <dev/hwt/hwt_thread.h>
-#include <dev/hwt/hwt_backend.h>
-#include <dev/hwt/hwt_vm.h>
 
 MALLOC_DECLARE(M_ARM_SPE);
 
