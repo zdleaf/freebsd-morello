@@ -112,7 +112,6 @@ FULL_PREEMPTION	opt_sched.h
 GZIO		opt_gzio.h
 IMGACT_BINMISC		opt_dontuse.h
 IPI_PREEMPTION	opt_sched.h
-GEOM_BDE	opt_geom.h
 GEOM_CACHE	opt_geom.h
 GEOM_CONCAT	opt_geom.h
 GEOM_ELI	opt_geom.h
@@ -187,7 +186,6 @@ MFI_DEBUG	opt_mfi.h
 MFI_DECODE_LOG	opt_mfi.h
 MPROF_BUFFERS	opt_mprof.h
 MPROF_HASH_SIZE	opt_mprof.h
-NEW_PCIB	opt_global.h
 NO_ADAPTIVE_MUTEXES	opt_adaptive_mutexes.h
 NO_ADAPTIVE_RWLOCKS
 NO_ADAPTIVE_SX
@@ -284,6 +282,7 @@ TMPFS		opt_dontuse.h
 UDF		opt_dontuse.h
 UNIONFS		opt_dontuse.h
 ZFS		opt_dontuse.h
+P9FS		opt_dontuse.h
 
 # Pseudofs debugging
 PSEUDOFS_TRACE	opt_pseudofs.h
@@ -466,6 +465,7 @@ IPFIREWALL_PMOD		opt_ipfw.h
 IPSEC			opt_ipsec.h
 IPSEC_DEBUG		opt_ipsec.h
 IPSEC_SUPPORT		opt_ipsec.h
+IPSEC_OFFLOAD		opt_ipsec.h
 IPSTEALTH
 KERN_TLS
 KRPC

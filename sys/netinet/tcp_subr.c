@@ -394,23 +394,25 @@ static struct tcp_function_block *
 find_tcp_functions_locked(struct tcp_function_set *fs)
 {
 	struct tcp_function *f;
-	struct tcp_function_block *blk=NULL;
+	struct tcp_function_block *blk = NULL;
 
+	rw_assert(&tcp_function_lock, RA_LOCKED);
 	TAILQ_FOREACH(f, &t_functions, tf_next) {
 		if (strcmp(f->tf_name, fs->function_set_name) == 0) {
 			blk = f->tf_fb;
 			break;
 		}
 	}
-	return(blk);
+	return (blk);
 }
 
 static struct tcp_function_block *
 find_tcp_fb_locked(struct tcp_function_block *blk, struct tcp_function **s)
 {
-	struct tcp_function_block *rblk=NULL;
+	struct tcp_function_block *rblk = NULL;
 	struct tcp_function *f;
 
+	rw_assert(&tcp_function_lock, RA_LOCKED);
 	TAILQ_FOREACH(f, &t_functions, tf_next) {
 		if (f->tf_fb == blk) {
 			rblk = blk;
@@ -433,7 +435,7 @@ find_and_ref_tcp_functions(struct tcp_function_set *fs)
 	if (blk)
 		refcount_acquire(&blk->tfb_refcnt);
 	rw_runlock(&tcp_function_lock);
-	return(blk);
+	return (blk);
 }
 
 struct tcp_function_block *
@@ -446,7 +448,7 @@ find_and_ref_tcp_fb(struct tcp_function_block *blk)
 	if (rblk)
 		refcount_acquire(&rblk->tfb_refcnt);
 	rw_runlock(&tcp_function_lock);
-	return(rblk);
+	return (rblk);
 }
 
 /* Find a matching alias for the given tcp_function_block. */
@@ -647,7 +649,7 @@ out:
 static int
 sysctl_net_inet_default_tcp_functions(SYSCTL_HANDLER_ARGS)
 {
-	int error=ENOENT;
+	int error = ENOENT;
 	struct tcp_function_set fs;
 	struct tcp_function_block *blk;
 
@@ -665,7 +667,7 @@ sysctl_net_inet_default_tcp_functions(SYSCTL_HANDLER_ARGS)
 
 	/* Check for error or no change */
 	if (error != 0 || req->newptr == NULL)
-		return(error);
+		return (error);
 
 	rw_wlock(&tcp_function_lock);
 	blk = find_tcp_functions_locked(&fs);
@@ -1170,81 +1172,83 @@ int
 register_tcp_functions_as_names(struct tcp_function_block *blk, int wait,
     const char *names[], int *num_names)
 {
-	struct tcp_function *n;
+	struct tcp_function *f[TCP_FUNCTION_NAME_NUM_MAX];
 	struct tcp_function_set fs;
-	int error, i;
+	int error, i, num_registered;
 
-	KASSERT(names != NULL && *num_names > 0,
-	    ("%s: Called with 0-length name list", __func__));
 	KASSERT(names != NULL, ("%s: Called with NULL name list", __func__));
+	KASSERT(*num_names > 0,
+	    ("%s: Called with non-positive length of name list", __func__));
 	KASSERT(rw_initialized(&tcp_function_lock),
 	    ("%s: called too early", __func__));
 
+	if (*num_names > TCP_FUNCTION_NAME_NUM_MAX) {
+		/* Too many names. */
+		*num_names = 0;
+		return (E2BIG);
+	}
 	if ((blk->tfb_tcp_output == NULL) ||
 	    (blk->tfb_tcp_do_segment == NULL) ||
 	    (blk->tfb_tcp_ctloutput == NULL) ||
 	    (blk->tfb_tcp_handoff_ok == NULL) ||
 	    (strlen(blk->tfb_tcp_block_name) == 0)) {
-		/*
-		 * These functions are required and you
-		 * need a name.
-		 */
+		/* These functions are required and a name is needed. */
 		*num_names = 0;
 		return (EINVAL);
 	}
 
+	for (i = 0; i < *num_names; i++) {
+		f[i] = malloc(sizeof(struct tcp_function), M_TCPFUNCTIONS, wait);
+		if (f[i] == NULL) {
+			while (--i >= 0)
+				free(f[i], M_TCPFUNCTIONS);
+			*num_names = 0;
+			return (ENOMEM);
+		}
+	}
+
+	num_registered = 0;
+	rw_wlock(&tcp_function_lock);
+	if (find_tcp_fb_locked(blk, NULL) != NULL) {
+		/* A TCP function block can only be registered once. */
+		error = EALREADY;
+		goto cleanup;
+	}
 	if (blk->tfb_flags & TCP_FUNC_BEING_REMOVED) {
-		*num_names = 0;
-		return (EINVAL);
+		error = EINVAL;
+		goto cleanup;
 	}
-
 	refcount_init(&blk->tfb_refcnt, 0);
 	blk->tfb_id = atomic_fetchadd_int(&next_tcp_stack_id, 1);
 	for (i = 0; i < *num_names; i++) {
-		n = malloc(sizeof(struct tcp_function), M_TCPFUNCTIONS, wait);
-		if (n == NULL) {
-			error = ENOMEM;
-			goto cleanup;
-		}
-		n->tf_fb = blk;
-
 		(void)strlcpy(fs.function_set_name, names[i],
 		    sizeof(fs.function_set_name));
-		rw_wlock(&tcp_function_lock);
 		if (find_tcp_functions_locked(&fs) != NULL) {
 			/* Duplicate name space not allowed */
-			rw_wunlock(&tcp_function_lock);
-			free(n, M_TCPFUNCTIONS);
 			error = EALREADY;
 			goto cleanup;
 		}
-		(void)strlcpy(n->tf_name, names[i], sizeof(n->tf_name));
-		TAILQ_INSERT_TAIL(&t_functions, n, tf_next);
+		f[i]->tf_fb = blk;
+		(void)strlcpy(f[i]->tf_name, names[i], sizeof(f[i]->tf_name));
+		TAILQ_INSERT_TAIL(&t_functions, f[i], tf_next);
 		tcp_fb_cnt++;
-		rw_wunlock(&tcp_function_lock);
-	}
-	return(0);
-
-cleanup:
-	/*
-	 * Deregister the names we just added. Because registration failed
-	 * for names[i], we don't need to deregister that name.
-	 */
-	*num_names = i;
-	rw_wlock(&tcp_function_lock);
-	while (--i >= 0) {
-		TAILQ_FOREACH(n, &t_functions, tf_next) {
-			if (!strncmp(n->tf_name, names[i],
-			    TCP_FUNCTION_NAME_LEN_MAX)) {
-				TAILQ_REMOVE(&t_functions, n, tf_next);
-				tcp_fb_cnt--;
-				n->tf_fb = NULL;
-				free(n, M_TCPFUNCTIONS);
-				break;
-			}
-		}
+		num_registered++;
 	}
 	rw_wunlock(&tcp_function_lock);
+	return (0);
+
+cleanup:
+	/* Remove the entries just added. */
+	for (i = 0; i < *num_names; i++) {
+		if (i < num_registered) {
+			TAILQ_REMOVE(&t_functions, f[i], tf_next);
+			tcp_fb_cnt--;
+		}
+		f[i]->tf_fb = NULL;
+		free(f[i], M_TCPFUNCTIONS);
+	}
+	rw_wunlock(&tcp_function_lock);
+	*num_names = num_registered;
 	return (error);
 }
 
@@ -2215,6 +2219,10 @@ tcp_newtcpcb(struct inpcb *inp)
 
 #ifdef TCP_HHOOK
 	if (khelp_init_osd(HELPER_CLASS_TCP, &tp->t_osd)) {
+		if (CC_ALGO(tp)->cb_destroy != NULL)
+			CC_ALGO(tp)->cb_destroy(&tp->t_ccv);
+		CC_DATA(tp) = NULL;
+		cc_detach(tp);
 		if (tp->t_fb->tfb_tcp_fb_fini)
 			(*tp->t_fb->tfb_tcp_fb_fini)(tp, 1);
 		refcount_release(&tp->t_fb->tfb_refcnt);
@@ -2291,6 +2299,13 @@ tcp_newtcpcb(struct inpcb *inp)
 	tp->t_pacing_rate = -1;
 	if (tp->t_fb->tfb_tcp_fb_init) {
 		if ((*tp->t_fb->tfb_tcp_fb_init)(tp, &tp->t_fb_ptr)) {
+			if (CC_ALGO(tp)->cb_destroy != NULL)
+				CC_ALGO(tp)->cb_destroy(&tp->t_ccv);
+			CC_DATA(tp) = NULL;
+			cc_detach(tp);
+#ifdef TCP_HHOOK
+			khelp_destroy_osd(&tp->t_osd);
+#endif
 			refcount_release(&tp->t_fb->tfb_refcnt);
 			return (NULL);
 		}
@@ -3336,6 +3351,9 @@ tcp_maxmtu(struct in_conninfo *inc, struct tcp_ifcap *cap)
 				cap->tsomax = ifp->if_hw_tsomax;
 				cap->tsomaxsegcount = ifp->if_hw_tsomaxsegcount;
 				cap->tsomaxsegsize = ifp->if_hw_tsomaxsegsize;
+				/* XXXKIB IFCAP2_IPSEC_OFFLOAD_TSO */
+				cap->ipsec_tso =  (ifp->if_capenable2 &
+				    IFCAP2_BIT(IFCAP2_IPSEC_OFFLOAD)) != 0;
 			}
 		}
 	}
@@ -3375,6 +3393,7 @@ tcp_maxmtu6(struct in_conninfo *inc, struct tcp_ifcap *cap)
 				cap->tsomax = ifp->if_hw_tsomax;
 				cap->tsomaxsegcount = ifp->if_hw_tsomaxsegcount;
 				cap->tsomaxsegsize = ifp->if_hw_tsomaxsegsize;
+				cap->ipsec_tso = false; /* XXXKIB */
 			}
 		}
 	}
@@ -4374,7 +4393,7 @@ tcp_req_check_for_stale_entries(struct tcpcb *tp, uint64_t ts, int rm_oldest)
 	uint64_t time_delta, oldest_delta;
 	int i, oldest, oldest_set = 0, cnt_rm = 0;
 
-	for(i = 0; i < MAX_TCP_TRK_REQ; i++) {
+	for (i = 0; i < MAX_TCP_TRK_REQ; i++) {
 		ent = &tp->t_tcpreq_info[i];
 		if (ent->flags != TCP_TRK_TRACK_FLG_USED) {
 			/*
@@ -4417,15 +4436,15 @@ tcp_req_check_for_stale_entries(struct tcpcb *tp, uint64_t ts, int rm_oldest)
 int
 tcp_req_check_for_comp(struct tcpcb *tp, tcp_seq ack_point)
 {
-	int i, ret=0;
+	int i, ret = 0;
 	struct tcp_sendfile_track *ent;
 
 	/* Clean up any old closed end requests that are now completed */
 	if (tp->t_tcpreq_req == 0)
-		return(0);
+		return (0);
 	if (tp->t_tcpreq_closed == 0)
-		return(0);
-	for(i = 0; i < MAX_TCP_TRK_REQ; i++) {
+		return (0);
+	for (i = 0; i < MAX_TCP_TRK_REQ; i++) {
 		ent = &tp->t_tcpreq_info[i];
 		/* Skip empty ones */
 		if (ent->flags == TCP_TRK_TRACK_FLG_EMPTY)
@@ -4448,11 +4467,11 @@ int
 tcp_req_is_entry_comp(struct tcpcb *tp, struct tcp_sendfile_track *ent, tcp_seq ack_point)
 {
 	if (tp->t_tcpreq_req == 0)
-		return(-1);
+		return (-1);
 	if (tp->t_tcpreq_closed == 0)
-		return(-1);
+		return (-1);
 	if (ent->flags == TCP_TRK_TRACK_FLG_EMPTY)
-		return(-1);
+		return (-1);
 	if (SEQ_GEQ(ack_point, ent->end_seq)) {
 		return (1);
 	}
@@ -4474,7 +4493,7 @@ tcp_req_find_a_req_that_is_completed_by(struct tcpcb *tp, tcp_seq th_ack, int *i
 		/* none open */
 		return (NULL);
 	}
-	for(i = 0; i < MAX_TCP_TRK_REQ; i++) {
+	for (i = 0; i < MAX_TCP_TRK_REQ; i++) {
 		ent = &tp->t_tcpreq_info[i];
 		if (ent->flags == TCP_TRK_TRACK_FLG_EMPTY)
 			continue;
@@ -4498,7 +4517,7 @@ tcp_req_find_req_for_seq(struct tcpcb *tp, tcp_seq seq)
 		/* none open */
 		return (NULL);
 	}
-	for(i = 0; i < MAX_TCP_TRK_REQ; i++) {
+	for (i = 0; i < MAX_TCP_TRK_REQ; i++) {
 		ent = &tp->t_tcpreq_info[i];
 		tcp_req_log_req_info(tp, ent, i, TCP_TRK_REQ_LOG_SEARCH,
 				      (uint64_t)seq, 0);
@@ -4546,7 +4565,7 @@ tcp_req_alloc_req_full(struct tcpcb *tp, struct tcp_snd_req *req, uint64_t ts, i
 		    (tp->t_tcpreq_req >= MAX_TCP_TRK_REQ));
 	/* Check to see if this is a duplicate of one not started */
 	if (tp->t_tcpreq_req) {
-		for(i = 0, allocated = 0; i < MAX_TCP_TRK_REQ; i++) {
+		for (i = 0, allocated = 0; i < MAX_TCP_TRK_REQ; i++) {
 			fil = &tp->t_tcpreq_info[i];
 			if ((fil->flags & TCP_TRK_TRACK_FLG_USED) == 0)
 				continue;
@@ -4561,20 +4580,20 @@ tcp_req_alloc_req_full(struct tcpcb *tp, struct tcp_snd_req *req, uint64_t ts, i
 				 * a 4xx of some sort and its going to age
 				 * out, lets not duplicate it.
 				 */
-				return(fil);
+				return (fil);
 			}
 		}
 	}
 	/* Ok if there is no room at the inn we are in trouble */
 	if (tp->t_tcpreq_req >= MAX_TCP_TRK_REQ) {
 		tcp_trace_point(tp, TCP_TP_REQ_LOG_FAIL);
-		for(i = 0; i < MAX_TCP_TRK_REQ; i++) {
+		for (i = 0; i < MAX_TCP_TRK_REQ; i++) {
 			tcp_req_log_req_info(tp, &tp->t_tcpreq_info[i],
 			    i, TCP_TRK_REQ_LOG_ALLOCFAIL, 0, 0);
 		}
 		return (NULL);
 	}
-	for(i = 0, allocated = 0; i < MAX_TCP_TRK_REQ; i++) {
+	for (i = 0, allocated = 0; i < MAX_TCP_TRK_REQ; i++) {
 		fil = &tp->t_tcpreq_info[i];
 		if (fil->flags == TCP_TRK_TRACK_FLG_EMPTY) {
 			allocated = 1;

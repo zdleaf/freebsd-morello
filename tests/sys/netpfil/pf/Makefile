@@ -1,4 +1,3 @@
-
 PACKAGE=	tests
 
 TESTSDIR=       ${TESTSBASE}/sys/netpfil/pf
@@ -17,6 +16,7 @@ ATF_TESTS_SH+=	altq \
 		fragmentation_no_reassembly \
 		get_state \
 		icmp \
+		if_enc \
 		limits \
 		loginterface \
 		killstate \
