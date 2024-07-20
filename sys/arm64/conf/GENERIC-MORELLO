@@ -1,4 +1,4 @@
-include		GENERIC
+include		GENERIC1
 ident		GENERIC-MORELLO
 
 nooptions	NFSCL
