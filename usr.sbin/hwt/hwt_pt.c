@@ -47,7 +47,6 @@
 #include <unistd.h>
 
 #include "amd64/pt/pt.h"
-#include "dev/hwt/hwt_event.h"
 #include "hwt.h"
 #include "hwt_elf.h"
 #include "hwt_pt.h"
@@ -86,8 +85,6 @@ static struct pt_image_section_cache *pt_iscache;
 static struct pt_dec_ctx *cpus;
 static RB_HEAD(threads, pt_dec_ctx) threads;
 RB_GENERATE_STATIC(threads, pt_dec_ctx, entry, pt_ctx_compare);
-
-static int kq_fd = -1;
 
 static void
 pt_ctx_sync_ts(struct trace_context *tc, struct pt_dec_ctx *dctx,
@@ -139,6 +136,7 @@ pt_cpu_ctx_init_cb(struct trace_context *tc, struct pt_dec_ctx *dctx,
 {
 	int cpu_id, fd;
 	char filename[32];
+	struct pt_config config;
 
 	cpu_id = dctx - cpus;
 	sprintf(filename, "/dev/hwt_%d_%d", tc->ident, cpu_id);
@@ -162,6 +160,21 @@ pt_cpu_ctx_init_cb(struct trace_context *tc, struct pt_dec_ctx *dctx,
 		    __func__, cpu_id, strerror(errno));
 	}
 	dctx->id = cpu_id;
+
+	if (!tc->raw) {
+		memset(&config, 0, sizeof(config));
+		config.size = sizeof(config);
+		config.begin = dctx->tracebuf;
+		config.end = (uint8_t *)dctx->tracebuf + tc->bufsize;
+
+		dctx->dec = pt_blk_alloc_decoder(&config);
+		if (dctx->dec == NULL) {
+			printf("%s: failed to allocate PT decoder for CPU %d\n",
+			    __func__, cpu_id);
+			free(dctx);
+			return;
+		}
+	}
 }
 
 static void
@@ -204,8 +217,6 @@ hwt_pt_image_load_cb(struct trace_context *tc, struct hwt_exec_img *img)
 static int
 hwt_pt_init(struct trace_context *tc)
 {
-	struct kevent ev[2];
-	int error;
 
 	/* Buffer size must be power of two. */
 	assert((tc->bufsize & (tc->bufsize - 1)) == 0);
@@ -219,6 +230,11 @@ hwt_pt_init(struct trace_context *tc)
 			return (ENXIO);
 		}
 	}
+
+	pt_iscache = pt_iscache_alloc(tc->image_name);
+	if (pt_iscache == NULL)
+		errx(EXIT_FAILURE, "%s: failed to allocate section cache",
+		    __func__);
 
 	switch (tc->mode) {
 	case HWT_MODE_CPU:
@@ -235,32 +251,6 @@ hwt_pt_init(struct trace_context *tc)
 		printf("%s: invalid tracing mode %d\n", __func__, tc->mode);
 		return (EINVAL);
 	}
-
-	tc->kqueue_fd = kqueue();
-	if (tc->kqueue_fd == -1)
-		errx(EXIT_FAILURE, "kqueue() failed");
-	kq_fd = tc->kqueue_fd; /* sig handler needs access to kq via global */
-
-	/* Let hwt notify us when the buffer is ready. */
-	EV_SET(&ev[0], HWT_KQ_BUFRDY_EV, EVFILT_USER, EV_ADD | EV_CLEAR,
-	    NOTE_FFCOPY, 0, NULL);
-	/* Let hwt notify us when something gets mapped into the process. */
-	EV_SET(&ev[1], HWT_KQ_NEW_RECORD_EV, EVFILT_USER, EV_ADD | EV_CLEAR,
-	    NOTE_FFCOPY, 0, NULL);
-
-	error = kevent(tc->kqueue_fd, ev, 2, NULL, 0, NULL);
-	if (error == -1)
-		errx(EXIT_FAILURE, "kevent register");
-	if ((ev[0].flags | ev[1].flags) & EV_ERROR)
-		// TODO: properly check per-event errors
-		errx(EXIT_FAILURE, "Event error: %s", strerror(ev[0].data));
-
-	pt_iscache = pt_iscache_alloc(tc->image_name);
-	if (pt_iscache == NULL)
-		errx(EXIT_FAILURE, "%s: failed to allocate section cache",
-		    __func__);
-
-	printf("%s kqueue_fd:%d\n", __func__, tc->kqueue_fd);
 
 	return (0);
 }
@@ -287,19 +277,18 @@ hwt_pt_mmap(struct trace_context *tc, struct hwt_record_user_entry *rec)
 		} else {
 			tid = rec->thread_id;
 		}
-		dctx = calloc(1, sizeof(*dctx));
-		if (dctx == NULL)
-			return (ENOMEM);
 		sprintf(filename, "/dev/hwt_%d_%d", tc->ident, tid);
 		fd = open(filename, O_RDONLY);
 		if (fd < 0) {
 			printf("Can't open %s\n", filename);
-			free(dctx);
 			return (-1);
 		}
 		if (tc->thr_fd == 0) {
 			tc->thr_fd = fd;
 		}
+		dctx = calloc(1, sizeof(*dctx));
+		if (dctx == NULL)
+			return (ENOMEM);
 		dctx->dev_fd = fd;
 		dctx->tracebuf = mmap(NULL, tc->bufsize, PROT_READ, MAP_SHARED,
 		    fd, 0);
@@ -308,35 +297,38 @@ hwt_pt_mmap(struct trace_context *tc, struct hwt_record_user_entry *rec)
 			    "%s: failed to map tracing buffer for thread %d: %s\n",
 			    __func__, tid, strerror(errno));
 			free(dctx);
-			return (-1);
+			return (ENOMEM);
 		}
 		dctx->id = tid;
-		/* Grab another context, if any, and copy its decoder image. */
-		if (!RB_EMPTY(&threads)) {
-			srcctx = RB_ROOT(&threads);
-			srcimg = pt_blk_get_image(srcctx->dec);
-			dstimg = pt_blk_get_image(dctx->dec);
-			pt_image_copy(dstimg, srcimg);
+		if (!tc->raw) {
+			/*
+			 * Grab another context, if any, and copy its decoder
+			 * image.
+			 */
+			if (!RB_EMPTY(&threads)) {
+				srcctx = RB_ROOT(&threads);
+				srcimg = pt_blk_get_image(srcctx->dec);
+				dstimg = pt_blk_get_image(dctx->dec);
+				pt_image_copy(dstimg, srcimg);
+			}
+			memset(&config, 0, sizeof(config));
+			config.size = sizeof(config);
+			config.begin = dctx->tracebuf;
+			config.end = (uint8_t *)dctx->tracebuf + tc->bufsize;
+
+			dctx->dec = pt_blk_alloc_decoder(&config);
+			if (dctx->dec == NULL) {
+				printf(
+				    "%s: failed to allocate PT decoder for thread\n",
+				    __func__);
+				free(dctx);
+				return (ENOMEM);
+			}
 		}
 		RB_INSERT(threads, &threads, dctx);
 		break;
 	default:
 		return (EINVAL);
-	}
-
-	if (!tc->raw) {
-		memset(&config, 0, sizeof(config));
-		config.size = sizeof(config);
-		config.begin = dctx->tracebuf;
-		config.end = (uint8_t *)dctx->tracebuf + tc->bufsize;
-
-		dctx->dec = pt_blk_alloc_decoder(&config);
-		if (dctx->dec == NULL) {
-			printf("%s: failed to allocate PT decoder for thread\n",
-			    __func__);
-			free(dctx);
-			return (ENOMEM);
-		}
 	}
 
 	return (0);
@@ -411,7 +403,8 @@ hwt_pt_print(struct trace_context *tc, struct pt_dec_ctx *dctx, uint64_t ip)
 
 	if (sym) {
 		psname = pmcstat_string_unintern(sym->ps_name);
-		offset = newpc - (sym->ps_start + image->pi_vaddr);
+		offset = newpc -
+		    (sym->ps_start + (image != NULL ? image->pi_vaddr : 0));
 		xo_emit_h(dctx->xop, "\t");
 		xo_emit_h(dctx->xop, "{:psname/%s/%s}", psname);
 		xo_emit_h(dctx->xop, "{:offset/+0x%lx/%ju}", offset);
@@ -431,12 +424,11 @@ hwt_pt_decode_chunk(struct trace_context *tc, struct pt_dec_ctx *dctx,
 	int error = 0;
 	struct pt_block blk;
 	struct pt_event event;
-	uint64_t prevoffs, offs;
+	uint64_t oldoffs, offs;
 	struct pt_block_decoder *dec;
-	uint64_t oldoffs;
 
 	dec = dctx->dec;
-	offs = prevoffs = start;
+	offs = start;
 	/* Set decoder to current offset. */
 	ret = pt_blk_sync_set(dec, start);
 	blk.ip = 0;
@@ -452,16 +444,16 @@ hwt_pt_decode_chunk(struct trace_context *tc, struct pt_dec_ctx *dctx,
 			if (ret == -pte_eos) {
 				/* Restore to last valid offset. */
 				pt_blk_sync_backward(dec);
-				ret = 0;
+				error = 0;
 				break;
 			}
 
 			ret = pt_blk_sync_forward(dec);
 			oldoffs = offs;
 			pt_blk_get_offset(dec, &offs);
-			if (ret <= 0 || offs >= (start + len) ||
+			if (ret < 0 || offs >= (start + len) ||
 			    offs <= oldoffs) {
-				if (ret != -pte_eos) {
+				if (ret < 0 && ret != -pte_eos) {
 					error = ret;
 					printf("ip: %p\n", (void *)blk.ip);
 					printf(
@@ -590,6 +582,31 @@ pt_process_data(struct trace_context *tc, struct pt_dec_ctx *dctx, uint64_t ts)
 }
 
 static int
+hwt_pt_process_buffer(struct trace_context *tc, int id, int curpage,
+    vm_offset_t offset)
+{
+	int error;
+	uint64_t ts;
+	struct pt_dec_ctx *dctx;
+
+	dctx = pt_get_decoder_ctx(tc, id);
+	if (dctx == NULL) {
+		printf("%s: unable to find decorder context for ID %d\n",
+		    __func__, id);
+
+		return (-1);
+	}
+
+	ts = (curpage * PAGE_SIZE) + offset;
+	error = pt_process_data(tc, dctx, ts);
+	if (error) {
+		return (error);
+	}
+
+	return (0);
+}
+
+static int
 pt_get_offs(int dev_fd, uint64_t *offs)
 {
 	struct hwt_bufptr_get bget;
@@ -610,7 +627,7 @@ pt_get_offs(int dev_fd, uint64_t *offs)
 }
 
 static void
-pt_ctx_process_cb(struct trace_context *tc, struct pt_dec_ctx *dctx,
+pt_ctx_shutdown_cb(struct trace_context *tc, struct pt_dec_ctx *dctx,
     void *arg __unused)
 {
 	int error;
@@ -624,89 +641,17 @@ pt_ctx_process_cb(struct trace_context *tc, struct pt_dec_ctx *dctx,
 		errx(EXIT_FAILURE, "pt_process_data");
 }
 
-static int
-hwt_pt_process(struct trace_context *tc)
+static void
+hwt_pt_shutdown(struct trace_context *tc)
 {
-	int status;
-	int ret, id;
-	int nrec, error;
-	struct kevent tevent;
-	struct pt_dec_ctx *dctx;
-
-	xo_open_container("trace");
-	xo_open_list("entries");
-
-	printf("Decoder started. Press ctrl+c to stop.\n");
-
-	while (1) {
-		waitpid(tc->pid, &status, WNOHANG);
-		if (WIFEXITED(status)) {
-			tc->terminate = 1;
-		}
-		if (!tc->terminate) {
-			printf("%s: waiting for new offset\n", __func__);
-			ret = kevent(tc->kqueue_fd, NULL, 0, &tevent, 1, NULL);
-			if (ret == -1) {
-				errx(EXIT_FAILURE, "kevent wait");
-			}
-		}
-		if (errno == EINTR || tc->terminate) {
-			printf(
-			    "%s: tracing terminated - fetching remaining data\n",
-			    __func__);
-			/* Fetch any remaining records. */
-			do {
-				error = hwt_record_fetch(tc, &nrec);
-				if (error != 0 || nrec == 0)
-					break;
-			} while (1);
-
-			/*
-			 * Iterate over all records and process remaining data.
-			 */
-			pt_foreach_ctx(tc, pt_ctx_process_cb, NULL);
-			return (0);
-		}
-
-		printf("EVENT ID: %lu\n", tevent.ident);
-		if (tevent.ident == HWT_KQ_BUFRDY_EV) {
-			id = tevent.fflags & HWT_KQ_BUFRDY_ID_MASK;
-			dctx = pt_get_decoder_ctx(tc, id);
-			if (dctx == NULL) {
-				printf(
-				    "%s: unable to find decorder context for ID %d\n",
-				    __func__, id);
-			}
-			errx(EXIT_FAILURE, "pt_get_decoder_ctx");
-
-			error = pt_process_data(tc, dctx, tevent.data);
-			if (error)
-				errx(EXIT_FAILURE, "pt_process_data");
-		} else if (tevent.ident == HWT_KQ_NEW_RECORD_EV) {
-			printf("%s: fetching new records\n", __func__);
-			do {
-				error = hwt_record_fetch(tc, &nrec);
-				if (error != 0 || nrec == 0)
-					break;
-			} while (1);
-		} else {
-			printf("%s: unknown event identifier %lu\n", __func__,
-			    tevent.ident);
-			errx(EXIT_FAILURE, "kevent ident");
-		}
-	}
-
-	xo_close_list("file");
-	xo_close_container("wc");
-	if (xo_finish() < 0)
-		xo_err(EXIT_FAILURE, "stdout");
-
-	return (0);
+	pt_foreach_ctx(tc, pt_ctx_shutdown_cb, NULL);
 }
 
-struct trace_dev_methods pt_methods = { .init = hwt_pt_init,
+struct trace_dev_methods pt_methods = {
+	.init = hwt_pt_init,
+	.shutdown = hwt_pt_shutdown,
 	.mmap = hwt_pt_mmap,
-	.process = hwt_pt_process,
+	.process_buffer = hwt_pt_process_buffer,
 	.set_config = hwt_pt_set_config,
 	.image_load_cb = hwt_pt_image_load_cb
 };
