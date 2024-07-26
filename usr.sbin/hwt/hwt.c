@@ -209,12 +209,12 @@ hwt_ncpu(void)
 }
 
 static int
-hwt_get_records(struct trace_context *tc, uint32_t *nrec)
+hwt_get_records(struct trace_context *tc, uint32_t *nrec, int wait)
 {
 	int nrecords;
 	int error;
 
-	error = hwt_record_fetch(tc, &nrecords);
+	error = hwt_record_fetch(tc, &nrecords, wait);
 	if (error)
 		return (error);
 
@@ -319,6 +319,71 @@ usage(void)
 }
 
 static int
+hwt_process_loop(struct trace_context *tc)
+{
+	int status;
+	int nrec, error;
+
+	xo_open_container("trace");
+	xo_open_list("entries");
+
+	printf("Decoder started. Press ctrl+c to stop.\n");
+
+	while (1) {
+		waitpid(tc->pid, &status, WNOHANG);
+		if (WIFEXITED(status)) {
+			tc->terminate = 1;
+		}
+		if (!tc->terminate) {
+			printf("%s: waiting for new records\n", __func__);
+			error = hwt_record_fetch(tc, &nrec, 1);
+			if (error != 0 || nrec == 0)
+				break;
+		}
+		if (errno == EINTR || tc->terminate) {
+			printf("%s: tracing terminated - exiting\n", __func__);
+			/* Fetch any remaining records */
+			hwt_record_fetch(tc, &nrec, 0);
+			if (tc->trace_dev->methods->shutdown != NULL)
+				tc->trace_dev->methods->shutdown(tc);
+			return (0);
+		}
+	}
+
+	xo_close_list("file");
+	xo_close_container("wc");
+	if (xo_finish() < 0)
+		xo_err(EXIT_FAILURE, "stdout");
+
+	return (0);
+}
+
+static int
+hwt_process(struct trace_context *tc)
+{
+	int error;
+
+	if (tc->trace_dev->methods->process_buffer != NULL) {
+		error = hwt_process_loop(tc);
+		if (error) {
+			printf("Can't process data, error %d.\n", error);
+			return (error);
+		}
+	} else {
+		if (tc->trace_dev->methods->process == NULL)
+			errx(EX_SOFTWARE,
+			    "Backend has no data processing methods specified\n");
+		error = tc->trace_dev->methods->process(tc);
+		if (error) {
+			printf("Can't process data, error %d.\n", error);
+			return (error);
+		}
+	}
+
+	return (0);
+}
+
+static int
 hwt_mode_cpu(struct trace_context *tc)
 {
 	uint32_t nrec;
@@ -346,7 +411,7 @@ hwt_mode_cpu(struct trace_context *tc)
 
 	tc->pp->pp_pid = -1;
 
-	error = hwt_get_records(tc, &nrec);
+	error = hwt_get_records(tc, &nrec, 0);
 	if (error != 0)
 		return (error);
 
@@ -364,13 +429,7 @@ hwt_mode_cpu(struct trace_context *tc)
 	if (error)
 		errx(EX_SOFTWARE, "failed to start tracing, error %d\n", error);
 
-	error = tc->trace_dev->methods->process(tc);
-	if (error) {
-		printf("cant process data, error %d\n", error);
-		return (error);
-	}
-
-	return (0);
+	return (hwt_process(tc));
 }
 
 static int
@@ -529,7 +588,7 @@ hwt_mode_thread(struct trace_context *tc, char **cmd, char **env)
 	 */
 	tot_rec = 0;
 	do {
-		error = hwt_get_records(tc, &nrec);
+		error = hwt_get_records(tc, &nrec, 0);
 		if (error != 0 || nrec == 0)
 			break;
 		tot_rec += nrec;
@@ -541,13 +600,7 @@ hwt_mode_thread(struct trace_context *tc, char **cmd, char **env)
 		    "Failed to receive expected amount of HWT records.");
 	}
 
-	error = tc->trace_dev->methods->process(tc);
-	if (error) {
-		printf("Can't process data, error %d.\n", error);
-		return (error);
-	}
-
-	return (0);
+	return (hwt_process(tc));
 }
 
 static int
