@@ -130,7 +130,8 @@ hwt_vm_alloc_pages(struct hwt_vm *vm, int kva_req)
 	memattr = VM_MEMATTR_DEVICE;
 
 	if (kva_req) {
-		if ((vm->kvaddr = kva_alloc(vm->npages * PAGE_SIZE)) == 0)
+		vm->kvaddr = kva_alloc(vm->npages * PAGE_SIZE);
+		if (!vm->kvaddr)
 			return (ENOMEM);
 	}
 
@@ -417,7 +418,7 @@ hwt_vm_destroy_buffers(struct hwt_vm *vm)
 	vm_page_t m;
 	int i;
 
-	if (vm->ctx->kva_req && vm->kvaddr != 0) {
+	if (vm->ctx->hwt_backend->kva_req && vm->kvaddr != 0) {
 		pmap_qremove(vm->kvaddr, vm->npages);
 		kva_free(vm->kvaddr, vm->npages * PAGE_SIZE);
 	}

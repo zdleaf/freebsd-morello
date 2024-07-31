@@ -736,6 +736,7 @@ static struct hwt_backend_ops pt_ops = {
 static struct hwt_backend backend = {
 	.ops = &pt_ops,
 	.name = "pt",
+	.kva_req = 1,
 };
 
 static void

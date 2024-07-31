@@ -55,6 +55,8 @@ struct hwt_backend_ops {
 struct hwt_backend {
 	const char			*name;
 	struct hwt_backend_ops		*ops;
+	/* buffers require kernel virtual addresses */
+	bool				kva_req;
 };
 
 int hwt_backend_init(struct hwt_context *ctx);
