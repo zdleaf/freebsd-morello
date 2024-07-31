@@ -102,7 +102,7 @@
 MALLOC_DECLARE(M_ARM_SPE);
 
 extern u_int mp_maxid;
-extern struct taskqueue *taskqueue_hwt;
+extern struct taskqueue *taskqueue_arm_spe;
 
 void spe_backend_disable_smp(struct hwt_context *ctx);
 

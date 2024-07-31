@@ -52,7 +52,10 @@
 
 MALLOC_DEFINE(M_ARM_SPE, "armspe", "Arm SPE tracing");
 
-extern struct taskqueue *taskqueue_hwt;
+/*
+ * taskqueue(9) used for sleepable routines called from interrupt handlers
+ */
+TASKQUEUE_FAST_DEFINE_THREAD(arm_spe);
 
 void arm_spe_send_buffer(void *, int);
 static void arm_spe_error(void *, int);
@@ -165,7 +168,7 @@ arm_spe_intr(void *arg)
 			device_printf(dev, "unknown PMBSR_EC: %#x\n", ec);
 			arm_spe_disable(NULL);
 			TASK_INIT(&sc->task, 0, (task_fn_t *)arm_spe_error, sc->ctx);
-			taskqueue_enqueue(taskqueue_hwt, &sc->task);
+			taskqueue_enqueue(taskqueue_arm_spe, &sc->task);
 			return (FILTER_HANDLED);
 	}
 
@@ -187,7 +190,7 @@ arm_spe_intr(void *arg)
 			 */
 			arm_spe_disable(NULL);
 			TASK_INIT(&sc->task, 0, (task_fn_t *)arm_spe_error, sc->ctx);
-			taskqueue_enqueue(taskqueue_hwt, &sc->task);
+			taskqueue_enqueue(taskqueue_arm_spe, &sc->task);
 			/* PMBPTR_EL1 is fault address if PMBSR_DL is 1 */
 			device_printf(dev, "CPU:%d PMBSR_EL1:%#lx\n", cpu_id, pmbsr);
 			device_printf(dev, "PMBPTR_EL1:%#lx PMBLIMITR_EL1:%#lx\n",
@@ -223,7 +226,7 @@ arm_spe_intr(void *arg)
 	 * add to a taskqueue to be scheduled later instead
 	 */
 	TASK_INIT(&info->task[i], 0, (task_fn_t *)arm_spe_send_buffer, buf);
-	taskqueue_enqueue(taskqueue_hwt, &info->task[i]);
+	taskqueue_enqueue(taskqueue_arm_spe, &info->task[i]);
 
 	/*
 	 * It's possible userspace hasn't yet notified us they've copied out the
