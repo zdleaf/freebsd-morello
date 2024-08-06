@@ -403,6 +403,15 @@ LENTRY(enter_kernel_el)
 	msr	icc_sre_el2, x2
 2:
 
+	/* Set the Monitor Debug Configuration Register */
+	mrs	x2, mdcr_el2
+	/* Enable SPE at EL1
+	 * TODO: Once VHE is enabled this will need to change - when kern is
+	 * booted at EL2 use 0b00, else 0b11
+	 */
+	orr	x2, x2, (0b11 << MDCR_E2PB_SHIFT)
+	msr	mdcr_el2, x2
+
 	/* Set the address to return to our return address */
 	msr	elr_el2, x30
 	isb

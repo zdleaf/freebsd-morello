@@ -117,29 +117,6 @@
  *    device within the context, entire context will be marked as RUNNING.
  * 4. The rest is similar to the THREAD mode.
  *
- *
- * A taskqueue(9) is declared in this file for asynchronous execution of tasks
- *	e.g. sleepable routines called from interrupt handlers
- *
- * to use it, extern the queue in the src file where it will be used:
- *	extern struct taskqueue *taskqueue_hwt;
- *
- * then call TASK_INIT to setup a task + enqueue it:
- *	TASK_INIT(struct *task, 0, (task_fn_t *)func, *arg);
- *	taskqueue_enqueue(taskqueue_hwt, struct *task);
- *
- *
- * A kqueue(2)(9) can be configured in userspace to allow userspace to sleep
- * until notified by the kernel
- *	e.g. notify userspace to service a buffer on a buffer full interrupt
- *
- * hwt_context ctx contains kqueue_fd + struct thread *hwt_td of the calling
- * userspace tool.
- *
- * Create an event and register on kqueue to wake userspace:
- *	EV_SET(struct *kevent, EVENT_NUM, EVFILT_USER, 0,
- *	    NOTE_TRIGGER | NOTE_FFCOPY | uflags, data, NULL);
- *	ret = kqfd_register(ctx->kqueue_fd, *kevent, ctx->hwt_td, M_WAITOK);
  */
 
 #include <sys/param.h>
