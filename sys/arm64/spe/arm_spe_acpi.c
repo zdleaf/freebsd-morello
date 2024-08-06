@@ -58,6 +58,8 @@ DEFINE_CLASS_1(spe, arm_spe_acpi_driver, arm_spe_acpi_methods,
     sizeof(struct arm_spe_softc), arm_spe_driver);
 
 DRIVER_MODULE(spe, acpi, arm_spe_acpi_driver, 0, 0);
+MODULE_DEPEND(spe, hwt, 1, 1, 1);
+MODULE_VERSION(spe, 1);
 
 struct madt_data {
 	u_int irq;

@@ -62,6 +62,8 @@ DEFINE_CLASS_1(spe, arm_spe_fdt_driver, arm_spe_fdt_methods,
     sizeof(struct arm_spe_softc), arm_spe_driver);
 
 DRIVER_MODULE(spe, simplebus, arm_spe_fdt_driver, 0, 0);
+MODULE_DEPEND(spe, hwt, 1, 1, 1);
+MODULE_VERSION(spe, 1);
 
 static int
 arm_spe_fdt_probe(device_t dev)
