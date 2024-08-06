@@ -9,11 +9,13 @@ SRCS	= \
 	arm_spe.h \
 	arm_spe_dev.h
 
+SRCS+=	opt_platform.h
+
 SRCS.DEV_ACPI= \
 	arm_spe_acpi.c
 
 .if !empty(OPT_FDT)
-SRCS+	= \
+SRCS+= \
 	arm_spe_fdt.c
 .endif
 
