@@ -379,6 +379,7 @@ SUBDIR=	\
 	smbfs \
 	snp \
 	sound \
+	${_spe} \
 	${_speaker} \
 	spi \
 	${_splash} \
@@ -669,6 +670,7 @@ _irdma=		irdma
 .endif
 
 .if ${MACHINE_CPUARCH} == "aarch64"
+_spe=		spe
 .if !empty(OPT_FDT)
 _coresight=	coresight
 .endif

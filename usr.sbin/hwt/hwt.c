@@ -61,6 +61,7 @@
 
 #if defined(__aarch64__)
 #include "hwt_coresight.h"
+#include "hwt_spe.h"
 #endif
 
 #if defined(__amd64__)
@@ -86,6 +87,7 @@ static struct trace_context tcs;
 static struct trace_dev trace_devs[] = {
 #if defined(__aarch64__)
 	{ "coresight",	"ARM Coresight", &cs_methods },
+	{ "spe",	"ARM Statistical Profiling Extension", &spe_methods },
 #endif
 #if defined(__amd64__)
 	{ "pt", "Intel PT", &pt_methods},
@@ -304,8 +306,9 @@ usage(void)
 			" [-f name] [path to executable]\n"
 		"\t -s\tcpu_id\t\tCPU (kernel) mode.\n"
 		"\t -c\tname\t\tName of tracing device, e.g. 'coresight'.\n"
-		"\t -b\tbufsize\t\tSize of trace buffer (per each thread)"
-		    " in bytes.\n"
+		"\t -b\tbufsize\t\tSize of trace buffer (per each thread/cpu)\n"
+		"\t\t\t\tin bytes. Must be a multiple of page size\n"
+		"\t\t\t\te.g. 4096.\n"
 		"\t -t\tid\t\tThread index of application passed to decoder.\n"
 		"\t -r\t\t\tRaw flag. Do not decode results.\n"
 		"\t -w\tfilename\tStore results into file.\n"
@@ -389,7 +392,8 @@ hwt_mode_cpu(struct trace_context *tc)
 	uint32_t nrec;
 	int error;
 
-	if (tc->image_name == NULL || tc->func_name == NULL)
+	if (strcmp(tc->trace_dev->name, "coresight") == 0 &&
+	    (tc->image_name == NULL || tc->func_name == NULL))
 		errx(EX_USAGE, "IP range filtering must be setup for CPU"
 		    " tracing");
 
@@ -398,7 +402,10 @@ hwt_mode_cpu(struct trace_context *tc)
 		printf("%s: failed to alloc cpu-mode ctx, error %d errno %d\n",
 		    __func__, error, errno);
 		if (errno == EPERM)
-			printf("Permission denied.");
+			printf("Permission denied");
+		else if (errno == EINVAL)
+			printf("Invalid argument: buffer size is not a multiple"
+			    " of page size, or is too small/large");
 		printf("\n");
 		return (error);
 	}
@@ -417,9 +424,11 @@ hwt_mode_cpu(struct trace_context *tc)
 
 	printf("Received %d kernel mappings\n", nrec);
 
-	error = hwt_find_sym(tc);
-	if (error)
-		errx(EX_USAGE, "could not find symbol");
+	if(tc->image_name || tc->func_name) {
+		error = hwt_find_sym(tc);
+		if (error)
+			errx(EX_USAGE, "could not find symbol");
+	}
 
 	error = tc->trace_dev->methods->set_config(tc);
 	if (error != 0)
@@ -545,7 +554,10 @@ hwt_mode_thread(struct trace_context *tc, char **cmd, char **env)
 		       "error %d errno %d\n",
 		    __func__, error, errno);
 		if (errno == EPERM)
-			printf("Permission denied.");
+			printf("Permission denied");
+		else if (errno == EINVAL)
+			printf("Invalid argument: buffer size is not a multiple"
+			    " of page size, or is too small/large");
 		printf("\n");
 		return (error);
 	}

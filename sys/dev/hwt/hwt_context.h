@@ -60,7 +60,6 @@ struct hwt_context {
 	int				pause_on_mmap;
 
 	size_t				bufsize; /* Trace bufsize for each vm.*/
-	int				kva_req;
 
 	void				*config;
 	size_t				config_size;

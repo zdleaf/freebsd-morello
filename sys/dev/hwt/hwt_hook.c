@@ -230,7 +230,7 @@ hwt_hook_thread_create(struct thread *td)
 		return (ENXIO);
 	thread_id = atomic_fetchadd_int(&ctx->thread_counter, 1);
 	bufsize = ctx->bufsize;
-	kva_req = ctx->kva_req;
+	kva_req = ctx->hwt_backend->kva_req;
 	sprintf(path, "hwt_%d_%d", ctx->ident, thread_id);
 	hwt_ctx_put(ctx);
 
