@@ -854,7 +854,7 @@ tcp_packets_this_ack(struct tcpcb *tp, tcp_seq ack)
 #define	TF2_CANNOT_DO_ECN	0x00080000 /* The stack does not do ECN */
 #define	TF2_PROC_SACK_PROHIBIT	0x00100000 /* Due to small MSS size do not process sack's */
 #define	TF2_IPSEC_TSO		0x00200000 /* IPSEC + TSO supported */
-#define	TF2_NO_ISS_CHECK	0x00200000 /* Don't check SEG.ACK against ISS */
+#define	TF2_NO_ISS_CHECK	0x00400000 /* Don't check SEG.ACK against ISS */
 
 /*
  * Structure to hold TCP options that are only used during segment
@@ -1268,6 +1268,8 @@ VNET_DECLARE(int, tcp_log_in_vain);
 VNET_DECLARE(int, drop_synfin);
 VNET_DECLARE(int, path_mtu_discovery);
 VNET_DECLARE(int, tcp_abc_l_var);
+VNET_DECLARE(uint32_t, tcp_ack_war_cnt);
+VNET_DECLARE(uint32_t, tcp_ack_war_time_window);
 VNET_DECLARE(int, tcp_autorcvbuf_max);
 VNET_DECLARE(int, tcp_autosndbuf_inc);
 VNET_DECLARE(int, tcp_autosndbuf_max);
@@ -1319,6 +1321,8 @@ VNET_DECLARE(struct inpcbinfo, tcbinfo);
 #define	V_path_mtu_discovery		VNET(path_mtu_discovery)
 #define	V_tcbinfo			VNET(tcbinfo)
 #define	V_tcp_abc_l_var			VNET(tcp_abc_l_var)
+#define	V_tcp_ack_war_cnt		VNET(tcp_ack_war_cnt)
+#define	V_tcp_ack_war_time_window	VNET(tcp_ack_war_time_window)
 #define	V_tcp_autorcvbuf_max		VNET(tcp_autorcvbuf_max)
 #define	V_tcp_autosndbuf_inc		VNET(tcp_autosndbuf_inc)
 #define	V_tcp_autosndbuf_max		VNET(tcp_autosndbuf_max)
