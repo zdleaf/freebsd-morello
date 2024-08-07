@@ -253,7 +253,6 @@ hwt_ioctl_alloc_mode_thread(struct thread *td, struct hwt_owner *ho,
 
 	error = hwt_backend_init(ctx);
 	if (error) {
-		hwt_thread_free(thr);
 		hwt_ctx_free(ctx);
 		return (error);
 	}
