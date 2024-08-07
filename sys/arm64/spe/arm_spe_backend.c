@@ -30,42 +30,53 @@
  */
 
 /*
- * Hardware Tracing framework
- *
  * Arm Statistical Profiling Extension (SPE) backend
  *
- * This driver writes raw SPE records into a large single buffer allocated by
- * hwt. This buffer is split in half to create a 2 element circular buffer (aka
- * ping-pong buffer) where the kernel writes to one half while userspace is
- * copying the other half.
+ * Basic SPE operation
  *
- * When the first half of the buffer is full, a buffer full interrupt will
- * switch writing to the second half. The kernel adds the details of the half
- * that needs copying to an STAILQ (FIFO) and notifies userspace via kqueue how
- * many buffers on the queue need servicing.
+ *   SPE is enabled and configured on a per-core basis, with each core requiring
+ *   separate code to enable and configure. Each core also requires a separate
+ *   buffer passed as config where the CPU will write profiling data. When the
+ *   profiling buffer is full, an interrupt will be taken on the same CPU.
  *
- * The userspace tool is sleeping via kevent() and wakes up on notification from
- * the kernel via an ARM_SPE_KQ_BUF event that contains the number of items on
- * the queue. Userspace sends a HWT_IOC_BUFPTR_GET ioctl to fetch the first item
- * on the queue and copy out this buffer. It then sends HWT_IOC_SVC_BUF to
- * notify kernel it is safe to overwrite that half of the buffer.
+ * Driver Design
  *
- * Should the kernel fill up the second half of the buffer before userspace has
- * notified us it's copied out the other half, the kernel will pause profiling
- * to avoid overwriting until it receives the HWT_IOC_SVC_BUF ioctl. Using large
- * buffer sizes should minimise these pauses and loss of profiling data. Since
- * it is generally expected that consuming (copying) this data is faster than
- * producing it, in practice this has not so far been an issue. If it does
- * prove to be an issue even with large buffer sizes then additional buffering
- * i.e. n element circular buffers might help.
+ * - HWT allocates a large single buffer per core. This buffer is split in half
+ *   to create a 2 element circular buffer (aka ping-pong buffer) where the
+ *   kernel writes to one half while userspace is copying the other half
+ * - SMP calls are used to enable and configure each core, with SPE initially
+ *   configured to write to the first half of the buffer
+ * - When the first half of the buffer is full, a buffer full interrupt will
+ *   immediately switch writing to the second half. The kernel adds the details
+ *   of the half that needs copying to a FIFO STAILQ and notifies userspace via
+ *   kqueue by sending a ARM_SPE_KQ_BUF kevent with how many buffers on the
+ *   queue need servicing
+ * - The kernel responds to HWT_IOC_BUFPTR_GET ioctl by sending details of the
+ *   first item from the queue
+ * - The buffers pending copying will not be overwritten until an
+ *   HWT_IOC_SVC_BUF ioctl is received from userspace confirming the data has
+ *   been copied out
+ * - In the case where both halfs of the buffer are full, profiling will be
+ *   paused until notification via HWT_IOC_SVC_BUF is received
  *
- * The STAILQ + HWT_IOC_BUFPTR_GET method is required because kqueue can only
- * queue one event of the same type, with subsequent events overwriting data in
- * the first event. This works with the current use case since we can update the
- * event with the number of items on the queue. The alternative is to register
- * individual events per either CPU or THREAD e.g. EVENT+ID, although this
- * requires passing IDs to userspace to setup individual events for each. This
- * could be a future optimisation to avoid the additional BUFPTR_GET ioctl.
+ * Future improvements and limitations
+ *
+ * - Using large buffer sizes should minimise pauses and loss of profiling
+ *   data while kernel is waiting for userspace to copy out data. Since it is
+ *   generally expected that consuming (copying) this data is faster than
+ *   producing it, in practice this has not so far been an issue. If it does
+ *   prove to be an issue even with large buffer sizes then additional buffering
+ *   i.e. n element circular buffers might be required.
+ *
+ * - kqueue can only notify and queue one kevent of the same type, with
+ *   subsequent events overwriting data in the first event. The kevent
+ *   ARM_SPE_KQ_BUF can therefore only contain the number of buffers on the
+ *   STAILQ, incrementing each time a new buffer is full. In this case kqueue
+ *   serves just as a notification to userspace to wake up and query the kernel
+ *   with the appropriate ioctl. An alternative might be custom kevents where
+ *   the kevent identifier is encoded with something like n+cpu_id or n+tid. In
+ *   this case data could be sent directly with kqueue via the kevent data and
+ *   fflags elements, avoiding the extra ioctl.
  *
  */
 

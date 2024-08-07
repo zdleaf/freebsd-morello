@@ -551,8 +551,8 @@ hwt_mode_thread(struct trace_context *tc, char **cmd, char **env)
 	error = hwt_ctx_alloc(tc);
 	if (error) {
 		printf("%s: failed to alloc thread-mode ctx "
-		       "error %d errno %d\n",
-		    __func__, error, errno);
+		       "error %d errno %d %s\n",
+		    __func__, error, errno, strerror(errno));
 		if (errno == EPERM)
 			printf("Permission denied");
 		else if (errno == EINVAL)
