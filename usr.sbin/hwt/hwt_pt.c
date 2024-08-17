@@ -28,17 +28,16 @@
 #include <sys/cpuset.h>
 #include <sys/errno.h>
 #include <sys/event.h>
-#include <sys/hwt.h>
 #include <sys/ioctl.h>
 #include <sys/mman.h>
 #include <sys/socket.h>
 #include <sys/sysctl.h>
 #include <sys/wait.h>
 #include <sys/tree.h>
+#include <sys/hwt.h>
+#include <sys/hwt_record.h>
 
 #include <err.h>
-#include <libipt/intel-pt.h>
-#include <libxo/xo.h>
 #include <stdio.h>
 #include <string.h>
 #include <assert.h>
@@ -46,22 +45,21 @@
 #include <fcntl.h>
 #include <unistd.h>
 
-#include "amd64/pt/pt.h"
+#include <libxo/xo.h>
+#include <amd64/pt/pt.h>
+#include <libipt/intel-pt.h>
+
+#include "libpmcstat_stubs.h"
+#include <libpmcstat.h>
+
 #include "hwt.h"
 #include "hwt_elf.h"
 #include "hwt_pt.h"
-#include "sys/hwt_record.h"
-#include "sys/types.h"
-#include "libpmcstat_stubs.h"
-#include <libpmcstat.h>
-#include <libxo/xo.h>
 
 #define pt_strerror(errcode) pt_errstr(pt_errcode((errcode)))
 
-static int pt_ctx_compare(const void *n1, const void *n2);
-
 /*
- * Decoder state.
+ * Trace decoder state.
  */
 struct pt_dec_ctx {
 	size_t curoff;
@@ -79,24 +77,15 @@ struct pt_dec_ctx {
 
 typedef void (
     *pt_ctx_iter_cb)(struct trace_context *, struct pt_dec_ctx *, void *);
+static int pt_ctx_compare(const void *n1, const void *n2);
 
+/*
+ * Active decoder states.
+ */
 static struct pt_image_section_cache *pt_iscache;
-
 static struct pt_dec_ctx *cpus;
 static RB_HEAD(threads, pt_dec_ctx) threads;
 RB_GENERATE_STATIC(threads, pt_dec_ctx, entry, pt_ctx_compare);
-
-static void
-pt_ctx_sync_ts(struct trace_context *tc, struct pt_dec_ctx *dctx,
-    uint64_t newts)
-{
-	size_t newoff;
-
-	newoff = (newts - dctx->ts) & (tc->bufsize - 1);
-
-	dctx->ts = newts;
-	dctx->curoff = newoff;
-}
 
 static int
 pt_ctx_compare(const void *n1, const void *n2)
@@ -107,6 +96,9 @@ pt_ctx_compare(const void *n1, const void *n2)
 	return (c1->id < c2->id ? -1 : c1->id > c2->id ? 1 : 0);
 }
 
+/*
+ * Iterate over all active decoders and invoked provided callback.
+ */
 static void
 pt_foreach_ctx(struct trace_context *tc, pt_ctx_iter_cb callback, void *arg)
 {
@@ -130,6 +122,10 @@ pt_foreach_ctx(struct trace_context *tc, pt_ctx_iter_cb callback, void *arg)
 	}
 }
 
+/*
+ * Initialize a trace decoder.
+ * Invoked as a callback from 'pt_foreach_ctx'.
+ */
 static void
 pt_cpu_ctx_init_cb(struct trace_context *tc, struct pt_dec_ctx *dctx,
     void *arg __unused)
@@ -177,6 +173,10 @@ pt_cpu_ctx_init_cb(struct trace_context *tc, struct pt_dec_ctx *dctx,
 	}
 }
 
+/*
+ * Add a new ELF section to the trace decoder.
+ * Invoked as a callback from 'pt_foreach_ctx'.
+ */
 static void
 pt_update_image_cb(struct trace_context *tc __unused, struct pt_dec_ctx *dctx,
     void *arg)
@@ -194,6 +194,10 @@ pt_update_image_cb(struct trace_context *tc __unused, struct pt_dec_ctx *dctx,
 		    __func__, pt_strerror(error));
 }
 
+/*
+ * Add all ELF sections to the trace decoder.
+ * Invoked as a callback from 'pt_foreach_ctx'.
+ */
 static int
 hwt_pt_image_load_cb(struct trace_context *tc, struct hwt_exec_img *img)
 {
@@ -255,6 +259,11 @@ hwt_pt_init(struct trace_context *tc)
 	return (0);
 }
 
+/*
+ * Map and initialize the tracing buffer.
+ * Called whenever a new traced thread gets created or
+ * when HWT_MODE_CPU tracing is started.
+ */
 static int
 hwt_pt_mmap(struct trace_context *tc, struct hwt_record_user_entry *rec)
 {
@@ -433,6 +442,7 @@ hwt_pt_decode_chunk(struct trace_context *tc, struct pt_dec_ctx *dctx,
 	ret = pt_blk_sync_set(dec, start);
 	blk.ip = 0;
 	do {
+		/* Process any pending events. */
 		while (ret & pts_event_pending) {
 			ret = pt_blk_event(dec, &event, sizeof(event));
 			pt_blk_get_offset(dec, &offs);
@@ -497,7 +507,8 @@ pt_process_chunk(struct trace_context *tc, struct pt_dec_ctx *dctx,
     uint64_t offs, size_t len, uint64_t *processed)
 {
 	if (tc->raw) {
-		return (hwt_pt_dump_chunk(dctx, tc->raw_f, offs, len, processed));
+		return (
+		    hwt_pt_dump_chunk(dctx, tc->raw_f, offs, len, processed));
 	} else {
 		return (hwt_pt_decode_chunk(tc, dctx, offs, len, processed));
 	}
@@ -522,6 +533,21 @@ pt_get_decoder_ctx(struct trace_context *tc, int ctxid)
 	return (NULL);
 }
 
+/*
+ * Re-sync buffer when wrap is detected.
+ */
+static void
+pt_ctx_sync_ts(struct trace_context *tc, struct pt_dec_ctx *dctx,
+    uint64_t newts)
+{
+	size_t newoff;
+
+	newoff = (newts - dctx->ts) & (tc->bufsize - 1);
+
+	dctx->ts = newts;
+	dctx->curoff = newoff;
+}
+
 static int
 pt_process_data(struct trace_context *tc, struct pt_dec_ctx *dctx, uint64_t ts)
 {
@@ -530,7 +556,7 @@ pt_process_data(struct trace_context *tc, struct pt_dec_ctx *dctx, uint64_t ts)
 	size_t newoff, curoff, len;
 
 	/*
-	 * Check if the buffer overflowed since
+	 * Check if the buffer wrapped since
 	 * the last time we processed it
 	 * and try to resync.
 	 */
@@ -581,6 +607,9 @@ pt_process_data(struct trace_context *tc, struct pt_dec_ctx *dctx, uint64_t ts)
 	return (0);
 }
 
+/*
+ * Decode part of the tracing buffer.
+ */
 static int
 hwt_pt_process_buffer(struct trace_context *tc, int id, int curpage,
     vm_offset_t offset)
@@ -606,22 +635,23 @@ hwt_pt_process_buffer(struct trace_context *tc, int id, int curpage,
 	return (0);
 }
 
+/*
+ * Fetch last valid trace offset for 'dev_fd'.
+ */
 static int
 pt_get_offs(int dev_fd, uint64_t *offs)
 {
 	struct hwt_bufptr_get bget;
-	vm_offset_t curpage_offset;
+	vm_offset_t offset;
 	int curpage;
 	int error;
 
-	bget.curpage = &curpage;
-	bget.curpage_offset = &curpage_offset;
-
+	bget.ident = &curpage;
+	bget.offset = &offset;
 	error = ioctl(dev_fd, HWT_IOC_BUFPTR_GET, &bget);
 	if (error)
 		return (error);
-
-	*offs = curpage * PAGE_SIZE + curpage_offset;
+	*offs = curpage * PAGE_SIZE + offset;
 
 	return (0);
 }
