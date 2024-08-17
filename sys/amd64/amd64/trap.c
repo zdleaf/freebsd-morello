@@ -207,6 +207,32 @@ static const struct {
 	},
 };
 
+static __inline int
+nmi_handle_pcint(struct trapframe *frame){
+	int handled = 0;
+
+#ifdef HWT_HOOKS
+	/*
+	 * Handle Intel PT interrupt if hwt is active.
+	 */
+	if (hwt_intr != NULL)
+		handled |= !!(*hwt_intr)(frame);
+#endif
+
+#ifdef HWPMC_HOOKS
+	/*
+	 * CPU PMCs interrupt using an NMI.  If the PMC module is
+	 * active, pass the 'rip' value to the PMC module's interrupt
+	 * handler.  A non-zero return value from the handler means that
+	 * the NMI was consumed by it and we can return immediately.
+	 */
+	if (pmc_intr != NULL)
+		handled |= !!(*pmc_intr)(frame);
+#endif
+
+	return (handled);
+}
+
 /*
  * Exception, fault, and trap interface to the FreeBSD kernel.
  * This common code is called from assembly language IDT gate entry
@@ -254,22 +280,8 @@ trap(struct trapframe *frame)
 	}
 
 	if (type == T_NMI) {
-#ifdef HWT_HOOKS
-		if (hwt_intr != NULL && (*hwt_intr)(frame) != 0)
+		if (nmi_handle_pcint(frame) != 0)
 			return;
-#endif
-
-#ifdef HWPMC_HOOKS
-		/*
-		 * CPU PMCs interrupt using an NMI.  If the PMC module is
-		 * active, pass the 'rip' value to the PMC module's interrupt
-		 * handler.  A non-zero return value from the handler means that
-		 * the NMI was consumed by it and we can return immediately.
-		 */
-		if (pmc_intr != NULL &&
-		    (*pmc_intr)(frame) != 0)
-			return;
-#endif
 	}
 
 	if ((frame->tf_rflags & PSL_I) == 0) {
