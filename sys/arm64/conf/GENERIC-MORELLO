@@ -1,0 +1,9 @@
+include		GENERIC1
+ident		GENERIC-MORELLO
+
+nooptions	NFSCL
+nooptions	NFSD
+nooptions	NFSLOCKD
+nooptions	NFS_ROOT
+
+options 	ROOTDEVNAME=\"ufs:/dev/ada0p2\"

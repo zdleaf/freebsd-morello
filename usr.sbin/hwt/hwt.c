@@ -53,12 +53,15 @@
 
 #include "libpmcstat_stubs.h"
 #include <libpmcstat.h>
+#include <libgen.h>
 #include <libxo/xo.h>
 
 #include "hwt.h"
+#include "hwt_elf.h"
 
 #if defined(__aarch64__)
 #include "hwt_coresight.h"
+#include "hwt_spe.h"
 #endif
 
 #if defined(__amd64__)
@@ -84,6 +87,7 @@ static struct trace_context tcs;
 static struct trace_dev trace_devs[] = {
 #if defined(__aarch64__)
 	{ "coresight",	"ARM Coresight", &cs_methods },
+	{ "spe",	"ARM Statistical Profiling Extension", &spe_methods },
 #endif
 #if defined(__amd64__)
 	{ "pt", "Intel PT", &pt_methods},
@@ -207,18 +211,46 @@ hwt_ncpu(void)
 }
 
 static int
-hwt_get_records(struct trace_context *tc, uint32_t *nrec)
+hwt_get_records(struct trace_context *tc, uint32_t *nrec, int wait)
 {
 	int nrecords;
 	int error;
 
-	error = hwt_record_fetch(tc, &nrecords);
+	error = hwt_record_fetch(tc, &nrecords, wait);
 	if (error)
 		return (error);
 
 	*nrec = nrecords;
 
 	return (0);
+}
+
+struct pmcstat_symbol *
+hwt_sym_lookup(const struct trace_context *tc, uint64_t ip,
+    struct pmcstat_image **img, uint64_t *newpc0)
+{
+	struct pmcstat_image *image;
+	struct pmcstat_symbol *sym;
+	struct pmcstat_pcmap *map;
+	uint64_t newpc;
+
+	map = pmcstat_process_find_map(tc->pp, ip);
+	if (map != NULL) {
+		image = map->ppm_image;
+		newpc = ip -
+		    ((unsigned long)map->ppm_lowpc +
+			(image->pi_vaddr - image->pi_start));
+		sym = pmcstat_symbol_search(image, newpc); /* Could be NULL. */
+		newpc += image->pi_vaddr;
+
+		*img = image;
+		*newpc0 = newpc;
+
+		return (sym);
+	} else
+		*img = NULL;
+
+	return (NULL);
 }
 
 int
@@ -274,8 +306,9 @@ usage(void)
 			" [-f name] [path to executable]\n"
 		"\t -s\tcpu_id\t\tCPU (kernel) mode.\n"
 		"\t -c\tname\t\tName of tracing device, e.g. 'coresight'.\n"
-		"\t -b\tbufsize\t\tSize of trace buffer (per each thread)"
-		    " in bytes.\n"
+		"\t -b\tbufsize\t\tSize of trace buffer (per each thread/cpu)\n"
+		"\t\t\t\tin bytes. Must be a multiple of page size\n"
+		"\t\t\t\te.g. 4096.\n"
 		"\t -t\tid\t\tThread index of application passed to decoder.\n"
 		"\t -r\t\t\tRaw flag. Do not decode results.\n"
 		"\t -w\tfilename\tStore results into file.\n"
@@ -289,12 +322,78 @@ usage(void)
 }
 
 static int
+hwt_process_loop(struct trace_context *tc)
+{
+	int status;
+	int nrec, error;
+
+	xo_open_container("trace");
+	xo_open_list("entries");
+
+	printf("Decoder started. Press ctrl+c to stop.\n");
+
+	while (1) {
+		waitpid(tc->pid, &status, WNOHANG);
+		if (WIFEXITED(status)) {
+			tc->terminate = 1;
+		}
+		if (!tc->terminate) {
+			printf("%s: waiting for new records\n", __func__);
+			error = hwt_record_fetch(tc, &nrec, 1);
+			if (error != 0 || nrec == 0)
+				break;
+		}
+		if (errno == EINTR || tc->terminate) {
+			printf("%s: tracing terminated - exiting\n", __func__);
+			/* Fetch any remaining records */
+			hwt_record_fetch(tc, &nrec, 0);
+			if (tc->trace_dev->methods->shutdown != NULL)
+				tc->trace_dev->methods->shutdown(tc);
+			return (0);
+		}
+	}
+
+	xo_close_list("file");
+	xo_close_container("wc");
+	if (xo_finish() < 0)
+		xo_err(EXIT_FAILURE, "stdout");
+
+	return (0);
+}
+
+static int
+hwt_process(struct trace_context *tc)
+{
+	int error;
+
+	if (tc->trace_dev->methods->process_buffer != NULL) {
+		error = hwt_process_loop(tc);
+		if (error) {
+			printf("Can't process data, error %d.\n", error);
+			return (error);
+		}
+	} else {
+		if (tc->trace_dev->methods->process == NULL)
+			errx(EX_SOFTWARE,
+			    "Backend has no data processing methods specified\n");
+		error = tc->trace_dev->methods->process(tc);
+		if (error) {
+			printf("Can't process data, error %d.\n", error);
+			return (error);
+		}
+	}
+
+	return (0);
+}
+
+static int
 hwt_mode_cpu(struct trace_context *tc)
 {
 	uint32_t nrec;
 	int error;
 
-	if (tc->image_name == NULL || tc->func_name == NULL)
+	if (strcmp(tc->trace_dev->name, "coresight") == 0 &&
+	    (tc->image_name == NULL || tc->func_name == NULL))
 		errx(EX_USAGE, "IP range filtering must be setup for CPU"
 		    " tracing");
 
@@ -303,7 +402,10 @@ hwt_mode_cpu(struct trace_context *tc)
 		printf("%s: failed to alloc cpu-mode ctx, error %d errno %d\n",
 		    __func__, error, errno);
 		if (errno == EPERM)
-			printf("Permission denied.");
+			printf("Permission denied");
+		else if (errno == EINVAL)
+			printf("Invalid argument: buffer size is not a multiple"
+			    " of page size, or is too small/large");
 		printf("\n");
 		return (error);
 	}
@@ -316,15 +418,17 @@ hwt_mode_cpu(struct trace_context *tc)
 
 	tc->pp->pp_pid = -1;
 
-	error = hwt_get_records(tc, &nrec);
+	error = hwt_get_records(tc, &nrec, 0);
 	if (error != 0)
 		return (error);
 
 	printf("Received %d kernel mappings\n", nrec);
 
-	error = hwt_find_sym(tc);
-	if (error)
-		errx(EX_USAGE, "could not find symbol");
+	if(tc->image_name || tc->func_name) {
+		error = hwt_find_sym(tc);
+		if (error)
+			errx(EX_USAGE, "could not find symbol");
+	}
 
 	error = tc->trace_dev->methods->set_config(tc);
 	if (error != 0)
@@ -334,13 +438,7 @@ hwt_mode_cpu(struct trace_context *tc)
 	if (error)
 		errx(EX_SOFTWARE, "failed to start tracing, error %d\n", error);
 
-	error = tc->trace_dev->methods->process(tc);
-	if (error) {
-		printf("cant process data, error %d\n", error);
-		return (error);
-	}
-
-	return (0);
+	return (hwt_process(tc));
 }
 
 static int
@@ -453,10 +551,13 @@ hwt_mode_thread(struct trace_context *tc, char **cmd, char **env)
 	error = hwt_ctx_alloc(tc);
 	if (error) {
 		printf("%s: failed to alloc thread-mode ctx "
-		       "error %d errno %d\n",
-		    __func__, error, errno);
+		       "error %d errno %d %s\n",
+		    __func__, error, errno, strerror(errno));
 		if (errno == EPERM)
-			printf("Permission denied.");
+			printf("Permission denied");
+		else if (errno == EINVAL)
+			printf("Invalid argument: buffer size is not a multiple"
+			    " of page size, or is too small/large");
 		printf("\n");
 		return (error);
 	}
@@ -499,7 +600,7 @@ hwt_mode_thread(struct trace_context *tc, char **cmd, char **env)
 	 */
 	tot_rec = 0;
 	do {
-		error = hwt_get_records(tc, &nrec);
+		error = hwt_get_records(tc, &nrec, 0);
 		if (error != 0 || nrec == 0)
 			break;
 		tot_rec += nrec;
@@ -511,13 +612,7 @@ hwt_mode_thread(struct trace_context *tc, char **cmd, char **env)
 		    "Failed to receive expected amount of HWT records.");
 	}
 
-	error = tc->trace_dev->methods->process(tc);
-	if (error) {
-		printf("Can't process data, error %d.\n", error);
-		return (error);
-	}
-
-	return (0);
+	return (hwt_process(tc));
 }
 
 static int
@@ -628,7 +723,10 @@ main(int argc, char **argv, char **env)
 			 * Name of dynamic lib or main executable for IP
 			 * address range filtering.
 			 */
-			tc->image_name = strdup(optarg);
+			tc->image_name = strdup(basename(optarg));
+			if (*tc->image_name == '.' || *tc->image_name == '/')
+				err(EX_USAGE,
+				    "Invalid executable path provided");
 			break;
 		case 'f':
 			/* Name of the func to trace. */

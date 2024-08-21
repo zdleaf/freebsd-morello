@@ -166,10 +166,10 @@ static bool gdb_active = false;
 struct gdb_reg {
 	enum vm_reg_name id;
 	int size;
-}
+};
 
 #ifdef __amd64__
-static const gdb_regset[] = {
+static const struct gdb_reg gdb_regset[] = {
 	{ .id = VM_REG_GUEST_RAX, .size = 8 },
 	{ .id = VM_REG_GUEST_RBX, .size = 8 },
 	{ .id = VM_REG_GUEST_RCX, .size = 8 },
@@ -212,7 +212,7 @@ static const gdb_regset[] = {
 	{ .id = VM_REG_GUEST_EFER, .size = 8 },
 };
 #else /* __aarch64__ */
-static const gdb_regset[] = {
+static const struct gdb_reg gdb_regset[] = {
 	{ .id = VM_REG_GUEST_X0, .size = 8 },
 	{ .id = VM_REG_GUEST_X1, .size = 8 },
 	{ .id = VM_REG_GUEST_X2, .size = 8 },
@@ -648,6 +648,28 @@ append_packet_data(const uint8_t *data, size_t len)
 		cur_csum += *data;
 		data++;
 		len--;
+	}
+}
+
+static void
+append_binary_data(const uint8_t *data, size_t len)
+{
+	uint8_t buf[2];
+
+	for (; len > 0; data++, len--) {
+		switch (*data) {
+		case '}':
+		case '#':
+		case '$':
+		case '*':
+			buf[0] = 0x7d;
+			buf[1] = *data ^ 0x20;
+			append_packet_data(buf, 2);
+			break;
+		default:
+			append_packet_data(data, 1);
+			break;
+		}
 	}
 }
 
@@ -1801,10 +1823,10 @@ gdb_query(const uint8_t *data, size_t len)
 			append_char('l');
 		} else if (doff + dlen >= xmllen) {
 			append_char('l');
-			append_packet_data(xml + doff, xmllen - doff);
+			append_binary_data(xml + doff, xmllen - doff);
 		} else {
 			append_char('m');
-			append_packet_data(xml + doff, dlen);
+			append_binary_data(xml + doff, dlen);
 		}
 		finish_packet();
 		(void)munmap(__DECONST(void *, xml), xmllen);
