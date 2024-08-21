@@ -51,6 +51,7 @@
 #include <sys/mutex.h>
 #include <sys/pcpu.h>
 #include <sys/proc.h>
+#include <sys/refcount.h>
 #include <sys/sched.h>
 #include <sys/smp.h>
 #include <sys/sysctl.h>
@@ -207,6 +208,7 @@ static uint64_t lapic_ipi_wait_mult;
 static int __read_mostly lapic_ds_idle_timeout = 1000000;
 #endif
 unsigned int max_apic_id;
+static int pcint_refcnt = 0;
 
 SYSCTL_NODE(_hw, OID_AUTO, apic, CTLFLAG_RD | CTLFLAG_MPSAFE, 0,
     "APIC options");
@@ -810,53 +812,22 @@ lapic_intrcnt(void *dummy __unused)
 SYSINIT(lapic_intrcnt, SI_SUB_INTR, SI_ORDER_MIDDLE, lapic_intrcnt, NULL);
 
 void
-lapic_reenable_pmc(void)
+lapic_reenable_pcint(void)
 {
-#ifdef HWPMC_HOOKS
+#if defined(HWPMC_HOOKS) || defined(HWT_HOOKS)
 	uint32_t value;
 
+	if (refcount_load(&pcint_refcnt) == 0)
+		return;
 	value = lapic_read32(LAPIC_LVT_PCINT);
 	value &= ~APIC_LVT_M;
 	lapic_write32(LAPIC_LVT_PCINT, value);
 #endif
 }
 
-#ifdef HWT_HOOKS
-
-void
-lapic_reenable_pt_pmi(void)
-{
-	uint32_t value;
-
-	value = lapic_read32(LAPIC_LVT_PCINT);
-	value &= ~APIC_LVT_M;
-	lapic_write32(LAPIC_LVT_PCINT, value);
-}
-
-void
-lapic_enable_pt_pmi(void)
-{
-        uint32_t value = 0;
-
-        value |= APIC_LVT_DM_NMI;
-        lapic_write32(LAPIC_LVT_PCINT, value);
-}
-
-void
-lapic_disable_pt_pmi(void)
-{
-        uint32_t value;
-
-        value = lapic_read32(LAPIC_LVT_PCINT);
-        value |= APIC_LVT_M;
-        lapic_write32(LAPIC_LVT_PCINT, value);
-}
-#endif
-
-
-#ifdef HWPMC_HOOKS
+#if defined(HWPMC_HOOKS) || defined(HWT_HOOKS)
 static void
-lapic_update_pmc(void *dummy)
+lapic_update_pcint(void *dummy)
 {
 	struct lapic *la;
 
@@ -892,9 +863,9 @@ lapic_calibrate_timer(void)
 }
 
 int
-lapic_enable_pmc(void)
+lapic_enable_pcint(void)
 {
-#ifdef HWPMC_HOOKS
+#if defined(HWPMC_HOOKS) || defined(HWT_HOOKS)
 	u_int32_t maxlvt;
 
 #ifdef DEV_ATPIC
@@ -907,11 +878,12 @@ lapic_enable_pmc(void)
 	maxlvt = (lapic_read32(LAPIC_VERSION) & APIC_VER_MAXLVT) >> MAXLVTSHIFT;
 	if (maxlvt < APIC_LVT_PMC)
 		return (0);
-
+	if (refcount_acquire(&pcint_refcnt) > 0)
+		return (1);
 	lvts[APIC_LVT_PMC].lvt_masked = 0;
 
 	MPASS(mp_ncpus == 1 || smp_started);
-	smp_rendezvous(NULL, lapic_update_pmc, NULL, NULL);
+	smp_rendezvous(NULL, lapic_update_pcint, NULL, NULL);
 	return (1);
 #else
 	return (0);
@@ -919,9 +891,9 @@ lapic_enable_pmc(void)
 }
 
 void
-lapic_disable_pmc(void)
+lapic_disable_pcint(void)
 {
-#ifdef HWPMC_HOOKS
+#if defined(HWPMC_HOOKS) || defined(HWT_HOOKS)
 	u_int32_t maxlvt;
 
 #ifdef DEV_ATPIC
@@ -934,14 +906,16 @@ lapic_disable_pmc(void)
 	maxlvt = (lapic_read32(LAPIC_VERSION) & APIC_VER_MAXLVT) >> MAXLVTSHIFT;
 	if (maxlvt < APIC_LVT_PMC)
 		return;
-
+	if (!refcount_release_if_not_last(&pcint_refcnt) &&
+	    refcount_release(&pcint_refcnt) != 0)
+		return;
 	lvts[APIC_LVT_PMC].lvt_masked = 1;
 
 #ifdef SMP
 	/* The APs should always be started when hwpmc is unloaded. */
 	KASSERT(mp_ncpus == 1 || smp_started, ("hwpmc unloaded too early"));
 #endif
-	smp_rendezvous(NULL, lapic_update_pmc, NULL, NULL);
+	smp_rendezvous(NULL, lapic_update_pcint, NULL, NULL);
 #endif
 }
 
